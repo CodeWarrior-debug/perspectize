@@ -61,6 +61,31 @@ openssl rand -base64 32
 - Admin user: CREATE, DROP, ALTER for migrations
 - Never use superuser for app connections
 
+### Local secret access for AI agents
+
+Claude Code (and any agent working in this repo) must never see real secret
+values. Enforcement:
+
+- **`.env*` files are unreadable**, except `.env.example` / `.env.test`, which
+  contain variable names and comments only.
+  - Read tool: `permissions.deny` rules in `.claude/settings.json`.
+  - Bash: `.claude/hooks/deny-env-read.sh` (PreToolUse) blocks any command that
+    references a protected `.env` file unless it is a safe metadata/lifecycle op
+    (`test`, `ls`, `stat`, `rm`, `git`, `cp SRC .env`, …). It is deny-by-default,
+    so an unusual read path is blocked rather than missed.
+- **`.env.example` is the source of truth** for which variables exist. Copy it to
+  `.env` and fill in real values by hand. Never paste a real value into
+  `.env.example` or any committed file.
+- **Secret-shaped test fixtures must be generated at runtime**, never hard-coded
+  — a literal like `whsec_…` / `sk_…` in source trips GitHub secret scanning
+  (see alert #1). Example: `webhook_handler_test.go` builds its svix secret from
+  `crypto/rand` per run.
+- **Self-verify runs as a real user without credentials**: `.claude/scripts/sv-chrome.sh`
+  launches Chrome against a persistent, pre-authenticated profile
+  (`.claude/sv-profile/`, gitignored + deny-listed). A human signs in once as a
+  dedicated throwaway test user; the agent only ever drives the already-logged-in
+  browser. See `.docs/VERIFICATION.md` §0.
+
 ## Secret Rotation
 
 ### JWT Secret Rotation

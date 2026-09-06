@@ -3302,9 +3302,18 @@ Signature verification uses the svix library's own signer: `svixwebhook.NewWebho
   	svixwebhook "github.com/svix/svix-webhooks/go"
   )
 
-  // testWebhookSecret is "whsec_" + 32 chars of valid standard base64, which is
-  // what svixwebhook.NewWebhook expects.
-  const testWebhookSecret = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+  // testWebhookSecret is generated fresh per run: "whsec_" + standard base64 of
+  // 24 random bytes, the shape svixwebhook.NewWebhook expects. Generated rather
+  // than hard-coded so no secret-shaped literal lives in the repo.
+  var testWebhookSecret = newTestWebhookSecret()
+
+  func newTestWebhookSecret() string {
+  	b := make([]byte, 24)
+  	if _, err := rand.Read(b); err != nil {
+  		panic("generate test webhook secret: " + err.Error())
+  	}
+  	return "whsec_" + base64.StdEncoding.EncodeToString(b)
+  }
 
   // signedWebhookRequest builds a POST carrying `body` with genuinely valid svix
   // signature headers for testWebhookSecret.

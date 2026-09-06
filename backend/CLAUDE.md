@@ -73,7 +73,10 @@ make docker-up / make docker-down / make docker-logs
 
 Two sources (precedence order): **env vars** > `config/config.json`.
 Required: `DATABASE_URL`. Optional: `YOUTUBE_API_KEY`, `DATABASE_PASSWORD`.
-See `.env.example`. Production note: Sevalla may require `?sslmode=disable`.
+See `.env.example` — it lists every variable by name (values blank on purpose).
+Copy it to `backend/.env` and fill in real values by hand; the agent cannot read
+`.env` (see [../.docs/SECURITY.md](../.docs/SECURITY.md)). Production note: Sevalla
+may require `?sslmode=disable`.
 
 **Sevalla build strategy:** Dockerfile builder. Dockerfile path = `backend/Dockerfile` (relative to repo root, not context). Docker context = `backend`. Sevalla requires the redundant `backend/` prefix on the Dockerfile path even though context is already `backend`.
 

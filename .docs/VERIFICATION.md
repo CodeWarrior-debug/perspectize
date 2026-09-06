@@ -2,6 +2,69 @@
 
 Before marking any work complete, run interactive verification.
 
+## 0. Authenticated session (one-time setup)
+
+Self-verify drives Chrome through a persistent, pre-authenticated profile so it
+can exercise logged-in flows (add a video, set a primary category) without the
+agent ever handling a credential. The secret is a revocable Clerk session cookie
+for a throwaway test user, living in a profile dir the agent cannot read.
+
+### a. Create the test user (one-time)
+
+The app runs a Clerk **development** instance locally (`sk_test` / `pk_test`),
+which supports test identities with no real inbox:
+
+```bash
+make start                                   # backend :8080 + frontend :5173
+bash .claude/scripts/sv-chrome.sh http://localhost:5173/
+```
+
+In that Chrome window, **Sign up**:
+- Email: `perspectize-sv+clerk_test@gmail.com` (any `+clerk_test` address —
+  Clerk dev instances intercept these)
+- Password: a real one, stored in a human password manager — never in the repo,
+  an `.env`, or the chat
+- Email verification code: `424242` (fixed code for `+clerk_test` on dev
+  instances)
+- Finish username onboarding, then load the app once while signed in so the
+  backend's just-in-time user creation (`clerk_middleware.go`) writes the local
+  `users` row. No Clerk webhook needed.
+
+Close Chrome. The session persists in `.claude/sv-profile/` (gitignored; covered
+by the `Read` deny rules in `.claude/settings.json`). Repeat only when the Clerk
+session expires.
+
+### b. Wire the chrome-devtools MCP to that profile
+
+`chrome-devtools-mcp` (v0.x) launches its own Chrome. Point it at the persistent
+profile so the agent's browser is already signed in. In `~/.claude.json` →
+`mcpServers.chrome-devtools.args`:
+
+```json
+"args": [
+  "chrome-devtools-mcp@latest",
+  "--userDataDir=/ABSOLUTE/PATH/TO/repo/.claude/sv-profile"
+]
+```
+
+Then **restart Claude Code** — the MCP reads its config only at startup.
+
+Notes:
+- `--userDataDir` (camelCase) is the current flag; `--isolated` already defaults
+  to `false`, but without `--userDataDir` the MCP uses
+  `~/.cache/chrome-devtools-mcp/chrome-profile*`, not this one.
+- This is a **global** MCP config edit — chrome-devtools in every project then
+  loads this profile. Revert by removing the arg.
+- The MCP-launched Chrome and a manual `sv-chrome.sh` **cannot run at the same
+  time** (same profile dir → SingletonLock). Use `sv-chrome.sh` only for the
+  one-time human sign-in; let the MCP own the browser after that.
+- Alternative: keep `sv-chrome.sh` running (it exposes `:9222`) and use
+  `--browserUrl=http://127.0.0.1:9222` instead of `--userDataDir`.
+
+**Agent rule:** assume the session is live. If you hit a signed-out state, STOP
+and ask the human to re-run the sign-in — never authenticate or enter
+credentials yourself.
+
 ## 1. Start Services
 
 The database is hosted on Sevalla (cloud PostgreSQL) — no Docker or local database setup needed.

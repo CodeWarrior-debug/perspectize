@@ -33,6 +33,10 @@ $RECYCLE.BIN/
 
 # Logs
 *.log
+logs/
+
+# Root `make start` detached-process bookkeeping
+.dev/
 
 # Vim
 *.swp
@@ -50,6 +54,9 @@ CLAUDE.local.md
 
 # Claude Code isolated worktrees (EnterWorktree tool, standardized location)
 .claude/worktrees/
+
+# Self-verify persistent Chrome profile (holds a logged-in session; never commit)
+.claude/sv-profile/
 
 # Private bug tracking (not for public exposure)
 .planning/phases/bugs/
