@@ -32,6 +32,58 @@
 
 ---
 
+## Backend Prerequisites (edit / delete / mute)
+
+Three features — **edit message**, **delete message**, and **mute thread** — require a backend PR that does not yet exist. The DB columns are already reserved (`messages.edited_at`, `messages.deleted_at`, `thread_participants.muted`), so no migration is needed. Everything else must be added.
+
+> **If the backend PR has not merged yet:** execute Tasks 1–22 in full. Tasks 23 and 24 are frontend-only and will type-check and unit-test without a live backend, but the new mutations will 404 at runtime until the backend ships.
+
+### Required backend changes (one PR against the messaging backend branch)
+
+**`backend/messaging.graphql` — schema additions**
+
+```graphql
+# New event variants
+type MessageEdited  { message: Message! }
+type MessageDeleted { messageId: ID!  threadId: ID! }
+
+# Extend the union (replace the existing declaration)
+union ThreadEvent =
+    MessagePosted | ReadReceiptChanged | TypingChanged
+  | ParticipantChanged | PresenceChanged | StreamReset
+  | MessageEdited | MessageDeleted
+
+# Field additions (extend existing types — gqlgen merges them)
+extend type Message       { editedAt: String }      # null until edited
+extend type MessageThread { muted:    Boolean! }    # maps to thread_participants.muted
+
+# New mutations
+extend type Mutation {
+  editMessage(messageId: ID!, body: String!): Message!        @auth
+  deleteMessage(messageId: ID!): Boolean!                     @auth
+  muteThread(threadId: ID!, muted: Boolean!): MessageThread!  @auth
+}
+```
+
+**Service layer (`internal/core/services/messaging_service.go`)**
+- `EditMessage(ctx, messageId, newBody)` — asserts caller is the original sender; enforces 8 KB cap; sets `edited_at = now()`; publishes `ThreadEventMessageEdited` via `PgNotifier`.
+- `DeleteMessage(ctx, messageId)` — asserts caller is the original sender; sets `deleted_at = now()`; publishes `ThreadEventMessageDeleted`.
+- `MuteThread(ctx, threadId, muted)` — no ownership check beyond participant; updates `thread_participants.muted`; returns the full `MessageThread`.
+
+**Repository**
+- `MessageRepository`: add `UpdateMessageBody(ctx, id, body, editedAt)` and `SoftDeleteMessage(ctx, id, deletedAt)`. `ListSince` and the history query must exclude rows where `deleted_at IS NOT NULL` (return a `MessageDeleted` event from the subscription instead; the frontend removes them locally).
+- `ThreadRepository`: add `SetMuted(ctx, threadId, userID, muted bool)`.
+
+**Realtime**
+- Add `ThreadEventMessageEdited` and `ThreadEventMessageDeleted` variants to the sealed `ThreadEvent` interface in `internal/core/domain/realtime.go`.
+- Hub fan-out and `PgNotifier` envelope handling must recognise the two new variants (same pattern as the six existing ones).
+
+**GraphQL resolvers**
+- Wire `EditMessage`, `DeleteMessage`, `MuteThread` resolver stubs to the service.
+- `threadEvents` subscription resolver must emit `MessageEdited` and `MessageDeleted` into the hub on the relevant events.
+
+---
+
 ## File Structure
 
 **New — WebSocket transport & subscription plumbing**
@@ -52,6 +104,9 @@
 - `src/lib/queries/hooks/useSetTyping.ts`
 - `src/lib/queries/hooks/useAddThreadParticipants.ts`
 - `src/lib/queries/hooks/useLeaveThread.ts`
+- `src/lib/queries/hooks/useEditMessage.ts` _(Task 23 — requires backend PR)_
+- `src/lib/queries/hooks/useDeleteMessage.ts` _(Task 23 — requires backend PR)_
+- `src/lib/queries/hooks/useMuteThread.ts` _(Task 23 — requires backend PR)_
 
 **New — subscription runes (wire cache ⇆ WS)**
 - `src/lib/messaging/useThreadStream.svelte.ts` — for the open thread: subscribe `threadEvents(threadId, sinceSeq)`, fold events into cache, expose `typingUsers` and `presence` reactive maps, handle `StreamReset` + reconnect resync.
@@ -584,6 +639,157 @@ git add src/lib/queries/messaging.ts frontend/tests/unit/queries-messaging.test.
 git commit -m "feat(messaging): add GraphQL documents and response types"
 ```
 
+### Addendum — edit / delete / mute additions (splice into the file created in Step 3)
+
+After the existing interface definitions, add:
+
+```ts
+// Extend Message with editedAt
+// (replace the existing Message interface body — add the editedAt field)
+export interface Message {
+	id: string;
+	threadId: string;
+	sender: MessagingUser;
+	seq: number;
+	body: string;
+	editedAt: string | null;   // ← NEW; null until the sender edits
+	createdAt: string;
+}
+
+// Extend MessageThread with muted
+// (replace the existing MessageThread interface body — add the muted field)
+export interface MessageThread {
+	id: string;
+	title: string | null;
+	participants: ThreadParticipant[];
+	lastMessageAt: string;
+	latestSeq: number;
+	myLastReadSeq: number;
+	unreadCount: number;
+	muted: boolean;            // ← NEW; maps to thread_participants.muted
+	createdAt: string;
+}
+
+// New response interfaces
+export interface EditMessageResponse   { editMessage: Message }
+export interface DeleteMessageResponse { deleteMessage: boolean }
+export interface MuteThreadResponse    { muteThread: MessageThread }
+```
+
+Extend `MESSAGE_FIELDS` to include `editedAt` (so every document that uses the fragment picks it up):
+
+```ts
+const MESSAGE_FIELDS = `
+	id
+	threadId
+	seq
+	body
+	editedAt
+	createdAt
+	sender { ${USER_FIELDS} }
+`;
+```
+
+Extend `THREAD_FIELDS` to include `muted`:
+
+```ts
+const THREAD_FIELDS = `
+	id
+	title
+	lastMessageAt
+	latestSeq
+	myLastReadSeq
+	unreadCount
+	muted
+	createdAt
+	participants {
+		user { ${USER_FIELDS} }
+		role
+		lastReadSeq
+		joinedAt
+	}
+`;
+```
+
+Add new mutation documents:
+
+```ts
+export const EDIT_MESSAGE = gql`
+	mutation EditMessage($messageId: ID!, $body: String!) {
+		editMessage(messageId: $messageId, body: $body) {
+			${MESSAGE_FIELDS}
+		}
+	}
+`;
+
+export const DELETE_MESSAGE = gql`
+	mutation DeleteMessage($messageId: ID!) {
+		deleteMessage(messageId: $messageId)
+	}
+`;
+
+export const MUTE_THREAD = gql`
+	mutation MuteThread($threadId: ID!, $muted: Boolean!) {
+		muteThread(threadId: $threadId, muted: $muted) {
+			${THREAD_FIELDS}
+		}
+	}
+`;
+```
+
+Extend `THREAD_EVENTS_SUBSCRIPTION` to include the two new union fragments. Replace the existing document:
+
+```ts
+export const THREAD_EVENTS_SUBSCRIPTION = gql`
+	subscription ThreadEvents($threadId: ID!, $sinceSeq: IntID) {
+		threadEvents(threadId: $threadId, sinceSeq: $sinceSeq) {
+			__typename
+			... on MessagePosted     { message { ${MESSAGE_FIELDS} } }
+			... on ReadReceiptChanged { threadId userId lastReadSeq }
+			... on TypingChanged      { threadId userId typing }
+			... on ParticipantChanged { threadId userId change }
+			... on PresenceChanged    { threadId userId state }
+			... on StreamReset        { threadId }
+			... on MessageEdited      { message { ${MESSAGE_FIELDS} } }
+			... on MessageDeleted     { messageId threadId }
+		}
+	}
+`;
+```
+
+**Additional tests to add to `frontend/tests/unit/queries-messaging.test.ts`:**
+
+```ts
+it('editMessage mutation requests the MESSAGE_FIELDS fragment including editedAt', () => {
+	expect(EDIT_MESSAGE).toContain('mutation EditMessage');
+	expect(EDIT_MESSAGE).toContain('$messageId: ID!');
+	expect(EDIT_MESSAGE).toContain('editedAt');
+});
+
+it('deleteMessage mutation names its operation', () => {
+	expect(DELETE_MESSAGE).toContain('mutation DeleteMessage');
+	expect(DELETE_MESSAGE).toContain('$messageId: ID!');
+});
+
+it('muteThread mutation returns a full thread including muted field', () => {
+	expect(MUTE_THREAD).toContain('mutation MuteThread');
+	expect(MUTE_THREAD).toContain('muted');
+});
+
+it('threadEvents subscription includes MessageEdited and MessageDeleted fragments', () => {
+	expect(THREAD_EVENTS_SUBSCRIPTION).toContain('... on MessageEdited');
+	expect(THREAD_EVENTS_SUBSCRIPTION).toContain('... on MessageDeleted');
+	expect(THREAD_EVENTS_SUBSCRIPTION).toContain('messageId');
+});
+```
+
+Update the commit step to include the extended tests:
+
+```bash
+git add src/lib/queries/messaging.ts frontend/tests/unit/queries-messaging.test.ts
+git commit -m "feat(messaging): add edit/delete/mute documents and extend Message/MessageThread types"
+```
+
 ---
 ## Task 4: Event types + thread-cache reducers (`events.ts`, `threadCache.ts`)
 
@@ -1037,6 +1243,134 @@ Expected: PASS (18 tests).
 ```bash
 git add src/lib/messaging/events.ts src/lib/messaging/threadCache.ts frontend/tests/unit/messaging-threadCache.test.ts
 git commit -m "feat(messaging): thread-event types and pure cache reducers"
+```
+
+### Addendum — edit / delete event types and reducers (splice into files created in Steps 3 & 4)
+
+**`src/lib/messaging/events.ts` — add two new event interfaces and extend the union:**
+
+```ts
+export interface MessageEditedEvent {
+	__typename: 'MessageEdited';
+	message: Message;          // full message with updated body and editedAt
+}
+export interface MessageDeletedEvent {
+	__typename: 'MessageDeleted';
+	messageId: string;
+	threadId: string;
+}
+
+// Replace the ThreadEvent union to include the new members
+export type ThreadEvent =
+	| MessagePostedEvent
+	| ReadReceiptChangedEvent
+	| TypingChangedEvent
+	| ParticipantChangedEvent
+	| PresenceChangedEvent
+	| StreamResetEvent
+	| MessageEditedEvent
+	| MessageDeletedEvent;
+```
+
+Also extend `ThreadEventTypename`:
+
+```ts
+export type ThreadEventTypename =
+	| 'MessagePosted' | 'ReadReceiptChanged' | 'TypingChanged'
+	| 'ParticipantChanged' | 'PresenceChanged' | 'StreamReset'
+	| 'MessageEdited' | 'MessageDeleted';
+```
+
+**`src/lib/messaging/threadCache.ts` — add two new exported functions and extend the switch:**
+
+```ts
+/** Replace a message in the list by id with updated body + editedAt. Returns the same ref when nothing changed. */
+export function applyMessageEdited(
+	cache: ThreadMessagesCache,
+	message: Message,
+): ThreadMessagesCache {
+	const idx = cache.items.findIndex((m) => m.id === message.id);
+	if (idx === -1) return cache;
+	if (cache.items[idx].body === message.body && cache.items[idx].editedAt === message.editedAt) {
+		return cache;
+	}
+	const items = [...cache.items];
+	items[idx] = message;
+	return { ...cache, items };
+}
+
+/** Remove a message from the list by id. Returns the same ref when not found. */
+export function applyMessageDeleted(
+	cache: ThreadMessagesCache,
+	messageId: string,
+): ThreadMessagesCache {
+	const idx = cache.items.findIndex((m) => m.id === messageId);
+	if (idx === -1) return cache;
+	const items = cache.items.filter((m) => m.id !== messageId);
+	return { ...cache, items };
+}
+```
+
+Extend the `applyThreadEventToThread` switch with two new cases (insert before the `default` branch):
+
+```ts
+case 'MessageEdited': {
+	// No thread-level summary fields change on edit; return unchanged.
+	return thread;
+}
+case 'MessageDeleted': {
+	// If the deleted message was the latest, latestSeq is now stale —
+	// a refetch will correct it. For now return unchanged; the inbox
+	// subscription will update unreadCount on the next MessagePosted.
+	return thread;
+}
+```
+
+**Additional tests to add to `frontend/tests/unit/messaging-threadCache.test.ts`:**
+
+```ts
+describe('threadCache — edit and delete', () => {
+	it('applyMessageEdited replaces body and editedAt for a known id', () => {
+		const orig = msg(7, { body: 'old', editedAt: null });
+		let c = seedFromApiPage([orig], pageInfo());
+		const edited = { ...orig, body: 'new body', editedAt: '2026-09-07T14:00:00Z' };
+		c = applyMessageEdited(c, edited);
+		expect(c.items[0].body).toBe('new body');
+		expect(c.items[0].editedAt).toBe('2026-09-07T14:00:00Z');
+	});
+
+	it('applyMessageEdited returns the same ref when the message is not present', () => {
+		const c = seedFromApiPage([msg(7)], pageInfo());
+		expect(applyMessageEdited(c, msg(99, { body: 'x' }))).toBe(c);
+	});
+
+	it('applyMessageDeleted removes the message by id', () => {
+		let c = seedFromApiPage([msg(7), msg(8)], pageInfo());
+		c = applyMessageDeleted(c, 'm7');
+		expect(c.items.map((m) => m.seq)).toEqual([8]);
+	});
+
+	it('applyMessageDeleted returns the same ref when the id is not present', () => {
+		const c = seedFromApiPage([msg(7)], pageInfo());
+		expect(applyMessageDeleted(c, 'no-such-id')).toBe(c);
+	});
+});
+```
+
+> **Note:** the `msg` helper in the test file uses `id: \`m\${seq}\`` — that matches the ids used above. If `Message.editedAt` was not part of the original helper, extend it:
+> ```ts
+> const msg = (seq: number, over: Partial<Message> = {}): Message => ({
+>   ...,
+>   editedAt: null,   // ← add this line
+>   ...over,
+> });
+> ```
+
+Update the commit to include both files:
+
+```bash
+git add src/lib/messaging/events.ts src/lib/messaging/threadCache.ts frontend/tests/unit/messaging-threadCache.test.ts
+git commit -m "feat(messaging): MessageEdited/MessageDeleted events and cache reducers"
 ```
 
 ---
@@ -2509,6 +2843,363 @@ git commit -m "feat(messaging): typing / add-participants / leave-thread hooks"
 ```
 
 ---
+
+## Task 23: Mutation hooks — edit, delete, mute _(requires backend PR)_
+
+**Files:**
+- Create: `src/lib/queries/hooks/useEditMessage.ts`
+- Create: `src/lib/queries/hooks/useDeleteMessage.ts`
+- Create: `src/lib/queries/hooks/useMuteThread.ts`
+- Test: `frontend/tests/unit/hooks-useEditMessage.test.ts`
+- Test: `frontend/tests/unit/hooks-useDeleteMessage.test.ts`
+- Test: `frontend/tests/unit/hooks-useMuteThread.test.ts`
+
+**Interfaces:**
+- Consumes: `graphqlRequest` (`$lib/queries/client`); `EDIT_MESSAGE`, `DELETE_MESSAGE`, `MUTE_THREAD`, response types (`$lib/queries/messaging`); `queryKeys`; `applyMessageEdited`, `applyMessageDeleted`, `ThreadMessagesCache` (`$lib/messaging/threadCache`); `createMutation`, `useQueryClient`; `toast` (`svelte-sonner`).
+- Produces:
+  - `useEditMessage()` → `createMutation`. `mutate` takes `{ messageId: string; threadId: string; body: string; previousBody: string }`.
+    - `onMutate(args)`: optimistically sets `queryKeys.messaging.messages.list(threadId)` via `setQueryData` → `applyMessageEdited(cache, { ...existing_item, body: args.body, editedAt: new Date().toISOString() })` where `existing_item` is found by `messageId`. Returns `{ previousBody: args.previousBody }` as context for rollback.
+    - `mutationFn(args)` → `graphqlRequest<EditMessageResponse>(EDIT_MESSAGE, { messageId: args.messageId, body: args.body.trim() })`.
+    - `onSuccess(data, args)` → `setQueryData(key, (c) => c ? applyMessageEdited(c, data.editMessage) : c)` (reconciles server `editedAt`).
+    - `onError(_e, args, ctx)` → rolls back via `setQueryData` using `ctx.previousBody`; `toast.error('Could not edit message')`.
+  - `useDeleteMessage()` → `createMutation`. `mutate` takes `{ messageId: string; threadId: string }`.
+    - `onMutate(args)`: optimistically removes from `queryKeys.messaging.messages.list(threadId)` via `applyMessageDeleted(cache, args.messageId)`.
+    - `mutationFn(args)` → `graphqlRequest<DeleteMessageResponse>(DELETE_MESSAGE, { messageId: args.messageId })`.
+    - `onError(_e, args)` → `queryClient.invalidateQueries({ queryKey: queryKeys.messaging.messages.list(args.threadId) })` (refetch restores the row); `toast.error('Could not delete message')`.
+    - No `onSuccess` needed — the subscription's `MessageDeleted` event is the authoritative source; if the subscription is live, it already applied `applyMessageDeleted`; if not, the optimistic removal stands.
+  - `useMuteThread()` → `createMutation`. `mutate` takes `{ threadId: string; muted: boolean }`.
+    - `mutationFn(args)` → `graphqlRequest<MuteThreadResponse>(MUTE_THREAD, { threadId: args.threadId, muted: args.muted })`.
+    - `onSuccess(data)` → `queryClient.setQueryData(queryKeys.messaging.threads.detail(data.muteThread.id), data.muteThread)` then invalidate `queryKeys.messaging.threads.lists()` with `refetchType: 'none'`.
+    - `onError` → `toast.error(args.muted ? 'Could not mute thread' : 'Could not unmute thread')`.
+
+- [ ] **Step 1: Write the failing tests**
+
+```ts
+// frontend/tests/unit/hooks-useEditMessage.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+	mockGraphql: vi.fn(),
+	mockSetQueryData: vi.fn(),
+	mockToastError: vi.fn(),
+	captured: undefined as any,
+}));
+
+vi.mock('@tanstack/svelte-query', () => ({
+	createMutation: vi.fn((fn: () => any) => {
+		mocks.captured = fn();
+		return { mutate: vi.fn(), isPending: false };
+	}),
+	useQueryClient: vi.fn(() => ({ setQueryData: mocks.mockSetQueryData })),
+}));
+vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
+vi.mock('svelte-sonner', () => ({ toast: { error: mocks.mockToastError, success: vi.fn() } }));
+
+import { useEditMessage } from '$lib/queries/hooks/useEditMessage';
+import { EDIT_MESSAGE } from '$lib/queries/messaging';
+import { queryKeys } from '$lib/queries/keys';
+
+const sender = { id: 'u1', username: 'me' };
+const existingMsg = { id: 'm7', threadId: 't1', sender, seq: 7, body: 'old', editedAt: null, createdAt: 'x' };
+const existingCache = { items: [existingMsg], oldestLoadedSeq: 7, hasMoreOlder: false };
+
+describe('useEditMessage', () => {
+	beforeEach(() => vi.clearAllMocks());
+
+	it('onMutate optimistically updates the message body', () => {
+		useEditMessage();
+		mocks.captured.onMutate({ messageId: 'm7', threadId: 't1', body: 'new body', previousBody: 'old' });
+		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(
+			queryKeys.messaging.messages.list('t1'),
+			expect.any(Function),
+		);
+		const updater = mocks.mockSetQueryData.mock.calls[0][1];
+		const next = updater(existingCache);
+		expect(next.items[0].body).toBe('new body');
+		expect(next.items[0].editedAt).not.toBeNull();
+	});
+
+	it('mutationFn sends EDIT_MESSAGE with trimmed body', async () => {
+		useEditMessage();
+		mocks.mockGraphql.mockResolvedValue({ editMessage: { ...existingMsg, body: 'new body', editedAt: '2026-09-07T14:00:00Z' } });
+		await mocks.captured.mutationFn({ messageId: 'm7', threadId: 't1', body: '  new body  ', previousBody: 'old' });
+		expect(mocks.mockGraphql).toHaveBeenCalledWith(EDIT_MESSAGE, { messageId: 'm7', body: 'new body' });
+	});
+
+	it('onError rolls back to the previousBody and toasts', () => {
+		useEditMessage();
+		mocks.captured.onError(new Error('x'), { messageId: 'm7', threadId: 't1', body: 'new', previousBody: 'old' }, {});
+		const updater = mocks.mockSetQueryData.mock.calls[0][1];
+		const next = updater({ items: [{ ...existingMsg, body: 'new' }], oldestLoadedSeq: 7, hasMoreOlder: false });
+		expect(next.items[0].body).toBe('old');
+		expect(mocks.mockToastError).toHaveBeenCalled();
+	});
+});
+```
+
+```ts
+// frontend/tests/unit/hooks-useDeleteMessage.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+	mockGraphql: vi.fn(),
+	mockSetQueryData: vi.fn(),
+	mockInvalidate: vi.fn(),
+	mockToastError: vi.fn(),
+	captured: undefined as any,
+}));
+
+vi.mock('@tanstack/svelte-query', () => ({
+	createMutation: vi.fn((fn: () => any) => {
+		mocks.captured = fn();
+		return { mutate: vi.fn() };
+	}),
+	useQueryClient: vi.fn(() => ({ setQueryData: mocks.mockSetQueryData, invalidateQueries: mocks.mockInvalidate })),
+}));
+vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
+vi.mock('svelte-sonner', () => ({ toast: { error: mocks.mockToastError, success: vi.fn() } }));
+
+import { useDeleteMessage } from '$lib/queries/hooks/useDeleteMessage';
+import { DELETE_MESSAGE } from '$lib/queries/messaging';
+import { queryKeys } from '$lib/queries/keys';
+
+describe('useDeleteMessage', () => {
+	beforeEach(() => vi.clearAllMocks());
+
+	it('onMutate optimistically removes the message from the list', () => {
+		useDeleteMessage();
+		mocks.captured.onMutate({ messageId: 'm7', threadId: 't1' });
+		const updater = mocks.mockSetQueryData.mock.calls[0][1];
+		const next = updater({
+			items: [
+				{ id: 'm7', seq: 7 },
+				{ id: 'm8', seq: 8 },
+			],
+			oldestLoadedSeq: 7,
+			hasMoreOlder: false,
+		});
+		expect(next.items.map((m: any) => m.id)).toEqual(['m8']);
+	});
+
+	it('mutationFn calls DELETE_MESSAGE', async () => {
+		useDeleteMessage();
+		mocks.mockGraphql.mockResolvedValue({ deleteMessage: true });
+		await mocks.captured.mutationFn({ messageId: 'm7', threadId: 't1' });
+		expect(mocks.mockGraphql).toHaveBeenCalledWith(DELETE_MESSAGE, { messageId: 'm7' });
+	});
+
+	it('onError invalidates the message list and toasts', () => {
+		useDeleteMessage();
+		mocks.captured.onError(new Error('fail'), { messageId: 'm7', threadId: 't1' });
+		expect(mocks.mockInvalidate).toHaveBeenCalledWith({
+			queryKey: queryKeys.messaging.messages.list('t1'),
+		});
+		expect(mocks.mockToastError).toHaveBeenCalled();
+	});
+});
+```
+
+```ts
+// frontend/tests/unit/hooks-useMuteThread.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+	mockGraphql: vi.fn(),
+	mockSetQueryData: vi.fn(),
+	mockInvalidate: vi.fn(),
+	mockToastError: vi.fn(),
+	captured: undefined as any,
+}));
+
+vi.mock('@tanstack/svelte-query', () => ({
+	createMutation: vi.fn((fn: () => any) => {
+		mocks.captured = fn();
+		return { mutate: vi.fn() };
+	}),
+	useQueryClient: vi.fn(() => ({ setQueryData: mocks.mockSetQueryData, invalidateQueries: mocks.mockInvalidate })),
+}));
+vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
+vi.mock('svelte-sonner', () => ({ toast: { error: mocks.mockToastError, success: vi.fn() } }));
+
+import { useMuteThread } from '$lib/queries/hooks/useMuteThread';
+import { MUTE_THREAD } from '$lib/queries/messaging';
+import { queryKeys } from '$lib/queries/keys';
+
+const thread = { id: 't1', title: null, participants: [], lastMessageAt: 'x', latestSeq: 0, myLastReadSeq: 0, unreadCount: 0, muted: true, createdAt: 'x' };
+
+describe('useMuteThread', () => {
+	beforeEach(() => vi.clearAllMocks());
+
+	it('mutationFn calls MUTE_THREAD with the given muted flag', async () => {
+		useMuteThread();
+		mocks.mockGraphql.mockResolvedValue({ muteThread: thread });
+		await mocks.captured.mutationFn({ threadId: 't1', muted: true });
+		expect(mocks.mockGraphql).toHaveBeenCalledWith(MUTE_THREAD, { threadId: 't1', muted: true });
+	});
+
+	it('onSuccess writes the thread detail and invalidates the list without refetching', () => {
+		useMuteThread();
+		mocks.captured.onSuccess({ muteThread: thread }, { threadId: 't1', muted: true });
+		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(
+			queryKeys.messaging.threads.detail('t1'),
+			thread,
+		);
+		expect(mocks.mockInvalidate).toHaveBeenCalledWith({
+			queryKey: queryKeys.messaging.threads.lists(),
+			refetchType: 'none',
+		});
+	});
+
+	it('onError toasts with the direction-aware message', () => {
+		useMuteThread();
+		mocks.captured.onError(new Error('fail'), { threadId: 't1', muted: true });
+		expect(mocks.mockToastError).toHaveBeenCalledWith('Could not mute thread');
+		vi.clearAllMocks();
+		mocks.captured.onError(new Error('fail'), { threadId: 't1', muted: false });
+		expect(mocks.mockToastError).toHaveBeenCalledWith('Could not unmute thread');
+	});
+});
+```
+
+- [ ] **Step 2: Run them, expect failure**
+
+Run: `cd frontend && pnpm run test:run -- hooks-useEditMessage hooks-useDeleteMessage hooks-useMuteThread`
+Expected: FAIL — modules not found.
+
+- [ ] **Step 3: Create `src/lib/queries/hooks/useEditMessage.ts`**
+
+```ts
+import { createMutation, useQueryClient } from '@tanstack/svelte-query';
+import { graphqlRequest } from '../client';
+import { EDIT_MESSAGE, type EditMessageResponse } from '../messaging';
+import { queryKeys } from '../keys';
+import { applyMessageEdited, type ThreadMessagesCache } from '$lib/messaging/threadCache';
+import { toast } from 'svelte-sonner';
+
+export function useEditMessage() {
+	const queryClient = useQueryClient();
+
+	return createMutation(() => ({
+		mutationFn: async (args: { messageId: string; threadId: string; body: string; previousBody: string }) => {
+			return graphqlRequest<EditMessageResponse>(EDIT_MESSAGE, {
+				messageId: args.messageId,
+				body: args.body.trim(),
+			});
+		},
+		onMutate: (args) => {
+			const key = queryKeys.messaging.messages.list(args.threadId);
+			queryClient.setQueryData<ThreadMessagesCache>(key, (cache) => {
+				if (!cache) return cache;
+				const existing = cache.items.find((m) => m.id === args.messageId);
+				if (!existing) return cache;
+				return applyMessageEdited(cache, {
+					...existing,
+					body: args.body.trim(),
+					editedAt: new Date().toISOString(),
+				});
+			});
+			return { previousBody: args.previousBody };
+		},
+		onSuccess: (data, args) => {
+			const key = queryKeys.messaging.messages.list(args.threadId);
+			queryClient.setQueryData<ThreadMessagesCache>(key, (cache) =>
+				cache ? applyMessageEdited(cache, data.editMessage) : cache,
+			);
+		},
+		onError: (_err, args, _ctx) => {
+			const key = queryKeys.messaging.messages.list(args.threadId);
+			queryClient.setQueryData<ThreadMessagesCache>(key, (cache) => {
+				if (!cache) return cache;
+				const existing = cache.items.find((m) => m.id === args.messageId);
+				if (!existing) return cache;
+				return applyMessageEdited(cache, { ...existing, body: args.previousBody });
+			});
+			toast.error('Could not edit message');
+		},
+	}));
+}
+```
+
+- [ ] **Step 4: Create `src/lib/queries/hooks/useDeleteMessage.ts`**
+
+```ts
+import { createMutation, useQueryClient } from '@tanstack/svelte-query';
+import { graphqlRequest } from '../client';
+import { DELETE_MESSAGE, type DeleteMessageResponse } from '../messaging';
+import { queryKeys } from '../keys';
+import { applyMessageDeleted, type ThreadMessagesCache } from '$lib/messaging/threadCache';
+import { toast } from 'svelte-sonner';
+
+export function useDeleteMessage() {
+	const queryClient = useQueryClient();
+
+	return createMutation(() => ({
+		mutationFn: (args: { messageId: string; threadId: string }) =>
+			graphqlRequest<DeleteMessageResponse>(DELETE_MESSAGE, { messageId: args.messageId }),
+		onMutate: (args) => {
+			queryClient.setQueryData<ThreadMessagesCache>(
+				queryKeys.messaging.messages.list(args.threadId),
+				(cache) => (cache ? applyMessageDeleted(cache, args.messageId) : cache),
+			);
+		},
+		onError: (_err, args) => {
+			// Invalidate so the refetch restores the deleted row in the UI.
+			queryClient.invalidateQueries({ queryKey: queryKeys.messaging.messages.list(args.threadId) });
+			toast.error('Could not delete message');
+		},
+	}));
+}
+```
+
+- [ ] **Step 5: Create `src/lib/queries/hooks/useMuteThread.ts`**
+
+```ts
+import { createMutation, useQueryClient } from '@tanstack/svelte-query';
+import { graphqlRequest } from '../client';
+import { MUTE_THREAD, type MuteThreadResponse } from '../messaging';
+import { queryKeys } from '../keys';
+import { toast } from 'svelte-sonner';
+
+export function useMuteThread() {
+	const queryClient = useQueryClient();
+
+	return createMutation(() => ({
+		mutationFn: (args: { threadId: string; muted: boolean }) =>
+			graphqlRequest<MuteThreadResponse>(MUTE_THREAD, {
+				threadId: args.threadId,
+				muted: args.muted,
+			}),
+		onSuccess: (data) => {
+			queryClient.setQueryData(
+				queryKeys.messaging.threads.detail(data.muteThread.id),
+				data.muteThread,
+			);
+			queryClient.invalidateQueries({
+				queryKey: queryKeys.messaging.threads.lists(),
+				refetchType: 'none',
+			});
+		},
+		onError: (_err, args) => {
+			toast.error(args.muted ? 'Could not mute thread' : 'Could not unmute thread');
+		},
+	}));
+}
+```
+
+- [ ] **Step 6: Run tests, expect pass**
+
+Run: `cd frontend && pnpm run test:run -- hooks-useEditMessage hooks-useDeleteMessage hooks-useMuteThread`
+Expected: PASS (9 tests).
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/lib/queries/hooks/useEditMessage.ts src/lib/queries/hooks/useDeleteMessage.ts src/lib/queries/hooks/useMuteThread.ts frontend/tests/unit/hooks-useEditMessage.test.ts frontend/tests/unit/hooks-useDeleteMessage.test.ts frontend/tests/unit/hooks-useMuteThread.test.ts
+git commit -m "feat(messaging): edit/delete/mute mutation hooks"
+```
+
+---
+
 ## Task 12: Inbox subscription rune (`useInboxStream.svelte.ts`)
 
 **Files:**
@@ -4567,6 +5258,305 @@ git commit -m "feat(messaging): header link with unread badge and inbox stream m
 
 ---
 
+## Task 24: Edit/delete UI + mute toggle _(requires backend PR + Task 23)_
+
+**Files (all existing — amend only):**
+- Modify: `src/lib/components/messaging/MessageBubble.svelte`
+- Modify: `src/lib/components/messaging/MessageComposer.svelte`
+- Modify: `src/lib/components/messaging/ThreadListItem.svelte`
+- Modify: `src/routes/messages/[threadId]/+page.svelte`
+- Modify: `src/routes/messages/+layout.svelte` (pass `useMuteThread` down or co-locate)
+- Test: `frontend/tests/components/MessageBubble.test.ts` (extend)
+- Test: `frontend/tests/components/MessageComposer.test.ts` (extend)
+- Test: `frontend/tests/components/ThreadListItem.test.ts` (extend)
+
+**Interfaces consumed:**
+- `useEditMessage`, `useDeleteMessage` from `$lib/queries/hooks/useEditMessage` / `useDeleteMessage`.
+- `useMuteThread` from `$lib/queries/hooks/useMuteThread`.
+- `applyMessageEdited`, `applyMessageDeleted` already wired into the cache via hooks.
+- `BellIcon`, `BellOffIcon`, `PencilIcon`, `Trash2Icon`, `CheckIcon`, `XIcon` from `@lucide/svelte/icons/*`.
+
+**Design rules:**
+- Edit and delete actions appear **only on the viewer's own messages** (`message.sender.id === currentUser.id`).
+- Actions surface on hover (desktop) via an absolutely-positioned action row above the bubble — not a modal context menu (avoids extra dependency).
+- Mute toggle lives in a `⋮` overflow menu on `ThreadListItem` (reuse the pattern if one exists; otherwise a simple `<details>` / popover button).
+- Muted threads render a `BellOffIcon` next to the thread title in `ThreadListItem`. No other visual change.
+- Editing uses inline replacement of the bubble body with a `<textarea>` pre-filled with the current body; Escape cancels, Enter (without Shift) or a ✓ button confirms.
+- Delete requires **no confirmation dialog** for v1 (optimistic remove is immediate). Add a brief `toast('Message deleted')` so the action is reversible in user perception (future undo hook).
+
+- [ ] **Step 1: Amend `MessageBubble.svelte`**
+
+Add these props alongside the existing ones:
+
+```svelte
+<script lang="ts">
+  import type { Message, MessagingUser } from '$lib/queries/messaging';
+  import PencilIcon from '@lucide/svelte/icons/pencil';
+  import Trash2Icon from '@lucide/svelte/icons/trash-2';
+  import CheckIcon from '@lucide/svelte/icons/check';
+  import XIcon from '@lucide/svelte/icons/x';
+  import { toast } from 'svelte-sonner';
+
+  interface Props {
+    message: Message;
+    currentUser: MessagingUser;
+    onEdit: (messageId: string, threadId: string, newBody: string, previousBody: string) => void;
+    onDelete: (messageId: string, threadId: string) => void;
+    // ...existing props (isOptimistic, readBy, etc.)
+  }
+
+  let { message, currentUser, onEdit, onDelete, ...rest }: Props = $props();
+
+  const isOwn = $derived(message.sender.id === currentUser.id);
+  let editing = $state(false);
+  let editBody = $state('');
+
+  function startEdit() {
+    editBody = message.body;
+    editing = true;
+  }
+
+  function cancelEdit() {
+    editing = false;
+  }
+
+  function confirmEdit() {
+    const trimmed = editBody.trim();
+    if (trimmed && trimmed !== message.body) {
+      onEdit(message.id, message.threadId, trimmed, message.body);
+    }
+    editing = false;
+  }
+
+  function handleEditKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirmEdit(); }
+    if (e.key === 'Escape') { cancelEdit(); }
+  }
+
+  function handleDelete() {
+    onDelete(message.id, message.threadId);
+    toast('Message deleted');
+  }
+</script>
+
+<!-- In the bubble template, replace the body section with: -->
+{#if editing}
+  <div class="flex flex-col gap-1">
+    <textarea
+      class="w-full resize-none rounded border border-border bg-background px-2 py-1 text-sm focus:outline-none"
+      rows={2}
+      bind:value={editBody}
+      onkeydown={handleEditKeydown}
+      aria-label="Edit message"
+    ></textarea>
+    <div class="flex gap-1">
+      <button onclick={confirmEdit} aria-label="Confirm edit" class="text-primary hover:opacity-80">
+        <CheckIcon size={14} />
+      </button>
+      <button onclick={cancelEdit} aria-label="Cancel edit" class="text-muted-foreground hover:opacity-80">
+        <XIcon size={14} />
+      </button>
+    </div>
+  </div>
+{:else}
+  <p class="text-sm break-words whitespace-pre-wrap">{message.body}</p>
+  {#if message.editedAt}
+    <span class="text-xs text-muted-foreground">(edited)</span>
+  {/if}
+{/if}
+
+<!-- Action row (own messages only, visible on group hover via CSS) -->
+{#if isOwn && !editing}
+  <div class="absolute -top-6 right-0 hidden group-hover:flex items-center gap-1 bg-background border border-border rounded px-1 py-0.5 shadow-sm">
+    <button onclick={startEdit} aria-label="Edit message" class="text-muted-foreground hover:text-foreground">
+      <PencilIcon size={14} />
+    </button>
+    <button onclick={handleDelete} aria-label="Delete message" class="text-muted-foreground hover:text-destructive">
+      <Trash2Icon size={14} />
+    </button>
+  </div>
+{/if}
+```
+
+Add `group relative` to the bubble's outermost wrapper element so the action row appears on hover.
+
+- [ ] **Step 2: Amend `MessageComposer.svelte`**
+
+No changes needed. The composer is only for new messages; edit uses the inline `<textarea>` in `MessageBubble`. Confirm the composer does **not** intercept the `editing` state — they are independent.
+
+- [ ] **Step 3: Wire edit/delete hooks in `[threadId]/+page.svelte`**
+
+```svelte
+<script lang="ts">
+  import { useEditMessage } from '$lib/queries/hooks/useEditMessage';
+  import { useDeleteMessage } from '$lib/queries/hooks/useDeleteMessage';
+  // ... existing imports
+
+  const editMutation = useEditMessage();
+  const deleteMutation = useDeleteMessage();
+
+  function handleEdit(messageId: string, threadId: string, newBody: string, previousBody: string) {
+    editMutation.mutate({ messageId, threadId, body: newBody, previousBody });
+  }
+
+  function handleDelete(messageId: string, threadId: string) {
+    deleteMutation.mutate({ messageId, threadId });
+  }
+</script>
+
+<!-- Pass the callbacks into ThreadView, which passes them to each MessageBubble -->
+<ThreadView
+  {threadId}
+  currentUser={...}
+  onEditMessage={handleEdit}
+  onDeleteMessage={handleDelete}
+/>
+```
+
+`ThreadView.svelte` must forward `onEditMessage` and `onDeleteMessage` to each `MessageBubble` it renders.
+
+- [ ] **Step 4: Amend `ThreadListItem.svelte` — mute toggle**
+
+```svelte
+<script lang="ts">
+  import BellIcon from '@lucide/svelte/icons/bell';
+  import BellOffIcon from '@lucide/svelte/icons/bell-off';
+  import { useMuteThread } from '$lib/queries/hooks/useMuteThread';
+  // ... existing imports
+
+  interface Props {
+    thread: MessageThread;
+    active: boolean;
+    // ...existing
+  }
+  let { thread, active }: Props = $props();
+
+  const muteMutation = useMuteThread();
+
+  function toggleMute(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    muteMutation.mutate({ threadId: thread.id, muted: !thread.muted });
+  }
+</script>
+
+<!-- In the existing list-item template, add a muted indicator next to the thread title: -->
+<div class="flex items-center gap-1 min-w-0">
+  <span class="truncate font-medium text-sm">{thread.title ?? 'Direct message'}</span>
+  {#if thread.muted}
+    <BellOffIcon size={12} class="shrink-0 text-muted-foreground" aria-label="Muted" />
+  {/if}
+</div>
+
+<!-- And add a mute toggle button in the item's trailing area (alongside any existing action buttons): -->
+<button
+  onclick={toggleMute}
+  class="shrink-0 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+  aria-label={thread.muted ? 'Unmute thread' : 'Mute thread'}
+  title={thread.muted ? 'Unmute' : 'Mute notifications'}
+>
+  {#if thread.muted}
+    <BellIcon size={14} />
+  {:else}
+    <BellOffIcon size={14} />
+  {/if}
+</button>
+```
+
+Add `group` to `ThreadListItem`'s outermost element if not already present.
+
+- [ ] **Step 5: Add / extend component tests**
+
+```ts
+// frontend/tests/components/MessageBubble.test.ts (extend existing)
+
+it('shows edit and delete buttons on hover for own messages', async () => {
+  render(MessageBubble, {
+    props: {
+      message: { id: 'm1', threadId: 't1', sender: { id: 'u1', username: 'me' }, seq: 1, body: 'hello', editedAt: null, createdAt: 'x' },
+      currentUser: { id: 'u1', username: 'me' },
+      onEdit: vi.fn(),
+      onDelete: vi.fn(),
+    },
+  });
+  expect(screen.getByLabelText('Edit message')).toBeInTheDocument();
+  expect(screen.getByLabelText('Delete message')).toBeInTheDocument();
+});
+
+it('does not show edit/delete for another user's message', () => {
+  render(MessageBubble, {
+    props: {
+      message: { id: 'm1', threadId: 't1', sender: { id: 'u2', username: 'bob' }, seq: 1, body: 'hi', editedAt: null, createdAt: 'x' },
+      currentUser: { id: 'u1', username: 'me' },
+      onEdit: vi.fn(),
+      onDelete: vi.fn(),
+    },
+  });
+  expect(screen.queryByLabelText('Edit message')).not.toBeInTheDocument();
+});
+
+it('enters edit mode on pencil click and calls onEdit on confirm', async () => {
+  const onEdit = vi.fn();
+  render(MessageBubble, {
+    props: {
+      message: { id: 'm1', threadId: 't1', sender: { id: 'u1', username: 'me' }, seq: 1, body: 'old body', editedAt: null, createdAt: 'x' },
+      currentUser: { id: 'u1', username: 'me' },
+      onEdit,
+      onDelete: vi.fn(),
+    },
+  });
+  await fireEvent.click(screen.getByLabelText('Edit message'));
+  const textarea = screen.getByRole('textbox', { name: /edit message/i });
+  await fireEvent.change(textarea, { target: { value: 'new body' } });
+  await fireEvent.click(screen.getByLabelText('Confirm edit'));
+  expect(onEdit).toHaveBeenCalledWith('m1', 't1', 'new body', 'old body');
+});
+
+it('shows (edited) label when editedAt is set', () => {
+  render(MessageBubble, {
+    props: {
+      message: { id: 'm1', threadId: 't1', sender: { id: 'u1', username: 'me' }, seq: 1, body: 'changed', editedAt: '2026-09-07T14:00:00Z', createdAt: 'x' },
+      currentUser: { id: 'u1', username: 'me' },
+      onEdit: vi.fn(),
+      onDelete: vi.fn(),
+    },
+  });
+  expect(screen.getByText('(edited)')).toBeInTheDocument();
+});
+```
+
+```ts
+// frontend/tests/components/ThreadListItem.test.ts (extend existing)
+
+it('renders a muted indicator when thread.muted is true', () => {
+  render(ThreadListItem, {
+    props: { thread: { ...baseThread, muted: true }, active: false },
+  });
+  expect(screen.getByLabelText('Muted')).toBeInTheDocument();
+});
+
+it('shows a mute toggle button on hover', () => {
+  render(ThreadListItem, {
+    props: { thread: { ...baseThread, muted: false }, active: false },
+  });
+  expect(screen.getByLabelText('Mute thread')).toBeInTheDocument();
+});
+```
+
+- [ ] **Step 6: Run tests, expect pass**
+
+Run: `cd frontend && pnpm run test:run -- MessageBubble ThreadListItem`
+Expected: all new cases pass alongside the existing tests.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/lib/components/messaging/MessageBubble.svelte src/lib/components/messaging/ThreadListItem.svelte src/routes/messages/\[threadId\]/+page.svelte frontend/tests/components/MessageBubble.test.ts frontend/tests/components/ThreadListItem.test.ts
+git commit -m "feat(messaging): inline message edit/delete and thread mute toggle"
+```
+
+---
+
 ## Task 22: Full verification & PR
 
 **Files:** none (verification + PR only).
@@ -4655,6 +5645,12 @@ Summarise: files added, test counts, `pnpm run check` / `pnpm run test:run` / `p
 - **No virtualization library** for the message list. The thread history is hard-capped near 1,000 messages server-side and paged in 40 at a time; a plain scroll container with load-older-on-scroll is enough and avoids a new dependency. If profiling later shows jank, swapping in `@tanstack/svelte-virtual` is a localized change inside `ThreadView.svelte`.
 - **`messageThreads` is fetched once with default paging** (no infinite scroll on the thread list). The inbox is small for v1; add paging when a user reasonably has >50 threads.
 - **`addThreadParticipants` ADDED events** don't synthesize a participant client-side (no user object on the event) — the reducer is a no-op for ADDED and the thread detail is invalidated/refetched instead (Task 11).
+
+**Features added beyond the original spec (Tasks 23–24):**
+- **Edit message** — inline edit in `MessageBubble` (own messages only), optimistic update via `useEditMessage`, reconciled by `MessageEdited` subscription event.
+- **Delete message** — optimistic remove via `useDeleteMessage`, confirmed by `MessageDeleted` subscription event; no undo in v1.
+- **Mute thread** — toggle in `ThreadListItem` via `useMuteThread`; muted threads show a `BellOffIcon`.
+- All three require the backend prerequisites PR (see **Backend Prerequisites** section above). They are gated behind Task 23/24 and do not block Tasks 1–22.
 
 **Placeholder scan:** none — every step has literal code or a literal command.
 
