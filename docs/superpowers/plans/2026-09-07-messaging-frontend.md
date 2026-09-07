@@ -1,14 +1,20 @@
-# Messaging Frontend Implementation Plan
+# Messaging Frontend + Backend-Delta Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the SvelteKit messaging client — real-time threads, message history, composer, typing indicators, read receipts, and presence — against the already-merged messaging GraphQL API on the `worktree-feature+messaging-architecture-research` branch.
+**Goal:** Ship user-to-user messaging in the SvelteKit app — real-time threads, message history, composer, typing indicators, read receipts, presence, **message edit, message delete, and thread mute** — plus the backend delta those three features and an **unbounded (env-configurable) retention policy** require, all in one branch (`feature/messaging-frontend`) and one PR targeting the messaging backend branch.
 
-**Architecture:** A lazily-created browser-only `graphql-ws` client holds one WebSocket to `/graphql`, authenticated with the Clerk token in `connectionParams`. Queries and mutations keep using `graphqlRequest` + TanStack Query (function-wrapper hooks). Subscription events (`threadEvents`, `inboxEvents`) are folded into the TanStack Query cache by pure reducer functions — there is no parallel store. UI lives under `/messages` and `/messages/[threadId]` with a two-pane desktop layout that collapses to one pane on mobile.
+**Architecture:** _Backend (Part A):_ drop the hard-coded 1000-message prune from the insert trigger and replace it with an opt-in application-side retention sweep gated by `MESSAGE_RETENTION_MAX`; add `editMessage` / `deleteMessage` / `muteThread` mutations, `Message.editedAt` / `Message.deletedAt` fields, and `MessageEdited` / `MessageDeleted` events, following the existing hexagonal + `pg_notify` fan-out patterns. _Frontend (Parts B–C):_ a lazily-created browser-only `graphql-ws` client holds one WebSocket to `/graphql`, authenticated with the Clerk token in `connectionParams`. Queries/mutations keep using `graphqlRequest` + TanStack Query (function-wrapper hooks). Subscription events (`threadEvents`, `inboxEvents`) are folded into the TanStack Query cache by pure reducer functions — no parallel store. UI lives under `/messages` and `/messages/[threadId]`, two-pane on desktop, one pane on mobile.
 
-**Tech Stack:** SvelteKit 2 (Svelte 5 runes), TanStack Svelte Query v6, `graphql-request`, `graphql-ws` (new dependency), Tailwind v4, shadcn-svelte, `@lucide/svelte`, `svelte-clerk`, Vitest (jsdom `unit` project).
+**Tech Stack:** _Backend:_ Go, gqlgen (schema-first), GORM + pgx/v5, PostgreSQL 17, `golang-migrate`. _Frontend:_ SvelteKit 2 (Svelte 5 runes), TanStack Svelte Query v6, `graphql-request`, `graphql-ws` (new dependency), Tailwind v4, shadcn-svelte, `@lucide/svelte`, `svelte-clerk`, Vitest (jsdom `unit` project).
 
-**Spec:** `docs/superpowers/specs/2026-09-06-messaging-architecture-design.md` (section "Frontend integration" and the "GraphQL API" schema block). The backend schema as actually shipped is `backend/messaging.graphql` on the base branch — prefer it over the spec where they differ.
+**Spec:** `docs/superpowers/specs/2026-09-06-messaging-architecture-design.md`. This plan **deliberately diverges** from the spec on two points, per explicit user direction (2026-09-07):
+1. **Retention:** the spec's "roughly newest 1,000 per thread" hard cap is removed. Default behaviour is unbounded history; an operator re-introduces a cap by setting `MESSAGE_RETENTION_MAX` (integer, messages-per-thread; unset or `0` = unlimited).
+2. **Edit/delete/mute are in v1**, not deferred. The spec lists "Message edit/delete UI" under Non-Goals; that is overridden here.
+
+Everywhere else the spec and `backend/messaging.graphql` on the base branch are authoritative; prefer the shipped schema file over the spec prose where they differ.
+
+**Execution order:** Part A (backend, Tasks A1–A6) → Part B (frontend core, Tasks 1–21) → Part C (frontend edit/delete/mute, Tasks 22–24) → Task 25 (whole-stack verification + PR). Part B Task 3 and Task 4 are written against core messaging only; Part C adds the edit/delete/mute GraphQL documents, reducers, and UI additively so Part B stays independently reviewable.
 
 ## Global Constraints
 
@@ -30,64 +36,48 @@
 - **No `User.presence` field exists.** Presence is delivered only as `PresenceChanged` events inside `threadEvents` for the currently-open thread. Do not query presence anywhere.
 - **Routing is already CSR-only.** `src/routes/+layout.ts` sets `prerender = false; ssr = false; csr = true;` app-wide, so the `/messages` subtree needs no route config file. Queries stay client-only via the QueryClient's `enabled: browser` default in `src/routes/+layout.svelte`.
 
----
+### Backend constraints (Part A)
 
-## Backend Prerequisites (edit / delete / mute)
-
-Three features — **edit message**, **delete message**, and **mute thread** — require a backend PR that does not yet exist. The DB columns are already reserved (`messages.edited_at`, `messages.deleted_at`, `thread_participants.muted`), so no migration is needed. Everything else must be added.
-
-> **If the backend PR has not merged yet:** execute Tasks 1–22 in full. Tasks 23 and 24 are frontend-only and will type-check and unit-test without a live backend, but the new mutations will 404 at runtime until the backend ships.
-
-### Required backend changes (one PR against the messaging backend branch)
-
-**`backend/messaging.graphql` — schema additions**
-
-```graphql
-# New event variants
-type MessageEdited  { message: Message! }
-type MessageDeleted { messageId: ID!  threadId: ID! }
-
-# Extend the union (replace the existing declaration)
-union ThreadEvent =
-    MessagePosted | ReadReceiptChanged | TypingChanged
-  | ParticipantChanged | PresenceChanged | StreamReset
-  | MessageEdited | MessageDeleted
-
-# Field additions (extend existing types — gqlgen merges them)
-extend type Message       { editedAt: String }      # null until edited
-extend type MessageThread { muted:    Boolean! }    # maps to thread_participants.muted
-
-# New mutations
-extend type Mutation {
-  editMessage(messageId: ID!, body: String!): Message!        @auth
-  deleteMessage(messageId: ID!): Boolean!                     @auth
-  muteThread(threadId: ID!, muted: Boolean!): MessageThread!  @auth
-}
-```
-
-**Service layer (`internal/core/services/messaging_service.go`)**
-- `EditMessage(ctx, messageId, newBody)` — asserts caller is the original sender; enforces 8 KB cap; sets `edited_at = now()`; publishes `ThreadEventMessageEdited` via `PgNotifier`.
-- `DeleteMessage(ctx, messageId)` — asserts caller is the original sender; sets `deleted_at = now()`; publishes `ThreadEventMessageDeleted`.
-- `MuteThread(ctx, threadId, muted)` — no ownership check beyond participant; updates `thread_participants.muted`; returns the full `MessageThread`.
-
-**Repository**
-- `MessageRepository`: add `UpdateMessageBody(ctx, id, body, editedAt)` and `SoftDeleteMessage(ctx, id, deletedAt)`. `ListSince` and the history query must exclude rows where `deleted_at IS NOT NULL` (return a `MessageDeleted` event from the subscription instead; the frontend removes them locally).
-- `ThreadRepository`: add `SetMuted(ctx, threadId, userID, muted bool)`.
-
-**Realtime**
-- Add `ThreadEventMessageEdited` and `ThreadEventMessageDeleted` variants to the sealed `ThreadEvent` interface in `internal/core/domain/realtime.go`.
-- Hub fan-out and `PgNotifier` envelope handling must recognise the two new variants (same pattern as the six existing ones).
-
-**GraphQL resolvers**
-- Wire `EditMessage`, `DeleteMessage`, `MuteThread` resolver stubs to the service.
-- `threadEvents` subscription resolver must emit `MessageEdited` and `MessageDeleted` into the hub on the relevant events.
+- **Go conventions:** hexagonal — ports in `internal/core/ports/`, domain in `internal/core/domain/`, adapters in `internal/adapters/`. Wrap errors with `fmt.Errorf("...: %w", err)` and the `domain.Err*` sentinels (`ErrForbidden`, `ErrNotFound`, `ErrInvalidInput`). Follow `.docs/GO_PATTERNS.md`.
+- **No chained shell commands** — one `go` / `migrate` / `make` invocation per tool call.
+- **Codegen:** after any change to `backend/*.graphql`, run `make graphql-gen` from `backend/` and commit the regenerated `internal/adapters/graphql/generated/*.go` + `model/models_gen.go` in the **same commit** as the schema change. `git diff --exit-code` on the generated dir must be clean afterward.
+- **Migration numbering:** highest existing is `000017` on this branch. New migrations start at `000018`. Confirm with `ls backend/migrations/ | tail -3` at execution — never assume.
+- **DB-gated tests** use the existing `t.Skip()`-when-unavailable pattern (see `backend/test/repositories/helpers_test.go`). A cloud/CI run without a database still compiles and runs the non-DB tests.
+- **Retention env var:** `MESSAGE_RETENTION_MAX` — integer, max messages retained per thread. Unset, empty, non-numeric, or `≤ 0` all mean **unlimited** (no sweep). `MESSAGE_RETENTION_SWEEP_MINUTES` — sweep interval, default `15`, only consulted when the max is positive.
+- **Edit/delete authorization:** only the original `sender_id` may edit or delete their own message. Editing a deleted message is `ErrInvalidInput`. Body limit is the existing `maxMessageBodyBytes` (8192). Delete is a soft delete: set `deleted_at`, blank `body` to `''`, keep the row and its `seq`.
+- **Mute:** any active participant may mute/unmute the thread for themselves (`thread_participants.muted`). No new event — the mutation returns the updated `MessageThread`.
 
 ---
 
 ## File Structure
 
+### Part A — backend (Tasks A1–A6)
+
+**Retention (Task A1–A2)**
+- Create: `backend/migrations/000018_messaging_retention_unbounded.up.sql` / `.down.sql` — `CREATE OR REPLACE FUNCTION publish_and_prune_message()` without the `DELETE … seq <= NEW.seq - 1000` block (up); restore it (down).
+- Modify: `backend/internal/config/config.go` — parse `MESSAGE_RETENTION_MAX` and `MESSAGE_RETENTION_SWEEP_MINUTES`.
+- Create: `backend/internal/core/services/retention.go` — `RetentionSweeper` (`Run(ctx)` ticker; per-thread "keep newest N" delete; no-op when `Max <= 0`).
+- Modify: `backend/cmd/server/main.go` — start the sweeper goroutine when `Max > 0`, stop it on shutdown.
+- Create: `backend/test/services/retention_test.go` (DB-gated).
+
+**Edit / delete / mute (Tasks A3–A5)**
+- Modify: `backend/messaging.graphql` — `Message.editedAt`/`deletedAt` fields; `editMessage`/`deleteMessage`/`muteThread` mutations; `MessageEdited`/`MessageDeleted` types added to the `ThreadEvent` union.
+- Modify: `backend/internal/core/domain/messaging.go` — `Message.EditedAt *time.Time`, `Message.DeletedAt *time.Time`.
+- Modify: `backend/internal/core/domain/realtime.go` — `MessageEditedEvent{ Message Message }`, `MessageDeletedEvent{ ThreadID int; MessageID int64; Seq int64 }` + `isThreadEvent()`; `EventEnvelope` needs no new fields (reuses `Type`/`ThreadID`/`Seq`/`MessageID`).
+- Modify: `backend/internal/core/ports/repositories/message_repository.go` — `UpdateBody`, `SoftDelete`.
+- Modify: `backend/internal/core/ports/repositories/thread_repository.go` — `SetMuted`.
+- Modify: `backend/internal/core/ports/services/messaging_service.go` — `EditMessage`, `DeleteMessage`, `MuteThread`.
+- Modify: `backend/internal/adapters/repositories/postgres/gorm_message_repository.go`, `gorm_thread_repository.go`, `gorm_messaging_mappers.go`, `gorm_models.go`.
+- Modify: `backend/internal/core/services/messaging_service.go` — the three methods + `maxMessageBodyBytes` reuse.
+- Modify: `backend/internal/adapters/realtime/hub.go` — `PublishEnvelope` cases `"MESSAGE_EDITED"` / `"MESSAGE_DELETED"`.
+- Modify: `backend/internal/adapters/graphql/resolvers/messaging.resolvers.go`, `model/messaging.go`, `resolver.go` — mutation resolvers, `Message.EditedAt`/`DeletedAt` field resolvers, union type-switch entries.
+- Regenerated: `backend/internal/adapters/graphql/generated/*.go`, `model/models_gen.go` (via `make graphql-gen`).
+- Tests: `backend/test/services/messaging_service_test.go`, `backend/test/resolvers/messaging_resolver_test.go`, `backend/test/realtime/hub_test.go`, `backend/test/repositories/gorm_message_repository_test.go` — extend.
+
+### Part B / C — frontend
+
 **New — WebSocket transport & subscription plumbing**
-- `src/lib/messaging/ws-client.ts` — lazy singleton `graphql-ws` client. Exports `getWsClient()`, `subscribeGraphql<T>(payload, handlers)`, `disposeWsClient()` (test cleanup), and a `wsConnectionState` reactive store (`'connecting' | 'connected' | 'closed'`).
+- `src/lib/messaging/ws-client.svelte.ts` — lazy singleton `graphql-ws` client. Exports `getWsClient()`, `subscribeGraphql<T>(payload, handlers)`, `disposeWsClient()` (test cleanup), and `wsStatus` (`$state`, `'connecting' | 'connected' | 'closed'`). (Every other mention of `ws-client.ts` in this plan means this `.svelte.ts` file.)
 - `src/lib/messaging/events.ts` — `ThreadEvent` / `InboxEvent` TypeScript types and the `ThreadEventTypename` union literal.
 - `src/lib/messaging/threadCache.ts` — **pure functions** that fold one `ThreadEvent` into cache values: `applyThreadEventToMessages(page, event)`, `applyThreadEventToThread(thread, event, myUserId)`, `nextSinceSeq(pages)`, `typingUsersReducer(state, event, now)`, `presenceReducer(state, event)`. No TanStack imports — take plain data, return plain data.
 - `src/lib/messaging/inboxCache.ts` — pure `applyInboxEvent(threads, event)` returning a new sorted thread array.
@@ -104,9 +94,9 @@ extend type Mutation {
 - `src/lib/queries/hooks/useSetTyping.ts`
 - `src/lib/queries/hooks/useAddThreadParticipants.ts`
 - `src/lib/queries/hooks/useLeaveThread.ts`
-- `src/lib/queries/hooks/useEditMessage.ts` _(Task 23 — requires backend PR)_
-- `src/lib/queries/hooks/useDeleteMessage.ts` _(Task 23 — requires backend PR)_
-- `src/lib/queries/hooks/useMuteThread.ts` _(Task 23 — requires backend PR)_
+- `src/lib/queries/hooks/useEditMessage.ts` _(Part C, Task 23)_
+- `src/lib/queries/hooks/useDeleteMessage.ts` _(Part C, Task 23)_
+- `src/lib/queries/hooks/useMuteThread.ts` _(Part C, Task 23)_
 
 **New — subscription runes (wire cache ⇆ WS)**
 - `src/lib/messaging/useThreadStream.svelte.ts` — for the open thread: subscribe `threadEvents(threadId, sinceSeq)`, fold events into cache, expose `typingUsers` and `presence` reactive maps, handle `StreamReset` + reconnect resync.
@@ -132,6 +122,727 @@ extend type Mutation {
 - `tests/components/MessageBubble.test.ts`, `tests/components/MessageComposer.test.ts`, `tests/components/ThreadListItem.test.ts`, `tests/components/TypingIndicator.test.ts`, `tests/components/Avatar.test.ts`, `tests/components/Header.test.ts` (extend existing)
 
 ---
+
+# Part A — Backend delta
+
+## Task A1: Migration — drop the hard-coded 1000-message prune
+
+**Files:**
+- Create: `backend/migrations/000018_messaging_retention_unbounded.up.sql`
+- Create: `backend/migrations/000018_messaging_retention_unbounded.down.sql`
+
+**Interfaces:**
+- Produces: `publish_and_prune_message()` trigger function that only emits the `MESSAGE_POSTED` NOTIFY — no `DELETE`. History is unbounded at the DB layer after this migration.
+
+- [ ] **Step 1: Confirm the next migration number**
+
+Run: `ls backend/migrations/ | tail -3`
+Expected: highest is `000017_add_messaging.*`. If a `000018` already exists, use the next free number and adjust both filenames.
+
+- [ ] **Step 2: Write `000018_messaging_retention_unbounded.up.sql`**
+
+```sql
+-- Retention is no longer enforced in-trigger. The application-side
+-- RetentionSweeper (gated by MESSAGE_RETENTION_MAX) is now the only pruner,
+-- and it is disabled by default -> unbounded history.
+CREATE OR REPLACE FUNCTION publish_and_prune_message() RETURNS trigger AS $$
+BEGIN
+    PERFORM pg_notify('thread_events', json_build_object(
+        'type',       'MESSAGE_POSTED',
+        'thread_id',  NEW.thread_id,
+        'seq',        NEW.seq,
+        'message_id', NEW.id
+    )::text);
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+- [ ] **Step 3: Write `000018_messaging_retention_unbounded.down.sql`**
+
+```sql
+-- Restore the in-trigger prune (newest ~1000 per thread).
+CREATE OR REPLACE FUNCTION publish_and_prune_message() RETURNS trigger AS $$
+BEGIN
+    PERFORM pg_notify('thread_events', json_build_object(
+        'type',       'MESSAGE_POSTED',
+        'thread_id',  NEW.thread_id,
+        'seq',        NEW.seq,
+        'message_id', NEW.id
+    )::text);
+
+    IF NEW.seq % 50 = 0 THEN
+        DELETE FROM messages
+         WHERE thread_id = NEW.thread_id
+           AND seq <= NEW.seq - 1000;
+    END IF;
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+- [ ] **Step 4: Sanity-check the SQL parses**
+
+Run: `cd backend && go build ./...` (no Go change yet — this just confirms nothing else broke).
+If a local database is available: `migrate -path migrations -database "$DATABASE_URL" up` then `... down 1` then `... up` and confirm no error. If no DB, note "migration not exercised — no local DB" in the report.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/migrations/000018_messaging_retention_unbounded.up.sql backend/migrations/000018_messaging_retention_unbounded.down.sql
+git commit -m "feat(messaging): remove in-trigger 1000-message retention cap"
+```
+
+---
+
+## Task A2: Env-configured application-side retention sweep
+
+**Files:**
+- Modify: `backend/internal/config/config.go`
+- Create: `backend/internal/core/services/retention.go`
+- Create: `backend/test/services/retention_test.go`
+- Modify: `backend/cmd/server/main.go`
+- Test (config): `backend/test/config/config_test.go` (extend)
+
+**Interfaces:**
+- Consumes: `*gorm.DB` (or the existing DB handle type used by other services — match `NewMessagingService`'s repo wiring); `config.Config`.
+- Produces:
+  - `config.Config` gains `MessageRetentionMax int` and `MessageRetentionSweepMinutes int` (default `15`).
+  - `services.RetentionSweeper` with `NewRetentionSweeper(db *gorm.DB, maxPerThread int, interval time.Duration) *RetentionSweeper`, method `SweepOnce(ctx context.Context) (deleted int64, err error)` and `Run(ctx context.Context)` (ticker loop; returns when `ctx` is done). `SweepOnce` is a no-op returning `(0, nil)` when `maxPerThread <= 0`.
+
+- [ ] **Step 1: Write the failing config test**
+
+Add to `backend/test/config/config_test.go` (mirror the existing table style):
+
+```go
+func TestLoad_MessageRetention(t *testing.T) {
+	t.Setenv("MESSAGE_RETENTION_MAX", "500")
+	t.Setenv("MESSAGE_RETENTION_SWEEP_MINUTES", "30")
+	cfg := config.Load() // use whatever constructor the file already exposes
+	if cfg.MessageRetentionMax != 500 {
+		t.Fatalf("MessageRetentionMax = %d, want 500", cfg.MessageRetentionMax)
+	}
+	if cfg.MessageRetentionSweepMinutes != 30 {
+		t.Fatalf("MessageRetentionSweepMinutes = %d, want 30", cfg.MessageRetentionSweepMinutes)
+	}
+}
+
+func TestLoad_MessageRetention_DefaultsUnbounded(t *testing.T) {
+	t.Setenv("MESSAGE_RETENTION_MAX", "")
+	cfg := config.Load()
+	if cfg.MessageRetentionMax != 0 {
+		t.Fatalf("MessageRetentionMax = %d, want 0 (unbounded)", cfg.MessageRetentionMax)
+	}
+	if cfg.MessageRetentionSweepMinutes != 15 {
+		t.Fatalf("MessageRetentionSweepMinutes = %d, want 15 default", cfg.MessageRetentionSweepMinutes)
+	}
+}
+```
+
+Adjust the constructor name/signature to whatever `config.go` actually exports (it uses `os.Getenv` directly — follow the pattern at `config.go:78-108`).
+
+- [ ] **Step 2: Run it, expect failure**
+
+Run: `cd backend && go test ./test/config/ -run TestLoad_MessageRetention`
+Expected: compile error — unknown field `MessageRetentionMax`.
+
+- [ ] **Step 3: Add the config fields**
+
+In `config.go`, next to the other optional-env parsing:
+
+```go
+// Retention: 0 / unset / invalid => unbounded (no sweep).
+if v := os.Getenv("MESSAGE_RETENTION_MAX"); v != "" {
+	if n, err := strconv.Atoi(v); err == nil && n > 0 {
+		cfg.MessageRetentionMax = n
+	}
+}
+cfg.MessageRetentionSweepMinutes = 15
+if v := os.Getenv("MESSAGE_RETENTION_SWEEP_MINUTES"); v != "" {
+	if n, err := strconv.Atoi(v); err == nil && n > 0 {
+		cfg.MessageRetentionSweepMinutes = n
+	}
+}
+```
+
+Add the two `int` fields to the `Config` struct. Add `"strconv"` to imports if not present.
+
+- [ ] **Step 4: Run the config test, expect pass**
+
+Run: `cd backend && go test ./test/config/ -run TestLoad_MessageRetention`
+Expected: PASS.
+
+- [ ] **Step 5: Write the failing sweeper test (DB-gated)**
+
+```go
+// backend/test/services/retention_test.go
+package services_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
+	// reuse the DB-gated helper the repository tests use
+)
+
+func TestRetentionSweeper_KeepsNewestN(t *testing.T) {
+	db := openTestDBOrSkip(t) // mirror backend/test/repositories/helpers_test.go
+	ctx := context.Background()
+
+	threadID, sender := seedThreadWithMessages(t, db, 30) // helper: inserts 30 messages, seq 1..30
+	_ = sender
+
+	sw := services.NewRetentionSweeper(db, 10, 0)
+	deleted, err := sw.SweepOnce(ctx)
+	if err != nil {
+		t.Fatalf("SweepOnce: %v", err)
+	}
+	if deleted != 20 {
+		t.Fatalf("deleted = %d, want 20", deleted)
+	}
+
+	var count int64
+	db.Table("messages").Where("thread_id = ?", threadID).Count(&count)
+	if count != 10 {
+		t.Fatalf("remaining = %d, want 10", count)
+	}
+
+	var minSeq, maxSeq int64
+	db.Table("messages").Where("thread_id = ?", threadID).Select("min(seq)").Scan(&minSeq)
+	db.Table("messages").Where("thread_id = ?", threadID).Select("max(seq)").Scan(&maxSeq)
+	if minSeq != 21 || maxSeq != 30 {
+		t.Fatalf("seq window = [%d,%d], want [21,30] (no renumbering)", minSeq, maxSeq)
+	}
+}
+
+func TestRetentionSweeper_DisabledIsNoop(t *testing.T) {
+	sw := services.NewRetentionSweeper(nil, 0, 0)
+	deleted, err := sw.SweepOnce(context.Background())
+	if err != nil || deleted != 0 {
+		t.Fatalf("disabled sweep: deleted=%d err=%v, want 0,nil", deleted, err)
+	}
+}
+```
+
+If the repo test helpers do not already expose `seedThreadWithMessages`, add it beside them (insert a thread + participant + N rows via the same GORM models the repo tests use; the `assign_message_seq` trigger fills `seq`).
+
+- [ ] **Step 6: Run it, expect failure**
+
+Run: `cd backend && go test ./test/services/ -run TestRetentionSweeper`
+Expected: compile error — no `services.NewRetentionSweeper`.
+
+- [ ] **Step 7: Implement `retention.go`**
+
+```go
+package services
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"time"
+
+	"gorm.io/gorm"
+)
+
+// RetentionSweeper deletes all but the newest maxPerThread messages in each
+// thread. It is a no-op when maxPerThread <= 0.
+type RetentionSweeper struct {
+	db           *gorm.DB
+	maxPerThread int
+	interval     time.Duration
+}
+
+// NewRetentionSweeper builds a sweeper. interval <= 0 defaults to 15 minutes
+// (only used by Run).
+func NewRetentionSweeper(db *gorm.DB, maxPerThread int, interval time.Duration) *RetentionSweeper {
+	if interval <= 0 {
+		interval = 15 * time.Minute
+	}
+	return &RetentionSweeper{db: db, maxPerThread: maxPerThread, interval: interval}
+}
+
+// SweepOnce prunes every thread to its newest maxPerThread messages.
+func (s *RetentionSweeper) SweepOnce(ctx context.Context) (int64, error) {
+	if s.maxPerThread <= 0 {
+		return 0, nil
+	}
+	res := s.db.WithContext(ctx).Exec(`
+		DELETE FROM messages m
+		USING (SELECT thread_id, MAX(seq) AS mx FROM messages GROUP BY thread_id) t
+		WHERE m.thread_id = t.thread_id
+		  AND m.seq <= t.mx - ?`, s.maxPerThread)
+	if res.Error != nil {
+		return 0, fmt.Errorf("retention sweep: %w", res.Error)
+	}
+	return res.RowsAffected, nil
+}
+
+// Run sweeps immediately, then on every interval tick until ctx is done.
+func (s *RetentionSweeper) Run(ctx context.Context) {
+	if s.maxPerThread <= 0 {
+		return
+	}
+	t := time.NewTicker(s.interval)
+	defer t.Stop()
+	for {
+		if n, err := s.SweepOnce(ctx); err != nil {
+			slog.Error("retention sweep failed", "error", err)
+		} else if n > 0 {
+			slog.Info("retention sweep pruned messages", "deleted", n, "max_per_thread", s.maxPerThread)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+```
+
+- [ ] **Step 8: Run the sweeper tests**
+
+Run: `cd backend && go test ./test/services/ -run TestRetentionSweeper`
+Expected: `TestRetentionSweeper_DisabledIsNoop` PASS; `TestRetentionSweeper_KeepsNewestN` PASS or SKIP (no DB).
+
+- [ ] **Step 9: Wire into `main.go`**
+
+Where the hub/listener goroutines are started, add:
+
+```go
+if cfg.MessageRetentionMax > 0 {
+	sweeper := services.NewRetentionSweeper(
+		db, cfg.MessageRetentionMax,
+		time.Duration(cfg.MessageRetentionSweepMinutes)*time.Minute,
+	)
+	go sweeper.Run(ctx) // ctx is the server's shutdown context
+	slog.Info("message retention sweep enabled",
+		"max_per_thread", cfg.MessageRetentionMax,
+		"interval_minutes", cfg.MessageRetentionSweepMinutes)
+}
+```
+
+Use the same `db` handle and shutdown `ctx` the listener uses (see `main.go:160-190`).
+
+- [ ] **Step 10: Build + full backend test**
+
+Run: `cd backend && go build ./...`
+Run: `cd backend && go test ./...`
+Expected: build clean; tests pass (DB-gated ones skip without a database).
+
+- [ ] **Step 11: Commit**
+
+```bash
+git add backend/internal/config/config.go backend/internal/core/services/retention.go backend/test/services/retention_test.go backend/test/config/config_test.go backend/cmd/server/main.go
+git commit -m "feat(messaging): env-configurable application-side retention sweep (MESSAGE_RETENTION_MAX)"
+```
+
+---
+
+## Task A3: Schema + domain for edit / delete / mute + codegen
+
+**Files:**
+- Modify: `backend/messaging.graphql`
+- Modify: `backend/internal/core/domain/messaging.go`
+- Modify: `backend/internal/core/domain/realtime.go`
+- Regenerated: `backend/internal/adapters/graphql/generated/*.go`, `backend/internal/adapters/graphql/model/models_gen.go`
+
+**Interfaces:**
+- Produces (schema):
+  ```graphql
+  extend type Message {
+    editedAt: String
+    deletedAt: String
+  }
+
+  type MessageEdited  { message: Message! }
+  type MessageDeleted { threadId: ID!  messageId: ID!  seq: IntID! }
+
+  union ThreadEvent =
+      MessagePosted
+    | ReadReceiptChanged
+    | TypingChanged
+    | ParticipantChanged
+    | PresenceChanged
+    | StreamReset
+    | MessageEdited
+    | MessageDeleted
+
+  extend type Mutation {
+    editMessage(messageId: ID!, body: String!): Message! @auth
+    deleteMessage(messageId: ID!): Message! @auth
+    muteThread(threadId: ID!, muted: Boolean!): MessageThread! @auth
+  }
+  ```
+  Notes:
+  - **Delete is a tombstone** (user ruling 2026-09-07): `deleteMessage` returns the updated `Message!` with `deletedAt` set and `body = ""`; the row and its `seq` stay in history. `MessageDeleted` carries `seq` so clients can locate the row without a full message payload.
+  - `editMessage` takes flat `messageId` + `body` args (no wrapper input type) to match the frontend documents in Task 3's addendum.
+  - `Message` and `Mutation` already exist in `messaging.graphql`; add the new fields to the **existing** `type Message { … }` block and the new mutations to the **existing** `extend type Mutation { … }` block rather than re-`extend`-ing. Replace the existing `union ThreadEvent = …` declaration in place.
+- Produces (domain): `domain.Message` gains `EditedAt *time.Time` and `DeletedAt *time.Time`. `domain/realtime.go` gains:
+  ```go
+  type MessageEditedEvent struct{ Message Message }
+  type MessageDeletedEvent struct {
+      ThreadID  int
+      MessageID int64
+      Seq       int64
+  }
+  func (MessageEditedEvent) isThreadEvent()  {}
+  func (MessageDeletedEvent) isThreadEvent() {}
+  ```
+- Produces (gqlgen models): `model.MessageEdited`, `model.MessageDeleted`, `model.EditMessageInput`, and `IsThreadEvent()` markers on the two new model types (gqlgen generates these from the union membership — verify after codegen).
+
+- [ ] **Step 1: Edit `backend/messaging.graphql`** as above.
+
+- [ ] **Step 2: Add the domain fields**
+
+`domain/messaging.go` — extend `Message`:
+```go
+type Message struct {
+	ID          int64
+	ThreadID    int
+	SenderID    int
+	Seq         int64
+	Body        string
+	ClientNonce string
+	CreatedAt   time.Time
+	EditedAt    *time.Time
+	DeletedAt   *time.Time
+}
+```
+
+`domain/realtime.go` — add the two event structs + `isThreadEvent()` markers next to the existing ones.
+
+- [ ] **Step 3: Regenerate**
+
+Run: `cd backend && make graphql-gen`
+Expected: `internal/adapters/graphql/generated/*.go` and `model/models_gen.go` change; `messaging.resolvers.go` gains stub methods for `EditMessage`, `DeleteMessage`, `MuteThread`, `Message.EditedAt`, `Message.DeletedAt` (gqlgen appends `panic("not implemented")` stubs — those are filled in Task A6).
+
+- [ ] **Step 4: Build**
+
+Run: `cd backend && go build ./...`
+Expected: compiles. Unimplemented resolver stubs panic at runtime only, not at build. If the union marker methods are missing for `model.MessageEdited` / `model.MessageDeleted`, add them by hand in `model/messaging.go` mirroring the other members (`func (model.MessageEdited) IsThreadEvent() {}`).
+
+- [ ] **Step 5: Commit (schema + domain + generated together)**
+
+```bash
+git add backend/messaging.graphql backend/internal/core/domain/messaging.go backend/internal/core/domain/realtime.go backend/internal/adapters/graphql/generated backend/internal/adapters/graphql/model
+git commit -m "feat(messaging): schema + domain + codegen for edit/delete/mute"
+```
+
+---
+
+## Task A4: Repository layer — UpdateBody, SoftDelete, SetMuted
+
+**Files:**
+- Modify: `backend/internal/core/ports/repositories/message_repository.go`
+- Modify: `backend/internal/core/ports/repositories/thread_repository.go`
+- Modify: `backend/internal/adapters/repositories/postgres/gorm_message_repository.go`
+- Modify: `backend/internal/adapters/repositories/postgres/gorm_thread_repository.go`
+- Modify: `backend/internal/adapters/repositories/postgres/gorm_messaging_mappers.go`
+- Modify: `backend/internal/adapters/repositories/postgres/gorm_models.go`
+- Test: `backend/test/repositories/gorm_message_repository_test.go` (extend), `backend/test/repositories/gorm_thread_repository_test.go` (extend)
+
+**Interfaces:**
+- Produces (ports):
+  - `MessageRepository.UpdateBody(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error)` — updates `body` + `edited_at`, returns the reloaded row. `domain.ErrNotFound` when the id is absent.
+  - `MessageRepository.SoftDelete(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error)` — sets `deleted_at`, sets `body = ''`, returns the reloaded row.
+  - `ThreadRepository.SetMuted(ctx context.Context, threadID, userID int, muted bool) error` — updates `thread_participants.muted`; `domain.ErrNotFound` when no such participant row.
+- Produces (models/mappers): `MessageModel` gains `EditedAt *time.Time` / `DeletedAt *time.Time` (columns `edited_at` / `deleted_at`); `messageModelToDomain` / `messageDomainToModel` carry them. `messageDomainToModel` still must NOT set `Seq`/`CreatedAt` (see the existing comment in `gorm_messaging_mappers.go`).
+
+- [ ] **Step 1: Write failing repo tests** (DB-gated, mirror the existing file's helpers)
+
+```go
+func TestGormMessageRepository_UpdateBody(t *testing.T) {
+	db := openTestDBOrSkip(t)
+	repo := postgres.NewGormMessageRepository(db)
+	ctx := context.Background()
+	m := insertMessage(t, db, /* thread, sender */) // existing helper
+
+	edited, err := repo.UpdateBody(ctx, m.ID, "edited text", time.Now().UTC())
+	if err != nil { t.Fatal(err) }
+	if edited.Body != "edited text" || edited.EditedAt == nil {
+		t.Fatalf("got body=%q editedAt=%v", edited.Body, edited.EditedAt)
+	}
+	if edited.Seq != m.Seq { t.Fatalf("seq changed: %d -> %d", m.Seq, edited.Seq) }
+}
+
+func TestGormMessageRepository_SoftDelete(t *testing.T) {
+	db := openTestDBOrSkip(t)
+	repo := postgres.NewGormMessageRepository(db)
+	ctx := context.Background()
+	m := insertMessage(t, db)
+
+	del, err := repo.SoftDelete(ctx, m.ID, time.Now().UTC())
+	if err != nil { t.Fatal(err) }
+	if del.DeletedAt == nil || del.Body != "" {
+		t.Fatalf("got deletedAt=%v body=%q", del.DeletedAt, del.Body)
+	}
+}
+
+func TestGormMessageRepository_UpdateBody_NotFound(t *testing.T) {
+	db := openTestDBOrSkip(t)
+	repo := postgres.NewGormMessageRepository(db)
+	_, err := repo.UpdateBody(context.Background(), 999999, "x", time.Now())
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}
+```
+
+And for the thread repo:
+```go
+func TestGormThreadRepository_SetMuted(t *testing.T) {
+	db := openTestDBOrSkip(t)
+	repo := postgres.NewGormThreadRepository(db)
+	ctx := context.Background()
+	threadID, userID := seedThreadWithParticipant(t, db) // existing helper
+
+	if err := repo.SetMuted(ctx, threadID, userID, true); err != nil { t.Fatal(err) }
+	th, _ := repo.GetThread(ctx, threadID)
+	for _, p := range th.Participants {
+		if p.UserID == userID && !p.Muted { t.Fatal("muted not persisted") }
+	}
+}
+```
+
+- [ ] **Step 2: Run, expect failure**
+
+Run: `cd backend && go test ./test/repositories/ -run 'UpdateBody|SoftDelete|SetMuted'`
+Expected: compile error — methods don't exist.
+
+- [ ] **Step 3: Add model + mapper fields**
+
+`gorm_models.go` — add to `MessageModel`:
+```go
+EditedAt  *time.Time `gorm:"column:edited_at"`
+DeletedAt *time.Time `gorm:"column:deleted_at"`
+```
+`gorm_messaging_mappers.go` — carry `EditedAt` / `DeletedAt` in both directions.
+
+- [ ] **Step 4: Implement the three repo methods**
+
+`gorm_message_repository.go`:
+```go
+func (r *GormMessageRepository) UpdateBody(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error) {
+	res := r.db.WithContext(ctx).Model(&MessageModel{}).
+		Where("id = ?", messageID).
+		Updates(map[string]any{"body": body, "edited_at": editedAt})
+	if res.Error != nil {
+		return nil, fmt.Errorf("update message body: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return nil, domain.ErrNotFound
+	}
+	return r.GetByID(ctx, messageID)
+}
+
+func (r *GormMessageRepository) SoftDelete(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
+	res := r.db.WithContext(ctx).Model(&MessageModel{}).
+		Where("id = ?", messageID).
+		Updates(map[string]any{"deleted_at": deletedAt, "body": ""})
+	if res.Error != nil {
+		return nil, fmt.Errorf("soft-delete message: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return nil, domain.ErrNotFound
+	}
+	return r.GetByID(ctx, messageID)
+}
+```
+`gorm_thread_repository.go`:
+```go
+func (r *GormThreadRepository) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
+	res := r.db.WithContext(ctx).Table("thread_participants").
+		Where("thread_id = ? AND user_id = ?", threadID, userID).
+		Update("muted", muted)
+	if res.Error != nil {
+		return fmt.Errorf("set muted: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+```
+Add the method signatures to the port interfaces. `ListHistory` / `ListSince` are **not** changed here — deleted rows stay in history as tombstones (`body == ""`, `deleted_at` set); the frontend renders them as "message deleted". (This keeps `seq` continuity and replay trivial.)
+
+- [ ] **Step 5: Run repo tests**
+
+Run: `cd backend && go test ./test/repositories/ -run 'UpdateBody|SoftDelete|SetMuted'`
+Expected: PASS or SKIP (no DB).
+
+- [ ] **Step 6: Build**
+
+Run: `cd backend && go build ./...`
+Expected: clean.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add backend/internal/core/ports/repositories backend/internal/adapters/repositories/postgres backend/test/repositories
+git commit -m "feat(messaging): repo UpdateBody / SoftDelete / SetMuted"
+```
+
+---
+
+## Task A5: Service layer — EditMessage, DeleteMessage, MuteThread
+
+**Files:**
+- Modify: `backend/internal/core/ports/services/messaging_service.go`
+- Modify: `backend/internal/core/services/messaging_service.go`
+- Test: `backend/test/services/messaging_service_test.go` (extend)
+
+**Interfaces:**
+- Consumes: `MessageRepository.GetByID` / `UpdateBody` / `SoftDelete`; `ThreadRepository.SetMuted` / `GetThread`; `publisher.PublishEphemeral`; `domain.EventEnvelope`.
+- Produces on `MessagingService` (port + impl):
+  - `EditMessage(ctx context.Context, actorUserID int, messageID int64, body string) (*domain.Message, error)` — loads the message; `ErrNotFound` if absent; `ErrForbidden` if `msg.SenderID != actorUserID`; `ErrInvalidInput` if `msg.DeletedAt != nil` or `len(body) == 0` or `len([]byte(body)) > maxMessageBodyBytes`; calls `UpdateBody(ctx, messageID, body, time.Now().UTC())`; then `publisher.PublishEphemeral(ctx, domain.EventEnvelope{Type: "MESSAGE_EDITED", ThreadID: msg.ThreadID, Seq: msg.Seq, MessageID: messageID})`; returns the updated message.
+  - `DeleteMessage(ctx context.Context, actorUserID int, messageID int64) (*domain.Message, error)` — loads; `ErrNotFound` / `ErrForbidden` as above; idempotent if already deleted (return the row, no publish); calls `SoftDelete(ctx, messageID, time.Now().UTC())`; then `PublishEphemeral(ctx, domain.EventEnvelope{Type: "MESSAGE_DELETED", ThreadID: msg.ThreadID, Seq: msg.Seq, MessageID: messageID})`; returns the tombstoned message.
+  - `MuteThread(ctx context.Context, actorUserID, threadID int, muted bool) (*domain.MessageThread, error)` — `AssertParticipant` first; `threadRepo.SetMuted`; returns `threadRepo.GetThread(ctx, threadID)`.
+
+- [ ] **Step 1: Write failing service tests** (mocked repos — mirror the existing `messaging_service_test.go` mock style)
+
+```go
+func TestEditMessage_OnlySenderMayEdit(t *testing.T) {
+	// GetByID returns a message with SenderID=7; actor=9 => ErrForbidden
+}
+func TestEditMessage_RejectsEmptyAndOversize(t *testing.T) {
+	// actor==sender; body "" => ErrInvalidInput; body >8192 bytes => ErrInvalidInput
+}
+func TestEditMessage_RejectsEditingDeleted(t *testing.T) {
+	// GetByID returns DeletedAt != nil => ErrInvalidInput
+}
+func TestEditMessage_PublishesMessageEditedEnvelope(t *testing.T) {
+	// happy path: UpdateBody called; publisher received Type=="MESSAGE_EDITED" with the msg ThreadID/Seq/MessageID
+}
+func TestDeleteMessage_OnlySenderMayDelete(t *testing.T) { /* ErrForbidden */ }
+func TestDeleteMessage_PublishesMessageDeletedEnvelope(t *testing.T) { /* SoftDelete called; envelope Type=="MESSAGE_DELETED" */ }
+func TestDeleteMessage_IdempotentWhenAlreadyDeleted(t *testing.T) {
+	// GetByID returns DeletedAt != nil => returns row, SoftDelete NOT called, no publish
+}
+func TestMuteThread_RequiresParticipant(t *testing.T) {
+	// GetThread returns a thread the actor is not in => ErrForbidden; SetMuted not called
+}
+func TestMuteThread_SetsAndReturnsThread(t *testing.T) {
+	// participant: SetMuted(threadID,actor,true) called; returns GetThread result
+}
+```
+
+Use the existing fake repo + fake publisher types in that test file; add `GetByIDFunc` / `UpdateBodyFunc` / `SoftDeleteFunc` / `SetMutedFunc` hooks to them if not present.
+
+- [ ] **Step 2: Run, expect failure**
+
+Run: `cd backend && go test ./test/services/ -run 'EditMessage|DeleteMessage|MuteThread'`
+Expected: compile error — methods don't exist.
+
+- [ ] **Step 3: Implement the three methods** in `messaging_service.go` (per the Interfaces block), and add them to the `MessagingService` port interface.
+
+- [ ] **Step 4: Run service tests**
+
+Run: `cd backend && go test ./test/services/`
+Expected: PASS.
+
+- [ ] **Step 5: Build + full test**
+
+Run: `cd backend && go build ./...`
+Run: `cd backend && go test ./...`
+Expected: build clean; all pass/skip.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add backend/internal/core/ports/services/messaging_service.go backend/internal/core/services/messaging_service.go backend/test/services/messaging_service_test.go
+git commit -m "feat(messaging): EditMessage / DeleteMessage / MuteThread service methods"
+```
+
+---
+
+## Task A6: Hub fan-out + GraphQL resolvers for edit / delete / mute
+
+**Files:**
+- Modify: `backend/internal/adapters/realtime/hub.go`
+- Modify: `backend/internal/adapters/graphql/resolvers/messaging.resolvers.go`
+- Modify: `backend/internal/adapters/graphql/model/messaging.go` (union markers / helpers if needed)
+- Modify: `backend/internal/adapters/graphql/resolvers/resolver.go` (if the union type-switch lives there)
+- Test: `backend/test/realtime/hub_test.go` (extend), `backend/test/resolvers/messaging_resolver_test.go` (extend)
+
+**Interfaces:**
+- Consumes: `domain.EventEnvelope` types `"MESSAGE_EDITED"` / `"MESSAGE_DELETED"`; `h.msgRepo.GetByID`; `domain.MessageEditedEvent` / `domain.MessageDeletedEvent`; the gqlgen `MessagingService` resolver root.
+- Produces:
+  - `Hub.PublishEnvelope` handles the two new envelope types: `"MESSAGE_EDITED"` loads the message via `h.msgRepo.GetByID(ctx, env.MessageID)` (same early-drop guard as `MESSAGE_POSTED`) and `h.Broadcast(env.ThreadID, domain.MessageEditedEvent{Message: *m})`; `"MESSAGE_DELETED"` broadcasts `domain.MessageDeletedEvent{ThreadID: env.ThreadID, MessageID: env.MessageID, Seq: env.Seq}` with no DB load.
+  - The `threadEvents` subscription resolver's domain→GraphQL mapping (wherever `domain.MessagePostedEvent` becomes `model.MessagePosted`) gains cases for `domain.MessageEditedEvent` → `model.MessageEdited{Message: messageToModel(...)}` and `domain.MessageDeletedEvent` → `model.MessageDeleted{ThreadID: ..., MessageID: ..., Seq: ...}`.
+  - `Mutation.EditMessage(ctx, messageID string, body string) (*model.Message, error)` — parse `messageID` via the existing `parseIntID` helper, call `r.Messaging.EditMessage(ctx, actor.ID, id, body)`, map to `model.Message`.
+  - `Mutation.DeleteMessage(ctx, messageID string) (*model.Message, error)` — parse id, call `r.Messaging.DeleteMessage`, map (returns the tombstoned message: `body == ""`, `deletedAt` set).
+  - `Mutation.MuteThread(ctx, threadID string, muted bool) (*model.MessageThread, error)` — parse id, call `r.Messaging.MuteThread`, map via the existing thread mapper.
+  - `Message.EditedAt(ctx, obj *model.Message) (*string, error)` / `Message.DeletedAt(...)` — RFC3339 format of the underlying `*time.Time`, or `nil`. If `model.Message` already carries the timestamps as strings from the mapper, gqlgen may not need field resolvers — check the generated interface and only implement what it demands. Ensure `messageToModel` copies `EditedAt`/`DeletedAt` (formatted like `CreatedAt` is).
+
+- [ ] **Step 1: Write failing hub test**
+
+```go
+func TestHub_PublishEnvelope_MessageEdited(t *testing.T) {
+	// fake msgRepo.GetByID returns a message; subscribe; PublishEnvelope{Type:"MESSAGE_EDITED", MessageID, ThreadID}
+	// assert the subscriber receives a domain.MessageEditedEvent with that message
+}
+func TestHub_PublishEnvelope_MessageDeleted(t *testing.T) {
+	// subscribe; PublishEnvelope{Type:"MESSAGE_DELETED", ThreadID, MessageID, Seq}
+	// assert subscriber receives domain.MessageDeletedEvent{ThreadID, MessageID, Seq}; msgRepo.GetByID NOT called
+}
+```
+
+- [ ] **Step 2: Run, expect failure**
+
+Run: `cd backend && go test ./test/realtime/ -run MessageEdited`
+Expected: FAIL — envelope type falls through to the `default` warn branch, no event delivered.
+
+- [ ] **Step 3: Implement the hub cases** in `PublishEnvelope` (place next to `case "MESSAGE_POSTED":`).
+
+- [ ] **Step 4: Implement the resolver methods + subscription mapping**
+
+Fill the gqlgen stubs in `messaging.resolvers.go`. For the subscription event mapping, find the existing `switch` (or type-assert chain) that turns `domain.ThreadEvent` into the `model` union and add the two cases. Reuse `messageToModel`, `parseIntID`, and the thread mapper already in that file.
+
+- [ ] **Step 5: Write failing resolver tests** (extend `messaging_resolver_test.go`, mirroring its harness)
+
+```go
+func TestEditMessageResolver_HappyPath(t *testing.T) {
+	// fake MessagingService.EditMessage returns an edited message; resolver returns model.Message with editedAt set
+}
+func TestDeleteMessageResolver_HappyPath(t *testing.T) {
+	// returns tombstoned model.Message (body "", deletedAt set)
+}
+func TestMuteThreadResolver_HappyPath(t *testing.T) {
+	// returns model.MessageThread; service MuteThread called with (actor, threadID, true)
+}
+func TestEditMessageResolver_PropagatesForbidden(t *testing.T) {
+	// service returns domain.ErrForbidden => resolver returns an error carrying FORBIDDEN (match how other resolvers surface it)
+}
+```
+
+- [ ] **Step 6: Run resolver + hub tests**
+
+Run: `cd backend && go test ./test/realtime/ ./test/resolvers/`
+Expected: PASS.
+
+- [ ] **Step 7: Codegen guard + full backend build/test**
+
+Run: `cd backend && make graphql-gen`
+Run: `cd backend && git diff --exit-code internal/adapters/graphql/generated internal/adapters/graphql/model/models_gen.go`
+Expected: no diff (generated code already committed in A3 and unchanged by hand-written resolvers).
+Run: `cd backend && go build ./...`
+Run: `cd backend && go test ./...`
+Expected: all green (DB-gated skip without a database).
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add backend/internal/adapters/realtime/hub.go backend/internal/adapters/graphql backend/test/realtime backend/test/resolvers
+git commit -m "feat(messaging): hub + resolvers for edit/delete/mute events and mutations"
+```
+
+---
+
+# Part B — Frontend core
+
 ## Task 1: Add `graphql-ws` dependency
 
 **Files:**
@@ -651,8 +1362,9 @@ export interface Message {
 	threadId: string;
 	sender: MessagingUser;
 	seq: number;
-	body: string;
+	body: string;               // "" once deleted (tombstone)
 	editedAt: string | null;   // ← NEW; null until the sender edits
+	deletedAt: string | null;  // ← NEW; null unless soft-deleted → render "message deleted"
 	createdAt: string;
 }
 
@@ -672,11 +1384,11 @@ export interface MessageThread {
 
 // New response interfaces
 export interface EditMessageResponse   { editMessage: Message }
-export interface DeleteMessageResponse { deleteMessage: boolean }
+export interface DeleteMessageResponse { deleteMessage: Message }   // tombstone: body "", deletedAt set
 export interface MuteThreadResponse    { muteThread: MessageThread }
 ```
 
-Extend `MESSAGE_FIELDS` to include `editedAt` (so every document that uses the fragment picks it up):
+Extend `MESSAGE_FIELDS` to include `editedAt` and `deletedAt` (so every document that uses the fragment picks them up):
 
 ```ts
 const MESSAGE_FIELDS = `
@@ -685,6 +1397,7 @@ const MESSAGE_FIELDS = `
 	seq
 	body
 	editedAt
+	deletedAt
 	createdAt
 	sender { ${USER_FIELDS} }
 `;
@@ -724,7 +1437,9 @@ export const EDIT_MESSAGE = gql`
 
 export const DELETE_MESSAGE = gql`
 	mutation DeleteMessage($messageId: ID!) {
-		deleteMessage(messageId: $messageId)
+		deleteMessage(messageId: $messageId) {
+			${MESSAGE_FIELDS}
+		}
 	}
 `;
 
@@ -751,7 +1466,7 @@ export const THREAD_EVENTS_SUBSCRIPTION = gql`
 			... on PresenceChanged    { threadId userId state }
 			... on StreamReset        { threadId }
 			... on MessageEdited      { message { ${MESSAGE_FIELDS} } }
-			... on MessageDeleted     { messageId threadId }
+			... on MessageDeleted     { threadId messageId seq }
 		}
 	}
 `;
@@ -766,9 +1481,10 @@ it('editMessage mutation requests the MESSAGE_FIELDS fragment including editedAt
 	expect(EDIT_MESSAGE).toContain('editedAt');
 });
 
-it('deleteMessage mutation names its operation', () => {
+it('deleteMessage mutation returns the tombstoned message fields', () => {
 	expect(DELETE_MESSAGE).toContain('mutation DeleteMessage');
 	expect(DELETE_MESSAGE).toContain('$messageId: ID!');
+	expect(DELETE_MESSAGE).toContain('deletedAt');
 });
 
 it('muteThread mutation returns a full thread including muted field', () => {
@@ -779,7 +1495,7 @@ it('muteThread mutation returns a full thread including muted field', () => {
 it('threadEvents subscription includes MessageEdited and MessageDeleted fragments', () => {
 	expect(THREAD_EVENTS_SUBSCRIPTION).toContain('... on MessageEdited');
 	expect(THREAD_EVENTS_SUBSCRIPTION).toContain('... on MessageDeleted');
-	expect(THREAD_EVENTS_SUBSCRIPTION).toContain('messageId');
+	expect(THREAD_EVENTS_SUBSCRIPTION).toMatch(/on MessageDeleted\s*{[^}]*seq/);
 });
 ```
 
@@ -1256,8 +1972,9 @@ export interface MessageEditedEvent {
 }
 export interface MessageDeletedEvent {
 	__typename: 'MessageDeleted';
-	messageId: string;
 	threadId: string;
+	messageId: string;
+	seq: number;
 }
 
 // Replace the ThreadEvent union to include the new members
@@ -1299,17 +2016,30 @@ export function applyMessageEdited(
 	return { ...cache, items };
 }
 
-/** Remove a message from the list by id. Returns the same ref when not found. */
+/**
+ * Tombstone a message in place by id: blank its body and set `deletedAt`, keeping
+ * it (and its seq) in the list so history stays gap-free. Match on id first, then
+ * on `seq` (the MessageDeleted event carries seq but not the message id shape the
+ * optimistic row used). `deletedAt` may be passed (server value) or defaulted to now.
+ * Returns the same ref when the row is absent or already tombstoned.
+ */
 export function applyMessageDeleted(
 	cache: ThreadMessagesCache,
-	messageId: string,
+	ref: { messageId?: string; seq?: number },
+	deletedAt: string = new Date().toISOString(),
 ): ThreadMessagesCache {
-	const idx = cache.items.findIndex((m) => m.id === messageId);
+	const idx = cache.items.findIndex(
+		(m) => (ref.messageId != null && m.id === ref.messageId) || (ref.seq != null && m.seq === ref.seq),
+	);
 	if (idx === -1) return cache;
-	const items = cache.items.filter((m) => m.id !== messageId);
+	if (cache.items[idx].deletedAt != null && cache.items[idx].body === '') return cache;
+	const items = [...cache.items];
+	items[idx] = { ...items[idx], body: '', deletedAt };
 	return { ...cache, items };
 }
 ```
+
+> Callers: the subscription passes `{ messageId, seq }` from the `MessageDeleted` event; the optimistic `useDeleteMessage` hook passes `{ messageId }` and lets `deletedAt` default.
 
 Extend the `applyThreadEventToThread` switch with two new cases (insert before the `default` branch):
 
@@ -1344,27 +2074,39 @@ describe('threadCache — edit and delete', () => {
 		expect(applyMessageEdited(c, msg(99, { body: 'x' }))).toBe(c);
 	});
 
-	it('applyMessageDeleted removes the message by id', () => {
+	it('applyMessageDeleted tombstones in place (keeps seq, blanks body, sets deletedAt)', () => {
 		let c = seedFromApiPage([msg(7), msg(8)], pageInfo());
-		c = applyMessageDeleted(c, 'm7');
-		expect(c.items.map((m) => m.seq)).toEqual([8]);
+		c = applyMessageDeleted(c, { messageId: 'm7', seq: 7 }, '2026-09-07T15:00:00Z');
+		expect(c.items.map((m) => m.seq)).toEqual([7, 8]);
+		expect(c.items[0]).toMatchObject({ body: '', deletedAt: '2026-09-07T15:00:00Z' });
 	});
 
-	it('applyMessageDeleted returns the same ref when the id is not present', () => {
+	it('applyMessageDeleted matches on seq when the id is unknown', () => {
+		let c = seedFromApiPage([msg(7)], pageInfo());
+		c = applyMessageDeleted(c, { seq: 7 });
+		expect(c.items[0].body).toBe('');
+		expect(c.items[0].deletedAt).not.toBeNull();
+	});
+
+	it('applyMessageDeleted returns the same ref when the row is absent or already tombstoned', () => {
 		const c = seedFromApiPage([msg(7)], pageInfo());
-		expect(applyMessageDeleted(c, 'no-such-id')).toBe(c);
+		expect(applyMessageDeleted(c, { messageId: 'no-such-id' })).toBe(c);
+		const t = applyMessageDeleted(c, { seq: 7 });
+		expect(applyMessageDeleted(t, { seq: 7 })).toBe(t);
 	});
 });
 ```
 
-> **Note:** the `msg` helper in the test file uses `id: \`m\${seq}\`` — that matches the ids used above. If `Message.editedAt` was not part of the original helper, extend it:
+> **Note:** the `msg` helper in the test file uses `id: \`m\${seq}\`` — that matches the ids used above. Extend it for the two new nullable fields so the `Message` literal type-checks everywhere it is used (Task 3's structural type test and this file):
 > ```ts
 > const msg = (seq: number, over: Partial<Message> = {}): Message => ({
 >   ...,
->   editedAt: null,   // ← add this line
+>   editedAt: null,   // ← add
+>   deletedAt: null,  // ← add
 >   ...over,
 > });
 > ```
+> Also update Task 3's `queries-messaging.test.ts` `Message` structural-type literal to include `editedAt: null, deletedAt: null`.
 
 Update the commit to include both files:
 
@@ -2844,7 +3586,9 @@ git commit -m "feat(messaging): typing / add-participants / leave-thread hooks"
 
 ---
 
-## Task 23: Mutation hooks — edit, delete, mute _(requires backend PR)_
+## Task 23: Mutation hooks — edit, delete, mute
+
+_(Backend for these ships in Part A of this same plan/branch — Tasks A3–A6. Depends on Task 3's addendum for the GraphQL documents and Task 4's addendum for `applyMessageEdited` / `applyMessageDeleted`.)_
 
 **Files:**
 - Create: `src/lib/queries/hooks/useEditMessage.ts`
@@ -2863,10 +3607,10 @@ git commit -m "feat(messaging): typing / add-participants / leave-thread hooks"
     - `onSuccess(data, args)` → `setQueryData(key, (c) => c ? applyMessageEdited(c, data.editMessage) : c)` (reconciles server `editedAt`).
     - `onError(_e, args, ctx)` → rolls back via `setQueryData` using `ctx.previousBody`; `toast.error('Could not edit message')`.
   - `useDeleteMessage()` → `createMutation`. `mutate` takes `{ messageId: string; threadId: string }`.
-    - `onMutate(args)`: optimistically removes from `queryKeys.messaging.messages.list(threadId)` via `applyMessageDeleted(cache, args.messageId)`.
+    - `onMutate(args)`: optimistically **tombstones** the row in `queryKeys.messaging.messages.list(threadId)` via `applyMessageDeleted(cache, { messageId: args.messageId })` (blank body + `deletedAt`, row kept).
     - `mutationFn(args)` → `graphqlRequest<DeleteMessageResponse>(DELETE_MESSAGE, { messageId: args.messageId })`.
-    - `onError(_e, args)` → `queryClient.invalidateQueries({ queryKey: queryKeys.messaging.messages.list(args.threadId) })` (refetch restores the row); `toast.error('Could not delete message')`.
-    - No `onSuccess` needed — the subscription's `MessageDeleted` event is the authoritative source; if the subscription is live, it already applied `applyMessageDeleted`; if not, the optimistic removal stands.
+    - `onSuccess(data, args)` → `setQueryData(key, (c) => c ? applyMessageEdited(c, data.deleteMessage) : c)` — reuse `applyMessageEdited` (it replaces the item by id) to reconcile the server's exact `deletedAt`/`body`.
+    - `onError(_e, args)` → `queryClient.invalidateQueries({ queryKey: queryKeys.messaging.messages.list(args.threadId) })` (refetch restores the un-tombstoned row); `toast.error('Could not delete message')`.
   - `useMuteThread()` → `createMutation`. `mutate` takes `{ threadId: string; muted: boolean }`.
     - `mutationFn(args)` → `graphqlRequest<MuteThreadResponse>(MUTE_THREAD, { threadId: args.threadId, muted: args.muted })`.
     - `onSuccess(data)` → `queryClient.setQueryData(queryKeys.messaging.threads.detail(data.muteThread.id), data.muteThread)` then invalidate `queryKeys.messaging.threads.lists()` with `refetchType: 'none'`.
@@ -2966,24 +3710,27 @@ import { queryKeys } from '$lib/queries/keys';
 describe('useDeleteMessage', () => {
 	beforeEach(() => vi.clearAllMocks());
 
-	it('onMutate optimistically removes the message from the list', () => {
+	it('onMutate optimistically tombstones the message in place', () => {
 		useDeleteMessage();
 		mocks.captured.onMutate({ messageId: 'm7', threadId: 't1' });
 		const updater = mocks.mockSetQueryData.mock.calls[0][1];
 		const next = updater({
 			items: [
-				{ id: 'm7', seq: 7 },
-				{ id: 'm8', seq: 8 },
+				{ id: 'm7', seq: 7, body: 'secret', deletedAt: null },
+				{ id: 'm8', seq: 8, body: 'hi', deletedAt: null },
 			],
 			oldestLoadedSeq: 7,
 			hasMoreOlder: false,
 		});
-		expect(next.items.map((m: any) => m.id)).toEqual(['m8']);
+		expect(next.items.map((m: any) => m.id)).toEqual(['m7', 'm8']);
+		expect(next.items[0]).toMatchObject({ body: '', deletedAt: expect.any(String) });
 	});
 
 	it('mutationFn calls DELETE_MESSAGE', async () => {
 		useDeleteMessage();
-		mocks.mockGraphql.mockResolvedValue({ deleteMessage: true });
+		mocks.mockGraphql.mockResolvedValue({
+			deleteMessage: { id: 'm7', threadId: 't1', seq: 7, body: '', editedAt: null, deletedAt: '2026-09-07T15:00:00Z', createdAt: 'x', sender: { id: 'u1', username: 'me' } },
+		});
 		await mocks.captured.mutationFn({ messageId: 'm7', threadId: 't1' });
 		expect(mocks.mockGraphql).toHaveBeenCalledWith(DELETE_MESSAGE, { messageId: 'm7' });
 	});
@@ -3127,7 +3874,11 @@ import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { graphqlRequest } from '../client';
 import { DELETE_MESSAGE, type DeleteMessageResponse } from '../messaging';
 import { queryKeys } from '../keys';
-import { applyMessageDeleted, type ThreadMessagesCache } from '$lib/messaging/threadCache';
+import {
+	applyMessageDeleted,
+	applyMessageEdited,
+	type ThreadMessagesCache,
+} from '$lib/messaging/threadCache';
 import { toast } from 'svelte-sonner';
 
 export function useDeleteMessage() {
@@ -3139,11 +3890,17 @@ export function useDeleteMessage() {
 		onMutate: (args) => {
 			queryClient.setQueryData<ThreadMessagesCache>(
 				queryKeys.messaging.messages.list(args.threadId),
-				(cache) => (cache ? applyMessageDeleted(cache, args.messageId) : cache),
+				(cache) => (cache ? applyMessageDeleted(cache, { messageId: args.messageId }) : cache),
+			);
+		},
+		onSuccess: (data, args) => {
+			queryClient.setQueryData<ThreadMessagesCache>(
+				queryKeys.messaging.messages.list(args.threadId),
+				(cache) => (cache ? applyMessageEdited(cache, data.deleteMessage) : cache),
 			);
 		},
 		onError: (_err, args) => {
-			// Invalidate so the refetch restores the deleted row in the UI.
+			// Invalidate so the refetch restores the un-tombstoned row in the UI.
 			queryClient.invalidateQueries({ queryKey: queryKeys.messaging.messages.list(args.threadId) });
 			toast.error('Could not delete message');
 		},
@@ -3673,6 +4430,56 @@ Expected: PASS (6 tests).
 git add src/lib/messaging/useThreadStream.svelte.ts frontend/tests/unit/messaging-useThreadStream.test.ts
 git commit -m "feat(messaging): per-thread events subscription rune"
 ```
+
+### Addendum — MessageEdited / MessageDeleted dispatch (splice into Task 13's Step 3 file + test)
+
+**Imports:** add `applyMessageEdited, applyMessageDeleted` to the `$lib/messaging/threadCache` import.
+
+**`handle()` switch — add two cases before the `StreamReset` case:**
+
+```ts
+			case 'MessageEdited':
+				opts.queryClient.setQueryData<ThreadMessagesCache>(messagesKey(), (c) =>
+					c ? applyMessageEdited(c, event.message) : c,
+				);
+				break;
+			case 'MessageDeleted':
+				opts.queryClient.setQueryData<ThreadMessagesCache>(messagesKey(), (c) =>
+					c
+						? applyMessageDeleted(c, { messageId: event.messageId, seq: event.seq })
+						: c,
+				);
+				break;
+```
+
+(No `threads.detail` update on either — an edit changes no summary field, and a delete keeps `seq`/`latestSeq` intact as a tombstone. `applyThreadEventToThread`'s `MessageEdited`/`MessageDeleted` cases from Task 4's addendum still return the thread unchanged, so calling it is optional; skip it here.)
+
+**Add a test** to `frontend/tests/unit/messaging-useThreadStream.test.ts`:
+
+```ts
+	it('MessageEdited replaces the body in the message cache; MessageDeleted tombstones it', () => {
+		const mKey = JSON.stringify(queryKeys.messaging.messages.list('t1'));
+		const caches: Record<string, any> = {
+			[mKey]: {
+				items: [{ ...msg(7), body: 'original', editedAt: null, deletedAt: null }],
+				oldestLoadedSeq: 7,
+				hasMoreOlder: false,
+			},
+		};
+		const s = createThreadStream({ queryClient: fakeQC(caches) as any, getThreadId: () => 't1', myUserId: 'u1', now: clockFn });
+		s.start();
+		mocks.handlers.next({
+			threadEvents: { __typename: 'MessageEdited', message: { ...msg(7), body: 'fixed', editedAt: '2026-09-07T15:00:00Z', deletedAt: null } },
+		});
+		expect(caches[mKey].items[0].body).toBe('fixed');
+		mocks.handlers.next({ threadEvents: { __typename: 'MessageDeleted', threadId: 't1', messageId: 'm7', seq: 7 } });
+		expect(caches[mKey].items[0]).toMatchObject({ body: '', deletedAt: expect.any(String) });
+		expect(caches[mKey].items.map((m: any) => m.seq)).toEqual([7]);
+		s.stop();
+	});
+```
+
+Update the Task 13 commit to include the extended test file (it is already in the `git add` list).
 
 ---
 ## Task 14: Presentational primitives — format util, Avatar, PresenceDot, TypingIndicator
@@ -5258,7 +6065,13 @@ git commit -m "feat(messaging): header link with unread badge and inbox stream m
 
 ---
 
-## Task 24: Edit/delete UI + mute toggle _(requires backend PR + Task 23)_
+## Task 24: Edit/delete UI + mute toggle
+
+_(Depends on Tasks 15, 17, 19, 23.)_
+
+> **Prop reconciliation (read first).** Task 15 built `MessageBubble.svelte` with props `{ message, mine, showSender }`. This task adds `{ currentUser, onEdit, onDelete }`. The final prop set is `{ message, mine, showSender, currentUser, onEdit, onDelete }` — keep `mine`/`showSender` (still used for alignment/sender label) and derive `isOwn` from `mine` rather than re-deriving from `currentUser` (they must agree; `mine` is the single source). `ThreadView` (Task 19) already passes `mine`/`showSender`; extend it to also thread `currentUser`, `onEditMessage`, `onDeleteMessage` through to each bubble, and accept those three as its own props from `[threadId]/+page.svelte`.
+
+> **Tombstone rendering (delete = tombstone, per the 2026-09-07 ruling).** A deleted message is **not** removed from the list. When `message.deletedAt != null` (or `message.body === ''`), `MessageBubble` renders a muted italic `"message deleted"` line instead of the body, shows **no** `(edited)` label, and shows **no** edit/delete action row regardless of `isOwn`. Add a `MessageBubble` test for this.
 
 **Files (all existing — amend only):**
 - Modify: `src/lib/components/messaging/MessageBubble.svelte`
@@ -5340,7 +6153,9 @@ Add these props alongside the existing ones:
 </script>
 
 <!-- In the bubble template, replace the body section with: -->
-{#if editing}
+{#if message.deletedAt || message.body === ''}
+  <p class="text-sm italic text-muted-foreground">message deleted</p>
+{:else if editing}
   <div class="flex flex-col gap-1">
     <textarea
       class="w-full resize-none rounded border border-border bg-background px-2 py-1 text-sm focus:outline-none"
@@ -5365,8 +6180,8 @@ Add these props alongside the existing ones:
   {/if}
 {/if}
 
-<!-- Action row (own messages only, visible on group hover via CSS) -->
-{#if isOwn && !editing}
+<!-- Action row (own, non-deleted messages only, visible on group hover via CSS) -->
+{#if isOwn && !editing && !message.deletedAt && message.body !== ''}
   <div class="absolute -top-6 right-0 hidden group-hover:flex items-center gap-1 bg-background border border-border rounded px-1 py-0.5 shadow-sm">
     <button onclick={startEdit} aria-label="Edit message" class="text-muted-foreground hover:text-foreground">
       <PencilIcon size={14} />
@@ -5515,13 +6330,29 @@ it('enters edit mode on pencil click and calls onEdit on confirm', async () => {
 it('shows (edited) label when editedAt is set', () => {
   render(MessageBubble, {
     props: {
-      message: { id: 'm1', threadId: 't1', sender: { id: 'u1', username: 'me' }, seq: 1, body: 'changed', editedAt: '2026-09-07T14:00:00Z', createdAt: 'x' },
+      message: { id: 'm1', threadId: 't1', sender: { id: 'u1', username: 'me' }, seq: 1, body: 'changed', editedAt: '2026-09-07T14:00:00Z', deletedAt: null, createdAt: 'x' },
+      mine: true, showSender: false,
       currentUser: { id: 'u1', username: 'me' },
       onEdit: vi.fn(),
       onDelete: vi.fn(),
     },
   });
   expect(screen.getByText('(edited)')).toBeInTheDocument();
+});
+
+it('renders a tombstone and no actions for a deleted message', () => {
+  render(MessageBubble, {
+    props: {
+      message: { id: 'm1', threadId: 't1', sender: { id: 'u1', username: 'me' }, seq: 1, body: '', editedAt: null, deletedAt: '2026-09-07T15:00:00Z', createdAt: 'x' },
+      mine: true, showSender: false,
+      currentUser: { id: 'u1', username: 'me' },
+      onEdit: vi.fn(),
+      onDelete: vi.fn(),
+    },
+  });
+  expect(screen.getByText('message deleted')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Edit message')).not.toBeInTheDocument();
+  expect(screen.queryByText('(edited)')).not.toBeInTheDocument();
 });
 ```
 
@@ -5557,43 +6388,52 @@ git commit -m "feat(messaging): inline message edit/delete and thread mute toggl
 
 ---
 
-## Task 22: Full verification & PR
+## Task 22: Whole-stack verification & PR
 
-**Files:** none (verification + PR only).
+**Files:** none (verification + PR only). Runs after every Part A, B and C task.
 
-- [ ] **Step 1: Type-check**
+- [ ] **Step 1: Backend build + tests + codegen guard**
+
+Run: `cd backend && go build ./...` — zero errors.
+Run: `cd backend && go test ./...` — all pass (DB-gated tests skip without a database; note that in the report).
+Run: `cd backend && make graphql-gen`
+Run: `cd backend && git diff --exit-code internal/adapters/graphql/generated internal/adapters/graphql/model/models_gen.go` — no diff (generated code already committed and in sync with `messaging.graphql`).
+Run: `ls backend/migrations/ | tail -3` — confirm `000018_messaging_retention_unbounded.*` is the newest and there is no numbering gap.
+
+- [ ] **Step 2: Frontend type-check**
 
 Run: `cd frontend && pnpm run check`
 Expected: 0 errors. Fix any type errors before proceeding (common cause: a `queryKey` factory returns a readonly tuple — cast with `as unknown as` only if TanStack's overloads reject it, otherwise adjust the call site).
 
-- [ ] **Step 2: Full frontend test suite**
+- [ ] **Step 3: Full frontend test suite**
 
 Run: `cd frontend && pnpm run test:run`
 Expected: all pass (the pre-existing suite plus every `messaging-*`, `hooks-*messaging*`, and new component test). If `messaging-useThreadStream` or `messaging-typing` is flaky under the full run, check for a leaked real timer — every `setInterval`/`setTimeout` path in this plan is injectable; the test must use `vi.useFakeTimers()` or the injected clock.
 
-- [ ] **Step 3: Prettier**
+- [ ] **Step 4: Prettier**
 
 Run: `cd frontend && pnpm exec prettier --write src/lib/messaging src/lib/queries/messaging.ts src/lib/queries/hooks src/lib/components/messaging src/routes/messages tests`
 Expected: files reformatted in place, no errors.
 
-- [ ] **Step 4: Stale-reference grep**
+- [ ] **Step 5: Stale-reference grep**
 
 Run: `git grep -n "ws-client\.ts\b" -- frontend` (should be empty — the file is `ws-client.svelte.ts`).
-Run: `git grep -n "messages-frontend" -- docs` (sanity: plan filename only).
+Run: `git grep -n "EditMessageInput" -- backend` (should be empty — `editMessage` takes flat args).
+Run: `git grep -n "seq <= NEW.seq - 1000" -- backend/migrations` (only the `000018 …down.sql` restore path may match).
 
-- [ ] **Step 5: Build**
+- [ ] **Step 6: Frontend build**
 
 Run: `cd frontend && pnpm run build`
 Expected: adapter-static build succeeds; `build/_headers` and `build/_redirects` still present.
 
-- [ ] **Step 6: Commit any formatting/type fixups**
+- [ ] **Step 7: Commit any formatting/type fixups**
 
 ```bash
 git add -A
 git commit -m "chore(messaging): prettier + type fixups"
 ```
 
-- [ ] **Step 7: Session reflection, then open the PR**
+- [ ] **Step 8: Session reflection, then open the PR**
 
 Run the `/revise-claude-md` command (required by the pre-PR hook — it cannot be called via the Skill tool). If it surfaces no learnings, proceed straight to the PR.
 
@@ -5602,24 +6442,26 @@ Push and open the PR **against the messaging backend branch**, using `gh api` (n
 ```bash
 git push -u origin feature/messaging-frontend
 gh api repos/CodeWarrior-debug/perspectize/pulls \
-  -f title="feat(messaging): SvelteKit messaging client — threads, realtime, receipts, presence" \
+  -f title="feat(messaging): messaging client + edit/delete/mute + unbounded retention" \
   -f head="feature/messaging-frontend" \
   -f base="worktree-feature+messaging-architecture-research" \
   -F body=@<path-to-filled-template>
 ```
 
 PR body must:
-- Fill **Feature Description**, **Technical Changes** (WS client, cache-reducer approach, hooks, components, routes), **Test Plan** (unit + component coverage; note browser verification is local-only per CLAUDE.md and deferred to a local session).
-- State the base branch is the messaging backend branch and this PR should merge only after (or together with) it.
-- Leave the **Demo** screenshot table with a note that UI screenshots are pending a local self-verification session (no Clerk sign-in available in cloud/CI).
+- **Feature Description:** end-to-end messaging in the app (threads, realtime delivery, history paging, typing, read receipts, presence), plus message **edit**, message **delete** (tombstone), thread **mute**, and removal of the hard-coded 1000-message retention cap (now opt-in via `MESSAGE_RETENTION_MAX`).
+- **Technical Changes:** _Backend_ — migration `000018` drops the in-trigger prune; `RetentionSweeper` (env-gated); `editMessage`/`deleteMessage`/`muteThread` mutations; `Message.editedAt`/`deletedAt`; `MessageEdited`/`MessageDeleted` events + hub fan-out. _Frontend_ — `graphql-ws` client, pure cache-reducer approach, TanStack hooks, `/messages` routes, components.
+- **Test Plan:** backend `go test ./...` + `make graphql-gen` no-diff; frontend `pnpm run check` + `pnpm run test:run` + `pnpm run build`. Note browser verification is local-only per CLAUDE.md and deferred to a local session.
+- State the base branch is `worktree-feature+messaging-architecture-research`; this PR carries its own backend delta and should merge after (or together with) that branch.
+- **Demo** screenshot table: note UI screenshots pending a local self-verification session (no Clerk sign-in in cloud/CI). Document `MESSAGE_RETENTION_MAX` / `MESSAGE_RETENTION_SWEEP_MINUTES` in the env section.
 - End with:
   ```
   🤖 Generated with [Claude Code](https://claude.com/claude-code)
   ```
 
-- [ ] **Step 8: Report**
+- [ ] **Step 9: Report**
 
-Summarise: files added, test counts, `pnpm run check` / `pnpm run test:run` / `pnpm run build` results (paste the summary lines), and the PR URL.
+Summarise: backend + frontend build/test results (paste the summary lines), test counts, migration list, and the PR URL.
 
 ---
 
@@ -5646,11 +6488,12 @@ Summarise: files added, test counts, `pnpm run check` / `pnpm run test:run` / `p
 - **`messageThreads` is fetched once with default paging** (no infinite scroll on the thread list). The inbox is small for v1; add paging when a user reasonably has >50 threads.
 - **`addThreadParticipants` ADDED events** don't synthesize a participant client-side (no user object on the event) — the reducer is a no-op for ADDED and the thread detail is invalidated/refetched instead (Task 11).
 
-**Features added beyond the original spec (Tasks 23–24):**
-- **Edit message** — inline edit in `MessageBubble` (own messages only), optimistic update via `useEditMessage`, reconciled by `MessageEdited` subscription event.
-- **Delete message** — optimistic remove via `useDeleteMessage`, confirmed by `MessageDeleted` subscription event; no undo in v1.
-- **Mute thread** — toggle in `ThreadListItem` via `useMuteThread`; muted threads show a `BellOffIcon`.
-- All three require the backend prerequisites PR (see **Backend Prerequisites** section above). They are gated behind Task 23/24 and do not block Tasks 1–22.
+**Deliberate divergences from the spec (user direction, 2026-09-07):**
+- **Retention cap removed** — Tasks A1–A2. The spec's in-trigger "newest ~1000 per thread" prune is gone; history is unbounded unless `MESSAGE_RETENTION_MAX` is set, in which case `RetentionSweeper` prunes on an interval.
+- **Edit message** — Tasks A3–A6 (backend), 23–24 (frontend). Inline edit in `MessageBubble` (own messages only), optimistic via `useEditMessage`, reconciled by the `MessageEdited` event. Shows `(edited)`.
+- **Delete message (tombstone)** — Tasks A3–A6, 23–24. Soft delete: row + `seq` kept, `body` blanked, `deletedAt` set; `deleteMessage` returns the tombstoned `Message`. `MessageBubble` renders "message deleted" and no actions. Optimistic tombstone via `useDeleteMessage`, reconciled by the `MessageDeleted` event (carries `seq`). No undo in v1.
+- **Mute thread** — Tasks A3–A6, 23–24. `thread_participants.muted` per viewer; toggle in `ThreadListItem` via `useMuteThread`; muted threads show `BellOffIcon`. No new event — the mutation returns the updated thread.
+- All backend for the above ships in **this** branch/PR (Part A), not a separate PR.
 
 **Placeholder scan:** none — every step has literal code or a literal command.
 
