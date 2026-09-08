@@ -40,4 +40,21 @@ export const queryKeys = {
 		details: () => [...queryKeys.perspectives.all(), 'detail'] as const,
 		detail: (id: string) => [...queryKeys.perspectives.details(), id] as const,
 	},
+
+	messaging: {
+		all: () => [...queryKeys.all, 'messaging'] as const,
+		threads: {
+			all: () => [...queryKeys.messaging.all(), 'threads'] as const,
+			lists: () => [...queryKeys.messaging.threads.all(), 'list'] as const,
+			list: () => [...queryKeys.messaging.threads.lists()] as const,
+			details: () => [...queryKeys.messaging.threads.all(), 'detail'] as const,
+			detail: (id: string) => [...queryKeys.messaging.threads.details(), id] as const,
+		},
+		messages: {
+			all: () => [...queryKeys.messaging.all(), 'messages'] as const,
+			lists: () => [...queryKeys.messaging.messages.all(), 'list'] as const,
+			list: (threadId: string) =>
+				[...queryKeys.messaging.messages.lists(), { threadId }] as const,
+		},
+	},
 } as const;
