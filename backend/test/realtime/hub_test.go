@@ -34,6 +34,12 @@ func (s stubMsgRepo) MaxSeq(ctx context.Context, t int) (int64, error) { return 
 func (s stubMsgRepo) CountSince(ctx context.Context, t int, since int64) (int, error) {
 	return 0, nil
 }
+func (s stubMsgRepo) UpdateBody(ctx context.Context, id int64, body string, editedAt time.Time) (*domain.Message, error) {
+	return nil, nil
+}
+func (s stubMsgRepo) SoftDelete(ctx context.Context, id int64, deletedAt time.Time) (*domain.Message, error) {
+	return nil, nil
+}
 
 // stubThreadRepo is a ThreadRepository whose GetThread returns a caller-supplied
 // thread; the Hub's inbox fan-out uses it to resolve participants.
@@ -62,6 +68,9 @@ func (stubThreadRepo) SetLeft(ctx context.Context, threadID, userID int, at time
 	return nil
 }
 func (stubThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) error {
+	return nil
+}
+func (stubThreadRepo) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
 	return nil
 }
 

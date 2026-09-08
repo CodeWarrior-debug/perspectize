@@ -24,6 +24,7 @@ type mockThreadRepo struct {
 	addParticipantsFn    func(ctx context.Context, threadID int, userIDs []int) error
 	setLeftFn            func(ctx context.Context, threadID, userID int, at time.Time) error
 	setLastReadFn        func(ctx context.Context, threadID, userID int, seq int64) error
+	setMutedFn           func(ctx context.Context, threadID, userID int, muted bool) error
 }
 
 func (m *mockThreadRepo) CreateThread(ctx context.Context, createdBy int, title *string, participantUserIDs []int) (*domain.MessageThread, error) {
@@ -75,6 +76,13 @@ func (m *mockThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, 
 	return nil
 }
 
+func (m *mockThreadRepo) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
+	if m.setMutedFn != nil {
+		return m.setMutedFn(ctx, threadID, userID, muted)
+	}
+	return nil
+}
+
 // --- mock MessageRepository ---
 
 type mockMessageRepo struct {
@@ -84,6 +92,8 @@ type mockMessageRepo struct {
 	listSinceFn   func(ctx context.Context, threadID int, sinceSeq int64) ([]domain.Message, error)
 	maxSeqFn      func(ctx context.Context, threadID int) (int64, error)
 	countSinceFn  func(ctx context.Context, threadID int, sinceSeq int64) (int, error)
+	updateBodyFn  func(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error)
+	softDeleteFn  func(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error)
 }
 
 func (m *mockMessageRepo) Insert(ctx context.Context, msg *domain.Message) (*domain.Message, error) {
@@ -128,6 +138,20 @@ func (m *mockMessageRepo) CountSince(ctx context.Context, threadID int, sinceSeq
 		return m.countSinceFn(ctx, threadID, sinceSeq)
 	}
 	return 0, nil
+}
+
+func (m *mockMessageRepo) UpdateBody(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error) {
+	if m.updateBodyFn != nil {
+		return m.updateBodyFn(ctx, messageID, body, editedAt)
+	}
+	return nil, domain.ErrNotFound
+}
+
+func (m *mockMessageRepo) SoftDelete(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
+	if m.softDeleteFn != nil {
+		return m.softDeleteFn(ctx, messageID, deletedAt)
+	}
+	return nil, domain.ErrNotFound
 }
 
 // --- mock EventPublisher ---

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
@@ -134,6 +135,38 @@ func (r *GormMessageRepository) CountSince(ctx context.Context, threadID int, si
 		return 0, fmt.Errorf("failed to count messages since seq: %w", err)
 	}
 	return int(n), nil
+}
+
+// UpdateBody rewrites a message body and stamps edited_at. The row is reloaded
+// via GetByID so the returned message carries the trigger-assigned seq and the
+// DB created_at unchanged. A missing id is reported as domain.ErrNotFound.
+func (r *GormMessageRepository) UpdateBody(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error) {
+	res := r.db.WithContext(ctx).Model(&MessageModel{}).
+		Where("id = ?", messageID).
+		Updates(map[string]any{"body": body, "edited_at": editedAt})
+	if res.Error != nil {
+		return nil, fmt.Errorf("failed to update message body: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return nil, domain.ErrNotFound
+	}
+	return r.GetByID(ctx, messageID)
+}
+
+// SoftDelete tombstones a message: deleted_at is set and the body blanked while
+// the row and its seq stay in place so history replay is unaffected. The
+// reloaded row is returned. A missing id is reported as domain.ErrNotFound.
+func (r *GormMessageRepository) SoftDelete(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
+	res := r.db.WithContext(ctx).Model(&MessageModel{}).
+		Where("id = ?", messageID).
+		Updates(map[string]any{"deleted_at": deletedAt, "body": ""})
+	if res.Error != nil {
+		return nil, fmt.Errorf("failed to soft-delete message: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return nil, domain.ErrNotFound
+	}
+	return r.GetByID(ctx, messageID)
 }
 
 func messageModelsToDomain(rows []MessageModel) []domain.Message {

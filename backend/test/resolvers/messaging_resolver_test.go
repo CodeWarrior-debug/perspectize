@@ -133,6 +133,12 @@ func (s inboxStubMsgRepo) MaxSeq(ctx context.Context, threadID int) (int64, erro
 func (s inboxStubMsgRepo) CountSince(ctx context.Context, threadID int, sinceSeq int64) (int, error) {
 	return 0, nil
 }
+func (s inboxStubMsgRepo) UpdateBody(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error) {
+	return nil, nil
+}
+func (s inboxStubMsgRepo) SoftDelete(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
+	return nil, nil
+}
 
 type inboxStubThreadRepo struct{ thread domain.MessageThread }
 
@@ -156,6 +162,9 @@ func (inboxStubThreadRepo) SetLeft(ctx context.Context, threadID, userID int, at
 	return nil
 }
 func (inboxStubThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) error {
+	return nil
+}
+func (inboxStubThreadRepo) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
 	return nil
 }
 
