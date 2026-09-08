@@ -841,6 +841,65 @@ git commit -m "feat(messaging): hub + resolvers for edit/delete/mute events and 
 
 ---
 
+## Task A7: Expose `MessageThread.muted` on the GraphQL schema
+
+**Why:** added during execution (2026-09-07). The frontend `THREAD_FIELDS` fragment (Task 3 addendum) selects `muted` on `MessageThread`, but Part A's schema work never added that field to the GraphQL `type MessageThread` — `muted` lived only on the DB table / domain `ThreadParticipant` / repo / service. Without this task every thread-fetching operation fails client-side GraphQL validation (`Cannot query field "muted" on type "MessageThread"`).
+
+**Files:**
+- Modify: `backend/messaging.graphql`
+- Modify: `backend/internal/adapters/graphql/resolvers/helpers.go` (add `mutedFor` helper)
+- Modify: `backend/internal/adapters/graphql/resolvers/messaging.resolvers.go` (implement the generated `MessageThread.Muted` resolver stub)
+- Regenerated: `backend/internal/adapters/graphql/generated/*.go`
+- Test: `backend/test/resolvers/messaging_resolver_test.go` (extend)
+
+**Interfaces:**
+- Schema: add `muted: Boolean!` to `type MessageThread { ... }` (the caller's own `thread_participants.muted`, caller-relative like `myLastReadSeq`).
+- `mutedFor(t *domain.MessageThread, userID int) bool` in `helpers.go`, mirroring `lastReadSeqFor` exactly: `nil` guard → `false`; loop `t.Participants`, return `p.Muted` for the matching `UserID`; default `false`.
+- `func (r *messageThreadResolver) Muted(ctx context.Context, obj *model.MessageThread) (bool, error)` mirroring `MyLastReadSeq`: `actor, ok := auth.ForContext(ctx)`; `if !ok { return false, domain.ErrForbidden }`; `return mutedFor(obj.Src, actor.ID), nil`.
+
+- [ ] **Step 1: Add `muted: Boolean!` to `type MessageThread` in `backend/messaging.graphql`.**
+
+- [ ] **Step 2: Regenerate**
+
+Run: `cd backend && make graphql-gen`
+Expected: generates a `messageThreadResolver.Muted` `panic("not implemented")` stub in `messaging.resolvers.go` and adds the field to `generated/`.
+
+- [ ] **Step 3: Write the failing resolver test**
+
+Extend `backend/test/resolvers/messaging_resolver_test.go`, mirroring the existing `MyLastReadSeq` / `UnreadCount` resolver tests:
+
+```go
+func TestMessageThreadResolver_Muted(t *testing.T) {
+	// obj.Src is a *domain.MessageThread with two participants:
+	//   {UserID: 1, Muted: true}, {UserID: 2, Muted: false}
+	// actor in ctx = user 1 -> Muted() returns true
+	// actor in ctx = user 2 -> Muted() returns false
+	// no actor in ctx -> domain.ErrForbidden
+}
+```
+
+- [ ] **Step 4: Run it — RED** (`cd backend && go test ./test/resolvers/ -run Muted` → fails: stub panics / undefined).
+
+- [ ] **Step 5: Add `mutedFor` to `helpers.go` and implement the `Muted` resolver** per the Interfaces block. Also confirm `messageThreadToModel` sets `.Src` (it does — `MyLastReadSeq` already relies on it), so `MuteThread`'s returned thread resolves `muted` correctly.
+
+- [ ] **Step 6: Run tests — GREEN**
+
+Run: `cd backend && go test ./test/resolvers/ -run Muted`
+Run: `cd backend && go build ./...`
+Run: `cd backend && go test ./...`
+Run: `cd backend && make graphql-gen` then `git diff --exit-code internal/adapters/graphql/generated internal/adapters/graphql/model/models_gen.go` (clean)
+
+- [ ] **Step 7: Commit** (schema + generated + helper + resolver + test in one commit)
+
+```bash
+git add backend/messaging.graphql backend/internal/adapters/graphql backend/test/resolvers
+git commit -m "feat(messaging): expose MessageThread.muted (caller-relative) on the schema"
+```
+
+Commit body ends with the standard two trailers.
+
+---
+
 # Part B — Frontend core
 
 ## Task 1: Add `graphql-ws` dependency
