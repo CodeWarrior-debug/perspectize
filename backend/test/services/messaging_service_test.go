@@ -469,3 +469,210 @@ func TestMaxSeq_EnforcesParticipantAndReturnsRepoValue(t *testing.T) {
 }
 
 var _ portservices.MessagingService = (*services.MessagingServiceImpl)(nil)
+
+// --- EditMessage ---
+
+func TestEditMessage_OnlySenderMayEdit(t *testing.T) {
+	updateCalled := false
+	msgRepo := &mockMessageRepo{
+		getByIDFn: func(ctx context.Context, id int64) (*domain.Message, error) {
+			return &domain.Message{ID: id, ThreadID: 7, SenderID: 7, Seq: 3}, nil
+		},
+		updateBodyFn: func(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error) {
+			updateCalled = true
+			return nil, nil
+		},
+	}
+	svc := services.NewMessagingService(&mockThreadRepo{}, msgRepo, &mockPublisher{}, newLimiter(100))
+
+	_, err := svc.EditMessage(context.Background(), 9, 100, "new body")
+
+	assert.True(t, errors.Is(err, domain.ErrForbidden), "expected ErrForbidden, got %v", err)
+	assert.False(t, updateCalled, "UpdateBody must not be called")
+}
+
+func TestEditMessage_NotFound(t *testing.T) {
+	msgRepo := &mockMessageRepo{
+		getByIDFn: func(ctx context.Context, id int64) (*domain.Message, error) {
+			return nil, domain.ErrNotFound
+		},
+	}
+	svc := services.NewMessagingService(&mockThreadRepo{}, msgRepo, &mockPublisher{}, newLimiter(100))
+
+	_, err := svc.EditMessage(context.Background(), 1, 100, "x")
+
+	assert.True(t, errors.Is(err, domain.ErrNotFound), "expected ErrNotFound, got %v", err)
+}
+
+func TestEditMessage_RejectsEmptyAndOversize(t *testing.T) {
+	msgRepo := &mockMessageRepo{
+		getByIDFn: func(ctx context.Context, id int64) (*domain.Message, error) {
+			return &domain.Message{ID: id, ThreadID: 7, SenderID: 1, Seq: 3}, nil
+		},
+	}
+	svc := services.NewMessagingService(&mockThreadRepo{}, msgRepo, &mockPublisher{}, newLimiter(100))
+
+	_, err := svc.EditMessage(context.Background(), 1, 100, "")
+	assert.True(t, errors.Is(err, domain.ErrInvalidInput), "empty body: expected ErrInvalidInput, got %v", err)
+
+	_, err = svc.EditMessage(context.Background(), 1, 100, strings.Repeat("a", 8193))
+	assert.True(t, errors.Is(err, domain.ErrInvalidInput), "oversize body: expected ErrInvalidInput, got %v", err)
+}
+
+func TestEditMessage_RejectsEditingDeleted(t *testing.T) {
+	now := time.Now().UTC()
+	msgRepo := &mockMessageRepo{
+		getByIDFn: func(ctx context.Context, id int64) (*domain.Message, error) {
+			return &domain.Message{ID: id, ThreadID: 7, SenderID: 1, Seq: 3, DeletedAt: &now}, nil
+		},
+	}
+	svc := services.NewMessagingService(&mockThreadRepo{}, msgRepo, &mockPublisher{}, newLimiter(100))
+
+	_, err := svc.EditMessage(context.Background(), 1, 100, "new body")
+
+	assert.True(t, errors.Is(err, domain.ErrInvalidInput), "expected ErrInvalidInput, got %v", err)
+}
+
+func TestEditMessage_PublishesMessageEditedEnvelope(t *testing.T) {
+	var gotBody string
+	msgRepo := &mockMessageRepo{
+		getByIDFn: func(ctx context.Context, id int64) (*domain.Message, error) {
+			return &domain.Message{ID: id, ThreadID: 7, SenderID: 1, Seq: 3}, nil
+		},
+		updateBodyFn: func(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error) {
+			gotBody = body
+			return &domain.Message{ID: messageID, ThreadID: 7, SenderID: 1, Seq: 3, Body: body, EditedAt: &editedAt}, nil
+		},
+	}
+	pub := &mockPublisher{}
+	svc := services.NewMessagingService(&mockThreadRepo{}, msgRepo, pub, newLimiter(100))
+
+	got, err := svc.EditMessage(context.Background(), 1, 100, "edited")
+
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "edited", gotBody)
+	assert.Equal(t, "edited", got.Body)
+	require.Len(t, pub.calls, 1)
+	assert.Equal(t, "MESSAGE_EDITED", pub.calls[0].Type)
+	assert.Equal(t, 7, pub.calls[0].ThreadID)
+	assert.Equal(t, int64(3), pub.calls[0].Seq)
+	assert.Equal(t, int64(100), pub.calls[0].MessageID)
+}
+
+// --- DeleteMessage ---
+
+func TestDeleteMessage_OnlySenderMayDelete(t *testing.T) {
+	softDeleteCalled := false
+	msgRepo := &mockMessageRepo{
+		getByIDFn: func(ctx context.Context, id int64) (*domain.Message, error) {
+			return &domain.Message{ID: id, ThreadID: 7, SenderID: 7, Seq: 3}, nil
+		},
+		softDeleteFn: func(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
+			softDeleteCalled = true
+			return nil, nil
+		},
+	}
+	svc := services.NewMessagingService(&mockThreadRepo{}, msgRepo, &mockPublisher{}, newLimiter(100))
+
+	_, err := svc.DeleteMessage(context.Background(), 9, 100)
+
+	assert.True(t, errors.Is(err, domain.ErrForbidden), "expected ErrForbidden, got %v", err)
+	assert.False(t, softDeleteCalled, "SoftDelete must not be called")
+}
+
+func TestDeleteMessage_PublishesMessageDeletedEnvelope(t *testing.T) {
+	softDeleteCalled := false
+	msgRepo := &mockMessageRepo{
+		getByIDFn: func(ctx context.Context, id int64) (*domain.Message, error) {
+			return &domain.Message{ID: id, ThreadID: 7, SenderID: 1, Seq: 5}, nil
+		},
+		softDeleteFn: func(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
+			softDeleteCalled = true
+			return &domain.Message{ID: messageID, ThreadID: 7, SenderID: 1, Seq: 5, Body: "", DeletedAt: &deletedAt}, nil
+		},
+	}
+	pub := &mockPublisher{}
+	svc := services.NewMessagingService(&mockThreadRepo{}, msgRepo, pub, newLimiter(100))
+
+	got, err := svc.DeleteMessage(context.Background(), 1, 100)
+
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.True(t, softDeleteCalled)
+	assert.NotNil(t, got.DeletedAt)
+	require.Len(t, pub.calls, 1)
+	assert.Equal(t, "MESSAGE_DELETED", pub.calls[0].Type)
+	assert.Equal(t, 7, pub.calls[0].ThreadID)
+	assert.Equal(t, int64(5), pub.calls[0].Seq)
+	assert.Equal(t, int64(100), pub.calls[0].MessageID)
+}
+
+func TestDeleteMessage_IdempotentWhenAlreadyDeleted(t *testing.T) {
+	now := time.Now().UTC()
+	softDeleteCalled := false
+	msgRepo := &mockMessageRepo{
+		getByIDFn: func(ctx context.Context, id int64) (*domain.Message, error) {
+			return &domain.Message{ID: id, ThreadID: 7, SenderID: 1, Seq: 5, DeletedAt: &now}, nil
+		},
+		softDeleteFn: func(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
+			softDeleteCalled = true
+			return nil, nil
+		},
+	}
+	pub := &mockPublisher{}
+	svc := services.NewMessagingService(&mockThreadRepo{}, msgRepo, pub, newLimiter(100))
+
+	got, err := svc.DeleteMessage(context.Background(), 1, 100)
+
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.NotNil(t, got.DeletedAt)
+	assert.False(t, softDeleteCalled, "SoftDelete must not be called for an already-deleted message")
+	assert.Empty(t, pub.calls, "no publish on idempotent delete")
+}
+
+// --- MuteThread ---
+
+func TestMuteThread_RequiresParticipant(t *testing.T) {
+	setMutedCalled := false
+	threadRepo := &mockThreadRepo{
+		getThreadFn: func(ctx context.Context, threadID int) (*domain.MessageThread, error) {
+			return threadWithParticipants(7, 1, 2), nil
+		},
+		setMutedFn: func(ctx context.Context, threadID, userID int, muted bool) error {
+			setMutedCalled = true
+			return nil
+		},
+	}
+	svc := services.NewMessagingService(threadRepo, &mockMessageRepo{}, &mockPublisher{}, newLimiter(100))
+
+	_, err := svc.MuteThread(context.Background(), 99, 7, true)
+
+	assert.True(t, errors.Is(err, domain.ErrForbidden), "expected ErrForbidden, got %v", err)
+	assert.False(t, setMutedCalled, "SetMuted must not be called")
+}
+
+func TestMuteThread_SetsAndReturnsThread(t *testing.T) {
+	var gotThreadID, gotUserID int
+	var gotMuted bool
+	returned := threadWithParticipants(7, 1, 2)
+	threadRepo := &mockThreadRepo{
+		getThreadFn: func(ctx context.Context, threadID int) (*domain.MessageThread, error) {
+			return returned, nil
+		},
+		setMutedFn: func(ctx context.Context, threadID, userID int, muted bool) error {
+			gotThreadID, gotUserID, gotMuted = threadID, userID, muted
+			return nil
+		},
+	}
+	svc := services.NewMessagingService(threadRepo, &mockMessageRepo{}, &mockPublisher{}, newLimiter(100))
+
+	got, err := svc.MuteThread(context.Background(), 1, 7, true)
+
+	require.NoError(t, err)
+	assert.Same(t, returned, got)
+	assert.Equal(t, 7, gotThreadID)
+	assert.Equal(t, 1, gotUserID)
+	assert.True(t, gotMuted)
+}

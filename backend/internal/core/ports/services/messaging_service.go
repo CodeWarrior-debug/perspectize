@@ -28,6 +28,19 @@ type SendMessageInput struct {
 type MessagingService interface {
 	CreateThread(ctx context.Context, actorUserID int, participantUserIDs []int, title *string) (*domain.MessageThread, error)
 	SendMessage(ctx context.Context, actorUserID int, in SendMessageInput) (*domain.Message, error)
+	// EditMessage updates the body of a message the actor sent. Rejects a
+	// missing message (ErrNotFound), a non-sender actor (ErrForbidden), and an
+	// empty / oversize body or an already-deleted message (ErrInvalidInput).
+	// Publishes MESSAGE_EDITED on success.
+	EditMessage(ctx context.Context, actorUserID int, messageID int64, body string) (*domain.Message, error)
+	// DeleteMessage soft-deletes a message the actor sent. Same not-found /
+	// forbidden rules as EditMessage. Idempotent: a message already deleted is
+	// returned unchanged with no publish. Publishes MESSAGE_DELETED on a real
+	// delete.
+	DeleteMessage(ctx context.Context, actorUserID int, messageID int64) (*domain.Message, error)
+	// MuteThread sets the actor's muted flag for a thread they participate in
+	// and returns the refreshed thread.
+	MuteThread(ctx context.Context, actorUserID, threadID int, muted bool) (*domain.MessageThread, error)
 	MarkRead(ctx context.Context, actorUserID, threadID int, seq int64) (*domain.MessageThread, error)
 	AddParticipants(ctx context.Context, actorUserID, threadID int, userIDs []int) (*domain.MessageThread, error)
 	LeaveThread(ctx context.Context, actorUserID, threadID int) error

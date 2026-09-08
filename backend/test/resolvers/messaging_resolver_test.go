@@ -30,6 +30,9 @@ type fakeMessaging struct {
 	listSinceFn         func(ctx context.Context, actor, threadID int, sinceSeq int64) ([]domain.Message, error)
 	getHistoryFn        func(ctx context.Context, actor, threadID, limit int, beforeSeq *int64) ([]domain.Message, error)
 	assertParticipantFn func(ctx context.Context, actor, threadID int) error
+	editMessageFn       func(ctx context.Context, actor int, messageID int64, body string) (*domain.Message, error)
+	deleteMessageFn     func(ctx context.Context, actor int, messageID int64) (*domain.Message, error)
+	muteThreadFn        func(ctx context.Context, actor, threadID int, muted bool) (*domain.MessageThread, error)
 }
 
 var _ portservices.MessagingService = (*fakeMessaging)(nil)
@@ -110,6 +113,27 @@ func (f *fakeMessaging) UnreadCount(ctx context.Context, threadID int, sinceSeq 
 		return 0, nil
 	}
 	return f.unreadCountFn(ctx, threadID, sinceSeq)
+}
+
+func (f *fakeMessaging) EditMessage(ctx context.Context, actor int, messageID int64, body string) (*domain.Message, error) {
+	if f.editMessageFn == nil {
+		return nil, nil
+	}
+	return f.editMessageFn(ctx, actor, messageID, body)
+}
+
+func (f *fakeMessaging) DeleteMessage(ctx context.Context, actor int, messageID int64) (*domain.Message, error) {
+	if f.deleteMessageFn == nil {
+		return nil, nil
+	}
+	return f.deleteMessageFn(ctx, actor, messageID)
+}
+
+func (f *fakeMessaging) MuteThread(ctx context.Context, actor, threadID int, muted bool) (*domain.MessageThread, error) {
+	if f.muteThreadFn == nil {
+		return nil, nil
+	}
+	return f.muteThreadFn(ctx, actor, threadID, muted)
 }
 
 // inboxStubMsgRepo / inboxStubThreadRepo are the minimum repository surface the
