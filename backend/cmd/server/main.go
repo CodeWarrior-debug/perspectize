@@ -182,6 +182,20 @@ func main() {
 	go listener.Run(listenerCtx)
 	defer stopListener()
 
+	// Application-side message retention sweep. Disabled unless
+	// MESSAGE_RETENTION_MAX is a positive value — since migration 000018 the
+	// database no longer prunes messages itself, so this is the only pruner.
+	if cfg.MessageRetentionMax > 0 {
+		sweeper := services.NewRetentionSweeper(
+			db, cfg.MessageRetentionMax,
+			time.Duration(cfg.MessageRetentionSweepMinutes)*time.Minute,
+		)
+		go sweeper.Run(listenerCtx)
+		slog.Info("message retention sweep enabled",
+			"max_per_thread", cfg.MessageRetentionMax,
+			"interval_minutes", cfg.MessageRetentionSweepMinutes)
+	}
+
 	// Shared Clerk token verifier — reused by HTTP middleware and the
 	// WebSocket InitFunc so both transports resolve identities identically.
 	tokenVerifier := auth.NewClerkTokenVerifier()
