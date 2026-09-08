@@ -309,6 +309,31 @@ func TestMessageThreadResolver_ReadPointers(t *testing.T) {
 	assert.Equal(t, 1, parts[0].SrcUserID)
 }
 
+// muted is caller-relative: it resolves the actor's own thread_participants.muted
+// off the thread aggregate the parent query already loaded, like myLastReadSeq.
+func TestMessageThreadResolver_Muted(t *testing.T) {
+	thread := &domain.MessageThread{
+		ID: 5,
+		Participants: []domain.ThreadParticipant{
+			{ThreadID: 5, UserID: 1, Muted: true, Role: domain.ThreadRoleOwner},
+			{ThreadID: 5, UserID: 2, Muted: false, Role: domain.ThreadRoleMember},
+		},
+	}
+	r := &resolvers.Resolver{Messaging: &fakeMessaging{}}
+	obj := &model.MessageThread{ID: "5", Src: thread}
+
+	got, err := r.MessageThread().Muted(authedCtx(1), obj)
+	require.NoError(t, err)
+	assert.True(t, got, "actor 1 muted the thread")
+
+	got, err = r.MessageThread().Muted(authedCtx(2), obj)
+	require.NoError(t, err)
+	assert.False(t, got, "actor 2 did not mute the thread")
+
+	_, err = r.MessageThread().Muted(context.Background(), obj)
+	assert.ErrorIs(t, err, domain.ErrForbidden, "no actor in ctx is forbidden")
+}
+
 // history is a descending-by-seq message log, mirroring how the repository
 // pages backwards from the newest message.
 func historyPage(all []domain.Message, limit int, beforeSeq *int64) []domain.Message {

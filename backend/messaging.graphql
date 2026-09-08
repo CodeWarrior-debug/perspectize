@@ -19,6 +19,7 @@ type MessageThread {
   latestSeq: IntID!
   myLastReadSeq: IntID!
   unreadCount: Int!
+  muted: Boolean!
   createdAt: String!
 }
 

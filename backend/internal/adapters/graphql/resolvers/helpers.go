@@ -237,6 +237,21 @@ func lastReadSeqFor(t *domain.MessageThread, userID int) int64 {
 	return 0
 }
 
+// mutedFor returns the actor's mute flag within a thread aggregate, or false
+// when the aggregate or the actor's row is absent. Caller-relative, mirroring
+// lastReadSeqFor.
+func mutedFor(t *domain.MessageThread, userID int) bool {
+	if t == nil {
+		return false
+	}
+	for _, p := range t.Participants {
+		if p.UserID == userID {
+			return p.Muted
+		}
+	}
+	return false
+}
+
 // messageThreadToModel projects a domain thread onto its GraphQL model,
 // retaining a copy of the domain aggregate in Src for the participant /
 // read-pointer field resolvers.

@@ -102,6 +102,15 @@ func (r *messageThreadResolver) UnreadCount(ctx context.Context, obj *model.Mess
 	return r.Messaging.UnreadCount(ctx, tid, lastReadSeqFor(obj.Src, actor.ID))
 }
 
+// Muted is the resolver for the muted field.
+func (r *messageThreadResolver) Muted(ctx context.Context, obj *model.MessageThread) (bool, error) {
+	actor, ok := auth.ForContext(ctx)
+	if !ok {
+		return false, domain.ErrForbidden
+	}
+	return mutedFor(obj.Src, actor.ID), nil
+}
+
 // CreateMessageThread is the resolver for the createMessageThread field.
 func (r *mutationResolver) CreateMessageThread(ctx context.Context, input model.CreateMessageThreadInput) (*model.MessageThread, error) {
 	actor, ok := auth.ForContext(ctx)
