@@ -19,6 +19,8 @@ overrides:
   tar: ^7.5.22
   prosemirror-transform: 1.12.0
   fast-uri: ^3.1.6
+  undici: ^7.24.0
+  devalue: ^5.8.1
 
 importers:
 
