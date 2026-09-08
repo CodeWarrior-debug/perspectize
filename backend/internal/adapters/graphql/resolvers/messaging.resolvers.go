@@ -30,6 +30,16 @@ func (r *messageResolver) Sender(ctx context.Context, obj *model.Message) (*mode
 	return userDomainToModel(u), nil
 }
 
+// EditedAt is the resolver for the editedAt field.
+func (r *messageResolver) EditedAt(ctx context.Context, obj *model.Message) (*string, error) {
+	panic(fmt.Errorf("not implemented: EditedAt - editedAt"))
+}
+
+// DeletedAt is the resolver for the deletedAt field.
+func (r *messageResolver) DeletedAt(ctx context.Context, obj *model.Message) (*string, error) {
+	panic(fmt.Errorf("not implemented: DeletedAt - deletedAt"))
+}
+
 // Participants is the resolver for the participants field.
 func (r *messageThreadResolver) Participants(ctx context.Context, obj *model.MessageThread) ([]*model.ThreadParticipant, error) {
 	if _, ok := auth.ForContext(ctx); !ok {
@@ -207,6 +217,21 @@ func (r *mutationResolver) LeaveThread(ctx context.Context, threadID string) (bo
 		return false, err
 	}
 	return true, nil
+}
+
+// EditMessage is the resolver for the editMessage field.
+func (r *mutationResolver) EditMessage(ctx context.Context, messageID string, body string) (*model.Message, error) {
+	panic(fmt.Errorf("not implemented: EditMessage - editMessage"))
+}
+
+// DeleteMessage is the resolver for the deleteMessage field.
+func (r *mutationResolver) DeleteMessage(ctx context.Context, messageID string) (*model.Message, error) {
+	panic(fmt.Errorf("not implemented: DeleteMessage - deleteMessage"))
+}
+
+// MuteThread is the resolver for the muteThread field.
+func (r *mutationResolver) MuteThread(ctx context.Context, threadID string, muted bool) (*model.MessageThread, error) {
+	panic(fmt.Errorf("not implemented: MuteThread - muteThread"))
 }
 
 // MessageThreads is the resolver for the messageThreads field.

@@ -36,6 +36,8 @@ type Message {
   seq: IntID!
   body: String!
   createdAt: String!
+  editedAt: String
+  deletedAt: String
 }
 
 type MessageConnection {
@@ -49,6 +51,8 @@ type TypingChanged { threadId: ID!  userId: ID!  typing: Boolean! }
 type ParticipantChanged { threadId: ID!  userId: ID!  change: ParticipantChangeKind! }
 type PresenceChanged { threadId: ID!  userId: ID!  state: PresenceState! }
 type StreamReset { threadId: ID! }
+type MessageEdited  { message: Message! }
+type MessageDeleted { threadId: ID!  messageId: ID!  seq: IntID! }
 
 union ThreadEvent =
     MessagePosted
@@ -57,6 +61,8 @@ union ThreadEvent =
   | ParticipantChanged
   | PresenceChanged
   | StreamReset
+  | MessageEdited
+  | MessageDeleted
 
 type InboxEvent {
   threadId: ID!
@@ -81,6 +87,9 @@ extend type Mutation {
   setTyping(threadId: ID!, typing: Boolean!): Boolean! @auth
   addThreadParticipants(threadId: ID!, userIds: [ID!]!): MessageThread! @auth
   leaveThread(threadId: ID!): Boolean! @auth
+  editMessage(messageId: ID!, body: String!): Message! @auth
+  deleteMessage(messageId: ID!): Message! @auth
+  muteThread(threadId: ID!, muted: Boolean!): MessageThread! @auth
 }
 
 type Subscription {
