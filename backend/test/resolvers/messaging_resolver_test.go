@@ -598,6 +598,72 @@ func TestInboxEventsSubscription_DeliversAndClosesOnCancel(t *testing.T) {
 	}, 2*time.Second, 10*time.Millisecond, "inbox channel not closed after cancel")
 }
 
+func TestEditMessageResolver_HappyPath(t *testing.T) {
+	editedAt := time.Date(2026, 9, 7, 10, 0, 0, 0, time.UTC)
+	fake := &fakeMessaging{editMessageFn: func(ctx context.Context, actor int, messageID int64, body string) (*domain.Message, error) {
+		assert.Equal(t, 1, actor)
+		assert.Equal(t, int64(9), messageID)
+		assert.Equal(t, "new body", body)
+		return &domain.Message{ID: 9, ThreadID: 2, SenderID: 1, Seq: 4, Body: "new body", CreatedAt: editedAt, EditedAt: &editedAt}, nil
+	}}
+	r := &resolvers.Resolver{Messaging: fake}
+
+	out, err := r.Mutation().EditMessage(authedCtx(1), "9", "new body")
+
+	require.NoError(t, err)
+	assert.Equal(t, "9", out.ID)
+	assert.Equal(t, "new body", out.Body)
+	require.NotNil(t, out.EditedAt)
+	assert.Equal(t, "2026-09-07T10:00:00Z", *out.EditedAt)
+}
+
+func TestDeleteMessageResolver_HappyPath(t *testing.T) {
+	deletedAt := time.Date(2026, 9, 7, 11, 0, 0, 0, time.UTC)
+	fake := &fakeMessaging{deleteMessageFn: func(ctx context.Context, actor int, messageID int64) (*domain.Message, error) {
+		assert.Equal(t, 1, actor)
+		assert.Equal(t, int64(9), messageID)
+		return &domain.Message{ID: 9, ThreadID: 2, SenderID: 1, Seq: 4, Body: "", DeletedAt: &deletedAt}, nil
+	}}
+	r := &resolvers.Resolver{Messaging: fake}
+
+	out, err := r.Mutation().DeleteMessage(authedCtx(1), "9")
+
+	require.NoError(t, err)
+	assert.Equal(t, "", out.Body, "tombstone has an empty body")
+	require.NotNil(t, out.DeletedAt)
+	assert.Equal(t, "2026-09-07T11:00:00Z", *out.DeletedAt)
+	assert.Nil(t, out.EditedAt)
+}
+
+func TestMuteThreadResolver_HappyPath(t *testing.T) {
+	var gotActor, gotThread int
+	var gotMuted bool
+	fake := &fakeMessaging{muteThreadFn: func(ctx context.Context, actor, threadID int, muted bool) (*domain.MessageThread, error) {
+		gotActor, gotThread, gotMuted = actor, threadID, muted
+		return &domain.MessageThread{ID: threadID}, nil
+	}}
+	r := &resolvers.Resolver{Messaging: fake}
+
+	out, err := r.Mutation().MuteThread(authedCtx(1), "5", true)
+
+	require.NoError(t, err)
+	assert.Equal(t, "5", out.ID)
+	assert.Equal(t, 1, gotActor)
+	assert.Equal(t, 5, gotThread)
+	assert.True(t, gotMuted, "service called with muted=true")
+}
+
+func TestEditMessageResolver_PropagatesForbidden(t *testing.T) {
+	fake := &fakeMessaging{editMessageFn: func(context.Context, int, int64, string) (*domain.Message, error) {
+		return nil, fmt.Errorf("%w: nope", domain.ErrForbidden)
+	}}
+	r := &resolvers.Resolver{Messaging: fake}
+
+	_, err := r.Mutation().EditMessage(authedCtx(1), "9", "x")
+
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
 func TestInboxEventsSubscription_UnauthenticatedIsForbidden(t *testing.T) {
 	r := &resolvers.Resolver{Messaging: &fakeMessaging{}, Hub: realtime.NewHub(nil, nil, nil)}
 

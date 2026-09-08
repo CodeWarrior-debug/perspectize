@@ -287,6 +287,37 @@ func (h *Hub) PublishEnvelope(ctx context.Context, env domain.EventEnvelope) {
 		}
 		h.Broadcast(env.ThreadID, domain.MessagePostedEvent{Message: *m})
 		h.fanOutInbox(ctx, env.ThreadID, m.Seq, m.CreatedAt)
+	case "MESSAGE_EDITED":
+		// Same early-drop guard as MESSAGE_POSTED. An edit changes no inbox
+		// summary, so there is no fanOutInbox call below.
+		h.mu.RLock()
+		threadSubs, inboxSubs := len(h.subs[env.ThreadID]), len(h.inbox)
+		h.mu.RUnlock()
+		if threadSubs == 0 && inboxSubs == 0 {
+			return
+		}
+
+		m, err := h.msgRepo.GetByID(ctx, env.MessageID)
+		if err != nil {
+			slog.Error("realtime hub: load message for MESSAGE_EDITED failed",
+				"message_id", env.MessageID, "thread_id", env.ThreadID, "err", err)
+			return
+		}
+		h.Broadcast(env.ThreadID, domain.MessageEditedEvent{Message: *m})
+	case "MESSAGE_DELETED":
+		// A tombstone carries everything the client needs (thread, message, seq),
+		// so there is no message load and the guard only cares about thread subs.
+		h.mu.RLock()
+		threadSubs := len(h.subs[env.ThreadID])
+		h.mu.RUnlock()
+		if threadSubs == 0 {
+			return
+		}
+		h.Broadcast(env.ThreadID, domain.MessageDeletedEvent{
+			ThreadID:  env.ThreadID,
+			MessageID: env.MessageID,
+			Seq:       env.Seq,
+		})
 	case "READ_RECEIPT_CHANGED":
 		h.Broadcast(env.ThreadID, domain.ReadReceiptChangedEvent{
 			ThreadID:    env.ThreadID,

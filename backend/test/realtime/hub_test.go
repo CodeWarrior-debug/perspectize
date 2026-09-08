@@ -383,6 +383,47 @@ func TestHub_MessagePostedSkipsLookupWithNoLocalSubscribers(t *testing.T) {
 	<-ch
 }
 
+func TestHub_PublishEnvelope_MessageEdited(t *testing.T) {
+	hub := newHub(domain.Message{ID: 10, ThreadID: 1, Seq: 3, Body: "edited body"})
+	ch, unsub := hub.Subscribe(1, 1)
+	defer unsub()
+
+	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{Type: "MESSAGE_EDITED", ThreadID: 1, MessageID: 10})
+
+	select {
+	case evt := <-ch:
+		me, ok := evt.(domain.MessageEditedEvent)
+		require.Truef(t, ok, "expected MessageEditedEvent, got %T", evt)
+		assert.Equal(t, "edited body", me.Message.Body)
+		assert.Equal(t, int64(10), me.Message.ID)
+	case <-time.After(time.Second):
+		t.Fatal("no edited event")
+	}
+}
+
+func TestHub_PublishEnvelope_MessageDeleted(t *testing.T) {
+	loads := 0
+	hub := realtime.NewHub(countingMsgRepo{loads: &loads}, stubThreadRepo{}, nil)
+	ch, unsub := hub.Subscribe(1, 1)
+	defer unsub()
+
+	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{
+		Type: "MESSAGE_DELETED", ThreadID: 1, MessageID: 10, Seq: 7,
+	})
+
+	select {
+	case evt := <-ch:
+		md, ok := evt.(domain.MessageDeletedEvent)
+		require.Truef(t, ok, "expected MessageDeletedEvent, got %T", evt)
+		assert.Equal(t, 1, md.ThreadID)
+		assert.Equal(t, int64(10), md.MessageID)
+		assert.Equal(t, int64(7), md.Seq)
+	case <-time.After(time.Second):
+		t.Fatal("no deleted event")
+	}
+	assert.Equal(t, 0, loads, "MESSAGE_DELETED must not load the message")
+}
+
 func TestHub_PublishEphemeralSatisfiesPort(t *testing.T) {
 	var pub portservices.EventPublisher = newHub(domain.Message{})
 	err := pub.PublishEphemeral(context.Background(), domain.EventEnvelope{Type: "PRESENCE_CHANGED", ThreadID: 9, UserID: 1, State: "ONLINE"})

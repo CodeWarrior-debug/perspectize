@@ -71,11 +71,13 @@ type ThreadParticipant struct {
 // Message is the GraphQL projection of domain.Message. SrcSenderID feeds the
 // `sender` field resolver.
 type Message struct {
-	ID        string `json:"id"`
-	ThreadID  string `json:"threadId"`
-	Seq       int    `json:"seq"`
-	Body      string `json:"body"`
-	CreatedAt string `json:"createdAt"`
+	ID        string  `json:"id"`
+	ThreadID  string  `json:"threadId"`
+	Seq       int     `json:"seq"`
+	Body      string  `json:"body"`
+	CreatedAt string  `json:"createdAt"`
+	EditedAt  *string `json:"editedAt,omitempty"`
+	DeletedAt *string `json:"deletedAt,omitempty"`
 
 	SrcSenderID int `json:"-"`
 }
