@@ -68,6 +68,8 @@ This project uses **Svelte 5 runes** exclusively. Do not use Svelte 4 syntax.
 
 **Additional rules:** Never use `$effect` for derivation (use `$derived`). Render children via `{@render children()}` with `let { children } = $props()`.
 
+**`$effect` only tracks state read _synchronously_ in the effect body.** A value read solely inside a `setTimeout`/`Promise`/`await` callback is NOT a tracked dependency, so the effect runs once on mount and never re-runs. For a debounce, copy the reactive value into a local const at the top of the effect first (`const term = searchTerm;`), then use the local inside the timer — see `discover/SearchBar.svelte`. (Bug history: `CategoryTypeahead.svelte`'s Wikidata search read `searchTerm` only inside its `setTimeout`, so the debounced term never updated and the search query never fired.)
+
 ## TanStack Query + GraphQL
 
 Queries use `graphql-request` with TanStack Svelte Query.
