@@ -194,11 +194,12 @@ describe('AG Grid Cell Rendering', () => {
 		const viewCells = document.querySelectorAll('.ag-cell[col-id="views"]');
 		expect(viewCells.length).toBe(3);
 
-		// 45200 → "45.2K", 128000 → "128K", 67500 → "67.5K"
+		// formatCount() renders a space before the unit and always one decimal:
+		// 45200 → "45.2 K", 128000 → "128.0 K", 67500 → "67.5 K"
 		const texts = Array.from(viewCells).map((cell) => cell.textContent?.trim());
-		expect(texts).toContain('45.2K');
-		expect(texts).toContain('128K');
-		expect(texts).toContain('67.5K');
+		expect(texts).toContain('45.2 K');
+		expect(texts).toContain('128.0 K');
+		expect(texts).toContain('67.5 K');
 	});
 
 	it('renders formatted duration values', async () => {
