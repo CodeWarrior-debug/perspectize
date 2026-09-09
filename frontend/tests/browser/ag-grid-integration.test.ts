@@ -13,9 +13,14 @@
  */
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import type { GridApi } from '@ag-grid-community/core';
 
 import AGGridTestHarness from './fixtures/AGGridTestHarness.svelte';
+
+// Injected by vitest.config.browser.ts (see `define`). Absolute, so captures
+// land in the shared screenshots folder instead of next to this file.
+declare const __SV_SCREENSHOT_DIR__: string;
 
 const SAMPLE_ROWS = [
 	{
@@ -123,6 +128,9 @@ describe('AG Grid Lifecycle', () => {
 		// AG Grid renders its own root element
 		const agRoot = document.querySelector('.ag-root-wrapper');
 		expect(agRoot).not.toBeNull();
+
+		// Static end-state: a screenshot is the right (and cheapest) evidence here.
+		await page.screenshot({ path: `${__SV_SCREENSHOT_DIR__}/sv-ag-grid-render.png` });
 	});
 });
 
@@ -186,11 +194,12 @@ describe('AG Grid Cell Rendering', () => {
 		const viewCells = document.querySelectorAll('.ag-cell[col-id="views"]');
 		expect(viewCells.length).toBe(3);
 
-		// 45200 → "45.2K", 128000 → "128K", 67500 → "67.5K"
+		// formatCount() renders a space before the unit and always one decimal:
+		// 45200 → "45.2 K", 128000 → "128.0 K", 67500 → "67.5 K"
 		const texts = Array.from(viewCells).map((cell) => cell.textContent?.trim());
-		expect(texts).toContain('45.2K');
-		expect(texts).toContain('128K');
-		expect(texts).toContain('67.5K');
+		expect(texts).toContain('45.2 K');
+		expect(texts).toContain('128.0 K');
+		expect(texts).toContain('67.5 K');
 	});
 
 	it('renders formatted duration values', async () => {

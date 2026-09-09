@@ -182,4 +182,14 @@ Symptom in the browser: `Failed to load module script: Expected a JavaScript-or-
 
 **Date formatting timezone:** `formatDate`/`formatDateCompact` use `toLocaleDateString` (local timezone). In tests, use midday UTC times (`T12:00:00Z`) not midnight (`T00:00:00Z`) to avoid dates shifting to previous day in US timezones.
 
-**AG Grid testing strategy:** AG Grid doesn't render in jsdom — no lifecycle hooks, no Grid API, no cell rendering. Test AG Grid logic by extracting pure functions into `$lib/utils/grid-config.ts` (sort mapping, pagination bounds, responsive tiers, comparators, column metadata). Test renderers/formatters via `$lib/utils/formatting.ts`. For grid integration (filter UI, sort clicks, responsive `$effect` blocks), use Playwright E2E or Vitest Browser Mode (future). See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) testing section.
+**AG Grid testing strategy:** AG Grid doesn't render in jsdom — no lifecycle hooks, no Grid API, no cell rendering. Test AG Grid logic by extracting pure functions into `$lib/utils/grid-config.ts` (sort mapping, pagination bounds, responsive tiers, comparators, column metadata). Test renderers/formatters via `$lib/utils/formatting.ts`. For grid integration (filter UI, sort clicks, responsive `$effect` blocks), use Playwright E2E or Vitest Browser Mode (`tests/browser/`, see below). See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) testing section.
+
+**Vitest Browser Mode (`tests/browser/`, config in `vitest.config.browser.ts`) is not run in CI** — `frontend-test.yml` only runs `test:coverage` on the unit project. A browser-test assertion can be wrong from the day it's written and nothing catches it (`ag-grid-integration.test.ts` had stale `formatCount` expectations that never once passed). Run `pnpm run test:browser` locally before trusting a browser test file.
+
+**Vitest Browser Mode capture gotchas:**
+- `page.screenshot({ path })` resolves the path **relative to the test file**, not against `browser.instances[].screenshotDirectory` — only an absolute path escapes `tests/browser/`.
+- `screenshotDirectory` and `attachmentsDir` (failure screenshots, `context.annotate`) are two separate config options — set both or `attachmentsDir` defaults to a stray `frontend/.vitest-attachments/`.
+- Writing outside the project root (e.g. into a shared screenshots folder) needs `server.fs.allow` widened — Vite's default `server.fs.strict` refuses it.
+- Default browser viewport is 414x896 — clips a wide test harness (e.g. the 1200px AG Grid fixture) out of every screenshot/video. Set `browser.instances[].viewport` explicitly for anything wider.
+- `pnpm run test:browser -- --browser.headless` is parsed as a file-name filter, not a flag — pass provider flags directly (`pnpm run test:browser --browser.headless=true`), no `--`.
+- Playwright's `recordVideo` records per browser **context**, not per test — a `-t` filter is needed to scope a recording to one case, otherwise every test in the run shares one video.
