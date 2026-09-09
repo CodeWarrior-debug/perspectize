@@ -86,6 +86,10 @@ may require `?sslmode=disable`.
 
 Schema-first in `schema.graphql`. After changes: `make graphql-gen` → implement resolvers in `internal/adapters/graphql/resolvers/` → wire to services.
 
+**`make graphql-gen` always leaves a colliding `schema.resolvers.go` behind.** `gqlgen.yml` uses `layout: follow-schema`, which names resolver files after the schema file — one `schema.graphql` means gqlgen insists on writing one `resolvers/schema.resolvers.go` holding *every* resolver. The resolvers were since split by domain (`content`/`category`/`perspective`/`user.resolvers.go`), so that file redeclares all of them and the run ends with `method Resolver.Content already declared` / `contentResolver redeclared in this block`.
+
+The failure is confined to that last step: `generated.go` and `models_gen.go` are written *before* it, so the regeneration you wanted did happen. Recover by deleting the stray file (`rm internal/adapters/graphql/resolvers/schema.resolvers.go`) and rebuilding — but **diff it first** when the schema gained a field, because the stub for that new field is in there and belongs in the matching per-domain file. Don't automate the `rm` in the Makefile for that reason. The real fix is to split `schema.graphql` per domain so `follow-schema` lines up with the resolver files.
+
 ## Testing
 
 - **Unit:** Mock deps, no DB. `make test`.
