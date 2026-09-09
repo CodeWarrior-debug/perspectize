@@ -13,9 +13,14 @@
  */
 import { render } from 'vitest-browser-svelte';
 import { describe, it, expect, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import type { GridApi } from '@ag-grid-community/core';
 
 import AGGridTestHarness from './fixtures/AGGridTestHarness.svelte';
+
+// Injected by vitest.config.browser.ts (see `define`). Absolute, so captures
+// land in the shared screenshots folder instead of next to this file.
+declare const __SV_SCREENSHOT_DIR__: string;
 
 const SAMPLE_ROWS = [
 	{
@@ -123,6 +128,9 @@ describe('AG Grid Lifecycle', () => {
 		// AG Grid renders its own root element
 		const agRoot = document.querySelector('.ag-root-wrapper');
 		expect(agRoot).not.toBeNull();
+
+		// Static end-state: a screenshot is the right (and cheapest) evidence here.
+		await page.screenshot({ path: `${__SV_SCREENSHOT_DIR__}/sv-ag-grid-render.png` });
 	});
 });
 
