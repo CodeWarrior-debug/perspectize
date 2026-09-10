@@ -114,6 +114,18 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 		}
 	}
 
+	// Read-authorization predicate (see PerspectiveService.ListPerspectives).
+	// WHERE shape — benchmarked against a UNION in
+	// docs/superpowers/plans/2026-09-09-perspective-privacy-plan.md Task 6.
+	if params.RestrictToPublicOrOwner {
+		if params.ViewerID != nil {
+			query = query.Where("privacy = ? OR user_id = ?",
+				privacyToDBValue(domain.PrivacyPublic), *params.ViewerID)
+		} else {
+			query = query.Where("privacy = ?", privacyToDBValue(domain.PrivacyPublic))
+		}
+	}
+
 	// Total count (before cursor/limit — respects filters only)
 	var totalCountInt *int
 	if params.IncludeTotalCount {
