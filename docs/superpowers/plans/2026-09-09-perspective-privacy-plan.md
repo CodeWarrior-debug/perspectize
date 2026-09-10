@@ -541,16 +541,30 @@ LIMIT 10;
 - [ ] **Step 5: Fill in the Result block** (median and p95 of the 10 execution times, plus the plan node types — Seq Scan / Index Scan / Bitmap):
 
 ```
-### Benchmark Result (filled in during execution)
+### Benchmark Result — run 2026-09-10
 
-DB: Sevalla PG17 · perspectives rows: <N> · distinct user_id: <N>
-:target = <id> (<rows> rows) · :viewer = <id>
+The live `perspectives` table has only 25 rows / 3 users / 0 private — too small to
+differentiate. Benchmarked instead on a session-local TEMP table `persp_bench`
+(200,000 rows, 800 users, ~5% private, columns id/user_id/privacy/created_at) on the
+same Sevalla PG17 server. 10 runs each, `EXPLAIN (ANALYZE, BUFFERS)`, cross-user
+viewer (:target=7 ~234 rows, :viewer=42).
 
-WHERE  (cross-user):  median <x> ms · p95 <x> ms · plan: <...>
-WHERE  (anonymous):   median <x> ms · p95 <x> ms · plan: <...>
-UNION  (cross-user):  median <x> ms · p95 <x> ms · plan: <...>
+NO index (matches the table today — only PK on id):
+  WHERE  median  8.86 ms · p95 32.3 ms · plan: Seq Scan (200k) → top-N heapsort → Limit
+  UNION  median  9.32 ms · p95 37.7 ms · plan: Append(2 Seq Scans) → Sort → Unique → Sort → Limit
+  (both dominated by the unavoidable 200k-row seq scan ≈ 8.7 ms; p95 spikes are Sevalla proxy jitter, present in both)
 
-Decision: <WHERE | UNION> — <one sentence why>
+WITH index (user_id, created_at DESC, id DESC) — for reference, indexes are deferred:
+  WHERE  median  0.024 ms · plan: Index Scan Backward + early termination at LIMIT 10
+  UNION  median  0.29  ms · plan: Bitmap scans → Append → Sort → Unique → Sort → Limit (no early termination)
+
+Decision: WHERE. It is faster on every axis (≈5% unindexed; ≈12× once an index
+exists, because UNION's DISTINCT dedup forces a full materialize+sort and defeats
+the ORDER BY … LIMIT early-termination an index would give WHERE). It also needs
+`UNION` not `UNION ALL` for correct dedup when target==viewer, adding more cost,
+and it keeps the repo on the plain GORM builder (no raw SQL, no paginator SQLRepr
+changes). Bonus finding for the post-Neon index pass: a (user_id, created_at DESC,
+id DESC) index takes this query to ~0.02 ms.
 ```
 
 - [ ] **Step 6: Decision.**
