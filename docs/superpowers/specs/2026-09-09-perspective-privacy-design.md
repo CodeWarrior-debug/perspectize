@@ -53,7 +53,7 @@ to `PUBLIC` — but:
 
 ## Design
 
-### Component 1 — Migration `000017_harden_perspective_privacy`
+### Component 1 — Migration `000018_harden_perspective_privacy` (renumbered from 000017 — PR #346 holds 000017_add_messaging)
 
 `up`:
 ```sql
@@ -139,13 +139,15 @@ validation (privacy alone is not "content").
 
 **`useCreatePerspective.ts`.** Add `privacy?: 'PUBLIC' | 'PRIVATE'` to
 `CreatePerspectiveInput`; send it in the mutation; the optimistic row uses the
-submitted value (lowercased to match `PerspectiveItem.privacy: string`) instead of
-the hardcoded `'public'`.
+submitted uppercase value (`'PUBLIC'` / `'PRIVATE'`, via `input.privacy ?? 'PUBLIC'`),
+matching what the server enum returns. This also fixes the pre-existing hardcoded
+`'public'` inconsistency.
 
 **`useUpdatePerspective.ts`.** Add `privacy?: 'PUBLIC' | 'PRIVATE'` to
-`UpdatePerspectiveInput`; send it; carry it through `applyEdit` (lowercased) so the
-optimistic patch reflects the new value; `onSuccess` server reconciliation already
-overwrites it.
+`UpdatePerspectiveInput`; send it; carry the submitted uppercase value
+(`'PUBLIC'` / `'PRIVATE'`) through `applyEdit` so the optimistic patch reflects the
+new value, matching what the server returns; `onSuccess` server reconciliation
+already overwrites it.
 
 **Display.** The shared `PerspectiveFields` fragment already selects `privacy`; no
 list/query change. A small lock indicator on private rows is out of scope for this
@@ -199,7 +201,7 @@ confirm it still shows in the owner's own activity list (owner-viewing-self path
 ## File touch list
 
 **Backend:**
-- Create: `backend/migrations/000017_harden_perspective_privacy.up.sql` / `.down.sql`
+- Create: `backend/migrations/000018_harden_perspective_privacy.up.sql` / `.down.sql`
 - Modify: `backend/internal/core/services/perspective_service.go` — viewer-aware `ListPerspectives`
 - Modify: `backend/internal/core/ports/...` + `backend/internal/adapters/graphql/resolvers/perspective.resolvers.go` — pass viewer from `auth.ForContext`; `perspectiveByID` nil-for-non-owner
 - Modify: `backend/internal/adapters/repositories/postgres/gorm_perspective_repository.go` (+ `helpers.go` if UNION) — chosen filter shape

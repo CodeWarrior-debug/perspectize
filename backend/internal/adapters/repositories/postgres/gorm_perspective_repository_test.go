@@ -320,7 +320,7 @@ func TestGormPerspectiveRepository_List(t *testing.T) {
 
 	t.Run("RestrictToPublicOrOwner with a viewer adds the public-or-owner predicate", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`WHERE .*privacy = .* OR user_id = `).
+		mock.ExpectQuery(`WHERE user_id = \$1 AND \(privacy = \$2 OR user_id = \$3\)`).
 			WillReturnRows(fullPerspectiveRow(perspectiveRows(), 5))
 
 		viewer := 7
@@ -338,7 +338,7 @@ func TestGormPerspectiveRepository_List(t *testing.T) {
 
 	t.Run("RestrictToPublicOrOwner with no viewer restricts to public only", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`WHERE .*privacy = `).
+		mock.ExpectQuery(`WHERE user_id = \$1 AND privacy = \$2 ORDER BY`).
 			WillReturnRows(perspectiveRows())
 
 		got, err := NewGormPerspectiveRepository(db).List(ctx, domain.PerspectiveListParams{
