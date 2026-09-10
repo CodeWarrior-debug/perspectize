@@ -18,6 +18,7 @@ export interface UpdatePerspectiveInput {
 	like?: string;
 	review?: string;
 	customFields?: Record<string, number>;
+	privacy?: 'PUBLIC' | 'PRIVATE';
 }
 
 type ListSnapshot = [readonly unknown[], ListPerspectivesByUserResponse | undefined][];
@@ -43,6 +44,7 @@ function applyEdit(p: PerspectiveItem, input: UpdatePerspectiveInput): Perspecti
 		like: input.like ?? p.like,
 		review: input.review ?? p.review,
 		customFields: input.customFields ?? p.customFields,
+		privacy: input.privacy ?? p.privacy,
 		updatedAt: new Date().toISOString(),
 	};
 }

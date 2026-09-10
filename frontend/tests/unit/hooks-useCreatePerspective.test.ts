@@ -139,6 +139,36 @@ describe('useCreatePerspective hook', () => {
 		});
 	});
 
+	describe('privacy', () => {
+		it('forwards privacy to the mutation and the optimistic row', async () => {
+			const { graphqlRequest } = await import('$lib/queries/client');
+			const { CREATE_PERSPECTIVE } = await import('$lib/queries/perspectives');
+			(graphqlRequest as any).mockResolvedValue({
+				createPerspective: { id: '1', userID: '42', quality: 9000, privacy: 'PRIVATE', createdAt: '', updatedAt: '' },
+			});
+
+			const input = { userID: 42, quality: 9000, privacy: 'PRIVATE' as const };
+			await capturedMutationOptions.mutationFn(input);
+			expect(graphqlRequest).toHaveBeenCalledWith(CREATE_PERSPECTIVE, {
+				input: expect.objectContaining({ privacy: 'PRIVATE' }),
+			});
+
+			const existing = { perspectives: { items: [] as unknown[] } };
+			await capturedMutationOptions.onMutate(input);
+			const updater = mockSetQueriesData.mock.calls[0][1];
+			const next = updater(existing);
+			expect(next.perspectives.items[0]).toMatchObject({ privacy: 'PRIVATE' });
+		});
+
+		it('defaults the optimistic row to PUBLIC when privacy is omitted', async () => {
+			const existing = { perspectives: { items: [] as unknown[] } };
+			await capturedMutationOptions.onMutate({ userID: 42, quality: 9000 });
+			const updater = mockSetQueriesData.mock.calls[0][1];
+			const next = updater(existing);
+			expect(next.perspectives.items[0]).toMatchObject({ privacy: 'PUBLIC' });
+		});
+	});
+
 	describe('onSuccess callback', () => {
 		it('shows success toast "Perspective added"', () => {
 			capturedMutationOptions.onSuccess();
