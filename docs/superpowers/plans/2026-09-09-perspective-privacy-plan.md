@@ -19,7 +19,8 @@
 - No new index (deferred to the post-Neon tuning pass per spec).
 - No `@auth` directive added to `perspectives` or `perspectiveByID` — public browsing is a planned follow-up.
 - Frontend: Svelte 5 runes only (`$state`, `$derived`, `$effect`); TanStack Query v6 function-wrapper pattern (`createMutation(() => ({...}))`); never pass an options object directly.
-- Migration number: next free is `000017` (confirmed: `ls backend/migrations/` ends at `000016_add_user_onboarding`). Re-check with `ls backend/migrations/ | tail -4` before creating the file in case something landed first.
+- Migration number: **`000018`** (`000017` is taken by open PR #346 `000017_add_messaging`; the harden migration was authored as 017, then renumbered — files are `backend/migrations/000018_harden_perspective_privacy.{up,down}.sql`). The `up.sql` DDL is idempotent (`DROP CONSTRAINT IF EXISTS` before `ADD`).
+- Migrations are **not** run automatically anywhere (no runner in `cmd/server`, no CI step, no release command in-repo). `000018` must be applied **by hand to each environment** (`make migrate-up` with that env's `DATABASE_URL`) as part of rollout. Do not apply it to any shared DB during execution — the PR notes the manual step.
 - Verification before PR: `go build ./...` + `go test ./...` in `backend/`, `pnpm run test:run` in `frontend/`, all green, output summarised in the PR. Browser verification is local-only — hand any UI-behaviour check back to a local session, do not attempt Clerk sign-in.
 
 ---
