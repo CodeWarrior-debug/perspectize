@@ -519,4 +519,43 @@ describe('PerspectivePopover component', () => {
 			expect(screen.getByRole('button', { name: 'Save perspective' })).toBeInTheDocument();
 		});
 	});
+
+	describe('privacy toggle', () => {
+		it('submits privacy PUBLIC by default', async () => {
+			renderPopover();
+			await tick();
+			await fireEvent.click(screen.getByLabelText('Thumbs up'));
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+			expect(mocks.mockCreateMutate).toHaveBeenCalled();
+			const payload = mocks.mockCreateMutate.mock.calls.at(-1)![0];
+			expect(payload.privacy).toBe('PUBLIC');
+		});
+
+		it('submits privacy PRIVATE when the toggle is on', async () => {
+			renderPopover();
+			await tick();
+			await fireEvent.click(screen.getByLabelText('Thumbs up'));
+			await fireEvent.click(screen.getByRole('switch', { name: /private/i }));
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+			expect(mocks.mockCreateMutate).toHaveBeenCalled();
+			const payload = mocks.mockCreateMutate.mock.calls.at(-1)![0];
+			expect(payload.privacy).toBe('PRIVATE');
+		});
+
+		it('initialises the toggle from an existing private perspective in edit mode', async () => {
+			renderPopover({
+				existingPerspective: {
+					id: '5',
+					privacy: 'PRIVATE',
+					quality: 7500,
+					agreement: 5000,
+					importance: 6000,
+					confidence: 8000,
+					like: null,
+				},
+			});
+			await tick();
+			expect(screen.getByRole('switch', { name: /private/i })).toBeChecked();
+		});
+	});
 });

@@ -14,6 +14,8 @@
 		DrawerHeader,
 		DrawerTitle,
 		Button,
+		Label,
+		Switch,
 	} from '$lib/components/shadcn';
 	import RatingInput from '$lib/components/RatingInput.svelte';
 	import Thumbs from '$lib/components/Thumbs.svelte';
@@ -65,6 +67,9 @@
 	// Like field — 'THUMBS_UP', 'THUMBS_DOWN', or null
 	type LikeValue = 'THUMBS_UP' | 'THUMBS_DOWN' | null;
 	let likeValue = $state<LikeValue>(null);
+
+	// Privacy toggle — off (PUBLIC) by default
+	let isPrivate = $state(false);
 
 	// Comment (rich text HTML)
 	// TODO: Backend integration — comment field not yet in GraphQL schema
@@ -180,6 +185,7 @@
 		likeValue = l === 'THUMBS_UP' ? 'THUMBS_UP' : l === 'THUMBS_DOWN' ? 'THUMBS_DOWN' : null;
 		comment = existingPerspective?.review ?? '';
 		commentFullscreenOpen = false;
+		isPrivate = String(existingPerspective?.privacy ?? '').toUpperCase() === 'PRIVATE';
 		// Restore dynamic fields from customFields if editing
 		const cf = existingPerspective?.customFields as Record<string, number> | null;
 		if (cf && Object.keys(cf).length > 0) {
@@ -241,6 +247,7 @@
 					like: likeValue ?? undefined,
 					review: getReview(),
 					customFields: buildCustomFields(),
+					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
 				},
 				{
 					onSuccess: () => {
@@ -261,6 +268,7 @@
 					like: likeValue ?? undefined,
 					review: getReview(),
 					customFields: buildCustomFields(),
+					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
 				},
 				{
 					onSuccess: () => {
@@ -429,6 +437,14 @@
 			</div>
 
 			<AddFieldSearch addedKeys={activeFields} onAdd={addField} placeholder="Add a field — e.g. clarity" dense />
+
+			<div class="flex items-center justify-between rounded-md border border-border px-3 py-2">
+				<div class="flex flex-col">
+					<Label for="perspective-private">Private</Label>
+					<span class="text-xs text-muted-foreground">Only you can see private perspectives</span>
+				</div>
+				<Switch id="perspective-private" bind:checked={isPrivate} aria-label="Private" />
+			</div>
 		</div>
 
 		<!-- Action buttons — extra bottom padding on mobile for home indicator -->
