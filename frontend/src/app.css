@@ -88,6 +88,129 @@
 	--color-logo-purple: #8b5cf6;
 }
 
+/*
+ * Theme presets — generated from frontend/src/lib/theme/presets.ts's
+ * derivation pipeline. Regenerate with:
+ *   npx tsx gen-preset-css.mjs   (see frontend/CLAUDE.md theme picker notes)
+ * Reading Room (default) needs no block — it IS the @theme above.
+ */
+
+[data-theme='archive'] {
+	--color-background: #fdf5ec;
+	--color-foreground: #3a2f22;
+	--color-card: #fdf5ec;
+	--color-card-foreground: #3a2f22;
+	--color-popover: #fdf5ec;
+	--color-popover-foreground: #3a2f22;
+	--color-primary: #7c5a2e;
+	--color-primary-hover: #634a26;
+	--color-primary-foreground: #ffffff;
+	--color-secondary: #f5ebe0;
+	--color-secondary-hover: #fff5ea;
+	--color-secondary-foreground: #171717;
+	--color-muted: #f5ebe0;
+	--color-muted-foreground: #171717;
+	--color-accent: #efe4d3;
+	--color-accent-foreground: #171717;
+	--color-destructive: #b3441f;
+	--color-destructive-hover: #982a00;
+	--color-destructive-foreground: #ffffff;
+	--color-border: #dcc9a8;
+	--color-input: #dcc9a8;
+	--color-ring: #7c5a2e;
+	--color-rating-positive: #3ba13a;
+	--color-rating-neutral: #ca8a05;
+	--color-rating-negative: #dc2912;
+	--color-rating-undecided: #6a728b;
+}
+
+[data-theme='garden'] {
+	--color-background: #f9fdfa;
+	--color-foreground: #233026;
+	--color-card: #f9fdfa;
+	--color-card-foreground: #233026;
+	--color-popover: #f9fdfa;
+	--color-popover-foreground: #233026;
+	--color-primary: #2f4a3a;
+	--color-primary-hover: #26392d;
+	--color-primary-foreground: #ffffff;
+	--color-secondary: #eaf3ed;
+	--color-secondary-hover: #f4fdf7;
+	--color-secondary-foreground: #171717;
+	--color-muted: #eaf3ed;
+	--color-muted-foreground: #171717;
+	--color-accent: #e5ecdf;
+	--color-accent-foreground: #171717;
+	--color-destructive: #a6421f;
+	--color-destructive-hover: #8b2900;
+	--color-destructive-foreground: #ffffff;
+	--color-border: #c9d6c1;
+	--color-input: #c9d6c1;
+	--color-ring: #2f4a3a;
+	--color-rating-positive: #0ea34c;
+	--color-rating-neutral: #c38e00;
+	--color-rating-negative: #da2f00;
+	--color-rating-undecided: #61758a;
+}
+
+[data-theme='midnight'] {
+	--color-background: #0d1421;
+	--color-foreground: #e8e6df;
+	--color-card: #0d1421;
+	--color-card-foreground: #e8e6df;
+	--color-popover: #0d1421;
+	--color-popover-foreground: #e8e6df;
+	--color-primary: #0d1b33;
+	--color-primary-hover: #16263f;
+	--color-primary-foreground: #ffffff;
+	--color-secondary: #192438;
+	--color-secondary-hover: #202b40;
+	--color-secondary-foreground: #ffffff;
+	--color-muted: #192438;
+	--color-muted-foreground: #ffffff;
+	--color-accent: #232c42;
+	--color-accent-foreground: #ffffff;
+	--color-destructive: #e5484d;
+	--color-destructive-hover: #c82a36;
+	--color-destructive-foreground: #171717;
+	--color-border: #2c3448;
+	--color-input: #2c3448;
+	--color-ring: #0d1b33;
+	--color-rating-positive: #00a55f;
+	--color-rating-neutral: #d68128;
+	--color-rating-negative: #db2149;
+	--color-rating-undecided: #64748b;
+}
+
+[data-theme='terminal'] {
+	--color-background: #090b0a;
+	--color-foreground: #c9f5d9;
+	--color-card: #090b0a;
+	--color-card-foreground: #c9f5d9;
+	--color-popover: #090b0a;
+	--color-popover-foreground: #c9f5d9;
+	--color-primary: #00301f;
+	--color-primary-hover: #00432b;
+	--color-primary-foreground: #ffffff;
+	--color-secondary: #121714;
+	--color-secondary-hover: #191e1b;
+	--color-secondary-foreground: #ffffff;
+	--color-muted: #121714;
+	--color-muted-foreground: #ffffff;
+	--color-accent: #0f1f16;
+	--color-accent-foreground: #ffffff;
+	--color-destructive: #ff5c5c;
+	--color-destructive-hover: #e24044;
+	--color-destructive-foreground: #171717;
+	--color-border: #233327;
+	--color-input: #233327;
+	--color-ring: #00301f;
+	--color-rating-positive: #06a34d;
+	--color-rating-neutral: #c38e00;
+	--color-rating-negative: #da3000;
+	--color-rating-undecided: #61758a;
+}
+
 /* Tags tooltip */
 .tags-tooltip {
 	max-width: 320px;
