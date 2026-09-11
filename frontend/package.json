@@ -29,7 +29,7 @@
 		"@capacitor/cli": "^7.5.0",
 		"@capacitor/ios": "^8.4.1",
 		"@internationalized/date": "^3.12.4",
-		"@lucide/svelte": "^0.577.0",
+		"@lucide/svelte": "^1.42.0",
 		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "~2.70.2",
