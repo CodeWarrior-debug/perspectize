@@ -4,7 +4,7 @@
 	import { THEME_PRESETS, THEME_PRESET_TOKENS } from '$lib/theme/presets';
 	import { downloadThemeCss } from '$lib/theme/export';
 	import { deriveTheme, type BaseThemeTokens } from '$lib/theme/derive';
-	import { formatColorForUnit, type ColorUnit } from '$lib/theme/format';
+	import { formatColorForUnit, parseColorInput, type ColorUnit } from '$lib/theme/format';
 	import type { ThemeStore } from '$lib/theme/store.svelte';
 
 	let { store }: { store: ThemeStore } = $props();
@@ -27,6 +27,28 @@
 	let openRow = $state<keyof BaseThemeTokens | null>(null);
 	let saveName = $state('');
 	let showSaveInput = $state(false);
+
+	// Draft text for each row's direct-input field, keyed by token. Only
+	// populated while the user has typed an unparseable value for that row —
+	// keeps their in-progress typing on screen instead of snapping back to
+	// the last valid formatted value on every keystroke. Cleared once the
+	// input parses successfully (the formatted value from editTokens takes
+	// over as the displayed value again).
+	let invalidDrafts = $state<Partial<Record<keyof BaseThemeTokens, string>>>({});
+
+	function colorInputValue(key: keyof BaseThemeTokens): string {
+		return invalidDrafts[key] ?? formatColorForUnit(editTokens[key], unit);
+	}
+
+	function handleColorInput(key: keyof BaseThemeTokens, text: string) {
+		const hex = parseColorInput(text);
+		if (hex) {
+			invalidDrafts = { ...invalidDrafts, [key]: undefined };
+			updateToken(key, hex);
+		} else {
+			invalidDrafts = { ...invalidDrafts, [key]: text };
+		}
+	}
 
 	function startCustomizing() {
 		const active = store.activeFullTokens();
@@ -147,9 +169,13 @@
 						onclick={() => (openRow = openRow === row.key ? null : row.key)}
 					></button>
 					<span class="text-sm flex-1">{row.label}</span>
-					<span class="text-xs text-muted-foreground font-mono text-right break-all">
-						{formatColorForUnit(editTokens[row.key], unit)}
-					</span>
+					<Input
+						value={colorInputValue(row.key)}
+						oninput={(e) => handleColorInput(row.key, e.currentTarget.value)}
+						aria-label="{row.label} value ({unit})"
+						aria-invalid={invalidDrafts[row.key] !== undefined}
+						class="h-7 w-36 shrink-0 font-mono text-xs"
+					/>
 				</div>
 				{#if openRow === row.key}
 					<div class="pl-9">
