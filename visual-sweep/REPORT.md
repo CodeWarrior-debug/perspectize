@@ -194,7 +194,43 @@ The other 8 columns' tooltips (Type, Length, Views, Likes, %Liked, Date, Channel
 
 ---
 
-## 9. [P3, needs confirmation] Grid scroll position isn't reset when switching "Loaded" ↔ "All Items" data mode
+## 9. [P2] Truncated "Category" cells show no tooltip revealing the full value, unlike every other truncated column
+
+**Where:** the `category` colDef, `ActivityTable.svelte:424-432`.
+
+**Repro:** Activity page → hover a truncated Category cell (e.g. "bodybuil…").
+
+**Actual:** no tooltip appears at all, even after waiting past the grid's `tooltipShowDelay: 1000`:
+![actual](sv-09-category-cell-no-tooltip.png)
+
+**Expected (for comparison — the adjacent truncated Channel cell in the same row correctly reveals its full value on hover):**
+![expected](sv-09-channel-cell-tooltip-expected.png)
+
+Channel, Tags, and Item all show a tooltip with the full untruncated value when hovered. Category is the odd one out — a category like "nutritional science" or "bodybuilding" that gets cut to "nutrition…"/"bodybuil…" in the 150px-wide column has no way to be read in full without opening the category-edit popover.
+
+**Root cause:** `defaultColDef` provides a grid-wide fallback (`ActivityTable.svelte:628-634`): `tooltipValueGetter: (params) => params.valueFormatted ?? params.value ?? ''`. That works for Channel (`field: 'channelTitle'`, so `params.value` is a real string) and for columns with an explicit `tooltipField`/`tooltipComponent` (Tags, Item). But the `category` colDef has no `field` at all — it renders entirely through `cellRenderer: categoryCellRenderer` reading `data.primaryCategory` directly — so `params.value` and `params.valueFormatted` are both `undefined` for this column, and the inherited tooltipValueGetter returns `''`, i.e. no tooltip.
+
+**Suggested fix:** give the `category` colDef an explicit `tooltipValueGetter` that reads the same field the cell renderer uses:
+```ts
+{
+  colId: 'category',
+  headerName: 'Category',
+  headerTooltip: 'Wikidata category',
+  width: 150,
+  sortable: false,
+  filter: false,
+  cellRenderer: categoryCellRenderer,
+  tooltipValueGetter: (params) => params.data?.primaryCategory?.label ?? '', // NEW
+  hide: true,
+}
+```
+(adjust the field path to whatever `categoryCellRenderer` actually reads).
+
+**Worth a unit test?** Borderline-yes — this is a small, deterministic gap (tooltip present vs. absent) rather than a multi-state UI, but it's exactly the kind of thing a pure `tooltipValueGetter` function is trivial to unit test in isolation (call it with a sample row, assert non-empty string) without needing AG Grid or a browser at all. Cheap enough to add alongside the fix.
+
+---
+
+## 10. [P3, needs confirmation] Grid scroll position isn't reset when switching "Loaded" ↔ "All Items" data mode
 
 **Where:** `frontend/src/lib/components/ActivityTable.svelte`, the `$effect` that reacts to `mode`/page changes.
 
@@ -226,7 +262,8 @@ gridApi.ensureIndexVisible(0, 'top');
 | 6 | P3 | Hiding columns leaves unfilled blank space on the right | No strong case — visual layout-fill check |
 | 7 | P2 | "Tags" header tooltip shows "No tags" instead of description | Yes — cheap, pure two-state unit test |
 | 8 | P3 | Item/perspective header tooltips overlap row content, style differs from other columns | No — single visual state |
-| 9 | P3 (unconfirmed) | Scroll position not reset on data-mode switch | Yes, if confirmed — stateful (mode toggle) |
+| 9 | P2 | Truncated Category cells show no tooltip (Channel/Tags/Item do) | Borderline — cheap pure-function test |
+| 10 | P3 (unconfirmed) | Scroll position not reset on data-mode switch | Yes, if confirmed — stateful (mode toggle) |
 
 **Verified clean, no action needed:** every column-header tooltip except Tags (#7) shows correct, consistent static text; all numeric filter operators (`=`, `≠`, `>`, `≥`, `<`, `≤`, Between) render their correct symbol in the filter chip and filter correctly; the "All Items" (server) mode's total count updates correctly when filtered (only "Loaded" mode has issue #1).
 
