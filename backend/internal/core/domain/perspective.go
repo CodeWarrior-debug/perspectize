@@ -104,6 +104,15 @@ type PerspectiveListParams struct {
 	SortOrder         SortOrder
 	IncludeTotalCount bool
 	Filter            *PerspectiveFilter
+
+	// ViewerID is the authenticated caller's local user id, or nil when the
+	// request is anonymous. Set by the resolver from auth.ForContext.
+	ViewerID *int
+
+	// RestrictToPublicOrOwner, when true, limits results to rows that are
+	// public OR owned by ViewerID. Set by PerspectiveService.ListPerspectives;
+	// the repository translates it into a WHERE predicate.
+	RestrictToPublicOrOwner bool
 }
 
 // PaginatedPerspectives represents a paginated list of perspectives

@@ -19,6 +19,7 @@ export interface CreatePerspectiveInput {
 	like?: string;
 	review?: string;
 	customFields?: Record<string, number>;
+	privacy?: 'PUBLIC' | 'PRIVATE';
 }
 
 type ListSnapshot = [readonly unknown[], ListPerspectivesByUserResponse | undefined][];
@@ -41,7 +42,7 @@ function optimisticPerspective(input: CreatePerspectiveInput, id: string): Persp
 		confidence: input.confidence ?? null,
 		like: input.like ?? null,
 		review: input.review ?? null,
-		privacy: 'public',
+		privacy: input.privacy ?? 'PUBLIC',
 		description: null,
 		primaryPerspectiveID: null,
 		relatedPerspectiveIDs: null,

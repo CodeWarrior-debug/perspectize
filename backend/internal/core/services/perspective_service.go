@@ -254,6 +254,15 @@ func (s *PerspectiveService) ListPerspectives(ctx context.Context, params domain
 		}
 	}
 
+	// Read authorization: unless the caller is unambiguously asking only for
+	// their own rows, results must be limited to public rows plus the caller's
+	// own. The repository turns RestrictToPublicOrOwner into a WHERE predicate.
+	isOwnListOnly := params.Filter != nil &&
+		params.Filter.UserID != nil &&
+		params.ViewerID != nil &&
+		*params.Filter.UserID == *params.ViewerID
+	params.RestrictToPublicOrOwner = !isOwnListOnly
+
 	result, err := s.repo.List(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list perspectives: %w", err)

@@ -317,4 +317,51 @@ func TestGormPerspectiveRepository_List(t *testing.T) {
 			assertAllExpectationsMet(t, mock)
 		})
 	}
+
+	t.Run("RestrictToPublicOrOwner with a viewer adds the public-or-owner predicate", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`WHERE user_id = \$1 AND \(privacy = \$2 OR user_id = \$3\)`).
+			WillReturnRows(fullPerspectiveRow(perspectiveRows(), 5))
+
+		viewer := 7
+		got, err := NewGormPerspectiveRepository(db).List(ctx, domain.PerspectiveListParams{
+			Filter:                  &domain.PerspectiveFilter{UserID: pInt(9)},
+			ViewerID:                &viewer,
+			RestrictToPublicOrOwner: true,
+			SortBy:                  domain.PerspectiveSortByCreatedAt,
+			SortOrder:               domain.SortOrderDesc,
+		})
+		require.NoError(t, err)
+		require.Len(t, got.Items, 1)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("RestrictToPublicOrOwner with no viewer restricts to public only", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`WHERE user_id = \$1 AND privacy = \$2 ORDER BY`).
+			WillReturnRows(perspectiveRows())
+
+		got, err := NewGormPerspectiveRepository(db).List(ctx, domain.PerspectiveListParams{
+			Filter:                  &domain.PerspectiveFilter{UserID: pInt(9)},
+			ViewerID:                nil,
+			RestrictToPublicOrOwner: true,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("RestrictToPublicOrOwner false leaves the query unrestricted", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		// No privacy predicate expected — a plain user_id filter only.
+		mock.ExpectQuery(`SELECT \* FROM "perspectives" WHERE user_id = \$1 ORDER BY`).
+			WillReturnRows(perspectiveRows())
+
+		_, err := NewGormPerspectiveRepository(db).List(ctx, domain.PerspectiveListParams{
+			Filter:                  &domain.PerspectiveFilter{UserID: pInt(7)},
+			RestrictToPublicOrOwner: false,
+		})
+		require.NoError(t, err)
+		assertAllExpectationsMet(t, mock)
+	})
 }

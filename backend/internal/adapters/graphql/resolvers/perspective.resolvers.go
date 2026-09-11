@@ -112,6 +112,16 @@ func (r *queryResolver) PerspectiveByID(ctx context.Context, id string) (*model.
 		return nil, fmt.Errorf("failed to get perspective")
 	}
 
+	// Private perspectives are visible only to their owner; return nil (not an
+	// error) so the id's existence isn't disclosed. See
+	// docs/superpowers/specs/2026-09-09-perspective-privacy-design.md.
+	if perspective.Privacy == domain.PrivacyPrivate {
+		viewer, ok := auth.ForContext(ctx)
+		if !ok || viewer.ID != perspective.UserID {
+			return nil, nil
+		}
+	}
+
 	return perspectiveDomainToModel(perspective), nil
 }
 
@@ -153,6 +163,13 @@ func (r *queryResolver) Perspectives(ctx context.Context, first *int, after *str
 		if filter.Privacy != nil {
 			params.Filter.Privacy = filter.Privacy
 		}
+	}
+
+	// Scope the listing to what this viewer may see (public rows + their own).
+	// See docs/superpowers/specs/2026-09-09-perspective-privacy-design.md.
+	if viewer, ok := auth.ForContext(ctx); ok {
+		id := viewer.ID
+		params.ViewerID = &id
 	}
 
 	result, err := r.PerspectiveService.ListPerspectives(ctx, params)
