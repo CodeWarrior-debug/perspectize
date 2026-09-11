@@ -71,7 +71,7 @@
 		"ag-grid-svelte5": "^1.0.3",
 		"clsx": "^2.1.1",
 		"dompurify": "^3.4.15",
-		"graphql": "^16.13.1",
+		"graphql": "^16.14.2",
 		"graphql-request": "^7.4.0",
 		"svelte-clerk": "^1.1.15",
 		"svelte-sonner": "^1.1.0",
