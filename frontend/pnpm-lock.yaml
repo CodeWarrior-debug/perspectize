@@ -100,8 +100,8 @@ importers:
         specifier: ^3.12.4
         version: 3.12.4
       '@lucide/svelte':
-        specifier: ^0.577.0
-        version: 0.577.0(svelte@5.56.3)
+        specifier: ^1.42.0
+        version: 1.42.0(svelte@5.56.3)
       '@sveltejs/adapter-auto':
         specifier: ^7.0.1
         version: 7.0.1(@sveltejs/kit@2.70.3(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@7.3.6(@types/node@25.2.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.50.0)))(svelte@5.56.3)(typescript@5.9.3)(vite@7.3.6(@types/node@25.2.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.50.0)))
@@ -1066,8 +1066,8 @@ packages:
   '@jscpd/tokenizer@4.0.4':
     resolution: {integrity: sha512-xxYYY/qaLah/FlwogEbGIxx9CjDO+G9E6qawcy26WwrflzJb6wsnhjwdneN6Wb0RNCDsqvzY+bzG453jsin4UQ==}
 
-  '@lucide/svelte@0.577.0':
-    resolution: {integrity: sha512-0P6mkySd2MapIEgq08tADPmcN4DHndC/02PWwaLkOerXlx5Sv9aT4BxyXLIY+eccr0g/nEyCYiJesqS61YdBZQ==}
+  '@lucide/svelte@1.42.0':
+    resolution: {integrity: sha512-9vOi3EdzJht5aD7F5OraoxrK2GyyL1Y+kVXEtIg4+IAdKmDBrwYK2d/x7akC89uA+cvkfjcw+IuzH0vfd/TuzA==}
     peerDependencies:
       svelte: ^5
 
@@ -4855,7 +4855,7 @@ snapshots:
       reprism: 0.0.11
       spark-md5: 3.0.2
 
-  '@lucide/svelte@0.577.0(svelte@5.56.3)':
+  '@lucide/svelte@1.42.0(svelte@5.56.3)':
     dependencies:
       svelte: 5.56.3
 
