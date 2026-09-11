@@ -566,3 +566,21 @@ Session start on this machine showed: `[vtsls] Installing vtsls... [vtsls] Faile
 **Fix applied (2026-09-02):** Disabled `vtsls@claude-code-lsps` at user scope (`claude plugin disable vtsls@claude-code-lsps`) rather than installing a second redundant TS language server. `typescript-lsp@claude-plugins-official` remains enabled and confirmed working. `gopls@claude-code-lsps` was separately confirmed working (`gopls version` → v0.21.1 at `/Users/jamesjordan/go/bin/gopls`) — no fix needed there. Restart Claude Code to pick up the plugin change.
 
 **Source:** Dev request (2026-09-02), observed vtsls install failure at session start.
+
+---
+
+## Cache Clerk ID → Local User Lookup in Auth Middleware
+
+**Type:** Dev × Performance
+
+`clerk_middleware.go` verifies the incoming Clerk JWT (cheap — the SDK caches Clerk's JWKS in-memory, so signature verification is a local check, no network call per request) and then resolves the token's Clerk ID to a local `users` row via `GetByClerkID`, a Postgres query. That DB lookup runs on **every** authenticated request — there's no caching layer between the middleware and the database.
+
+At current traffic this is fine. At real scale (many requests per second from the same signed-in users — polling, rapid successive GraphQL mutations, etc.) it becomes redundant load: the same user's row gets re-fetched on every request in a burst.
+
+**What to do:**
+- Add a short-TTL cache (in-memory LRU, or Redis if the app already has one) keyed by Clerk ID → local `domain.User`, TTL ~30–60s.
+- Invalidate on the Clerk webhook events the app already listens for (user updated/deactivated) rather than relying purely on TTL expiry, so role/deactivation changes don't have a stale window longer than necessary.
+
+**Priority:** Low — not worth the complexity at current (Sevalla-hosted, low-traffic) scale. Revisit if/when request volume from authenticated users grows meaningfully.
+
+**Source:** Dev discussion (2026-09-10), during PR #356 (issue #246 userID-spoofing fix) — question about whether `auth.RequireAuth`'s context lookup or the upstream middleware's DB call would ever become a cost concern.
