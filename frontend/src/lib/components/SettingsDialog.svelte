@@ -18,12 +18,12 @@
 			<DialogTitle>Settings</DialogTitle>
 		</DialogHeader>
 
-		<div class="flex gap-6 min-h-[320px]">
-			<nav class="w-40 shrink-0 flex flex-col gap-1" aria-label="Settings sections">
+		<div class="flex flex-col gap-4 sm:flex-row sm:gap-6 min-h-[320px] max-h-[75vh] overflow-y-auto">
+			<nav class="flex gap-1 overflow-x-auto sm:w-40 sm:shrink-0 sm:flex-col sm:overflow-visible" aria-label="Settings sections">
 				{#each sections as section (section.id)}
 					<button
 						type="button"
-						class="text-left text-sm px-2 py-1.5 rounded-md {activeSection === section.id
+						class="shrink-0 whitespace-nowrap text-left text-sm px-2 py-1.5 rounded-md {activeSection === section.id
 							? 'bg-muted font-medium'
 							: 'text-muted-foreground hover:bg-muted/50'}"
 						onclick={() => (activeSection = section.id)}
