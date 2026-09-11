@@ -1,4 +1,4 @@
-import { converter, formatRgb } from 'culori';
+import { converter, formatRgb, formatHex, parse } from 'culori';
 
 const toOklch = converter('oklch');
 
@@ -28,4 +28,20 @@ export function formatColorForUnit(hex: string, unit: ColorUnit): string {
 	const chroma = (c.c ?? 0).toFixed(3);
 	const h = (c.h ?? 0).toFixed(1);
 	return `oklch(${l} ${chroma} ${h})`;
+}
+
+/**
+ * Parse a color string typed by the user — in any of the three units the
+ * customize panel's toggle supports (hex, `rgb(...)`, or `oklch(...)`), or
+ * any other CSS color syntax culori understands — into a hex string.
+ *
+ * Returns null for unparseable input so callers can reject the edit rather
+ * than silently applying garbage.
+ */
+export function parseColorInput(input: string): string | null {
+	const trimmed = input.trim();
+	if (!trimmed) return null;
+	const parsed = parse(trimmed);
+	if (!parsed) return null;
+	return formatHex(parsed);
 }
