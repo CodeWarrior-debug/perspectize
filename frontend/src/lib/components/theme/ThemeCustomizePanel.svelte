@@ -4,6 +4,7 @@
 	import { THEME_PRESETS, THEME_PRESET_TOKENS } from '$lib/theme/presets';
 	import { downloadThemeCss } from '$lib/theme/export';
 	import { deriveTheme, type BaseThemeTokens } from '$lib/theme/derive';
+	import { formatColorForUnit, type ColorUnit } from '$lib/theme/format';
 	import type { ThemeStore } from '$lib/theme/store.svelte';
 
 	let { store }: { store: ThemeStore } = $props();
@@ -19,8 +20,7 @@
 		{ key: 'destructive', label: 'Destructive' },
 	];
 
-	type Unit = 'oklch' | 'hex' | 'rgb';
-	let unit = $state<Unit>('oklch');
+	let unit = $state<ColorUnit>('oklch');
 
 	let customizing = $state(false);
 	let editTokens = $state<BaseThemeTokens>(structuredClone(THEME_PRESETS[0].base));
@@ -122,14 +122,14 @@
 		<Button variant="outline" onclick={startCustomizing}>Customize</Button>
 	{:else}
 		<div class="flex flex-col gap-4 border-t border-border pt-4">
-			<div class="flex items-center justify-between">
+			<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 				<span class="text-sm font-medium">Custom colors</span>
 				<div class="flex gap-1 text-xs">
 					{#each ['oklch', 'hex', 'rgb'] as u}
 						<button
 							type="button"
 							class="px-2 py-1 rounded {unit === u ? 'bg-primary text-primary-foreground' : 'bg-muted'}"
-							onclick={() => (unit = u as Unit)}
+							onclick={() => (unit = u as ColorUnit)}
 						>
 							{u.toUpperCase()}
 						</button>
@@ -147,7 +147,9 @@
 						onclick={() => (openRow = openRow === row.key ? null : row.key)}
 					></button>
 					<span class="text-sm flex-1">{row.label}</span>
-					<span class="text-xs text-muted-foreground font-mono">{editTokens[row.key]}</span>
+					<span class="text-xs text-muted-foreground font-mono text-right break-all">
+						{formatColorForUnit(editTokens[row.key], unit)}
+					</span>
 				</div>
 				{#if openRow === row.key}
 					<div class="pl-9">
