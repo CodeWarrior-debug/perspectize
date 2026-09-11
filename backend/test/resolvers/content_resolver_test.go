@@ -275,8 +275,13 @@ func injectAuthMiddleware(next http.Handler) http.Handler {
 // Wires auth directives and injects an authenticated user context via auth middleware
 // so mutation tests pass the @auth directive check.
 func setupTestServer(repo *mockContentRepository, ytClient *mockYouTubeClient) *httptest.Server {
-	userRepo := &mockUserRepository{}
-	perspectiveRepo := &mockPerspectiveRepository{}
+	return setupTestServerWithRepos(repo, ytClient, &mockPerspectiveRepository{}, &mockUserRepository{})
+}
+
+// setupTestServerWithRepos is like setupTestServer but lets the caller supply
+// mockPerspectiveRepository/mockUserRepository (e.g. to assert on createPerspective
+// calls or stub GetByID for the resolver's post-auth user lookup).
+func setupTestServerWithRepos(repo *mockContentRepository, ytClient *mockYouTubeClient, perspectiveRepo *mockPerspectiveRepository, userRepo *mockUserRepository) *httptest.Server {
 	categoryRepo := &mockCategoryRepository{}
 	wikidataClient := &mockWikidataClient{}
 	contentService := services.NewContentService(repo, ytClient)
@@ -523,6 +528,45 @@ func TestCreateContentFromYouTube_DerivesUserIDFromSession_WhenZero(t *testing.T
 
 	assert.Empty(t, result.Errors)
 	assert.Equal(t, 1, capturedUserID)
+}
+
+func TestCreateContentFromYouTube_RejectsSpoofedUserID(t *testing.T) {
+	// Issue #246: a non-zero userId that doesn't match the authenticated
+	// session must be rejected, not trusted verbatim.
+	metadata := &portservices.VideoMetadata{
+		Title:    "Amazing Video",
+		Duration: 600,
+		Response: json.RawMessage(`{"items":[]}`),
+	}
+
+	var createCalled bool
+	repo := &mockContentRepository{
+		getByURLFn: func(ctx context.Context, url string) (*domain.Content, error) {
+			return nil, domain.ErrNotFound
+		},
+		getOrCreateByURLFn: func(ctx context.Context, content *domain.Content) (*domain.Content, bool, error) {
+			createCalled = true
+			content.ID = 42
+			return content, false, nil
+		},
+	}
+
+	ytClient := &mockYouTubeClient{
+		getVideoMetadataFn: func(ctx context.Context, videoID string) (*portservices.VideoMetadata, error) {
+			return metadata, nil
+		},
+	}
+
+	server := setupTestServer(repo, ytClient)
+	defer server.Close()
+
+	// injectAuthMiddleware authenticates as user ID 1; userId: 2 attempts to
+	// attribute the content to a different user.
+	result := executeGraphQL(t, server, `mutation { createContentFromYouTube(input: { url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", userId: 2 }) { content { id } alreadyExisted } }`)
+
+	require.NotEmpty(t, result.Errors, "Expected an error when userId doesn't match the authenticated session")
+	assert.Contains(t, result.Errors[0].Message, "access denied")
+	assert.False(t, createCalled, "Content should not be created when userId is spoofed")
 }
 
 func TestCreateContentFromYouTube_AlreadyExists(t *testing.T) {

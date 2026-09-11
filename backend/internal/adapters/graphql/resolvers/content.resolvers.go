@@ -54,15 +54,17 @@ func (r *contentResolver) PrimaryCategory(ctx context.Context, obj *model.Conten
 
 // CreateContentFromYouTube is the resolver for the createContentFromYouTube field.
 func (r *mutationResolver) CreateContentFromYouTube(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error) {
-	// Use authenticated user when userID is not provided or zero (mirrors CreatePerspective)
-	userID := input.UserID
-	if userID == 0 {
-		authUser, err := auth.RequireAuth(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("access denied: authentication required")
-		}
-		userID = authUser.ID
+	// Always derive identity from the authenticated session (mirrors CreatePerspective).
+	// A client-supplied userID is only accepted if it matches the session; anything
+	// else is an attempt to attribute content to another user.
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
 	}
+	if input.UserID != 0 && input.UserID != authUser.ID {
+		return nil, fmt.Errorf("access denied: cannot create content for another user")
+	}
+	userID := authUser.ID
 
 	content, err := r.ContentService.CreateFromYouTube(ctx, input.URL, userID)
 
