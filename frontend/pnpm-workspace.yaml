@@ -32,6 +32,7 @@ overrides:
   fast-uri: ^3.1.6
   undici: ^7.24.0
   devalue: ^5.8.1
+  '@lucide/svelte': 1.43.0
 # Dropped when the two override sources were reconciled: `rollup: ^4.59.0`,
 # `minimatch: ^10.2.3` and `tinyglobby>picomatch: ^4.0.4`. The first two were
 # never in effect (package.json won, and the tree still resolves rollup@2.80.0
