@@ -201,6 +201,7 @@
 
 	let gridApi = $state<GridApi | null>(null);
 	let gridReady = $state(false);
+	let displayedRowCount = $state<number | null>(null);
 	let debounceTimer: ReturnType<typeof setTimeout>;
 	let skipNextSortEvent = $state(false);
 	let activeFilterModel = $state<Record<string, any>>({});
@@ -298,6 +299,14 @@
 	const rowData = $derived(contentQuery.data?.content.items ?? []);
 	const detailsModalContent = $derived(rowData.find((item) => String(item.id) === detailsModalContentId) ?? null);
 	const totalCount = $derived(contentQuery.data?.content.totalCount ?? 0);
+	// Reset the filtered-row count whenever the underlying row data changes
+	// (new fetch, mode switch) so a stale filtered count from the previous
+	// dataset doesn't linger until the next filter interaction.
+	$effect(() => {
+		rowData;
+		displayedRowCount = null;
+	});
+	const loadedItemsCount = $derived(displayedRowCount ?? rowData.length);
 	const loading = $derived(contentQuery.isLoading || contentQuery.isPlaceholderData);
 	const hasActiveFilters = $derived(Object.keys(filters).length > 0 || searchText !== '');
 
@@ -428,6 +437,7 @@
 				sortable: false,
 				filter: false,
 				cellRenderer: categoryCellRenderer,
+				tooltipValueGetter: (params) => params.data?.primaryCategory?.label ?? '',
 				hide: true,
 			},
 			{
@@ -498,6 +508,7 @@
 				headerName: 'Date',
 				flex: 1,
 				maxWidth: 150,
+				minWidth: 130, // fits "Sep 9, 2023"-style formatted dates, not just the "Date" header label
 
 				filter: 'agDateColumnFilter',
 				filterValueGetter: (params) => {
@@ -690,6 +701,7 @@
 		onFilterChanged: (event: FilterChangedEvent) => {
 			// Immediate: update chip display
 			activeFilterModel = event.api.getFilterModel();
+			displayedRowCount = event.api.getDisplayedRowCount();
 
 			// In "Loaded" mode, AG Grid handles client-side filter — skip URL update
 			if (mode === 'loaded') return;
@@ -928,7 +940,7 @@
 				{totalCount} total
 			</div>
 			<!-- Data Mode Toggle -->
-			<DataModeToggle {mode} loadedCount={rowData.length} onToggle={handleModeToggle} />
+			<DataModeToggle {mode} loadedCount={loadedItemsCount} onToggle={handleModeToggle} />
 			{#if !cardMode}
 				<button
 					type="button"

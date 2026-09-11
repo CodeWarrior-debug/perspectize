@@ -59,9 +59,9 @@ describe('TagsTooltip', () => {
 		expect(tooltip.getGui().textContent).toBe('No tags');
 	});
 
-	it('shows "No tags" when data is undefined', () => {
+	it('shows the static header description when data is undefined (header hover, no row context)', () => {
 		const tooltip = createTooltip(undefined);
-		expect(tooltip.getGui().textContent).toBe('No tags');
+		expect(tooltip.getGui().textContent).toBe('Tags from YouTube API');
 	});
 
 	it('renders single tag', () => {
