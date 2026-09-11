@@ -28,26 +28,41 @@
 	let saveName = $state('');
 	let showSaveInput = $state(false);
 
-	// Draft text for each row's direct-input field, keyed by token. Only
-	// populated while the user has typed an unparseable value for that row —
-	// keeps their in-progress typing on screen instead of snapping back to
-	// the last valid formatted value on every keystroke. Cleared once the
-	// input parses successfully (the formatted value from editTokens takes
-	// over as the displayed value again).
-	let invalidDrafts = $state<Partial<Record<keyof BaseThemeTokens, string>>>({});
+	// Draft text for each row's direct-input field, keyed by token. While a
+	// row is focused, its displayed value comes ONLY from this draft, never
+	// from re-formatting editTokens — otherwise every valid keystroke (e.g.
+	// finishing a hex pair, or a digit that completes a parseable oklch
+	// number) round-trips through updateToken -> formatColorForUnit and
+	// rewrites the input's value mid-type, which snaps the cursor to the end
+	// and makes typing feel like it's fighting back. The draft is seeded from
+	// the formatted value on focus and dropped on blur, so once editing ends
+	// the field falls back to reflecting editTokens/unit again (including
+	// picking up changes made via the color wheel).
+	let drafts = $state<Partial<Record<keyof BaseThemeTokens, string>>>({});
+	let invalidRows = $state<Partial<Record<keyof BaseThemeTokens, boolean>>>({});
 
 	function colorInputValue(key: keyof BaseThemeTokens): string {
-		return invalidDrafts[key] ?? formatColorForUnit(editTokens[key], unit);
+		return drafts[key] ?? formatColorForUnit(editTokens[key], unit);
+	}
+
+	function handleColorFocus(key: keyof BaseThemeTokens) {
+		drafts = { ...drafts, [key]: formatColorForUnit(editTokens[key], unit) };
 	}
 
 	function handleColorInput(key: keyof BaseThemeTokens, text: string) {
+		drafts = { ...drafts, [key]: text };
 		const hex = parseColorInput(text);
 		if (hex) {
-			invalidDrafts = { ...invalidDrafts, [key]: undefined };
+			invalidRows = { ...invalidRows, [key]: false };
 			updateToken(key, hex);
 		} else {
-			invalidDrafts = { ...invalidDrafts, [key]: text };
+			invalidRows = { ...invalidRows, [key]: true };
 		}
+	}
+
+	function handleColorBlur(key: keyof BaseThemeTokens) {
+		drafts = { ...drafts, [key]: undefined };
+		invalidRows = { ...invalidRows, [key]: false };
 	}
 
 	function startCustomizing() {
@@ -171,9 +186,11 @@
 					<span class="text-sm flex-1">{row.label}</span>
 					<Input
 						value={colorInputValue(row.key)}
+						onfocus={() => handleColorFocus(row.key)}
 						oninput={(e) => handleColorInput(row.key, e.currentTarget.value)}
+						onblur={() => handleColorBlur(row.key)}
 						aria-label="{row.label} value ({unit})"
-						aria-invalid={invalidDrafts[row.key] !== undefined}
+						aria-invalid={invalidRows[row.key] === true}
 						class="h-7 w-36 shrink-0 font-mono text-xs"
 					/>
 				</div>
