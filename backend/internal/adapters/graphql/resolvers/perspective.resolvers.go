@@ -23,15 +23,17 @@ import (
 
 // CreatePerspective is the resolver for the createPerspective field.
 func (r *mutationResolver) CreatePerspective(ctx context.Context, input model.CreatePerspectiveInput) (*model.Perspective, error) {
-	// Use authenticated user when userID is not provided or zero
-	userID := input.UserID
-	if userID == 0 {
-		authUser, err := auth.RequireAuth(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("access denied: authentication required")
-		}
-		userID = authUser.ID
+	// Always derive identity from the authenticated session. A client-supplied
+	// userID is only accepted if it matches the session (e.g. 0/"derive" sentinel);
+	// anything else is an attempt to attribute content to another user.
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
 	}
+	if input.UserID != 0 && input.UserID != authUser.ID {
+		return nil, fmt.Errorf("access denied: cannot create perspective for another user")
+	}
+	userID := authUser.ID
 
 	perspective, err := r.PerspectiveService.Create(ctx, modelToCreatePerspectiveInput(userID, input))
 	if err != nil {
