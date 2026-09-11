@@ -115,7 +115,86 @@ const sortIconEm = 1.6; // was 1.2
 
 ---
 
-## 5. [P3, needs confirmation] Grid scroll position isn't reset when switching "Loaded" ↔ "All Items" data mode
+## 5. [P1] The Column picker lets you hide the "Item" column, leaving rows with no way to identify which video they are
+
+**Where:** `frontend/src/lib/components/ColumnPickerDialog.svelte` (no protected/required columns) and the `item` colDef in `ActivityTable.svelte:392-406`.
+
+**Repro:** Activity page → Columns → uncheck "Item" → Done.
+
+**Actual:** every row loses its only identifying content (thumbnail + title). What's left is a bare `+`/perspective icon, a Type icon, Category, Length, Likes, %Liked, Date, Channel and Tags — for a busy channel like "Bite-sized Philosophy" or "Jordan Peterson Rules for Life" with many same-length videos, there is now no way to tell which row is which video without re-enabling the column:
+![actual](sv-08-item-column-removable.png)
+
+**Why this matters:** every other hideable column is supplementary (Views, Likes, Tags, Description, …) — losing any one of them still leaves the video identifiable. "Item" is the only column carrying the title, so it's structurally different from the rest of the list and shouldn't be offered as an equal, freely-togglable checkbox.
+
+**Suggested fix:** exclude "Item" from the column picker's checkbox list entirely (simplest), or mark it `disabled`/always-checked with a short note ("required") the way some grid column-chooser UIs pin an identity column. `ColumnPickerDialog.svelte`'s list is driven by the same column-metadata array the checkboxes map over — filtering `colId !== 'item'` out of that list (or before it) resolves this without touching AG Grid column defs.
+
+**Worth a unit test?** Yes — this is a stateful list-of-toggles component (each column has a checked/unchecked state), and "Item must never reach the unchecked state" is exactly the kind of invariant that silently regresses if someone later refactors the picker to loop over all columns generically. A unit test on the column-picker's configuration (e.g. `getPickerColumns()` in `grid-config.ts` never includes `item`, or the rendered checkbox for Item is `disabled`) is cheap and durable.
+
+---
+
+## 6. [P3] Hiding several columns leaves a large unfilled void on the right instead of stretching remaining columns
+
+**Where:** `ActivityTable.svelte` column `flex` configuration / grid width recalculation.
+
+**Repro:** Activity page → Columns → uncheck "Views" and "Item" (or any couple of wide columns) → Done.
+
+**Actual:** measured live, the grid container (`.ag-root`) is 1212px wide but the header's content only fills 907px — a ~305px (25%) blank strip on the right where no column renders, instead of the remaining columns' `flex` values growing to fill the container:
+![actual](sv-08-item-column-removable.png)
+
+**Suggested fix:** this is likely the same "Re-evaluate flex column widths when the grid container resizes" `$effect` mentioned in `ActivityTable.svelte` (~line 864) not also re-running when the *set of visible columns* changes (only on container resize) — trigger the same flex recalculation from `handleColumnToggle`/`setColumnsVisible` calls, not just `ResizeObserver`.
+
+**Worth a unit test?** No strong case — this is a layout-fill behavior with one real state worth checking (columns hidden vs. not), best caught visually. If `grid-config.ts` grows a pure helper for flex recalculation, a quick assertion that total flex-basis fills container width would be cheap to add, but not worth a dedicated new test file on its own.
+
+---
+
+## 7. [P2] "Tags" column header tooltip shows "No tags" instead of a column description
+
+**Where:** `frontend/src/lib/components/TagsTooltip.ts` and the `tags` colDef in `ActivityTable.svelte:521-533`.
+
+**Repro:** Activity page → hover the "Tags" column header.
+
+**Actual:** every other header shows a static description on hover (e.g. "Channel name from YouTube API", "Wikidata category") — Tags instead shows **"No tags"**:
+![actual](sv-07-tags-header-tooltip-wrong.png)
+
+**Root cause:** the colDef correctly sets `headerTooltip: 'Tags from YouTube API'` (`ActivityTable.svelte:532`), same as every other column — but it also sets `tooltipComponent: TagsTooltip` (a component meant for *cell* tooltips, rendering a tag-chip list). AG Grid applies a column's `tooltipComponent` to its header tooltip too, unless told otherwise. `TagsTooltip.init()` reads `params.data?.tags ?? []` (`TagsTooltip.ts:10`); on a header hover there's no row `data`, so it falls into the empty-tags branch and renders the literal string `'No tags'` — silently overriding the intended `headerTooltip` text.
+
+**Suggested fix:** guard `TagsTooltip` against the header case, e.g. render the static header text when `params.data` is undefined:
+```ts
+init(params: ITooltipParams) {
+  this.el = document.createElement('div');
+  this.el.className = 'tags-tooltip';
+
+  if (!params.data) {
+    this.el.textContent = 'Tags from YouTube API'; // header hover — no row context
+    return;
+  }
+  const tags: string[] = params.data?.tags ?? [];
+  ...
+```
+(or check whatever `ITooltipParams` field distinguishes header vs. cell in the AG Grid version this repo pins, and use that instead of inferring from missing `data`).
+
+**Worth a unit test?** Yes — `TagsTooltip` is a small, pure-ish class with two real states (row-context tooltip vs. header-context tooltip) that render completely different content; a unit test instantiating it with `data: undefined` vs. `data: {tags: [...]}` and asserting the rendered text is cheap and would have caught this directly, no AG Grid/browser harness needed.
+
+---
+
+## 8. [P3] The leftmost "perspective" and "Item" header tooltips render differently from the other 8 columns and overlap row content
+
+**Where:** `ActivityTable.svelte`, `perspectize` and `item` colDefs (`headerComponent: PerspectiveHeaderRenderer` for the former).
+
+**Repro:** Activity page → hover the leftmost icon-only header, then hover "Item".
+
+**Observed:** both tooltips render directly over the row(s) immediately below the header — e.g. hovering "Item" shows "Video title and thumbnail from YouTube API" positioned so it visually covers the first data row's own title text:
+![actual](sv-06-item-header-tooltip-overlap.png)
+
+The other 8 columns' tooltips (Type, Length, Views, Likes, %Liked, Date, Channel, Category) render as a compact chip that sits clear of row content. This pair is more likely to occlude real data because Item/perspective sit at the far left where the first row starts almost immediately below the header.
+
+**Note:** on a first-ever hover after page load, the Item tooltip additionally appeared in a distinctly lighter/wider style before settling into the normal dark chip on subsequent hovers — possibly a one-time style/paint-order quirk. Only the overlap-with-content issue reproduced consistently; treat the style-flash note as a low-confidence secondary observation, not a separate confirmed bug.
+
+**Worth a unit test?** No — single visual/positioning state, quickest to verify by eye.
+
+---
+
+## 9. [P3, needs confirmation] Grid scroll position isn't reset when switching "Loaded" ↔ "All Items" data mode
 
 **Where:** `frontend/src/lib/components/ActivityTable.svelte`, the `$effect` that reacts to `mode`/page changes.
 
@@ -143,6 +222,12 @@ gridApi.ensureIndexVisible(0, 'top');
 | 2 | P2 | Sorted column header truncates ("Length" → "Le…") | Yes — stateful (sort states) |
 | 3 | P2 | Date column truncates at 1280px | Optional/lightweight — mostly static layout |
 | 4 | P4 | Category popover has no anchor, covers row below | No — single visual state |
-| 5 | P3 (unconfirmed) | Scroll position not reset on data-mode switch | Yes, if confirmed — stateful (mode toggle) |
+| 5 | P1 | "Item" column can be hidden, rows become unidentifiable | Yes — stateful (picker checkbox invariant) |
+| 6 | P3 | Hiding columns leaves unfilled blank space on the right | No strong case — visual layout-fill check |
+| 7 | P2 | "Tags" header tooltip shows "No tags" instead of description | Yes — cheap, pure two-state unit test |
+| 8 | P3 | Item/perspective header tooltips overlap row content, style differs from other columns | No — single visual state |
+| 9 | P3 (unconfirmed) | Scroll position not reset on data-mode switch | Yes, if confirmed — stateful (mode toggle) |
+
+**Verified clean, no action needed:** every column-header tooltip except Tags (#7) shows correct, consistent static text; all numeric filter operators (`=`, `≠`, `>`, `≥`, `<`, `≤`, Between) render their correct symbol in the filter chip and filter correctly; the "All Items" (server) mode's total count updates correctly when filtered (only "Loaded" mode has issue #1).
 
 Per plan: this `visual-sweep/` folder (screenshots + this report) should be deleted as the last commit once the above are fixed.
