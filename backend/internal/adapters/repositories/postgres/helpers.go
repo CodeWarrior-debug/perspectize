@@ -87,9 +87,8 @@ func intSliceToInt64Array(ints []int) Int64Array {
 	return result
 }
 
-// buildContentSortRules builds paginator rules for content sorting
-// Returns slice with primary sort rule + ID tie-breaker rule
-func buildContentSortRules(sortBy domain.ContentSortBy, order domain.SortOrder) []paginator.Rule {
+// contentSortRule builds a single paginator.Rule for one content sort column.
+func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) paginator.Rule {
 	// Map domain.SortOrder to paginator.Order
 	var paginatorOrder paginator.Order
 	if order == domain.SortOrderAsc {
@@ -98,73 +97,113 @@ func buildContentSortRules(sortBy domain.ContentSortBy, order domain.SortOrder) 
 		paginatorOrder = paginator.DESC
 	}
 
-	var primaryRule paginator.Rule
-
 	switch sortBy {
 	case domain.ContentSortByViewCount:
-		primaryRule = paginator.Rule{
+		return paginator.Rule{
 			Key:             "ViewCount",
 			Order:           paginatorOrder,
 			SQLRepr:         "(response->'items'->0->'statistics'->>'viewCount')::BIGINT",
 			NULLReplacement: int64(0),
 		}
 	case domain.ContentSortByLikeCount:
-		primaryRule = paginator.Rule{
+		return paginator.Rule{
 			Key:             "LikeCount",
 			Order:           paginatorOrder,
 			SQLRepr:         "(response->'items'->0->'statistics'->>'likeCount')::BIGINT",
 			NULLReplacement: int64(0),
 		}
 	case domain.ContentSortByPublishedAt:
-		primaryRule = paginator.Rule{
+		return paginator.Rule{
 			Key:             "PublishedAt",
 			Order:           paginatorOrder,
 			SQLRepr:         "response->'items'->0->'snippet'->>'publishedAt'",
 			NULLReplacement: "",
 		}
 	case domain.ContentSortByChannelTitle:
-		primaryRule = paginator.Rule{
+		return paginator.Rule{
 			Key:             "ChannelTitle",
 			Order:           paginatorOrder,
 			SQLRepr:         "response->'items'->0->'snippet'->>'channelTitle'",
 			NULLReplacement: "",
 		}
 	case domain.ContentSortByLength:
-		primaryRule = paginator.Rule{
+		return paginator.Rule{
 			Key:             "Length",
 			Order:           paginatorOrder,
 			NULLReplacement: int64(0),
 		}
 	case domain.ContentSortByUpdatedAt:
-		primaryRule = paginator.Rule{
+		return paginator.Rule{
 			Key:   "UpdatedAt",
 			Order: paginatorOrder,
 		}
 	case domain.ContentSortByName:
-		primaryRule = paginator.Rule{
+		return paginator.Rule{
 			Key:   "Name",
 			Order: paginatorOrder,
 		}
 	case domain.ContentSortByCreatedAt:
-		primaryRule = paginator.Rule{
+		return paginator.Rule{
 			Key:   "CreatedAt",
 			Order: paginatorOrder,
 		}
 	default:
 		// Default to CreatedAt DESC
-		primaryRule = paginator.Rule{
+		return paginator.Rule{
 			Key:   "CreatedAt",
 			Order: paginator.DESC,
 		}
 	}
+}
 
-	// Tie-breaker: ID with same sort direction as primary
+// buildContentSortRules builds paginator rules for a single-column content sort.
+// Returns slice with primary sort rule + ID tie-breaker rule.
+func buildContentSortRules(sortBy domain.ContentSortBy, order domain.SortOrder) []paginator.Rule {
+	primaryRule := contentSortRule(sortBy, order)
+
+	// Tie-breaker: ID using the requested order (not necessarily primaryRule.Order —
+	// an unrecognized sortBy falls back to a hardcoded CreatedAt DESC primary rule
+	// while the tie-breaker still honors what the caller asked for).
+	var paginatorOrder paginator.Order
+	if order == domain.SortOrderAsc {
+		paginatorOrder = paginator.ASC
+	} else {
+		paginatorOrder = paginator.DESC
+	}
 	tieBreaker := paginator.Rule{
 		Key:   "ID",
 		Order: paginatorOrder,
 	}
 
 	return []paginator.Rule{primaryRule, tieBreaker}
+}
+
+// buildContentSortRulesMulti builds paginator rules for a multi-column content sort.
+// Each entry in sorts becomes a rule in priority order (first entry is primary,
+// later entries break ties left-to-right), followed by an ID tie-breaker using the
+// last column's direction. Duplicate fields (a column listed twice) are collapsed
+// to their first occurrence. Falls back to CreatedAt DESC when sorts is empty.
+func buildContentSortRulesMulti(sorts []domain.ContentSortRule) []paginator.Rule {
+	if len(sorts) == 0 {
+		return buildContentSortRules(domain.ContentSortByCreatedAt, domain.SortOrderDesc)
+	}
+
+	seen := make(map[domain.ContentSortBy]bool, len(sorts))
+	rules := make([]paginator.Rule, 0, len(sorts)+1)
+	var lastOrder paginator.Order
+
+	for _, s := range sorts {
+		if seen[s.Field] {
+			continue
+		}
+		seen[s.Field] = true
+		rule := contentSortRule(s.Field, s.Order)
+		rules = append(rules, rule)
+		lastOrder = rule.Order
+	}
+
+	rules = append(rules, paginator.Rule{Key: "ID", Order: lastOrder})
+	return rules
 }
 
 // buildPerspectiveSortRules builds paginator rules for perspective sorting

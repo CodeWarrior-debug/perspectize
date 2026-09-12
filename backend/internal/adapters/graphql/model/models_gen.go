@@ -69,6 +69,11 @@ type ContentFilter struct {
 	UpdatedBefore     *string             `json:"updatedBefore,omitempty"`
 }
 
+type ContentSortInput struct {
+	Field domain.ContentSortBy `json:"field"`
+	Order domain.SortOrder     `json:"order"`
+}
+
 type CreateClaimInput struct {
 	Text            string `json:"text"`
 	UserID          int    `json:"userID"`
