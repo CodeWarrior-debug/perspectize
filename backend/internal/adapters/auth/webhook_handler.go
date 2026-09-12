@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -123,7 +124,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "user.updated":
 		err = h.UserRepo.UpdateByClerkID(ctx, userData.ID, userData.username(), userData.primaryEmail())
 		if err != nil {
-			if err == domain.ErrNotFound {
+			if errors.Is(err, domain.ErrNotFound) {
 				slog.Warn("webhook: user not found for update, creating", "clerk_id", userData.ID)
 				_, err = h.UserRepo.CreateFromClerk(ctx, userData.ID, userData.username(), userData.primaryEmail())
 				if err != nil {
@@ -139,7 +140,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	case "user.deleted":
 		err = h.UserRepo.DeactivateByClerkID(ctx, userData.ID)
-		if err != nil && err != domain.ErrNotFound {
+		if err != nil && !errors.Is(err, domain.ErrNotFound) {
 			slog.Error("webhook: failed to deactivate user", "clerk_id", userData.ID, "error", err)
 			http.Error(w, "failed to deactivate user", http.StatusInternalServerError)
 			return
