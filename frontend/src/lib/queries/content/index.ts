@@ -129,6 +129,11 @@ export const GET_CONTENT = gql`
 export interface ContentAggregates {
 	perspectiveCount: number | null;
 	averageRating: number | null;
+	// How many public perspectives set a Quality rating — i.e. how many
+	// values averageRating was actually averaged over. Can be less than
+	// perspectiveCount since Quality is optional. Shown in a tooltip on the
+	// average rating tile.
+	qualityRatingCount: number | null;
 }
 
 export interface ContentAggregatesResponse {
@@ -141,6 +146,7 @@ export const GET_CONTENT_AGGREGATES = gql`
 			id
 			perspectiveCount
 			averageRating
+			qualityRatingCount
 		}
 	}
 `;

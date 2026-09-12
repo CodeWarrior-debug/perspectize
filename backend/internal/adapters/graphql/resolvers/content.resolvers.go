@@ -82,9 +82,24 @@ func (r *contentResolver) AverageRating(ctx context.Context, obj *model.Content)
 	return agg.AverageQuality, nil
 }
 
-// loadPerspectiveAggregate is the shared fetch behind PerspectiveCount and
-// AverageRating. Returns (nil, nil) when the content has no public
-// perspectives at all.
+// QualityRatingCount is the resolver for the qualityRatingCount field.
+//
+// How many of the content's public perspectives set a Quality rating — i.e.
+// how many values AverageRating was actually averaged over. Meant for a
+// tooltip on the average rating display, since it can be less than
+// PerspectiveCount (Quality is optional).
+func (r *contentResolver) QualityRatingCount(ctx context.Context, obj *model.Content) (*int, error) {
+	agg, err := r.loadPerspectiveAggregate(ctx, obj)
+	if err != nil || agg == nil {
+		return nil, err
+	}
+	count := agg.QualityCount
+	return &count, nil
+}
+
+// loadPerspectiveAggregate is the shared fetch behind PerspectiveCount,
+// AverageRating, and QualityRatingCount. Returns (nil, nil) when the content
+// has no public perspectives at all.
 func (r *contentResolver) loadPerspectiveAggregate(ctx context.Context, obj *model.Content) (*domain.PerspectiveAggregate, error) {
 	contentID, err := strconv.Atoi(obj.ID)
 	if err != nil {

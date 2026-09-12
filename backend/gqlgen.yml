@@ -76,6 +76,8 @@ models:
         resolver: true
       averageRating:
         resolver: true
+      qualityRatingCount:
+        resolver: true
     # Non-schema field: carries the primary_category_id FK already loaded by
     # the content list query so the primaryCategory resolver can batch-load the
     # category via dataloader instead of re-fetching the content row per item.

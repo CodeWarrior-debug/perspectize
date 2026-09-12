@@ -545,7 +545,7 @@ func TestPerspectiveService_AggregateByContentIDs(t *testing.T) {
 			aggregateFn: func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 				assert.Equal(t, []int{1, 2}, contentIDs)
 				return map[int]*domain.PerspectiveAggregate{
-					1: {ContentID: 1, Count: 3, AverageQuality: &avg},
+					1: {ContentID: 1, Count: 3, QualityCount: 2, AverageQuality: &avg},
 				}, nil
 			},
 		}
@@ -555,6 +555,7 @@ func TestPerspectiveService_AggregateByContentIDs(t *testing.T) {
 		require.NoError(t, err)
 		require.Contains(t, got, 1)
 		assert.Equal(t, 3, got[1].Count)
+		assert.Equal(t, 2, got[1].QualityCount)
 		assert.Equal(t, &avg, got[1].AverageQuality)
 		assert.NotContains(t, got, 2)
 	})

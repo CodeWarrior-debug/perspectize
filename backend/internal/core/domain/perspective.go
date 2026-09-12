@@ -126,14 +126,15 @@ type PaginatedPerspectives struct {
 }
 
 // PerspectiveAggregate summarizes the public perspectives on a single piece
-// of content: how many there are, and their average Quality rating (the
-// "headline" rating dimension - see RatingInput.svelte's field order on the
-// frontend). AverageQuality is nil when no public perspective on the content
-// has a Quality rating set (COUNT/AVG over an all-NULL column), which is
-// distinct from Count == 0.
+// of content: how many there are, how many of those set a Quality rating
+// (the "headline" rating dimension - see RatingInput.svelte's field order on
+// the frontend), and their average Quality. QualityCount can be less than
+// Count since Quality is optional. AverageQuality is nil when QualityCount
+// is 0 (COUNT/AVG over an all-NULL column), which is distinct from Count == 0.
 type PerspectiveAggregate struct {
 	ContentID      int
 	Count          int
+	QualityCount   int
 	AverageQuality *float64
 }
 

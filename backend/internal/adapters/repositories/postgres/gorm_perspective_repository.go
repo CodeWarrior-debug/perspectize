@@ -170,15 +170,22 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 
 // aggregateRow is the scan target for the grouped count/avg query below.
 type aggregateRow struct {
-	ContentID  int
-	Count      int
-	AvgQuality *float64
+	ContentID    int
+	Count        int
+	QualityCount int
+	AvgQuality   *float64
 }
 
-// AggregateByContentIDs computes, per content ID, the count and average
-// Quality of PUBLIC perspectives. Perspectives with a nil Privacy are treated
-// as public everywhere else in this codebase (see gorm_mappers.go), so NULL
-// is included alongside the stored lowercase "public" value.
+// AggregateByContentIDs computes, per content ID, the count of PUBLIC
+// perspectives, how many of those set a Quality rating, and their average
+// Quality. Perspectives with a nil Privacy are treated as public everywhere
+// else in this codebase (see gorm_mappers.go), so NULL is included alongside
+// the stored lowercase "public" value.
+//
+// QualityCount (COUNT(quality), which skips NULLs) can be smaller than Count
+// (COUNT(*), every public perspective) since Quality is optional — that's
+// the number shown in the average-rating tooltip so "N ratings" always
+// matches what AverageQuality was actually computed over.
 func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 	if len(contentIDs) == 0 {
 		return map[int]*domain.PerspectiveAggregate{}, nil
@@ -189,7 +196,7 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 	var rows []aggregateRow
 	err := r.db.WithContext(ctx).
 		Model(&PerspectiveModel{}).
-		Select("content_id AS content_id, COUNT(*) AS count, AVG(quality) AS avg_quality").
+		Select("content_id AS content_id, COUNT(*) AS count, COUNT(quality) AS quality_count, AVG(quality) AS avg_quality").
 		Where("content_id IN ?", contentIDs).
 		Where("privacy = ? OR privacy IS NULL", publicValue).
 		Group("content_id").
@@ -203,6 +210,7 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 		out[row.ContentID] = &domain.PerspectiveAggregate{
 			ContentID:      row.ContentID,
 			Count:          row.Count,
+			QualityCount:   row.QualityCount,
 			AverageQuality: row.AvgQuality,
 		}
 	}

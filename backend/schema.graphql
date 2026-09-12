@@ -131,6 +131,11 @@ type Content {
   # them, e.g. the details modal, not the main content list.
   perspectiveCount: Int
   averageRating: Float
+  # How many of this content's public perspectives set a Quality rating —
+  # i.e. how many values averageRating was actually computed over. Can be
+  # less than perspectiveCount since Quality is optional. Meant for a tooltip
+  # on the average rating display ("N quality ratings").
+  qualityRatingCount: Int
   createdAt: String!
   updatedAt: String!
 }

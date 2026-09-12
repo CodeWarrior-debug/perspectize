@@ -86,7 +86,9 @@ describe('ActivityDetailsModal', () => {
 	});
 
 	it('renders the loaded perspective count and average rating', () => {
-		mocks.mockQueryState.data = { contentByID: { id: content.id, perspectiveCount: 7, averageRating: 8234 } };
+		mocks.mockQueryState.data = {
+			contentByID: { id: content.id, perspectiveCount: 7, averageRating: 8234, qualityRatingCount: 5 },
+		};
 		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 		expect(screen.getByText('7')).toBeInTheDocument();
@@ -94,11 +96,37 @@ describe('ActivityDetailsModal', () => {
 	});
 
 	it('shows a dash for average rating when no public perspective has a rating', () => {
-		mocks.mockQueryState.data = { contentByID: { id: content.id, perspectiveCount: 0, averageRating: null } };
+		mocks.mockQueryState.data = {
+			contentByID: { id: content.id, perspectiveCount: 0, averageRating: null, qualityRatingCount: 0 },
+		};
 		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 		expect(screen.getByText('0')).toBeInTheDocument();
 		expect(screen.getByText('—')).toBeInTheDocument();
+	});
+
+	it('shows the quality rating count in a tooltip on the avg rating tile', () => {
+		mocks.mockQueryState.data = {
+			contentByID: { id: content.id, perspectiveCount: 7, averageRating: 8234, qualityRatingCount: 5 },
+		};
+		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+
+		expect(screen.getByText('Avg. Rating').closest('[data-tooltip]')).toHaveAttribute(
+			'data-tooltip',
+			'5 quality ratings',
+		);
+	});
+
+	it('singularizes the tooltip when there is exactly one quality rating', () => {
+		mocks.mockQueryState.data = {
+			contentByID: { id: content.id, perspectiveCount: 1, averageRating: 8234, qualityRatingCount: 1 },
+		};
+		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+
+		expect(screen.getByText('Avg. Rating').closest('[data-tooltip]')).toHaveAttribute(
+			'data-tooltip',
+			'1 quality rating',
+		);
 	});
 
 	it('renders tags when present', () => {

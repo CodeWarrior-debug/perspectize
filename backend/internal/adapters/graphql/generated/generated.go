@@ -58,27 +58,28 @@ type ComplexityRoot struct {
 	}
 
 	Content struct {
-		AddedBy          func(childComplexity int) int
-		AddedByUserID    func(childComplexity int) int
-		AverageRating    func(childComplexity int) int
-		ChannelTitle     func(childComplexity int) int
-		CommentCount     func(childComplexity int) int
-		ContentType      func(childComplexity int) int
-		CreatedAt        func(childComplexity int) int
-		Description      func(childComplexity int) int
-		ID               func(childComplexity int) int
-		Length           func(childComplexity int) int
-		LengthUnits      func(childComplexity int) int
-		LikeCount        func(childComplexity int) int
-		Name             func(childComplexity int) int
-		PerspectiveCount func(childComplexity int) int
-		PrimaryCategory  func(childComplexity int) int
-		PublishedAt      func(childComplexity int) int
-		Response         func(childComplexity int) int
-		Tags             func(childComplexity int) int
-		URL              func(childComplexity int) int
-		UpdatedAt        func(childComplexity int) int
-		ViewCount        func(childComplexity int) int
+		AddedBy            func(childComplexity int) int
+		AddedByUserID      func(childComplexity int) int
+		AverageRating      func(childComplexity int) int
+		ChannelTitle       func(childComplexity int) int
+		CommentCount       func(childComplexity int) int
+		ContentType        func(childComplexity int) int
+		CreatedAt          func(childComplexity int) int
+		Description        func(childComplexity int) int
+		ID                 func(childComplexity int) int
+		Length             func(childComplexity int) int
+		LengthUnits        func(childComplexity int) int
+		LikeCount          func(childComplexity int) int
+		Name               func(childComplexity int) int
+		PerspectiveCount   func(childComplexity int) int
+		PrimaryCategory    func(childComplexity int) int
+		PublishedAt        func(childComplexity int) int
+		QualityRatingCount func(childComplexity int) int
+		Response           func(childComplexity int) int
+		Tags               func(childComplexity int) int
+		URL                func(childComplexity int) int
+		UpdatedAt          func(childComplexity int) int
+		ViewCount          func(childComplexity int) int
 	}
 
 	CreateContentResult struct {
@@ -191,6 +192,7 @@ type ContentResolver interface {
 	PrimaryCategory(ctx context.Context, obj *model.Content) (*model.Category, error)
 	PerspectiveCount(ctx context.Context, obj *model.Content) (*int, error)
 	AverageRating(ctx context.Context, obj *model.Content) (*float64, error)
+	QualityRatingCount(ctx context.Context, obj *model.Content) (*int, error)
 }
 type MutationResolver interface {
 	CreateContentFromYouTube(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error)
@@ -391,6 +393,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.PublishedAt(childComplexity), true
+	case "Content.qualityRatingCount":
+		if e.ComplexityRoot.Content.QualityRatingCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.QualityRatingCount(childComplexity), true
 	case "Content.response":
 		if e.ComplexityRoot.Content.Response == nil {
 			break
@@ -1180,6 +1188,11 @@ type Content {
   # them, e.g. the details modal, not the main content list.
   perspectiveCount: Int
   averageRating: Float
+  # How many of this content's public perspectives set a Quality rating —
+  # i.e. how many values averageRating was actually computed over. Can be
+  # less than perspectiveCount since Quality is optional. Meant for a tooltip
+  # on the average rating display ("N quality ratings").
+  qualityRatingCount: Int
   createdAt: String!
   updatedAt: String!
 }
@@ -1473,6 +1486,8 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_perspectiveCount(ctx, field)
 	case "averageRating":
 		return ec.fieldContext_Content_averageRating(ctx, field)
+	case "qualityRatingCount":
+		return ec.fieldContext_Content_qualityRatingCount(ctx, field)
 	case "createdAt":
 		return ec.fieldContext_Content_createdAt(ctx, field)
 	case "updatedAt":
@@ -2887,6 +2902,29 @@ func (ec *executionContext) _Content_averageRating(ctx context.Context, field gr
 }
 func (ec *executionContext) fieldContext_Content_averageRating(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Content", field, true, true, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _Content_qualityRatingCount(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_qualityRatingCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Content().QualityRatingCount(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_qualityRatingCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, true, true, errors.New("field of type Int does not have child fields"))
 }
 
 func (ec *executionContext) _Content_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
@@ -7425,6 +7463,44 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 					}
 				}()
 				res = ec._Content_averageRating(ctx, field, obj)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "qualityRatingCount":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Content_qualityRatingCount(ctx, field, obj)
 				if res == graphql.RequiredNull {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}

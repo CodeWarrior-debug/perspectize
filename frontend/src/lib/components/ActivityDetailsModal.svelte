@@ -69,6 +69,14 @@
 		const avg = aggregatesQuery.data?.contentByID?.averageRating;
 		return avg === null || avg === undefined ? '—' : ratingToDisplay(avg);
 	});
+	// Tooltip on the Avg. Rating tile — how many quality ratings it's averaged
+	// over, since that can be fewer than the perspective count (Quality is an
+	// optional field on a perspective).
+	const qualityRatingCountTooltip = $derived.by(() => {
+		if (aggregatesQuery.isLoading) return 'Loading…';
+		const count = aggregatesQuery.data?.contentByID?.qualityRatingCount ?? 0;
+		return count === 1 ? '1 quality rating' : `${count} quality ratings`;
+	});
 
 	function handleOpenChange(next: boolean) {
 		if (!next) onClose();
@@ -129,7 +137,10 @@
 							{perspectiveCountDisplay}
 						</div>
 					</div>
-					<div class="rounded-lg border border-border bg-accent px-3 py-2.5">
+					<div
+						class="hover-tooltip rounded-lg border border-border bg-accent px-3 py-2.5"
+						data-tooltip={qualityRatingCountTooltip}
+					>
 						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Avg. Rating</div>
 						<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-lg font-bold text-foreground">
 							{averageRatingDisplay}
