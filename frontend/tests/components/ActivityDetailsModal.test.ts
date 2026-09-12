@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 	mockToastSuccess: vi.fn(),
 	mockToastError: vi.fn(),
 	mockMutationState: { mutate: null as any, isPending: false },
+	mockQueryState: { isLoading: false, data: undefined as any },
 }));
 
 vi.mock('@tanstack/svelte-query', () => ({
@@ -17,6 +18,10 @@ vi.mock('@tanstack/svelte-query', () => ({
 		optionsFn();
 		mocks.mockMutationState.mutate = mocks.mockMutate;
 		return mocks.mockMutationState;
+	}),
+	createQuery: vi.fn((optionsFn: () => any) => {
+		optionsFn();
+		return mocks.mockQueryState;
 	}),
 	useQueryClient: vi.fn(() => ({
 		invalidateQueries: mocks.mockInvalidateQueries,
@@ -33,6 +38,8 @@ vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
 function reset() {
 	vi.clearAllMocks();
 	mocks.mockMutationState.isPending = false;
+	mocks.mockQueryState.isLoading = false;
+	mocks.mockQueryState.data = undefined;
 }
 
 const content = {
@@ -69,12 +76,29 @@ describe('ActivityDetailsModal', () => {
 		expect(screen.getByText('0:59')).toBeInTheDocument(); // duration
 	});
 
-	it('shows placeholder stats for perspectives and avg rating', () => {
+	it('shows a loading indicator for perspectives and avg rating while the aggregates query is in flight', () => {
+		mocks.mockQueryState.isLoading = true;
 		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 
 		expect(screen.getByText('Perspectives')).toBeInTheDocument();
 		expect(screen.getByText('Avg. Rating')).toBeInTheDocument();
-		expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
+		expect(screen.getAllByText('…').length).toBe(2);
+	});
+
+	it('renders the loaded perspective count and average rating', () => {
+		mocks.mockQueryState.data = { contentByID: { id: content.id, perspectiveCount: 7, averageRating: 8234 } };
+		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+
+		expect(screen.getByText('7')).toBeInTheDocument();
+		expect(screen.getByText('8.234')).toBeInTheDocument();
+	});
+
+	it('shows a dash for average rating when no public perspective has a rating', () => {
+		mocks.mockQueryState.data = { contentByID: { id: content.id, perspectiveCount: 0, averageRating: null } };
+		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+
+		expect(screen.getByText('0')).toBeInTheDocument();
+		expect(screen.getByText('—')).toBeInTheDocument();
 	});
 
 	it('renders tags when present', () => {

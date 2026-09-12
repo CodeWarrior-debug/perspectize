@@ -72,6 +72,10 @@ func (m *mockPerspectiveService) ListPerspectives(ctx context.Context, params do
 	return nil, nil
 }
 
+func (m *mockPerspectiveService) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
+	return map[int]*domain.PerspectiveAggregate{}, nil
+}
+
 // withFieldContext creates a context with a gqlgen FieldContext
 func withFieldContext(ctx context.Context, fieldName string, args map[string]interface{}) context.Context {
 	fc := &graphql.FieldContext{

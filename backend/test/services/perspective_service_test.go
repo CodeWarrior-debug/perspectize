@@ -15,11 +15,12 @@ import (
 
 // mockPerspectiveRepository implements repositories.PerspectiveRepository for testing
 type mockPerspectiveRepository struct {
-	createFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
-	getByIDFn func(ctx context.Context, id int) (*domain.Perspective, error)
-	updateFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
-	deleteFn  func(ctx context.Context, id int) error
-	listFn    func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
+	createFn    func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
+	getByIDFn   func(ctx context.Context, id int) (*domain.Perspective, error)
+	updateFn    func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
+	deleteFn    func(ctx context.Context, id int) error
+	listFn      func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
+	aggregateFn func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
 }
 
 func (m *mockPerspectiveRepository) Create(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
@@ -60,6 +61,13 @@ func (m *mockPerspectiveRepository) List(ctx context.Context, params domain.Pers
 
 func (m *mockPerspectiveRepository) ReassignByUser(ctx context.Context, fromUserID, toUserID int) error {
 	return nil
+}
+
+func (m *mockPerspectiveRepository) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
+	if m.aggregateFn != nil {
+		return m.aggregateFn(ctx, contentIDs)
+	}
+	return map[int]*domain.PerspectiveAggregate{}, nil
 }
 
 // mockUserRepoForPerspective implements repositories.UserRepository for perspective tests
@@ -525,5 +533,42 @@ func TestPerspectiveService_ListPerspectives_PrivacyEnforcement(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.True(t, got.RestrictToPublicOrOwner)
+	})
+}
+
+func TestPerspectiveService_AggregateByContentIDs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("passes through the repository's aggregates", func(t *testing.T) {
+		avg := 8234.5
+		repo := &mockPerspectiveRepository{
+			aggregateFn: func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
+				assert.Equal(t, []int{1, 2}, contentIDs)
+				return map[int]*domain.PerspectiveAggregate{
+					1: {ContentID: 1, Count: 3, AverageQuality: &avg},
+				}, nil
+			},
+		}
+		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+
+		got, err := svc.AggregateByContentIDs(ctx, []int{1, 2})
+		require.NoError(t, err)
+		require.Contains(t, got, 1)
+		assert.Equal(t, 3, got[1].Count)
+		assert.Equal(t, &avg, got[1].AverageQuality)
+		assert.NotContains(t, got, 2)
+	})
+
+	t.Run("wraps a repository error", func(t *testing.T) {
+		repo := &mockPerspectiveRepository{
+			aggregateFn: func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
+				return nil, fmt.Errorf("db exploded")
+			},
+		}
+		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+
+		_, err := svc.AggregateByContentIDs(ctx, []int{1})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "db exploded")
 	})
 }

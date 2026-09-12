@@ -44,6 +44,8 @@ type Content struct {
 	Description       *string        `json:"description,omitempty"`
 	Response          map[string]any `json:"response,omitempty"`
 	PrimaryCategory   *Category      `json:"primaryCategory,omitempty"`
+	PerspectiveCount  *int           `json:"perspectiveCount,omitempty"`
+	AverageRating     *float64       `json:"averageRating,omitempty"`
 	CreatedAt         string         `json:"createdAt"`
 	UpdatedAt         string         `json:"updatedAt"`
 	PrimaryCategoryID *int           `json:"-"`

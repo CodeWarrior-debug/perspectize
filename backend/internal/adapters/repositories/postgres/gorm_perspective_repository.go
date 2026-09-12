@@ -168,6 +168,47 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 	return result, nil
 }
 
+// aggregateRow is the scan target for the grouped count/avg query below.
+type aggregateRow struct {
+	ContentID  int
+	Count      int
+	AvgQuality *float64
+}
+
+// AggregateByContentIDs computes, per content ID, the count and average
+// Quality of PUBLIC perspectives. Perspectives with a nil Privacy are treated
+// as public everywhere else in this codebase (see gorm_mappers.go), so NULL
+// is included alongside the stored lowercase "public" value.
+func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
+	if len(contentIDs) == 0 {
+		return map[int]*domain.PerspectiveAggregate{}, nil
+	}
+
+	publicValue := privacyToDBValue(domain.PrivacyPublic)
+
+	var rows []aggregateRow
+	err := r.db.WithContext(ctx).
+		Model(&PerspectiveModel{}).
+		Select("content_id AS content_id, COUNT(*) AS count, AVG(quality) AS avg_quality").
+		Where("content_id IN ?", contentIDs).
+		Where("privacy = ? OR privacy IS NULL", publicValue).
+		Group("content_id").
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate perspectives by content: %w", err)
+	}
+
+	out := make(map[int]*domain.PerspectiveAggregate, len(rows))
+	for _, row := range rows {
+		out[row.ContentID] = &domain.PerspectiveAggregate{
+			ContentID:      row.ContentID,
+			Count:          row.Count,
+			AverageQuality: row.AvgQuality,
+		}
+	}
+	return out, nil
+}
+
 // ReassignByUser updates all perspectives owned by fromUserID to toUserID
 func (r *GormPerspectiveRepository) ReassignByUser(ctx context.Context, fromUserID, toUserID int) error {
 	return r.db.WithContext(ctx).

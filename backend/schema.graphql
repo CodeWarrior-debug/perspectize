@@ -125,6 +125,12 @@ type Content {
   description: String
   response: JSON
   primaryCategory: Category
+  # Aggregates computed from public perspectives on this content. Resolved
+  # on demand (batched per-request via dataloader) rather than stored on the
+  # content row — a client only pays for these when it actually selects
+  # them, e.g. the details modal, not the main content list.
+  perspectiveCount: Int
+  averageRating: Float
   createdAt: String!
   updatedAt: String!
 }

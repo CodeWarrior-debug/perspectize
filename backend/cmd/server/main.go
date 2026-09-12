@@ -199,9 +199,9 @@ func main() {
 	r.Use(apimw.SecureHeaders())       // M-14: security headers (HSTS, X-Content-Type-Options, X-Frame-Options)
 	r.Use(apimw.ContentTypeValidation) // M-15: CSRF protection via Content-Type
 	r.Use(auth.Middleware(userRepo))
-	r.Use(graphqldl.Middleware(categoryService)) // per-request GraphQL dataloaders (batches Content.primaryCategory)
-	r.Use(perfmw.RequestTimer)                   // structured request timing (replaces chi Logger)
-	r.Use(perfmw.Recoverer)                      // structured panic recovery (JSON via slog)
+	r.Use(graphqldl.Middleware(categoryService, perspectiveService)) // per-request GraphQL dataloaders (batches Content.primaryCategory, Content.perspectiveCount/averageRating)
+	r.Use(perfmw.RequestTimer)                                       // structured request timing (replaces chi Logger)
+	r.Use(perfmw.Recoverer)                                          // structured panic recovery (JSON via slog)
 
 	// Webhook routes — skip auth middleware; Svix signature provides verification
 	webhookSecret := os.Getenv("CLERK_WEBHOOK_SIGNING_SECRET")

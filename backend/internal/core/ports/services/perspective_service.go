@@ -66,4 +66,8 @@ type PerspectiveService interface {
 
 	// ListPerspectives retrieves a paginated list of perspectives
 	ListPerspectives(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
+
+	// AggregateByContentIDs computes the public-perspective count and average
+	// Quality rating for each given content ID, batched into a single query.
+	AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
 }

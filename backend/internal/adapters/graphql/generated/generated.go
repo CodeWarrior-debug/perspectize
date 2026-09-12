@@ -58,25 +58,27 @@ type ComplexityRoot struct {
 	}
 
 	Content struct {
-		AddedBy         func(childComplexity int) int
-		AddedByUserID   func(childComplexity int) int
-		ChannelTitle    func(childComplexity int) int
-		CommentCount    func(childComplexity int) int
-		ContentType     func(childComplexity int) int
-		CreatedAt       func(childComplexity int) int
-		Description     func(childComplexity int) int
-		ID              func(childComplexity int) int
-		Length          func(childComplexity int) int
-		LengthUnits     func(childComplexity int) int
-		LikeCount       func(childComplexity int) int
-		Name            func(childComplexity int) int
-		PrimaryCategory func(childComplexity int) int
-		PublishedAt     func(childComplexity int) int
-		Response        func(childComplexity int) int
-		Tags            func(childComplexity int) int
-		URL             func(childComplexity int) int
-		UpdatedAt       func(childComplexity int) int
-		ViewCount       func(childComplexity int) int
+		AddedBy          func(childComplexity int) int
+		AddedByUserID    func(childComplexity int) int
+		AverageRating    func(childComplexity int) int
+		ChannelTitle     func(childComplexity int) int
+		CommentCount     func(childComplexity int) int
+		ContentType      func(childComplexity int) int
+		CreatedAt        func(childComplexity int) int
+		Description      func(childComplexity int) int
+		ID               func(childComplexity int) int
+		Length           func(childComplexity int) int
+		LengthUnits      func(childComplexity int) int
+		LikeCount        func(childComplexity int) int
+		Name             func(childComplexity int) int
+		PerspectiveCount func(childComplexity int) int
+		PrimaryCategory  func(childComplexity int) int
+		PublishedAt      func(childComplexity int) int
+		Response         func(childComplexity int) int
+		Tags             func(childComplexity int) int
+		URL              func(childComplexity int) int
+		UpdatedAt        func(childComplexity int) int
+		ViewCount        func(childComplexity int) int
 	}
 
 	CreateContentResult struct {
@@ -187,6 +189,8 @@ type ComplexityRoot struct {
 
 type ContentResolver interface {
 	PrimaryCategory(ctx context.Context, obj *model.Content) (*model.Category, error)
+	PerspectiveCount(ctx context.Context, obj *model.Content) (*int, error)
+	AverageRating(ctx context.Context, obj *model.Content) (*float64, error)
 }
 type MutationResolver interface {
 	CreateContentFromYouTube(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error)
@@ -303,6 +307,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.AddedByUserID(childComplexity), true
+	case "Content.averageRating":
+		if e.ComplexityRoot.Content.AverageRating == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.AverageRating(childComplexity), true
 	case "Content.channelTitle":
 		if e.ComplexityRoot.Content.ChannelTitle == nil {
 			break
@@ -363,6 +373,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.Name(childComplexity), true
+	case "Content.perspectiveCount":
+		if e.ComplexityRoot.Content.PerspectiveCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.PerspectiveCount(childComplexity), true
 	case "Content.primaryCategory":
 		if e.ComplexityRoot.Content.PrimaryCategory == nil {
 			break
@@ -1158,6 +1174,12 @@ type Content {
   description: String
   response: JSON
   primaryCategory: Category
+  # Aggregates computed from public perspectives on this content. Resolved
+  # on demand (batched per-request via dataloader) rather than stored on the
+  # content row — a client only pays for these when it actually selects
+  # them, e.g. the details modal, not the main content list.
+  perspectiveCount: Int
+  averageRating: Float
   createdAt: String!
   updatedAt: String!
 }
@@ -1447,6 +1469,10 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_response(ctx, field)
 	case "primaryCategory":
 		return ec.fieldContext_Content_primaryCategory(ctx, field)
+	case "perspectiveCount":
+		return ec.fieldContext_Content_perspectiveCount(ctx, field)
+	case "averageRating":
+		return ec.fieldContext_Content_averageRating(ctx, field)
 	case "createdAt":
 		return ec.fieldContext_Content_createdAt(ctx, field)
 	case "updatedAt":
@@ -2815,6 +2841,52 @@ func (ec *executionContext) fieldContext_Content_primaryCategory(_ context.Conte
 		},
 	}
 	return fc, nil
+}
+
+func (ec *executionContext) _Content_perspectiveCount(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_perspectiveCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Content().PerspectiveCount(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_perspectiveCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, true, true, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _Content_averageRating(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_averageRating(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Content().AverageRating(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_averageRating(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, true, true, errors.New("field of type Float does not have child fields"))
 }
 
 func (ec *executionContext) _Content_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
@@ -7305,6 +7377,82 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "perspectiveCount":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Content_perspectiveCount(ctx, field, obj)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "averageRating":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Content_averageRating(ctx, field, obj)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "createdAt":
 			out.Values[i] = ec._Content_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -9235,6 +9383,23 @@ func (ec *executionContext) marshalOContentType2ᚖgithubᚗcomᚋCodeWarriorᚑ
 	_ = ctx
 	res := graphql.MarshalString(string(*v))
 	return res
+}
+
+func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v any) (*float64, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalFloatContext(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel ast.SelectionSet, v *float64) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	res := graphql.MarshalFloatContext(*v)
+	return graphql.WrapContextMarshaler(ctx, res)
 }
 
 func (ec *executionContext) unmarshalOID2ᚖstring(ctx context.Context, v any) (*string, error) {

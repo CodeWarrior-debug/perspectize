@@ -122,6 +122,29 @@ export const GET_CONTENT = gql`
 	}
 `;
 
+// perspectiveCount/averageRating are computed aggregates over a content's
+// perspectives (see backend Content.perspectiveCount/averageRating resolvers)
+// — too expensive to include on every row of LIST_CONTENT, so they're
+// fetched lazily via this dedicated query only when the details modal opens.
+export interface ContentAggregates {
+	perspectiveCount: number | null;
+	averageRating: number | null;
+}
+
+export interface ContentAggregatesResponse {
+	contentByID: ({ id: string } & ContentAggregates) | null;
+}
+
+export const GET_CONTENT_AGGREGATES = gql`
+	query GetContentAggregates($id: ID!) {
+		contentByID(id: $id) {
+			id
+			perspectiveCount
+			averageRating
+		}
+	}
+`;
+
 export const CREATE_CONTENT_FROM_YOUTUBE = gql`
 	mutation CreateContentFromYouTube($input: CreateContentFromYouTubeInput!) {
 		createContentFromYouTube(input: $input) {
