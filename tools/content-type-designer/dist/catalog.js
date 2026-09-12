@@ -289,7 +289,7 @@ export const COLUMNS = [
             article: b('Author', 'typical', 'scrape', "response->>'author'", true, { tooltip: 'Byline from the page, when one is published' }),
             podcast: b('Show', 'required', 'api', "response->>'showTitle'", true),
             music: b('Artist', 'required', 'api', "response->>'artist'", true),
-            claim: b('Claimant', 'optional', 'user', "response->>'claimant'", true, { tooltip: 'Who asserts the claim, if attributed' }),
+            claim: b('Claimant', 'optional', 'user', "response->>'claimant'", true, { tooltip: 'PLANNED — not written by CreateClaim today. Who asserts the claim, if attributed' }),
             joke: b('Comedian', 'optional', 'user', "response->>'teller'", true),
             purchase: b('Merchant', 'required', 'user', "response->>'merchant'", true),
             perspective: b('Holder', 'required', 'internal', "response->>'holder'", true, { tooltip: 'The person whose perspective this is' }),
@@ -359,7 +359,7 @@ export const COLUMNS = [
             article: b('Published', 'typical', 'scrape', "response->>'publishedTime'", true),
             podcast: b('Aired', 'required', 'api', "response->>'pubDate'", true),
             music: b('Released', 'typical', 'api', "response->>'releaseDate'", true),
-            claim: b('Asserted', 'optional', 'user', "response->>'assertedAt'", true),
+            claim: b('Asserted', 'optional', 'user', "response->>'assertedAt'", true, { tooltip: 'PLANNED — not written by CreateClaim today' }),
             joke: b('First told', 'optional', 'user', "response->>'firstToldAt'", false),
             purchase: b('Purchased', 'required', 'user', "response->>'purchasedAt'", true),
             perspective: b('Stated', 'typical', 'internal', "response->>'statedAt'", true),
@@ -450,7 +450,7 @@ export const COLUMNS = [
         filterable: true,
         gapFallback: 'hide-column',
         bindings: {
-            claim: b('Stance', 'required', 'user', "response->>'stance'", true, { tooltip: 'Affirm / deny / undecided' }),
+            claim: b('Stance', 'required', 'user', "response->>'stance'", true, { tooltip: 'PLANNED — not written by CreateClaim today. Affirm / deny / undecided' }),
             perspective: b('Stance', 'required', 'internal', "response->>'stance'", true, { tooltip: 'Agrees / disagrees / mixed on the subject' })
         }
     },
@@ -466,7 +466,7 @@ export const COLUMNS = [
         gapFallback: 'hide-column',
         align: 'right',
         bindings: {
-            claim: b('Confidence', 'typical', 'user', "(response->>'confidence')::int", true),
+            claim: b('Confidence', 'typical', 'user', "(response->>'confidence')::int", true, { tooltip: 'PLANNED — not written by CreateClaim today' }),
             perspective: b('Confidence', 'optional', 'internal', "(response->>'confidence')::int", false)
         }
     },
@@ -476,13 +476,23 @@ export const COLUMNS = [
         group: 'epistemic',
         valueType: 'ref',
         tooltip: 'The content or claim this item is about',
+        // 'promoted-column' is accurate for perspective (domain.Perspective.ContentID is a real FK
+        // column) but not for claim, which stores its link inside response JSONB — see the claim
+        // binding's comment below. ColumnDef only has one storage value per column, so this is a
+        // known modeling gap in the tool rather than a claim-specific bug; flagging here so it isn't
+        // read as "claim also has a promoted column."
         storage: 'promoted-column',
         sortable: false,
         filterable: true,
         gapFallback: 'em-dash',
         bindings: {
             perspective: b('About', 'required', 'internal', 'subject_content_id → content', true),
-            claim: b('Source', 'optional', 'user', 'subject_content_id → content', false, { tooltip: 'The content the claim was drawn from, if any' })
+            // Backend field is response.parentContentId (JSONB), not a promoted column, and it's
+            // currently required (ContentService.CreateClaim rejects parentContentID <= 0). Product
+            // direction (2026-09-12): a claim should NOT need a parent — this stays 'optional' to
+            // reflect that target, and relaxing the backend constraint is tracked with the universal
+            // Add Content modal work, not done standalone. Update this note once that ships.
+            claim: b('Source', 'optional', 'user', "response->>'parentContentId' → content", false, { tooltip: 'The content the claim was drawn from, if any — not required' })
         }
     },
     {
@@ -502,7 +512,7 @@ export const COLUMNS = [
             podcast: b('Listened', 'optional', 'user', "response->>'progressStatus'", false),
             article: b('Read', 'optional', 'user', "response->>'progressStatus'", false),
             paper: b('Read', 'optional', 'user', "response->>'progressStatus'", false),
-            claim: b('Verdict', 'typical', 'user', "response->>'verdict'", true, { tooltip: 'Unverified / supported / contested / refuted' })
+            claim: b('Verdict', 'typical', 'user', "response->>'verdict'", true, { tooltip: 'PLANNED — not written by CreateClaim today. Unverified / supported / contested / refuted' })
         }
     },
     {
@@ -558,7 +568,7 @@ export const COLUMNS = [
             article: b('Excerpt', 'typical', 'scrape', "response->>'excerpt'", false),
             podcast: b('Show notes', 'typical', 'api', "response->>'summary'", false),
             music: b('Notes', 'optional', 'user', "response->>'notes'", false),
-            claim: b('Context', 'typical', 'user', "response->>'context'", false),
+            claim: b('Context', 'typical', 'user', "response->>'context'", false, { tooltip: 'PLANNED — not written by CreateClaim today' }),
             joke: b('Full text', 'required', 'user', "response->>'body'", true, { tooltip: 'The joke in full — the setup alone is the title' }),
             purchase: b('Notes', 'optional', 'user', "response->>'notes'", false),
             perspective: b('The take', 'required', 'internal', "response->>'body'", true),

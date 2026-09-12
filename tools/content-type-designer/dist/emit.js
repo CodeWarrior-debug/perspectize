@@ -3,7 +3,7 @@ import { bindingFor, resolveGrid, typeLabel } from './model.js';
 const YES = 'yes';
 const NO = 'no';
 function esc(v) {
-    return v.replace(/\|/g, '\\|').replace(/\n+/g, ' ').trim();
+    return v.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n+/g, ' ').trim();
 }
 function table(headers, rows) {
     if (rows.length === 0)
