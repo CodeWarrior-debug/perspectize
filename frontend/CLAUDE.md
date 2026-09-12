@@ -72,6 +72,8 @@ This project uses **Svelte 5 runes** exclusively. Do not use Svelte 4 syntax.
 
 **`$effect` only tracks state read _synchronously_ in the effect body.** A value read solely inside a `setTimeout`/`Promise`/`await` callback is NOT a tracked dependency, so the effect runs once on mount and never re-runs. For a debounce, copy the reactive value into a local const at the top of the effect first (`const term = searchTerm;`), then use the local inside the timer — see `discover/SearchBar.svelte`. (Bug history: `CategoryTypeahead.svelte`'s Wikidata search read `searchTerm` only inside its `setTimeout`, so the debounced term never updated and the search query never fired.)
 
+**An `$effect` that writes a `$state` var and then reads that same var back (even just-assigned) loops.** Svelte 5 flags this as `effect_update_depth_exceeded` — assigning `foo = x` then reading `foo.length` later in the same effect re-triggers the effect indefinitely, even though the value is unchanged. Fix: read from a local `const` derived off the source (prop) instead of reading the `$state` var back. See `PerspectivePopover.svelte`'s `existingPerspective` reset effect.
+
 ## TanStack Query + GraphQL
 
 Queries use `graphql-request` with TanStack Svelte Query.
