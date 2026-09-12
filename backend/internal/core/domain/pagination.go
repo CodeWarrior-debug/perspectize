@@ -22,6 +22,13 @@ const (
 	SortOrderDesc SortOrder = "DESC"
 )
 
+// ContentSortRule is one column of a multi-column sort, in priority order
+// (the first entry is the primary sort; later entries break ties).
+type ContentSortRule struct {
+	Field ContentSortBy
+	Order SortOrder
+}
+
 // ContentFilter contains filter criteria for content queries
 type ContentFilter struct {
 	ContentType      *ContentType
@@ -55,6 +62,9 @@ type ContentListParams struct {
 	Before            *string
 	SortBy            ContentSortBy
 	SortOrder         SortOrder
+	// Sorts, when non-empty, is a multi-column sort that takes priority over
+	// SortBy/SortOrder (kept as the single-column fallback for existing callers).
+	Sorts             []ContentSortRule
 	IncludeTotalCount bool
 	Filter            *ContentFilter
 }

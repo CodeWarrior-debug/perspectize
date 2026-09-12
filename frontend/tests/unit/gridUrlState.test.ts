@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	parseGridParams,
 	serializeGridParams,
+	sortsToGraphQL,
 	filterToUrlParams,
 	urlParamsToFilter,
 	urlParamsToGraphQLFilter,
@@ -31,16 +32,34 @@ describe('parseGridParams', () => {
 		expect(parseGridParams(params).mode).toBe(GRID_DEFAULTS.mode);
 	});
 
-	it('parses sort and dir', () => {
-		const params = new URLSearchParams('sort=views&dir=asc');
+	it('parses a single-column sort', () => {
+		const params = new URLSearchParams('sort=views.asc');
 		const result = parseGridParams(params);
-		expect(result.sort).toBe('views');
-		expect(result.dir).toBe('asc');
+		expect(result.sorts).toEqual([{ col: 'views', dir: 'asc' }]);
 	});
 
-	it('falls back to default dir for invalid value', () => {
-		const params = new URLSearchParams('dir=sideways');
-		expect(parseGridParams(params).dir).toBe(GRID_DEFAULTS.dir);
+	it('parses a multi-column sort in priority order', () => {
+		const params = new URLSearchParams('sort=views.desc,likes.asc');
+		const result = parseGridParams(params);
+		expect(result.sorts).toEqual([
+			{ col: 'views', dir: 'desc' },
+			{ col: 'likes', dir: 'asc' },
+		]);
+	});
+
+	it('parses sort=none as an explicitly cleared sort', () => {
+		const params = new URLSearchParams('sort=none');
+		expect(parseGridParams(params).sorts).toEqual([]);
+	});
+
+	it('falls back to default sorts for a malformed entry', () => {
+		const params = new URLSearchParams('sort=sideways');
+		expect(parseGridParams(params).sorts).toEqual(GRID_DEFAULTS.sorts);
+	});
+
+	it('drops duplicate columns, keeping the first occurrence', () => {
+		const params = new URLSearchParams('sort=views.desc,views.asc');
+		expect(parseGridParams(params).sorts).toEqual([{ col: 'views', dir: 'desc' }]);
 	});
 
 	it('parses page and pageSize', () => {
@@ -75,7 +94,7 @@ describe('parseGridParams', () => {
 		const params = new URLSearchParams('unknown=value&another=thing');
 		const result = parseGridParams(params);
 		expect(result.filters).toEqual({});
-		expect(result.sort).toBe(GRID_DEFAULTS.sort);
+		expect(result.sorts).toEqual(GRID_DEFAULTS.sorts);
 	});
 
 	it('collects multiple f.* params', () => {
@@ -105,7 +124,7 @@ describe('serializeGridParams', () => {
 	});
 
 	it('omits default sort', () => {
-		const state = { ...GRID_DEFAULTS, sort: 'updatedAt' };
+		const state = { ...GRID_DEFAULTS, sorts: [{ col: 'updatedAt', dir: 'desc' as const }] };
 		expect(serializeGridParams(state)).not.toContain('sort');
 	});
 
@@ -115,11 +134,28 @@ describe('serializeGridParams', () => {
 		expect(result).toContain('mode=all');
 	});
 
-	it('serializes non-default sort', () => {
-		const state = { ...GRID_DEFAULTS, sort: 'views', dir: 'asc' as const };
+	it('serializes a non-default single-column sort', () => {
+		const state = { ...GRID_DEFAULTS, sorts: [{ col: 'views', dir: 'asc' as const }] };
 		const result = serializeGridParams(state);
-		expect(result).toContain('sort=views');
-		expect(result).toContain('dir=asc');
+		expect(result).toContain('sort=views.asc');
+	});
+
+	it('serializes a multi-column sort in priority order', () => {
+		const state = {
+			...GRID_DEFAULTS,
+			sorts: [
+				{ col: 'views', dir: 'desc' as const },
+				{ col: 'likes', dir: 'asc' as const },
+			],
+		};
+		const result = serializeGridParams(state);
+		expect(new URLSearchParams(result).get('sort')).toBe('views.desc,likes.asc');
+	});
+
+	it('serializes an explicitly cleared sort as sort=none', () => {
+		const state = { ...GRID_DEFAULTS, sorts: [] };
+		const result = serializeGridParams(state);
+		expect(new URLSearchParams(result).get('sort')).toBe('none');
 	});
 
 	it('omits default page (1)', () => {
@@ -161,8 +197,10 @@ describe('serializeGridParams', () => {
 	it('round-trips with parseGridParams (non-defaults)', () => {
 		const state = {
 			mode: 'all' as const,
-			sort: 'views',
-			dir: 'asc' as const,
+			sorts: [
+				{ col: 'views', dir: 'asc' as const },
+				{ col: 'likes', dir: 'desc' as const },
+			],
 			page: 3,
 			pageSize: 25,
 			q: 'tutorial',
@@ -555,5 +593,42 @@ describe('COL_TO_SORT / SORT_TO_COL', () => {
 	it('has item in COL_TO_SORT mapping to NAME', () => {
 		expect(COL_TO_SORT['item']).toBe('NAME');
 		expect(SORT_TO_COL['NAME']).toBe('item');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// sortsToGraphQL
+// ---------------------------------------------------------------------------
+
+describe('sortsToGraphQL', () => {
+	it('returns undefined for an empty list', () => {
+		expect(sortsToGraphQL([])).toBeUndefined();
+	});
+
+	it('maps a single sort to the GraphQL shape', () => {
+		expect(sortsToGraphQL([{ col: 'views', dir: 'desc' }])).toEqual([{ field: 'VIEW_COUNT', order: 'DESC' }]);
+	});
+
+	it('preserves priority order across multiple columns', () => {
+		const result = sortsToGraphQL([
+			{ col: 'views', dir: 'desc' },
+			{ col: 'channel', dir: 'asc' },
+		]);
+		expect(result).toEqual([
+			{ field: 'VIEW_COUNT', order: 'DESC' },
+			{ field: 'CHANNEL_TITLE', order: 'ASC' },
+		]);
+	});
+
+	it('drops columns not present in COL_TO_SORT', () => {
+		const result = sortsToGraphQL([
+			{ col: 'tags', dir: 'asc' }, // not sortable
+			{ col: 'views', dir: 'desc' },
+		]);
+		expect(result).toEqual([{ field: 'VIEW_COUNT', order: 'DESC' }]);
+	});
+
+	it('returns undefined when every column is unsortable', () => {
+		expect(sortsToGraphQL([{ col: 'tags', dir: 'asc' }])).toBeUndefined();
 	});
 });

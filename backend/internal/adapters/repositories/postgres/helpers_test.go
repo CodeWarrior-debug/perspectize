@@ -225,6 +225,37 @@ func TestBuildContentSortRules(t *testing.T) {
 	}
 }
 
+func TestBuildContentSortRulesMulti(t *testing.T) {
+	t.Run("empty sorts falls back to CreatedAt DESC", func(t *testing.T) {
+		rules := buildContentSortRulesMulti(nil)
+		assert.Equal(t, buildContentSortRules(domain.ContentSortByCreatedAt, domain.SortOrderDesc), rules)
+	})
+
+	t.Run("multiple columns produce one rule per column plus a final ID tie-breaker", func(t *testing.T) {
+		rules := buildContentSortRulesMulti([]domain.ContentSortRule{
+			{Field: domain.ContentSortByViewCount, Order: domain.SortOrderDesc},
+			{Field: domain.ContentSortByName, Order: domain.SortOrderAsc},
+		})
+		require.Len(t, rules, 3)
+		assert.Equal(t, "ViewCount", rules[0].Key)
+		assert.Equal(t, paginator.DESC, rules[0].Order)
+		assert.Equal(t, "Name", rules[1].Key)
+		assert.Equal(t, paginator.ASC, rules[1].Order)
+		// ID tie-breaker follows the last column's direction
+		assert.Equal(t, paginator.Rule{Key: "ID", Order: paginator.ASC}, rules[2])
+	})
+
+	t.Run("duplicate fields collapse to their first occurrence", func(t *testing.T) {
+		rules := buildContentSortRulesMulti([]domain.ContentSortRule{
+			{Field: domain.ContentSortByName, Order: domain.SortOrderAsc},
+			{Field: domain.ContentSortByName, Order: domain.SortOrderDesc},
+		})
+		require.Len(t, rules, 2)
+		assert.Equal(t, paginator.Rule{Key: "Name", Order: paginator.ASC}, rules[0])
+		assert.Equal(t, paginator.Rule{Key: "ID", Order: paginator.ASC}, rules[1])
+	})
+}
+
 func TestBuildPerspectiveSortRules(t *testing.T) {
 	tests := []struct {
 		name         string

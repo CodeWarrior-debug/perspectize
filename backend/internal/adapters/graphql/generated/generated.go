@@ -145,7 +145,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Content         func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.ContentFilter) int
+		Content         func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, sorts []*model.ContentSortInput, includeTotalCount *bool, filter *model.ContentFilter) int
 		ContentByID     func(childComplexity int, id string) int
 		Me              func(childComplexity int) int
 		PerspectiveByID func(childComplexity int, id string) int
@@ -205,7 +205,7 @@ type MutationResolver interface {
 type QueryResolver interface {
 	Me(ctx context.Context) (*model.User, error)
 	ContentByID(ctx context.Context, id string) (*model.Content, error)
-	Content(ctx context.Context, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.ContentFilter) (*model.PaginatedContent, error)
+	Content(ctx context.Context, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, sorts []*model.ContentSortInput, includeTotalCount *bool, filter *model.ContentFilter) (*model.PaginatedContent, error)
 	UserByID(ctx context.Context, id string) (*model.User, error)
 	UserByUsername(ctx context.Context, username string) (*model.User, error)
 	Users(ctx context.Context) ([]*model.User, error)
@@ -764,7 +764,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.Content(childComplexity, args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string), args["sortBy"].(*domain.ContentSortBy), args["sortOrder"].(*domain.SortOrder), args["includeTotalCount"].(*bool), args["filter"].(*model.ContentFilter)), true
+		return e.ComplexityRoot.Query.Content(childComplexity, args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string), args["sortBy"].(*domain.ContentSortBy), args["sortOrder"].(*domain.SortOrder), args["sorts"].([]*model.ContentSortInput), args["includeTotalCount"].(*bool), args["filter"].(*model.ContentFilter)), true
 	case "Query.contentByID":
 		if e.ComplexityRoot.Query.ContentByID == nil {
 			break
@@ -948,6 +948,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		ec.unmarshalInputCategorizedRatingInput,
 		ec.unmarshalInputContentFilter,
+		ec.unmarshalInputContentSortInput,
 		ec.unmarshalInputCreateClaimInput,
 		ec.unmarshalInputCreateContentFromYouTubeInput,
 		ec.unmarshalInputCreatePerspectiveInput,
@@ -1193,6 +1194,12 @@ enum SortOrder {
   DESC
 }
 
+# One column of a multi-column sort, in priority order (first entry breaks ties first).
+input ContentSortInput {
+  field: ContentSortBy!
+  order: SortOrder!
+}
+
 enum ContentType {
   YOUTUBE
   CLAIM
@@ -1348,6 +1355,9 @@ type Query {
     before: String
     sortBy: ContentSortBy = CREATED_AT
     sortOrder: SortOrder = DESC
+    # Multi-column sort. When provided (non-empty), takes priority over sortBy/sortOrder,
+    # which stay as the single-column fallback for existing clients.
+    sorts: [ContentSortInput!]
     includeTotalCount: Boolean = false
     filter: ContentFilter
   ): PaginatedContent!
@@ -1980,22 +1990,30 @@ func (ec *executionContext) field_Query_content_args(ctx context.Context, rawArg
 		return nil, err
 	}
 	args["sortOrder"] = arg5
-	arg6, err := graphql.ProcessArgField(ctx, rawArgs, "includeTotalCount",
+	arg6, err := graphql.ProcessArgField(ctx, rawArgs, "sorts",
+		func(ctx context.Context, v any) ([]*model.ContentSortInput, error) {
+			return ec.unmarshalOContentSortInput2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContentSortInputᚄ(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["sorts"] = arg6
+	arg7, err := graphql.ProcessArgField(ctx, rawArgs, "includeTotalCount",
 		func(ctx context.Context, v any) (*bool, error) {
 			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["includeTotalCount"] = arg6
-	arg7, err := graphql.ProcessArgField(ctx, rawArgs, "filter",
+	args["includeTotalCount"] = arg7
+	arg8, err := graphql.ProcessArgField(ctx, rawArgs, "filter",
 		func(ctx context.Context, v any) (*model.ContentFilter, error) {
 			return ec.unmarshalOContentFilter2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContentFilter(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["filter"] = arg7
+	args["filter"] = arg8
 	return args, nil
 }
 
@@ -4547,7 +4565,7 @@ func (ec *executionContext) _Query_content(ctx context.Context, field graphql.Co
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().Content(ctx, fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["last"].(*int), fc.Args["before"].(*string), fc.Args["sortBy"].(*domain.ContentSortBy), fc.Args["sortOrder"].(*domain.SortOrder), fc.Args["includeTotalCount"].(*bool), fc.Args["filter"].(*model.ContentFilter))
+			return ec.Resolvers.Query().Content(ctx, fc.Args["first"].(*int), fc.Args["after"].(*string), fc.Args["last"].(*int), fc.Args["before"].(*string), fc.Args["sortBy"].(*domain.ContentSortBy), fc.Args["sortOrder"].(*domain.SortOrder), fc.Args["sorts"].([]*model.ContentSortInput), fc.Args["includeTotalCount"].(*bool), fc.Args["filter"].(*model.ContentFilter))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model.PaginatedContent) graphql.Marshaler {
@@ -6496,6 +6514,43 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.UpdatedBefore = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputContentSortInput(ctx context.Context, obj any) (model.ContentSortInput, error) {
+	var it model.ContentSortInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"field", "order"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "field":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("field"))
+			data, err := ec.unmarshalNContentSortBy2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentSortBy(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Field = data
+		case "order":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("order"))
+			data, err := ec.unmarshalNSortOrder2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐSortOrder(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Order = data
 		}
 	}
 	return it, nil
@@ -8710,6 +8765,28 @@ func (ec *executionContext) marshalNContent2ᚖgithubᚗcomᚋCodeWarriorᚑdebu
 	return ec._Content(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNContentSortBy2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentSortBy(ctx context.Context, v any) (domain.ContentSortBy, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.ContentSortBy(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNContentSortBy2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentSortBy(ctx context.Context, sel ast.SelectionSet, v domain.ContentSortBy) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNContentSortInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContentSortInput(ctx context.Context, v any) (*model.ContentSortInput, error) {
+	res, err := ec.unmarshalInputContentSortInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCreateClaimInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateClaimInput(ctx context.Context, v any) (model.CreateClaimInput, error) {
 	res, err := ec.unmarshalInputCreateClaimInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -8864,6 +8941,23 @@ func (ec *executionContext) marshalNPrivacy2githubᚗcomᚋCodeWarriorᚑdebug�
 func (ec *executionContext) unmarshalNSetPrimaryCategoryInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSetPrimaryCategoryInput(ctx context.Context, v any) (model.SetPrimaryCategoryInput, error) {
 	res, err := ec.unmarshalInputSetPrimaryCategoryInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNSortOrder2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐSortOrder(ctx context.Context, v any) (domain.SortOrder, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.SortOrder(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNSortOrder2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐSortOrder(ctx context.Context, sel ast.SelectionSet, v domain.SortOrder) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {
@@ -9216,6 +9310,23 @@ func (ec *executionContext) marshalOContentSortBy2ᚖgithubᚗcomᚋCodeWarrior�
 	_ = ctx
 	res := graphql.MarshalString(string(*v))
 	return res
+}
+
+func (ec *executionContext) unmarshalOContentSortInput2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContentSortInputᚄ(ctx context.Context, v any) ([]*model.ContentSortInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]*model.ContentSortInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNContentSortInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContentSortInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
 }
 
 func (ec *executionContext) unmarshalOContentType2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentType(ctx context.Context, v any) (*domain.ContentType, error) {

@@ -159,7 +159,7 @@ func (r *queryResolver) ContentByID(ctx context.Context, id string) (*model.Cont
 }
 
 // Content is the resolver for the content field.
-func (r *queryResolver) Content(ctx context.Context, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.ContentFilter) (*model.PaginatedContent, error) {
+func (r *queryResolver) Content(ctx context.Context, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, sorts []*model.ContentSortInput, includeTotalCount *bool, filter *model.ContentFilter) (*model.PaginatedContent, error) {
 	params := domain.ContentListParams{
 		First:  first,
 		After:  after,
@@ -178,6 +178,17 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		params.SortOrder = *sortOrder
 	} else {
 		params.SortOrder = domain.SortOrderDesc
+	}
+
+	// Multi-column sort — takes priority over sortBy/sortOrder when provided.
+	if len(sorts) > 0 {
+		params.Sorts = make([]domain.ContentSortRule, 0, len(sorts))
+		for _, s := range sorts {
+			if s == nil {
+				continue
+			}
+			params.Sorts = append(params.Sorts, domain.ContentSortRule{Field: s.Field, Order: s.Order})
+		}
 	}
 
 	if includeTotalCount != nil {

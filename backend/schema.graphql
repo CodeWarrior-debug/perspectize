@@ -160,6 +160,12 @@ enum SortOrder {
   DESC
 }
 
+# One column of a multi-column sort, in priority order (first entry breaks ties first).
+input ContentSortInput {
+  field: ContentSortBy!
+  order: SortOrder!
+}
+
 enum ContentType {
   YOUTUBE
   CLAIM
@@ -315,6 +321,9 @@ type Query {
     before: String
     sortBy: ContentSortBy = CREATED_AT
     sortOrder: SortOrder = DESC
+    # Multi-column sort. When provided (non-empty), takes priority over sortBy/sortOrder,
+    # which stay as the single-column fallback for existing clients.
+    sorts: [ContentSortInput!]
     includeTotalCount: Boolean = false
     filter: ContentFilter
   ): PaginatedContent!

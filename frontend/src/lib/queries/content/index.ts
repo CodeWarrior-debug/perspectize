@@ -40,6 +40,11 @@ export interface ContentResponse {
 	};
 }
 
+export interface ContentSortInput {
+	field: string; // ContentSortBy enum value
+	order: 'ASC' | 'DESC';
+}
+
 export interface CreateContentResponse {
 	createContentFromYouTube: {
 		content: ContentItem;
@@ -57,6 +62,7 @@ export const LIST_CONTENT = gql`
 		$after: String
 		$sortBy: ContentSortBy = UPDATED_AT
 		$sortOrder: SortOrder = DESC
+		$sorts: [ContentSortInput!]
 		$filter: ContentFilter
 		$includeTotalCount: Boolean = true
 	) {
@@ -65,6 +71,7 @@ export const LIST_CONTENT = gql`
 			after: $after
 			sortBy: $sortBy
 			sortOrder: $sortOrder
+			sorts: $sorts
 			filter: $filter
 			includeTotalCount: $includeTotalCount
 		) {
