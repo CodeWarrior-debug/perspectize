@@ -27,6 +27,8 @@
 	import { useCreatePerspective } from '$lib/queries/perspectives/useCreatePerspective';
 	import { useUpdatePerspective } from '$lib/queries/perspectives/useUpdatePerspective';
 	import type { PerspectiveItem } from '$lib/queries/perspectives';
+	import type { Feeling } from '$lib/components/FeelWheel.svelte';
+	import type { Component } from 'svelte';
 
 	/**
 	 * PerspectivePopover — centered modal for creating or editing a perspective.
@@ -70,6 +72,20 @@
 
 	// Privacy toggle — off (PUBLIC) by default
 	let isPrivate = $state(false);
+
+	// Feel-wheel — lazy-loaded only once the picker is opened, so read-only
+	// perspective views never pull the wheel/search-set code into their bundle.
+	let feelings = $state<Feeling[]>([]);
+	let feelWheelOpen = $state(false);
+	let FeelWheelComponent = $state<Component<{ value: Feeling[] }> | null>(null);
+
+	async function openFeelWheel() {
+		feelWheelOpen = true;
+		if (!FeelWheelComponent) {
+			const mod = await import('$lib/components/FeelWheel.svelte');
+			FeelWheelComponent = mod.default;
+		}
+	}
 
 	// Comment (rich text HTML)
 	// TODO: Backend integration — comment field not yet in GraphQL schema
@@ -186,6 +202,13 @@
 		comment = existingPerspective?.review ?? '';
 		commentFullscreenOpen = false;
 		isPrivate = String(existingPerspective?.privacy ?? '').toUpperCase() === 'PRIVATE';
+		const nextFeelings = existingPerspective?.feelings ?? [];
+		feelings = nextFeelings;
+		if (nextFeelings.length > 0) {
+			void openFeelWheel();
+		} else {
+			feelWheelOpen = false;
+		}
 		// Restore dynamic fields from customFields if editing
 		const cf = existingPerspective?.customFields as Record<string, number> | null;
 		if (cf && Object.keys(cf).length > 0) {
@@ -230,11 +253,21 @@
 		const hasAnyRating = quality !== null || agreement !== null || importance !== null || confidence !== null;
 		const hasLike = likeValue !== null;
 		const hasDynamic = Object.values(dynamicValues).some((v) => v !== null);
+		const hasFeelings = feelings.length > 0;
 
-		if (!hasAnyRating && !hasLike && !hasComment && !hasDynamic) {
+		if (!hasAnyRating && !hasLike && !hasComment && !hasDynamic && !hasFeelings) {
 			toast.error('Please fill in at least one field');
 			return;
 		}
+
+		const feelingsPayload = hasFeelings
+			? feelings.map((f) => ({
+					emoji: f.emoji,
+					label: f.label ?? undefined,
+					intensity: f.intensity,
+					note: f.note ?? undefined,
+				}))
+			: undefined;
 
 		if (isEditMode && existingPerspective) {
 			updateMutation.mutate(
@@ -247,6 +280,7 @@
 					like: likeValue ?? undefined,
 					review: getReview(),
 					customFields: buildCustomFields(),
+					feelings: feelingsPayload,
 					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
 				},
 				{
@@ -268,6 +302,7 @@
 					like: likeValue ?? undefined,
 					review: getReview(),
 					customFields: buildCustomFields(),
+					feelings: feelingsPayload,
 					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
 				},
 				{
@@ -437,6 +472,23 @@
 			</div>
 
 			<AddFieldSearch addedKeys={activeFields} onAdd={addField} placeholder="Add a field — e.g. clarity" dense />
+
+			{#if !feelWheelOpen}
+				<button
+					type="button"
+					onclick={openFeelWheel}
+					class="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-2 text-sm text-muted-foreground hover:opacity-70"
+				>
+					<span class="text-base leading-none">🙂</span>
+					Add a feeling
+				</button>
+			{:else if FeelWheelComponent}
+				<div class="rounded-md border border-border p-3">
+					<FeelWheelComponent bind:value={feelings} />
+				</div>
+			{:else}
+				<div class="text-center text-sm text-muted-foreground py-4">Loading feel-wheel…</div>
+			{/if}
 
 			<div class="flex items-center justify-between rounded-md border border-border px-3 py-2">
 				<div class="flex flex-col">
