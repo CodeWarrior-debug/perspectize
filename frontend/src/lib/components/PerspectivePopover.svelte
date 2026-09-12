@@ -202,8 +202,9 @@
 		comment = existingPerspective?.review ?? '';
 		commentFullscreenOpen = false;
 		isPrivate = String(existingPerspective?.privacy ?? '').toUpperCase() === 'PRIVATE';
-		feelings = existingPerspective?.feelings ?? [];
-		if (feelings.length > 0) {
+		const nextFeelings = existingPerspective?.feelings ?? [];
+		feelings = nextFeelings;
+		if (nextFeelings.length > 0) {
 			void openFeelWheel();
 		} else {
 			feelWheelOpen = false;
