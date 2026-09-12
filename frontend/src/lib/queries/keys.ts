@@ -37,6 +37,8 @@ export const queryKeys = {
 		all: () => [...queryKeys.all, 'perspectives'] as const,
 		lists: () => [...queryKeys.perspectives.all(), 'list'] as const,
 		listByUser: (userId: number) => [...queryKeys.perspectives.lists(), { userId }] as const,
+		activityFeed: (includePrivate: boolean) =>
+			[...queryKeys.perspectives.lists(), 'activityFeed', { includePrivate }] as const,
 		details: () => [...queryKeys.perspectives.all(), 'detail'] as const,
 		detail: (id: string) => [...queryKeys.perspectives.details(), id] as const,
 	},

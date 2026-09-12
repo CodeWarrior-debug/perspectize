@@ -85,3 +85,46 @@ export const LIST_PERSPECTIVES_BY_USER = gql`
 		}
 	}
 `;
+
+// Activity feed: recent perspectives across all users, newest updated first.
+// The backend's default read-authorization (RestrictToPublicOrOwner) already
+// scopes this to public rows plus the signed-in viewer's own — passing an
+// explicit `privacy: PUBLIC` filter additionally hides the viewer's own
+// private perspectives, which is how the "include my private perspectives"
+// toggle on the user-activity view is implemented client-side.
+export interface ActivityPerspectiveItem {
+	id: string;
+	userID: string;
+	contentID: string | null;
+	privacy: string;
+	description: string | null;
+	content: { id: string; name: string } | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface ListActivityPerspectivesResponse {
+	perspectives: {
+		items: ActivityPerspectiveItem[];
+	};
+}
+
+export const LIST_ACTIVITY_PERSPECTIVES = gql`
+	query ListActivityPerspectives($first: Int, $filter: PerspectiveFilter) {
+		perspectives(first: $first, sortBy: UPDATED_AT, sortOrder: DESC, filter: $filter) {
+			items {
+				id
+				userID
+				contentID
+				privacy
+				description
+				content {
+					id
+					name
+				}
+				createdAt
+				updatedAt
+			}
+		}
+	}
+`;
