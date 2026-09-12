@@ -32,10 +32,11 @@ func NewClient(apiKey string) *Client {
 
 // YouTubeAPIResponse represents the trimmed response stored in the database.
 // Only fields the app actually reads are included — everything else
-// (thumbnails, etag, status, topicDetails, etc.) is stripped on ingest.
+// (items[].id, thumbnails, etag, status, topicDetails, etc.) is stripped on
+// ingest. See FEATURE_BACKLOG.md "YouTube JSONB Storage" for the sizing
+// analysis behind this trim.
 type YouTubeAPIResponse struct {
 	Items []struct {
-		ID      string `json:"id"`
 		Snippet struct {
 			Title        string   `json:"title"`
 			Description  string   `json:"description"`
