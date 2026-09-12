@@ -4,6 +4,8 @@
 **Scope:** `frontend/package.json` (SvelteKit app)
 **Tool used:** [`npm-check-updates`](https://github.com/raine/npm-check-updates) (`npx npm-check-updates`), cross-referenced with npm registry publish timestamps for "how far behind" figures.
 
+This report lives alongside the monthly maintenance routine (see [SKILL.md](SKILL.md)) — re-run `npx npm-check-updates` each month and refresh this table rather than treating it as a one-off.
+
 Only packages where `ncu` reports a newer version are listed. Everything else in `package.json` (e.g. `@ag-grid-community/*`, `@tanstack/*`, `@tiptap/*`, `svelte`, `svelte-check`, `tailwindcss`, `dompurify`, `graphql-request`, etc.) is already on the latest published version as of this report.
 
 ## Patch updates (low risk)

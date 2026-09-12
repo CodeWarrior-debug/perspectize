@@ -1,16 +1,18 @@
 # Backend Dependency Upgrade Analysis
 
-**Generated:** 2026-09-12
+**Generated:** 2026-09-12 · **Last applied:** 2026-09-12
 **Scope:** `backend/go.mod` (Go GraphQL API), **direct (non-indirect) dependencies only**
 **Tool used:** `go list -m -u -versions ./...` (Go's built-in module tooling — there's no widely-adopted third-party "ncu for Go"; `go list -u` against the module graph is the standard equivalent) plus `go.mod`'s own `go`/`toolchain` directives and `proxy.golang.org` publish timestamps for age.
 
+This report lives alongside the monthly maintenance routine (see [SKILL.md](SKILL.md)) — re-run the `go list -m -u -versions` sweep each month and refresh this table rather than treating it as a one-off.
+
 ## Result summary
 
-The backend is in **very good shape**: of 20 direct dependencies, **19 are already on the latest published version**. Only one is behind:
+The backend is in **very good shape**: of 20 direct dependencies, **19 are already on the latest published version**. One was behind and has since been bumped:
 
-| Package | Current | Latest | Behind | Function | Benefits of upgrading | Drawbacks / Risks | Recommendation |
+| Package | Was | Now | Behind (at time of check) | Function | Benefits of upgrading | Drawbacks / Risks | Status |
 |---|---|---|---|---|---|---|---|
-| `github.com/jackc/pgx/v5` | v5.10.0 | v5.11.0 | ~3 months (2026-06-03 → 2026-09-07) | PostgreSQL driver used under GORM's `gorm.io/driver/postgres` for all DB access | Minor release — bug fixes and small feature additions to the Postgres wire-protocol driver; low-risk to take | Minor version bump, but it's the driver for every DB query in the app — validate connection pooling / `pgxpool` config options haven't changed defaults before deploying | **Upgrade now**, run full backend test suite (`go test ./...`) before merging since this touches every DB-backed code path |
+| `github.com/jackc/pgx/v5` | v5.10.0 | **v5.11.0** | ~3 months (2026-06-03 → 2026-09-07) | PostgreSQL driver used under GORM's `gorm.io/driver/postgres` for all DB access | Minor release — bug fixes and small feature additions to the Postgres wire-protocol driver; low-risk to take | Minor version bump, but it's the driver for every DB query in the app — validated via full test suite before merging | **Done** — bumped via `go get github.com/jackc/pgx/v5@v5.11.0 && go mod tidy`; `go build ./...` and `go test ./...` both clean |
 
 Toolchain: `go.mod` already pins `go 1.26` / `toolchain go1.26.0`, matching the `go version` installed in this environment — no Go toolchain upgrade needed.
 
@@ -43,4 +45,4 @@ Toolchain: `go.mod` already pins `go 1.26` / `toolchain go1.26.0`, matching the 
 
 ## Recommendation
 
-Single small PR: bump `github.com/jackc/pgx/v5` to `v5.11.0` via `go get github.com/jackc/pgx/v5@v5.11.0 && go mod tidy` in `backend/`, run `go build ./...` and `go test ./...` per the mandatory self-verification checklist in `CLAUDE.md`, then commit as `chore: bump pgx to v5.11.0`. No other backend action needed at this time — re-run this check periodically (e.g. as part of the monthly maintenance routine) rather than on an ongoing basis, since the surface here is already current.
+No backend action currently outstanding — re-run this check as part of each monthly maintenance pass (see the added step in [SKILL.md](SKILL.md)) rather than on an ad-hoc basis, since the surface here is already current.
