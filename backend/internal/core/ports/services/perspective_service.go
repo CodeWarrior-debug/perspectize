@@ -22,6 +22,7 @@ type CreatePerspectiveInput struct {
 	Parts                 []int
 	Labels                []string
 	CategorizedRatings    []domain.CategorizedRating
+	Feelings              []domain.FeelingEntry
 	PrimaryPerspectiveID  *int
 	RelatedPerspectiveIDs []int
 	CustomFields          json.RawMessage
@@ -44,6 +45,7 @@ type UpdatePerspectiveInput struct {
 	Parts                 []int
 	Labels                []string
 	CategorizedRatings    []domain.CategorizedRating
+	Feelings              []domain.FeelingEntry
 	PrimaryPerspectiveID  *int
 	RelatedPerspectiveIDs []int
 	CustomFields          json.RawMessage

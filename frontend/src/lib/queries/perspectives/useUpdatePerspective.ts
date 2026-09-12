@@ -6,8 +6,10 @@ import {
 	type UpdatePerspectiveResponse,
 	type ListPerspectivesByUserResponse,
 	type PerspectiveItem,
+	type FeelingEntry,
 } from './index';
 import { queryKeys } from '../keys';
+import type { FeelingInput } from './useCreatePerspective';
 
 export interface UpdatePerspectiveInput {
 	id: number;
@@ -18,6 +20,7 @@ export interface UpdatePerspectiveInput {
 	like?: string;
 	review?: string;
 	customFields?: Record<string, number>;
+	feelings?: FeelingInput[];
 	privacy?: 'PUBLIC' | 'PRIVATE';
 }
 
@@ -44,6 +47,7 @@ function applyEdit(p: PerspectiveItem, input: UpdatePerspectiveInput): Perspecti
 		like: input.like ?? p.like,
 		review: input.review ?? p.review,
 		customFields: input.customFields ?? p.customFields,
+		feelings: (input.feelings as FeelingEntry[] | undefined) ?? p.feelings,
 		privacy: input.privacy ?? p.privacy,
 		updatedAt: new Date().toISOString(),
 	};

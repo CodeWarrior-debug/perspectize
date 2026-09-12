@@ -6,8 +6,16 @@ import {
 	type CreatePerspectiveResponse,
 	type ListPerspectivesByUserResponse,
 	type PerspectiveItem,
+	type FeelingEntry,
 } from './index';
 import { queryKeys } from '../keys';
+
+export interface FeelingInput {
+	emoji: string;
+	label?: string;
+	intensity: number;
+	note?: string;
+}
 
 export interface CreatePerspectiveInput {
 	userID: number;
@@ -19,6 +27,7 @@ export interface CreatePerspectiveInput {
 	like?: string;
 	review?: string;
 	customFields?: Record<string, number>;
+	feelings?: FeelingInput[];
 	privacy?: 'PUBLIC' | 'PRIVATE';
 }
 
@@ -47,6 +56,7 @@ function optimisticPerspective(input: CreatePerspectiveInput, id: string): Persp
 		primaryPerspectiveID: null,
 		relatedPerspectiveIDs: null,
 		customFields: input.customFields ?? null,
+		feelings: (input.feelings as FeelingEntry[] | undefined) ?? null,
 		createdAt: now,
 		updatedAt: now,
 	};

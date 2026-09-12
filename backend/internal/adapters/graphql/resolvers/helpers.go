@@ -181,6 +181,19 @@ func perspectiveDomainToModel(p *domain.Perspective) *model.Perspective {
 		}
 	}
 
+	// Convert feelings
+	if len(p.Feelings) > 0 {
+		m.Feelings = make([]*model.FeelingEntry, len(p.Feelings))
+		for i, f := range p.Feelings {
+			m.Feelings[i] = &model.FeelingEntry{
+				Emoji:     f.Emoji,
+				Label:     nilIfEmpty(f.Label),
+				Intensity: f.Intensity,
+				Note:      f.Note,
+			}
+		}
+	}
+
 	// Convert new perspective reference fields
 	if p.PrimaryPerspectiveID != nil {
 		ppID := strconv.Itoa(*p.PrimaryPerspectiveID)
@@ -220,6 +233,7 @@ func modelToCreatePerspectiveInput(userID int, input model.CreatePerspectiveInpu
 		Parts:                 input.Parts,
 		Labels:                input.Labels,
 		CategorizedRatings:    categorizedRatingInputsToDomain(input.CategorizedRatings),
+		Feelings:              feelingInputsToDomain(input.Feelings),
 		PrimaryPerspectiveID:  input.PrimaryPerspectiveID,
 		RelatedPerspectiveIDs: input.RelatedPerspectiveIDs,
 		Review:                input.Review,
@@ -253,6 +267,7 @@ func modelToUpdatePerspectiveInput(input model.UpdatePerspectiveInput) portservi
 		Parts:                 input.Parts,
 		Labels:                input.Labels,
 		CategorizedRatings:    categorizedRatingInputsToDomain(input.CategorizedRatings),
+		Feelings:              feelingInputsToDomain(input.Feelings),
 		PrimaryPerspectiveID:  input.PrimaryPerspectiveID,
 		RelatedPerspectiveIDs: input.RelatedPerspectiveIDs,
 		Review:                input.Review,
@@ -283,4 +298,36 @@ func categorizedRatingInputsToDomain(ratings []*model.CategorizedRatingInput) []
 		}
 	}
 	return out
+}
+
+// feelingInputsToDomain converts GraphQL feeling inputs to their domain form.
+// Returns nil (not an empty slice) for a nil/empty input, matching
+// categorizedRatingInputsToDomain's "not provided" semantics on update.
+func feelingInputsToDomain(feelings []*model.FeelingInput) []domain.FeelingEntry {
+	if len(feelings) == 0 {
+		return nil
+	}
+	out := make([]domain.FeelingEntry, len(feelings))
+	for i, f := range feelings {
+		label := ""
+		if f.Label != nil {
+			label = *f.Label
+		}
+		out[i] = domain.FeelingEntry{
+			Emoji:     f.Emoji,
+			Label:     label,
+			Intensity: f.Intensity,
+			Note:      f.Note,
+		}
+	}
+	return out
+}
+
+// nilIfEmpty returns nil for an empty string, otherwise a pointer to it —
+// used for optional GraphQL string fields backed by a non-pointer domain field.
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
