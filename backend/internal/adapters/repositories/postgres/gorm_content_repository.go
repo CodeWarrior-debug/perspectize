@@ -135,6 +135,47 @@ func (r *GormContentRepository) UpdateMetadata(ctx context.Context, id int, name
 }
 
 // List retrieves a paginated list of content using cursor-based pagination
+// contentSearchColumns maps each ContentSearchField to the SQL expression (and its own
+// ILIKE) used to match it. Keeping the expressions here (rather than inline in
+// applyContentSearch) keeps the OR-assembly loop free of per-field SQL detail.
+var contentSearchColumns = map[domain.ContentSearchField]string{
+	domain.ContentSearchFieldTitle:        "name ILIKE ?",
+	domain.ContentSearchFieldDescription:  "response->'items'->0->'snippet'->>'description' ILIKE ?",
+	domain.ContentSearchFieldChannelTitle: "response->'items'->0->'snippet'->>'channelTitle' ILIKE ?",
+	domain.ContentSearchFieldTags:         "(response->'items'->0->'snippet'->'tags')::text ILIKE ?",
+}
+
+// applyContentSearch scopes a free-text search term to one or more content columns,
+// OR'd together (so "everything except tags" still matches a title-only or
+// description-only hit). An empty/omitted fields list preserves the historical
+// default of matching on the title (name) alone.
+func applyContentSearch(query *gorm.DB, term string, fields []domain.ContentSearchField) *gorm.DB {
+	if len(fields) == 0 {
+		fields = []domain.ContentSearchField{domain.ContentSearchFieldTitle}
+	}
+
+	pattern := "%" + term + "%"
+	var group *gorm.DB
+	for _, field := range fields {
+		expr, ok := contentSearchColumns[field]
+		if !ok {
+			continue
+		}
+		if group == nil {
+			// Session(&gorm.Session{}) gives an independent statement (its own clause
+			// builder) scoped off `query`, so chaining Or() below only groups these
+			// field conditions together rather than mutating `query`'s own filters.
+			group = query.Session(&gorm.Session{}).Where(expr, pattern)
+		} else {
+			group = group.Or(expr, pattern)
+		}
+	}
+	if group == nil {
+		return query
+	}
+	return query.Where(group)
+}
+
 func (r *GormContentRepository) List(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
 	limit := 10
 	if params.First != nil {
@@ -170,7 +211,7 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 			query = query.Where("length <= ?", *params.Filter.MaxLengthSeconds)
 		}
 		if params.Filter.Search != nil && *params.Filter.Search != "" {
-			query = query.Where("name ILIKE ?", "%"+*params.Filter.Search+"%")
+			query = applyContentSearch(query, *params.Filter.Search, params.Filter.SearchFields)
 		}
 		// View count filters (JSONB extraction)
 		if params.Filter.MinViewCount != nil {

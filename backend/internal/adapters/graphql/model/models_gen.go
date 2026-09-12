@@ -50,23 +50,24 @@ type Content struct {
 }
 
 type ContentFilter struct {
-	ContentType       *domain.ContentType `json:"contentType,omitempty"`
-	MinLengthSeconds  *int                `json:"minLengthSeconds,omitempty"`
-	MaxLengthSeconds  *int                `json:"maxLengthSeconds,omitempty"`
-	Search            *string             `json:"search,omitempty"`
-	MinViewCount      *int                `json:"minViewCount,omitempty"`
-	MaxViewCount      *int                `json:"maxViewCount,omitempty"`
-	MinLikeCount      *int                `json:"minLikeCount,omitempty"`
-	MaxLikeCount      *int                `json:"maxLikeCount,omitempty"`
-	PublishedAfter    *string             `json:"publishedAfter,omitempty"`
-	PublishedBefore   *string             `json:"publishedBefore,omitempty"`
-	ChannelTitle      *string             `json:"channelTitle,omitempty"`
-	TagContains       *string             `json:"tagContains,omitempty"`
-	DescriptionSearch *string             `json:"descriptionSearch,omitempty"`
-	CreatedAfter      *string             `json:"createdAfter,omitempty"`
-	CreatedBefore     *string             `json:"createdBefore,omitempty"`
-	UpdatedAfter      *string             `json:"updatedAfter,omitempty"`
-	UpdatedBefore     *string             `json:"updatedBefore,omitempty"`
+	ContentType       *domain.ContentType         `json:"contentType,omitempty"`
+	MinLengthSeconds  *int                        `json:"minLengthSeconds,omitempty"`
+	MaxLengthSeconds  *int                        `json:"maxLengthSeconds,omitempty"`
+	Search            *string                     `json:"search,omitempty"`
+	SearchFields      []domain.ContentSearchField `json:"searchFields,omitempty"`
+	MinViewCount      *int                        `json:"minViewCount,omitempty"`
+	MaxViewCount      *int                        `json:"maxViewCount,omitempty"`
+	MinLikeCount      *int                        `json:"minLikeCount,omitempty"`
+	MaxLikeCount      *int                        `json:"maxLikeCount,omitempty"`
+	PublishedAfter    *string                     `json:"publishedAfter,omitempty"`
+	PublishedBefore   *string                     `json:"publishedBefore,omitempty"`
+	ChannelTitle      *string                     `json:"channelTitle,omitempty"`
+	TagContains       *string                     `json:"tagContains,omitempty"`
+	DescriptionSearch *string                     `json:"descriptionSearch,omitempty"`
+	CreatedAfter      *string                     `json:"createdAfter,omitempty"`
+	CreatedBefore     *string                     `json:"createdBefore,omitempty"`
+	UpdatedAfter      *string                     `json:"updatedAfter,omitempty"`
+	UpdatedBefore     *string                     `json:"updatedBefore,omitempty"`
 }
 
 type CreateClaimInput struct {

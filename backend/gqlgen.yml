@@ -58,6 +58,9 @@ models:
   ContentType:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ContentType
+  ContentSearchField:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ContentSearchField
   ReviewStatus:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ReviewStatus

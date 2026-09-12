@@ -165,6 +165,14 @@ enum ContentType {
   CLAIM
 }
 
+# Text columns that ContentFilter.search can be scoped to.
+enum ContentSearchField {
+  TITLE
+  DESCRIPTION
+  CHANNEL_TITLE
+  TAGS
+}
+
 # Inputs
 input CreateContentFromYouTubeInput {
   url: String!
@@ -177,6 +185,8 @@ input ContentFilter {
   minLengthSeconds: Int
   maxLengthSeconds: Int
   search: String
+  # Which columns `search` matches against (OR'd together). Omitted/empty = TITLE only.
+  searchFields: [ContentSearchField!]
   # View/like count filters
   minViewCount: Int
   maxViewCount: Int

@@ -28,6 +28,8 @@ type ContentFilter struct {
 	MinLengthSeconds *int
 	MaxLengthSeconds *int
 	Search           *string
+	// SearchFields scopes Search to these columns (OR'd). Empty = TITLE only.
+	SearchFields []ContentSearchField
 	// View/like count filters (JSONB extraction)
 	MinViewCount *int
 	MaxViewCount *int

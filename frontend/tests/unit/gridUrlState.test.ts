@@ -166,6 +166,7 @@ describe('serializeGridParams', () => {
 			page: 3,
 			pageSize: 25,
 			q: 'tutorial',
+			qFields: GRID_DEFAULTS.qFields,
 			filters: { type: 'youtube', views: '1000..5000' },
 		};
 		const serialized = serializeGridParams(state);
@@ -419,9 +420,22 @@ describe('urlParamsToGraphQLFilter', () => {
 		expect(urlParamsToGraphQLFilter({}, '')).toBeUndefined();
 	});
 
-	it('maps q (search) to search field', () => {
+	it('maps q (search) to search field, defaulting to all search scopes', () => {
 		const result = urlParamsToGraphQLFilter({}, 'cooking');
+		expect(result).toEqual({
+			search: 'cooking',
+			searchFields: ['TITLE', 'DESCRIPTION', 'CHANNEL_TITLE', 'TAGS'],
+		});
+	});
+
+	it('omits searchFields when scoped to TITLE only (matches the server default)', () => {
+		const result = urlParamsToGraphQLFilter({}, 'cooking', ['title']);
 		expect(result).toEqual({ search: 'cooking' });
+	});
+
+	it('sends a narrowed searchFields list for a partial scope', () => {
+		const result = urlParamsToGraphQLFilter({}, 'cooking', ['title', 'desc']);
+		expect(result).toEqual({ search: 'cooking', searchFields: ['TITLE', 'DESCRIPTION'] });
 	});
 
 	it('maps f.type to contentType (uppercased)', () => {
@@ -493,6 +507,7 @@ describe('urlParamsToGraphQLFilter', () => {
 		const result = urlParamsToGraphQLFilter({ type: 'youtube', views: '1000..' }, 'cooking');
 		expect(result).toEqual({
 			search: 'cooking',
+			searchFields: ['TITLE', 'DESCRIPTION', 'CHANNEL_TITLE', 'TAGS'],
 			contentType: 'YOUTUBE',
 			minViewCount: 1000,
 		});
@@ -505,7 +520,10 @@ describe('urlParamsToGraphQLFilter', () => {
 
 	it('item filter overrides search bar value', () => {
 		const result = urlParamsToGraphQLFilter({ item: 'specific title' }, 'broad search');
-		expect(result).toEqual({ search: 'specific title' });
+		expect(result).toEqual({
+			search: 'specific title',
+			searchFields: ['TITLE', 'DESCRIPTION', 'CHANNEL_TITLE', 'TAGS'],
+		});
 	});
 
 	it('ignores empty filter values', () => {

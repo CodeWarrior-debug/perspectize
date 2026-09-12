@@ -10,6 +10,12 @@
 /** Data mode: 'all' = server-side, 'loaded' = client-side */
 export type DataMode = 'all' | 'loaded';
 
+/** Which columns the `q` search box matches against. */
+export type SearchScopeKey = 'title' | 'desc' | 'channel' | 'tags';
+
+/** All available search scopes — the search box matches everything by default. */
+export const ALL_SEARCH_SCOPES: SearchScopeKey[] = ['title', 'desc', 'channel', 'tags'];
+
 /** Parsed grid state from URL params */
 export interface GridParams {
 	mode: DataMode;
@@ -18,6 +24,7 @@ export interface GridParams {
 	page: number; // 1-indexed
 	pageSize: number;
 	q: string; // Text search
+	qFields: SearchScopeKey[]; // Which columns `q` matches — defaults to all
 	filters: Record<string, string>; // f.type=youtube, f.views=1000..5000, etc.
 }
 
@@ -29,6 +36,7 @@ export const GRID_DEFAULTS: GridParams = {
 	page: 1,
 	pageSize: 10,
 	q: '',
+	qFields: ALL_SEARCH_SCOPES,
 	filters: {},
 };
 
@@ -73,6 +81,7 @@ export function parseGridParams(params: URLSearchParams): GridParams {
 	const page = params.get('page');
 	const pageSize = params.get('pageSize');
 	const q = params.get('q');
+	const qf = params.get('qf');
 
 	const filters: Record<string, string> = {};
 	for (const [key, value] of params.entries()) {
@@ -90,8 +99,22 @@ export function parseGridParams(params: URLSearchParams): GridParams {
 		pageSize:
 			pageSize !== null && !isNaN(Number(pageSize)) && Number(pageSize) > 0 ? Number(pageSize) : GRID_DEFAULTS.pageSize,
 		q: q ?? GRID_DEFAULTS.q,
+		qFields: parseSearchScopes(qf),
 		filters,
 	};
+}
+
+/** Parse the `qf` URL value into a validated, de-duped list of scope keys. Falls back to "all" when absent, empty, or entirely invalid. */
+function parseSearchScopes(qf: string | null): SearchScopeKey[] {
+	if (!qf) return ALL_SEARCH_SCOPES;
+	const valid = new Set(ALL_SEARCH_SCOPES);
+	const parsed = qf
+		.split(',')
+		.map((s) => s.trim())
+		.filter((s): s is SearchScopeKey => valid.has(s as SearchScopeKey));
+	// De-dupe while preserving ALL_SEARCH_SCOPES order for a stable serialized form.
+	const selected = new Set(parsed);
+	return selected.size > 0 ? ALL_SEARCH_SCOPES.filter((s) => selected.has(s)) : ALL_SEARCH_SCOPES;
 }
 
 /** Serialize GridParams to URL search string (omitting defaults) */
@@ -104,12 +127,17 @@ export function serializeGridParams(state: GridParams): string {
 	if (state.page !== GRID_DEFAULTS.page) params.set('page', String(state.page));
 	if (state.pageSize !== GRID_DEFAULTS.pageSize) params.set('pageSize', String(state.pageSize));
 	if (state.q !== GRID_DEFAULTS.q) params.set('q', state.q);
+	if (!sameScopes(state.qFields, GRID_DEFAULTS.qFields)) params.set('qf', state.qFields.join(','));
 
 	for (const [key, value] of Object.entries(state.filters)) {
 		params.set(`f.${key}`, value);
 	}
 
 	return params.toString();
+}
+
+function sameScopes(a: SearchScopeKey[], b: SearchScopeKey[]): boolean {
+	return a.length === b.length && a.every((s) => b.includes(s));
 }
 
 // ---------------------------------------------------------------------------
@@ -309,12 +337,24 @@ export function urlParamsToFilter(filters: Record<string, string>): Record<strin
 // GraphQL ContentFilter input
 // ---------------------------------------------------------------------------
 
+/** GraphQL ContentSearchField enum values (backend `schema.graphql`) */
+export type ContentSearchFieldGQL = 'TITLE' | 'DESCRIPTION' | 'CHANNEL_TITLE' | 'TAGS';
+
+/** UI scope key → GraphQL ContentSearchField enum value */
+const SCOPE_TO_GQL_FIELD: Record<SearchScopeKey, ContentSearchFieldGQL> = {
+	title: 'TITLE',
+	desc: 'DESCRIPTION',
+	channel: 'CHANNEL_TITLE',
+	tags: 'TAGS',
+};
+
 /** GraphQL ContentFilter input — defined here so Plan 02 (Wave 1) doesn't depend on Plan 03 */
 export interface ContentFilterInput {
 	contentType?: string;
 	minLengthSeconds?: number;
 	maxLengthSeconds?: number;
 	search?: string;
+	searchFields?: ContentSearchFieldGQL[];
 	minViewCount?: number;
 	maxViewCount?: number;
 	minLikeCount?: number;
@@ -369,12 +409,19 @@ function parseDateRange(value: string): { from?: string; to?: string } {
 export function urlParamsToGraphQLFilter(
 	filters: Record<string, string>,
 	search: string,
+	searchFields: SearchScopeKey[] = ALL_SEARCH_SCOPES,
 ): ContentFilterInput | undefined {
 	const result: ContentFilterInput = {};
 	let hasAny = false;
 
 	if (search) {
 		result.search = search;
+		// The backend defaults an omitted searchFields to TITLE only, so the UI's default
+		// (search everything) must always be sent explicitly — only a single-field scope
+		// that happens to be exactly TITLE can safely rely on the server default instead.
+		if (!(searchFields.length === 1 && searchFields[0] === 'title')) {
+			result.searchFields = searchFields.map((s) => SCOPE_TO_GQL_FIELD[s]);
+		}
 		hasAny = true;
 	}
 
