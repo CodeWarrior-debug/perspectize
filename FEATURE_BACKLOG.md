@@ -136,28 +136,11 @@ page size for `ActivityTable`, so a user can switch between "My reading queue",
 
 ---
 
-## Compress/Trim YouTube Raw JSONB Response
+## YouTube JSONB Storage (resolved — closed out, re-verified 2026-09-12)
 
-The `content.response` JSONB column stores the full YouTube Data API response and accounts for **93.7% of all content table data**. At 49 rows this is manageable but will scale poorly.
+**Status: done, no action beyond a minor field drop.** `YouTubeAPIResponse` in `backend/internal/adapters/youtube/client.go` was already trimmed to `items[].{id,snippet.{title,description,channelTitle,publishedAt,tags},contentDetails.duration,statistics.{viewCount,likeCount,commentCount}}` *before* this backlog entry was originally written (confirmed via git history) — the 93.7%/118KB figures above were measured against that already-trimmed shape, not a raw untrimmed API response. There was no further "trim on ingest" left undone.
 
-**Per-column byte analysis (49 rows):**
-
-| Column | Total Bytes | % of Row Data |
-|--------|------------|---------------|
-| response (jsonb) | 118 KB | 93.7% |
-| name | 2.4 KB | 1.9% |
-| url | 2.2 KB | 1.7% |
-| row overhead | 1.5 KB | 1.2% |
-| all other columns | ~1.6 KB | 1.3% |
-
-Average response: **2,469 bytes/row**. All other columns combined: **136 bytes/row**.
-
-**Options:**
-1. **Trim on ingest** — Store only the JSONB paths the app actually reads (`snippet.title`, `snippet.channelTitle`, `snippet.publishedAt`, `snippet.description`, `snippet.tags`, `statistics.*`) and drop unused nested objects (`contentDetails`, `status`, `topicDetails`, `recordingDetails`, etc.)
-2. **Extract to columns** — Promote frequently queried JSONB paths into proper columns (the GraphQL schema already exposes `viewCount`, `likeCount`, `commentCount`, `channelTitle`, `publishedAt`, `tags`, `description` as resolved fields). Keep a trimmed `response` as fallback.
-3. **Compress** — Use `pg_lz_compress` or application-level compression for the raw response if full fidelity is needed for audit/replay.
-
-**Priority:** Low — not a problem at current scale (49 rows, 8 MB DB). Revisit when content table approaches 1,000+ rows.
+**Re-verified against the dev DB (2026-09-12, 96 YouTube rows):** `content.response` averages 1,817 bytes/row, ~174 KB total — a small fraction of the whole `perspectize` DB (~8.4 MB via `pg_database_size`). The Sevalla dashboard's larger reported "used storage" figure (~63 MB) is cluster-level overhead (WAL, daily automated backups with 7-day retention, template/system databases) unrelated to `content` table growth. Of the fields still kept, `items[].id` was fetched/stored but never read anywhere in the Go codebase — dropped as a code-cleanliness fix (~18 bytes/row, not a meaningful storage change). No further optimization (column promotion, compression) is justified at this scale — revisit only if the content table grows into the 10,000+ row range. See issue #367 for the investigation.
 
 ---
 
