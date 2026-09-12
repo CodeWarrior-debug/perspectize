@@ -67,6 +67,7 @@ vi.mock('$lib/assets/favicon.svg', () => ({
 class IntersectionObserverMock implements IntersectionObserver {
 	readonly root: Element | Document | null = null;
 	readonly rootMargin: string = '';
+	readonly scrollMargin: string = '';
 	readonly thresholds: ReadonlyArray<number> = [];
 	private callback: IntersectionObserverCallback;
 

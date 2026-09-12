@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import { tick } from 'svelte';
+import { tick, type Snippet } from 'svelte';
 import FormPopover from '$lib/components/FormPopover.svelte';
+
+// FormPopover's triggerIcon/formFields props are Snippet<[]>, which is a compiled
+// Svelte construct (an opaque branded function) that can't be produced from a plain
+// .ts file — a bare `() => {}` is close enough at runtime (these tests never render
+// real icon/field markup) but fails the type check, so it's cast through `unknown`.
+const noopSnippet = (() => {}) as unknown as Snippet;
 
 // Mock CreateUserPopover's dependencies that FormPopover doesn't directly need
 vi.mock('@tanstack/svelte-query', () => ({
@@ -34,8 +40,8 @@ function renderFormPopover(overrides: Record<string, any> = {}) {
 			submitLabel: 'Submit',
 			pendingLabel: 'Submitting...',
 			onSubmit: vi.fn(),
-			triggerIcon: () => {},
-			formFields: () => {},
+			triggerIcon: noopSnippet,
+			formFields: noopSnippet,
 			...overrides,
 		},
 	});
