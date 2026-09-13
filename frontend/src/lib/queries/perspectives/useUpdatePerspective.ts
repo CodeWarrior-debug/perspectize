@@ -99,6 +99,16 @@ export function useUpdatePerspective() {
 				patchLists((list) => list.map((p) => (p.id === updated.id ? updated : p))),
 			);
 			queryClient.invalidateQueries({ ...listFilter, refetchType: 'none' });
+
+			// Editing a perspective — including toggling its Privacy — changes this
+			// content's perspectiveCount/averageRating (see useContentAggregates,
+			// which now counts private perspectives too). Evict the cached aggregate
+			// so the details modal doesn't keep showing pre-edit numbers for up to
+			// staleTime; without this, toggling privacy off looked like it did
+			// nothing until the 60s cache staleTime happened to lapse.
+			if (updated.contentID) {
+				queryClient.invalidateQueries({ queryKey: queryKeys.content.detail(updated.contentID) });
+			}
 		},
 	}));
 }

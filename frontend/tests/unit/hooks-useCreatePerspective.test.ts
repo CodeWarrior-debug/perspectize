@@ -201,7 +201,7 @@ describe('useCreatePerspective hook', () => {
 			);
 		});
 
-		it('does not invalidate content lists cache (content unchanged by perspective)', () => {
+		it('does not invalidate content lists cache (content list fields unchanged by perspective)', () => {
 			capturedMutationOptions.onSuccess(
 				{ createPerspective: createdRow },
 				{ userID: 42 },
@@ -210,6 +210,29 @@ describe('useCreatePerspective hook', () => {
 			expect(mockInvalidateQueries).not.toHaveBeenCalledWith(
 				expect.objectContaining({ queryKey: expect.arrayContaining(['content', 'list']) }),
 			);
+		});
+
+		it("invalidates the new perspective's content aggregate cache (perspectiveCount/averageRating can change)", () => {
+			capturedMutationOptions.onSuccess(
+				{ createPerspective: createdRow },
+				{ userID: 42 },
+				{ previous: [], tempId: 'x' },
+			);
+			expect(mockInvalidateQueries).toHaveBeenCalledWith(
+				expect.objectContaining({ queryKey: expect.arrayContaining(['content', 'detail', '10']) }),
+			);
+		});
+
+		it('does not invalidate the content cache when the created row has no contentID', () => {
+			capturedMutationOptions.onSuccess(
+				{ createPerspective: { ...createdRow, contentID: null } },
+				{ userID: 42 },
+				{ previous: [], tempId: 'x' },
+			);
+			const contentCall = mockInvalidateQueries.mock.calls.find((call: any[]) =>
+				call[0]?.queryKey?.includes('content'),
+			);
+			expect(contentCall).toBeUndefined();
 		});
 	});
 
