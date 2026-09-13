@@ -97,4 +97,38 @@ describe('createThemeStore', () => {
 
 		expect(store.activeFullTokens().primary).toBe(customPrimary);
 	});
+
+	it('selectCustom activates an existing custom theme and persists it', () => {
+		const store = createThemeStore();
+		const saved = store.saveCustomTheme('Custom', THEME_PRESETS[0].base);
+		store.selectPreset(DEFAULT_THEME_ID);
+		expect(store.state.activeThemeId).toBe(DEFAULT_THEME_ID);
+
+		store.selectCustom(saved.id);
+
+		expect(store.state.activeThemeId).toBe(saved.id);
+		const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+		expect(persisted.activeThemeId).toBe(saved.id);
+	});
+
+	it('selectCustom is a no-op for an id that is not a saved custom theme', () => {
+		const store = createThemeStore();
+		store.selectPreset(DEFAULT_THEME_ID);
+
+		store.selectCustom('does-not-exist');
+
+		expect(store.state.activeThemeId).toBe(DEFAULT_THEME_ID);
+	});
+
+	it('previewCustomTokens applies the tokens to the DOM without changing activeThemeId or persisting', () => {
+		const store = createThemeStore();
+		const before = store.state.activeThemeId;
+		const beforePersisted = localStorage.getItem(STORAGE_KEY);
+
+		store.previewCustomTokens({ ...THEME_PRESETS[0].base, primary: '#abcdef' });
+
+		expect(store.state.activeThemeId).toBe(before);
+		expect(localStorage.getItem(STORAGE_KEY)).toBe(beforePersisted);
+		expect(document.documentElement.style.getPropertyValue('--color-primary')).toBe('#abcdef');
+	});
 });

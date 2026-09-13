@@ -63,6 +63,14 @@ export default defineConfig({
 				'src/lib/components/shadcn/**',
 				'src/routes/**',
 				'src/lib/components/ActivityTable.svelte',
+				// Thin wrapper around a third-party interactive widget (dynamically-
+				// imported @jaames/iro canvas color picker) — its own code is just
+				// construct-on-mount/teardown-on-destroy glue; meaningfully unit-testing
+				// it would mean re-implementing canvas pointer interaction, so it's
+				// excluded like ActivityTable.svelte above. ThemeCustomizePanel.svelte,
+				// which uses it, is NOT excluded — that one has real logic and is tested
+				// with ColorWheel swapped for a stub (see theme-customize-panel.test.ts).
+				'src/lib/components/theme/ColorWheel.svelte',
 			],
 			thresholds: {
 				lines: 80,

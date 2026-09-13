@@ -115,6 +115,16 @@ describe('useAddVideo hook', () => {
 			expect(mockToastSuccess).not.toHaveBeenCalled();
 		});
 
+		it('falls back to a full refetch when the response has no content item', () => {
+			capturedMutationOptions.onSuccess({
+				createContentFromYouTube: { content: null, alreadyExisted: false },
+			});
+			expect(mockSetQueriesData).not.toHaveBeenCalled();
+			expect(mockInvalidateQueries).toHaveBeenCalledWith(
+				expect.not.objectContaining({ refetchType: 'none' }),
+			);
+		});
+
 		it('does not insert duplicate into cache', () => {
 			capturedMutationOptions.onSuccess({
 				createContentFromYouTube: { content: { name: 'Existing Video', id: '1' }, alreadyExisted: true },
@@ -140,6 +150,34 @@ describe('useAddVideo hook', () => {
 		it('shows "video not found" message', () => {
 			capturedMutationOptions.onError(new Error('video not found: xyz'));
 			expect(mockToastError).toHaveBeenCalledWith('Invalid YouTube URL or video not found');
+		});
+
+		it('shows "invalid youtube url" message', () => {
+			capturedMutationOptions.onError(new Error('Invalid YouTube URL'));
+			expect(mockToastError).toHaveBeenCalledWith('Invalid YouTube URL or video not found');
+		});
+
+		it('shows a sign-in prompt for "access denied" errors', () => {
+			capturedMutationOptions.onError(new Error('access denied'));
+			expect(mockToastError).toHaveBeenCalledWith('Please sign in to add a video');
+		});
+
+		it('shows a sign-in prompt for "authentication required" errors', () => {
+			capturedMutationOptions.onError(new Error('Authentication required'));
+			expect(mockToastError).toHaveBeenCalledWith('Please sign in to add a video');
+		});
+
+		it('shows a generic failure message for an unrecognized error', () => {
+			capturedMutationOptions.onError(new Error('something else entirely'));
+			expect(mockToastError).toHaveBeenCalledWith('Failed to add video. Please try again.');
+		});
+
+		it('logs the raw error to the console', () => {
+			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const err = new Error('boom');
+			capturedMutationOptions.onError(err);
+			expect(consoleSpy).toHaveBeenCalledWith('[AddVideo] mutation failed:', err);
+			consoleSpy.mockRestore();
 		});
 	});
 });

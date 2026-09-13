@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatColorForUnit } from '$lib/theme/format';
+import { formatColorForUnit, parseColorInput } from '$lib/theme/format';
 
 describe('formatColorForUnit', () => {
 	const navy = '#1a365d';
@@ -27,5 +27,33 @@ describe('formatColorForUnit', () => {
 	it('falls back to the original string for an unparseable color', () => {
 		expect(formatColorForUnit('not-a-color', 'oklch')).toBe('not-a-color');
 		expect(formatColorForUnit('not-a-color', 'rgb')).toBe('not-a-color');
+	});
+});
+
+describe('parseColorInput', () => {
+	it('parses a hex string back to itself', () => {
+		expect(parseColorInput('#1a365d')).toBe('#1a365d');
+	});
+
+	it('parses an rgb() string into hex', () => {
+		expect(parseColorInput('rgb(26, 54, 93)')).toBe('#1a365d');
+	});
+
+	it('parses an oklch() string into hex', () => {
+		const hex = parseColorInput('oklch(0.301 0.056 259.2)');
+		expect(hex).toMatch(/^#[0-9a-f]{6}$/);
+	});
+
+	it('trims surrounding whitespace before parsing', () => {
+		expect(parseColorInput('  #1a365d  ')).toBe('#1a365d');
+	});
+
+	it('returns null for empty/whitespace-only input', () => {
+		expect(parseColorInput('')).toBeNull();
+		expect(parseColorInput('   ')).toBeNull();
+	});
+
+	it('returns null for unparseable input', () => {
+		expect(parseColorInput('not a color')).toBeNull();
 	});
 });
