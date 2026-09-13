@@ -1,12 +1,18 @@
 <script lang="ts">
 	import { Show, SignInButton, UserButton } from 'svelte-clerk';
 	import AddVideoPopover from '$lib/components/AddVideoPopover.svelte';
+	import { useMessageThreads } from '$lib/queries/hooks/useMessageThreads';
+	import { totalUnread } from '$lib/messaging/inboxCache';
 	import { page } from '$app/state';
 
 	const navLinks = [
 		{ href: '/', label: 'Activity' },
 		{ href: '/discover', label: 'Discover' },
+		{ href: '/messages', label: 'Messages' },
 	];
+
+	const threads = useMessageThreads();
+	const unread = $derived(totalUnread(threads.data?.messageThreads ?? []));
 
 	function isActive(href: string): boolean {
 		return href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href);
@@ -34,6 +40,12 @@
 							: 'text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/10'}"
 					>
 						{link.label}
+						{#if link.href === '/messages' && unread > 0}
+							<span
+								data-testid="nav-unread"
+								class="ml-1 rounded-full bg-primary-foreground/20 px-1.5 text-xs"
+							>{unread}</span>
+						{/if}
 					</a>
 				{/each}
 			</nav>

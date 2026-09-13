@@ -7,6 +7,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import AuthUserSync from '$lib/components/AuthUserSync.svelte';
 	import Header from '$lib/components/Header.svelte';
+	import InboxStreamMount from '$lib/components/messaging/InboxStreamMount.svelte';
 	import GuestLanding from '$lib/components/onboarding/GuestLanding.svelte';
 	import OnboardingShell from '$lib/components/onboarding/OnboardingShell.svelte';
 	import { reportWebVitals } from '$lib/vitals';
@@ -57,6 +58,7 @@
 					<GuestLanding />
 				</Show>
 				<Show when="signed-in">
+					<InboxStreamMount />
 					<OnboardingShell />
 					{@render children()}
 				</Show>

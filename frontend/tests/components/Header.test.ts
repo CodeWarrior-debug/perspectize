@@ -34,6 +34,18 @@ vi.mock('$lib/components/AddVideoPopover.svelte', () => ({
 	})),
 }));
 
+// Mock useMessageThreads hook
+vi.mock('$lib/queries/hooks/useMessageThreads', () => ({
+	useMessageThreads: () => ({ data: { messageThreads: [{ id: 't1', unreadCount: 3, title: null, participants: [], lastMessageAt: 'x', latestSeq: 3, myLastReadSeq: 0, createdAt: 'x' }] } }),
+}));
+
+// Mock totalUnread function
+vi.mock('$lib/messaging/inboxCache', () => ({
+	totalUnread: (threads: any) => {
+		return threads.reduce((sum: number, t: any) => sum + (t.unreadCount || 0), 0);
+	},
+}));
+
 function renderHeader() {
 	const result = render(Header);
 	const header = result.container.querySelector('header');
@@ -140,5 +152,12 @@ describe('Header component', () => {
 		render(Header);
 		const link = screen.getByRole('link', { name: 'Activity' });
 		expect(link).toHaveAttribute('href', '/');
+	});
+
+	it('shows a Messages nav link with the unread total', () => {
+		renderHeader();
+		const link = screen.getByRole('link', { name: /messages/i });
+		expect(link).toHaveAttribute('href', '/messages');
+		expect(screen.getByTestId('nav-unread')).toHaveTextContent('3');
 	});
 });
