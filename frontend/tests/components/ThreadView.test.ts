@@ -76,13 +76,13 @@ describe('ThreadView', () => {
 	beforeEach(() => vi.clearAllMocks());
 
 	it('renders a bubble per message and starts the stream', () => {
-		render(ThreadView, { props: { threadId: 't1' } });
+		render(ThreadView, { props: { threadId: 't1', onEditMessage: vi.fn(), onDeleteMessage: vi.fn() } });
 		expect(screen.getAllByTestId('message')).toHaveLength(2);
 		expect(mocks.start).toHaveBeenCalled();
 	});
 
 	it('composer send routes to the send hook with the thread id and last seq', async () => {
-		render(ThreadView, { props: { threadId: 't1' } });
+		render(ThreadView, { props: { threadId: 't1', onEditMessage: vi.fn(), onDeleteMessage: vi.fn() } });
 		await fireEvent.input(screen.getByTestId('composer-input'), { target: { value: 'hello' } });
 		await fireEvent.click(screen.getByTestId('composer-send'));
 		expect(mocks.sendMutate).toHaveBeenCalledWith(

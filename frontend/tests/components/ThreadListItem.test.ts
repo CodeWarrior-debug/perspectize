@@ -1,5 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
+
+vi.mock('@tanstack/svelte-query', () => ({
+	createMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+	useQueryClient: vi.fn(() => ({
+		setQueryData: vi.fn(),
+		invalidateQueries: vi.fn(),
+	})),
+}));
+vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('svelte-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+
 import ThreadListItem from '$lib/components/messaging/ThreadListItem.svelte';
 
 const thread = (over = {}) => ({
@@ -33,5 +44,31 @@ describe('ThreadListItem', () => {
 	it('marks the active row with aria-current', () => {
 		render(ThreadListItem, { props: { thread: thread(), myUserId: 'u1', active: true } });
 		expect(screen.getByTestId('thread-item')).toHaveAttribute('aria-current', 'page');
+	});
+
+	it('renders a muted indicator when thread.muted is true', () => {
+		render(ThreadListItem, {
+			props: { thread: thread({ muted: true }), myUserId: 'u1', active: false },
+		});
+		expect(screen.getByLabelText('Muted')).toBeInTheDocument();
+	});
+
+	it('does not render a muted indicator when thread.muted is false', () => {
+		render(ThreadListItem, {
+			props: { thread: thread({ muted: false }), myUserId: 'u1', active: false },
+		});
+		expect(screen.queryByLabelText('Muted')).not.toBeInTheDocument();
+	});
+
+	it('shows a mute toggle button reflecting the current muted state', () => {
+		render(ThreadListItem, {
+			props: { thread: thread({ muted: false }), myUserId: 'u1', active: false },
+		});
+		expect(screen.getByLabelText('Mute thread')).toBeInTheDocument();
+
+		render(ThreadListItem, {
+			props: { thread: thread({ muted: true }), myUserId: 'u1', active: false },
+		});
+		expect(screen.getByLabelText('Unmute thread')).toBeInTheDocument();
 	});
 });

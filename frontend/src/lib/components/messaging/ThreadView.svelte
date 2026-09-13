@@ -26,7 +26,20 @@
 	import ReadReceiptAvatars from './ReadReceiptAvatars.svelte';
 	import PresenceDot from './PresenceDot.svelte';
 
-	let { threadId }: { threadId: string } = $props();
+	let {
+		threadId,
+		onEditMessage,
+		onDeleteMessage,
+	}: {
+		threadId: string;
+		onEditMessage: (
+			messageId: string,
+			threadId: string,
+			newBody: string,
+			previousBody: string,
+		) => void;
+		onDeleteMessage: (messageId: string, threadId: string) => void;
+	} = $props();
 
 	const queryClient = useQueryClient();
 	const meState = useMe();
@@ -128,6 +141,9 @@
 				{message}
 				mine={message.sender.id === myUserId}
 				showSender={showSenderForIndex(items, i)}
+				currentUser={meUser}
+				onEdit={onEditMessage}
+				onDelete={onDeleteMessage}
 			/>
 		{/each}
 		{#if thread && items.length}
