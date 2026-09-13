@@ -2,7 +2,6 @@
 	import { toast } from 'svelte-sonner';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import InfoIcon from '@lucide/svelte/icons/info';
-	import XIcon from '@lucide/svelte/icons/x';
 	import { MediaQuery } from 'svelte/reactivity';
 	import {
 		Dialog,
@@ -371,8 +370,7 @@
 	<form onsubmit={handleSubmit} class="flex flex-col flex-1 min-h-0 overflow-hidden">
 		<div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 flex flex-col gap-3.5">
 			<div class="grid grid-cols-2 gap-3">
-				{#each activeFields as fieldKey, idx (fieldKey)}
-					{@const isLeftCol = idx % 2 === 0}
+				{#each activeFields as fieldKey (fieldKey)}
 					<div class="relative" bind:this={fieldRefs[fieldKey]}>
 						{#if fieldKey === 'quality'}
 							<RatingInput
@@ -420,18 +418,6 @@
 								onRemove={() => removeField(fieldKey)}
 							/>
 						{/if}
-						<button
-							type="button"
-							onclick={() => removeField(fieldKey)}
-							class="hover-tooltip absolute top-1/2 -translate-y-1/2 flex items-center justify-center bg-white border border-border rounded-full shadow-sm text-muted-foreground hover:opacity-70 transition-opacity z-10"
-							style="width: 16px; height: 16px; {isLeftCol
-								? `right: ${mobile ? '4px' : '12px'};`
-								: `left: ${mobile ? '4px' : '12px'};`}"
-							aria-label="Remove {getFieldLabel(fieldKey)}"
-							data-tooltip="Remove {getFieldLabel(fieldKey)}"
-						>
-							<XIcon class="size-2" strokeWidth={3} />
-						</button>
 					</div>
 				{/each}
 			</div>
