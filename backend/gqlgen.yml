@@ -3,6 +3,7 @@
 
 schema:
   - schema.graphql
+  - messaging.graphql
 
 exec:
   filename: internal/adapters/graphql/generated/generated.go
@@ -64,6 +65,34 @@ models:
   UserRole:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.UserRole
+
+  # Messaging enums - bind directly to domain types
+  ThreadRole:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ThreadRole
+  PresenceState:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.PresenceState
+
+  # Messaging types with hand-written models (see model/messaging.go) so field
+  # resolvers can reach the underlying domain aggregate.
+  MessageThread:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model.MessageThread
+  ThreadParticipant:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model.ThreadParticipant
+  Message:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model.Message
+    fields:
+      # model.Message carries editedAt/deletedAt as preformatted string pointers,
+      # but keep them as field resolvers so the generated code is unchanged from
+      # the A3 baseline (the resolvers just surface obj.EditedAt / obj.DeletedAt).
+      editedAt:
+        resolver: true
+      deletedAt:
+        resolver: true
   User:
     fields:
       email:

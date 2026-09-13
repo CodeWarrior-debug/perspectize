@@ -94,10 +94,7 @@ describe('FilterChips', () => {
 
 	it('calls setFilterModel(null) when Clear all is clicked', async () => {
 		const api = mockGridApi();
-		renderChips(
-			{ channel: { filterType: 'text', type: 'contains', filter: 'test' } },
-			api,
-		);
+		renderChips({ channel: { filterType: 'text', type: 'contains', filter: 'test' } }, api);
 
 		const clearBtn = screen.getByText('Clear all');
 		await fireEvent.click(clearBtn);

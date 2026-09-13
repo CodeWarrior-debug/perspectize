@@ -80,7 +80,9 @@ describe('AddVideoDialog mutation setup', () => {
 
 	it('mutationFn calls graphqlRequest with correct args', async () => {
 		const { graphqlRequest } = await import('$lib/queries/client');
-		(graphqlRequest as any).mockResolvedValue({ createContentFromYouTube: { content: { name: 'Test' }, alreadyExisted: false } });
+		(graphqlRequest as any).mockResolvedValue({
+			createContentFromYouTube: { content: { name: 'Test' }, alreadyExisted: false },
+		});
 		await mocks.capturedMutationOptions.mutationFn('https://youtube.com/watch?v=abc123');
 		expect(graphqlRequest).toHaveBeenCalledWith(expect.anything(), {
 			input: { url: 'https://youtube.com/watch?v=abc123', userId: 0 },

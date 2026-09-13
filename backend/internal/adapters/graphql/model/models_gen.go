@@ -3,8 +3,17 @@
 package model
 
 import (
+	"bytes"
+	"fmt"
+	"io"
+	"strconv"
+
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
+
+type ThreadEvent interface {
+	IsThreadEvent()
+}
 
 type CategorizedRating struct {
 	Category string `json:"category"`
@@ -88,6 +97,11 @@ type CreateContentResult struct {
 	AlreadyExisted bool     `json:"alreadyExisted"`
 }
 
+type CreateMessageThreadInput struct {
+	ParticipantUserIds []string `json:"participantUserIds"`
+	Title              *string  `json:"title,omitempty"`
+}
+
 type CreatePerspectiveInput struct {
 	UserID                int                       `json:"userID"`
 	ContentID             *int                      `json:"contentID,omitempty"`
@@ -102,6 +116,7 @@ type CreatePerspectiveInput struct {
 	Parts                 []int                     `json:"parts,omitempty"`
 	Labels                []string                  `json:"labels,omitempty"`
 	CategorizedRatings    []*CategorizedRatingInput `json:"categorizedRatings,omitempty"`
+	Feelings              []*FeelingInput           `json:"feelings,omitempty"`
 	PrimaryPerspectiveID  *int                      `json:"primaryPerspectiveID,omitempty"`
 	RelatedPerspectiveIDs []int                     `json:"relatedPerspectiveIDs,omitempty"`
 	CustomFields          map[string]any            `json:"customFields,omitempty"`
@@ -112,6 +127,52 @@ type CreateUserInput struct {
 	Username string  `json:"username"`
 	Email    *string `json:"email,omitempty"`
 }
+
+type FeelingEntry struct {
+	Emoji     string  `json:"emoji"`
+	Label     *string `json:"label,omitempty"`
+	Intensity int     `json:"intensity"`
+	Note      *string `json:"note,omitempty"`
+}
+
+type FeelingInput struct {
+	Emoji     string  `json:"emoji"`
+	Label     *string `json:"label,omitempty"`
+	Intensity int     `json:"intensity"`
+	Note      *string `json:"note,omitempty"`
+}
+
+type InboxEvent struct {
+	ThreadID      string `json:"threadId"`
+	LastMessageAt string `json:"lastMessageAt"`
+	LatestSeq     int    `json:"latestSeq"`
+	UnreadCount   int    `json:"unreadCount"`
+}
+
+type MessageConnection struct {
+	Items    []*Message `json:"items"`
+	PageInfo *PageInfo  `json:"pageInfo"`
+}
+
+type MessageDeleted struct {
+	ThreadID  string `json:"threadId"`
+	MessageID string `json:"messageId"`
+	Seq       int    `json:"seq"`
+}
+
+func (MessageDeleted) IsThreadEvent() {}
+
+type MessageEdited struct {
+	Message *Message `json:"message"`
+}
+
+func (MessageEdited) IsThreadEvent() {}
+
+type MessagePosted struct {
+	Message *Message `json:"message"`
+}
+
+func (MessagePosted) IsThreadEvent() {}
 
 type Mutation struct {
 }
@@ -135,6 +196,14 @@ type PaginatedPerspectives struct {
 	TotalCount *int           `json:"totalCount,omitempty"`
 }
 
+type ParticipantChanged struct {
+	ThreadID string                `json:"threadId"`
+	UserID   string                `json:"userId"`
+	Change   ParticipantChangeKind `json:"change"`
+}
+
+func (ParticipantChanged) IsThreadEvent() {}
+
 type Perspective struct {
 	ID                    string               `json:"id"`
 	UserID                string               `json:"userID"`
@@ -153,6 +222,7 @@ type Perspective struct {
 	Parts                 []int                `json:"parts,omitempty"`
 	Labels                []string             `json:"labels,omitempty"`
 	CategorizedRatings    []*CategorizedRating `json:"categorizedRatings,omitempty"`
+	Feelings              []*FeelingEntry      `json:"feelings,omitempty"`
 	PrimaryPerspectiveID  *string              `json:"primaryPerspectiveID,omitempty"`
 	RelatedPerspectiveIDs []int                `json:"relatedPerspectiveIDs,omitempty"`
 	CustomFields          map[string]any       `json:"customFields,omitempty"`
@@ -167,7 +237,29 @@ type PerspectiveFilter struct {
 	Privacy   *domain.Privacy `json:"privacy,omitempty"`
 }
 
+type PresenceChanged struct {
+	ThreadID string               `json:"threadId"`
+	UserID   string               `json:"userId"`
+	State    domain.PresenceState `json:"state"`
+}
+
+func (PresenceChanged) IsThreadEvent() {}
+
 type Query struct {
+}
+
+type ReadReceiptChanged struct {
+	ThreadID    string `json:"threadId"`
+	UserID      string `json:"userId"`
+	LastReadSeq int    `json:"lastReadSeq"`
+}
+
+func (ReadReceiptChanged) IsThreadEvent() {}
+
+type SendMessageInput struct {
+	ThreadID    string `json:"threadId"`
+	Body        string `json:"body"`
+	ClientNonce string `json:"clientNonce"`
 }
 
 type SetPrimaryCategoryInput struct {
@@ -177,6 +269,23 @@ type SetPrimaryCategoryInput struct {
 	Description *string `json:"description,omitempty"`
 	EntityType  *string `json:"entityType,omitempty"`
 }
+
+type StreamReset struct {
+	ThreadID string `json:"threadId"`
+}
+
+func (StreamReset) IsThreadEvent() {}
+
+type Subscription struct {
+}
+
+type TypingChanged struct {
+	ThreadID string `json:"threadId"`
+	UserID   string `json:"userId"`
+	Typing   bool   `json:"typing"`
+}
+
+func (TypingChanged) IsThreadEvent() {}
 
 type UpdatePerspectiveInput struct {
 	ID                    int                       `json:"id"`
@@ -193,6 +302,7 @@ type UpdatePerspectiveInput struct {
 	Parts                 []int                     `json:"parts,omitempty"`
 	Labels                []string                  `json:"labels,omitempty"`
 	CategorizedRatings    []*CategorizedRatingInput `json:"categorizedRatings,omitempty"`
+	Feelings              []*FeelingInput           `json:"feelings,omitempty"`
 	PrimaryPerspectiveID  *int                      `json:"primaryPerspectiveID,omitempty"`
 	RelatedPerspectiveIDs []int                     `json:"relatedPerspectiveIDs,omitempty"`
 	CustomFields          map[string]any            `json:"customFields,omitempty"`
@@ -227,4 +337,59 @@ type WikidataSearchResult struct {
 	Label       string  `json:"label"`
 	Description *string `json:"description,omitempty"`
 	EntityType  *string `json:"entityType,omitempty"`
+}
+
+type ParticipantChangeKind string
+
+const (
+	ParticipantChangeKindAdded   ParticipantChangeKind = "ADDED"
+	ParticipantChangeKindRemoved ParticipantChangeKind = "REMOVED"
+)
+
+var AllParticipantChangeKind = []ParticipantChangeKind{
+	ParticipantChangeKindAdded,
+	ParticipantChangeKindRemoved,
+}
+
+func (e ParticipantChangeKind) IsValid() bool {
+	switch e {
+	case ParticipantChangeKindAdded, ParticipantChangeKindRemoved:
+		return true
+	}
+	return false
+}
+
+func (e ParticipantChangeKind) String() string {
+	return string(e)
+}
+
+func (e *ParticipantChangeKind) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ParticipantChangeKind(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ParticipantChangeKind", str)
+	}
+	return nil
+}
+
+func (e ParticipantChangeKind) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ParticipantChangeKind) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ParticipantChangeKind) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }

@@ -72,6 +72,8 @@ This project uses **Svelte 5 runes** exclusively. Do not use Svelte 4 syntax.
 
 **`$effect` only tracks state read _synchronously_ in the effect body.** A value read solely inside a `setTimeout`/`Promise`/`await` callback is NOT a tracked dependency, so the effect runs once on mount and never re-runs. For a debounce, copy the reactive value into a local const at the top of the effect first (`const term = searchTerm;`), then use the local inside the timer — see `discover/SearchBar.svelte`. (Bug history: `CategoryTypeahead.svelte`'s Wikidata search read `searchTerm` only inside its `setTimeout`, so the debounced term never updated and the search query never fired.)
 
+**An `$effect` that writes a `$state` var and then reads that same var back (even just-assigned) loops.** Svelte 5 flags this as `effect_update_depth_exceeded` — assigning `foo = x` then reading `foo.length` later in the same effect re-triggers the effect indefinitely, even though the value is unchanged. Fix: read from a local `const` derived off the source (prop) instead of reading the `$state` var back. See `PerspectivePopover.svelte`'s `existingPerspective` reset effect.
+
 ## TanStack Query + GraphQL
 
 Queries use `graphql-request` with TanStack Svelte Query.
@@ -195,3 +197,5 @@ Symptom in the browser: `Failed to load module script: Expected a JavaScript-or-
 - Default browser viewport is 414x896 — clips a wide test harness (e.g. the 1200px AG Grid fixture) out of every screenshot/video. Set `browser.instances[].viewport` explicitly for anything wider.
 - `pnpm run test:browser -- --browser.headless` is parsed as a file-name filter, not a flag — pass provider flags directly (`pnpm run test:browser --browser.headless=true`), no `--`.
 - Playwright's `recordVideo` records per browser **context**, not per test — a `-t` filter is needed to scope a recording to one case, otherwise every test in the run shares one video.
+
+**Stale `node_modules` after switching branches silently inflates `pnpm run check`/`pnpm run test:run` baselines.** Checking out a branch whose `package.json` added a dependency (e.g. `graphql-ws`) without running `pnpm install` leaves the new import unresolved — `svelte-check` reports it as a type error, and any test importing that module fails, both looking exactly like "pre-existing" noise unrelated to current work. A multi-session SDD effort on `feature/messaging-frontend` carried a wrong "7 errors / 8 failing tests" baseline across ten task dispatches before a fresh `pnpm install` revealed the true baseline (3 errors, 0 failures) — the extra 4 errors and 8 failures were 100% the missing package, not real defects. Always `pnpm install` immediately after checking out a branch with dependency changes, before trusting any "baseline" error/failure count.
