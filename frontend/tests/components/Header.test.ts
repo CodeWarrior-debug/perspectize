@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import Header from '$lib/components/Header.svelte';
 
@@ -32,40 +32,6 @@ vi.mock('$lib/components/AddVideoPopover.svelte', () => ({
 		$on: vi.fn(),
 		$destroy: vi.fn(),
 	})),
-}));
-
-// Mock useMessageThreads hook
-vi.mock('$lib/queries/hooks/useMessageThreads', () => ({
-	useMessageThreads: () => ({
-		data: {
-			messageThreads: [
-				{
-					id: 't1',
-					unreadCount: 3,
-					title: null,
-					participants: [],
-					lastMessageAt: 'x',
-					latestSeq: 3,
-					myLastReadSeq: 0,
-					createdAt: 'x',
-				},
-			],
-		},
-	}),
-}));
-
-// Mock totalUnread function
-vi.mock('$lib/messaging/inboxCache', () => ({
-	totalUnread: (threads: any) => {
-		return threads.reduce((sum: number, t: any) => sum + (t.unreadCount || 0), 0);
-	},
-}));
-
-// Mock useMe hook — signed-in by default so existing Messages-link tests still see it.
-// Mutable so the signed-out test below can flip it without needing module reset gymnastics.
-const meMockState = vi.hoisted(() => ({ me: { id: 'u1', username: 'me' } as { id: string; username: string } | null }));
-vi.mock('$lib/queries/hooks/useMe.svelte', () => ({
-	useMe: () => ({ me: meMockState.me }),
 }));
 
 function renderHeader() {
@@ -176,23 +142,8 @@ describe('Header component', () => {
 		expect(link).toHaveAttribute('href', '/');
 	});
 
-	it('shows a Messages nav link with the unread total', () => {
+	it('does not render a Messages nav link (messaging entry point is the floating widget)', () => {
 		renderHeader();
-		const link = screen.getByRole('link', { name: /messages/i });
-		expect(link).toHaveAttribute('href', '/messages');
-		expect(screen.getByTestId('nav-unread')).toHaveTextContent('3');
-	});
-});
-
-describe('Header component (signed out)', () => {
-	afterEach(() => {
-		meMockState.me = { id: 'u1', username: 'me' };
-	});
-
-	it('hides the Messages nav link when signed out', () => {
-		meMockState.me = null;
-		render(Header);
 		expect(screen.queryByRole('link', { name: /messages/i })).not.toBeInTheDocument();
-		expect(screen.getByRole('link', { name: 'Activity' })).toBeInTheDocument();
 	});
 });

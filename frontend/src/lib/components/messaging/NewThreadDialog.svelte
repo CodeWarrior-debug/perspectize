@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { createQuery } from '@tanstack/svelte-query';
+	import { goto } from '$app/navigation';
 	import { graphqlRequest } from '$lib/queries/client';
 	import { LIST_USERS, type UsersResponse } from '$lib/queries/users';
 	import { queryKeys } from '$lib/queries/keys';
 	import { useCreateMessageThread } from '$lib/queries/hooks/useCreateMessageThread';
+	import type { CreateMessageThreadResponse } from '$lib/queries/messaging';
 	import {
 		Dialog,
 		DialogContent,
@@ -14,8 +16,18 @@
 		Input,
 	} from '$lib/components/shadcn';
 
-	let { open, onOpenChange, myUserId }: { open: boolean; onOpenChange: (open: boolean) => void; myUserId: string } =
-		$props();
+	let {
+		open,
+		onOpenChange,
+		myUserId,
+		onCreated,
+	}: {
+		open: boolean;
+		onOpenChange: (open: boolean) => void;
+		myUserId: string;
+		/** Called with the new thread's id instead of navigating to /messages/[id] — used by the floating messaging widget, which selects the thread in place. */
+		onCreated?: (threadId: string) => void;
+	} = $props();
 
 	let filter = $state('');
 	let selected = $state(new Set<string>());
@@ -50,7 +62,16 @@
 
 	function start() {
 		if (!selected.size) return;
-		createThread.mutate({ participantUserIds: [...selected] });
+		createThread.mutate(
+			{ participantUserIds: [...selected] },
+			{
+				onSuccess: (data: CreateMessageThreadResponse) => {
+					const threadId = data.createMessageThread.id;
+					if (onCreated) onCreated(threadId);
+					else goto('/messages/' + threadId);
+				},
+			},
+		);
 		onOpenChange(false);
 	}
 </script>

@@ -39,6 +39,31 @@ describe('NewThreadDialog', () => {
 		await fireEvent.click(alice);
 		await fireEvent.click(bob);
 		await fireEvent.click(screen.getByTestId('start-thread'));
-		expect(mocks.mockMutate).toHaveBeenCalledWith({ participantUserIds: ['u2', 'u3'] });
+		expect(mocks.mockMutate).toHaveBeenCalledWith(
+			{ participantUserIds: ['u2', 'u3'] },
+			{ onSuccess: expect.any(Function) },
+		);
+	});
+
+	it('navigates to the new thread on success when no onCreated callback is given', async () => {
+		const { goto } = await import('$app/navigation');
+		render(NewThreadDialog, { props: { open: true, onOpenChange: vi.fn(), myUserId: 'u1' } });
+		await fireEvent.click(screen.getAllByTestId('user-option')[0]);
+		await fireEvent.click(screen.getByTestId('start-thread'));
+		const { onSuccess } = mocks.mockMutate.mock.calls[0][1];
+		onSuccess({ createMessageThread: { id: 't9' } });
+		expect(goto).toHaveBeenCalledWith('/messages/t9');
+	});
+
+	it('calls onCreated instead of navigating when provided', async () => {
+		const { goto } = await import('$app/navigation');
+		const onCreated = vi.fn();
+		render(NewThreadDialog, { props: { open: true, onOpenChange: vi.fn(), myUserId: 'u1', onCreated } });
+		await fireEvent.click(screen.getAllByTestId('user-option')[0]);
+		await fireEvent.click(screen.getByTestId('start-thread'));
+		const { onSuccess } = mocks.mockMutate.mock.calls[0][1];
+		onSuccess({ createMessageThread: { id: 't9' } });
+		expect(onCreated).toHaveBeenCalledWith('t9');
+		expect(goto).not.toHaveBeenCalled();
 	});
 });

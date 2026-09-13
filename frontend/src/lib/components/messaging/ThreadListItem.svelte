@@ -7,7 +7,12 @@
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
 	import { useMuteThread } from '$lib/queries/hooks/useMuteThread';
 
-	let { thread, myUserId, active }: { thread: MessageThread; myUserId: string; active: boolean } = $props();
+	let {
+		thread,
+		myUserId,
+		active,
+		onSelect,
+	}: { thread: MessageThread; myUserId: string; active: boolean; onSelect?: (threadId: string) => void } = $props();
 
 	const title = $derived(threadTitle(thread, myUserId));
 	const muteMutation = useMuteThread();
@@ -17,6 +22,14 @@
 		e.stopPropagation();
 		muteMutation.mutate({ threadId: thread.id, muted: !thread.muted });
 	}
+
+	// When `onSelect` is provided (e.g. the floating messaging widget), the row
+	// selects a thread in place instead of navigating to the /messages route.
+	function handleClick(e: MouseEvent) {
+		if (!onSelect) return;
+		e.preventDefault();
+		onSelect(thread.id);
+	}
 </script>
 
 <div class="group relative flex items-center gap-3 rounded-md px-3 py-2 hover:bg-muted/60 {active ? 'bg-muted' : ''}">
@@ -24,6 +37,7 @@
 		data-testid="thread-item"
 		href={'/messages/' + thread.id}
 		aria-current={active ? 'page' : undefined}
+		onclick={handleClick}
 		class="flex min-w-0 flex-1 items-center gap-3"
 	>
 		<Avatar username={title} />

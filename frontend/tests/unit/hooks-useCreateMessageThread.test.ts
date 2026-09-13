@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({
 	mockGraphql: vi.fn(),
 	mockInvalidate: vi.fn(),
-	mockGoto: vi.fn(),
 	mockToastError: vi.fn(),
 	captured: undefined as any,
 }));
@@ -16,7 +15,6 @@ vi.mock('@tanstack/svelte-query', () => ({
 	useQueryClient: vi.fn(() => ({ invalidateQueries: mocks.mockInvalidate })),
 }));
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
-vi.mock('$app/navigation', () => ({ goto: mocks.mockGoto }));
 vi.mock('svelte-sonner', () => ({ toast: { error: mocks.mockToastError, success: vi.fn() } }));
 
 import { useCreateMessageThread } from '$lib/queries/hooks/useCreateMessageThread';
@@ -35,11 +33,10 @@ describe('useCreateMessageThread', () => {
 		});
 	});
 
-	it('onSuccess invalidates the thread list and navigates to the new thread', () => {
+	it('onSuccess invalidates the thread list (navigation is the caller decision — see NewThreadDialog)', () => {
 		useCreateMessageThread();
-		mocks.captured.onSuccess({ createMessageThread: { id: 't9' } });
+		mocks.captured.onSuccess();
 		expect(mocks.mockInvalidate).toHaveBeenCalledWith({ queryKey: queryKeys.messaging.threads.lists() });
-		expect(mocks.mockGoto).toHaveBeenCalledWith('/messages/t9');
 	});
 
 	it('onError toasts a friendly message', () => {

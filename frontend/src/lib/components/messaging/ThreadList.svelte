@@ -10,12 +10,14 @@
 		activeThreadId,
 		loading,
 		onNewThread,
+		onSelect,
 	}: {
 		threads: MessageThread[];
 		myUserId: string;
 		activeThreadId: string | null;
 		loading: boolean;
 		onNewThread: () => void;
+		onSelect?: (threadId: string) => void;
 	} = $props();
 </script>
 
@@ -34,7 +36,7 @@
 			<p data-testid="threads-empty" class="p-3 text-sm text-muted-foreground">No conversations yet</p>
 		{:else}
 			{#each threads as thread (thread.id)}
-				<ThreadListItem {thread} {myUserId} active={thread.id === activeThreadId} />
+				<ThreadListItem {thread} {myUserId} active={thread.id === activeThreadId} {onSelect} />
 			{/each}
 		{/if}
 	</div>
