@@ -138,11 +138,12 @@ defer db.Close()
 ### Verification checklist
 
 1. **Build**: `go build ./...` in `backend/` — must compile with zero errors
-2. **Backend tests**: `go test ./...` in `backend/` — all must pass
-3. **Frontend tests**: `pnpm run test:run` in `frontend/` — all must pass
-4. **Stale references**: If renaming/moving files or paths, grep the entire repo for old names
+2. **Format**: `gofmt -l .` in `backend/` — must return empty (CI's `Build` job fails otherwise). `make install-hooks` (once per checkout) auto-fixes this on every commit — see the shared git pre-commit hook further down this file.
+3. **Backend tests**: `go test ./...` in `backend/` — all must pass
+4. **Frontend tests**: `pnpm run test:run` in `frontend/` — all must pass
+5. **Stale references**: If renaming/moving files or paths, grep the entire repo for old names
 
-Run the relevant subset (e.g., backend-only changes skip step 3). Report results explicitly — don't just say "tests pass", show the output summary.
+Run the relevant subset (e.g., backend-only changes skip step 4). Report results explicitly — don't just say "tests pass", show the output summary.
 
 **Browser verification is local-only.** Driving the running app via the Chrome DevTools MCP (`.docs/VERIFICATION.md` §3) needs `.claude/.env` and `.claude/sv-profile/` — both gitignored and hand-provisioned per machine. Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in; run only the headless checklist (build, backend tests, frontend tests) and hand UI-behavior checks back to a local session.
 
@@ -184,7 +185,10 @@ See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow
   - `/revise-claude-md` (also the Skill entry `claude-md-management:revise-claude-md` once the plugin is loaded). If it won't resolve — Skill says "Unknown skill" and typing it shows nothing — the plugin marketplace cache is stale: run `/reload-plugins` (and `/plugin` to refresh), then retry.
 - **Pre-commit tests:** `require-tests.sh` injects a non-blocking reminder on `git commit` to verify test coverage for new/modified frontend `src/` files. Config, styles, docs, and test files are exempt.
 - **Pre-commit prettier:** `prettier-precommit.sh` injects a non-blocking reminder on `git commit` to run `pnpm exec prettier --write` on staged frontend files.
+- **Pre-commit gofmt (fallback):** `gofmt-precommit.sh` only fires when `core.hooksPath` isn't set to `.hooks` in the current checkout — see below for the real fix — and then reminds to run `make install-hooks` rather than to gofmt by hand.
 - **Matching is anchored on command position** (start of string or after a shell separator), not a raw substring search — a trigger phrase (e.g. `gh pr create`) appearing inside a quoted commit message or PR body elsewhere on the line does not fire the hook.
+
+**Shared git pre-commit hook (`.hooks/pre-commit`, real `core.hooksPath` hook — not a Claude Code hook):** Auto-formats staged `backend/*.go` (gofmt) and `frontend/src/*.{svelte,ts,js}` (prettier) files and re-stages them on every `git commit`, regardless of what tool/human is committing. Not active by default — activate once per checkout with `make install-hooks` (from `backend/`, sets `core.hooksPath` to `.hooks`). This is what actually prevents the CI `Build` job's `gofmt -l .` check from failing (as it did on PR #366); the `.claude/hooks/gofmt-precommit.sh` PreToolUse reminder above is only a fallback for a checkout where this hasn't been activated yet.
 
 **Cowork session cleanup:** Claude cowork (claude.ai web) sessions leave `_tmp_*` files and conversation transcript `.txt` files in the repo root and `frontend/`. Delete these before committing.
 

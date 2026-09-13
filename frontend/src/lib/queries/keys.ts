@@ -10,6 +10,7 @@ export const queryKeys = {
 		list: (filters: {
 			sortBy?: string;
 			sortOrder?: string;
+			sorts?: { field: string; order: string }[];
 			search?: string;
 			first?: number;
 			after?: string | null;
