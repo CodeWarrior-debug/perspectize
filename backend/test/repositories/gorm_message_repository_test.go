@@ -163,7 +163,14 @@ func TestGormMessageRepository_SoftDelete_NotFound(t *testing.T) {
 	assert.True(t, errors.Is(err, domain.ErrNotFound), "want ErrNotFound, got %v", err)
 }
 
-func TestGormMessageRepository_RetentionPrunesBeyond1000(t *testing.T) {
+// TestGormMessageRepository_RetentionUnboundedByDefault exercises the insert
+// trigger past the old 1000-message-per-thread cap. Migration 000021 dropped
+// that in-trigger prune in favor of the application-side RetentionSweeper
+// (MESSAGE_RETENTION_MAX, disabled by default — see
+// TestRetentionSweeper_KeepsNewestN in test/services), so with no sweeper
+// running, history is unbounded: nothing beyond the trigger's own seq
+// assignment and pg_notify runs, and all inserted rows must survive.
+func TestGormMessageRepository_RetentionUnboundedByDefault(t *testing.T) {
 	repo, threadID, a, _ := messageTestSetup(t)
 	ctx := context.Background()
 
@@ -178,8 +185,8 @@ func TestGormMessageRepository_RetentionPrunesBeyond1000(t *testing.T) {
 
 	all, err := repo.ListSince(ctx, threadID, 0)
 	require.NoError(t, err)
-	assert.Len(t, all, 1000, "retention trigger should keep only the most recent 1000")
+	assert.Len(t, all, 1050, "retention is unbounded without a running RetentionSweeper")
 	require.NotEmpty(t, all)
-	assert.Equal(t, int64(51), all[0].Seq, "oldest surviving message should be seq 51")
+	assert.Equal(t, int64(1), all[0].Seq, "oldest message should survive")
 	assert.Equal(t, int64(1050), all[len(all)-1].Seq)
 }
