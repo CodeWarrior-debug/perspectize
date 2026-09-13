@@ -5,17 +5,11 @@ export function initials(username: string): string {
 	return chars ? chars.toUpperCase() : '?';
 }
 
-export function otherParticipants(
-	thread: Pick<MessageThread, 'participants'>,
-	myUserId: string,
-): MessagingUser[] {
+export function otherParticipants(thread: Pick<MessageThread, 'participants'>, myUserId: string): MessagingUser[] {
 	return thread.participants.filter((p) => p.user.id !== myUserId).map((p) => p.user);
 }
 
-export function threadTitle(
-	thread: Pick<MessageThread, 'title' | 'participants'>,
-	myUserId: string,
-): string {
+export function threadTitle(thread: Pick<MessageThread, 'title' | 'participants'>, myUserId: string): string {
 	if (thread.title && thread.title.trim()) return thread.title;
 	const others = otherParticipants(thread, myUserId);
 	if (others.length) return others.map((u) => u.username).join(', ');

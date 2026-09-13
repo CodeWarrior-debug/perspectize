@@ -37,10 +37,10 @@ describe('useMarkThreadRead', () => {
 	it('onSuccess writes the thread detail and invalidates the list without refetching', () => {
 		useMarkThreadRead();
 		mocks.captured.onSuccess({ markThreadRead: { id: 't1', unreadCount: 0 } }, { threadId: 't1', seq: 12 });
-		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(
-			queryKeys.messaging.threads.detail('t1'),
-			{ id: 't1', unreadCount: 0 },
-		);
+		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(queryKeys.messaging.threads.detail('t1'), {
+			id: 't1',
+			unreadCount: 0,
+		});
 		expect(mocks.mockInvalidate).toHaveBeenCalledWith({
 			queryKey: queryKeys.messaging.threads.lists(),
 			refetchType: 'none',

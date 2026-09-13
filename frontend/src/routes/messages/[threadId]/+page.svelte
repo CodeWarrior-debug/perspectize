@@ -7,12 +7,7 @@
 	const editMutation = useEditMessage();
 	const deleteMutation = useDeleteMessage();
 
-	function handleEdit(
-		messageId: string,
-		threadId: string,
-		newBody: string,
-		previousBody: string,
-	) {
+	function handleEdit(messageId: string, threadId: string, newBody: string, previousBody: string) {
 		editMutation.mutate({ messageId, threadId, body: newBody, previousBody });
 	}
 
@@ -22,9 +17,5 @@
 </script>
 
 {#key page.params.threadId}
-	<ThreadView
-		threadId={page.params.threadId ?? ''}
-		onEditMessage={handleEdit}
-		onDeleteMessage={handleDelete}
-	/>
+	<ThreadView threadId={page.params.threadId ?? ''} onEditMessage={handleEdit} onDeleteMessage={handleDelete} />
 {/key}

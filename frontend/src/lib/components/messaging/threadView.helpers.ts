@@ -15,10 +15,7 @@ export function lastKnownSeq(items: Message[]): number {
 	return max;
 }
 
-export function typingUsernames(
-	thread: MessageThread | null,
-	typingUserIds: string[],
-): string[] {
+export function typingUsernames(thread: MessageThread | null, typingUserIds: string[]): string[] {
 	if (!thread) return [];
 	return typingUserIds
 		.map((id) => thread.participants.find((p) => p.user.id === id)?.user.username)

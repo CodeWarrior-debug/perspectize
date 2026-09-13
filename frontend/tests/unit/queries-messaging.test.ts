@@ -75,12 +75,25 @@ describe('messaging GraphQL documents', () => {
 
 	it('exported types are structurally usable', () => {
 		const t: MessageThread = {
-			id: '1', title: null, participants: [], lastMessageAt: 'x',
-			latestSeq: 0, myLastReadSeq: 0, unreadCount: 0, muted: false, createdAt: 'x',
+			id: '1',
+			title: null,
+			participants: [],
+			lastMessageAt: 'x',
+			latestSeq: 0,
+			myLastReadSeq: 0,
+			unreadCount: 0,
+			muted: false,
+			createdAt: 'x',
 		};
 		const m: Message = {
-			id: '1', threadId: '1', sender: { id: '2', username: 'a' },
-			seq: 1, body: 'hi', editedAt: null, deletedAt: null, createdAt: 'x',
+			id: '1',
+			threadId: '1',
+			sender: { id: '2', username: 'a' },
+			seq: 1,
+			body: 'hi',
+			editedAt: null,
+			deletedAt: null,
+			createdAt: 'x',
 		};
 		const c: MessageConnection = {
 			items: [m],

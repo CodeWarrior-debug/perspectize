@@ -88,18 +88,10 @@
 					aria-label="Edit message"
 				></textarea>
 				<div class="flex gap-1">
-					<button
-						onclick={confirmEdit}
-						aria-label="Confirm edit"
-						class="text-primary hover:opacity-80"
-					>
+					<button onclick={confirmEdit} aria-label="Confirm edit" class="text-primary hover:opacity-80">
 						<CheckIcon size={14} />
 					</button>
-					<button
-						onclick={cancelEdit}
-						aria-label="Cancel edit"
-						class="text-muted-foreground hover:opacity-80"
-					>
+					<button onclick={cancelEdit} aria-label="Cancel edit" class="text-muted-foreground hover:opacity-80">
 						<XIcon size={14} />
 					</button>
 				</div>
@@ -119,18 +111,10 @@
 		<div
 			class="absolute -top-6 right-0 hidden items-center gap-1 rounded border border-border bg-background px-1 py-0.5 shadow-sm group-hover:flex"
 		>
-			<button
-				onclick={startEdit}
-				aria-label="Edit message"
-				class="text-muted-foreground hover:text-foreground"
-			>
+			<button onclick={startEdit} aria-label="Edit message" class="text-muted-foreground hover:text-foreground">
 				<PencilIcon size={14} />
 			</button>
-			<button
-				onclick={handleDelete}
-				aria-label="Delete message"
-				class="text-muted-foreground hover:text-destructive"
-			>
+			<button onclick={handleDelete} aria-label="Delete message" class="text-muted-foreground hover:text-destructive">
 				<Trash2Icon size={14} />
 			</button>
 		</div>

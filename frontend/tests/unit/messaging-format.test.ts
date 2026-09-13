@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-	initials,
-	threadTitle,
-	otherParticipants,
-	messageClockTime,
-	typingLabel,
-} from '$lib/messaging/format';
+import { initials, threadTitle, otherParticipants, messageClockTime, typingLabel } from '$lib/messaging/format';
 
 const part = (id: string, username: string) => ({
 	user: { id, username },
@@ -25,19 +19,14 @@ describe('messaging/format', () => {
 	it('threadTitle prefers an explicit title, then other usernames, then "Just you"', () => {
 		expect(threadTitle({ title: 'Standup', participants: [] }, 'u1')).toBe('Standup');
 		expect(
-			threadTitle(
-				{ title: null, participants: [part('u1', 'me'), part('u2', 'alice'), part('u3', 'bob')] },
-				'u1',
-			),
+			threadTitle({ title: null, participants: [part('u1', 'me'), part('u2', 'alice'), part('u3', 'bob')] }, 'u1'),
 		).toBe('alice, bob');
 		expect(threadTitle({ title: null, participants: [part('u1', 'me')] }, 'u1')).toBe('Just you');
 	});
 
 	it('otherParticipants excludes me', () => {
 		expect(
-			otherParticipants({ participants: [part('u1', 'me'), part('u2', 'alice')] }, 'u1').map(
-				(u) => u.username,
-			),
+			otherParticipants({ participants: [part('u1', 'me'), part('u2', 'alice')] }, 'u1').map((u) => u.username),
 		).toEqual(['alice']);
 	});
 

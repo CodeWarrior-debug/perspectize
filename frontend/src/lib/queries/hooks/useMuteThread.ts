@@ -14,10 +14,7 @@ export function useMuteThread() {
 				muted: args.muted,
 			}),
 		onSuccess: (data) => {
-			queryClient.setQueryData(
-				queryKeys.messaging.threads.detail(data.muteThread.id),
-				data.muteThread,
-			);
+			queryClient.setQueryData(queryKeys.messaging.threads.detail(data.muteThread.id), data.muteThread);
 			queryClient.invalidateQueries({
 				queryKey: queryKeys.messaging.threads.lists(),
 				refetchType: 'none',

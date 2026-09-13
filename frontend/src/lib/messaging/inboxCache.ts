@@ -1,9 +1,6 @@
 import type { MessageThread, InboxEvent } from '$lib/queries/messaging';
 
-export function applyInboxEvent(
-	threads: MessageThread[],
-	event: InboxEvent,
-): MessageThread[] {
+export function applyInboxEvent(threads: MessageThread[], event: InboxEvent): MessageThread[] {
 	const idx = threads.findIndex((t) => t.id === event.threadId);
 	if (idx === -1) return threads;
 	const current = threads[idx];

@@ -30,10 +30,7 @@ export function optimisticMessage(args: {
 	};
 }
 
-export function addOptimistic(
-	cache: ThreadMessagesCache,
-	optimistic: Message,
-): ThreadMessagesCache {
+export function addOptimistic(cache: ThreadMessagesCache, optimistic: Message): ThreadMessagesCache {
 	if (cache.items.some((m) => m.id === optimistic.id)) return cache;
 	const items = [...cache.items, optimistic].sort((a, b) => a.seq - b.seq);
 	return { ...cache, items };

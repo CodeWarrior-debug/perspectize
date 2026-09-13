@@ -155,9 +155,7 @@ describe('threadCache — thread summary reducer', () => {
 
 	it('unrelated events return the same reference', () => {
 		const t = thread();
-		expect(
-			applyThreadEventToThread(t, { __typename: 'StreamReset', threadId: 't1' }, 'u1'),
-		).toBe(t);
+		expect(applyThreadEventToThread(t, { __typename: 'StreamReset', threadId: 't1' }, 'u1')).toBe(t);
 	});
 });
 

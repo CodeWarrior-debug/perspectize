@@ -2,11 +2,7 @@ import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 import { graphqlRequest } from '../client';
 import { LIST_THREAD_MESSAGES, type ListThreadMessagesResponse } from '../messaging';
 import { queryKeys } from '../keys';
-import {
-	seedFromApiPage,
-	prependOlderPage,
-	type ThreadMessagesCache,
-} from '$lib/messaging/threadCache';
+import { seedFromApiPage, prependOlderPage, type ThreadMessagesCache } from '$lib/messaging/threadCache';
 
 const PAGE_SIZE = 40;
 
@@ -38,10 +34,8 @@ export function useThreadMessages(getThreadId: () => string) {
 				first: PAGE_SIZE,
 				before: current.oldestLoadedSeq,
 			});
-			queryClient.setQueryData<ThreadMessagesCache>(
-				queryKeys.messaging.messages.list(getThreadId()),
-				(old) =>
-					old ? prependOlderPage(old, res.threadMessages.items, res.threadMessages.pageInfo) : old,
+			queryClient.setQueryData<ThreadMessagesCache>(queryKeys.messaging.messages.list(getThreadId()), (old) =>
+				old ? prependOlderPage(old, res.threadMessages.items, res.threadMessages.pageInfo) : old,
 			);
 		} finally {
 			isFetchingOlder = false;

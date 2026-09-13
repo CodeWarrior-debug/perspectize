@@ -48,8 +48,11 @@ describe('optimistic send', () => {
 	it('addOptimistic appends to the end of the ascending list', () => {
 		let c = seedFromApiPage([real(7), real(6)], pageInfo);
 		const opt = optimisticMessage({
-			body: 'x', sender: { id: 'u1', username: 'me' }, threadId: 't1',
-			clientNonce: 'n1', afterSeq: 7,
+			body: 'x',
+			sender: { id: 'u1', username: 'me' },
+			threadId: 't1',
+			clientNonce: 'n1',
+			afterSeq: 7,
 		});
 		c = addOptimistic(c, opt);
 		expect(c.items[c.items.length - 1].id).toBe('optimistic:n1');
@@ -58,8 +61,11 @@ describe('optimistic send', () => {
 	it('reconcileSentMessage swaps the optimistic row for the server row', () => {
 		let c = seedFromApiPage([real(7)], pageInfo);
 		const opt = optimisticMessage({
-			body: 'x', sender: { id: 'u1', username: 'me' }, threadId: 't1',
-			clientNonce: 'n1', afterSeq: 7,
+			body: 'x',
+			sender: { id: 'u1', username: 'me' },
+			threadId: 't1',
+			clientNonce: 'n1',
+			afterSeq: 7,
 		});
 		c = addOptimistic(c, opt);
 		c = reconcileSentMessage(c, 'n1', real(8, { body: 'x' }));

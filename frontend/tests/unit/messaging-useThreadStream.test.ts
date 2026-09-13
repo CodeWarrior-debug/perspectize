@@ -31,7 +31,11 @@ function fakeQC(caches: Record<string, any>) {
 }
 
 const msg = (seq: number, senderId = 'u2') => ({
-	id: `m${seq}`, threadId: 't1', seq, body: `b${seq}`, createdAt: 'x',
+	id: `m${seq}`,
+	threadId: 't1',
+	seq,
+	body: `b${seq}`,
+	createdAt: 'x',
 	sender: { id: senderId, username: senderId },
 });
 
@@ -50,10 +54,17 @@ describe('createThreadStream', () => {
 	it('start() subscribes with sinceSeq from the messages cache', () => {
 		const caches: Record<string, any> = {
 			[JSON.stringify(queryKeys.messaging.messages.list('t1'))]: {
-				items: [msg(4), msg(7)], oldestLoadedSeq: 4, hasMoreOlder: false,
+				items: [msg(4), msg(7)],
+				oldestLoadedSeq: 4,
+				hasMoreOlder: false,
 			},
 		};
-		const s = createThreadStream({ queryClient: fakeQC(caches) as any, getThreadId: () => 't1', myUserId: 'u1', now: clockFn });
+		const s = createThreadStream({
+			queryClient: fakeQC(caches) as any,
+			getThreadId: () => 't1',
+			myUserId: 'u1',
+			now: clockFn,
+		});
 		s.start();
 		s.start();
 		expect(mocks.subscribeGraphql).toHaveBeenCalledTimes(1);
@@ -70,8 +81,14 @@ describe('createThreadStream', () => {
 		const caches: Record<string, any> = {
 			[mKey]: { items: [msg(7)], oldestLoadedSeq: 7, hasMoreOlder: false },
 			[tKey]: {
-				id: 't1', title: null, participants: [], lastMessageAt: 'x',
-				latestSeq: 7, myLastReadSeq: 7, unreadCount: 0, createdAt: 'x',
+				id: 't1',
+				title: null,
+				participants: [],
+				lastMessageAt: 'x',
+				latestSeq: 7,
+				myLastReadSeq: 7,
+				unreadCount: 0,
+				createdAt: 'x',
 			},
 		};
 		const qc = fakeQC(caches);
@@ -85,7 +102,12 @@ describe('createThreadStream', () => {
 	});
 
 	it('TypingChanged drives typingUserIds and excludes myUserId; prune clears it after TTL', () => {
-		const s = createThreadStream({ queryClient: fakeQC({}) as any, getThreadId: () => 't1', myUserId: 'u1', now: clockFn });
+		const s = createThreadStream({
+			queryClient: fakeQC({}) as any,
+			getThreadId: () => 't1',
+			myUserId: 'u1',
+			now: clockFn,
+		});
 		s.start();
 		mocks.handlers.next({ threadEvents: { __typename: 'TypingChanged', threadId: 't1', userId: 'u2', typing: true } });
 		mocks.handlers.next({ threadEvents: { __typename: 'TypingChanged', threadId: 't1', userId: 'u1', typing: true } });
@@ -97,16 +119,27 @@ describe('createThreadStream', () => {
 	});
 
 	it('PresenceChanged is exposed on presence', () => {
-		const s = createThreadStream({ queryClient: fakeQC({}) as any, getThreadId: () => 't1', myUserId: 'u1', now: clockFn });
+		const s = createThreadStream({
+			queryClient: fakeQC({}) as any,
+			getThreadId: () => 't1',
+			myUserId: 'u1',
+			now: clockFn,
+		});
 		s.start();
-		mocks.handlers.next({ threadEvents: { __typename: 'PresenceChanged', threadId: 't1', userId: 'u2', state: 'ONLINE' } });
+		mocks.handlers.next({
+			threadEvents: { __typename: 'PresenceChanged', threadId: 't1', userId: 'u2', state: 'ONLINE' },
+		});
 		expect(s.presence.u2).toBe('ONLINE');
 		s.stop();
 	});
 
 	it('StreamReset invalidates the message list and resubscribes', () => {
 		const qc = fakeQC({
-			[JSON.stringify(queryKeys.messaging.messages.list('t1'))]: { items: [msg(7)], oldestLoadedSeq: 7, hasMoreOlder: false },
+			[JSON.stringify(queryKeys.messaging.messages.list('t1'))]: {
+				items: [msg(7)],
+				oldestLoadedSeq: 7,
+				hasMoreOlder: false,
+			},
 		});
 		const s = createThreadStream({ queryClient: qc as any, getThreadId: () => 't1', myUserId: 'u1', now: clockFn });
 		s.start();
@@ -118,7 +151,12 @@ describe('createThreadStream', () => {
 	});
 
 	it('stop() disposes and clears the prune interval', () => {
-		const s = createThreadStream({ queryClient: fakeQC({}) as any, getThreadId: () => 't1', myUserId: 'u1', now: clockFn });
+		const s = createThreadStream({
+			queryClient: fakeQC({}) as any,
+			getThreadId: () => 't1',
+			myUserId: 'u1',
+			now: clockFn,
+		});
 		s.start();
 		s.stop();
 		expect(mocks.dispose).toHaveBeenCalledTimes(1);
@@ -135,10 +173,18 @@ describe('createThreadStream', () => {
 				hasMoreOlder: false,
 			},
 		};
-		const s = createThreadStream({ queryClient: fakeQC(caches) as any, getThreadId: () => 't1', myUserId: 'u1', now: clockFn });
+		const s = createThreadStream({
+			queryClient: fakeQC(caches) as any,
+			getThreadId: () => 't1',
+			myUserId: 'u1',
+			now: clockFn,
+		});
 		s.start();
 		mocks.handlers.next({
-			threadEvents: { __typename: 'MessageEdited', message: { ...msg(7), body: 'fixed', editedAt: '2026-09-07T15:00:00Z', deletedAt: null } },
+			threadEvents: {
+				__typename: 'MessageEdited',
+				message: { ...msg(7), body: 'fixed', editedAt: '2026-09-07T15:00:00Z', deletedAt: null },
+			},
 		});
 		expect(caches[mKey].items[0].body).toBe('fixed');
 		mocks.handlers.next({ threadEvents: { __typename: 'MessageDeleted', threadId: 't1', messageId: 'm7', seq: 7 } });

@@ -14,9 +14,15 @@ vi.mock('svelte-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } })
 import ThreadList from '$lib/components/messaging/ThreadList.svelte';
 
 const thread = (id: string) => ({
-	id, title: `T ${id}`, participants: [],
+	id,
+	title: `T ${id}`,
+	participants: [],
 	lastMessageAt: '2026-09-07T12:00:00Z',
-	latestSeq: 1, myLastReadSeq: 1, unreadCount: 0, muted: false, createdAt: 'x',
+	latestSeq: 1,
+	myLastReadSeq: 1,
+	unreadCount: 0,
+	muted: false,
+	createdAt: 'x',
 });
 
 describe('ThreadList', () => {
@@ -32,7 +38,10 @@ describe('ThreadList', () => {
 		render(ThreadList, {
 			props: {
 				threads: [thread('a'), thread('b')],
-				myUserId: 'u1', activeThreadId: 'b', loading: false, onNewThread,
+				myUserId: 'u1',
+				activeThreadId: 'b',
+				loading: false,
+				onNewThread,
 			},
 		});
 		expect(screen.getAllByTestId('thread-item')).toHaveLength(2);

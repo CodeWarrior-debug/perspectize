@@ -31,10 +31,7 @@ describe('useEditMessage', () => {
 	it('onMutate optimistically updates the message body', () => {
 		useEditMessage();
 		mocks.captured.onMutate({ messageId: 'm7', threadId: 't1', body: 'new body', previousBody: 'old' });
-		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(
-			queryKeys.messaging.messages.list('t1'),
-			expect.any(Function),
-		);
+		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(queryKeys.messaging.messages.list('t1'), expect.any(Function));
 		const updater = mocks.mockSetQueryData.mock.calls[0][1];
 		const next = updater(existingCache);
 		expect(next.items[0].body).toBe('new body');
@@ -43,7 +40,9 @@ describe('useEditMessage', () => {
 
 	it('mutationFn sends EDIT_MESSAGE with trimmed body', async () => {
 		useEditMessage();
-		mocks.mockGraphql.mockResolvedValue({ editMessage: { ...existingMsg, body: 'new body', editedAt: '2026-09-07T14:00:00Z' } });
+		mocks.mockGraphql.mockResolvedValue({
+			editMessage: { ...existingMsg, body: 'new body', editedAt: '2026-09-07T14:00:00Z' },
+		});
 		await mocks.captured.mutationFn({ messageId: 'm7', threadId: 't1', body: '  new body  ', previousBody: 'old' });
 		expect(mocks.mockGraphql).toHaveBeenCalledWith(EDIT_MESSAGE, { messageId: 'm7', body: 'new body' });
 	});

@@ -17,10 +17,7 @@ function sortAsc(items: Message[]): Message[] {
 	return [...items].sort((a, b) => a.seq - b.seq);
 }
 
-export function seedFromApiPage(
-	apiItems: Message[],
-	pageInfo: MessagePageInfo,
-): ThreadMessagesCache {
+export function seedFromApiPage(apiItems: Message[], pageInfo: MessagePageInfo): ThreadMessagesCache {
 	const items = sortAsc(apiItems);
 	return {
 		items,
@@ -29,10 +26,7 @@ export function seedFromApiPage(
 	};
 }
 
-export function applyMessagePosted(
-	cache: ThreadMessagesCache,
-	message: Message,
-): ThreadMessagesCache {
+export function applyMessagePosted(cache: ThreadMessagesCache, message: Message): ThreadMessagesCache {
 	if (message.seq <= 0) return cache;
 	const bySeq = cache.items.findIndex((m) => m.seq === message.seq);
 	if (bySeq !== -1) {
@@ -68,10 +62,7 @@ export function nextSinceSeq(cache: ThreadMessagesCache): number | null {
 }
 
 /** Replace a message in the list by id with updated body + editedAt. Returns the same ref when nothing changed. */
-export function applyMessageEdited(
-	cache: ThreadMessagesCache,
-	message: Message,
-): ThreadMessagesCache {
+export function applyMessageEdited(cache: ThreadMessagesCache, message: Message): ThreadMessagesCache {
 	const idx = cache.items.findIndex((m) => m.id === message.id);
 	if (idx === -1) return cache;
 	if (cache.items[idx].body === message.body && cache.items[idx].editedAt === message.editedAt) {
@@ -95,8 +86,7 @@ export function applyMessageDeleted(
 	deletedAt: string = new Date().toISOString(),
 ): ThreadMessagesCache {
 	const idx = cache.items.findIndex(
-		(m) =>
-			(ref.messageId != null && m.id === ref.messageId) || (ref.seq != null && m.seq === ref.seq),
+		(m) => (ref.messageId != null && m.id === ref.messageId) || (ref.seq != null && m.seq === ref.seq),
 	);
 	if (idx === -1) return cache;
 	if (cache.items[idx].deletedAt != null && cache.items[idx].body === '') return cache;
@@ -105,11 +95,7 @@ export function applyMessageDeleted(
 	return { ...cache, items };
 }
 
-export function applyThreadEventToThread(
-	thread: MessageThread,
-	event: ThreadEvent,
-	myUserId: string,
-): MessageThread {
+export function applyThreadEventToThread(thread: MessageThread, event: ThreadEvent, myUserId: string): MessageThread {
 	switch (event.__typename) {
 		case 'MessagePosted': {
 			const m = event.message;
@@ -132,9 +118,7 @@ export function applyThreadEventToThread(
 				participants[idx] = { ...participants[idx], lastReadSeq: event.lastReadSeq };
 			}
 			const isMe = event.userId === myUserId;
-			const myLastReadSeq = isMe
-				? Math.max(thread.myLastReadSeq, event.lastReadSeq)
-				: thread.myLastReadSeq;
+			const myLastReadSeq = isMe ? Math.max(thread.myLastReadSeq, event.lastReadSeq) : thread.myLastReadSeq;
 			if (participants === thread.participants && myLastReadSeq === thread.myLastReadSeq) {
 				return thread;
 			}
@@ -180,8 +164,7 @@ export function typingUsersReducer(
 		else delete next[event.userId];
 	}
 	const sameKeys =
-		Object.keys(next).length === Object.keys(state).length &&
-		Object.keys(next).every((k) => state[k] === next[k]);
+		Object.keys(next).length === Object.keys(state).length && Object.keys(next).every((k) => state[k] === next[k]);
 	return sameKeys ? state : next;
 }
 

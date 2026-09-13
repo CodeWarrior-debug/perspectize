@@ -13,10 +13,7 @@ export function useMarkThreadRead() {
 				seq: vars.seq,
 			}),
 		onSuccess: (data: MarkThreadReadResponse, vars: { threadId: string; seq: number }) => {
-			queryClient.setQueryData(
-				queryKeys.messaging.threads.detail(vars.threadId),
-				data.markThreadRead,
-			);
+			queryClient.setQueryData(queryKeys.messaging.threads.detail(vars.threadId), data.markThreadRead);
 			queryClient.invalidateQueries({
 				queryKey: queryKeys.messaging.threads.lists(),
 				refetchType: 'none',

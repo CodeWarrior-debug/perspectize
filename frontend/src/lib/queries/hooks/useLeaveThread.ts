@@ -8,8 +8,7 @@ import { queryKeys } from '../keys';
 export function useLeaveThread() {
 	const queryClient = useQueryClient();
 	return createMutation(() => ({
-		mutationFn: (vars: { threadId: string }) =>
-			graphqlRequest<LeaveThreadResponse>(LEAVE_THREAD, vars),
+		mutationFn: (vars: { threadId: string }) => graphqlRequest<LeaveThreadResponse>(LEAVE_THREAD, vars),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.messaging.threads.lists() });
 			goto('/messages');

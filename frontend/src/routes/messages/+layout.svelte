@@ -18,9 +18,7 @@
 </script>
 
 <div class="flex h-[calc(100vh-4rem)]">
-	<div
-		class="w-full border-r border-border md:block md:w-80 {mobileThreadOpen ? 'hidden' : ''}"
-	>
+	<div class="w-full border-r border-border md:block md:w-80 {mobileThreadOpen ? 'hidden' : ''}">
 		<ThreadList
 			threads={threadsQuery.data?.messageThreads ?? []}
 			{myUserId}

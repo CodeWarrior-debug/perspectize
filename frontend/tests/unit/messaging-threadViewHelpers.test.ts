@@ -21,9 +21,7 @@ const m = (seq: number, senderId: string, id = `m${seq}`): Message => ({
 const thread = (over: Partial<MessageThread> = {}): MessageThread => ({
 	id: 't1',
 	title: null,
-	participants: [
-		{ user: { id: 'u2', username: 'alice' }, role: 'MEMBER', lastReadSeq: 0, joinedAt: 'x' },
-	],
+	participants: [{ user: { id: 'u2', username: 'alice' }, role: 'MEMBER', lastReadSeq: 0, joinedAt: 'x' }],
 	lastMessageAt: 'x',
 	latestSeq: 5,
 	myLastReadSeq: 5,

@@ -12,15 +12,17 @@ describe('queryKeys.messaging', () => {
 	});
 
 	it('threads.detail(id) nests under the threads prefix', () => {
-		expect(queryKeys.messaging.threads.detail('42')).toEqual([
-			'app', 'messaging', 'threads', 'detail', '42',
-		]);
+		expect(queryKeys.messaging.threads.detail('42')).toEqual(['app', 'messaging', 'threads', 'detail', '42']);
 	});
 
 	it('messages.list(threadId) carries the threadId in an object', () => {
 		expect(queryKeys.messaging.messages.lists()).toEqual(['app', 'messaging', 'messages', 'list']);
 		expect(queryKeys.messaging.messages.list('42')).toEqual([
-			'app', 'messaging', 'messages', 'list', { threadId: '42' },
+			'app',
+			'messaging',
+			'messages',
+			'list',
+			{ threadId: '42' },
 		]);
 	});
 });

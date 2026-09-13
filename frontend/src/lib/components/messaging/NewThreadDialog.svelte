@@ -14,11 +14,8 @@
 		Input,
 	} from '$lib/components/shadcn';
 
-	let {
-		open,
-		onOpenChange,
-		myUserId,
-	}: { open: boolean; onOpenChange: (open: boolean) => void; myUserId: string } = $props();
+	let { open, onOpenChange, myUserId }: { open: boolean; onOpenChange: (open: boolean) => void; myUserId: string } =
+		$props();
 
 	let filter = $state('');
 	let selected = $state(new Set<string>());
@@ -84,11 +81,7 @@
 		</div>
 
 		<DialogFooter>
-			<Button
-				data-testid="start-thread"
-				disabled={!selected.size || createThread.isPending}
-				onclick={start}
-			>
+			<Button data-testid="start-thread" disabled={!selected.size || createThread.isPending} onclick={start}>
 				Start
 			</Button>
 		</DialogFooter>

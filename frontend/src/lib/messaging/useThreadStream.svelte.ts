@@ -68,9 +68,7 @@ export function createThreadStream(opts: {
 				break;
 			case 'MessageDeleted':
 				opts.queryClient.setQueryData<ThreadMessagesCache>(messagesKey(), (c) =>
-					c
-						? applyMessageDeleted(c, { messageId: event.messageId, seq: event.seq })
-						: c,
+					c ? applyMessageDeleted(c, { messageId: event.messageId, seq: event.seq }) : c,
 				);
 				break;
 			case 'StreamReset':

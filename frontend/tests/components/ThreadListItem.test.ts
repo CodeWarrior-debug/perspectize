@@ -14,13 +14,18 @@ vi.mock('svelte-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } })
 import ThreadListItem from '$lib/components/messaging/ThreadListItem.svelte';
 
 const thread = (over = {}) => ({
-	id: 't1', title: null,
+	id: 't1',
+	title: null,
 	participants: [
 		{ user: { id: 'u1', username: 'me' }, role: 'OWNER' as const, lastReadSeq: 0, joinedAt: 'x' },
 		{ user: { id: 'u2', username: 'alice' }, role: 'MEMBER' as const, lastReadSeq: 0, joinedAt: 'x' },
 	],
 	lastMessageAt: '2026-09-07T12:00:00Z',
-	latestSeq: 3, myLastReadSeq: 3, unreadCount: 0, muted: false, createdAt: 'x',
+	latestSeq: 3,
+	myLastReadSeq: 3,
+	unreadCount: 0,
+	muted: false,
+	createdAt: 'x',
 	...over,
 });
 

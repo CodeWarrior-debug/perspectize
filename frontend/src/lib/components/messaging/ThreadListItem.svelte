@@ -7,11 +7,7 @@
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
 	import { useMuteThread } from '$lib/queries/hooks/useMuteThread';
 
-	let {
-		thread,
-		myUserId,
-		active,
-	}: { thread: MessageThread; myUserId: string; active: boolean } = $props();
+	let { thread, myUserId, active }: { thread: MessageThread; myUserId: string; active: boolean } = $props();
 
 	const title = $derived(threadTitle(thread, myUserId));
 	const muteMutation = useMuteThread();

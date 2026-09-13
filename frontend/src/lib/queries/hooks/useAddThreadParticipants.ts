@@ -9,14 +9,8 @@ export function useAddThreadParticipants() {
 	return createMutation(() => ({
 		mutationFn: (vars: { threadId: string; userIds: string[] }) =>
 			graphqlRequest<AddThreadParticipantsResponse>(ADD_THREAD_PARTICIPANTS, vars),
-		onSuccess: (
-			data: AddThreadParticipantsResponse,
-			vars: { threadId: string; userIds: string[] },
-		) => {
-			queryClient.setQueryData(
-				queryKeys.messaging.threads.detail(vars.threadId),
-				data.addThreadParticipants,
-			);
+		onSuccess: (data: AddThreadParticipantsResponse, vars: { threadId: string; userIds: string[] }) => {
+			queryClient.setQueryData(queryKeys.messaging.threads.detail(vars.threadId), data.addThreadParticipants);
 			queryClient.invalidateQueries({ queryKey: queryKeys.messaging.threads.lists() });
 			toast.success('Added to conversation');
 		},

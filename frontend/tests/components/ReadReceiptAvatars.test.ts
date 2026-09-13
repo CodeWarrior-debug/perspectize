@@ -3,7 +3,10 @@ import { render, screen } from '@testing-library/svelte';
 import ReadReceiptAvatars from '$lib/components/messaging/ReadReceiptAvatars.svelte';
 
 const p = (id: string, username: string, lastReadSeq: number) => ({
-	user: { id, username }, role: 'MEMBER' as const, lastReadSeq, joinedAt: 'x',
+	user: { id, username },
+	role: 'MEMBER' as const,
+	lastReadSeq,
+	joinedAt: 'x',
 });
 
 describe('ReadReceiptAvatars', () => {

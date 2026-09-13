@@ -44,7 +44,16 @@ describe('useDeleteMessage', () => {
 	it('mutationFn calls DELETE_MESSAGE', async () => {
 		useDeleteMessage();
 		mocks.mockGraphql.mockResolvedValue({
-			deleteMessage: { id: 'm7', threadId: 't1', seq: 7, body: '', editedAt: null, deletedAt: '2026-09-07T15:00:00Z', createdAt: 'x', sender: { id: 'u1', username: 'me' } },
+			deleteMessage: {
+				id: 'm7',
+				threadId: 't1',
+				seq: 7,
+				body: '',
+				editedAt: null,
+				deletedAt: '2026-09-07T15:00:00Z',
+				createdAt: 'x',
+				sender: { id: 'u1', username: 'me' },
+			},
 		});
 		await mocks.captured.mutationFn({ messageId: 'm7', threadId: 't1' });
 		expect(mocks.mockGraphql).toHaveBeenCalledWith(DELETE_MESSAGE, { messageId: 'm7' });

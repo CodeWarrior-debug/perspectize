@@ -36,7 +36,22 @@ vi.mock('$lib/components/AddVideoPopover.svelte', () => ({
 
 // Mock useMessageThreads hook
 vi.mock('$lib/queries/hooks/useMessageThreads', () => ({
-	useMessageThreads: () => ({ data: { messageThreads: [{ id: 't1', unreadCount: 3, title: null, participants: [], lastMessageAt: 'x', latestSeq: 3, myLastReadSeq: 0, createdAt: 'x' }] } }),
+	useMessageThreads: () => ({
+		data: {
+			messageThreads: [
+				{
+					id: 't1',
+					unreadCount: 3,
+					title: null,
+					participants: [],
+					lastMessageAt: 'x',
+					latestSeq: 3,
+					myLastReadSeq: 0,
+					createdAt: 'x',
+				},
+			],
+		},
+	}),
 }));
 
 // Mock totalUnread function

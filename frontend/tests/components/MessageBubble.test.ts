@@ -3,9 +3,14 @@ import { render, screen, fireEvent } from '@testing-library/svelte';
 import MessageBubble from '$lib/components/messaging/MessageBubble.svelte';
 
 const base = {
-	id: 'm1', threadId: 't1', seq: 5, body: 'hello world',
-	createdAt: '2026-09-07T13:05:00Z', sender: { id: 'u2', username: 'alice' },
-	editedAt: null, deletedAt: null,
+	id: 'm1',
+	threadId: 't1',
+	seq: 5,
+	body: 'hello world',
+	createdAt: '2026-09-07T13:05:00Z',
+	sender: { id: 'u2', username: 'alice' },
+	editedAt: null,
+	deletedAt: null,
 };
 
 const me = { id: 'u1', username: 'me' };
@@ -153,7 +158,7 @@ describe('MessageBubble', () => {
 		expect(screen.queryByText('(edited)')).not.toBeInTheDocument();
 	});
 
-	it('renders a tombstone for another user\'s deleted message with no actions', () => {
+	it("renders a tombstone for another user's deleted message with no actions", () => {
 		render(MessageBubble, {
 			props: {
 				message: { ...base, body: '', deletedAt: '2026-09-07T15:00:00Z' },

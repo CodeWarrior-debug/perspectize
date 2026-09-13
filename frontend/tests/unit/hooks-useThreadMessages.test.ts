@@ -49,9 +49,7 @@ describe('useThreadMessages', () => {
 	it('fetchOlder folds an older page via prependOlderPage into the same key', async () => {
 		const olderPage = {
 			threadMessages: {
-				items: [
-					{ id: 'm7', threadId: 't1', sender: { id: 'u2', username: 'b' }, seq: 7, body: 'g', createdAt: 'x' },
-				],
+				items: [{ id: 'm7', threadId: 't1', sender: { id: 'u2', username: 'b' }, seq: 7, body: 'g', createdAt: 'x' }],
 				pageInfo: { hasNextPage: false, hasPreviousPage: false, startCursor: '7', endCursor: '7' },
 			},
 		};
@@ -62,12 +60,11 @@ describe('useThreadMessages', () => {
 		mocks.mockGraphql.mockResolvedValue(olderPage);
 		await api.fetchOlder();
 		expect(mocks.mockGraphql).toHaveBeenCalledWith(LIST_THREAD_MESSAGES, {
-			threadId: 't1', first: 40, before: 8,
+			threadId: 't1',
+			first: 40,
+			before: 8,
 		});
-		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(
-			queryKeys.messaging.messages.list('t1'),
-			expect.any(Function),
-		);
+		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(queryKeys.messaging.messages.list('t1'), expect.any(Function));
 		const updater = mocks.mockSetQueryData.mock.calls[0][1];
 		const next = updater({ items: [{ seq: 8 }, { seq: 9 }], oldestLoadedSeq: 8, hasMoreOlder: true });
 		expect(next.items.map((m: any) => m.seq)).toEqual([7, 8, 9]);

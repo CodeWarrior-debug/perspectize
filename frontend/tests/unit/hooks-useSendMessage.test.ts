@@ -31,10 +31,7 @@ describe('useSendMessage', () => {
 		const args: any = { threadId: 't1', body: 'hi there', sender, afterSeq: 7 };
 		mocks.captured.onMutate(args);
 		expect(typeof args.__nonce).toBe('string');
-		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(
-			queryKeys.messaging.messages.list('t1'),
-			expect.any(Function),
-		);
+		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(queryKeys.messaging.messages.list('t1'), expect.any(Function));
 		const updater = mocks.mockSetQueryData.mock.calls[0][1];
 		const next = updater({ items: [{ id: 'm7', seq: 7 }], oldestLoadedSeq: 7, hasMoreOlder: false });
 		expect(next.items[next.items.length - 1].id).toBe('optimistic:' + args.__nonce);
@@ -44,7 +41,9 @@ describe('useSendMessage', () => {
 		useSendMessage();
 		const args: any = { threadId: 't1', body: '  hi  ', sender, afterSeq: 7 };
 		mocks.captured.onMutate(args);
-		mocks.mockGraphql.mockResolvedValue({ sendMessage: { id: 'm8', seq: 8, body: 'hi', threadId: 't1', sender, createdAt: 'x' } });
+		mocks.mockGraphql.mockResolvedValue({
+			sendMessage: { id: 'm8', seq: 8, body: 'hi', threadId: 't1', sender, createdAt: 'x' },
+		});
 		const result = await mocks.captured.mutationFn(args);
 		expect(mocks.mockGraphql).toHaveBeenCalledWith(SEND_MESSAGE, {
 			input: { threadId: 't1', body: 'hi', clientNonce: args.__nonce },
@@ -57,7 +56,12 @@ describe('useSendMessage', () => {
 		const args: any = { threadId: 't1', body: 'x', sender, afterSeq: 7, __nonce: 'n1' };
 		mocks.captured.onError(new Error('boom'), args);
 		const updater = mocks.mockSetQueryData.mock.calls[0][1];
-		const next = updater({ items: [{ id: 'optimistic:n1', seq: 7.5 }, { id: 'm7', seq: 7 }] });
+		const next = updater({
+			items: [
+				{ id: 'optimistic:n1', seq: 7.5 },
+				{ id: 'm7', seq: 7 },
+			],
+		});
 		expect(next.items.map((m: any) => m.id)).toEqual(['m7']);
 		expect(mocks.mockToastError).toHaveBeenCalled();
 	});

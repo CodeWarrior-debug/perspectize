@@ -3,12 +3,7 @@ import { toast } from 'svelte-sonner';
 import { graphqlRequest } from '../client';
 import { SEND_MESSAGE, type SendMessageResponse, type MessagingUser } from '../messaging';
 import { queryKeys } from '../keys';
-import {
-	makeClientNonce,
-	optimisticMessage,
-	addOptimistic,
-	reconcileSentMessage,
-} from '$lib/messaging/optimistic';
+import { makeClientNonce, optimisticMessage, addOptimistic, reconcileSentMessage } from '$lib/messaging/optimistic';
 import type { ThreadMessagesCache } from '$lib/messaging/threadCache';
 
 export interface SendArgs {
@@ -33,9 +28,8 @@ export function useSendMessage() {
 				clientNonce: args.__nonce,
 				afterSeq: args.afterSeq,
 			});
-			queryClient.setQueryData<ThreadMessagesCache>(
-				queryKeys.messaging.messages.list(args.threadId),
-				(cache) => (cache ? addOptimistic(cache, optimistic) : cache),
+			queryClient.setQueryData<ThreadMessagesCache>(queryKeys.messaging.messages.list(args.threadId), (cache) =>
+				cache ? addOptimistic(cache, optimistic) : cache,
 			);
 		},
 		mutationFn: async (args: SendArgs) => {
@@ -47,20 +41,14 @@ export function useSendMessage() {
 		},
 		onError: (_err: unknown, args: SendArgs) => {
 			const optId = 'optimistic:' + args.__nonce;
-			queryClient.setQueryData<ThreadMessagesCache>(
-				queryKeys.messaging.messages.list(args.threadId),
-				(cache) =>
-					cache ? { ...cache, items: cache.items.filter((m) => m.id !== optId) } : cache,
+			queryClient.setQueryData<ThreadMessagesCache>(queryKeys.messaging.messages.list(args.threadId), (cache) =>
+				cache ? { ...cache, items: cache.items.filter((m) => m.id !== optId) } : cache,
 			);
 			toast.error('Message failed to send');
 		},
 		onSuccess: (result: { response: SendMessageResponse; clientNonce: string; args: SendArgs }) => {
-			queryClient.setQueryData<ThreadMessagesCache>(
-				queryKeys.messaging.messages.list(result.args.threadId),
-				(cache) =>
-					cache
-						? reconcileSentMessage(cache, result.clientNonce, result.response.sendMessage)
-						: cache,
+			queryClient.setQueryData<ThreadMessagesCache>(queryKeys.messaging.messages.list(result.args.threadId), (cache) =>
+				cache ? reconcileSentMessage(cache, result.clientNonce, result.response.sendMessage) : cache,
 			);
 		},
 	}));

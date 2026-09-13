@@ -1,11 +1,7 @@
 <script lang="ts">
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { graphqlRequest } from '$lib/queries/client';
-	import {
-		GET_MESSAGE_THREAD,
-		type GetMessageThreadResponse,
-		type MessagingUser,
-	} from '$lib/queries/messaging';
+	import { GET_MESSAGE_THREAD, type GetMessageThreadResponse, type MessagingUser } from '$lib/queries/messaging';
 	import { queryKeys } from '$lib/queries/keys';
 	import { useMe } from '$lib/queries/hooks/useMe.svelte';
 	import { useThreadMessages } from '$lib/queries/hooks/useThreadMessages.svelte';
@@ -14,12 +10,7 @@
 	import { useMarkThreadRead } from '$lib/queries/hooks/useMarkThreadRead';
 	import { createThreadStream } from '$lib/messaging/useThreadStream.svelte';
 	import { otherParticipants } from '$lib/messaging/format';
-	import {
-		showSenderForIndex,
-		lastKnownSeq,
-		typingUsernames,
-		shouldMarkRead,
-	} from './threadView.helpers';
+	import { showSenderForIndex, lastKnownSeq, typingUsernames, shouldMarkRead } from './threadView.helpers';
 	import MessageBubble from './MessageBubble.svelte';
 	import MessageComposer from './MessageComposer.svelte';
 	import TypingIndicator from './TypingIndicator.svelte';
@@ -32,12 +23,7 @@
 		onDeleteMessage,
 	}: {
 		threadId: string;
-		onEditMessage: (
-			messageId: string,
-			threadId: string,
-			newBody: string,
-			previousBody: string,
-		) => void;
+		onEditMessage: (messageId: string, threadId: string, newBody: string, previousBody: string) => void;
 		onDeleteMessage: (messageId: string, threadId: string) => void;
 	} = $props();
 
@@ -101,8 +87,7 @@
 			return;
 		}
 		if (count > lastItemCount) {
-			const scrolledUp =
-				scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight > 200;
+			const scrolledUp = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight > 200;
 			if (!scrolledUp) scrollEl.scrollTop = scrollEl.scrollHeight;
 		}
 		lastItemCount = count;
@@ -148,19 +133,12 @@
 		{/each}
 		{#if thread && items.length}
 			<div class="flex justify-end">
-				<ReadReceiptAvatars
-					participants={thread.participants}
-					seq={lastKnownSeq(items)}
-					{myUserId}
-				/>
+				<ReadReceiptAvatars participants={thread.participants} seq={lastKnownSeq(items)} {myUserId} />
 			</div>
 		{/if}
 	</div>
 
 	<TypingIndicator usernames={typingUsernames(thread, stream?.typingUserIds ?? [])} />
 
-	<MessageComposer
-		onSend={handleSend}
-		onTypingChange={(typing) => setTyping.mutate({ threadId, typing })}
-	/>
+	<MessageComposer onSend={handleSend} onTypingChange={(typing) => setTyping.mutate({ threadId, typing })} />
 </div>

@@ -15,7 +15,7 @@ function fakeClock() {
 			timers.delete(h);
 		},
 	};
-	return { clock, fire: (h: number) => timers.get(h)?.() , pending: () => timers.size };
+	return { clock, fire: (h: number) => timers.get(h)?.(), pending: () => timers.size };
 }
 
 describe('createTypingController', () => {

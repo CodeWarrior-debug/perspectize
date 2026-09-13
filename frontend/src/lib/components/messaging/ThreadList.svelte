@@ -31,9 +31,7 @@
 		{#if loading && !threads.length}
 			<p class="p-3 text-sm text-muted-foreground">Loading…</p>
 		{:else if !threads.length}
-			<p data-testid="threads-empty" class="p-3 text-sm text-muted-foreground">
-				No conversations yet
-			</p>
+			<p data-testid="threads-empty" class="p-3 text-sm text-muted-foreground">No conversations yet</p>
 		{:else}
 			{#each threads as thread (thread.id)}
 				<ThreadListItem {thread} {myUserId} active={thread.id === activeThreadId} />

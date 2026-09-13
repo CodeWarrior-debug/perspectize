@@ -22,7 +22,17 @@ import { useMuteThread } from '$lib/queries/hooks/useMuteThread';
 import { MUTE_THREAD } from '$lib/queries/messaging';
 import { queryKeys } from '$lib/queries/keys';
 
-const thread = { id: 't1', title: null, participants: [], lastMessageAt: 'x', latestSeq: 0, myLastReadSeq: 0, unreadCount: 0, muted: true, createdAt: 'x' };
+const thread = {
+	id: 't1',
+	title: null,
+	participants: [],
+	lastMessageAt: 'x',
+	latestSeq: 0,
+	myLastReadSeq: 0,
+	unreadCount: 0,
+	muted: true,
+	createdAt: 'x',
+};
 
 describe('useMuteThread', () => {
 	beforeEach(() => vi.clearAllMocks());
@@ -37,10 +47,7 @@ describe('useMuteThread', () => {
 	it('onSuccess writes the thread detail and invalidates the list without refetching', () => {
 		useMuteThread();
 		mocks.captured.onSuccess({ muteThread: thread }, { threadId: 't1', muted: true });
-		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(
-			queryKeys.messaging.threads.detail('t1'),
-			thread,
-		);
+		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(queryKeys.messaging.threads.detail('t1'), thread);
 		expect(mocks.mockInvalidate).toHaveBeenCalledWith({
 			queryKey: queryKeys.messaging.threads.lists(),
 			refetchType: 'none',
