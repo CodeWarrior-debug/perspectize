@@ -104,4 +104,23 @@ describe('UserActivityView', () => {
 		});
 		expect(screen.queryByText('Include my private perspectives')).not.toBeInTheDocument();
 	});
+
+	// Regression test: a failed content/perspectives request (e.g. `first` outside the
+	// backend's [1, 100] range) must surface as an error, not silently render every user
+	// as "No activity yet" via the `?? []` fallbacks in the grouping logic.
+	it('shows an error state instead of empty groups when a query fails', async () => {
+		mockRequest.mockImplementation((query: string) => {
+			if (query.includes('ListUsers')) return Promise.resolve(usersResponse);
+			if (query.includes('ListContent')) return Promise.reject(new Error('first must be between 1 and 100'));
+			if (query.includes('ListActivityPerspectives')) return Promise.resolve(perspectivesResponse);
+			return Promise.resolve({});
+		});
+
+		renderView();
+
+		await waitFor(() => {
+			expect(screen.getByText('Failed to load activity. Please try again.')).toBeInTheDocument();
+		});
+		expect(screen.queryByTestId(/user-activity-/)).not.toBeInTheDocument();
+	});
 });

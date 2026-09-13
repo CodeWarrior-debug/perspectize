@@ -18,7 +18,13 @@
 	const EVENTS_PER_USER = 5;
 	// How many content/perspective rows to pull to build the feed from. Client-side
 	// aggregation only — see backend note below for why no new query was needed.
-	const FEED_SAMPLE_SIZE = 200;
+	//
+	// Capped at 100: both ContentService.ListContent and PerspectiveService.ListPerspectives
+	// reject `first` outside [1, 100] as invalid input (content_service.go / perspective_service.go).
+	// A larger value doesn't just get clamped — the whole query errors, which (before the
+	// hasError check below existed) silently rendered as every user showing "No activity yet"
+	// (the unrelated, unpaginated `users` query has no such cap and loaded fine regardless).
+	const FEED_SAMPLE_SIZE = 100;
 
 	const meCtx = useMe();
 	const currentUserId = $derived(meCtx.me ? meCtx.me.id : null);
@@ -66,6 +72,15 @@
 	const loading = $derived(
 		usersQuery.isLoading || contentQuery.isLoading || perspectivesQuery.isLoading,
 	);
+	// Surfaced explicitly rather than left to fall through to empty arrays — a failed
+	// content/perspectives request must not render as "no activity" for every user.
+	//
+	// Gotcha: the template must check `loading` before `hasError` (see the {#if} chain
+	// below). With `hasError` checked first, the queries never settle in tests — reading
+	// `.isError` before `.isLoading` on the same createQuery result somehow leaves the
+	// component stuck showing "Loading activity…" forever (reproduced in
+	// UserActivityView.test.ts). Root cause not fully understood; keep `loading` first.
+	const hasError = $derived(usersQuery.isError || contentQuery.isError || perspectivesQuery.isError);
 
 	type Event =
 		| { kind: 'content'; ts: string; contentID: string; name: string }
@@ -150,6 +165,8 @@
 
 	{#if loading}
 		<div class="py-12 text-center text-muted-foreground">Loading activity…</div>
+	{:else if hasError}
+		<div class="py-12 text-center text-muted-foreground">Failed to load activity. Please try again.</div>
 	{:else if groups.length === 0}
 		<div class="py-12 text-center text-muted-foreground">No users yet</div>
 	{:else}
