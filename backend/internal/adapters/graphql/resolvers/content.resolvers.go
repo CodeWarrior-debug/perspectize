@@ -71,9 +71,10 @@ func (r *contentResolver) PerspectiveCount(ctx context.Context, obj *model.Conte
 //
 // "Rating" here is the perspective's Quality dimension — the first/primary
 // rating field on the perspective form (see RatingInput.svelte's field
-// order) — averaged across the content's PUBLIC perspectives. Returns nil
-// when there are no public perspectives, or none of them set a Quality
-// value (distinct cases collapsed to the same "nothing to show" nil).
+// order) — averaged across ALL of the content's perspectives, public and
+// private alike (see PerspectiveAggregate's doc comment). Returns nil when
+// there are no perspectives, or none of them set a Quality value (distinct
+// cases collapsed to the same "nothing to show" nil).
 func (r *contentResolver) AverageRating(ctx context.Context, obj *model.Content) (*float64, error) {
 	agg, err := r.loadPerspectiveAggregate(ctx, obj)
 	if err != nil || agg == nil {
@@ -84,10 +85,10 @@ func (r *contentResolver) AverageRating(ctx context.Context, obj *model.Content)
 
 // QualityRatingCount is the resolver for the qualityRatingCount field.
 //
-// How many of the content's public perspectives set a Quality rating — i.e.
-// how many values AverageRating was actually averaged over. Meant for a
-// tooltip on the average rating display, since it can be less than
-// PerspectiveCount (Quality is optional).
+// How many of the content's perspectives set a Quality rating — i.e. how
+// many values AverageRating was actually averaged over. Meant for a tooltip
+// on the average rating display, since it can be less than PerspectiveCount
+// (Quality is optional).
 func (r *contentResolver) QualityRatingCount(ctx context.Context, obj *model.Content) (*int, error) {
 	agg, err := r.loadPerspectiveAggregate(ctx, obj)
 	if err != nil || agg == nil {
@@ -99,7 +100,7 @@ func (r *contentResolver) QualityRatingCount(ctx context.Context, obj *model.Con
 
 // loadPerspectiveAggregate is the shared fetch behind PerspectiveCount,
 // AverageRating, and QualityRatingCount. Returns (nil, nil) when the content
-// has no public perspectives at all.
+// has no perspectives at all.
 func (r *contentResolver) loadPerspectiveAggregate(ctx context.Context, obj *model.Content) (*domain.PerspectiveAggregate, error) {
 	contentID, err := strconv.Atoi(obj.ID)
 	if err != nil {

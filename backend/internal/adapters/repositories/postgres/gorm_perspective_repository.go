@@ -176,29 +176,26 @@ type aggregateRow struct {
 	AvgQuality   *float64
 }
 
-// AggregateByContentIDs computes, per content ID, the count of PUBLIC
-// perspectives, how many of those set a Quality rating, and their average
-// Quality. Perspectives with a nil Privacy are treated as public everywhere
-// else in this codebase (see gorm_mappers.go), so NULL is included alongside
-// the stored lowercase "public" value.
+// AggregateByContentIDs computes, per content ID, the count of ALL
+// perspectives (public and private alike — a perspective's Privacy controls
+// who can read its content, not whether it counts toward the aggregate;
+// see FEATURE_BACKLOG.md for a possible future opt-out), how many of those
+// set a Quality rating, and their average Quality.
 //
 // QualityCount (COUNT(quality), which skips NULLs) can be smaller than Count
-// (COUNT(*), every public perspective) since Quality is optional — that's
-// the number shown in the average-rating tooltip so "N ratings" always
-// matches what AverageQuality was actually computed over.
+// (COUNT(*), every perspective) since Quality is optional — that's the
+// number shown in the average-rating tooltip so "N ratings" always matches
+// what AverageQuality was actually computed over.
 func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 	if len(contentIDs) == 0 {
 		return map[int]*domain.PerspectiveAggregate{}, nil
 	}
-
-	publicValue := privacyToDBValue(domain.PrivacyPublic)
 
 	var rows []aggregateRow
 	err := r.db.WithContext(ctx).
 		Model(&PerspectiveModel{}).
 		Select("content_id AS content_id, COUNT(*) AS count, COUNT(quality) AS quality_count, AVG(quality) AS avg_quality").
 		Where("content_id IN ?", contentIDs).
-		Where("privacy = ? OR privacy IS NULL", publicValue).
 		Group("content_id").
 		Find(&rows).Error
 	if err != nil {
