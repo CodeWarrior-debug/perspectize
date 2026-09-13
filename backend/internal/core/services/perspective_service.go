@@ -77,6 +77,16 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 		return nil, fmt.Errorf("%w: related_perspective_ids cannot exceed 50 entries", domain.ErrInvalidInput)
 	}
 
+	// Validate feelings
+	if len(input.Feelings) > domain.MaxFeelings {
+		return nil, fmt.Errorf("%w: feelings cannot exceed %d entries", domain.ErrInvalidInput, domain.MaxFeelings)
+	}
+	for _, f := range input.Feelings {
+		if !domain.ValidateFeelingEntry(f) {
+			return nil, fmt.Errorf("%w: feeling %q has an invalid emoji or intensity %d", domain.ErrInvalidInput, f.Emoji, f.Intensity)
+		}
+	}
+
 	// Set default privacy
 	privacy := domain.PrivacyPublic
 	if input.Privacy != nil {
@@ -97,6 +107,7 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 		Parts:                 input.Parts,
 		Labels:                input.Labels,
 		CategorizedRatings:    input.CategorizedRatings,
+		Feelings:              input.Feelings,
 		PrimaryPerspectiveID:  input.PrimaryPerspectiveID,
 		RelatedPerspectiveIDs: input.RelatedPerspectiveIDs,
 		CustomFields:          input.CustomFields,
@@ -171,6 +182,19 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 			}
 		}
 		existing.CategorizedRatings = input.CategorizedRatings
+	}
+
+	// Validate and update feelings if provided
+	if input.Feelings != nil {
+		if len(input.Feelings) > domain.MaxFeelings {
+			return nil, fmt.Errorf("%w: feelings cannot exceed %d entries", domain.ErrInvalidInput, domain.MaxFeelings)
+		}
+		for _, f := range input.Feelings {
+			if !domain.ValidateFeelingEntry(f) {
+				return nil, fmt.Errorf("%w: feeling %q has an invalid emoji or intensity %d", domain.ErrInvalidInput, f.Emoji, f.Intensity)
+			}
+		}
+		existing.Feelings = input.Feelings
 	}
 
 	// Update optional fields

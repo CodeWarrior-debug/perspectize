@@ -99,6 +99,7 @@ type CreatePerspectiveInput struct {
 	Parts                 []int                     `json:"parts,omitempty"`
 	Labels                []string                  `json:"labels,omitempty"`
 	CategorizedRatings    []*CategorizedRatingInput `json:"categorizedRatings,omitempty"`
+	Feelings              []*FeelingInput           `json:"feelings,omitempty"`
 	PrimaryPerspectiveID  *int                      `json:"primaryPerspectiveID,omitempty"`
 	RelatedPerspectiveIDs []int                     `json:"relatedPerspectiveIDs,omitempty"`
 	CustomFields          map[string]any            `json:"customFields,omitempty"`
@@ -108,6 +109,20 @@ type CreatePerspectiveInput struct {
 type CreateUserInput struct {
 	Username string  `json:"username"`
 	Email    *string `json:"email,omitempty"`
+}
+
+type FeelingEntry struct {
+	Emoji     string  `json:"emoji"`
+	Label     *string `json:"label,omitempty"`
+	Intensity int     `json:"intensity"`
+	Note      *string `json:"note,omitempty"`
+}
+
+type FeelingInput struct {
+	Emoji     string  `json:"emoji"`
+	Label     *string `json:"label,omitempty"`
+	Intensity int     `json:"intensity"`
+	Note      *string `json:"note,omitempty"`
 }
 
 type Mutation struct {
@@ -150,6 +165,7 @@ type Perspective struct {
 	Parts                 []int                `json:"parts,omitempty"`
 	Labels                []string             `json:"labels,omitempty"`
 	CategorizedRatings    []*CategorizedRating `json:"categorizedRatings,omitempty"`
+	Feelings              []*FeelingEntry      `json:"feelings,omitempty"`
 	PrimaryPerspectiveID  *string              `json:"primaryPerspectiveID,omitempty"`
 	RelatedPerspectiveIDs []int                `json:"relatedPerspectiveIDs,omitempty"`
 	CustomFields          map[string]any       `json:"customFields,omitempty"`
@@ -190,6 +206,7 @@ type UpdatePerspectiveInput struct {
 	Parts                 []int                     `json:"parts,omitempty"`
 	Labels                []string                  `json:"labels,omitempty"`
 	CategorizedRatings    []*CategorizedRatingInput `json:"categorizedRatings,omitempty"`
+	Feelings              []*FeelingInput           `json:"feelings,omitempty"`
 	PrimaryPerspectiveID  *int                      `json:"primaryPerspectiveID,omitempty"`
 	RelatedPerspectiveIDs []int                     `json:"relatedPerspectiveIDs,omitempty"`
 	CustomFields          map[string]any            `json:"customFields,omitempty"`

@@ -1,5 +1,12 @@
 import { gql } from 'graphql-request';
 
+export interface FeelingEntry {
+	emoji: string;
+	label: string | null;
+	intensity: number;
+	note: string | null;
+}
+
 export interface PerspectiveItem {
 	id: string;
 	userID: string;
@@ -15,6 +22,7 @@ export interface PerspectiveItem {
 	primaryPerspectiveID: string | null;
 	relatedPerspectiveIDs: number[] | null;
 	customFields: Record<string, unknown> | null;
+	feelings: FeelingEntry[] | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -49,6 +57,12 @@ const PERSPECTIVE_FIELDS = gql`
 		primaryPerspectiveID
 		relatedPerspectiveIDs
 		customFields
+		feelings {
+			emoji
+			label
+			intensity
+			note
+		}
 		createdAt
 		updatedAt
 	}

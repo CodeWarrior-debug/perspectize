@@ -207,6 +207,18 @@ func perspectiveModelToDomain(m *PerspectiveModel) *domain.Perspective {
 		}
 	}
 
+	// Feelings: unmarshal from JSONBArray strings (same pattern as CategorizedRatings)
+	if len(m.Feelings) > 0 {
+		p.Feelings = make([]domain.FeelingEntry, 0, len(m.Feelings))
+		for _, jsonStr := range m.Feelings {
+			var f domain.FeelingEntry
+			if err := json.Unmarshal([]byte(jsonStr), &f); err != nil {
+				continue
+			}
+			p.Feelings = append(p.Feelings, f)
+		}
+	}
+
 	// PrimaryPerspectiveID: direct copy
 	p.PrimaryPerspectiveID = m.PrimaryPerspectiveID
 
@@ -279,6 +291,18 @@ func perspectiveDomainToModel(p *domain.Perspective) *PerspectiveModel {
 				continue
 			}
 			m.CategorizedRatings[i] = string(data)
+		}
+	}
+
+	// Feelings: marshal to JSONBArray strings (same pattern as CategorizedRatings)
+	if len(p.Feelings) > 0 {
+		m.Feelings = make(JSONBArray, len(p.Feelings))
+		for i, f := range p.Feelings {
+			data, err := json.Marshal(f)
+			if err != nil {
+				continue
+			}
+			m.Feelings[i] = string(data)
 		}
 	}
 
