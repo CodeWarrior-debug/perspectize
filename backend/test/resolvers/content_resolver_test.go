@@ -288,7 +288,7 @@ func setupTestServerWithRepos(repo *mockContentRepository, ytClient *mockYouTube
 	userService := services.NewUserService(userRepo, repo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, repo, wikidataClient)
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService)
+	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)
 	directiveRoot := directives.NewDirectiveRoot(contentService, perspectiveService)
 	gqlConfig := generated.Config{
 		Resolvers: resolver,
@@ -1299,7 +1299,7 @@ func TestNewResolver(t *testing.T) {
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, repo, wikidataClient)
 
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService)
+	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)
 
 	assert.NotNil(t, resolver)
 	assert.Equal(t, contentService, resolver.ContentService)

@@ -1,0 +1,12 @@
+DROP TRIGGER IF EXISTS trg_touch_thread_last_message ON messages;
+DROP TRIGGER IF EXISTS trg_publish_and_prune_message ON messages;
+DROP TRIGGER IF EXISTS trg_assign_message_seq ON messages;
+DROP TRIGGER IF EXISTS trg_init_thread_sequence ON message_threads;
+DROP FUNCTION IF EXISTS touch_thread_last_message();
+DROP FUNCTION IF EXISTS publish_and_prune_message();
+DROP FUNCTION IF EXISTS assign_message_seq();
+DROP FUNCTION IF EXISTS init_thread_sequence();
+DROP TABLE IF EXISTS messages;
+DROP TABLE IF EXISTS thread_sequences;
+DROP TABLE IF EXISTS thread_participants;
+DROP TABLE IF EXISTS message_threads;

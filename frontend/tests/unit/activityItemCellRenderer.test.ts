@@ -60,11 +60,7 @@ describe('activityItemCellRenderer', () => {
 		const thumbWrap = result.querySelector('[data-testid="item-thumb"]') as HTMLElement;
 		thumbWrap.click();
 
-		expect(openSpy).toHaveBeenCalledWith(
-			'https://youtube.com/watch?v=abc123',
-			'_blank',
-			'noopener,noreferrer',
-		);
+		expect(openSpy).toHaveBeenCalledWith('https://youtube.com/watch?v=abc123', '_blank', 'noopener,noreferrer');
 		expect(onOpenDetails).not.toHaveBeenCalled();
 
 		openSpy.mockRestore();

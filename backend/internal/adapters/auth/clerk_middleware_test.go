@@ -145,7 +145,7 @@ func runAuthHandler(t *testing.T, repo *stubUserRepo, subject string) (*domain.A
 	}
 
 	rec := httptest.NewRecorder()
-	newAuthHandler(repo, next).ServeHTTP(rec, req)
+	newAuthHandler(repo, NewClerkTokenVerifier(), next).ServeHTTP(rec, req)
 
 	require.True(t, nextCalled, "the middleware must always call next (it is permissive)")
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -418,7 +418,7 @@ func TestMiddleware_UnauthenticatedRequestPassesThrough(t *testing.T) {
 	var seen *domain.AuthenticatedUser
 	var found bool
 
-	handler := Middleware(&stubUserRepo{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := Middleware(&stubUserRepo{}, NewClerkTokenVerifier())(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nextCalled = true
 		seen, found = ForContext(r.Context())
 		w.WriteHeader(http.StatusOK)
@@ -439,7 +439,7 @@ func TestMiddleware_UnparseableBearerTokenPassesThrough(t *testing.T) {
 	var nextCalled bool
 	var found bool
 
-	handler := Middleware(&stubUserRepo{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := Middleware(&stubUserRepo{}, NewClerkTokenVerifier())(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nextCalled = true
 		_, found = ForContext(r.Context())
 		w.WriteHeader(http.StatusOK)

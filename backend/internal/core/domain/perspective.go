@@ -28,6 +28,20 @@ type CategorizedRating struct {
 	Rating   int    `json:"rating"`
 }
 
+// FeelingEntry represents one emoji feeling attached to a perspective, picked
+// from the feel-wheel (or its extended search set) with an intensity and an
+// optional freeform note. See docs/superpowers/specs/2026-09-12-feel-wheel-design.md.
+type FeelingEntry struct {
+	Emoji     string  `json:"emoji"`           // literal emoji grapheme, e.g. "🥰"
+	Label     string  `json:"label,omitempty"` // human label, prefilled for curated entries
+	Intensity int     `json:"intensity"`       // 0-10000, see RatingMin/RatingMax
+	Note      *string `json:"note,omitempty"`  // freeform why/nuance
+}
+
+// MaxFeelings is the app-level cap on feelings per perspective, matching the
+// cap pattern used for RelatedPerspectiveIDs.
+const MaxFeelings = 10
+
 // Perspective represents a user's viewpoint on content
 type Perspective struct {
 	ID        int
@@ -54,6 +68,9 @@ type Perspective struct {
 	// JSONB field
 	CategorizedRatings []CategorizedRating
 
+	// Feelings is the emoji feel-wheel selections for this perspective (JSONB array).
+	Feelings []FeelingEntry
+
 	// Perspective reference fields (Phase 4)
 	PrimaryPerspectiveID  *int            // FK to another perspective (optional)
 	RelatedPerspectiveIDs []int           // array of perspective IDs (max 50 app-level cap)
@@ -77,6 +94,16 @@ func ValidateRating(rating *int) bool {
 		return true // nil is valid (optional field)
 	}
 	return *rating >= RatingMin && *rating <= RatingMax
+}
+
+// ValidateFeelingEntry checks that a feeling entry has a non-empty emoji and
+// an intensity within the shared rating range.
+func ValidateFeelingEntry(f FeelingEntry) bool {
+	if f.Emoji == "" {
+		return false
+	}
+	intensity := f.Intensity
+	return ValidateRating(&intensity)
 }
 
 // PerspectiveSortBy represents sortable fields for perspective queries

@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-	advanceCoachStep,
-	skipCoachStep,
-	coachStepTitle,
-	coachStepBody,
-} from '$lib/onboarding/steps';
+import { advanceCoachStep, skipCoachStep, coachStepTitle, coachStepBody } from '$lib/onboarding/steps';
 
 describe('coach step machine', () => {
 	it('advances from step 1 to step 2', () => {
