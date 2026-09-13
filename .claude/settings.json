@@ -116,6 +116,10 @@
           },
           {
             "type": "command",
+            "command": "bash .claude/hooks/gofmt-precommit.sh"
+          },
+          {
+            "type": "command",
             "command": "bash .claude/hooks/require-tests.sh"
           },
           {
