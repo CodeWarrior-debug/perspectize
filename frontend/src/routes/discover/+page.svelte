@@ -8,7 +8,7 @@
 	import { graphqlRequest } from '$lib/queries/client';
 	import { LIST_CONTENT, type ContentResponse } from '$lib/queries/content';
 	import { queryKeys } from '$lib/queries/keys';
-	import { useAddVideo } from '$lib/queries/hooks/useAddVideo';
+	import { useAddVideo } from '$lib/queries/content/useAddVideo';
 	import {
 		fetchYouTubeSearch,
 		fetchYouTubeTrending,

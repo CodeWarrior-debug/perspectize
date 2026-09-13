@@ -73,7 +73,10 @@ make docker-up / make docker-down / make docker-logs
 
 Two sources (precedence order): **env vars** > `config/config.json`.
 Required: `DATABASE_URL`. Optional: `YOUTUBE_API_KEY`, `DATABASE_PASSWORD`.
-See `.env.example`. Production note: Sevalla may require `?sslmode=disable`.
+See `.env.example` — it lists every variable by name (values blank on purpose).
+Copy it to `backend/.env` and fill in real values by hand; the agent cannot read
+`.env` (see [../.docs/SECURITY.md](../.docs/SECURITY.md)). Production note: Sevalla
+may require `?sslmode=disable`.
 
 **Sevalla build strategy:** Dockerfile builder. Dockerfile path = `backend/Dockerfile` (relative to repo root, not context). Docker context = `backend`. Sevalla requires the redundant `backend/` prefix on the Dockerfile path even though context is already `backend`.
 
@@ -82,6 +85,10 @@ See `.env.example`. Production note: Sevalla may require `?sslmode=disable`.
 ## GraphQL
 
 Schema-first in `schema.graphql`. After changes: `make graphql-gen` → implement resolvers in `internal/adapters/graphql/resolvers/` → wire to services.
+
+**`make graphql-gen` always leaves a colliding `schema.resolvers.go` behind.** `gqlgen.yml` uses `layout: follow-schema`, which names resolver files after the schema file — one `schema.graphql` means gqlgen insists on writing one `resolvers/schema.resolvers.go` holding *every* resolver. The resolvers were since split by domain (`content`/`category`/`perspective`/`user.resolvers.go`), so that file redeclares all of them and the run ends with `method Resolver.Content already declared` / `contentResolver redeclared in this block`.
+
+The failure is confined to that last step: `generated.go` and `models_gen.go` are written *before* it, so the regeneration you wanted did happen. Recover by deleting the stray file (`rm internal/adapters/graphql/resolvers/schema.resolvers.go`) and rebuilding — but **diff it first** when the schema gained a field, because the stub for that new field is in there and belongs in the matching per-domain file. Don't automate the `rm` in the Makefile for that reason. The real fix is to split `schema.graphql` per domain so `follow-schema` lines up with the resolver files.
 
 ## Testing
 
@@ -117,6 +124,10 @@ CORS middleware is configured in `cmd/server/main.go` for local development. Cur
 **Adding repository interface methods:** When adding a new method to a port interface (e.g., `ListAll` on `UserRepository`), all test mocks that implement that interface must also be updated or compilation fails. Check `test/` for mock implementations.
 
 **JSON scalar:** Use `graphql.Map` (configured as `JSON` in `gqlgen.yml`) for JSONB data.
+
+**gqlgen test client (`gqlgen/client`):** rejects response keys with no matching struct field (`'x' has invalid keys`). Spell out *every* selected field in the decode target, or decode into `map[string]json.RawMessage`.
+
+**Non-schema model fields:** use `extraFields` under a type in `gqlgen.yml` (e.g. `Content.PrimaryCategoryID`) to carry data (like an FK) onto a generated model for a resolver to use, then `go run github.com/99designs/gqlgen generate`. Populate it in `domainToModel`.
 
 **Directive arg introspection:** `graphql.GetFieldContext(ctx).Args["input"]` is the *typed* input struct (e.g. `model.UpdatePerspectiveInput`), not `map[string]interface{}`. Directive/middleware code that digs a value out of an input object must read the struct (by `json` tag via reflection), not just type-assert to a map — a map-only assertion silently fails for every real request. See `directives/auth.go` `extractResourceID`/`fieldByJSONTag`.
 

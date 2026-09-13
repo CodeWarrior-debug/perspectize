@@ -36,25 +36,26 @@ type Category struct {
 }
 
 type Content struct {
-	ID              string         `json:"id"`
-	Name            string         `json:"name"`
-	URL             *string        `json:"url,omitempty"`
-	ContentType     string         `json:"contentType"`
-	AddedByUserID   string         `json:"addedByUserID"`
-	AddedBy         *User          `json:"addedBy,omitempty"`
-	Length          *int           `json:"length,omitempty"`
-	LengthUnits     *string        `json:"lengthUnits,omitempty"`
-	ViewCount       *int           `json:"viewCount,omitempty"`
-	LikeCount       *int           `json:"likeCount,omitempty"`
-	CommentCount    *int           `json:"commentCount,omitempty"`
-	ChannelTitle    *string        `json:"channelTitle,omitempty"`
-	PublishedAt     *string        `json:"publishedAt,omitempty"`
-	Tags            []string       `json:"tags,omitempty"`
-	Description     *string        `json:"description,omitempty"`
-	Response        map[string]any `json:"response,omitempty"`
-	PrimaryCategory *Category      `json:"primaryCategory,omitempty"`
-	CreatedAt       string         `json:"createdAt"`
-	UpdatedAt       string         `json:"updatedAt"`
+	ID                string         `json:"id"`
+	Name              string         `json:"name"`
+	URL               *string        `json:"url,omitempty"`
+	ContentType       string         `json:"contentType"`
+	AddedByUserID     string         `json:"addedByUserID"`
+	AddedBy           *User          `json:"addedBy,omitempty"`
+	Length            *int           `json:"length,omitempty"`
+	LengthUnits       *string        `json:"lengthUnits,omitempty"`
+	ViewCount         *int           `json:"viewCount,omitempty"`
+	LikeCount         *int           `json:"likeCount,omitempty"`
+	CommentCount      *int           `json:"commentCount,omitempty"`
+	ChannelTitle      *string        `json:"channelTitle,omitempty"`
+	PublishedAt       *string        `json:"publishedAt,omitempty"`
+	Tags              []string       `json:"tags,omitempty"`
+	Description       *string        `json:"description,omitempty"`
+	Response          map[string]any `json:"response,omitempty"`
+	PrimaryCategory   *Category      `json:"primaryCategory,omitempty"`
+	CreatedAt         string         `json:"createdAt"`
+	UpdatedAt         string         `json:"updatedAt"`
+	PrimaryCategoryID *int           `json:"-"`
 }
 
 type ContentFilter struct {
@@ -112,6 +113,7 @@ type CreatePerspectiveInput struct {
 	Parts                 []int                     `json:"parts,omitempty"`
 	Labels                []string                  `json:"labels,omitempty"`
 	CategorizedRatings    []*CategorizedRatingInput `json:"categorizedRatings,omitempty"`
+	Feelings              []*FeelingInput           `json:"feelings,omitempty"`
 	PrimaryPerspectiveID  *int                      `json:"primaryPerspectiveID,omitempty"`
 	RelatedPerspectiveIDs []int                     `json:"relatedPerspectiveIDs,omitempty"`
 	CustomFields          map[string]any            `json:"customFields,omitempty"`
@@ -121,6 +123,20 @@ type CreatePerspectiveInput struct {
 type CreateUserInput struct {
 	Username string  `json:"username"`
 	Email    *string `json:"email,omitempty"`
+}
+
+type FeelingEntry struct {
+	Emoji     string  `json:"emoji"`
+	Label     *string `json:"label,omitempty"`
+	Intensity int     `json:"intensity"`
+	Note      *string `json:"note,omitempty"`
+}
+
+type FeelingInput struct {
+	Emoji     string  `json:"emoji"`
+	Label     *string `json:"label,omitempty"`
+	Intensity int     `json:"intensity"`
+	Note      *string `json:"note,omitempty"`
 }
 
 type InboxEvent struct {
@@ -203,6 +219,7 @@ type Perspective struct {
 	Parts                 []int                `json:"parts,omitempty"`
 	Labels                []string             `json:"labels,omitempty"`
 	CategorizedRatings    []*CategorizedRating `json:"categorizedRatings,omitempty"`
+	Feelings              []*FeelingEntry      `json:"feelings,omitempty"`
 	PrimaryPerspectiveID  *string              `json:"primaryPerspectiveID,omitempty"`
 	RelatedPerspectiveIDs []int                `json:"relatedPerspectiveIDs,omitempty"`
 	CustomFields          map[string]any       `json:"customFields,omitempty"`
@@ -282,6 +299,7 @@ type UpdatePerspectiveInput struct {
 	Parts                 []int                     `json:"parts,omitempty"`
 	Labels                []string                  `json:"labels,omitempty"`
 	CategorizedRatings    []*CategorizedRatingInput `json:"categorizedRatings,omitempty"`
+	Feelings              []*FeelingInput           `json:"feelings,omitempty"`
 	PrimaryPerspectiveID  *int                      `json:"primaryPerspectiveID,omitempty"`
 	RelatedPerspectiveIDs []int                     `json:"relatedPerspectiveIDs,omitempty"`
 	CustomFields          map[string]any            `json:"customFields,omitempty"`
@@ -356,7 +374,7 @@ func (e *ParticipantChangeKind) UnmarshalGQL(v any) error {
 }
 
 func (e ParticipantChangeKind) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *ParticipantChangeKind) UnmarshalJSON(b []byte) error {

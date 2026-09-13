@@ -77,6 +77,16 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 		return nil, fmt.Errorf("%w: related_perspective_ids cannot exceed 50 entries", domain.ErrInvalidInput)
 	}
 
+	// Validate feelings
+	if len(input.Feelings) > domain.MaxFeelings {
+		return nil, fmt.Errorf("%w: feelings cannot exceed %d entries", domain.ErrInvalidInput, domain.MaxFeelings)
+	}
+	for _, f := range input.Feelings {
+		if !domain.ValidateFeelingEntry(f) {
+			return nil, fmt.Errorf("%w: feeling %q has an invalid emoji or intensity %d", domain.ErrInvalidInput, f.Emoji, f.Intensity)
+		}
+	}
+
 	// Set default privacy
 	privacy := domain.PrivacyPublic
 	if input.Privacy != nil {
@@ -97,6 +107,7 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 		Parts:                 input.Parts,
 		Labels:                input.Labels,
 		CategorizedRatings:    input.CategorizedRatings,
+		Feelings:              input.Feelings,
 		PrimaryPerspectiveID:  input.PrimaryPerspectiveID,
 		RelatedPerspectiveIDs: input.RelatedPerspectiveIDs,
 		CustomFields:          input.CustomFields,
@@ -171,6 +182,19 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 			}
 		}
 		existing.CategorizedRatings = input.CategorizedRatings
+	}
+
+	// Validate and update feelings if provided
+	if input.Feelings != nil {
+		if len(input.Feelings) > domain.MaxFeelings {
+			return nil, fmt.Errorf("%w: feelings cannot exceed %d entries", domain.ErrInvalidInput, domain.MaxFeelings)
+		}
+		for _, f := range input.Feelings {
+			if !domain.ValidateFeelingEntry(f) {
+				return nil, fmt.Errorf("%w: feeling %q has an invalid emoji or intensity %d", domain.ErrInvalidInput, f.Emoji, f.Intensity)
+			}
+		}
+		existing.Feelings = input.Feelings
 	}
 
 	// Update optional fields
@@ -253,6 +277,15 @@ func (s *PerspectiveService) ListPerspectives(ctx context.Context, params domain
 			return nil, fmt.Errorf("%w: last must be between 1 and 100", domain.ErrInvalidInput)
 		}
 	}
+
+	// Read authorization: unless the caller is unambiguously asking only for
+	// their own rows, results must be limited to public rows plus the caller's
+	// own. The repository turns RestrictToPublicOrOwner into a WHERE predicate.
+	isOwnListOnly := params.Filter != nil &&
+		params.Filter.UserID != nil &&
+		params.ViewerID != nil &&
+		*params.Filter.UserID == *params.ViewerID
+	params.RestrictToPublicOrOwner = !isOwnListOnly
 
 	result, err := s.repo.List(ctx, params)
 	if err != nil {

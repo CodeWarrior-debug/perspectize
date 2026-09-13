@@ -48,6 +48,23 @@ gh release create screenshots \
 - One persistent `screenshots` release accumulates assets across every PR — no per-PR release/tag needed
 - `--clobber` makes re-uploading after a fix idempotent — same filename just replaces the old asset and the PR's existing markdown link keeps working
 
+## Videos
+
+The same bucket release hosts `.mp4`/`.webm` captures (e.g. from Vitest Browser Mode's opt-in `recordVideo` — see `frontend/CLAUDE.md`). The upload and URL-lookup steps are identical to screenshots, just with a different glob:
+
+```bash
+gh release upload screenshots /Users/jamesjordan/Downloads/screenshots/sv-<plan>-*.mp4 --clobber
+gh release view screenshots --json assets --jq '.assets[] | select(.name | startswith("sv-<plan>-")) | .browser_download_url'
+```
+
+Embed with an HTML `<video>` tag rather than markdown image syntax — `![]()` doesn't add player controls even when GitHub renders it as a link:
+
+```markdown
+<video src="https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-01-sort-animation.mp4" controls></video>
+```
+
+GitHub's markdown renderer strips `<video>` tags from most sources, but a release-asset URL resolves through `objects.githubusercontent.com`, which is on the allowed host list — so this should render an inline player. If it doesn't, fall back to dragging the file directly into the PR description box in the browser (Web UI uploads always produce a player, uploading to `user-images.githubusercontent.com` instead) and replace the tag with the URL it generates.
+
 ## Required permission
 
 `gh release create`/`gh release upload`/`gh release view` need the `Bash(gh release:*)` allow rule in `.claude/settings.json`.

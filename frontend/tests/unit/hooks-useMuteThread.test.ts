@@ -18,7 +18,7 @@ vi.mock('@tanstack/svelte-query', () => ({
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
 vi.mock('svelte-sonner', () => ({ toast: { error: mocks.mockToastError, success: vi.fn() } }));
 
-import { useMuteThread } from '$lib/queries/hooks/useMuteThread';
+import { useMuteThread } from '$lib/queries/messaging/useMuteThread';
 import { MUTE_THREAD } from '$lib/queries/messaging';
 import { queryKeys } from '$lib/queries/keys';
 

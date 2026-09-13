@@ -10,7 +10,7 @@
 		Input,
 		Label,
 	} from '$lib/components/shadcn';
-	import { useAddVideo } from '$lib/queries/hooks/useAddVideo';
+	import { useAddVideo } from '$lib/queries/content/useAddVideo';
 	import { validateYouTubeUrl } from '$lib/utils/youtube';
 
 	// Props

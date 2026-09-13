@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { useMe } from '$lib/queries/hooks/useMe.svelte';
-	import { useMessageThreads } from '$lib/queries/hooks/useMessageThreads';
-	import { useEditMessage } from '$lib/queries/hooks/useEditMessage';
-	import { useDeleteMessage } from '$lib/queries/hooks/useDeleteMessage';
+	import { useMe } from '$lib/queries/users/useMe.svelte';
+	import { useMessageThreads } from '$lib/queries/messaging/useMessageThreads';
+	import { useEditMessage } from '$lib/queries/messaging/useEditMessage';
+	import { useDeleteMessage } from '$lib/queries/messaging/useDeleteMessage';
 	import { totalUnread } from '$lib/messaging/inboxCache';
 	import ThreadList from './ThreadList.svelte';
 	import ThreadView from './ThreadView.svelte';

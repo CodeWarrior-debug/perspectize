@@ -96,3 +96,23 @@ func (s *CategoryServiceImpl) SearchWikidata(ctx context.Context, query string, 
 func (s *CategoryServiceImpl) GetCategoryByID(ctx context.Context, id int) (*domain.Category, error) {
 	return s.categoryRepo.GetByID(ctx, id)
 }
+
+// GetCategoriesByIDs fetches multiple categories by primary key in one batched
+// query. Deduplicates input IDs before hitting the repository.
+func (s *CategoryServiceImpl) GetCategoriesByIDs(ctx context.Context, ids []int) ([]*domain.Category, error) {
+	if len(ids) == 0 {
+		return []*domain.Category{}, nil
+	}
+
+	seen := make(map[int]struct{}, len(ids))
+	unique := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+
+	return s.categoryRepo.GetByIDs(ctx, unique)
+}

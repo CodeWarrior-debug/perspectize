@@ -16,8 +16,9 @@ import (
 
 // mockCategoryRepository implements repositories.CategoryRepository for testing
 type mockCategoryRepository struct {
-	upsertFn  func(ctx context.Context, category *domain.Category) (*domain.Category, error)
-	getByIDFn func(ctx context.Context, id int) (*domain.Category, error)
+	upsertFn   func(ctx context.Context, category *domain.Category) (*domain.Category, error)
+	getByIDFn  func(ctx context.Context, id int) (*domain.Category, error)
+	getByIDsFn func(ctx context.Context, ids []int) ([]*domain.Category, error)
 }
 
 func (m *mockCategoryRepository) Upsert(ctx context.Context, category *domain.Category) (*domain.Category, error) {
@@ -33,6 +34,13 @@ func (m *mockCategoryRepository) GetByID(ctx context.Context, id int) (*domain.C
 		return m.getByIDFn(ctx, id)
 	}
 	return nil, domain.ErrNotFound
+}
+
+func (m *mockCategoryRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.Category, error) {
+	if m.getByIDsFn != nil {
+		return m.getByIDsFn(ctx, ids)
+	}
+	return []*domain.Category{}, nil
 }
 
 // mockWikidataClient implements services.WikidataClient for testing

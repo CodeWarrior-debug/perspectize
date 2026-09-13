@@ -4,7 +4,7 @@
 	import { graphqlRequest } from '$lib/queries/client';
 	import { LIST_USERS, type UsersResponse } from '$lib/queries/users';
 	import { queryKeys } from '$lib/queries/keys';
-	import { useCreateMessageThread } from '$lib/queries/hooks/useCreateMessageThread';
+	import { useCreateMessageThread } from '$lib/queries/messaging/useCreateMessageThread';
 	import type { CreateMessageThreadResponse } from '$lib/queries/messaging';
 	import {
 		Dialog,

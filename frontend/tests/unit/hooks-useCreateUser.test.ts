@@ -43,7 +43,7 @@ describe('useCreateUser hook', () => {
 
 	describe('hook initialization', () => {
 		it('returns a mutation object with mutate method', async () => {
-			const { useCreateUser } = await import('$lib/queries/hooks/useCreateUser');
+			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
 			const mutation = useCreateUser();
 
 			expect(mutation).toBeDefined();
@@ -53,7 +53,7 @@ describe('useCreateUser hook', () => {
 
 		it('calls createMutation with a function that returns options', async () => {
 			const { createMutation } = await import('@tanstack/svelte-query');
-			const { useCreateUser } = await import('$lib/queries/hooks/useCreateUser');
+			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
 
 			useCreateUser();
 
@@ -64,7 +64,7 @@ describe('useCreateUser hook', () => {
 		});
 
 		it('captures mutation options via createMutation factory', async () => {
-			const { useCreateUser } = await import('$lib/queries/hooks/useCreateUser');
+			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
 			useCreateUser();
 
 			expect(capturedMutationOptions).toBeDefined();
@@ -73,7 +73,7 @@ describe('useCreateUser hook', () => {
 
 	describe('mutationFn', () => {
 		beforeEach(async () => {
-			const { useCreateUser } = await import('$lib/queries/hooks/useCreateUser');
+			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
 			useCreateUser();
 		});
 
@@ -124,7 +124,7 @@ describe('useCreateUser hook', () => {
 
 	describe('onSuccess callback', () => {
 		beforeEach(async () => {
-			const { useCreateUser } = await import('$lib/queries/hooks/useCreateUser');
+			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
 			useCreateUser();
 		});
 
@@ -172,7 +172,7 @@ describe('useCreateUser hook', () => {
 
 	describe('onError callback', () => {
 		beforeEach(async () => {
-			const { useCreateUser } = await import('$lib/queries/hooks/useCreateUser');
+			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
 			useCreateUser();
 		});
 
@@ -233,7 +233,7 @@ describe('useCreateUser hook', () => {
 
 	describe('integration with queryClient and toasts', () => {
 		beforeEach(async () => {
-			const { useCreateUser } = await import('$lib/queries/hooks/useCreateUser');
+			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
 			useCreateUser();
 		});
 
@@ -264,7 +264,7 @@ describe('useCreateUser hook', () => {
 
 	describe('mutation input handling', () => {
 		beforeEach(async () => {
-			const { useCreateUser } = await import('$lib/queries/hooks/useCreateUser');
+			const { useCreateUser } = await import('$lib/queries/users/useCreateUser');
 			useCreateUser();
 		});
 

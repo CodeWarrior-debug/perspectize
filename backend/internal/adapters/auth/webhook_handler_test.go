@@ -2,7 +2,10 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -17,9 +20,19 @@ import (
 	svixwebhook "github.com/svix/svix-webhooks/go"
 )
 
-// testWebhookSecret is "whsec_" + 32 chars of valid standard base64, which is
-// what svixwebhook.NewWebhook expects.
-const testWebhookSecret = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+// testWebhookSecret is a throwaway secret generated fresh for each test run:
+// "whsec_" + standard base64 of 24 random bytes, the shape svixwebhook.NewWebhook
+// expects. Generated rather than hard-coded so no secret-shaped literal ever
+// lives in the repo (GitHub secret scanning flags any whsec_ literal).
+var testWebhookSecret = newTestWebhookSecret()
+
+func newTestWebhookSecret() string {
+	b := make([]byte, 24)
+	if _, err := rand.Read(b); err != nil {
+		panic("generate test webhook secret: " + err.Error())
+	}
+	return "whsec_" + base64.StdEncoding.EncodeToString(b)
+}
 
 // signedWebhookRequest builds a POST carrying `body` with genuinely valid svix
 // signature headers for testWebhookSecret.
@@ -338,6 +351,27 @@ func TestWebhookHandler_UserUpdated(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, rec.Code)
 		assert.Contains(t, rec.Body.String(), "failed to update user")
 	})
+
+	t.Run("a wrapped ErrNotFound still falls back to creating the user and returns 200", func(t *testing.T) {
+		// Regression test for #325: the dispatch must use errors.Is, not a raw
+		// == comparison, so a repository that wraps the sentinel (e.g.
+		// fmt.Errorf("update by clerk id: %w", domain.ErrNotFound)) still
+		// triggers the fallback instead of falling into the generic 500 path.
+		createCalled := false
+		repo := &stubUserRepo{
+			updateByClerkIDFn: func(ctx context.Context, clerkID, username, email string) error {
+				return fmt.Errorf("update by clerk id: %w", domain.ErrNotFound)
+			},
+			createFromClerkFn: func(ctx context.Context, clerkID, username, email string) (*domain.User, error) {
+				createCalled = true
+				return &domain.User{ID: 1}, nil
+			},
+		}
+
+		rec := serveWebhook(t, repo, testWebhookSecret, signedWebhookRequest(t, updatedEventBody))
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.True(t, createCalled, "a wrapped ErrNotFound must still trigger the create fallback")
+	})
 }
 
 const deletedEventBody = `{"type":"user.deleted","data":{"id":"user_abc"}}`
@@ -378,6 +412,19 @@ func TestWebhookHandler_UserDeleted(t *testing.T) {
 		rec := serveWebhook(t, repo, testWebhookSecret, signedWebhookRequest(t, deletedEventBody))
 		assert.Equal(t, http.StatusInternalServerError, rec.Code)
 		assert.Contains(t, rec.Body.String(), "failed to deactivate user")
+	})
+
+	t.Run("a wrapped ErrNotFound is tolerated and returns 200", func(t *testing.T) {
+		// Regression test for #325: same errors.Is requirement for the
+		// user.deleted tolerance branch.
+		repo := &stubUserRepo{
+			deactivateByClerkIDFn: func(ctx context.Context, clerkID string) error {
+				return fmt.Errorf("deactivate by clerk id: %w", domain.ErrNotFound)
+			},
+		}
+
+		rec := serveWebhook(t, repo, testWebhookSecret, signedWebhookRequest(t, deletedEventBody))
+		assert.Equal(t, http.StatusOK, rec.Code)
 	})
 }
 

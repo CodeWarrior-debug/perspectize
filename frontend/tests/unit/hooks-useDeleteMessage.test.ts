@@ -18,7 +18,7 @@ vi.mock('@tanstack/svelte-query', () => ({
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
 vi.mock('svelte-sonner', () => ({ toast: { error: mocks.mockToastError, success: vi.fn() } }));
 
-import { useDeleteMessage } from '$lib/queries/hooks/useDeleteMessage';
+import { useDeleteMessage } from '$lib/queries/messaging/useDeleteMessage';
 import { DELETE_MESSAGE } from '$lib/queries/messaging';
 import { queryKeys } from '$lib/queries/keys';
 

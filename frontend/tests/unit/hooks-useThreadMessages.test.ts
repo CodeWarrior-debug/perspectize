@@ -18,7 +18,7 @@ vi.mock('$lib/queries/client', () => ({
 	graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a),
 }));
 
-import { useThreadMessages } from '$lib/queries/hooks/useThreadMessages.svelte';
+import { useThreadMessages } from '$lib/queries/messaging/useThreadMessages.svelte';
 import { LIST_THREAD_MESSAGES } from '$lib/queries/messaging';
 import { queryKeys } from '$lib/queries/keys';
 

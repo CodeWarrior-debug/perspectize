@@ -3,7 +3,7 @@
 	 * Signed-in shell: coach eligibility, quiet graduate, and OnboardingCoach mount.
 	 */
 	import { createQuery } from '@tanstack/svelte-query';
-	import { useMe } from '$lib/queries/hooks/useMe.svelte';
+	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import { isCoachEligible } from '$lib/onboarding/eligibility';
 	import {
 		resolveShowCoach,
@@ -12,7 +12,7 @@
 		getCoachForceOpen,
 	} from '$lib/onboarding/coachGate.svelte';
 	import { CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
-	import { useMarkOnboardingSeen } from '$lib/queries/hooks/useMarkOnboardingSeen';
+	import { useMarkOnboardingSeen } from '$lib/queries/users/useMarkOnboardingSeen';
 	import { graphqlRequest } from '$lib/queries/client';
 	import { LIST_CONTENT, type ContentResponse } from '$lib/queries/content';
 	import {

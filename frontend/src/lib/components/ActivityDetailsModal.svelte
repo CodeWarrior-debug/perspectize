@@ -13,7 +13,7 @@
 		extractVideoIdFromUrl,
 		getSourceDataCooldown,
 	} from '$lib/utils/formatting';
-	import { useUpdateSourceData } from '$lib/queries/hooks/useUpdateSourceData';
+	import { useUpdateSourceData } from '$lib/queries/content/useUpdateSourceData';
 
 	interface ModalContent {
 		id: string;

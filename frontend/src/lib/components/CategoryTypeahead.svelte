@@ -9,19 +9,26 @@
 		currentCategory = null,
 		onSelect,
 		onClose,
+		debouncedTerm = $bindable(''),
 	}: {
 		contentId: number;
 		currentCategory: { label: string; wikidataQid: string } | null;
 		onSelect: (result: WikidataSearchResult) => void;
 		onClose: () => void;
+		/** Debounced search term; exposed as bindable for testing the debounce. */
+		debouncedTerm?: string;
 	} = $props();
 
 	let searchTerm = $state('');
-	let debouncedTerm = $state('');
 
+	// Debounce: read `searchTerm` synchronously so Svelte tracks it as a
+	// dependency — reading it only inside the setTimeout callback meant the
+	// effect ran once on mount and never re-ran on keystrokes, so no search
+	// request ever fired.
 	$effect(() => {
+		const term = searchTerm;
 		const timer = setTimeout(() => {
-			debouncedTerm = searchTerm;
+			debouncedTerm = term;
 		}, 300);
 		return () => clearTimeout(timer);
 	});

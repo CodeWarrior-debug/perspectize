@@ -53,6 +53,14 @@ type CategorizedRating {
   rating: Int!
 }
 
+# One emoji feeling selection from the feel-wheel (or its extended search set)
+type FeelingEntry {
+  emoji: String!
+  label: String
+  intensity: Int!
+  note: String
+}
+
 type Perspective {
   id: ID!
   userID: ID!
@@ -71,6 +79,7 @@ type Perspective {
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRating!]
+  feelings: [FeelingEntry!]
   primaryPerspectiveID: ID
   relatedPerspectiveIDs: [Int!]
   customFields: JSON
@@ -214,6 +223,13 @@ input CategorizedRatingInput {
   rating: Int!
 }
 
+input FeelingInput {
+  emoji: String!
+  label: String
+  intensity: Int!
+  note: String
+}
+
 input CreatePerspectiveInput {
   userID: IntID!
   contentID: IntID
@@ -228,6 +244,7 @@ input CreatePerspectiveInput {
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRatingInput!]
+  feelings: [FeelingInput!]
   primaryPerspectiveID: IntID
   relatedPerspectiveIDs: [Int!]
   customFields: JSON
@@ -249,6 +266,7 @@ input UpdatePerspectiveInput {
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRatingInput!]
+  feelings: [FeelingInput!]
   primaryPerspectiveID: IntID
   relatedPerspectiveIDs: [Int!]
   customFields: JSON

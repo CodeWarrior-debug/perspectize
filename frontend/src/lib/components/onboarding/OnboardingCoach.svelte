@@ -25,7 +25,7 @@
 		coachStepBody,
 		type CoachStep,
 	} from '$lib/onboarding/steps';
-	import { useMarkOnboardingSeen } from '$lib/queries/hooks/useMarkOnboardingSeen';
+	import { useMarkOnboardingSeen } from '$lib/queries/users/useMarkOnboardingSeen';
 	import { graphqlRequest } from '$lib/queries/client';
 	import { LIST_CONTENT, type ContentItem, type ContentResponse } from '$lib/queries/content';
 	import {
@@ -235,7 +235,13 @@
 			>
 				Skip all
 			</button>
-			<span class="text-xs text-muted-foreground">Esc to dismiss</span>
+			<button
+				type="button"
+				class="text-xs text-muted-foreground underline-offset-2 hover:underline"
+				onclick={handleDismiss}
+			>
+				Don't show again
+			</button>
 		</div>
 	</div>
 {/snippet}

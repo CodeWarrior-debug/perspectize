@@ -41,7 +41,7 @@ describe('useSetPrimaryCategory hook', () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		capturedMutationOptions = undefined;
-		const { useSetPrimaryCategory } = await import('$lib/queries/hooks/useSetPrimaryCategory');
+		const { useSetPrimaryCategory } = await import('$lib/queries/categories/useSetPrimaryCategory');
 		useSetPrimaryCategory();
 	});
 

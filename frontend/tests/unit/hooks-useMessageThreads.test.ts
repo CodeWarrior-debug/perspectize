@@ -17,7 +17,7 @@ vi.mock('$lib/queries/client', () => ({
 	graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a),
 }));
 
-import { useMessageThreads } from '$lib/queries/hooks/useMessageThreads';
+import { useMessageThreads } from '$lib/queries/messaging/useMessageThreads';
 import { LIST_MESSAGE_THREADS } from '$lib/queries/messaging';
 import { queryKeys } from '$lib/queries/keys';
 

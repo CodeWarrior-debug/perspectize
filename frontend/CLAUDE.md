@@ -51,6 +51,8 @@ pnpm run test         # Tests in watch mode
 
 **`pnpm exec` must run from `frontend/`** — running from repo root fails with `ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE`. Use `cd frontend && pnpm exec ...` or `pnpm --dir frontend exec ...`.
 
+**Env vars:** `.env.example` lists every `VITE_*` variable by name (values blank on purpose). Copy it to `frontend/.env` and fill in real values by hand — the agent cannot read `.env` (see [../.docs/SECURITY.md](../.docs/SECURITY.md)).
+
 ## Svelte 5 Patterns
 
 This project uses **Svelte 5 runes** exclusively. Do not use Svelte 4 syntax.
@@ -65,6 +67,12 @@ This project uses **Svelte 5 runes** exclusively. Do not use Svelte 4 syntax.
 | `onclick={handler}`                 | `on:click={handler}`          |
 
 **Additional rules:** Never use `$effect` for derivation (use `$derived`). Render children via `{@render children()}` with `let { children } = $props()`.
+
+**Runes in a plain `.ts` module require the `.svelte.ts` extension.** `$state`/`$derived`/etc. only compile in `.svelte` files or files named `*.svelte.ts` — a rune used in a bare `.ts` file fails at build/type-check time with no Svelte-specific error pointing at the cause. Any non-component module that needs reactive state (e.g. a shared store) must be named `foo.svelte.ts`, not `foo.ts` — see `frontend/src/lib/theme/store.svelte.ts`.
+
+**`$effect` only tracks state read _synchronously_ in the effect body.** A value read solely inside a `setTimeout`/`Promise`/`await` callback is NOT a tracked dependency, so the effect runs once on mount and never re-runs. For a debounce, copy the reactive value into a local const at the top of the effect first (`const term = searchTerm;`), then use the local inside the timer — see `discover/SearchBar.svelte`. (Bug history: `CategoryTypeahead.svelte`'s Wikidata search read `searchTerm` only inside its `setTimeout`, so the debounced term never updated and the search query never fired.)
+
+**An `$effect` that writes a `$state` var and then reads that same var back (even just-assigned) loops.** Svelte 5 flags this as `effect_update_depth_exceeded` — assigning `foo = x` then reading `foo.length` later in the same effect re-triggers the effect indefinitely, even though the value is unchanged. Fix: read from a local `const` derived off the source (prop) instead of reading the `$state` var back. See `PerspectivePopover.svelte`'s `existingPerspective` reset effect.
 
 ## TanStack Query + GraphQL
 
@@ -178,6 +186,16 @@ Symptom in the browser: `Failed to load module script: Expected a JavaScript-or-
 
 **Date formatting timezone:** `formatDate`/`formatDateCompact` use `toLocaleDateString` (local timezone). In tests, use midday UTC times (`T12:00:00Z`) not midnight (`T00:00:00Z`) to avoid dates shifting to previous day in US timezones.
 
-**AG Grid testing strategy:** AG Grid doesn't render in jsdom — no lifecycle hooks, no Grid API, no cell rendering. Test AG Grid logic by extracting pure functions into `$lib/utils/grid-config.ts` (sort mapping, pagination bounds, responsive tiers, comparators, column metadata). Test renderers/formatters via `$lib/utils/formatting.ts`. For grid integration (filter UI, sort clicks, responsive `$effect` blocks), use Playwright E2E or Vitest Browser Mode (future). See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) testing section.
+**AG Grid testing strategy:** AG Grid doesn't render in jsdom — no lifecycle hooks, no Grid API, no cell rendering. Test AG Grid logic by extracting pure functions into `$lib/utils/grid-config.ts` (sort mapping, pagination bounds, responsive tiers, comparators, column metadata). Test renderers/formatters via `$lib/utils/formatting.ts`. For grid integration (filter UI, sort clicks, responsive `$effect` blocks), use Playwright E2E or Vitest Browser Mode (`tests/browser/`, see below). See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) testing section.
+
+**Vitest Browser Mode (`tests/browser/`, config in `vitest.config.browser.ts`) is not run in CI** — `frontend-test.yml` only runs `test:coverage` on the unit project. A browser-test assertion can be wrong from the day it's written and nothing catches it (`ag-grid-integration.test.ts` had stale `formatCount` expectations that never once passed). Run `pnpm run test:browser` locally before trusting a browser test file.
+
+**Vitest Browser Mode capture gotchas:**
+- `page.screenshot({ path })` resolves the path **relative to the test file**, not against `browser.instances[].screenshotDirectory` — only an absolute path escapes `tests/browser/`.
+- `screenshotDirectory` and `attachmentsDir` (failure screenshots, `context.annotate`) are two separate config options — set both or `attachmentsDir` defaults to a stray `frontend/.vitest-attachments/`.
+- Writing outside the project root (e.g. into a shared screenshots folder) needs `server.fs.allow` widened — Vite's default `server.fs.strict` refuses it.
+- Default browser viewport is 414x896 — clips a wide test harness (e.g. the 1200px AG Grid fixture) out of every screenshot/video. Set `browser.instances[].viewport` explicitly for anything wider.
+- `pnpm run test:browser -- --browser.headless` is parsed as a file-name filter, not a flag — pass provider flags directly (`pnpm run test:browser --browser.headless=true`), no `--`.
+- Playwright's `recordVideo` records per browser **context**, not per test — a `-t` filter is needed to scope a recording to one case, otherwise every test in the run shares one video.
 
 **Stale `node_modules` after switching branches silently inflates `pnpm run check`/`pnpm run test:run` baselines.** Checking out a branch whose `package.json` added a dependency (e.g. `graphql-ws`) without running `pnpm install` leaves the new import unresolved — `svelte-check` reports it as a type error, and any test importing that module fails, both looking exactly like "pre-existing" noise unrelated to current work. A multi-session SDD effort on `feature/messaging-frontend` carried a wrong "7 errors / 8 failing tests" baseline across ten task dispatches before a fresh `pnpm install` revealed the true baseline (3 errors, 0 failures) — the extra 4 errors and 8 failures were 100% the missing package, not real defects. Always `pnpm install` immediately after checking out a branch with dependency changes, before trusting any "baseline" error/failure count.

@@ -13,4 +13,9 @@ type CategoryRepository interface {
 
 	// GetByID fetches a category by its primary key
 	GetByID(ctx context.Context, id int) (*domain.Category, error)
+
+	// GetByIDs fetches multiple categories by primary key in a single query
+	// (WHERE id = ANY($1)). IDs with no matching row are simply absent from
+	// the result slice; a missing ID is not an error. Order is not guaranteed.
+	GetByIDs(ctx context.Context, ids []int) ([]*domain.Category, error)
 }

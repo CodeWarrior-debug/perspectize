@@ -5,7 +5,7 @@
 	import Avatar from './Avatar.svelte';
 	import BellIcon from '@lucide/svelte/icons/bell';
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
-	import { useMuteThread } from '$lib/queries/hooks/useMuteThread';
+	import { useMuteThread } from '$lib/queries/messaging/useMuteThread';
 
 	let {
 		thread,

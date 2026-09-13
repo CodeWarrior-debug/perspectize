@@ -199,9 +199,14 @@ export interface TogglableColumn {
 	label: string;
 }
 
-/** Data columns every user can show/hide. */
+/**
+ * Data columns every user can show/hide.
+ *
+ * "item" is deliberately excluded — it's the only column carrying a video's
+ * title/thumbnail, so hiding it leaves rows with no way to identify which
+ * video they are. It's always visible and never offered as a toggle.
+ */
 export const DATA_COLUMNS: readonly TogglableColumn[] = [
-	{ colId: 'item', label: 'Item' },
 	{ colId: 'type', label: 'Type' },
 	{ colId: 'duration', label: 'Length' },
 	{ colId: 'views', label: 'Views' },

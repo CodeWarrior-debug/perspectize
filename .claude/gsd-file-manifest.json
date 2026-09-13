@@ -187,7 +187,6 @@
     "hooks/gsd-prompt-guard.js": "c20524c50188ff7702314e8f80364fd84edb65ff03a9f2ed2a47fca9f11f8e28",
     "hooks/gsd-read-guard.js": "5d57fa3835f4f41c68cd8c80c1cc0acab8a50dd9d99d92f19981c5062d0d26f2",
     "hooks/gsd-session-state.sh": "1b8fa8cdcac0e2b7364543bd3b937ca4a2e5aa8253a5754efd0ee836b0946cf9",
-    "hooks/gsd-statusline.js": "32ecf694a42ae89e9895bfb57fe93e989ecd59011d33da9f98300ecfe756127c",
     "hooks/gsd-validate-commit.sh": "1faac54d5fba92a5475cb2fa7787cdf68dcf26a7d596a0d3d2fe7af003166a75",
     "hooks/gsd-workflow-guard.js": "d21c7f7b6a0d007d3d4feeb358d3240fdf47cfe80a81c230b1562b03d534cde2"
   }

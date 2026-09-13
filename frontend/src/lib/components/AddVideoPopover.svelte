@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Input, Label } from '$lib/components/shadcn';
 	import FormPopover from '$lib/components/FormPopover.svelte';
-	import { useAddVideo } from '$lib/queries/hooks/useAddVideo';
+	import { useAddVideo } from '$lib/queries/content/useAddVideo';
 	import { validateYouTubeUrl } from '$lib/utils/youtube';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ClipboardPasteIcon from '@lucide/svelte/icons/clipboard-paste';

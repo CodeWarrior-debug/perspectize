@@ -25,4 +25,10 @@ type CategoryService interface {
 
 	// GetCategoryByID fetches a category by its primary key
 	GetCategoryByID(ctx context.Context, id int) (*domain.Category, error)
+
+	// GetCategoriesByIDs fetches multiple categories by primary key in a
+	// single batched query. Used by the GraphQL category dataloader to
+	// collapse per-row Content.primaryCategory lookups into one round-trip.
+	// Missing IDs are omitted from the result; order is not guaranteed.
+	GetCategoriesByIDs(ctx context.Context, ids []int) ([]*domain.Category, error)
 }

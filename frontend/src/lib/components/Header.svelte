@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { Show, SignInButton, UserButton } from 'svelte-clerk';
 	import AddVideoPopover from '$lib/components/AddVideoPopover.svelte';
+	import SettingsDialog from '$lib/components/SettingsDialog.svelte';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { page } from '$app/state';
+	import { createThemeStore } from '$lib/theme/store.svelte';
+
+	const themeStore = createThemeStore();
+	let settingsOpen = $state(false);
 
 	const navLinks = [
 		{ href: '/', label: 'Activity' },
@@ -41,6 +47,14 @@
 		<div class="flex items-center gap-2 md:gap-4 shrink-0">
 			<Show when="signed-in">
 				<AddVideoPopover triggerVariant="outline" />
+				<button
+					type="button"
+					aria-label="Settings"
+					class="inline-flex items-center justify-center rounded-md size-9 text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+					onclick={() => (settingsOpen = true)}
+				>
+					<SettingsIcon class="size-4" />
+				</button>
 				<UserButton
 					appearance={{
 						elements: {
@@ -49,6 +63,8 @@
 					}}
 				/>
 			</Show>
+
+			<SettingsDialog bind:open={settingsOpen} store={themeStore} />
 
 			<Show when="signed-out">
 				<SignInButton mode="modal">

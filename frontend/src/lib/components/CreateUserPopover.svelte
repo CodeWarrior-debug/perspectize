@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Input, Label } from '$lib/components/shadcn';
 	import FormPopover from '$lib/components/FormPopover.svelte';
-	import { useCreateUser } from '$lib/queries/hooks/useCreateUser';
+	import { useCreateUser } from '$lib/queries/users/useCreateUser';
 	import UserPlusIcon from '@lucide/svelte/icons/user-plus';
 
 	let { onUserCreated }: { onUserCreated: (userId: string) => void } = $props();

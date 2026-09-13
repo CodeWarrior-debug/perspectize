@@ -41,7 +41,7 @@ describe('useCreateClaim hook', () => {
 
 	describe('hook initialization', () => {
 		it('returns a mutation object with mutate method', async () => {
-			const { useCreateClaim } = await import('$lib/queries/hooks/useCreateClaim');
+			const { useCreateClaim } = await import('$lib/queries/content/useCreateClaim');
 			const mutation = useCreateClaim();
 			expect(mutation).toBeDefined();
 			expect(mutation.mutate).toBeDefined();
@@ -50,14 +50,14 @@ describe('useCreateClaim hook', () => {
 
 	describe('mutationFn', () => {
 		it('is defined and callable', async () => {
-			const { useCreateClaim } = await import('$lib/queries/hooks/useCreateClaim');
+			const { useCreateClaim } = await import('$lib/queries/content/useCreateClaim');
 			useCreateClaim();
 			expect(capturedMutationOptions).toBeDefined();
 			expect(typeof capturedMutationOptions.mutationFn).toBe('function');
 		});
 
 		it('calls graphqlRequest with CREATE_CLAIM and input', async () => {
-			const { useCreateClaim } = await import('$lib/queries/hooks/useCreateClaim');
+			const { useCreateClaim } = await import('$lib/queries/content/useCreateClaim');
 			const { graphqlRequest } = await import('$lib/queries/client');
 			useCreateClaim();
 
@@ -74,7 +74,7 @@ describe('useCreateClaim hook', () => {
 
 	describe('onSuccess callback', () => {
 		beforeEach(async () => {
-			const { useCreateClaim } = await import('$lib/queries/hooks/useCreateClaim');
+			const { useCreateClaim } = await import('$lib/queries/content/useCreateClaim');
 			useCreateClaim();
 		});
 
@@ -93,7 +93,7 @@ describe('useCreateClaim hook', () => {
 
 	describe('onError callback', () => {
 		beforeEach(async () => {
-			const { useCreateClaim } = await import('$lib/queries/hooks/useCreateClaim');
+			const { useCreateClaim } = await import('$lib/queries/content/useCreateClaim');
 			useCreateClaim();
 		});
 
@@ -130,7 +130,7 @@ describe('useCreateClaim hook', () => {
 
 	describe('integration with queryClient and toasts', () => {
 		beforeEach(async () => {
-			const { useCreateClaim } = await import('$lib/queries/hooks/useCreateClaim');
+			const { useCreateClaim } = await import('$lib/queries/content/useCreateClaim');
 			useCreateClaim();
 		});
 

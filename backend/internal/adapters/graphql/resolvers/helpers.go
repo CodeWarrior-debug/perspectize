@@ -10,6 +10,7 @@ import (
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
 
 // userDomainToModel converts a domain User to a GraphQL model User
@@ -56,6 +57,9 @@ func domainToModel(c *domain.Content) *model.Content {
 		LengthUnits:   c.LengthUnits,
 		CreatedAt:     c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:     c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		// Non-schema field — lets contentResolver.PrimaryCategory batch-load the
+		// category by FK via dataloader instead of re-fetching the content row.
+		PrimaryCategoryID: c.PrimaryCategoryID,
 	}
 
 	// Parse the raw response JSON into a map for GraphQL
@@ -176,6 +180,19 @@ func perspectiveDomainToModel(p *domain.Perspective) *model.Perspective {
 			m.CategorizedRatings[i] = &model.CategorizedRating{
 				Category: cr.Category,
 				Rating:   cr.Rating,
+			}
+		}
+	}
+
+	// Convert feelings
+	if len(p.Feelings) > 0 {
+		m.Feelings = make([]*model.FeelingEntry, len(p.Feelings))
+		for i, f := range p.Feelings {
+			m.Feelings[i] = &model.FeelingEntry{
+				Emoji:     f.Emoji,
+				Label:     nilIfEmpty(f.Label),
+				Intensity: f.Intensity,
+				Note:      f.Note,
 			}
 		}
 	}
@@ -393,4 +410,123 @@ func parseIntID(field, raw string) (int, error) {
 		return 0, fmt.Errorf("%w: %s must be a numeric id", domain.ErrInvalidInput, field)
 	}
 	return v, nil
+}
+
+// modelToCreatePerspectiveInput converts a GraphQL CreatePerspectiveInput into the
+// service-layer input, handling customFields JSON marshaling and categorized rating
+// conversion. Keeps the CreatePerspective resolver free of field-by-field mapping —
+// adding a new perspective field means touching this function (and its Update sibling
+// below), not the resolver body.
+func modelToCreatePerspectiveInput(userID int, input model.CreatePerspectiveInput) portservices.CreatePerspectiveInput {
+	serviceInput := portservices.CreatePerspectiveInput{
+		UserID:                userID,
+		ContentID:             input.ContentID,
+		Quality:               input.Quality,
+		Agreement:             input.Agreement,
+		Importance:            input.Importance,
+		Confidence:            input.Confidence,
+		Like:                  input.Like,
+		Privacy:               input.Privacy,
+		Description:           input.Description,
+		Category:              input.Category,
+		Parts:                 input.Parts,
+		Labels:                input.Labels,
+		CategorizedRatings:    categorizedRatingInputsToDomain(input.CategorizedRatings),
+		Feelings:              feelingInputsToDomain(input.Feelings),
+		PrimaryPerspectiveID:  input.PrimaryPerspectiveID,
+		RelatedPerspectiveIDs: input.RelatedPerspectiveIDs,
+		Review:                input.Review,
+	}
+
+	if input.CustomFields != nil {
+		if data, err := json.Marshal(input.CustomFields); err == nil {
+			serviceInput.CustomFields = data
+		}
+	}
+
+	return serviceInput
+}
+
+// modelToUpdatePerspectiveInput converts a GraphQL UpdatePerspectiveInput into the
+// service-layer input. See modelToCreatePerspectiveInput for why this mapping lives
+// here instead of inline in the resolver.
+func modelToUpdatePerspectiveInput(input model.UpdatePerspectiveInput) portservices.UpdatePerspectiveInput {
+	serviceInput := portservices.UpdatePerspectiveInput{
+		ID:                    input.ID,
+		ContentID:             input.ContentID,
+		Quality:               input.Quality,
+		Agreement:             input.Agreement,
+		Importance:            input.Importance,
+		Confidence:            input.Confidence,
+		Like:                  input.Like,
+		Privacy:               input.Privacy,
+		Description:           input.Description,
+		Category:              input.Category,
+		ReviewStatus:          input.ReviewStatus,
+		Parts:                 input.Parts,
+		Labels:                input.Labels,
+		CategorizedRatings:    categorizedRatingInputsToDomain(input.CategorizedRatings),
+		Feelings:              feelingInputsToDomain(input.Feelings),
+		PrimaryPerspectiveID:  input.PrimaryPerspectiveID,
+		RelatedPerspectiveIDs: input.RelatedPerspectiveIDs,
+		Review:                input.Review,
+	}
+
+	if input.CustomFields != nil {
+		if data, err := json.Marshal(input.CustomFields); err == nil {
+			serviceInput.CustomFields = data
+		}
+	}
+
+	return serviceInput
+}
+
+// categorizedRatingInputsToDomain converts GraphQL categorized rating inputs to their
+// domain form. Returns nil (not an empty slice) for a nil/empty input, matching the
+// original resolver behavior: an empty categorizedRatings array is indistinguishable
+// from "not provided" and does not clear existing ratings on update.
+func categorizedRatingInputsToDomain(ratings []*model.CategorizedRatingInput) []domain.CategorizedRating {
+	if len(ratings) == 0 {
+		return nil
+	}
+	out := make([]domain.CategorizedRating, len(ratings))
+	for i, cr := range ratings {
+		out[i] = domain.CategorizedRating{
+			Category: cr.Category,
+			Rating:   cr.Rating,
+		}
+	}
+	return out
+}
+
+// feelingInputsToDomain converts GraphQL feeling inputs to their domain form.
+// Returns nil (not an empty slice) for a nil/empty input, matching
+// categorizedRatingInputsToDomain's "not provided" semantics on update.
+func feelingInputsToDomain(feelings []*model.FeelingInput) []domain.FeelingEntry {
+	if len(feelings) == 0 {
+		return nil
+	}
+	out := make([]domain.FeelingEntry, len(feelings))
+	for i, f := range feelings {
+		label := ""
+		if f.Label != nil {
+			label = *f.Label
+		}
+		out[i] = domain.FeelingEntry{
+			Emoji:     f.Emoji,
+			Label:     label,
+			Intensity: f.Intensity,
+			Note:      f.Note,
+		}
+	}
+	return out
+}
+
+// nilIfEmpty returns nil for an empty string, otherwise a pointer to it —
+// used for optional GraphQL string fields backed by a non-pointer domain field.
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

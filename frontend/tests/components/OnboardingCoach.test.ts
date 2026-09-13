@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
 	mockGraphql: vi.fn(),
 }));
 
-vi.mock('$lib/queries/hooks/useMarkOnboardingSeen', () => ({
+vi.mock('$lib/queries/users/useMarkOnboardingSeen', () => ({
 	useMarkOnboardingSeen: () => ({
 		mutate: mocks.mockMarkMutate,
 		isPending: false,

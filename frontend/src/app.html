@@ -11,6 +11,27 @@
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
+		<script>
+			// Apply the persisted theme before paint to avoid a flash of the default theme.
+			// Reads a cache written by lib/theme/store.svelte.ts — no derivation logic here.
+			(function () {
+				try {
+					var raw = localStorage.getItem('perspectize-theme-applied');
+					if (!raw) return;
+					var cache = JSON.parse(raw);
+					var root = document.documentElement;
+					if (cache.dataThemeId) {
+						root.setAttribute('data-theme', cache.dataThemeId);
+					} else if (cache.vars) {
+						for (var k in cache.vars) {
+							root.style.setProperty(k, cache.vars[k]);
+						}
+					}
+				} catch (e) {
+					// Corrupt/unavailable cache — fall back to the default theme silently.
+				}
+			})();
+		</script>
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 </html>

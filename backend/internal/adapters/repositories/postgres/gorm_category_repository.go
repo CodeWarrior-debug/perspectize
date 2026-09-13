@@ -62,3 +62,23 @@ func (r *GormCategoryRepository) GetByID(ctx context.Context, id int) (*domain.C
 
 	return categoryModelToDomain(&model), nil
 }
+
+// GetByIDs fetches multiple categories by primary key in a single query.
+// Emits `WHERE id IN (...)` (GORM expands a slice bind to ANY-equivalent).
+// Missing IDs are omitted; an empty input returns an empty slice with no query.
+func (r *GormCategoryRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.Category, error) {
+	if len(ids) == 0 {
+		return []*domain.Category{}, nil
+	}
+
+	var models []CategoryModel
+	if err := r.db.WithContext(ctx).Where("id IN ?", ids).Find(&models).Error; err != nil {
+		return nil, fmt.Errorf("failed to get categories by ids: %w", err)
+	}
+
+	categories := make([]*domain.Category, 0, len(models))
+	for i := range models {
+		categories = append(categories, categoryModelToDomain(&models[i]))
+	}
+	return categories, nil
+}

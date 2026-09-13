@@ -25,7 +25,7 @@ vi.mock('$lib/queries/client', () => ({
 	graphqlRequest: (...args: unknown[]) => mocks.mockGraphql(...args),
 }));
 
-import { useMarkOnboardingSeen } from '$lib/queries/hooks/useMarkOnboardingSeen';
+import { useMarkOnboardingSeen } from '$lib/queries/users/useMarkOnboardingSeen';
 import { MARK_ONBOARDING_SEEN } from '$lib/queries/users';
 
 describe('useMarkOnboardingSeen', () => {

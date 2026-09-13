@@ -24,9 +24,9 @@ vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => moc
 vi.mock('$app/navigation', () => ({ goto: mocks.mockGoto }));
 vi.mock('svelte-sonner', () => ({ toast: { success: mocks.mockToastSuccess, error: mocks.mockToastError } }));
 
-import { useSetTyping } from '$lib/queries/hooks/useSetTyping';
-import { useAddThreadParticipants } from '$lib/queries/hooks/useAddThreadParticipants';
-import { useLeaveThread } from '$lib/queries/hooks/useLeaveThread';
+import { useSetTyping } from '$lib/queries/messaging/useSetTyping';
+import { useAddThreadParticipants } from '$lib/queries/messaging/useAddThreadParticipants';
+import { useLeaveThread } from '$lib/queries/messaging/useLeaveThread';
 import { SET_TYPING, ADD_THREAD_PARTICIPANTS, LEAVE_THREAD } from '$lib/queries/messaging';
 import { queryKeys } from '$lib/queries/keys';
 

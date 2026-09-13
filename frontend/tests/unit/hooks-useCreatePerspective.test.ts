@@ -54,13 +54,13 @@ describe('useCreatePerspective hook', () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		capturedMutationOptions = undefined;
-		const { useCreatePerspective } = await import('$lib/queries/hooks/useCreatePerspective');
+		const { useCreatePerspective } = await import('$lib/queries/perspectives/useCreatePerspective');
 		useCreatePerspective();
 	});
 
 	describe('hook initialization', () => {
 		it('returns a mutation object with mutate method', async () => {
-			const { useCreatePerspective } = await import('$lib/queries/hooks/useCreatePerspective');
+			const { useCreatePerspective } = await import('$lib/queries/perspectives/useCreatePerspective');
 			const mutation = useCreatePerspective();
 			expect(mutation).toBeDefined();
 			expect(mutation.mutate).toBeDefined();
@@ -136,6 +136,36 @@ describe('useCreatePerspective hook', () => {
 			expect(next.perspectives.items).toHaveLength(2);
 			expect(next.perspectives.items[0]).toMatchObject({ id: ctx.tempId, contentID: '10', quality: 7500 });
 			expect(ctx.previous).toHaveLength(1);
+		});
+	});
+
+	describe('privacy', () => {
+		it('forwards privacy to the mutation and the optimistic row', async () => {
+			const { graphqlRequest } = await import('$lib/queries/client');
+			const { CREATE_PERSPECTIVE } = await import('$lib/queries/perspectives');
+			(graphqlRequest as any).mockResolvedValue({
+				createPerspective: { id: '1', userID: '42', quality: 9000, privacy: 'PRIVATE', createdAt: '', updatedAt: '' },
+			});
+
+			const input = { userID: 42, quality: 9000, privacy: 'PRIVATE' as const };
+			await capturedMutationOptions.mutationFn(input);
+			expect(graphqlRequest).toHaveBeenCalledWith(CREATE_PERSPECTIVE, {
+				input: expect.objectContaining({ privacy: 'PRIVATE' }),
+			});
+
+			const existing = { perspectives: { items: [] as unknown[] } };
+			await capturedMutationOptions.onMutate(input);
+			const updater = mockSetQueriesData.mock.calls[0][1];
+			const next = updater(existing);
+			expect(next.perspectives.items[0]).toMatchObject({ privacy: 'PRIVATE' });
+		});
+
+		it('defaults the optimistic row to PUBLIC when privacy is omitted', async () => {
+			const existing = { perspectives: { items: [] as unknown[] } };
+			await capturedMutationOptions.onMutate({ userID: 42, quality: 9000 });
+			const updater = mockSetQueriesData.mock.calls[0][1];
+			const next = updater(existing);
+			expect(next.perspectives.items[0]).toMatchObject({ privacy: 'PUBLIC' });
 		});
 	});
 

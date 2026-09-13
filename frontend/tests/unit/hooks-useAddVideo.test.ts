@@ -42,7 +42,7 @@ describe('useAddVideo hook', () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		capturedMutationOptions = undefined;
-		const { useAddVideo } = await import('$lib/queries/hooks/useAddVideo');
+		const { useAddVideo } = await import('$lib/queries/content/useAddVideo');
 		useAddVideo();
 	});
 

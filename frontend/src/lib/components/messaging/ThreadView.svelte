@@ -3,11 +3,11 @@
 	import { graphqlRequest } from '$lib/queries/client';
 	import { GET_MESSAGE_THREAD, type GetMessageThreadResponse, type MessagingUser } from '$lib/queries/messaging';
 	import { queryKeys } from '$lib/queries/keys';
-	import { useMe } from '$lib/queries/hooks/useMe.svelte';
-	import { useThreadMessages } from '$lib/queries/hooks/useThreadMessages.svelte';
-	import { useSendMessage } from '$lib/queries/hooks/useSendMessage';
-	import { useSetTyping } from '$lib/queries/hooks/useSetTyping';
-	import { useMarkThreadRead } from '$lib/queries/hooks/useMarkThreadRead';
+	import { useMe } from '$lib/queries/users/useMe.svelte';
+	import { useThreadMessages } from '$lib/queries/messaging/useThreadMessages.svelte';
+	import { useSendMessage } from '$lib/queries/messaging/useSendMessage';
+	import { useSetTyping } from '$lib/queries/messaging/useSetTyping';
+	import { useMarkThreadRead } from '$lib/queries/messaging/useMarkThreadRead';
 	import { createThreadStream } from '$lib/messaging/useThreadStream.svelte';
 	import { otherParticipants } from '$lib/messaging/format';
 	import { showSenderForIndex, lastKnownSeq, typingUsernames, shouldMarkRead } from './threadView.helpers';

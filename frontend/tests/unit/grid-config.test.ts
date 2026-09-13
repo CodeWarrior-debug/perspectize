@@ -413,9 +413,8 @@ describe('COLUMN_FILTERS', () => {
 // Column-picker registry
 // ---------------------------------------------------------------------------
 describe('column-picker registry', () => {
-	it('DATA_COLUMNS holds the 10 user-togglable data columns', () => {
+	it('DATA_COLUMNS holds the 9 user-togglable data columns', () => {
 		expect(DATA_COLUMNS.map((c) => c.colId)).toEqual([
-			'item',
 			'type',
 			'duration',
 			'views',
@@ -426,6 +425,11 @@ describe('column-picker registry', () => {
 			'tags',
 			'description',
 		]);
+	});
+
+	it('does not list the "item" column — it must always stay visible so rows remain identifiable', () => {
+		expect(DATA_COLUMNS.map((c) => c.colId)).not.toContain('item');
+		expect(togglableColIds(true)).not.toContain('item');
 	});
 
 	it('INTERNAL_COLUMNS holds the 5 admin-only columns', () => {
@@ -443,13 +447,13 @@ describe('column-picker registry', () => {
 		}
 	});
 
-	it('togglableColIds(false) returns only the 10 data columns', () => {
+	it('togglableColIds(false) returns only the 9 data columns', () => {
 		expect(togglableColIds(false)).toEqual(DATA_COLUMNS.map((c) => c.colId));
 	});
 
-	it('togglableColIds(true) returns all 15 columns', () => {
+	it('togglableColIds(true) returns all 14 columns', () => {
 		const ids = togglableColIds(true);
-		expect(ids).toHaveLength(15);
+		expect(ids).toHaveLength(14);
 		expect(ids).toEqual([...DATA_COLUMNS.map((c) => c.colId), ...INTERNAL_COLUMNS.map((c) => c.colId)]);
 	});
 

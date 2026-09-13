@@ -78,6 +78,16 @@
       "mcp__chrome-devtools__hover",
       "mcp__chrome-devtools__list_network_requests",
       "mcp__chrome-devtools__get_network_request"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
+      "Read(**/.env.development)",
+      "Read(**/.env.production)",
+      "Read(**/.env.staging)",
+      "Read(**/.env.secret)",
+      "Read(.claude/sv-profile/**)"
     ]
   },
   "hooks": {
@@ -98,6 +108,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash .claude/hooks/deny-env-read.sh"
+          },
+          {
+            "type": "command",
             "command": "bash .claude/hooks/prettier-precommit.sh"
           },
           {
@@ -111,10 +125,6 @@
         ]
       }
     ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "node .claude/hooks/gsd-statusline.js"
   },
   "enabledPlugins": {
     "hookify@claude-plugins-official": false,

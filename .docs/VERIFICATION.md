@@ -2,6 +2,71 @@
 
 Before marking any work complete, run interactive verification.
 
+## 0. Authenticated session (one-time setup)
+
+Self-verify drives Chrome through a persistent, pre-authenticated profile so it
+can exercise logged-in flows (add a video, set a primary category) without the
+agent ever handling a credential. The secret is a revocable Clerk session cookie
+for a throwaway test user, living in a profile dir the agent cannot read.
+
+### a. Create the test user (one-time)
+
+The app runs a Clerk **development** instance locally (`sk_test` / `pk_test`),
+which supports test identities with no real inbox:
+
+```bash
+make start                                   # backend :8080 + frontend :5173
+bash .claude/scripts/sv-chrome.sh http://localhost:5173/
+```
+
+In that Chrome window, **Sign up**:
+- Email: `perspectize-sv+clerk_test@gmail.com` (any `+clerk_test` address —
+  Clerk dev instances intercept these)
+- Password: a real one, kept in a human password manager and mirrored into the
+  gitignored `.claude/.env` as `SV_TEST_USER_PASSWORD` (see
+  `.claude/.env.example` and §3) so a lapsed session can be re-driven — never in
+  a tracked file or in the chat
+- Email verification code: `424242` (fixed code for `+clerk_test` on dev
+  instances)
+- Finish username onboarding, then load the app once while signed in so the
+  backend's just-in-time user creation (`clerk_middleware.go`) writes the local
+  `users` row. No Clerk webhook needed.
+
+Close Chrome. The session persists in `.claude/sv-profile/` (gitignored; covered
+by the `Read` deny rules in `.claude/settings.json`). Repeat only when the Clerk
+session expires.
+
+### b. Wire the chrome-devtools MCP to that profile
+
+`chrome-devtools-mcp` (v0.x) launches its own Chrome. Point it at the persistent
+profile so the agent's browser is already signed in. In `~/.claude.json` →
+`mcpServers.chrome-devtools.args`:
+
+```json
+"args": [
+  "chrome-devtools-mcp@latest",
+  "--userDataDir=/ABSOLUTE/PATH/TO/repo/.claude/sv-profile"
+]
+```
+
+Then **restart Claude Code** — the MCP reads its config only at startup.
+
+Notes:
+- `--userDataDir` (camelCase) is the current flag; `--isolated` already defaults
+  to `false`, but without `--userDataDir` the MCP uses
+  `~/.cache/chrome-devtools-mcp/chrome-profile*`, not this one.
+- This is a **global** MCP config edit — chrome-devtools in every project then
+  loads this profile. Revert by removing the arg.
+- The MCP-launched Chrome and a manual `sv-chrome.sh` **cannot run at the same
+  time** (same profile dir → SingletonLock). Use `sv-chrome.sh` only for the
+  one-time human sign-in; let the MCP own the browser after that.
+- Alternative: keep `sv-chrome.sh` running (it exposes `:9222`) and use
+  `--browserUrl=http://127.0.0.1:9222` instead of `--userDataDir`.
+
+**Agent rule:** assume the session is live. If you hit a signed-out state, STOP
+and ask the human to re-run the sign-in — never authenticate or enter
+credentials yourself.
+
 ## 1. Start Services
 
 The database is hosted on Sevalla (cloud PostgreSQL) — no Docker or local database setup needed.
@@ -37,6 +102,13 @@ Also test any frontend GraphQL queries (`src/lib/queries/*.ts`) against the live
 
 ## 3. Verify Frontend (Chrome DevTools MCP)
 
+> **Local-only step — do not attempt in cloud / CI / fresh-machine sessions.**
+> Driving the running app requires two gitignored, machine-local artifacts:
+> - `.claude/.env` — `SV_TEST_USER_EMAIL` / `SV_TEST_USER_PASSWORD` / `SV_TEST_USER_OTP` for the dedicated Clerk dev-instance test user (values are hand-provisioned per machine; never commit or paste them).
+> - `.claude/sv-profile/` — the persisted Chrome profile the MCP attaches to.
+>
+> If either is missing, or there is no real Chrome / display, **skip this section entirely** and run only the headless checklist (`go build ./...`, `go test ./...`, `pnpm run test:run`). Do not try to sign in to Clerk — the instance and creds are scoped to a single local operator. Hand any UI-behavior verification back to a local session.
+
 | Step | MCP Tool | Purpose |
 |------|----------|---------|
 | Navigate | `mcp__chrome-devtools__navigate_page` | Load frontend URL |
@@ -46,19 +118,9 @@ Also test any frontend GraphQL queries (`src/lib/queries/*.ts`) against the live
 | Console | `mcp__chrome-devtools__list_console_messages` | Check for JS errors |
 | Interact | `mcp__chrome-devtools__click` | Test buttons, toasts, navigation |
 
-## 4. GSD Plan Verification
+> `fill` **appends** to a non-empty input rather than replacing it. Clear the field first via `evaluate_script` (native value setter + dispatch `input`) before filling.
 
-For each plan's `must_haves`:
-
-| Check | Command |
-|-------|---------|
-| `truths` | Run actual command, verify output |
-| `artifacts.path` | `test -f {path} && echo "exists"` |
-| `artifacts.contains` | `grep -q "{pattern}" {path}` |
-| `artifacts.min_lines` | `wc -l < {path}` >= N |
-| `key_links.pattern` | `grep -q "{pattern}" {from}` |
-
-## 5. Evidence Capture
+## 4. Evidence Capture
 
 Save screenshots to `/Users/jamesjordan/Downloads/screenshots/` with naming convention:
 - **Prefix:** `sv-` (Self-Verify) — supersedes the old `ccsv-` prefix; `ccsv-` may still appear in older screenshots but new captures use `sv-`

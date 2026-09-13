@@ -20,7 +20,7 @@ vi.mock('@tanstack/svelte-query', () => ({
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
 vi.mock('svelte-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
-import { useMarkThreadRead } from '$lib/queries/hooks/useMarkThreadRead';
+import { useMarkThreadRead } from '$lib/queries/messaging/useMarkThreadRead';
 import { MARK_THREAD_READ } from '$lib/queries/messaging';
 import { queryKeys } from '$lib/queries/keys';
 

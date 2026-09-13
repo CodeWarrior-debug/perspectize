@@ -110,21 +110,37 @@ and invisible to npm tooling. Run the scanner that gates CI, not a proxy.
 
 ### 5. Prefer `^` over `>=` in pnpm `overrides`
 
+**Overrides live in `frontend/pnpm-workspace.yaml`'s `overrides:` block only
+— never in `package.json`'s `pnpm.overrides`.** With `package.json#pnpm.overrides`
+non-empty, pnpm's config loader replaces the whole `overrides` object instead
+of merging it with `pnpm-workspace.yaml`'s, so the workspace file's entries
+are silently ignored (no warning, no error) — a known, currently-open
+upstream pnpm bug ([#10675](https://github.com/pnpm/pnpm/issues/10675),
+[#10614](https://github.com/pnpm/pnpm/issues/10614), open as of pnpm
+10.29.3). Worse, `pnpm/action-setup` in CI and Dependabot's pnpm helper
+resolve the two files in opposite priority order, so if both are populated
+and drift apart, Dependabot PRs regenerate the lockfile against the wrong
+file's values and fail `pnpm install --frozen-lockfile` in CI with
+`ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`. Keep `package.json#pnpm.overrides` empty
+and put every override in `pnpm-workspace.yaml` (see the comment there). This
+should be revisited once the repo bumps pnpm past whatever version fixes the
+upstream bug — and again at pnpm 11, which drops `package.json#pnpm` support
+entirely in favor of `pnpm-workspace.yaml`, potentially reversing which file
+"wins" in the interim.
+
 `>=x` lets a transitive resolve to a future **major** version with breaking
 changes. `^x` pins to the current major while still taking the security patch.
 
-```jsonc
-"pnpm": {
-  "overrides": {
-    "cookie": "^0.7.0",          // good: patched, but won't jump to 1.x
-    "picomatch": "^4.0.4"
-    // avoid: "cookie": ">=0.7.0"
-  }
-}
+```yaml
+# frontend/pnpm-workspace.yaml
+overrides:
+  cookie: ^0.7.0          # good: patched, but won't jump to 1.x
+  picomatch: ^4.0.4
+  # avoid: cookie: ">=0.7.0"
 ```
 
 When overriding a package only on a specific path, scope it:
-`"tinyglobby>picomatch": "^4.0.4"`. (Note: an override version must actually
+`'tinyglobby>picomatch': ^4.0.4`. (Note: an override version must actually
 exist — e.g. there is no `picomatch@2.3.2`; the v2 line tops out at `2.3.1`.)
 
 **Exception — pin exact when a specific version must be excluded.** Caret only
@@ -133,9 +149,9 @@ single bad version within that range. If the override exists to keep a
 *specific* published version out (blocked by `minimumReleaseAge`, see #7
 below; or a known regression), use an exact pin instead:
 
-```jsonc
-"prosemirror-transform": "1.12.0"   // exact: 1.12.1 satisfies ^1.12.0 too,
-                                     // so caret wouldn't exclude it
+```yaml
+prosemirror-transform: 1.12.0   # exact: 1.12.1 satisfies ^1.12.0 too,
+                                 # so caret wouldn't exclude it
 ```
 
 **Exception — compound OR ranges for a skipped vulnerable band.** `nanoid`'s

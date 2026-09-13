@@ -54,13 +54,13 @@ describe('useUpdatePerspective hook', () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		capturedMutationOptions = undefined;
-		const { useUpdatePerspective } = await import('$lib/queries/hooks/useUpdatePerspective');
+		const { useUpdatePerspective } = await import('$lib/queries/perspectives/useUpdatePerspective');
 		useUpdatePerspective();
 	});
 
 	describe('hook initialization', () => {
 		it('returns a mutation object with mutate method', async () => {
-			const { useUpdatePerspective } = await import('$lib/queries/hooks/useUpdatePerspective');
+			const { useUpdatePerspective } = await import('$lib/queries/perspectives/useUpdatePerspective');
 			const mutation = useUpdatePerspective();
 			expect(mutation).toBeDefined();
 			expect(mutation.mutate).toBeDefined();
@@ -152,6 +152,31 @@ describe('useUpdatePerspective hook', () => {
 			expect(next.perspectives.items[0]).toMatchObject({ id: '5', quality: 6000, importance: 2000 });
 			expect(next.perspectives.items[0].updatedAt).not.toBe('old');
 			expect(ctx.previous).toHaveLength(1);
+		});
+	});
+
+	describe('privacy', () => {
+		it('forwards privacy and patches the cached row via applyEdit', async () => {
+			const { graphqlRequest } = await import('$lib/queries/client');
+			const { UPDATE_PERSPECTIVE } = await import('$lib/queries/perspectives');
+			(graphqlRequest as any).mockResolvedValue({
+				updatePerspective: { id: '5', userID: '42', privacy: 'PRIVATE', createdAt: '', updatedAt: '' },
+			});
+
+			const input = { id: 5, privacy: 'PRIVATE' as const };
+			await capturedMutationOptions.mutationFn(input);
+			expect(graphqlRequest).toHaveBeenCalledWith(UPDATE_PERSPECTIVE, {
+				input: expect.objectContaining({ id: 5, privacy: 'PRIVATE' }),
+			});
+
+			const existing = {
+				perspectives: { items: [{ id: '5', quality: 1000, privacy: 'PUBLIC', updatedAt: 'old' }] },
+			};
+			mockGetQueriesData.mockReturnValueOnce([[['app', 'perspectives', 'list', { userId: 42 }], existing]]);
+			await capturedMutationOptions.onMutate(input);
+			const updater = mockSetQueriesData.mock.calls[0][1];
+			const next = updater(existing);
+			expect(next.perspectives.items[0]).toMatchObject({ id: '5', privacy: 'PRIVATE' });
 		});
 	});
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
@@ -110,7 +109,19 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 			query = query.Where("content_id = ?", *params.Filter.ContentID)
 		}
 		if params.Filter.Privacy != nil {
-			query = query.Where("privacy = ?", strings.ToLower(string(*params.Filter.Privacy)))
+			query = query.Where("privacy = ?", privacyToDBValue(*params.Filter.Privacy))
+		}
+	}
+
+	// Read-authorization predicate (see PerspectiveService.ListPerspectives).
+	// WHERE shape chosen over UNION: benchmark 2026-09-10 (plan Task 6) — WHERE
+	// ~8.9ms vs UNION ~9.3ms unindexed, 0.02ms vs 0.29ms with a (user_id,created_at) index.
+	if params.RestrictToPublicOrOwner {
+		if params.ViewerID != nil {
+			query = query.Where("privacy = ? OR user_id = ?",
+				privacyToDBValue(domain.PrivacyPublic), *params.ViewerID)
+		} else {
+			query = query.Where("privacy = ?", privacyToDBValue(domain.PrivacyPublic))
 		}
 	}
 

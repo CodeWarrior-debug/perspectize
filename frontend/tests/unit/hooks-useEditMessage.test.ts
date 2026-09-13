@@ -18,7 +18,7 @@ vi.mock('@tanstack/svelte-query', () => ({
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
 vi.mock('svelte-sonner', () => ({ toast: { error: mocks.mockToastError, success: vi.fn() } }));
 
-import { useEditMessage } from '$lib/queries/hooks/useEditMessage';
+import { useEditMessage } from '$lib/queries/messaging/useEditMessage';
 import { EDIT_MESSAGE } from '$lib/queries/messaging';
 import { queryKeys } from '$lib/queries/keys';
 

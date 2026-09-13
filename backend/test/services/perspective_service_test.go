@@ -465,3 +465,65 @@ func TestValidateRating_Invalid(t *testing.T) {
 func TestValidateRating_Nil(t *testing.T) {
 	assert.True(t, domain.ValidateRating(nil))
 }
+
+func TestPerspectiveService_ListPerspectives_PrivacyEnforcement(t *testing.T) {
+	ctx := context.Background()
+	pInt := func(i int) *int { return &i }
+
+	newSvc := func(capture *domain.PerspectiveListParams) *services.PerspectiveService {
+		repo := &mockPerspectiveRepository{
+			listFn: func(_ context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error) {
+				*capture = params
+				return &domain.PaginatedPerspectives{Items: []*domain.Perspective{}}, nil
+			},
+		}
+		return services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+	}
+
+	t.Run("owner viewing their own list is not restricted", func(t *testing.T) {
+		var got domain.PerspectiveListParams
+		svc := newSvc(&got)
+		_, err := svc.ListPerspectives(ctx, domain.PerspectiveListParams{
+			ViewerID: pInt(7),
+			Filter:   &domain.PerspectiveFilter{UserID: pInt(7)},
+		})
+		require.NoError(t, err)
+		assert.False(t, got.RestrictToPublicOrOwner)
+	})
+
+	t.Run("different signed-in user is restricted", func(t *testing.T) {
+		var got domain.PerspectiveListParams
+		svc := newSvc(&got)
+		_, err := svc.ListPerspectives(ctx, domain.PerspectiveListParams{
+			ViewerID: pInt(7),
+			Filter:   &domain.PerspectiveFilter{UserID: pInt(9)},
+		})
+		require.NoError(t, err)
+		assert.True(t, got.RestrictToPublicOrOwner)
+		require.NotNil(t, got.ViewerID)
+		assert.Equal(t, 7, *got.ViewerID)
+	})
+
+	t.Run("anonymous viewer is restricted", func(t *testing.T) {
+		var got domain.PerspectiveListParams
+		svc := newSvc(&got)
+		_, err := svc.ListPerspectives(ctx, domain.PerspectiveListParams{
+			ViewerID: nil,
+			Filter:   &domain.PerspectiveFilter{UserID: pInt(9)},
+		})
+		require.NoError(t, err)
+		assert.True(t, got.RestrictToPublicOrOwner)
+		assert.Nil(t, got.ViewerID)
+	})
+
+	t.Run("no user filter is restricted even for a signed-in caller", func(t *testing.T) {
+		var got domain.PerspectiveListParams
+		svc := newSvc(&got)
+		_, err := svc.ListPerspectives(ctx, domain.PerspectiveListParams{
+			ViewerID: pInt(7),
+			Filter:   nil,
+		})
+		require.NoError(t, err)
+		assert.True(t, got.RestrictToPublicOrOwner)
+	})
+}
