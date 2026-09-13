@@ -13,7 +13,7 @@ import (
 // run against config file values only. t.Setenv restores originals on cleanup.
 func clearConfigEnvVars(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"DATABASE_URL", "DATABASE_PASSWORD", "YOUTUBE_API_KEY", "YOUTUBE_API_CACHE_TTL_SECONDS"} {
+	for _, key := range []string{"DATABASE_URL", "DATABASE_PASSWORD", "YOUTUBE_API_KEY", "YOUTUBE_API_CACHE_TTL_SECONDS", "MESSAGE_RETENTION_MAX", "MESSAGE_RETENTION_SWEEP_MINUTES"} {
 		t.Setenv(key, "")
 	}
 }
@@ -73,6 +73,43 @@ func TestLoad_YouTubeCacheTTL_InvalidFallsBackToDefault(t *testing.T) {
 	cfg, err := config.Load("../../config/config.example.json")
 	assert.NoError(t, err)
 	assert.Equal(t, config.DefaultYouTubeCacheTTLSeconds, cfg.YouTube.CacheTTLSeconds)
+}
+
+// TestLoad_MessageRetention verifies the retention env vars are parsed onto Config.
+func TestLoad_MessageRetention(t *testing.T) {
+	clearConfigEnvVars(t)
+	t.Setenv("MESSAGE_RETENTION_MAX", "500")
+	t.Setenv("MESSAGE_RETENTION_SWEEP_MINUTES", "30")
+
+	cfg, err := config.Load("../../config/config.example.json")
+	assert.NoError(t, err)
+	assert.Equal(t, 500, cfg.MessageRetentionMax)
+	assert.Equal(t, 30, cfg.MessageRetentionSweepMinutes)
+}
+
+// TestLoad_MessageRetention_DefaultsUnbounded verifies retention is off by
+// default (max 0 => no sweep) and the sweep interval defaults to 15 minutes.
+func TestLoad_MessageRetention_DefaultsUnbounded(t *testing.T) {
+	clearConfigEnvVars(t)
+	t.Setenv("MESSAGE_RETENTION_MAX", "")
+
+	cfg, err := config.Load("../../config/config.example.json")
+	assert.NoError(t, err)
+	assert.Equal(t, 0, cfg.MessageRetentionMax, "retention unbounded by default")
+	assert.Equal(t, 15, cfg.MessageRetentionSweepMinutes, "sweep interval defaults to 15 minutes")
+}
+
+// TestLoad_MessageRetention_InvalidIgnored verifies a garbage value leaves
+// retention unbounded rather than crashing config load.
+func TestLoad_MessageRetention_InvalidIgnored(t *testing.T) {
+	clearConfigEnvVars(t)
+	t.Setenv("MESSAGE_RETENTION_MAX", "not-a-number")
+	t.Setenv("MESSAGE_RETENTION_SWEEP_MINUTES", "-5")
+
+	cfg, err := config.Load("../../config/config.example.json")
+	assert.NoError(t, err)
+	assert.Equal(t, 0, cfg.MessageRetentionMax)
+	assert.Equal(t, 15, cfg.MessageRetentionSweepMinutes)
 }
 
 // TestLoad_RealConfigWithEnvOverrides tests that env vars override the real config

@@ -8,6 +8,7 @@ require (
 	github.com/99designs/gqlgen v0.17.95
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/clerk/clerk-sdk-go/v2 v2.7.0
+	github.com/coder/websocket v1.8.15
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/go-chi/cors v1.2.2
 	github.com/go-chi/httprate v0.16.0
@@ -36,7 +37,6 @@ require (
 	github.com/bep/golibsass v1.2.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/coder/websocket v1.8.15 // indirect
 	github.com/creack/pty v1.1.23 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect

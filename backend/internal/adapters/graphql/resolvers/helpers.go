@@ -1,9 +1,12 @@
 package resolvers
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"strconv"
+	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
@@ -211,6 +214,202 @@ func perspectiveDomainToModel(p *domain.Perspective) *model.Perspective {
 	m.Review = p.Review
 
 	return m
+}
+
+// ---- Messaging mappers ----
+
+// subscriptionBuffer bounds each GraphQL subscription's outbound queue. It
+// matches the hub's per-subscriber buffer so neither side is the sole
+// bottleneck.
+const subscriptionBuffer = 64
+
+// defaultPageSize / maxPageSize bound messaging list and history queries.
+const (
+	defaultPageSize = 50
+	maxPageSize     = 100
+)
+
+// pageLimit normalises an optional `first` argument into a bounded page size.
+func pageLimit(first *int) int {
+	if first == nil || *first <= 0 {
+		return defaultPageSize
+	}
+	if *first > maxPageSize {
+		return maxPageSize
+	}
+	return *first
+}
+
+// lastReadSeqFor returns the actor's read pointer within a thread aggregate,
+// or 0 when the aggregate or the actor's row is absent.
+func lastReadSeqFor(t *domain.MessageThread, userID int) int64 {
+	if t == nil {
+		return 0
+	}
+	for _, p := range t.Participants {
+		if p.UserID == userID {
+			return p.LastReadSeq
+		}
+	}
+	return 0
+}
+
+// mutedFor returns the actor's mute flag within a thread aggregate, or false
+// when the aggregate or the actor's row is absent. Caller-relative, mirroring
+// lastReadSeqFor.
+func mutedFor(t *domain.MessageThread, userID int) bool {
+	if t == nil {
+		return false
+	}
+	for _, p := range t.Participants {
+		if p.UserID == userID {
+			return p.Muted
+		}
+	}
+	return false
+}
+
+// messageThreadToModel projects a domain thread onto its GraphQL model,
+// retaining a copy of the domain aggregate in Src for the participant /
+// read-pointer field resolvers.
+func messageThreadToModel(t *domain.MessageThread) *model.MessageThread {
+	if t == nil {
+		return nil
+	}
+	src := *t
+	out := &model.MessageThread{
+		ID:            strconv.Itoa(t.ID),
+		Title:         t.Title,
+		LastMessageAt: t.LastMessageAt.Format(time.RFC3339),
+		CreatedAt:     t.CreatedAt.Format(time.RFC3339),
+		Src:           &src,
+	}
+	// Share per-thread lookups (latestSeq) across this thread's field resolvers.
+	out.EnableMemo()
+	return out
+}
+
+// latestSeqOf resolves a thread's highest message seq once per projected thread
+// object, using the trusted (no re-authorization) service call: the query that
+// produced the object already checked participation.
+func (r *Resolver) latestSeqOf(ctx context.Context, obj *model.MessageThread) (int64, error) {
+	return obj.ResolveLatestSeq(func() (int64, error) {
+		tid, err := parseIntID("id", obj.ID)
+		if err != nil {
+			return 0, err
+		}
+		return r.Messaging.ThreadMaxSeq(ctx, tid)
+	})
+}
+
+// threadParticipantToModel projects a domain participant row onto its GraphQL
+// model. The user is resolved lazily by threadParticipantResolver.User.
+func threadParticipantToModel(p domain.ThreadParticipant) *model.ThreadParticipant {
+	return &model.ThreadParticipant{
+		Role:        p.Role,
+		LastReadSeq: int(p.LastReadSeq),
+		JoinedAt:    p.JoinedAt.Format(time.RFC3339),
+		SrcUserID:   p.UserID,
+	}
+}
+
+// messageToModel projects a domain message onto its GraphQL model. The sender
+// is resolved lazily by messageResolver.Sender.
+func messageToModel(m domain.Message) *model.Message {
+	return &model.Message{
+		ID:          strconv.FormatInt(m.ID, 10),
+		ThreadID:    strconv.Itoa(m.ThreadID),
+		Seq:         int(m.Seq),
+		Body:        m.Body,
+		CreatedAt:   m.CreatedAt.Format(time.RFC3339),
+		EditedAt:    rfc3339Ptr(m.EditedAt),
+		DeletedAt:   rfc3339Ptr(m.DeletedAt),
+		SrcSenderID: m.SenderID,
+	}
+}
+
+// rfc3339Ptr formats an optional timestamp as an RFC3339 string pointer,
+// preserving nil so an unset editedAt/deletedAt marshals as GraphQL null.
+func rfc3339Ptr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := t.Format(time.RFC3339)
+	return &s
+}
+
+// inboxEventToModel projects a domain inbox event onto its GraphQL model.
+func inboxEventToModel(e domain.InboxEvent) *model.InboxEvent {
+	return &model.InboxEvent{
+		ThreadID:      strconv.Itoa(e.ThreadID),
+		LastMessageAt: e.LastMessageAt.Format(time.RFC3339),
+		LatestSeq:     int(e.LatestSeq),
+		UnreadCount:   e.UnreadCount,
+	}
+}
+
+// toModelThreadEvent maps a domain thread event onto the GraphQL ThreadEvent
+// union. An unrecognized variant yields nil, which the caller drops.
+func toModelThreadEvent(evt domain.ThreadEvent) model.ThreadEvent {
+	switch e := evt.(type) {
+	case domain.MessagePostedEvent:
+		return model.MessagePosted{Message: messageToModel(e.Message)}
+	case domain.MessageEditedEvent:
+		return model.MessageEdited{Message: messageToModel(e.Message)}
+	case domain.MessageDeletedEvent:
+		return model.MessageDeleted{
+			ThreadID:  strconv.Itoa(e.ThreadID),
+			MessageID: strconv.FormatInt(e.MessageID, 10),
+			Seq:       int(e.Seq),
+		}
+	case domain.ReadReceiptChangedEvent:
+		return model.ReadReceiptChanged{
+			ThreadID:    strconv.Itoa(e.ThreadID),
+			UserID:      strconv.Itoa(e.UserID),
+			LastReadSeq: int(e.LastReadSeq),
+		}
+	case domain.TypingChangedEvent:
+		return model.TypingChanged{
+			ThreadID: strconv.Itoa(e.ThreadID),
+			UserID:   strconv.Itoa(e.UserID),
+			Typing:   e.Typing,
+		}
+	case domain.ParticipantChangedEvent:
+		// e.Change is a bare string on the envelope; an unexpected value would
+		// marshal to a GraphQL-invalid enum, so drop the event instead.
+		kind := model.ParticipantChangeKind(e.Change)
+		if !kind.IsValid() {
+			slog.Warn("graphql: dropping participant event with invalid change kind",
+				"change", e.Change, "thread_id", e.ThreadID)
+			return nil
+		}
+		return model.ParticipantChanged{
+			ThreadID: strconv.Itoa(e.ThreadID),
+			UserID:   strconv.Itoa(e.UserID),
+			Change:   kind,
+		}
+	case domain.PresenceChangedEvent:
+		return model.PresenceChanged{
+			ThreadID: strconv.Itoa(e.ThreadID),
+			UserID:   strconv.Itoa(e.UserID),
+			State:    e.State,
+		}
+	case domain.StreamResetEvent:
+		return model.StreamReset{ThreadID: strconv.Itoa(e.ThreadID)}
+	default:
+		slog.Warn("graphql: unmapped domain thread event", "type", fmt.Sprintf("%T", evt))
+		return nil
+	}
+}
+
+// parseIntID parses a GraphQL ID! argument into an int, wrapping failures as
+// domain.ErrInvalidInput so the transport surfaces a client error.
+func parseIntID(field, raw string) (int, error) {
+	v, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("%w: %s must be a numeric id", domain.ErrInvalidInput, field)
+	}
+	return v, nil
 }
 
 // modelToCreatePerspectiveInput converts a GraphQL CreatePerspectiveInput into the

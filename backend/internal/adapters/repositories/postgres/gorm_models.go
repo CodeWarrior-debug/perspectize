@@ -98,3 +98,42 @@ type PerspectiveModel struct {
 func (PerspectiveModel) TableName() string {
 	return "perspectives"
 }
+
+// MessageThreadModel is the GORM model for message_threads.
+type MessageThreadModel struct {
+	ID            int64     `gorm:"primaryKey;autoIncrement"`
+	Title         *string   `gorm:"column:title"`
+	CreatedBy     int64     `gorm:"column:created_by;not null"`
+	LastMessageAt time.Time `gorm:"column:last_message_at"`
+	CreatedAt     time.Time `gorm:"column:created_at;autoCreateTime"`
+}
+
+func (MessageThreadModel) TableName() string { return "message_threads" }
+
+// ThreadParticipantModel is the GORM model for thread_participants.
+type ThreadParticipantModel struct {
+	ThreadID    int64      `gorm:"column:thread_id;primaryKey"`
+	UserID      int64      `gorm:"column:user_id;primaryKey"`
+	Role        string     `gorm:"column:role;not null;default:MEMBER"`
+	LastReadSeq int64      `gorm:"column:last_read_seq;not null;default:0"`
+	Muted       bool       `gorm:"column:muted;not null;default:false"`
+	JoinedAt    time.Time  `gorm:"column:joined_at;autoCreateTime"`
+	LeftAt      *time.Time `gorm:"column:left_at"`
+}
+
+func (ThreadParticipantModel) TableName() string { return "thread_participants" }
+
+// MessageModel is the GORM model for messages.
+type MessageModel struct {
+	ID          int64      `gorm:"primaryKey;autoIncrement"`
+	ThreadID    int64      `gorm:"column:thread_id;not null"`
+	SenderID    int64      `gorm:"column:sender_id;not null"`
+	Seq         int64      `gorm:"column:seq"` // assigned by DB trigger; do not set on insert
+	Body        string     `gorm:"column:body;not null"`
+	ClientNonce string     `gorm:"column:client_nonce;not null"`
+	CreatedAt   time.Time  `gorm:"column:created_at;autoCreateTime"`
+	EditedAt    *time.Time `gorm:"column:edited_at"`
+	DeletedAt   *time.Time `gorm:"column:deleted_at"`
+}
+
+func (MessageModel) TableName() string { return "messages" }
