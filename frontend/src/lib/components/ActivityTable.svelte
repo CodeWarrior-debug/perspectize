@@ -24,12 +24,12 @@
 	import {
 		parseGridParams,
 		serializeGridParams,
-		COL_TO_SORT,
+		sortsToGraphQL,
 		urlParamsToGraphQLFilter,
 		urlParamsToFilter,
 		filterToUrlParams,
 	} from '$lib/utils/gridUrlState';
-	import type { DataMode, GridParams } from '$lib/utils/gridUrlState';
+	import type { DataMode, GridParams, SortSpec } from '$lib/utils/gridUrlState';
 	import {
 		typeCellRenderer,
 		categoryCellRenderer,
@@ -64,6 +64,7 @@
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
+	import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
 	import { TagsTooltip } from '$lib/components/TagsTooltip';
 	import { DescriptionTooltip } from '$lib/components/DescriptionTooltip';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
@@ -177,8 +178,14 @@
 
 	// Individual derived fields from URL
 	const mode = $derived(gridParams.mode);
-	const sortBy = $derived(COL_TO_SORT[gridParams.sort] ?? 'UPDATED_AT');
-	const sortOrder = $derived(gridParams.dir === 'asc' ? 'ASC' : 'DESC');
+	// Multi-column sort. The GraphQL `sorts` list carries every sorted column in
+	// priority order; `sortBy`/`sortOrder` (the first entry, or the legacy default)
+	// stay populated too since the server still requires them as its single-sort
+	// fallback for anything that predates multi-sort.
+	const sorts = $derived(gridParams.sorts);
+	const graphqlSorts = $derived(sortsToGraphQL(sorts));
+	const sortBy = $derived(graphqlSorts?.[0]?.field ?? 'UPDATED_AT');
+	const sortOrder = $derived(graphqlSorts?.[0]?.order ?? 'DESC');
 	const pageNum = $derived(gridParams.page); // 1-indexed
 	const pageSize = $derived(gridParams.pageSize);
 	const searchText = $derived(gridParams.q);
@@ -204,6 +211,10 @@
 	let displayedRowCount = $state<number | null>(null);
 	let debounceTimer: ReturnType<typeof setTimeout>;
 	let skipNextSortEvent = $state(false);
+	// Tracks whether AG Grid currently has any column sorted, in "Loaded" (client) mode —
+	// mirrors gridParams.sorts's role for "All Items" mode, since client-mode sort state
+	// lives entirely in the grid, not the URL.
+	let clientSortActive = $state(false);
 	let activeFilterModel = $state<Record<string, any>>({});
 	// Responsive tier: 'xs' (<445px), 'sm' (445-639px), 'md' (640-899px), 'lg' (900px+)
 	let responsiveTier = $state<'xs' | 'sm' | 'md' | 'lg'>('lg');
@@ -262,6 +273,7 @@
 		queryKey: queryKeys.content.list({
 			sortBy: mode === 'all' ? sortBy : 'UPDATED_AT',
 			sortOrder: mode === 'all' ? sortOrder : 'DESC',
+			sorts: mode === 'all' ? graphqlSorts : undefined,
 			// Search/filter must always reflect what queryFn actually sends (graphqlFilter is used
 			// unconditionally below, regardless of mode) — hardcoding these to '' / undefined for
 			// 'loaded' mode desyncs the cache key from the real request, so typing or clearing the
@@ -278,6 +290,7 @@
 				after: mode === 'all' ? currentCursor : null,
 				sortBy: mode === 'all' ? sortBy : 'UPDATED_AT',
 				sortOrder: mode === 'all' ? sortOrder : 'DESC',
+				sorts: mode === 'all' ? graphqlSorts : undefined,
 				filter: graphqlFilter,
 				includeTotalCount: true,
 			});
@@ -314,9 +327,34 @@
 	// Mode switch handler
 	// ---------------------------------------------------------------------------
 
+	// True when sorting is anything other than the default single updatedAt/desc —
+	// i.e. multiple sorted columns, a single non-default column, or explicitly cleared.
+	const hasActiveSort = $derived(
+		mode === 'loaded'
+			? clientSortActive
+			: sorts.length !== 1 || sorts[0].col !== 'updatedAt' || sorts[0].dir !== 'desc',
+	);
+
+	/**
+	 * Clear all sorting. In "Loaded" mode, AG Grid owns sort state directly, so we
+	 * reset it there and let onSortChanged (a no-op for this mode) be skipped by
+	 * AG Grid's own dedup. In "All Items" mode, sorting is server-side via the URL —
+	 * push an explicit empty sort list (distinct from the param being absent, which
+	 * means "default") so the grid shows unsorted server order.
+	 */
+	function handleClearSorts() {
+		if (mode === 'loaded') {
+			gridApi?.applyColumnState({ defaultState: { sort: null } });
+		} else {
+			cursors = [null];
+			updateUrl({ sorts: [], page: 1 });
+		}
+	}
+
 	function handleModeToggle(newMode: DataMode) {
 		// Reset pagination when switching modes
 		cursors = [null];
+		if (newMode === 'loaded') clientSortActive = false;
 
 		// When switching Loaded → All: sync AG Grid filter state to URL params
 		if (newMode === 'all' && gridApi) {
@@ -675,28 +713,33 @@
 			gridReady = true;
 		},
 		onSortChanged: (event: SortChangedEvent) => {
-			// In "Loaded" mode, AG Grid handles client-side sort — skip URL update
-			if (mode === 'loaded') return;
+			// In "Loaded" mode, AG Grid handles client-side sort (including multi-column
+			// via shift-click) entirely on its own — track active-sort state for the
+			// "Clear sorts" button, then skip the URL update.
+			if (mode === 'loaded') {
+				clientSortActive = event.api.getColumnState().some((col) => col.sort);
+				return;
+			}
 			// Skip if we triggered this event programmatically (to avoid loop)
 			if (skipNextSortEvent) {
 				skipNextSortEvent = false;
 				return;
 			}
 
-			// Server-side: update URL → triggers refetch
+			// Server-side: read every sorted column (multi-column sort applies shift-click
+			// or ctrl-click in AG Grid), in priority order, and push the whole list to the URL.
 			const sortModel = event.api
 				.getColumnState()
 				.filter((col) => col.sort)
 				.sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
 
-			if (sortModel.length > 0) {
-				const col = sortModel[0];
-				cursors = [null]; // Reset cursor stack
-				updateUrl({ sort: col.colId ?? 'updatedAt', dir: col.sort === 'asc' ? 'asc' : 'desc', page: 1 });
-			} else {
-				cursors = [null];
-				updateUrl({ sort: 'updatedAt', dir: 'desc', page: 1 });
-			}
+			const newSorts: SortSpec[] = sortModel.map((col) => ({
+				col: col.colId ?? 'updatedAt',
+				dir: col.sort === 'asc' ? 'asc' : 'desc',
+			}));
+
+			cursors = [null]; // Reset cursor stack
+			updateUrl({ sorts: newSorts.length > 0 ? newSorts : [], page: 1 });
 		},
 		onFilterChanged: (event: FilterChangedEvent) => {
 			// Immediate: update chip display
@@ -734,7 +777,7 @@
 		if (!gridApi || !gridReady || mode !== 'all') return;
 		skipNextSortEvent = true;
 		gridApi.applyColumnState({
-			state: [{ colId: gridParams.sort, sort: gridParams.dir }],
+			state: gridParams.sorts.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
 			defaultState: { sort: null },
 		});
 	});
@@ -951,6 +994,17 @@
 				>
 					<SlidersHorizontalIcon class="size-4" />
 					<span class="hidden md:inline">Columns</span>
+				</button>
+				<button
+					type="button"
+					aria-label="Clear sorts"
+					title="Shift-click column headers to sort by multiple columns"
+					onclick={handleClearSorts}
+					disabled={!gridReady || !hasActiveSort}
+					class="inline-flex items-center gap-1.5 px-2 py-1 text-sm border border-input rounded-md bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+				>
+					<ArrowUpDownIcon class="size-4" />
+					<span class="hidden md:inline">Clear sorts</span>
 				</button>
 			{/if}
 			{#if mode === 'all'}

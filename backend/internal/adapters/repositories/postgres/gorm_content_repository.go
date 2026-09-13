@@ -141,8 +141,14 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		limit = *params.First
 	}
 
-	// Build sort rules using helper from helpers.go
-	rules := buildContentSortRules(params.SortBy, params.SortOrder)
+	// Build sort rules using helper from helpers.go. Multi-column sort (params.Sorts)
+	// takes priority; single-column SortBy/SortOrder is the fallback for older callers.
+	var rules []paginator.Rule
+	if len(params.Sorts) > 0 {
+		rules = buildContentSortRulesMulti(params.Sorts)
+	} else {
+		rules = buildContentSortRules(params.SortBy, params.SortOrder)
+	}
 
 	// Configure paginator options
 	opts := []paginator.Option{

@@ -90,6 +90,8 @@ Schema-first in `schema.graphql`. After changes: `make graphql-gen` → implemen
 
 The failure is confined to that last step: `generated.go` and `models_gen.go` are written *before* it, so the regeneration you wanted did happen. Recover by deleting the stray file (`rm internal/adapters/graphql/resolvers/schema.resolvers.go`) and rebuilding — but **diff it first** when the schema gained a field, because the stub for that new field is in there and belongs in the matching per-domain file. Don't automate the `rm` in the Makefile for that reason. The real fix is to split `schema.graphql` per domain so `follow-schema` lines up with the resolver files.
 
+**Adding a query/mutation arg regenerates the resolver signature, positionally.** After `make graphql-gen`, the new arg lands wherever it sits in the schema's arg list — not appended at the end of the Go signature. Read the stub in the stray `schema.resolvers.go` (see above) to get the exact updated signature, then copy it verbatim into the real per-domain resolver file; don't hand-guess the param order.
+
 ## Testing
 
 - **Unit:** Mock deps, no DB. `make test`.
