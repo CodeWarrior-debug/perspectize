@@ -10,11 +10,16 @@
 /** Data mode: 'all' = server-side, 'loaded' = client-side */
 export type DataMode = 'all' | 'loaded';
 
+/** One column of a multi-column sort, in priority order (first = primary). */
+export interface SortSpec {
+	col: string; // AG Grid colId (e.g., 'views', 'updatedAt')
+	dir: 'asc' | 'desc';
+}
+
 /** Parsed grid state from URL params */
 export interface GridParams {
 	mode: DataMode;
-	sort: string; // AG Grid colId (e.g., 'views', 'updatedAt')
-	dir: 'asc' | 'desc';
+	sorts: SortSpec[]; // Multi-column sort, priority order. Empty means "no sort" (client mode only).
 	page: number; // 1-indexed
 	pageSize: number;
 	q: string; // Text search
@@ -24,13 +29,53 @@ export interface GridParams {
 /** Default values — omitted from URL when matching */
 export const GRID_DEFAULTS: GridParams = {
 	mode: 'loaded',
-	sort: 'updatedAt',
-	dir: 'desc',
+	sorts: [{ col: 'updatedAt', dir: 'desc' }],
 	page: 1,
 	pageSize: 10,
 	q: '',
 	filters: {},
 };
+
+/** Max columns considered for a multi-column sort — matches AG Grid's practical limit for this table. */
+const MAX_SORT_COLUMNS = 5;
+
+function sortsEqual(a: SortSpec[], b: SortSpec[]): boolean {
+	return a.length === b.length && a.every((s, i) => s.col === b[i].col && s.dir === b[i].dir);
+}
+
+/** Serialize a SortSpec[] to the URL `sort` param format: "colA.desc,colB.asc" */
+function serializeSorts(sorts: SortSpec[]): string {
+	return sorts.map((s) => `${s.col}.${s.dir}`).join(',');
+}
+
+/** Sentinel URL value for "sorting explicitly cleared" (distinct from the param being absent). */
+const NO_SORT = 'none';
+
+/** Parse the URL `sort` param ("colA.desc,colB.asc") back into a SortSpec[]. */
+function parseSorts(raw: string | null): SortSpec[] {
+	if (!raw) return GRID_DEFAULTS.sorts;
+	if (raw === NO_SORT) return [];
+	const sorts: SortSpec[] = [];
+	const seen = new Set<string>();
+	for (const part of raw.split(',')) {
+		const dotIdx = part.lastIndexOf('.');
+		if (dotIdx === -1) continue;
+		const col = part.slice(0, dotIdx);
+		const dir = part.slice(dotIdx + 1);
+		if (!col || (dir !== 'asc' && dir !== 'desc') || seen.has(col)) continue;
+		seen.add(col);
+		sorts.push({ col, dir });
+		if (sorts.length >= MAX_SORT_COLUMNS) break;
+	}
+	// A non-empty but entirely malformed param (no dot, bad direction) parses to
+	// nothing usable — fall back to the default rather than silently clearing sort.
+	return sorts.length > 0 ? sorts : GRID_DEFAULTS.sorts;
+}
+
+/** Serialize a SortSpec[] to its URL form, using the NO_SORT sentinel for an explicit clear. */
+function serializeSortsForUrl(sorts: SortSpec[]): string {
+	return sorts.length === 0 ? NO_SORT : serializeSorts(sorts);
+}
 
 // ---------------------------------------------------------------------------
 // AG Grid colId ↔ GraphQL ContentSortBy bidirectional maps
@@ -61,6 +106,18 @@ export const SORT_TO_COL: Record<string, string> = {
 	UPDATED_AT: 'updatedAt',
 };
 
+/**
+ * Convert a SortSpec[] (URL/AG Grid shape) to the GraphQL `sorts` input list.
+ * Unknown colIds (not in COL_TO_SORT) are dropped. Returns undefined for an
+ * empty result so callers can omit the variable entirely.
+ */
+export function sortsToGraphQL(sorts: SortSpec[]): { field: string; order: 'ASC' | 'DESC' }[] | undefined {
+	const result = sorts
+		.filter((s) => COL_TO_SORT[s.col])
+		.map((s) => ({ field: COL_TO_SORT[s.col], order: s.dir === 'asc' ? ('ASC' as const) : ('DESC' as const) }));
+	return result.length > 0 ? result : undefined;
+}
+
 // ---------------------------------------------------------------------------
 // GridParams serialization
 // ---------------------------------------------------------------------------
@@ -69,7 +126,6 @@ export const SORT_TO_COL: Record<string, string> = {
 export function parseGridParams(params: URLSearchParams): GridParams {
 	const mode = params.get('mode');
 	const sort = params.get('sort');
-	const dir = params.get('dir');
 	const page = params.get('page');
 	const pageSize = params.get('pageSize');
 	const q = params.get('q');
@@ -84,8 +140,7 @@ export function parseGridParams(params: URLSearchParams): GridParams {
 
 	return {
 		mode: mode === 'all' ? 'all' : GRID_DEFAULTS.mode,
-		sort: sort ?? GRID_DEFAULTS.sort,
-		dir: dir === 'asc' ? 'asc' : dir === 'desc' ? 'desc' : GRID_DEFAULTS.dir,
+		sorts: parseSorts(sort),
 		page: page !== null && !isNaN(Number(page)) && Number(page) >= 1 ? Number(page) : GRID_DEFAULTS.page,
 		pageSize:
 			pageSize !== null && !isNaN(Number(pageSize)) && Number(pageSize) > 0 ? Number(pageSize) : GRID_DEFAULTS.pageSize,
@@ -99,8 +154,7 @@ export function serializeGridParams(state: GridParams): string {
 	const params = new URLSearchParams();
 
 	if (state.mode !== GRID_DEFAULTS.mode) params.set('mode', state.mode);
-	if (state.sort !== GRID_DEFAULTS.sort) params.set('sort', state.sort);
-	if (state.dir !== GRID_DEFAULTS.dir) params.set('dir', state.dir);
+	if (!sortsEqual(state.sorts, GRID_DEFAULTS.sorts)) params.set('sort', serializeSortsForUrl(state.sorts));
 	if (state.page !== GRID_DEFAULTS.page) params.set('page', String(state.page));
 	if (state.pageSize !== GRID_DEFAULTS.pageSize) params.set('pageSize', String(state.pageSize));
 	if (state.q !== GRID_DEFAULTS.q) params.set('q', state.q);
