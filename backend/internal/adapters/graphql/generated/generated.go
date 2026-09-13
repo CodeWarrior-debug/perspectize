@@ -31,8 +31,12 @@ type Config = graphql.Config[ResolverRoot, DirectiveRoot, ComplexityRoot]
 
 type ResolverRoot interface {
 	Content() ContentResolver
+	Message() MessageResolver
+	MessageThread() MessageThreadResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
+	Subscription() SubscriptionResolver
+	ThreadParticipant() ThreadParticipantResolver
 	User() UserResolver
 }
 
@@ -84,16 +88,81 @@ type ComplexityRoot struct {
 		Content        func(childComplexity int) int
 	}
 
+	FeelingEntry struct {
+		Emoji     func(childComplexity int) int
+		Intensity func(childComplexity int) int
+		Label     func(childComplexity int) int
+		Note      func(childComplexity int) int
+	}
+
+	InboxEvent struct {
+		LastMessageAt func(childComplexity int) int
+		LatestSeq     func(childComplexity int) int
+		ThreadID      func(childComplexity int) int
+		UnreadCount   func(childComplexity int) int
+	}
+
+	Message struct {
+		Body      func(childComplexity int) int
+		CreatedAt func(childComplexity int) int
+		DeletedAt func(childComplexity int) int
+		EditedAt  func(childComplexity int) int
+		ID        func(childComplexity int) int
+		Sender    func(childComplexity int) int
+		Seq       func(childComplexity int) int
+		ThreadID  func(childComplexity int) int
+	}
+
+	MessageConnection struct {
+		Items    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
+	}
+
+	MessageDeleted struct {
+		MessageID func(childComplexity int) int
+		Seq       func(childComplexity int) int
+		ThreadID  func(childComplexity int) int
+	}
+
+	MessageEdited struct {
+		Message func(childComplexity int) int
+	}
+
+	MessagePosted struct {
+		Message func(childComplexity int) int
+	}
+
+	MessageThread struct {
+		CreatedAt     func(childComplexity int) int
+		ID            func(childComplexity int) int
+		LastMessageAt func(childComplexity int) int
+		LatestSeq     func(childComplexity int) int
+		Muted         func(childComplexity int) int
+		MyLastReadSeq func(childComplexity int) int
+		Participants  func(childComplexity int) int
+		Title         func(childComplexity int) int
+		UnreadCount   func(childComplexity int) int
+	}
+
 	Mutation struct {
+		AddThreadParticipants           func(childComplexity int, threadID string, userIds []string) int
 		CreateClaim                     func(childComplexity int, input model.CreateClaimInput) int
 		CreateContentFromYouTube        func(childComplexity int, input model.CreateContentFromYouTubeInput) int
+		CreateMessageThread             func(childComplexity int, input model.CreateMessageThreadInput) int
 		CreatePerspective               func(childComplexity int, input model.CreatePerspectiveInput) int
 		CreateUser                      func(childComplexity int, input model.CreateUserInput) int
+		DeleteMessage                   func(childComplexity int, messageID string) int
 		DeletePerspective               func(childComplexity int, id string) int
 		DeleteUser                      func(childComplexity int, id string) int
+		EditMessage                     func(childComplexity int, messageID string, body string) int
+		LeaveThread                     func(childComplexity int, threadID string) int
 		MarkOnboardingSeen              func(childComplexity int, version int) int
+		MarkThreadRead                  func(childComplexity int, threadID string, seq int) int
+		MuteThread                      func(childComplexity int, threadID string, muted bool) int
+		SendMessage                     func(childComplexity int, input model.SendMessageInput) int
 		SetOnboardingDisplayNextSession func(childComplexity int, displayNextSession bool) int
 		SetPrimaryCategory              func(childComplexity int, input model.SetPrimaryCategoryInput) int
+		SetTyping                       func(childComplexity int, threadID string, typing bool) int
 		UpdateContentSourceData         func(childComplexity int, contentID int) int
 		UpdatePerspective               func(childComplexity int, input model.UpdatePerspectiveInput) int
 		UpdateUser                      func(childComplexity int, input model.UpdateUserInput) int
@@ -118,6 +187,12 @@ type ComplexityRoot struct {
 		TotalCount func(childComplexity int) int
 	}
 
+	ParticipantChanged struct {
+		Change   func(childComplexity int) int
+		ThreadID func(childComplexity int) int
+		UserID   func(childComplexity int) int
+	}
+
 	Perspective struct {
 		Agreement             func(childComplexity int) int
 		CategorizedRatings    func(childComplexity int) int
@@ -128,6 +203,7 @@ type ComplexityRoot struct {
 		CreatedAt             func(childComplexity int) int
 		CustomFields          func(childComplexity int) int
 		Description           func(childComplexity int) int
+		Feelings              func(childComplexity int) int
 		ID                    func(childComplexity int) int
 		Importance            func(childComplexity int) int
 		Labels                func(childComplexity int) int
@@ -144,16 +220,53 @@ type ComplexityRoot struct {
 		UserID                func(childComplexity int) int
 	}
 
+	PresenceChanged struct {
+		State    func(childComplexity int) int
+		ThreadID func(childComplexity int) int
+		UserID   func(childComplexity int) int
+	}
+
 	Query struct {
 		Content         func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.ContentFilter) int
 		ContentByID     func(childComplexity int, id string) int
 		Me              func(childComplexity int) int
+		MessageThread   func(childComplexity int, id string) int
+		MessageThreads  func(childComplexity int, first *int, before *string) int
 		PerspectiveByID func(childComplexity int, id string) int
 		Perspectives    func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) int
+		ThreadMessages  func(childComplexity int, threadID string, first *int, before *int) int
 		UserByID        func(childComplexity int, id string) int
 		UserByUsername  func(childComplexity int, username string) int
 		Users           func(childComplexity int) int
 		WikidataSearch  func(childComplexity int, query string, language *string, limit *int) int
+	}
+
+	ReadReceiptChanged struct {
+		LastReadSeq func(childComplexity int) int
+		ThreadID    func(childComplexity int) int
+		UserID      func(childComplexity int) int
+	}
+
+	StreamReset struct {
+		ThreadID func(childComplexity int) int
+	}
+
+	Subscription struct {
+		InboxEvents  func(childComplexity int) int
+		ThreadEvents func(childComplexity int, threadID string, sinceSeq *int) int
+	}
+
+	ThreadParticipant struct {
+		JoinedAt    func(childComplexity int) int
+		LastReadSeq func(childComplexity int) int
+		Role        func(childComplexity int) int
+		User        func(childComplexity int) int
+	}
+
+	TypingChanged struct {
+		ThreadID func(childComplexity int) int
+		Typing   func(childComplexity int) int
+		UserID   func(childComplexity int) int
 	}
 
 	User struct {
@@ -188,6 +301,20 @@ type ComplexityRoot struct {
 type ContentResolver interface {
 	PrimaryCategory(ctx context.Context, obj *model.Content) (*model.Category, error)
 }
+type MessageResolver interface {
+	Sender(ctx context.Context, obj *model.Message) (*model.User, error)
+
+	EditedAt(ctx context.Context, obj *model.Message) (*string, error)
+	DeletedAt(ctx context.Context, obj *model.Message) (*string, error)
+}
+type MessageThreadResolver interface {
+	Participants(ctx context.Context, obj *model.MessageThread) ([]*model.ThreadParticipant, error)
+
+	LatestSeq(ctx context.Context, obj *model.MessageThread) (int, error)
+	MyLastReadSeq(ctx context.Context, obj *model.MessageThread) (int, error)
+	UnreadCount(ctx context.Context, obj *model.MessageThread) (int, error)
+	Muted(ctx context.Context, obj *model.MessageThread) (bool, error)
+}
 type MutationResolver interface {
 	CreateContentFromYouTube(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error)
 	UpdateContentSourceData(ctx context.Context, contentID int) (*model.Content, error)
@@ -201,6 +328,15 @@ type MutationResolver interface {
 	DeletePerspective(ctx context.Context, id string) (bool, error)
 	CreateClaim(ctx context.Context, input model.CreateClaimInput) (*model.Content, error)
 	SetPrimaryCategory(ctx context.Context, input model.SetPrimaryCategoryInput) (*model.Content, error)
+	CreateMessageThread(ctx context.Context, input model.CreateMessageThreadInput) (*model.MessageThread, error)
+	SendMessage(ctx context.Context, input model.SendMessageInput) (*model.Message, error)
+	MarkThreadRead(ctx context.Context, threadID string, seq int) (*model.MessageThread, error)
+	SetTyping(ctx context.Context, threadID string, typing bool) (bool, error)
+	AddThreadParticipants(ctx context.Context, threadID string, userIds []string) (*model.MessageThread, error)
+	LeaveThread(ctx context.Context, threadID string) (bool, error)
+	EditMessage(ctx context.Context, messageID string, body string) (*model.Message, error)
+	DeleteMessage(ctx context.Context, messageID string) (*model.Message, error)
+	MuteThread(ctx context.Context, threadID string, muted bool) (*model.MessageThread, error)
 }
 type QueryResolver interface {
 	Me(ctx context.Context) (*model.User, error)
@@ -212,6 +348,16 @@ type QueryResolver interface {
 	WikidataSearch(ctx context.Context, query string, language *string, limit *int) ([]*model.WikidataSearchResult, error)
 	PerspectiveByID(ctx context.Context, id string) (*model.Perspective, error)
 	Perspectives(ctx context.Context, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) (*model.PaginatedPerspectives, error)
+	MessageThreads(ctx context.Context, first *int, before *string) ([]*model.MessageThread, error)
+	MessageThread(ctx context.Context, id string) (*model.MessageThread, error)
+	ThreadMessages(ctx context.Context, threadID string, first *int, before *int) (*model.MessageConnection, error)
+}
+type SubscriptionResolver interface {
+	ThreadEvents(ctx context.Context, threadID string, sinceSeq *int) (<-chan model.ThreadEvent, error)
+	InboxEvents(ctx context.Context) (<-chan *model.InboxEvent, error)
+}
+type ThreadParticipantResolver interface {
+	User(ctx context.Context, obj *model.ThreadParticipant) (*model.User, error)
 }
 type UserResolver interface {
 	Email(ctx context.Context, obj *model.User) (*string, error)
@@ -419,6 +565,217 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.CreateContentResult.Content(childComplexity), true
 
+	case "FeelingEntry.emoji":
+		if e.ComplexityRoot.FeelingEntry.Emoji == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingEntry.Emoji(childComplexity), true
+	case "FeelingEntry.intensity":
+		if e.ComplexityRoot.FeelingEntry.Intensity == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingEntry.Intensity(childComplexity), true
+	case "FeelingEntry.label":
+		if e.ComplexityRoot.FeelingEntry.Label == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingEntry.Label(childComplexity), true
+	case "FeelingEntry.note":
+		if e.ComplexityRoot.FeelingEntry.Note == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingEntry.Note(childComplexity), true
+
+	case "InboxEvent.lastMessageAt":
+		if e.ComplexityRoot.InboxEvent.LastMessageAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InboxEvent.LastMessageAt(childComplexity), true
+	case "InboxEvent.latestSeq":
+		if e.ComplexityRoot.InboxEvent.LatestSeq == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InboxEvent.LatestSeq(childComplexity), true
+	case "InboxEvent.threadId":
+		if e.ComplexityRoot.InboxEvent.ThreadID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InboxEvent.ThreadID(childComplexity), true
+	case "InboxEvent.unreadCount":
+		if e.ComplexityRoot.InboxEvent.UnreadCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InboxEvent.UnreadCount(childComplexity), true
+
+	case "Message.body":
+		if e.ComplexityRoot.Message.Body == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Message.Body(childComplexity), true
+	case "Message.createdAt":
+		if e.ComplexityRoot.Message.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Message.CreatedAt(childComplexity), true
+	case "Message.deletedAt":
+		if e.ComplexityRoot.Message.DeletedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Message.DeletedAt(childComplexity), true
+	case "Message.editedAt":
+		if e.ComplexityRoot.Message.EditedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Message.EditedAt(childComplexity), true
+	case "Message.id":
+		if e.ComplexityRoot.Message.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Message.ID(childComplexity), true
+	case "Message.sender":
+		if e.ComplexityRoot.Message.Sender == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Message.Sender(childComplexity), true
+	case "Message.seq":
+		if e.ComplexityRoot.Message.Seq == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Message.Seq(childComplexity), true
+	case "Message.threadId":
+		if e.ComplexityRoot.Message.ThreadID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Message.ThreadID(childComplexity), true
+
+	case "MessageConnection.items":
+		if e.ComplexityRoot.MessageConnection.Items == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageConnection.Items(childComplexity), true
+	case "MessageConnection.pageInfo":
+		if e.ComplexityRoot.MessageConnection.PageInfo == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageConnection.PageInfo(childComplexity), true
+
+	case "MessageDeleted.messageId":
+		if e.ComplexityRoot.MessageDeleted.MessageID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageDeleted.MessageID(childComplexity), true
+	case "MessageDeleted.seq":
+		if e.ComplexityRoot.MessageDeleted.Seq == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageDeleted.Seq(childComplexity), true
+	case "MessageDeleted.threadId":
+		if e.ComplexityRoot.MessageDeleted.ThreadID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageDeleted.ThreadID(childComplexity), true
+
+	case "MessageEdited.message":
+		if e.ComplexityRoot.MessageEdited.Message == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageEdited.Message(childComplexity), true
+
+	case "MessagePosted.message":
+		if e.ComplexityRoot.MessagePosted.Message == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessagePosted.Message(childComplexity), true
+
+	case "MessageThread.createdAt":
+		if e.ComplexityRoot.MessageThread.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageThread.CreatedAt(childComplexity), true
+	case "MessageThread.id":
+		if e.ComplexityRoot.MessageThread.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageThread.ID(childComplexity), true
+	case "MessageThread.lastMessageAt":
+		if e.ComplexityRoot.MessageThread.LastMessageAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageThread.LastMessageAt(childComplexity), true
+	case "MessageThread.latestSeq":
+		if e.ComplexityRoot.MessageThread.LatestSeq == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageThread.LatestSeq(childComplexity), true
+	case "MessageThread.muted":
+		if e.ComplexityRoot.MessageThread.Muted == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageThread.Muted(childComplexity), true
+	case "MessageThread.myLastReadSeq":
+		if e.ComplexityRoot.MessageThread.MyLastReadSeq == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageThread.MyLastReadSeq(childComplexity), true
+	case "MessageThread.participants":
+		if e.ComplexityRoot.MessageThread.Participants == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageThread.Participants(childComplexity), true
+	case "MessageThread.title":
+		if e.ComplexityRoot.MessageThread.Title == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageThread.Title(childComplexity), true
+	case "MessageThread.unreadCount":
+		if e.ComplexityRoot.MessageThread.UnreadCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageThread.UnreadCount(childComplexity), true
+
+	case "Mutation.addThreadParticipants":
+		if e.ComplexityRoot.Mutation.AddThreadParticipants == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_addThreadParticipants_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.AddThreadParticipants(childComplexity, args["threadId"].(string), args["userIds"].([]string)), true
 	case "Mutation.createClaim":
 		if e.ComplexityRoot.Mutation.CreateClaim == nil {
 			break
@@ -441,6 +798,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateContentFromYouTube(childComplexity, args["input"].(model.CreateContentFromYouTubeInput)), true
+	case "Mutation.createMessageThread":
+		if e.ComplexityRoot.Mutation.CreateMessageThread == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createMessageThread_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateMessageThread(childComplexity, args["input"].(model.CreateMessageThreadInput)), true
 	case "Mutation.createPerspective":
 		if e.ComplexityRoot.Mutation.CreatePerspective == nil {
 			break
@@ -463,6 +831,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateUser(childComplexity, args["input"].(model.CreateUserInput)), true
+	case "Mutation.deleteMessage":
+		if e.ComplexityRoot.Mutation.DeleteMessage == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteMessage_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeleteMessage(childComplexity, args["messageId"].(string)), true
 	case "Mutation.deletePerspective":
 		if e.ComplexityRoot.Mutation.DeletePerspective == nil {
 			break
@@ -485,6 +864,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteUser(childComplexity, args["id"].(string)), true
+	case "Mutation.editMessage":
+		if e.ComplexityRoot.Mutation.EditMessage == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_editMessage_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.EditMessage(childComplexity, args["messageId"].(string), args["body"].(string)), true
+	case "Mutation.leaveThread":
+		if e.ComplexityRoot.Mutation.LeaveThread == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_leaveThread_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.LeaveThread(childComplexity, args["threadId"].(string)), true
 	case "Mutation.markOnboardingSeen":
 		if e.ComplexityRoot.Mutation.MarkOnboardingSeen == nil {
 			break
@@ -496,6 +897,39 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.MarkOnboardingSeen(childComplexity, args["version"].(int)), true
+	case "Mutation.markThreadRead":
+		if e.ComplexityRoot.Mutation.MarkThreadRead == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_markThreadRead_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.MarkThreadRead(childComplexity, args["threadId"].(string), args["seq"].(int)), true
+	case "Mutation.muteThread":
+		if e.ComplexityRoot.Mutation.MuteThread == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_muteThread_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.MuteThread(childComplexity, args["threadId"].(string), args["muted"].(bool)), true
+	case "Mutation.sendMessage":
+		if e.ComplexityRoot.Mutation.SendMessage == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_sendMessage_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.SendMessage(childComplexity, args["input"].(model.SendMessageInput)), true
 	case "Mutation.setOnboardingDisplayNextSession":
 		if e.ComplexityRoot.Mutation.SetOnboardingDisplayNextSession == nil {
 			break
@@ -518,6 +952,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.SetPrimaryCategory(childComplexity, args["input"].(model.SetPrimaryCategoryInput)), true
+	case "Mutation.setTyping":
+		if e.ComplexityRoot.Mutation.SetTyping == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setTyping_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.SetTyping(childComplexity, args["threadId"].(string), args["typing"].(bool)), true
 	case "Mutation.updateContentSourceData":
 		if e.ComplexityRoot.Mutation.UpdateContentSourceData == nil {
 			break
@@ -615,6 +1060,25 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.PaginatedPerspectives.TotalCount(childComplexity), true
 
+	case "ParticipantChanged.change":
+		if e.ComplexityRoot.ParticipantChanged.Change == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ParticipantChanged.Change(childComplexity), true
+	case "ParticipantChanged.threadId":
+		if e.ComplexityRoot.ParticipantChanged.ThreadID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ParticipantChanged.ThreadID(childComplexity), true
+	case "ParticipantChanged.userId":
+		if e.ComplexityRoot.ParticipantChanged.UserID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ParticipantChanged.UserID(childComplexity), true
+
 	case "Perspective.agreement":
 		if e.ComplexityRoot.Perspective.Agreement == nil {
 			break
@@ -669,6 +1133,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Perspective.Description(childComplexity), true
+	case "Perspective.feelings":
+		if e.ComplexityRoot.Perspective.Feelings == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Perspective.Feelings(childComplexity), true
 	case "Perspective.id":
 		if e.ComplexityRoot.Perspective.ID == nil {
 			break
@@ -754,6 +1224,25 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Perspective.UserID(childComplexity), true
 
+	case "PresenceChanged.state":
+		if e.ComplexityRoot.PresenceChanged.State == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PresenceChanged.State(childComplexity), true
+	case "PresenceChanged.threadId":
+		if e.ComplexityRoot.PresenceChanged.ThreadID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PresenceChanged.ThreadID(childComplexity), true
+	case "PresenceChanged.userId":
+		if e.ComplexityRoot.PresenceChanged.UserID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PresenceChanged.UserID(childComplexity), true
+
 	case "Query.content":
 		if e.ComplexityRoot.Query.Content == nil {
 			break
@@ -783,6 +1272,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Me(childComplexity), true
+	case "Query.messageThread":
+		if e.ComplexityRoot.Query.MessageThread == nil {
+			break
+		}
+
+		args, err := ec.field_Query_messageThread_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.MessageThread(childComplexity, args["id"].(string)), true
+	case "Query.messageThreads":
+		if e.ComplexityRoot.Query.MessageThreads == nil {
+			break
+		}
+
+		args, err := ec.field_Query_messageThreads_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.MessageThreads(childComplexity, args["first"].(*int), args["before"].(*string)), true
 	case "Query.perspectiveByID":
 		if e.ComplexityRoot.Query.PerspectiveByID == nil {
 			break
@@ -805,6 +1316,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Perspectives(childComplexity, args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string), args["sortBy"].(*domain.PerspectiveSortBy), args["sortOrder"].(*domain.SortOrder), args["includeTotalCount"].(*bool), args["filter"].(*model.PerspectiveFilter)), true
+	case "Query.threadMessages":
+		if e.ComplexityRoot.Query.ThreadMessages == nil {
+			break
+		}
+
+		args, err := ec.field_Query_threadMessages_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ThreadMessages(childComplexity, args["threadId"].(string), args["first"].(*int), args["before"].(*int)), true
 	case "Query.userByID":
 		if e.ComplexityRoot.Query.UserByID == nil {
 			break
@@ -844,6 +1366,94 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.WikidataSearch(childComplexity, args["query"].(string), args["language"].(*string), args["limit"].(*int)), true
+
+	case "ReadReceiptChanged.lastReadSeq":
+		if e.ComplexityRoot.ReadReceiptChanged.LastReadSeq == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReadReceiptChanged.LastReadSeq(childComplexity), true
+	case "ReadReceiptChanged.threadId":
+		if e.ComplexityRoot.ReadReceiptChanged.ThreadID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReadReceiptChanged.ThreadID(childComplexity), true
+	case "ReadReceiptChanged.userId":
+		if e.ComplexityRoot.ReadReceiptChanged.UserID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReadReceiptChanged.UserID(childComplexity), true
+
+	case "StreamReset.threadId":
+		if e.ComplexityRoot.StreamReset.ThreadID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.StreamReset.ThreadID(childComplexity), true
+
+	case "Subscription.inboxEvents":
+		if e.ComplexityRoot.Subscription.InboxEvents == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Subscription.InboxEvents(childComplexity), true
+	case "Subscription.threadEvents":
+		if e.ComplexityRoot.Subscription.ThreadEvents == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_threadEvents_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Subscription.ThreadEvents(childComplexity, args["threadId"].(string), args["sinceSeq"].(*int)), true
+
+	case "ThreadParticipant.joinedAt":
+		if e.ComplexityRoot.ThreadParticipant.JoinedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ThreadParticipant.JoinedAt(childComplexity), true
+	case "ThreadParticipant.lastReadSeq":
+		if e.ComplexityRoot.ThreadParticipant.LastReadSeq == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ThreadParticipant.LastReadSeq(childComplexity), true
+	case "ThreadParticipant.role":
+		if e.ComplexityRoot.ThreadParticipant.Role == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ThreadParticipant.Role(childComplexity), true
+	case "ThreadParticipant.user":
+		if e.ComplexityRoot.ThreadParticipant.User == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ThreadParticipant.User(childComplexity), true
+
+	case "TypingChanged.threadId":
+		if e.ComplexityRoot.TypingChanged.ThreadID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TypingChanged.ThreadID(childComplexity), true
+	case "TypingChanged.typing":
+		if e.ComplexityRoot.TypingChanged.Typing == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TypingChanged.Typing(childComplexity), true
+	case "TypingChanged.userId":
+		if e.ComplexityRoot.TypingChanged.UserID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TypingChanged.UserID(childComplexity), true
 
 	case "User.active":
 		if e.ComplexityRoot.User.Active == nil {
@@ -950,9 +1560,12 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputContentFilter,
 		ec.unmarshalInputCreateClaimInput,
 		ec.unmarshalInputCreateContentFromYouTubeInput,
+		ec.unmarshalInputCreateMessageThreadInput,
 		ec.unmarshalInputCreatePerspectiveInput,
 		ec.unmarshalInputCreateUserInput,
+		ec.unmarshalInputFeelingInput,
 		ec.unmarshalInputPerspectiveFilter,
+		ec.unmarshalInputSendMessageInput,
 		ec.unmarshalInputSetPrimaryCategoryInput,
 		ec.unmarshalInputUpdatePerspectiveInput,
 		ec.unmarshalInputUpdateUserInput,
@@ -999,6 +1612,23 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
 			data := ec._Mutation(ctx, opCtx.Operation.SelectionSet)
 			var buf bytes.Buffer
+			data.MarshalGQL(&buf)
+
+			return &graphql.Response{
+				Data: buf.Bytes(),
+			}
+		}
+	case ast.Subscription:
+		next := ec._Subscription(ctx, opCtx.Operation.SelectionSet)
+
+		var buf bytes.Buffer
+		return func(ctx context.Context) *graphql.Response {
+			buf.Reset()
+			data := next(ctx)
+
+			if data == nil {
+				return nil
+			}
 			data.MarshalGQL(&buf)
 
 			return &graphql.Response{
@@ -1086,6 +1716,14 @@ type CategorizedRating {
   rating: Int!
 }
 
+# One emoji feeling selection from the feel-wheel (or its extended search set)
+type FeelingEntry {
+  emoji: String!
+  label: String
+  intensity: Int!
+  note: String
+}
+
 type Perspective {
   id: ID!
   userID: ID!
@@ -1104,6 +1742,7 @@ type Perspective {
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRating!]
+  feelings: [FeelingEntry!]
   primaryPerspectiveID: ID
   relatedPerspectiveIDs: [Int!]
   customFields: JSON
@@ -1247,6 +1886,13 @@ input CategorizedRatingInput {
   rating: Int!
 }
 
+input FeelingInput {
+  emoji: String!
+  label: String
+  intensity: Int!
+  note: String
+}
+
 input CreatePerspectiveInput {
   userID: IntID!
   contentID: IntID
@@ -1261,6 +1907,7 @@ input CreatePerspectiveInput {
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRatingInput!]
+  feelings: [FeelingInput!]
   primaryPerspectiveID: IntID
   relatedPerspectiveIDs: [Int!]
   customFields: JSON
@@ -1282,6 +1929,7 @@ input UpdatePerspectiveInput {
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRatingInput!]
+  feelings: [FeelingInput!]
   primaryPerspectiveID: IntID
   relatedPerspectiveIDs: [Int!]
   customFields: JSON
@@ -1372,6 +2020,106 @@ type Query {
     includeTotalCount: Boolean = false
     filter: PerspectiveFilter
   ): PaginatedPerspectives!
+}
+`, BuiltIn: false},
+	{Name: "../../../../messaging.graphql", Input: `# ---- Messaging ----
+#
+# Kept in its own schema file so gqlgen's follow-schema layout emits the
+# messaging resolvers into resolvers/messaging.resolvers.go rather than
+# growing schema.resolvers.go.
+#
+# ` + "`" + `Query` + "`" + ` and ` + "`" + `Mutation` + "`" + ` already exist in schema.graphql, so they are extended.
+# ` + "`" + `Subscription` + "`" + ` does not exist anywhere yet, so it is declared directly.
+
+enum ThreadRole { OWNER MEMBER }
+enum PresenceState { ONLINE OFFLINE }
+enum ParticipantChangeKind { ADDED REMOVED }
+
+type MessageThread {
+  id: ID!
+  title: String
+  participants: [ThreadParticipant!]!
+  lastMessageAt: String!
+  latestSeq: IntID!
+  myLastReadSeq: IntID!
+  unreadCount: Int!
+  muted: Boolean!
+  createdAt: String!
+}
+
+type ThreadParticipant {
+  user: User!
+  role: ThreadRole!
+  lastReadSeq: IntID!
+  joinedAt: String!
+}
+
+type Message {
+  id: ID!
+  threadId: ID!
+  sender: User!
+  seq: IntID!
+  body: String!
+  createdAt: String!
+  editedAt: String
+  deletedAt: String
+}
+
+type MessageConnection {
+  items: [Message!]!
+  pageInfo: PageInfo!
+}
+
+type MessagePosted { message: Message! }
+type ReadReceiptChanged { threadId: ID!  userId: ID!  lastReadSeq: IntID! }
+type TypingChanged { threadId: ID!  userId: ID!  typing: Boolean! }
+type ParticipantChanged { threadId: ID!  userId: ID!  change: ParticipantChangeKind! }
+type PresenceChanged { threadId: ID!  userId: ID!  state: PresenceState! }
+type StreamReset { threadId: ID! }
+type MessageEdited  { message: Message! }
+type MessageDeleted { threadId: ID!  messageId: ID!  seq: IntID! }
+
+union ThreadEvent =
+    MessagePosted
+  | ReadReceiptChanged
+  | TypingChanged
+  | ParticipantChanged
+  | PresenceChanged
+  | StreamReset
+  | MessageEdited
+  | MessageDeleted
+
+type InboxEvent {
+  threadId: ID!
+  lastMessageAt: String!
+  latestSeq: IntID!
+  unreadCount: Int!
+}
+
+input CreateMessageThreadInput { participantUserIds: [ID!]!  title: String }
+input SendMessageInput { threadId: ID!  body: String!  clientNonce: String! }
+
+extend type Query {
+  messageThreads(first: Int, before: String): [MessageThread!]! @auth
+  messageThread(id: ID!): MessageThread @auth
+  threadMessages(threadId: ID!, first: Int, before: IntID): MessageConnection! @auth
+}
+
+extend type Mutation {
+  createMessageThread(input: CreateMessageThreadInput!): MessageThread! @auth
+  sendMessage(input: SendMessageInput!): Message! @auth
+  markThreadRead(threadId: ID!, seq: IntID!): MessageThread! @auth
+  setTyping(threadId: ID!, typing: Boolean!): Boolean! @auth
+  addThreadParticipants(threadId: ID!, userIds: [ID!]!): MessageThread! @auth
+  leaveThread(threadId: ID!): Boolean! @auth
+  editMessage(messageId: ID!, body: String!): Message! @auth
+  deleteMessage(messageId: ID!): Message! @auth
+  muteThread(threadId: ID!, muted: Boolean!): MessageThread! @auth
+}
+
+type Subscription {
+  threadEvents(threadId: ID!, sinceSeq: IntID): ThreadEvent! @auth
+  inboxEvents: InboxEvent! @auth
 }
 `, BuiltIn: false},
 }
@@ -1465,6 +2213,90 @@ func (ec *executionContext) childFields_CreateContentResult(ctx context.Context,
 	return nil, fmt.Errorf("no field named %q was found under type CreateContentResult", field.Name)
 }
 
+func (ec *executionContext) childFields_FeelingEntry(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "emoji":
+		return ec.fieldContext_FeelingEntry_emoji(ctx, field)
+	case "label":
+		return ec.fieldContext_FeelingEntry_label(ctx, field)
+	case "intensity":
+		return ec.fieldContext_FeelingEntry_intensity(ctx, field)
+	case "note":
+		return ec.fieldContext_FeelingEntry_note(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type FeelingEntry", field.Name)
+}
+
+func (ec *executionContext) childFields_InboxEvent(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "threadId":
+		return ec.fieldContext_InboxEvent_threadId(ctx, field)
+	case "lastMessageAt":
+		return ec.fieldContext_InboxEvent_lastMessageAt(ctx, field)
+	case "latestSeq":
+		return ec.fieldContext_InboxEvent_latestSeq(ctx, field)
+	case "unreadCount":
+		return ec.fieldContext_InboxEvent_unreadCount(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type InboxEvent", field.Name)
+}
+
+func (ec *executionContext) childFields_Message(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_Message_id(ctx, field)
+	case "threadId":
+		return ec.fieldContext_Message_threadId(ctx, field)
+	case "sender":
+		return ec.fieldContext_Message_sender(ctx, field)
+	case "seq":
+		return ec.fieldContext_Message_seq(ctx, field)
+	case "body":
+		return ec.fieldContext_Message_body(ctx, field)
+	case "createdAt":
+		return ec.fieldContext_Message_createdAt(ctx, field)
+	case "editedAt":
+		return ec.fieldContext_Message_editedAt(ctx, field)
+	case "deletedAt":
+		return ec.fieldContext_Message_deletedAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type Message", field.Name)
+}
+
+func (ec *executionContext) childFields_MessageConnection(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "items":
+		return ec.fieldContext_MessageConnection_items(ctx, field)
+	case "pageInfo":
+		return ec.fieldContext_MessageConnection_pageInfo(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type MessageConnection", field.Name)
+}
+
+func (ec *executionContext) childFields_MessageThread(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_MessageThread_id(ctx, field)
+	case "title":
+		return ec.fieldContext_MessageThread_title(ctx, field)
+	case "participants":
+		return ec.fieldContext_MessageThread_participants(ctx, field)
+	case "lastMessageAt":
+		return ec.fieldContext_MessageThread_lastMessageAt(ctx, field)
+	case "latestSeq":
+		return ec.fieldContext_MessageThread_latestSeq(ctx, field)
+	case "myLastReadSeq":
+		return ec.fieldContext_MessageThread_myLastReadSeq(ctx, field)
+	case "unreadCount":
+		return ec.fieldContext_MessageThread_unreadCount(ctx, field)
+	case "muted":
+		return ec.fieldContext_MessageThread_muted(ctx, field)
+	case "createdAt":
+		return ec.fieldContext_MessageThread_createdAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type MessageThread", field.Name)
+}
+
 func (ec *executionContext) childFields_PageInfo(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "hasNextPage":
@@ -1539,6 +2371,8 @@ func (ec *executionContext) childFields_Perspective(ctx context.Context, field g
 		return ec.fieldContext_Perspective_labels(ctx, field)
 	case "categorizedRatings":
 		return ec.fieldContext_Perspective_categorizedRatings(ctx, field)
+	case "feelings":
+		return ec.fieldContext_Perspective_feelings(ctx, field)
 	case "primaryPerspectiveID":
 		return ec.fieldContext_Perspective_primaryPerspectiveID(ctx, field)
 	case "relatedPerspectiveIDs":
@@ -1553,6 +2387,20 @@ func (ec *executionContext) childFields_Perspective(ctx context.Context, field g
 		return ec.fieldContext_Perspective_updatedAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Perspective", field.Name)
+}
+
+func (ec *executionContext) childFields_ThreadParticipant(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "user":
+		return ec.fieldContext_ThreadParticipant_user(ctx, field)
+	case "role":
+		return ec.fieldContext_ThreadParticipant_role(ctx, field)
+	case "lastReadSeq":
+		return ec.fieldContext_ThreadParticipant_lastReadSeq(ctx, field)
+	case "joinedAt":
+		return ec.fieldContext_ThreadParticipant_joinedAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ThreadParticipant", field.Name)
 }
 
 func (ec *executionContext) childFields_User(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -1733,6 +2581,28 @@ func (ec *executionContext) dir_owner_args(ctx context.Context, rawArgs map[stri
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_addThreadParticipants_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "threadId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["threadId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "userIds",
+		func(ctx context.Context, v any) ([]string, error) {
+			return ec.unmarshalNID2ᚕstringᚄ(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["userIds"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createClaim_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1753,6 +2623,20 @@ func (ec *executionContext) field_Mutation_createContentFromYouTube_args(ctx con
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.CreateContentFromYouTubeInput, error) {
 			return ec.unmarshalNCreateContentFromYouTubeInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromYouTubeInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_createMessageThread_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.CreateMessageThreadInput, error) {
+			return ec.unmarshalNCreateMessageThreadInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateMessageThreadInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -1789,6 +2673,20 @@ func (ec *executionContext) field_Mutation_createUser_args(ctx context.Context, 
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_deleteMessage_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "messageId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["messageId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_deletePerspective_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1817,6 +2715,42 @@ func (ec *executionContext) field_Mutation_deleteUser_args(ctx context.Context, 
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_editMessage_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "messageId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["messageId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "body",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["body"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_leaveThread_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "threadId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["threadId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_markOnboardingSeen_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1828,6 +2762,64 @@ func (ec *executionContext) field_Mutation_markOnboardingSeen_args(ctx context.C
 		return nil, err
 	}
 	args["version"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_markThreadRead_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "threadId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["threadId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "seq",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNIntID2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["seq"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_muteThread_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "threadId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["threadId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "muted",
+		func(ctx context.Context, v any) (bool, error) {
+			return ec.unmarshalNBoolean2bool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["muted"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_sendMessage_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.SendMessageInput, error) {
+			return ec.unmarshalNSendMessageInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSendMessageInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -1856,6 +2848,28 @@ func (ec *executionContext) field_Mutation_setPrimaryCategory_args(ctx context.C
 		return nil, err
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_setTyping_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "threadId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["threadId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "typing",
+		func(ctx context.Context, v any) (bool, error) {
+			return ec.unmarshalNBoolean2bool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["typing"] = arg1
 	return args, nil
 }
 
@@ -1999,6 +3013,42 @@ func (ec *executionContext) field_Query_content_args(ctx context.Context, rawArg
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_messageThread_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_messageThreads_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOInt2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "before",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["before"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_perspectiveByID_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2083,6 +3133,36 @@ func (ec *executionContext) field_Query_perspectives_args(ctx context.Context, r
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_threadMessages_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "threadId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["threadId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "first",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOInt2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "before",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOIntID2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["before"] = arg2
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_userByID_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2138,6 +3218,28 @@ func (ec *executionContext) field_Query_wikidataSearch_args(ctx context.Context,
 		return nil, err
 	}
 	args["limit"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Subscription_threadEvents_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "threadId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["threadId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "sinceSeq",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOIntID2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["sinceSeq"] = arg1
 	return args, nil
 }
 
@@ -2918,6 +4020,796 @@ func (ec *executionContext) fieldContext_CreateContentResult_alreadyExisted(_ co
 	return graphql.NewScalarFieldContext("CreateContentResult", field, false, false, errors.New("field of type Boolean does not have child fields"))
 }
 
+func (ec *executionContext) _FeelingEntry_emoji(ctx context.Context, field graphql.CollectedField, obj *model.FeelingEntry) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingEntry_emoji(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Emoji, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingEntry_emoji(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingEntry", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingEntry_label(ctx context.Context, field graphql.CollectedField, obj *model.FeelingEntry) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingEntry_label(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Label, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingEntry_label(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingEntry", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingEntry_intensity(ctx context.Context, field graphql.CollectedField, obj *model.FeelingEntry) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingEntry_intensity(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Intensity, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingEntry_intensity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingEntry", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingEntry_note(ctx context.Context, field graphql.CollectedField, obj *model.FeelingEntry) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingEntry_note(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Note, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingEntry_note(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingEntry", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InboxEvent_threadId(ctx context.Context, field graphql.CollectedField, obj *model.InboxEvent) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InboxEvent_threadId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ThreadID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InboxEvent_threadId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InboxEvent", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _InboxEvent_lastMessageAt(ctx context.Context, field graphql.CollectedField, obj *model.InboxEvent) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InboxEvent_lastMessageAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LastMessageAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InboxEvent_lastMessageAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InboxEvent", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InboxEvent_latestSeq(ctx context.Context, field graphql.CollectedField, obj *model.InboxEvent) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InboxEvent_latestSeq(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LatestSeq, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNIntID2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InboxEvent_latestSeq(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InboxEvent", field, false, false, errors.New("field of type IntID does not have child fields"))
+}
+
+func (ec *executionContext) _InboxEvent_unreadCount(ctx context.Context, field graphql.CollectedField, obj *model.InboxEvent) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InboxEvent_unreadCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UnreadCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InboxEvent_unreadCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InboxEvent", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _Message_id(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Message_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Message_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Message", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _Message_threadId(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Message_threadId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ThreadID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Message_threadId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Message", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _Message_sender(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Message_sender(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Message().Sender(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.User) graphql.Marshaler {
+			return ec.marshalNUser2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUser(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Message_sender(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Message",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_User(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Message_seq(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Message_seq(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Seq, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNIntID2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Message_seq(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Message", field, false, false, errors.New("field of type IntID does not have child fields"))
+}
+
+func (ec *executionContext) _Message_body(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Message_body(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Body, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Message_body(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Message", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Message_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Message_createdAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Message_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Message", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Message_editedAt(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Message_editedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Message().EditedAt(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Message_editedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Message", field, true, true, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Message_deletedAt(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Message_deletedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Message().DeletedAt(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Message_deletedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Message", field, true, true, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _MessageConnection_items(ctx context.Context, field graphql.CollectedField, obj *model.MessageConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageConnection_items(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Items, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.Message) graphql.Marshaler {
+			return ec.marshalNMessage2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessageConnection_items(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Message(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessageConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.MessageConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageConnection_pageInfo(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.PageInfo) graphql.Marshaler {
+			return ec.marshalNPageInfo2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPageInfo(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessageConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PageInfo(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessageDeleted_threadId(ctx context.Context, field graphql.CollectedField, obj *model.MessageDeleted) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageDeleted_threadId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ThreadID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessageDeleted_threadId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MessageDeleted", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _MessageDeleted_messageId(ctx context.Context, field graphql.CollectedField, obj *model.MessageDeleted) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageDeleted_messageId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MessageID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessageDeleted_messageId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MessageDeleted", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _MessageDeleted_seq(ctx context.Context, field graphql.CollectedField, obj *model.MessageDeleted) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageDeleted_seq(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Seq, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNIntID2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessageDeleted_seq(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MessageDeleted", field, false, false, errors.New("field of type IntID does not have child fields"))
+}
+
+func (ec *executionContext) _MessageEdited_message(ctx context.Context, field graphql.CollectedField, obj *model.MessageEdited) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageEdited_message(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Message, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Message) graphql.Marshaler {
+			return ec.marshalNMessage2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessage(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessageEdited_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageEdited",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Message(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessagePosted_message(ctx context.Context, field graphql.CollectedField, obj *model.MessagePosted) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessagePosted_message(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Message, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Message) graphql.Marshaler {
+			return ec.marshalNMessage2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessage(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessagePosted_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessagePosted",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Message(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessageThread_id(ctx context.Context, field graphql.CollectedField, obj *model.MessageThread) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageThread_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessageThread_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MessageThread", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _MessageThread_title(ctx context.Context, field graphql.CollectedField, obj *model.MessageThread) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageThread_title(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Title, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_MessageThread_title(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MessageThread", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _MessageThread_participants(ctx context.Context, field graphql.CollectedField, obj *model.MessageThread) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageThread_participants(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.MessageThread().Participants(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.ThreadParticipant) graphql.Marshaler {
+			return ec.marshalNThreadParticipant2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐThreadParticipantᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessageThread_participants(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageThread",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ThreadParticipant(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessageThread_lastMessageAt(ctx context.Context, field graphql.CollectedField, obj *model.MessageThread) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageThread_lastMessageAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LastMessageAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessageThread_lastMessageAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MessageThread", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _MessageThread_latestSeq(ctx context.Context, field graphql.CollectedField, obj *model.MessageThread) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageThread_latestSeq(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.MessageThread().LatestSeq(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNIntID2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessageThread_latestSeq(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MessageThread", field, true, true, errors.New("field of type IntID does not have child fields"))
+}
+
+func (ec *executionContext) _MessageThread_myLastReadSeq(ctx context.Context, field graphql.CollectedField, obj *model.MessageThread) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageThread_myLastReadSeq(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.MessageThread().MyLastReadSeq(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNIntID2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessageThread_myLastReadSeq(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MessageThread", field, true, true, errors.New("field of type IntID does not have child fields"))
+}
+
+func (ec *executionContext) _MessageThread_unreadCount(ctx context.Context, field graphql.CollectedField, obj *model.MessageThread) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageThread_unreadCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.MessageThread().UnreadCount(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessageThread_unreadCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MessageThread", field, true, true, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _MessageThread_muted(ctx context.Context, field graphql.CollectedField, obj *model.MessageThread) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageThread_muted(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.MessageThread().Muted(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessageThread_muted(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MessageThread", field, true, true, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _MessageThread_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.MessageThread) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MessageThread_createdAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MessageThread_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MessageThread", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _Mutation_createContentFromYouTube(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3626,6 +5518,519 @@ func (ec *executionContext) fieldContext_Mutation_setPrimaryCategory(ctx context
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_createMessageThread(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_createMessageThread(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CreateMessageThread(ctx, fc.Args["input"].(model.CreateMessageThreadInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.MessageThread
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.MessageThread) graphql.Marshaler {
+			return ec.marshalNMessageThread2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageThread(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_createMessageThread(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_MessageThread(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createMessageThread_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_sendMessage(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_sendMessage(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().SendMessage(ctx, fc.Args["input"].(model.SendMessageInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.Message
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Message) graphql.Marshaler {
+			return ec.marshalNMessage2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessage(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_sendMessage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Message(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_sendMessage_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_markThreadRead(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_markThreadRead(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().MarkThreadRead(ctx, fc.Args["threadId"].(string), fc.Args["seq"].(int))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.MessageThread
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.MessageThread) graphql.Marshaler {
+			return ec.marshalNMessageThread2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageThread(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_markThreadRead(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_MessageThread(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_markThreadRead_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_setTyping(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_setTyping(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().SetTyping(ctx, fc.Args["threadId"].(string), fc.Args["typing"].(bool))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_setTyping(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_setTyping_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_addThreadParticipants(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_addThreadParticipants(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().AddThreadParticipants(ctx, fc.Args["threadId"].(string), fc.Args["userIds"].([]string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.MessageThread
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.MessageThread) graphql.Marshaler {
+			return ec.marshalNMessageThread2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageThread(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_addThreadParticipants(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_MessageThread(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_addThreadParticipants_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_leaveThread(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_leaveThread(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().LeaveThread(ctx, fc.Args["threadId"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_leaveThread(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_leaveThread_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_editMessage(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_editMessage(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().EditMessage(ctx, fc.Args["messageId"].(string), fc.Args["body"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.Message
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Message) graphql.Marshaler {
+			return ec.marshalNMessage2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessage(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_editMessage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Message(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_editMessage_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteMessage(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_deleteMessage(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeleteMessage(ctx, fc.Args["messageId"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.Message
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Message) graphql.Marshaler {
+			return ec.marshalNMessage2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessage(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_deleteMessage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Message(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteMessage_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_muteThread(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_muteThread(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().MuteThread(ctx, fc.Args["threadId"].(string), fc.Args["muted"].(bool))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.MessageThread
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.MessageThread) graphql.Marshaler {
+			return ec.marshalNMessageThread2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageThread(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_muteThread(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_MessageThread(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_muteThread_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PageInfo_hasNextPage(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3890,6 +6295,75 @@ func (ec *executionContext) _PaginatedPerspectives_totalCount(ctx context.Contex
 }
 func (ec *executionContext) fieldContext_PaginatedPerspectives_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("PaginatedPerspectives", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ParticipantChanged_threadId(ctx context.Context, field graphql.CollectedField, obj *model.ParticipantChanged) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ParticipantChanged_threadId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ThreadID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ParticipantChanged_threadId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ParticipantChanged", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _ParticipantChanged_userId(ctx context.Context, field graphql.CollectedField, obj *model.ParticipantChanged) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ParticipantChanged_userId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ParticipantChanged_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ParticipantChanged", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _ParticipantChanged_change(ctx context.Context, field graphql.CollectedField, obj *model.ParticipantChanged) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ParticipantChanged_change(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Change, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.ParticipantChangeKind) graphql.Marshaler {
+			return ec.marshalNParticipantChangeKind2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐParticipantChangeKind(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ParticipantChanged_change(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ParticipantChanged", field, false, false, errors.New("field of type ParticipantChangeKind does not have child fields"))
 }
 
 func (ec *executionContext) _Perspective_id(ctx context.Context, field graphql.CollectedField, obj *model.Perspective) (ret graphql.Marshaler) {
@@ -4310,6 +6784,38 @@ func (ec *executionContext) fieldContext_Perspective_categorizedRatings(_ contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Perspective_feelings(ctx context.Context, field graphql.CollectedField, obj *model.Perspective) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Perspective_feelings(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Feelings, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.FeelingEntry) graphql.Marshaler {
+			return ec.marshalOFeelingEntry2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingEntryᚄ(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Perspective_feelings(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Perspective",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_FeelingEntry(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Perspective_primaryPerspectiveID(ctx context.Context, field graphql.CollectedField, obj *model.Perspective) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4446,6 +6952,75 @@ func (ec *executionContext) _Perspective_updatedAt(ctx context.Context, field gr
 }
 func (ec *executionContext) fieldContext_Perspective_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Perspective", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _PresenceChanged_threadId(ctx context.Context, field graphql.CollectedField, obj *model.PresenceChanged) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PresenceChanged_threadId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ThreadID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PresenceChanged_threadId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PresenceChanged", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _PresenceChanged_userId(ctx context.Context, field graphql.CollectedField, obj *model.PresenceChanged) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PresenceChanged_userId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PresenceChanged_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PresenceChanged", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _PresenceChanged_state(ctx context.Context, field graphql.CollectedField, obj *model.PresenceChanged) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PresenceChanged_state(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.State, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v domain.PresenceState) graphql.Marshaler {
+			return ec.marshalNPresenceState2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPresenceState(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PresenceChanged_state(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PresenceChanged", field, false, false, errors.New("field of type PresenceState does not have child fields"))
 }
 
 func (ec *executionContext) _Query_me(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -4833,6 +7408,177 @@ func (ec *executionContext) fieldContext_Query_perspectives(ctx context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_messageThreads(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_messageThreads(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().MessageThreads(ctx, fc.Args["first"].(*int), fc.Args["before"].(*string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal []*model.MessageThread
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.MessageThread) graphql.Marshaler {
+			return ec.marshalNMessageThread2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageThreadᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_messageThreads(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_MessageThread(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_messageThreads_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_messageThread(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_messageThread(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().MessageThread(ctx, fc.Args["id"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.MessageThread
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.MessageThread) graphql.Marshaler {
+			return ec.marshalOMessageThread2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageThread(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Query_messageThread(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_MessageThread(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_messageThread_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_threadMessages(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_threadMessages(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ThreadMessages(ctx, fc.Args["threadId"].(string), fc.Args["first"].(*int), fc.Args["before"].(*int))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.MessageConnection
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.MessageConnection) graphql.Marshaler {
+			return ec.marshalNMessageConnection2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageConnection(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_threadMessages(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_MessageConnection(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_threadMessages_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4907,6 +7653,370 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 		},
 	}
 	return fc, nil
+}
+
+func (ec *executionContext) _ReadReceiptChanged_threadId(ctx context.Context, field graphql.CollectedField, obj *model.ReadReceiptChanged) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ReadReceiptChanged_threadId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ThreadID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ReadReceiptChanged_threadId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ReadReceiptChanged", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _ReadReceiptChanged_userId(ctx context.Context, field graphql.CollectedField, obj *model.ReadReceiptChanged) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ReadReceiptChanged_userId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ReadReceiptChanged_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ReadReceiptChanged", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _ReadReceiptChanged_lastReadSeq(ctx context.Context, field graphql.CollectedField, obj *model.ReadReceiptChanged) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ReadReceiptChanged_lastReadSeq(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LastReadSeq, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNIntID2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ReadReceiptChanged_lastReadSeq(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ReadReceiptChanged", field, false, false, errors.New("field of type IntID does not have child fields"))
+}
+
+func (ec *executionContext) _StreamReset_threadId(ctx context.Context, field graphql.CollectedField, obj *model.StreamReset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_StreamReset_threadId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ThreadID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_StreamReset_threadId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("StreamReset", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _Subscription_threadEvents(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Subscription_threadEvents(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Subscription().ThreadEvents(ctx, fc.Args["threadId"].(string), fc.Args["sinceSeq"].(*int))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal model.ThreadEvent
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v model.ThreadEvent) graphql.Marshaler {
+			return ec.marshalNThreadEvent2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐThreadEvent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Subscription_threadEvents(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ThreadEvent does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_threadEvents_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_inboxEvents(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Subscription_inboxEvents(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Subscription().InboxEvents(ctx)
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.InboxEvent
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.InboxEvent) graphql.Marshaler {
+			return ec.marshalNInboxEvent2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInboxEvent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Subscription_inboxEvents(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_InboxEvent(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ThreadParticipant_user(ctx context.Context, field graphql.CollectedField, obj *model.ThreadParticipant) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ThreadParticipant_user(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.ThreadParticipant().User(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.User) graphql.Marshaler {
+			return ec.marshalNUser2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUser(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ThreadParticipant_user(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ThreadParticipant",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_User(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ThreadParticipant_role(ctx context.Context, field graphql.CollectedField, obj *model.ThreadParticipant) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ThreadParticipant_role(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Role, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v domain.ThreadRole) graphql.Marshaler {
+			return ec.marshalNThreadRole2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐThreadRole(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ThreadParticipant_role(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ThreadParticipant", field, false, false, errors.New("field of type ThreadRole does not have child fields"))
+}
+
+func (ec *executionContext) _ThreadParticipant_lastReadSeq(ctx context.Context, field graphql.CollectedField, obj *model.ThreadParticipant) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ThreadParticipant_lastReadSeq(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LastReadSeq, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNIntID2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ThreadParticipant_lastReadSeq(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ThreadParticipant", field, false, false, errors.New("field of type IntID does not have child fields"))
+}
+
+func (ec *executionContext) _ThreadParticipant_joinedAt(ctx context.Context, field graphql.CollectedField, obj *model.ThreadParticipant) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ThreadParticipant_joinedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.JoinedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ThreadParticipant_joinedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ThreadParticipant", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _TypingChanged_threadId(ctx context.Context, field graphql.CollectedField, obj *model.TypingChanged) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_TypingChanged_threadId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ThreadID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_TypingChanged_threadId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("TypingChanged", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _TypingChanged_userId(ctx context.Context, field graphql.CollectedField, obj *model.TypingChanged) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_TypingChanged_userId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_TypingChanged_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("TypingChanged", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _TypingChanged_typing(ctx context.Context, field graphql.CollectedField, obj *model.TypingChanged) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_TypingChanged_typing(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Typing, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_TypingChanged_typing(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("TypingChanged", field, false, false, errors.New("field of type Boolean does not have child fields"))
 }
 
 func (ec *executionContext) _User_id(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
@@ -6582,6 +9692,43 @@ func (ec *executionContext) unmarshalInputCreateContentFromYouTubeInput(ctx cont
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCreateMessageThreadInput(ctx context.Context, obj any) (model.CreateMessageThreadInput, error) {
+	var it model.CreateMessageThreadInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"participantUserIds", "title"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "participantUserIds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("participantUserIds"))
+			data, err := ec.unmarshalNID2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ParticipantUserIds = data
+		case "title":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("title"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Title = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreatePerspectiveInput(ctx context.Context, obj any) (model.CreatePerspectiveInput, error) {
 	var it model.CreatePerspectiveInput
 	if obj == nil {
@@ -6593,7 +9740,7 @@ func (ec *executionContext) unmarshalInputCreatePerspectiveInput(ctx context.Con
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"userID", "contentID", "quality", "agreement", "importance", "confidence", "like", "privacy", "description", "category", "parts", "labels", "categorizedRatings", "primaryPerspectiveID", "relatedPerspectiveIDs", "customFields", "review"}
+	fieldsInOrder := [...]string{"userID", "contentID", "quality", "agreement", "importance", "confidence", "like", "privacy", "description", "category", "parts", "labels", "categorizedRatings", "feelings", "primaryPerspectiveID", "relatedPerspectiveIDs", "customFields", "review"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -6691,6 +9838,13 @@ func (ec *executionContext) unmarshalInputCreatePerspectiveInput(ctx context.Con
 				return it, err
 			}
 			it.CategorizedRatings = data
+		case "feelings":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("feelings"))
+			data, err := ec.unmarshalOFeelingInput2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Feelings = data
 		case "primaryPerspectiveID":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("primaryPerspectiveID"))
 			data, err := ec.unmarshalOIntID2ᚖint(ctx, v)
@@ -6761,6 +9915,57 @@ func (ec *executionContext) unmarshalInputCreateUserInput(ctx context.Context, o
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputFeelingInput(ctx context.Context, obj any) (model.FeelingInput, error) {
+	var it model.FeelingInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"emoji", "label", "intensity", "note"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "emoji":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("emoji"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Emoji = data
+		case "label":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("label"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Label = data
+		case "intensity":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("intensity"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Intensity = data
+		case "note":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("note"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Note = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputPerspectiveFilter(ctx context.Context, obj any) (model.PerspectiveFilter, error) {
 	var it model.PerspectiveFilter
 	if obj == nil {
@@ -6800,6 +10005,50 @@ func (ec *executionContext) unmarshalInputPerspectiveFilter(ctx context.Context,
 				return it, err
 			}
 			it.Privacy = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputSendMessageInput(ctx context.Context, obj any) (model.SendMessageInput, error) {
+	var it model.SendMessageInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"threadId", "body", "clientNonce"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "threadId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("threadId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ThreadID = data
+		case "body":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("body"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Body = data
+		case "clientNonce":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientNonce"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientNonce = data
 		}
 	}
 	return it, nil
@@ -6874,7 +10123,7 @@ func (ec *executionContext) unmarshalInputUpdatePerspectiveInput(ctx context.Con
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"id", "contentID", "quality", "agreement", "importance", "confidence", "like", "privacy", "description", "category", "reviewStatus", "parts", "labels", "categorizedRatings", "primaryPerspectiveID", "relatedPerspectiveIDs", "customFields", "review"}
+	fieldsInOrder := [...]string{"id", "contentID", "quality", "agreement", "importance", "confidence", "like", "privacy", "description", "category", "reviewStatus", "parts", "labels", "categorizedRatings", "feelings", "primaryPerspectiveID", "relatedPerspectiveIDs", "customFields", "review"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -6979,6 +10228,13 @@ func (ec *executionContext) unmarshalInputUpdatePerspectiveInput(ctx context.Con
 				return it, err
 			}
 			it.CategorizedRatings = data
+		case "feelings":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("feelings"))
+			data, err := ec.unmarshalOFeelingInput2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Feelings = data
 		case "primaryPerspectiveID":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("primaryPerspectiveID"))
 			data, err := ec.unmarshalOIntID2ᚖint(ctx, v)
@@ -7059,6 +10315,75 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
+
+func (ec *executionContext) _ThreadEvent(ctx context.Context, sel ast.SelectionSet, obj model.ThreadEvent) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.TypingChanged:
+		return ec._TypingChanged(ctx, sel, &obj)
+	case *model.TypingChanged:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._TypingChanged(ctx, sel, obj)
+	case model.StreamReset:
+		return ec._StreamReset(ctx, sel, &obj)
+	case *model.StreamReset:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._StreamReset(ctx, sel, obj)
+	case model.ReadReceiptChanged:
+		return ec._ReadReceiptChanged(ctx, sel, &obj)
+	case *model.ReadReceiptChanged:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ReadReceiptChanged(ctx, sel, obj)
+	case model.PresenceChanged:
+		return ec._PresenceChanged(ctx, sel, &obj)
+	case *model.PresenceChanged:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._PresenceChanged(ctx, sel, obj)
+	case model.ParticipantChanged:
+		return ec._ParticipantChanged(ctx, sel, &obj)
+	case *model.ParticipantChanged:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ParticipantChanged(ctx, sel, obj)
+	case model.MessagePosted:
+		return ec._MessagePosted(ctx, sel, &obj)
+	case *model.MessagePosted:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._MessagePosted(ctx, sel, obj)
+	case model.MessageEdited:
+		return ec._MessageEdited(ctx, sel, &obj)
+	case *model.MessageEdited:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._MessageEdited(ctx, sel, obj)
+	case model.MessageDeleted:
+		return ec._MessageDeleted(ctx, sel, &obj)
+	case *model.MessageDeleted:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._MessageDeleted(ctx, sel, obj)
+	default:
+		if typedObj, ok := obj.(graphql.Marshaler); ok {
+			return typedObj
+		} else {
+			panic(fmt.Errorf("unexpected type %T; non-generated variants of ThreadEvent must implement graphql.Marshaler", obj))
+		}
+	}
+}
 
 // endregion ************************** interface.gotpl ***************************
 
@@ -7379,6 +10704,694 @@ func (ec *executionContext) _CreateContentResult(ctx context.Context, sel ast.Se
 	return out
 }
 
+var feelingEntryImplementors = []string{"FeelingEntry"}
+
+func (ec *executionContext) _FeelingEntry(ctx context.Context, sel ast.SelectionSet, obj *model.FeelingEntry) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, feelingEntryImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FeelingEntry")
+		case "emoji":
+			out.Values[i] = ec._FeelingEntry_emoji(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "label":
+			out.Values[i] = ec._FeelingEntry_label(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "intensity":
+			out.Values[i] = ec._FeelingEntry_intensity(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "note":
+			out.Values[i] = ec._FeelingEntry_note(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var inboxEventImplementors = []string{"InboxEvent"}
+
+func (ec *executionContext) _InboxEvent(ctx context.Context, sel ast.SelectionSet, obj *model.InboxEvent) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, inboxEventImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("InboxEvent")
+		case "threadId":
+			out.Values[i] = ec._InboxEvent_threadId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastMessageAt":
+			out.Values[i] = ec._InboxEvent_lastMessageAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "latestSeq":
+			out.Values[i] = ec._InboxEvent_latestSeq(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "unreadCount":
+			out.Values[i] = ec._InboxEvent_unreadCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var messageImplementors = []string{"Message"}
+
+func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, obj *model.Message) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, messageImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Message")
+		case "id":
+			out.Values[i] = ec._Message_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "threadId":
+			out.Values[i] = ec._Message_threadId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "sender":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Message_sender(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "seq":
+			out.Values[i] = ec._Message_seq(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "body":
+			out.Values[i] = ec._Message_body(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "createdAt":
+			out.Values[i] = ec._Message_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "editedAt":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Message_editedAt(ctx, field, obj)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "deletedAt":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Message_deletedAt(ctx, field, obj)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var messageConnectionImplementors = []string{"MessageConnection"}
+
+func (ec *executionContext) _MessageConnection(ctx context.Context, sel ast.SelectionSet, obj *model.MessageConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, messageConnectionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MessageConnection")
+		case "items":
+			out.Values[i] = ec._MessageConnection_items(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pageInfo":
+			out.Values[i] = ec._MessageConnection_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var messageDeletedImplementors = []string{"MessageDeleted", "ThreadEvent"}
+
+func (ec *executionContext) _MessageDeleted(ctx context.Context, sel ast.SelectionSet, obj *model.MessageDeleted) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, messageDeletedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MessageDeleted")
+		case "threadId":
+			out.Values[i] = ec._MessageDeleted_threadId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "messageId":
+			out.Values[i] = ec._MessageDeleted_messageId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "seq":
+			out.Values[i] = ec._MessageDeleted_seq(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var messageEditedImplementors = []string{"MessageEdited", "ThreadEvent"}
+
+func (ec *executionContext) _MessageEdited(ctx context.Context, sel ast.SelectionSet, obj *model.MessageEdited) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, messageEditedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MessageEdited")
+		case "message":
+			out.Values[i] = ec._MessageEdited_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var messagePostedImplementors = []string{"MessagePosted", "ThreadEvent"}
+
+func (ec *executionContext) _MessagePosted(ctx context.Context, sel ast.SelectionSet, obj *model.MessagePosted) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, messagePostedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MessagePosted")
+		case "message":
+			out.Values[i] = ec._MessagePosted_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var messageThreadImplementors = []string{"MessageThread"}
+
+func (ec *executionContext) _MessageThread(ctx context.Context, sel ast.SelectionSet, obj *model.MessageThread) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, messageThreadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MessageThread")
+		case "id":
+			out.Values[i] = ec._MessageThread_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "title":
+			out.Values[i] = ec._MessageThread_title(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "participants":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._MessageThread_participants(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "lastMessageAt":
+			out.Values[i] = ec._MessageThread_lastMessageAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "latestSeq":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._MessageThread_latestSeq(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "myLastReadSeq":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._MessageThread_myLastReadSeq(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "unreadCount":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._MessageThread_unreadCount(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "muted":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._MessageThread_muted(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "createdAt":
+			out.Values[i] = ec._MessageThread_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -7479,6 +11492,69 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "setPrimaryCategory":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_setPrimaryCategory(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createMessageThread":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createMessageThread(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sendMessage":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_sendMessage(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "markThreadRead":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_markThreadRead(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "setTyping":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_setTyping(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "addThreadParticipants":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_addThreadParticipants(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "leaveThread":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_leaveThread(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "editMessage":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_editMessage(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteMessage":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteMessage(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "muteThread":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_muteThread(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -7653,6 +11729,54 @@ func (ec *executionContext) _PaginatedPerspectives(ctx context.Context, sel ast.
 	return out
 }
 
+var participantChangedImplementors = []string{"ParticipantChanged", "ThreadEvent"}
+
+func (ec *executionContext) _ParticipantChanged(ctx context.Context, sel ast.SelectionSet, obj *model.ParticipantChanged) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, participantChangedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ParticipantChanged")
+		case "threadId":
+			out.Values[i] = ec._ParticipantChanged_threadId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "userId":
+			out.Values[i] = ec._ParticipantChanged_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "change":
+			out.Values[i] = ec._ParticipantChanged_change(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var perspectiveImplementors = []string{"Perspective"}
 
 func (ec *executionContext) _Perspective(ctx context.Context, sel ast.SelectionSet, obj *model.Perspective) graphql.Marshaler {
@@ -7750,6 +11874,11 @@ func (ec *executionContext) _Perspective(ctx context.Context, sel ast.SelectionS
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
+		case "feelings":
+			out.Values[i] = ec._Perspective_feelings(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		case "primaryPerspectiveID":
 			out.Values[i] = ec._Perspective_primaryPerspectiveID(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
@@ -7777,6 +11906,54 @@ func (ec *executionContext) _Perspective(ctx context.Context, sel ast.SelectionS
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Perspective_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var presenceChangedImplementors = []string{"PresenceChanged", "ThreadEvent"}
+
+func (ec *executionContext) _PresenceChanged(ctx context.Context, sel ast.SelectionSet, obj *model.PresenceChanged) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, presenceChangedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PresenceChanged")
+		case "threadId":
+			out.Values[i] = ec._PresenceChanged_threadId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "userId":
+			out.Values[i] = ec._PresenceChanged_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "state":
+			out.Values[i] = ec._PresenceChanged_state(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -8019,6 +12196,72 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "messageThreads":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_messageThreads(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "messageThread":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_messageThread(ctx, field)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "threadMessages":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_threadMessages(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -8032,6 +12275,248 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			})
 			if out.Values[i] == graphql.RequiredNull {
 				atomic.AddUint32(&out.Invalids, 1)
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var readReceiptChangedImplementors = []string{"ReadReceiptChanged", "ThreadEvent"}
+
+func (ec *executionContext) _ReadReceiptChanged(ctx context.Context, sel ast.SelectionSet, obj *model.ReadReceiptChanged) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, readReceiptChangedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ReadReceiptChanged")
+		case "threadId":
+			out.Values[i] = ec._ReadReceiptChanged_threadId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "userId":
+			out.Values[i] = ec._ReadReceiptChanged_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastReadSeq":
+			out.Values[i] = ec._ReadReceiptChanged_lastReadSeq(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var streamResetImplementors = []string{"StreamReset", "ThreadEvent"}
+
+func (ec *executionContext) _StreamReset(ctx context.Context, sel ast.SelectionSet, obj *model.StreamReset) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, streamResetImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StreamReset")
+		case "threadId":
+			out.Values[i] = ec._StreamReset_threadId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var subscriptionImplementors = []string{"Subscription"}
+
+func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, subscriptionImplementors)
+	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
+		Object: "Subscription",
+	})
+	if len(fields) != 1 {
+		graphql.AddErrorf(ctx, "must subscribe to exactly one stream")
+		return nil
+	}
+
+	switch fields[0].Name {
+	case "threadEvents":
+		return ec._Subscription_threadEvents(ctx, fields[0])
+	case "inboxEvents":
+		return ec._Subscription_inboxEvents(ctx, fields[0])
+	default:
+		panic("unknown field " + strconv.Quote(fields[0].Name))
+	}
+}
+
+var threadParticipantImplementors = []string{"ThreadParticipant"}
+
+func (ec *executionContext) _ThreadParticipant(ctx context.Context, sel ast.SelectionSet, obj *model.ThreadParticipant) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, threadParticipantImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ThreadParticipant")
+		case "user":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ThreadParticipant_user(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "role":
+			out.Values[i] = ec._ThreadParticipant_role(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "lastReadSeq":
+			out.Values[i] = ec._ThreadParticipant_lastReadSeq(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "joinedAt":
+			out.Values[i] = ec._ThreadParticipant_joinedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var typingChangedImplementors = []string{"TypingChanged", "ThreadEvent"}
+
+func (ec *executionContext) _TypingChanged(ctx context.Context, sel ast.SelectionSet, obj *model.TypingChanged) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, typingChangedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TypingChanged")
+		case "threadId":
+			out.Values[i] = ec._TypingChanged_threadId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "userId":
+			out.Values[i] = ec._TypingChanged_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "typing":
+			out.Values[i] = ec._TypingChanged_typing(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -8730,6 +13215,11 @@ func (ec *executionContext) marshalNCreateContentResult2ᚖgithubᚗcomᚋCodeWa
 	return ec._CreateContentResult(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNCreateMessageThreadInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateMessageThreadInput(ctx context.Context, v any) (model.CreateMessageThreadInput, error) {
+	res, err := ec.unmarshalInputCreateMessageThreadInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCreatePerspectiveInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreatePerspectiveInput(ctx context.Context, v any) (model.CreatePerspectiveInput, error) {
 	res, err := ec.unmarshalInputCreatePerspectiveInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -8738,6 +13228,21 @@ func (ec *executionContext) unmarshalNCreatePerspectiveInput2githubᚗcomᚋCode
 func (ec *executionContext) unmarshalNCreateUserInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateUserInput(ctx context.Context, v any) (model.CreateUserInput, error) {
 	res, err := ec.unmarshalInputCreateUserInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFeelingEntry2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingEntry(ctx context.Context, sel ast.SelectionSet, v *model.FeelingEntry) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._FeelingEntry(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNFeelingInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingInput(ctx context.Context, v any) (*model.FeelingInput, error) {
+	res, err := ec.unmarshalInputFeelingInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v any) (string, error) {
@@ -8754,6 +13259,45 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNID2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]string, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNID2string(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNID2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNID2string(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNInboxEvent2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInboxEvent(ctx context.Context, sel ast.SelectionSet, v *model.InboxEvent) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._InboxEvent(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v any) (int, error) {
@@ -8788,6 +13332,68 @@ func (ec *executionContext) marshalNIntID2int(ctx context.Context, sel ast.Selec
 	return res
 }
 
+func (ec *executionContext) marshalNMessage2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Message) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNMessage2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessage(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNMessage2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessage(ctx context.Context, sel ast.SelectionSet, v *model.Message) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Message(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNMessageConnection2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageConnection(ctx context.Context, sel ast.SelectionSet, v *model.MessageConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._MessageConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNMessageThread2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageThreadᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.MessageThread) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNMessageThread2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageThread(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNMessageThread2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageThread(ctx context.Context, sel ast.SelectionSet, v *model.MessageThread) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._MessageThread(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v *model.PageInfo) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -8818,6 +13424,16 @@ func (ec *executionContext) marshalNPaginatedPerspectives2ᚖgithubᚗcomᚋCode
 	return ec._PaginatedPerspectives(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNParticipantChangeKind2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐParticipantChangeKind(ctx context.Context, v any) (model.ParticipantChangeKind, error) {
+	var res model.ParticipantChangeKind
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNParticipantChangeKind2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐParticipantChangeKind(ctx context.Context, sel ast.SelectionSet, v model.ParticipantChangeKind) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) marshalNPerspective2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPerspectiveᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Perspective) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -8844,6 +13460,23 @@ func (ec *executionContext) marshalNPerspective2ᚖgithubᚗcomᚋCodeWarriorᚑ
 	return ec._Perspective(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNPresenceState2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPresenceState(ctx context.Context, v any) (domain.PresenceState, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.PresenceState(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNPresenceState2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPresenceState(ctx context.Context, sel ast.SelectionSet, v domain.PresenceState) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) unmarshalNPrivacy2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPrivacy(ctx context.Context, v any) (domain.Privacy, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := domain.Privacy(tmp)
@@ -8861,6 +13494,11 @@ func (ec *executionContext) marshalNPrivacy2githubᚗcomᚋCodeWarriorᚑdebug�
 	return res
 }
 
+func (ec *executionContext) unmarshalNSendMessageInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSendMessageInput(ctx context.Context, v any) (model.SendMessageInput, error) {
+	res, err := ec.unmarshalInputSendMessageInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNSetPrimaryCategoryInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSetPrimaryCategoryInput(ctx context.Context, v any) (model.SetPrimaryCategoryInput, error) {
 	res, err := ec.unmarshalInputSetPrimaryCategoryInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -8874,6 +13512,59 @@ func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) 
 func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
 	_ = sel
 	res := graphql.MarshalString(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) marshalNThreadEvent2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐThreadEvent(ctx context.Context, sel ast.SelectionSet, v model.ThreadEvent) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ThreadEvent(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNThreadParticipant2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐThreadParticipantᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ThreadParticipant) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNThreadParticipant2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐThreadParticipant(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNThreadParticipant2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐThreadParticipant(ctx context.Context, sel ast.SelectionSet, v *model.ThreadParticipant) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ThreadParticipant(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNThreadRole2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐThreadRole(ctx context.Context, v any) (domain.ThreadRole, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.ThreadRole(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNThreadRole2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐThreadRole(ctx context.Context, sel ast.SelectionSet, v domain.ThreadRole) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -9237,6 +13928,42 @@ func (ec *executionContext) marshalOContentType2ᚖgithubᚗcomᚋCodeWarriorᚑ
 	return res
 }
 
+func (ec *executionContext) marshalOFeelingEntry2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingEntryᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.FeelingEntry) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNFeelingEntry2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingEntry(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) unmarshalOFeelingInput2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingInputᚄ(ctx context.Context, v any) ([]*model.FeelingInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]*model.FeelingInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNFeelingInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
 func (ec *executionContext) unmarshalOID2ᚖstring(ctx context.Context, v any) (*string, error) {
 	if v == nil {
 		return nil, nil
@@ -9342,6 +14069,13 @@ func (ec *executionContext) marshalOJSON2map(ctx context.Context, sel ast.Select
 	_ = ctx
 	res := graphql.MarshalMap(v)
 	return res
+}
+
+func (ec *executionContext) marshalOMessageThread2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageThread(ctx context.Context, sel ast.SelectionSet, v *model.MessageThread) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._MessageThread(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOPerspective2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPerspective(ctx context.Context, sel ast.SelectionSet, v *model.Perspective) graphql.Marshaler {

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,17 +22,20 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/directives"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/generated"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/resolvers"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/realtime"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
 	apimw "github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/middleware"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/wikidata"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/config"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/database"
 	gqltiming "github.com/CodeWarrior-debug/perspectize/backend/pkg/graphql"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/logger"
 	perfmw "github.com/CodeWarrior-debug/perspectize/backend/pkg/middleware"
 	"github.com/clerk/clerk-sdk-go/v2"
+	coderws "github.com/coder/websocket"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -148,6 +152,8 @@ func main() {
 	userRepo := postgres.NewGormUserRepository(db)
 	perspectiveRepo := postgres.NewGormPerspectiveRepository(db)
 	categoryRepo := postgres.NewGormCategoryRepository(db)
+	threadRepo := postgres.NewGormThreadRepository(db)
+	messageRepo := postgres.NewGormMessageRepository(db)
 
 	// Initialize services
 	contentService := services.NewContentService(contentRepo, youtubeClient)
@@ -155,8 +161,51 @@ func main() {
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
 
+	// Messaging realtime plumbing: the hub fans events out in-process, the
+	// listener feeds it from Postgres NOTIFY, the presence tracker records who
+	// is connected (its connection lifecycle is wired from the WebSocket
+	// InitFunc via realtime.RunPresenceSession).
+	// The notifier lets the hub publish ephemeral events over pg_notify so every
+	// instance (this one included, via its own Listener) delivers them.
+	notifier, err := realtime.NewPgNotifier(context.Background(), dsn)
+	if err != nil {
+		log.Fatalf("Failed to create realtime notifier: %v", err)
+	}
+	defer notifier.Close()
+
+	hub := realtime.NewHub(messageRepo, threadRepo, notifier)
+	presence := realtime.NewPresenceTracker()
+	limiter := services.NewSlidingWindowLimiter(10, 10*time.Second)
+	messagingService := services.NewMessagingService(threadRepo, messageRepo, hub, limiter)
+
+	listener := realtime.NewListener(dsn, hub)
+	listenerCtx, stopListener := context.WithCancel(context.Background())
+	go listener.Run(listenerCtx)
+	defer stopListener()
+
+	// Application-side message retention sweep. Disabled unless
+	// MESSAGE_RETENTION_MAX is a positive value — since migration 000018 the
+	// database no longer prunes messages itself, so this is the only pruner.
+	if cfg.MessageRetentionMax > 0 {
+		sweeper := services.NewRetentionSweeper(
+			db, cfg.MessageRetentionMax,
+			time.Duration(cfg.MessageRetentionSweepMinutes)*time.Minute,
+		)
+		go sweeper.Run(listenerCtx)
+		slog.Info("message retention sweep enabled",
+			"max_per_thread", cfg.MessageRetentionMax,
+			"interval_minutes", cfg.MessageRetentionSweepMinutes)
+	}
+
+	// Shared Clerk token verifier — reused by HTTP middleware and the
+	// WebSocket InitFunc so both transports resolve identities identically.
+	tokenVerifier := auth.NewClerkTokenVerifier()
+
 	// Initialize GraphQL with directive wiring
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService)
+	resolver := resolvers.NewResolver(
+		contentService, userService, perspectiveService, categoryService,
+		messagingService, hub, presence,
+	)
 	directiveRoot := directives.NewDirectiveRoot(contentService, perspectiveService)
 	gqlConfig := generated.Config{
 		Resolvers: resolver,
@@ -167,6 +216,46 @@ func main() {
 	}
 	srv := handler.New(generated.NewExecutableSchema(gqlConfig))
 	srv.AddTransport(transport.Options{})
+	// WebSocket transport for GraphQL subscriptions. InitFunc authenticates the
+	// connection from the graphql-ws connection_init payload, then starts a
+	// presence session that marks the user ONLINE for the life of the socket
+	// and OFFLINE a grace period after the last one closes.
+	srv.AddTransport(transport.Websocket{
+		// gqlgen v0.17.95's default WebsocketImplementation (coder/websocket)
+		// rejects cross-origin upgrades unless told otherwise. Reuse the
+		// configured CORS allowlist instead of same-origin-only.
+		Implementation:        coderWebsocketImplementationFor(secCfg.CORSOrigins),
+		KeepAlivePingInterval: 10 * time.Second,
+		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
+			token := initPayload.Authorization()
+			if token == "" {
+				if v, ok := initPayload["authToken"].(string); ok {
+					token = v
+				}
+			}
+			token = strings.TrimPrefix(token, "Bearer ")
+			if token == "" {
+				return ctx, nil, fmt.Errorf("unauthenticated websocket: missing token")
+			}
+			identity, err := tokenVerifier.Verify(ctx, token)
+			if err != nil || identity.ClerkID == "" {
+				return ctx, nil, fmt.Errorf("unauthenticated websocket: invalid token")
+			}
+			user, err := userRepo.GetByClerkID(ctx, identity.ClerkID)
+			if err != nil || user == nil {
+				return ctx, nil, fmt.Errorf("unauthenticated websocket: unknown user")
+			}
+			authUser := &domain.AuthenticatedUser{
+				ID:       user.ID,
+				ClerkID:  identity.ClerkID,
+				Username: user.Username,
+				Email:    user.Email,
+				Role:     user.Role,
+			}
+			go realtime.RunPresenceSession(ctx, presence, hub, threadRepo, user.ID, realtime.DefaultPresenceConfig())
+			return auth.WithAuthenticatedUser(ctx, authUser), &initPayload, nil
+		},
+	})
 	srv.AddTransport(transport.GET{})
 	srv.AddTransport(transport.POST{})
 	srv.AddTransport(transport.MultipartForm{})
@@ -198,7 +287,7 @@ func main() {
 	}))
 	r.Use(apimw.SecureHeaders())       // M-14: security headers (HSTS, X-Content-Type-Options, X-Frame-Options)
 	r.Use(apimw.ContentTypeValidation) // M-15: CSRF protection via Content-Type
-	r.Use(auth.Middleware(userRepo))
+	r.Use(auth.Middleware(userRepo, tokenVerifier))
 	r.Use(graphqldl.Middleware(categoryService)) // per-request GraphQL dataloaders (batches Content.primaryCategory)
 	r.Use(perfmw.RequestTimer)                   // structured request timing (replaces chi Logger)
 	r.Use(perfmw.Recoverer)                      // structured panic recovery (JSON via slog)
@@ -232,8 +321,10 @@ func main() {
 		w.Write([]byte("ready"))
 	})
 
-	// GraphQL
-	r.Handle("/graphql", srv)
+	// GraphQL. The wrapper clears the per-request I/O deadlines for WebSocket
+	// upgrades so long-lived subscriptions are not killed by the server's
+	// Read/WriteTimeout.
+	r.Handle("/graphql", clearDeadlinesForWebsocket(srv))
 	if os.Getenv("APP_ENV") != "production" {
 		r.Handle("/", playground.Handler("GraphQL Playground", "/graphql"))
 		r.Get("/debug/db-stats", database.StatsHandler(sqlDB))
@@ -269,6 +360,61 @@ func main() {
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+// coderWebsocketImplementationFor builds the coder/websocket-backed
+// implementation gqlgen's transport.Websocket uses, honoring the same CORS
+// allowlist as the HTTP transport. A bare "*" (the configured allow-all case)
+// maps to InsecureSkipVerify, since coder/websocket's OriginPatterns
+// deliberately doesn't accept "*" as a pattern (it wants InsecureSkipVerify
+// used explicitly instead, to make an intentionally-open policy visible in
+// the code). Anything else is passed through as an OriginPatterns entry —
+// each pattern already matches "scheme://host" when it contains "://", which
+// is exactly the shape our configured origins are in. The InitFunc still
+// requires a valid token before any data flows regardless of origin.
+func coderWebsocketImplementationFor(allowedOrigins []string) transport.CoderWebsocketImplementation {
+	opts := coderws.AcceptOptions{}
+	for _, allowed := range allowedOrigins {
+		if allowed == "*" {
+			opts.InsecureSkipVerify = true
+			opts.OriginPatterns = nil
+			break
+		}
+		opts.OriginPatterns = append(opts.OriginPatterns, allowed)
+	}
+	return transport.CoderWebsocketImplementation{AcceptOptions: opts}
+}
+
+// clearDeadlinesForWebsocket removes the connection deadlines that
+// http.Server stamps from ReadTimeout/WriteTimeout before the handler runs.
+// Those deadlines survive the WebSocket hijack and would otherwise terminate
+// every subscription after WriteTimeout elapses. Plain HTTP requests are
+// untouched and keep their timeouts.
+func clearDeadlinesForWebsocket(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isWebsocketHandshake(r) {
+			rc := http.NewResponseController(w)
+			if err := rc.SetReadDeadline(time.Time{}); err != nil {
+				slog.Warn("could not clear websocket read deadline", "error", err)
+			}
+			if err := rc.SetWriteDeadline(time.Time{}); err != nil {
+				slog.Warn("could not clear websocket write deadline", "error", err)
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// isWebsocketHandshake reports whether r is a genuine RFC 6455 upgrade request.
+// All three conditions are required: a lone spoofed `Upgrade: websocket` header
+// on a POST would otherwise strip that request's deadlines and give an attacker
+// an unbounded-duration /graphql call. A real handshake is always a GET with
+// `Connection: Upgrade` and a client-generated Sec-WebSocket-Key.
+func isWebsocketHandshake(r *http.Request) bool {
+	return r.Method == http.MethodGet &&
+		strings.EqualFold(r.Header.Get("Upgrade"), "websocket") &&
+		strings.Contains(strings.ToLower(r.Header.Get("Connection")), "upgrade") &&
+		r.Header.Get("Sec-WebSocket-Key") != ""
 }
 
 // initTracer sets up an OTel TracerProvider with an OTLP HTTP exporter.

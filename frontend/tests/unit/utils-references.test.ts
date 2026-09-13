@@ -19,9 +19,7 @@ describe('resolveAtReference', () => {
 	});
 
 	it('replaces all occurrences of @this in a longer string', () => {
-		expect(resolveAtReference('@this and @this again', 'Content')).toBe(
-			'Content and Content again'
-		);
+		expect(resolveAtReference('@this and @this again', 'Content')).toBe('Content and Content again');
 	});
 
 	it('works with an empty parent content name', () => {

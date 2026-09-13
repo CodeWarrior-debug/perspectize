@@ -1,0 +1,99 @@
+# ---- Messaging ----
+#
+# Kept in its own schema file so gqlgen's follow-schema layout emits the
+# messaging resolvers into resolvers/messaging.resolvers.go rather than
+# growing schema.resolvers.go.
+#
+# `Query` and `Mutation` already exist in schema.graphql, so they are extended.
+# `Subscription` does not exist anywhere yet, so it is declared directly.
+
+enum ThreadRole { OWNER MEMBER }
+enum PresenceState { ONLINE OFFLINE }
+enum ParticipantChangeKind { ADDED REMOVED }
+
+type MessageThread {
+  id: ID!
+  title: String
+  participants: [ThreadParticipant!]!
+  lastMessageAt: String!
+  latestSeq: IntID!
+  myLastReadSeq: IntID!
+  unreadCount: Int!
+  muted: Boolean!
+  createdAt: String!
+}
+
+type ThreadParticipant {
+  user: User!
+  role: ThreadRole!
+  lastReadSeq: IntID!
+  joinedAt: String!
+}
+
+type Message {
+  id: ID!
+  threadId: ID!
+  sender: User!
+  seq: IntID!
+  body: String!
+  createdAt: String!
+  editedAt: String
+  deletedAt: String
+}
+
+type MessageConnection {
+  items: [Message!]!
+  pageInfo: PageInfo!
+}
+
+type MessagePosted { message: Message! }
+type ReadReceiptChanged { threadId: ID!  userId: ID!  lastReadSeq: IntID! }
+type TypingChanged { threadId: ID!  userId: ID!  typing: Boolean! }
+type ParticipantChanged { threadId: ID!  userId: ID!  change: ParticipantChangeKind! }
+type PresenceChanged { threadId: ID!  userId: ID!  state: PresenceState! }
+type StreamReset { threadId: ID! }
+type MessageEdited  { message: Message! }
+type MessageDeleted { threadId: ID!  messageId: ID!  seq: IntID! }
+
+union ThreadEvent =
+    MessagePosted
+  | ReadReceiptChanged
+  | TypingChanged
+  | ParticipantChanged
+  | PresenceChanged
+  | StreamReset
+  | MessageEdited
+  | MessageDeleted
+
+type InboxEvent {
+  threadId: ID!
+  lastMessageAt: String!
+  latestSeq: IntID!
+  unreadCount: Int!
+}
+
+input CreateMessageThreadInput { participantUserIds: [ID!]!  title: String }
+input SendMessageInput { threadId: ID!  body: String!  clientNonce: String! }
+
+extend type Query {
+  messageThreads(first: Int, before: String): [MessageThread!]! @auth
+  messageThread(id: ID!): MessageThread @auth
+  threadMessages(threadId: ID!, first: Int, before: IntID): MessageConnection! @auth
+}
+
+extend type Mutation {
+  createMessageThread(input: CreateMessageThreadInput!): MessageThread! @auth
+  sendMessage(input: SendMessageInput!): Message! @auth
+  markThreadRead(threadId: ID!, seq: IntID!): MessageThread! @auth
+  setTyping(threadId: ID!, typing: Boolean!): Boolean! @auth
+  addThreadParticipants(threadId: ID!, userIds: [ID!]!): MessageThread! @auth
+  leaveThread(threadId: ID!): Boolean! @auth
+  editMessage(messageId: ID!, body: String!): Message! @auth
+  deleteMessage(messageId: ID!): Message! @auth
+  muteThread(threadId: ID!, muted: Boolean!): MessageThread! @auth
+}
+
+type Subscription {
+  threadEvents(threadId: ID!, sinceSeq: IntID): ThreadEvent! @auth
+  inboxEvents: InboxEvent! @auth
+}

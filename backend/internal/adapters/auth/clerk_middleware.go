@@ -8,17 +8,17 @@ import (
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	repositories "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
-	"github.com/clerk/clerk-sdk-go/v2"
+	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	clerkhttp "github.com/clerk/clerk-sdk-go/v2/http"
 	clerkuser "github.com/clerk/clerk-sdk-go/v2/user"
 )
 
 // Middleware verifies Clerk Bearer tokens and resolves local users.
 // Permissive: unauthenticated requests pass through for public queries.
-func Middleware(userRepo repositories.UserRepository) func(http.Handler) http.Handler {
+func Middleware(userRepo repositories.UserRepository, verifier portservices.TokenVerifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		// Wrap with Clerk's JWT verification middleware
-		return clerkhttp.WithHeaderAuthorization()(newAuthHandler(userRepo, next))
+		return clerkhttp.WithHeaderAuthorization()(newAuthHandler(userRepo, verifier, next))
 	}
 }
 
@@ -32,17 +32,17 @@ func Middleware(userRepo repositories.UserRepository) func(http.Handler) http.Ha
 //
 // Every failure path is permissive: it calls next unauthenticated rather than
 // rejecting the request, so public queries keep working.
-func newAuthHandler(userRepo repositories.UserRepository, next http.Handler) http.Handler {
+func newAuthHandler(userRepo repositories.UserRepository, verifier portservices.TokenVerifier, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		claims, ok := clerk.SessionClaimsFromContext(r.Context())
-		if !ok || claims == nil {
+		id, err := verifier.Verify(r.Context(), "")
+		if err != nil || id.ClerkID == "" {
 			// No valid session — pass through as unauthenticated
 			next.ServeHTTP(w, r)
 			return
 		}
 
 		// Resolve Clerk user ID to local user
-		clerkUserID := claims.Subject
+		clerkUserID := id.ClerkID
 		user, err := userRepo.GetByClerkID(r.Context(), clerkUserID)
 		if err != nil {
 			if errors.Is(err, domain.ErrNotFound) {

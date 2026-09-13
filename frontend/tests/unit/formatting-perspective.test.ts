@@ -279,7 +279,10 @@ describe('perspectiveCellRenderer function', () => {
 		});
 
 		it('shows glasses for content with perspective', () => {
-			const map = new Map([['content-1', {}], ['content-2', {}]]);
+			const map = new Map([
+				['content-1', {}],
+				['content-2', {}],
+			]);
 			const element = perspectiveCellRenderer({
 				data: { id: 'content-1' },
 				context: { perspectivesByContentId: map },

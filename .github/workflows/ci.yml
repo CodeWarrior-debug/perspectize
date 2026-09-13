@@ -42,6 +42,14 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Install golang-migrate
+        run: go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
+        run: migrate -path migrations -database "$DATABASE_URL" up
+
       - name: Run tests
         env:
           DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable

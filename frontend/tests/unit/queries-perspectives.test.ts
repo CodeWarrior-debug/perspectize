@@ -27,6 +27,7 @@ describe('Perspective GraphQL query definitions', () => {
 				primaryPerspectiveID: null,
 				relatedPerspectiveIDs: [2, 3],
 				customFields: { key: 'value' },
+				feelings: null,
 				createdAt: '2024-01-01T12:00:00Z',
 				updatedAt: '2024-01-01T12:00:00Z',
 			};
@@ -49,6 +50,7 @@ describe('Perspective GraphQL query definitions', () => {
 				primaryPerspectiveID: null,
 				relatedPerspectiveIDs: null,
 				customFields: null,
+				feelings: null,
 				createdAt: '2024-01-01T12:00:00Z',
 				updatedAt: '2024-01-01T12:00:00Z',
 			};
@@ -72,6 +74,7 @@ describe('Perspective GraphQL query definitions', () => {
 					primaryPerspectiveID: null,
 					relatedPerspectiveIDs: null,
 					customFields: null,
+					feelings: null,
 					createdAt: '2024-01-01T12:00:00Z',
 					updatedAt: '2024-01-01T12:00:00Z',
 				},
@@ -96,6 +99,7 @@ describe('Perspective GraphQL query definitions', () => {
 					primaryPerspectiveID: null,
 					relatedPerspectiveIDs: null,
 					customFields: null,
+					feelings: null,
 					createdAt: '2024-01-01T12:00:00Z',
 					updatedAt: '2024-01-01T12:00:00Z',
 				},

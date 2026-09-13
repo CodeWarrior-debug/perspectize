@@ -53,13 +53,9 @@ describe('coachGate', () => {
 	});
 
 	it('quiet graduate only once per attempt flag', () => {
-		expect(
-			resolveQuietGraduate({ eligible: true, ownedContentCount: 1, perspectiveCount: 1 }),
-		).toBe(true);
+		expect(resolveQuietGraduate({ eligible: true, ownedContentCount: 1, perspectiveCount: 1 })).toBe(true);
 		markQuietGraduateAttempted();
 		expect(getQuietGraduateAttempted()).toBe(true);
-		expect(
-			resolveQuietGraduate({ eligible: true, ownedContentCount: 1, perspectiveCount: 1 }),
-		).toBe(false);
+		expect(resolveQuietGraduate({ eligible: true, ownedContentCount: 1, perspectiveCount: 1 })).toBe(false);
 	});
 });
