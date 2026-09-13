@@ -56,12 +56,12 @@ type ContentFilter struct {
 
 // ContentListParams contains parameters for paginated content queries
 type ContentListParams struct {
-	First             *int
-	After             *string // Opaque cursor (base64-encoded id)
-	Last              *int
-	Before            *string
-	SortBy            ContentSortBy
-	SortOrder         SortOrder
+	First     *int
+	After     *string // Opaque cursor (base64-encoded id)
+	Last      *int
+	Before    *string
+	SortBy    ContentSortBy
+	SortOrder SortOrder
 	// Sorts, when non-empty, is a multi-column sort that takes priority over
 	// SortBy/SortOrder (kept as the single-column fallback for existing callers).
 	Sorts             []ContentSortRule
