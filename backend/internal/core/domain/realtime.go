@@ -62,12 +62,24 @@ type PresenceChangedEvent struct {
 // StreamResetEvent signals that the event stream should be reset (e.g., on reconnect).
 type StreamResetEvent struct{ ThreadID int }
 
+// MessageEditedEvent is delivered when a message's body is edited.
+type MessageEditedEvent struct{ Message Message }
+
+// MessageDeletedEvent is delivered when a message is tombstoned (row and seq kept, body blanked).
+type MessageDeletedEvent struct {
+	ThreadID  int
+	MessageID int64
+	Seq       int64
+}
+
 func (MessagePostedEvent) isThreadEvent()      {}
 func (ReadReceiptChangedEvent) isThreadEvent() {}
 func (TypingChangedEvent) isThreadEvent()      {}
 func (ParticipantChangedEvent) isThreadEvent() {}
 func (PresenceChangedEvent) isThreadEvent()    {}
 func (StreamResetEvent) isThreadEvent()        {}
+func (MessageEditedEvent) isThreadEvent()      {}
+func (MessageDeletedEvent) isThreadEvent()     {}
 
 // InboxEvent represents a summary of a thread in a user's inbox.
 type InboxEvent struct {

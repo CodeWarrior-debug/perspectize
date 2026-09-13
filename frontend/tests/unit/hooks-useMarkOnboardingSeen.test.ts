@@ -63,10 +63,7 @@ describe('useMarkOnboardingSeen', () => {
 		mocks.capturedOptions.onSuccess({ markOnboardingSeen: next });
 
 		expect(getCoachForceOpen()).toBe(false);
-		expect(mocks.mockSetQueriesData).toHaveBeenCalledWith(
-			{ queryKey: ['me'] },
-			expect.any(Function),
-		);
+		expect(mocks.mockSetQueriesData).toHaveBeenCalledWith({ queryKey: ['me'] }, expect.any(Function));
 
 		const patcher = mocks.mockSetQueriesData.mock.calls[0][1];
 		const patched = patcher({

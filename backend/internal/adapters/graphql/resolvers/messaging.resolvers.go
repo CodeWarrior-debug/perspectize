@@ -30,6 +30,17 @@ func (r *messageResolver) Sender(ctx context.Context, obj *model.Message) (*mode
 	return userDomainToModel(u), nil
 }
 
+// EditedAt is the resolver for the editedAt field. messageToModel already
+// formatted the timestamp; this just surfaces it.
+func (r *messageResolver) EditedAt(ctx context.Context, obj *model.Message) (*string, error) {
+	return obj.EditedAt, nil
+}
+
+// DeletedAt is the resolver for the deletedAt field.
+func (r *messageResolver) DeletedAt(ctx context.Context, obj *model.Message) (*string, error) {
+	return obj.DeletedAt, nil
+}
+
 // Participants is the resolver for the participants field.
 func (r *messageThreadResolver) Participants(ctx context.Context, obj *model.MessageThread) ([]*model.ThreadParticipant, error) {
 	if _, ok := auth.ForContext(ctx); !ok {
@@ -89,6 +100,15 @@ func (r *messageThreadResolver) UnreadCount(ctx context.Context, obj *model.Mess
 		return 0, err
 	}
 	return r.Messaging.UnreadCount(ctx, tid, lastReadSeqFor(obj.Src, actor.ID))
+}
+
+// Muted is the resolver for the muted field.
+func (r *messageThreadResolver) Muted(ctx context.Context, obj *model.MessageThread) (bool, error) {
+	actor, ok := auth.ForContext(ctx)
+	if !ok {
+		return false, domain.ErrForbidden
+	}
+	return mutedFor(obj.Src, actor.ID), nil
 }
 
 // CreateMessageThread is the resolver for the createMessageThread field.
@@ -207,6 +227,58 @@ func (r *mutationResolver) LeaveThread(ctx context.Context, threadID string) (bo
 		return false, err
 	}
 	return true, nil
+}
+
+// EditMessage is the resolver for the editMessage field.
+func (r *mutationResolver) EditMessage(ctx context.Context, messageID string, body string) (*model.Message, error) {
+	actor, ok := auth.ForContext(ctx)
+	if !ok {
+		return nil, domain.ErrForbidden
+	}
+	id, err := parseIntID("messageId", messageID)
+	if err != nil {
+		return nil, err
+	}
+	msg, err := r.Messaging.EditMessage(ctx, actor.ID, int64(id), body)
+	if err != nil {
+		return nil, err
+	}
+	return messageToModel(*msg), nil
+}
+
+// DeleteMessage is the resolver for the deleteMessage field. It returns the
+// tombstoned message (blank body, deletedAt set).
+func (r *mutationResolver) DeleteMessage(ctx context.Context, messageID string) (*model.Message, error) {
+	actor, ok := auth.ForContext(ctx)
+	if !ok {
+		return nil, domain.ErrForbidden
+	}
+	id, err := parseIntID("messageId", messageID)
+	if err != nil {
+		return nil, err
+	}
+	msg, err := r.Messaging.DeleteMessage(ctx, actor.ID, int64(id))
+	if err != nil {
+		return nil, err
+	}
+	return messageToModel(*msg), nil
+}
+
+// MuteThread is the resolver for the muteThread field.
+func (r *mutationResolver) MuteThread(ctx context.Context, threadID string, muted bool) (*model.MessageThread, error) {
+	actor, ok := auth.ForContext(ctx)
+	if !ok {
+		return nil, domain.ErrForbidden
+	}
+	tid, err := parseIntID("threadId", threadID)
+	if err != nil {
+		return nil, err
+	}
+	thread, err := r.Messaging.MuteThread(ctx, actor.ID, tid, muted)
+	if err != nil {
+		return nil, err
+	}
+	return messageThreadToModel(thread), nil
 }
 
 // MessageThreads is the resolver for the messageThreads field.

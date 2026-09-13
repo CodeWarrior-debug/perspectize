@@ -135,6 +135,20 @@ type MessageConnection struct {
 	PageInfo *PageInfo  `json:"pageInfo"`
 }
 
+type MessageDeleted struct {
+	ThreadID  string `json:"threadId"`
+	MessageID string `json:"messageId"`
+	Seq       int    `json:"seq"`
+}
+
+func (MessageDeleted) IsThreadEvent() {}
+
+type MessageEdited struct {
+	Message *Message `json:"message"`
+}
+
+func (MessageEdited) IsThreadEvent() {}
+
 type MessagePosted struct {
 	Message *Message `json:"message"`
 }

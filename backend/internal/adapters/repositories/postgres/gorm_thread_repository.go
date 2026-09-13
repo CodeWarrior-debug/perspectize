@@ -206,6 +206,22 @@ func (r *GormThreadRepository) SetLeft(ctx context.Context, threadID, userID int
 	return nil
 }
 
+// SetMuted toggles a participant's muted flag. No matching participant row is
+// reported as domain.ErrNotFound.
+func (r *GormThreadRepository) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
+	res := r.db.WithContext(ctx).
+		Model(&ThreadParticipantModel{}).
+		Where("thread_id = ? AND user_id = ?", threadID, userID).
+		Update("muted", muted)
+	if res.Error != nil {
+		return fmt.Errorf("failed to set participant muted flag: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
 // SetLastRead advances a participant's read pointer. It is forward-only: the
 // last_read_seq < ? predicate makes a lower or equal seq a no-op.
 func (r *GormThreadRepository) SetLastRead(ctx context.Context, threadID, userID int, seq int64) error {

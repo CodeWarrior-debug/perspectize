@@ -13,7 +13,20 @@ type Config struct {
 	Database DatabaseConfig `json:"database"`
 	YouTube  YouTubeConfig  `json:"youtube"`
 	Logging  LoggingConfig  `json:"logging"`
+
+	// MessageRetentionMax caps how many of the newest messages each thread
+	// keeps. 0 (the default) disables the application-side retention sweep
+	// entirely — threads grow unbounded. Set via MESSAGE_RETENTION_MAX.
+	MessageRetentionMax int `json:"message_retention_max"`
+
+	// MessageRetentionSweepMinutes is how often the retention sweep runs when
+	// enabled. Defaults to 15. Set via MESSAGE_RETENTION_SWEEP_MINUTES.
+	MessageRetentionSweepMinutes int `json:"message_retention_sweep_minutes"`
 }
+
+// DefaultMessageRetentionSweepMinutes is the sweep cadence when retention is
+// enabled but MESSAGE_RETENTION_SWEEP_MINUTES is unset or invalid.
+const DefaultMessageRetentionSweepMinutes = 15
 
 // ServerConfig holds HTTP server configuration
 type ServerConfig struct {
@@ -91,6 +104,20 @@ func Load(configPath string) (*Config, error) {
 	if ttlStr := os.Getenv("YOUTUBE_API_CACHE_TTL_SECONDS"); ttlStr != "" {
 		if v, err := strconv.Atoi(ttlStr); err == nil && v >= 0 {
 			cfg.YouTube.CacheTTLSeconds = v
+		}
+	}
+
+	// Message retention: 0 / unset / invalid => unbounded (no application-side
+	// sweep). Only a positive value enables pruning.
+	if v := os.Getenv("MESSAGE_RETENTION_MAX"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.MessageRetentionMax = n
+		}
+	}
+	cfg.MessageRetentionSweepMinutes = DefaultMessageRetentionSweepMinutes
+	if v := os.Getenv("MESSAGE_RETENTION_SWEEP_MINUTES"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.MessageRetentionSweepMinutes = n
 		}
 	}
 

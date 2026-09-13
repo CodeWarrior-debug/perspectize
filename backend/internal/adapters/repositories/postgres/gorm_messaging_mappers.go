@@ -6,13 +6,17 @@ func messageModelToDomain(m *MessageModel) domain.Message {
 	return domain.Message{
 		ID: m.ID, ThreadID: int(m.ThreadID), SenderID: int(m.SenderID),
 		Seq: m.Seq, Body: m.Body, ClientNonce: m.ClientNonce, CreatedAt: m.CreatedAt,
+		EditedAt: m.EditedAt, DeletedAt: m.DeletedAt,
 	}
 }
 
 func messageDomainToModel(d *domain.Message) *MessageModel {
+	// Seq and CreatedAt are assigned by the DB (trigger / autoCreateTime) and
+	// must NOT be set here.
 	return &MessageModel{
 		ID: d.ID, ThreadID: int64(d.ThreadID), SenderID: int64(d.SenderID),
 		Body: d.Body, ClientNonce: d.ClientNonce,
+		EditedAt: d.EditedAt, DeletedAt: d.DeletedAt,
 	}
 }
 

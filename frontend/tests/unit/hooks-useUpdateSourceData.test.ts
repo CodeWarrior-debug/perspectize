@@ -1,14 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockMutate, mockInvalidateQueries, mockSetQueriesData, mockToastSuccess, mockToastError } = vi.hoisted(
-	() => ({
-		mockMutate: vi.fn(),
-		mockInvalidateQueries: vi.fn(),
-		mockSetQueriesData: vi.fn(),
-		mockToastSuccess: vi.fn(),
-		mockToastError: vi.fn(),
-	}),
-);
+const { mockMutate, mockInvalidateQueries, mockSetQueriesData, mockToastSuccess, mockToastError } = vi.hoisted(() => ({
+	mockMutate: vi.fn(),
+	mockInvalidateQueries: vi.fn(),
+	mockSetQueriesData: vi.fn(),
+	mockToastSuccess: vi.fn(),
+	mockToastError: vi.fn(),
+}));
 
 let capturedMutationOptions: any;
 

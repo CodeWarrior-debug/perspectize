@@ -1,18 +1,10 @@
 import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { graphqlRequest } from '../client';
-import {
-	MARK_ONBOARDING_SEEN,
-	type MarkOnboardingSeenResponse,
-	type MeResponse,
-	type UserOnboarding,
-} from '../users';
+import { MARK_ONBOARDING_SEEN, type MarkOnboardingSeenResponse, type MeResponse, type UserOnboarding } from '../users';
 import { CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
 import { setCoachForceOpen } from '$lib/onboarding/coachGate.svelte';
 
-function patchMeOnboarding(
-	queryClient: ReturnType<typeof useQueryClient>,
-	onboarding: UserOnboarding,
-) {
+function patchMeOnboarding(queryClient: ReturnType<typeof useQueryClient>, onboarding: UserOnboarding) {
 	queryClient.setQueriesData<MeResponse>({ queryKey: ['me'] }, (old) => {
 		if (!old?.me) return old;
 		return {

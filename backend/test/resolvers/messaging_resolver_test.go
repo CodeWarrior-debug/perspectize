@@ -30,6 +30,9 @@ type fakeMessaging struct {
 	listSinceFn         func(ctx context.Context, actor, threadID int, sinceSeq int64) ([]domain.Message, error)
 	getHistoryFn        func(ctx context.Context, actor, threadID, limit int, beforeSeq *int64) ([]domain.Message, error)
 	assertParticipantFn func(ctx context.Context, actor, threadID int) error
+	editMessageFn       func(ctx context.Context, actor int, messageID int64, body string) (*domain.Message, error)
+	deleteMessageFn     func(ctx context.Context, actor int, messageID int64) (*domain.Message, error)
+	muteThreadFn        func(ctx context.Context, actor, threadID int, muted bool) (*domain.MessageThread, error)
 }
 
 var _ portservices.MessagingService = (*fakeMessaging)(nil)
@@ -112,6 +115,27 @@ func (f *fakeMessaging) UnreadCount(ctx context.Context, threadID int, sinceSeq 
 	return f.unreadCountFn(ctx, threadID, sinceSeq)
 }
 
+func (f *fakeMessaging) EditMessage(ctx context.Context, actor int, messageID int64, body string) (*domain.Message, error) {
+	if f.editMessageFn == nil {
+		return nil, nil
+	}
+	return f.editMessageFn(ctx, actor, messageID, body)
+}
+
+func (f *fakeMessaging) DeleteMessage(ctx context.Context, actor int, messageID int64) (*domain.Message, error) {
+	if f.deleteMessageFn == nil {
+		return nil, nil
+	}
+	return f.deleteMessageFn(ctx, actor, messageID)
+}
+
+func (f *fakeMessaging) MuteThread(ctx context.Context, actor, threadID int, muted bool) (*domain.MessageThread, error) {
+	if f.muteThreadFn == nil {
+		return nil, nil
+	}
+	return f.muteThreadFn(ctx, actor, threadID, muted)
+}
+
 // inboxStubMsgRepo / inboxStubThreadRepo are the minimum repository surface the
 // Hub touches when fanning a MESSAGE_POSTED envelope out to per-user inboxes.
 type inboxStubMsgRepo struct{ msg domain.Message }
@@ -132,6 +156,12 @@ func (s inboxStubMsgRepo) ListSince(ctx context.Context, threadID int, sinceSeq 
 func (s inboxStubMsgRepo) MaxSeq(ctx context.Context, threadID int) (int64, error) { return 0, nil }
 func (s inboxStubMsgRepo) CountSince(ctx context.Context, threadID int, sinceSeq int64) (int, error) {
 	return 0, nil
+}
+func (s inboxStubMsgRepo) UpdateBody(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error) {
+	return nil, nil
+}
+func (s inboxStubMsgRepo) SoftDelete(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
+	return nil, nil
 }
 
 type inboxStubThreadRepo struct{ thread domain.MessageThread }
@@ -156,6 +186,9 @@ func (inboxStubThreadRepo) SetLeft(ctx context.Context, threadID, userID int, at
 	return nil
 }
 func (inboxStubThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) error {
+	return nil
+}
+func (inboxStubThreadRepo) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
 	return nil
 }
 
@@ -274,6 +307,31 @@ func TestMessageThreadResolver_ReadPointers(t *testing.T) {
 	require.Len(t, parts, 2)
 	assert.Equal(t, domain.ThreadRoleOwner, parts[0].Role)
 	assert.Equal(t, 1, parts[0].SrcUserID)
+}
+
+// muted is caller-relative: it resolves the actor's own thread_participants.muted
+// off the thread aggregate the parent query already loaded, like myLastReadSeq.
+func TestMessageThreadResolver_Muted(t *testing.T) {
+	thread := &domain.MessageThread{
+		ID: 5,
+		Participants: []domain.ThreadParticipant{
+			{ThreadID: 5, UserID: 1, Muted: true, Role: domain.ThreadRoleOwner},
+			{ThreadID: 5, UserID: 2, Muted: false, Role: domain.ThreadRoleMember},
+		},
+	}
+	r := &resolvers.Resolver{Messaging: &fakeMessaging{}}
+	obj := &model.MessageThread{ID: "5", Src: thread}
+
+	got, err := r.MessageThread().Muted(authedCtx(1), obj)
+	require.NoError(t, err)
+	assert.True(t, got, "actor 1 muted the thread")
+
+	got, err = r.MessageThread().Muted(authedCtx(2), obj)
+	require.NoError(t, err)
+	assert.False(t, got, "actor 2 did not mute the thread")
+
+	_, err = r.MessageThread().Muted(context.Background(), obj)
+	assert.ErrorIs(t, err, domain.ErrForbidden, "no actor in ctx is forbidden")
 }
 
 // history is a descending-by-seq message log, mirroring how the repository
@@ -563,6 +621,72 @@ func TestInboxEventsSubscription_DeliversAndClosesOnCancel(t *testing.T) {
 			return false
 		}
 	}, 2*time.Second, 10*time.Millisecond, "inbox channel not closed after cancel")
+}
+
+func TestEditMessageResolver_HappyPath(t *testing.T) {
+	editedAt := time.Date(2026, 9, 7, 10, 0, 0, 0, time.UTC)
+	fake := &fakeMessaging{editMessageFn: func(ctx context.Context, actor int, messageID int64, body string) (*domain.Message, error) {
+		assert.Equal(t, 1, actor)
+		assert.Equal(t, int64(9), messageID)
+		assert.Equal(t, "new body", body)
+		return &domain.Message{ID: 9, ThreadID: 2, SenderID: 1, Seq: 4, Body: "new body", CreatedAt: editedAt, EditedAt: &editedAt}, nil
+	}}
+	r := &resolvers.Resolver{Messaging: fake}
+
+	out, err := r.Mutation().EditMessage(authedCtx(1), "9", "new body")
+
+	require.NoError(t, err)
+	assert.Equal(t, "9", out.ID)
+	assert.Equal(t, "new body", out.Body)
+	require.NotNil(t, out.EditedAt)
+	assert.Equal(t, "2026-09-07T10:00:00Z", *out.EditedAt)
+}
+
+func TestDeleteMessageResolver_HappyPath(t *testing.T) {
+	deletedAt := time.Date(2026, 9, 7, 11, 0, 0, 0, time.UTC)
+	fake := &fakeMessaging{deleteMessageFn: func(ctx context.Context, actor int, messageID int64) (*domain.Message, error) {
+		assert.Equal(t, 1, actor)
+		assert.Equal(t, int64(9), messageID)
+		return &domain.Message{ID: 9, ThreadID: 2, SenderID: 1, Seq: 4, Body: "", DeletedAt: &deletedAt}, nil
+	}}
+	r := &resolvers.Resolver{Messaging: fake}
+
+	out, err := r.Mutation().DeleteMessage(authedCtx(1), "9")
+
+	require.NoError(t, err)
+	assert.Equal(t, "", out.Body, "tombstone has an empty body")
+	require.NotNil(t, out.DeletedAt)
+	assert.Equal(t, "2026-09-07T11:00:00Z", *out.DeletedAt)
+	assert.Nil(t, out.EditedAt)
+}
+
+func TestMuteThreadResolver_HappyPath(t *testing.T) {
+	var gotActor, gotThread int
+	var gotMuted bool
+	fake := &fakeMessaging{muteThreadFn: func(ctx context.Context, actor, threadID int, muted bool) (*domain.MessageThread, error) {
+		gotActor, gotThread, gotMuted = actor, threadID, muted
+		return &domain.MessageThread{ID: threadID}, nil
+	}}
+	r := &resolvers.Resolver{Messaging: fake}
+
+	out, err := r.Mutation().MuteThread(authedCtx(1), "5", true)
+
+	require.NoError(t, err)
+	assert.Equal(t, "5", out.ID)
+	assert.Equal(t, 1, gotActor)
+	assert.Equal(t, 5, gotThread)
+	assert.True(t, gotMuted, "service called with muted=true")
+}
+
+func TestEditMessageResolver_PropagatesForbidden(t *testing.T) {
+	fake := &fakeMessaging{editMessageFn: func(context.Context, int, int64, string) (*domain.Message, error) {
+		return nil, fmt.Errorf("%w: nope", domain.ErrForbidden)
+	}}
+	r := &resolvers.Resolver{Messaging: fake}
+
+	_, err := r.Mutation().EditMessage(authedCtx(1), "9", "x")
+
+	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
 
 func TestInboxEventsSubscription_UnauthenticatedIsForbidden(t *testing.T) {

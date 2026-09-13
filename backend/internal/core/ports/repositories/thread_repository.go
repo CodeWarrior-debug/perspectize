@@ -16,4 +16,7 @@ type ThreadRepository interface {
 	AddParticipants(ctx context.Context, threadID int, userIDs []int) error
 	SetLeft(ctx context.Context, threadID, userID int, at time.Time) error
 	SetLastRead(ctx context.Context, threadID, userID int, seq int64) error
+	// SetMuted toggles a participant's muted flag. No matching participant row is
+	// reported as domain.ErrNotFound.
+	SetMuted(ctx context.Context, threadID, userID int, muted bool) error
 }

@@ -72,6 +72,71 @@ func (s *MessagingServiceImpl) SendMessage(ctx context.Context, actorUserID int,
 	})
 }
 
+// EditMessage updates the body of a message the actor sent.
+func (s *MessagingServiceImpl) EditMessage(ctx context.Context, actorUserID int, messageID int64, body string) (*domain.Message, error) {
+	msg, err := s.msgRepo.GetByID(ctx, messageID)
+	if err != nil {
+		return nil, err
+	}
+	if msg.SenderID != actorUserID {
+		return nil, fmt.Errorf("%w: only the sender may edit message %d", domain.ErrForbidden, messageID)
+	}
+	if msg.DeletedAt != nil {
+		return nil, fmt.Errorf("%w: message %d is deleted", domain.ErrInvalidInput, messageID)
+	}
+	if len(body) == 0 || len([]byte(body)) > maxMessageBodyBytes {
+		return nil, fmt.Errorf("%w: message body must be 1..%d bytes", domain.ErrInvalidInput, maxMessageBodyBytes)
+	}
+	updated, err := s.msgRepo.UpdateBody(ctx, messageID, body, time.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	_ = s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
+		Type:      "MESSAGE_EDITED",
+		ThreadID:  msg.ThreadID,
+		Seq:       msg.Seq,
+		MessageID: messageID,
+	})
+	return updated, nil
+}
+
+// DeleteMessage soft-deletes a message the actor sent. Idempotent when the
+// message is already deleted.
+func (s *MessagingServiceImpl) DeleteMessage(ctx context.Context, actorUserID int, messageID int64) (*domain.Message, error) {
+	msg, err := s.msgRepo.GetByID(ctx, messageID)
+	if err != nil {
+		return nil, err
+	}
+	if msg.SenderID != actorUserID {
+		return nil, fmt.Errorf("%w: only the sender may delete message %d", domain.ErrForbidden, messageID)
+	}
+	if msg.DeletedAt != nil {
+		return msg, nil
+	}
+	tombstoned, err := s.msgRepo.SoftDelete(ctx, messageID, time.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	_ = s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
+		Type:      "MESSAGE_DELETED",
+		ThreadID:  msg.ThreadID,
+		Seq:       msg.Seq,
+		MessageID: messageID,
+	})
+	return tombstoned, nil
+}
+
+// MuteThread sets the actor's muted flag for a thread they participate in.
+func (s *MessagingServiceImpl) MuteThread(ctx context.Context, actorUserID, threadID int, muted bool) (*domain.MessageThread, error) {
+	if err := s.AssertParticipant(ctx, actorUserID, threadID); err != nil {
+		return nil, err
+	}
+	if err := s.threadRepo.SetMuted(ctx, threadID, actorUserID, muted); err != nil {
+		return nil, err
+	}
+	return s.threadRepo.GetThread(ctx, threadID)
+}
+
 // MarkRead updates the actor's read receipt position in the thread.
 func (s *MessagingServiceImpl) MarkRead(ctx context.Context, actorUserID, threadID int, seq int64) (*domain.MessageThread, error) {
 	if err := s.AssertParticipant(ctx, actorUserID, threadID); err != nil {

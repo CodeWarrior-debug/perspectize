@@ -237,6 +237,21 @@ func lastReadSeqFor(t *domain.MessageThread, userID int) int64 {
 	return 0
 }
 
+// mutedFor returns the actor's mute flag within a thread aggregate, or false
+// when the aggregate or the actor's row is absent. Caller-relative, mirroring
+// lastReadSeqFor.
+func mutedFor(t *domain.MessageThread, userID int) bool {
+	if t == nil {
+		return false
+	}
+	for _, p := range t.Participants {
+		if p.UserID == userID {
+			return p.Muted
+		}
+	}
+	return false
+}
+
 // messageThreadToModel projects a domain thread onto its GraphQL model,
 // retaining a copy of the domain aggregate in Src for the participant /
 // read-pointer field resolvers.
@@ -290,8 +305,20 @@ func messageToModel(m domain.Message) *model.Message {
 		Seq:         int(m.Seq),
 		Body:        m.Body,
 		CreatedAt:   m.CreatedAt.Format(time.RFC3339),
+		EditedAt:    rfc3339Ptr(m.EditedAt),
+		DeletedAt:   rfc3339Ptr(m.DeletedAt),
 		SrcSenderID: m.SenderID,
 	}
+}
+
+// rfc3339Ptr formats an optional timestamp as an RFC3339 string pointer,
+// preserving nil so an unset editedAt/deletedAt marshals as GraphQL null.
+func rfc3339Ptr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := t.Format(time.RFC3339)
+	return &s
 }
 
 // inboxEventToModel projects a domain inbox event onto its GraphQL model.
@@ -310,6 +337,14 @@ func toModelThreadEvent(evt domain.ThreadEvent) model.ThreadEvent {
 	switch e := evt.(type) {
 	case domain.MessagePostedEvent:
 		return model.MessagePosted{Message: messageToModel(e.Message)}
+	case domain.MessageEditedEvent:
+		return model.MessageEdited{Message: messageToModel(e.Message)}
+	case domain.MessageDeletedEvent:
+		return model.MessageDeleted{
+			ThreadID:  strconv.Itoa(e.ThreadID),
+			MessageID: strconv.FormatInt(e.MessageID, 10),
+			Seq:       int(e.Seq),
+		}
 	case domain.ReadReceiptChangedEvent:
 		return model.ReadReceiptChanged{
 			ThreadID:    strconv.Itoa(e.ThreadID),

@@ -34,6 +34,12 @@ func (s stubMsgRepo) MaxSeq(ctx context.Context, t int) (int64, error) { return 
 func (s stubMsgRepo) CountSince(ctx context.Context, t int, since int64) (int, error) {
 	return 0, nil
 }
+func (s stubMsgRepo) UpdateBody(ctx context.Context, id int64, body string, editedAt time.Time) (*domain.Message, error) {
+	return nil, nil
+}
+func (s stubMsgRepo) SoftDelete(ctx context.Context, id int64, deletedAt time.Time) (*domain.Message, error) {
+	return nil, nil
+}
 
 // stubThreadRepo is a ThreadRepository whose GetThread returns a caller-supplied
 // thread; the Hub's inbox fan-out uses it to resolve participants.
@@ -62,6 +68,9 @@ func (stubThreadRepo) SetLeft(ctx context.Context, threadID, userID int, at time
 	return nil
 }
 func (stubThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) error {
+	return nil
+}
+func (stubThreadRepo) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
 	return nil
 }
 
@@ -372,6 +381,47 @@ func TestHub_MessagePostedSkipsLookupWithNoLocalSubscribers(t *testing.T) {
 	})
 	assert.Equal(t, 1, loads, "with a subscriber the message is loaded")
 	<-ch
+}
+
+func TestHub_PublishEnvelope_MessageEdited(t *testing.T) {
+	hub := newHub(domain.Message{ID: 10, ThreadID: 1, Seq: 3, Body: "edited body"})
+	ch, unsub := hub.Subscribe(1, 1)
+	defer unsub()
+
+	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{Type: "MESSAGE_EDITED", ThreadID: 1, MessageID: 10})
+
+	select {
+	case evt := <-ch:
+		me, ok := evt.(domain.MessageEditedEvent)
+		require.Truef(t, ok, "expected MessageEditedEvent, got %T", evt)
+		assert.Equal(t, "edited body", me.Message.Body)
+		assert.Equal(t, int64(10), me.Message.ID)
+	case <-time.After(time.Second):
+		t.Fatal("no edited event")
+	}
+}
+
+func TestHub_PublishEnvelope_MessageDeleted(t *testing.T) {
+	loads := 0
+	hub := realtime.NewHub(countingMsgRepo{loads: &loads}, stubThreadRepo{}, nil)
+	ch, unsub := hub.Subscribe(1, 1)
+	defer unsub()
+
+	hub.PublishEnvelope(context.Background(), domain.EventEnvelope{
+		Type: "MESSAGE_DELETED", ThreadID: 1, MessageID: 10, Seq: 7,
+	})
+
+	select {
+	case evt := <-ch:
+		md, ok := evt.(domain.MessageDeletedEvent)
+		require.Truef(t, ok, "expected MessageDeletedEvent, got %T", evt)
+		assert.Equal(t, 1, md.ThreadID)
+		assert.Equal(t, int64(10), md.MessageID)
+		assert.Equal(t, int64(7), md.Seq)
+	case <-time.After(time.Second):
+		t.Fatal("no deleted event")
+	}
+	assert.Equal(t, 0, loads, "MESSAGE_DELETED must not load the message")
 }
 
 func TestHub_PublishEphemeralSatisfiesPort(t *testing.T) {

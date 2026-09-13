@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-	isCoachEligible,
-	shouldQuietGraduate,
-	type OnboardingState,
-} from '$lib/onboarding/eligibility';
+import { isCoachEligible, shouldQuietGraduate, type OnboardingState } from '$lib/onboarding/eligibility';
 import { CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
 
 function onboarding(partial: Partial<OnboardingState> = {}): OnboardingState {

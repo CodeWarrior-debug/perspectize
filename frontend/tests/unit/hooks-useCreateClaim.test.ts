@@ -86,7 +86,7 @@ describe('useCreateClaim hook', () => {
 		it('invalidates content lists cache', () => {
 			capturedMutationOptions.onSuccess();
 			expect(mockInvalidateQueries).toHaveBeenCalledWith(
-				expect.objectContaining({ queryKey: expect.arrayContaining(['content', 'list']) })
+				expect.objectContaining({ queryKey: expect.arrayContaining(['content', 'list']) }),
 			);
 		});
 	});

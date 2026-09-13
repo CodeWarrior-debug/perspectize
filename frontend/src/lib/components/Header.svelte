@@ -52,7 +52,9 @@
 
 			<Show when="signed-out">
 				<SignInButton mode="modal">
-					<button class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 border border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+					<button
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 border border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+					>
 						Sign In
 					</button>
 				</SignInButton>

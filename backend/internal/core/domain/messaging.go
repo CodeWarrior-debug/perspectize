@@ -62,4 +62,6 @@ type Message struct {
 	Body        string
 	ClientNonce string
 	CreatedAt   time.Time
+	EditedAt    *time.Time
+	DeletedAt   *time.Time
 }

@@ -160,6 +160,47 @@ func TestGormThreadRepository_AddParticipants_ClearsLeftAt(t *testing.T) {
 	assert.True(t, got.IsActiveParticipant(b), "rejoining participant should have left_at cleared")
 }
 
+func TestGormThreadRepository_SetMuted(t *testing.T) {
+	db := openTestDB(t)
+	repo := postgres.NewGormThreadRepository(db)
+	userRepo := postgres.NewGormUserRepository(db)
+	ctx := context.Background()
+
+	a := mustCreateUser(t, userRepo, "thr-a")
+	b := mustCreateUser(t, userRepo, "thr-b")
+	t.Cleanup(func() { cleanupUsers(t, db, a, b) })
+
+	threadID := mustCreateThread(t, repo, a, []int{a, b})
+
+	require.NoError(t, repo.SetMuted(ctx, threadID, a, true))
+
+	got, err := repo.GetThread(ctx, threadID)
+	require.NoError(t, err)
+	for _, p := range got.Participants {
+		if p.UserID == a {
+			assert.True(t, p.Muted, "muted flag must be persisted")
+		}
+	}
+
+	require.NoError(t, repo.SetMuted(ctx, threadID, a, false))
+	got, err = repo.GetThread(ctx, threadID)
+	require.NoError(t, err)
+	for _, p := range got.Participants {
+		if p.UserID == a {
+			assert.False(t, p.Muted, "muted flag must be clearable")
+		}
+	}
+}
+
+func TestGormThreadRepository_SetMuted_NotFound(t *testing.T) {
+	db := openTestDB(t)
+	repo := postgres.NewGormThreadRepository(db)
+	ctx := context.Background()
+
+	err := repo.SetMuted(ctx, -1, -1, true)
+	assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
+}
+
 func TestGormThreadRepository_ListThreadsForUser_DescByLastMessage(t *testing.T) {
 	db := openTestDB(t)
 	repo := postgres.NewGormThreadRepository(db)

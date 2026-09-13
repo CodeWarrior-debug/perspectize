@@ -2,8 +2,10 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
@@ -119,6 +121,46 @@ func TestGormMessageRepository_MaxSeq(t *testing.T) {
 	max, err = repo.MaxSeq(ctx, threadID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(3), max)
+}
+
+func TestGormMessageRepository_UpdateBody(t *testing.T) {
+	repo, threadID, a, _ := messageTestSetup(t)
+	ctx := context.Background()
+
+	m, err := repo.Insert(ctx, &domain.Message{ThreadID: threadID, SenderID: a, Body: "original", ClientNonce: "u1"})
+	require.NoError(t, err)
+
+	edited, err := repo.UpdateBody(ctx, m.ID, "edited text", time.Now().UTC())
+	require.NoError(t, err)
+	assert.Equal(t, "edited text", edited.Body)
+	require.NotNil(t, edited.EditedAt)
+	assert.Equal(t, m.Seq, edited.Seq, "seq must not change on edit")
+}
+
+func TestGormMessageRepository_SoftDelete(t *testing.T) {
+	repo, threadID, a, _ := messageTestSetup(t)
+	ctx := context.Background()
+
+	m, err := repo.Insert(ctx, &domain.Message{ThreadID: threadID, SenderID: a, Body: "to be deleted", ClientNonce: "d1"})
+	require.NoError(t, err)
+
+	del, err := repo.SoftDelete(ctx, m.ID, time.Now().UTC())
+	require.NoError(t, err)
+	require.NotNil(t, del.DeletedAt)
+	assert.Equal(t, "", del.Body, "soft delete must blank the body")
+	assert.Equal(t, m.Seq, del.Seq, "seq must survive as a tombstone")
+}
+
+func TestGormMessageRepository_UpdateBody_NotFound(t *testing.T) {
+	repo, _, _, _ := messageTestSetup(t)
+	_, err := repo.UpdateBody(context.Background(), 999999999, "x", time.Now().UTC())
+	assert.True(t, errors.Is(err, domain.ErrNotFound), "want ErrNotFound, got %v", err)
+}
+
+func TestGormMessageRepository_SoftDelete_NotFound(t *testing.T) {
+	repo, _, _, _ := messageTestSetup(t)
+	_, err := repo.SoftDelete(context.Background(), 999999999, time.Now().UTC())
+	assert.True(t, errors.Is(err, domain.ErrNotFound), "want ErrNotFound, got %v", err)
 }
 
 func TestGormMessageRepository_RetentionPrunesBeyond1000(t *testing.T) {
