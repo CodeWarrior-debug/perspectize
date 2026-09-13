@@ -9,10 +9,12 @@
 	import { LIST_USERS, type UsersResponse } from '$lib/queries/users';
 	import { queryKeys } from '$lib/queries/keys';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
-	import { formatDateTime } from '$lib/utils/formatting';
+	import { formatDateTime, extractVideoIdFromUrl, formatDuration } from '$lib/utils/formatting';
 	import { Switch } from '$lib/components/shadcn';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import PlayIcon from '@lucide/svelte/icons/play';
+	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 
 	// How many recent events to show per user before collapsing behind "show more".
 	const EVENTS_PER_USER = 5;
@@ -82,9 +84,20 @@
 	// UserActivityView.test.ts). Root cause not fully understood; keep `loading` first.
 	const hasError = $derived(usersQuery.isError || contentQuery.isError || perspectivesQuery.isError);
 
-	type Event =
-		| { kind: 'content'; ts: string; contentID: string; name: string }
-		| { kind: 'perspective'; ts: string; contentID: string | null; name: string; private: boolean };
+	// One activity item, shaped like ActivityCardList's row so it renders with the same
+	// thumbnail-card look as the main Activity page's mobile view — kind/private just add
+	// a small badge on top of that shared card.
+	type Event = {
+		kind: 'content' | 'perspective';
+		ts: string;
+		contentID: string | null;
+		name: string;
+		url: string | null;
+		channelTitle: string | null;
+		length: number | null;
+		lengthUnits: string | null;
+		private: boolean;
+	};
 
 	interface UserGroup {
 		userID: string;
@@ -114,7 +127,17 @@
 
 		for (const c of contentItems) {
 			const group = ensure(c.addedByUserID, `User ${c.addedByUserID}`);
-			group.events.push({ kind: 'content', ts: c.updatedAt, contentID: c.id, name: c.name });
+			group.events.push({
+				kind: 'content',
+				ts: c.updatedAt,
+				contentID: c.id,
+				name: c.name,
+				url: c.url,
+				channelTitle: c.channelTitle,
+				length: c.length,
+				lengthUnits: c.lengthUnits,
+				private: false,
+			});
 		}
 
 		for (const p of perspectiveItems) {
@@ -124,6 +147,10 @@
 				ts: p.updatedAt,
 				contentID: p.contentID,
 				name: p.content?.name ?? p.description ?? 'a perspective',
+				url: p.content?.url ?? null,
+				channelTitle: p.content?.channelTitle ?? null,
+				length: p.content?.length ?? null,
+				lengthUnits: p.content?.lengthUnits ?? null,
 				private: p.privacy === 'PRIVATE',
 			});
 		}
@@ -153,6 +180,27 @@
 
 		return result;
 	});
+
+	function thumbSrc(url: string | null): string | null {
+		const videoId = extractVideoIdFromUrl(url);
+		return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null;
+	}
+
+	function handleThumbClick(url: string | null, e: MouseEvent) {
+		e.stopPropagation();
+		if (url) window.open(url, '_blank', 'noopener,noreferrer');
+	}
+
+	// Details modal — looked up from the already-fetched content list by id. Only
+	// content-added events (and perspective events whose content happens to also be in
+	// that same recent-100 sample) resolve to a full row; others just don't open a modal.
+	let detailsContentId = $state<string | null>(null);
+	const detailsContent = $derived(
+		(contentQuery.data?.content.items ?? []).find((item) => item.id === detailsContentId) ?? null,
+	);
+	function handleOpenDetails(contentId: string) {
+		detailsContentId = contentId;
+	}
 </script>
 
 <div class="flex flex-col gap-4 px-2 py-2">
@@ -184,31 +232,77 @@
 				{#if group.events.length === 0}
 					<p class="text-xs text-muted-foreground">No activity yet</p>
 				{:else}
-					<ul class="flex flex-col gap-2">
+					<div class="flex flex-col gap-2.5">
 						{#each group.events.slice(0, EVENTS_PER_USER) as event, i (i)}
-							<li class="flex items-start gap-2 text-sm">
-								<span class="mt-0.5 flex size-5 flex-none items-center justify-center text-muted-foreground">
-									{#if event.kind === 'perspective'}
-										<GlassesIcon class="size-3.5" />
-									{:else}
-										<PlusIcon class="size-3.5" />
+							<div class="flex items-center gap-3 rounded-lg border border-border bg-card p-2.5 hover:bg-primary/[0.06]">
+								<button
+									type="button"
+									title="Open original content in new tab"
+									class="relative h-16 w-24 flex-none overflow-hidden rounded-md bg-muted"
+									onclick={(e) => handleThumbClick(event.url, e)}
+								>
+									{#if thumbSrc(event.url)}
+										<img
+											src={thumbSrc(event.url)}
+											alt=""
+											class="h-full w-full object-cover"
+											onerror={(e) => e.currentTarget.remove()}
+										/>
 									{/if}
-								</span>
-								<div class="min-w-0 flex-1">
-									<div class="line-clamp-1 font-medium text-foreground">
-										{event.kind === 'content' ? 'Added' : 'Perspective on'}
+									<span
+										class="absolute right-1 bottom-1 flex items-center justify-center rounded bg-[rgba(23,23,23,0.65)] p-1"
+									>
+										<PlayIcon class="size-2.5 fill-white text-white" />
+									</span>
+									<span
+										class="absolute left-1 top-1 flex items-center justify-center rounded bg-[rgba(23,23,23,0.65)] p-1"
+										title={event.kind === 'perspective' ? 'Perspective' : 'Added'}
+									>
+										{#if event.kind === 'perspective'}
+											<GlassesIcon class="size-2.5 text-white" />
+										{:else}
+											<PlusIcon class="size-2.5 text-white" />
+										{/if}
+									</span>
+								</button>
+
+								<button
+									type="button"
+									title="View content data + details"
+									class="min-w-0 flex-1 text-left"
+									onclick={() => event.contentID && handleOpenDetails(event.contentID)}
+								>
+									<div
+										class="line-clamp-2 font-[family-name:var(--font-family-serif)] text-sm leading-tight font-semibold text-foreground"
+									>
 										{event.name}
-										{#if event.kind === 'perspective' && event.private}
+										{#if event.private}
 											<span class="ml-1 text-[11px] font-normal text-muted-foreground">(private)</span>
 										{/if}
 									</div>
-									<div class="text-xs text-muted-foreground">{formatDateTime(event.ts)}</div>
-								</div>
-							</li>
+									<div class="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+										{#if event.channelTitle}
+											<span>{event.channelTitle}</span>
+											<span>&middot;</span>
+										{/if}
+										{#if event.length}
+											<span>{formatDuration(event.length, event.lengthUnits)}</span>
+											<span>&middot;</span>
+										{/if}
+										<span>{formatDateTime(event.ts)}</span>
+									</div>
+								</button>
+							</div>
 						{/each}
-					</ul>
+					</div>
 				{/if}
 			</div>
 		{/each}
 	{/if}
 </div>
+
+<ActivityDetailsModal
+	content={detailsContent}
+	open={detailsContentId !== null}
+	onClose={() => (detailsContentId = null)}
+/>

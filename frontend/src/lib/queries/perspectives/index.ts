@@ -112,7 +112,14 @@ export interface ActivityPerspectiveItem {
 	contentID: string | null;
 	privacy: string;
 	description: string | null;
-	content: { id: string; name: string } | null;
+	content: {
+		id: string;
+		name: string;
+		url: string | null;
+		channelTitle: string | null;
+		length: number | null;
+		lengthUnits: string | null;
+	} | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -123,6 +130,9 @@ export interface ListActivityPerspectivesResponse {
 	};
 }
 
+// Selects the same thumbnail-card fields as LIST_CONTENT (url/channelTitle/length/
+// lengthUnits) on the nested content, so the by-user activity view can render a
+// perspective event with the same card look as a content-added event.
 export const LIST_ACTIVITY_PERSPECTIVES = gql`
 	query ListActivityPerspectives($first: Int, $filter: PerspectiveFilter) {
 		perspectives(first: $first, sortBy: UPDATED_AT, sortOrder: DESC, filter: $filter) {
@@ -135,6 +145,10 @@ export const LIST_ACTIVITY_PERSPECTIVES = gql`
 				content {
 					id
 					name
+					url
+					channelTitle
+					length
+					lengthUnits
 				}
 				createdAt
 				updatedAt
