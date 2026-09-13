@@ -39,10 +39,13 @@ cp .env.example .env
 # 4. Install dependencies
 go mod download
 
-# 5. Run migrations
+# 5. Install shared git hooks (auto-formats staged Go/Svelte/TS on commit)
+make install-hooks
+
+# 6. Run migrations
 make migrate-up
 
-# 6. Start the server
+# 7. Start the server
 make run
 
 # Server running at http://localhost:8080
