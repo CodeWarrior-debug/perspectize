@@ -31,7 +31,12 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
 5. **Re-run `gsd:map-codebase`.**
    - Invoke the `gsd:map-codebase` command/skill to refresh `.planning/codebase/` docs.
 
-6. **Record the run in ROUTINES.md.**
+6. **Check dependency freshness.**
+   - Frontend: `npx npm-check-updates` in `frontend/`, refresh [FRONTEND_DEPENDENCY_ANALYSIS.md](FRONTEND_DEPENDENCY_ANALYSIS.md) with current findings.
+   - Backend: `go list -m -u -versions` against the direct (non-indirect) requires in `backend/go.mod`, refresh [BACKEND_DEPENDENCY_ANALYSIS.md](BACKEND_DEPENDENCY_ANALYSIS.md).
+   - Patch/minor bumps with no known breaking changes can be applied directly (verify with `go build`/`go test` or `pnpm run test:run` per `CLAUDE.md`'s self-verification checklist). Majors — especially interdependent ones (e.g. Vite + its Svelte plugin + Vitest) — get flagged in the doc for a follow-up PR rather than bundled into this routine's commit.
+
+7. **Record the run in ROUTINES.md.**
    - Append a row: `| <Month-Year> | Y | <one-line summary — branches deleted, PRs merged, anything skipped> |`
    - If the routine was only partially completed (e.g. user deferred a step), mark `Completed` as `N` and explain why in Comments — a future session can pick it up, and the 10-merges gate won't re-trigger prematurely since the row already exists for that month.
 

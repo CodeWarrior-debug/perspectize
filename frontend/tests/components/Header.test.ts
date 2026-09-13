@@ -141,4 +141,9 @@ describe('Header component', () => {
 		const link = screen.getByRole('link', { name: 'Activity' });
 		expect(link).toHaveAttribute('href', '/');
 	});
+
+	it('does not render a Messages nav link (messaging entry point is the floating widget)', () => {
+		renderHeader();
+		expect(screen.queryByRole('link', { name: /messages/i })).not.toBeInTheDocument();
+	});
 });
