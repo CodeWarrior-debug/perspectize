@@ -17,17 +17,19 @@ export function useEditMessage() {
 		},
 		onMutate: (args) => {
 			const key = queryKeys.messaging.messages.list(args.threadId);
+			const existing = queryClient.getQueryData<ThreadMessagesCache>(key)?.items.find((m) => m.id === args.messageId);
+			const previousEditedAt = existing?.editedAt ?? null;
 			queryClient.setQueryData<ThreadMessagesCache>(key, (cache) => {
 				if (!cache) return cache;
-				const existing = cache.items.find((m) => m.id === args.messageId);
-				if (!existing) return cache;
+				const current = cache.items.find((m) => m.id === args.messageId);
+				if (!current) return cache;
 				return applyMessageEdited(cache, {
-					...existing,
+					...current,
 					body: args.body.trim(),
 					editedAt: new Date().toISOString(),
 				});
 			});
-			return { previousBody: args.previousBody };
+			return { previousBody: args.previousBody, previousEditedAt };
 		},
 		onSuccess: (data, args) => {
 			const key = queryKeys.messaging.messages.list(args.threadId);
@@ -35,13 +37,17 @@ export function useEditMessage() {
 				cache ? applyMessageEdited(cache, data.editMessage) : cache,
 			);
 		},
-		onError: (_err, args, _ctx) => {
+		onError: (_err, args, ctx) => {
 			const key = queryKeys.messaging.messages.list(args.threadId);
 			queryClient.setQueryData<ThreadMessagesCache>(key, (cache) => {
 				if (!cache) return cache;
 				const existing = cache.items.find((m) => m.id === args.messageId);
 				if (!existing) return cache;
-				return applyMessageEdited(cache, { ...existing, body: args.previousBody });
+				return applyMessageEdited(cache, {
+					...existing,
+					body: args.previousBody,
+					editedAt: ctx?.previousEditedAt ?? null,
+				});
 			});
 			toast.error('Could not edit message');
 		},

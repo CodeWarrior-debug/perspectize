@@ -44,14 +44,18 @@ describe('useMuteThread', () => {
 		expect(mocks.mockGraphql).toHaveBeenCalledWith(MUTE_THREAD, { threadId: 't1', muted: true });
 	});
 
-	it('onSuccess writes the thread detail and invalidates the list without refetching', () => {
+	it('onSuccess writes the thread detail and patches the matching thread in the list cache', () => {
 		useMuteThread();
 		mocks.captured.onSuccess({ muteThread: thread }, { threadId: 't1', muted: true });
 		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(queryKeys.messaging.threads.detail('t1'), thread);
-		expect(mocks.mockInvalidate).toHaveBeenCalledWith({
-			queryKey: queryKeys.messaging.threads.lists(),
-			refetchType: 'none',
-		});
+		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(queryKeys.messaging.threads.list(), expect.any(Function));
+
+		const listUpdater = mocks.mockSetQueryData.mock.calls.find(
+			(call) => JSON.stringify(call[0]) === JSON.stringify(queryKeys.messaging.threads.list()),
+		)![1];
+		const otherThread = { ...thread, id: 't2', muted: false };
+		const next = listUpdater({ messageThreads: [otherThread, { ...thread, muted: false }] });
+		expect(next.messageThreads).toEqual([otherThread, thread]);
 	});
 
 	it('onError toasts with the direction-aware message', () => {

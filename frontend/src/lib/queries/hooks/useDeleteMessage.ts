@@ -20,6 +20,7 @@ export function useDeleteMessage() {
 			queryClient.setQueryData<ThreadMessagesCache>(queryKeys.messaging.messages.list(args.threadId), (cache) =>
 				cache ? applyMessageEdited(cache, data.deleteMessage) : cache,
 			);
+			toast('Message deleted');
 		},
 		onError: (_err, args) => {
 			// Invalidate so the refetch restores the un-tombstoned row in the UI.

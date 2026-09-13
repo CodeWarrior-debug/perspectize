@@ -2,6 +2,7 @@
 	import { Show, SignInButton, UserButton } from 'svelte-clerk';
 	import AddVideoPopover from '$lib/components/AddVideoPopover.svelte';
 	import { useMessageThreads } from '$lib/queries/hooks/useMessageThreads';
+	import { useMe } from '$lib/queries/hooks/useMe.svelte';
 	import { totalUnread } from '$lib/messaging/inboxCache';
 	import { page } from '$app/state';
 
@@ -11,7 +12,9 @@
 		{ href: '/messages', label: 'Messages' },
 	];
 
-	const threads = useMessageThreads();
+	const meState = useMe();
+	const signedIn = $derived(!!meState.me);
+	const threads = useMessageThreads(() => signedIn);
 	const unread = $derived(totalUnread(threads.data?.messageThreads ?? []));
 
 	function isActive(href: string): boolean {
@@ -30,23 +33,24 @@
 			</a>
 			<nav class="flex items-center gap-0.5 sm:gap-2 shrink-0">
 				{#each navLinks as link (link.href)}
-					<a
-						href={link.href}
-						aria-current={isActive(link.href) ? 'page' : undefined}
-						class="px-1.5 sm:px-2 py-1 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap transition-colors {isActive(
-							link.href,
-						)
-							? 'text-primary-foreground bg-primary-foreground/15'
-							: 'text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/10'}"
-					>
-						{link.label}
-						{#if link.href === '/messages' && unread > 0}
-							<span
-								data-testid="nav-unread"
-								class="ml-1 rounded-full bg-primary-foreground/20 px-1.5 text-xs"
-							>{unread}</span>
-						{/if}
-					</a>
+					{#if link.href !== '/messages' || signedIn}
+						<a
+							href={link.href}
+							aria-current={isActive(link.href) ? 'page' : undefined}
+							class="px-1.5 sm:px-2 py-1 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap transition-colors {isActive(
+								link.href,
+							)
+								? 'text-primary-foreground bg-primary-foreground/15'
+								: 'text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/10'}"
+						>
+							{link.label}
+							{#if link.href === '/messages' && unread > 0}
+								<span data-testid="nav-unread" class="ml-1 rounded-full bg-primary-foreground/20 px-1.5 text-xs"
+									>{unread}</span
+								>
+							{/if}
+						</a>
+					{/if}
 				{/each}
 			</nav>
 		</div>
@@ -64,7 +68,9 @@
 
 			<Show when="signed-out">
 				<SignInButton mode="modal">
-					<button class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 border border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+					<button
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 border border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+					>
 						Sign In
 					</button>
 				</SignInButton>

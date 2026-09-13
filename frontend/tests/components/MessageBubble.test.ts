@@ -106,7 +106,7 @@ describe('MessageBubble', () => {
 			},
 		});
 		await fireEvent.click(screen.getByLabelText('Edit message'));
-		const textarea = screen.getByLabelText('Edit message');
+		const textarea = screen.getByLabelText('Edit message body');
 		await fireEvent.input(textarea, { target: { value: 'new body' } });
 		await fireEvent.click(screen.getByLabelText('Confirm edit'));
 		expect(onEdit).toHaveBeenCalledWith('m1', 't1', 'new body', 'old body');
@@ -126,7 +126,7 @@ describe('MessageBubble', () => {
 		expect(screen.getByText('(edited)')).toBeInTheDocument();
 	});
 
-	it('calls onDelete and shows a toast when delete is clicked', async () => {
+	it('calls onDelete when delete is clicked', async () => {
 		const onDelete = vi.fn();
 		render(MessageBubble, {
 			props: {

@@ -54,6 +54,7 @@
 	const items = $derived(messages.query.data?.items ?? []);
 	const thread = $derived(threadQuery.data ?? null);
 	const others = $derived(thread ? otherParticipants(thread, myUserId) : []);
+	const currentSeq = $derived(lastKnownSeq(items));
 
 	let stream = $state<ReturnType<typeof createThreadStream> | null>(null);
 	let scrollEl: HTMLDivElement | null = $state(null);
@@ -74,7 +75,7 @@
 	});
 
 	$effect(() => {
-		const seq = lastKnownSeq(items);
+		const seq = currentSeq;
 		if (thread && shouldMarkRead(thread) && seq > thread.myLastReadSeq) {
 			markRead.mutate({ threadId, seq });
 		}
@@ -98,7 +99,7 @@
 	}
 
 	function handleSend(body: string) {
-		send.mutate({ threadId, body, sender: meUser, afterSeq: lastKnownSeq(items) });
+		send.mutate({ threadId, body, sender: meUser, afterSeq: currentSeq });
 	}
 </script>
 
@@ -133,7 +134,7 @@
 		{/each}
 		{#if thread && items.length}
 			<div class="flex justify-end">
-				<ReadReceiptAvatars participants={thread.participants} seq={lastKnownSeq(items)} {myUserId} />
+				<ReadReceiptAvatars participants={thread.participants} seq={currentSeq} {myUserId} />
 			</div>
 		{/if}
 	</div>

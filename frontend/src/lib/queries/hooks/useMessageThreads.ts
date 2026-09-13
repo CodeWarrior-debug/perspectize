@@ -3,10 +3,11 @@ import { graphqlRequest } from '../client';
 import { LIST_MESSAGE_THREADS, type ListMessageThreadsResponse } from '../messaging';
 import { queryKeys } from '../keys';
 
-export function useMessageThreads() {
+export function useMessageThreads(enabled: () => boolean = () => true) {
 	return createQuery(() => ({
 		queryKey: queryKeys.messaging.threads.list(),
 		queryFn: () => graphqlRequest<ListMessageThreadsResponse>(LIST_MESSAGE_THREADS),
 		staleTime: 30_000,
+		enabled: enabled(),
 	}));
 }

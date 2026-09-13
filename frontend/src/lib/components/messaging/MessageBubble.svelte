@@ -7,7 +7,6 @@
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import XIcon from '@lucide/svelte/icons/x';
-	import { toast } from 'svelte-sonner';
 
 	let {
 		message,
@@ -60,7 +59,6 @@
 
 	function handleDelete() {
 		onDelete(message.id, message.threadId);
-		toast('Message deleted');
 	}
 </script>
 
@@ -85,7 +83,7 @@
 					rows={2}
 					bind:value={editBody}
 					onkeydown={handleEditKeydown}
-					aria-label="Edit message"
+					aria-label="Edit message body"
 				></textarea>
 				<div class="flex gap-1">
 					<button onclick={confirmEdit} aria-label="Confirm edit" class="text-primary hover:opacity-80">

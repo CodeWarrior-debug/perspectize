@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 
 const mocks = vi.hoisted(() => ({
@@ -73,7 +73,12 @@ vi.mock('$lib/messaging/useThreadStream.svelte', () => ({
 import ThreadView from '$lib/components/messaging/ThreadView.svelte';
 
 describe('ThreadView', () => {
+	const originalMessagesItems = mocks.messagesData.items;
+
 	beforeEach(() => vi.clearAllMocks());
+	afterEach(() => {
+		mocks.messagesData.items = originalMessagesItems;
+	});
 
 	it('renders a bubble per message and starts the stream', () => {
 		render(ThreadView, { props: { threadId: 't1', onEditMessage: vi.fn(), onDeleteMessage: vi.fn() } });
@@ -88,5 +93,40 @@ describe('ThreadView', () => {
 		expect(mocks.sendMutate).toHaveBeenCalledWith(
 			expect.objectContaining({ threadId: 't1', body: 'hello', afterSeq: 2 }),
 		);
+	});
+
+	it('deleting an own message bubble reaches onDeleteMessage', async () => {
+		const onDeleteMessage = vi.fn();
+		render(ThreadView, { props: { threadId: 't1', onEditMessage: vi.fn(), onDeleteMessage } });
+		// mocks.messagesData: m2 (seq 2, sender u1) is "mine" since useMe returns id u1.
+		await fireEvent.click(screen.getByLabelText('Delete message'));
+		expect(onDeleteMessage).toHaveBeenCalledWith('m2', 't1');
+	});
+
+	it('editing an own message bubble reaches onEditMessage', async () => {
+		const onEditMessage = vi.fn();
+		render(ThreadView, { props: { threadId: 't1', onEditMessage, onDeleteMessage: vi.fn() } });
+		await fireEvent.click(screen.getByLabelText('Edit message'));
+		const textarea = screen.getByLabelText('Edit message body');
+		await fireEvent.input(textarea, { target: { value: 'edited body' } });
+		await fireEvent.click(screen.getByLabelText('Confirm edit'));
+		expect(onEditMessage).toHaveBeenCalledWith('m2', 't1', 'edited body', 'yo');
+	});
+
+	it('renders a tombstone for a deleted message through the full render path', () => {
+		mocks.messagesData.items = [
+			{
+				id: 'm1',
+				threadId: 't1',
+				seq: 1,
+				body: '',
+				createdAt: 'x',
+				sender: { id: 'u2', username: 'alice' },
+				deletedAt: '2026-09-07T15:00:00Z',
+			},
+			mocks.messagesData.items[1],
+		] as typeof mocks.messagesData.items;
+		render(ThreadView, { props: { threadId: 't1', onEditMessage: vi.fn(), onDeleteMessage: vi.fn() } });
+		expect(screen.getByText('message deleted')).toBeInTheDocument();
 	});
 });

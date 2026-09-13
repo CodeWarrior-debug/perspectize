@@ -1,8 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/svelte';
+
+const mocks = vi.hoisted(() => ({
+	mutate: vi.fn(),
+}));
 
 vi.mock('@tanstack/svelte-query', () => ({
-	createMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+	createMutation: vi.fn(() => ({ mutate: mocks.mutate, isPending: false })),
 	useQueryClient: vi.fn(() => ({
 		setQueryData: vi.fn(),
 		invalidateQueries: vi.fn(),
@@ -30,6 +34,8 @@ const thread = (over = {}) => ({
 });
 
 describe('ThreadListItem', () => {
+	beforeEach(() => vi.clearAllMocks());
+
 	it('links to the thread and shows the derived title', () => {
 		render(ThreadListItem, { props: { thread: thread(), myUserId: 'u1', active: false } });
 		const el = screen.getByTestId('thread-item');
@@ -75,5 +81,31 @@ describe('ThreadListItem', () => {
 			props: { thread: thread({ muted: true }), myUserId: 'u1', active: false },
 		});
 		expect(screen.getByLabelText('Unmute thread')).toBeInTheDocument();
+	});
+
+	it('clicking the mute toggle calls the mutation to mute an unmuted thread', async () => {
+		render(ThreadListItem, {
+			props: { thread: thread({ muted: false }), myUserId: 'u1', active: false },
+		});
+		await fireEvent.click(screen.getByLabelText('Mute thread'));
+		expect(mocks.mutate).toHaveBeenCalledWith({ threadId: 't1', muted: true });
+	});
+
+	it('clicking the mute toggle calls the mutation to unmute a muted thread', async () => {
+		render(ThreadListItem, {
+			props: { thread: thread({ muted: true }), myUserId: 'u1', active: false },
+		});
+		await fireEvent.click(screen.getByLabelText('Unmute thread'));
+		expect(mocks.mutate).toHaveBeenCalledWith({ threadId: 't1', muted: false });
+	});
+
+	it('renders the mute button as a sibling of the thread link, not nested inside it', () => {
+		render(ThreadListItem, {
+			props: { thread: thread({ muted: false }), myUserId: 'u1', active: false },
+		});
+		const link = screen.getByTestId('thread-item');
+		const button = screen.getByLabelText('Mute thread');
+		expect(link.contains(button)).toBe(false);
+		expect(button.contains(link)).toBe(false);
 	});
 });

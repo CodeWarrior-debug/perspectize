@@ -34,16 +34,18 @@ describe('useMarkThreadRead', () => {
 		expect(mocks.mockGraphql).toHaveBeenCalledWith(MARK_THREAD_READ, { threadId: 't1', seq: 12 });
 	});
 
-	it('onSuccess writes the thread detail and invalidates the list without refetching', () => {
+	it('onSuccess writes the thread detail and patches the matching thread in the list cache', () => {
 		useMarkThreadRead();
-		mocks.captured.onSuccess({ markThreadRead: { id: 't1', unreadCount: 0 } }, { threadId: 't1', seq: 12 });
-		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(queryKeys.messaging.threads.detail('t1'), {
-			id: 't1',
-			unreadCount: 0,
-		});
-		expect(mocks.mockInvalidate).toHaveBeenCalledWith({
-			queryKey: queryKeys.messaging.threads.lists(),
-			refetchType: 'none',
-		});
+		const updated = { id: 't1', unreadCount: 0 };
+		mocks.captured.onSuccess({ markThreadRead: updated }, { threadId: 't1', seq: 12 });
+		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(queryKeys.messaging.threads.detail('t1'), updated);
+		expect(mocks.mockSetQueryData).toHaveBeenCalledWith(queryKeys.messaging.threads.list(), expect.any(Function));
+
+		const listUpdater = mocks.mockSetQueryData.mock.calls.find(
+			(call) => JSON.stringify(call[0]) === JSON.stringify(queryKeys.messaging.threads.list()),
+		)![1];
+		const other = { id: 't2', unreadCount: 5 };
+		const next = listUpdater({ messageThreads: [other, { id: 't1', unreadCount: 5 }] });
+		expect(next.messageThreads).toEqual([other, updated]);
 	});
 });

@@ -55,7 +55,7 @@
 	}
 </script>
 
-<Dialog bind:open onOpenChange={(v) => onOpenChange(v)}>
+<Dialog {open} onOpenChange={(v) => onOpenChange(v)}>
 	<DialogContent>
 		<DialogHeader>
 			<DialogTitle>New conversation</DialogTitle>
