@@ -452,6 +452,52 @@ func TestGormContentRepository_List(t *testing.T) {
 		})
 	}
 
+	// SearchFields scopes the free-text Search term to specific columns, OR'd
+	// together — distinct from the other filter fields above, which are each
+	// independently ANDed in. These cases are the contract for that OR grouping.
+	searchScopeCases := []struct {
+		name      string
+		fields    []domain.ContentSearchField
+		wantSQLRe string
+	}{
+		{"omitted defaults to title only", nil, `WHERE name ILIKE \$1`},
+		{"explicit TITLE only", []domain.ContentSearchField{domain.ContentSearchFieldTitle}, `WHERE name ILIKE \$1`},
+		{
+			"TITLE and DESCRIPTION are OR'd",
+			[]domain.ContentSearchField{domain.ContentSearchFieldTitle, domain.ContentSearchFieldDescription},
+			`WHERE name ILIKE \$1 OR response->'items'->0->'snippet'->>'description' ILIKE \$2`,
+		},
+		{
+			"all four fields are OR'd",
+			[]domain.ContentSearchField{
+				domain.ContentSearchFieldTitle, domain.ContentSearchFieldDescription,
+				domain.ContentSearchFieldChannelTitle, domain.ContentSearchFieldTags,
+			},
+			`WHERE name ILIKE \$1 OR response->'items'->0->'snippet'->>'description' ILIKE \$2 OR response->'items'->0->'snippet'->>'channelTitle' ILIKE \$3 OR \(response->'items'->0->'snippet'->'tags'\)::text ILIKE \$4`,
+		},
+		{
+			"CHANNEL_TITLE and TAGS only (title/description excluded)",
+			[]domain.ContentSearchField{domain.ContentSearchFieldChannelTitle, domain.ContentSearchFieldTags},
+			`WHERE response->'items'->0->'snippet'->>'channelTitle' ILIKE \$1 OR \(response->'items'->0->'snippet'->'tags'\)::text ILIKE \$2`,
+		},
+	}
+
+	for _, sc := range searchScopeCases {
+		t.Run("searchFields: "+sc.name, func(t *testing.T) {
+			db, mock := newMockDB(t)
+			mock.ExpectQuery(sc.wantSQLRe).WillReturnRows(contentRows())
+
+			got, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{
+				SortBy:    domain.ContentSortByCreatedAt,
+				SortOrder: domain.SortOrderDesc,
+				Filter:    &domain.ContentFilter{Search: cStr("term"), SearchFields: sc.fields},
+			})
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			assertAllExpectationsMet(t, mock)
+		})
+	}
+
 	t.Run("all filters combined produce a single query", func(t *testing.T) {
 		db, mock := newMockDB(t)
 		ct := domain.ContentTypeYouTube

@@ -159,7 +159,9 @@ describe('ActivityTable', () => {
 		await waitFor(() => {
 			expect(mockRequest).toHaveBeenCalledWith(
 				expect.anything(),
-				expect.objectContaining({ filter: { search: 'sowell' } }),
+				expect.objectContaining({
+					filter: { search: 'sowell', searchFields: ['TITLE', 'DESCRIPTION', 'CHANNEL_TITLE', 'TAGS'] },
+				}),
 			);
 		});
 		unmount();

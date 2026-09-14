@@ -45,6 +45,40 @@ export default defineConfig({
 		conditions: ['browser'],
 	},
 	test: {
+		// Coverage is a root-level (workspace) option, not a per-project one — it
+		// used to live under the 'unit' project's `test` block below, which typechecks
+		// against ProjectConfig and doesn't have a `coverage` key, so `pnpm run check`
+		// failed on this file. `pnpm run test:coverage` still only exercises the
+		// 'unit' project (its own `include`/`exclude` scope it to that already).
+		coverage: {
+			provider: 'v8',
+			reporter: ['text', 'json', 'html'],
+			exclude: [
+				'node_modules/',
+				'.svelte-kit/',
+				'**/*.d.ts',
+				'**/*.config.*',
+				'**/setup.ts',
+				'tests/helpers/**',
+				'src/lib/components/shadcn/**',
+				'src/routes/**',
+				'src/lib/components/ActivityTable.svelte',
+				// Thin wrapper around a third-party interactive widget (dynamically-
+				// imported @jaames/iro canvas color picker) — its own code is just
+				// construct-on-mount/teardown-on-destroy glue; meaningfully unit-testing
+				// it would mean re-implementing canvas pointer interaction, so it's
+				// excluded like ActivityTable.svelte above. ThemeCustomizePanel.svelte,
+				// which uses it, is NOT excluded — that one has real logic and is tested
+				// with ColorWheel swapped for a stub (see theme-customize-panel.test.ts).
+				'src/lib/components/theme/ColorWheel.svelte',
+			],
+			thresholds: {
+				lines: 80,
+				functions: 75,
+				branches: 75,
+				statements: 80,
+			},
+		},
 		projects: [
 			{
 				extends: './vite.config.ts',
@@ -55,27 +89,6 @@ export default defineConfig({
 					environment: 'jsdom',
 					globals: true,
 					setupFiles: ['./tests/setup.ts'],
-					coverage: {
-						provider: 'v8',
-						reporter: ['text', 'json', 'html'],
-						exclude: [
-							'node_modules/',
-							'.svelte-kit/',
-							'**/*.d.ts',
-							'**/*.config.*',
-							'**/setup.ts',
-							'tests/helpers/**',
-							'src/lib/components/shadcn/**',
-							'src/routes/**',
-							'src/lib/components/ActivityTable.svelte',
-						],
-						thresholds: {
-							lines: 80,
-							functions: 75,
-							branches: 75,
-							statements: 80,
-						},
-					},
 				},
 			},
 			'./vitest.config.browser.ts',

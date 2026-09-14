@@ -79,6 +79,32 @@ describe('activityItemCellRenderer', () => {
 		expect(onOpenDetails).toHaveBeenCalledWith('42');
 	});
 
+	it('removes the thumbnail image if it fails to load (falls back to the plain bg-muted block)', () => {
+		const result = activityItemCellRenderer({
+			data: { id: '1', name: 'My Video', url: 'https://youtube.com/watch?v=abc123' },
+		}) as HTMLElement;
+
+		const img = result.querySelector('img') as HTMLImageElement;
+		expect(img).toBeTruthy();
+		img.dispatchEvent(new Event('error'));
+
+		expect(result.querySelector('img')).toBeNull();
+	});
+
+	it('clicking the thumbnail with no url does not attempt to open a new tab', () => {
+		const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+		const result = activityItemCellRenderer({
+			data: { id: '1', name: 'No URL', url: null },
+		}) as HTMLElement;
+
+		const thumbWrap = result.querySelector('[data-testid="item-thumb"]') as HTMLElement;
+		thumbWrap.click();
+
+		expect(openSpy).not.toHaveBeenCalled();
+		openSpy.mockRestore();
+	});
+
 	it('does not set a native title attribute (avoids doubling up with the AG Grid cell tooltip)', () => {
 		const result = activityItemCellRenderer({
 			data: { id: '1', name: 'My Video', url: 'https://youtube.com/watch?v=abc123' },

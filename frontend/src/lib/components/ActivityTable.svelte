@@ -189,6 +189,7 @@
 	const pageNum = $derived(gridParams.page); // 1-indexed
 	const pageSize = $derived(gridParams.pageSize);
 	const searchText = $derived(gridParams.q);
+	const searchFields = $derived(gridParams.qFields);
 	const filters = $derived(gridParams.filters);
 
 	// ---------------------------------------------------------------------------
@@ -266,7 +267,11 @@
 	// In server-side mode, build GraphQL filter from URL params + search
 	// In client-side mode, pass search as simple filter (no column filters)
 	const graphqlFilter = $derived(
-		mode === 'all' ? urlParamsToGraphQLFilter(filters, searchText) : searchText ? { search: searchText } : undefined,
+		mode === 'all'
+			? urlParamsToGraphQLFilter(filters, searchText, searchFields)
+			: searchText
+				? urlParamsToGraphQLFilter({}, searchText, searchFields)
+				: undefined,
 	);
 
 	const contentQuery = createQuery(() => ({
@@ -279,6 +284,7 @@
 			// 'loaded' mode desyncs the cache key from the real request, so typing or clearing the
 			// search box never invalidates the cache and the grid keeps showing stale results.
 			search: searchText,
+			searchFields,
 			first: pageSize,
 			after: currentCursor,
 			filter: graphqlFilter as Record<string, unknown> | undefined,

@@ -1,11 +1,17 @@
 <script lang="ts">
 	import ActivityTable from '$lib/components/ActivityTable.svelte';
 	import UserActivityView from '$lib/components/UserActivityView.svelte';
-	import { Input } from '$lib/components/shadcn';
+	import { Input, Popover, PopoverContent, PopoverTrigger, buttonVariants } from '$lib/components/shadcn';
 	import SearchIcon from '@lucide/svelte/icons/search';
+	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { parseGridParams, serializeGridParams } from '$lib/utils/gridUrlState';
+	import {
+		parseGridParams,
+		serializeGridParams,
+		ALL_SEARCH_SCOPES,
+		type SearchScopeKey,
+	} from '$lib/utils/gridUrlState';
 
 	// Derive current grid params from URL
 	const gridParams = $derived(parseGridParams(page.url.searchParams));
@@ -18,6 +24,13 @@
 	// Initialized from URL on mount; user typing updates this independently of URL
 	let searchInput = $state(page.url.searchParams.get('q') ?? '');
 
+	const SCOPE_LABELS: Record<SearchScopeKey, string> = {
+		title: 'Title',
+		desc: 'Description',
+		channel: 'Channel',
+		tags: 'Tags',
+	};
+
 	// Debounced search → URL update
 	let searchTimer: ReturnType<typeof setTimeout>;
 	function handleSearchInput(value: string) {
@@ -29,6 +42,23 @@
 			goto(search ? `?${search}` : '/', { replaceState: true, keepFocus: true, noScroll: true });
 		}, 300);
 	}
+
+	function toggleScope(scope: SearchScopeKey) {
+		const current = gridParams.qFields;
+		const isSelected = current.includes(scope);
+		// Always leave at least one scope selected — unchecking the last one is a no-op.
+		if (isSelected && current.length === 1) return;
+		const nextFields = isSelected ? current.filter((s) => s !== scope) : [...current, scope];
+		const updated = { ...gridParams, qFields: nextFields, page: 1 };
+		const search = serializeGridParams(updated);
+		goto(search ? `?${search}` : '/', { replaceState: true, keepFocus: true, noScroll: true });
+	}
+
+	const scopeSummary = $derived(
+		gridParams.qFields.length === ALL_SEARCH_SCOPES.length
+			? 'All fields'
+			: gridParams.qFields.map((s) => SCOPE_LABELS[s]).join(', '),
+	);
 </script>
 
 <div class="flex flex-col h-[calc(100vh-4rem)]">
@@ -73,6 +103,31 @@
 							class="pl-9"
 						/>
 					</div>
+					<Popover>
+						<PopoverTrigger
+							class={buttonVariants({ variant: 'outline', size: 'icon' })}
+							aria-label="Choose which fields to search ({scopeSummary})"
+							title="Search fields: {scopeSummary}"
+						>
+							<SlidersHorizontalIcon class="size-4" />
+						</PopoverTrigger>
+						<PopoverContent align="end" class="w-56 p-2">
+							<p class="text-xs font-medium text-muted-foreground px-2 pb-1">Search in</p>
+							{#each ALL_SEARCH_SCOPES as scope (scope)}
+								<label
+									class="flex items-center gap-2 px-2 py-1.5 rounded-sm text-sm cursor-pointer hover:bg-accent"
+								>
+									<input
+										type="checkbox"
+										checked={gridParams.qFields.includes(scope)}
+										onchange={() => toggleScope(scope)}
+										class="size-4 accent-primary"
+									/>
+									{SCOPE_LABELS[scope]}
+								</label>
+							{/each}
+						</PopoverContent>
+					</Popover>
 				{/if}
 			</div>
 		</div>

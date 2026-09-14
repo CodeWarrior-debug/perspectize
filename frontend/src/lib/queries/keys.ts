@@ -12,6 +12,7 @@ export const queryKeys = {
 			sortOrder?: string;
 			sorts?: { field: string; order: string }[];
 			search?: string;
+			searchFields?: string[];
 			first?: number;
 			after?: string | null;
 			filter?: Record<string, unknown>;

@@ -1822,14 +1822,16 @@ type Content {
   description: String
   response: JSON
   primaryCategory: Category
-  # Aggregates computed from public perspectives on this content. Resolved
-  # on demand (batched per-request via dataloader) rather than stored on the
-  # content row — a client only pays for these when it actually selects
-  # them, e.g. the details modal, not the main content list.
+  # Aggregates computed from ALL perspectives on this content — public and
+  # private alike (privacy controls readability, not whether a perspective
+  # counts here). Resolved on demand (batched per-request via dataloader)
+  # rather than stored on the content row — a client only pays for these
+  # when it actually selects them, e.g. the details modal, not the main
+  # content list.
   perspectiveCount: Int
   averageRating: Float
-  # How many of this content's public perspectives set a Quality rating —
-  # i.e. how many values averageRating was actually computed over. Can be
+  # How many of this content's perspectives set a Quality rating — i.e.
+  # how many values averageRating was actually computed over. Can be
   # less than perspectiveCount since Quality is optional. Meant for a tooltip
   # on the average rating display ("N quality ratings").
   qualityRatingCount: Int
@@ -1879,6 +1881,14 @@ enum ContentType {
   CLAIM
 }
 
+# Text columns that ContentFilter.search can be scoped to.
+enum ContentSearchField {
+  TITLE
+  DESCRIPTION
+  CHANNEL_TITLE
+  TAGS
+}
+
 # Inputs
 input CreateContentFromYouTubeInput {
   url: String!
@@ -1891,6 +1901,8 @@ input ContentFilter {
   minLengthSeconds: Int
   maxLengthSeconds: Int
   search: String
+  # Which columns ` + "`" + `search` + "`" + ` matches against (OR'd together). Omitted/empty = TITLE only.
+  searchFields: [ContentSearchField!]
   # View/like count filters
   minViewCount: Int
   maxViewCount: Int
@@ -9608,7 +9620,7 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"contentType", "minLengthSeconds", "maxLengthSeconds", "search", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
+	fieldsInOrder := [...]string{"contentType", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -9643,6 +9655,13 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.Search = data
+		case "searchFields":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("searchFields"))
+			data, err := ec.unmarshalOContentSearchField2ᚕgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentSearchFieldᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SearchFields = data
 		case "minViewCount":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minViewCount"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
@@ -13474,6 +13493,23 @@ func (ec *executionContext) marshalNContent2ᚖgithubᚗcomᚋCodeWarriorᚑdebu
 	return ec._Content(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNContentSearchField2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentSearchField(ctx context.Context, v any) (domain.ContentSearchField, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.ContentSearchField(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNContentSearchField2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentSearchField(ctx context.Context, sel ast.SelectionSet, v domain.ContentSearchField) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) unmarshalNContentSortBy2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentSortBy(ctx context.Context, v any) (domain.ContentSortBy, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := domain.ContentSortBy(tmp)
@@ -14206,6 +14242,42 @@ func (ec *executionContext) unmarshalOContentFilter2ᚖgithubᚗcomᚋCodeWarrio
 	}
 	res, err := ec.unmarshalInputContentFilter(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOContentSearchField2ᚕgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentSearchFieldᚄ(ctx context.Context, v any) ([]domain.ContentSearchField, error) {
+	if v == nil {
+		return nil, nil
+	}
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]domain.ContentSearchField, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNContentSearchField2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentSearchField(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOContentSearchField2ᚕgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentSearchFieldᚄ(ctx context.Context, sel ast.SelectionSet, v []domain.ContentSearchField) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNContentSearchField2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentSearchField(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOContentSortBy2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentSortBy(ctx context.Context, v any) (*domain.ContentSortBy, error) {
