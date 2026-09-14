@@ -51,6 +51,8 @@ pnpm run test         # Tests in watch mode
 
 **`pnpm exec` must run from `frontend/`** — running from repo root fails with `ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE`. Use `cd frontend && pnpm exec ...` or `pnpm --dir frontend exec ...`.
 
+**Cloud/CI sandbox sessions start with no `frontend/node_modules`** (a fresh container/checkout, unlike a local dev machine). `pnpm run check`, `test:run`, etc. fail with confusing module-resolution errors — not an "install first" message — until `pnpm install` is run once in `frontend/`.
+
 **Env vars:** `.env.example` lists every `VITE_*` variable by name (values blank on purpose). Copy it to `frontend/.env` and fill in real values by hand — the agent cannot read `.env` (see [../.docs/SECURITY.md](../.docs/SECURITY.md)).
 
 ## Svelte 5 Patterns

@@ -1,0 +1,308 @@
+<script lang="ts">
+	import { createQuery } from '@tanstack/svelte-query';
+	import { graphqlRequest } from '$lib/queries/client';
+	import { LIST_CONTENT, type ContentResponse } from '$lib/queries/content';
+	import {
+		LIST_ACTIVITY_PERSPECTIVES,
+		type ListActivityPerspectivesResponse,
+	} from '$lib/queries/perspectives';
+	import { LIST_USERS, type UsersResponse } from '$lib/queries/users';
+	import { queryKeys } from '$lib/queries/keys';
+	import { useMe } from '$lib/queries/users/useMe.svelte';
+	import { formatDateTime, extractVideoIdFromUrl, formatDuration } from '$lib/utils/formatting';
+	import { Switch } from '$lib/components/shadcn';
+	import GlassesIcon from '@lucide/svelte/icons/glasses';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import PlayIcon from '@lucide/svelte/icons/play';
+	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
+
+	// How many recent events to show per user before collapsing behind "show more".
+	const EVENTS_PER_USER = 5;
+	// How many content/perspective rows to pull to build the feed from. Client-side
+	// aggregation only — see backend note below for why no new query was needed.
+	//
+	// Capped at 100: both ContentService.ListContent and PerspectiveService.ListPerspectives
+	// reject `first` outside [1, 100] as invalid input (content_service.go / perspective_service.go).
+	// A larger value doesn't just get clamped — the whole query errors, which (before the
+	// hasError check below existed) silently rendered as every user showing "No activity yet"
+	// (the unrelated, unpaginated `users` query has no such cap and loaded fine regardless).
+	const FEED_SAMPLE_SIZE = 100;
+
+	const meCtx = useMe();
+	const currentUserId = $derived(meCtx.me ? meCtx.me.id : null);
+
+	// Only meaningful for the signed-in viewer's own perspectives: the backend's
+	// default read-authorization already mixes in "my private perspectives" with
+	// everyone else's public ones (and never returns anyone else's private rows —
+	// that scoping happens server-side and isn't something this toggle touches).
+	// Flipping this off asks explicitly for privacy: PUBLIC, which additionally
+	// hides the viewer's own privates from the feed.
+	let includeOwnPrivate = $state(true);
+
+	const usersQuery = createQuery(() => ({
+		queryKey: queryKeys.users.list(),
+		queryFn: () => graphqlRequest<UsersResponse>(LIST_USERS),
+		staleTime: 5 * 60 * 1000,
+	}));
+
+	const contentQuery = createQuery(() => ({
+		queryKey: queryKeys.content.list({
+			sortBy: 'UPDATED_AT',
+			sortOrder: 'DESC',
+			first: FEED_SAMPLE_SIZE,
+		}),
+		queryFn: () =>
+			graphqlRequest<ContentResponse>(LIST_CONTENT, {
+				first: FEED_SAMPLE_SIZE,
+				sortBy: 'UPDATED_AT',
+				sortOrder: 'DESC',
+				includeTotalCount: false,
+			}),
+		staleTime: 30 * 1000,
+	}));
+
+	const perspectivesQuery = createQuery(() => ({
+		queryKey: queryKeys.perspectives.activityFeed(includeOwnPrivate),
+		queryFn: () =>
+			graphqlRequest<ListActivityPerspectivesResponse>(LIST_ACTIVITY_PERSPECTIVES, {
+				first: FEED_SAMPLE_SIZE,
+				filter: includeOwnPrivate ? undefined : { privacy: 'PUBLIC' },
+			}),
+		staleTime: 30 * 1000,
+	}));
+
+	const loading = $derived(
+		usersQuery.isLoading || contentQuery.isLoading || perspectivesQuery.isLoading,
+	);
+	// Surfaced explicitly rather than left to fall through to empty arrays — a failed
+	// content/perspectives request must not render as "no activity" for every user.
+	//
+	// Gotcha: the template must check `loading` before `hasError` (see the {#if} chain
+	// below). With `hasError` checked first, the queries never settle in tests — reading
+	// `.isError` before `.isLoading` on the same createQuery result somehow leaves the
+	// component stuck showing "Loading activity…" forever (reproduced in
+	// UserActivityView.test.ts). Root cause not fully understood; keep `loading` first.
+	const hasError = $derived(usersQuery.isError || contentQuery.isError || perspectivesQuery.isError);
+
+	// One activity item, shaped like ActivityCardList's row so it renders with the same
+	// thumbnail-card look as the main Activity page's mobile view — kind/private just add
+	// a small badge on top of that shared card.
+	type Event = {
+		kind: 'content' | 'perspective';
+		ts: string;
+		contentID: string | null;
+		name: string;
+		url: string | null;
+		channelTitle: string | null;
+		length: number | null;
+		lengthUnits: string | null;
+		private: boolean;
+	};
+
+	interface UserGroup {
+		userID: string;
+		username: string;
+		events: Event[];
+		latestTs: string | null;
+	}
+
+	const groups = $derived.by((): UserGroup[] => {
+		const users = usersQuery.data?.users ?? [];
+		const contentItems = contentQuery.data?.content.items ?? [];
+		const perspectiveItems = perspectivesQuery.data?.perspectives.items ?? [];
+
+		const byUser = new Map<string, UserGroup>();
+		for (const u of users) {
+			byUser.set(u.id, { userID: u.id, username: u.username, events: [], latestTs: null });
+		}
+
+		function ensure(userID: string, fallbackName: string): UserGroup {
+			let group = byUser.get(userID);
+			if (!group) {
+				group = { userID, username: fallbackName, events: [], latestTs: null };
+				byUser.set(userID, group);
+			}
+			return group;
+		}
+
+		for (const c of contentItems) {
+			const group = ensure(c.addedByUserID, `User ${c.addedByUserID}`);
+			group.events.push({
+				kind: 'content',
+				ts: c.updatedAt,
+				contentID: c.id,
+				name: c.name,
+				url: c.url,
+				channelTitle: c.channelTitle,
+				length: c.length,
+				lengthUnits: c.lengthUnits,
+				private: false,
+			});
+		}
+
+		for (const p of perspectiveItems) {
+			const group = ensure(p.userID, `User ${p.userID}`);
+			group.events.push({
+				kind: 'perspective',
+				ts: p.updatedAt,
+				contentID: p.contentID,
+				name: p.content?.name ?? p.description ?? 'a perspective',
+				url: p.content?.url ?? null,
+				channelTitle: p.content?.channelTitle ?? null,
+				length: p.content?.length ?? null,
+				lengthUnits: p.content?.lengthUnits ?? null,
+				private: p.privacy === 'PRIVATE',
+			});
+		}
+
+		const result = Array.from(byUser.values());
+		for (const group of result) {
+			group.events.sort((a, b) => (a.ts < b.ts ? 1 : -1));
+			group.latestTs = group.events[0]?.ts ?? null;
+		}
+
+		// Users with no activity sort to the bottom, most-recently-active first
+		// otherwise. The signed-in user is then pulled to the very top.
+		result.sort((a, b) => {
+			if (a.latestTs === null && b.latestTs === null) return a.username.localeCompare(b.username);
+			if (a.latestTs === null) return 1;
+			if (b.latestTs === null) return -1;
+			return a.latestTs < b.latestTs ? 1 : -1;
+		});
+
+		if (currentUserId !== null) {
+			const meIndex = result.findIndex((g) => g.userID === currentUserId);
+			if (meIndex > 0) {
+				const [me] = result.splice(meIndex, 1);
+				result.unshift(me);
+			}
+		}
+
+		return result;
+	});
+
+	function thumbSrc(url: string | null): string | null {
+		const videoId = extractVideoIdFromUrl(url);
+		return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null;
+	}
+
+	function handleThumbClick(url: string | null, e: MouseEvent) {
+		e.stopPropagation();
+		if (url) window.open(url, '_blank', 'noopener,noreferrer');
+	}
+
+	// Details modal — looked up from the already-fetched content list by id. Only
+	// content-added events (and perspective events whose content happens to also be in
+	// that same recent-100 sample) resolve to a full row; others just don't open a modal.
+	let detailsContentId = $state<string | null>(null);
+	const detailsContent = $derived(
+		(contentQuery.data?.content.items ?? []).find((item) => item.id === detailsContentId) ?? null,
+	);
+	function handleOpenDetails(contentId: string) {
+		detailsContentId = contentId;
+	}
+</script>
+
+<div class="flex flex-col gap-4 px-2 py-2">
+	{#if meCtx.me}
+		<label class="flex w-fit items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm">
+			<Switch bind:checked={includeOwnPrivate} />
+			Include my private perspectives
+		</label>
+	{/if}
+
+	{#if loading}
+		<div class="py-12 text-center text-muted-foreground">Loading activity…</div>
+	{:else if hasError}
+		<div class="py-12 text-center text-muted-foreground">Failed to load activity. Please try again.</div>
+	{:else if groups.length === 0}
+		<div class="py-12 text-center text-muted-foreground">No users yet</div>
+	{:else}
+		{#each groups as group (group.userID)}
+			<div class="rounded-lg border border-border bg-card p-3" data-testid={`user-activity-${group.userID}`}>
+				<div class="mb-2 flex items-center gap-2">
+					<h3 class="text-sm font-semibold text-foreground">
+						{group.userID === currentUserId ? 'You' : group.username}
+					</h3>
+					{#if group.userID === currentUserId}
+						<span class="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">You</span>
+					{/if}
+				</div>
+
+				{#if group.events.length === 0}
+					<p class="text-xs text-muted-foreground">No activity yet</p>
+				{:else}
+					<div class="flex flex-col gap-2.5">
+						{#each group.events.slice(0, EVENTS_PER_USER) as event, i (i)}
+							<div class="flex items-center gap-3 rounded-lg border border-border bg-card p-2.5 hover:bg-primary/[0.06]">
+								<button
+									type="button"
+									title="Open original content in new tab"
+									class="relative h-16 w-24 flex-none overflow-hidden rounded-md bg-muted"
+									onclick={(e) => handleThumbClick(event.url, e)}
+								>
+									{#if thumbSrc(event.url)}
+										<img
+											src={thumbSrc(event.url)}
+											alt=""
+											class="h-full w-full object-cover"
+											onerror={(e) => e.currentTarget.remove()}
+										/>
+									{/if}
+									<span
+										class="absolute right-1 bottom-1 flex items-center justify-center rounded bg-[rgba(23,23,23,0.65)] p-1"
+									>
+										<PlayIcon class="size-2.5 fill-white text-white" />
+									</span>
+									<span
+										class="absolute left-1 top-1 flex items-center justify-center rounded bg-[rgba(23,23,23,0.65)] p-1"
+										title={event.kind === 'perspective' ? 'Perspective' : 'Added'}
+									>
+										{#if event.kind === 'perspective'}
+											<GlassesIcon class="size-2.5 text-white" />
+										{:else}
+											<PlusIcon class="size-2.5 text-white" />
+										{/if}
+									</span>
+								</button>
+
+								<button
+									type="button"
+									title="View content data + details"
+									class="min-w-0 flex-1 text-left"
+									onclick={() => event.contentID && handleOpenDetails(event.contentID)}
+								>
+									<div
+										class="line-clamp-2 font-[family-name:var(--font-family-serif)] text-sm leading-tight font-semibold text-foreground"
+									>
+										{event.name}
+										{#if event.private}
+											<span class="ml-1 text-[11px] font-normal text-muted-foreground">(private)</span>
+										{/if}
+									</div>
+									<div class="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+										{#if event.channelTitle}
+											<span>{event.channelTitle}</span>
+											<span>&middot;</span>
+										{/if}
+										{#if event.length}
+											<span>{formatDuration(event.length, event.lengthUnits)}</span>
+											<span>&middot;</span>
+										{/if}
+										<span>{formatDateTime(event.ts)}</span>
+									</div>
+								</button>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{/each}
+	{/if}
+</div>
+
+<ActivityDetailsModal
+	content={detailsContent}
+	open={detailsContentId !== null}
+	onClose={() => (detailsContentId = null)}
+/>

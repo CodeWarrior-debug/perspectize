@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ActivityTable from '$lib/components/ActivityTable.svelte';
+	import UserActivityView from '$lib/components/UserActivityView.svelte';
 	import { Input, Popover, PopoverContent, PopoverTrigger, buttonVariants } from '$lib/components/shadcn';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
@@ -14,6 +15,10 @@
 
 	// Derive current grid params from URL
 	const gridParams = $derived(parseGridParams(page.url.searchParams));
+
+	// "All Content" (existing grid) vs "By User" (new grouped activity view).
+	// Session-only, not persisted to the URL — mirrors the column picker's scope.
+	let view = $state<'content' | 'byUser'>('content');
 
 	// Local search input state (tracks what user has typed)
 	// Initialized from URL on mount; user typing updates this independently of URL
@@ -64,52 +69,80 @@
 				<h1 class="text-2xl md:text-3xl font-semibold text-foreground">Activity</h1>
 				<p class="text-sm text-muted-foreground mt-1">Recently updated content</p>
 			</div>
-			<div class="flex items-center gap-2 w-full sm:w-auto">
-				<div class="relative w-full sm:w-64 md:w-80">
-					<SearchIcon
-						class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none"
-					/>
-					<Input
-						type="text"
-						placeholder="Search content..."
-						value={searchInput}
-						oninput={(e) => handleSearchInput(e.currentTarget.value)}
-						class="pl-9"
-					/>
-				</div>
-				<Popover>
-					<PopoverTrigger
-						class={buttonVariants({ variant: 'outline', size: 'icon' })}
-						aria-label="Choose which fields to search ({scopeSummary})"
-						title="Search fields: {scopeSummary}"
+			<div class="flex items-center gap-2">
+				<div class="flex items-center gap-1 rounded-md border border-input bg-background p-0.5">
+					<button
+						type="button"
+						class="px-2.5 py-1 text-xs font-medium rounded transition-colors {view === 'content'
+							? 'bg-primary text-primary-foreground'
+							: 'text-muted-foreground hover:text-foreground'}"
+						onclick={() => (view = 'content')}
 					>
-						<SlidersHorizontalIcon class="size-4" />
-					</PopoverTrigger>
-					<PopoverContent align="end" class="w-56 p-2">
-						<p class="text-xs font-medium text-muted-foreground px-2 pb-1">Search in</p>
-						{#each ALL_SEARCH_SCOPES as scope (scope)}
-							<label
-								class="flex items-center gap-2 px-2 py-1.5 rounded-sm text-sm cursor-pointer hover:bg-accent"
-							>
-								<input
-									type="checkbox"
-									checked={gridParams.qFields.includes(scope)}
-									onchange={() => toggleScope(scope)}
-									class="size-4 accent-primary"
-								/>
-								{SCOPE_LABELS[scope]}
-							</label>
-						{/each}
-					</PopoverContent>
-				</Popover>
+						All Content
+					</button>
+					<button
+						type="button"
+						class="px-2.5 py-1 text-xs font-medium rounded transition-colors {view === 'byUser'
+							? 'bg-primary text-primary-foreground'
+							: 'text-muted-foreground hover:text-foreground'}"
+						onclick={() => (view = 'byUser')}
+					>
+						By User
+					</button>
+				</div>
+				{#if view === 'content'}
+					<div class="relative w-full sm:w-64 md:w-80">
+						<SearchIcon
+							class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none"
+						/>
+						<Input
+							type="text"
+							placeholder="Search content..."
+							value={searchInput}
+							oninput={(e) => handleSearchInput(e.currentTarget.value)}
+							class="pl-9"
+						/>
+					</div>
+					<Popover>
+						<PopoverTrigger
+							class={buttonVariants({ variant: 'outline', size: 'icon' })}
+							aria-label="Choose which fields to search ({scopeSummary})"
+							title="Search fields: {scopeSummary}"
+						>
+							<SlidersHorizontalIcon class="size-4" />
+						</PopoverTrigger>
+						<PopoverContent align="end" class="w-56 p-2">
+							<p class="text-xs font-medium text-muted-foreground px-2 pb-1">Search in</p>
+							{#each ALL_SEARCH_SCOPES as scope (scope)}
+								<label
+									class="flex items-center gap-2 px-2 py-1.5 rounded-sm text-sm cursor-pointer hover:bg-accent"
+								>
+									<input
+										type="checkbox"
+										checked={gridParams.qFields.includes(scope)}
+										onchange={() => toggleScope(scope)}
+										class="size-4 accent-primary"
+									/>
+									{SCOPE_LABELS[scope]}
+								</label>
+							{/each}
+						</PopoverContent>
+					</Popover>
+				{/if}
 			</div>
 		</div>
 	</div>
 
-	<!-- Table Card -->
+	<!-- Content Card -->
 	<div class="flex-1 min-h-0 px-4 md:px-6 lg:px-8 pb-4">
-		<div class="border rounded-lg shadow-sm overflow-hidden h-full flex flex-col">
-			<ActivityTable />
-		</div>
+		{#if view === 'content'}
+			<div class="border rounded-lg shadow-sm overflow-hidden h-full flex flex-col">
+				<ActivityTable />
+			</div>
+		{:else}
+			<div class="border rounded-lg shadow-sm overflow-y-auto h-full">
+				<UserActivityView />
+			</div>
+		{/if}
 	</div>
 </div>
