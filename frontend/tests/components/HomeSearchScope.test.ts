@@ -14,6 +14,14 @@ vi.mock('$lib/components/ActivityTable.svelte', () => ({
 	default: vi.fn(() => ({ $$: {}, $set: vi.fn(), $on: vi.fn(), $destroy: vi.fn() })),
 }));
 
+// +page.svelte also statically imports UserActivityView (the "By User" tab, added
+// in #363) — stub it out too. It pulls in svelte-clerk transitively, which touches
+// $env/dynamic/public and blows up outside a real SvelteKit request context; this
+// suite only exercises the "All Content" search box + scope picker.
+vi.mock('$lib/components/UserActivityView.svelte', () => ({
+	default: vi.fn(() => ({ $$: {}, $set: vi.fn(), $on: vi.fn(), $destroy: vi.fn() })),
+}));
+
 import Page from '../../src/routes/+page.svelte';
 
 describe('Activity page search scope picker', () => {
