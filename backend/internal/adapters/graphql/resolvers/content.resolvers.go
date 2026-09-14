@@ -52,6 +52,82 @@ func (r *contentResolver) PrimaryCategory(ctx context.Context, obj *model.Conten
 	return categoryDomainToModel(category), nil
 }
 
+// PerspectiveCount is the resolver for the perspectiveCount field.
+//
+// Batched per-request via the PerspectiveAggregateByContentID dataloader
+// (mirrors PrimaryCategory above) so a page of content rows costs one grouped
+// query, not one per row. Falls back to a single-row service call when the
+// dataloader middleware isn't installed (e.g. direct resolver unit tests).
+func (r *contentResolver) PerspectiveCount(ctx context.Context, obj *model.Content) (*int, error) {
+	agg, err := r.loadPerspectiveAggregate(ctx, obj)
+	if err != nil || agg == nil {
+		return nil, err
+	}
+	count := agg.Count
+	return &count, nil
+}
+
+// AverageRating is the resolver for the averageRating field.
+//
+// "Rating" here is the perspective's Quality dimension — the first/primary
+// rating field on the perspective form (see RatingInput.svelte's field
+// order) — averaged across ALL of the content's perspectives, public and
+// private alike (see PerspectiveAggregate's doc comment). Returns nil when
+// there are no perspectives, or none of them set a Quality value (distinct
+// cases collapsed to the same "nothing to show" nil).
+func (r *contentResolver) AverageRating(ctx context.Context, obj *model.Content) (*float64, error) {
+	agg, err := r.loadPerspectiveAggregate(ctx, obj)
+	if err != nil || agg == nil {
+		return nil, err
+	}
+	return agg.AverageQuality, nil
+}
+
+// QualityRatingCount is the resolver for the qualityRatingCount field.
+//
+// How many of the content's perspectives set a Quality rating — i.e. how
+// many values AverageRating was actually averaged over. Meant for a tooltip
+// on the average rating display, since it can be less than PerspectiveCount
+// (Quality is optional).
+func (r *contentResolver) QualityRatingCount(ctx context.Context, obj *model.Content) (*int, error) {
+	agg, err := r.loadPerspectiveAggregate(ctx, obj)
+	if err != nil || agg == nil {
+		return nil, err
+	}
+	count := agg.QualityCount
+	return &count, nil
+}
+
+// loadPerspectiveAggregate is the shared fetch behind PerspectiveCount,
+// AverageRating, and QualityRatingCount. Returns (nil, nil) when the content
+// has no perspectives at all.
+func (r *contentResolver) loadPerspectiveAggregate(ctx context.Context, obj *model.Content) (*domain.PerspectiveAggregate, error) {
+	contentID, err := strconv.Atoi(obj.ID)
+	if err != nil {
+		slog.Error("resolving perspective aggregate: invalid content ID", "id", obj.ID, "error", err)
+		return nil, nil
+	}
+
+	if loaders := dataloader.For(ctx); loaders != nil {
+		agg, err := loaders.PerspectiveAggregateByContentID.Load(ctx, contentID)
+		if err != nil {
+			if dataloader.IsNotFound(err) {
+				return nil, nil
+			}
+			slog.Error("resolving perspective aggregate via dataloader failed", "contentID", contentID, "error", err)
+			return nil, nil
+		}
+		return agg, nil
+	}
+
+	aggregates, err := r.PerspectiveService.AggregateByContentIDs(ctx, []int{contentID})
+	if err != nil {
+		slog.Error("resolving perspective aggregate failed", "contentID", contentID, "error", err)
+		return nil, nil
+	}
+	return aggregates[contentID], nil
+}
+
 // CreateContentFromYouTube is the resolver for the createContentFromYouTube field.
 func (r *mutationResolver) CreateContentFromYouTube(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error) {
 	// Always derive identity from the authenticated session (mirrors CreatePerspective).

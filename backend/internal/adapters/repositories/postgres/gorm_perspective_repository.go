@@ -168,6 +168,52 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 	return result, nil
 }
 
+// aggregateRow is the scan target for the grouped count/avg query below.
+type aggregateRow struct {
+	ContentID    int
+	Count        int
+	QualityCount int
+	AvgQuality   *float64
+}
+
+// AggregateByContentIDs computes, per content ID, the count of ALL
+// perspectives (public and private alike — a perspective's Privacy controls
+// who can read its content, not whether it counts toward the aggregate;
+// see FEATURE_BACKLOG.md for a possible future opt-out), how many of those
+// set a Quality rating, and their average Quality.
+//
+// QualityCount (COUNT(quality), which skips NULLs) can be smaller than Count
+// (COUNT(*), every perspective) since Quality is optional — that's the
+// number shown in the average-rating tooltip so "N ratings" always matches
+// what AverageQuality was actually computed over.
+func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
+	if len(contentIDs) == 0 {
+		return map[int]*domain.PerspectiveAggregate{}, nil
+	}
+
+	var rows []aggregateRow
+	err := r.db.WithContext(ctx).
+		Model(&PerspectiveModel{}).
+		Select("content_id AS content_id, COUNT(*) AS count, COUNT(quality) AS quality_count, AVG(quality) AS avg_quality").
+		Where("content_id IN ?", contentIDs).
+		Group("content_id").
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate perspectives by content: %w", err)
+	}
+
+	out := make(map[int]*domain.PerspectiveAggregate, len(rows))
+	for _, row := range rows {
+		out[row.ContentID] = &domain.PerspectiveAggregate{
+			ContentID:      row.ContentID,
+			Count:          row.Count,
+			QualityCount:   row.QualityCount,
+			AverageQuality: row.AvgQuality,
+		}
+	}
+	return out, nil
+}
+
 // ReassignByUser updates all perspectives owned by fromUserID to toUserID
 func (r *GormPerspectiveRepository) ReassignByUser(ctx context.Context, fromUserID, toUserID int) error {
 	return r.db.WithContext(ctx).

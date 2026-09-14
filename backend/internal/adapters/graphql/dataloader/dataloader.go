@@ -24,24 +24,27 @@ type ctxKey struct{}
 // Loaders holds every per-request loader. One instance lives for the duration
 // of a single HTTP request.
 type Loaders struct {
-	CategoryByID *dataloadgen.Loader[int, *domain.Category]
+	CategoryByID                    *dataloadgen.Loader[int, *domain.Category]
+	PerspectiveAggregateByContentID *dataloadgen.Loader[int, *domain.PerspectiveAggregate]
 }
 
 // NewLoaders builds a fresh set of loaders backed by the given services.
-func NewLoaders(categoryService portservices.CategoryService) *Loaders {
+func NewLoaders(categoryService portservices.CategoryService, perspectiveService portservices.PerspectiveService) *Loaders {
 	cb := &categoryBatcher{service: categoryService}
+	pb := &perspectiveAggregateBatcher{service: perspectiveService}
 	return &Loaders{
-		CategoryByID: dataloadgen.NewMappedLoader(cb.byID),
+		CategoryByID:                    dataloadgen.NewMappedLoader(cb.byID),
+		PerspectiveAggregateByContentID: dataloadgen.NewMappedLoader(pb.byContentID),
 	}
 }
 
 // Middleware injects a fresh *Loaders into the context of every request. It
 // mirrors the chi middleware conventions in cmd/server/main.go (a
 // func(http.Handler) http.Handler).
-func Middleware(categoryService portservices.CategoryService) func(http.Handler) http.Handler {
+func Middleware(categoryService portservices.CategoryService, perspectiveService portservices.PerspectiveService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), ctxKey{}, NewLoaders(categoryService))
+			ctx := context.WithValue(r.Context(), ctxKey{}, NewLoaders(categoryService, perspectiveService))
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -74,6 +77,21 @@ func (b *categoryBatcher) byID(ctx context.Context, ids []int) (map[int]*domain.
 		}
 	}
 	return out, nil
+}
+
+// perspectiveAggregateBatcher adapts PerspectiveService to a dataloadgen
+// mapped-fetch func, batching per-content perspective count/average-rating
+// lookups across a single GraphQL request into one query.
+type perspectiveAggregateBatcher struct {
+	service portservices.PerspectiveService
+}
+
+// byContentID resolves a batch of content IDs to their perspective aggregate.
+// A content ID with no public perspectives is simply absent from the
+// returned map; dataloadgen surfaces that as dataloadgen.ErrNotFound, which
+// resolvers treat as "count 0 / no average" via IsNotFound.
+func (b *perspectiveAggregateBatcher) byContentID(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
+	return b.service.AggregateByContentIDs(ctx, contentIDs)
 }
 
 // IsNotFound reports whether a loader error is just "this key had no row",

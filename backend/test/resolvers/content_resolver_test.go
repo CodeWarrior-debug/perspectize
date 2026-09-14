@@ -224,6 +224,10 @@ func (m *mockPerspectiveRepository) ReassignByUser(ctx context.Context, fromUser
 	return nil
 }
 
+func (m *mockPerspectiveRepository) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
+	return map[int]*domain.PerspectiveAggregate{}, nil
+}
+
 // mockCategoryRepository implements repositories.CategoryRepository for testing
 type mockCategoryRepository struct{}
 

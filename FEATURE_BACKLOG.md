@@ -6,14 +6,13 @@ Ideas and future enhancements captured during development. Not committed to any 
 
 ## Perspective Count + Avg Rating in Content Details Modal
 
-`ActivityDetailsModal.svelte`'s "Perspectives" and "Avg. Rating" stat tiles currently render a hardcoded `—` placeholder — there's no backend support yet. `Content` in `backend/schema.graphql` has no `perspectiveCount`/`averageRating` fields, and no resolver aggregates `Perspective` rows per content item.
+**Done (2026-09-13):** `Content.perspectiveCount` / `Content.averageRating` / `Content.qualityRatingCount` shipped — resolved on demand via a dataloader-batched aggregate query (`PerspectiveRepository.AggregateByContentIDs`), lazy-loaded in `ActivityDetailsModal.svelte` only while the modal is open (`useContentAggregates`). `averageRating` is the perspective's Quality dimension; `qualityRatingCount` (shown in a hover tooltip) is how many perspectives actually set one.
 
-**What to do:**
-- Add `perspectiveCount: Int!` and `averageRating: Float` to the `Content` type, backed by a resolver that aggregates `Perspective` rows (likely an "overall" rating average — needs a product decision on which field(s) count toward it, given quality/agreement/importance/confidence/like/custom fields).
-- Decide eagerness: computing this per row for a large `content` list could be expensive — consider a DataLoader-batched aggregate query, or lazy-loading the two values only when the details modal opens (a small dedicated query keyed on `contentId`) rather than fetching them for every row in the activity table.
-- Frontend: replace the two `—` placeholders in `ActivityDetailsModal.svelte` with the real values once available; if lazy-loaded, show a loading state in the tiles while the dedicated query is in flight.
+By design, the aggregate currently counts **every** perspective on the content, public and private alike — a perspective's Privacy controls who can *read* it, not whether it counts toward the total (confirmed 2026-09-13 after a user reported their own private perspective wasn't reflected in the count).
 
-**Priority:** Deferred — flagged during a UI pass (2026-09-05) as more involved than a UI tweak; needs the product decision on rating aggregation before backend work starts.
+**Possible future work — per-perspective aggregate opt-out (premium?):** let a user mark an individual perspective as excluded from `perspectiveCount`/`averageRating` altogether (distinct from Privacy, which only hides its *content* from other viewers). Floated as a possible premium/paid feature — no design or schema work started. Would need a new field on `Perspective` (e.g. `excludeFromAggregates: Boolean`) and a `WHERE` clause change in `AggregateByContentIDs` (`internal/adapters/repositories/postgres/gorm_perspective_repository.go`).
+
+**Priority:** Core feature shipped; the opt-out idea is unscoped and low priority until there's a concrete premium-tier plan.
 
 ---
 

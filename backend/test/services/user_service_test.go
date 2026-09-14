@@ -158,6 +158,9 @@ func (m *mockPerspectiveRepoForUser) ReassignByUser(ctx context.Context, fromUse
 	}
 	return nil
 }
+func (m *mockPerspectiveRepoForUser) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
+	return map[int]*domain.PerspectiveAggregate{}, nil
+}
 
 // newTestUserService creates a UserService with default mocks for content/perspective repos
 func newTestUserService(repo *mockUserRepository) *services.UserService {

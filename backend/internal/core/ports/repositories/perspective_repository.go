@@ -14,4 +14,9 @@ type PerspectiveRepository interface {
 	Delete(ctx context.Context, id int) error
 	List(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
 	ReassignByUser(ctx context.Context, fromUserID, toUserID int) error
+
+	// AggregateByContentIDs computes, for each given content ID, the count and
+	// average Quality rating of its PUBLIC perspectives. Content IDs with no
+	// public perspectives are simply absent from the result map (count 0).
+	AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
 }
