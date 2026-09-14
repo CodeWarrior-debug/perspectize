@@ -148,7 +148,8 @@
 	</label>
 
 	<!-- Stepper row -->
-	<div class="flex items-center justify-center gap-1.5 relative">
+	<div class="flex items-center justify-center">
+	<div class="inline-flex items-center gap-1.5 relative">
 		<!-- Decrement button -->
 		<button
 			type="button"
@@ -204,6 +205,21 @@
 				<XIcon class="size-3" />
 			</button>
 		{/if}
+
+		<!-- Remove field button (X) — snug to the right of the stepper row, vertically centered on it -->
+		{#if onRemove}
+			<button
+				type="button"
+				onclick={onRemove}
+				class="hover-tooltip flex items-center justify-center bg-white border border-border rounded-full shadow-sm text-muted-foreground hover:opacity-70 transition-opacity z-10"
+				style="position: absolute; top: 50%; left: 100%; margin-left: 4px; transform: translateY(-50%); width: 16px; height: 16px;"
+				aria-label="Remove {label}"
+				data-tooltip="Remove {label}"
+			>
+				<XIcon class="size-2" strokeWidth={3} />
+			</button>
+		{/if}
+	</div>
 	</div>
 
 	<!-- Progress bar -->
