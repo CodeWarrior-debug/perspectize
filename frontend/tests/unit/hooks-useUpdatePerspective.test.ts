@@ -215,8 +215,15 @@ describe('useUpdatePerspective hook', () => {
 			);
 		});
 
-		it('does not invalidate content cache on update', () => {
+		it("invalidates the edited content's aggregate cache (perspectiveCount/averageRating can change)", () => {
 			capturedMutationOptions.onSuccess({ updatePerspective: updatedRow });
+			expect(mockInvalidateQueries).toHaveBeenCalledWith(
+				expect.objectContaining({ queryKey: expect.arrayContaining(['content', 'detail', '10']) }),
+			);
+		});
+
+		it('does not invalidate the content cache when the updated row has no contentID', () => {
+			capturedMutationOptions.onSuccess({ updatePerspective: { ...updatedRow, contentID: null } });
 			const contentCall = mockInvalidateQueries.mock.calls.find((call: any[]) =>
 				call[0]?.queryKey?.includes('content'),
 			);

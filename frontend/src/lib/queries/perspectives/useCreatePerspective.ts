@@ -122,6 +122,13 @@ export function useCreatePerspective() {
 			);
 			// Mark stale for eventual consistency without an immediate refetch.
 			queryClient.invalidateQueries({ ...listFilter, refetchType: 'none' });
+
+			// A new perspective changes this content's perspectiveCount/averageRating
+			// (see useContentAggregates) — evict the cached aggregate so the details
+			// modal doesn't keep showing pre-creation numbers for up to staleTime.
+			if (created.contentID) {
+				queryClient.invalidateQueries({ queryKey: queryKeys.content.detail(created.contentID) });
+			}
 		},
 	}));
 }

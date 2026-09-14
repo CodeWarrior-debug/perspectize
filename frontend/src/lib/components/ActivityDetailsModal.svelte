@@ -14,6 +14,8 @@
 		getSourceDataCooldown,
 	} from '$lib/utils/formatting';
 	import { useUpdateSourceData } from '$lib/queries/content/useUpdateSourceData';
+	import { useContentAggregates } from '$lib/queries/content/useContentAggregates';
+	import { ratingToDisplay } from '$lib/utils/ratings';
 
 	interface ModalContent {
 		id: string;
@@ -54,6 +56,27 @@
 	const cooldown = $derived(content ? getSourceDataCooldown(content.updatedAt) : { active: false, remainingMs: 0 });
 
 	const updateSourceData = useUpdateSourceData();
+
+	// Lazy-loaded on demand — see useContentAggregates's doc comment. Keyed off
+	// the currently-open content's id, so it only fetches while the modal is
+	// actually open for a given item (re-runs if the id changes while open).
+	const aggregatesQuery = useContentAggregates(() => (open ? (content?.id ?? null) : null));
+	const perspectiveCountDisplay = $derived(
+		aggregatesQuery.isLoading ? '…' : (aggregatesQuery.data?.contentByID?.perspectiveCount ?? 0).toString(),
+	);
+	const averageRatingDisplay = $derived.by(() => {
+		if (aggregatesQuery.isLoading) return '…';
+		const avg = aggregatesQuery.data?.contentByID?.averageRating;
+		return avg === null || avg === undefined ? '—' : ratingToDisplay(avg);
+	});
+	// Tooltip on the Avg. Rating tile — how many quality ratings it's averaged
+	// over, since that can be fewer than the perspective count (Quality is an
+	// optional field on a perspective).
+	const qualityRatingCountTooltip = $derived.by(() => {
+		if (aggregatesQuery.isLoading) return 'Loading…';
+		const count = aggregatesQuery.data?.contentByID?.qualityRatingCount ?? 0;
+		return count === 1 ? '1 quality rating' : `${count} quality ratings`;
+	});
 
 	function handleOpenChange(next: boolean) {
 		if (!next) onClose();
@@ -110,11 +133,18 @@
 				<div class="mt-4.5 grid grid-cols-2 gap-2.5">
 					<div class="rounded-lg border border-border bg-accent px-3 py-2.5">
 						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Perspectives</div>
-						<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-lg font-bold text-foreground">—</div>
+						<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-lg font-bold text-foreground">
+							{perspectiveCountDisplay}
+						</div>
 					</div>
-					<div class="rounded-lg border border-border bg-accent px-3 py-2.5">
+					<div
+						class="hover-tooltip rounded-lg border border-border bg-accent px-3 py-2.5"
+						data-tooltip={qualityRatingCountTooltip}
+					>
 						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Avg. Rating</div>
-						<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-lg font-bold text-foreground">—</div>
+						<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-lg font-bold text-foreground">
+							{averageRatingDisplay}
+						</div>
 					</div>
 					<div class="rounded-lg border border-border bg-accent px-3 py-2.5">
 						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Views</div>

@@ -152,6 +152,22 @@ type PaginatedPerspectives struct {
 	TotalCount  *int
 }
 
+// PerspectiveAggregate summarizes ALL perspectives on a single piece of
+// content — public and private alike; Privacy controls who can read a
+// perspective's content, not whether it counts here (see FEATURE_BACKLOG.md
+// for a possible future opt-out of aggregates) — how many there are, how
+// many of those set a Quality rating (the "headline" rating dimension - see
+// RatingInput.svelte's field order on the frontend), and their average
+// Quality. QualityCount can be less than Count since Quality is optional.
+// AverageQuality is nil when QualityCount is 0 (COUNT/AVG over an all-NULL
+// column), which is distinct from Count == 0.
+type PerspectiveAggregate struct {
+	ContentID      int
+	Count          int
+	QualityCount   int
+	AverageQuality *float64
+}
+
 // MarshalCategorizedRatings converts CategorizedRatings to JSON for storage
 func (p *Perspective) MarshalCategorizedRatings() ([]json.RawMessage, error) {
 	if len(p.CategorizedRatings) == 0 {
