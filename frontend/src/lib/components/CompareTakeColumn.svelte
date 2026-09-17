@@ -46,7 +46,7 @@
 				Unique feelings
 			</span>
 			<div class="flex flex-wrap gap-1.5">
-				{#each uniqueFeelings as f (f.label ?? f.emoji)}
+				{#each uniqueFeelings as f, i (`${f.emoji}:${f.label ?? ''}:${i}`)}
 					<span class="rounded-full border border-border px-2 py-0.5 text-[12px]">{f.emoji} {f.label ?? ''}</span>
 				{/each}
 			</div>

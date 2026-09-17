@@ -36,7 +36,7 @@
 	{#if feelings.shared.length > 0}
 		<div class="flex items-center gap-2 rounded-full border border-[var(--color-rating-positive)] px-3 py-1.5 text-[13px]">
 			<span class="font-medium" style="color: var(--color-rating-positive);">Matching feelings</span>
-			{#each feelings.shared as f (f.label ?? f.emoji)}
+			{#each feelings.shared as f, i (`${f.emoji}:${f.label ?? ''}:${i}`)}
 				<span>{f.emoji} {f.label ?? ''}</span>
 			{/each}
 		</div>

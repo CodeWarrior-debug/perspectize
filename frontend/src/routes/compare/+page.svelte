@@ -3,8 +3,8 @@
 	import Compare from '$lib/components/Compare.svelte';
 
 	const contentId = $derived(page.url.searchParams.get('contentId') ?? '');
-	const initialLeftId = $derived(page.url.searchParams.get('left'));
-	const initialRightId = $derived(page.url.searchParams.get('right'));
+	const initialLeftId = $derived(page.url.searchParams.get('left') || null);
+	const initialRightId = $derived(page.url.searchParams.get('right') || null);
 </script>
 
 {#if contentId}

@@ -2,6 +2,11 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import ComparePickerRow from '$lib/components/ComparePickerRow.svelte';
 
+function avatarColor(select: HTMLElement): string | undefined {
+	const avatar = select.parentElement?.querySelector('span[style*="background-color"]') as HTMLElement | null;
+	return avatar?.style.backgroundColor;
+}
+
 const options = [
 	{ id: '1', name: 'You' },
 	{ id: '2', name: 'Jamie Lee' },
@@ -52,5 +57,44 @@ describe('ComparePickerRow', () => {
 		});
 		await fireEvent.click(screen.getByRole('button', { name: /swap sides/i }));
 		expect(onSwap).toHaveBeenCalled();
+	});
+
+	it("colors the avatar by viewer identity, not by side, and follows the viewer across a swap", () => {
+		// Viewer (id '1') on the left: left avatar is primary, right is purple.
+		const { rerender } = render(ComparePickerRow, {
+			props: {
+				options,
+				leftId: '1',
+				rightId: '2',
+				viewerId: '1',
+				onLeftChange: vi.fn(),
+				onRightChange: vi.fn(),
+				onSwap: vi.fn(),
+			},
+		});
+		expect(avatarColor(screen.getByTestId('picker-left'))).toBe('var(--color-primary)');
+		expect(avatarColor(screen.getByTestId('picker-right'))).toBe('var(--color-logo-purple)');
+
+		// After a swap, the viewer moves to the right side — their avatar must
+		// stay primary-colored, following identity rather than position.
+		rerender({
+			options,
+			leftId: '2',
+			rightId: '1',
+			viewerId: '1',
+			onLeftChange: vi.fn(),
+			onRightChange: vi.fn(),
+			onSwap: vi.fn(),
+		});
+		expect(avatarColor(screen.getByTestId('picker-left'))).toBe('var(--color-logo-purple)');
+		expect(avatarColor(screen.getByTestId('picker-right'))).toBe('var(--color-primary)');
+	});
+
+	it('has accessible names on both selects', () => {
+		render(ComparePickerRow, {
+			props: { options, leftId: '1', rightId: '2', onLeftChange: vi.fn(), onRightChange: vi.fn(), onSwap: vi.fn() },
+		});
+		expect(screen.getByRole('combobox', { name: 'Left perspective' })).toBeInTheDocument();
+		expect(screen.getByRole('combobox', { name: 'Right perspective' })).toBeInTheDocument();
 	});
 });

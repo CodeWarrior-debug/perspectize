@@ -8,17 +8,6 @@
 		type ListPerspectivesByContentResponse,
 	} from '$lib/queries/perspectives';
 	import { GET_CONTENT } from '$lib/queries/content';
-
-	interface CompareContentBanner {
-		id: string;
-		name: string;
-		url: string | null;
-		length: number | null;
-		lengthUnits: string | null;
-	}
-	interface GetContentResponse {
-		contentByID: CompareContentBanner | null;
-	}
 	import { queryKeys } from '$lib/queries/keys';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import {
@@ -34,7 +23,18 @@
 	import CompareRatingTable from '$lib/components/CompareRatingTable.svelte';
 	import CompareTakeColumn from '$lib/components/CompareTakeColumn.svelte';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
-	import { formatDuration } from '$lib/utils/formatting';
+	import { formatDuration, extractVideoIdFromUrl } from '$lib/utils/formatting';
+
+	interface CompareContentBanner {
+		id: string;
+		name: string;
+		url: string | null;
+		length: number | null;
+		lengthUnits: string | null;
+	}
+	interface GetContentResponse {
+		contentByID: CompareContentBanner | null;
+	}
 
 	let {
 		contentId,
@@ -66,7 +66,7 @@
 	// $lib/queries/content — it does NOT return channelTitle/description/tags,
 	// only the fields below, so the banner is limited to what it actually has.
 	const contentQuery = createQuery(() => ({
-		queryKey: queryKeys.content.detail(contentId),
+		queryKey: queryKeys.content.banner(contentId),
 		queryFn: () => graphqlRequest<GetContentResponse>(GET_CONTENT, { id: contentId }),
 	}));
 
@@ -94,8 +94,17 @@
 		return candidates.reduce((latest, p) => (p.updatedAt > latest.updatedAt ? p : latest)).userID;
 	}
 
-	const leftId = $derived(initialLeftId ?? defaultLeftId());
-	const rightId = $derived(initialRightId ?? defaultRightId(leftId));
+	// A URL id is only honored if it names a user present in the fetched
+	// (privacy-scoped) perspectives set — otherwise (stale/bookmarked link to
+	// a since-deleted/private perspective) fall back to the computed default
+	// rather than silently treating the invalid id as a valid selection.
+	function validId(id: string | null): string | null {
+		if (id === null) return null;
+		return options.some((o) => o.id === id) ? id : null;
+	}
+
+	const leftId = $derived(validId(initialLeftId) ?? defaultLeftId());
+	const rightId = $derived(validId(initialRightId) ?? defaultRightId(leftId));
 
 	function updateUrl(next: { left?: string; right?: string }) {
 		const params = new URLSearchParams();
@@ -142,6 +151,9 @@
 
 	const loading = $derived(usersQuery.isLoading || perspectivesQuery.isLoading);
 	const hasComparison = $derived(perspectives.length >= 2 && !!leftPerspective && !!rightPerspective);
+	const hasNoPerspectives = $derived(!loading && perspectives.length === 0);
+
+	const contentVideoId = $derived(extractVideoIdFromUrl(content?.url ?? null));
 </script>
 
 <div class="mx-auto flex max-w-[880px] flex-col gap-4 px-5 py-5">
@@ -157,8 +169,17 @@
 
 	{#if content}
 		<div class="flex items-center justify-between rounded-lg border border-border px-3.5 py-2.5">
-			<span class="text-[13px] font-medium text-foreground">{content.name}</span>
-			{#if content.length !== null && content.lengthUnits !== null}
+			<div class="flex items-center gap-2.5">
+				{#if contentVideoId}
+					<img
+						src={`https://i.ytimg.com/vi/${contentVideoId}/default.jpg`}
+						alt=""
+						class="h-8 w-10 flex-none rounded object-cover"
+					/>
+				{/if}
+				<span class="text-[13px] font-medium text-foreground">{content.name}</span>
+			</div>
+			{#if content.length != null && content.lengthUnits != null}
 				<span class="text-[12px] text-muted-foreground">{formatDuration(content.length, content.lengthUnits)}</span>
 			{/if}
 		</div>
@@ -168,6 +189,10 @@
 		<div class="py-12 text-center text-muted-foreground">Loading comparison…</div>
 	{:else if usersQuery.isError || perspectivesQuery.isError}
 		<div class="py-12 text-center text-muted-foreground">Failed to load this comparison. Please try again.</div>
+	{:else if hasNoPerspectives}
+		<div class="rounded-lg border border-border bg-accent p-6 text-center text-[13.5px] text-muted-foreground">
+			No one has shared a perspective on this content yet.
+		</div>
 	{:else if !hasComparison}
 		<div class="rounded-lg border border-border bg-accent p-6 text-center text-[13.5px] text-muted-foreground">
 			No other perspectives on this content yet to compare against.
@@ -177,6 +202,7 @@
 			{options}
 			leftId={leftId!}
 			rightId={rightId!}
+			viewerId={meCtx.me?.id ?? null}
 			onLeftChange={handleLeftChange}
 			onRightChange={handleRightChange}
 			onSwap={handleSwap}
@@ -202,7 +228,7 @@
 		<div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
 			<CompareTakeColumn
 				name={displayName(leftId!)}
-				avatarColor="var(--color-primary)"
+				avatarColor={leftId === meCtx.me?.id ? 'var(--color-primary)' : 'var(--color-logo-purple)'}
 				review={leftPerspective!.review}
 				uniqueFeelings={feelingsComparison.leftOnly}
 			/>
@@ -215,7 +241,7 @@
 			/>
 			<CompareTakeColumn
 				name={displayName(rightId!)}
-				avatarColor="var(--color-logo-purple)"
+				avatarColor={rightId === meCtx.me?.id ? 'var(--color-primary)' : 'var(--color-logo-purple)'}
 				review={rightPerspective!.review}
 				uniqueFeelings={feelingsComparison.rightOnly}
 			/>

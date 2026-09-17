@@ -81,10 +81,21 @@ function numericCustomFields(customFields: Record<string, unknown> | null): Map<
 	return result;
 }
 
-function labelFor(key: string): string {
+/**
+ * Human-readable label for a rating dimension key. Standard dimensions use
+ * their fixed label; custom field keys (which AddFieldSearch prefixes with
+ * "custom:" and lowercases) have the prefix stripped, hyphens converted to
+ * spaces, and every word title-cased — e.g. "story-pacing" -> "Story Pacing".
+ * Shared with PerspectivePopover.svelte's field labels so the same key reads
+ * identically everywhere in the app.
+ */
+export function getFieldLabel(key: string): string {
 	const standard = STANDARD_DIMENSIONS.find((d) => d.key === key);
 	if (standard) return standard.label;
-	return key.charAt(0).toUpperCase() + key.slice(1);
+	return key
+		.replace(/^custom:/, '')
+		.replace(/-/g, ' ')
+		.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function compareRatings(left: PerspectiveItem, right: PerspectiveItem): RatingRow[] {
@@ -108,8 +119,8 @@ export function compareRatings(left: PerspectiveItem, right: PerspectiveItem): R
 		});
 	}
 
-	const leftCustom = numericCustomFields(left.customFields as Record<string, unknown> | null);
-	const rightCustom = numericCustomFields(right.customFields as Record<string, unknown> | null);
+	const leftCustom = numericCustomFields(left.customFields);
+	const rightCustom = numericCustomFields(right.customFields);
 	for (const [key, leftRaw] of leftCustom) {
 		if (!rightCustom.has(key)) continue;
 		const rightRaw = rightCustom.get(key)!;
@@ -118,7 +129,7 @@ export function compareRatings(left: PerspectiveItem, right: PerspectiveItem): R
 		const delta = Math.abs(leftDisplay - rightDisplay);
 		rows.push({
 			key,
-			label: labelFor(key),
+			label: getFieldLabel(key),
 			leftDisplay,
 			rightDisplay,
 			delta,

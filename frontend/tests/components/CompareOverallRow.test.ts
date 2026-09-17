@@ -17,4 +17,18 @@ describe('CompareOverallRow', () => {
 		render(CompareOverallRow, { props: { overall: { left: null, right: 'THUMBS_UP', agree: false } } });
 		expect(screen.getByTestId('overall-left')).toHaveTextContent('—');
 	});
+
+	it('gives thumb icons an accessible name', () => {
+		render(CompareOverallRow, { props: { overall: { left: 'THUMBS_UP', right: 'THUMBS_DOWN', agree: false } } });
+		expect(screen.getByRole('img', { name: 'Thumbs up' })).toBeInTheDocument();
+		expect(screen.getByRole('img', { name: 'Thumbs down' })).toBeInTheDocument();
+	});
+
+	it('uses the theme-aware rating color tokens for thumb fill/stroke', () => {
+		render(CompareOverallRow, { props: { overall: { left: 'THUMBS_UP', right: 'THUMBS_DOWN', agree: false } } });
+		const up = screen.getByRole('img', { name: 'Thumbs up' });
+		const down = screen.getByRole('img', { name: 'Thumbs down' });
+		expect(up).toHaveAttribute('fill', 'var(--color-rating-positive)');
+		expect(down).toHaveAttribute('fill', 'var(--color-rating-negative)');
+	});
 });

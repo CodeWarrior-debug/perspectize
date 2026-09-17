@@ -5,6 +5,7 @@
 		options,
 		leftId,
 		rightId,
+		viewerId = null,
 		onLeftChange,
 		onRightChange,
 		onSwap,
@@ -12,6 +13,7 @@
 		options: { id: string; name: string }[];
 		leftId: string;
 		rightId: string;
+		viewerId?: string | null;
 		onLeftChange: (id: string) => void;
 		onRightChange: (id: string) => void;
 		onSwap: () => void;
@@ -20,8 +22,10 @@
 	const leftOptions = $derived(options.filter((o) => o.id !== rightId));
 	const rightOptions = $derived(options.filter((o) => o.id !== leftId));
 
+	// Color by identity (the viewer, "You", is always primary-colored) — not
+	// by side/position — so a Swap doesn't change "You"'s avatar color.
 	function avatarColor(id: string): string {
-		return id === leftId ? 'var(--color-primary)' : 'var(--color-logo-purple)';
+		return id === viewerId ? 'var(--color-primary)' : 'var(--color-logo-purple)';
 	}
 
 	function initials(name: string): string {
@@ -47,6 +51,7 @@
 		</span>
 		<select
 			data-testid="picker-left"
+			aria-label="Left perspective"
 			class="w-full min-w-0 bg-transparent text-sm font-medium text-foreground"
 			value={leftId}
 			onchange={(e) => onLeftChange(e.currentTarget.value)}
@@ -75,6 +80,7 @@
 		</span>
 		<select
 			data-testid="picker-right"
+			aria-label="Right perspective"
 			class="w-full min-w-0 bg-transparent text-sm font-medium text-foreground"
 			value={rightId}
 			onchange={(e) => onRightChange(e.currentTarget.value)}

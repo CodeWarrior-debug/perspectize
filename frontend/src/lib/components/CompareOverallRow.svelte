@@ -16,13 +16,31 @@
 {#snippet thumbIcon(value: string | null, testId: string)}
 	<span data-testid={testId} class="flex items-center justify-center">
 		{#if value === 'THUMBS_UP'}
-			<svg width="20" height="20" viewBox="0 0 24 24" fill="#16a34a" stroke="#16a34a" stroke-width="1.6">
+			<svg
+				width="20"
+				height="20"
+				viewBox="0 0 24 24"
+				fill="var(--color-rating-positive)"
+				stroke="var(--color-rating-positive)"
+				stroke-width="1.6"
+				role="img"
+				aria-label="Thumbs up"
+			>
 				{#each THUMB_UP_PATHS as d (d)}
 					<path {d} />
 				{/each}
 			</svg>
 		{:else if value === 'THUMBS_DOWN'}
-			<svg width="20" height="20" viewBox="0 0 24 24" fill="#dc2626" stroke="#dc2626" stroke-width="1.6">
+			<svg
+				width="20"
+				height="20"
+				viewBox="0 0 24 24"
+				fill="var(--color-rating-negative)"
+				stroke="var(--color-rating-negative)"
+				stroke-width="1.6"
+				role="img"
+				aria-label="Thumbs down"
+			>
 				{#each THUMB_DOWN_PATHS as d (d)}
 					<path {d} />
 				{/each}
