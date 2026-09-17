@@ -1,7 +1,11 @@
 # Backend performance tests (k6)
 
 Load tests for the Go GraphQL API, isolated per route/operation so a single
-slow resolver doesn't get hidden in an aggregate number.
+slow resolver doesn't get hidden in an aggregate number. Every scenario runs
+a fixed, guaranteed iteration count (`ITERATIONS`, default 20, floor 10) via
+k6's `shared-iterations` executor, rather than a time-boxed ramp — so every
+run reports a known, comparable sample size instead of "however many
+requests happened to fit in the time window."
 
 ## Install
 
@@ -23,6 +27,13 @@ AUTH_TOKEN=<clerk-session-jwt> k6 run perf/k6/graphql.js
 
 # target a single operation instead of the full suite
 AUTH_TOKEN=<jwt> k6 run perf/k6/graphql.js --env OPERATION=contentList
+
+# more/fewer iterations per operation (floor of 10 enforced)
+k6 run perf/k6/graphql.js --env ITERATIONS=50
+
+# operations needing a real record id are skipped (with a console warning)
+# unless you provide one:
+CONTENT_ID=123 PERSPECTIVE_ID=45 USERNAME=someuser k6 run perf/k6/graphql.js
 
 # against deployed dev/staging
 k6 run perf/k6/health.js -e BASE_URL=https://<sevalla-backend-host>
@@ -53,10 +64,22 @@ want a clean throughput number instead of a rate-limit stress test).
 
 ## Adding a new operation
 
-Add an entry to `OPERATIONS` in `graphql.js` with the query/mutation string
-and variables. Each operation gets its own k6 `group()`, so its timing shows
-up isolated in the summary and report — it doesn't get averaged in with
-every other route.
+Add an entry to `OPERATIONS` in `graphql.js` with the query string and
+variables. Each operation gets its own k6 `group()` and its own
+`shared-iterations` scenario, so its timing and iteration count show up
+isolated in the summary and report — it doesn't get averaged in with every
+other route.
+
+## Testing mutations
+
+Every mutation in the schema requires `@auth` and writes real rows to the
+shared Sevalla dev database (`backend/CLAUDE.md` — there is no local Docker
+Postgres). This scaffold deliberately only load-tests queries, not
+mutations, to avoid polluting shared state on repeated runs. If you need to
+load-test a mutation, do it against a disposable database/environment, and
+prefer one that's cheap to clean up (e.g. `markOnboardingSeen` over
+`createUser`/`deletePerspective`) — never point mutation load tests at the
+shared dev DB.
 
 ## Files
 
