@@ -45,7 +45,7 @@ const OPERATIONS = {
 		requiresAuth: false,
 		query: `query ContentList($first: Int) {
       content(first: $first, sortBy: CREATED_AT, sortOrder: DESC) {
-        edges { node { id title } }
+        items { id name }
         pageInfo { hasNextPage endCursor }
       }
     }`,
@@ -55,7 +55,7 @@ const OPERATIONS = {
 		requiresAuth: false,
 		requiresArg: CONTENT_ID ? null : 'CONTENT_ID',
 		query: `query ContentByID($id: ID!) {
-      contentByID(id: $id) { id title }
+      contentByID(id: $id) { id name }
     }`,
 		variables: { id: CONTENT_ID },
 	},
@@ -63,7 +63,7 @@ const OPERATIONS = {
 		requiresAuth: false,
 		query: `query PerspectivesList($first: Int) {
       perspectives(first: $first, sortBy: CREATED_AT, sortOrder: DESC) {
-        edges { node { id } }
+        items { id }
         pageInfo { hasNextPage endCursor }
       }
     }`,
@@ -93,7 +93,7 @@ const OPERATIONS = {
 	wikidataSearch: {
 		requiresAuth: false,
 		query: `query WikidataSearch($query: String!, $limit: Int) {
-      wikidataSearch(query: $query, limit: $limit) { id label }
+      wikidataSearch(query: $query, limit: $limit) { qid label }
     }`,
 		variables: { query: 'science', limit: 5 },
 	},

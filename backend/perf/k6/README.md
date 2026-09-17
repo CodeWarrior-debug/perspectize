@@ -51,6 +51,49 @@ node perf/k6/report.mjs perf/k6/results/graphql-run.json perf/k6/results/graphql
 
 Open `perf/k6/results/graphql-report.html` in a browser.
 
+## Capacity ramp test
+
+`ramp.js` finds where latency starts to degrade as concurrency increases,
+stepping through 5→10→20→30→40→50 concurrent VUs hammering `contentList`
+with no think time. This is a different question from the per-operation
+scripts above ("how fast is one request") — it's "how many concurrent
+requests can this hold up under."
+
+**Run it against a dedicated instance, not your normal dev server.** The
+global rate limiter (see below) will dominate the results long before real
+capacity limits do, and you don't want a capacity test competing with normal
+dev traffic on `:8080`. Spin up a second instance on another port with the
+limiter raised:
+
+```bash
+# from backend/, in a separate terminal
+cat > config/config.ramptest.json <<'JSON'
+{ "server": { "port": 8081, "host": "" } }
+JSON
+CONFIG_PATH=config/config.ramptest.json RATE_LIMIT_PER_MIN=100000 go run ./cmd/server
+
+# then, in another terminal:
+k6 run perf/k6/ramp.js --out json=perf/k6/results/ramp-run.json -e BASE_URL=http://localhost:8081
+node perf/k6/analyze-ramp.mjs perf/k6/results/ramp-run.json
+```
+
+`config.ramptest.json` is gitignored-by-convention (don't commit it) — it
+only needs a port override; `DATABASE_URL` etc. still come from your normal
+`.env`. Delete it and kill the second instance when you're done.
+
+`analyze-ramp.mjs` buckets the run's raw output into each 15s concurrency
+window (skipping the first 3s of each to let VUs ramp up) and prints
+avg/p95/p99/max per step, since k6's own summary only gives one number for
+the whole run.
+
+**Reading the result:** if p95 stays flat (or grows slowly) as VUs climb,
+you haven't found the ceiling yet — rerun with higher `stages` targets in
+`ramp.js`. A step where p95 jumps sharply relative to the previous step is
+the degradation point. Remember these are VUs in a tight loop, not real
+users with think-time between actions — the request rate a given VU count
+produces is far higher than that many real concurrent visitors would
+generate, so don't read "VUs" as "concurrent users" directly.
+
 ## Rate limiting
 
 The API has a global per-IP rate limiter (`RATE_LIMIT_PER_MIN`, default
