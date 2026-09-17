@@ -183,6 +183,12 @@
 						</div>
 					</div>
 					<div class="flex flex-col items-end gap-1">
+						<a
+							href={`/compare?contentId=${content.id}`}
+							class="inline-flex items-center gap-1.5 rounded-md border border-primary px-3.5 py-2 text-[13px] font-semibold text-primary hover:bg-primary/5"
+						>
+							Compare
+						</a>
 						<button
 							type="button"
 							disabled={updateSourceData.isPending || cooldown.active}
