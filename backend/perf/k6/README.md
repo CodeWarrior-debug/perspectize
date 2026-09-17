@@ -54,10 +54,11 @@ Open `perf/k6/results/graphql-report.html` in a browser.
 ## Capacity ramp test
 
 `ramp.js` finds where latency starts to degrade as concurrency increases,
-stepping through 5→10→20→30→40→50 concurrent VUs hammering `contentList`
+stepping through 50→60→70→80→90→100 concurrent VUs hammering `contentList`
 with no think time. This is a different question from the per-operation
 scripts above ("how fast is one request") — it's "how many concurrent
-requests can this hold up under."
+requests can this hold up under." Adjust the `stages` array to explore a
+different range — see "What we found" below for why this range was chosen.
 
 **Run it against a dedicated instance, not your normal dev server.** The
 global rate limiter (see below) will dominate the results long before real
@@ -93,6 +94,17 @@ the degradation point. Remember these are VUs in a tight loop, not real
 users with think-time between actions — the request rate a given VU count
 produces is far higher than that many real concurrent visitors would
 generate, so don't read "VUs" as "concurrent users" directly.
+
+**What we found:** the real ceiling here isn't the Go server or the
+network — it's `MaxOpenConnections: 25` in `pkg/database/postgres.go`.
+Watching `/debug/db-stats` live during a run confirms it: once concurrent
+requests exceed the pool size, `WaitCount`/`WaitDuration` climb without
+bound and every extra request queues for a connection instead of failing.
+That shows up as throughput *plateauing* around 60 VUs (~900-920 req/s,
+regardless of pushing VUs higher) while p95/avg latency keep climbing
+linearly with VU count — classic queueing-delay behavior, not instability
+or errors. See PR #384 for the full curve and a Little's Law estimate of
+real-user capacity derived from the plateaued throughput.
 
 ## Rate limiting
 

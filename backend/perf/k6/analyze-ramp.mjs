@@ -24,12 +24,12 @@ points.forEach((p) => (p.rel = (p.t - testStart) / 1000));
 
 // Matches the stages in ramp.js
 const stages = [
-	{ target: 5, end: 15 },
-	{ target: 10, end: 30 },
-	{ target: 20, end: 45 },
-	{ target: 30, end: 60 },
-	{ target: 40, end: 75 },
-	{ target: 50, end: 90 },
+	{ target: 50, end: 15 },
+	{ target: 60, end: 30 },
+	{ target: 70, end: 45 },
+	{ target: 80, end: 60 },
+	{ target: 90, end: 75 },
+	{ target: 100, end: 90 },
 ];
 
 function percentile(arr, p) {
@@ -38,10 +38,12 @@ function percentile(arr, p) {
 	return sorted[Math.max(0, idx)] ?? 0;
 }
 
+const maxT = Math.max(...points.map((p) => p.rel));
 let prevEnd = 0;
 console.log('Target VUs | Requests | Avg (ms) | p95 (ms) | p99 (ms) | Max (ms)');
 console.log('-----------|----------|----------|----------|----------|----------');
 for (const stage of stages) {
+	if (prevEnd > maxT) break; // run was killed before this stage started
 	// Skip the first few seconds of each window to let the VU ramp settle.
 	const windowStart = prevEnd + 3;
 	const bucket = points.filter((p) => p.rel >= windowStart && p.rel < stage.end).map((p) => p.v);
