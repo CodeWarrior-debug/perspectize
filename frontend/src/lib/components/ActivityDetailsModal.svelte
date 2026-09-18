@@ -183,19 +183,27 @@
 						</div>
 					</div>
 					<div class="flex flex-col items-end gap-1">
-						<button
-							type="button"
-							disabled={updateSourceData.isPending || cooldown.active}
-							onclick={handleUpdateSourceData}
-							class="inline-flex items-center gap-1.5 rounded-md border border-primary px-3.5 py-2 text-[13px] font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
-						>
-							{#if updateSourceData.isPending}
-								<LoaderCircleIcon class="size-3.5 animate-spin" />
-							{/if}
-							Update source data
-						</button>
+						<div class="flex flex-wrap items-center justify-end gap-2">
+							<a
+								href={`/compare?contentId=${content.id}`}
+								class="inline-flex items-center gap-1.5 rounded-md border border-primary px-3.5 py-2 text-[13px] font-semibold text-primary hover:bg-primary/5"
+							>
+								Compare
+							</a>
+							<button
+								type="button"
+								disabled={updateSourceData.isPending || cooldown.active}
+								onclick={handleUpdateSourceData}
+								class="inline-flex items-center gap-1.5 rounded-md border border-primary px-3.5 py-2 text-[13px] font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
+							>
+								{#if updateSourceData.isPending}
+									<LoaderCircleIcon class="size-3.5 animate-spin" />
+								{/if}
+								Update source data
+							</button>
+						</div>
 						{#if cooldown.active}
-							<div class="max-w-[180px] text-right text-[11px] text-muted-foreground">
+							<div class="max-w-[280px] text-right text-[11px] text-muted-foreground">
 								This was updated recently. Check back in {formatRemainingTime(cooldown.remainingMs)} to refresh again.
 							</div>
 						{/if}

@@ -12,6 +12,7 @@
 	const navLinks = [
 		{ href: '/', label: 'Activity' },
 		{ href: '/discover', label: 'Discover' },
+		{ href: '/compare', label: 'Compare' },
 	];
 
 	function isActive(href: string): boolean {

@@ -20,6 +20,11 @@ export const queryKeys = {
 		}) => [...queryKeys.content.lists(), filters] as const,
 		details: () => [...queryKeys.content.all(), 'detail'] as const,
 		detail: (id: string) => [...queryKeys.content.details(), id] as const,
+		// Distinct from `detail` (GET_CONTENT_AGGREGATES) — Compare.svelte's
+		// content banner fetches different fields (GET_CONTENT) and must not
+		// share a cache key, or whichever query populates the cache first wins
+		// for the shared staleTime window and the other reads wrong fields.
+		banner: (id: string) => [...queryKeys.content.details(), 'banner', id] as const,
 	},
 
 	users: {
@@ -39,6 +44,8 @@ export const queryKeys = {
 		all: () => [...queryKeys.all, 'perspectives'] as const,
 		lists: () => [...queryKeys.perspectives.all(), 'list'] as const,
 		listByUser: (userId: number) => [...queryKeys.perspectives.lists(), { userId }] as const,
+		listByContent: (contentId: number) =>
+			[...queryKeys.perspectives.lists(), { contentId }] as const,
 		activityFeed: (includePrivate: boolean) =>
 			[...queryKeys.perspectives.lists(), 'activityFeed', { includePrivate }] as const,
 		details: () => [...queryKeys.perspectives.all(), 'detail'] as const,

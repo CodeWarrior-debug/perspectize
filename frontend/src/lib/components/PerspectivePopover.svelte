@@ -135,21 +135,7 @@
 		}
 	}
 
-	function getFieldLabel(key: string): string {
-		const labels: Record<string, string> = {
-			quality: 'Quality',
-			agreement: 'Agreement',
-			importance: 'Importance',
-			confidence: 'Confidence',
-		};
-		return (
-			labels[key] ??
-			key
-				.replace(/^custom:/, '')
-				.replace(/-/g, ' ')
-				.replace(/\b\w/g, (c) => c.toUpperCase())
-		);
-	}
+	import { getFieldLabel } from '$lib/utils/comparePerspectives';
 
 	// Tracks the most recently added field so its newly-rendered row can be
 	// scrolled into view — the ratings grid grows downward inside a scroll

@@ -100,6 +100,27 @@ export const LIST_PERSPECTIVES_BY_USER = gql`
 	}
 `;
 
+export interface ListPerspectivesByContentResponse {
+	perspectives: {
+		items: PerspectiveItem[];
+	};
+}
+
+// Compare page: every perspective on one content row, public + viewer's own
+// private (the backend's default RestrictToPublicOrOwner authorization does
+// this scoping server-side — this is the whole privacy-gating enforcement
+// point, no client-side filtering needed on top of it).
+export const LIST_PERSPECTIVES_BY_CONTENT = gql`
+	${PERSPECTIVE_FIELDS}
+	query ListPerspectivesByContent($contentID: IntID) {
+		perspectives(filter: { contentID: $contentID }) {
+			items {
+				...PerspectiveFields
+			}
+		}
+	}
+`;
+
 // Activity feed: recent perspectives across all users, newest updated first.
 // The backend's default read-authorization (RestrictToPublicOrOwner) already
 // scopes this to public rows plus the signed-in viewer's own — passing an

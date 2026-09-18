@@ -16,7 +16,32 @@ import {
 	DATA_COLUMNS,
 	INTERNAL_COLUMNS,
 	togglableColIds,
+	SORTABLE_COLUMNS,
+	compareContentBySorts,
 } from '$lib/utils/grid-config';
+import type { ContentItem } from '$lib/queries/content';
+
+function row(overrides: Partial<ContentItem>): ContentItem {
+	return {
+		id: '1',
+		name: '',
+		addedByUserID: '1',
+		url: null,
+		contentType: 'YOUTUBE',
+		length: null,
+		lengthUnits: null,
+		viewCount: null,
+		likeCount: null,
+		channelTitle: null,
+		publishedAt: null,
+		tags: null,
+		description: null,
+		primaryCategory: null,
+		createdAt: '2024-01-01T00:00:00Z',
+		updatedAt: '2024-01-01T00:00:00Z',
+		...overrides,
+	};
+}
 
 // ---------------------------------------------------------------------------
 // SORT_FIELD_MAP
@@ -459,5 +484,81 @@ describe('column-picker registry', () => {
 
 	it('does not list the perspectize action column', () => {
 		expect(togglableColIds(true)).not.toContain('perspectize');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// SORTABLE_COLUMNS
+// ---------------------------------------------------------------------------
+describe('SORTABLE_COLUMNS', () => {
+	it('excludes the type alias column', () => {
+		expect(SORTABLE_COLUMNS.map((c) => c.colId)).not.toContain('type');
+	});
+
+	it('every entry has a non-empty label', () => {
+		for (const col of SORTABLE_COLUMNS) {
+			expect(col.label.length).toBeGreaterThan(0);
+		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// compareContentBySorts
+// ---------------------------------------------------------------------------
+describe('compareContentBySorts', () => {
+	it('returns 0 for an empty sort list', () => {
+		expect(compareContentBySorts(row({ name: 'b' }), row({ name: 'a' }), [])).toBe(0);
+	});
+
+	it('sorts by a single numeric column, descending', () => {
+		const rows = [row({ id: '1', viewCount: 10 }), row({ id: '2', viewCount: 30 }), row({ id: '3', viewCount: 20 })];
+		const sorted = [...rows].sort((a, b) => compareContentBySorts(a, b, [{ col: 'views', dir: 'desc' }]));
+		expect(sorted.map((r) => r.id)).toEqual(['2', '3', '1']);
+	});
+
+	it('sorts by a single numeric column, ascending', () => {
+		const rows = [row({ id: '1', viewCount: 10 }), row({ id: '2', viewCount: 30 }), row({ id: '3', viewCount: 20 })];
+		const sorted = [...rows].sort((a, b) => compareContentBySorts(a, b, [{ col: 'views', dir: 'asc' }]));
+		expect(sorted.map((r) => r.id)).toEqual(['1', '3', '2']);
+	});
+
+	it('breaks ties on the primary column using the next sort column', () => {
+		const rows = [
+			row({ id: '1', viewCount: 10, likeCount: 5 }),
+			row({ id: '2', viewCount: 10, likeCount: 1 }),
+			row({ id: '3', viewCount: 20, likeCount: 9 }),
+		];
+		const sorted = [...rows].sort((a, b) =>
+			compareContentBySorts(a, b, [
+				{ col: 'views', dir: 'desc' },
+				{ col: 'likes', dir: 'asc' },
+			]),
+		);
+		expect(sorted.map((r) => r.id)).toEqual(['3', '2', '1']);
+	});
+
+	it('sorts nulls last regardless of direction', () => {
+		const rows = [row({ id: '1', viewCount: null }), row({ id: '2', viewCount: 5 })];
+		const asc = [...rows].sort((a, b) => compareContentBySorts(a, b, [{ col: 'views', dir: 'asc' }]));
+		const desc = [...rows].sort((a, b) => compareContentBySorts(a, b, [{ col: 'views', dir: 'desc' }]));
+		expect(asc.map((r) => r.id)).toEqual(['2', '1']);
+		expect(desc.map((r) => r.id)).toEqual(['2', '1']);
+	});
+
+	it('sorts strings case-insensitively', () => {
+		const rows = [row({ id: '1', name: 'banana' }), row({ id: '2', name: 'Apple' })];
+		const sorted = [...rows].sort((a, b) => compareContentBySorts(a, b, [{ col: 'item', dir: 'asc' }]));
+		expect(sorted.map((r) => r.id)).toEqual(['2', '1']);
+	});
+
+	it('skips a colId with no known value getter', () => {
+		const rows = [row({ id: '1', viewCount: 30 }), row({ id: '2', viewCount: 10 })];
+		const sorted = [...rows].sort((a, b) =>
+			compareContentBySorts(a, b, [
+				{ col: 'tags', dir: 'asc' }, // not in SORT_VALUE_GETTERS
+				{ col: 'views', dir: 'asc' },
+			]),
+		);
+		expect(sorted.map((r) => r.id)).toEqual(['2', '1']);
 	});
 });
