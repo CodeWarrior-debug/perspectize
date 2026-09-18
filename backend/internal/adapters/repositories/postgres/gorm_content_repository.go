@@ -184,9 +184,9 @@ func applyContentSearch(query *gorm.DB, term string, fields []domain.ContentSear
 				continue
 			}
 			if group == nil {
-				// Session(&gorm.Session{}) gives an independent statement (its own clause
-				// builder) with no inherited conditions (NewDB), so chaining Or() below only groups these
-				// field conditions together rather than mutating `query`'s own filters.
+				// NewDB gives an independent statement with no inherited conditions, so this
+				// phrase's Or() chain only groups its own field conditions instead of picking up
+				// `query`'s filters (including earlier phrases' groups).
 				group = query.Session(&gorm.Session{NewDB: true}).Where(expr, pattern)
 			} else {
 				group = group.Or(expr, pattern)
