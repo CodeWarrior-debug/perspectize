@@ -9,6 +9,7 @@
 		FilterChangedEvent,
 		ColDef,
 		CellClickedEvent,
+		CellMouseOverEvent,
 	} from '@ag-grid-community/core';
 	import { createQuery, keepPreviousData } from '@tanstack/svelte-query';
 	import { page } from '$app/state';
@@ -65,8 +66,10 @@
 	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
-	import { TagsTooltip } from '$lib/components/TagsTooltip';
-	import { DescriptionTooltip } from '$lib/components/DescriptionTooltip';
+	import CellPopover, { type PopoverState } from '$lib/components/CellPopover.svelte';
+	import { buildPopoverState } from '$lib/utils/tooltipHover';
+	import type { CellCtx } from '$lib/utils/tooltipSpec';
+	import { onDestroy } from 'svelte';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
 	import PerspectivePopover from '$lib/components/PerspectivePopover.svelte';
@@ -441,6 +444,7 @@
 				resizable: false,
 				cellRenderer: perspectiveCellRenderer,
 				cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 },
+				context: { tooltipSpec: false },
 			},
 			{
 				colId: 'item',
@@ -452,7 +456,6 @@
 				filterValueGetter: (params) => params.data?.name ?? '',
 				cellRenderer: activityItemCellRenderer,
 				cellStyle: { padding: 0 },
-				tooltipValueGetter: (params) => params.data?.name ?? '',
 				headerTooltip: 'Video title and thumbnail from YouTube API',
 			},
 			{
@@ -481,7 +484,6 @@
 				sortable: false,
 				filter: false,
 				cellRenderer: categoryCellRenderer,
-				tooltipValueGetter: (params) => params.data?.primaryCategory?.label ?? '',
 				hide: true,
 			},
 			{
@@ -514,7 +516,12 @@
 
 				filter: 'agNumberColumnFilter',
 				valueFormatter: (params) => formatCount(params.value),
-				tooltipValueGetter: (params) => formatCountExact(params.data?.viewCount ?? null),
+				context: {
+					tooltipSpec: {
+						text: (c: CellCtx) => formatCountExact(c.data?.viewCount ?? null),
+						copyValue: (c: CellCtx) => c.data?.viewCount,
+					},
+				},
 				headerTooltip: 'View count from YouTube API',
 			},
 			{
@@ -526,7 +533,12 @@
 
 				filter: 'agNumberColumnFilter',
 				valueFormatter: (params) => formatCount(params.value),
-				tooltipValueGetter: (params) => formatCountExact(params.data?.likeCount ?? null),
+				context: {
+					tooltipSpec: {
+						text: (c: CellCtx) => formatCountExact(c.data?.likeCount ?? null),
+						copyValue: (c: CellCtx) => c.data?.likeCount,
+					},
+				},
 				headerTooltip: 'Like count from YouTube API',
 			},
 			{
@@ -538,7 +550,12 @@
 				filter: false,
 				valueGetter: percentLikedValueGetter,
 				valueFormatter: (params) => formatPercentLiked(params.value),
-				tooltipValueGetter: percentLikedTooltip,
+				context: {
+					tooltipSpec: {
+						text: (c: CellCtx) => percentLikedTooltip({ data: c.data }),
+						copyValue: (c: CellCtx) => percentLikedValueGetter({ data: c.data }),
+					},
+				},
 				comparator: (_valueA, _valueB, nodeA, nodeB) => {
 					const a = percentLikedValueGetter({ data: nodeA?.data }) ?? -1;
 					const b = percentLikedValueGetter({ data: nodeB?.data }) ?? -1;
@@ -582,8 +599,7 @@
 				filter: 'agTextColumnFilter',
 				filterValueGetter: (params) => formatTags(params.data?.tags ?? null),
 				valueFormatter: (params) => formatTags(params.value),
-				tooltipComponent: TagsTooltip,
-				tooltipField: 'tags',
+				context: { tooltipSpec: { mode: 'multi', items: (c: CellCtx) => c.data?.tags ?? [] } },
 				headerTooltip: 'Tags from YouTube API',
 			},
 			{
@@ -594,8 +610,7 @@
 				sortable: false,
 				filter: 'agTextColumnFilter',
 				valueFormatter: (params) => truncateDescription(params.value, 80),
-				tooltipComponent: DescriptionTooltip,
-				tooltipField: 'description',
+				context: { tooltipSpec: { text: (c: CellCtx) => c.data?.description ?? '' } },
 				headerTooltip: 'Video description from YouTube API',
 				hide: true,
 			},
@@ -677,15 +692,49 @@
 	// AG Grid options (mode-conditional event handlers)
 	// ---------------------------------------------------------------------------
 
+	let popover = $state<PopoverState | null>(null);
+	let openTimer: ReturnType<typeof setTimeout> | undefined;
+	let closeTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function scheduleClose() {
+		clearTimeout(openTimer);
+		clearTimeout(closeTimer);
+		closeTimer = setTimeout(() => (popover = null), 150);
+	}
+
+	// The PopoverState is built once when the open timer fires so its identity stays
+	// stable while open (CellPopover resets multi-select on identity change).
+	function handleCellMouseOver(e: CellMouseOverEvent<ContentItem>) {
+		clearTimeout(closeTimer);
+		clearTimeout(openTimer);
+		const cellEl = (e.event?.target as HTMLElement | null)?.closest<HTMLElement>('.ag-cell');
+		if (!cellEl || !e.colDef) return;
+		if (popover?.anchor === cellEl) return;
+		openTimer = setTimeout(() => {
+			popover = buildPopoverState({
+				colDef: e.colDef,
+				value: e.value,
+				valueFormatted: e.api.getCellValue<string>({
+					rowNode: e.node,
+					colKey: e.column,
+					useFormatter: true,
+				}),
+				data: e.data,
+				cellEl,
+			});
+		}, 600);
+	}
+
+	onDestroy(() => {
+		clearTimeout(openTimer);
+		clearTimeout(closeTimer);
+	});
+
 	const gridOptions: GridOptions<ContentItem> = {
 		columnDefs,
 		pagination: false, // Manual pagination
 		defaultColDef: {
 			resizable: true,
-
-			tooltipValueGetter: (params) => {
-				return params.valueFormatted ?? params.value ?? '';
-			},
 		},
 		tooltipShowDelay: 1000,
 		tooltipInteraction: true,
@@ -693,6 +742,8 @@
 		domLayout: 'normal',
 		suppressCellFocus: true,
 		context: { perspectivesByContentId: new Map(), onOpenDetails: handleOpenDetails },
+		onCellMouseOver: handleCellMouseOver,
+		onCellMouseOut: scheduleClose,
 		onCellClicked: (event: CellClickedEvent<ContentItem>) => {
 			if (!event.data) return;
 
@@ -978,6 +1029,12 @@
 		>
 			<AgGridSvelte5Component {gridOptions} {rowData} {theme} {modules} />
 		</div>
+		<CellPopover
+			state={popover}
+			onEnter={() => clearTimeout(closeTimer)}
+			onLeave={scheduleClose}
+			onClose={() => (popover = null)}
+		/>
 	{/if}
 
 	<!-- Manual Pagination Controls -->
