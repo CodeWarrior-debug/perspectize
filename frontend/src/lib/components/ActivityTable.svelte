@@ -67,7 +67,7 @@
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
 	import CellPopover, { type PopoverState } from '$lib/components/CellPopover.svelte';
-	import { buildPopoverState } from '$lib/utils/tooltipHover';
+	import { buildPopoverState, createHoverController } from '$lib/utils/tooltipHover';
 	import type { CellCtx } from '$lib/utils/tooltipSpec';
 	import { onDestroy } from 'svelte';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
@@ -456,6 +456,12 @@
 				filterValueGetter: (params) => params.data?.name ?? '',
 				cellRenderer: activityItemCellRenderer,
 				cellStyle: { padding: 0 },
+				context: {
+					tooltipSpec: {
+						text: (c: CellCtx) => c.data?.name ?? '',
+						copyValue: (c: CellCtx) => c.data?.name ?? '',
+					},
+				},
 				headerTooltip: 'Video title and thumbnail from YouTube API',
 			},
 			{
@@ -484,6 +490,12 @@
 				sortable: false,
 				filter: false,
 				cellRenderer: categoryCellRenderer,
+				context: {
+					tooltipSpec: {
+						text: (c: CellCtx) => c.data?.primaryCategory?.label ?? '',
+						copyValue: (c: CellCtx) => c.data?.primaryCategory?.label ?? '',
+					},
+				},
 				hide: true,
 			},
 			{
@@ -693,25 +705,16 @@
 	// ---------------------------------------------------------------------------
 
 	let popover = $state<PopoverState | null>(null);
-	let openTimer: ReturnType<typeof setTimeout> | undefined;
-	let closeTimer: ReturnType<typeof setTimeout> | undefined;
+	const hover = createHoverController({
+		getState: () => popover,
+		setState: (s) => (popover = s),
+	});
 
-	function scheduleClose() {
-		clearTimeout(openTimer);
-		clearTimeout(closeTimer);
-		closeTimer = setTimeout(() => (popover = null), 150);
-	}
-
-	// The PopoverState is built once when the open timer fires so its identity stays
-	// stable while open (CellPopover resets multi-select on identity change).
 	function handleCellMouseOver(e: CellMouseOverEvent<ContentItem>) {
-		clearTimeout(closeTimer);
-		clearTimeout(openTimer);
 		const cellEl = (e.event?.target as HTMLElement | null)?.closest<HTMLElement>('.ag-cell');
 		if (!cellEl || !e.colDef) return;
-		if (popover?.anchor === cellEl) return;
-		openTimer = setTimeout(() => {
-			popover = buildPopoverState({
+		hover.hover(cellEl, () =>
+			buildPopoverState({
 				colDef: e.colDef,
 				value: e.value,
 				valueFormatted: e.api.getCellValue<string>({
@@ -721,14 +724,11 @@
 				}),
 				data: e.data,
 				cellEl,
-			});
-		}, 600);
+			})
+		);
 	}
 
-	onDestroy(() => {
-		clearTimeout(openTimer);
-		clearTimeout(closeTimer);
-	});
+	onDestroy(() => hover.destroy());
 
 	const gridOptions: GridOptions<ContentItem> = {
 		columnDefs,
@@ -743,7 +743,7 @@
 		suppressCellFocus: true,
 		context: { perspectivesByContentId: new Map(), onOpenDetails: handleOpenDetails },
 		onCellMouseOver: handleCellMouseOver,
-		onCellMouseOut: scheduleClose,
+		onCellMouseOut: () => hover.leave(),
 		onCellClicked: (event: CellClickedEvent<ContentItem>) => {
 			if (!event.data) return;
 
@@ -1031,8 +1031,8 @@
 		</div>
 		<CellPopover
 			state={popover}
-			onEnter={() => clearTimeout(closeTimer)}
-			onLeave={scheduleClose}
+			onEnter={() => hover.enter()}
+			onLeave={() => hover.leave()}
 			onClose={() => (popover = null)}
 		/>
 	{/if}
