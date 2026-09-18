@@ -211,34 +211,8 @@
 	--color-rating-undecided: #61758a;
 }
 
-/* Tags tooltip */
-.tags-tooltip {
-	max-width: 320px;
-	max-height: 200px;
-	overflow-y: auto;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-	padding: 10px;
-	background: rgba(45, 45, 45, 0.9);
-	border: none;
-	border-radius: 6px;
-	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-	font-size: 13px;
-}
-
-.tags-tooltip-chip {
-	display: inline-block;
-	padding: 3px 10px;
-	background: rgba(255, 255, 255, 0.15);
-	border: 1px solid rgba(255, 255, 255, 0.25);
-	border-radius: 12px;
-	color: rgba(255, 255, 255, 0.95);
-	white-space: nowrap;
-}
-
 /* Hover tooltip — CSS-only tooltip matching the AG Grid column tooltip look
-   (.tags-tooltip above), for plain HTML elements outside the grid. Usage:
+   (.tip-surface), for plain HTML elements outside the grid. Usage:
    class="hover-tooltip" data-tooltip="Some text" instead of a native title=. */
 .hover-tooltip {
 	position: relative;
@@ -268,26 +242,9 @@
 	opacity: 1;
 }
 
-/* Description tooltip */
-.description-tooltip {
-	white-space: pre-wrap;
-	word-break: break-word;
-	padding: 10px;
-	background: rgba(45, 45, 45, 0.9);
-	border: none;
-	border-radius: 6px;
-	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-	font-size: 13px;
-	line-height: 1.5;
-	color: rgba(255, 255, 255, 0.95);
-	max-width: 400px;
-	max-height: 300px;
-	overflow-y: auto;
-}
-
 /* AG Grid tooltip styling — match browser native tooltip look */
 .ag-tooltip {
-	font-size: 15px !important;
+	font-size: 13px !important;
 	max-width: 400px !important;
 	white-space: normal !important;
 	word-break: break-word !important;
@@ -295,8 +252,8 @@
 	background-color: rgba(45, 45, 45, 0.9) !important;
 	color: rgba(255, 255, 255, 0.95) !important;
 	border: none !important;
-	border-radius: 4px !important;
-	padding: 4px 8px !important;
+	border-radius: 6px !important;
+	padding: 10px !important;
 	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2) !important;
 	max-height: 300px !important;
 	overflow-y: auto !important;
