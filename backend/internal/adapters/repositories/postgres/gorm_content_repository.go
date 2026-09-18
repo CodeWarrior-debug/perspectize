@@ -145,6 +145,26 @@ var contentSearchColumns = map[domain.ContentSearchField]string{
 	domain.ContentSearchFieldTags:         "(response->'items'->0->'snippet'->'tags')::text ILIKE ?",
 }
 
+// maxSearchPhrases caps comma-separated phrases per search to bound query size.
+const maxSearchPhrases = 10
+
+// splitSearchPhrases splits a search string on commas only (whitespace inside a
+// phrase is preserved), trims each phrase, drops empties, and caps the count.
+func splitSearchPhrases(term string) []string {
+	var phrases []string
+	for _, p := range strings.Split(term, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		phrases = append(phrases, p)
+		if len(phrases) == maxSearchPhrases {
+			break
+		}
+	}
+	return phrases
+}
+
 // applyContentSearch scopes a free-text search term to one or more content columns,
 // OR'd together (so "everything except tags" still matches a title-only or
 // description-only hit). An empty/omitted fields list preserves the historical
@@ -154,26 +174,30 @@ func applyContentSearch(query *gorm.DB, term string, fields []domain.ContentSear
 		fields = []domain.ContentSearchField{domain.ContentSearchFieldTitle}
 	}
 
-	pattern := "%" + term + "%"
-	var group *gorm.DB
-	for _, field := range fields {
-		expr, ok := contentSearchColumns[field]
-		if !ok {
-			continue
+	// Each comma-separated phrase gets its own per-field OR group; groups are AND'd.
+	for _, phrase := range splitSearchPhrases(term) {
+		pattern := "%" + phrase + "%"
+		var group *gorm.DB
+		for _, field := range fields {
+			expr, ok := contentSearchColumns[field]
+			if !ok {
+				continue
+			}
+			if group == nil {
+				// NewDB gives an independent statement with no inherited conditions, so this
+				// phrase's Or() chain only groups its own field conditions instead of picking up
+				// `query`'s filters (including earlier phrases' groups).
+				group = query.Session(&gorm.Session{NewDB: true}).Where(expr, pattern)
+			} else {
+				group = group.Or(expr, pattern)
+			}
 		}
 		if group == nil {
-			// Session(&gorm.Session{}) gives an independent statement (its own clause
-			// builder) scoped off `query`, so chaining Or() below only groups these
-			// field conditions together rather than mutating `query`'s own filters.
-			group = query.Session(&gorm.Session{}).Where(expr, pattern)
-		} else {
-			group = group.Or(expr, pattern)
+			return query
 		}
+		query = query.Where(group)
 	}
-	if group == nil {
-		return query
-	}
-	return query.Where(group)
+	return query
 }
 
 func (r *GormContentRepository) List(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
