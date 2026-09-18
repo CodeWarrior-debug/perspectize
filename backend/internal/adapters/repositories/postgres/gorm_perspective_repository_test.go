@@ -365,3 +365,35 @@ func TestGormPerspectiveRepository_List(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 }
+
+func TestGormPerspectiveRepository_AggregateByContentIDs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Count is COUNT(*) — a perspective with no Quality still counts", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		// One content id, one row: quality_count=0 (no Quality set on the lone
+		// perspective) but count=1 — proves Count isn't accidentally tied to
+		// COUNT(quality)/the Quality column at all.
+		rows := sqlmock.NewRows([]string{"content_id", "count", "quality_count", "avg_quality"}).
+			AddRow(11, 1, 0, nil)
+		mock.ExpectQuery(`SELECT content_id AS content_id, COUNT\(\*\) AS count, COUNT\(quality\) AS quality_count, AVG\(quality\) AS avg_quality FROM "perspectives" WHERE content_id IN \(\$1\) GROUP BY "content_id"`).
+			WithArgs(11).
+			WillReturnRows(rows)
+
+		got, err := NewGormPerspectiveRepository(db).AggregateByContentIDs(ctx, []int{11})
+		require.NoError(t, err)
+		require.Contains(t, got, 11)
+		assert.Equal(t, 1, got[11].Count)
+		assert.Equal(t, 0, got[11].QualityCount)
+		assert.Nil(t, got[11].AverageQuality)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("empty contentIDs short-circuits without a query", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		got, err := NewGormPerspectiveRepository(db).AggregateByContentIDs(ctx, []int{})
+		require.NoError(t, err)
+		assert.Empty(t, got)
+		assertAllExpectationsMet(t, mock)
+	})
+}
