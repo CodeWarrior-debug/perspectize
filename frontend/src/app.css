@@ -318,3 +318,64 @@
 		display: none;
 	}
 }
+
+/* Shared tooltip/popover surface — one look for every cell tooltip */
+.tip-surface {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	max-width: 400px;
+	max-height: 300px;
+	overflow-y: auto;
+	padding: 10px;
+	background: rgba(45, 45, 45, 0.9);
+	color: rgba(255, 255, 255, 0.95);
+	border: none;
+	border-radius: 6px;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+	font-size: 13px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-break: break-word;
+	z-index: 100;
+}
+.tip-copy-btn {
+	align-self: flex-end;
+	opacity: 0.8;
+	cursor: pointer;
+}
+.tip-copy-btn:hover,
+.tip-copy-btn:focus-visible {
+	opacity: 1;
+}
+.tip-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+.tip-chip {
+	padding: 3px 10px;
+	border-radius: 12px;
+	white-space: nowrap;
+	cursor: pointer;
+	background: rgba(255, 255, 255, 0.15);
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	color: rgba(255, 255, 255, 0.95);
+}
+.tip-chip[data-selected='true'] {
+	background: rgba(255, 255, 255, 0.4);
+	border-color: #fff;
+}
+.tip-actions {
+	display: flex;
+	gap: 8px;
+}
+.tip-actions button {
+	cursor: pointer;
+	text-decoration: underline;
+}
+.tip-actions button:disabled {
+	opacity: 0.4;
+	cursor: default;
+	text-decoration: none;
+}
