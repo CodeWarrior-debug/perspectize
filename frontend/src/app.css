@@ -296,8 +296,18 @@
 	word-break: break-word;
 	z-index: 100;
 }
+.tip-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+}
+.tip-text {
+	flex: 1 1 auto;
+	min-width: 0;
+}
 .tip-copy-btn {
-	align-self: flex-end;
+	flex: 0 0 auto;
+	margin-top: 2px;
 	opacity: 0.8;
 	cursor: pointer;
 }

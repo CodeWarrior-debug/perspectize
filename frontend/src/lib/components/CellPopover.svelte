@@ -71,16 +71,18 @@
 				onpointerleave={onLeave}
 			>
 				{#if popover.mode === 'single'}
-					<span data-testid="tip-text">{popover.text}</span>
-					{#if popover.copy !== null}
-						<button
-							type="button"
-							class="tip-copy-btn"
-							data-testid="tip-copy"
-							aria-label="Copy value"
-							onclick={() => copy(popover.copy!)}><CopyIcon size={14} aria-hidden="true" /></button
-						>
-					{/if}
+					<div class="tip-row">
+						<span class="tip-text" data-testid="tip-text">{popover.text}</span>
+						{#if popover.copy !== null}
+							<button
+								type="button"
+								class="tip-copy-btn"
+								data-testid="tip-copy"
+								aria-label="Copy value"
+								onclick={() => copy(popover.copy!)}><CopyIcon size={14} aria-hidden="true" /></button
+							>
+						{/if}
+					</div>
 				{:else}
 					<div class="tip-chips">
 						{#each popover.items as item, i (i)}
