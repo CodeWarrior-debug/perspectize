@@ -61,7 +61,7 @@
 				customAnchor={popover.anchor}
 				side="bottom"
 				align="start"
-				sideOffset={6}
+				sideOffset={8 - popover.anchor.getBoundingClientRect().height / 2}
 				trapFocus={false}
 				onOpenAutoFocus={(e) => e.preventDefault()}
 				class="tip-surface"
