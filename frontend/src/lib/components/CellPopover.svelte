@@ -65,6 +65,8 @@
 				trapFocus={false}
 				onOpenAutoFocus={(e) => e.preventDefault()}
 				class="tip-surface"
+				aria-label="Cell details"
+				data-testid="cell-popover"
 				onpointerenter={onEnter}
 				onpointerleave={onLeave}
 			>
@@ -76,12 +78,12 @@
 							class="tip-copy-btn"
 							data-testid="tip-copy"
 							aria-label="Copy value"
-							onclick={() => copy(popover.copy!)}><CopyIcon size={14} /></button
+							onclick={() => copy(popover.copy!)}><CopyIcon size={14} aria-hidden="true" /></button
 						>
 					{/if}
 				{:else}
 					<div class="tip-chips">
-						{#each popover.items as item (item)}
+						{#each popover.items as item, i (i)}
 							<button
 								type="button"
 								class="tip-chip"

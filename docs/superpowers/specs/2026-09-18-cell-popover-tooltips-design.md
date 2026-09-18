@@ -27,6 +27,7 @@ A single `CellPopover.svelte` (bits-ui Popover) mounted once outside the grid, a
 - **Override:** column sets only what differs, shallow-merged over the default (e.g. `{ copyValue: p => p.data.likeCount }`).
 - **Opt out:** `tooltipSpec: false` (thumbnail, Actions columns).
 - **Multi mode:** `{ mode: 'multi', items: p => p.data.tags }` shows a checklist with "Copy selected" and "Copy all"; nothing copied by default.
+- **`emptyText`:** shown when a multi list is empty or the single-mode text is empty; when unset, no popover opens.
 - `TooltipSpec` is one exported TS type.
 - Copy via `navigator.clipboard` + `svelte-sonner` toast.
 
@@ -39,3 +40,7 @@ Activity table only. After trying it, decide whether to extend to `hover-tooltip
 ## Open items
 - Confirm which columns show the mismatch (browser check at implementation start).
 - Clipboard failure handling (permission denied): toast an error.
+
+## Known limitations
+- Keyboard Enter/Space open is not wired because `suppressCellFocus: true` is kept.
+- `.hover-tooltip` (12px) is intentionally not unified (option B later).

@@ -25,7 +25,7 @@ export function buildPopoverState(params: BuildPopoverParams): PopoverState | nu
 		return { anchor: params.cellEl, mode: 'multi', text: '', copy: null, items };
 	}
 	const text = displayText(spec, ctx);
-	if (text === '') return empty();
+	if (text.trim() === '') return empty();
 	return {
 		anchor: params.cellEl,
 		mode: 'single',
@@ -47,9 +47,15 @@ export function createHoverController(opts: HoverControllerOptions) {
 	const closeDelay = opts.closeDelay ?? 150;
 	let openTimer: ReturnType<typeof setTimeout> | undefined;
 	let closeTimer: ReturnType<typeof setTimeout> | undefined;
+	let pendingAnchor: HTMLElement | null = null;
+
+	function cancelOpen() {
+		clearTimeout(openTimer);
+		pendingAnchor = null;
+	}
 
 	function scheduleClose() {
-		clearTimeout(openTimer);
+		cancelOpen();
 		clearTimeout(closeTimer);
 		closeTimer = setTimeout(() => opts.setState(null), closeDelay);
 	}
@@ -58,16 +64,34 @@ export function createHoverController(opts: HoverControllerOptions) {
 		// State is built once per open so its identity stays stable while shown.
 		hover(cellEl: HTMLElement, build: () => PopoverState | null) {
 			clearTimeout(closeTimer);
+			const current = opts.getState();
+			if (current?.anchor === cellEl) {
+				cancelOpen();
+				return;
+			}
+			// Moving to a different cell: drop the old popover now, not after the open delay.
+			if (current) opts.setState(null);
+			// Same pending cell (child-element mouseovers): keep the running open timer.
+			if (pendingAnchor === cellEl) return;
 			clearTimeout(openTimer);
-			if (opts.getState()?.anchor === cellEl) return;
-			openTimer = setTimeout(() => opts.setState(build()), openDelay);
+			pendingAnchor = cellEl;
+			openTimer = setTimeout(() => {
+				pendingAnchor = null;
+				opts.setState(build());
+			}, openDelay);
 		},
 		leave: scheduleClose,
 		enter() {
 			clearTimeout(closeTimer);
 		},
+		// Immediately close and cancel any pending open (scroll/sort/filter/data change).
+		close() {
+			cancelOpen();
+			clearTimeout(closeTimer);
+			opts.setState(null);
+		},
 		destroy() {
-			clearTimeout(openTimer);
+			cancelOpen();
 			clearTimeout(closeTimer);
 		},
 	};

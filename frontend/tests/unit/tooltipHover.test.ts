@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildPopoverState, createHoverController } from '$lib/utils/tooltipHover';
 import { formatCountExact, percentLikedTooltip, percentLikedValueGetter } from '$lib/utils/formatting';
+import { ACTIVITY_TOOLTIP_SPECS } from '$lib/utils/activityTooltipSpecs';
 import type { PopoverState } from '$lib/components/CellPopover.svelte';
 
 const cellEl = document.createElement('div');
@@ -21,103 +22,82 @@ describe('buildPopoverState', () => {
 		expect(buildPopoverState({ colDef: { context: { tooltipSpec: false } }, value: 'x', data: {}, cellEl })).toBeNull();
 	});
 
-	it('likes-style override copies the raw number without commas', () => {
-		const spec = {
-			text: (c: any) => formatCountExact(c.data?.likeCount ?? null),
-			copyValue: (c: any) => c.data?.likeCount,
-		};
+	it('whitespace-only text is treated as empty', () => {
+		expect(buildPopoverState({ colDef: {}, value: '   ', valueFormatted: '  ', cellEl })).toBeNull();
 		const s = buildPopoverState({
-			colDef: { context: { tooltipSpec: spec } },
-			value: 1234567,
-			valueFormatted: '1.2M',
-			data: { likeCount: 1234567 },
+			colDef: { context: { tooltipSpec: { emptyText: 'None', text: () => ' \n ' } } },
+			value: 'x',
 			cellEl,
 		});
-		expect(s?.copy).toBe('1234567');
-		expect(s?.text).toContain(',');
-	});
-
-	it('tags-style multi mode returns items and no copy', () => {
-		const s = buildPopoverState({
-			colDef: { context: { tooltipSpec: { mode: 'multi', items: (c: any) => c.data?.tags ?? [] } } },
-			value: ['a', 'b'],
-			data: { tags: ['a', 'b'] },
-			cellEl,
-		});
-		expect(s).toMatchObject({ mode: 'multi', items: ['a', 'b'], copy: null, text: '' });
+		expect(s).toMatchObject({ text: 'None', copy: null });
 	});
 });
 
-describe('buildPopoverState column specs', () => {
-	const mk = (tooltipSpec: any, data: any, value: unknown = undefined, valueFormatted: string | null = null) =>
-		buildPopoverState({ colDef: { context: { tooltipSpec } }, value, valueFormatted, data, cellEl });
+describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
+	const S = ACTIVITY_TOOLTIP_SPECS;
+	const mk = (key: keyof typeof S, data: any, value: unknown = undefined, valueFormatted: string | null = null) =>
+		buildPopoverState({ colDef: { context: { tooltipSpec: S[key] } }, value, valueFormatted, data, cellEl });
 
-	it('item column shows the name despite undefined value', () => {
-		const s = mk({ text: (c: any) => c.data?.name ?? '', copyValue: (c: any) => c.data?.name ?? '' }, { name: 'Vid' });
-		expect(s).toMatchObject({ text: 'Vid', copy: 'Vid' });
-	});
-
-	it('category column shows the primary category label', () => {
-		const s = mk(
-			{
-				text: (c: any) => c.data?.primaryCategory?.label ?? '',
-				copyValue: (c: any) => c.data?.primaryCategory?.label ?? '',
-			},
-			{ primaryCategory: { label: 'Music' } },
+	it('has an entry for every specced column id', () => {
+		// Limitation: asserts the map, not that ActivityTable columnDefs reference it (AG Grid does not render in jsdom).
+		expect(Object.keys(S).sort()).toEqual(
+			['category', 'description', 'item', 'likes', 'percentLiked', 'perspectize', 'tags', 'views'].sort(),
 		);
-		expect(s).toMatchObject({ text: 'Music', copy: 'Music' });
+		expect(S.perspectize).toBe(false);
+		for (const k of Object.keys(S) as (keyof typeof S)[]) expect(S[k]).toBeDefined();
 	});
 
-	it('default column with null valueFormatted falls back to value', () => {
-		expect(mk(undefined, {}, 42, null)).toMatchObject({ text: '42', copy: '42' });
+	it('perspectize opts out', () => {
+		expect(mk('perspectize', {})).toBeNull();
 	});
 
-	it('description column shows full description', () => {
-		const s = mk({ text: (c: any) => c.data?.description ?? '' }, { description: 'long text' }, 'long...');
-		expect(s?.text).toBe('long text');
+	it('item shows the name despite undefined value', () => {
+		expect(mk('item', { name: 'Vid' })).toMatchObject({ text: 'Vid', copy: 'Vid' });
 	});
 
-	it('percent liked uses tooltip text and raw value for copy', () => {
+	it('category shows the primary category label', () => {
+		expect(mk('category', { primaryCategory: { label: 'Music' } })).toMatchObject({ text: 'Music', copy: 'Music' });
+	});
+
+	it('views shows exact count and copies the raw number without commas', () => {
+		const s = mk('views', { viewCount: 1234567 }, 1234567, '1.2M');
+		expect(s?.text).toBe(formatCountExact(1234567));
+		expect(s?.text).toContain(',');
+		expect(s?.copy).toBe('1234567');
+	});
+
+	it('likes shows exact count and copies the raw number without commas', () => {
+		const s = mk('likes', { likeCount: 9876543 }, 9876543, '9.9M');
+		expect(s?.text).toBe(formatCountExact(9876543));
+		expect(s?.copy).toBe('9876543');
+	});
+
+	it('percentLiked uses tooltip text and raw value for copy', () => {
 		const data = { likeCount: 1, viewCount: 4 };
-		const s = mk(
-			{
-				text: (c: any) => percentLikedTooltip({ data: c.data }),
-				copyValue: (c: any) => percentLikedValueGetter({ data: c.data }),
-			},
-			data,
-		);
+		const s = mk('percentLiked', data);
 		expect(s?.text).toBe(percentLikedTooltip({ data } as any));
 		expect(s?.copy).toBe(String(percentLikedValueGetter({ data } as any)));
 	});
-});
 
-describe('buildPopoverState empty states', () => {
-	const tags = { tooltipSpec: { mode: 'multi' as const, emptyText: 'No tags', items: (c: any) => c.data?.tags ?? [] } };
-	const desc = { tooltipSpec: { emptyText: 'No description', text: (c: any) => c.data?.description ?? '' } };
-
-	it('tags [] gives the No tags popover with no copy and no items', () => {
-		const s = buildPopoverState({ colDef: { context: tags }, value: null, data: { tags: [] }, cellEl });
-		expect(s).toMatchObject({ mode: 'single', text: 'No tags', copy: null, items: [] });
+	it('tags with items is multi with no copy', () => {
+		expect(mk('tags', { tags: ['a', 'b'] })).toMatchObject({ mode: 'multi', items: ['a', 'b'], copy: null, text: '' });
 	});
 
-	it('tags missing gives the No tags popover', () => {
-		const s = buildPopoverState({ colDef: { context: tags }, value: null, data: {}, cellEl });
-		expect(s).toMatchObject({ mode: 'single', text: 'No tags', copy: null, items: [] });
+	it('tags empty or missing gives No tags', () => {
+		expect(mk('tags', { tags: [] })).toMatchObject({ mode: 'single', text: 'No tags', copy: null, items: [] });
+		expect(mk('tags', {})).toMatchObject({ mode: 'single', text: 'No tags', copy: null, items: [] });
 	});
 
-	it('tags with items stays multi with items', () => {
-		const s = buildPopoverState({ colDef: { context: tags }, value: null, data: { tags: ['a', 'b'] }, cellEl });
-		expect(s).toMatchObject({ mode: 'multi', items: ['a', 'b'] });
+	it('description shows full text, or No description when empty', () => {
+		expect(mk('description', { description: 'long text' }, 'long...')?.text).toBe('long text');
+		expect(mk('description', { description: '' }, '')).toMatchObject({ text: 'No description', copy: null });
 	});
 
-	it('description empty gives No description with no copy', () => {
-		const s = buildPopoverState({ colDef: { context: desc }, value: '', data: { description: '' }, cellEl });
-		expect(s).toMatchObject({ mode: 'single', text: 'No description', copy: null, items: [] });
-	});
-
-	it('description present is unchanged', () => {
-		const s = buildPopoverState({ colDef: { context: desc }, value: 'x', data: { description: 'hello' }, cellEl });
-		expect(s).toMatchObject({ mode: 'single', text: 'hello', items: [] });
+	it('default column with null valueFormatted falls back to value', () => {
+		expect(buildPopoverState({ colDef: {}, value: 42, valueFormatted: null, data: {}, cellEl })).toMatchObject({
+			text: '42',
+			copy: '42',
+		});
 	});
 
 	it('empty text with no emptyText returns null', () => {
@@ -198,6 +178,64 @@ describe('createHoverController', () => {
 		ctl.hover(b.el, b.build);
 		vi.advanceTimersByTime(600);
 		expect(get()?.text).toBe('b');
+	});
+
+	it('moving A to B closes A immediately, then opens B after 600ms', () => {
+		const { ctl, get, cell } = setup();
+		const a = cell('a');
+		const b = cell('b');
+		ctl.hover(a.el, a.build);
+		vi.advanceTimersByTime(600);
+		expect(get()?.text).toBe('a');
+		ctl.hover(b.el, b.build);
+		expect(get()).toBeNull();
+		vi.advanceTimersByTime(599);
+		expect(get()).toBeNull();
+		vi.advanceTimersByTime(1);
+		expect(get()?.text).toBe('b');
+	});
+
+	it('moving A to an opted-out cell leaves no popover', () => {
+		const { ctl, get, cell } = setup();
+		const a = cell('a');
+		const off = document.createElement('div');
+		ctl.hover(a.el, a.build);
+		vi.advanceTimersByTime(600);
+		ctl.hover(off, () => null);
+		expect(get()).toBeNull();
+		vi.advanceTimersByTime(2000);
+		expect(get()).toBeNull();
+	});
+
+	it('repeated hover on a pending cell does not restart the open timer', () => {
+		const { ctl, get, cell } = setup();
+		const a = cell('a');
+		ctl.hover(a.el, a.build);
+		vi.advanceTimersByTime(300);
+		ctl.hover(a.el, a.build);
+		vi.advanceTimersByTime(299);
+		expect(get()).toBeNull();
+		vi.advanceTimersByTime(1);
+		expect(get()?.text).toBe('a');
+	});
+
+	it('close closes an open popover immediately', () => {
+		const { ctl, get, cell } = setup();
+		const a = cell('a');
+		ctl.hover(a.el, a.build);
+		vi.advanceTimersByTime(600);
+		ctl.close();
+		expect(get()).toBeNull();
+	});
+
+	it('close cancels a pending open', () => {
+		const { ctl, get, cell } = setup();
+		const a = cell('a');
+		ctl.hover(a.el, a.build);
+		vi.advanceTimersByTime(300);
+		ctl.close();
+		vi.advanceTimersByTime(1000);
+		expect(get()).toBeNull();
 	});
 
 	it('destroy clears both timers', () => {

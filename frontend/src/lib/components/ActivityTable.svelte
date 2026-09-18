@@ -42,10 +42,8 @@
 		formatDurationSeconds,
 		dateValueFormatter,
 		formatCount,
-		formatCountExact,
 		percentLikedValueGetter,
 		formatPercentLiked,
-		percentLikedTooltip,
 		formatPublishDate,
 		formatTags,
 		truncateDescription,
@@ -68,7 +66,7 @@
 	import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
 	import CellPopover, { type PopoverState } from '$lib/components/CellPopover.svelte';
 	import { buildPopoverState, createHoverController } from '$lib/utils/tooltipHover';
-	import type { CellCtx } from '$lib/utils/tooltipSpec';
+	import { ACTIVITY_TOOLTIP_SPECS } from '$lib/utils/activityTooltipSpecs';
 	import { onDestroy } from 'svelte';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
@@ -327,6 +325,7 @@
 	$effect(() => {
 		rowData;
 		displayedRowCount = null;
+		hover.close(); // AG Grid recycles cell DOM; a stale anchor would mislead
 	});
 	const loadedItemsCount = $derived(displayedRowCount ?? rowData.length);
 	const loading = $derived(contentQuery.isLoading || contentQuery.isPlaceholderData);
@@ -444,7 +443,7 @@
 				resizable: false,
 				cellRenderer: perspectiveCellRenderer,
 				cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 },
-				context: { tooltipSpec: false },
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.perspectize },
 			},
 			{
 				colId: 'item',
@@ -456,12 +455,7 @@
 				filterValueGetter: (params) => params.data?.name ?? '',
 				cellRenderer: activityItemCellRenderer,
 				cellStyle: { padding: 0 },
-				context: {
-					tooltipSpec: {
-						text: (c: CellCtx) => c.data?.name ?? '',
-						copyValue: (c: CellCtx) => c.data?.name ?? '',
-					},
-				},
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.item },
 				headerTooltip: 'Video title and thumbnail from YouTube API',
 			},
 			{
@@ -490,12 +484,7 @@
 				sortable: false,
 				filter: false,
 				cellRenderer: categoryCellRenderer,
-				context: {
-					tooltipSpec: {
-						text: (c: CellCtx) => c.data?.primaryCategory?.label ?? '',
-						copyValue: (c: CellCtx) => c.data?.primaryCategory?.label ?? '',
-					},
-				},
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.category },
 				hide: true,
 			},
 			{
@@ -528,12 +517,7 @@
 
 				filter: 'agNumberColumnFilter',
 				valueFormatter: (params) => formatCount(params.value),
-				context: {
-					tooltipSpec: {
-						text: (c: CellCtx) => formatCountExact(c.data?.viewCount ?? null),
-						copyValue: (c: CellCtx) => c.data?.viewCount,
-					},
-				},
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.views },
 				headerTooltip: 'View count from YouTube API',
 			},
 			{
@@ -545,12 +529,7 @@
 
 				filter: 'agNumberColumnFilter',
 				valueFormatter: (params) => formatCount(params.value),
-				context: {
-					tooltipSpec: {
-						text: (c: CellCtx) => formatCountExact(c.data?.likeCount ?? null),
-						copyValue: (c: CellCtx) => c.data?.likeCount,
-					},
-				},
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.likes },
 				headerTooltip: 'Like count from YouTube API',
 			},
 			{
@@ -562,12 +541,7 @@
 				filter: false,
 				valueGetter: percentLikedValueGetter,
 				valueFormatter: (params) => formatPercentLiked(params.value),
-				context: {
-					tooltipSpec: {
-						text: (c: CellCtx) => percentLikedTooltip({ data: c.data }),
-						copyValue: (c: CellCtx) => percentLikedValueGetter({ data: c.data }),
-					},
-				},
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.percentLiked },
 				comparator: (_valueA, _valueB, nodeA, nodeB) => {
 					const a = percentLikedValueGetter({ data: nodeA?.data }) ?? -1;
 					const b = percentLikedValueGetter({ data: nodeB?.data }) ?? -1;
@@ -611,7 +585,7 @@
 				filter: 'agTextColumnFilter',
 				filterValueGetter: (params) => formatTags(params.data?.tags ?? null),
 				valueFormatter: (params) => formatTags(params.value),
-				context: { tooltipSpec: { mode: 'multi', emptyText: 'No tags', items: (c: CellCtx) => c.data?.tags ?? [] } },
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.tags },
 				headerTooltip: 'Tags from YouTube API',
 			},
 			{
@@ -622,7 +596,7 @@
 				sortable: false,
 				filter: 'agTextColumnFilter',
 				valueFormatter: (params) => truncateDescription(params.value, 80),
-				context: { tooltipSpec: { emptyText: 'No description', text: (c: CellCtx) => c.data?.description ?? '' } },
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.description },
 				headerTooltip: 'Video description from YouTube API',
 				hide: true,
 			},
@@ -744,6 +718,7 @@
 		context: { perspectivesByContentId: new Map(), onOpenDetails: handleOpenDetails },
 		onCellMouseOver: handleCellMouseOver,
 		onCellMouseOut: () => hover.leave(),
+		onBodyScroll: () => hover.close(),
 		onCellClicked: (event: CellClickedEvent<ContentItem>) => {
 			if (!event.data) return;
 
@@ -770,6 +745,7 @@
 			gridReady = true;
 		},
 		onSortChanged: (event: SortChangedEvent) => {
+			hover.close();
 			// In "Loaded" mode, AG Grid handles client-side sort (including multi-column
 			// via shift-click) entirely on its own — track active-sort state for the
 			// "Clear sorts" button, then skip the URL update.
@@ -799,6 +775,7 @@
 			updateUrl({ sorts: newSorts.length > 0 ? newSorts : [], page: 1 });
 		},
 		onFilterChanged: (event: FilterChangedEvent) => {
+			hover.close();
 			// Immediate: update chip display
 			activeFilterModel = event.api.getFilterModel();
 			displayedRowCount = event.api.getDisplayedRowCount();

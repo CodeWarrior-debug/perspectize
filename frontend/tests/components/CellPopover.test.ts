@@ -87,7 +87,57 @@ describe('CellPopover', () => {
 			state: { anchor: anchor(), mode: 'single', text: 'x', copy: 'x', items: [] },
 		});
 		await fireEvent.click(screen.getByTestId('tip-copy'));
-		await Promise.resolve();
-		expect(mocks.error).toHaveBeenCalled();
+		await vi.waitFor(() => expect(mocks.error).toHaveBeenCalled());
+	});
+
+	it('hover bridge: pointer enter/leave on the content call onEnter/onLeave', async () => {
+		const onEnter = vi.fn();
+		const onLeave = vi.fn();
+		render(CellPopover, {
+			...base,
+			onEnter,
+			onLeave,
+			state: { anchor: anchor(), mode: 'single', text: 'x', copy: 'x', items: [] },
+		});
+		const content = screen.getByTestId('cell-popover');
+		await fireEvent.pointerEnter(content);
+		expect(onEnter).toHaveBeenCalled();
+		await fireEvent.pointerLeave(content);
+		expect(onLeave).toHaveBeenCalled();
+	});
+
+	it('selection resets on a new state object but persists on the same object', async () => {
+		const multi = () => ({ anchor: anchor(), mode: 'multi' as const, text: '', copy: null, items: ['a', 'b'] });
+		const first = multi();
+		const { rerender } = render(CellPopover, { ...base, state: first });
+		const copySel = () => screen.getByTestId('tip-copy-selected') as HTMLButtonElement;
+		await fireEvent.click(screen.getByTestId('tip-item-a'));
+		expect(copySel().disabled).toBe(false);
+		await rerender({ ...base, state: first });
+		expect(copySel().disabled).toBe(false);
+		await rerender({ ...base, state: multi() });
+		await vi.waitFor(() => expect(copySel().disabled).toBe(true));
+	});
+
+	it('clicking a chip twice deselects it', async () => {
+		render(CellPopover, {
+			...base,
+			state: { anchor: anchor(), mode: 'multi', text: '', copy: null, items: ['a', 'b'] },
+		});
+		const chip = screen.getByTestId('tip-item-a');
+		await fireEvent.click(chip);
+		expect(chip.getAttribute('aria-pressed')).toBe('true');
+		await fireEvent.click(chip);
+		expect(chip.getAttribute('aria-pressed')).toBe('false');
+		expect((screen.getByTestId('tip-copy-selected') as HTMLButtonElement).disabled).toBe(true);
+	});
+
+	it('duplicate tags render without throwing', () => {
+		render(CellPopover, {
+			...base,
+			state: { anchor: anchor(), mode: 'multi', text: '', copy: null, items: ['a', 'a', 'b'] },
+		});
+		expect(screen.getAllByTestId('tip-item-a').length).toBe(2);
+		expect(screen.getByTestId('tip-item-b')).toBeTruthy();
 	});
 });
