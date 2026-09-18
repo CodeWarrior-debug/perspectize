@@ -28,7 +28,7 @@ export function activityItemCellRenderer(
 	const onOpenDetails = params.context?.onOpenDetails;
 
 	// No native `title` attribute here (or on the thumbnail below) — the column's
-	// tooltipValueGetter already renders an AG Grid tooltip on cell hover, and a
+	// context.tooltipSpec popover already shows details on cell hover, and a
 	// native title attribute on top of that shows two overlapping tooltip boxes.
 	const cell = document.createElement('div');
 	cell.className =

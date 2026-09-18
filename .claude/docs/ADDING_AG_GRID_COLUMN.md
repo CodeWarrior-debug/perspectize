@@ -87,6 +87,7 @@ Is the field already in the ContentItem TypeScript interface?
 | **`field`** | Maps to `ContentItem` property | Must match TS interface field, or omit if using `valueGetter` |
 | **`headerName`** | Display text | Short label for column header |
 | **`headerTooltip`** | Hover text | Longer description |
+| **`context: { tooltipSpec }`** | Cell hover popover | Omit for default (displayed text + copy of raw value); `false` to opt out; `{ text, copyValue }` to override display/copy; `{ mode: 'multi', items, emptyText }` for chip lists; add the spec to `ACTIVITY_TOOLTIP_SPECS` (`frontend/src/lib/utils/activityTooltipSpecs.ts`) |
 
 ---
 
@@ -241,6 +242,8 @@ For a field that already exists in `ContentItem` with no backend changes:
   floatingFilter: true,
   hide: true,
   valueFormatter: (params: ValueFormatterParams) => formatCount(params.value),
+  // Optional: omit for the default popover, or reference a spec from ACTIVITY_TOOLTIP_SPECS
+  context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.commentCount },
 },
 ```
 
