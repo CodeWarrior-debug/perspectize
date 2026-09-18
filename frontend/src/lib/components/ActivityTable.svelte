@@ -57,14 +57,17 @@
 		resolveSortOrder,
 		capitalizeContentType,
 		durationComparator,
+		compareContentBySorts,
 		computeNextPage,
 		computePrevPage,
 		togglableColIds,
 	} from '$lib/utils/grid-config';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
+	import SortPickerDialog from '$lib/components/SortPickerDialog.svelte';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
+	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import { TagsTooltip } from '$lib/components/TagsTooltip';
 	import { DescriptionTooltip } from '$lib/components/DescriptionTooltip';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
@@ -212,10 +215,13 @@
 	let displayedRowCount = $state<number | null>(null);
 	let debounceTimer: ReturnType<typeof setTimeout>;
 	let skipNextSortEvent = $state(false);
-	// Tracks whether AG Grid currently has any column sorted, in "Loaded" (client) mode —
-	// mirrors gridParams.sorts's role for "All Items" mode, since client-mode sort state
-	// lives entirely in the grid, not the URL.
-	let clientSortActive = $state(false);
+	// Mirrors gridParams.sorts's role for "All Items" mode, but for "Loaded" (client)
+	// mode — client-mode sort state lives in the grid (when there's a grid) or, on the
+	// mobile card list where there's no grid at all, nowhere but here. Kept as the
+	// source of truth the SortPickerDialog reads/writes in "Loaded" mode, and used to
+	// manually sort rows for the card list when there's no AG Grid instance to do it.
+	let clientSorts = $state<SortSpec[]>([]);
+	let sortPickerOpen = $state(false);
 	let activeFilterModel = $state<Record<string, any>>({});
 	// Responsive tier: 'xs' (<445px), 'sm' (445-639px), 'md' (640-899px), 'lg' (900px+)
 	let responsiveTier = $state<'xs' | 'sm' | 'md' | 'lg'>('lg');
@@ -337,19 +343,33 @@
 	// i.e. multiple sorted columns, a single non-default column, or explicitly cleared.
 	const hasActiveSort = $derived(
 		mode === 'loaded'
-			? clientSortActive
+			? clientSorts.length > 0
 			: sorts.length !== 1 || sorts[0].col !== 'updatedAt' || sorts[0].dir !== 'desc',
 	);
 
+	// What the SortPickerDialog reads/writes — the URL list in "All Items" mode,
+	// the grid-mirroring state in "Loaded" mode (works with or without a live grid).
+	const activeSorts = $derived(mode === 'loaded' ? clientSorts : sorts);
+
+	// The mobile card list has no AG Grid instance to sort for it. In "All Items" mode
+	// the server already returned rows in the requested order; in "Loaded" mode, apply
+	// clientSorts by hand. On desktop, AG Grid does this itself, so this is a no-op.
+	const sortedRowData = $derived(
+		mode === 'loaded' && cardMode && clientSorts.length > 0
+			? [...rowData].sort((a, b) => compareContentBySorts(a, b, clientSorts))
+			: rowData,
+	);
+
 	/**
-	 * Clear all sorting. In "Loaded" mode, AG Grid owns sort state directly, so we
-	 * reset it there and let onSortChanged (a no-op for this mode) be skipped by
-	 * AG Grid's own dedup. In "All Items" mode, sorting is server-side via the URL —
-	 * push an explicit empty sort list (distinct from the param being absent, which
-	 * means "default") so the grid shows unsorted server order.
+	 * Clear all sorting. In "Loaded" mode, reset both our own tracking state and (when
+	 * a grid exists) AG Grid's — the mobile card list has no grid, so clientSorts alone
+	 * drives it. In "All Items" mode, sorting is server-side via the URL — push an
+	 * explicit empty sort list (distinct from the param being absent, which means
+	 * "default") so the grid/cards show unsorted server order.
 	 */
 	function handleClearSorts() {
 		if (mode === 'loaded') {
+			clientSorts = [];
 			gridApi?.applyColumnState({ defaultState: { sort: null } });
 		} else {
 			cursors = [null];
@@ -357,10 +377,30 @@
 		}
 	}
 
+	/**
+	 * Apply a full replacement sort list from the SortPickerDialog. In "All Items"
+	 * mode this is just another URL update (identical to what onSortChanged does for
+	 * grid-driven sorts). In "Loaded" mode, update our own tracking state and, when a
+	 * grid exists, mirror it there too — on mobile (no grid), clientSorts alone drives
+	 * the card list via sortedRowData above.
+	 */
+	function handleSortsApply(newSorts: SortSpec[]) {
+		if (mode === 'all') {
+			cursors = [null];
+			updateUrl({ sorts: newSorts, page: 1 });
+			return;
+		}
+		clientSorts = newSorts;
+		gridApi?.applyColumnState({
+			state: newSorts.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
+			defaultState: { sort: null },
+		});
+	}
+
 	function handleModeToggle(newMode: DataMode) {
 		// Reset pagination when switching modes
 		cursors = [null];
-		if (newMode === 'loaded') clientSortActive = false;
+		if (newMode === 'loaded') clientSorts = [];
 
 		// When switching Loaded → All: sync AG Grid filter state to URL params
 		if (newMode === 'all' && gridApi) {
@@ -720,10 +760,15 @@
 		},
 		onSortChanged: (event: SortChangedEvent) => {
 			// In "Loaded" mode, AG Grid handles client-side sort (including multi-column
-			// via shift-click) entirely on its own — track active-sort state for the
-			// "Clear sorts" button, then skip the URL update.
+			// via shift-click) entirely on its own — mirror its sort state into
+			// clientSorts (read by "Clear sorts", the SortPickerDialog, and the mobile
+			// card list, which has no grid of its own), then skip the URL update.
 			if (mode === 'loaded') {
-				clientSortActive = event.api.getColumnState().some((col) => col.sort);
+				clientSorts = event.api
+					.getColumnState()
+					.filter((col) => col.sort)
+					.sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0))
+					.map((col) => ({ col: col.colId ?? 'updatedAt', dir: col.sort === 'asc' ? ('asc' as const) : ('desc' as const) }));
 				return;
 			}
 			// Skip if we triggered this event programmatically (to avoid loop)
@@ -962,7 +1007,7 @@
 	{:else if cardMode}
 		<div class="flex-1 min-h-0 overflow-y-auto">
 			<ActivityCardList
-				{rowData}
+				rowData={sortedRowData}
 				{perspectiveContentIds}
 				onOpenDetails={handleOpenDetails}
 				onAddPerspective={handleAddPerspectiveFromCard}
@@ -1001,18 +1046,30 @@
 					<SlidersHorizontalIcon class="size-4" />
 					<span class="hidden md:inline">Columns</span>
 				</button>
-				<button
-					type="button"
-					aria-label="Clear sorts"
-					title="Shift-click column headers to sort by multiple columns"
-					onclick={handleClearSorts}
-					disabled={!gridReady || !hasActiveSort}
-					class="inline-flex items-center gap-1.5 px-2 py-1 text-sm border border-input rounded-md bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-				>
-					<ArrowUpDownIcon class="size-4" />
-					<span class="hidden md:inline">Clear sorts</span>
-				</button>
 			{/if}
+			<!-- Sort controls — shown on mobile too (unlike Columns): the picker doesn't
+			     depend on AG Grid, and the mobile card list has its own sort applied via
+			     sortedRowData/clientSorts, so there's no grid-readiness gate here. -->
+			<button
+				type="button"
+				aria-label="Edit sorts"
+				title="Or shift-click column headers to sort by multiple columns"
+				onclick={() => (sortPickerOpen = true)}
+				class="inline-flex items-center gap-1.5 px-2 py-1 text-sm border border-input rounded-md bg-background hover:bg-accent"
+			>
+				<ListOrderedIcon class="size-4" />
+				<span class="hidden md:inline">Edit sorts</span>
+			</button>
+			<button
+				type="button"
+				aria-label="Clear sorts"
+				onclick={handleClearSorts}
+				disabled={!hasActiveSort}
+				class="inline-flex items-center gap-1.5 px-2 py-1 text-sm border border-input rounded-md bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+			>
+				<ArrowUpDownIcon class="size-4" />
+				<span class="hidden md:inline">Clear sorts</span>
+			</button>
 			{#if mode === 'all'}
 				<div class="hidden md:flex items-center gap-2">
 					<label for="pageSize" class="text-muted-foreground">Page size:</label>
@@ -1086,6 +1143,12 @@
 		{overrideActive}
 		onToggle={handleColumnToggle}
 	/>
+{/if}
+
+<!-- Sort picker — works identically on mobile and desktop, and in both data modes;
+     see handleSortsApply for how each mode is wired underneath. -->
+{#if sortPickerOpen}
+	<SortPickerDialog bind:open={sortPickerOpen} sorts={activeSorts} onApply={handleSortsApply} />
 {/if}
 
 <!-- Category typeahead popover — rendered outside the grid for correct portal positioning -->
