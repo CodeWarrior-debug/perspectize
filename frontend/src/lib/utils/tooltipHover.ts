@@ -48,6 +48,7 @@ export function createHoverController(opts: HoverControllerOptions) {
 	let openTimer: ReturnType<typeof setTimeout> | undefined;
 	let closeTimer: ReturnType<typeof setTimeout> | undefined;
 	let pendingAnchor: HTMLElement | null = null;
+	let insidePopover = false;
 
 	function cancelOpen() {
 		clearTimeout(openTimer);
@@ -57,7 +58,9 @@ export function createHoverController(opts: HoverControllerOptions) {
 	function scheduleClose() {
 		cancelOpen();
 		clearTimeout(closeTimer);
-		closeTimer = setTimeout(() => opts.setState(null), closeDelay);
+		closeTimer = setTimeout(() => {
+			if (!insidePopover) opts.setState(null);
+		}, closeDelay);
 	}
 
 	return {
@@ -69,28 +72,42 @@ export function createHoverController(opts: HoverControllerOptions) {
 				cancelOpen();
 				return;
 			}
-			// Moving to a different cell: drop the old popover now, not after the open delay.
-			if (current) opts.setState(null);
+			// Different cell: give the pointer a grace period to reach the open popover.
+			if (current) {
+				clearTimeout(closeTimer);
+				closeTimer = setTimeout(() => {
+					if (!insidePopover) opts.setState(null);
+				}, closeDelay);
+			}
 			// Same pending cell (child-element mouseovers): keep the running open timer.
 			if (pendingAnchor === cellEl) return;
 			clearTimeout(openTimer);
 			pendingAnchor = cellEl;
 			openTimer = setTimeout(() => {
 				pendingAnchor = null;
+				if (insidePopover) return;
 				opts.setState(build());
 			}, openDelay);
 		},
 		leave: scheduleClose,
+		popoverLeave() {
+			insidePopover = false;
+			scheduleClose();
+		},
 		enter() {
+			insidePopover = true;
 			clearTimeout(closeTimer);
+			cancelOpen();
 		},
 		// Immediately close and cancel any pending open (scroll/sort/filter/data change).
 		close() {
+			insidePopover = false;
 			cancelOpen();
 			clearTimeout(closeTimer);
 			opts.setState(null);
 		},
 		destroy() {
+			insidePopover = false;
 			cancelOpen();
 			clearTimeout(closeTimer);
 		},

@@ -1009,7 +1009,7 @@
 		<CellPopover
 			state={popover}
 			onEnter={() => hover.enter()}
-			onLeave={() => hover.leave()}
+			onLeave={() => hover.popoverLeave()}
 			onClose={() => (popover = null)}
 		/>
 	{/if}

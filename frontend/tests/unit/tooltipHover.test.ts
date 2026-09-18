@@ -188,11 +188,77 @@ describe('createHoverController', () => {
 		vi.advanceTimersByTime(600);
 		expect(get()?.text).toBe('a');
 		ctl.hover(b.el, b.build);
+		vi.advanceTimersByTime(100);
+		expect(get()?.text).toBe('a');
+		vi.advanceTimersByTime(50);
 		expect(get()).toBeNull();
-		vi.advanceTimersByTime(599);
+		vi.advanceTimersByTime(449);
 		expect(get()).toBeNull();
 		vi.advanceTimersByTime(1);
 		expect(get()?.text).toBe('b');
+	});
+
+	it('late cell mouse-out after enter does not close', () => {
+		const { ctl, get, cell } = setup();
+		const a = cell('a');
+		ctl.hover(a.el, a.build);
+		vi.advanceTimersByTime(600);
+		ctl.enter();
+		ctl.leave();
+		vi.advanceTimersByTime(1000);
+		expect(get()?.text).toBe('a');
+	});
+
+	it('popoverLeave closes after closeDelay', () => {
+		const { ctl, get, cell } = setup();
+		const a = cell('a');
+		ctl.hover(a.el, a.build);
+		vi.advanceTimersByTime(600);
+		ctl.enter();
+		ctl.popoverLeave();
+		vi.advanceTimersByTime(149);
+		expect(get()).not.toBeNull();
+		vi.advanceTimersByTime(1);
+		expect(get()).toBeNull();
+	});
+
+	it('enter before close delay keeps A and cancels B open', () => {
+		const { ctl, get, cell } = setup();
+		const a = cell('a');
+		const b = cell('b');
+		ctl.hover(a.el, a.build);
+		vi.advanceTimersByTime(600);
+		ctl.hover(b.el, b.build);
+		vi.advanceTimersByTime(50);
+		ctl.enter();
+		vi.advanceTimersByTime(1000);
+		expect(get()?.text).toBe('a');
+	});
+
+	it('close resets the inside flag so later leave closes', () => {
+		const { ctl, get, cell } = setup();
+		const a = cell('a');
+		ctl.hover(a.el, a.build);
+		vi.advanceTimersByTime(600);
+		ctl.enter();
+		ctl.close();
+		ctl.hover(a.el, a.build);
+		vi.advanceTimersByTime(600);
+		ctl.leave();
+		vi.advanceTimersByTime(150);
+		expect(get()).toBeNull();
+	});
+
+	it('destroy resets the inside flag', () => {
+		const { ctl, get, cell } = setup();
+		const a = cell('a');
+		ctl.hover(a.el, a.build);
+		vi.advanceTimersByTime(600);
+		ctl.enter();
+		ctl.destroy();
+		ctl.leave();
+		vi.advanceTimersByTime(150);
+		expect(get()).toBeNull();
 	});
 
 	it('moving A to an opted-out cell leaves no popover', () => {
@@ -202,7 +268,6 @@ describe('createHoverController', () => {
 		ctl.hover(a.el, a.build);
 		vi.advanceTimersByTime(600);
 		ctl.hover(off, () => null);
-		expect(get()).toBeNull();
 		vi.advanceTimersByTime(2000);
 		expect(get()).toBeNull();
 	});
