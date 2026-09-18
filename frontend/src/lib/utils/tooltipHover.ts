@@ -17,19 +17,19 @@ export function buildPopoverState(params: BuildPopoverParams): PopoverState | nu
 		valueFormatted: params.valueFormatted,
 		data: params.data as CellCtx['data'],
 	};
+	const empty = (): PopoverState | null =>
+		spec.emptyText ? { anchor: params.cellEl, mode: 'single', text: spec.emptyText, copy: null, items: [] } : null;
 	if (spec.mode === 'multi') {
-		return {
-			anchor: params.cellEl,
-			mode: 'multi',
-			text: '',
-			copy: null,
-			items: spec.items?.(ctx) ?? [],
-		};
+		const items = spec.items?.(ctx) ?? [];
+		if (items.length === 0) return empty();
+		return { anchor: params.cellEl, mode: 'multi', text: '', copy: null, items };
 	}
+	const text = displayText(spec, ctx);
+	if (text === '') return empty();
 	return {
 		anchor: params.cellEl,
 		mode: 'single',
-		text: displayText(spec, ctx),
+		text,
 		copy: copyText(spec, ctx),
 		items: [],
 	};

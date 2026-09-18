@@ -9,6 +9,8 @@ export interface TooltipSpec {
 	text?: (c: CellCtx) => string;
 	copyValue?: (c: CellCtx) => string | number | null | undefined;
 	items?: (c: CellCtx) => string[];
+	/** Shown (no copy) when the cell has no content; if unset, no popover opens. */
+	emptyText?: string;
 }
 
 export type ColTooltipSpec = TooltipSpec | false;

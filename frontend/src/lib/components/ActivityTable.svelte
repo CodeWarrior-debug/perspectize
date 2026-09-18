@@ -611,7 +611,7 @@
 				filter: 'agTextColumnFilter',
 				filterValueGetter: (params) => formatTags(params.data?.tags ?? null),
 				valueFormatter: (params) => formatTags(params.value),
-				context: { tooltipSpec: { mode: 'multi', items: (c: CellCtx) => c.data?.tags ?? [] } },
+				context: { tooltipSpec: { mode: 'multi', emptyText: 'No tags', items: (c: CellCtx) => c.data?.tags ?? [] } },
 				headerTooltip: 'Tags from YouTube API',
 			},
 			{
@@ -622,7 +622,7 @@
 				sortable: false,
 				filter: 'agTextColumnFilter',
 				valueFormatter: (params) => truncateDescription(params.value, 80),
-				context: { tooltipSpec: { text: (c: CellCtx) => c.data?.description ?? '' } },
+				context: { tooltipSpec: { emptyText: 'No description', text: (c: CellCtx) => c.data?.description ?? '' } },
 				headerTooltip: 'Video description from YouTube API',
 				hide: true,
 			},
@@ -724,7 +724,7 @@
 				}),
 				data: e.data,
 				cellEl,
-			})
+			}),
 		);
 	}
 

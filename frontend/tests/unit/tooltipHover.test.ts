@@ -91,6 +91,40 @@ describe('buildPopoverState column specs', () => {
 	});
 });
 
+describe('buildPopoverState empty states', () => {
+	const tags = { tooltipSpec: { mode: 'multi' as const, emptyText: 'No tags', items: (c: any) => c.data?.tags ?? [] } };
+	const desc = { tooltipSpec: { emptyText: 'No description', text: (c: any) => c.data?.description ?? '' } };
+
+	it('tags [] gives the No tags popover with no copy and no items', () => {
+		const s = buildPopoverState({ colDef: { context: tags }, value: null, data: { tags: [] }, cellEl });
+		expect(s).toMatchObject({ mode: 'single', text: 'No tags', copy: null, items: [] });
+	});
+
+	it('tags missing gives the No tags popover', () => {
+		const s = buildPopoverState({ colDef: { context: tags }, value: null, data: {}, cellEl });
+		expect(s).toMatchObject({ mode: 'single', text: 'No tags', copy: null, items: [] });
+	});
+
+	it('tags with items stays multi with items', () => {
+		const s = buildPopoverState({ colDef: { context: tags }, value: null, data: { tags: ['a', 'b'] }, cellEl });
+		expect(s).toMatchObject({ mode: 'multi', items: ['a', 'b'] });
+	});
+
+	it('description empty gives No description with no copy', () => {
+		const s = buildPopoverState({ colDef: { context: desc }, value: '', data: { description: '' }, cellEl });
+		expect(s).toMatchObject({ mode: 'single', text: 'No description', copy: null, items: [] });
+	});
+
+	it('description present is unchanged', () => {
+		const s = buildPopoverState({ colDef: { context: desc }, value: 'x', data: { description: 'hello' }, cellEl });
+		expect(s).toMatchObject({ mode: 'single', text: 'hello', items: [] });
+	});
+
+	it('empty text with no emptyText returns null', () => {
+		expect(buildPopoverState({ colDef: {}, value: '', cellEl })).toBeNull();
+	});
+});
+
 describe('createHoverController', () => {
 	afterEach(() => vi.useRealTimers());
 
