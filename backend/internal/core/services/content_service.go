@@ -67,7 +67,7 @@ func (s *ContentService) CreateFromYouTube(ctx context.Context, url string, user
 	content := &domain.Content{
 		Name:          metadata.Title,
 		URL:           &canonicalURL,
-		ContentType:   domain.ContentTypeYouTube,
+		ContentType:   domain.ContentTypeYouTubeVideo,
 		AddedByUserID: userID,
 		Length:        &metadata.Duration,
 		LengthUnits:   &lengthUnits,

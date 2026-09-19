@@ -59,13 +59,13 @@ func TestJSONBArray_Value(t *testing.T) {
 }
 
 func TestContentTypeDBValueConversion(t *testing.T) {
-	assert.Equal(t, "youtube", contentTypeToDBValue(domain.ContentTypeYouTube))
+	assert.Equal(t, "youtube_video", contentTypeToDBValue(domain.ContentTypeYouTubeVideo))
 	assert.Equal(t, "claim", contentTypeToDBValue(domain.ContentTypeClaim))
 	assert.Equal(t, "", contentTypeToDBValue(domain.ContentType("")))
 
-	assert.Equal(t, domain.ContentTypeYouTube, contentTypeFromDBValue("youtube"))
+	assert.Equal(t, domain.ContentTypeYouTubeVideo, contentTypeFromDBValue("youtube_video"))
 	assert.Equal(t, domain.ContentTypeClaim, contentTypeFromDBValue("claim"))
-	assert.Equal(t, domain.ContentTypeYouTube, contentTypeFromDBValue("YouTube"))
+	assert.Equal(t, domain.ContentTypeYouTubeVideo, contentTypeFromDBValue("YouTube_Video"))
 	assert.Equal(t, domain.ContentType(""), contentTypeFromDBValue(""))
 }
 

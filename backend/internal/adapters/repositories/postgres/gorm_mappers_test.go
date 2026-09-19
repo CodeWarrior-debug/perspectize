@@ -143,7 +143,7 @@ func TestContentModelToDomain(t *testing.T) {
 		ID:                11,
 		Name:              "Some Video",
 		URL:               strPtr("https://youtube.com/watch?v=abc"),
-		ContentType:       "youtube",
+		ContentType:       "youtube_video",
 		AddedByUserID:     4,
 		Length:            intPtr(300),
 		LengthUnits:       strPtr("seconds"),
@@ -155,7 +155,7 @@ func TestContentModelToDomain(t *testing.T) {
 	require.NotNil(t, got)
 	assert.Equal(t, 11, got.ID)
 	assert.Equal(t, "Some Video", got.Name)
-	assert.Equal(t, domain.ContentTypeYouTube, got.ContentType, "content_type must be uppercased into the domain enum")
+	assert.Equal(t, domain.ContentTypeYouTubeVideo, got.ContentType, "content_type must be uppercased into the domain enum")
 	assert.Equal(t, 4, got.AddedByUserID)
 	assert.Equal(t, json.RawMessage(`{"items":[]}`), got.Response)
 	require.NotNil(t, got.PrimaryCategoryID)
