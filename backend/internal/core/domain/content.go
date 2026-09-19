@@ -9,8 +9,8 @@ import (
 type ContentType string
 
 const (
-	ContentTypeYouTube ContentType = "YOUTUBE"
-	ContentTypeClaim   ContentType = "CLAIM"
+	ContentTypeYouTubeVideo ContentType = "YOUTUBE_VIDEO"
+	ContentTypeClaim        ContentType = "CLAIM"
 )
 
 // ContentSearchField identifies a text column that a ContentFilter.search term

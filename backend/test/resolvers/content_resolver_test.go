@@ -345,7 +345,7 @@ func TestContentQuery_Success(t *testing.T) {
 				ID:          1,
 				Name:        "Test Video",
 				URL:         &url,
-				ContentType: domain.ContentTypeYouTube,
+				ContentType: domain.ContentTypeYouTubeVideo,
 			}, nil
 		},
 	}
@@ -370,7 +370,7 @@ func TestContentQuery_Success(t *testing.T) {
 
 	assert.Equal(t, "1", data.ContentByID.ID)
 	assert.Equal(t, "Test Video", data.ContentByID.Name)
-	assert.Equal(t, "YOUTUBE", data.ContentByID.ContentType)
+	assert.Equal(t, "YOUTUBE_VIDEO", data.ContentByID.ContentType)
 	assert.Equal(t, url, data.ContentByID.URL)
 }
 
@@ -492,7 +492,7 @@ func TestCreateContentFromYouTube_Success(t *testing.T) {
 
 	assert.Equal(t, "42", data.CreateContentFromYouTube.Content.ID)
 	assert.Equal(t, "Amazing Video", data.CreateContentFromYouTube.Content.Name)
-	assert.Equal(t, "YOUTUBE", data.CreateContentFromYouTube.Content.ContentType)
+	assert.Equal(t, "YOUTUBE_VIDEO", data.CreateContentFromYouTube.Content.ContentType)
 	assert.False(t, data.CreateContentFromYouTube.AlreadyExisted)
 }
 
@@ -575,7 +575,7 @@ func TestCreateContentFromYouTube_RejectsSpoofedUserID(t *testing.T) {
 
 func TestCreateContentFromYouTube_AlreadyExists(t *testing.T) {
 	canonicalURL := "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-	existing := &domain.Content{ID: 1, Name: "Existing Video", URL: &canonicalURL, ContentType: domain.ContentTypeYouTube}
+	existing := &domain.Content{ID: 1, Name: "Existing Video", URL: &canonicalURL, ContentType: domain.ContentTypeYouTubeVideo}
 	repo := &mockContentRepository{
 		getByURLFn: func(ctx context.Context, url string) (*domain.Content, error) {
 			// The canonical URL is found — service returns existing content + ErrAlreadyExists
@@ -633,7 +633,7 @@ func TestCreateContentFromYouTube_InvalidURL(t *testing.T) {
 
 func TestUpdateContentSourceData_Success(t *testing.T) {
 	url := "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-	existing := &domain.Content{ID: 5, Name: "Old Title", URL: &url, ContentType: domain.ContentTypeYouTube, AddedByUserID: 1}
+	existing := &domain.Content{ID: 5, Name: "Old Title", URL: &url, ContentType: domain.ContentTypeYouTubeVideo, AddedByUserID: 1}
 	metadata := &portservices.VideoMetadata{
 		Title:    "New Title",
 		Duration: 600,
@@ -647,7 +647,7 @@ func TestUpdateContentSourceData_Success(t *testing.T) {
 		},
 		updateMetadataFn: func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
 			capturedID = id
-			return &domain.Content{ID: id, Name: name, URL: &url, ContentType: domain.ContentTypeYouTube, AddedByUserID: 1}, nil
+			return &domain.Content{ID: id, Name: name, URL: &url, ContentType: domain.ContentTypeYouTubeVideo, AddedByUserID: 1}, nil
 		},
 	}
 
@@ -697,7 +697,7 @@ func TestUpdateContentSourceData_NotFound(t *testing.T) {
 
 func TestUpdateContentSourceData_YouTubeAPIError(t *testing.T) {
 	url := "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-	existing := &domain.Content{ID: 5, Name: "Old Title", URL: &url, ContentType: domain.ContentTypeYouTube}
+	existing := &domain.Content{ID: 5, Name: "Old Title", URL: &url, ContentType: domain.ContentTypeYouTubeVideo}
 	repo := &mockContentRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
 			return existing, nil
@@ -734,8 +734,8 @@ func TestPaginatedContentQuery_DefaultPagination(t *testing.T) {
 			url := "https://youtube.com/watch?v=abc123"
 			return &domain.PaginatedContent{
 				Items: []*domain.Content{
-					{ID: 1, Name: "Video 1", URL: &url, ContentType: domain.ContentTypeYouTube},
-					{ID: 2, Name: "Video 2", URL: &url, ContentType: domain.ContentTypeYouTube},
+					{ID: 1, Name: "Video 1", URL: &url, ContentType: domain.ContentTypeYouTubeVideo},
+					{ID: 2, Name: "Video 2", URL: &url, ContentType: domain.ContentTypeYouTubeVideo},
 				},
 				HasNext: false,
 				HasPrev: false,
@@ -781,7 +781,7 @@ func TestPaginatedContentQuery_WithFirstParameter(t *testing.T) {
 			url := "https://youtube.com/watch?v=abc123"
 			items := make([]*domain.Content, 5)
 			for i := 0; i < 5; i++ {
-				items[i] = &domain.Content{ID: i + 1, Name: fmt.Sprintf("Video %d", i+1), URL: &url, ContentType: domain.ContentTypeYouTube}
+				items[i] = &domain.Content{ID: i + 1, Name: fmt.Sprintf("Video %d", i+1), URL: &url, ContentType: domain.ContentTypeYouTubeVideo}
 			}
 			endCursor := "cursor123"
 			return &domain.PaginatedContent{
@@ -887,7 +887,7 @@ func TestPaginatedContentQuery_WithAfterCursor(t *testing.T) {
 			url := "https://youtube.com/watch?v=abc123"
 			return &domain.PaginatedContent{
 				Items: []*domain.Content{
-					{ID: 11, Name: "Video 11", URL: &url, ContentType: domain.ContentTypeYouTube},
+					{ID: 11, Name: "Video 11", URL: &url, ContentType: domain.ContentTypeYouTubeVideo},
 				},
 				HasNext: false,
 				HasPrev: true,
@@ -967,12 +967,12 @@ func TestPaginatedContentQuery_WithContentTypeFilter(t *testing.T) {
 		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
 			require.NotNil(t, params.Filter)
 			require.NotNil(t, params.Filter.ContentType)
-			assert.Equal(t, domain.ContentTypeYouTube, *params.Filter.ContentType)
+			assert.Equal(t, domain.ContentTypeYouTubeVideo, *params.Filter.ContentType)
 
 			url := "https://youtube.com/watch?v=abc123"
 			return &domain.PaginatedContent{
 				Items: []*domain.Content{
-					{ID: 1, Name: "YouTube Video", URL: &url, ContentType: domain.ContentTypeYouTube},
+					{ID: 1, Name: "YouTube Video", URL: &url, ContentType: domain.ContentTypeYouTubeVideo},
 				},
 				HasNext: false,
 				HasPrev: false,
@@ -983,7 +983,7 @@ func TestPaginatedContentQuery_WithContentTypeFilter(t *testing.T) {
 	server := setupTestServer(repo, &mockYouTubeClient{})
 	defer server.Close()
 
-	result := executeGraphQL(t, server, `{ content(filter: { contentType: YOUTUBE }) { items { id name contentType } } }`)
+	result := executeGraphQL(t, server, `{ content(filter: { contentType: YOUTUBE_VIDEO }) { items { id name contentType } } }`)
 
 	assert.Empty(t, result.Errors)
 
@@ -1001,7 +1001,7 @@ func TestPaginatedContentQuery_WithContentTypeFilter(t *testing.T) {
 
 	assert.Len(t, data.Content.Items, 1)
 	assert.Equal(t, "YouTube Video", data.Content.Items[0].Name)
-	assert.Equal(t, "YOUTUBE", data.Content.Items[0].ContentType)
+	assert.Equal(t, "YOUTUBE_VIDEO", data.Content.Items[0].ContentType)
 }
 
 func TestPaginatedContentQuery_WithFilterAndTotalCount(t *testing.T) {
@@ -1024,7 +1024,7 @@ func TestPaginatedContentQuery_WithFilterAndTotalCount(t *testing.T) {
 	server := setupTestServer(repo, &mockYouTubeClient{})
 	defer server.Close()
 
-	result := executeGraphQL(t, server, `{ content(filter: { contentType: YOUTUBE }, includeTotalCount: true) { totalCount items { id } } }`)
+	result := executeGraphQL(t, server, `{ content(filter: { contentType: YOUTUBE_VIDEO }, includeTotalCount: true) { totalCount items { id } } }`)
 
 	assert.Empty(t, result.Errors)
 
@@ -1076,7 +1076,7 @@ func TestPaginatedContentQuery_WithMinLengthFilter(t *testing.T) {
 			length := 600
 			return &domain.PaginatedContent{
 				Items: []*domain.Content{
-					{ID: 1, Name: "Long Video", URL: &url, ContentType: domain.ContentTypeYouTube, Length: &length},
+					{ID: 1, Name: "Long Video", URL: &url, ContentType: domain.ContentTypeYouTubeVideo, Length: &length},
 				},
 				HasNext: false,
 				HasPrev: false,
@@ -1120,7 +1120,7 @@ func TestPaginatedContentQuery_WithMaxLengthFilter(t *testing.T) {
 			length := 120
 			return &domain.PaginatedContent{
 				Items: []*domain.Content{
-					{ID: 1, Name: "Short Video", URL: &url, ContentType: domain.ContentTypeYouTube, Length: &length},
+					{ID: 1, Name: "Short Video", URL: &url, ContentType: domain.ContentTypeYouTubeVideo, Length: &length},
 				},
 				HasNext: false,
 				HasPrev: false,
@@ -1165,7 +1165,7 @@ func TestPaginatedContentQuery_WithMinMaxLengthFilter(t *testing.T) {
 			length := 200
 			return &domain.PaginatedContent{
 				Items: []*domain.Content{
-					{ID: 1, Name: "Medium Video", URL: &url, ContentType: domain.ContentTypeYouTube, Length: &length},
+					{ID: 1, Name: "Medium Video", URL: &url, ContentType: domain.ContentTypeYouTubeVideo, Length: &length},
 				},
 				HasNext: false,
 				HasPrev: false,
@@ -1203,7 +1203,7 @@ func TestSetPrimaryCategory_Success(t *testing.T) {
 			return &domain.Content{
 				ID:                id,
 				Name:              "Test Video",
-				ContentType:       domain.ContentTypeYouTube,
+				ContentType:       domain.ContentTypeYouTubeVideo,
 				PrimaryCategoryID: &catID,
 			}, nil
 		},
