@@ -693,6 +693,19 @@ Plans:
 Plans:
 - [ ] TBD (run /gsd:plan-phase 19 to break down)
 
+### Phase 20: Bible passage content: scripture reference model, lazy passage content, and frontend passage display (BSB text)
+
+**Goal:** Let users write perspectives on Bible verses and passages. Scripture is modeled as ranges over a seeded canonical verse ordinal (book/chapter/passage/testament are ranges, not separate content types); passage content rows are created lazily; text is a display layer using public-domain BSB only. Frontend gets a reference parser, passage picker, passage text display, and ActivityTable/sermon integration.
+**Requirements**: TBD
+**Depends on:** Phase 19
+**Plans:** 0 plans (design complete; planned in superpowers, not GSD)
+
+Design: `docs/superpowers/specs/2026-09-19-bible-passage-frontend-design.md`
+Survey data: `tools/gty-channel-survey/` (Grace to You channel: 2,602 videos, ~50% of titles carry a parseable reference)
+
+Plans:
+- [ ] TBD (write via superpowers:writing-plans → `docs/superpowers/plans/`)
+
 ---
 
 ## v1.1 Feature Phases (11-16)
