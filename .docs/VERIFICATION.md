@@ -80,6 +80,17 @@ overwrites your clipboard. Add scenarios in the `SCENARIOS` object; helpers
 a cell scrolls it into view, and a scroll cancels a pending popover open — the
 helper scrolls first and settles before hovering.
 
+**Verifying from a worktree.** A worktree has no gitignored `frontend/.env`, and
+the Clerk session doesn't carry across dev-server ports. Serve the worktree's code
+on a spare port with a throwaway wrapper config (outside the repo) that spreads the
+worktree's `vite.config.ts` and sets `root` to the worktree's `frontend/` and
+`envDir` to the main checkout's `frontend/` (vite has no `--envDir` CLI flag; don't
+symlink or read `.env`). Run it with `vite dev --config <wrapper> --port 5174
+--strictPort`, ask the human to sign in once at that origin in the `sv-chrome.sh`
+Chrome, then run the script with `BASE_URL=http://localhost:5174`. The `chat-panel`
+scenario measures the messaging panel's top edge against the app header at several
+viewport heights.
+
 ## 1. Start Services
 
 The database is hosted on Sevalla (cloud PostgreSQL) — no Docker or local database setup needed.
