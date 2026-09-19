@@ -505,11 +505,7 @@
 				maxWidth: 100,
 
 				filter: 'agTextColumnFilter',
-				valueGetter: (params) => {
-					const t = params.data?.contentType;
-					if (!t) return '';
-					return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
-				},
+				valueGetter: (params) => capitalizeContentType(params.data?.contentType),
 				filterValueGetter: (params) => {
 					return params.data?.contentType?.toLowerCase() ?? '';
 				},
@@ -795,7 +791,10 @@
 					.getColumnState()
 					.filter((col) => col.sort)
 					.sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0))
-					.map((col) => ({ col: col.colId ?? 'updatedAt', dir: col.sort === 'asc' ? ('asc' as const) : ('desc' as const) }));
+					.map((col) => ({
+						col: col.colId ?? 'updatedAt',
+						dir: col.sort === 'asc' ? ('asc' as const) : ('desc' as const),
+					}));
 				return;
 			}
 			// Skip if we triggered this event programmatically (to avoid loop)

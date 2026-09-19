@@ -489,7 +489,8 @@ export function urlParamsToGraphQLFilter(
 				break;
 
 			case 'type':
-				result.contentType = value.toUpperCase();
+				// Bookmarked URLs from before the youtube → youtube_video rename still say "youtube"
+				result.contentType = value.toLowerCase() === 'youtube' ? 'YOUTUBE_VIDEO' : value.toUpperCase();
 				hasAny = true;
 				break;
 
