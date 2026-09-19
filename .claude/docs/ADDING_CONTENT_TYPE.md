@@ -147,7 +147,7 @@ In `backend/schema.graphql`:
 1. Add to ContentType enum:
    ```graphql
    enum ContentType {
-     YOUTUBE
+     YOUTUBE_VIDEO
      ARTICLE
    }
    ```
