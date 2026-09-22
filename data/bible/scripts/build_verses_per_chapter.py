@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
-"""One-off normalizer: upstream KJV verse list -> data/bible/verses.tsv.
+"""One-off derivation: upstream KJV verse list -> versesPerChapter on books.json.
+
 Re-run only if the upstream source is corrected. See data/bible/README.md.
+
+Rather than materializing one row per verse (31,102 rows), this script
+computes, for each of the 66 books, the number of verses in each chapter
+(an array in chapter order) and writes it as a new `versesPerChapter` field
+on that book's object in books.json. The global verse ordinal for any
+(book, chapter, verse) is fully determined by these per-chapter counts:
+
+    ordinal = sum(verses in every earlier book)
+            + sum(verses in earlier chapters of this book)
+            + verse
+
+so there is no need to commit the flat per-verse table as a build artifact.
 
 Upstream source: github.com/BibleBot/RandomVersesData. That repo stores one
 KJV verse per file, named `<n>.txt` for n = 0..31101, where n already equals
@@ -12,12 +25,13 @@ using a fixed-width, non-standard abbreviation scheme (e.g. `Sa1` for
 (UPSTREAM_BOOK_MAP) rather than reusing books.json aliases.
 
 Usage:
-    python3 build_verses.py <upstream_dir> <books.json> <out.tsv>
+    python3 build_verses_per_chapter.py <upstream_dir> <books.json> <out_books.json>
 
 <upstream_dir> is a local checkout of BibleBot/RandomVersesData (a directory
 containing 0.txt .. 31101.txt).
+<books.json> is read for book id/name/chapterCount and rewritten to
+<out_books.json> with a new `versesPerChapter` field added to every book.
 """
-import csv
 import glob
 import json
 import os
@@ -125,19 +139,32 @@ def main(upstream_dir: str, books_path: str, out_path: str) -> None:
         books = json.load(f)
     name_to_id = {b["name"]: b["id"] for b in books}
 
-    rows = []  # (book_id, chapter, verse)
+    # book_id -> {chapter: max verse seen}
+    max_verse_by_chapter = {}
     for book_name, chapter, verse in parse_upstream(upstream_dir):
         book_id = name_to_id[book_name]
-        rows.append((book_id, chapter, verse))
+        chapters = max_verse_by_chapter.setdefault(book_id, {})
+        chapters[chapter] = max(chapters.get(chapter, 0), verse)
 
-    rows.sort(key=lambda r: r)  # canonical order relies on book_id order
-    with open(out_path, "w", newline="") as out:
-        writer = csv.writer(out, delimiter="\t")
-        writer.writerow(["verse_id", "book_id", "chapter", "verse"])
-        for i, (book_id, chapter, verse) in enumerate(rows, start=1):
-            writer.writerow([i, book_id, chapter, verse])
+    total = 0
+    for book in books:
+        chapters = max_verse_by_chapter.get(book["id"], {})
+        verses_per_chapter = [
+            chapters[c] for c in range(1, book["chapterCount"] + 1)
+        ]
+        if len(verses_per_chapter) != book["chapterCount"]:
+            raise ValueError(
+                f"{book['name']}: derived {len(verses_per_chapter)} chapters, "
+                f"expected chapterCount={book['chapterCount']}"
+            )
+        book["versesPerChapter"] = verses_per_chapter
+        total += sum(verses_per_chapter)
 
-    print(f"Wrote {len(rows)} verses to {out_path}", file=sys.stderr)
+    with open(out_path, "w") as out:
+        json.dump(books, out, indent=None)
+        out.write("\n")
+
+    print(f"Wrote versesPerChapter for {len(books)} books ({total} verses total) to {out_path}", file=sys.stderr)
 
 
 if __name__ == "__main__":

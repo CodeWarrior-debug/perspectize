@@ -8,6 +8,7 @@ export interface BibleBook {
 	division: string;
 	chapterCount: number;
 	aliases: string[];
+	versesPerChapter: number[];
 }
 
 export const BIBLE_BOOKS: BibleBook[] = booksData as BibleBook[];
