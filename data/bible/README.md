@@ -7,8 +7,9 @@ reserved for future deuterocanonical support (see AN §Q22) — all rows are
 currently `protestant`.
 
 ## translations.json
-Hand-authored 2026-09-22. Bible Gateway version codes, spot-checked live
-before use in PR D per AN §Q15 (NASB/AMP especially — edition variants exist).
+Hand-authored 2026-09-22. Bible Gateway version codes per AN §Q15
+(NASB/AMP especially — edition variants exist). Live spot-check against
+Bible Gateway is still pending/deferred to a later PR — not yet completed.
 
 ## verses.tsv
 Source: https://github.com/BibleBot/RandomVersesData (one KJV verse per file,
@@ -28,10 +29,17 @@ Spot-checked chapter/verse counts against public KJV references: Genesis
 (50 chapters, 1533 verses), Psalms (150 chapters, 2461 verses), Revelation
 (22 chapters, 404 verses) — all match, and chapter counts agree with
 `books.json`'s `chapterCount` field for these three books.
+License: underlying KJV text is public domain; the RandomVersesData wrapper
+repository's own aggregation license was not separately audited
+(documentation completeness note only — the text itself carries no
+restriction).
 
-## bsb.txt (added in Task A3)
+## bsb.tsv
 Source: https://bereanbible.com/bsb.txt
 Downloaded: 2026-09-22
 License: Public domain (berean.bible/terms.htm, dedicated 2023-04-30)
 SHA-256: 2ac3af1de52d4e68261cba91d85c320b7eadc6560e830d99e591767b8ff5ca96
 Row count after normalization: 31102 (bsb.tsv, verse_id 1-31102, exact match to verses.tsv with no gaps or duplicates)
+16 verse_ids have empty text (traditionally-omitted verses such as Matthew
+17:21, Matthew 18:11, Mark 7:16 — present as empty in the official BSB
+source itself, not a parsing defect of this repo's normalization).

@@ -14,6 +14,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// data/books.json and data/verses.tsv (in this directory) are copies of
+// data/bible/{books.json,verses.tsv} at the repo root — go:embed cannot
+// reach outside this module. Keep them in sync; drift is caught by
+// TestSeederEmbeddedBooksJSON_MatchesRepoRoot / TestFrontendBooksJSON_MatchesRepoRoot /
+// TestSeederEmbeddedVersesTSV_MatchesRepoRoot in backend/test/domain/bible_reference_test.go.
+
 //go:embed data/books.json
 var booksJSON []byte
 
