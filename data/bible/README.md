@@ -31,7 +31,7 @@ Spot-checked chapter/verse counts against public KJV references: Genesis
 
 ## bsb.txt (added in Task A3)
 Source: https://bereanbible.com/bsb.txt
-Downloaded: <fill in on download date>
+Downloaded: 2026-09-22
 License: Public domain (berean.bible/terms.htm, dedicated 2023-04-30)
-SHA-256: <fill in after download>
-Row count after normalization: <fill in>
+SHA-256: 2ac3af1de52d4e68261cba91d85c320b7eadc6560e830d99e591767b8ff5ca96
+Row count after normalization: 31102 (bsb.tsv, verse_id 1-31102, exact match to verses.tsv with no gaps or duplicates)
