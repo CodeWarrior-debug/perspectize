@@ -29,6 +29,9 @@ type mockContentRepository struct {
 	getOrCreateByURLFn func(ctx context.Context, content *domain.Content) (*domain.Content, bool, error)
 	updateMetadataFn   func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error)
 	listFn             func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)
+
+	setDisplayTitleFn   func(ctx context.Context, contentID int, title string) (string, error)
+	clearDisplayTitleFn func(ctx context.Context, contentID int) error
 }
 
 func (m *mockContentRepository) Create(ctx context.Context, content *domain.Content) (*domain.Content, error) {
@@ -1313,9 +1316,15 @@ func TestNewResolver(t *testing.T) {
 }
 
 func (m *mockContentRepository) SetDisplayTitleIfEmpty(ctx context.Context, contentID int, title string) (string, error) {
+	if m.setDisplayTitleFn != nil {
+		return m.setDisplayTitleFn(ctx, contentID, title)
+	}
 	return title, nil
 }
 
 func (m *mockContentRepository) ClearDisplayTitle(ctx context.Context, contentID int) error {
+	if m.clearDisplayTitleFn != nil {
+		return m.clearDisplayTitleFn(ctx, contentID)
+	}
 	return nil
 }

@@ -134,6 +134,11 @@ type Content {
   description: String
   response: JSON
   primaryCategory: Category
+  # BIBLE_PASSAGE only: computed verse ordinals (see bible_book.verses_per_chapter)
+  # and the optional, first-write-wins display title. Null for other content types.
+  verseStartID: Int
+  verseEndID: Int
+  displayTitle: String
   # Aggregates computed from ALL perspectives on this content — public and
   # private alike (privacy controls readability, not whether a perspective
   # counts here). Resolved on demand (batched per-request via dataloader)
@@ -191,6 +196,7 @@ input ContentSortInput {
 enum ContentType {
   YOUTUBE
   CLAIM
+  BIBLE_PASSAGE
 }
 
 # Text columns that ContentFilter.search can be scoped to.
@@ -205,6 +211,22 @@ enum ContentSearchField {
 input CreateContentFromYouTubeInput {
   url: String!
   userId: IntID!
+}
+
+# Find-or-create a Bible passage. endChapter/endVerse equal startChapter/startVerse
+# for a single verse. userID is accepted only if it matches the session (or 0).
+input CreateContentFromPassageInput {
+  bookID: Int!
+  startChapter: Int!
+  startVerse: Int!
+  endChapter: Int!
+  endVerse: Int!
+  userID: IntID!
+}
+
+input SetPassageDisplayTitleInput {
+  contentID: IntID!
+  title: String!
 }
 
 # Filters for content queries
@@ -325,6 +347,13 @@ input CreateClaimInput {
 type Mutation {
   createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   updateContentSourceData(contentId: IntID!): Content! @auth
+
+  # Bible passage mutations
+  createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth
+  # First-write-wins: if a title already exists, returns the content with the existing title.
+  setPassageDisplayTitle(input: SetPassageDisplayTitleInput!): Content! @auth
+  # Admin only: resets the title so it can be set again.
+  clearPassageDisplayTitle(contentId: IntID!): Content! @auth
 
   # User mutations
   createUser(input: CreateUserInput!): User! @auth

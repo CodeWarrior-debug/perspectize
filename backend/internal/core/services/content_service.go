@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
@@ -277,4 +279,57 @@ func (s *ContentService) CreateFromPassage(ctx context.Context, input portservic
 		return result, domain.ErrAlreadyExists
 	}
 	return result, nil
+}
+
+// MaxPassageDisplayTitleLength caps a passage's optional display title (in characters).
+const MaxPassageDisplayTitleLength = 200
+
+// SetPassageDisplayTitle sets a passage's optional title, first-write-wins: a
+// losing writer gets the winning title back on the returned content rather than
+// an error, since their intent (this passage should have a title) was met.
+func (s *ContentService) SetPassageDisplayTitle(ctx context.Context, contentID int, title string) (*domain.Content, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return nil, fmt.Errorf("%w: title must not be empty", domain.ErrInvalidInput)
+	}
+	if utf8.RuneCountInString(title) > MaxPassageDisplayTitleLength {
+		return nil, fmt.Errorf("%w: title must be at most %d characters", domain.ErrInvalidInput, MaxPassageDisplayTitleLength)
+	}
+
+	content, err := s.getPassage(ctx, contentID)
+	if err != nil {
+		return nil, err
+	}
+	winning, err := s.repo.SetDisplayTitleIfEmpty(ctx, contentID, title)
+	if err != nil {
+		return nil, err
+	}
+	content.DisplayTitle = &winning
+	return content, nil
+}
+
+// ClearPassageDisplayTitle resets a passage's title to NULL. Authorization
+// (admin-only) is the caller's responsibility.
+func (s *ContentService) ClearPassageDisplayTitle(ctx context.Context, contentID int) (*domain.Content, error) {
+	content, err := s.getPassage(ctx, contentID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.ClearDisplayTitle(ctx, contentID); err != nil {
+		return nil, err
+	}
+	content.DisplayTitle = nil
+	return content, nil
+}
+
+// getPassage loads a content row and requires it to be a BIBLE_PASSAGE.
+func (s *ContentService) getPassage(ctx context.Context, contentID int) (*domain.Content, error) {
+	content, err := s.repo.GetByID(ctx, contentID)
+	if err != nil {
+		return nil, err
+	}
+	if content.ContentType != domain.ContentTypeBiblePassage {
+		return nil, fmt.Errorf("%w: content %d is not a Bible passage", domain.ErrInvalidInput, contentID)
+	}
+	return content, nil
 }

@@ -168,6 +168,78 @@ func (r *mutationResolver) CreateContentFromYouTube(ctx context.Context, input m
 	}, nil
 }
 
+// CreateContentFromPassage is the resolver for the createContentFromPassage field.
+func (r *mutationResolver) CreateContentFromPassage(ctx context.Context, input model.CreateContentFromPassageInput) (*model.Content, error) {
+	// Identity comes from the session; a client-supplied userID only has to match it.
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	if input.UserID != 0 && input.UserID != authUser.ID {
+		return nil, fmt.Errorf("access denied: cannot create content for another user")
+	}
+
+	content, err := r.ContentService.CreateFromPassage(ctx, portservices.CreatePassageInput{
+		BookID:       input.BookID,
+		StartChapter: input.StartChapter,
+		StartVerse:   input.StartVerse,
+		EndChapter:   input.EndChapter,
+		EndVerse:     input.EndVerse,
+		UserID:       authUser.ID,
+	})
+	// Idempotent duplicate: the passage row already exists — same as a fresh create for the caller.
+	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
+		return domainToModel(content), nil
+	}
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("%w", err)
+		}
+		slog.Error("failed to create passage content", "userID", authUser.ID, "error", err)
+		return nil, fmt.Errorf("failed to create passage")
+	}
+	return domainToModel(content), nil
+}
+
+// SetPassageDisplayTitle is the resolver for the setPassageDisplayTitle field.
+func (r *mutationResolver) SetPassageDisplayTitle(ctx context.Context, input model.SetPassageDisplayTitleInput) (*model.Content, error) {
+	content, err := r.ContentService.SetPassageDisplayTitle(ctx, input.ContentID, input.Title)
+	if err != nil {
+		return nil, passageTitleError(err)
+	}
+	return domainToModel(content), nil
+}
+
+// ClearPassageDisplayTitle is the resolver for the clearPassageDisplayTitle field.
+// Admin-only: clearing reopens the first-write-wins title to anyone.
+func (r *mutationResolver) ClearPassageDisplayTitle(ctx context.Context, contentID int) (*model.Content, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	if authUser.Role != domain.UserRoleAdmin {
+		return nil, fmt.Errorf("access denied: admin only")
+	}
+
+	content, err := r.ContentService.ClearPassageDisplayTitle(ctx, contentID)
+	if err != nil {
+		return nil, passageTitleError(err)
+	}
+	return domainToModel(content), nil
+}
+
+// passageTitleError maps title-mutation service errors to client-safe messages.
+func passageTitleError(err error) error {
+	if errors.Is(err, domain.ErrNotFound) {
+		return fmt.Errorf("content not found")
+	}
+	if errors.Is(err, domain.ErrInvalidInput) {
+		return fmt.Errorf("%w", err)
+	}
+	slog.Error("passage display title mutation failed", "error", err)
+	return fmt.Errorf("failed to update passage title")
+}
+
 // UpdateContentSourceData is the resolver for the updateContentSourceData field.
 func (r *mutationResolver) UpdateContentSourceData(ctx context.Context, contentID int) (*model.Content, error) {
 	content, err := r.ContentService.UpdateSourceData(ctx, contentID)

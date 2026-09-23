@@ -33,6 +33,14 @@ type ContentService interface {
 	// If the range already exists, returns the existing content along with ErrAlreadyExists.
 	CreateFromPassage(ctx context.Context, input CreatePassageInput) (*domain.Content, error)
 
+	// SetPassageDisplayTitle sets a passage's optional title, first-write-wins. If a title already
+	// exists, the existing title is kept and returned on the content (not an error).
+	SetPassageDisplayTitle(ctx context.Context, contentID int, title string) (*domain.Content, error)
+
+	// ClearPassageDisplayTitle resets a passage's title to NULL so it can be set again.
+	// Callers are responsible for authorizing (admin-only).
+	ClearPassageDisplayTitle(ctx context.Context, contentID int) (*domain.Content, error)
+
 	// GetByID retrieves content by ID
 	GetByID(ctx context.Context, id int) (*domain.Content, error)
 
