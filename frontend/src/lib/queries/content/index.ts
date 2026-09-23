@@ -2,12 +2,20 @@ import { gql } from 'graphql-request';
 
 export type { ContentFilterInput } from '$lib/utils/gridUrlState';
 
+// Values the API returns in Content.contentType (a String, not a GraphQL enum).
+export type ContentType = 'YOUTUBE' | 'CLAIM' | 'BIBLE_PASSAGE';
+
 export interface ContentItem {
 	id: string;
 	name: string;
 	addedByUserID: string;
 	url: string | null;
 	contentType: string;
+	// BIBLE_PASSAGE only: computed verse ordinals and the optional,
+	// first-write-wins display title. Null/absent for other content types.
+	verseStartID?: number | null;
+	verseEndID?: number | null;
+	displayTitle?: string | null;
 	length: number | null;
 	lengthUnits: string | null;
 	viewCount: number | null;
@@ -81,6 +89,9 @@ export const LIST_CONTENT = gql`
 				addedByUserID
 				url
 				contentType
+				verseStartID
+				verseEndID
+				displayTitle
 				length
 				lengthUnits
 				viewCount
