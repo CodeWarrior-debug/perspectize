@@ -185,4 +185,83 @@ describe('ActivityDetailsModal', () => {
 		const link = screen.getByRole('link', { name: /compare/i });
 		expect(link).toHaveAttribute('href', `/compare?contentId=${content.id}`);
 	});
+
+	describe('BIBLE_PASSAGE content', () => {
+		const passage = {
+			id: '7',
+			name: 'Genesis 1:1-3',
+			url: 'https://www.biblegateway.com/passage/?search=Genesis+1%3A1-3',
+			channelTitle: null,
+			viewCount: null,
+			likeCount: null,
+			length: null,
+			lengthUnits: null,
+			publishedAt: null,
+			updatedAt: '2026-03-01T00:00:00Z',
+			description: null,
+			tags: null,
+			contentType: 'BIBLE_PASSAGE',
+			displayTitle: null as string | null,
+			verseStartID: 1,
+			verseEndID: 3,
+		};
+
+		beforeEach(() => {
+			mocks.mockQueryState.data = {
+				passageText: {
+					translation: 'BSB',
+					copyright: 'Berean Standard Bible, public domain (CC0)',
+					verses: [{ verseId: 1, chapter: 1, verse: 1, text: 'In the beginning God created' }],
+				},
+			};
+		});
+
+		it('shows the passage header, reference, and passage text with no video stat tiles', () => {
+			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+
+			expect(screen.getByText('Bible Passage')).toBeInTheDocument();
+			expect(screen.queryByText('YouTube Video')).not.toBeInTheDocument();
+			expect(screen.getByTestId('passage-title')).toHaveTextContent('Genesis 1:1-3');
+			expect(screen.getByText(/In the beginning God created/)).toBeInTheDocument();
+			expect(screen.queryByText('Views')).not.toBeInTheDocument();
+			expect(screen.queryByText('Likes')).not.toBeInTheDocument();
+			expect(screen.queryByText('Duration')).not.toBeInTheDocument();
+			expect(screen.queryByText('Published')).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /update source data/i })).not.toBeInTheDocument();
+			// Perspective aggregates still apply to a passage
+			expect(screen.getByText('Perspectives')).toBeInTheDocument();
+		});
+
+		it('offers a title form while untitled and submits the trimmed title', async () => {
+			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+
+			const save = screen.getByRole('button', { name: /save title/i });
+			expect(save).toBeDisabled();
+
+			await fireEvent.input(screen.getByLabelText('Passage title'), { target: { value: '  Creation  ' } });
+			expect(save).not.toBeDisabled();
+			await fireEvent.click(save);
+
+			expect(mocks.mockMutate).toHaveBeenCalledWith({ contentID: '7', title: 'Creation' });
+		});
+
+		it('shows the display title with the reference as subtitle and hides the form once titled', () => {
+			render(ActivityDetailsModal, {
+				props: { content: { ...passage, displayTitle: 'Creation' }, open: true, onClose: vi.fn() },
+			});
+
+			expect(screen.getByTestId('passage-title')).toHaveTextContent('Creation');
+			expect(screen.getByText('Genesis 1:1-3')).toBeInTheDocument();
+			expect(screen.queryByLabelText('Passage title')).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /save title/i })).not.toBeInTheDocument();
+		});
+
+		it('disables Save title while the mutation is pending', async () => {
+			mocks.mockMutationState.isPending = true;
+			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+
+			await fireEvent.input(screen.getByLabelText('Passage title'), { target: { value: 'Creation' } });
+			expect(screen.getByRole('button', { name: /save title/i })).toBeDisabled();
+		});
+	});
 });

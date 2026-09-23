@@ -1,7 +1,64 @@
 import { extractVideoIdFromUrl } from './formatting';
+import { BIBLE_PASSAGE_ICON_SVG } from './icons';
+
+/**
+ * Bible passage variant of the Item cell: an icon tile instead of a thumbnail
+ * (no image request), the reference (`name`) as the title, and — once someone
+ * has set a display title — that title as primary text with the reference as
+ * a subtitle (AN Q23).
+ */
+function renderPassageCell(opts: {
+	id: string | number;
+	name: string;
+	url: string | null;
+	displayTitle?: string | null;
+	onOpenDetails?: (contentId: string) => void;
+}): HTMLElement {
+	const { id, name, url, displayTitle, onOpenDetails } = opts;
+
+	const cell = document.createElement('div');
+	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-2 cursor-pointer';
+	cell.addEventListener('click', () => onOpenDetails?.(String(id)));
+
+	const iconBox = document.createElement('div');
+	iconBox.dataset.testid = 'item-thumb';
+	iconBox.className = 'flex h-8 w-10 flex-none items-center justify-center rounded bg-muted text-primary';
+	iconBox.innerHTML = BIBLE_PASSAGE_ICON_SVG;
+	iconBox.addEventListener('click', (e) => {
+		e.stopPropagation();
+		if (url) window.open(url, '_blank', 'noopener,noreferrer');
+	});
+
+	const textWrap = document.createElement('div');
+	textWrap.className = 'min-w-0 flex-1 text-left whitespace-normal';
+
+	const title = document.createElement('div');
+	title.dataset.testid = 'item-title';
+	title.className = `${displayTitle ? 'line-clamp-1' : 'line-clamp-2'} font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline`;
+	title.textContent = displayTitle || name;
+	textWrap.appendChild(title);
+
+	if (displayTitle) {
+		const subtitle = document.createElement('div');
+		subtitle.dataset.testid = 'item-subtitle';
+		subtitle.className = 'line-clamp-1 text-[11px] leading-[1.5] text-muted-foreground';
+		subtitle.textContent = name;
+		textWrap.appendChild(subtitle);
+	}
+
+	cell.appendChild(iconBox);
+	cell.appendChild(textWrap);
+	return cell;
+}
 
 export interface ActivityItemCellRendererParams {
-	data?: { id: string | number; name: string; url: string | null };
+	data?: {
+		id: string | number;
+		name: string;
+		url: string | null;
+		contentType?: string;
+		displayTitle?: string | null;
+	};
 	context?: { onOpenDetails?: (contentId: string) => void };
 }
 
@@ -19,28 +76,28 @@ const PLAY_ICON_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="non
  * larger-thumbnail) version this replaced, and CLAUDE.md's AG Grid gotcha
  * for why `whitespace-normal` below is required.
  */
-export function activityItemCellRenderer(
-	params: ActivityItemCellRendererParams,
-): HTMLElement | string {
+export function activityItemCellRenderer(params: ActivityItemCellRendererParams): HTMLElement | string {
 	if (!params.data) return '';
 
-	const { id, name, url } = params.data;
+	const { id, name, url, contentType, displayTitle } = params.data;
 	const onOpenDetails = params.context?.onOpenDetails;
+
+	if (contentType === 'BIBLE_PASSAGE') {
+		return renderPassageCell({ id, name, url, displayTitle, onOpenDetails });
+	}
 
 	// No native `title` attribute here (or on the thumbnail below) — the column's
 	// context.tooltipSpec popover already shows details on cell hover, and a
 	// native title attribute on top of that shows two overlapping tooltip boxes.
 	const cell = document.createElement('div');
-	cell.className =
-		'group/cell flex h-full w-full items-center gap-2 px-2.5 py-2 cursor-pointer';
+	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-2 cursor-pointer';
 	cell.addEventListener('click', () => {
 		onOpenDetails?.(String(id));
 	});
 
 	const thumbWrap = document.createElement('div');
 	thumbWrap.dataset.testid = 'item-thumb';
-	thumbWrap.className =
-		'group/thumb relative h-8 w-10 flex-none overflow-hidden rounded bg-muted';
+	thumbWrap.className = 'group/thumb relative h-8 w-10 flex-none overflow-hidden rounded bg-muted';
 	thumbWrap.addEventListener('click', (e) => {
 		e.stopPropagation();
 		if (url) window.open(url, '_blank', 'noopener,noreferrer');
