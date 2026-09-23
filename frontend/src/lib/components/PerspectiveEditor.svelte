@@ -62,6 +62,15 @@
 					blockquote: false,
 					horizontalRule: false,
 					heading: { levels: [2, 3] },
+					// StarterKit v3 bundles Link and Underline; we register our own
+					// configured copies below, so disable the bundled ones to avoid
+					// duplicate extensions (which silently kept openOnClick/autolink on).
+					link: false,
+					underline: false,
+					// Neither sanitizer allows <s>/<code>, so formatting made with their
+					// shortcuts would be silently lost on save.
+					strike: false,
+					code: false,
 				}),
 				Underline,
 				Placeholder.configure({ placeholder }),
@@ -100,9 +109,10 @@
 		editor?.destroy();
 	});
 
+	// Buttons run on `click` so keyboard activation (Enter/Space) works; the
+	// `mousedown` preventDefault below keeps the editor selection from blurring.
 	function toolAction(command: () => void) {
-		return (e: MouseEvent) => {
-			e.preventDefault();
+		return () => {
 			command();
 			editor?.commands.focus();
 		};
@@ -134,6 +144,8 @@
 		isActive: () => boolean;
 		run: () => void;
 		desktopOnly?: boolean;
+		/** Toggle buttons expose their on/off state via aria-pressed. */
+		toggle?: boolean;
 	};
 
 	// `updateTick` is read here (unused otherwise) purely to force this $derived
@@ -144,6 +156,7 @@
 			? [
 					{
 						id: 'bold',
+						toggle: true,
 						label: 'Bold',
 						icon: BoldIcon,
 						isActive: () => editor!.isActive('bold'),
@@ -151,6 +164,7 @@
 					},
 					{
 						id: 'italic',
+						toggle: true,
 						label: 'Italic',
 						icon: ItalicIcon,
 						isActive: () => editor!.isActive('italic'),
@@ -158,6 +172,7 @@
 					},
 					{
 						id: 'underline',
+						toggle: true,
 						label: 'Underline',
 						icon: UnderlineIcon,
 						isActive: () => editor!.isActive('underline'),
@@ -165,6 +180,7 @@
 					},
 					{
 						id: 'bulletList',
+						toggle: true,
 						label: 'Bullet list',
 						icon: ListIcon,
 						isActive: () => editor!.isActive('bulletList'),
@@ -172,6 +188,7 @@
 					},
 					{
 						id: 'orderedList',
+						toggle: true,
 						label: 'Numbered list',
 						icon: ListOrderedIcon,
 						isActive: () => editor!.isActive('orderedList'),
@@ -179,6 +196,7 @@
 					},
 					{
 						id: 'link',
+						toggle: true,
 						label: 'Link',
 						icon: LinkIcon,
 						isActive: () => editor!.isActive('link'),
@@ -224,7 +242,7 @@
 						desktopOnly: true,
 					},
 				]
-			: []
+			: [],
 	);
 
 	const visibleItems = $derived(items.filter((i) => !i.desktopOnly || !isMobile));
@@ -235,12 +253,15 @@
 		{ value: '3', label: 'Heading 3' },
 	];
 
-	function currentHeadingValue(): string {
+	// Reads `updateTick` so the dropdown re-evaluates on every selection/content
+	// change (Tiptap's Editor isn't reactive to Svelte on its own).
+	const headingValue = $derived.by(() => {
+		void updateTick;
 		if (!editor) return '0';
 		if (editor.isActive('heading', { level: 2 })) return '2';
 		if (editor.isActive('heading', { level: 3 })) return '3';
 		return '0';
-	}
+	});
 
 	function onHeadingChange(e: Event) {
 		if (!editor) return;
@@ -261,15 +282,8 @@
 	class="comment-editor-wrapper border border-input rounded-lg bg-white overflow-hidden flex flex-col w-full min-w-0"
 >
 	<!-- Toolbar -->
-	<div
-		class="flex items-center gap-0.5 px-1.5 py-1 border-b border-border bg-accent relative flex-wrap"
-	>
-		<select
-			class="heading-select"
-			value={currentHeadingValue()}
-			onchange={onHeadingChange}
-			aria-label="Text style"
-		>
+	<div class="flex items-center gap-0.5 px-1.5 py-1 border-b border-border bg-accent relative flex-wrap">
+		<select class="heading-select" value={headingValue} onchange={onHeadingChange} aria-label="Text style">
 			{#each headingLevels as level (level.value)}
 				<option value={level.value}>{level.label}</option>
 			{/each}
@@ -282,8 +296,10 @@
 				type="button"
 				class="tool-btn"
 				class:active={item.isActive()}
-				onmousedown={toolAction(item.run)}
+				onmousedown={(e) => e.preventDefault()}
+				onclick={toolAction(item.run)}
 				aria-label={item.label}
+				aria-pressed={item.toggle ? item.isActive() : undefined}
 			>
 				<item.icon size={14} />
 			</button>
