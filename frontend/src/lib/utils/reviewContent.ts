@@ -13,3 +13,17 @@ export function hasReviewContent(html: string): boolean {
 	if (doc.body.querySelector('img')) return true;
 	return (doc.body.textContent ?? '').trim() !== '';
 }
+
+/**
+ * reviewPreviewText — one-line plain-text preview of editor HTML (used where
+ * the rich editor is collapsed, e.g. the mobile drawer). Blocks are separated
+ * by a space so adjacent paragraphs don't run together, and images show as
+ * "[image]" so an image-only review isn't blank.
+ */
+export function reviewPreviewText(html: string): string {
+	if (typeof DOMParser === 'undefined') return '';
+	const doc = new DOMParser().parseFromString(html, 'text/html');
+	doc.body.querySelectorAll('img').forEach((img) => img.replaceWith(' [image] '));
+	doc.body.querySelectorAll('p, h1, h2, h3, li, td, th, br').forEach((el) => el.append(' '));
+	return (doc.body.textContent ?? '').replace(/\s+/g, ' ').trim();
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hasReviewContent } from '$lib/utils/reviewContent';
+import { hasReviewContent, reviewPreviewText } from '$lib/utils/reviewContent';
 
 describe('hasReviewContent', () => {
 	it('is false for empty and whitespace-only editor output', () => {
@@ -34,5 +34,24 @@ describe('hasReviewContent', () => {
 		expect(hasReviewContent('<scr<script>ipt></scr</script>ipt>')).toBe(true);
 		expect(hasReviewContent('<p><<b></b>></p>')).toBe(true);
 		expect(hasReviewContent('<script></script>')).toBe(false);
+	});
+});
+
+describe('reviewPreviewText', () => {
+	it('separates block elements with a space instead of running them together', () => {
+		expect(reviewPreviewText('<h2>Title</h2><p>Body text</p>')).toBe('Title Body text');
+		expect(reviewPreviewText('<ul><li>one</li><li>two</li></ul>')).toBe('one two');
+		expect(reviewPreviewText('<table><tbody><tr><td>a</td><td>b</td></tr></tbody></table>')).toBe('a b');
+	});
+
+	it('shows a placeholder for images so an image-only review is not blank', () => {
+		expect(reviewPreviewText('<p><img src="https://example.com/a.png"></p>')).toBe('[image]');
+		expect(reviewPreviewText('<p>look</p><img src="https://example.com/a.png">')).toBe('look [image]');
+	});
+
+	it('returns an empty string for empty content and never leaks markup', () => {
+		expect(reviewPreviewText('')).toBe('');
+		expect(reviewPreviewText('<p></p>')).toBe('');
+		expect(reviewPreviewText('<scr<script>ipt>x</scr</script>ipt>')).not.toContain('<script');
 	});
 });

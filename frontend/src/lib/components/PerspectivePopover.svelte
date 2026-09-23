@@ -23,7 +23,7 @@
 	import CommentFullscreen from '$lib/components/CommentFullscreen.svelte';
 	import AddFieldSearch from '$lib/components/AddFieldSearch.svelte';
 	import { sanitizeHtml } from '$lib/utils/sanitize';
-	import { hasReviewContent } from '$lib/utils/reviewContent';
+	import { hasReviewContent, reviewPreviewText } from '$lib/utils/reviewContent';
 	import { draftKey, saveDraft, loadDraft, clearDraft } from '$lib/utils/perspectiveDraft';
 	import type { FieldDef } from '$lib/components/AddFieldSearch.svelte';
 	import { useCreatePerspective } from '$lib/queries/perspectives/useCreatePerspective';
@@ -415,7 +415,7 @@
 					class:text-muted-foreground={!hasComment}
 				>
 					{#if hasComment}
-						{comment.replace(/<[^>]*>/g, '')}
+						{reviewPreviewText(comment)}
 					{:else}
 						Add a comment
 					{/if}
