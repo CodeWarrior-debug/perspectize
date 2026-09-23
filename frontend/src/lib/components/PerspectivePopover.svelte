@@ -18,10 +18,11 @@
 	} from '$lib/components/shadcn';
 	import RatingInput from '$lib/components/RatingInput.svelte';
 	import Thumbs from '$lib/components/Thumbs.svelte';
-	import CommentEditor from '$lib/components/CommentEditor.svelte';
+	import PerspectiveEditor from '$lib/components/PerspectiveEditor.svelte';
 	import CommentFullscreen from '$lib/components/CommentFullscreen.svelte';
 	import AddFieldSearch from '$lib/components/AddFieldSearch.svelte';
 	import { sanitizeHtml } from '$lib/utils/sanitize';
+	import { draftKey, saveDraft, loadDraft, clearDraft } from '$lib/utils/perspectiveDraft';
 	import type { FieldDef } from '$lib/components/AddFieldSearch.svelte';
 	import { useCreatePerspective } from '$lib/queries/perspectives/useCreatePerspective';
 	import { useUpdatePerspective } from '$lib/queries/perspectives/useUpdatePerspective';
@@ -87,16 +88,16 @@
 	}
 
 	// Comment (rich text HTML)
-	// TODO: Backend integration — comment field not yet in GraphQL schema
 	let comment = $state('');
 	let commentFullscreenOpen = $state(false);
+	let restoredFromDraft = $state(false);
+	let draftSaveTimer: ReturnType<typeof setTimeout> | undefined;
 
 	// Dynamic fields — tracks which rating fields are shown
 	const DEFAULT_FIELDS = ['quality', 'agreement', 'importance', 'confidence'];
 	let activeFields = $state<string[]>([...DEFAULT_FIELDS]);
 
 	// Dynamic field values for non-core fields
-	// TODO: Backend integration — custom/suggested fields not yet in schema
 	let dynamicValues = $state<Record<string, number | null>>({});
 
 	// Mapping from field key to bindable state getter/setter
@@ -184,7 +185,15 @@
 		confidence = existingPerspective?.confidence ?? null;
 		const l = existingPerspective?.like;
 		likeValue = l === 'THUMBS_UP' ? 'THUMBS_UP' : l === 'THUMBS_DOWN' ? 'THUMBS_DOWN' : null;
-		comment = existingPerspective?.review ?? '';
+		const baseline = existingPerspective?.review ?? '';
+		const draft = loadDraft(draftKey(contentId, userId));
+		if (draft && draft !== baseline) {
+			comment = draft;
+			restoredFromDraft = true;
+		} else {
+			comment = baseline;
+			restoredFromDraft = false;
+		}
 		commentFullscreenOpen = false;
 		isPrivate = String(existingPerspective?.privacy ?? '').toUpperCase() === 'PRIVATE';
 		const nextFeelings = existingPerspective?.feelings ?? [];
@@ -215,6 +224,11 @@
 
 	function handleCommentChange(html: string) {
 		comment = html;
+		restoredFromDraft = false;
+		if (draftSaveTimer) clearTimeout(draftSaveTimer);
+		draftSaveTimer = setTimeout(() => {
+			saveDraft(draftKey(contentId, userId), html);
+		}, 1000);
 	}
 
 	// Build customFields payload from dynamic (non-core) field values.
@@ -270,6 +284,7 @@
 				},
 				{
 					onSuccess: () => {
+						clearDraft(draftKey(contentId, userId));
 						onSuccess?.();
 						onClose();
 					},
@@ -292,6 +307,7 @@
 				},
 				{
 					onSuccess: () => {
+						clearDraft(draftKey(contentId, userId));
 						onSuccess?.();
 						onClose();
 					},
@@ -374,7 +390,7 @@
 			</button>
 		{:else}
 			<div class="flex-1 min-w-0 relative">
-				<CommentEditor
+				<PerspectiveEditor
 					value={comment}
 					onChange={handleCommentChange}
 					minHeight={68}
@@ -382,10 +398,28 @@
 					onPopout={() => {
 						commentFullscreenOpen = true;
 					}}
+					isMobile={mobile}
 				/>
 			</div>
 		{/if}
 	</div>
+
+	{#if restoredFromDraft}
+		<div
+			class="shrink-0 flex items-center justify-between gap-2 px-5 py-2 border-b border-border bg-accent text-[12px] text-muted-foreground"
+		>
+			<span>Restored unsaved draft</span>
+			<button
+				type="button"
+				class="text-muted-foreground underline hover:opacity-70"
+				onclick={() => {
+					restoredFromDraft = false;
+				}}
+			>
+				Dismiss
+			</button>
+		</div>
+	{/if}
 
 	<!-- Scrollable body — ratings + add field -->
 	<form onsubmit={handleSubmit} class="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -533,5 +567,6 @@
 		onClose={() => {
 			commentFullscreenOpen = false;
 		}}
+		isMobile={isMobile.current}
 	/>
 {/if}

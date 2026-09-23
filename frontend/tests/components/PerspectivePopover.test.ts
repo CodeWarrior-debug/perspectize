@@ -7,7 +7,22 @@ const mocks = vi.hoisted(() => ({
 	mockCreateMutate: vi.fn(),
 	mockUpdateMutate: vi.fn(),
 	mockOnClose: vi.fn(),
+	mockSaveDraft: vi.fn(),
+	mockLoadDraft: vi.fn(() => null as string | null),
+	mockClearDraft: vi.fn(),
 }));
+
+vi.mock('$lib/utils/perspectiveDraft', () => ({
+	draftKey: (contentId: number, userId: number) => `draft:${contentId}:${userId}`,
+	saveDraft: mocks.mockSaveDraft,
+	loadDraft: mocks.mockLoadDraft,
+	clearDraft: mocks.mockClearDraft,
+}));
+
+vi.mock('$lib/components/PerspectiveEditor.svelte', async () => {
+	const mod = await import('../helpers/FakePerspectiveEditor.svelte');
+	return { default: mod.default };
+});
 
 vi.mock('$lib/queries/perspectives/useCreatePerspective', () => ({
 	useCreatePerspective: vi.fn(() => ({
@@ -52,6 +67,7 @@ function renderPopover(props?: {
 describe('PerspectivePopover component', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mocks.mockLoadDraft.mockReturnValue(null);
 	});
 
 	describe('rendering', () => {
@@ -556,6 +572,74 @@ describe('PerspectivePopover component', () => {
 			});
 			await tick();
 			expect(screen.getByRole('switch', { name: /private/i })).toBeChecked();
+		});
+	});
+
+	describe('draft persistence', () => {
+		it('typing triggers a debounced saveDraft call', async () => {
+			vi.useFakeTimers();
+			try {
+				renderPopover();
+				await tick();
+
+				const editor = screen.getByLabelText('Comment');
+				await fireEvent.input(editor, { target: { value: '<p>hello</p>' } });
+
+				expect(mocks.mockSaveDraft).not.toHaveBeenCalled();
+				await vi.advanceTimersByTimeAsync(1000);
+				expect(mocks.mockSaveDraft).toHaveBeenCalledWith('draft:1:42', '<p>hello</p>');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('reopening with an existing draft shows the restore banner and populates the editor', async () => {
+			mocks.mockLoadDraft.mockReturnValue('<p>draft content</p>');
+			renderPopover();
+			await tick();
+
+			expect(screen.getByText('Restored unsaved draft')).toBeInTheDocument();
+			expect(screen.getByLabelText('Comment')).toHaveValue('<p>draft content</p>');
+		});
+
+		it('does not show the restore banner when no draft exists', async () => {
+			mocks.mockLoadDraft.mockReturnValue(null);
+			renderPopover();
+			await tick();
+
+			expect(screen.queryByText('Restored unsaved draft')).not.toBeInTheDocument();
+		});
+
+		it('successful create clears the draft', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			await fireEvent.click(screen.getByLabelText('Thumbs up'));
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			expect(mocks.mockCreateMutate).toHaveBeenCalled();
+			const options = mocks.mockCreateMutate.mock.calls.at(-1)![1];
+			options.onSuccess();
+			expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
+		});
+
+		it('successful update clears the draft', async () => {
+			renderPopover({
+				existingPerspective: {
+					id: '5',
+					quality: 7500,
+					agreement: null,
+					importance: null,
+					confidence: null,
+					like: null,
+				},
+			});
+			await tick();
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			expect(mocks.mockUpdateMutate).toHaveBeenCalled();
+			const options = mocks.mockUpdateMutate.mock.calls.at(-1)![1];
+			options.onSuccess();
+			expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
 		});
 	});
 });
