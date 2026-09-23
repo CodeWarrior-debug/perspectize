@@ -568,3 +568,11 @@ func TestUpdateSourceData_RepositoryUpdateError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to update content metadata")
 }
+
+func (m *mockContentRepository) SetDisplayTitleIfEmpty(ctx context.Context, contentID int, title string) (string, error) {
+	return title, nil
+}
+
+func (m *mockContentRepository) ClearDisplayTitle(ctx context.Context, contentID int) error {
+	return nil
+}

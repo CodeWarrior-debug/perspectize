@@ -1311,3 +1311,11 @@ func TestNewResolver(t *testing.T) {
 	assert.Equal(t, perspectiveService, resolver.PerspectiveService)
 	assert.Equal(t, categoryService, resolver.CategoryService)
 }
+
+func (m *mockContentRepository) SetDisplayTitleIfEmpty(ctx context.Context, contentID int, title string) (string, error) {
+	return title, nil
+}
+
+func (m *mockContentRepository) ClearDisplayTitle(ctx context.Context, contentID int) error {
+	return nil
+}
