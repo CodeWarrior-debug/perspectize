@@ -17,14 +17,27 @@ import (
 type ContentService struct {
 	repo          repositories.ContentRepository
 	youtubeClient portservices.YouTubeClient
+	bibleRepo     repositories.BibleReferenceRepository
+}
+
+// ContentServiceOption configures optional ContentService dependencies.
+type ContentServiceOption func(*ContentService)
+
+// WithBibleReference enables BIBLE_PASSAGE creation by supplying the reference-data repository.
+func WithBibleReference(repo repositories.BibleReferenceRepository) ContentServiceOption {
+	return func(s *ContentService) { s.bibleRepo = repo }
 }
 
 // NewContentService creates a new content service
-func NewContentService(repo repositories.ContentRepository, yt portservices.YouTubeClient) *ContentService {
-	return &ContentService{
+func NewContentService(repo repositories.ContentRepository, yt portservices.YouTubeClient, opts ...ContentServiceOption) *ContentService {
+	s := &ContentService{
 		repo:          repo,
 		youtubeClient: yt,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // CreateFromYouTube creates content from a YouTube URL, attributed to the given user.
@@ -209,5 +222,59 @@ func (s *ContentService) ListContent(ctx context.Context, params domain.ContentL
 		return nil, fmt.Errorf("failed to list content: %w", err)
 	}
 
+	return result, nil
+}
+
+// CreateFromPassage finds or creates the BIBLE_PASSAGE content row for a verse
+// range. Verse ordinals are computed from bible_book.verses_per_chapter, which
+// also validates that the chapter/verse exist. The canonical URL (the dedupe
+// key) and name are always regenerated from the resolved book — never taken
+// from user input — and dedupe reuses the atomic ON CONFLICT(url) upsert.
+func (s *ContentService) CreateFromPassage(ctx context.Context, input portservices.CreatePassageInput) (*domain.Content, error) {
+	if s.bibleRepo == nil {
+		return nil, errors.New("bible passage support is not configured")
+	}
+	if input.EndChapter < input.StartChapter ||
+		(input.EndChapter == input.StartChapter && input.EndVerse < input.StartVerse) {
+		return nil, fmt.Errorf("%w: passage end is before its start", domain.ErrInvalidPassage)
+	}
+
+	books, err := s.bibleRepo.ListBooks(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load bible reference data: %w", err)
+	}
+	startID, err := domain.BibleVerseOrdinal(books, input.BookID, input.StartChapter, input.StartVerse)
+	if err != nil {
+		return nil, err
+	}
+	endID, err := domain.BibleVerseOrdinal(books, input.BookID, input.EndChapter, input.EndVerse)
+	if err != nil {
+		return nil, err
+	}
+	var bookName string
+	for _, b := range books {
+		if b.ID == input.BookID {
+			bookName = b.Name
+			break
+		}
+	}
+
+	canonicalURL := domain.CanonicalPassageURL(bookName, input.StartChapter, input.StartVerse, input.EndChapter, input.EndVerse)
+	content := &domain.Content{
+		Name:          domain.CanonicalPassageName(bookName, input.StartChapter, input.StartVerse, input.EndChapter, input.EndVerse),
+		URL:           &canonicalURL,
+		ContentType:   domain.ContentTypeBiblePassage,
+		AddedByUserID: input.UserID,
+		VerseStartID:  &startID,
+		VerseEndID:    &endID,
+	}
+
+	result, existed, err := s.repo.GetOrCreateByURL(ctx, content, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create passage content: %w", err)
+	}
+	if existed {
+		return result, domain.ErrAlreadyExists
+	}
 	return result, nil
 }

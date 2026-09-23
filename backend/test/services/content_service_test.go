@@ -576,3 +576,98 @@ func (m *mockContentRepository) SetDisplayTitleIfEmpty(ctx context.Context, cont
 func (m *mockContentRepository) ClearDisplayTitle(ctx context.Context, contentID int) error {
 	return nil
 }
+
+// mockBibleReferenceRepo implements repositories.BibleReferenceRepository for testing
+type mockBibleReferenceRepo struct {
+	books []domain.BibleBook
+	err   error
+}
+
+func (m *mockBibleReferenceRepo) ListBooks(ctx context.Context) ([]domain.BibleBook, error) {
+	return m.books, m.err
+}
+
+func testBibleBooks() []domain.BibleBook {
+	return []domain.BibleBook{
+		{ID: 1, Name: "Genesis", VersesPerChapter: []int{31, 25, 24}},
+		{ID: 2, Name: "Exodus", VersesPerChapter: []int{22, 25}},
+	}
+}
+
+func TestCreateFromPassage_NewRange_UsesCanonicalStringsAndComputedOrdinals(t *testing.T) {
+	var got *domain.Content
+	repo := &mockContentRepository{
+		getOrCreateByURLFn: func(ctx context.Context, c *domain.Content, refresh bool) (*domain.Content, bool, error) {
+			got = c
+			assert.False(t, refresh, "passages must not refresh on conflict")
+			return c, false, nil
+		},
+	}
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, services.WithBibleReference(&mockBibleReferenceRepo{books: testBibleBooks()}))
+
+	// Exodus 1:1-2 → ordinals after Genesis's 80 verses: 81..82
+	result, err := svc.CreateFromPassage(context.Background(), portservices.CreatePassageInput{
+		BookID: 2, StartChapter: 1, StartVerse: 1, EndChapter: 1, EndVerse: 2, UserID: 42,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, domain.ContentTypeBiblePassage, got.ContentType)
+	assert.Equal(t, "Exodus 1:1-2", got.Name)
+	require.NotNil(t, got.URL)
+	assert.Equal(t, "https://www.biblegateway.com/passage/?search=Exodus+1%3A1-2", *got.URL)
+	assert.Equal(t, 42, got.AddedByUserID)
+	require.NotNil(t, got.VerseStartID)
+	require.NotNil(t, got.VerseEndID)
+	assert.Equal(t, 81, *got.VerseStartID)
+	assert.Equal(t, 82, *got.VerseEndID)
+}
+
+func TestCreateFromPassage_ExistingRange_ReturnsContentAndErrAlreadyExists(t *testing.T) {
+	existing := &domain.Content{ID: 5, ContentType: domain.ContentTypeBiblePassage}
+	repo := &mockContentRepository{
+		getOrCreateByURLFn: func(ctx context.Context, c *domain.Content, refresh bool) (*domain.Content, bool, error) {
+			return existing, true, nil
+		},
+	}
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, services.WithBibleReference(&mockBibleReferenceRepo{books: testBibleBooks()}))
+
+	result, err := svc.CreateFromPassage(context.Background(), portservices.CreatePassageInput{
+		BookID: 1, StartChapter: 1, StartVerse: 1, EndChapter: 1, EndVerse: 3, UserID: 1,
+	})
+
+	assert.ErrorIs(t, err, domain.ErrAlreadyExists)
+	assert.Same(t, existing, result)
+}
+
+func TestCreateFromPassage_Validation(t *testing.T) {
+	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, services.WithBibleReference(&mockBibleReferenceRepo{books: testBibleBooks()}))
+
+	cases := map[string]portservices.CreatePassageInput{
+		"end verse before start":     {BookID: 1, StartChapter: 1, StartVerse: 5, EndChapter: 1, EndVerse: 2, UserID: 1},
+		"end chapter before start":   {BookID: 1, StartChapter: 3, StartVerse: 1, EndChapter: 1, EndVerse: 1, UserID: 1},
+		"unknown book":               {BookID: 99, StartChapter: 1, StartVerse: 1, EndChapter: 1, EndVerse: 1, UserID: 1},
+		"chapter beyond book":        {BookID: 2, StartChapter: 3, StartVerse: 1, EndChapter: 3, EndVerse: 1, UserID: 1},
+		"verse beyond chapter (end)": {BookID: 1, StartChapter: 1, StartVerse: 1, EndChapter: 1, EndVerse: 32, UserID: 1},
+	}
+	for name, input := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := svc.CreateFromPassage(context.Background(), input)
+			assert.ErrorIs(t, err, domain.ErrInvalidPassage)
+			assert.ErrorIs(t, err, domain.ErrInvalidInput)
+		})
+	}
+}
+
+func TestCreateFromPassage_BibleRepoErrorAndMissingConfig(t *testing.T) {
+	in := portservices.CreatePassageInput{BookID: 1, StartChapter: 1, StartVerse: 1, EndChapter: 1, EndVerse: 1, UserID: 1}
+
+	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, services.WithBibleReference(&mockBibleReferenceRepo{err: errors.New("db down")}))
+	_, err := svc.CreateFromPassage(context.Background(), in)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "db down")
+
+	unconfigured := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{})
+	_, err = unconfigured.CreateFromPassage(context.Background(), in)
+	require.Error(t, err)
+}

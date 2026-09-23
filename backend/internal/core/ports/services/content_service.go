@@ -13,10 +13,25 @@ type CreateClaimInput struct {
 	ParentContentID int
 }
 
+// CreatePassageInput holds the input for creating (or finding) a Bible passage
+// content entry. EndChapter/EndVerse equal StartChapter/StartVerse for a single verse.
+type CreatePassageInput struct {
+	BookID       int
+	StartChapter int
+	StartVerse   int
+	EndChapter   int
+	EndVerse     int
+	UserID       int
+}
+
 // ContentService defines the contract for content business logic
 type ContentService interface {
 	// CreateFromYouTube creates content from a YouTube URL, attributed to the given user
 	CreateFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error)
+
+	// CreateFromPassage finds or creates the BIBLE_PASSAGE content row for a verse range.
+	// If the range already exists, returns the existing content along with ErrAlreadyExists.
+	CreateFromPassage(ctx context.Context, input CreatePassageInput) (*domain.Content, error)
 
 	// GetByID retrieves content by ID
 	GetByID(ctx context.Context, id int) (*domain.Content, error)

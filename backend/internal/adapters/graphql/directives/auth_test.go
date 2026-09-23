@@ -40,6 +40,10 @@ func (m *mockContentService) CreateClaim(ctx context.Context, input portservices
 	return nil, nil
 }
 
+func (m *mockContentService) CreateFromPassage(ctx context.Context, input portservices.CreatePassageInput) (*domain.Content, error) {
+	return nil, nil
+}
+
 func (m *mockContentService) UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error) {
 	return nil, nil
 }
