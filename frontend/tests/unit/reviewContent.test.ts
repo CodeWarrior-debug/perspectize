@@ -24,4 +24,15 @@ describe('hasReviewContent', () => {
 		expect(hasReviewContent(empty)).toBe(false);
 		expect(hasReviewContent(empty.replace('<p></p>', '<p>x</p>'))).toBe(true);
 	});
+
+	it('treats non-breaking-space-only content as empty', () => {
+		expect(hasReviewContent('<p>&nbsp;</p>')).toBe(false);
+	});
+
+	it('does not get fooled by nested/malformed tag fragments', () => {
+		// A regex tag-stripper leaves "<script" behind here; a real parser does not.
+		expect(hasReviewContent('<scr<script>ipt></scr</script>ipt>')).toBe(true);
+		expect(hasReviewContent('<p><<b></b>></p>')).toBe(true);
+		expect(hasReviewContent('<script></script>')).toBe(false);
+	});
 });
