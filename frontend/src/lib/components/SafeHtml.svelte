@@ -26,6 +26,17 @@
 		padding-left: 22px;
 		margin: 4px 0;
 	}
+	/* Tailwind's preflight resets list-style to none, so restore markers. */
+	.safe-html :global(ul) {
+		list-style: disc;
+	}
+	.safe-html :global(ol) {
+		list-style: decimal;
+	}
+	.safe-html :global(a) {
+		color: var(--color-primary);
+		text-decoration: underline;
+	}
 	.safe-html :global(li) {
 		margin: 2px 0;
 	}
