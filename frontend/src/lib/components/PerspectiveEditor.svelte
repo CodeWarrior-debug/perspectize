@@ -371,7 +371,7 @@
 	}
 	:global(.tiptap-content th),
 	:global(.tiptap-content td) {
-		border: 1px solid var(--border);
+		border: 1px solid var(--color-border);
 		padding: 4px 8px;
 		text-align: left;
 	}
