@@ -35,4 +35,31 @@
 	.safe-html :global(p:last-child) {
 		margin-bottom: 0;
 	}
+	.safe-html :global(h2) {
+		font-size: 1.25rem;
+		font-weight: 600;
+		margin: 0.75rem 0 0.25rem;
+	}
+	.safe-html :global(h3) {
+		font-size: 1.1rem;
+		font-weight: 600;
+		margin: 0.5rem 0 0.25rem;
+	}
+	.safe-html :global(img) {
+		max-width: 100%;
+		height: auto;
+		border-radius: 4px;
+	}
+	.safe-html :global(table) {
+		border-collapse: collapse;
+		width: 100%;
+		overflow-x: auto;
+		display: block;
+	}
+	.safe-html :global(th),
+	.safe-html :global(td) {
+		border: 1px solid var(--border);
+		padding: 4px 8px;
+		text-align: left;
+	}
 </style>
