@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import InfoIcon from '@lucide/svelte/icons/info';
@@ -22,6 +23,7 @@
 	import CommentFullscreen from '$lib/components/CommentFullscreen.svelte';
 	import AddFieldSearch from '$lib/components/AddFieldSearch.svelte';
 	import { sanitizeHtml } from '$lib/utils/sanitize';
+	import { hasReviewContent } from '$lib/utils/reviewContent';
 	import { draftKey, saveDraft, loadDraft, clearDraft } from '$lib/utils/perspectiveDraft';
 	import type { FieldDef } from '$lib/components/AddFieldSearch.svelte';
 	import { useCreatePerspective } from '$lib/queries/perspectives/useCreatePerspective';
@@ -92,6 +94,8 @@
 	let commentFullscreenOpen = $state(false);
 	let restoredFromDraft = $state(false);
 	let draftSaveTimer: ReturnType<typeof setTimeout> | undefined;
+	// Latest HTML awaiting the debounced draft save (null when nothing is pending).
+	let pendingDraft: string | null = null;
 
 	// Dynamic fields — tracks which rating fields are shown
 	const DEFAULT_FIELDS = ['quality', 'agreement', 'importance', 'confidence'];
@@ -185,8 +189,11 @@
 		confidence = existingPerspective?.confidence ?? null;
 		const l = existingPerspective?.like;
 		likeValue = l === 'THUMBS_UP' ? 'THUMBS_UP' : l === 'THUMBS_DOWN' ? 'THUMBS_DOWN' : null;
+		cancelPendingDraft();
 		const baseline = existingPerspective?.review ?? '';
-		const draft = loadDraft(draftKey(contentId, userId));
+		// Only restore a draft that was started from this same server review;
+		// a draft based on an older copy would overwrite newer saved content.
+		const draft = loadDraft(draftKey(contentId, userId), baseline);
 		if (draft && draft !== baseline) {
 			comment = draft;
 			restoredFromDraft = true;
@@ -220,15 +227,39 @@
 	const updateMutation = useUpdatePerspective();
 	const isPending = $derived(createMutation.isPending || updateMutation.isPending);
 
-	const hasComment = $derived(!!comment.replace(/<[^>]*>/g, '').trim());
+	const hasComment = $derived(hasReviewContent(comment));
+
+	function cancelPendingDraft() {
+		if (draftSaveTimer) clearTimeout(draftSaveTimer);
+		draftSaveTimer = undefined;
+		pendingDraft = null;
+	}
+
+	// Write the pending draft now (debounce fired, or the popover is closing).
+	function flushPendingDraft() {
+		const html = pendingDraft;
+		cancelPendingDraft();
+		if (html !== null) {
+			saveDraft(draftKey(contentId, userId), html, existingPerspective?.review ?? '');
+		}
+	}
+
+	// Closing the popover within the debounce window must not lose the last edits.
+	onDestroy(flushPendingDraft);
 
 	function handleCommentChange(html: string) {
 		comment = html;
 		restoredFromDraft = false;
+		pendingDraft = html;
 		if (draftSaveTimer) clearTimeout(draftSaveTimer);
-		draftSaveTimer = setTimeout(() => {
-			saveDraft(draftKey(contentId, userId), html);
-		}, 1000);
+		draftSaveTimer = setTimeout(flushPendingDraft, 1000);
+	}
+
+	function discardDraft() {
+		cancelPendingDraft();
+		clearDraft(draftKey(contentId, userId));
+		comment = existingPerspective?.review ?? '';
+		restoredFromDraft = false;
 	}
 
 	// Build customFields payload from dynamic (non-core) field values.
@@ -242,8 +273,7 @@
 
 	// Get review text — sanitize HTML and only send if non-empty
 	function getReview(): string | undefined {
-		const stripped = comment.replace(/<[^>]*>/g, '').trim();
-		return stripped ? sanitizeHtml(comment) : undefined;
+		return hasReviewContent(comment) ? sanitizeHtml(comment) : undefined;
 	}
 
 	function handleSubmit(e: Event) {
@@ -284,6 +314,9 @@
 				},
 				{
 					onSuccess: () => {
+						// Cancel first: a debounced save still in flight would re-create the
+						// draft we are about to delete.
+						cancelPendingDraft();
 						clearDraft(draftKey(contentId, userId));
 						onSuccess?.();
 						onClose();
@@ -307,6 +340,9 @@
 				},
 				{
 					onSuccess: () => {
+						// Cancel first: a debounced save still in flight would re-create the
+						// draft we are about to delete.
+						cancelPendingDraft();
 						clearDraft(draftKey(contentId, userId));
 						onSuccess?.();
 						onClose();
@@ -409,14 +445,8 @@
 			class="shrink-0 flex items-center justify-between gap-2 px-5 py-2 border-b border-border bg-accent text-[12px] text-muted-foreground"
 		>
 			<span>Restored unsaved draft</span>
-			<button
-				type="button"
-				class="text-muted-foreground underline hover:opacity-70"
-				onclick={() => {
-					restoredFromDraft = false;
-				}}
-			>
-				Dismiss
+			<button type="button" class="text-muted-foreground underline hover:opacity-70" onclick={discardDraft}>
+				Discard draft
 			</button>
 		</div>
 	{/if}

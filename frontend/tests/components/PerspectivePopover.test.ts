@@ -587,7 +587,7 @@ describe('PerspectivePopover component', () => {
 
 				expect(mocks.mockSaveDraft).not.toHaveBeenCalled();
 				await vi.advanceTimersByTimeAsync(1000);
-				expect(mocks.mockSaveDraft).toHaveBeenCalledWith('draft:1:42', '<p>hello</p>');
+				expect(mocks.mockSaveDraft).toHaveBeenCalledWith('draft:1:42', '<p>hello</p>', '');
 			} finally {
 				vi.useRealTimers();
 			}
@@ -640,6 +640,116 @@ describe('PerspectivePopover component', () => {
 			const options = mocks.mockUpdateMutate.mock.calls.at(-1)![1];
 			options.onSuccess();
 			expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
+		});
+	});
+
+	describe('image-only reviews', () => {
+		const imageOnly = '<p><img src="https://example.com/a.png"></p>';
+
+		it('saves an image-only review alongside a rating instead of dropping it', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: imageOnly } });
+			await fireEvent.click(screen.getByLabelText('Thumbs up'));
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			expect(mocks.mockCreateMutate).toHaveBeenCalled();
+			const payload = mocks.mockCreateMutate.mock.calls.at(-1)![0];
+			expect(payload.review).toContain('<img');
+		});
+
+		it('counts an image-only review as content, so it can be saved on its own', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: imageOnly } });
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			expect(mocks.mockCreateMutate).toHaveBeenCalled();
+		});
+	});
+
+	describe('draft lifecycle', () => {
+		it('a pending debounced draft save cannot resurrect the draft after a successful save', async () => {
+			vi.useFakeTimers();
+			try {
+				renderPopover({ existingPerspective: null });
+				await tick();
+				await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>typed</p>' } });
+				await fireEvent.click(screen.getByLabelText('Thumbs up'));
+				await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+				mocks.mockCreateMutate.mock.calls.at(-1)![1].onSuccess();
+				expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
+
+				await vi.advanceTimersByTimeAsync(1500);
+				expect(mocks.mockSaveDraft).not.toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('flushes a pending draft save immediately when the popover unmounts', async () => {
+			vi.useFakeTimers();
+			try {
+				const { unmount } = renderPopover({ existingPerspective: null });
+				await tick();
+				await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>almost lost</p>' } });
+				expect(mocks.mockSaveDraft).not.toHaveBeenCalled();
+
+				unmount();
+				expect(mocks.mockSaveDraft).toHaveBeenCalledWith('draft:1:42', '<p>almost lost</p>', '');
+				await vi.advanceTimersByTimeAsync(1500);
+				expect(mocks.mockSaveDraft).toHaveBeenCalledTimes(1);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('keys drafts to the server review they were started from', async () => {
+			vi.useFakeTimers();
+			try {
+				renderPopover({
+					existingPerspective: {
+						id: '5',
+						quality: 7500,
+						agreement: null,
+						importance: null,
+						confidence: null,
+						like: null,
+						review: '<p>server copy</p>',
+					},
+				});
+				await tick();
+				expect(mocks.mockLoadDraft).toHaveBeenCalledWith('draft:1:42', '<p>server copy</p>');
+
+				await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>edited</p>' } });
+				await vi.advanceTimersByTimeAsync(1000);
+				expect(mocks.mockSaveDraft).toHaveBeenCalledWith('draft:1:42', '<p>edited</p>', '<p>server copy</p>');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('"Discard draft" reverts to the saved review and deletes the stored draft', async () => {
+			mocks.mockLoadDraft.mockReturnValue('<p>stale draft</p>');
+			renderPopover({
+				existingPerspective: {
+					id: '5',
+					quality: 7500,
+					agreement: null,
+					importance: null,
+					confidence: null,
+					like: null,
+					review: '<p>saved copy</p>',
+				},
+			});
+			await tick();
+			expect(screen.getByLabelText('Comment')).toHaveValue('<p>stale draft</p>');
+
+			await fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }));
+
+			expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
+			expect(screen.getByLabelText('Comment')).toHaveValue('<p>saved copy</p>');
+			expect(screen.queryByText('Restored unsaved draft')).not.toBeInTheDocument();
 		});
 	});
 });

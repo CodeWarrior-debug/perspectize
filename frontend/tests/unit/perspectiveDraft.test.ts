@@ -32,6 +32,27 @@ describe('perspectiveDraft', () => {
 		expect(draftKey(1, 2)).toBe(a);
 	});
 
+	it('returns the draft only while the server baseline it was started from is unchanged', () => {
+		const key = draftKey(1, 2);
+		saveDraft(key, '<p>my edit</p>', '<p>server v1</p>');
+		expect(loadDraft(key, '<p>server v1</p>')).toBe('<p>my edit</p>');
+	});
+
+	it('discards a draft whose baseline no longer matches the server copy', () => {
+		const key = draftKey(1, 2);
+		saveDraft(key, '<p>my edit</p>', '<p>server v1</p>');
+		expect(loadDraft(key, '<p>server v2 saved elsewhere</p>')).toBeNull();
+		// ...and the stale entry is gone, not just hidden
+		expect(loadDraft(key, '<p>server v1</p>')).toBeNull();
+	});
+
+	it('treats a missing baseline as the empty string (a brand-new perspective)', () => {
+		const key = draftKey(1, 2);
+		saveDraft(key, '<p>new</p>');
+		expect(loadDraft(key)).toBe('<p>new</p>');
+		expect(loadDraft(key, '')).toBe('<p>new</p>');
+	});
+
 	it('degrades to a no-op when localStorage throws (private browsing/quota)', () => {
 		const setItemSpy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
 			throw new Error('QuotaExceededError');
