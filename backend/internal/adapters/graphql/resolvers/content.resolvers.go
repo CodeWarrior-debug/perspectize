@@ -228,6 +228,27 @@ func (r *mutationResolver) ClearPassageDisplayTitle(ctx context.Context, content
 	return domainToModel(content), nil
 }
 
+// PassageText is the resolver for the passageText field.
+func (r *queryResolver) PassageText(ctx context.Context, startVerseID int, endVerseID int) (*model.PassageText, error) {
+	text, err := r.ContentService.PassageText(ctx, startVerseID, endVerseID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("passage text not found")
+		}
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("%w", err)
+		}
+		slog.Error("failed to load passage text", "start", startVerseID, "end", endVerseID, "error", err)
+		return nil, fmt.Errorf("failed to load passage text")
+	}
+
+	verses := make([]*model.PassageVerse, len(text.Verses))
+	for i, v := range text.Verses {
+		verses[i] = &model.PassageVerse{VerseID: v.VerseID, Chapter: v.Chapter, Verse: v.Verse, Text: v.Text}
+	}
+	return &model.PassageText{Translation: text.Translation, Copyright: text.Copyright, Verses: verses}, nil
+}
+
 // passageTitleError maps title-mutation service errors to client-safe messages.
 func passageTitleError(err error) error {
 	if errors.Is(err, domain.ErrNotFound) {

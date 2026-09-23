@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"net/url"
+	"sort"
 )
 
 // ErrInvalidPassage is returned when a passage reference is out of range
@@ -55,6 +56,57 @@ func BibleVerseOrdinal(books []BibleBook, bookID, chapter, verse int) (int, erro
 		offset += n
 	}
 	return offset + verse, nil
+}
+
+// BibleVerseFromOrdinal is the inverse of BibleVerseOrdinal: it resolves a
+// 1-based global verse ordinal back to (bookID, chapter, verse). books may be
+// in any order; they are walked by ascending ID.
+func BibleVerseFromOrdinal(books []BibleBook, ordinal int) (bookID, chapter, verse int, err error) {
+	if ordinal < 1 {
+		return 0, 0, 0, fmt.Errorf("%w: verse ordinal %d out of range", ErrInvalidPassage, ordinal)
+	}
+	sorted := make([]BibleBook, len(books))
+	copy(sorted, books)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ID < sorted[j].ID })
+
+	remaining := ordinal
+	for _, b := range sorted {
+		for ch, n := range b.VersesPerChapter {
+			if remaining <= n {
+				return b.ID, ch + 1, remaining, nil
+			}
+			remaining -= n
+		}
+	}
+	return 0, 0, 0, fmt.Errorf("%w: verse ordinal %d out of range", ErrInvalidPassage, ordinal)
+}
+
+// BibleTranslationBSB is the code of the only translation whose text is stored
+// locally (Berean Standard Bible, public domain).
+const BibleTranslationBSB = "BSB"
+
+// BibleTranslationBSBCopyright is the attribution line shown with BSB text.
+const BibleTranslationBSBCopyright = "Berean Standard Bible, public domain (CC0)"
+
+// BibleVerseText is one stored verse of a translation, keyed by ordinal.
+type BibleVerseText struct {
+	VerseID int
+	Text    string
+}
+
+// PassageVerse is a verse of passage text with its resolved reference.
+type PassageVerse struct {
+	VerseID int
+	Chapter int
+	Verse   int
+	Text    string
+}
+
+// PassageText is the text of a verse range in one translation.
+type PassageText struct {
+	Translation string
+	Copyright   string
+	Verses      []PassageVerse
 }
 
 // CanonicalPassageURL builds the version-less Bible Gateway URL used as the

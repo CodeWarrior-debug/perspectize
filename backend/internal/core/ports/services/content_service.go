@@ -41,6 +41,9 @@ type ContentService interface {
 	// Callers are responsible for authorizing (admin-only).
 	ClearPassageDisplayTitle(ctx context.Context, contentID int) (*domain.Content, error)
 
+	// PassageText returns the stored BSB text for the verse-ordinal range startVerseID..endVerseID.
+	PassageText(ctx context.Context, startVerseID, endVerseID int) (*domain.PassageText, error)
+
 	// GetByID retrieves content by ID
 	GetByID(ctx context.Context, id int) (*domain.Content, error)
 

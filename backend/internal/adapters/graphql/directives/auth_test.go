@@ -52,6 +52,10 @@ func (m *mockContentService) ClearPassageDisplayTitle(ctx context.Context, conte
 	return nil, nil
 }
 
+func (m *mockContentService) PassageText(ctx context.Context, startVerseID, endVerseID int) (*domain.PassageText, error) {
+	return nil, nil
+}
+
 func (m *mockContentService) UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error) {
 	return nil, nil
 }

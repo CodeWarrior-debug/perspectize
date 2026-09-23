@@ -222,6 +222,19 @@ type ParticipantChanged struct {
 
 func (ParticipantChanged) IsThreadEvent() {}
 
+type PassageText struct {
+	Translation string          `json:"translation"`
+	Copyright   string          `json:"copyright"`
+	Verses      []*PassageVerse `json:"verses"`
+}
+
+type PassageVerse struct {
+	VerseID int    `json:"verseId"`
+	Chapter int    `json:"chapter"`
+	Verse   int    `json:"verse"`
+	Text    string `json:"text"`
+}
+
 type Perspective struct {
 	ID                    string               `json:"id"`
 	UserID                string               `json:"userID"`

@@ -3,6 +3,7 @@ package resolvers_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -19,6 +20,14 @@ import (
 )
 
 type stubBibleRepo struct{}
+
+func (stubBibleRepo) GetVerseTexts(ctx context.Context, translation string, startID, endID int) ([]domain.BibleVerseText, error) {
+	var out []domain.BibleVerseText
+	for id := startID; id <= endID && id <= 3; id++ {
+		out = append(out, domain.BibleVerseText{VerseID: id, Text: fmt.Sprintf("verse %d", id)})
+	}
+	return out, nil
+}
 
 func (stubBibleRepo) ListBooks(ctx context.Context) ([]domain.BibleBook, error) {
 	return []domain.BibleBook{
@@ -185,4 +194,41 @@ func TestClearPassageDisplayTitle_AdminOnly(t *testing.T) {
 		assert.True(t, cleared)
 		assert.Contains(t, string(result.Data), `"displayTitle":null`)
 	})
+}
+
+func TestPassageText_Query(t *testing.T) {
+	server := setupPassageTestServer(&mockContentRepository{}, domain.UserRoleDefault)
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `query { passageText(startVerseId: 1, endVerseId: 3) { translation copyright verses { verseId chapter verse text } } }`)
+	require.Empty(t, result.Errors)
+
+	var data struct {
+		PassageText struct {
+			Translation string `json:"translation"`
+			Copyright   string `json:"copyright"`
+			Verses      []struct {
+				VerseID int    `json:"verseId"`
+				Chapter int    `json:"chapter"`
+				Verse   int    `json:"verse"`
+				Text    string `json:"text"`
+			} `json:"verses"`
+		} `json:"passageText"`
+	}
+	require.NoError(t, json.Unmarshal(result.Data, &data))
+	assert.Equal(t, "BSB", data.PassageText.Translation)
+	assert.Contains(t, data.PassageText.Copyright, "public domain")
+	require.Len(t, data.PassageText.Verses, 3)
+	assert.Equal(t, 1, data.PassageText.Verses[0].Chapter)
+	assert.Equal(t, 3, data.PassageText.Verses[2].Verse)
+	assert.Equal(t, "verse 3", data.PassageText.Verses[2].Text)
+}
+
+func TestPassageText_Query_RejectsBadRange(t *testing.T) {
+	server := setupPassageTestServer(&mockContentRepository{}, domain.UserRoleDefault)
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `query { passageText(startVerseId: 5, endVerseId: 2) { translation } }`)
+	require.NotEmpty(t, result.Errors)
+	assert.Contains(t, result.Errors[0].Message, "invalid Bible passage")
 }

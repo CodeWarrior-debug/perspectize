@@ -63,3 +63,23 @@ func (r *GormBibleReferenceRepository) ListBooks(ctx context.Context) ([]domain.
 	r.books = books
 	return books, nil
 }
+
+// GetVerseTexts reads bible_verse_text for an inclusive ordinal range.
+func (r *GormBibleReferenceRepository) GetVerseTexts(ctx context.Context, translation string, startID, endID int) ([]domain.BibleVerseText, error) {
+	var rows []struct {
+		VerseID int    `gorm:"column:verse_id"`
+		Text    string `gorm:"column:text"`
+	}
+	err := r.db.WithContext(ctx).Table("bible_verse_text").
+		Select("verse_id", "text").
+		Where("translation = ? AND verse_id BETWEEN ? AND ?", translation, startID, endID).
+		Order("verse_id").Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to load verse text: %w", err)
+	}
+	out := make([]domain.BibleVerseText, len(rows))
+	for i, row := range rows {
+		out[i] = domain.BibleVerseText{VerseID: row.VerseID, Text: row.Text}
+	}
+	return out, nil
+}

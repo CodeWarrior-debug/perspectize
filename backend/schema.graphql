@@ -229,6 +229,21 @@ input SetPassageDisplayTitleInput {
   title: String!
 }
 
+# BSB (public domain) text for a verse-ordinal range.
+type PassageVerse {
+  verseId: Int!
+  chapter: Int!
+  verse: Int!
+  # Empty for verses the BSB omits (e.g. Matthew 17:21).
+  text: String!
+}
+
+type PassageText {
+  translation: String!
+  copyright: String!
+  verses: [PassageVerse!]!
+}
+
 # Filters for content queries
 input ContentFilter {
   contentType: ContentType
@@ -397,6 +412,9 @@ type Query {
     includeTotalCount: Boolean = false
     filter: ContentFilter
   ): PaginatedContent!
+
+  # Bible passage text for verse ordinals startVerseId..endVerseId (inclusive, capped server-side)
+  passageText(startVerseId: Int!, endVerseId: Int!): PassageText!
 
   # User queries
   userByID(id: ID!): User

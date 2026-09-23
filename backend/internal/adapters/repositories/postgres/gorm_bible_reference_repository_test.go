@@ -61,3 +61,31 @@ func TestGormBibleReferenceRepository_ListBooks(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 }
+
+func TestGormBibleReferenceRepository_GetVerseTexts(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("maps rows in ordinal order", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`SELECT .* FROM "bible_verse_text" WHERE translation = \$1 AND verse_id BETWEEN \$2 AND \$3`).
+			WithArgs("BSB", 1, 2).
+			WillReturnRows(sqlmock.NewRows([]string{"verse_id", "text"}).AddRow(1, "In the beginning").AddRow(2, ""))
+
+		got, err := NewGormBibleReferenceRepository(db).GetVerseTexts(ctx, "BSB", 1, 2)
+		require.NoError(t, err)
+		require.Len(t, got, 2)
+		assert.Equal(t, 1, got[0].VerseID)
+		assert.Equal(t, "In the beginning", got[0].Text)
+		assert.Equal(t, "", got[1].Text)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("wraps query errors", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`SELECT .* FROM "bible_verse_text"`).WillReturnError(errors.New("boom"))
+
+		_, err := NewGormBibleReferenceRepository(db).GetVerseTexts(ctx, "BSB", 1, 2)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to load verse text")
+	})
+}

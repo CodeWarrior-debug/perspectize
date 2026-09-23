@@ -581,6 +581,17 @@ func (m *mockContentRepository) ClearDisplayTitle(ctx context.Context, contentID
 type mockBibleReferenceRepo struct {
 	books []domain.BibleBook
 	err   error
+	texts []domain.BibleVerseText
+}
+
+func (m *mockBibleReferenceRepo) GetVerseTexts(ctx context.Context, translation string, startID, endID int) ([]domain.BibleVerseText, error) {
+	var out []domain.BibleVerseText
+	for _, t := range m.texts {
+		if t.VerseID >= startID && t.VerseID <= endID {
+			out = append(out, t)
+		}
+	}
+	return out, m.err
 }
 
 func (m *mockBibleReferenceRepo) ListBooks(ctx context.Context) ([]domain.BibleBook, error) {
@@ -669,5 +680,46 @@ func TestCreateFromPassage_BibleRepoErrorAndMissingConfig(t *testing.T) {
 
 	unconfigured := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{})
 	_, err = unconfigured.CreateFromPassage(context.Background(), in)
+	require.Error(t, err)
+}
+
+func TestPassageText_ReturnsVersesWithResolvedReferences(t *testing.T) {
+	bible := &mockBibleReferenceRepo{
+		books: testBibleBooks(), // Genesis 31/25/24, Exodus 22/25
+		texts: []domain.BibleVerseText{{VerseID: 31, Text: "last of Gen 1"}, {VerseID: 32, Text: "first of Gen 2"}, {VerseID: 33, Text: ""}},
+	}
+	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, services.WithBibleReference(bible))
+
+	got, err := svc.PassageText(context.Background(), 31, 33)
+
+	require.NoError(t, err)
+	assert.Equal(t, "BSB", got.Translation)
+	assert.Contains(t, got.Copyright, "public domain")
+	require.Len(t, got.Verses, 3)
+	assert.Equal(t, domain.PassageVerse{VerseID: 31, Chapter: 1, Verse: 31, Text: "last of Gen 1"}, got.Verses[0])
+	assert.Equal(t, domain.PassageVerse{VerseID: 32, Chapter: 2, Verse: 1, Text: "first of Gen 2"}, got.Verses[1])
+	assert.Equal(t, "", got.Verses[2].Text, "verses the BSB omits stay empty rather than failing")
+}
+
+func TestPassageText_Errors(t *testing.T) {
+	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, services.WithBibleReference(&mockBibleReferenceRepo{
+		books: testBibleBooks(),
+		texts: []domain.BibleVerseText{{VerseID: 1, Text: "a"}},
+	}))
+	ctx := context.Background()
+
+	_, err := svc.PassageText(ctx, 0, 1)
+	assert.ErrorIs(t, err, domain.ErrInvalidPassage)
+	_, err = svc.PassageText(ctx, 5, 4)
+	assert.ErrorIs(t, err, domain.ErrInvalidPassage)
+	_, err = svc.PassageText(ctx, 1, services.MaxPassageTextVerses+1)
+	assert.ErrorIs(t, err, domain.ErrInvalidPassage, "range over the cap is rejected")
+
+	// Verses missing from bible_verse_text (unseeded env or out-of-range ordinal).
+	_, err = svc.PassageText(ctx, 1, 3)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+
+	unconfigured := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{})
+	_, err = unconfigured.PassageText(ctx, 1, 1)
 	require.Error(t, err)
 }

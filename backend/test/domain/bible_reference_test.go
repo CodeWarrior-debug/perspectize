@@ -129,3 +129,54 @@ func TestBibleVerseOrdinal_RealBooks(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 31102, end, "Revelation 22:21 is the last seeded verse")
 }
+
+func TestBibleVerseFromOrdinal_Synthetic(t *testing.T) {
+	books := []domain.BibleBook{
+		{ID: 2, Name: "B", VersesPerChapter: []int{4, 6}}, // unordered on purpose
+		{ID: 1, Name: "A", VersesPerChapter: []int{3, 5}},
+	}
+	cases := []struct{ ord, book, ch, v int }{
+		{1, 1, 1, 1}, {3, 1, 1, 3}, {4, 1, 2, 1}, {8, 1, 2, 5}, {9, 2, 1, 1}, {18, 2, 2, 6},
+	}
+	for _, c := range cases {
+		book, ch, v, err := domain.BibleVerseFromOrdinal(books, c.ord)
+		require.NoError(t, err)
+		assert.Equal(t, [3]int{c.book, c.ch, c.v}, [3]int{book, ch, v}, "ordinal %d", c.ord)
+	}
+	for _, bad := range []int{0, -1, 19} {
+		_, _, _, err := domain.BibleVerseFromOrdinal(books, bad)
+		assert.ErrorIs(t, err, domain.ErrInvalidPassage, "ordinal %d", bad)
+	}
+}
+
+// Every real ordinal must round-trip through both directions of the formula.
+func TestBibleVerseOrdinal_RoundTripsForAllRealVerses(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "data", "bible", "books.json"))
+	require.NoError(t, err)
+	var rows []struct {
+		ID               int    `json:"id"`
+		Name             string `json:"name"`
+		VersesPerChapter []int  `json:"versesPerChapter"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &rows))
+	books := make([]domain.BibleBook, len(rows))
+	for i, r := range rows {
+		books[i] = domain.BibleBook{ID: r.ID, Name: r.Name, VersesPerChapter: r.VersesPerChapter}
+	}
+
+	want := 1
+	for _, b := range books {
+		for ch, n := range b.VersesPerChapter {
+			for v := 1; v <= n; v++ {
+				got, err := domain.BibleVerseOrdinal(books, b.ID, ch+1, v)
+				require.NoError(t, err)
+				require.Equal(t, want, got, "%s %d:%d", b.Name, ch+1, v)
+				gb, gc, gv, err := domain.BibleVerseFromOrdinal(books, got)
+				require.NoError(t, err)
+				require.Equal(t, [3]int{b.ID, ch + 1, v}, [3]int{gb, gc, gv})
+				want++
+			}
+		}
+	}
+	assert.Equal(t, 31103, want, "31,102 verses walked")
+}

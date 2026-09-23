@@ -333,3 +333,49 @@ func (s *ContentService) getPassage(ctx context.Context, contentID int) (*domain
 	}
 	return content, nil
 }
+
+// MaxPassageTextVerses bounds a single passageText read so a client can't pull
+// the whole Bible in one query. Sized above the largest single book (Psalms,
+// 2,461 verses); the frontend links out instead of rendering long passages.
+const MaxPassageTextVerses = 2500
+
+// PassageText returns the stored BSB text for verse ordinals startVerseID..endVerseID.
+func (s *ContentService) PassageText(ctx context.Context, startVerseID, endVerseID int) (*domain.PassageText, error) {
+	if s.bibleRepo == nil {
+		return nil, errors.New("bible passage support is not configured")
+	}
+	if startVerseID < 1 || endVerseID < startVerseID {
+		return nil, fmt.Errorf("%w: invalid verse range %d-%d", domain.ErrInvalidPassage, startVerseID, endVerseID)
+	}
+	count := endVerseID - startVerseID + 1
+	if count > MaxPassageTextVerses {
+		return nil, fmt.Errorf("%w: passage exceeds %d verses", domain.ErrInvalidPassage, MaxPassageTextVerses)
+	}
+
+	books, err := s.bibleRepo.ListBooks(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load bible reference data: %w", err)
+	}
+	texts, err := s.bibleRepo.GetVerseTexts(ctx, domain.BibleTranslationBSB, startVerseID, endVerseID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load passage text: %w", err)
+	}
+	if len(texts) != count {
+		// Out-of-range ordinal, or the seeder hasn't loaded bsb.tsv into this environment.
+		return nil, fmt.Errorf("%w: verses %d-%d not found (%d of %d present)", domain.ErrNotFound, startVerseID, endVerseID, len(texts), count)
+	}
+
+	verses := make([]domain.PassageVerse, len(texts))
+	for i, t := range texts {
+		_, chapter, verse, err := domain.BibleVerseFromOrdinal(books, t.VerseID)
+		if err != nil {
+			return nil, err
+		}
+		verses[i] = domain.PassageVerse{VerseID: t.VerseID, Chapter: chapter, Verse: verse, Text: t.Text}
+	}
+	return &domain.PassageText{
+		Translation: domain.BibleTranslationBSB,
+		Copyright:   domain.BibleTranslationBSBCopyright,
+		Verses:      verses,
+	}, nil
+}
