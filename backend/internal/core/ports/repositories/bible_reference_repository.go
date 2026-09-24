@@ -16,4 +16,8 @@ type BibleReferenceRepository interface {
 	// GetVerseTexts returns the stored text of a translation for verse ordinals
 	// startID..endID inclusive, ordered by ordinal. Missing verses are simply absent.
 	GetVerseTexts(ctx context.Context, translation string, startID, endID int) ([]domain.BibleVerseText, error)
+	// GetInterlinearWords returns the interlinear rows (each joined with its lexicon
+	// gloss) for verse ordinals startID..endID inclusive, ordered by verse_id then
+	// bsb_sort. Verses with no alignment data are simply absent.
+	GetInterlinearWords(ctx context.Context, startID, endID int) ([]domain.InterlinearWordRow, error)
 }

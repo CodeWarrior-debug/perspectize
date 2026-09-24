@@ -167,6 +167,32 @@ type InboxEvent struct {
 	UnreadCount   int    `json:"unreadCount"`
 }
 
+type InterlinearSegment struct {
+	Text        string `json:"text"`
+	SpaceBefore bool   `json:"spaceBefore"`
+}
+
+type InterlinearVerse struct {
+	VerseID  int                   `json:"verseId"`
+	Chapter  int                   `json:"chapter"`
+	Verse    int                   `json:"verse"`
+	Segments []*InterlinearSegment `json:"segments"`
+	Words    []*InterlinearWord    `json:"words"`
+}
+
+type InterlinearWord struct {
+	ID          int    `json:"id"`
+	Language    string `json:"language"`
+	Source      string `json:"source"`
+	Translit    string `json:"translit"`
+	Parsing     string `json:"parsing"`
+	Strongs     string `json:"strongs"`
+	Gloss       string `json:"gloss"`
+	TagSource   string `json:"tagSource"`
+	SourceOrder int    `json:"sourceOrder"`
+	Segment     *int   `json:"segment,omitempty"`
+}
+
 type MessageConnection struct {
 	Items    []*Message `json:"items"`
 	PageInfo *PageInfo  `json:"pageInfo"`
@@ -221,6 +247,10 @@ type ParticipantChanged struct {
 }
 
 func (ParticipantChanged) IsThreadEvent() {}
+
+type PassageInterlinear struct {
+	Verses []*InterlinearVerse `json:"verses"`
+}
 
 type PassageText struct {
 	Translation string          `json:"translation"`
