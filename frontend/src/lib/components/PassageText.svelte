@@ -43,9 +43,10 @@
 		{@const { translation, copyright } = query.data.passageText}
 		<div>
 			{#each visibleVerses as v (v.verseId)}
+				<!-- The explicit trailing space keeps a verse number from running into the previous verse's last word. -->
 				<span
-					>{#if v.text}<sup class="mr-0.5 text-[10px] text-muted-foreground">{v.verse}</sup>{v.text}
-					{/if}</span
+					>{#if v.text}<sup class="mr-0.5 ml-0.5 text-[10px] text-muted-foreground">{v.verse}</sup
+						>{v.text}{' '}{/if}</span
 				>
 			{/each}
 		</div>

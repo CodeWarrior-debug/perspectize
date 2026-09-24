@@ -5,10 +5,12 @@
 	let { store = bibleVersion }: { store?: BibleVersionStore } = $props();
 </script>
 
-<label class="inline-flex items-center gap-2 text-[12px] text-muted-foreground">
-	<span>Bible Gateway version</span>
+<label
+	class="flex max-w-full min-w-0 flex-col gap-1 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:gap-2"
+>
+	<span class="whitespace-nowrap">Bible Gateway version</span>
 	<select
-		class="rounded-md border border-input bg-background px-2 py-1 text-[13px] text-foreground"
+		class="min-w-0 max-w-full rounded-md border border-input bg-background px-2 py-1 text-[13px] text-foreground"
 		value={store.code}
 		onchange={(e) => store.set(e.currentTarget.value)}
 	>

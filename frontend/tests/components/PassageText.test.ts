@@ -73,6 +73,14 @@ describe('PassageText', () => {
 		expect(screen.queryByText(/Verse text 60/)).not.toBeInTheDocument();
 	});
 
+	it('separates consecutive verses with a space so a verse number never runs into the previous verse', () => {
+		mocks.mockQueryState.data = {
+			passageText: { translation: 'BSB', copyright: COPYRIGHT, verses: makeVerses(2) },
+		};
+		const { container } = render(PassageText, { props: { startVerseId: 1, endVerseId: 2 } });
+		expect(container.textContent).toContain('Verse text 1 2Verse text 2');
+	});
+
 	it('shows no verse text, does not fetch, and points to the links below above the hard cap', () => {
 		// Genesis 1:1 (id 1) through id 200 is 200 verses.
 		render(PassageText, { props: { startVerseId: 1, endVerseId: 200 } });
