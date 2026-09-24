@@ -189,6 +189,94 @@ describe('useUpdatePerspective hook', () => {
 		});
 	});
 
+	// Gap #2 in the UI gap audit: explicit null used to be treated the same as
+	// undefined (omitted) — `input.x ?? p.x` — so a cleared field's optimistic
+	// patch silently kept the old value instead of showing the clear. `pick()`
+	// now only falls back to the cached value when the key is `undefined`.
+	describe('clearing fields (explicit null)', () => {
+		it('forwards explicit null fields to graphqlRequest, not dropped like undefined would be', async () => {
+			const { graphqlRequest } = await import('$lib/queries/client');
+			(graphqlRequest as any).mockResolvedValue({
+				updatePerspective: { id: '5', userID: '42', privacy: 'PUBLIC', createdAt: '', updatedAt: '' },
+			});
+
+			const input = { id: 5, quality: null, review: null, customFields: null, feelings: null };
+			await capturedMutationOptions.mutationFn(input);
+
+			expect(graphqlRequest).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.objectContaining({ input: { id: 5, quality: null, review: null, customFields: null, feelings: null } }),
+			);
+		});
+
+		it('optimistically clears quality/agreement/importance/confidence/like/review when sent as null', async () => {
+			const existing = {
+				perspectives: {
+					items: [
+						{
+							id: '5',
+							quality: 1000,
+							agreement: 1000,
+							importance: 1000,
+							confidence: 1000,
+							like: 'THUMBS_UP',
+							review: 'old review',
+						},
+					],
+				},
+			};
+			await capturedMutationOptions.onMutate({
+				id: 5,
+				quality: null,
+				agreement: null,
+				importance: null,
+				confidence: null,
+				like: null,
+				review: null,
+			});
+
+			const updater = mockSetQueriesData.mock.calls[0][1];
+			const next = updater(existing);
+			expect(next.perspectives.items[0]).toMatchObject({
+				quality: null,
+				agreement: null,
+				importance: null,
+				confidence: null,
+				like: null,
+				review: null,
+			});
+		});
+
+		it('leaves cached values untouched for fields the input omits (undefined), alongside clearing the ones sent as null', async () => {
+			const existing = {
+				perspectives: { items: [{ id: '5', quality: 1000, agreement: 2000, review: 'kept' }] },
+			};
+			await capturedMutationOptions.onMutate({ id: 5, quality: null }); // agreement/review omitted
+
+			const updater = mockSetQueriesData.mock.calls[0][1];
+			const next = updater(existing);
+			expect(next.perspectives.items[0]).toMatchObject({ quality: null, agreement: 2000, review: 'kept' });
+		});
+
+		it('clears customFields to null, not an empty object', async () => {
+			const existing = { perspectives: { items: [{ id: '5', customFields: { depth: 8000 } }] } };
+			await capturedMutationOptions.onMutate({ id: 5, customFields: null });
+
+			const updater = mockSetQueriesData.mock.calls[0][1];
+			const next = updater(existing);
+			expect(next.perspectives.items[0].customFields).toBeNull();
+		});
+
+		it('clears feelings to null', async () => {
+			const existing = { perspectives: { items: [{ id: '5', feelings: [{ emoji: '😀', intensity: 3 }] }] } };
+			await capturedMutationOptions.onMutate({ id: 5, feelings: null });
+
+			const updater = mockSetQueriesData.mock.calls[0][1];
+			const next = updater(existing);
+			expect(next.perspectives.items[0].feelings).toBeNull();
+		});
+	});
+
 	describe('onSuccess callback', () => {
 		it('shows success toast "Perspective updated"', () => {
 			capturedMutationOptions.onSuccess();

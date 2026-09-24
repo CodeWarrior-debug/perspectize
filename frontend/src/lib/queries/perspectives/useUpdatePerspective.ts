@@ -13,14 +13,15 @@ import type { FeelingInput } from './useCreatePerspective';
 
 export interface UpdatePerspectiveInput {
 	id: number;
-	quality?: number;
-	agreement?: number;
-	importance?: number;
-	confidence?: number;
-	like?: string;
-	review?: string;
-	customFields?: Record<string, number>;
-	feelings?: FeelingInput[];
+	/** undefined = leave unchanged (the key is omitted from the request); null = clear. */
+	quality?: number | null;
+	agreement?: number | null;
+	importance?: number | null;
+	confidence?: number | null;
+	like?: string | null;
+	review?: string | null;
+	customFields?: Record<string, number> | null;
+	feelings?: FeelingInput[] | null;
 	privacy?: 'PUBLIC' | 'PRIVATE';
 }
 
@@ -36,18 +37,30 @@ function patchLists(
 	return (old) => (old ? { perspectives: { ...old.perspectives, items: items(old.perspectives.items) } } : old);
 }
 
-/** Apply the submitted fields onto the cached row (omitted fields keep their value). */
+/** undefined (the key was omitted) keeps the cached value; anything else — including
+ *  explicit null — overwrites it. This mirrors the server's tri-state Update(): a
+ *  field the caller didn't mention stays put, one they set to null gets cleared. */
+function pick<T>(next: T | undefined, prev: T): T {
+	return next === undefined ? prev : next;
+}
+
+/** Apply the submitted fields onto the cached row. See pick() above for the
+ *  undefined-vs-null-vs-value semantics — this optimistic patch mirrors what the
+ *  server does in perspective_service.go's Update(), so a cleared field shows
+ *  cleared immediately instead of only after the response replaces the row. */
 function applyEdit(p: PerspectiveItem, input: UpdatePerspectiveInput): PerspectiveItem {
 	return {
 		...p,
-		quality: input.quality ?? p.quality,
-		agreement: input.agreement ?? p.agreement,
-		importance: input.importance ?? p.importance,
-		confidence: input.confidence ?? p.confidence,
-		like: input.like ?? p.like,
-		review: input.review ?? p.review,
-		customFields: input.customFields ?? p.customFields,
-		feelings: (input.feelings as FeelingEntry[] | undefined) ?? p.feelings,
+		quality: pick(input.quality, p.quality),
+		agreement: pick(input.agreement, p.agreement),
+		importance: pick(input.importance, p.importance),
+		confidence: pick(input.confidence, p.confidence),
+		like: pick(input.like, p.like),
+		review: pick(input.review, p.review),
+		// The server stores a cleared customFields as an absent/null column, same as
+		// a perspective that never had one — no need for a separate "{}" convention.
+		customFields: pick(input.customFields, p.customFields),
+		feelings: pick(input.feelings as FeelingEntry[] | null | undefined, p.feelings),
 		privacy: input.privacy ?? p.privacy,
 		updatedAt: new Date().toISOString(),
 	};

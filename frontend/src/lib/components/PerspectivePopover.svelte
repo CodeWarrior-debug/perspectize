@@ -304,14 +304,18 @@
 			updateMutation.mutate(
 				{
 					id: parseInt(existingPerspective.id, 10),
-					quality: quality ?? undefined,
-					agreement: agreement ?? undefined,
-					importance: importance ?? undefined,
-					confidence: confidence ?? undefined,
-					like: likeValue ?? undefined,
-					review: getReview(),
-					customFields: buildCustomFields(),
-					feelings: feelingsPayload,
+					// Edit mode sends the full form state, not just what changed: a field
+					// the user emptied is sent as null so the server clears it -- unlike
+					// create (below), undefined here would be dropped by graphql-request
+					// and read by the server as "leave unchanged," not "clear."
+					quality,
+					agreement,
+					importance,
+					confidence,
+					like: likeValue,
+					review: getReview() ?? null,
+					customFields: buildCustomFields() ?? null,
+					feelings: feelingsPayload ?? null,
 					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
 				},
 				{
