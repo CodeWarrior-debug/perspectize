@@ -27,7 +27,7 @@
 	},
 	"devDependencies": {
 		"@capacitor/android": "^8.5.2",
-		"@capacitor/cli": "^7.5.0",
+		"@capacitor/cli": "^8.5.2",
 		"@capacitor/ios": "^8.5.2",
 		"@internationalized/date": "^3.12.4",
 		"@lhci/cli": "^0.15.1",
