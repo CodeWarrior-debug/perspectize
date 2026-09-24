@@ -142,6 +142,22 @@ func (s *PerspectiveService) GetByID(ctx context.Context, id int) (*domain.Persp
 }
 
 // Update updates an existing perspective
+// applyRating implements the tri-state update rule for one rating field:
+// clear wins, then a provided value is validated and applied, otherwise the
+// field is left alone.
+func applyRating(name string, clear bool, v *int, dst **int) error {
+	switch {
+	case clear:
+		*dst = nil
+	case v != nil:
+		if !domain.ValidateRating(v) {
+			return fmt.Errorf("%w: %s %d", domain.ErrInvalidRating, name, *v)
+		}
+		*dst = v
+	}
+	return nil
+}
+
 func (s *PerspectiveService) Update(ctx context.Context, input portservices.UpdatePerspectiveInput) (*domain.Perspective, error) {
 	if input.ID <= 0 {
 		return nil, fmt.Errorf("%w: perspective id must be a positive integer", domain.ErrInvalidInput)
@@ -153,30 +169,21 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 		return nil, fmt.Errorf("failed to get perspective: %w", err)
 	}
 
-	// Validate and update ratings
-	if input.Quality != nil {
-		if !domain.ValidateRating(input.Quality) {
-			return nil, fmt.Errorf("%w: quality %d", domain.ErrInvalidRating, *input.Quality)
-		}
-		existing.Quality = input.Quality
+	// Validate and update ratings. Explicit clear wins over a provided value (the
+	// mapper never sets both for the same field, but resolving the precedence
+	// here keeps this function correct even if a future caller did); a value is
+	// validated then applied; omitted leaves the existing rating untouched.
+	if err := applyRating("quality", input.ClearQuality, input.Quality, &existing.Quality); err != nil {
+		return nil, err
 	}
-	if input.Agreement != nil {
-		if !domain.ValidateRating(input.Agreement) {
-			return nil, fmt.Errorf("%w: agreement %d", domain.ErrInvalidRating, *input.Agreement)
-		}
-		existing.Agreement = input.Agreement
+	if err := applyRating("agreement", input.ClearAgreement, input.Agreement, &existing.Agreement); err != nil {
+		return nil, err
 	}
-	if input.Importance != nil {
-		if !domain.ValidateRating(input.Importance) {
-			return nil, fmt.Errorf("%w: importance %d", domain.ErrInvalidRating, *input.Importance)
-		}
-		existing.Importance = input.Importance
+	if err := applyRating("importance", input.ClearImportance, input.Importance, &existing.Importance); err != nil {
+		return nil, err
 	}
-	if input.Confidence != nil {
-		if !domain.ValidateRating(input.Confidence) {
-			return nil, fmt.Errorf("%w: confidence %d", domain.ErrInvalidRating, *input.Confidence)
-		}
-		existing.Confidence = input.Confidence
+	if err := applyRating("confidence", input.ClearConfidence, input.Confidence, &existing.Confidence); err != nil {
+		return nil, err
 	}
 
 	// Validate categorized ratings if provided
@@ -190,8 +197,11 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 		existing.CategorizedRatings = input.CategorizedRatings
 	}
 
-	// Validate and update feelings if provided
-	if input.Feelings != nil {
+	// Validate and update feelings. Explicit clear (an empty list from the
+	// client) wins over a provided value, same tri-state rule as the ratings.
+	if input.ClearFeelings {
+		existing.Feelings = nil
+	} else if input.Feelings != nil {
 		if len(input.Feelings) > domain.MaxFeelings {
 			return nil, fmt.Errorf("%w: feelings cannot exceed %d entries", domain.ErrInvalidInput, domain.MaxFeelings)
 		}
@@ -207,7 +217,9 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 	if input.ContentID != nil {
 		existing.ContentID = input.ContentID
 	}
-	if input.Like != nil {
+	if input.ClearLike {
+		existing.Like = nil
+	} else if input.Like != nil {
 		existing.Like = input.Like
 	}
 	if input.Privacy != nil {
@@ -237,10 +249,14 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 		}
 		existing.RelatedPerspectiveIDs = input.RelatedPerspectiveIDs
 	}
-	if input.CustomFields != nil {
+	if input.ClearCustomFields {
+		existing.CustomFields = nil
+	} else if input.CustomFields != nil {
 		existing.CustomFields = input.CustomFields
 	}
-	if input.Review != nil {
+	if input.ClearReview {
+		existing.Review = nil
+	} else if input.Review != nil {
 		s := sanitizeReview(*input.Review)
 		existing.Review = &s
 	}

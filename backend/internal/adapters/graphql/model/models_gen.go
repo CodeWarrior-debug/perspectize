@@ -8,6 +8,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
 
@@ -293,26 +294,39 @@ type TypingChanged struct {
 
 func (TypingChanged) IsThreadEvent() {}
 
+// Partial update: omit a field to leave it unchanged. For quality, agreement,
+// importance, confidence, like, review, customFields and feelings, sending an
+// explicit null clears the field (an empty feelings list or empty customFields
+// object also clears). Every other field is a plain optional -- omit to leave
+// unchanged, no way to clear it yet.
 type UpdatePerspectiveInput struct {
-	ID                    int                       `json:"id"`
-	ContentID             *int                      `json:"contentID,omitempty"`
-	Quality               *int                      `json:"quality,omitempty"`
-	Agreement             *int                      `json:"agreement,omitempty"`
-	Importance            *int                      `json:"importance,omitempty"`
-	Confidence            *int                      `json:"confidence,omitempty"`
-	Like                  *string                   `json:"like,omitempty"`
-	Privacy               *domain.Privacy           `json:"privacy,omitempty"`
-	Description           *string                   `json:"description,omitempty"`
-	Category              *string                   `json:"category,omitempty"`
-	ReviewStatus          *domain.ReviewStatus      `json:"reviewStatus,omitempty"`
-	Parts                 []int                     `json:"parts,omitempty"`
-	Labels                []string                  `json:"labels,omitempty"`
-	CategorizedRatings    []*CategorizedRatingInput `json:"categorizedRatings,omitempty"`
-	Feelings              []*FeelingInput           `json:"feelings,omitempty"`
-	PrimaryPerspectiveID  *int                      `json:"primaryPerspectiveID,omitempty"`
-	RelatedPerspectiveIDs []int                     `json:"relatedPerspectiveIDs,omitempty"`
-	CustomFields          map[string]any            `json:"customFields,omitempty"`
-	Review                *string                   `json:"review,omitempty"`
+	ID        int  `json:"id"`
+	ContentID *int `json:"contentID,omitempty"`
+	// Omit = unchanged; null = clear.
+	Quality graphql.Omittable[*int] `json:"quality,omitempty"`
+	// Omit = unchanged; null = clear.
+	Agreement graphql.Omittable[*int] `json:"agreement,omitempty"`
+	// Omit = unchanged; null = clear.
+	Importance graphql.Omittable[*int] `json:"importance,omitempty"`
+	// Omit = unchanged; null = clear.
+	Confidence graphql.Omittable[*int] `json:"confidence,omitempty"`
+	// Omit = unchanged; null = clear.
+	Like               graphql.Omittable[*string] `json:"like,omitempty"`
+	Privacy            *domain.Privacy            `json:"privacy,omitempty"`
+	Description        *string                    `json:"description,omitempty"`
+	Category           *string                    `json:"category,omitempty"`
+	ReviewStatus       *domain.ReviewStatus       `json:"reviewStatus,omitempty"`
+	Parts              []int                      `json:"parts,omitempty"`
+	Labels             []string                   `json:"labels,omitempty"`
+	CategorizedRatings []*CategorizedRatingInput  `json:"categorizedRatings,omitempty"`
+	// Omit = unchanged; null or [] = clear.
+	Feelings              graphql.Omittable[[]*FeelingInput] `json:"feelings,omitempty"`
+	PrimaryPerspectiveID  *int                               `json:"primaryPerspectiveID,omitempty"`
+	RelatedPerspectiveIDs []int                              `json:"relatedPerspectiveIDs,omitempty"`
+	// Omit = unchanged; null or {} = clear.
+	CustomFields graphql.Omittable[map[string]any] `json:"customFields,omitempty"`
+	// Omit = unchanged; null = clear.
+	Review graphql.Omittable[*string] `json:"review,omitempty"`
 }
 
 type UpdateUserInput struct {

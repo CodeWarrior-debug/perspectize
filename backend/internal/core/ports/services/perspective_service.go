@@ -50,6 +50,22 @@ type UpdatePerspectiveInput struct {
 	RelatedPerspectiveIDs []int
 	CustomFields          json.RawMessage
 	Review                *string
+
+	// Clear* requests that the matching field be reset to "no value". Set only
+	// by the GraphQL adapter (modelToUpdatePerspectiveInput in helpers.go) when
+	// the client sent an explicit null (or, for Feelings/CustomFields, an empty
+	// list/object) -- distinct from omitting the field, which leaves it
+	// unchanged. When true, the paired value field above is ignored. See the UI
+	// gap audit, gap #2: without this, there was no way to clear a rating,
+	// review, feelings, or customFields once set.
+	ClearQuality      bool
+	ClearAgreement    bool
+	ClearImportance   bool
+	ClearConfidence   bool
+	ClearLike         bool
+	ClearReview       bool
+	ClearCustomFields bool
+	ClearFeelings     bool
 }
 
 // PerspectiveService defines the contract for perspective business logic
