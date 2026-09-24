@@ -78,3 +78,57 @@ prefer this instead of committing its text:
 
 Trade-off: a leaner repo and smaller PR diffs, but seeding then depends on the
 network and on the source URL staying up.
+
+## Interlinear data
+
+Word-level alignment ("Show original language") is seeded from two versioned release
+files, not from git: `bible-word-vN.tsv.gz` (one row per Berean source word, plus
+English-only rows so verse text rebuilds exactly) and `bible-lexicon-vN.tsv.gz`
+(short meaning per disambiguated Strong's tag). Only the manifest, `sources.json`,
+is committed. It records each upstream source (URL or STEPBible commit, SHA-256 of
+every input file), and the release asset name, SHA-256 and row count of each output.
+The seeder refuses to load a file whose SHA-256 differs from the manifest.
+
+Release assets are **never overwritten**: a new data version gets a new name
+(`bible-word-v2.tsv.gz`) and a new manifest `version`.
+
+### Producing the files
+
+Download the pinned inputs into a scratch folder (not the repo), then run the
+normalizer. `<TAHOT>` etc. are the file names from the pinned STEPBible commits in
+`sources.json`:
+
+```bash
+curl -L -o bsb_tables.tsv https://bereanbible.com/bsb_tables.tsv
+# TAHOT (4 files) and TAGNT (2 files) at commit 0f60797c170f11a1f8dc75c5f7617973e2e66b0d,
+# path "Translators Amalgamated OT+NT/"; TBESH / TBESG at commit
+# 48b7cfbda441adb6445ea565b4ed23dd98dfdf2e, path "Lexicons/", from
+# https://raw.githubusercontent.com/STEPBible/STEPBible-Data/<commit>/<path>/<file>
+
+python3 data/bible/scripts/normalize_interlinear.py \
+  --berean bsb_tables.tsv --tahot <TAHOT files> --tagnt <TAGNT files> \
+  --lex-heb <TBESH> --lex-grk <TBESG> --version 1 --berean-downloaded 2026-09-24 \
+  --step-tagged-commit 0f60797c170f11a1f8dc75c5f7617973e2e66b0d \
+  --step-lexicon-commit 48b7cfbda441adb6445ea565b4ed23dd98dfdf2e
+```
+
+Outputs land in `data/bible/interlinear/` (gitignored). Measured on 2026-09-24:
+31,084 verses, 442,312 rows, 437,559 word rows, 98.86% aligned to an exact tag,
+5,000 on the fallback rule; verses 2662 and 6964 fail the text-consistency check and
+are left out (they render as plain text). Tests: `python3 -m unittest discover -s
+data/bible/scripts -t data/bible/scripts`.
+
+`orig_strongs` is Berean's plain Strong's number exactly as published and is never
+modified. `strongs` is the disambiguated STEPBible tag (for example `H1254B`), found
+by joining to STEPBible's tagged texts; `strongs_source` says whether it was
+`tagged` or a `fallback` to the plain number's most common tag.
+
+### Licenses
+
+- Berean Standard Bible word alignment: "The Berean Bible and Majority Bible texts
+  are officially dedicated to the public domain as of April 30, 2023." / "All uses
+  are freely permitted." (berean.bible/terms.htm)
+- STEPBible-Data (Tyndale House): CC BY 4.0. Credit "STEP Bible", linked to
+  www.STEPBible.org. Modifications: the normalizer keeps only the Gloss column of the
+  lexicons (the Hebrew `Meaning` paragraph needs Online Bible's permission) and
+  attaches the disambiguated tag from TAHOT/TAGNT to each Berean word.
