@@ -23,10 +23,16 @@ In the passage details modal, a reader can turn on **original language** for a p
 
 ## Data sources
 
-**Berean word alignment** — `bereanbible.com/bsb_tables.tsv`. Public domain per the publisher (ANSWERS Q2; wording to be re-read from the source page before it appears in UI copy).
+**Berean word alignment** — `bereanbible.com/bsb_tables.tsv`. **Verified 2026-09-24 against `berean.bible/terms.htm`:** "The Berean Bible and Majority Bible texts are officially dedicated to the public domain as of April 30, 2023." / "All uses are freely permitted." Attribution is "appreciated but not required" ("The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain."). They request that derivative works differing from the official text not use the Berean name. **The page says nothing separate about the tables/Strong's/interlinear files; treating them as covered by the same dedication is an inference, not a stated fact.**
 - One row per Hebrew/Greek source word. Header (23 columns) includes `Heb Sort`, `Greek Sort`, `BSB Sort`, `Verse`, `Language`, `Translit`, two `Parsing` columns, `Str Heb`, `Str Grk`, `VerseId`, ` BSB version `, punctuation/quote columns (`pnc`, `begQ`, `endQ`, `Space`).
-- **Verified 2026-09-24 (own scripts on the downloaded file):** ~85.5 MB, 754,647 lines; **437,587 word rows carry a Strong's number** (299,456 Hebrew + 138,131 Greek), which matches the ANSWERS doc's ~440k — the other ~317k lines have no Strong's number (not inspected further). **Strong's numbers are plain digits with no letter suffixes** (`1254`, `7225`). Column indices: `Str Heb` = 10, `Str Grk` = 11, `VerseId` = 12, ` BSB version ` = 18. Every one of the 13,876 distinct numbers has at least one STEPBible lexicon row.
-- Reported by the research spike, **not independently re-verified**: `Verse` is a global verse counter (John 3:16 = 26137); `VerseId` is filled only on each verse's first row and needs forward-filling; `-` marks untranslated words; a `vvv` placeholder appears in John 3:16 and must be filtered; continuation rows leave ` BSB version ` blank and belong to the preceding phrase; display order comes from `BSB Sort`, never file order. (Seen directly for John 3:16: `Greek Sort` gives original order; the `vvv` row is the word "mē".)
+- **Verified 2026-09-24 (own scripts on the downloaded file):** ~85.5 MB, 754,647 lines; **437,587 word rows carry a Strong's number** (299,456 Hebrew + 138,131 Greek), which matches the ANSWERS doc's ~440k. **Line census (verified):** 311,917 lines are completely empty padding (41%); 4,640 lines have English but no source word (added English words, some are `-`/`. . .` markers); the rest have a Strong's number. 1,104 word rows have blank English. **Strong's numbers are plain digits with no letter suffixes** (`1254`, `7225`). Column indices: `Str Heb` = 10, `Str Grk` = 11, `VerseId` = 12, ` BSB version ` = 18. Every one of the 13,876 distinct numbers has at least one STEPBible lexicon row.
+- **Verified (own scripts):**
+  - **The `Verse` column equals our verse ordinal for all 31,102 verses (0 mismatches)**, so the seeder joins on it directly (John 3:16 = 26137). `VerseId` is filled only on each verse's first row and needs forward-filling.
+  - `-` (29,695 rows) marks a source word with no English; `vvv` (4,849 rows) is a placeholder for a word whose English sits elsewhere; `. . .` is an ellipsis marker. None of these belong in display text.
+  - Supplied English words are wrapped in `[ ]` or `{ }`; some cells contain HTML (`<p class=|indent2|>`, `<span class=|reftext|>…`).
+  - **Closing quotes and dashes can live in the `End text` column** (e.g. `” `, ` —`), not just `endQ`; an `End text` value in square brackets (`[’’]`) is a duplicate hint and is ignored.
+  - **Continuation rows** (source word, blank English; 1,104): 1,050 (95%) have a `BSB Sort` exactly 1 after the preceding word row and belong to that phrase. The other 54 (mostly `H1961` "to be") sit far away after the padding rows and belong to **no** phrase: they are chips with no connector.
+  - Display order comes from `BSB Sort`; original order from `Heb Sort` (Hebrew) or `Greek Sort` (Greek; Hebrew sort is `999999` on Greek rows).
 - No gloss/definition column exists.
 - **Plain numbers are ambiguous (verified).** 34.7% of word rows (151,687 of 437,587) carry a number that has more than one STEPBible lexicon entry, and 22.2% (97,067) map to genuinely different entries. Examples: `H1254` (55 occurrences) covers `H1254A` "to create" (incl. Piel "clear" at Joshua 17:15, 17:18) and `H1254B` "to fatten" (1 Samuel 2:29 only); `H3068` ×6,522 = LORD / The Lord / …; `H430` ×2,600 = God / (LORD)-Elohe / …; `H834`, `H1004` (10 entries), `H4428`. Taking "the first lexicon row" would sometimes give a wrong or odd meaning, so v1 disambiguates (next section).
 
@@ -39,10 +45,12 @@ In the passage details modal, a reader can turn on **original language** for a p
 
 **STEPBible tagged texts (disambiguation source)** — `Translators Amalgamated OT+NT/`: TAHOT (Hebrew OT, 4 files, ~70 MB) and TAGNT (Greek NT, 2 files, ~30 MB). **Verified by download 2026-09-24.**
 - Every word carries its exact disambiguated Strong's tag (`dStrong`), designed to be backward-compatible with plain Strong's. Examples: Genesis 1:1 "he created" = `H1254A`, "God" = `H0430G`, "in beginning" = `H9003/{H7225G}` (lexical tag in braces); **1 Samuel 2:29 #12 "by fattening yourselves" = `H1254B`**; John 3:16 `G3439`, `G5207`.
-- References use English (NRSV) versification; Psalm titles are verse `.0` (e.g. `Psa.139.0(139.1)`), with word numbers continuing into verse 1. The BSB prints the title inside its verse 1, so the join folds `.0` words into verse 1. Book abbreviations differ from the obvious (`Ezk`, `Nam`, `Sng`, `Jol`, `Php`, `Jhn`, `Jas`…).
-- **Join measured over the whole Bible (own script, per verse, in-order match on plain number, tolerant of inserted/missing words):** 98.82% of 437,474 word rows aligned; **99.30% of the ambiguous rows** (150,612 of 151,673). Spot checks all correct (`H1254B` at 1 Samuel 2:29, `H1254A` at Genesis 1:1, `H0430G`, `G3439`, `G5207`). By testament: OT 99.72%, NT 96.87% (Greek variants). Psalm verse 1 only 84.16% (66 of 150 psalms, mostly long titles; in 53 of them the word counts are equal but the order differs).
-- Not aligned (about 1.2% of rows), and 8 verses with no tagged verse at all (Romans 16:25–27, 2 Corinthians 13:13–14, Philippians 1:16–17, John 7:53): fall back to the primary lexicon entry for that number.
-- 627 aligned rows (0.14%) carry one of 22 tags that have no gloss in the lexicons (e.g. `H0430J` ×215, `G2453` ×192, `H3064` ×75, `G3708` ×60): fall back to the main entry for the same plain number.
+- References use English (NRSV) versification; Psalm titles are verse `.0` (e.g. `Psa.139.0(139.1)`). The BSB prints the title inside its verse 1, so the join folds `.0` words into verse 1. **TAHOT word numbers restart at every Hebrew verse** (Psalm 51's title plus verse 1 has three runs numbered 1…), so the words must be kept in **file order**, never sorted by word number (sorting was the cause of an earlier 84% Psalm-verse-1 result). Book abbreviations differ from the obvious (`Ezk`, `Nam`, `Sng`, `Jol`, `Php`, `Jhn`, `Jas`…).
+- **Join measured over the whole Bible** (own script; per verse; in-order longest-common-subsequence on the plain number, tolerant of inserted or missing words): **98.88% of 437,474 word rows aligned; 99.37% of the ambiguous rows** (150,721 of 151,673). Old Testament 99.81%; **New Testament 96.87%**; Psalm verse 1 (title + first verse) 99.69% (5 of 150 psalms still have an unaligned word). Spot checks correct: `H1254B` at 1 Samuel 2:29 (and `H7225H` "best" there), `H1254A`/`H0430G`/`H7225G` at Genesis 1:1, `G3439`, `G5207`.
+- **Why rows fail to align:** the two datasets sometimes use different numbers for the same word (Genesis 1:4 "good": Berean `H2896`, tagged `H2895`; Greek pronoun `G1473` ×1,940 where TAGNT uses form-specific numbers). 4,886 rows are unaligned; **only 952 of them (0.22% of all rows) have an ambiguous number** (672 are the Greek "see" verbs `G3708`, `G1492`); the other 3,934 have a single lexicon entry, so the fallback gives exactly the right meaning. Eight verses have no tagged verse at all (Romans 16:25–27, 2 Corinthians 13:13–14, Philippians 1:16–17, John 7:53).
+- **Do not pair unaligned words by position.** It would "recover" 4,321 rows but a sample shows wrong meanings (e.g. `H3588` "for" paired with `H3541` "thus"; `H168` "tent" with `H0428` "these").
+- **Fallback rule (measured):** for an unaligned or gloss-less row use the plain number's **most common tag across the Bible** (from the join itself), and if that tag has no gloss, the next most common that has one, then the first lexicon row. On the aligned ambiguous rows this rule is right **79.0%** of the time, versus 71.1% for "first lexicon row" (which picks `H5892A` "excitement" instead of "city"). Expected wrong-sense rows ≈ 200 (0.05% of all rows), each marked `strongs_source = fallback`.
+- 627 aligned rows (0.14%) carry one of 22 tags that have no gloss in the lexicons (`H0430J` ×215, `G2453` ×192, `H3064` ×75, `G3708` ×60, proper names…); the fallback chain above gives sensible meanings for all of them ("God", "Jew", the same name).
 
 ## Provenance and versioning
 
@@ -54,11 +62,12 @@ In the passage details modal, a reader can turn on **original language** for a p
 - The Berean data is normalized **once, at data-preparation time** (unused columns dropped, continuation rows resolved, padding removed, **and the disambiguated tag attached by joining to TAHOT/TAGNT**) and uploaded to our release. The join script is committed as the normalizer (audit trail). Nothing joins at runtime.
 - The manifest records STEPBible's commit SHA for the lexicons **and** for TAHOT/TAGNT (the ~100 MB of tagged texts are needed only when preparing data, not to run the app). STEPBible files are fetched from STEPBible's GitHub at that pinned commit with checked-in SHA-256s rather than re-hosted.
 - **Keep the original (owner request, 2026-09-24):** wherever the normalizer overrides a source value, the original is kept in a column with an `orig_` prefix so the change can be reverted without re-fetching anything (see Database).
+- **Measured release-asset size (normalizer prototype, 2026-09-24):** 442,340 rows, 61.9 MB as TSV, **12.9 MB gzipped** (`gzip -9`). No column dominates (largest: source word 1.7 MB, translit 1.2 MB, English 1.2 MB); dropping `parse_full` (determined by `parse_short` in all but 3 of 3,804 values) would save ~1.4 MB, not worth the complexity. Fine as a GitHub release asset. **Database size is not measured** (no local Postgres, and the shared dev database must not be used for experiments): expect on the order of 100 MB with indexes — confirm the Sevalla plan's headroom before seeding.
 - Rejected: the seeder downloading from bereanbible.com live on every run (setup would depend on a third party); committing the data to git (permanent multi-MB blob).
 
 ## Database (new migration, next free number is 000026 — re-check at plan time)
 
-- `bible_word`: one row per source word — verse id (FK `bible_verse`), `source_sort`, `bsb_sort`, `language` (`heb`/`grc`), source word, transliteration, **`orig_strongs`** (Berean's plain number, exactly as in the source file, never modified), **`strongs`** (the disambiguated tag, e.g. `H1254B`, or the main entry for the plain number when the join could not align the word), **`strongs_source`** (`tagged` or `fallback`), parsing (short/full), `span_group` (groups continuation rows), English phrase (NULL on continuation rows), punctuation/quote fields. Indexed on verse id. Reverting the disambiguation = read `orig_strongs` instead of `strongs`.
+- `bible_word`: one row per source word — verse id (FK `bible_verse`), `source_sort`, `bsb_sort`, `language` (`heb`/`grc`), source word, transliteration, **`orig_strongs`** (Berean's plain number, exactly as in the source file, never modified), **`strongs`** (the disambiguated tag, e.g. `H1254B`, or the main entry for the plain number when the join could not align the word), **`strongs_source`** (`tagged` or `fallback`), parsing (short/full), `span_head` (the `BSB Sort` of the first row of the phrase this word belongs to; NULL for a source word that belongs to no phrase), English phrase (NULL on continuation rows), `pre`/`post` punctuation and quote strings (already cleaned). English words with no source word (about 4,700 rows) are stored as rows with no source-word columns so the rebuilt text is complete. Prototype size: 442,340 rows. Indexed on verse id. Reverting the disambiguation = read `orig_strongs` instead of `strongs`.
 - `bible_lexicon`: disambiguated tag (PK, e.g. `H1254B`), plain number, language, gloss (~23k rows).
 - `bible_data_version`: one row, the loaded manifest version.
 - Seeded by extending the existing `backend/cmd/seed-bible` command; idempotent (upsert). **Migrations are applied by hand per environment — never `make migrate-*`; the PR states this.**
@@ -71,7 +80,7 @@ One new query, `passageInterlinear(startVerseId, endVerseId)`:
 - Reuses the authenticated `graphqlRequest()` wrapper. `queryKey` mirrors every variable sent. `staleTime: Infinity` (data never changes).
 - Read-only and public, like `passageText`: works for signed-out readers.
 
-**Text-consistency guard.** Interlinear text is rebuilt from the alignment rows (its punctuation and quote columns). A test asserts it equals the plain BSB verse text verse by verse. Where it doesn't match, or the verse is absent from the alignment file (the 16 BSB-omitted verses, issue #410), that verse renders as plain text.
+**Text-consistency guard (verified achievable).** The normalizer rebuilds each verse's text from the alignment rows and a test asserts it equals `bsb.tsv`. With rules taken from the data, **31,100 of 31,102 verses rebuild exactly (99.994%)**, including the 16 BSB-omitted verses (empty in both, issue #410). Rebuild rules: order rows by `BSB Sort`; per row emit `begQ + English + pnc + endQ + End text`; drop `-`, `vvv` and `. . .` (also when embedded in a phrase); strip `[ ]`, `{ }` and HTML; drop `begQ` values that are `reftext` verse-number spans; ignore an `End text` in square brackets; join pieces with a space, then remove spaces before closing punctuation and after opening quotes, and around em dashes. The two exceptions: **verse 2662** (alignment lacks "of silver"; it has `. . .`) and **verse 6964** (a missing space after "web."). A verse that fails the check renders as plain text (the interlinear is not offered for it). The guard is a test in CI, so future data changes cannot silently break it.
 
 ## UI
 
@@ -96,7 +105,7 @@ Button: off / loading / error+retry / on. Popover: idle, hover, pinned, closed b
 - **1 Samuel 2:29** — `1254` becomes `H1254B` ("to fatten"), not `H1254A`; and "from the choicest of" is `H7225H` ("best"), not `H7225G`.
 - **Genesis 1:1** — `1254` becomes `H1254A`; `430` becomes `H0430G`.
 - **Genesis 1:1** — `H1254` (created) and `H430` (God) swap position between original order and English order; "In the beginning" is one span mapped to one number (`H7225`).
-- **John 3:16** — "one and only" is one phrase mapping to the single Greek word `G3439`, before "Son" (`G5207`) in English but after it in Greek order; the `vvv` placeholder row is filtered; continuation rows group into the preceding phrase.
+- **John 3:16** — "one and only" is one phrase mapping to the single Greek word `G3439`, before "Son" (`G5207`) in English but after it in Greek order; the `vvv` placeholder row is filtered. Continuation rows (blank English, `BSB Sort` exactly +1) group into the preceding phrase; a blank-English word that is not adjacent (e.g. `H1961` at Genesis 39:5) belongs to no phrase. **Also:** Psalm 51:1 (title folded into verse 1, three TAHOT word-number runs) aligns fully; Genesis 1:4 "good" (`H2896` vs `H2895`) is a known unaligned word that falls back; verse 2662 fails the rebuild guard and renders plain.
 
 ## Out of scope for v1
 
@@ -104,16 +113,21 @@ Hand-written editorial definitions; STEPBible's longer `Meaning` text; per-devic
 
 ## Open items to verify during planning (not assumptions)
 
-**Resolved 2026-09-24 (evidence in Data sources):**
-- Berean plain numbers map to *multiple* STEPBible entries (owner's hunch confirmed): 34.7% of word rows; disambiguation by joining to TAHOT/TAGNT recovers the exact tag for 99.30% of the ambiguous rows.
-- Row count: 437,587 word rows have a Strong's number (matches ~440k); the 754,647 figure counts lines without one.
+**Resolved 2026-09-24 (evidence in Data sources; the throwaway prototype scripts are saved beside this spec in `interlinear-prototype/` (they hard-code scratch paths; the plan must port them as the real, committed normalizer):**
+- Berean plain numbers map to *multiple* STEPBible entries (owner's hunch confirmed): 34.7% of word rows; the join to TAHOT/TAGNT recovers the exact tag for 99.37% of the ambiguous rows.
+- Row count: 437,587 word rows (matches ~440k); of the other 317,060 lines, 311,917 are empty padding and about 5,100 are English-only or heading lines.
+- The `Verse` column equals our verse ordinal for all 31,102 verses.
+- Rebuilt text equals `bsb.tsv` for 31,100 of 31,102 verses; the 16 BSB-omitted verses are empty in both.
+- Psalm titles: fixed (was my sort bug); Psalm verse 1 aligns 99.69%.
+- Fallback rule chosen and measured (79.0% vs 71.1% for first-row); positional pairing rejected.
+- The 22 gloss-less tags: fallback gives sensible meanings.
+- BSB public-domain wording read at source; STEPBible CC BY wording read from its README and lexicon headers.
+- Release-asset size measured: 12.9 MB gzip.
 - `openscriptures/strongs` is not used, so its unclear license is moot.
 
-**Still open for planning:**
-1. Psalm verse 1 (title + first verse): 84% aligned; find why word order differs in the 53 same-count psalms (long titles: 51, 52, 54, 56, 60, 34, 57, 88…) and fix the fold, or accept the fallback.
-2. New Testament alignment is 96.87% (Greek variants); check whether filtering TAGNT to the NA28 words raises it.
-3. The 22 tags with no gloss (`H0430J` ×215, `G2453` ×192, `H3064`, `G3708`…): confirm the fallback to the plain number's main entry gives an acceptable meaning, or add a small manual mapping.
-4. Whether the Berean `Verse` counter equals our verse ordinal (John 3:16 should be 26137).
-5. Whether every alignment verse's rebuilt text matches `bsb.tsv`; list the mismatches.
-6. The exact BSB public-domain wording (the berean.bible downloads page carries no license text; the terms page has not been read) and STEPBible's CC BY wording for the credit line.
-7. Post-normalization size of the release asset (drop unused columns; measure gzip).
+**Still open (cannot be settled from here):**
+1. **Database size on Sevalla** (~100 MB estimated, not measured): the owner should confirm the plan's headroom before the seeder runs anywhere.
+2. **Tables' license coverage:** the BSB terms page does not mention the tables/Strong's/morphology files separately; treating them as covered by the public-domain dedication is an inference. The underlying Hebrew/Greek text and Strong's numbering carry their own upstream terms that the BSB page does not address. If that matters, ask the publisher.
+3. **New Testament alignment stays 96.87%** (number disagreements such as `G1473` and the Greek "see" verbs). The impact is small (only 952 unaligned rows are ambiguous), but a small hand-made equivalence table (e.g. `G3708`↔`G1492`/`G3700`) could recover most of them; decide in planning whether it is worth it.
+4. **Verse 2662 and 6964** render plain (or need a one-line normalizer fix for 6964); confirm with a fresh look when the normalizer is ported.
+5. **TAHOT/TAGNT pinned commit:** record the exact commit SHA when the data is first prepared (the files were downloaded from `master` on 2026-09-24).
