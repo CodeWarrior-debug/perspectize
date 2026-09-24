@@ -52,14 +52,9 @@
 		headerMinWidth,
 	} from '$lib/utils/formatting';
 	import {
-		SORT_FIELD_MAP,
-		resolveSortField,
-		resolveSortOrder,
 		capitalizeContentType,
 		durationComparator,
 		compareContentBySorts,
-		computeNextPage,
-		computePrevPage,
 		togglableColIds,
 	} from '$lib/utils/grid-config';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
@@ -485,11 +480,7 @@
 				maxWidth: 100,
 
 				filter: 'agTextColumnFilter',
-				valueGetter: (params) => {
-					const t = params.data?.contentType;
-					if (!t) return '';
-					return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
-				},
+				valueGetter: (params) => capitalizeContentType(params.data?.contentType),
 				filterValueGetter: (params) => {
 					return params.data?.contentType?.toLowerCase() ?? '';
 				},
@@ -521,11 +512,7 @@
 				},
 				valueGetter: durationValueGetter,
 				filterValueGetter: durationFilterValueGetter,
-				comparator: (_valueA, _valueB, nodeA, nodeB) => {
-					const a = nodeA?.data?.length ?? 0;
-					const b = nodeB?.data?.length ?? 0;
-					return a - b;
-				},
+				comparator: durationComparator,
 				headerTooltip: 'Video duration from YouTube API',
 			},
 			{
