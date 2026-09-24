@@ -4,10 +4,10 @@ import FilterBar from '$lib/components/discover/FilterBar.svelte';
 import type { SearchFilters } from '$lib/services/youtubeApi';
 
 // Note: bits-ui Select interactions (opening the popover, clicking an item)
-// are not reliably testable in jsdom — see SearchBar.test.ts and
-// UserSelector.test.ts for the established precedent in this codebase. These
-// tests stick to DOM-observable rendering and the Clear Filters
-// visibility/label logic, which is pure prop-driven behavior.
+// are not reliably testable in jsdom — see SearchBar.test.ts for the
+// established precedent in this codebase. These tests stick to
+// DOM-observable rendering and the Clear Filters visibility/label logic,
+// which is pure prop-driven behavior.
 
 const defaultFilters: SearchFilters = { videoDuration: undefined, publishedAfter: undefined, order: 'relevance' };
 
