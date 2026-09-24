@@ -63,7 +63,7 @@
 
 <div class="flex flex-col h-[calc(100vh-4rem)]">
 	<!-- Page Header: Title + Search -->
-	<div class="px-4 md:px-6 lg:px-8 py-4 md:py-6">
+	<div class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
 		<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
 			<div>
 				<h1 class="text-2xl md:text-3xl font-semibold text-foreground">Activity</h1>
@@ -134,9 +134,10 @@
 	</div>
 
 	<!-- Content Card -->
-	<div class="flex-1 min-h-0 px-4 md:px-6 lg:px-8 pb-4">
+	<!-- pb-20: keeps the card's pagination bar clear of the fixed Messages button. -->
+	<div class="flex-1 min-h-0 w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 pb-20">
 		{#if view === 'content'}
-			<div class="border rounded-lg shadow-sm overflow-hidden h-full flex flex-col">
+			<div class="border border-border rounded-lg shadow-sm overflow-hidden h-full flex flex-col">
 				<ActivityTable />
 			</div>
 		{:else}

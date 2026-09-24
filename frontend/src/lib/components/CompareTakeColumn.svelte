@@ -1,4 +1,6 @@
 <script lang="ts">
+	import SafeHtml from './SafeHtml.svelte';
+
 	let {
 		name,
 		avatarColor,
@@ -32,13 +34,13 @@
 		</span>
 		<span class="text-[13px] font-semibold text-foreground">{name}</span>
 	</div>
-	<p class="font-[family-name:var(--font-family-serif)] text-[13.5px] leading-snug text-foreground">
+	<div class="font-[family-name:var(--font-family-serif)] text-[13.5px] leading-snug text-foreground">
 		{#if review}
-			&ldquo;{review}&rdquo;
+			<SafeHtml html={review} />
 		{:else}
 			<span class="text-muted-foreground">No written review.</span>
 		{/if}
-	</p>
+	</div>
 
 	{#if uniqueFeelings.length > 0}
 		<div class="flex flex-col gap-1.5 border-t border-border pt-2.5">

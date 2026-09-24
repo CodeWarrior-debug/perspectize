@@ -142,6 +142,14 @@ Full setup and examples: [docs/AG_GRID.md](docs/AG_GRID.md)
 
 **Grid remount gotcha:** the `cardMode` breakpoint (<860px) and the error state unmount `AgGridSvelte5Component` entirely — a new Grid API is created on the way back, so any imperative column state (`setColumnsVisible`, `applyColumnState`, the session column-picker override) MUST be re-applied from an `$effect` that reruns on `gridReady`, not just at the moment the user changes it.
 
+**Grid colours come from theme tokens, not hex.** `src/lib/utils/grid-theme.ts` (`GRID_THEME_PARAMS`, unit-tested to contain no raw colours) feeds `themeQuartz.withParams`, so the grid follows the theme picker. Zebra/hover come from `--color-row-alt` / `--color-row-hover` / `--color-row-accent`, derived in `src/lib/theme/derive.ts` (so custom themes get them too). Adding a derived token means: `DerivedTokens` + `toCssVarMap` + `clearInlineThemeVars` in `store.svelte.ts`, the default `@theme` block in `app.css`, and the four `[data-theme]` blocks (regenerate with `npx tsx gen-preset-css.mjs`; for a new token `git diff` must show only additions). Changing how an existing token is *derived* changes every preset's generated block and the default block's matching values; `tests/unit/theme/css-agreement.test.ts` fails until `app.css` is regenerated. Row hover is a foreground wash (not primary-driven) so dimming the primary never erodes hover-vs-zebra; an authored neutral with chroma >= 0.004 keeps its own hue.
+
+**A bare `border` class is `currentColor` under Tailwind v4, not the theme's border token.** Pair it with `border-border` (or `border-b border-border` etc.) or the frame renders in the text colour: near-black on light themes, near-white on dark. Caught on the Activity grid card.
+
+**AG Grid paints row hover on `.ag-row-hover::before`, above the row background and below the cell content.** An opaque hover colour is therefore safe (text stays visible) and is what makes hover identical on odd and even rows — an alpha hover composites differently over the zebra. The left hover bar is an `inset` box-shadow on that same `::before` (`app.css`).
+
+**Column minimum widths must fit the page container.** The Activity page is capped at `max-w-screen-xl` (1280px), leaving a 1212px grid; `headerMinWidth` (`formatting.ts`) sums to just under that. Reserving extra header room (an icon slot, a divider) silently overflows the grid and clips the last column on every wide screen. The `?f.type=youtube` URL filter is applied through the grid's filter model, so the mobile card list (grid unmounted) ignores it.
+
 ## Figma Design Workflow
 
 - **[docs/FIGMA.md](docs/FIGMA.md)** — Figma file reference (file keys, pages, variables, code↔Figma mapping)

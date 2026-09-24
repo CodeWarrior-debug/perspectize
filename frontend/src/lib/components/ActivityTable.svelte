@@ -29,6 +29,7 @@
 		urlParamsToGraphQLFilter,
 		urlParamsToFilter,
 		filterToUrlParams,
+		filtersEqual,
 	} from '$lib/utils/gridUrlState';
 	import type { DataMode, GridParams, SortSpec } from '$lib/utils/gridUrlState';
 	import {
@@ -61,6 +62,7 @@
 		computePrevPage,
 		togglableColIds,
 	} from '$lib/utils/grid-config';
+	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
 	import SortPickerDialog from '$lib/components/SortPickerDialog.svelte';
@@ -441,29 +443,7 @@
 
 	const modules = [ClientSideRowModelModule];
 
-	const theme = themeQuartz.withParams({
-		fontFamily: "'Geist', system-ui, sans-serif",
-		fontSize: 14,
-		headerBackgroundColor: '#1a365d',
-		headerTextColor: '#ffffff',
-		headerFontWeight: 600,
-		oddRowBackgroundColor: '#f7fafc',
-		rowHoverColor: 'rgba(26, 54, 93, 0.06)',
-		borderColor: '#d4d4d4',
-		accentColor: '#1a365d',
-		foregroundColor: '#171717',
-		backgroundColor: '#ffffff',
-		selectedRowBackgroundColor: 'rgba(26, 54, 93, 0.08)',
-		columnHoverColor: 'rgba(26, 54, 93, 0.04)',
-		headerColumnResizeHandleColor: 'rgba(255, 255, 255, 0.5)',
-		// 64px comfortably fits a 32px thumbnail alongside a 2-line, 13px/1.5-leading title
-		// with margin to spare — a tighter value clips descenders (g/y/p/q/j) on the second
-		// line via the row's own overflow:hidden, even though line-clamp itself only ever
-		// cuts whole lines. See CLAUDE.md's AG Grid gotcha.
-		rowHeight: 64,
-		headerHeight: 40,
-		listItemHeight: 24,
-	});
+	const theme = themeQuartz.withParams(GRID_THEME_PARAMS);
 
 	// flex = clamp-like: proportional sizing with min/max constraints
 	// minWidth is auto-derived from headerName unless explicitly set (e.g. Item = 200)
@@ -795,7 +775,10 @@
 					.getColumnState()
 					.filter((col) => col.sort)
 					.sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0))
-					.map((col) => ({ col: col.colId ?? 'updatedAt', dir: col.sort === 'asc' ? ('asc' as const) : ('desc' as const) }));
+					.map((col) => ({
+						col: col.colId ?? 'updatedAt',
+						dir: col.sort === 'asc' ? ('asc' as const) : ('desc' as const),
+					}));
 				return;
 			}
 			// Skip if we triggered this event programmatically (to avoid loop)
@@ -825,14 +808,18 @@
 			activeFilterModel = event.api.getFilterModel();
 			displayedRowCount = event.api.getDisplayedRowCount();
 
-			// In "Loaded" mode, AG Grid handles client-side filter — skip URL update
-			if (mode === 'loaded') return;
-
-			// Server-side: debounce → convert filter model → update URL
+			// Debounce → convert filter model → update URL. In "Loaded" mode AG Grid already
+			// filtered client-side; the URL write just keeps the URL authoritative, so a
+			// cleared default filter (f=none) isn't re-applied by the restore effect below.
 			clearTimeout(debounceTimer);
 			debounceTimer = setTimeout(() => {
 				const filterModel = event.api.getFilterModel();
 				const urlFilters = filterToUrlParams(filterModel as Record<string, unknown>);
+				if (filtersEqual(urlFilters, gridParams.filters)) return;
+				if (mode === 'loaded') {
+					updateUrl({ filters: urlFilters });
+					return;
+				}
 				cursors = [null];
 				updateUrl({ filters: urlFilters, page: 1 });
 			}, 500);
@@ -977,8 +964,8 @@
 			const smCols = ['category', 'channel'];
 			const mdCols = ['duration', 'publishDate'];
 			const lgCols = ['views', 'likes', 'percentLiked', 'tags'];
-			// createdAt/updatedAt/id/addedByUserID/url stay hidden via their colDef
-			// `hide: true` until an admin enables them in the column picker.
+			// createdAt/updatedAt stay hidden via their colDef `hide: true` until the
+			// user enables them in the column picker; id/addedByUserID/url likewise, admins only.
 			const alwaysHidden = ['description'];
 
 			api.setColumnsVisible(alwaysVisible, true);
@@ -1012,7 +999,20 @@
 
 <div class="flex flex-col h-full gap-4">
 	<!-- Active Filter Chips — always visible so users can clear filters even during errors -->
-	<FilterChips {gridApi} filterModel={activeFilterModel} />
+	<FilterChips
+		{gridApi}
+		filterModel={gridApi ? activeFilterModel : urlParamsToFilter(filters)}
+		onRemove={(colId) => {
+			const next = { ...gridParams.filters };
+			delete next[colId];
+			cursors = [null];
+			updateUrl({ filters: next, page: 1 });
+		}}
+		onClearAll={() => {
+			cursors = [null];
+			updateUrl({ filters: {}, page: 1 });
+		}}
+	/>
 
 	<!-- Error State -->
 	{#if contentQuery.isError}

@@ -41,8 +41,18 @@ export const GRID_DEFAULTS: GridParams = {
 	pageSize: 10,
 	q: '',
 	qFields: ALL_SEARCH_SCOPES,
-	filters: {},
+	// First load shows YouTube content only. Clearing it is persisted as `f=none`.
+	filters: { type: 'youtube' },
 };
+
+/** Sentinel URL value for "filters explicitly cleared" (distinct from no `f.*` params, which means defaults). */
+const NO_FILTERS = 'none';
+
+/** Shallow equality for URL filter maps (key order ignored). */
+export function filtersEqual(a: Record<string, string>, b: Record<string, string>): boolean {
+	const aKeys = Object.keys(a);
+	return aKeys.length === Object.keys(b).length && aKeys.every((k) => a[k] === b[k]);
+}
 
 /** Max columns considered for a multi-column sort — matches AG Grid's practical limit for this table. */
 const MAX_SORT_COLUMNS = 5;
@@ -139,13 +149,19 @@ export function parseGridParams(params: URLSearchParams): GridParams {
 	const q = params.get('q');
 	const qf = params.get('qf');
 
-	const filters: Record<string, string> = {};
+	const parsedFilters: Record<string, string> = {};
 	for (const [key, value] of params.entries()) {
 		if (key.startsWith('f.')) {
 			const filterKey = key.slice(2); // strip 'f.' prefix
-			filters[filterKey] = value;
+			parsedFilters[filterKey] = value;
 		}
 	}
+	const filters =
+		Object.keys(parsedFilters).length > 0
+			? parsedFilters
+			: params.get('f') === NO_FILTERS
+				? {}
+				: { ...GRID_DEFAULTS.filters };
 
 	return {
 		mode: mode === 'all' ? 'all' : GRID_DEFAULTS.mode,
@@ -183,8 +199,12 @@ export function serializeGridParams(state: GridParams): string {
 	if (state.q !== GRID_DEFAULTS.q) params.set('q', state.q);
 	if (!sameScopes(state.qFields, GRID_DEFAULTS.qFields)) params.set('qf', state.qFields.join(','));
 
-	for (const [key, value] of Object.entries(state.filters)) {
-		params.set(`f.${key}`, value);
+	if (!filtersEqual(state.filters, GRID_DEFAULTS.filters)) {
+		const entries = Object.entries(state.filters);
+		if (entries.length === 0) params.set('f', NO_FILTERS);
+		for (const [key, value] of entries) {
+			params.set(`f.${key}`, value);
+		}
 	}
 
 	return params.toString();

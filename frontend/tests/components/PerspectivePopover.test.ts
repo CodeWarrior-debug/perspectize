@@ -7,7 +7,22 @@ const mocks = vi.hoisted(() => ({
 	mockCreateMutate: vi.fn(),
 	mockUpdateMutate: vi.fn(),
 	mockOnClose: vi.fn(),
+	mockSaveDraft: vi.fn(),
+	mockLoadDraft: vi.fn(() => null as string | null),
+	mockClearDraft: vi.fn(),
 }));
+
+vi.mock('$lib/utils/perspectiveDraft', () => ({
+	draftKey: (contentId: number, userId: number) => `draft:${contentId}:${userId}`,
+	saveDraft: mocks.mockSaveDraft,
+	loadDraft: mocks.mockLoadDraft,
+	clearDraft: mocks.mockClearDraft,
+}));
+
+vi.mock('$lib/components/PerspectiveEditor.svelte', async () => {
+	const mod = await import('../helpers/FakePerspectiveEditor.svelte');
+	return { default: mod.default };
+});
 
 vi.mock('$lib/queries/perspectives/useCreatePerspective', () => ({
 	useCreatePerspective: vi.fn(() => ({
@@ -52,6 +67,7 @@ function renderPopover(props?: {
 describe('PerspectivePopover component', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mocks.mockLoadDraft.mockReturnValue(null);
 	});
 
 	describe('rendering', () => {
@@ -556,6 +572,217 @@ describe('PerspectivePopover component', () => {
 			});
 			await tick();
 			expect(screen.getByRole('switch', { name: /private/i })).toBeChecked();
+		});
+	});
+
+	describe('draft persistence', () => {
+		it('typing triggers a debounced saveDraft call', async () => {
+			vi.useFakeTimers();
+			try {
+				renderPopover();
+				await tick();
+
+				const editor = screen.getByLabelText('Comment');
+				await fireEvent.input(editor, { target: { value: '<p>hello</p>' } });
+
+				expect(mocks.mockSaveDraft).not.toHaveBeenCalled();
+				await vi.advanceTimersByTimeAsync(1000);
+				expect(mocks.mockSaveDraft).toHaveBeenCalledWith('draft:1:42', '<p>hello</p>', '');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('reopening with an existing draft shows the restore banner and populates the editor', async () => {
+			mocks.mockLoadDraft.mockReturnValue('<p>draft content</p>');
+			renderPopover();
+			await tick();
+
+			expect(screen.getByText('Restored unsaved draft')).toBeInTheDocument();
+			expect(screen.getByLabelText('Comment')).toHaveValue('<p>draft content</p>');
+		});
+
+		it('does not show the restore banner when no draft exists', async () => {
+			mocks.mockLoadDraft.mockReturnValue(null);
+			renderPopover();
+			await tick();
+
+			expect(screen.queryByText('Restored unsaved draft')).not.toBeInTheDocument();
+		});
+
+		it('successful create clears the draft', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			await fireEvent.click(screen.getByLabelText('Thumbs up'));
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			expect(mocks.mockCreateMutate).toHaveBeenCalled();
+			const options = mocks.mockCreateMutate.mock.calls.at(-1)![1];
+			options.onSuccess();
+			expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
+		});
+
+		it('successful update clears the draft', async () => {
+			renderPopover({
+				existingPerspective: {
+					id: '5',
+					quality: 7500,
+					agreement: null,
+					importance: null,
+					confidence: null,
+					like: null,
+				},
+			});
+			await tick();
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			expect(mocks.mockUpdateMutate).toHaveBeenCalled();
+			const options = mocks.mockUpdateMutate.mock.calls.at(-1)![1];
+			options.onSuccess();
+			expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
+		});
+	});
+
+	describe('image-only reviews', () => {
+		const imageOnly = '<p><img src="https://example.com/a.png"></p>';
+
+		it('saves an image-only review alongside a rating instead of dropping it', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: imageOnly } });
+			await fireEvent.click(screen.getByLabelText('Thumbs up'));
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			expect(mocks.mockCreateMutate).toHaveBeenCalled();
+			const payload = mocks.mockCreateMutate.mock.calls.at(-1)![0];
+			expect(payload.review).toContain('<img');
+		});
+
+		it('counts an image-only review as content, so it can be saved on its own', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: imageOnly } });
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			expect(mocks.mockCreateMutate).toHaveBeenCalled();
+		});
+	});
+
+	describe('draft lifecycle', () => {
+		it('a pending debounced draft save cannot resurrect the draft after a successful save', async () => {
+			vi.useFakeTimers();
+			try {
+				renderPopover({ existingPerspective: null });
+				await tick();
+				await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>typed</p>' } });
+				await fireEvent.click(screen.getByLabelText('Thumbs up'));
+				await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+				mocks.mockCreateMutate.mock.calls.at(-1)![1].onSuccess();
+				expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
+
+				await vi.advanceTimersByTimeAsync(1500);
+				expect(mocks.mockSaveDraft).not.toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('flushes a pending draft save immediately when the popover unmounts', async () => {
+			vi.useFakeTimers();
+			try {
+				const { unmount } = renderPopover({ existingPerspective: null });
+				await tick();
+				await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>almost lost</p>' } });
+				expect(mocks.mockSaveDraft).not.toHaveBeenCalled();
+
+				unmount();
+				expect(mocks.mockSaveDraft).toHaveBeenCalledWith('draft:1:42', '<p>almost lost</p>', '');
+				await vi.advanceTimersByTimeAsync(1500);
+				expect(mocks.mockSaveDraft).toHaveBeenCalledTimes(1);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('keys drafts to the server review they were started from', async () => {
+			vi.useFakeTimers();
+			try {
+				renderPopover({
+					existingPerspective: {
+						id: '5',
+						quality: 7500,
+						agreement: null,
+						importance: null,
+						confidence: null,
+						like: null,
+						review: '<p>server copy</p>',
+					},
+				});
+				await tick();
+				expect(mocks.mockLoadDraft).toHaveBeenCalledWith('draft:1:42', '<p>server copy</p>');
+
+				await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>edited</p>' } });
+				await vi.advanceTimersByTimeAsync(1000);
+				expect(mocks.mockSaveDraft).toHaveBeenCalledWith('draft:1:42', '<p>edited</p>', '<p>server copy</p>');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('"Discard draft" reverts to the saved review and deletes the stored draft', async () => {
+			mocks.mockLoadDraft.mockReturnValue('<p>stale draft</p>');
+			renderPopover({
+				existingPerspective: {
+					id: '5',
+					quality: 7500,
+					agreement: null,
+					importance: null,
+					confidence: null,
+					like: null,
+					review: '<p>saved copy</p>',
+				},
+			});
+			await tick();
+			expect(screen.getByLabelText('Comment')).toHaveValue('<p>stale draft</p>');
+
+			await fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }));
+
+			expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
+			expect(screen.getByLabelText('Comment')).toHaveValue('<p>saved copy</p>');
+			expect(screen.queryByText('Restored unsaved draft')).not.toBeInTheDocument();
+		});
+	});
+	describe('expanding the comment editor in place', () => {
+		it('starts collapsed', async () => {
+			renderPopover();
+			await tick();
+
+			expect(screen.getByLabelText('Comment')).toHaveAttribute('data-expanded', 'false');
+			expect(screen.getByRole('button', { name: 'Expand comment' })).toBeInTheDocument();
+		});
+
+		it('expand grows the editor and collapse returns it, in the same dialog', async () => {
+			renderPopover();
+			await tick();
+
+			await fireEvent.click(screen.getByRole('button', { name: 'Expand comment' }));
+			expect(screen.getByLabelText('Comment')).toHaveAttribute('data-expanded', 'true');
+			expect(screen.getByRole('button', { name: 'Save perspective' })).toBeInTheDocument();
+
+			await fireEvent.click(screen.getByRole('button', { name: 'Collapse comment' }));
+			expect(screen.getByLabelText('Comment')).toHaveAttribute('data-expanded', 'false');
+			expect(mocks.mockOnClose).not.toHaveBeenCalled();
+		});
+
+		it('keeps typed text across expand and collapse (single editor, no sync step)', async () => {
+			renderPopover();
+			await tick();
+
+			await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>draft</p>' } });
+			await fireEvent.click(screen.getByRole('button', { name: 'Expand comment' }));
+			expect(screen.getByLabelText('Comment')).toHaveValue('<p>draft</p>');
+			await fireEvent.click(screen.getByRole('button', { name: 'Collapse comment' }));
+			expect(screen.getByLabelText('Comment')).toHaveValue('<p>draft</p>');
 		});
 	});
 });

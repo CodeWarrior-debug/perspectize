@@ -11,6 +11,33 @@ describe('CompareTakeColumn', () => {
 		expect(screen.getByText(/Solid overview/)).toBeInTheDocument();
 	});
 
+	it('renders rich review HTML as formatted content, not escaped markup', () => {
+		render(CompareTakeColumn, {
+			props: {
+				name: 'Jamie Lee',
+				avatarColor: '#8b5cf6',
+				review: '<h2>Big idea</h2><table><tbody><tr><td>cell</td></tr></tbody></table>',
+				uniqueFeelings: [],
+			},
+		});
+		expect(screen.getByRole('heading', { level: 2, name: 'Big idea' })).toBeInTheDocument();
+		expect(screen.getByRole('cell', { name: 'cell' })).toBeInTheDocument();
+		expect(screen.queryByText(/<h2>/)).not.toBeInTheDocument();
+	});
+
+	it('strips scripts from review HTML before rendering', () => {
+		const { container } = render(CompareTakeColumn, {
+			props: {
+				name: 'Jamie Lee',
+				avatarColor: '#8b5cf6',
+				review: '<p>ok</p><script>window.__pwned = true</script><img src="x" onerror="window.__pwned = true">',
+				uniqueFeelings: [],
+			},
+		});
+		expect(container.querySelector('script')).toBeNull();
+		expect(container.querySelector('img')?.getAttribute('onerror')).toBeNull();
+	});
+
 	it('shows a placeholder when there is no review text', () => {
 		render(CompareTakeColumn, {
 			props: { name: 'Jamie Lee', avatarColor: '#8b5cf6', review: null, uniqueFeelings: [] },

@@ -66,6 +66,12 @@
 	}
 
 	function startCustomizing() {
+		const pending = store.pendingPreview();
+		if (pending) {
+			editTokens = pending;
+			customizing = true;
+			return;
+		}
 		const active = store.activeFullTokens();
 		editTokens = {
 			primary: active.primary,
