@@ -107,6 +107,20 @@ describe('row tokens', () => {
 		expect(readingRoom.rowAccent).toBe(readingRoom.primary);
 	});
 
+	it('keeps hover distinct from the zebra however dim the primary is (hover is not driven by primary lightness)', () => {
+		const base = THEME_PRESETS.find((p) => p.id === 'midnight')!.base;
+		for (const primary of ['#8fb0ff', '#5a83b2', '#3d5f8a', '#22334a']) {
+			const full = deriveTheme({ ...base, primary });
+			expect(oklabDistance(full.rowHover, full.rowAlt)).toBeGreaterThanOrEqual(0.04);
+			expect(wcagContrast(full.foreground, full.rowHover)).toBeGreaterThanOrEqual(4.5);
+		}
+		const light = THEME_PRESETS[0].base;
+		for (const primary of ['#1a365d', '#4a6a94', '#8aa4c8']) {
+			const full = deriveTheme({ ...light, primary });
+			expect(oklabDistance(full.rowHover, full.rowAlt)).toBeGreaterThanOrEqual(0.04);
+		}
+	});
+
 	it('exposes the row tokens as CSS variables', () => {
 		const vars = toCssVarMap(deriveTheme(READING_ROOM_BASE));
 		expect(Object.keys(vars)).toEqual(

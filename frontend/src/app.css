@@ -80,7 +80,7 @@
 
 	/* Theme/Light — Grid rows (zebra, opaque hover, hover bar) */
 	--color-row-alt: #f8f8f8;
-	--color-row-hover: #e1e5eb;
+	--color-row-hover: #e1e2e4;
 	--color-row-accent: #1a365d;
 
 	/* Rating Colors */
@@ -128,7 +128,7 @@
 	--color-rating-negative: #dc2912;
 	--color-rating-undecided: #6a728b;
 	--color-row-alt: #f8efe6;
-	--color-row-hover: #ede1d4;
+	--color-row-hover: #e7ded3;
 	--color-row-accent: #7c5a2e;
 }
 
@@ -160,7 +160,7 @@
 	--color-rating-negative: #da2f00;
 	--color-rating-undecided: #61758a;
 	--color-row-alt: #f3f7f4;
-	--color-row-hover: #dfe6e1;
+	--color-row-hover: #dee4e0;
 	--color-row-accent: #2f4a3a;
 }
 
@@ -192,7 +192,7 @@
 	--color-rating-negative: #db2149;
 	--color-rating-undecided: #64748b;
 	--color-row-alt: #111825;
-	--color-row-hover: #222935;
+	--color-row-hover: #212734;
 	--color-row-accent: #e8e6df;
 }
 
@@ -224,7 +224,7 @@
 	--color-rating-negative: #da3000;
 	--color-rating-undecided: #61758a;
 	--color-row-alt: #0d0f0e;
-	--color-row-hover: #1b211e;
+	--color-row-hover: #1a1f1d;
 	--color-row-accent: #c9f5d9;
 }
 
