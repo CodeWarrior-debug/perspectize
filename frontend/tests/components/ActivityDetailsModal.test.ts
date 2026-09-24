@@ -284,5 +284,15 @@ describe('ActivityDetailsModal', () => {
 			await fireEvent.input(screen.getByLabelText('Passage title'), { target: { value: 'Creation' } });
 			expect(screen.getByRole('button', { name: /save title/i })).toBeDisabled();
 		});
+
+		it('offers original language for a passage and not for a YouTube video', () => {
+			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+			expect(screen.getByRole('button', { name: /show original language/i })).toBeInTheDocument();
+		});
+
+		it('does not offer original language for a YouTube video', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			expect(screen.queryByRole('button', { name: /original language/i })).not.toBeInTheDocument();
+		});
 	});
 });
