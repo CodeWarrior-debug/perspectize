@@ -25,7 +25,11 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="fixed inset-0 bg-black/55 flex items-center justify-center p-4 z-[100]" onclick={handleBackdropClick}>
+<div
+	data-testid="comment-fullscreen"
+	class="fixed inset-0 bg-black/55 flex items-center justify-center p-4 z-[100]"
+	onclick={handleBackdropClick}
+>
 	<div class="bg-white rounded-xl w-full max-w-[560px] max-h-[90%] flex flex-col overflow-hidden shadow-2xl">
 		<!-- Header -->
 		<div class="px-4 py-3 border-b border-border flex items-center justify-between">

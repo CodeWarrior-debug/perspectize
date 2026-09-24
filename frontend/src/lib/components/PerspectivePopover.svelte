@@ -572,6 +572,17 @@
 		<DialogContent
 			class="sm:max-w-[460px] w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col"
 			overlayClass="bg-black/45"
+			onInteractOutside={(e) => {
+				// The expanded editor renders outside DialogContent, so clicks in it
+				// look like outside-clicks — don't let them dismiss this dialog.
+				if (commentFullscreenOpen) e.preventDefault();
+			}}
+			onEscapeKeydown={(e) => {
+				if (commentFullscreenOpen) {
+					e.preventDefault();
+					commentFullscreenOpen = false;
+				}
+			}}
 		>
 			{@render modalBody(false)}
 		</DialogContent>
@@ -580,6 +591,7 @@
 	<!-- Mobile: bottom sheet drawer -->
 	<Drawer
 		bind:open
+		dismissible={!commentFullscreenOpen}
 		onOpenChange={(isOpen) => {
 			if (!isOpen) onClose();
 		}}

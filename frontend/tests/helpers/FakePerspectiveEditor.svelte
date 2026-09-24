@@ -8,6 +8,8 @@
 	let {
 		value = '',
 		onChange,
+		showPopout = false,
+		onPopout,
 		isMobile = false,
 	}: {
 		value?: string;
@@ -24,5 +26,7 @@
 	aria-label="Comment"
 	data-mobile={isMobile}
 	{value}
-	oninput={(e) => onChange((e.target as HTMLTextAreaElement).value)}
-></textarea>
+	oninput={(e) => onChange((e.target as HTMLTextAreaElement).value)}></textarea>
+{#if showPopout}
+	<button type="button" aria-label="Expand comment" onclick={() => onPopout?.()}></button>
+{/if}
