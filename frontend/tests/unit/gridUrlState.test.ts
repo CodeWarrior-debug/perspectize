@@ -93,8 +93,20 @@ describe('parseGridParams', () => {
 	it('ignores unknown params', () => {
 		const params = new URLSearchParams('unknown=value&another=thing');
 		const result = parseGridParams(params);
-		expect(result.filters).toEqual({});
+		expect(result.filters).toEqual(GRID_DEFAULTS.filters);
 		expect(result.sorts).toEqual(GRID_DEFAULTS.sorts);
+	});
+
+	it('defaults to the YouTube type filter when no f.* params are present', () => {
+		expect(parseGridParams(new URLSearchParams('')).filters).toEqual({ type: 'youtube' });
+	});
+
+	it('parses f=none as explicitly cleared filters', () => {
+		expect(parseGridParams(new URLSearchParams('f=none')).filters).toEqual({});
+	});
+
+	it('explicit f.* params replace the default filter', () => {
+		expect(parseGridParams(new URLSearchParams('f.views=1000..')).filters).toEqual({ views: '1000..' });
 	});
 
 	it('collects multiple f.* params', () => {
@@ -186,6 +198,17 @@ describe('serializeGridParams', () => {
 		const result = serializeGridParams(state);
 		expect(result).toContain('f.type=youtube');
 		expect(result).toContain('f.views=1000..');
+	});
+
+	it('omits the default filter from the URL', () => {
+		expect(serializeGridParams(GRID_DEFAULTS)).not.toContain('f.');
+	});
+
+	it('serializes cleared filters as f=none and round-trips', () => {
+		const state = { ...GRID_DEFAULTS, filters: {} };
+		const serialized = serializeGridParams(state);
+		expect(serialized).toBe('f=none');
+		expect(parseGridParams(new URLSearchParams(serialized)).filters).toEqual({});
 	});
 
 	it('round-trips with parseGridParams (defaults)', () => {

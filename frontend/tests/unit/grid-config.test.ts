@@ -438,9 +438,10 @@ describe('COLUMN_FILTERS', () => {
 // Column-picker registry
 // ---------------------------------------------------------------------------
 describe('column-picker registry', () => {
-	it('DATA_COLUMNS holds the 9 user-togglable data columns', () => {
+	it('DATA_COLUMNS holds the 12 user-togglable data columns', () => {
 		expect(DATA_COLUMNS.map((c) => c.colId)).toEqual([
 			'type',
+			'category',
 			'duration',
 			'views',
 			'likes',
@@ -449,6 +450,8 @@ describe('column-picker registry', () => {
 			'channel',
 			'tags',
 			'description',
+			'createdAt',
+			'updatedAt',
 		]);
 	});
 
@@ -457,8 +460,8 @@ describe('column-picker registry', () => {
 		expect(togglableColIds(true)).not.toContain('item');
 	});
 
-	it('INTERNAL_COLUMNS holds the 5 admin-only columns', () => {
-		expect(INTERNAL_COLUMNS.map((c) => c.colId)).toEqual(['id', 'addedByUserID', 'url', 'createdAt', 'updatedAt']);
+	it('INTERNAL_COLUMNS holds the 3 admin-only columns', () => {
+		expect(INTERNAL_COLUMNS.map((c) => c.colId)).toEqual(['id', 'addedByUserID', 'url']);
 	});
 
 	it('every registry colId is unique across both groups', () => {
@@ -472,13 +475,13 @@ describe('column-picker registry', () => {
 		}
 	});
 
-	it('togglableColIds(false) returns only the 9 data columns', () => {
+	it('togglableColIds(false) returns only the 12 data columns', () => {
 		expect(togglableColIds(false)).toEqual(DATA_COLUMNS.map((c) => c.colId));
 	});
 
-	it('togglableColIds(true) returns all 14 columns', () => {
+	it('togglableColIds(true) returns all 15 columns', () => {
 		const ids = togglableColIds(true);
-		expect(ids).toHaveLength(14);
+		expect(ids).toHaveLength(15);
 		expect(ids).toEqual([...DATA_COLUMNS.map((c) => c.colId), ...INTERNAL_COLUMNS.map((c) => c.colId)]);
 	});
 
