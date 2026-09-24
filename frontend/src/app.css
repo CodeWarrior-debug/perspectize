@@ -90,7 +90,7 @@
 	--color-ring: #1a365d;
 
 	/* Theme/Light — Grid rows (zebra, opaque hover, hover bar) */
-	--color-row-alt: #f4f3f1;
+	--color-row-alt: #f8f7f4;
 	--color-row-hover: #dedfdd;
 	--color-row-accent: #1a365d;
 
@@ -138,7 +138,7 @@
 	--color-rating-neutral: #ca8a05;
 	--color-rating-negative: #dc2912;
 	--color-rating-undecided: #6a728b;
-	--color-row-alt: #f6f0e6;
+	--color-row-alt: #f8f3e9;
 	--color-row-hover: #e5dfd3;
 	--color-row-accent: #7c5a2e;
 }
@@ -170,7 +170,7 @@
 	--color-rating-neutral: #c38e00;
 	--color-rating-negative: #da2f00;
 	--color-rating-undecided: #61758a;
-	--color-row-alt: #f5f6f2;
+	--color-row-alt: #f8f9f5;
 	--color-row-hover: #e0e3df;
 	--color-row-accent: #2f4a3a;
 }
@@ -202,7 +202,7 @@
 	--color-rating-neutral: #d68128;
 	--color-rating-negative: #db2149;
 	--color-rating-undecided: #64748b;
-	--color-row-alt: #141823;
+	--color-row-alt: #121621;
 	--color-row-hover: #242732;
 	--color-row-accent: #e8e6df;
 }
@@ -234,7 +234,7 @@
 	--color-rating-neutral: #c38e00;
 	--color-rating-negative: #da3000;
 	--color-rating-undecided: #61758a;
-	--color-row-alt: #0d0f0e;
+	--color-row-alt: #0b0d0c;
 	--color-row-hover: #1a1f1d;
 	--color-row-accent: #c9f5d9;
 }

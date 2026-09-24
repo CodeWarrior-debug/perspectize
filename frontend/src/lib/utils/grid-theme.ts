@@ -16,6 +16,7 @@ export const GRID_THEME_PARAMS = {
 	foregroundColor: 'var(--color-foreground)',
 	borderColor: 'var(--color-border)',
 	accentColor: 'var(--color-primary)',
+	rowBorder: true,
 	oddRowBackgroundColor: 'var(--color-row-alt)',
 	rowHoverColor: 'var(--color-row-hover)',
 	selectedRowBackgroundColor: 'var(--color-row-hover)',

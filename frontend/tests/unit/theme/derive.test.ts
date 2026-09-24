@@ -114,6 +114,11 @@ describe('row tokens', () => {
 		},
 	);
 
+	it.each(THEME_PRESETS)('preset "$id": the zebra is faint — within 0.02 (OKLab) of the page', (preset) => {
+		const full = deriveTheme(preset.base);
+		expect(oklabDistance(full.rowAlt, full.background)).toBeLessThanOrEqual(0.02);
+	});
+
 	it('tints hover from the foreground when primary is nearly the page colour (dark presets)', () => {
 		const midnight = deriveTheme(THEME_PRESETS.find((p) => p.id === 'midnight')!.base);
 		expect(midnight.rowAccent).toBe(midnight.foreground);

@@ -155,8 +155,11 @@ function darken(hexColor: string, amount: number): string {
 	return hex({ ...c, l: Math.max(0, c.l - amount) });
 }
 
-/** Zebra is a whisper of the foreground over the background, so it reads on light and dark alike. */
-const ROW_ALT_MIX = 0.025;
+/**
+ * Zebra is a whisper of the foreground over the background, so it reads on light and dark alike.
+ * Rows are separated by hairlines (see grid-theme.ts), so the stripe only has to be barely there.
+ */
+const ROW_ALT_MIX = 0.012;
 /**
  * Hover is a foreground wash (so its distance from the zebra is set by the page's own contrast,
  * not by how bright the primary is) with a hint of the accent colour for character. Driving it

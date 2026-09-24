@@ -30,3 +30,9 @@ describe('header', () => {
 		expect(GRID_THEME_PARAMS.headerColumnBorder).toBe(false);
 	});
 });
+
+describe('rows', () => {
+	it('separates rows with hairlines, so the zebra can stay faint', () => {
+		expect(GRID_THEME_PARAMS.rowBorder).toBe(true);
+	});
+});
