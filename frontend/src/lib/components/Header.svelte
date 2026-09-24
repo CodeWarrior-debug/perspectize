@@ -9,10 +9,10 @@
 	const themeStore = createThemeStore();
 	let settingsOpen = $state(false);
 
-	// The header sits on --color-primary, so the ring uses --color-primary-foreground (always
+	// The header sits on --color-header, so the ring uses --color-header-foreground (always
 	// contrasts with it) rather than --color-ring, which is near-invisible on the dark presets.
 	const focusRing =
-		'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 focus-visible:ring-offset-2 focus-visible:ring-offset-primary';
+		'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-header-foreground/80 focus-visible:ring-offset-2 focus-visible:ring-offset-header';
 
 	const navLinks = [
 		{ href: '/', label: 'Activity' },
@@ -25,12 +25,12 @@
 	}
 </script>
 
-<header class="h-16 border-b border-border bg-primary text-primary-foreground sticky top-0 z-50">
+<header class="h-16 border-b border-border header-surface text-header-foreground sticky top-0 z-50">
 	<div class="h-full px-4 md:px-6 lg:px-8 max-w-screen-xl mx-auto flex items-center justify-between gap-2 md:gap-4">
 		<div class="flex items-center gap-4 md:gap-6 min-w-0">
 			<a
 				href="/"
-				class="font-bold text-base sm:text-lg md:text-xl text-primary-foreground hover:text-primary-foreground/80 active:opacity-75 transition-colors min-w-0 truncate rounded-sm {focusRing}"
+				class="font-bold text-base sm:text-lg md:text-xl text-header-foreground hover:text-header-foreground/80 active:opacity-75 transition-colors min-w-0 truncate rounded-sm {focusRing}"
 			>
 				Perspectize
 			</a>
@@ -42,8 +42,8 @@
 						class="px-1.5 sm:px-2 py-1 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap transition-colors {focusRing} {isActive(
 							link.href,
 						)
-							? 'text-primary-foreground bg-primary-foreground/15'
-							: 'text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/10'}"
+							? 'text-header-foreground bg-header-foreground/15'
+							: 'text-header-foreground/80 hover:text-header-foreground hover:bg-header-foreground/10'}"
 					>
 						{link.label}
 					</a>
@@ -56,7 +56,7 @@
 				<button
 					type="button"
 					aria-label="Settings"
-					class="inline-flex items-center justify-center rounded-md size-9 text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors {focusRing}"
+					class="inline-flex items-center justify-center rounded-md size-9 text-header-foreground/80 hover:text-header-foreground hover:bg-header-foreground/10 transition-colors {focusRing}"
 					onclick={() => (settingsOpen = true)}
 				>
 					<SettingsIcon class="size-4" />
@@ -75,7 +75,7 @@
 			<Show when="signed-out">
 				<SignInButton mode="modal">
 					<button
-						class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 border border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+						class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 border border-header-foreground/20 text-header-foreground hover:bg-header-foreground/10 transition-colors"
 					>
 						Sign In
 					</button>

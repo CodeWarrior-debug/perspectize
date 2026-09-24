@@ -43,20 +43,20 @@
 <div class="flex items-center gap-2">
 	{#if usersQuery.isLoading}
 		<div
-			class="h-9 rounded-md border border-primary-foreground/30 bg-primary-foreground/10 px-3 text-sm text-primary-foreground flex items-center opacity-50"
+			class="h-9 rounded-md border border-header-foreground/30 bg-header-foreground/10 px-3 text-sm text-header-foreground flex items-center opacity-50"
 		>
 			Loading users...
 		</div>
 	{:else if usersQuery.error}
 		<div
-			class="h-9 rounded-md border border-primary-foreground/30 bg-primary-foreground/10 px-3 text-sm text-destructive flex items-center"
+			class="h-9 rounded-md border border-header-foreground/30 bg-header-foreground/10 px-3 text-sm text-destructive flex items-center"
 		>
 			Error loading users
 		</div>
 	{:else if usersQuery.data}
 		<Select bind:value={selectedValue} onValueChange={handleValueChange} type="single">
 			<SelectTrigger
-				class="w-28 sm:w-36 md:w-48 bg-primary-foreground/10 text-primary-foreground border-primary-foreground/30"
+				class="w-28 sm:w-36 md:w-48 bg-header-foreground/10 text-header-foreground border-header-foreground/30"
 			>
 				{selectedUsername()}
 			</SelectTrigger>

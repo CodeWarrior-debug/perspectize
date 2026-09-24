@@ -94,6 +94,10 @@
 	--color-row-hover: #e1e2e4;
 	--color-row-accent: #1a365d;
 
+	/* Theme/Header band (derived: primary on light themes, tinted page colour on dark) */
+	--color-header: #1a365d;
+	--color-header-foreground: #ffffff;
+
 	/* Rating Colors */
 	--color-rating-positive: #16a34a;
 	--color-rating-neutral: #ca8a04;
@@ -141,6 +145,8 @@
 	--color-row-alt: #f6f0e6;
 	--color-row-hover: #e5dfd3;
 	--color-row-accent: #7c5a2e;
+	--color-header: #7c5a2e;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='garden'] {
@@ -173,6 +179,8 @@
 	--color-row-alt: #f5f6f2;
 	--color-row-hover: #e0e3df;
 	--color-row-accent: #2f4a3a;
+	--color-header: #2f4a3a;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='midnight'] {
@@ -205,6 +213,8 @@
 	--color-row-alt: #141823;
 	--color-row-hover: #242732;
 	--color-row-accent: #e8e6df;
+	--color-header: #0f1624;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='terminal'] {
@@ -237,6 +247,8 @@
 	--color-row-alt: #0d0f0e;
 	--color-row-hover: #1a1f1d;
 	--color-row-accent: #c9f5d9;
+	--color-header: #0a130f;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='aw-refined-dusk-rose'] {
@@ -269,6 +281,8 @@
 	--color-row-alt: #f5f1f0;
 	--color-row-hover: #e4dddc;
 	--color-row-accent: #7a3b45;
+	--color-header: #7a3b45;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='aw-refined-slate-light'] {
@@ -301,6 +315,8 @@
 	--color-row-alt: #f1f4f6;
 	--color-row-hover: #dbe0e8;
 	--color-row-accent: #1d4ed8;
+	--color-header: #1d4ed8;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='aw-refined-midnight-ink'] {
@@ -333,6 +349,8 @@
 	--color-row-alt: #181e2f;
 	--color-row-hover: #262d3f;
 	--color-row-accent: #8fb0f0;
+	--color-header: #2e3a55;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='aw-refined-charcoal-sage'] {
@@ -365,6 +383,8 @@
 	--color-row-alt: #1f2320;
 	--color-row-hover: #2c312d;
 	--color-row-accent: #8fc4a0;
+	--color-header: #344238;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='aw-refined-warm-umber'] {
@@ -397,6 +417,8 @@
 	--color-row-alt: #25201b;
 	--color-row-hover: #342e28;
 	--color-row-accent: #d9b276;
+	--color-header: #483c2c;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='aw-refined-deep-sea'] {
@@ -429,6 +451,8 @@
 	--color-row-alt: #131f28;
 	--color-row-hover: #202e38;
 	--color-row-accent: #6cc4e0;
+	--color-header: #233f4c;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='aw-minimal-minimal-paper'] {
@@ -461,6 +485,8 @@
 	--color-row-alt: #f8f8f8;
 	--color-row-hover: #dfdfdf;
 	--color-row-accent: #0c0c09;
+	--color-header: #0c0c09;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='aw-minimal-warm-bone'] {
@@ -493,6 +519,8 @@
 	--color-row-alt: #ecedf0;
 	--color-row-hover: #d6d8dd;
 	--color-row-accent: #312c85;
+	--color-header: #312c85;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='aw-minimal-graphite'] {
@@ -525,6 +553,8 @@
 	--color-row-alt: #10100d;
 	--color-row-hover: #20201d;
 	--color-row-accent: #f4f4f1;
+	--color-header: #3a3a37;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='aw-minimal-terminal-glow'] {
@@ -557,6 +587,8 @@
 	--color-row-alt: #0d0f0e;
 	--color-row-hover: #181f1b;
 	--color-row-accent: #4ade80;
+	--color-header: #1b3623;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='aw-clean-mist'] {
@@ -589,6 +621,8 @@
 	--color-row-alt: #eff2f5;
 	--color-row-hover: #d9dfe5;
 	--color-row-accent: #1d4e89;
+	--color-header: #1d4e89;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='aw-clean-forest-night'] {
@@ -621,6 +655,8 @@
 	--color-row-alt: #121916;
 	--color-row-hover: #1f2824;
 	--color-row-accent: #5fbf8f;
+	--color-header: #20382c;
+	--color-header-foreground: #ffffff;
 }
 
 /* Hover tooltip — CSS-only tooltip matching the AG Grid column tooltip look
@@ -702,6 +738,12 @@
 /* Hover bar — drawn on AG Grid's own hover overlay so it sits on top of the opaque hover colour. */
 .ag-row-hover:not(.ag-full-width-row)::before {
 	box-shadow: inset 3px 0 0 var(--color-row-accent);
+}
+
+/* Header band: the theme's header colour with a barely-there top-to-bottom lift, so it reads as a surface not a flat slab. */
+.header-surface {
+	background-color: var(--color-header);
+	background-image: linear-gradient(to bottom, color-mix(in oklab, var(--color-header), white 7%), var(--color-header));
 }
 
 /* Mobile-specific utilities */

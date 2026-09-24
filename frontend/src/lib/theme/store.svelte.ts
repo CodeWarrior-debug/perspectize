@@ -122,6 +122,8 @@ function clearInlineThemeVars(root: HTMLElement): void {
 		'--color-row-alt',
 		'--color-row-hover',
 		'--color-row-accent',
+		'--color-header',
+		'--color-header-foreground',
 	];
 	for (const p of props) root.style.removeProperty(p);
 }

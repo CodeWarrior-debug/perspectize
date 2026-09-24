@@ -51,6 +51,8 @@ describe('app.css agrees with presets.ts', () => {
 			'--color-row-alt',
 			'--color-row-hover',
 			'--color-row-accent',
+			'--color-header',
+			'--color-header-foreground',
 		]) {
 			expect(actual[key], key).toBe(derived[key]);
 		}
