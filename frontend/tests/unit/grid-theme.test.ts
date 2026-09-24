@@ -30,3 +30,10 @@ describe('header', () => {
 		expect(GRID_THEME_PARAMS.headerColumnBorder).toBe(false);
 	});
 });
+
+describe('frame', () => {
+	it('drops the grid wrapper border so the page card is the only outline', () => {
+		expect(GRID_THEME_PARAMS.wrapperBorder).toBe(false);
+		expect(GRID_THEME_PARAMS.wrapperBorderRadius).toBe(0);
+	});
+});

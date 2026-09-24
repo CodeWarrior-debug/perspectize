@@ -12,6 +12,10 @@ export const GRID_THEME_PARAMS = {
 	headerBackgroundColor: 'var(--color-muted)',
 	headerTextColor: 'var(--color-foreground)',
 	headerColumnBorder: false,
+	// The Activity page wraps the grid in a bordered, rounded card, so the grid's own frame would be a
+	// second outline inside it.
+	wrapperBorder: false,
+	wrapperBorderRadius: 0,
 	backgroundColor: 'var(--color-background)',
 	foregroundColor: 'var(--color-foreground)',
 	borderColor: 'var(--color-border)',
