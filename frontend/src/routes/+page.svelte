@@ -70,10 +70,10 @@
 				<p class="text-sm text-muted-foreground mt-1">Recently updated content</p>
 			</div>
 			<div class="flex items-center gap-2">
-				<div class="flex items-center gap-1 rounded-md border border-input bg-background p-0.5">
+				<div class="flex h-9 items-center gap-1 rounded-md border border-input bg-background p-0.5">
 					<button
 						type="button"
-						class="px-2.5 py-1 text-xs font-medium rounded transition-colors {view === 'content'
+						class="h-full px-2.5 text-xs leading-[14px] sm:leading-4 font-medium rounded transition-colors {view === 'content'
 							? 'bg-primary text-primary-foreground'
 							: 'text-muted-foreground hover:text-foreground'}"
 						onclick={() => (view = 'content')}
@@ -82,7 +82,7 @@
 					</button>
 					<button
 						type="button"
-						class="px-2.5 py-1 text-xs font-medium rounded transition-colors {view === 'byUser'
+						class="h-full px-2.5 text-xs leading-[14px] sm:leading-4 font-medium rounded transition-colors {view === 'byUser'
 							? 'bg-primary text-primary-foreground'
 							: 'text-muted-foreground hover:text-foreground'}"
 						onclick={() => (view = 'byUser')}
