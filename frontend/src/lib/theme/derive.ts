@@ -1,4 +1,4 @@
-import { converter, formatHex, wcagContrast } from 'culori';
+import { converter, formatHex, interpolate, wcagContrast } from 'culori';
 
 interface Oklch {
 	mode: 'oklch';
@@ -41,6 +41,9 @@ export interface DerivedTokens {
 	ratingNeutral: string;
 	ratingNegative: string;
 	ratingUndecided: string;
+	rowAlt: string;
+	rowHover: string;
+	rowAccent: string;
 }
 
 export type FullThemeTokens = BaseThemeTokens & DerivedTokens;
@@ -147,6 +150,31 @@ function darken(hexColor: string, amount: number): string {
 	return hex({ ...c, l: Math.max(0, c.l - amount) });
 }
 
+/** Zebra is a whisper of the foreground over the background, so it reads on light and dark alike. */
+const ROW_ALT_MIX = 0.025;
+/** Hover must be clearly stronger than the zebra; the unit tests pin the minimum distance. */
+const ROW_HOVER_MIX = 0.12;
+/** Below this contrast a primary tint would be invisible against the page (Midnight, Terminal). */
+const MIN_ROW_ACCENT_CONTRAST = 1.5;
+
+function mix(fromHex: string, toHex: string, amount: number): string {
+	return formatHex(interpolate([fromHex, toHex], 'oklab')(amount)) ?? fromHex;
+}
+
+/**
+ * Row colours are opaque so hover looks identical on odd and even rows (an alpha overlay
+ * composites differently over the zebra stripe). Dark themes often ship a primary that is
+ * nearly the background, so those tint from the foreground instead.
+ */
+function deriveRowTokens(background: string, foreground: string, primary: string) {
+	const accent = wcagContrast(background, primary) >= MIN_ROW_ACCENT_CONTRAST ? primary : foreground;
+	return {
+		rowAlt: mix(background, foreground, ROW_ALT_MIX),
+		rowHover: mix(background, accent, ROW_HOVER_MIX),
+		rowAccent: accent,
+	};
+}
+
 /**
  * Compute the full token set (base 8 + everything derived) for a theme.
  * Runs identically for presets (once, authoring-time) and custom themes (live, in-browser).
@@ -190,6 +218,7 @@ export function deriveTheme(base: BaseThemeTokens): FullThemeTokens {
 		ratingNeutral: rating.ratingNeutral,
 		ratingNegative: rating.ratingNegative,
 		ratingUndecided: rating.ratingUndecided,
+		...deriveRowTokens(background, foreground, base.primary),
 	};
 }
 
@@ -222,5 +251,8 @@ export function toCssVarMap(tokens: FullThemeTokens): Record<string, string> {
 		'--color-rating-neutral': tokens.ratingNeutral,
 		'--color-rating-negative': tokens.ratingNegative,
 		'--color-rating-undecided': tokens.ratingUndecided,
+		'--color-row-alt': tokens.rowAlt,
+		'--color-row-hover': tokens.rowHover,
+		'--color-row-accent': tokens.rowAccent,
 	};
 }

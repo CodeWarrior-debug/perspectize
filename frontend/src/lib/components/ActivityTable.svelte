@@ -62,6 +62,7 @@
 		computePrevPage,
 		togglableColIds,
 	} from '$lib/utils/grid-config';
+	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
 	import SortPickerDialog from '$lib/components/SortPickerDialog.svelte';
@@ -442,29 +443,7 @@
 
 	const modules = [ClientSideRowModelModule];
 
-	const theme = themeQuartz.withParams({
-		fontFamily: "'Geist', system-ui, sans-serif",
-		fontSize: 14,
-		headerBackgroundColor: '#1a365d',
-		headerTextColor: '#ffffff',
-		headerFontWeight: 600,
-		oddRowBackgroundColor: '#f7fafc',
-		rowHoverColor: 'rgba(26, 54, 93, 0.06)',
-		borderColor: '#d4d4d4',
-		accentColor: '#1a365d',
-		foregroundColor: '#171717',
-		backgroundColor: '#ffffff',
-		selectedRowBackgroundColor: 'rgba(26, 54, 93, 0.08)',
-		columnHoverColor: 'rgba(26, 54, 93, 0.04)',
-		headerColumnResizeHandleColor: 'rgba(255, 255, 255, 0.5)',
-		// 64px comfortably fits a 32px thumbnail alongside a 2-line, 13px/1.5-leading title
-		// with margin to spare — a tighter value clips descenders (g/y/p/q/j) on the second
-		// line via the row's own overflow:hidden, even though line-clamp itself only ever
-		// cuts whole lines. See CLAUDE.md's AG Grid gotcha.
-		rowHeight: 64,
-		headerHeight: 40,
-		listItemHeight: 24,
-	});
+	const theme = themeQuartz.withParams(GRID_THEME_PARAMS);
 
 	// flex = clamp-like: proportional sizing with min/max constraints
 	// minWidth is auto-derived from headerName unless explicitly set (e.g. Item = 200)
