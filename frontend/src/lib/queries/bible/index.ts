@@ -52,3 +52,25 @@ export interface SetPassageDisplayTitleInput {
 export interface SetPassageDisplayTitleResponse {
 	setPassageDisplayTitle: { id: string; displayTitle: string | null };
 }
+
+// Idempotent: the server find-or-creates the passage row, so an existing
+// passage comes back as a normal Content (no "alreadyExisted" flag).
+export const CREATE_CONTENT_FROM_PASSAGE = gql`
+	mutation CreateContentFromPassage($input: CreateContentFromPassageInput!) {
+		createContentFromPassage(input: $input) {
+			id
+			name
+			contentType
+			displayTitle
+		}
+	}
+`;
+
+export interface CreateContentFromPassageResponse {
+	createContentFromPassage: {
+		id: string;
+		name: string;
+		contentType: string;
+		displayTitle: string | null;
+	};
+}
