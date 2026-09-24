@@ -111,11 +111,11 @@
 {#if content}
 	<Dialog {open} onOpenChange={handleOpenChange}>
 		<DialogContent showCloseButton={false} class="max-w-[560px] gap-0 overflow-hidden rounded-xl p-0">
-			<div class="flex items-start justify-between gap-3 bg-primary px-[22px] py-[18px]">
-				<DialogTitle class="text-xs font-semibold tracking-wide text-primary-foreground/70 uppercase">
+			<div class="flex items-start justify-between gap-3 header-surface px-[22px] py-[18px]">
+				<DialogTitle class="text-xs font-semibold tracking-wide text-header-foreground/70 uppercase">
 					{isPassage ? 'Bible Passage' : 'YouTube Video'}
 				</DialogTitle>
-				<DialogClose class="text-primary-foreground/80 hover:text-primary-foreground">
+				<DialogClose class="text-header-foreground/80 hover:text-header-foreground">
 					<XIcon class="size-[18px]" />
 					<span class="sr-only">Close</span>
 				</DialogClose>

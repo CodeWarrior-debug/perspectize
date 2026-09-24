@@ -94,6 +94,10 @@
 	--color-row-hover: #e1e2e4;
 	--color-row-accent: #1a365d;
 
+	/* Theme/Header band (derived: primary on light themes, tinted page colour on dark) */
+	--color-header: #1a365d;
+	--color-header-foreground: #ffffff;
+
 	/* Rating Colors */
 	--color-rating-positive: #16a34a;
 	--color-rating-neutral: #ca8a04;
@@ -141,6 +145,8 @@
 	--color-row-alt: #f6f0e6;
 	--color-row-hover: #e5dfd3;
 	--color-row-accent: #7c5a2e;
+	--color-header: #7c5a2e;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='garden'] {
@@ -173,6 +179,8 @@
 	--color-row-alt: #f5f6f2;
 	--color-row-hover: #e0e3df;
 	--color-row-accent: #2f4a3a;
+	--color-header: #2f4a3a;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='midnight'] {
@@ -205,6 +213,8 @@
 	--color-row-alt: #141823;
 	--color-row-hover: #242732;
 	--color-row-accent: #e8e6df;
+	--color-header: #0f1624;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='terminal'] {
@@ -237,6 +247,8 @@
 	--color-row-alt: #0d0f0e;
 	--color-row-hover: #1a1f1d;
 	--color-row-accent: #c9f5d9;
+	--color-header: #0a130f;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='fd-reading-room-v2'] {
@@ -269,6 +281,8 @@
 	--color-row-alt: #f5f4f2;
 	--color-row-hover: #e0e1e1;
 	--color-row-accent: #24406b;
+	--color-header: #24406b;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='fd-fieldnote'] {
@@ -301,6 +315,8 @@
 	--color-row-alt: #f0f2f1;
 	--color-row-hover: #dce0dd;
 	--color-row-accent: #2f5d4a;
+	--color-header: #2f5d4a;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='fd-archive-warm'] {
@@ -333,6 +349,8 @@
 	--color-row-alt: #f8f0e8;
 	--color-row-hover: #e7dfd5;
 	--color-row-accent: #7c5a2e;
+	--color-header: #7c5a2e;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='fd-lavender-ledger'] {
@@ -365,6 +383,8 @@
 	--color-row-alt: #f1f1f4;
 	--color-row-hover: #dddde5;
 	--color-row-accent: #4c3fa3;
+	--color-header: #4c3fa3;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='fd-plain-sheet'] {
@@ -397,6 +417,8 @@
 	--color-row-alt: #f8f8f8;
 	--color-row-hover: #e2e4e9;
 	--color-row-accent: #1d4ed8;
+	--color-header: #1d4ed8;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='fd-harbour-mist'] {
@@ -429,6 +451,8 @@
 	--color-row-alt: #f2f0ec;
 	--color-row-hover: #dfdedb;
 	--color-row-accent: #2c5f6f;
+	--color-header: #2c5f6f;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='fd-midnight-v2'] {
@@ -461,6 +485,8 @@
 	--color-row-alt: #171c23;
 	--color-row-hover: #242933;
 	--color-row-accent: #7aa2e3;
+	--color-header: #293548;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='fd-lamp-oil'] {
@@ -493,6 +519,8 @@
 	--color-row-alt: #1a1b1e;
 	--color-row-hover: #29292a;
 	--color-row-accent: #e0a94a;
+	--color-header: #403629;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='fd-deep-herbarium'] {
@@ -525,6 +553,8 @@
 	--color-row-alt: #131e1b;
 	--color-row-hover: #212d28;
 	--color-row-accent: #6fcf9f;
+	--color-header: #244034;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='fd-rose-vellum'] {
@@ -557,6 +587,8 @@
 	--color-row-alt: #f5eff0;
 	--color-row-hover: #e4dbdd;
 	--color-row-accent: #7a2e4d;
+	--color-header: #7a2e4d;
+	--color-header-foreground: #ffffff;
 }
 
 /* One typographic moment: page titles are set in Charter; everything else stays Geist. */
@@ -644,6 +676,12 @@
 /* Hover bar — drawn on AG Grid's own hover overlay so it sits on top of the opaque hover colour. */
 .ag-row-hover:not(.ag-full-width-row)::before {
 	box-shadow: inset 3px 0 0 var(--color-row-accent);
+}
+
+/* Header band: the theme's header colour with a barely-there top-to-bottom lift, so it reads as a surface not a flat slab. */
+.header-surface {
+	background-color: var(--color-header);
+	background-image: linear-gradient(to bottom, color-mix(in oklab, var(--color-header), white 7%), var(--color-header));
 }
 
 /* Mobile-specific utilities */

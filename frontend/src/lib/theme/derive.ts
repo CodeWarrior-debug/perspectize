@@ -44,6 +44,8 @@ export interface DerivedTokens {
 	rowAlt: string;
 	rowHover: string;
 	rowAccent: string;
+	header: string;
+	headerForeground: string;
 }
 
 export type FullThemeTokens = BaseThemeTokens & DerivedTokens;
@@ -204,6 +206,20 @@ function deriveRowTokens(background: string, foreground: string, primary: string
 	};
 }
 
+/** Share of the primary mixed into a dark page colour to make the header band (about a quarter). */
+const DARK_HEADER_PRIMARY_MIX = 0.24;
+const DARK_BACKGROUND_MAX_LIGHTNESS = 0.5;
+
+/**
+ * The header band. Light themes keep the primary. On dark themes a bright primary as a full-width
+ * slab is loud, so the band is the page colour tinted toward the primary: dark, but still coloured.
+ */
+function deriveHeaderTokens(background: string, primary: string) {
+	const header =
+		oklch(background).l < DARK_BACKGROUND_MAX_LIGHTNESS ? mix(background, primary, DARK_HEADER_PRIMARY_MIX) : primary;
+	return { header, headerForeground: pickForeground(header) };
+}
+
 /**
  * Compute the full token set (base 8 + everything derived) for a theme.
  * Runs identically for presets (once, authoring-time) and custom themes (live, in-browser).
@@ -248,6 +264,7 @@ export function deriveTheme(base: BaseThemeTokens): FullThemeTokens {
 		ratingNegative: rating.ratingNegative,
 		ratingUndecided: rating.ratingUndecided,
 		...deriveRowTokens(background, foreground, base.primary),
+		...deriveHeaderTokens(background, base.primary),
 	};
 }
 
@@ -283,5 +300,7 @@ export function toCssVarMap(tokens: FullThemeTokens): Record<string, string> {
 		'--color-row-alt': tokens.rowAlt,
 		'--color-row-hover': tokens.rowHover,
 		'--color-row-accent': tokens.rowAccent,
+		'--color-header': tokens.header,
+		'--color-header-foreground': tokens.headerForeground,
 	};
 }
