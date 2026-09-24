@@ -96,7 +96,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/monthly-routine-check.sh 2>/dev/null || true"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/monthly-routine-check.sh\" 2>/dev/null || true"
           }
         ]
       }
@@ -108,23 +108,23 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/deny-env-read.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/deny-env-read.sh\""
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/prettier-precommit.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/prettier-precommit.sh\""
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/gofmt-precommit.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/gofmt-precommit.sh\""
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/require-tests.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-tests.sh\""
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/require-session-reflection-before-pr.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-session-reflection-before-pr.sh\""
           }
         ]
       }
