@@ -146,6 +146,11 @@
 	// `userColumnOverride` is non-null and the responsive $effect below stops
 	// touching column visibility for the rest of the session. A page refresh
 	// clears it and automatic responsive layout resumes.
+	// Secondary toolbar buttons are ghost until hovered: no resting border or fill, a visible tint on hover
+	// (the derived row-hover token, since --color-accent is nearly white on light themes), a themed focus ring.
+	const TOOLBAR_BUTTON =
+		'inline-flex items-center gap-1.5 px-2 py-1 text-sm rounded-md text-foreground hover:bg-[var(--color-row-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed';
+
 	let columnPickerOpen = $state(false);
 	let userColumnOverride = $state<Record<string, boolean> | null>(null);
 	const overrideActive = $derived(userColumnOverride !== null);
@@ -1075,7 +1080,7 @@
 					aria-label="Choose columns"
 					onclick={() => (columnPickerOpen = true)}
 					disabled={!gridReady}
-					class="inline-flex items-center gap-1.5 px-2 py-1 text-sm border border-input rounded-md bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+					class={TOOLBAR_BUTTON}
 				>
 					<SlidersHorizontalIcon class="size-4" />
 					<span class="hidden md:inline">Columns</span>
@@ -1089,7 +1094,7 @@
 				aria-label="Edit sorts"
 				title="Or shift-click column headers to sort by multiple columns"
 				onclick={() => (sortPickerOpen = true)}
-				class="inline-flex items-center gap-1.5 px-2 py-1 text-sm border border-input rounded-md bg-background hover:bg-accent"
+				class={TOOLBAR_BUTTON}
 			>
 				<ListOrderedIcon class="size-4" />
 				<span class="hidden md:inline">Edit sorts</span>
@@ -1099,7 +1104,7 @@
 				aria-label="Clear sorts"
 				onclick={handleClearSorts}
 				disabled={!hasActiveSort}
-				class="inline-flex items-center gap-1.5 px-2 py-1 text-sm border border-input rounded-md bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+				class={TOOLBAR_BUTTON}
 			>
 				<ArrowUpDownIcon class="size-4" />
 				<span class="hidden md:inline">Clear sorts</span>
