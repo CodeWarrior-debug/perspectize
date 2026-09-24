@@ -734,3 +734,56 @@ func TestPassageText_Errors(t *testing.T) {
 	_, err = unconfigured.PassageText(ctx, 1, 1)
 	require.Error(t, err)
 }
+
+func interlinearPtr(n int) *int { return &n }
+
+func TestPassageInterlinear(t *testing.T) {
+	ctx := context.Background()
+	newSvc := func(repo *mockBibleReferenceRepo) *services.ContentService {
+		return services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, services.WithBibleReference(repo))
+	}
+	words := []domain.InterlinearWordRow{
+		{VerseID: 1, BSBSort: 1, Language: "heb", SourceSort: interlinearPtr(1), Source: "a", Strongs: "H0001", StrongsSource: "tagged", SpanHead: interlinearPtr(1), ChunkText: "In", Gloss: "x"},
+		{VerseID: 2, BSBSort: 9, ChunkText: "Now"},
+		{VerseID: 40, BSBSort: 5, ChunkText: "outside the requested range"},
+	}
+
+	t.Run("builds verses from the repository rows inside the range", func(t *testing.T) {
+		got, err := newSvc(&mockBibleReferenceRepo{books: testBibleBooks(), words: words}).PassageInterlinear(ctx, 1, 2)
+		require.NoError(t, err)
+		require.Len(t, got.Verses, 2)
+		assert.Equal(t, "In", got.Verses[0].Segments[0].Text)
+		assert.Equal(t, "x", got.Verses[0].Words[0].Gloss)
+		assert.Empty(t, got.Verses[1].Words)
+	})
+
+	t.Run("no rows is an empty result, not an error", func(t *testing.T) {
+		got, err := newSvc(&mockBibleReferenceRepo{books: testBibleBooks()}).PassageInterlinear(ctx, 1, 3)
+		require.NoError(t, err)
+		assert.NotNil(t, got.Verses)
+		assert.Empty(t, got.Verses)
+	})
+
+	t.Run("rejects bad ranges and oversize requests", func(t *testing.T) {
+		svc := newSvc(&mockBibleReferenceRepo{books: testBibleBooks()})
+		_, err := svc.PassageInterlinear(ctx, 0, 1)
+		assert.ErrorIs(t, err, domain.ErrInvalidPassage)
+		_, err = svc.PassageInterlinear(ctx, 5, 4)
+		assert.ErrorIs(t, err, domain.ErrInvalidPassage)
+		_, err = svc.PassageInterlinear(ctx, 1, services.MaxPassageTextVerses+1)
+		assert.ErrorIs(t, err, domain.ErrInvalidPassage)
+	})
+
+	t.Run("propagates repository errors", func(t *testing.T) {
+		_, err := newSvc(&mockBibleReferenceRepo{books: testBibleBooks(), err: errors.New("db down")}).PassageInterlinear(ctx, 1, 2)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "db down")
+	})
+
+	t.Run("requires bible support to be configured", func(t *testing.T) {
+		unconfigured := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{})
+		_, err := unconfigured.PassageInterlinear(ctx, 1, 1)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not configured")
+	})
+}

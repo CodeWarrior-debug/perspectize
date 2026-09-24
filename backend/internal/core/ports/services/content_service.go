@@ -44,6 +44,10 @@ type ContentService interface {
 	// PassageText returns the stored BSB text for the verse-ordinal range startVerseID..endVerseID.
 	PassageText(ctx context.Context, startVerseID, endVerseID int) (*domain.PassageText, error)
 
+	// PassageInterlinear returns word alignment for the verse-ordinal range startVerseID..endVerseID.
+	// Verses without alignment data are absent from the result (not an error).
+	PassageInterlinear(ctx context.Context, startVerseID, endVerseID int) (*domain.PassageInterlinear, error)
+
 	// GetByID retrieves content by ID
 	GetByID(ctx context.Context, id int) (*domain.Content, error)
 
