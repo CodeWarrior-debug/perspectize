@@ -17,6 +17,8 @@
 	import { useContentAggregates } from '$lib/queries/content/useContentAggregates';
 	import { ratingToDisplay } from '$lib/utils/ratings';
 	import PassageText from '$lib/components/PassageText.svelte';
+	import PassagePositionBar from '$lib/components/PassagePositionBar.svelte';
+	import PassageLinks from '$lib/components/PassageLinks.svelte';
 	import { useSetPassageDisplayTitle } from '$lib/queries/bible/useSetPassageDisplayTitle';
 
 	interface ModalContent {
@@ -136,6 +138,12 @@
 					{#if hasVerseRange}
 						<div class="mt-3.5 border-t border-border pt-3.5">
 							<PassageText startVerseId={content.verseStartID!} endVerseId={content.verseEndID!} />
+							<div class="mt-3.5">
+								<PassagePositionBar startVerseId={content.verseStartID!} endVerseId={content.verseEndID!} />
+							</div>
+							<div class="mt-3.5">
+								<PassageLinks startVerseId={content.verseStartID!} endVerseId={content.verseEndID!} />
+							</div>
 						</div>
 					{/if}
 
@@ -181,7 +189,8 @@
 					</div>
 				{/if}
 
-				{#if content.url}
+				<!-- A passage's stored url is its version-less dedupe key; PassageLinks shows versioned links instead. -->
+				{#if content.url && !isPassage}
 					<a
 						href={content.url}
 						target="_blank"
