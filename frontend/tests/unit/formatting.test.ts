@@ -565,6 +565,22 @@ describe('typeCellRenderer', () => {
 		expect(hidden).toBeTruthy();
 		expect(hidden?.textContent).toBe('YOUTUBE');
 	});
+
+	// Gap #12 in the UI gap audit: a CLAIM row rendered with the YouTube play
+	// icon, same as a YOUTUBE row — nothing distinguished them in the grid.
+	it('renders a different, theme-token-coloured icon for a CLAIM row (not the YouTube icon)', () => {
+		const claim = typeCellRenderer({ data: { contentType: 'CLAIM' } }) as HTMLElement;
+		const youtube = typeCellRenderer({ data: { contentType: 'YOUTUBE' } }) as HTMLElement;
+
+		const claimSvg = claim.querySelector('svg');
+		const claimPath = claimSvg?.querySelector('path')?.getAttribute('d');
+		const youtubePath = youtube.querySelector('svg')?.querySelector('path')?.getAttribute('d');
+
+		expect(claimSvg?.getAttribute('fill')).toBe('none');
+		expect(claimSvg?.getAttribute('stroke')).toBe('var(--color-muted-foreground)');
+		expect(claimPath).toBeTruthy();
+		expect(claimPath).not.toBe(youtubePath);
+	});
 });
 
 describe('headerMinWidth', () => {

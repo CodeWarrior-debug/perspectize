@@ -319,6 +319,14 @@ export function itemCellRenderer(params: { data?: { name: string; url: string | 
 /**
  * AG Grid cell renderer for type column with YouTube icon.
  */
+/** YouTube play-button icon path (the circle-with-triangle glyph), for typeCellRenderer. */
+const YOUTUBE_ICON_PATH =
+	'M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z';
+
+/** A plain speech-bubble glyph for CLAIM rows, distinct from the YouTube play button. */
+const CLAIM_ICON_PATH =
+	'M4 4h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-4.29 3.71A1 1 0 0 1 3 19V5a1 1 0 0 1 1-1zm2 4h12M6 10.5h8';
+
 export function typeCellRenderer(params: { data?: { contentType: string } }): HTMLElement | string {
 	if (!params.data) return '';
 
@@ -331,18 +339,25 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 	hidden.textContent = params.data.contentType ?? '';
 	container.appendChild(hidden);
 
-	// YouTube play button icon (red)
+	const isClaim = params.data.contentType === 'CLAIM';
+
 	const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 	svg.setAttribute('width', '20');
 	svg.setAttribute('height', '20');
 	svg.setAttribute('viewBox', '0 0 24 24');
-	svg.setAttribute('fill', '#FF0000');
+	if (isClaim) {
+		// Not a brand colour (unlike YouTube red below) — use the theme token.
+		svg.setAttribute('fill', 'none');
+		svg.setAttribute('stroke', 'var(--color-muted-foreground)');
+		svg.setAttribute('stroke-width', '2');
+		svg.setAttribute('stroke-linecap', 'round');
+		svg.setAttribute('stroke-linejoin', 'round');
+	} else {
+		svg.setAttribute('fill', '#FF0000'); // YouTube brand red
+	}
 
 	const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-	path.setAttribute(
-		'd',
-		'M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z',
-	);
+	path.setAttribute('d', isClaim ? CLAIM_ICON_PATH : YOUTUBE_ICON_PATH);
 
 	svg.appendChild(path);
 	container.appendChild(svg);
