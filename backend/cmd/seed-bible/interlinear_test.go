@@ -148,3 +148,34 @@ func TestSeedInterlinear_SkipsCleanlyWhenFilesAreNotDownloaded(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, loaded)
 }
+
+// The committed manifest and the release files (fetched by hand into data/bible/interlinear/)
+// must agree. Skipped when the files have not been downloaded, so CI stays offline.
+func TestManifestMatchesReleaseFilesWhenPresent(t *testing.T) {
+	m, err := loadManifest(filepath.Join("..", "..", "..", "data", "bible", "sources.json"))
+	require.NoError(t, err)
+	assert.Positive(t, m.Version)
+
+	dir := filepath.Join("..", "..", "..", "data", "bible", "interlinear")
+	wordData, err := readVerified(filepath.Join(dir, m.Outputs.BibleWord.Asset), m.Outputs.BibleWord.SHA256)
+	if os.IsNotExist(unwrapPathError(err)) {
+		t.Skip("interlinear release files not downloaded")
+	}
+	require.NoError(t, err)
+	lexData, err := readVerified(filepath.Join(dir, m.Outputs.BibleLexicon.Asset), m.Outputs.BibleLexicon.SHA256)
+	require.NoError(t, err)
+
+	words, err := parseWordTSV(wordData)
+	require.NoError(t, err)
+	assert.Len(t, words, m.Outputs.BibleWord.Rows)
+	lexicon, err := parseLexiconTSV(lexData)
+	require.NoError(t, err)
+	assert.Len(t, lexicon, m.Outputs.BibleLexicon.Rows)
+
+	seen := make(map[[2]int]bool, len(words))
+	for _, w := range words {
+		k := [2]int{w.VerseID, w.BSBSort}
+		require.False(t, seen[k], "duplicate primary key %v would fail the load", k)
+		seen[k] = true
+	}
+}
