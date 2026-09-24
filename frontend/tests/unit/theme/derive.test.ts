@@ -142,3 +142,15 @@ describe('row tokens', () => {
 		);
 	});
 });
+
+describe('focus ring', () => {
+	it.each(THEME_PRESETS)('preset "$id": the ring stands out from the page by at least 3:1 (WCAG 1.4.11)', (preset) => {
+		const full = deriveTheme(preset.base);
+		expect(wcagContrast(full.background, full.ring)).toBeGreaterThanOrEqual(3);
+	});
+
+	it('keeps the brand primary as the ring whenever it is already visible (light presets)', () => {
+		const readingRoom = deriveTheme(READING_ROOM_BASE);
+		expect(readingRoom.ring).toBe(readingRoom.primary);
+	});
+});

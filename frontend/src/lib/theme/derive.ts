@@ -172,6 +172,18 @@ function mix(fromHex: string, toHex: string, amount: number): string {
 	return formatHex(interpolate([fromHex, toHex], 'oklab')(amount)) ?? fromHex;
 }
 
+/** WCAG 1.4.11 non-text contrast: a focus ring must stand out from the page by at least 3:1. */
+const MIN_RING_CONTRAST = 3;
+
+/**
+ * The brand primary makes a fine ring on light themes, but dark presets ship a primary that is
+ * nearly the page colour (Midnight, Terminal), which makes the ring invisible; those fall back
+ * to the foreground.
+ */
+function deriveRing(background: string, primary: string, foreground: string): string {
+	return wcagContrast(background, primary) >= MIN_RING_CONTRAST ? primary : foreground;
+}
+
 /**
  * Row colours are opaque so hover looks identical on odd and even rows (an alpha overlay
  * composites differently over the zebra stripe). Dark themes often ship a primary that is
@@ -224,7 +236,7 @@ export function deriveTheme(base: BaseThemeTokens): FullThemeTokens {
 		destructiveForeground: pickForeground(base.destructive),
 		border: base.border,
 		input: base.border,
-		ring: base.primary,
+		ring: deriveRing(background, base.primary, foreground),
 		ratingPositive: rating.ratingPositive,
 		ratingNeutral: rating.ratingNeutral,
 		ratingNegative: rating.ratingNegative,
