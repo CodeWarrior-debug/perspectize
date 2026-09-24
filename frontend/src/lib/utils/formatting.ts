@@ -272,7 +272,9 @@ export function headerMinWidth(name: string, hasFilter = true): number {
 	const paddingEm = 1.5; // left + right cell padding
 	const sortIconEm = 1.6; // sort indicator — widened so short headers (e.g. "Length") don't truncate once an active sort indicator is actually painted, not just reserved for
 	const filterIconEm = hasFilter ? 1.5 : 0;
-	const separatorEm = 0.5; // column border/handle
+	// No column divider any more (headerColumnBorder is off and the resize handle is an overlay),
+	// so nothing to reserve — keeps the full column set inside the max-w-screen-xl page container.
+	const separatorEm = 0;
 	const totalEm = name.length * charWidthEm + paddingEm + sortIconEm + filterIconEm + separatorEm;
 	return Math.ceil(totalEm * GRID_FONT_SIZE);
 }
