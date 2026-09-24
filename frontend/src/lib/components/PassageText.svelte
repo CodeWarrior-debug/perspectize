@@ -3,12 +3,12 @@
 	import { graphqlRequest } from '$lib/queries/client';
 	import { PASSAGE_TEXT_QUERY, type PassageTextResponse } from '$lib/queries/bible';
 	import { queryKeys } from '$lib/queries/keys';
-	import { formatReference, verseIdsToRange } from '$lib/utils/bible';
 
 	let { startVerseId, endVerseId }: { startVerseId: number; endVerseId: number } = $props();
 
 	// Two-tier cap (AN Q13): render in full up to COLLAPSE_THRESHOLD verses,
-	// collapse behind a toggle up to HARD_CAP, and link out beyond that.
+	// collapse behind a toggle up to HARD_CAP, and show no text beyond that
+	// (PassageLinks, rendered alongside, carries the outbound link).
 	const COLLAPSE_THRESHOLD = 30;
 	const HARD_CAP = 150;
 	const COLLAPSED_PREVIEW_COUNT = 10;
@@ -30,23 +30,11 @@
 	const visibleVerses = $derived(
 		verseCount <= COLLAPSE_THRESHOLD || expanded ? verses : verses.slice(0, COLLAPSED_PREVIEW_COUNT),
 	);
-
-	// Same shape as backend CanonicalPassageURL (version-less Bible Gateway search).
-	const gatewayUrl = $derived.by(() => {
-		const range = verseIdsToRange(startVerseId, endVerseId);
-		if (!range) return null;
-		return `https://www.biblegateway.com/passage/?${new URLSearchParams({ search: formatReference(range) })}`;
-	});
 </script>
 
 <div class="passage-text font-[family-name:var(--font-family-serif)] text-[15px] leading-relaxed text-foreground">
 	{#if overCap}
 		<p class="text-muted-foreground">{verseCount} verses — too long to display here.</p>
-		{#if gatewayUrl}
-			<a href={gatewayUrl} target="_blank" rel="noopener noreferrer" class="text-[13px] text-primary hover:underline">
-				Read on Bible Gateway
-			</a>
-		{/if}
 	{:else if query.isLoading}
 		<p class="text-muted-foreground">Loading passage…</p>
 	{:else if query.isError}

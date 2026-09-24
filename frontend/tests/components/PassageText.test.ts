@@ -73,12 +73,13 @@ describe('PassageText', () => {
 		expect(screen.queryByText(/Verse text 60/)).not.toBeInTheDocument();
 	});
 
-	it('links out with no verse text and no fetch above the hard cap', () => {
+	it('shows no verse text, does not fetch, and points to the links below above the hard cap', () => {
 		// Genesis 1:1 (id 1) through id 200 is 200 verses.
 		render(PassageText, { props: { startVerseId: 1, endVerseId: 200 } });
 		expect(mocks.lastOptions.enabled).toBe(false);
 		expect(screen.queryByText(/Verse text/)).not.toBeInTheDocument();
-		const link = screen.getByRole('link', { name: /read on bible gateway/i });
-		expect(link.getAttribute('href')).toBe('https://www.biblegateway.com/passage/?search=Genesis+1%3A1-8%3A16');
+		expect(screen.getByText(/200 verses — too long to display here/i)).toBeInTheDocument();
+		// The outbound link now lives in PassageLinks (version-aware), not here.
+		expect(screen.queryByRole('link')).not.toBeInTheDocument();
 	});
 });
