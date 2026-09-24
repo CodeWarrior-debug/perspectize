@@ -105,6 +105,40 @@ describe('InterlinearPassage', () => {
 		await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
 	});
 
+	it('a pointerdown outside the component clears a pinned popover (tap-away)', async () => {
+		render(InterlinearPassage, { props: { verses: [plain(1, 1, 'x')], interlinear: [gen11] } });
+		await fireEvent.click(screen.getByRole('button', { name: 'God' }));
+		expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+		await fireEvent.pointerDown(document.body);
+		await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+	});
+
+	it('focus leaving a phrase clears the hover popover', async () => {
+		render(InterlinearPassage, { props: { verses: [plain(1, 1, 'x')], interlinear: [gen11] } });
+		const god = screen.getByRole('button', { name: 'God' });
+		await fireEvent.focusIn(god);
+		expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+		await fireEvent.focusOut(god);
+		await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+	});
+
+	it('clicking a chip pins it, and the pin survives mouseout', async () => {
+		render(InterlinearPassage, { props: { verses: [plain(1, 1, 'x')], interlinear: [gen11] } });
+		const chip = screen.getAllByRole('button').find((b) => b.getAttribute('data-chip') === '1:2')!;
+		await fireEvent.click(chip);
+		await fireEvent.mouseOut(chip);
+		expect(await screen.findByRole('tooltip')).toHaveTextContent('H430');
+	});
+
+	it('clicking the pinned word a second time unpins it: the popover goes once the pointer leaves', async () => {
+		render(InterlinearPassage, { props: { verses: [plain(1, 1, 'x')], interlinear: [gen11] } });
+		const god = screen.getByRole('button', { name: 'God' });
+		await fireEvent.click(god);
+		await fireEvent.click(god);
+		await fireEvent.mouseOut(god);
+		await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+	});
+
 	it('hovering a chip shows its word, and a word with no phrase still gets a popover but no connector', async () => {
 		render(InterlinearPassage, { props: { verses: [plain(1, 1, 'x')], interlinear: [gen11] } });
 		const marker = screen.getAllByRole('button').find((b) => b.getAttribute('data-chip') === '1:3')!;
