@@ -78,7 +78,7 @@
 	{#if open}
 		<div
 			data-testid="messaging-panel"
-			class="fixed bottom-24 right-5 z-40 flex h-[min(600px,calc(100vh-8rem))] w-[min(380px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl"
+			class="fixed bottom-24 right-5 z-40 flex h-[min(600px,calc(100dvh-12rem))] w-[min(380px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl"
 		>
 			{#if selectedThreadId}
 				<div class="flex items-center gap-2 border-b border-border p-2">

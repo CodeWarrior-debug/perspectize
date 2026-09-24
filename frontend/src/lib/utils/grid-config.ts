@@ -60,6 +60,60 @@ export function durationComparator(
 }
 
 /**
+ * Column-picker registry for the sort picker — every colId a user can add to a
+ * multi-column sort, with a human label. Kept in sync with `COL_TO_SORT` in
+ * gridUrlState.ts (that map is the URL/GraphQL codec; this is just labels for
+ * the picker UI). 'type' is deliberately excluded — it's a NAME alias, not an
+ * independently sortable column (see COL_TO_SORT's comment).
+ */
+export const SORTABLE_COLUMNS: readonly TogglableColumn[] = [
+	{ colId: 'item', label: 'Item' },
+	{ colId: 'duration', label: 'Length' },
+	{ colId: 'views', label: 'Views' },
+	{ colId: 'likes', label: 'Likes' },
+	{ colId: 'publishDate', label: 'Published' },
+	{ colId: 'channel', label: 'Channel' },
+	{ colId: 'createdAt', label: 'Date added' },
+	{ colId: 'updatedAt', label: 'Updated' },
+] as const;
+
+/** colId → row-value extractor, for client-side (non-grid) multi-column sorting. */
+const SORT_VALUE_GETTERS: Record<string, (row: ContentItem) => string | number | null> = {
+	item: (row) => row.name?.toLowerCase() ?? null,
+	duration: (row) => row.length,
+	views: (row) => row.viewCount,
+	likes: (row) => row.likeCount,
+	publishDate: (row) => row.publishedAt,
+	channel: (row) => row.channelTitle?.toLowerCase() ?? null,
+	createdAt: (row) => row.createdAt,
+	updatedAt: (row) => row.updatedAt,
+};
+
+/**
+ * Compare two rows by a priority-ordered multi-column sort, entirely client-side.
+ * Used where there's no AG Grid instance to delegate to (the mobile card list in
+ * "Loaded" mode) — mirrors what AG Grid's own multi-sort does with the column
+ * comparators above, but as a plain array comparator. Nulls sort last regardless
+ * of direction. Unknown/unsortable colIds are skipped (same policy as
+ * sortsToGraphQL dropping them for the server-side path).
+ */
+export function compareContentBySorts(a: ContentItem, b: ContentItem, sorts: { col: string; dir: 'asc' | 'desc' }[]): number {
+	for (const { col, dir } of sorts) {
+		const getValue = SORT_VALUE_GETTERS[col];
+		if (!getValue) continue;
+		const va = getValue(a);
+		const vb = getValue(b);
+		if (va == null && vb == null) continue;
+		if (va == null) return 1;
+		if (vb == null) return -1;
+		if (va === vb) continue;
+		const cmp = va < vb ? -1 : 1;
+		return dir === 'asc' ? cmp : -cmp;
+	}
+	return 0;
+}
+
+/**
  * Compute next page, respecting bounds.
  * Returns the new page number, or current if at last page.
  */

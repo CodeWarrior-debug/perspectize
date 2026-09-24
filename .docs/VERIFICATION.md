@@ -67,6 +67,30 @@ Notes:
 and ask the human to re-run the sign-in — never authenticate or enter
 credentials yourself.
 
+### c. Scripted checks over CDP (no MCP needed)
+
+If `sv-chrome.sh` is running (`:9222`) but the chrome-devtools MCP can't launch
+(it reports the profile is already in use), attach to that Chrome instead:
+`node .claude/scripts/sv-cdp-verify.cjs [scenario]`. It opens its own tab, runs a
+scenario (default `cell-popover`: styling parity, copy values, tags multi-select,
+hover/scroll behavior), prints JSON, and closes only its own tab. Copy checks
+paste the real clipboard into the search box to prove what was stored — this
+overwrites your clipboard. Add scenarios in the `SCENARIOS` object; helpers
+(`hoverCell`, `popover`, `pasteRead`) are at the top of the file. Note that hovering
+a cell scrolls it into view, and a scroll cancels a pending popover open — the
+helper scrolls first and settles before hovering.
+
+**Verifying from a worktree.** A worktree has no gitignored `frontend/.env`, and
+the Clerk session doesn't carry across dev-server ports. Serve the worktree's code
+on a spare port with a throwaway wrapper config (outside the repo) that spreads the
+worktree's `vite.config.ts` and sets `root` to the worktree's `frontend/` and
+`envDir` to the main checkout's `frontend/` (vite has no `--envDir` CLI flag; don't
+symlink or read `.env`). Run it with `vite dev --config <wrapper> --port 5174
+--strictPort`, ask the human to sign in once at that origin in the `sv-chrome.sh`
+Chrome, then run the script with `BASE_URL=http://localhost:5174`. The `chat-panel`
+scenario measures the messaging panel's top edge against the app header at several
+viewport heights.
+
 ## 1. Start Services
 
 The database is hosted on Sevalla (cloud PostgreSQL) — no Docker or local database setup needed.

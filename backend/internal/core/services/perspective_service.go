@@ -93,6 +93,12 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 		privacy = *input.Privacy
 	}
 
+	var sanitizedReview *string
+	if input.Review != nil {
+		s := sanitizeReview(*input.Review)
+		sanitizedReview = &s
+	}
+
 	perspective := &domain.Perspective{
 		UserID:                input.UserID,
 		ContentID:             input.ContentID,
@@ -111,7 +117,7 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 		PrimaryPerspectiveID:  input.PrimaryPerspectiveID,
 		RelatedPerspectiveIDs: input.RelatedPerspectiveIDs,
 		CustomFields:          input.CustomFields,
-		Review:                input.Review,
+		Review:                sanitizedReview,
 	}
 
 	created, err := s.repo.Create(ctx, perspective)
@@ -235,7 +241,8 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 		existing.CustomFields = input.CustomFields
 	}
 	if input.Review != nil {
-		existing.Review = input.Review
+		s := sanitizeReview(*input.Review)
+		existing.Review = &s
 	}
 
 	updated, err := s.repo.Update(ctx, existing)

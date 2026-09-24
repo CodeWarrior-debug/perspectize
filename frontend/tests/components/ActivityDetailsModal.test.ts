@@ -179,4 +179,10 @@ describe('ActivityDetailsModal', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /close/i }));
 		expect(onClose).toHaveBeenCalled();
 	});
+
+	it('renders a Compare link pointing at /compare for this content', () => {
+		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		const link = screen.getByRole('link', { name: /compare/i });
+		expect(link).toHaveAttribute('href', `/compare?contentId=${content.id}`);
+	});
 });

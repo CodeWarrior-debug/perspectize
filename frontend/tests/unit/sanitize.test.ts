@@ -24,11 +24,33 @@ describe('sanitizeHtml', () => {
 	});
 
 	it('strips disallowed tags but keeps their text content', () => {
-		const dirty = '<h1>Title</h1><img src="x.png" onerror="alert(1)" />';
+		const dirty = '<h1>Title</h1>';
 		const clean = sanitizeHtml(dirty);
 		expect(clean).not.toContain('<h1>');
-		expect(clean).not.toContain('<img');
 		expect(clean).toContain('Title');
+	});
+
+	it('allows headings, images, and tables through', () => {
+		const dirty =
+			'<h2>Heading</h2><h3>Subheading</h3><img src="https://example.com/x.png" alt="x"><table><tbody><tr><td>a</td></tr></tbody></table>';
+		const clean = sanitizeHtml(dirty);
+		expect(clean).toContain('<h2>Heading</h2>');
+		expect(clean).toContain('<h3>Subheading</h3>');
+		expect(clean).toContain('<img src="https://example.com/x.png" alt="x">');
+		expect(clean).toContain('<table>');
+	});
+
+	it('strips onerror handlers from images while keeping the tag', () => {
+		const dirty = '<img src="https://example.com/x.png" onerror="alert(1)">';
+		const clean = sanitizeHtml(dirty);
+		expect(clean).not.toContain('onerror');
+		expect(clean).toContain('<img src="https://example.com/x.png">');
+	});
+
+	it('strips javascript: URLs from img src', () => {
+		const dirty = '<img src="javascript:alert(1)" alt="x">';
+		const clean = sanitizeHtml(dirty);
+		expect(clean).not.toContain('javascript:');
 	});
 
 	it('drops a disallowed attribute (e.g. style) while keeping the tag', () => {

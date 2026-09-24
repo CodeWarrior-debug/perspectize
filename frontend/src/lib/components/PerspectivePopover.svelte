@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import InfoIcon from '@lucide/svelte/icons/info';
@@ -18,10 +19,11 @@
 	} from '$lib/components/shadcn';
 	import RatingInput from '$lib/components/RatingInput.svelte';
 	import Thumbs from '$lib/components/Thumbs.svelte';
-	import CommentEditor from '$lib/components/CommentEditor.svelte';
-	import CommentFullscreen from '$lib/components/CommentFullscreen.svelte';
+	import PerspectiveEditor from '$lib/components/PerspectiveEditor.svelte';
 	import AddFieldSearch from '$lib/components/AddFieldSearch.svelte';
 	import { sanitizeHtml } from '$lib/utils/sanitize';
+	import { hasReviewContent, reviewPreviewText } from '$lib/utils/reviewContent';
+	import { draftKey, saveDraft, loadDraft, clearDraft } from '$lib/utils/perspectiveDraft';
 	import type { FieldDef } from '$lib/components/AddFieldSearch.svelte';
 	import { useCreatePerspective } from '$lib/queries/perspectives/useCreatePerspective';
 	import { useUpdatePerspective } from '$lib/queries/perspectives/useUpdatePerspective';
@@ -87,16 +89,18 @@
 	}
 
 	// Comment (rich text HTML)
-	// TODO: Backend integration — comment field not yet in GraphQL schema
 	let comment = $state('');
-	let commentFullscreenOpen = $state(false);
+	let commentExpanded = $state(false);
+	let restoredFromDraft = $state(false);
+	let draftSaveTimer: ReturnType<typeof setTimeout> | undefined;
+	// Latest HTML awaiting the debounced draft save (null when nothing is pending).
+	let pendingDraft: string | null = null;
 
 	// Dynamic fields — tracks which rating fields are shown
 	const DEFAULT_FIELDS = ['quality', 'agreement', 'importance', 'confidence'];
 	let activeFields = $state<string[]>([...DEFAULT_FIELDS]);
 
 	// Dynamic field values for non-core fields
-	// TODO: Backend integration — custom/suggested fields not yet in schema
 	let dynamicValues = $state<Record<string, number | null>>({});
 
 	// Mapping from field key to bindable state getter/setter
@@ -135,21 +139,7 @@
 		}
 	}
 
-	function getFieldLabel(key: string): string {
-		const labels: Record<string, string> = {
-			quality: 'Quality',
-			agreement: 'Agreement',
-			importance: 'Importance',
-			confidence: 'Confidence',
-		};
-		return (
-			labels[key] ??
-			key
-				.replace(/^custom:/, '')
-				.replace(/-/g, ' ')
-				.replace(/\b\w/g, (c) => c.toUpperCase())
-		);
-	}
+	import { getFieldLabel } from '$lib/utils/comparePerspectives';
 
 	// Tracks the most recently added field so its newly-rendered row can be
 	// scrolled into view — the ratings grid grows downward inside a scroll
@@ -198,8 +188,19 @@
 		confidence = existingPerspective?.confidence ?? null;
 		const l = existingPerspective?.like;
 		likeValue = l === 'THUMBS_UP' ? 'THUMBS_UP' : l === 'THUMBS_DOWN' ? 'THUMBS_DOWN' : null;
-		comment = existingPerspective?.review ?? '';
-		commentFullscreenOpen = false;
+		cancelPendingDraft();
+		const baseline = existingPerspective?.review ?? '';
+		// Only restore a draft that was started from this same server review;
+		// a draft based on an older copy would overwrite newer saved content.
+		const draft = loadDraft(draftKey(contentId, userId), baseline);
+		if (draft && draft !== baseline) {
+			comment = draft;
+			restoredFromDraft = true;
+		} else {
+			comment = baseline;
+			restoredFromDraft = false;
+		}
+		commentExpanded = false;
 		isPrivate = String(existingPerspective?.privacy ?? '').toUpperCase() === 'PRIVATE';
 		const nextFeelings = existingPerspective?.feelings ?? [];
 		feelings = nextFeelings;
@@ -225,10 +226,39 @@
 	const updateMutation = useUpdatePerspective();
 	const isPending = $derived(createMutation.isPending || updateMutation.isPending);
 
-	const hasComment = $derived(!!comment.replace(/<[^>]*>/g, '').trim());
+	const hasComment = $derived(hasReviewContent(comment));
+
+	function cancelPendingDraft() {
+		if (draftSaveTimer) clearTimeout(draftSaveTimer);
+		draftSaveTimer = undefined;
+		pendingDraft = null;
+	}
+
+	// Write the pending draft now (debounce fired, or the popover is closing).
+	function flushPendingDraft() {
+		const html = pendingDraft;
+		cancelPendingDraft();
+		if (html !== null) {
+			saveDraft(draftKey(contentId, userId), html, existingPerspective?.review ?? '');
+		}
+	}
+
+	// Closing the popover within the debounce window must not lose the last edits.
+	onDestroy(flushPendingDraft);
 
 	function handleCommentChange(html: string) {
 		comment = html;
+		restoredFromDraft = false;
+		pendingDraft = html;
+		if (draftSaveTimer) clearTimeout(draftSaveTimer);
+		draftSaveTimer = setTimeout(flushPendingDraft, 1000);
+	}
+
+	function discardDraft() {
+		cancelPendingDraft();
+		clearDraft(draftKey(contentId, userId));
+		comment = existingPerspective?.review ?? '';
+		restoredFromDraft = false;
 	}
 
 	// Build customFields payload from dynamic (non-core) field values.
@@ -242,8 +272,7 @@
 
 	// Get review text — sanitize HTML and only send if non-empty
 	function getReview(): string | undefined {
-		const stripped = comment.replace(/<[^>]*>/g, '').trim();
-		return stripped ? sanitizeHtml(comment) : undefined;
+		return hasReviewContent(comment) ? sanitizeHtml(comment) : undefined;
 	}
 
 	function handleSubmit(e: Event) {
@@ -284,6 +313,10 @@
 				},
 				{
 					onSuccess: () => {
+						// Cancel first: a debounced save still in flight would re-create the
+						// draft we are about to delete.
+						cancelPendingDraft();
+						clearDraft(draftKey(contentId, userId));
 						onSuccess?.();
 						onClose();
 					},
@@ -306,6 +339,10 @@
 				},
 				{
 					onSuccess: () => {
+						// Cancel first: a debounced save still in flight would re-create the
+						// draft we are about to delete.
+						cancelPendingDraft();
+						clearDraft(draftKey(contentId, userId));
 						onSuccess?.();
 						onClose();
 					},
@@ -362,11 +399,11 @@
 			/>
 		</div>
 
-		{#if mobile}
+		{#if mobile && !commentExpanded}
 			<button
 				type="button"
 				onclick={() => {
-					commentFullscreenOpen = true;
+					commentExpanded = true;
 				}}
 				aria-label="Add comment"
 				class="flex flex-1 items-center justify-between gap-2 h-14 px-3 rounded-lg border border-border bg-white cursor-pointer text-left"
@@ -377,7 +414,7 @@
 					class:text-muted-foreground={!hasComment}
 				>
 					{#if hasComment}
-						{comment.replace(/<[^>]*>/g, '')}
+						{reviewPreviewText(comment)}
 					{:else}
 						Add a comment
 					{/if}
@@ -388,18 +425,31 @@
 			</button>
 		{:else}
 			<div class="flex-1 min-w-0 relative">
-				<CommentEditor
+				<PerspectiveEditor
 					value={comment}
 					onChange={handleCommentChange}
 					minHeight={68}
 					showPopout={true}
+					expanded={commentExpanded}
 					onPopout={() => {
-						commentFullscreenOpen = true;
+						commentExpanded = !commentExpanded;
 					}}
+					isMobile={mobile}
 				/>
 			</div>
 		{/if}
 	</div>
+
+	{#if restoredFromDraft}
+		<div
+			class="shrink-0 flex items-center justify-between gap-2 px-5 py-2 border-b border-border bg-accent text-[12px] text-muted-foreground"
+		>
+			<span>Restored unsaved draft</span>
+			<button type="button" class="text-muted-foreground underline hover:opacity-70" onclick={discardDraft}>
+				Discard draft
+			</button>
+		</div>
+	{/if}
 
 	<!-- Scrollable body — ratings + add field -->
 	<form onsubmit={handleSubmit} class="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -520,7 +570,10 @@
 		}}
 	>
 		<DialogContent
-			class="sm:max-w-[460px] w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col"
+			class={[
+				'w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col transition-[max-width] duration-200',
+				commentExpanded ? 'sm:max-w-[760px]' : 'sm:max-w-[460px]',
+			]}
 			overlayClass="bg-black/45"
 		>
 			{@render modalBody(false)}
@@ -538,14 +591,4 @@
 			{@render modalBody(true)}
 		</DrawerContent>
 	</Drawer>
-{/if}
-
-{#if commentFullscreenOpen}
-	<CommentFullscreen
-		value={comment}
-		onChange={handleCommentChange}
-		onClose={() => {
-			commentFullscreenOpen = false;
-		}}
-	/>
 {/if}
