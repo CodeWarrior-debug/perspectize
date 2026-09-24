@@ -116,6 +116,18 @@ describe('InterlinearPassage', () => {
 		expect(created).not.toHaveAttribute('aria-describedby');
 	});
 
+	it('a verse with data has no superscript number in the text; the chips row keeps it; a plain verse keeps its superscript', () => {
+		const { container } = render(InterlinearPassage, {
+			props: { verses: [plain(1, 1, 'ignored'), plain(2, 2, 'Now the earth was formless.')], interlinear: [gen11] },
+		});
+		const sups = Array.from(container.querySelectorAll('sup'));
+		expect(sups.map((s) => s.textContent)).toEqual(['2']); // only the plain verse
+		expect(container.querySelector('[data-segment="1:0"]')!.closest('span')!.querySelector('sup')).toBeNull();
+		// verse 1's number survives as the small label at the start of its chips
+		const chip = container.querySelector('[data-chip="1:0"]')!;
+		expect(chip.previousElementSibling?.textContent).toBe('1');
+	});
+
 	it('a pointerdown outside the component clears a pinned popover (tap-away)', async () => {
 		render(InterlinearPassage, { props: { verses: [plain(1, 1, 'x')], interlinear: [gen11] } });
 		await fireEvent.click(screen.getByRole('button', { name: 'God' }));

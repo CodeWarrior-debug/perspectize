@@ -142,7 +142,6 @@
 			{@const iv = byVerse.get(v.verseId)}
 			{#if iv}
 				<span
-					><sup class="mr-0.5 ml-0.5 text-[10px] text-muted-foreground">{v.verse}</sup
 					>{#each iv.segments as seg, i (i)}{#if seg.spaceBefore}{' '}{/if}{#if iv.words.some((w) => w.segment === i)}<button
 								type="button"
 								data-segment="{iv.verseId}:{i}"
