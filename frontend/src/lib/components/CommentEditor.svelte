@@ -77,7 +77,7 @@
 </script>
 
 <div
-	class="comment-editor-wrapper border border-input rounded-lg bg-white overflow-hidden flex flex-col w-full min-w-0"
+	class="comment-editor-wrapper border border-input rounded-lg bg-card overflow-hidden flex flex-col w-full min-w-0"
 >
 	<!-- Toolbar -->
 	<div class="flex items-center gap-0.5 px-1.5 py-1 border-b border-border bg-accent relative">

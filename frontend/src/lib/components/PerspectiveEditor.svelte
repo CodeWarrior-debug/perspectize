@@ -283,7 +283,7 @@
 </script>
 
 <div
-	class="comment-editor-wrapper border border-input rounded-lg bg-white overflow-hidden flex flex-col w-full min-w-0"
+	class="comment-editor-wrapper border border-input rounded-lg bg-card overflow-hidden flex flex-col w-full min-w-0"
 	style:--pe-min-height={expanded ? 'min(60vh, 560px)' : `${minHeight}px`}
 	data-expanded={expanded}
 >

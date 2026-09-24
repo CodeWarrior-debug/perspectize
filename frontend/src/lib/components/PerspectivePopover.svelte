@@ -358,7 +358,7 @@
 		{#if mobile}
 			<!-- Grabber handle -->
 			<div class="flex justify-center pb-2">
-				<div class="w-9 h-1 rounded-full bg-black/[0.18]"></div>
+				<div class="w-9 h-1 rounded-full bg-foreground/20"></div>
 			</div>
 		{/if}
 		<div class="flex items-center justify-center gap-2">
@@ -406,7 +406,7 @@
 					commentExpanded = true;
 				}}
 				aria-label="Add comment"
-				class="flex flex-1 items-center justify-between gap-2 h-14 px-3 rounded-lg border border-border bg-white cursor-pointer text-left"
+				class="flex flex-1 items-center justify-between gap-2 h-14 px-3 rounded-lg border border-border bg-card cursor-pointer text-left"
 			>
 				<span
 					class="font-serif text-[13px] line-clamp-2 flex-1"
