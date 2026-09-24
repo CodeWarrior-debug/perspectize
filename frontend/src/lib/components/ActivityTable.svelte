@@ -56,6 +56,7 @@
 		capitalizeContentType,
 		durationComparator,
 		compareContentBySorts,
+		filterContentRows,
 		togglableColIds,
 	} from '$lib/utils/grid-config';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
@@ -352,12 +353,20 @@
 	// the grid-mirroring state in "Loaded" mode (works with or without a live grid).
 	const activeSorts = $derived(mode === 'loaded' ? clientSorts : sorts);
 
-	// The mobile card list has no AG Grid instance to sort for it. In "All Items" mode
-	// the server already returned rows in the requested order; in "Loaded" mode, apply
-	// clientSorts by hand. On desktop, AG Grid does this itself, so this is a no-op.
+	// The mobile card list has no AG Grid instance to sort or filter for it. In "All
+	// Items" mode the server already returned rows in the requested (and filtered)
+	// order; in "Loaded" mode, apply clientSorts and the URL filters by hand — this
+	// used to only sort, so a mobile "Loaded"-mode card view silently ignored every
+	// column filter (see the UI gap audit, gap #5). On desktop, AG Grid does both
+	// itself, so this is a no-op there.
 	const sortedRowData = $derived(
-		mode === 'loaded' && cardMode && clientSorts.length > 0
-			? [...rowData].sort((a, b) => compareContentBySorts(a, b, clientSorts))
+		mode === 'loaded' && cardMode
+			? (() => {
+					const filtered = filterContentRows(rowData, urlParamsToFilter(filters));
+					return clientSorts.length > 0
+						? [...filtered].sort((a, b) => compareContentBySorts(a, b, clientSorts))
+						: filtered;
+				})()
 			: rowData,
 	);
 

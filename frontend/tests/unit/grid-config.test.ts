@@ -7,6 +7,7 @@ import {
 	togglableColIds,
 	SORTABLE_COLUMNS,
 	compareContentBySorts,
+	filterContentRows,
 } from '$lib/utils/grid-config';
 import type { ContentItem } from '$lib/queries/content';
 
@@ -242,5 +243,76 @@ describe('compareContentBySorts', () => {
 			]),
 		);
 		expect(sorted.map((r) => r.id)).toEqual(['2', '1']);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// filterContentRows
+// ---------------------------------------------------------------------------
+// Gap #5 (remainder) in the UI gap audit: the mobile card list in "Loaded"
+// mode ignored column filters entirely (there was no AG Grid instance to
+// filter for it). filterContentRows applies the same filter model
+// urlParamsToFilter (gridUrlState.ts) produces, by hand, against the plain
+// row array.
+describe('filterContentRows', () => {
+	it('returns all rows when the filter model is empty', () => {
+		const rows = [row({ id: '1' }), row({ id: '2' })];
+		expect(filterContentRows(rows, {})).toEqual(rows);
+	});
+
+	it('filters by a text "contains" filter (e.g. the default type: youtube filter)', () => {
+		const rows = [row({ id: '1', contentType: 'YOUTUBE' }), row({ id: '2', contentType: 'CLAIM' })];
+		const result = filterContentRows(rows, { type: { filterType: 'text', type: 'contains', filter: 'youtube' } });
+		expect(result.map((r) => r.id)).toEqual(['1']);
+	});
+
+	it('filters by a number range (views)', () => {
+		const rows = [
+			row({ id: '1', viewCount: 500 }),
+			row({ id: '2', viewCount: 1500 }),
+			row({ id: '3', viewCount: 3000 }),
+		];
+		const result = filterContentRows(rows, {
+			views: { filterType: 'number', type: 'inRange', filter: 1000, filterTo: 2000 },
+		});
+		expect(result.map((r) => r.id)).toEqual(['2']);
+	});
+
+	it('excludes a row with no value for a number filter (null does not match any range)', () => {
+		const rows = [row({ id: '1', viewCount: null }), row({ id: '2', viewCount: 1500 })];
+		const result = filterContentRows(rows, {
+			views: { filterType: 'number', type: 'greaterThan', filter: 0 },
+		});
+		expect(result.map((r) => r.id)).toEqual(['2']);
+	});
+
+	it('filters by a date range (publishDate)', () => {
+		const rows = [
+			row({ id: '1', publishedAt: '2026-01-01T00:00:00Z' }),
+			row({ id: '2', publishedAt: '2026-06-01T00:00:00Z' }),
+		];
+		const result = filterContentRows(rows, {
+			publishDate: { filterType: 'date', type: 'greaterThanOrEqual', dateFrom: '2026-03-01' },
+		});
+		expect(result.map((r) => r.id)).toEqual(['2']);
+	});
+
+	it('applies multiple filters as AND', () => {
+		const rows = [
+			row({ id: '1', contentType: 'YOUTUBE', viewCount: 500 }),
+			row({ id: '2', contentType: 'YOUTUBE', viewCount: 5000 }),
+			row({ id: '3', contentType: 'CLAIM', viewCount: 5000 }),
+		];
+		const result = filterContentRows(rows, {
+			type: { filterType: 'text', type: 'contains', filter: 'youtube' },
+			views: { filterType: 'number', type: 'greaterThan', filter: 1000 },
+		});
+		expect(result.map((r) => r.id)).toEqual(['2']);
+	});
+
+	it('skips a colId with no known value getter (matches everything for that entry)', () => {
+		const rows = [row({ id: '1' })];
+		const result = filterContentRows(rows, { notARealColumn: { filterType: 'text', type: 'contains', filter: 'x' } });
+		expect(result.map((r) => r.id)).toEqual(['1']);
 	});
 });
