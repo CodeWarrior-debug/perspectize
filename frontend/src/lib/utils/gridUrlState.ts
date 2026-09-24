@@ -228,7 +228,6 @@ type AGDateFilter = { filterType: 'date'; type: string; dateFrom?: string; dateT
 
 /** AG Grid colId → URL f.* param key */
 const COL_TO_FILTER_KEY: Record<string, string> = {
-	item: 'item',
 	type: 'type',
 	duration: 'duration',
 	views: 'views',
@@ -503,11 +502,6 @@ export function urlParamsToGraphQLFilter(
 		if (!value) continue;
 
 		switch (filterKey) {
-			case 'item':
-				result.search = value;
-				hasAny = true;
-				break;
-
 			case 'type':
 				result.contentType = value.toUpperCase();
 				hasAny = true;

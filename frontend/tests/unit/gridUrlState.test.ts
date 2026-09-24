@@ -574,15 +574,13 @@ describe('urlParamsToGraphQLFilter', () => {
 		});
 	});
 
-	it('maps item filter to search field', () => {
-		const result = urlParamsToGraphQLFilter({ item: 'baby shark' }, '');
-		expect(result).toEqual({ search: 'baby shark' });
-	});
-
-	it('item filter overrides search bar value', () => {
-		const result = urlParamsToGraphQLFilter({ item: 'specific title' }, 'broad search');
+	it('ignores an unknown "item" filter key instead of overwriting the search bar value', () => {
+		// The item column has no filter menu (filter: false — search handled by the page-level
+		// input), so this key can only reach here via a hand-crafted URL. It must not silently
+		// clobber `search`/`searchFields` the way it used to.
+		const result = urlParamsToGraphQLFilter({ item: 'baby shark' }, 'broad search');
 		expect(result).toEqual({
-			search: 'specific title',
+			search: 'broad search',
 			searchFields: ['TITLE', 'DESCRIPTION', 'CHANNEL_TITLE', 'TAGS'],
 		});
 	});
