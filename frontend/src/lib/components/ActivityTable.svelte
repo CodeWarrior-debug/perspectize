@@ -29,6 +29,7 @@
 		urlParamsToGraphQLFilter,
 		urlParamsToFilter,
 		filterToUrlParams,
+		filtersEqual,
 	} from '$lib/utils/gridUrlState';
 	import type { DataMode, GridParams, SortSpec } from '$lib/utils/gridUrlState';
 	import {
@@ -774,7 +775,10 @@
 					.getColumnState()
 					.filter((col) => col.sort)
 					.sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0))
-					.map((col) => ({ col: col.colId ?? 'updatedAt', dir: col.sort === 'asc' ? ('asc' as const) : ('desc' as const) }));
+					.map((col) => ({
+						col: col.colId ?? 'updatedAt',
+						dir: col.sort === 'asc' ? ('asc' as const) : ('desc' as const),
+					}));
 				return;
 			}
 			// Skip if we triggered this event programmatically (to avoid loop)
@@ -804,14 +808,18 @@
 			activeFilterModel = event.api.getFilterModel();
 			displayedRowCount = event.api.getDisplayedRowCount();
 
-			// In "Loaded" mode, AG Grid handles client-side filter — skip URL update
-			if (mode === 'loaded') return;
-
-			// Server-side: debounce → convert filter model → update URL
+			// Debounce → convert filter model → update URL. In "Loaded" mode AG Grid already
+			// filtered client-side; the URL write just keeps the URL authoritative, so a
+			// cleared default filter (f=none) isn't re-applied by the restore effect below.
 			clearTimeout(debounceTimer);
 			debounceTimer = setTimeout(() => {
 				const filterModel = event.api.getFilterModel();
 				const urlFilters = filterToUrlParams(filterModel as Record<string, unknown>);
+				if (filtersEqual(urlFilters, gridParams.filters)) return;
+				if (mode === 'loaded') {
+					updateUrl({ filters: urlFilters });
+					return;
+				}
 				cursors = [null];
 				updateUrl({ filters: urlFilters, page: 1 });
 			}, 500);
@@ -956,8 +964,8 @@
 			const smCols = ['category', 'channel'];
 			const mdCols = ['duration', 'publishDate'];
 			const lgCols = ['views', 'likes', 'percentLiked', 'tags'];
-			// createdAt/updatedAt/id/addedByUserID/url stay hidden via their colDef
-			// `hide: true` until an admin enables them in the column picker.
+			// createdAt/updatedAt stay hidden via their colDef `hide: true` until the
+			// user enables them in the column picker; id/addedByUserID/url likewise, admins only.
 			const alwaysHidden = ['description'];
 
 			api.setColumnsVisible(alwaysVisible, true);
@@ -991,7 +999,20 @@
 
 <div class="flex flex-col h-full gap-4">
 	<!-- Active Filter Chips — always visible so users can clear filters even during errors -->
-	<FilterChips {gridApi} filterModel={activeFilterModel} />
+	<FilterChips
+		{gridApi}
+		filterModel={gridApi ? activeFilterModel : urlParamsToFilter(filters)}
+		onRemove={(colId) => {
+			const next = { ...gridParams.filters };
+			delete next[colId];
+			cursors = [null];
+			updateUrl({ filters: next, page: 1 });
+		}}
+		onClearAll={() => {
+			cursors = [null];
+			updateUrl({ filters: {}, page: 1 });
+		}}
+	/>
 
 	<!-- Error State -->
 	{#if contentQuery.isError}

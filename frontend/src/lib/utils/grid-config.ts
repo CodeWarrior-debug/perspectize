@@ -97,7 +97,11 @@ const SORT_VALUE_GETTERS: Record<string, (row: ContentItem) => string | number |
  * of direction. Unknown/unsortable colIds are skipped (same policy as
  * sortsToGraphQL dropping them for the server-side path).
  */
-export function compareContentBySorts(a: ContentItem, b: ContentItem, sorts: { col: string; dir: 'asc' | 'desc' }[]): number {
+export function compareContentBySorts(
+	a: ContentItem,
+	b: ContentItem,
+	sorts: { col: string; dir: 'asc' | 'desc' }[],
+): number {
 	for (const { col, dir } of sorts) {
 		const getValue = SORT_VALUE_GETTERS[col];
 		if (!getValue) continue;
@@ -262,6 +266,7 @@ export interface TogglableColumn {
  */
 export const DATA_COLUMNS: readonly TogglableColumn[] = [
 	{ colId: 'type', label: 'Type' },
+	{ colId: 'category', label: 'Category' },
 	{ colId: 'duration', label: 'Length' },
 	{ colId: 'views', label: 'Views' },
 	{ colId: 'likes', label: 'Likes' },
@@ -270,6 +275,8 @@ export const DATA_COLUMNS: readonly TogglableColumn[] = [
 	{ colId: 'channel', label: 'Channel' },
 	{ colId: 'tags', label: 'Tags' },
 	{ colId: 'description', label: 'Description' },
+	{ colId: 'createdAt', label: 'Date Added' },
+	{ colId: 'updatedAt', label: 'Updated' },
 ] as const;
 
 /** Internal columns, offered only to admins. All hidden by default. */
@@ -277,8 +284,6 @@ export const INTERNAL_COLUMNS: readonly TogglableColumn[] = [
 	{ colId: 'id', label: 'Content ID' },
 	{ colId: 'addedByUserID', label: 'Submitter' },
 	{ colId: 'url', label: 'Source URL' },
-	{ colId: 'createdAt', label: 'Created at' },
-	{ colId: 'updatedAt', label: 'Updated at' },
 ] as const;
 
 /** Every colId the user may toggle, given their admin status. */
