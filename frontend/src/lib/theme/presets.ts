@@ -20,9 +20,9 @@ export const THEME_PRESETS: ThemePreset[] = [
 		base: {
 			primary: '#1a365d',
 			primaryHover: '#2d3748',
-			secondary: '#f5f5f5',
+			secondary: '#f5f3ee',
 			accent: '#f7fafc',
-			background: '#ffffff',
+			background: '#fbfaf7',
 			foreground: '#171717',
 			border: '#d4d4d4',
 			destructive: '#dc2626',

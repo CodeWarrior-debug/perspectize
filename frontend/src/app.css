@@ -48,15 +48,15 @@
 	--font-family-serif: 'Charter', 'Georgia', 'Times New Roman', serif;
 
 	/* Theme/Light — Base */
-	--color-background: #ffffff;
+	--color-background: #fbfaf7;
 	--color-foreground: #171717;
 
 	/* Theme/Light — Card */
-	--color-card: #ffffff;
+	--color-card: #fbfaf7;
 	--color-card-foreground: #171717;
 
 	/* Theme/Light — Popover */
-	--color-popover: #ffffff;
+	--color-popover: #fbfaf7;
 	--color-popover-foreground: #171717;
 
 	/* Theme/Light — Primary */
@@ -65,12 +65,12 @@
 	--color-primary-foreground: #ffffff;
 
 	/* Theme/Light — Secondary */
-	--color-secondary: #f5f5f5;
+	--color-secondary: #f5f3ee;
 	--color-secondary-hover: rgba(245, 245, 245, 0.8);
 	--color-secondary-foreground: #525252;
 
 	/* Theme/Light — Muted */
-	--color-muted: #f5f5f5;
+	--color-muted: #f5f3ee;
 	--color-muted-foreground: #525252;
 
 	/* Theme/Light — Accent */
@@ -90,8 +90,8 @@
 	--color-ring: #1a365d;
 
 	/* Theme/Light — Grid rows (zebra, opaque hover, hover bar) */
-	--color-row-alt: #f8f8f8;
-	--color-row-hover: #e1e2e4;
+	--color-row-alt: #f4f3f1;
+	--color-row-hover: #dedfdd;
 	--color-row-accent: #1a365d;
 
 	/* Rating Colors */

@@ -73,19 +73,19 @@ Design these as a **Figma local styles / variables** set. These are the semantic
 
 | Token                    | Hex                     | Usage                                             |
 | ------------------------ | ----------------------- | ------------------------------------------------- |
-| `background`             | `#ffffff`               | Page background                                   |
+| `background`             | `#fbfaf7`               | Page background (warm paper-white)                |
 | `foreground`             | `#171717`               | Default text (neutral-900)                        |
-| `card`                   | `#ffffff`               | Card/surface background                           |
+| `card`                   | `#fbfaf7`               | Card/surface background                           |
 | `card-foreground`        | `#171717`               | Text on cards                                     |
-| `popover`                | `#ffffff`               | Dropdown/dialog background                        |
+| `popover`                | `#fbfaf7`               | Dropdown/dialog background                        |
 | `popover-foreground`     | `#171717`               | Text in popovers                                  |
 | `primary`                | `#1a365d`               | Buttons, links, header accent (navy)              |
 | `primary-hover`          | `#2d3748`               | Primary hover state                               |
 | `primary-foreground`     | `#ffffff`               | Text on primary                                   |
-| `secondary`              | `#f5f5f5`               | Secondary buttons, tags (neutral-100)             |
+| `secondary`              | `#f5f3ee`               | Secondary buttons, tags (warm stone)              |
 | `secondary-hover`        | `rgba(245,245,245,0.8)` | Secondary hover state                             |
 | `secondary-foreground`   | `#525252`               | Text on secondary (neutral-600)                   |
-| `muted`                  | `#f5f5f5`               | Subtle backgrounds, disabled states (neutral-100) |
+| `muted`                  | `#f5f3ee`               | Subtle backgrounds, disabled states (warm stone)  |
 | `muted-foreground`       | `#525252`               | Placeholder text, captions (neutral-600)          |
 | `accent`                 | `#f7fafc`               | Hover highlights                                  |
 | `accent-foreground`      | `#2d3748`               | Text on accent                                    |
@@ -95,8 +95,8 @@ Design these as a **Figma local styles / variables** set. These are the semantic
 | `border`                 | `#d4d4d4`               | Default borders (neutral-300)                     |
 | `input`                  | `#d4d4d4`               | Input borders (neutral-300)                       |
 | `ring`                   | `#1a365d`               | Focus ring (matches primary)                      |
-| `row-alt`                | `#f8f8f8`               | Activity grid zebra (derived in `derive.ts`)      |
-| `row-hover`              | `#e1e5eb`               | Activity grid row hover, opaque (derived)         |
+| `row-alt`                | `#f4f3f1`               | Activity grid zebra (derived in `derive.ts`)      |
+| `row-hover`              | `#dde1e4`               | Activity grid row hover, opaque (derived)         |
 | `row-accent`             | `#1a365d`               | Activity grid hover bar (derived)                 |
 | `disabled`               | `0.5`                   | Disabled state opacity                            |
 
