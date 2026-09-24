@@ -1,3 +1,5 @@
+import { BIBLE_PASSAGE_ICON_SVG } from './icons';
+
 /**
  * Convert length + lengthUnits to display format.
  */
@@ -318,6 +320,16 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 
 	const container = document.createElement('div');
 	container.className = 'flex items-center justify-center h-full w-full';
+
+	if (params.data.contentType === 'BIBLE_PASSAGE') {
+		container.classList.add('text-primary');
+		container.innerHTML = BIBLE_PASSAGE_ICON_SVG;
+		const label = document.createElement('span');
+		label.className = 'sr-only';
+		label.textContent = 'Bible Passage';
+		container.appendChild(label);
+		return container;
+	}
 
 	// Hidden text for filter matching
 	const hidden = document.createElement('span');
