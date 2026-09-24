@@ -4,6 +4,7 @@
 	import { Input, Popover, PopoverContent, PopoverTrigger, buttonVariants } from '$lib/components/shadcn';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
+	import { segmentClass } from '$lib/utils/segmented';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import {
@@ -73,18 +74,16 @@
 				<div class="flex items-center gap-1 rounded-md border border-input bg-background p-0.5">
 					<button
 						type="button"
-						class="px-2.5 py-1 text-xs font-medium rounded transition-colors {view === 'content'
-							? 'bg-primary text-primary-foreground'
-							: 'text-muted-foreground hover:text-foreground'}"
+						class="px-2.5 py-1 text-xs font-medium rounded transition-colors {segmentClass(view === 'content')}"
+						aria-pressed={view === 'content'}
 						onclick={() => (view = 'content')}
 					>
 						All Content
 					</button>
 					<button
 						type="button"
-						class="px-2.5 py-1 text-xs font-medium rounded transition-colors {view === 'byUser'
-							? 'bg-primary text-primary-foreground'
-							: 'text-muted-foreground hover:text-foreground'}"
+						class="px-2.5 py-1 text-xs font-medium rounded transition-colors {segmentClass(view === 'byUser')}"
+						aria-pressed={view === 'byUser'}
 						onclick={() => (view = 'byUser')}
 					>
 						By User
