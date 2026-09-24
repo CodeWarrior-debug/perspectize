@@ -55,20 +55,31 @@ function applyEdit(p: PerspectiveItem, input: UpdatePerspectiveInput): Perspecti
 
 export function useUpdatePerspective() {
 	const queryClient = useQueryClient();
-	const listFilter = { queryKey: queryKeys.perspectives.lists() };
+	// PerspectiveItem-shaped branches only — patching by id never inserts a row, so a
+	// list that doesn't contain this perspective is untouched by the loop below.
+	// activityFeeds() is deliberately excluded: it caches a different row shape
+	// (ActivityPerspectiveItem, nested `content`, no rating fields) and is
+	// privacy-filtered server-side, so a PUBLIC<->PRIVATE toggle needs a real refetch
+	// to be re-filtered correctly, not a same-shape patch.
+	const rowListFilters: { queryKey: readonly unknown[] }[] = [
+		{ queryKey: queryKeys.perspectives.byUserLists() },
+		{ queryKey: queryKeys.perspectives.byContentLists() },
+	];
 
 	return createMutation(() => ({
 		mutationFn: async (input: UpdatePerspectiveInput) => {
 			return graphqlRequest<UpdatePerspectiveResponse>(UPDATE_PERSPECTIVE, { input });
 		},
 		onMutate: async (input: UpdatePerspectiveInput): Promise<UpdateContext> => {
-			await queryClient.cancelQueries(listFilter);
-			const previous = queryClient.getQueriesData<ListPerspectivesByUserResponse>(listFilter) as ListSnapshot;
-			const targetId = String(input.id);
-			queryClient.setQueriesData<ListPerspectivesByUserResponse>(
-				listFilter,
-				patchLists((list) => list.map((p) => (p.id === targetId ? applyEdit(p, input) : p))),
+			await Promise.all(rowListFilters.map((f) => queryClient.cancelQueries(f)));
+			const previous = rowListFilters.flatMap(
+				(f) => queryClient.getQueriesData<ListPerspectivesByUserResponse>(f) as ListSnapshot,
 			);
+			const targetId = String(input.id);
+			const edit = patchLists((list) => list.map((p) => (p.id === targetId ? applyEdit(p, input) : p)));
+			for (const f of rowListFilters) {
+				queryClient.setQueriesData<ListPerspectivesByUserResponse>(f, edit);
+			}
 			return { previous };
 		},
 		onError: (err: Error, _input: UpdatePerspectiveInput, context?: UpdateContext) => {
@@ -90,15 +101,21 @@ export function useUpdatePerspective() {
 
 			const updated = data?.updatePerspective;
 			if (!updated) {
-				queryClient.invalidateQueries(listFilter);
+				// Unexpected response shape — fall back to a full, shape-agnostic refetch.
+				queryClient.invalidateQueries({ queryKey: queryKeys.perspectives.lists() });
 				return;
 			}
 
-			queryClient.setQueriesData<ListPerspectivesByUserResponse>(
-				listFilter,
-				patchLists((list) => list.map((p) => (p.id === updated.id ? updated : p))),
-			);
-			queryClient.invalidateQueries({ ...listFilter, refetchType: 'none' });
+			const swap = patchLists((list) => list.map((p) => (p.id === updated.id ? updated : p)));
+			for (const f of rowListFilters) {
+				queryClient.setQueriesData<ListPerspectivesByUserResponse>(f, swap);
+				queryClient.invalidateQueries({ ...f, refetchType: 'none' });
+			}
+			// Activity rows carry nested `content` and are privacy-filtered — refetch
+			// rather than patch, so e.g. a PUBLIC->PRIVATE toggle drops the row out of
+			// activityFeed(false) instead of leaving it there until something else
+			// happens to refetch it.
+			queryClient.invalidateQueries({ queryKey: queryKeys.perspectives.activityFeeds() });
 
 			// Editing a perspective — including toggling its Privacy — changes this
 			// content's perspectiveCount/averageRating (see useContentAggregates,

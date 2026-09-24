@@ -121,7 +121,7 @@ describe('useCreatePerspective hook', () => {
 	describe('onMutate — optimistic insert', () => {
 		it('prepends an optimistic row to every cached perspectives list and returns a rollback snapshot', async () => {
 			const existing = { perspectives: { items: [{ id: '1', contentID: '99' }] } };
-			mockGetQueriesData.mockReturnValueOnce([[['app', 'perspectives', 'list', { userId: 42 }], existing]]);
+			mockGetQueriesData.mockReturnValueOnce([[['app', 'perspectives', 'list', 'byUser', { userId: 42 }], existing]]);
 
 			const ctx = await capturedMutationOptions.onMutate({ userID: 42, contentID: 10, quality: 7500 });
 
@@ -136,6 +136,15 @@ describe('useCreatePerspective hook', () => {
 			expect(next.perspectives.items).toHaveLength(2);
 			expect(next.perspectives.items[0]).toMatchObject({ id: ctx.tempId, contentID: '10', quality: 7500 });
 			expect(ctx.previous).toHaveLength(1);
+		});
+
+		it("scopes the optimistic patch to exactly the creator's own byUser list, not other users' or content's lists", async () => {
+			await capturedMutationOptions.onMutate({ userID: 42, contentID: 10, quality: 7500 });
+
+			expect(mockSetQueriesData).toHaveBeenCalledWith(
+				{ queryKey: ['app', 'perspectives', 'list', 'byUser', { userId: 42 }], exact: true },
+				expect.any(Function),
+			);
 		});
 	});
 
@@ -210,6 +219,42 @@ describe('useCreatePerspective hook', () => {
 			expect(mockInvalidateQueries).not.toHaveBeenCalledWith(
 				expect.objectContaining({ queryKey: expect.arrayContaining(['content', 'list']) }),
 			);
+		});
+
+		it('invalidates the activity feeds — never patched with a PerspectiveItem, since their row shape and privacy filtering differ', () => {
+			capturedMutationOptions.onSuccess(
+				{ createPerspective: createdRow },
+				{ userID: 42 },
+				{ previous: [], tempId: 'x' },
+			);
+			expect(mockInvalidateQueries).toHaveBeenCalledWith({
+				queryKey: ['app', 'perspectives', 'list', 'activityFeed'],
+			});
+		});
+
+		it("invalidates the created content's listByContent cache (e.g. an open Compare picker), exact", () => {
+			capturedMutationOptions.onSuccess(
+				{ createPerspective: createdRow },
+				{ userID: 42 },
+				{ previous: [], tempId: 'x' },
+			);
+			expect(mockInvalidateQueries).toHaveBeenCalledWith({
+				queryKey: ['app', 'perspectives', 'list', 'byContent', { contentId: 10 }],
+				exact: true,
+			});
+		});
+
+		it('does not patch listByContent or activityFeed with the new row (only invalidates them)', () => {
+			capturedMutationOptions.onSuccess(
+				{ createPerspective: createdRow },
+				{ userID: 42 },
+				{ previous: [], tempId: 'x' },
+			);
+			for (const call of mockSetQueriesData.mock.calls) {
+				const key = call[0]?.queryKey ?? call[0];
+				expect(key).not.toContain('byContent');
+				expect(key).not.toContain('activityFeed');
+			}
 		});
 
 		it("invalidates the new perspective's content aggregate cache (perspectiveCount/averageRating can change)", () => {

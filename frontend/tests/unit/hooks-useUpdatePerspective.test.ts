@@ -142,7 +142,7 @@ describe('useUpdatePerspective hook', () => {
 			const existing = {
 				perspectives: { items: [{ id: '5', quality: 1000, importance: 2000, updatedAt: 'old' }] },
 			};
-			mockGetQueriesData.mockReturnValueOnce([[['app', 'perspectives', 'list', { userId: 42 }], existing]]);
+			mockGetQueriesData.mockReturnValueOnce([[['app', 'perspectives', 'list', 'byUser', { userId: 42 }], existing]]);
 
 			const ctx = await capturedMutationOptions.onMutate({ id: 5, quality: 6000 });
 
@@ -152,6 +152,15 @@ describe('useUpdatePerspective hook', () => {
 			expect(next.perspectives.items[0]).toMatchObject({ id: '5', quality: 6000, importance: 2000 });
 			expect(next.perspectives.items[0].updatedAt).not.toBe('old');
 			expect(ctx.previous).toHaveLength(1);
+		});
+
+		it('patches both the byUser and byContent branches (a row can be cached under either), never activityFeed', async () => {
+			await capturedMutationOptions.onMutate({ id: 5, quality: 6000 });
+
+			const patchedFilters = mockSetQueriesData.mock.calls.map((call: any[]) => call[0].queryKey);
+			expect(patchedFilters).toContainEqual(['app', 'perspectives', 'list', 'byUser']);
+			expect(patchedFilters).toContainEqual(['app', 'perspectives', 'list', 'byContent']);
+			expect(patchedFilters).not.toContainEqual(expect.arrayContaining(['activityFeed']));
 		});
 	});
 
@@ -213,6 +222,17 @@ describe('useUpdatePerspective hook', () => {
 					refetchType: 'none',
 				}),
 			);
+		});
+
+		it('invalidates the activity feeds instead of patching them (different row shape, privacy-filtered)', () => {
+			capturedMutationOptions.onSuccess({ updatePerspective: updatedRow });
+			expect(mockInvalidateQueries).toHaveBeenCalledWith({
+				queryKey: ['app', 'perspectives', 'list', 'activityFeed'],
+			});
+			for (const call of mockSetQueriesData.mock.calls) {
+				const key = call[0]?.queryKey ?? call[0];
+				expect(key).not.toContain('activityFeed');
+			}
 		});
 
 		it("invalidates the edited content's aggregate cache (perspectiveCount/averageRating can change)", () => {
