@@ -73,6 +73,20 @@ describe('deriveTheme', () => {
 	});
 });
 
+describe('authored neutrals', () => {
+	it('keeps an authored warm background instead of re-hueing it to a cool primary', () => {
+		const base = { ...READING_ROOM_BASE, primary: '#2c4a7a', background: '#fbfaf7', secondary: '#f5f3ee' };
+		const full = deriveTheme(base);
+		expect(full.background).toBe(base.background);
+		expect(full.secondary).toBe(base.secondary);
+	});
+
+	it('still tints a fully grey background toward the primary hue', () => {
+		const full = deriveTheme({ ...READING_ROOM_BASE, background: '#e5e5e5', secondary: '#dddddd' });
+		expect(full.background).not.toBe('#e5e5e5');
+	});
+});
+
 describe('toCssVarMap', () => {
 	it('maps every derived token to a --color-* CSS custom property', () => {
 		const full = deriveTheme(READING_ROOM_BASE);

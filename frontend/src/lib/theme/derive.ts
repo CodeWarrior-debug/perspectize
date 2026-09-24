@@ -51,6 +51,8 @@ export type FullThemeTokens = BaseThemeTokens & DerivedTokens;
 const WHITE = '#ffffff';
 const NEAR_BLACK = '#171717';
 const AA_NORMAL_TEXT = 4.5;
+/** OKLCH chroma at or above which an authored neutral is treated as intentionally tinted. */
+const AUTHORED_TINT_CHROMA = 0.004;
 
 function oklch(hex: string): Oklch {
 	const c = toOklch(hex);
@@ -93,6 +95,9 @@ function clampForegroundForContrast(bgHex: string, fgHex: string): string {
 /** Tint a neutral toward the theme's primary hue; reduce chroma near lightness extremes. */
 function tintNeutralTowardHue(neutralHex: string, primaryHue: number): string {
 	const n = oklch(neutralHex);
+	// A neutral that already carries a deliberate tint (a warm paper, a cool graphite) keeps
+	// its own hue; re-hueing it to the primary would silently override the palette's intent.
+	if (n.c >= AUTHORED_TINT_CHROMA) return neutralHex;
 	const blendedHue = primaryHue;
 	// Chroma nudge shrinks as lightness approaches 0 or 1 (avoids muddy near-black/near-white).
 	const extremeFactor = 1 - Math.abs(n.l - 0.5) * 2; // 1 at L=0.5, 0 at L=0 or L=1

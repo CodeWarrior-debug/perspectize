@@ -101,19 +101,19 @@
  */
 
 [data-theme='archive'] {
-	--color-background: #fdf5ec;
+	--color-background: #fbf6ec;
 	--color-foreground: #3a2f22;
-	--color-card: #fdf5ec;
+	--color-card: #fbf6ec;
 	--color-card-foreground: #3a2f22;
-	--color-popover: #fdf5ec;
+	--color-popover: #fbf6ec;
 	--color-popover-foreground: #3a2f22;
 	--color-primary: #7c5a2e;
 	--color-primary-hover: #634a26;
 	--color-primary-foreground: #ffffff;
-	--color-secondary: #f5ebe0;
-	--color-secondary-hover: #fff5ea;
+	--color-secondary: #f3ece0;
+	--color-secondary-hover: #fdf6ea;
 	--color-secondary-foreground: #171717;
-	--color-muted: #f5ebe0;
+	--color-muted: #f3ece0;
 	--color-muted-foreground: #171717;
 	--color-accent: #efe4d3;
 	--color-accent-foreground: #171717;
@@ -127,25 +127,25 @@
 	--color-rating-neutral: #ca8a05;
 	--color-rating-negative: #dc2912;
 	--color-rating-undecided: #6a728b;
-	--color-row-alt: #f8efe6;
-	--color-row-hover: #e7ded3;
+	--color-row-alt: #f6f0e6;
+	--color-row-hover: #e5dfd3;
 	--color-row-accent: #7c5a2e;
 }
 
 [data-theme='garden'] {
-	--color-background: #f9fdfa;
+	--color-background: #fbfcf8;
 	--color-foreground: #233026;
-	--color-card: #f9fdfa;
+	--color-card: #fbfcf8;
 	--color-card-foreground: #233026;
-	--color-popover: #f9fdfa;
+	--color-popover: #fbfcf8;
 	--color-popover-foreground: #233026;
 	--color-primary: #2f4a3a;
 	--color-primary-hover: #26392d;
 	--color-primary-foreground: #ffffff;
-	--color-secondary: #eaf3ed;
-	--color-secondary-hover: #f4fdf7;
+	--color-secondary: #eef2ea;
+	--color-secondary-hover: #f8fcf4;
 	--color-secondary-foreground: #171717;
-	--color-muted: #eaf3ed;
+	--color-muted: #eef2ea;
 	--color-muted-foreground: #171717;
 	--color-accent: #e5ecdf;
 	--color-accent-foreground: #171717;
@@ -159,25 +159,25 @@
 	--color-rating-neutral: #c38e00;
 	--color-rating-negative: #da2f00;
 	--color-rating-undecided: #61758a;
-	--color-row-alt: #f3f7f4;
-	--color-row-hover: #dee4e0;
+	--color-row-alt: #f5f6f2;
+	--color-row-hover: #e0e3df;
 	--color-row-accent: #2f4a3a;
 }
 
 [data-theme='midnight'] {
-	--color-background: #0d1421;
+	--color-background: #10141f;
 	--color-foreground: #e8e6df;
-	--color-card: #0d1421;
+	--color-card: #10141f;
 	--color-card-foreground: #e8e6df;
-	--color-popover: #0d1421;
+	--color-popover: #10141f;
 	--color-popover-foreground: #e8e6df;
 	--color-primary: #0d1b33;
 	--color-primary-hover: #16263f;
 	--color-primary-foreground: #ffffff;
-	--color-secondary: #192438;
-	--color-secondary-hover: #202b40;
+	--color-secondary: #1c2436;
+	--color-secondary-hover: #232b3e;
 	--color-secondary-foreground: #ffffff;
-	--color-muted: #192438;
+	--color-muted: #1c2436;
 	--color-muted-foreground: #ffffff;
 	--color-accent: #232c42;
 	--color-accent-foreground: #ffffff;
@@ -191,8 +191,8 @@
 	--color-rating-neutral: #d68128;
 	--color-rating-negative: #db2149;
 	--color-rating-undecided: #64748b;
-	--color-row-alt: #111825;
-	--color-row-hover: #212734;
+	--color-row-alt: #141823;
+	--color-row-hover: #242732;
 	--color-row-accent: #e8e6df;
 }
 
@@ -206,10 +206,10 @@
 	--color-primary: #00301f;
 	--color-primary-hover: #00432b;
 	--color-primary-foreground: #ffffff;
-	--color-secondary: #121714;
-	--color-secondary-hover: #191e1b;
+	--color-secondary: #141614;
+	--color-secondary-hover: #1b1d1b;
 	--color-secondary-foreground: #ffffff;
-	--color-muted: #121714;
+	--color-muted: #141614;
 	--color-muted-foreground: #ffffff;
 	--color-accent: #0f1f16;
 	--color-accent-foreground: #ffffff;
