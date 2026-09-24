@@ -119,6 +119,9 @@ function clearInlineThemeVars(root: HTMLElement): void {
 		'--color-rating-neutral',
 		'--color-rating-negative',
 		'--color-rating-undecided',
+		'--color-row-alt',
+		'--color-row-hover',
+		'--color-row-accent',
 	];
 	for (const p of props) root.style.removeProperty(p);
 }

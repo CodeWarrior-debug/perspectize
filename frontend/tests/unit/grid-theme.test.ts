@@ -15,3 +15,10 @@ describe('GRID_THEME_PARAMS', () => {
 		expect(GRID_THEME_PARAMS.rowHeight).toBe(64);
 	});
 });
+
+describe('row colours', () => {
+	it('draws hover and zebra from the row tokens', () => {
+		expect(GRID_THEME_PARAMS.rowHoverColor).toBe('var(--color-row-hover)');
+		expect(GRID_THEME_PARAMS.oddRowBackgroundColor).toBe('var(--color-row-alt)');
+	});
+});

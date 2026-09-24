@@ -78,6 +78,11 @@
 	/* Theme/Light — Focus Ring */
 	--color-ring: #1a365d;
 
+	/* Theme/Light — Grid rows (zebra, opaque hover, hover bar) */
+	--color-row-alt: #f8f8f8;
+	--color-row-hover: #e1e5eb;
+	--color-row-accent: #1a365d;
+
 	/* Rating Colors */
 	--color-rating-positive: #16a34a;
 	--color-rating-neutral: #ca8a04;
@@ -122,6 +127,9 @@
 	--color-rating-neutral: #ca8a05;
 	--color-rating-negative: #dc2912;
 	--color-rating-undecided: #6a728b;
+	--color-row-alt: #f8efe6;
+	--color-row-hover: #ede1d4;
+	--color-row-accent: #7c5a2e;
 }
 
 [data-theme='garden'] {
@@ -151,6 +159,9 @@
 	--color-rating-neutral: #c38e00;
 	--color-rating-negative: #da2f00;
 	--color-rating-undecided: #61758a;
+	--color-row-alt: #f3f7f4;
+	--color-row-hover: #dfe6e1;
+	--color-row-accent: #2f4a3a;
 }
 
 [data-theme='midnight'] {
@@ -180,6 +191,9 @@
 	--color-rating-neutral: #d68128;
 	--color-rating-negative: #db2149;
 	--color-rating-undecided: #64748b;
+	--color-row-alt: #111825;
+	--color-row-hover: #222935;
+	--color-row-accent: #e8e6df;
 }
 
 [data-theme='terminal'] {
@@ -209,6 +223,9 @@
 	--color-rating-neutral: #c38e00;
 	--color-rating-negative: #da3000;
 	--color-rating-undecided: #61758a;
+	--color-row-alt: #0d0f0e;
+	--color-row-hover: #1b211e;
+	--color-row-accent: #c9f5d9;
 }
 
 /* Hover tooltip — CSS-only tooltip matching the AG Grid column tooltip look
@@ -267,6 +284,11 @@
 /* Keep Geist on type column (icon-only, no text to style) */
 .ag-cell[col-id='type'] {
 	font-family: 'Geist', system-ui, sans-serif;
+}
+
+/* Hover bar — drawn on AG Grid's own hover overlay so it sits on top of the opaque hover colour. */
+.ag-row-hover:not(.ag-full-width-row)::before {
+	box-shadow: inset 3px 0 0 var(--color-row-accent);
 }
 
 /* Mobile-specific utilities */

@@ -2,7 +2,8 @@
  * AG Grid theme params for the Activity table. Colours are token references, not hex, so the
  * grid follows the theme picker (presets and custom themes) like the rest of the app. AG Grid
  * emits each param as a CSS custom property, so `var(--color-*)` resolves at paint time.
- * Hover stays a faint primary tint here; distinct row tokens are a separate change.
+ * Row zebra/hover come from `deriveTheme`'s row tokens (opaque, so hover is identical on odd
+ * and even rows).
  */
 export const GRID_THEME_PARAMS = {
 	fontFamily: "'Geist', system-ui, sans-serif",
@@ -14,9 +15,9 @@ export const GRID_THEME_PARAMS = {
 	foregroundColor: 'var(--color-foreground)',
 	borderColor: 'var(--color-border)',
 	accentColor: 'var(--color-primary)',
-	oddRowBackgroundColor: 'var(--color-muted)',
-	rowHoverColor: 'color-mix(in srgb, var(--color-primary) 6%, transparent)',
-	selectedRowBackgroundColor: 'color-mix(in srgb, var(--color-primary) 8%, transparent)',
+	oddRowBackgroundColor: 'var(--color-row-alt)',
+	rowHoverColor: 'var(--color-row-hover)',
+	selectedRowBackgroundColor: 'var(--color-row-hover)',
 	columnHoverColor: 'transparent',
 	headerColumnResizeHandleColor: 'var(--color-primary-foreground)',
 	// 64px comfortably fits a 32px thumbnail alongside a 2-line, 13px/1.5-leading title

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { wcagContrast } from 'culori';
+import { differenceEuclidean, wcagContrast } from 'culori';
 import { deriveTheme, toCssVarMap, type BaseThemeTokens } from '$lib/theme/derive';
 import { THEME_PRESETS } from '$lib/theme/presets';
 
@@ -81,5 +81,36 @@ describe('toCssVarMap', () => {
 		expect(vars['--color-background']).toBe(full.background);
 		expect(vars['--color-rating-positive']).toBe(full.ratingPositive);
 		expect(Object.keys(vars).length).toBeGreaterThanOrEqual(25);
+	});
+});
+
+describe('row tokens', () => {
+	const oklabDistance = differenceEuclidean('oklab');
+
+	it.each(THEME_PRESETS)(
+		'preset "$id": hover is opaque, clearly distinct from the zebra, and keeps text readable',
+		(preset) => {
+			const full = deriveTheme(preset.base);
+			expect(full.rowHover).toMatch(/^#[0-9a-f]{6}$/);
+			expect(full.rowAlt).toMatch(/^#[0-9a-f]{6}$/);
+			expect(full.rowHover).not.toBe(full.rowAlt);
+			expect(oklabDistance(full.rowHover, full.rowAlt)).toBeGreaterThanOrEqual(0.04);
+			expect(wcagContrast(full.foreground, full.rowHover)).toBeGreaterThanOrEqual(4.5);
+			expect(wcagContrast(full.foreground, full.rowAlt)).toBeGreaterThanOrEqual(4.5);
+		},
+	);
+
+	it('tints hover from the foreground when primary is nearly the page colour (dark presets)', () => {
+		const midnight = deriveTheme(THEME_PRESETS.find((p) => p.id === 'midnight')!.base);
+		expect(midnight.rowAccent).toBe(midnight.foreground);
+		const readingRoom = deriveTheme(READING_ROOM_BASE);
+		expect(readingRoom.rowAccent).toBe(readingRoom.primary);
+	});
+
+	it('exposes the row tokens as CSS variables', () => {
+		const vars = toCssVarMap(deriveTheme(READING_ROOM_BASE));
+		expect(Object.keys(vars)).toEqual(
+			expect.arrayContaining(['--color-row-alt', '--color-row-hover', '--color-row-accent']),
+		);
 	});
 });
