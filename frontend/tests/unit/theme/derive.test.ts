@@ -146,4 +146,22 @@ describe('row tokens', () => {
 			expect.arrayContaining(['--color-row-alt', '--color-row-hover', '--color-row-accent']),
 		);
 	});
+
+	it.each(THEME_PRESETS.map((p) => [p.id, p] as const))(
+		'preset "%s": header text is AA-readable on the header band',
+		(_id, preset) => {
+			const full = deriveTheme(preset.base);
+			expect(wcagContrast(full.headerForeground, full.header)).toBeGreaterThanOrEqual(4.5);
+		},
+	);
+
+	it('keeps the primary as the header on light themes and dims it on dark ones', () => {
+		const readingRoom = deriveTheme(READING_ROOM_BASE);
+		expect(readingRoom.header).toBe(readingRoom.primary);
+		const midnight = deriveTheme(THEME_PRESETS.find((p) => p.id === 'midnight')!.base);
+		expect(midnight.header).not.toBe(midnight.primary);
+		expect(wcagContrast(midnight.header, midnight.background)).toBeLessThan(
+			wcagContrast(midnight.primary, midnight.background),
+		);
+	});
 });

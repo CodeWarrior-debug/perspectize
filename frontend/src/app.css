@@ -94,6 +94,10 @@
 	--color-row-hover: #dedfdd;
 	--color-row-accent: #1a365d;
 
+	/* Theme/Header band (derived: primary on light themes, tinted page colour on dark) */
+	--color-header: #1a365d;
+	--color-header-foreground: #ffffff;
+
 	/* Rating Colors */
 	--color-rating-positive: #16a34a;
 	--color-rating-neutral: #ca8a04;
@@ -141,6 +145,8 @@
 	--color-row-alt: #f8f3e9;
 	--color-row-hover: #e5dfd3;
 	--color-row-accent: #7c5a2e;
+	--color-header: #7c5a2e;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='garden'] {
@@ -173,6 +179,8 @@
 	--color-row-alt: #f8f9f5;
 	--color-row-hover: #e0e3df;
 	--color-row-accent: #2f4a3a;
+	--color-header: #2f4a3a;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='midnight'] {
@@ -205,6 +213,8 @@
 	--color-row-alt: #121621;
 	--color-row-hover: #242732;
 	--color-row-accent: #e8e6df;
+	--color-header: #0f1624;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='terminal'] {
@@ -237,6 +247,8 @@
 	--color-row-alt: #0b0d0c;
 	--color-row-hover: #1a1f1d;
 	--color-row-accent: #c9f5d9;
+	--color-header: #0a130f;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='dt-fog'] {
@@ -269,6 +281,8 @@
 	--color-row-alt: #f2f4f5;
 	--color-row-hover: #dbdee0;
 	--color-row-accent: #2f5d73;
+	--color-header: #2f5d73;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='dt-sage-paper'] {
@@ -301,6 +315,8 @@
 	--color-row-alt: #f4f6f3;
 	--color-row-hover: #dce0dc;
 	--color-row-accent: #2f4a3a;
+	--color-header: #2f4a3a;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='dt-slate-cobalt'] {
@@ -333,6 +349,8 @@
 	--color-row-alt: #f5f6f8;
 	--color-row-hover: #dcdfe6;
 	--color-row-accent: #2751d9;
+	--color-header: #2751d9;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='dt-clay-slate'] {
@@ -365,6 +383,8 @@
 	--color-row-alt: #f5f3f2;
 	--color-row-hover: #e2dddb;
 	--color-row-accent: #a8432a;
+	--color-header: #a8432a;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='dt-lavender-mist'] {
@@ -397,6 +417,8 @@
 	--color-row-alt: #f5f4f8;
 	--color-row-hover: #dedde6;
 	--color-row-accent: #5b46b0;
+	--color-header: #5b46b0;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='dt-midnight'] {
@@ -429,6 +451,8 @@
 	--color-row-alt: #14171e;
 	--color-row-hover: #232830;
 	--color-row-accent: #7fa2e6;
+	--color-header: #293346;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='dt-graphite'] {
@@ -461,6 +485,8 @@
 	--color-row-alt: #151618;
 	--color-row-hover: #24262a;
 	--color-row-accent: #8db4ff;
+	--color-header: #2d3646;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='dt-forest-night'] {
@@ -493,6 +519,8 @@
 	--color-row-alt: #121815;
 	--color-row-hover: #212924;
 	--color-row-accent: #7cc79a;
+	--color-header: #273b2f;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='dt-ink-cobalt'] {
@@ -525,6 +553,8 @@
 	--color-row-alt: #111622;
 	--color-row-hover: #202634;
 	--color-row-accent: #6f9bff;
+	--color-header: #24314e;
+	--color-header-foreground: #ffffff;
 }
 
 /* Hover tooltip — CSS-only tooltip matching the AG Grid column tooltip look
@@ -614,6 +644,12 @@
 /* Hover bar — drawn on AG Grid's own hover overlay so it sits on top of the opaque hover colour. */
 .ag-row-hover:not(.ag-full-width-row)::before {
 	box-shadow: inset 3px 0 0 var(--color-row-accent);
+}
+
+/* Header band: the theme's header colour with a barely-there top-to-bottom lift, so it reads as a surface not a flat slab. */
+.header-surface {
+	background-color: var(--color-header);
+	background-image: linear-gradient(to bottom, color-mix(in oklab, var(--color-header), white 7%), var(--color-header));
 }
 
 /* Mobile-specific utilities */
