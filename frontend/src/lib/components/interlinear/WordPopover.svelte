@@ -38,7 +38,7 @@
 		<div data-testid="popover-gloss" class="text-[13px] leading-relaxed text-foreground">{word.gloss}</div>
 	{/if}
 	{#if english}
-		<div class="text-[12px] text-muted-foreground">Rendered here as "{english}"</div>
+		<div class="text-[12px] text-muted-foreground">Rendered here as &ldquo;{english}&rdquo;</div>
 	{/if}
 	{#if word.parsing}
 		<div class="text-[11px] break-words whitespace-normal text-muted-foreground">{word.parsing}</div>

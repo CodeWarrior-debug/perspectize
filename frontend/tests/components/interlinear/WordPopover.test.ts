@@ -34,7 +34,7 @@ describe('WordPopover', () => {
 		expect(screen.getByText("ba.Ra'")).toBeInTheDocument();
 		expect(screen.getByText('to create')).toBeInTheDocument();
 		expect(screen.getByText(/third person masculine singular/)).toBeInTheDocument();
-		expect(screen.getByText(/Rendered here as "created"/)).toBeInTheDocument();
+		expect(screen.getByText(/Rendered here as “created”/)).toBeInTheDocument();
 	});
 
 	it('is a non-interactive tooltip positioned where it was told to be', () => {
