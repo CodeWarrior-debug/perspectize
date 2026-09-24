@@ -95,15 +95,26 @@
 		if (keyFromTarget(e)) send({ type: 'dblclick' });
 	};
 
-	function onDocumentKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') send({ type: 'escape' });
-	}
+	// Escape is handled in the CAPTURE phase so it runs before the surrounding dialog's bubble-phase
+	// escape layer; the key is only swallowed while a popover is actually showing, so a second
+	// Escape still reaches (and closes) the dialog. State is read inside the handler, not the effect.
+	$effect(() => {
+		const onKeydown = (e: KeyboardEvent) => {
+			if (e.key !== 'Escape') return;
+			if (!(activeWord && popover)) return;
+			e.stopPropagation();
+			send({ type: 'escape' });
+		};
+		document.addEventListener('keydown', onKeydown, { capture: true });
+		return () => document.removeEventListener('keydown', onKeydown, { capture: true });
+	});
+
 	function onDocumentPointerDown(e: Event) {
 		if (ui.pinned && container && !container.contains(e.target as Node)) send({ type: 'outside' });
 	}
 </script>
 
-<svelte:document onkeydown={onDocumentKeydown} onpointerdown={onDocumentPointerDown} />
+<svelte:document onpointerdown={onDocumentPointerDown} />
 <svelte:window onresize={() => (tick += 1)} />
 
 <div bind:this={container} class="relative">

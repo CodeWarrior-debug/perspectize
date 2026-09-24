@@ -80,6 +80,23 @@ describe('InterlinearPassage', () => {
 		await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
 	});
 
+	it('Escape with a popover showing does not reach a bubble-phase document listener (the dialog); a second Escape does', async () => {
+		const spy = vi.fn();
+		document.addEventListener('keydown', spy);
+		try {
+			render(InterlinearPassage, { props: { verses: [plain(1, 1, 'x')], interlinear: [gen11] } });
+			await fireEvent.click(screen.getByRole('button', { name: 'God' }));
+			expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+			await fireEvent.keyDown(document.body, { key: 'Escape' });
+			expect(spy).not.toHaveBeenCalled();
+			await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+			await fireEvent.keyDown(document.body, { key: 'Escape' });
+			expect(spy).toHaveBeenCalledTimes(1);
+		} finally {
+			document.removeEventListener('keydown', spy);
+		}
+	});
+
 	it('double-click clears a pinned popover', async () => {
 		render(InterlinearPassage, { props: { verses: [plain(1, 1, 'x')], interlinear: [gen11] } });
 		const god = screen.getByRole('button', { name: 'God' });
