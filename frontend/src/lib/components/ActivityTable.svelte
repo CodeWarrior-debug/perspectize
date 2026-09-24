@@ -18,6 +18,7 @@
 	import { LIST_CONTENT, type ContentItem, type ContentResponse } from '$lib/queries/content';
 	import {
 		LIST_PERSPECTIVES_BY_USER,
+		MAX_PERSPECTIVES_PER_LIST,
 		type ListPerspectivesByUserResponse,
 		type PerspectiveItem,
 	} from '$lib/queries/perspectives';
@@ -238,6 +239,7 @@
 		queryFn: () =>
 			graphqlRequest<ListPerspectivesByUserResponse>(LIST_PERSPECTIVES_BY_USER, {
 				userID: currentUserId,
+				first: MAX_PERSPECTIVES_PER_LIST,
 			}),
 		enabled: currentUserId !== null,
 		staleTime: 60 * 1000,
