@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { THEME_PRESETS, DEFAULT_THEME_ID, THEME_PRESET_TOKENS, generatePresetCss } from '$lib/theme/presets';
+import {
+	THEME_PRESETS,
+	DEFAULT_THEME_ID,
+	THEME_PRESET_TOKENS,
+	generatePresetCss,
+	presetStripColors,
+} from '$lib/theme/presets';
 
 describe('THEME_PRESET_TOKENS', () => {
 	it('derives a full token set for every preset', () => {
@@ -27,5 +33,15 @@ describe('generatePresetCss', () => {
 	it('includes each non-default preset derived tokens as CSS custom properties', () => {
 		const archive = THEME_PRESET_TOKENS['archive'];
 		expect(css).toContain(`--color-primary: ${archive.primary};`);
+	});
+});
+
+describe('presetStripColors', () => {
+	it.each(THEME_PRESETS)('preset "$id" previews page, zebra and hover as three distinct rows plus its primary', (preset) => {
+		const tokens = THEME_PRESET_TOKENS[preset.id];
+		const strip = presetStripColors(tokens);
+		expect(strip.rows).toEqual([tokens.background, tokens.rowAlt, tokens.rowHover]);
+		expect(strip.primary).toBe(tokens.primary);
+		expect(new Set(strip.rows).size).toBe(3);
 	});
 });

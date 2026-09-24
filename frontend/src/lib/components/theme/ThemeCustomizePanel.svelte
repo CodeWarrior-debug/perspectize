@@ -1,13 +1,17 @@
 <script lang="ts">
 	import { Button, Input, Label } from '$lib/components/shadcn';
 	import ColorWheel from './ColorWheel.svelte';
-	import { THEME_PRESETS, THEME_PRESET_TOKENS } from '$lib/theme/presets';
+	import { THEME_PRESETS, THEME_PRESET_TOKENS, presetStripColors } from '$lib/theme/presets';
 	import { downloadThemeCss } from '$lib/theme/export';
 	import { deriveTheme, type BaseThemeTokens } from '$lib/theme/derive';
 	import { formatColorForUnit, parseColorInput, type ColorUnit } from '$lib/theme/format';
 	import type { ThemeStore } from '$lib/theme/store.svelte';
 
 	let { store }: { store: ThemeStore } = $props();
+
+	const PRESET_STRIPS = Object.fromEntries(
+		THEME_PRESETS.map((p) => [p.id, presetStripColors(THEME_PRESET_TOKENS[p.id])]),
+	);
 
 	const BASE_TOKEN_ROWS: { key: keyof BaseThemeTokens; label: string }[] = [
 		{ key: 'primary', label: 'Primary' },
@@ -124,10 +128,17 @@
 					? 'border-primary ring-1 ring-primary'
 					: 'border-border hover:border-primary/50'}"
 			>
-				<div class="flex gap-1 mb-2">
-					{#each [THEME_PRESET_TOKENS[preset.id].primary, THEME_PRESET_TOKENS[preset.id].secondary, THEME_PRESET_TOKENS[preset.id].accent, THEME_PRESET_TOKENS[preset.id].background] as swatch}
-						<span class="size-4 rounded-full border border-black/10" style="background:{swatch}"></span>
-					{/each}
+				<div class="flex items-center gap-2 mb-2">
+					<!-- Mini table: page, zebra, hover rows — so the card previews what the grid will do. -->
+					<div class="flex w-12 flex-col overflow-hidden rounded border border-black/10" aria-hidden="true">
+						{#each PRESET_STRIPS[preset.id].rows as row}
+							<span class="h-2" style="background:{row}"></span>
+						{/each}
+					</div>
+					<span
+						class="size-4 rounded-full border border-black/10"
+						style="background:{PRESET_STRIPS[preset.id].primary}"
+					></span>
 				</div>
 				<div class="text-sm font-medium">{preset.name}</div>
 				<div class="text-xs text-muted-foreground">{preset.mood}</div>

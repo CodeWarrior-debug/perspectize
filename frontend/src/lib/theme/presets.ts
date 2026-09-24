@@ -97,6 +97,14 @@ export const THEME_PRESET_TOKENS: Record<string, FullThemeTokens> = Object.fromE
 	THEME_PRESETS.map((p) => [p.id, deriveTheme(p.base)]),
 );
 
+/**
+ * What a preset card previews: three stacked rows (page, zebra, hover) that mimic the table, plus
+ * the primary. Seeing the hover row next to the zebra lets a user judge the table before choosing.
+ */
+export function presetStripColors(tokens: FullThemeTokens): { rows: [string, string, string]; primary: string } {
+	return { rows: [tokens.background, tokens.rowAlt, tokens.rowHover], primary: tokens.primary };
+}
+
 /** Generated `[data-theme='<id>'] { --color-*: ...; }` CSS text for every non-default preset. */
 export function generatePresetCss(): string {
 	return THEME_PRESETS.filter((p) => p.id !== DEFAULT_THEME_ID)
