@@ -3,6 +3,7 @@
  * Pure functions and constants that can be unit-tested without a browser.
  */
 import type { ContentItem } from '$lib/queries/content';
+import { percentLikedValueGetter } from './formatting';
 
 /**
  * Maps AG Grid colId → GraphQL ContentSortBy enum value.
@@ -71,6 +72,11 @@ export const SORTABLE_COLUMNS: readonly TogglableColumn[] = [
 	{ colId: 'duration', label: 'Length' },
 	{ colId: 'views', label: 'Views' },
 	{ colId: 'likes', label: 'Likes' },
+	// Client-side only: no backend ContentSortBy enum value exists for this computed
+	// column, so it only sorts in "Loaded" mode and on the mobile card list. In "All
+	// Items" mode it's dropped by sortsToGraphQL (it's absent from COL_TO_SORT), same
+	// as it always was — this only fixes Loaded-mode/mobile, which silently ignored it.
+	{ colId: 'percentLiked', label: '% Liked' },
 	{ colId: 'publishDate', label: 'Published' },
 	{ colId: 'channel', label: 'Channel' },
 	{ colId: 'createdAt', label: 'Date added' },
@@ -83,6 +89,7 @@ const SORT_VALUE_GETTERS: Record<string, (row: ContentItem) => string | number |
 	duration: (row) => row.length,
 	views: (row) => row.viewCount,
 	likes: (row) => row.likeCount,
+	percentLiked: (row) => percentLikedValueGetter({ data: row }),
 	publishDate: (row) => row.publishedAt,
 	channel: (row) => row.channelTitle?.toLowerCase() ?? null,
 	createdAt: (row) => row.createdAt,

@@ -503,6 +503,10 @@ describe('SORTABLE_COLUMNS', () => {
 			expect(col.label.length).toBeGreaterThan(0);
 		}
 	});
+
+	it('includes percentLiked — sortable in the grid, must stay sortable in the mobile/Loaded-mode picker too', () => {
+		expect(SORTABLE_COLUMNS.map((c) => c.colId)).toContain('percentLiked');
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -552,6 +556,16 @@ describe('compareContentBySorts', () => {
 		const rows = [row({ id: '1', name: 'banana' }), row({ id: '2', name: 'Apple' })];
 		const sorted = [...rows].sort((a, b) => compareContentBySorts(a, b, [{ col: 'item', dir: 'asc' }]));
 		expect(sorted.map((r) => r.id)).toEqual(['2', '1']);
+	});
+
+	it('sorts by percentLiked (likes / views), the same computation the grid column uses', () => {
+		const rows = [
+			row({ id: '1', viewCount: 100, likeCount: 10 }), // 10%
+			row({ id: '2', viewCount: 100, likeCount: 90 }), // 90%
+			row({ id: '3', viewCount: 0, likeCount: 0 }), // null — no meaningful rate
+		];
+		const sorted = [...rows].sort((a, b) => compareContentBySorts(a, b, [{ col: 'percentLiked', dir: 'desc' }]));
+		expect(sorted.map((r) => r.id)).toEqual(['2', '1', '3']);
 	});
 
 	it('skips a colId with no known value getter', () => {
