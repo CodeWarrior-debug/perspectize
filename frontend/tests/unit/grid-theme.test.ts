@@ -22,3 +22,11 @@ describe('row colours', () => {
 		expect(GRID_THEME_PARAMS.oddRowBackgroundColor).toBe('var(--color-row-alt)');
 	});
 });
+
+describe('header', () => {
+	it('is a quiet band: muted background, foreground labels, no column dividers', () => {
+		expect(GRID_THEME_PARAMS.headerBackgroundColor).toBe('var(--color-muted)');
+		expect(GRID_THEME_PARAMS.headerTextColor).toBe('var(--color-foreground)');
+		expect(GRID_THEME_PARAMS.headerColumnBorder).toBe(false);
+	});
+});

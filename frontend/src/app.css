@@ -286,6 +286,24 @@
 	font-family: 'Geist', system-ui, sans-serif;
 }
 
+/* Column resize handles and filter buttons show on hover/focus (filter also when active), so the
+   header reads as labels first instead of a row of dividers and icons. */
+.ag-header-cell-resize::after {
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+.ag-header-cell:hover .ag-header-cell-resize::after {
+	opacity: 1;
+}
+.ag-header-cell:not(.ag-header-cell-filtered) .ag-header-cell-filter-button {
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+.ag-header-cell:hover .ag-header-cell-filter-button,
+.ag-header-cell:focus-within .ag-header-cell-filter-button {
+	opacity: 1;
+}
+
 /* Hover bar — drawn on AG Grid's own hover overlay so it sits on top of the opaque hover colour. */
 .ag-row-hover:not(.ag-full-width-row)::before {
 	box-shadow: inset 3px 0 0 var(--color-row-accent);

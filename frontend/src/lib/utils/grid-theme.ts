@@ -9,8 +9,9 @@ export const GRID_THEME_PARAMS = {
 	fontFamily: "'Geist', system-ui, sans-serif",
 	fontSize: 14,
 	headerFontWeight: 600,
-	headerBackgroundColor: 'var(--color-primary)',
-	headerTextColor: 'var(--color-primary-foreground)',
+	headerBackgroundColor: 'var(--color-muted)',
+	headerTextColor: 'var(--color-foreground)',
+	headerColumnBorder: false,
 	backgroundColor: 'var(--color-background)',
 	foregroundColor: 'var(--color-foreground)',
 	borderColor: 'var(--color-border)',
@@ -19,7 +20,7 @@ export const GRID_THEME_PARAMS = {
 	rowHoverColor: 'var(--color-row-hover)',
 	selectedRowBackgroundColor: 'var(--color-row-hover)',
 	columnHoverColor: 'transparent',
-	headerColumnResizeHandleColor: 'var(--color-primary-foreground)',
+	headerColumnResizeHandleColor: 'var(--color-border)',
 	// 64px comfortably fits a 32px thumbnail alongside a 2-line, 13px/1.5-leading title
 	// with margin to spare — a tighter value clips descenders (g/y/p/q/j) on the second
 	// line via the row's own overflow:hidden, even though line-clamp itself only ever
