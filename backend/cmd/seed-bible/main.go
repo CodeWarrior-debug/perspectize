@@ -49,6 +49,16 @@ func main() {
 	// bsb.tsv is 4 MB, so it is read from disk rather than duplicated under
 	// cmd/seed-bible/data for go:embed. The default assumes the documented
 	// invocation from backend/ (`go run ./cmd/seed-bible`).
+	//
+	// FUTURE TRANSLATIONS: don't commit their text. bsb.tsv stays tracked (BSB is
+	// small, static and public domain, so seeding stays offline and reproducible),
+	// but for each additional translation gitignore the data file and add a fetch
+	// script that downloads the source, verifies a SHA-256 recorded in
+	// data/bible/README.md (of the raw download, not the normalized .tsv), and
+	// normalizes it to verse_id<TAB>text. Commit that normalizer (BSB's original
+	// conversion was one-off and is not in the repo). This -bsb flag already makes
+	// the path configurable, so the seeder change is small. Trade-off: a leaner repo,
+	// but seeding then needs the network and the source URL staying up.
 	bsbPath := flag.String("bsb", "../data/bible/bsb.tsv", "path to data/bible/bsb.tsv (verse_id<TAB>text)")
 	flag.Parse()
 

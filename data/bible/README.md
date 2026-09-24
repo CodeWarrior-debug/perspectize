@@ -60,3 +60,21 @@ Row count after normalization: 31102 (bsb.tsv, verse_id 1-31102, exact match to 
 16 verse_ids have empty text (traditionally-omitted verses such as Matthew
 17:21, Matthew 18:11, Mark 7:16 — present as empty in the official BSB
 source itself, not a parsing defect of this repo's normalization).
+
+## Future translations: fetch, do not commit
+
+bsb.tsv stays tracked (about 4 MB, about 1.3 MB compressed; static, public
+domain, so seeding is offline and reproducible). For each additional translation,
+prefer this instead of committing its text:
+
+1. Gitignore the translation's data file.
+2. Add a fetch script that downloads the source.
+3. Have it verify a SHA-256 recorded here. Hash the raw download, not the
+   normalized .tsv.
+4. Have it normalize to verse_id<TAB>text. Commit that normalizer (the BSB
+   conversion was one-off and is not in the repo).
+5. cmd/seed-bible already takes -bsb <path>; generalizing that flag per
+   translation is a small change.
+
+Trade-off: a leaner repo and smaller PR diffs, but seeding then depends on the
+network and on the source URL staying up.
