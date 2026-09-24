@@ -203,14 +203,14 @@
 				{/if}
 
 				<div class="mt-4.5 grid grid-cols-2 gap-2.5">
-					<div class="rounded-lg border border-border bg-accent px-3 py-2.5">
+					<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Perspectives</div>
 						<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-lg font-bold text-foreground">
 							{perspectiveCountDisplay}
 						</div>
 					</div>
 					<div
-						class="hover-tooltip rounded-lg border border-border bg-accent px-3 py-2.5"
+						class="hover-tooltip rounded-lg border border-border bg-muted px-3 py-2.5"
 						data-tooltip={qualityRatingCountTooltip}
 					>
 						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Avg. Rating</div>
@@ -219,25 +219,25 @@
 						</div>
 					</div>
 					{#if !isPassage}
-						<div class="rounded-lg border border-border bg-accent px-3 py-2.5">
+						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Views</div>
 							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
 								{formatCount(content.viewCount)}
 							</div>
 						</div>
-						<div class="rounded-lg border border-border bg-accent px-3 py-2.5">
+						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Likes</div>
 							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
 								{formatCount(content.likeCount)}
 							</div>
 						</div>
-						<div class="rounded-lg border border-border bg-accent px-3 py-2.5">
+						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Duration</div>
 							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
 								{formatDuration(content.length, content.lengthUnits)}
 							</div>
 						</div>
-						<div class="rounded-lg border border-border bg-accent px-3 py-2.5">
+						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Published</div>
 							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
 								{content.publishedAt ? formatDate(content.publishedAt) : '—'}
