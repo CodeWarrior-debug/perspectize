@@ -97,7 +97,10 @@
 	let pendingDraft: string | null = null;
 
 	// Dynamic fields — tracks which rating fields are shown
-	const DEFAULT_FIELDS = ['quality', 'agreement', 'importance', 'confidence'];
+	// Single source of truth: STANDARD_DIMENSIONS in comparePerspectives.ts (also used
+	// by AddFieldSearch's core-field entries and Compare's getFieldLabel). See the UI
+	// gap audit, gap #17.
+	const DEFAULT_FIELDS: string[] = STANDARD_DIMENSIONS.map((d) => d.key);
 	let activeFields = $state<string[]>([...DEFAULT_FIELDS]);
 
 	// Dynamic field values for non-core fields
@@ -139,7 +142,7 @@
 		}
 	}
 
-	import { getFieldLabel } from '$lib/utils/comparePerspectives';
+	import { getFieldLabel, STANDARD_DIMENSIONS } from '$lib/utils/comparePerspectives';
 
 	// Tracks the most recently added field so its newly-rendered row can be
 	// scrolled into view — the ratings grid grows downward inside a scroll

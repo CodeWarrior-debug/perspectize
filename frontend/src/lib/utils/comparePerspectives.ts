@@ -53,7 +53,14 @@ export interface ComparisonSummary {
 export const SIMILAR_THRESHOLD = 1.0;
 export const DIVERGES_THRESHOLD = 3.0;
 
-const STANDARD_DIMENSIONS: { key: 'quality' | 'agreement' | 'importance' | 'confidence'; label: string }[] = [
+/**
+ * The four standard rating dimensions and their labels. This is the single
+ * source of truth `getFieldLabel` (below) reads from, and that
+ * AddFieldSearch.svelte and PerspectivePopover.svelte also import from, so a
+ * renamed/relabeled dimension can't drift between the three files (see the UI
+ * gap audit, gap #17).
+ */
+export const STANDARD_DIMENSIONS: { key: 'quality' | 'agreement' | 'importance' | 'confidence'; label: string }[] = [
 	{ key: 'quality', label: 'Quality' },
 	{ key: 'agreement', label: 'Agreement' },
 	{ key: 'importance', label: 'Importance' },
