@@ -1,8 +1,11 @@
+/** The one "no value" glyph for grid cells; keep new formatters on it. */
+export const EMPTY_VALUE = '—';
+
 /**
  * Convert length + lengthUnits to display format.
  */
 export function formatDuration(length: number | null, lengthUnits: string | null): string {
-	if (length === null) return '—';
+	if (length === null) return EMPTY_VALUE;
 
 	if (lengthUnits === 'seconds') {
 		const minutes = Math.floor(length / 60);
@@ -18,7 +21,7 @@ export function formatDuration(length: number | null, lengthUnits: string | null
  */
 export function formatDate(isoString: string): string {
 	const date = new Date(isoString);
-	if (isNaN(date.getTime())) return '—';
+	if (isNaN(date.getTime())) return EMPTY_VALUE;
 	return date.toLocaleDateString('en-US', {
 		year: 'numeric',
 		month: 'short',
@@ -34,7 +37,7 @@ export function formatDate(isoString: string): string {
  */
 export function formatDateTime(isoString: string): string {
 	const date = new Date(isoString);
-	if (isNaN(date.getTime())) return '—';
+	if (isNaN(date.getTime())) return EMPTY_VALUE;
 	return date.toLocaleString('en-US', {
 		year: 'numeric',
 		month: 'short',
@@ -91,7 +94,7 @@ export function formatRemainingTime(ms: number): string {
  * AG Grid value getter for duration column.
  */
 export function durationValueGetter(params: { data?: { length: number | null; lengthUnits: string | null } }): string {
-	if (!params.data) return '—';
+	if (!params.data) return EMPTY_VALUE;
 	return formatDuration(params.data.length, params.data.lengthUnits);
 }
 
@@ -134,7 +137,7 @@ export function parseDurationInput(text: string | null): number | null {
  * AG Grid value formatter for date columns.
  */
 export function dateValueFormatter(params: { value?: string }): string {
-	return params.value ? formatDate(params.value) : '—';
+	return params.value ? formatDate(params.value) : EMPTY_VALUE;
 }
 
 /**
@@ -148,7 +151,7 @@ export function contentRowId(params: { data?: { id: string | number } }): string
  * Format count numbers with K/M/B suffixes (space before suffix).
  */
 export function formatCount(count: number | null): string {
-	if (count === null) return '--';
+	if (count === null) return EMPTY_VALUE;
 	if (count < 1000) return String(count);
 	if (count < 1_000_000) return `${(count / 1_000).toFixed(1)} K`;
 	if (count < 1_000_000_000) return `${(count / 1_000_000).toFixed(1)} M`;
@@ -159,7 +162,8 @@ export function formatCount(count: number | null): string {
  * Format count with comma separators for exact display.
  */
 export function formatCountExact(count: number | null): string {
-	if (count === null) return '--';
+	// Empty (not EMPTY_VALUE): the tooltip layer treats '' as "nothing to show" and opens no popover.
+	if (count === null) return '';
 	return count.toLocaleString('en-US');
 }
 
@@ -183,7 +187,7 @@ export function percentLikedValueGetter(params: {
  * Format a % Liked value to 1 decimal place, or "—" when unavailable.
  */
 export function formatPercentLiked(value: number | null): string {
-	if (value === null) return '—';
+	if (value === null) return EMPTY_VALUE;
 	return `${value.toFixed(1)}%`;
 }
 
@@ -204,9 +208,9 @@ export function percentLikedTooltip(params: { data?: { viewCount: number | null;
  * Format date in compact form: "MMM 'YY" (e.g., "Jul '10") for tight columns.
  */
 export function formatDateCompact(isoString: string | null): string {
-	if (!isoString) return '—';
+	if (!isoString) return EMPTY_VALUE;
 	const date = new Date(isoString);
-	if (isNaN(date.getTime())) return '—';
+	if (isNaN(date.getTime())) return EMPTY_VALUE;
 	const month = date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
 	const year = String(date.getUTCFullYear()).slice(2);
 	return `${month} '${year}`;
@@ -216,7 +220,7 @@ export function formatDateCompact(isoString: string | null): string {
  * Format YouTube publish date (ISO string).
  */
 export function formatPublishDate(isoString: string | null): string {
-	if (!isoString) return '--';
+	if (!isoString) return EMPTY_VALUE;
 	return formatDate(isoString);
 }
 
@@ -224,7 +228,7 @@ export function formatPublishDate(isoString: string | null): string {
  * Format tags array to comma-separated string.
  */
 export function formatTags(tags: string[] | null): string {
-	if (!tags || tags.length === 0) return '--';
+	if (!tags || tags.length === 0) return EMPTY_VALUE;
 	return tags.join(', ');
 }
 
@@ -232,7 +236,7 @@ export function formatTags(tags: string[] | null): string {
  * Truncate description with ellipsis.
  */
 export function truncateDescription(desc: string | null, maxLength = 100): string {
-	if (!desc) return '--';
+	if (!desc) return EMPTY_VALUE;
 	if (desc.length <= maxLength) return desc;
 	return desc.substring(0, maxLength) + '...';
 }
@@ -268,7 +272,9 @@ export function headerMinWidth(name: string, hasFilter = true): number {
 	const paddingEm = 1.5; // left + right cell padding
 	const sortIconEm = 1.6; // sort indicator — widened so short headers (e.g. "Length") don't truncate once an active sort indicator is actually painted, not just reserved for
 	const filterIconEm = hasFilter ? 1.5 : 0;
-	const separatorEm = 0.5; // column border/handle
+	// No column divider any more (headerColumnBorder is off and the resize handle is an overlay),
+	// so nothing to reserve — keeps the full column set inside the max-w-screen-xl page container.
+	const separatorEm = 0;
 	const totalEm = name.length * charWidthEm + paddingEm + sortIconEm + filterIconEm + separatorEm;
 	return Math.ceil(totalEm * GRID_FONT_SIZE);
 }
