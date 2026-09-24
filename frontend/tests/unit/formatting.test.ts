@@ -24,6 +24,7 @@ import {
 	dateValueFormatter,
 	contentRowId,
 	headerMinWidth,
+	cleanDescription,
 	getSourceDataCooldown,
 	formatRemainingTime,
 	SOURCE_DATA_COOLDOWN_MS,
@@ -785,5 +786,55 @@ describe('categoryCellRenderer', () => {
 
 		expect(result.style.height).toBe('100%');
 		expect(result.style.width).toBe('100%');
+	});
+});
+
+describe('cleanDescription', () => {
+	it('drops a leading "SUBSCRIBE: <url>" line and keeps the real description', () => {
+		const desc = 'SUBSCRIBE: http://bit.ly/A24subscribe\n\nA documentary by Nathan Fielder and Lance Oppenheim.';
+		expect(cleanDescription(desc)).toBe('A documentary by Nathan Fielder and Lance Oppenheim.');
+	});
+
+	it('drops the line that only repeats the video title', () => {
+		const desc = 'Tempo- La Isla del Espanto (Video Oficial)\n\nA new single from Tempo about the island.';
+		expect(cleanDescription(desc, 'Tempo - La Isla del Espanto (Video Oficial)')).toBe(
+			'A new single from Tempo about the island.',
+		);
+	});
+
+	it('drops social/link boilerplate lines in English and Spanish', () => {
+		const desc = [
+			'\u{1F514} Suscr\u00edbete al canal oficial: http://www.youtube.com/@abc',
+			'FOLLOW FINESSE2TYMES',
+			'Instagram: https://a.lnk.to/Instagram',
+			'TikTok: https://a.lnk.to/TikTok',
+			'The footage was livestreamed on my Twitch channel.',
+		].join('\n');
+		expect(cleanDescription(desc)).toBe('The footage was livestreamed on my Twitch channel.');
+	});
+
+	it('drops lead-in lines that end in a colon (a caption for a list of links)', () => {
+		const desc = '\u{1F3A7} Escucha "La Isla" en todas las plataformas digitales:\n\u{1F4F1} Sigue a Tempo en sus Redes Sociales Oficiales:\nUn sencillo nuevo sobre la isla.';
+		expect(cleanDescription(desc)).toBe('Un sencillo nuevo sobre la isla.');
+	});
+
+	it('drops separator and hashtag-only lines', () => {
+		expect(cleanDescription('------\n#music #video\nA calm ambient mix for studying.')).toBe(
+			'A calm ambient mix for studying.',
+		);
+	});
+
+	it('keeps a long line that merely contains a link, minus the link', () => {
+		const desc = 'The full interview with the director is available at https://example.com/interview and runs an hour.';
+		expect(cleanDescription(desc)).toBe('The full interview with the director is available at and runs an hour.');
+	});
+
+	it('returns plain descriptions unchanged apart from whitespace', () => {
+		expect(cleanDescription('  A description   of the great video \n')).toBe('A description of the great video');
+	});
+
+	it('returns an empty string when only boilerplate is left', () => {
+		expect(cleanDescription('Instagram: https://a\nTikTok: https://b')).toBe('');
+		expect(cleanDescription('')).toBe('');
 	});
 });

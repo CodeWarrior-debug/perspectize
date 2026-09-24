@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { VideoItem } from '$lib/services/youtubeApi';
 	import { Button } from '$lib/components/shadcn';
-	import { formatDate } from '$lib/utils/formatting';
+	import { cleanDescription, formatDate } from '$lib/utils/formatting';
 	import CheckIcon from '@lucide/svelte/icons/check';
 
 	let {
@@ -15,6 +15,8 @@
 		isPending?: boolean;
 		onAdd: (videoId: string) => void;
 	} = $props();
+
+	const description = $derived(cleanDescription(video.description, video.title));
 
 	const thumbnailUrl = $derived(
 		video.thumbnails.medium?.url ?? video.thumbnails.high?.url ?? video.thumbnails.default?.url ?? '',
@@ -54,7 +56,9 @@
 		<h3 class="font-medium line-clamp-2">{video.title}</h3>
 		<p class="text-sm text-muted-foreground mt-1">{video.channelTitle}</p>
 		<p class="text-xs text-muted-foreground mt-1">{formatDate(video.publishedAt)}</p>
-		<p class="text-sm text-muted-foreground mt-2 line-clamp-2">{video.description}</p>
+		{#if description}
+			<p class="text-sm text-muted-foreground mt-2 line-clamp-2">{description}</p>
+		{/if}
 	</div>
 	<div class="shrink-0 self-start">
 		{#if isInLibrary}

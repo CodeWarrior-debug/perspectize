@@ -243,6 +243,45 @@ export function truncateDescription(desc: string | null, maxLength = 100): strin
 	return desc.substring(0, maxLength) + '...';
 }
 
+const URL_RE = /https?:\/\/\S+/gi;
+// Lines that open with a call to action or a social handle, allowing a leading emoji (🔔 Subscribe…).
+const PROMO_START_RE =
+	/^[\p{Extended_Pictographic}\s]*(subscribe|suscr[ií]bete|follow|s[ií]guenos|instagram|tiktok|twitter|facebook|discord|patreon|stay connected|get to know|listen to|available on|escucha|sigue a)\b/iu;
+const SEPARATOR_RE = /^[\s\-_=*~·•]{3,}$/;
+const HASHTAGS_ONLY_RE = /^(?:#\S+\s*)+$/;
+/** A line that had a link removed must still read as a sentence, or it was just a link caption. */
+const MIN_WORDS_AFTER_LINK_REMOVAL = 6;
+
+const normalizeForCompare = (text: string) =>
+	text
+		.toLowerCase()
+		.replace(/[^\p{L}\p{N}]+/gu, ' ')
+		.trim();
+
+/**
+ * The first real sentences of a YouTube description. Descriptions usually open with link and
+ * social boilerplate ("SUBSCRIBE: http://…", "Instagram: …") and often repeat the title; a card
+ * should show the actual description instead. Returns '' when nothing but boilerplate is left.
+ */
+export function cleanDescription(description: string | null | undefined, title?: string): string {
+	if (!description) return '';
+	const kept: string[] = [];
+	for (const raw of description.split(/\r?\n/)) {
+		const line = raw.trim();
+		if (!line || SEPARATOR_RE.test(line) || HASHTAGS_ONLY_RE.test(line) || PROMO_START_RE.test(line)) continue;
+		// A line ending in a colon captions what follows (usually a list of links), so it isn't description text.
+		if (line.endsWith(':')) continue;
+		if (title && normalizeForCompare(line) === normalizeForCompare(title)) continue;
+		const withoutLinks = line.replace(URL_RE, '').replace(/\s+/g, ' ').trim();
+		const hadLink = withoutLinks !== line;
+		if (hadLink && (withoutLinks.split(' ').length < MIN_WORDS_AFTER_LINK_REMOVAL || withoutLinks.endsWith(':'))) {
+			continue;
+		}
+		kept.push(withoutLinks);
+	}
+	return kept.join(' ').replace(/\s+/g, ' ').trim();
+}
+
 /**
  * Extract video ID from YouTube URL.
  */
