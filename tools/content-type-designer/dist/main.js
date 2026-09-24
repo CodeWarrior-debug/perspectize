@@ -1,7 +1,25 @@
 import { COLUMNS, GROUP_LABELS, TYPES } from './catalog.js';
 import { buildMatrix, buildSpec } from './emit.js';
-import { resolveGrid, typeLabel } from './model.js';
+import { bindingFor, gapText, resolveGrid, samplesFor, typeLabel } from './model.js';
 const STORAGE_KEY = 'perspectize.content-type-designer.v1';
+/** Seed the type currently being designed, so a fresh open / reset lands on a filled-in form. */
+const DEFAULT_SEED = 'bible';
+function seededState(typeId) {
+    const state = blankState();
+    const t = TYPES.find((x) => x.id === typeId);
+    if (!t)
+        return state;
+    state.draft = { ...t, id: 'draft' };
+    state.seed = t.id;
+    state.decisions = {};
+    for (const col of COLUMNS) {
+        const binding = col.bindings[t.id];
+        if (binding)
+            state.decisions[col.id] = { ...binding };
+    }
+    state.selected = ['draft'];
+    return state;
+}
 function blankState() {
     return {
         draft: {
@@ -27,7 +45,7 @@ function blankState() {
         testingNotes: ''
     };
 }
-let state = load() ?? blankState();
+let state = load() ?? seededState(DEFAULT_SEED);
 function load() {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -111,6 +129,7 @@ function renderIdentity() {
         if (!t)
             return;
         state.draft = { ...t, id: 'draft' };
+        state.seed = t.id;
         state.decisions = {};
         for (const col of COLUMNS) {
             const b = col.bindings[t.id];
@@ -198,7 +217,8 @@ function renderColumnRow(col) {
         field('Source', select(b.source, ['api', 'scrape', 'user', 'derived', 'internal'], (v) => (b.source = v))),
         field('Value path', input(b.path, (v) => (b.path = v), "response->>'field'")),
         field('Unit / format', input(b.unit ?? '', (v) => (b.unit = v || undefined), 'minutes, pages, minor units…')),
-        field('Tooltip override', input(b.tooltip ?? '', (v) => (b.tooltip = v || undefined), col.tooltip))
+        field('Tooltip override', input(b.tooltip ?? '', (v) => (b.tooltip = v || undefined), col.tooltip)),
+        field('Cell appearance', input(b.appearance ?? '', (v) => (b.appearance = v || undefined), 'font, icon, subtitle, alignment, sort comparator…'), 'How the cell renders for this type — carried into the spec.')
     ]);
     const flags = el('div', { class: 'flags' }, [
         checkbox(b.defaultVisible, (v) => (b.defaultVisible = v), 'Visible by default'),
@@ -214,7 +234,8 @@ function renderPreview() {
     const ids = [state.draft.id, ...TYPES.map((t) => t.id)];
     for (const id of ids) {
         const active = state.selected.includes(id);
-        const chip = el('button', { class: `chip${active ? ' on' : ''}`, type: 'button' }, [typeLabel(id, state.draft)]);
+        const label = id === state.draft.id ? `${typeLabel(id, state.draft)} (draft)` : typeLabel(id, state.draft);
+        const chip = el('button', { class: `chip${active ? ' on' : ''}`, type: 'button' }, [label]);
         chip.addEventListener('click', () => {
             state.selected = active ? state.selected.filter((x) => x !== id) : [...state.selected, id];
             save();
@@ -234,6 +255,7 @@ function renderPreview() {
             ])
         ]));
     }
+    const samples = renderSamples(state, grid.visible);
     const warn = el('ul', { class: 'warnings' });
     for (const w of grid.warnings) {
         warn.append(el('li', { class: `w-${w.severity}` }, [w.message]));
@@ -252,8 +274,49 @@ function renderPreview() {
             all: 'every selected type wants it'
         })),
         headerStrip,
+        ...(samples ? [samples] : []),
         hiddenList,
         warn
+    ]);
+}
+function sampleCell(value, tooltip) {
+    if (value === undefined)
+        return el('td', { class: 'unset', title: 'No sample value' }, ['·']);
+    if (typeof value === 'string')
+        return el('td', { title: tooltip }, [value]);
+    return el('td', { title: tooltip }, [
+        el('span', { class: 'cell-title' }, [value.text]),
+        ...(value.sub ? [el('span', { class: 'cell-sub' }, [value.sub])] : [])
+    ]);
+}
+/** Illustrative rows for the selected types that ship samples; null when none do. */
+function renderSamples(current, visible) {
+    const rows = [];
+    for (const id of current.selected) {
+        for (const cells of samplesFor(id, current))
+            rows.push({ typeId: id, cells });
+    }
+    if (rows.length === 0)
+        return null;
+    const head = el('tr', {}, visible.map((rc) => el('th', { title: rc.tooltip }, [rc.header || '◎'])));
+    const body = rows.map(({ typeId, cells }) => el('tr', {}, visible.map((rc) => {
+        if (rc.col.id === 'perspectize')
+            return el('td', { class: 'center' }, ['◎']);
+        if (rc.col.id === 'type')
+            return el('td', { class: 'muted' }, [typeLabel(typeId, current.draft)]);
+        const binding = bindingFor(rc.col, typeId, current);
+        if (!binding)
+            return el('td', { class: 'gap', title: `Not bound — ${rc.col.gapFallback}` }, [gapText(rc.col)]);
+        const td = sampleCell(cells[rc.col.id], binding.tooltip ?? rc.col.tooltip);
+        if (rc.col.align)
+            td.classList.add(rc.col.align);
+        return td;
+    })));
+    return el('div', { class: 'samples' }, [
+        el('p', { class: 'muted small' }, [
+            'Sample rows — hover a header or cell for its tooltip. "·" means the sample has no value for a bound column.'
+        ]),
+        el('div', { class: 'sample-scroll' }, [el('table', {}, [el('thead', {}, [head]), el('tbody', {}, body)])])
     ]);
 }
 function renderNotes() {
@@ -338,7 +401,7 @@ function renderDerived() {
 }
 const reset = document.getElementById('reset');
 reset?.addEventListener('click', () => {
-    state = blankState();
+    state = seededState(DEFAULT_SEED);
     save();
     render();
 });

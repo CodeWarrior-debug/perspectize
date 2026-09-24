@@ -1,4 +1,4 @@
-import { COLUMNS, TYPES } from './catalog.js';
+import { COLUMNS, SAMPLES, TYPES } from './catalog.js';
 export const ALL_TYPE_IDS = TYPES.map((t) => t.id);
 export function typeLabel(id, draft) {
     if (id === draft.id)
@@ -154,5 +154,14 @@ export function sharedWithOthers(state) {
         others: TYPES.filter((t) => col.bindings[t.id]).map((t) => t.id)
     }))
         .filter((entry) => entry.others.length > 0);
+}
+/** Sample rows for a type; the draft borrows the rows of the type it was seeded from. */
+export function samplesFor(id, state) {
+    const source = id === state.draft.id ? state.seed : id;
+    return (source && SAMPLES[source]) || [];
+}
+/** Text a preview cell shows for a column the row's type does not bind. */
+export function gapText(col) {
+    return col.gapFallback === 'blank' ? '' : '—';
 }
 //# sourceMappingURL=model.js.map

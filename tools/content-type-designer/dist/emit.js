@@ -1,5 +1,5 @@
 import { COLUMNS, GROUP_LABELS, TYPES } from './catalog.js';
-import { bindingFor, resolveGrid, typeLabel } from './model.js';
+import { bindingFor, gapText, resolveGrid, samplesFor, typeLabel } from './model.js';
 const YES = 'yes';
 const NO = 'no';
 function esc(v) {
@@ -88,6 +88,15 @@ export function buildSpec(state) {
             b.defaultVisible ? YES : NO
         ];
     })));
+    const styled = chosen.filter((col) => state.decisions[col.id].tooltip || state.decisions[col.id].appearance);
+    if (styled.length > 0) {
+        out.push('### Tooltips & cell appearance');
+        out.push('');
+        out.push(table(['Column', 'Label', 'Tooltip', 'Appearance'], styled.map((col) => {
+            const b = state.decisions[col.id];
+            return [col.id, b.label || col.generic, b.tooltip ?? col.tooltip, b.appearance ?? '—'];
+        })));
+    }
     const migrations = chosen.filter((c) => c.storage === 'promoted-column');
     out.push(migrations.length > 0
         ? `**Migration needed** for: ${migrations.map((c) => `\`${c.id}\``).join(', ')} — these are shared with other types and queried, so they earn a dedicated column rather than a JSONB path.`
@@ -152,6 +161,23 @@ export function buildSpec(state) {
                 })
             ])));
         }
+    }
+    const sampleRows = state.selected.flatMap((t) => samplesFor(t, state).map((cells) => ({ t, cells })));
+    if (sampleRows.length > 0) {
+        out.push('### Sample rows');
+        out.push('');
+        out.push(table(grid.visible.map((rc) => rc.header || '(icon)'), sampleRows.map(({ t, cells }) => grid.visible.map((rc) => {
+            if (rc.col.id === 'perspectize')
+                return '◎';
+            if (rc.col.id === 'type')
+                return typeLabel(t, d);
+            if (!bindingFor(rc.col, t, state))
+                return gapText(rc.col);
+            const v = cells[rc.col.id];
+            if (v === undefined)
+                return '';
+            return typeof v === 'string' ? v : v.sub ? `${v.text} / ${v.sub}` : v.text;
+        }))));
     }
     out.push('## 6. Consistency review');
     out.push('');
@@ -225,7 +251,7 @@ export function buildMatrix(state) {
         '',
         '● default-visible for that type, ○ available but off by default, — not applicable.',
         '',
-        table(['Column', ...ids.map((id) => typeLabel(id, state.draft))], rows)
+        table(['Column', ...ids.map((id) => (id === state.draft.id ? `${typeLabel(id, state.draft)} (draft)` : typeLabel(id, state.draft)))], rows)
     ].join('\n');
 }
 //# sourceMappingURL=emit.js.map

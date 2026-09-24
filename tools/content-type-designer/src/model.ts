@@ -1,9 +1,11 @@
 import {
   COLUMNS,
+  SAMPLES,
   TYPES,
   type Binding,
   type ColumnDef,
   type ContentTypeProfile,
+  type SampleCell,
   type TypeId
 } from './catalog.js';
 
@@ -24,6 +26,8 @@ export interface DraftState {
   /** Codebase conventions to deliberately deviate from, free text. */
   deviations: string;
   testingNotes: string;
+  /** Seeded type the draft was loaded from, so the preview can borrow its sample rows. */
+  seed?: string;
 }
 
 export const ALL_TYPE_IDS: string[] = TYPES.map((t) => t.id);
@@ -228,4 +232,15 @@ export function sharedWithOthers(state: DraftState): { col: ColumnDef; others: s
       others: TYPES.filter((t) => col.bindings[t.id]).map((t) => t.id)
     }))
     .filter((entry) => entry.others.length > 0);
+}
+
+/** Sample rows for a type; the draft borrows the rows of the type it was seeded from. */
+export function samplesFor(id: string, state: DraftState): Record<string, SampleCell>[] {
+  const source = id === state.draft.id ? state.seed : id;
+  return (source && SAMPLES[source as TypeId]) || [];
+}
+
+/** Text a preview cell shows for a column the row's type does not bind. */
+export function gapText(col: ColumnDef): string {
+  return col.gapFallback === 'blank' ? '' : '—';
 }
