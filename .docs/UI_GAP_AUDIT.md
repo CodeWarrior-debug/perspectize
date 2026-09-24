@@ -17,6 +17,18 @@ Ordered by how much a user would notice.
 
 ---
 
+## Decisions and status (2026-09-24)
+
+| Topic | Decision | Status |
+|---|---|---|
+| #1 Date Added / Updated | Every user can show them | **Fixed in this PR.** They moved from `INTERNAL_COLUMNS` to `DATA_COLUMNS` with the header labels. Category was added too. A new parity test (`tests/unit/column-registry-parity.test.ts`) fails if a column definition is ever missing from the picker lists. |
+| #12 CLAIM content type | No creation UI **until the owner says so** | Deferred. Leave `useCreateClaim` unused. The renderer/modal fixes in #12 and #11 can still ship. |
+| #14 Compare nav link | Stays in the top nav ("very close" to done) | The nav link stays. The empty-state picker is still open. |
+| New: first-load filter | The activity table starts filtered to **YouTube only** | **Done in this PR.** `GRID_DEFAULTS.filters = { type: 'youtube' }`. With no `f.*` params the default applies; clearing all filters is stored as `f=none`, following the existing `sort=none` pattern. Loaded-mode filter changes now update the URL, so a cleared default isn't put back. |
+| #5 Mobile filter chips | — | **Partly fixed in this PR.** In card view the chips come from the URL, and their X and "Clear all" now edit the URL. Needed because the new default filter would otherwise be stuck on mobile. Still open: adding a filter on mobile, and Loaded-mode card filtering. Today every row is YouTube, so the default filter has no effect there. |
+
+---
+
 ## Summary
 
 | # | UI gap | Verdict | Layer(s) missed |
