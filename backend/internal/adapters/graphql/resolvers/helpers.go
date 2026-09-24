@@ -60,6 +60,9 @@ func domainToModel(c *domain.Content) *model.Content {
 		// Non-schema field — lets contentResolver.PrimaryCategory batch-load the
 		// category by FK via dataloader instead of re-fetching the content row.
 		PrimaryCategoryID: c.PrimaryCategoryID,
+		VerseStartID:      c.VerseStartID,
+		VerseEndID:        c.VerseEndID,
+		DisplayTitle:      c.DisplayTitle,
 	}
 
 	// Parse the raw response JSON into a map for GraphQL
