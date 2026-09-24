@@ -5,7 +5,7 @@ import OriginalLanguage from '$lib/components/interlinear/OriginalLanguage.svelt
 import { queryKeys } from '$lib/queries/keys';
 
 const mocks = vi.hoisted(() => ({
-	state: { data: undefined as unknown, isLoading: false, isError: false, refetch: vi.fn() },
+	state: { data: undefined as unknown, isPending: false, isLoading: false, isError: false, refetch: vi.fn() },
 	lastOptions: null as any,
 }));
 
@@ -51,6 +51,7 @@ const genesis = {
 describe('OriginalLanguage', () => {
 	beforeEach(() => {
 		mocks.state.data = undefined;
+		mocks.state.isPending = false;
 		mocks.state.isLoading = false;
 		mocks.state.isError = false;
 		mocks.state.refetch = vi.fn();
@@ -58,10 +59,18 @@ describe('OriginalLanguage', () => {
 	});
 
 	it('loading: keeps showing the plain verses and says it is loading', () => {
+		mocks.state.isPending = true;
 		mocks.state.isLoading = true;
 		render(OriginalLanguage, { props });
 		expect(screen.getByTestId('plain')).toBeInTheDocument();
 		expect(screen.getByText(/loading original language/i)).toBeInTheDocument();
+	});
+
+	it('paused/offline (pending but not fetching): the plain verses stay on screen', () => {
+		mocks.state.isPending = true;
+		mocks.state.isLoading = false;
+		render(OriginalLanguage, { props });
+		expect(screen.getByTestId('plain')).toBeInTheDocument();
 	});
 
 	it('error: keeps the plain verses, shows a message and a working Retry', async () => {

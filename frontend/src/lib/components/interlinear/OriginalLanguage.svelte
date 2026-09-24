@@ -25,7 +25,7 @@
 	const interlinear = $derived(query.data?.passageInterlinear.verses ?? []);
 </script>
 
-{#if query.isLoading}
+{#if query.isPending}
 	{@render plain()}
 	<p class="mt-2 text-[12px] text-muted-foreground">Loading original language&hellip;</p>
 {:else if query.isError}
