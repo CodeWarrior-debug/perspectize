@@ -77,9 +77,9 @@ export const SORTABLE_COLUMNS: readonly TogglableColumn[] = [
 	// Items" mode it's dropped by sortsToGraphQL (it's absent from COL_TO_SORT), same
 	// as it always was — this only fixes Loaded-mode/mobile, which silently ignored it.
 	{ colId: 'percentLiked', label: '% Liked' },
-	{ colId: 'publishDate', label: 'Published' },
+	{ colId: 'publishDate', label: 'Date' },
 	{ colId: 'channel', label: 'Channel' },
-	{ colId: 'createdAt', label: 'Date added' },
+	{ colId: 'createdAt', label: 'Date Added' },
 	{ colId: 'updatedAt', label: 'Updated' },
 ] as const;
 
@@ -278,7 +278,7 @@ export const DATA_COLUMNS: readonly TogglableColumn[] = [
 	{ colId: 'views', label: 'Views' },
 	{ colId: 'likes', label: 'Likes' },
 	{ colId: 'percentLiked', label: '% Liked' },
-	{ colId: 'publishDate', label: 'Published' },
+	{ colId: 'publishDate', label: 'Date' },
 	{ colId: 'channel', label: 'Channel' },
 	{ colId: 'tags', label: 'Tags' },
 	{ colId: 'description', label: 'Description' },

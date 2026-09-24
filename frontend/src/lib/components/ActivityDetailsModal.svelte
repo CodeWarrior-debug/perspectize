@@ -159,13 +159,13 @@
 						</div>
 					</div>
 					<div class="rounded-lg border border-border bg-accent px-3 py-2.5">
-						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Duration</div>
+						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Length</div>
 						<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
 							{formatDuration(content.length, content.lengthUnits)}
 						</div>
 					</div>
 					<div class="rounded-lg border border-border bg-accent px-3 py-2.5">
-						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Published</div>
+						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Date</div>
 						<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
 							{content.publishedAt ? formatDate(content.publishedAt) : '—'}
 						</div>
