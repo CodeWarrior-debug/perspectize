@@ -10,7 +10,8 @@
 	import { TableRow } from '@tiptap/extension-table-row';
 	import { TableCell } from '@tiptap/extension-table-cell';
 	import { TableHeader } from '@tiptap/extension-table-header';
-	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
+	import Maximize2Icon from '@lucide/svelte/icons/maximize-2';
+	import Minimize2Icon from '@lucide/svelte/icons/minimize-2';
 	import BoldIcon from '@lucide/svelte/icons/bold';
 	import ItalicIcon from '@lucide/svelte/icons/italic';
 	import UnderlineIcon from '@lucide/svelte/icons/underline';
@@ -36,6 +37,7 @@
 		placeholder = 'Anything to write about your take?',
 		showPopout = false,
 		onPopout,
+		expanded = false,
 		isMobile = false,
 	}: {
 		value?: string;
@@ -44,6 +46,8 @@
 		placeholder?: string;
 		showPopout?: boolean;
 		onPopout?: () => void;
+		/** Grows the writing area in place; the popout button toggles it via `onPopout`. */
+		expanded?: boolean;
 		isMobile?: boolean;
 	} = $props();
 
@@ -92,13 +96,13 @@
 			editorProps: {
 				attributes: {
 					class: 'tiptap-content',
-					style: `min-height: ${minHeight}px; padding: 8px 10px; outline: none; font-family: var(--font-serif); font-size: 13.5px; line-height: 1.5; color: var(--color-foreground); overflow-wrap: anywhere; word-break: break-word; white-space: pre-wrap;`,
+					style: `min-height: var(--pe-min-height, ${minHeight}px); padding: 8px 10px; outline: none; font-family: var(--font-serif); font-size: 13.5px; line-height: 1.5; color: var(--color-foreground); overflow-wrap: anywhere; word-break: break-word; white-space: pre-wrap;`,
 				},
 			},
 		});
 	});
 
-	// Sync external value changes (e.g., from fullscreen editor)
+	// Sync external value changes (e.g., a draft restored by the parent)
 	$effect(() => {
 		if (editor && value !== editor.getHTML()) {
 			editor.commands.setContent(value, { emitUpdate: false });
@@ -280,6 +284,8 @@
 
 <div
 	class="comment-editor-wrapper border border-input rounded-lg bg-white overflow-hidden flex flex-col w-full min-w-0"
+	style:--pe-min-height={expanded ? 'min(60vh, 560px)' : `${minHeight}px`}
+	data-expanded={expanded}
 >
 	<!-- Toolbar -->
 	<div class="flex items-center gap-0.5 px-1.5 py-1 border-b border-border bg-accent relative flex-wrap">
@@ -310,9 +316,14 @@
 				type="button"
 				class="absolute top-1.5 right-1.5 p-1 border-none bg-transparent text-muted-foreground cursor-pointer rounded hover:opacity-70"
 				onclick={onPopout}
-				aria-label="Expand comment"
+				aria-label={expanded ? 'Collapse comment' : 'Expand comment'}
+				aria-pressed={expanded}
 			>
-				<ExternalLinkIcon class="size-3.5" />
+				{#if expanded}
+					<Minimize2Icon class="size-3.5" />
+				{:else}
+					<Maximize2Icon class="size-3.5" />
+				{/if}
 			</button>
 		{/if}
 	</div>

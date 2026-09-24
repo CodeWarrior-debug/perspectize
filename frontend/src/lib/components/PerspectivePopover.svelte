@@ -20,7 +20,6 @@
 	import RatingInput from '$lib/components/RatingInput.svelte';
 	import Thumbs from '$lib/components/Thumbs.svelte';
 	import PerspectiveEditor from '$lib/components/PerspectiveEditor.svelte';
-	import CommentFullscreen from '$lib/components/CommentFullscreen.svelte';
 	import AddFieldSearch from '$lib/components/AddFieldSearch.svelte';
 	import { sanitizeHtml } from '$lib/utils/sanitize';
 	import { hasReviewContent, reviewPreviewText } from '$lib/utils/reviewContent';
@@ -91,7 +90,7 @@
 
 	// Comment (rich text HTML)
 	let comment = $state('');
-	let commentFullscreenOpen = $state(false);
+	let commentExpanded = $state(false);
 	let restoredFromDraft = $state(false);
 	let draftSaveTimer: ReturnType<typeof setTimeout> | undefined;
 	// Latest HTML awaiting the debounced draft save (null when nothing is pending).
@@ -201,7 +200,7 @@
 			comment = baseline;
 			restoredFromDraft = false;
 		}
-		commentFullscreenOpen = false;
+		commentExpanded = false;
 		isPrivate = String(existingPerspective?.privacy ?? '').toUpperCase() === 'PRIVATE';
 		const nextFeelings = existingPerspective?.feelings ?? [];
 		feelings = nextFeelings;
@@ -400,11 +399,11 @@
 			/>
 		</div>
 
-		{#if mobile}
+		{#if mobile && !commentExpanded}
 			<button
 				type="button"
 				onclick={() => {
-					commentFullscreenOpen = true;
+					commentExpanded = true;
 				}}
 				aria-label="Add comment"
 				class="flex flex-1 items-center justify-between gap-2 h-14 px-3 rounded-lg border border-border bg-white cursor-pointer text-left"
@@ -431,8 +430,9 @@
 					onChange={handleCommentChange}
 					minHeight={68}
 					showPopout={true}
+					expanded={commentExpanded}
 					onPopout={() => {
-						commentFullscreenOpen = true;
+						commentExpanded = !commentExpanded;
 					}}
 					isMobile={mobile}
 				/>
@@ -570,19 +570,11 @@
 		}}
 	>
 		<DialogContent
-			class="sm:max-w-[460px] w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col"
+			class={[
+				'w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col transition-[max-width] duration-200',
+				commentExpanded ? 'sm:max-w-[760px]' : 'sm:max-w-[460px]',
+			]}
 			overlayClass="bg-black/45"
-			onInteractOutside={(e) => {
-				// The expanded editor renders outside DialogContent, so clicks in it
-				// look like outside-clicks — don't let them dismiss this dialog.
-				if (commentFullscreenOpen) e.preventDefault();
-			}}
-			onEscapeKeydown={(e) => {
-				if (commentFullscreenOpen) {
-					e.preventDefault();
-					commentFullscreenOpen = false;
-				}
-			}}
 		>
 			{@render modalBody(false)}
 		</DialogContent>
@@ -591,7 +583,6 @@
 	<!-- Mobile: bottom sheet drawer -->
 	<Drawer
 		bind:open
-		dismissible={!commentFullscreenOpen}
 		onOpenChange={(isOpen) => {
 			if (!isOpen) onClose();
 		}}
@@ -600,15 +591,4 @@
 			{@render modalBody(true)}
 		</DrawerContent>
 	</Drawer>
-{/if}
-
-{#if commentFullscreenOpen}
-	<CommentFullscreen
-		value={comment}
-		onChange={handleCommentChange}
-		onClose={() => {
-			commentFullscreenOpen = false;
-		}}
-		isMobile={isMobile.current}
-	/>
 {/if}

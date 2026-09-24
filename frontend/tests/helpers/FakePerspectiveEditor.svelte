@@ -10,6 +10,7 @@
 		onChange,
 		showPopout = false,
 		onPopout,
+		expanded = false,
 		isMobile = false,
 	}: {
 		value?: string;
@@ -18,6 +19,7 @@
 		placeholder?: string;
 		showPopout?: boolean;
 		onPopout?: () => void;
+		expanded?: boolean;
 		isMobile?: boolean;
 	} = $props();
 </script>
@@ -25,8 +27,10 @@
 <textarea
 	aria-label="Comment"
 	data-mobile={isMobile}
+	data-expanded={expanded}
 	{value}
 	oninput={(e) => onChange((e.target as HTMLTextAreaElement).value)}></textarea>
 {#if showPopout}
-	<button type="button" aria-label="Expand comment" onclick={() => onPopout?.()}></button>
+	<button type="button" aria-label={expanded ? 'Collapse comment' : 'Expand comment'} onclick={() => onPopout?.()}
+	></button>
 {/if}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/svelte';
+import { render, screen, fireEvent } from '@testing-library/svelte';
 import PerspectivePopover from '$lib/components/PerspectivePopover.svelte';
 import { tick } from 'svelte';
 
@@ -752,49 +752,37 @@ describe('PerspectivePopover component', () => {
 			expect(screen.queryByText('Restored unsaved draft')).not.toBeInTheDocument();
 		});
 	});
-	describe('expanded comment editor', () => {
-		async function openExpanded() {
+	describe('expanding the comment editor in place', () => {
+		it('starts collapsed', async () => {
 			renderPopover();
 			await tick();
+
+			expect(screen.getByLabelText('Comment')).toHaveAttribute('data-expanded', 'false');
+			expect(screen.getByRole('button', { name: 'Expand comment' })).toBeInTheDocument();
+		});
+
+		it('expand grows the editor and collapse returns it, in the same dialog', async () => {
+			renderPopover();
+			await tick();
+
 			await fireEvent.click(screen.getByRole('button', { name: 'Expand comment' }));
-			return screen.getByTestId('comment-fullscreen');
-		}
-
-		it('closing the expanded editor with its X leaves the dialog and draft open', async () => {
-			const expanded = await openExpanded();
-			const closeBtn = within(expanded).getByRole('button', { name: 'Close' });
-
-			// Real pointer sequence: bits-ui treats a press outside DialogContent as a dismiss.
-			const pointer = { pointerType: 'mouse', button: 0, isPrimary: true };
-			await fireEvent(closeBtn, new PointerEvent('pointerdown', { bubbles: true, ...pointer }));
-			await fireEvent(closeBtn, new PointerEvent('pointerup', { bubbles: true, ...pointer }));
-			await fireEvent.click(closeBtn);
-			await tick();
-
-			expect(screen.queryByTestId('comment-fullscreen')).not.toBeInTheDocument();
-			expect(mocks.mockOnClose).not.toHaveBeenCalled();
+			expect(screen.getByLabelText('Comment')).toHaveAttribute('data-expanded', 'true');
 			expect(screen.getByRole('button', { name: 'Save perspective' })).toBeInTheDocument();
+
+			await fireEvent.click(screen.getByRole('button', { name: 'Collapse comment' }));
+			expect(screen.getByLabelText('Comment')).toHaveAttribute('data-expanded', 'false');
+			expect(mocks.mockOnClose).not.toHaveBeenCalled();
 		});
 
-		it('Escape closes only the expanded editor, not the dialog', async () => {
-			await openExpanded();
-
-			await fireEvent.keyDown(document.body, { key: 'Escape' });
-			await tick();
-
-			expect(screen.queryByTestId('comment-fullscreen')).not.toBeInTheDocument();
-			expect(mocks.mockOnClose).not.toHaveBeenCalled();
-			expect(screen.getByRole('button', { name: 'Save perspective' })).toBeInTheDocument();
-		});
-
-		it('Escape with no expanded editor still closes the dialog', async () => {
+		it('keeps typed text across expand and collapse (single editor, no sync step)', async () => {
 			renderPopover();
 			await tick();
 
-			await fireEvent.keyDown(document.body, { key: 'Escape' });
-			await tick();
-
-			expect(mocks.mockOnClose).toHaveBeenCalled();
+			await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>draft</p>' } });
+			await fireEvent.click(screen.getByRole('button', { name: 'Expand comment' }));
+			expect(screen.getByLabelText('Comment')).toHaveValue('<p>draft</p>');
+			await fireEvent.click(screen.getByRole('button', { name: 'Collapse comment' }));
+			expect(screen.getByLabelText('Comment')).toHaveValue('<p>draft</p>');
 		});
 	});
 });
