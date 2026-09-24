@@ -22,7 +22,19 @@ import (
 type stubBibleRepo struct{}
 
 func (stubBibleRepo) GetInterlinearWords(ctx context.Context, startID, endID int) ([]domain.InterlinearWordRow, error) {
-	return nil, nil
+	one, two, three := 1, 2, 3
+	all := []domain.InterlinearWordRow{
+		{VerseID: 1, BSBSort: 100, Language: "heb", SourceSort: &one, Source: "רֵאשִׁית", Translit: "re.shit", ParseFull: "Noun", Strongs: "H7225G", StrongsSource: "tagged", SpanHead: &[]int{100}[0], ChunkText: "In the beginning", Gloss: "first: beginning"},
+		{VerseID: 1, BSBSort: 101, Language: "heb", SourceSort: &three, Source: "אֱלֹהִים", Translit: "'E.lo.Him", Strongs: "H0430G", StrongsSource: "tagged", SpanHead: &[]int{101}[0], ChunkText: "God", SpaceBefore: true, Gloss: "God"},
+		{VerseID: 1, BSBSort: 103, Language: "heb", SourceSort: &two, Source: "בָּרָא", Translit: "ba.Ra'", Strongs: "H1254A", StrongsSource: "tagged", SpanHead: &[]int{103}[0], ChunkText: "created", SpaceBefore: true, Gloss: "to create"},
+	}
+	var out []domain.InterlinearWordRow
+	for _, r := range all {
+		if r.VerseID >= startID && r.VerseID <= endID {
+			out = append(out, r)
+		}
+	}
+	return out, nil
 }
 
 func (stubBibleRepo) GetVerseTexts(ctx context.Context, translation string, startID, endID int) ([]domain.BibleVerseText, error) {
@@ -235,4 +247,65 @@ func TestPassageText_Query_RejectsBadRange(t *testing.T) {
 	result := executeGraphQL(t, server, `query { passageText(startVerseId: 5, endVerseId: 2) { translation } }`)
 	require.NotEmpty(t, result.Errors)
 	assert.Contains(t, result.Errors[0].Message, "invalid Bible passage")
+}
+
+func TestPassageInterlinear_Query(t *testing.T) {
+	server := setupPassageTestServer(&mockContentRepository{}, domain.UserRoleDefault)
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `query { passageInterlinear(startVerseId: 1, endVerseId: 3) { verses { verseId chapter verse segments { text spaceBefore } words { id language source strongs gloss tagSource sourceOrder segment } } } }`)
+	require.Empty(t, result.Errors)
+
+	var data struct {
+		PassageInterlinear struct {
+			Verses []struct {
+				VerseID  int `json:"verseId"`
+				Chapter  int `json:"chapter"`
+				Verse    int `json:"verse"`
+				Segments []struct {
+					Text        string `json:"text"`
+					SpaceBefore bool   `json:"spaceBefore"`
+				} `json:"segments"`
+				Words []struct {
+					ID          int    `json:"id"`
+					Language    string `json:"language"`
+					Source      string `json:"source"`
+					Strongs     string `json:"strongs"`
+					Gloss       string `json:"gloss"`
+					TagSource   string `json:"tagSource"`
+					SourceOrder int    `json:"sourceOrder"`
+					Segment     *int   `json:"segment"`
+				} `json:"words"`
+			} `json:"verses"`
+		} `json:"passageInterlinear"`
+	}
+	require.NoError(t, json.Unmarshal(result.Data, &data))
+	require.Len(t, data.PassageInterlinear.Verses, 1) // only verse 1 has data; verses 2-3 are simply absent
+	v := data.PassageInterlinear.Verses[0]
+	assert.Equal(t, 1, v.Verse)
+	require.Len(t, v.Segments, 3)
+	assert.Equal(t, "God", v.Segments[1].Text)
+	require.Len(t, v.Words, 3)
+	assert.Equal(t, []string{"H7225G", "H1254A", "H0430G"}, []string{v.Words[0].Strongs, v.Words[1].Strongs, v.Words[2].Strongs})
+	assert.Equal(t, "to create", v.Words[1].Gloss)
+	require.NotNil(t, v.Words[1].Segment)
+	assert.Equal(t, 2, *v.Words[1].Segment) // created -> 3rd English phrase
+	require.NotNil(t, v.Words[2].Segment)
+	assert.Equal(t, 1, *v.Words[2].Segment) // God -> 2nd English phrase
+}
+
+func TestPassageInterlinear_Query_NoDataIsAnEmptyList(t *testing.T) {
+	server := setupPassageTestServer(&mockContentRepository{}, domain.UserRoleDefault)
+	defer server.Close()
+	result := executeGraphQL(t, server, `query { passageInterlinear(startVerseId: 2, endVerseId: 3) { verses { verseId } } }`)
+	require.Empty(t, result.Errors)
+	assert.Contains(t, string(result.Data), `"verses":[]`)
+}
+
+func TestPassageInterlinear_Query_RejectsBadRange(t *testing.T) {
+	server := setupPassageTestServer(&mockContentRepository{}, domain.UserRoleDefault)
+	defer server.Close()
+	result := executeGraphQL(t, server, `query { passageInterlinear(startVerseId: 5, endVerseId: 2) { verses { verseId } } }`)
+	require.NotEmpty(t, result.Errors)
+	assert.Contains(t, result.Errors[0].Message, "invalid")
 }

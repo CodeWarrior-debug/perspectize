@@ -108,6 +108,32 @@ type ComplexityRoot struct {
 		UnreadCount   func(childComplexity int) int
 	}
 
+	InterlinearSegment struct {
+		SpaceBefore func(childComplexity int) int
+		Text        func(childComplexity int) int
+	}
+
+	InterlinearVerse struct {
+		Chapter  func(childComplexity int) int
+		Segments func(childComplexity int) int
+		Verse    func(childComplexity int) int
+		VerseID  func(childComplexity int) int
+		Words    func(childComplexity int) int
+	}
+
+	InterlinearWord struct {
+		Gloss       func(childComplexity int) int
+		ID          func(childComplexity int) int
+		Language    func(childComplexity int) int
+		Parsing     func(childComplexity int) int
+		Segment     func(childComplexity int) int
+		Source      func(childComplexity int) int
+		SourceOrder func(childComplexity int) int
+		Strongs     func(childComplexity int) int
+		TagSource   func(childComplexity int) int
+		Translit    func(childComplexity int) int
+	}
+
 	Message struct {
 		Body      func(childComplexity int) int
 		CreatedAt func(childComplexity int) int
@@ -202,6 +228,10 @@ type ComplexityRoot struct {
 		UserID   func(childComplexity int) int
 	}
 
+	PassageInterlinear struct {
+		Verses func(childComplexity int) int
+	}
+
 	PassageText struct {
 		Copyright   func(childComplexity int) int
 		Translation func(childComplexity int) int
@@ -249,19 +279,20 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Content         func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, sorts []*model.ContentSortInput, includeTotalCount *bool, filter *model.ContentFilter) int
-		ContentByID     func(childComplexity int, id string) int
-		Me              func(childComplexity int) int
-		MessageThread   func(childComplexity int, id string) int
-		MessageThreads  func(childComplexity int, first *int, before *string) int
-		PassageText     func(childComplexity int, startVerseID int, endVerseID int) int
-		PerspectiveByID func(childComplexity int, id string) int
-		Perspectives    func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) int
-		ThreadMessages  func(childComplexity int, threadID string, first *int, before *int) int
-		UserByID        func(childComplexity int, id string) int
-		UserByUsername  func(childComplexity int, username string) int
-		Users           func(childComplexity int) int
-		WikidataSearch  func(childComplexity int, query string, language *string, limit *int) int
+		Content            func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, sorts []*model.ContentSortInput, includeTotalCount *bool, filter *model.ContentFilter) int
+		ContentByID        func(childComplexity int, id string) int
+		Me                 func(childComplexity int) int
+		MessageThread      func(childComplexity int, id string) int
+		MessageThreads     func(childComplexity int, first *int, before *string) int
+		PassageInterlinear func(childComplexity int, startVerseID int, endVerseID int) int
+		PassageText        func(childComplexity int, startVerseID int, endVerseID int) int
+		PerspectiveByID    func(childComplexity int, id string) int
+		Perspectives       func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) int
+		ThreadMessages     func(childComplexity int, threadID string, first *int, before *int) int
+		UserByID           func(childComplexity int, id string) int
+		UserByUsername     func(childComplexity int, username string) int
+		Users              func(childComplexity int) int
+		WikidataSearch     func(childComplexity int, query string, language *string, limit *int) int
 	}
 
 	ReadReceiptChanged struct {
@@ -373,6 +404,7 @@ type QueryResolver interface {
 	ContentByID(ctx context.Context, id string) (*model.Content, error)
 	Content(ctx context.Context, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, sorts []*model.ContentSortInput, includeTotalCount *bool, filter *model.ContentFilter) (*model.PaginatedContent, error)
 	PassageText(ctx context.Context, startVerseID int, endVerseID int) (*model.PassageText, error)
+	PassageInterlinear(ctx context.Context, startVerseID int, endVerseID int) (*model.PassageInterlinear, error)
 	UserByID(ctx context.Context, id string) (*model.User, error)
 	UserByUsername(ctx context.Context, username string) (*model.User, error)
 	Users(ctx context.Context) ([]*model.User, error)
@@ -681,6 +713,111 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.InboxEvent.UnreadCount(childComplexity), true
+
+	case "InterlinearSegment.spaceBefore":
+		if e.ComplexityRoot.InterlinearSegment.SpaceBefore == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearSegment.SpaceBefore(childComplexity), true
+	case "InterlinearSegment.text":
+		if e.ComplexityRoot.InterlinearSegment.Text == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearSegment.Text(childComplexity), true
+
+	case "InterlinearVerse.chapter":
+		if e.ComplexityRoot.InterlinearVerse.Chapter == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearVerse.Chapter(childComplexity), true
+	case "InterlinearVerse.segments":
+		if e.ComplexityRoot.InterlinearVerse.Segments == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearVerse.Segments(childComplexity), true
+	case "InterlinearVerse.verse":
+		if e.ComplexityRoot.InterlinearVerse.Verse == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearVerse.Verse(childComplexity), true
+	case "InterlinearVerse.verseId":
+		if e.ComplexityRoot.InterlinearVerse.VerseID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearVerse.VerseID(childComplexity), true
+	case "InterlinearVerse.words":
+		if e.ComplexityRoot.InterlinearVerse.Words == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearVerse.Words(childComplexity), true
+
+	case "InterlinearWord.gloss":
+		if e.ComplexityRoot.InterlinearWord.Gloss == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.Gloss(childComplexity), true
+	case "InterlinearWord.id":
+		if e.ComplexityRoot.InterlinearWord.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.ID(childComplexity), true
+	case "InterlinearWord.language":
+		if e.ComplexityRoot.InterlinearWord.Language == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.Language(childComplexity), true
+	case "InterlinearWord.parsing":
+		if e.ComplexityRoot.InterlinearWord.Parsing == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.Parsing(childComplexity), true
+	case "InterlinearWord.segment":
+		if e.ComplexityRoot.InterlinearWord.Segment == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.Segment(childComplexity), true
+	case "InterlinearWord.source":
+		if e.ComplexityRoot.InterlinearWord.Source == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.Source(childComplexity), true
+	case "InterlinearWord.sourceOrder":
+		if e.ComplexityRoot.InterlinearWord.SourceOrder == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.SourceOrder(childComplexity), true
+	case "InterlinearWord.strongs":
+		if e.ComplexityRoot.InterlinearWord.Strongs == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.Strongs(childComplexity), true
+	case "InterlinearWord.tagSource":
+		if e.ComplexityRoot.InterlinearWord.TagSource == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.TagSource(childComplexity), true
+	case "InterlinearWord.translit":
+		if e.ComplexityRoot.InterlinearWord.Translit == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.Translit(childComplexity), true
 
 	case "Message.body":
 		if e.ComplexityRoot.Message.Body == nil {
@@ -1179,6 +1316,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.ParticipantChanged.UserID(childComplexity), true
 
+	case "PassageInterlinear.verses":
+		if e.ComplexityRoot.PassageInterlinear.Verses == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PassageInterlinear.Verses(childComplexity), true
+
 	case "PassageText.copyright":
 		if e.ComplexityRoot.PassageText.Copyright == nil {
 			break
@@ -1438,6 +1582,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.MessageThreads(childComplexity, args["first"].(*int), args["before"].(*string)), true
+	case "Query.passageInterlinear":
+		if e.ComplexityRoot.Query.PassageInterlinear == nil {
+			break
+		}
+
+		args, err := ec.field_Query_passageInterlinear_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.PassageInterlinear(childComplexity, args["startVerseId"].(int), args["endVerseId"].(int)), true
 	case "Query.passageText":
 		if e.ComplexityRoot.Query.PassageText == nil {
 			break
@@ -2065,6 +2220,43 @@ type PassageText {
   verses: [PassageVerse!]!
 }
 
+# One run of a verse's English text; concatenating segments (a space before each with
+# spaceBefore) reproduces the plain BSB verse.
+type InterlinearSegment {
+  text: String!
+  spaceBefore: Boolean!
+}
+
+# One Hebrew/Greek source word. Words are in original-language order; id is the index in that order.
+type InterlinearWord {
+  id: Int!
+  language: String!
+  source: String!
+  translit: String!
+  parsing: String!
+  # Disambiguated STEPBible tag (e.g. H1254B); Berean's own plain number is kept server-side.
+  strongs: String!
+  # Short meaning (STEPBible Gloss, CC BY 4.0).
+  gloss: String!
+  # "tagged" (exact match) or "fallback" (most common sense for the plain number).
+  tagSource: String!
+  sourceOrder: Int!
+  # Index into the verse's segments of the English phrase this word belongs to; null = no phrase.
+  segment: Int
+}
+
+type InterlinearVerse {
+  verseId: Int!
+  chapter: Int!
+  verse: Int!
+  segments: [InterlinearSegment!]!
+  words: [InterlinearWord!]!
+}
+
+type PassageInterlinear {
+  verses: [InterlinearVerse!]!
+}
+
 # Filters for content queries
 input ContentFilter {
   contentType: ContentType
@@ -2236,6 +2428,10 @@ type Query {
 
   # Bible passage text for verse ordinals startVerseId..endVerseId (inclusive, capped server-side)
   passageText(startVerseId: Int!, endVerseId: Int!): PassageText!
+
+  # Original-language word alignment for verse ordinals startVerseId..endVerseId (inclusive, capped server-side).
+  # Verses without alignment data are absent from the result.
+  passageInterlinear(startVerseId: Int!, endVerseId: Int!): PassageInterlinear!
 
   # User queries
   userByID(id: ID!): User
@@ -2490,6 +2686,58 @@ func (ec *executionContext) childFields_InboxEvent(ctx context.Context, field gr
 	return nil, fmt.Errorf("no field named %q was found under type InboxEvent", field.Name)
 }
 
+func (ec *executionContext) childFields_InterlinearSegment(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "text":
+		return ec.fieldContext_InterlinearSegment_text(ctx, field)
+	case "spaceBefore":
+		return ec.fieldContext_InterlinearSegment_spaceBefore(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type InterlinearSegment", field.Name)
+}
+
+func (ec *executionContext) childFields_InterlinearVerse(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "verseId":
+		return ec.fieldContext_InterlinearVerse_verseId(ctx, field)
+	case "chapter":
+		return ec.fieldContext_InterlinearVerse_chapter(ctx, field)
+	case "verse":
+		return ec.fieldContext_InterlinearVerse_verse(ctx, field)
+	case "segments":
+		return ec.fieldContext_InterlinearVerse_segments(ctx, field)
+	case "words":
+		return ec.fieldContext_InterlinearVerse_words(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type InterlinearVerse", field.Name)
+}
+
+func (ec *executionContext) childFields_InterlinearWord(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_InterlinearWord_id(ctx, field)
+	case "language":
+		return ec.fieldContext_InterlinearWord_language(ctx, field)
+	case "source":
+		return ec.fieldContext_InterlinearWord_source(ctx, field)
+	case "translit":
+		return ec.fieldContext_InterlinearWord_translit(ctx, field)
+	case "parsing":
+		return ec.fieldContext_InterlinearWord_parsing(ctx, field)
+	case "strongs":
+		return ec.fieldContext_InterlinearWord_strongs(ctx, field)
+	case "gloss":
+		return ec.fieldContext_InterlinearWord_gloss(ctx, field)
+	case "tagSource":
+		return ec.fieldContext_InterlinearWord_tagSource(ctx, field)
+	case "sourceOrder":
+		return ec.fieldContext_InterlinearWord_sourceOrder(ctx, field)
+	case "segment":
+		return ec.fieldContext_InterlinearWord_segment(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type InterlinearWord", field.Name)
+}
+
 func (ec *executionContext) childFields_Message(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "id":
@@ -2582,6 +2830,14 @@ func (ec *executionContext) childFields_PaginatedPerspectives(ctx context.Contex
 		return ec.fieldContext_PaginatedPerspectives_totalCount(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type PaginatedPerspectives", field.Name)
+}
+
+func (ec *executionContext) childFields_PassageInterlinear(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "verses":
+		return ec.fieldContext_PassageInterlinear_verses(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type PassageInterlinear", field.Name)
 }
 
 func (ec *executionContext) childFields_PassageText(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -3371,6 +3627,28 @@ func (ec *executionContext) field_Query_messageThreads_args(ctx context.Context,
 		return nil, err
 	}
 	args["before"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_passageInterlinear_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "startVerseId",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["startVerseId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "endVerseId",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["endVerseId"] = arg1
 	return args, nil
 }
 
@@ -4687,6 +4965,415 @@ func (ec *executionContext) _InboxEvent_unreadCount(ctx context.Context, field g
 }
 func (ec *executionContext) fieldContext_InboxEvent_unreadCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("InboxEvent", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearSegment_text(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearSegment) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearSegment_text(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Text, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearSegment_text(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearSegment", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearSegment_spaceBefore(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearSegment) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearSegment_spaceBefore(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SpaceBefore, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearSegment_spaceBefore(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearSegment", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearVerse_verseId(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearVerse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearVerse_verseId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.VerseID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearVerse_verseId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearVerse", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearVerse_chapter(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearVerse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearVerse_chapter(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Chapter, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearVerse_chapter(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearVerse", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearVerse_verse(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearVerse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearVerse_verse(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Verse, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearVerse_verse(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearVerse", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearVerse_segments(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearVerse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearVerse_segments(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Segments, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.InterlinearSegment) graphql.Marshaler {
+			return ec.marshalNInterlinearSegment2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearSegmentᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearVerse_segments(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InterlinearVerse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_InterlinearSegment(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _InterlinearVerse_words(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearVerse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearVerse_words(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Words, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.InterlinearWord) graphql.Marshaler {
+			return ec.marshalNInterlinearWord2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearWordᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearVerse_words(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InterlinearVerse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_InterlinearWord(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _InterlinearWord_id(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_language(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_language(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Language, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_language(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_source(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_source(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Source, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_source(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_translit(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_translit(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Translit, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_translit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_parsing(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_parsing(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Parsing, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_parsing(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_strongs(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_strongs(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Strongs, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_strongs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_gloss(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_gloss(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Gloss, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_gloss(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_tagSource(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_tagSource(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TagSource, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_tagSource(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_sourceOrder(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_sourceOrder(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SourceOrder, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_sourceOrder(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_segment(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_segment(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Segment, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_segment(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type Int does not have child fields"))
 }
 
 func (ec *executionContext) _Message_id(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
@@ -7022,6 +7709,38 @@ func (ec *executionContext) fieldContext_ParticipantChanged_change(_ context.Con
 	return graphql.NewScalarFieldContext("ParticipantChanged", field, false, false, errors.New("field of type ParticipantChangeKind does not have child fields"))
 }
 
+func (ec *executionContext) _PassageInterlinear_verses(ctx context.Context, field graphql.CollectedField, obj *model.PassageInterlinear) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PassageInterlinear_verses(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Verses, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.InterlinearVerse) graphql.Marshaler {
+			return ec.marshalNInterlinearVerse2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearVerseᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PassageInterlinear_verses(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PassageInterlinear",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_InterlinearVerse(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PassageText_translation(ctx context.Context, field graphql.CollectedField, obj *model.PassageText) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8020,6 +8739,50 @@ func (ec *executionContext) fieldContext_Query_passageText(ctx context.Context, 
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_passageText_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_passageInterlinear(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_passageInterlinear(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().PassageInterlinear(ctx, fc.Args["startVerseId"].(int), fc.Args["endVerseId"].(int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.PassageInterlinear) graphql.Marshaler {
+			return ec.marshalNPassageInterlinear2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPassageInterlinear(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_passageInterlinear(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PassageInterlinear(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_passageInterlinear_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -11955,6 +12718,190 @@ func (ec *executionContext) _InboxEvent(ctx context.Context, sel ast.SelectionSe
 	return out
 }
 
+var interlinearSegmentImplementors = []string{"InterlinearSegment"}
+
+func (ec *executionContext) _InterlinearSegment(ctx context.Context, sel ast.SelectionSet, obj *model.InterlinearSegment) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, interlinearSegmentImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("InterlinearSegment")
+		case "text":
+			out.Values[i] = ec._InterlinearSegment_text(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "spaceBefore":
+			out.Values[i] = ec._InterlinearSegment_spaceBefore(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var interlinearVerseImplementors = []string{"InterlinearVerse"}
+
+func (ec *executionContext) _InterlinearVerse(ctx context.Context, sel ast.SelectionSet, obj *model.InterlinearVerse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, interlinearVerseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("InterlinearVerse")
+		case "verseId":
+			out.Values[i] = ec._InterlinearVerse_verseId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "chapter":
+			out.Values[i] = ec._InterlinearVerse_chapter(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "verse":
+			out.Values[i] = ec._InterlinearVerse_verse(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "segments":
+			out.Values[i] = ec._InterlinearVerse_segments(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "words":
+			out.Values[i] = ec._InterlinearVerse_words(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var interlinearWordImplementors = []string{"InterlinearWord"}
+
+func (ec *executionContext) _InterlinearWord(ctx context.Context, sel ast.SelectionSet, obj *model.InterlinearWord) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, interlinearWordImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("InterlinearWord")
+		case "id":
+			out.Values[i] = ec._InterlinearWord_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "language":
+			out.Values[i] = ec._InterlinearWord_language(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "source":
+			out.Values[i] = ec._InterlinearWord_source(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "translit":
+			out.Values[i] = ec._InterlinearWord_translit(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "parsing":
+			out.Values[i] = ec._InterlinearWord_parsing(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "strongs":
+			out.Values[i] = ec._InterlinearWord_strongs(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "gloss":
+			out.Values[i] = ec._InterlinearWord_gloss(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "tagSource":
+			out.Values[i] = ec._InterlinearWord_tagSource(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sourceOrder":
+			out.Values[i] = ec._InterlinearWord_sourceOrder(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "segment":
+			out.Values[i] = ec._InterlinearWord_segment(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var messageImplementors = []string{"Message"}
 
 func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, obj *model.Message) graphql.Marshaler {
@@ -12943,6 +13890,44 @@ func (ec *executionContext) _ParticipantChanged(ctx context.Context, sel ast.Sel
 	return out
 }
 
+var passageInterlinearImplementors = []string{"PassageInterlinear"}
+
+func (ec *executionContext) _PassageInterlinear(ctx context.Context, sel ast.SelectionSet, obj *model.PassageInterlinear) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, passageInterlinearImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PassageInterlinear")
+		case "verses":
+			out.Values[i] = ec._PassageInterlinear_verses(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var passageTextImplementors = []string{"PassageText"}
 
 func (ec *executionContext) _PassageText(ctx context.Context, sel ast.SelectionSet, obj *model.PassageText) graphql.Marshaler {
@@ -13341,6 +14326,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_passageText(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "passageInterlinear":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_passageInterlinear(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -14665,6 +15672,84 @@ func (ec *executionContext) marshalNIntID2int(ctx context.Context, sel ast.Selec
 	return res
 }
 
+func (ec *executionContext) marshalNInterlinearSegment2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearSegmentᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.InterlinearSegment) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNInterlinearSegment2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearSegment(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNInterlinearSegment2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearSegment(ctx context.Context, sel ast.SelectionSet, v *model.InterlinearSegment) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._InterlinearSegment(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNInterlinearVerse2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearVerseᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.InterlinearVerse) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNInterlinearVerse2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearVerse(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNInterlinearVerse2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearVerse(ctx context.Context, sel ast.SelectionSet, v *model.InterlinearVerse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._InterlinearVerse(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNInterlinearWord2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearWordᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.InterlinearWord) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNInterlinearWord2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearWord(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNInterlinearWord2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearWord(ctx context.Context, sel ast.SelectionSet, v *model.InterlinearWord) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._InterlinearWord(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNMessage2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Message) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -14765,6 +15850,16 @@ func (ec *executionContext) unmarshalNParticipantChangeKind2githubᚗcomᚋCodeW
 
 func (ec *executionContext) marshalNParticipantChangeKind2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐParticipantChangeKind(ctx context.Context, sel ast.SelectionSet, v model.ParticipantChangeKind) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) marshalNPassageInterlinear2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPassageInterlinear(ctx context.Context, sel ast.SelectionSet, v *model.PassageInterlinear) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PassageInterlinear(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNPassageText2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPassageText(ctx context.Context, sel ast.SelectionSet, v *model.PassageText) graphql.Marshaler {
