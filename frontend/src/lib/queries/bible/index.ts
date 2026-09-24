@@ -74,3 +74,66 @@ export interface CreateContentFromPassageResponse {
 		displayTitle: string | null;
 	};
 }
+
+// Public query; lazy — only sent after the reader presses "Show original language".
+// Verses without alignment data are absent from the response (callers show plain text for them).
+export const PASSAGE_INTERLINEAR_QUERY = gql`
+	query PassageInterlinear($startVerseId: Int!, $endVerseId: Int!) {
+		passageInterlinear(startVerseId: $startVerseId, endVerseId: $endVerseId) {
+			verses {
+				verseId
+				chapter
+				verse
+				segments {
+					text
+					spaceBefore
+				}
+				words {
+					id
+					language
+					source
+					translit
+					parsing
+					strongs
+					gloss
+					tagSource
+					sourceOrder
+					segment
+				}
+			}
+		}
+	}
+`;
+
+export interface InterlinearSegment {
+	text: string;
+	spaceBefore: boolean;
+}
+
+export interface InterlinearWord {
+	/** index within its verse's `words` (which are in original-language order) */
+	id: number;
+	language: 'heb' | 'grc';
+	source: string;
+	translit: string;
+	parsing: string;
+	/** disambiguated tag, e.g. "H1254B" (display with formatStrongs) */
+	strongs: string;
+	gloss: string;
+	tagSource: 'tagged' | 'fallback';
+	sourceOrder: number;
+	/** index into the verse's `segments` of the English phrase, or null when the word belongs to no phrase */
+	segment: number | null;
+}
+
+export interface InterlinearVerse {
+	verseId: number;
+	chapter: number;
+	verse: number;
+	segments: InterlinearSegment[];
+	words: InterlinearWord[];
+}
+
+export interface PassageInterlinearResponse {
+	passageInterlinear: { verses: InterlinearVerse[] };
+}

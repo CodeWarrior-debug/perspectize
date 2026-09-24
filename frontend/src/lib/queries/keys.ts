@@ -31,6 +31,8 @@ export const queryKeys = {
 		all: () => [...queryKeys.all, 'bible'] as const,
 		passageText: (startVerseId: number, endVerseId: number) =>
 			[...queryKeys.bible.all(), 'passage', startVerseId, endVerseId] as const,
+		passageInterlinear: (startVerseId: number, endVerseId: number) =>
+			[...queryKeys.bible.all(), 'interlinear', startVerseId, endVerseId] as const,
 	},
 
 	users: {
