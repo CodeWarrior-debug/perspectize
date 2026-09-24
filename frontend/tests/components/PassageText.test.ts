@@ -14,6 +14,10 @@ vi.mock('@tanstack/svelte-query', () => ({
 	},
 }));
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('$lib/components/interlinear/OriginalLanguage.svelte', async () => {
+	const { default: Stub } = await import('../helpers/OriginalLanguageStub.svelte');
+	return { default: Stub };
+});
 
 const COPYRIGHT = 'Berean Standard Bible, public domain (CC0)';
 
@@ -89,5 +93,50 @@ describe('PassageText', () => {
 		expect(screen.getByText(/200 verses — too long to display here/i)).toBeInTheDocument();
 		// The outbound link now lives in PassageLinks (version-aware), not here.
 		expect(screen.queryByRole('link')).not.toBeInTheDocument();
+	});
+
+	it('offers "Show original language" once the text has loaded, off by default, without mounting the interlinear child', () => {
+		mocks.mockQueryState.data = { passageText: { translation: 'BSB', copyright: COPYRIGHT, verses: makeVerses(3) } };
+		render(PassageText, { props: { startVerseId: 1, endVerseId: 3 } });
+		const toggle = screen.getByRole('button', { name: /show original language/i });
+		expect(toggle).toHaveAttribute('aria-pressed', 'false');
+		expect(screen.queryByTestId('original-language-stub')).not.toBeInTheDocument();
+	});
+
+	it('pressing it mounts the interlinear view for the same range and keeps the plain verses available', async () => {
+		mocks.mockQueryState.data = { passageText: { translation: 'BSB', copyright: COPYRIGHT, verses: makeVerses(3) } };
+		render(PassageText, { props: { startVerseId: 1, endVerseId: 3 } });
+		await fireEvent.click(screen.getByRole('button', { name: /show original language/i }));
+		const stub = screen.getByTestId('original-language-stub');
+		expect(stub.getAttribute('data-range')).toBe('1-3');
+		expect(stub).toHaveTextContent('Verse text 1'); // the plain snippet still renders the verses
+		expect(screen.getByRole('button', { name: /show original language/i })).toHaveAttribute('aria-pressed', 'true');
+	});
+
+	it('pressing it again turns the mode off', async () => {
+		mocks.mockQueryState.data = { passageText: { translation: 'BSB', copyright: COPYRIGHT, verses: makeVerses(2) } };
+		render(PassageText, { props: { startVerseId: 1, endVerseId: 2 } });
+		const toggle = screen.getByRole('button', { name: /show original language/i });
+		await fireEvent.click(toggle);
+		await fireEvent.click(toggle);
+		expect(screen.queryByTestId('original-language-stub')).not.toBeInTheDocument();
+		expect(toggle).toHaveAttribute('aria-pressed', 'false');
+	});
+
+	it('does not offer the toggle while loading, on error, or above the 150-verse cap', () => {
+		mocks.mockQueryState.isLoading = true;
+		const { unmount } = render(PassageText, { props: { startVerseId: 1, endVerseId: 3 } });
+		expect(screen.queryByRole('button', { name: /original language/i })).not.toBeInTheDocument();
+		unmount();
+
+		mocks.mockQueryState.isLoading = false;
+		mocks.mockQueryState.isError = true;
+		const second = render(PassageText, { props: { startVerseId: 1, endVerseId: 3 } });
+		expect(screen.queryByRole('button', { name: /original language/i })).not.toBeInTheDocument();
+		second.unmount();
+
+		mocks.mockQueryState.isError = false;
+		render(PassageText, { props: { startVerseId: 1, endVerseId: 200 } });
+		expect(screen.queryByRole('button', { name: /original language/i })).not.toBeInTheDocument();
 	});
 });
