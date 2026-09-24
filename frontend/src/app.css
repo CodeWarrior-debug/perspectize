@@ -239,6 +239,12 @@
 	--color-row-accent: #c9f5d9;
 }
 
+/* One typographic moment: page titles are set in Charter; everything else stays Geist. */
+.page-title {
+	font-family: var(--font-family-serif);
+	letter-spacing: -0.01em;
+}
+
 /* Hover tooltip — CSS-only tooltip matching the AG Grid column tooltip look
    (.tip-surface), for plain HTML elements outside the grid. Usage:
    class="hover-tooltip" data-tooltip="Some text" instead of a native title=. */

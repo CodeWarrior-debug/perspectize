@@ -12,7 +12,7 @@
 	<Compare {contentId} {initialLeftId} {initialRightId} />
 {:else}
 	<div class="mx-auto flex max-w-[880px] flex-col items-center gap-4 px-5 py-16 text-center">
-		<h1 class="text-xl font-semibold text-foreground">Choose something to compare</h1>
+		<h1 class="page-title text-xl font-semibold text-foreground">Choose something to compare</h1>
 		<p class="max-w-md text-muted-foreground">
 			Compare puts two perspectives on the same content side by side. Open it from a piece of content's details in
 			Activity.

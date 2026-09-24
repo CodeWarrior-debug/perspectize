@@ -161,7 +161,7 @@
 
 	<div class="flex items-center gap-2">
 		<GlassesIcon class="size-[18px]" style="color: var(--color-primary);" />
-		<h1 class="text-xl font-semibold text-foreground">Compare perspectives</h1>
+		<h1 class="page-title text-xl font-semibold text-foreground">Compare perspectives</h1>
 	</div>
 	<p class="-mt-2 text-[12.5px]" style="color: var(--color-muted-foreground);">
 		Where ratings align, conflict, or were filled in differently.

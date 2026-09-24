@@ -66,7 +66,7 @@
 	<div class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
 		<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
 			<div>
-				<h1 class="text-2xl md:text-3xl font-semibold text-foreground">Activity</h1>
+				<h1 class="page-title text-2xl md:text-3xl font-semibold text-foreground">Activity</h1>
 				<p class="text-sm text-muted-foreground mt-1">Recently updated content</p>
 			</div>
 			<div class="flex items-center gap-2">

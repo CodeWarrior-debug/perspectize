@@ -212,7 +212,7 @@
 <PageWrapper>
 	<div class="flex flex-col gap-6">
 		<div>
-			<h1 class="text-2xl md:text-3xl font-semibold text-foreground">Discover</h1>
+			<h1 class="page-title text-2xl md:text-3xl font-semibold text-foreground">Discover</h1>
 			<p class="text-sm text-muted-foreground mt-1">Search YouTube and add videos to your library</p>
 		</div>
 
