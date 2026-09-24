@@ -1,5 +1,5 @@
 import { COLUMNS, GROUP_LABELS, TYPES, type ColumnDef } from './catalog.js';
-import { bindingFor, gapText, resolveGrid, samplesFor, typeLabel, type DraftState } from './model.js';
+import { bindingFor, gapText, resolveGrid, samplesFor, typeLabel, unitsFor, type DraftState } from './model.js';
 
 const YES = 'yes';
 const NO = 'no';
@@ -192,6 +192,25 @@ export function buildSpec(state: DraftState): string {
     )
   );
 
+  const mixedSorts = grid.visible.filter((rc) => rc.col.sortable && unitsFor(rc).length > 1);
+  if (mixedSorts.length) {
+    out.push('### Mixed-unit sort policy');
+    out.push('');
+    out.push(
+      'Sorting any of these columns on its own would order numbers that mean different things. The grid must not do it silently: when one becomes the *primary* sort key, show an alert and leave the order unchanged until the user picks one of:'
+    );
+    out.push('');
+    out.push('1. **Filter to one type** — one button per type, each named with its unit; the sort then applies within one unit.');
+    out.push('2. **Sort by Type, then the column** — a multi-column sort with the unit-consistent Type column as priority 1, so each type is ordered within its own unit.');
+    out.push('');
+    out.push(
+      table(
+        ['Column', 'Units in this selection'],
+        mixedSorts.map((rc) => [rc.header || rc.col.generic, unitsFor(rc).join(' · ')])
+      )
+    );
+  }
+
   const multi = state.selected.length > 1;
   if (multi) {
     const aliased = grid.visible.filter((rc) => new Set(rc.aliases.map((a) => a.label)).size > 1);
@@ -289,6 +308,14 @@ export function buildSpec(state: DraftState): string {
       : 'Migration: none.',
     d.sharesUrlSpace ? 'Migration: relax `UNIQUE(url)` to be type-scoped.' : 'Constraint: `UNIQUE(url)` unchanged.',
     'Repository: sort rules in `helpers.go`, virtual fields in `gorm_models.go`.',
+    ...(mixedSorts.length
+      ? [
+          'Domain + repository: add `ContentSortByContentType` (`CONTENT_TYPE`) so `buildContentSortRulesMulti` can take Type as priority 1 ahead of a mixed-unit column.',
+          `Frontend: in \`ActivityTable.svelte\` \`onSortChanged\`, when the primary sort column mixes units across the loaded types (${mixedSorts
+            .map((rc) => rc.header || rc.col.generic)
+            .join(', ')}), hold the sort and show the alert: filter to one type, or apply Type ▲ then the column via \`applyColumnState\` with \`sortIndex\` 0/1.`
+        ]
+      : []),
     'Resolver: mutation handler in `schema.resolvers.go`.',
     'Frontend: types + queries in `src/lib/queries/content.ts`; mutation hook alongside `useAddVideo.ts`.',
     d.urlRequired ? `Frontend: URL validation for ${d.urlPattern} in \`src/lib/utils/\`.` : 'Frontend: form validation for the manual fields (no URL rule).',

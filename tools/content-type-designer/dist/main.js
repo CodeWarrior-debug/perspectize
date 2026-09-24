@@ -1,6 +1,6 @@
 import { COLUMNS, GROUP_LABELS, TYPES } from './catalog.js';
 import { buildMatrix, buildSpec } from './emit.js';
-import { bindingFor, gapText, resolveGrid, samplesFor, typeLabel } from './model.js';
+import { bindingFor, gapText, resolveGrid, samplesFor, sortConflict, sortValue, typeLabel, unitsFor } from './model.js';
 const STORAGE_KEY = 'perspectize.content-type-designer.v1';
 /** Seed the type currently being designed, so a fresh open / reset lands on a filled-in form. */
 const DEFAULT_SEED = 'bible';
@@ -255,7 +255,7 @@ function renderPreview() {
             ])
         ]));
     }
-    const samples = renderSamples(state, grid.visible);
+    const samples = renderSamples(state, grid);
     const warn = el('ul', { class: 'warnings' });
     for (const w of grid.warnings) {
         warn.append(el('li', { class: `w-${w.severity}` }, [w.message]));
@@ -289,8 +289,71 @@ function sampleCell(value, tooltip) {
         ...(value.sub ? [el('span', { class: 'cell-sub' }, [value.sub])] : [])
     ]);
 }
+function cellText(value) {
+    return value === undefined ? undefined : typeof value === 'string' ? value : value.text;
+}
+/** Cycle one column through asc → desc → off, keeping any other keys as lower priorities. */
+function toggleSort(colId) {
+    const keys = state.sort ?? [];
+    const existing = keys.find((k) => k.colId === colId);
+    let next;
+    if (!existing)
+        next = [{ colId, dir: 'asc' }];
+    else if (existing.dir === 'asc')
+        next = keys.map((k) => (k.colId === colId ? { colId, dir: 'desc' } : k));
+    else
+        next = keys.filter((k) => k.colId !== colId);
+    state.sort = next;
+    save();
+    render();
+}
+/** The alert raised when a sort would order numbers that mean different things. */
+function renderSortAlert(current, grid) {
+    const conflicted = sortConflict(current.sort, grid);
+    if (!conflicted)
+        return null;
+    const header = conflicted.header || conflicted.col.generic;
+    const units = unitsFor(conflicted);
+    const key = current.sort[0];
+    const actions = [];
+    const typeCol = grid.visible.find((rc) => rc.col.id === 'type');
+    if (typeCol) {
+        const multi = el('button', { type: 'button', class: 'primary' }, [`Sort by Type, then ${header}`]);
+        multi.addEventListener('click', () => {
+            state.sort = [{ colId: 'type', dir: 'asc' }, key];
+            save();
+            render();
+        });
+        actions.push(multi);
+    }
+    for (const typeId of conflicted.bound) {
+        const unit = conflicted.aliases.find((a) => a.typeId === typeId)?.unit;
+        const only = el('button', { type: 'button' }, [`Only ${typeLabel(typeId, current.draft)}${unit ? ` (${unit})` : ''}`]);
+        only.addEventListener('click', () => {
+            state.selected = [typeId];
+            save();
+            render();
+        });
+        actions.push(only);
+    }
+    const cancel = el('button', { type: 'button' }, ['Cancel sort']);
+    cancel.addEventListener('click', () => {
+        state.sort = [];
+        save();
+        render();
+    });
+    actions.push(cancel);
+    return el('div', { class: 'sort-alert', role: 'alert' }, [
+        el('strong', {}, [`"${header}" mixes units: ${units.join(' · ')}.`]),
+        el('span', {}, [
+            ' Sorting it on its own would put 453 words next to 453 seconds as if they were the same number. Rows stay unsorted until you pick one:'
+        ]),
+        el('div', { class: 'row' }, actions)
+    ]);
+}
 /** Illustrative rows for the selected types that ship samples; null when none do. */
-function renderSamples(current, visible) {
+function renderSamples(current, grid) {
+    const visible = grid.visible;
     const rows = [];
     for (const id of current.selected) {
         for (const cells of samplesFor(id, current))
@@ -298,7 +361,52 @@ function renderSamples(current, visible) {
     }
     if (rows.length === 0)
         return null;
-    const head = el('tr', {}, visible.map((rc) => el('th', { title: rc.tooltip }, [rc.header || '◎'])));
+    const valueOf = (row, colId) => {
+        if (colId === 'type')
+            return typeLabel(row.typeId, current.draft);
+        const col = visible.find((rc) => rc.col.id === colId)?.col;
+        if (!col || !bindingFor(col, row.typeId, current))
+            return undefined;
+        return cellText(row.cells[colId]);
+    };
+    const keys = (current.sort ?? []).filter((k) => visible.some((rc) => rc.col.id === k.colId && rc.col.sortable));
+    const alert = renderSortAlert(current, grid);
+    if (keys.length && !alert) {
+        rows.sort((a, b) => {
+            for (const k of keys) {
+                const va = sortValue(valueOf(a, k.colId));
+                const vb = sortValue(valueOf(b, k.colId));
+                if (va === vb)
+                    continue;
+                if (va === null)
+                    return 1; // blanks last in either direction
+                if (vb === null)
+                    return -1;
+                const cmp = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb));
+                if (cmp !== 0)
+                    return k.dir === 'asc' ? cmp : -cmp;
+            }
+            return 0;
+        });
+    }
+    const head = el('tr', {}, visible.map((rc) => {
+        const idx = keys.findIndex((k) => k.colId === rc.col.id);
+        const key = keys[idx];
+        const units = unitsFor(rc);
+        const label = [
+            rc.header || '◎',
+            ...(key ? [` ${key.dir === 'asc' ? '▲' : '▼'}`] : []),
+            ...(key && keys.length > 1 ? [el('sup', {}, [String(idx + 1)])] : [])
+        ];
+        const th = el('th', { title: units.length > 1 ? `${rc.tooltip} — mixed units: ${units.join(' · ')}` : rc.tooltip }, label);
+        if (rc.col.sortable) {
+            th.classList.add('sortable');
+            if (units.length > 1)
+                th.classList.add('mixed');
+            th.addEventListener('click', () => toggleSort(rc.col.id));
+        }
+        return th;
+    }));
     const body = rows.map(({ typeId, cells }) => el('tr', {}, visible.map((rc) => {
         if (rc.col.id === 'perspectize')
             return el('td', { class: 'center' }, ['◎']);
@@ -314,8 +422,9 @@ function renderSamples(current, visible) {
     })));
     return el('div', { class: 'samples' }, [
         el('p', { class: 'muted small' }, [
-            'Sample rows — hover a header or cell for its tooltip. "·" means the sample has no value for a bound column.'
+            'Sample rows — click a header to sort (again to reverse, a third time to clear); hover for its tooltip. "·" means the sample has no value for a bound column; a dashed header mixes units.'
         ]),
+        ...(alert ? [alert] : []),
         el('div', { class: 'sample-scroll' }, [el('table', {}, [el('thead', {}, [head]), el('tbody', {}, body)])])
     ]);
 }

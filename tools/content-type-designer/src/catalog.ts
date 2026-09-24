@@ -506,12 +506,22 @@ export const COLUMNS: ColumnDef[] = [
       paper: b('Pages', 'optional', 'api', 'length + length_units', false, { unit: 'pages' }),
       joke: b('Words', 'optional', 'derived', 'length + length_units', false, { unit: 'words' }),
       place: b('Visit length', 'optional', 'user', 'length + length_units', false, { unit: 'minutes' }),
-      // ANSWERS doc Q11 (verse count, not word count) — deferred to PR D, and PR D did not set it.
-      bible: b('Verses', 'typical', 'derived', 'verse_end_id − verse_start_id + 1 → length, length_units = verses', true, {
-        unit: 'verses',
-        tooltip: 'PLANNED (Q11) — not written by CreateFromPassage today. Number of verses in the range.',
-        appearance: 'Right-aligned integer, e.g. "15". Singular "1 verse" in the tooltip only.'
-      })
+      // Decision 2026-09-24: word count in the BSB, superseding the ANSWERS doc's Q11 answer
+      // (verse count). Neither is written by CreateFromPassage today.
+      bible: b(
+        'Words - BSB',
+        'typical',
+        'derived',
+        "Σ words of bible_verse_text (translation 'BSB') for verse_start_id..verse_end_id → length, length_units = 'words'",
+        true,
+        {
+          unit: 'words (BSB)',
+          tooltip:
+            'PLANNED — not written by CreateFromPassage today. Word count of the passage in the Berean Standard Bible; other translations differ. Counted once when the passage is added.',
+          appearance:
+            'Right-aligned integer with thousands separator, e.g. "453". The unit lives in the header, not the cell. Sorting alongside other types raises the mixed-unit alert (filter to one type, or sort by Type then Length).'
+        }
+      )
     }
   },
   {
@@ -833,6 +843,39 @@ export type SampleCell = string | { text: string; sub?: string };
  * a column a row does not mention renders the column's gap fallback.
  */
 export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
+  // Illustrative only — made-up channels and figures, there so a mixed
+  // YouTube + Bible passage selection has something to sort against.
+  youtube: [
+    {
+      item: 'Expository sermon: The Beatitudes (Matthew 5:1-12)',
+      creator: 'Example Church',
+      length: '52:14',
+      date: '2025-03-09',
+      audience: '18,402',
+      approval: '4.1%',
+      category: 'Sermon',
+      createdAt: '2026-09-03'
+    },
+    {
+      item: 'Overview: Isaiah 40–66 in eight minutes',
+      creator: 'Example Bible Project',
+      length: '8:05',
+      date: '2024-11-21',
+      audience: '1,204,881',
+      approval: '3.2%',
+      category: 'Bible study',
+      createdAt: '2026-09-11'
+    },
+    {
+      item: 'Q&A: Reading Revelation without fear',
+      creator: 'Example Seminary',
+      length: '1:12:40',
+      date: '2026-01-15',
+      audience: '6,730',
+      approval: '5.0%',
+      createdAt: '2026-09-19'
+    }
+  ],
   // One passage per canonical division (data/bible/books.json on
   // feature/bible-outbound-links). Verse ids and opening lines are real —
   // computed from versesPerChapter and copied from data/bible/bsb.tsv.
@@ -844,7 +887,7 @@ export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
       item: 'Deuteronomy 6:4-9',
       genre: 'Torah · OT',
       venue: 'Deuteronomy · #5',
-      length: '6',
+      length: '105',
       identifier: '5091–5096',
       description: 'Hear, O Israel: The LORD our God, the LORD is One.',
       category: 'Shema',
@@ -854,7 +897,7 @@ export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
       item: 'Ruth 1:16-17',
       genre: 'History · OT',
       venue: 'Ruth · #8',
-      length: '2',
+      length: '72',
       identifier: '7144–7145',
       description: 'But Ruth replied: “Do not urge me to leave you or to turn from following you…',
       createdAt: '2026-09-04'
@@ -863,7 +906,7 @@ export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
       item: { text: 'The Lord is my shepherd', sub: 'Psalms 23:1-6' },
       genre: 'Wisdom · OT',
       venue: 'Psalms · #19',
-      length: '6',
+      length: '120',
       identifier: '14237–14242',
       description: 'A Psalm of David. The LORD is my shepherd; I shall not want.',
       category: 'Psalm 23',
@@ -873,7 +916,7 @@ export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
       item: { text: 'The Suffering Servant', sub: 'Isaiah 52:13-53:12' },
       genre: 'Major Prophets · OT',
       venue: 'Isaiah · #23',
-      length: '15',
+      length: '453',
       identifier: '18710–18724',
       description: 'Behold, My Servant will prosper; He will be raised and lifted up and highly exalted.',
       category: 'Messianic prophecy',
@@ -883,7 +926,7 @@ export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
       item: 'Micah 6:8',
       genre: 'Minor Prophets · OT',
       venue: 'Micah · #33',
-      length: '1',
+      length: '31',
       identifier: '22657',
       description: 'He has shown you, O man, what is good. And what does the LORD require of you…',
       category: 'Social justice',
@@ -893,7 +936,7 @@ export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
       item: { text: 'The Word became flesh', sub: 'John 1:1-14' },
       genre: 'Gospels · NT',
       venue: 'John · #43',
-      length: '14',
+      length: '224',
       identifier: '26046–26059',
       description: 'In the beginning was the Word, and the Word was with God, and the Word was God.',
       category: 'Incarnation',
@@ -903,7 +946,7 @@ export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
       item: 'Acts 2:42-47',
       genre: 'Acts · NT',
       venue: 'Acts · #44',
-      length: '6',
+      length: '109',
       identifier: '26992–26997',
       description: 'They devoted themselves to the apostles’ teaching and to the fellowship, to the breaking of bread…',
       createdAt: '2026-09-15'
@@ -912,7 +955,7 @@ export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
       item: { text: 'The Way of Love', sub: '1 Corinthians 13:1-13' },
       genre: 'Pauline Epistles · NT',
       venue: '1 Corinthians · #46',
-      length: '13',
+      length: '269',
       identifier: '28667–28679',
       description: 'If I speak in the tongues of men and of angels, but have not love, I am only a ringing gong…',
       category: 'Love',
@@ -922,7 +965,7 @@ export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
       item: 'James 1:2-4',
       genre: 'General Epistles · NT',
       venue: 'James · #59',
-      length: '3',
+      length: '41',
       identifier: '30269–30271',
       description: 'Consider it pure joy, my brothers, when you encounter trials of many kinds,',
       createdAt: '2026-09-20'
@@ -931,7 +974,7 @@ export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
       item: 'Revelation 21:1-4',
       genre: 'Apocalyptic · NT',
       venue: 'Revelation · #66',
-      length: '4',
+      length: '117',
       identifier: '31055–31058',
       description: 'Then I saw a new heaven and a new earth, for the first heaven and earth had passed away…',
       category: 'New creation',

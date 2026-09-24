@@ -49,8 +49,13 @@ column declares a **gap policy** (`em-dash`, `blank`, `substitute`,
 Given a selection of types, the preview flags:
 
 - **Sparse columns** — a default column populated for under half the selection.
-- **Mixed units** — e.g. Length across video seconds, book pages and article
-  read-time, which must never be sorted as one numeric axis unnormalised.
+- **Mixed units** — e.g. Length across video seconds, book pages and Bible
+  passage words (BSB), which must never be sorted as one numeric axis. The
+  sample table enforces the policy. Sorting such a column as the primary key
+  raises an alert and leaves the order unchanged until you pick one of two
+  fixes. **Filter to one type** keeps a single unit. **Sort by Type, then the
+  column** is a multi-column sort that puts the unit-consistent Type column
+  first. The spec emits that policy and the backend/frontend steps it needs.
 - **Mixed provenance** — a column that is fetched for some types and
   user-entered for others (Rating is the standing example).
 - **Lost required fields** — a type declaring a field required and
