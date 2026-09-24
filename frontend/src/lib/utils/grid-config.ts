@@ -71,9 +71,9 @@ export const SORTABLE_COLUMNS: readonly TogglableColumn[] = [
 	{ colId: 'duration', label: 'Length' },
 	{ colId: 'views', label: 'Views' },
 	{ colId: 'likes', label: 'Likes' },
-	{ colId: 'publishDate', label: 'Published' },
+	{ colId: 'publishDate', label: 'Date' },
 	{ colId: 'channel', label: 'Channel' },
-	{ colId: 'createdAt', label: 'Date added' },
+	{ colId: 'createdAt', label: 'Date Added' },
 	{ colId: 'updatedAt', label: 'Updated' },
 ] as const;
 
@@ -271,7 +271,7 @@ export const DATA_COLUMNS: readonly TogglableColumn[] = [
 	{ colId: 'views', label: 'Views' },
 	{ colId: 'likes', label: 'Likes' },
 	{ colId: 'percentLiked', label: '% Liked' },
-	{ colId: 'publishDate', label: 'Published' },
+	{ colId: 'publishDate', label: 'Date' },
 	{ colId: 'channel', label: 'Channel' },
 	{ colId: 'tags', label: 'Tags' },
 	{ colId: 'description', label: 'Description' },

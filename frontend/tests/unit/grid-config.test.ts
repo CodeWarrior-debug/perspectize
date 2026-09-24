@@ -469,6 +469,32 @@ describe('column-picker registry', () => {
 		expect(new Set(all).size).toBe(all.length);
 	});
 
+	// The picker must name a column exactly as the grid header does (ActivityTable colDef headerName),
+	// or users hunt for "Published" in a grid whose header says "Date".
+	it("labels match the grid's own column headers", () => {
+		const gridHeaders: Record<string, string> = {
+			item: 'Item',
+			type: 'Type',
+			category: 'Category',
+			duration: 'Length',
+			views: 'Views',
+			likes: 'Likes',
+			percentLiked: '% Liked',
+			publishDate: 'Date',
+			channel: 'Channel',
+			tags: 'Tags',
+			description: 'Description',
+			updatedAt: 'Updated',
+			createdAt: 'Date Added',
+			id: 'Content ID',
+			addedByUserID: 'Submitter',
+			url: 'Source URL',
+		};
+		for (const col of [...DATA_COLUMNS, ...INTERNAL_COLUMNS, ...SORTABLE_COLUMNS]) {
+			expect(col.label, col.colId).toBe(gridHeaders[col.colId]);
+		}
+	});
+
 	it('every registry column has a non-empty label', () => {
 		for (const col of [...DATA_COLUMNS, ...INTERNAL_COLUMNS]) {
 			expect(col.label.length).toBeGreaterThan(0);
