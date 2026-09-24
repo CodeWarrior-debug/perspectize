@@ -139,13 +139,19 @@ export function createThemeStore() {
 		applyThemeToDom(state);
 	}
 
+	// The unsaved live preview, kept so reopening the customize panel resumes it instead of
+	// silently reseeding from the preset while the page still shows the preview.
+	let unsavedPreview: BaseThemeTokens | null = null;
+
 	function selectPreset(id: string) {
+		unsavedPreview = null;
 		state.activeThemeId = id;
 		persistAndApply();
 	}
 
 	function selectCustom(id: string) {
 		if (!isCustomTheme(state, id)) return;
+		unsavedPreview = null;
 		state.activeThemeId = id;
 		persistAndApply();
 	}
@@ -153,10 +159,16 @@ export function createThemeStore() {
 	function previewCustomTokens(tokens: BaseThemeTokens) {
 		// Live-preview without persisting or changing activeThemeId — used while dragging the wheel
 		// before the user has saved a name.
+		unsavedPreview = { ...tokens };
 		applyThemeToDom({ activeThemeId: '__preview__', customThemes: [{ id: '__preview__', name: '', tokens }] }, false);
 	}
 
+	function pendingPreview(): BaseThemeTokens | null {
+		return unsavedPreview ? { ...unsavedPreview } : null;
+	}
+
 	function saveCustomTheme(name: string, tokens: BaseThemeTokens): CustomTheme {
+		unsavedPreview = null;
 		const theme: CustomTheme = { id: crypto.randomUUID(), name, tokens };
 		state.customThemes.push(theme);
 		state.activeThemeId = theme.id;
@@ -185,6 +197,7 @@ export function createThemeStore() {
 		selectPreset,
 		selectCustom,
 		previewCustomTokens,
+		pendingPreview,
 		saveCustomTheme,
 		deleteCustomTheme,
 		activeFullTokens,
