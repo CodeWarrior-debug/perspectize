@@ -325,7 +325,8 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 	if (!params.data) return '';
 
 	const container = document.createElement('div');
-	container.className = 'flex items-center justify-center h-full w-full';
+	// text-muted-foreground: the icon labels the content type, it isn't an alert, so it follows the theme.
+	container.className = 'flex items-center justify-center h-full w-full text-muted-foreground';
 
 	if (params.data.contentType === 'BIBLE_PASSAGE') {
 		container.classList.add('text-primary');
@@ -343,12 +344,12 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 	hidden.textContent = params.data.contentType ?? '';
 	container.appendChild(hidden);
 
-	// YouTube play button icon (red)
+	// YouTube play button icon
 	const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 	svg.setAttribute('width', '20');
 	svg.setAttribute('height', '20');
 	svg.setAttribute('viewBox', '0 0 24 24');
-	svg.setAttribute('fill', '#FF0000');
+	svg.setAttribute('fill', 'currentColor');
 
 	const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
 	path.setAttribute(

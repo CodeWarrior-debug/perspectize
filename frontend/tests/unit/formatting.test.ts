@@ -549,7 +549,9 @@ describe('typeCellRenderer', () => {
 
 		const svg = result.querySelector('svg');
 		expect(svg).toBeTruthy();
-		expect(svg?.getAttribute('fill')).toBe('#FF0000');
+		// Follows the theme (muted text colour) instead of a hard-coded alert red.
+		expect(svg?.getAttribute('fill')).toBe('currentColor');
+		expect(result.className).toContain('text-muted-foreground');
 		expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
 
 		const path = svg?.querySelector('path');
