@@ -97,6 +97,15 @@ export const THEME_PRESET_TOKENS: Record<string, FullThemeTokens> = Object.fromE
 	THEME_PRESETS.map((p) => [p.id, deriveTheme(p.base)]),
 );
 
+/**
+ * The four dots on a preset card: page, row hover, primary, text. Showing the hover row (rather
+ * than several near-white surfaces) lets a user see what the table will do before choosing, and
+ * keeps two dark presets with similar primaries from looking identical.
+ */
+export function presetSwatchColors(tokens: FullThemeTokens): [string, string, string, string] {
+	return [tokens.background, tokens.rowHover, tokens.primary, tokens.foreground];
+}
+
 /** Generated `[data-theme='<id>'] { --color-*: ...; }` CSS text for every non-default preset. */
 export function generatePresetCss(): string {
 	return THEME_PRESETS.filter((p) => p.id !== DEFAULT_THEME_ID)
