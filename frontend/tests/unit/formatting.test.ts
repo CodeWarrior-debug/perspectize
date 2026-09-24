@@ -565,16 +565,6 @@ describe('typeCellRenderer', () => {
 		expect(hidden).toBeTruthy();
 		expect(hidden?.textContent).toBe('YOUTUBE');
 	});
-
-	it('shows the Bible passage icon (not the YouTube icon) for BIBLE_PASSAGE', () => {
-		const result = typeCellRenderer({
-			data: { contentType: 'BIBLE_PASSAGE' },
-		}) as HTMLElement;
-
-		expect(result.querySelector('svg[data-icon="bible-passage"]')).toBeTruthy();
-		expect(result.querySelector('svg[fill="#FF0000"]')).toBeNull();
-		expect(result.querySelector('.sr-only')?.textContent).toBe('Bible Passage');
-	});
 });
 
 describe('headerMinWidth', () => {

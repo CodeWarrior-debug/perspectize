@@ -69,18 +69,3 @@ func TestContent_NilOptionalFields(t *testing.T) {
 	assert.Nil(t, content.Length)
 	assert.Nil(t, content.LengthUnits)
 }
-
-func TestContentType_BiblePassage(t *testing.T) {
-	assert.Equal(t, domain.ContentType("BIBLE_PASSAGE"), domain.ContentTypeBiblePassage)
-}
-
-func TestContent_BiblePassageFields_OptionalAndNilByDefault(t *testing.T) {
-	c := domain.Content{
-		Name:          "Genesis 1:1-3",
-		ContentType:   domain.ContentTypeBiblePassage,
-		AddedByUserID: 1,
-	}
-	assert.Nil(t, c.VerseStartID)
-	assert.Nil(t, c.VerseEndID)
-	assert.Nil(t, c.DisplayTitle)
-}

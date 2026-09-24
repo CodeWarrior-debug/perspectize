@@ -40,22 +40,6 @@ func (m *mockContentService) CreateClaim(ctx context.Context, input portservices
 	return nil, nil
 }
 
-func (m *mockContentService) CreateFromPassage(ctx context.Context, input portservices.CreatePassageInput) (*domain.Content, error) {
-	return nil, nil
-}
-
-func (m *mockContentService) SetPassageDisplayTitle(ctx context.Context, contentID int, title string) (*domain.Content, error) {
-	return nil, nil
-}
-
-func (m *mockContentService) ClearPassageDisplayTitle(ctx context.Context, contentID int) (*domain.Content, error) {
-	return nil, nil
-}
-
-func (m *mockContentService) PassageText(ctx context.Context, startVerseID, endVerseID int) (*domain.PassageText, error) {
-	return nil, nil
-}
-
 func (m *mockContentService) UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error) {
 	return nil, nil
 }

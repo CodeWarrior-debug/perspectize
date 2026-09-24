@@ -154,10 +154,9 @@ func main() {
 	categoryRepo := postgres.NewGormCategoryRepository(db)
 	threadRepo := postgres.NewGormThreadRepository(db)
 	messageRepo := postgres.NewGormMessageRepository(db)
-	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
 
 	// Initialize services
-	contentService := services.NewContentService(contentRepo, youtubeClient, services.WithBibleReference(bibleReferenceRepo))
+	contentService := services.NewContentService(contentRepo, youtubeClient)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)

@@ -955,11 +955,3 @@ func TestBackfillSemantics_SeenAtCurrentVersion(t *testing.T) {
 	showCoach := backfilled.DisplayNextSession || backfilled.Version < domain.CurrentIntroVersion
 	assert.False(t, showCoach)
 }
-
-func (m *mockContentRepoForUser) SetDisplayTitleIfEmpty(ctx context.Context, contentID int, title string) (string, error) {
-	return title, nil
-}
-
-func (m *mockContentRepoForUser) ClearDisplayTitle(ctx context.Context, contentID int) error {
-	return nil
-}

@@ -50,9 +50,6 @@ type ContentModel struct {
 	LengthUnits       *string         `gorm:""`
 	Response          json.RawMessage `gorm:"type:jsonb"`
 	PrimaryCategoryID *int            `gorm:"column:primary_category_id"`
-	VerseStartID      *int            `gorm:"column:verse_start_id"`
-	VerseEndID        *int            `gorm:"column:verse_end_id"`
-	DisplayTitle      *string         `gorm:"column:display_title"`
 
 	// Dummy fields for gorm-cursor-paginator sort key validation.
 	// These are NOT database columns — SQLRepr provides the actual SQL.

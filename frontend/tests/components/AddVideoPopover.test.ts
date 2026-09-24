@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import AddContentPopover from '$lib/components/AddContentPopover.svelte';
+import AddVideoPopover from '$lib/components/AddVideoPopover.svelte';
 import { tick } from 'svelte';
 
 // Hoisted mocks — shared pattern for useAddVideo components
@@ -41,42 +41,42 @@ function reset() {
 	mocks.mockMutationState.isSuccess = false;
 }
 
-describe('AddContentPopover component', () => {
+describe('AddVideoPopover component', () => {
 	beforeEach(reset);
 
 	it('renders without errors', () => {
-		expect(render(AddContentPopover).container).toBeTruthy();
+		expect(render(AddVideoPopover).container).toBeTruthy();
 	});
 
 	it('renders Add Video button', () => {
-		render(AddContentPopover);
-		expect(screen.getByRole('button', { name: /add content/i })).toBeInTheDocument();
+		render(AddVideoPopover);
+		expect(screen.getByRole('button', { name: /add video/i })).toBeInTheDocument();
 	});
 
 	it('button has plus icon', () => {
-		render(AddContentPopover);
-		expect(screen.getByRole('button', { name: /add content/i }).querySelector('svg')).toBeInTheDocument();
+		render(AddVideoPopover);
+		expect(screen.getByRole('button', { name: /add video/i }).querySelector('svg')).toBeInTheDocument();
 	});
 
 	it('uses buttonVariants for styling', () => {
-		render(AddContentPopover);
-		expect(screen.getByRole('button', { name: /add content/i }).className).toBeTruthy();
+		render(AddVideoPopover);
+		expect(screen.getByRole('button', { name: /add video/i }).className).toBeTruthy();
 	});
 
 	it('opens popover when trigger is clicked', async () => {
-		const { container } = render(AddContentPopover);
-		await fireEvent.click(screen.getByRole('button', { name: /add content/i }));
+		const { container } = render(AddVideoPopover);
+		await fireEvent.click(screen.getByRole('button', { name: /add video/i }));
 		await tick();
 		expect(container).toBeTruthy();
 	});
 });
 
-describe('AddContentPopover paste button', () => {
+describe('AddVideoPopover paste button', () => {
 	beforeEach(reset);
 
 	async function openPopover() {
-		render(AddContentPopover);
-		await fireEvent.click(screen.getByRole('button', { name: /add content/i }));
+		render(AddVideoPopover);
+		await fireEvent.click(screen.getByRole('button', { name: /add video/i }));
 		await tick();
 	}
 
@@ -94,9 +94,7 @@ describe('AddContentPopover paste button', () => {
 		await tick();
 
 		expect(readText).toHaveBeenCalled();
-		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toHaveValue(
-			'https://youtube.com/watch?v=abc123',
-		);
+		expect(screen.getByPlaceholderText(/youtube.com\/watch/i)).toHaveValue('https://youtube.com/watch?v=abc123');
 	});
 
 	it('shows an error message when clipboard read fails', async () => {
@@ -111,19 +109,19 @@ describe('AddContentPopover paste button', () => {
 	});
 });
 
-describe('AddContentPopover $effect behaviors', () => {
+describe('AddVideoPopover $effect behaviors', () => {
 	beforeEach(reset);
 
 	it('renders with mutation in success state', () => {
 		mocks.mockMutationState.isSuccess = true;
-		expect(render(AddContentPopover).container).toBeTruthy();
+		expect(render(AddVideoPopover).container).toBeTruthy();
 	});
 });
 
-describe('AddContentPopover mutation setup', () => {
+describe('AddVideoPopover mutation setup', () => {
 	beforeEach(() => {
 		reset();
-		render(AddContentPopover);
+		render(AddVideoPopover);
 	});
 
 	it('captures mutation options from useAddVideo hook', () => {

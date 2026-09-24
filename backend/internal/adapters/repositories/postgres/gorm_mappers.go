@@ -123,9 +123,6 @@ func contentModelToDomain(m *ContentModel) *domain.Content {
 		LengthUnits:       m.LengthUnits,
 		Response:          m.Response,
 		PrimaryCategoryID: m.PrimaryCategoryID,
-		VerseStartID:      m.VerseStartID,
-		VerseEndID:        m.VerseEndID,
-		DisplayTitle:      m.DisplayTitle,
 		CreatedAt:         m.CreatedAt,
 		UpdatedAt:         m.UpdatedAt,
 	}
@@ -146,9 +143,6 @@ func contentDomainToModel(c *domain.Content) *ContentModel {
 		LengthUnits:       c.LengthUnits,
 		Response:          c.Response,
 		PrimaryCategoryID: c.PrimaryCategoryID,
-		VerseStartID:      c.VerseStartID,
-		VerseEndID:        c.VerseEndID,
-		DisplayTitle:      c.DisplayTitle,
 		// CreatedAt and UpdatedAt are managed by GORM
 	}
 }

@@ -336,20 +336,3 @@ func TestPerspectiveMappers_RoundTrip(t *testing.T) {
 	assert.Equal(t, original.CategorizedRatings, roundTripped.CategorizedRatings)
 	assert.Equal(t, original.RelatedPerspectiveIDs, roundTripped.RelatedPerspectiveIDs)
 }
-
-func TestContentMapper_BiblePassageFields_RoundTrip(t *testing.T) {
-	c := &domain.Content{
-		Name:          "Genesis 1:1-3",
-		ContentType:   domain.ContentTypeBiblePassage,
-		AddedByUserID: 1,
-		VerseStartID:  intPtr(1),
-		VerseEndID:    intPtr(3),
-		DisplayTitle:  strPtr("Creation"),
-	}
-	back := contentModelToDomain(contentDomainToModel(c))
-
-	assert.Equal(t, domain.ContentTypeBiblePassage, back.ContentType)
-	assert.Equal(t, intPtr(1), back.VerseStartID)
-	assert.Equal(t, intPtr(3), back.VerseEndID)
-	assert.Equal(t, strPtr("Creation"), back.DisplayTitle)
-}
