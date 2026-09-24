@@ -292,6 +292,14 @@
 	font-family: 'Charter', 'Georgia', 'Times New Roman', serif;
 }
 
+/* Numeric columns use tabular figures so digits line up down the column (1.8 M over 889.4 M). */
+.ag-cell[col-id='duration'],
+.ag-cell[col-id='views'],
+.ag-cell[col-id='likes'],
+.ag-cell[col-id='percentLiked'] {
+	font-variant-numeric: tabular-nums;
+}
+
 /* Keep Geist on type column (icon-only, no text to style) */
 .ag-cell[col-id='type'] {
 	font-family: 'Geist', system-ui, sans-serif;
