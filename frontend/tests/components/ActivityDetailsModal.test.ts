@@ -216,6 +216,27 @@ describe('ActivityDetailsModal', () => {
 			};
 		});
 
+		it('shows the position bar, a versioned Bible Gateway link, and collapsed commentaries', () => {
+			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+
+			expect(screen.getByText(/Verses 1–3 of 31,102 · Genesis \(book 1 of 66\)/)).toBeInTheDocument();
+			expect(screen.getByRole('link', { name: /read on bible gateway/i })).toHaveAttribute(
+				'href',
+				expect.stringContaining('&version='),
+			);
+			expect(screen.getByText(/commentaries/i).closest('details')!.open).toBe(false);
+		});
+
+		it('does not show the raw version-less Bible Gateway url as a link (it would serve a different translation)', () => {
+			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+			expect(screen.queryByText(passage.url)).not.toBeInTheDocument();
+		});
+
+		it('does not show passage links for a YouTube video', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			expect(screen.queryByRole('link', { name: /read on bible gateway/i })).not.toBeInTheDocument();
+		});
+
 		it('shows the passage header, reference, and passage text with no video stat tiles', () => {
 			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
 
