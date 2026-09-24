@@ -159,11 +159,28 @@ describe('InterlinearPassage', () => {
 		expect(screen.queryAllByRole('button')).toHaveLength(0);
 	});
 
-	it('a pinned word whose verse is no longer rendered does not crash', async () => {
-		const { rerender } = render(InterlinearPassage, { props: { verses: [plain(1, 1, 'x')], interlinear: [gen11] } });
+	it('a pinned word whose verse is collapsed away (interlinear unchanged) loses its popover and connector for good', async () => {
+		const gen12: InterlinearVerse = {
+			verseId: 2,
+			chapter: 1,
+			verse: 2,
+			segments: [{ text: 'Now the earth', spaceBefore: false }],
+			words: [word(0, 'H0776G', 'earth', 0)],
+		};
+		const interlinear = [gen11, gen12];
+		const { rerender } = render(InterlinearPassage, {
+			props: { verses: [plain(1, 1, 'x'), plain(2, 2, 'y')], interlinear },
+		});
 		await fireEvent.click(screen.getByRole('button', { name: 'God' }));
-		await rerender({ verses: [plain(2, 2, 'other')], interlinear: [] });
+		expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+		// collapse: only the verses prop changes; interlinear still contains the pinned verse
+		await rerender({ verses: [plain(2, 2, 'y')], interlinear });
+		await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+		expect(screen.queryByTestId('connector')).not.toBeInTheDocument();
+		// re-expand: the old pin must not come back
+		await rerender({ verses: [plain(1, 1, 'x'), plain(2, 2, 'y')], interlinear });
 		expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+		expect(screen.queryByTestId('connector')).not.toBeInTheDocument();
 	});
 });
 

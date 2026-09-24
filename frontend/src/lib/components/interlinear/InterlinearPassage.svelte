@@ -21,6 +21,8 @@
 	const byVerse = $derived(new Map(interlinear.map((v) => [v.verseId, v])));
 	// Words for the passage, verse by verse, each verse in original order (chips row).
 	const chipVerses = $derived(verses.map((v) => byVerse.get(v.verseId)).filter((v): v is InterlinearVerse => !!v));
+	// The active word resolves only against verses that are on screen (rendered AND have data).
+	const visibleByVerse = $derived(new Map(chipVerses.map((v) => [v.verseId, v])));
 
 	let ui = $state(initialInterlinearState); // not named `state`: that collides with the $state rune
 	let container = $state<HTMLDivElement | undefined>();
@@ -35,7 +37,7 @@
 	function lookup(key: string | null): { verse: InterlinearVerse; word: InterlinearWord } | null {
 		if (!key) return null;
 		const [verseId, wordId] = key.split(':').map(Number);
-		const verse = byVerse.get(verseId);
+		const verse = visibleByVerse.get(verseId);
 		const word = verse?.words[wordId];
 		return verse && word ? { verse, word } : null;
 	}
@@ -45,6 +47,12 @@
 			? (activeWord.verse.segments[activeWord.word.segment]?.text ?? null)
 			: null,
 	);
+
+	// A pinned/hovered key whose verse is no longer visible (e.g. the passage collapsed) is dropped so
+	// it cannot resurface when the verse comes back. Reads derived values, writes only `ui`.
+	$effect(() => {
+		if (active && !activeWord) send({ type: 'outside' });
+	});
 
 	let popover = $state<{ left: number; top: number } | null>(null);
 	let line = $state<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
