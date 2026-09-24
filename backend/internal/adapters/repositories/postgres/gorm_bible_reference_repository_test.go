@@ -89,3 +89,48 @@ func TestGormBibleReferenceRepository_GetVerseTexts(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to load verse text")
 	})
 }
+
+func TestGormBibleReferenceRepository_GetInterlinearWords(t *testing.T) {
+	ctx := context.Background()
+	cols := []string{"verse_id", "bsb_sort", "language", "source_sort", "source", "translit", "parse_short", "parse_full",
+		"orig_strongs", "strongs", "strongs_source", "span_head", "chunk_text", "space_before", "gloss"}
+
+	t.Run("maps rows including NULLs and the joined gloss", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`bible_word`).
+			WithArgs(1, 2).
+			WillReturnRows(sqlmock.NewRows(cols).
+				AddRow(1, 100, "heb", 1, "רֵאשִׁית", "re.shit", "N", "Noun", 7225, "H7225G", "tagged", 100, "In the beginning", false, "first: beginning").
+				AddRow(1, 104, "", nil, "", "", "", "", nil, "", "", nil, "the earth.", true, ""))
+
+		got, err := NewGormBibleReferenceRepository(db).GetInterlinearWords(ctx, 1, 2)
+		require.NoError(t, err)
+		require.Len(t, got, 2)
+		assert.Equal(t, "H7225G", got[0].Strongs)
+		assert.Equal(t, "first: beginning", got[0].Gloss)
+		require.NotNil(t, got[0].SourceSort)
+		assert.Equal(t, 1, *got[0].SourceSort)
+		require.NotNil(t, got[0].SpanHead)
+		assert.Nil(t, got[1].SourceSort)
+		assert.Nil(t, got[1].OrigStrongs)
+		assert.Nil(t, got[1].SpanHead)
+		assert.True(t, got[1].SpaceBefore)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("no rows is an empty result, not an error (unseeded environment)", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`bible_word`).WillReturnRows(sqlmock.NewRows(cols))
+		got, err := NewGormBibleReferenceRepository(db).GetInterlinearWords(ctx, 1, 2)
+		require.NoError(t, err)
+		assert.Empty(t, got)
+	})
+
+	t.Run("wraps query errors", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`bible_word`).WillReturnError(errors.New("boom"))
+		_, err := NewGormBibleReferenceRepository(db).GetInterlinearWords(ctx, 1, 2)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "boom")
+	})
+}

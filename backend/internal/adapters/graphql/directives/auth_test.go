@@ -56,6 +56,10 @@ func (m *mockContentService) PassageText(ctx context.Context, startVerseID, endV
 	return nil, nil
 }
 
+func (m *mockContentService) PassageInterlinear(ctx context.Context, startVerseID, endVerseID int) (*domain.PassageInterlinear, error) {
+	return nil, nil
+}
+
 func (m *mockContentService) UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error) {
 	return nil, nil
 }

@@ -379,3 +379,33 @@ func (s *ContentService) PassageText(ctx context.Context, startVerseID, endVerse
 		Verses:      verses,
 	}, nil
 }
+
+// PassageInterlinear returns the interlinear (original-language) data for a verse range.
+// It applies the same range and size limits as PassageText. A range with no alignment
+// rows (unseeded environment, omitted verses) yields an empty result, not an error, so
+// the client can show plain text.
+func (s *ContentService) PassageInterlinear(ctx context.Context, startVerseID, endVerseID int) (*domain.PassageInterlinear, error) {
+	if s.bibleRepo == nil {
+		return nil, errors.New("bible passage support is not configured")
+	}
+	if startVerseID < 1 || endVerseID < startVerseID {
+		return nil, fmt.Errorf("%w: invalid verse range %d-%d", domain.ErrInvalidPassage, startVerseID, endVerseID)
+	}
+	if endVerseID-startVerseID+1 > MaxPassageTextVerses {
+		return nil, fmt.Errorf("%w: passage exceeds %d verses", domain.ErrInvalidPassage, MaxPassageTextVerses)
+	}
+
+	books, err := s.bibleRepo.ListBooks(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load bible reference data: %w", err)
+	}
+	rows, err := s.bibleRepo.GetInterlinearWords(ctx, startVerseID, endVerseID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load interlinear words: %w", err)
+	}
+	verses, err := domain.BuildInterlinearVerses(books, rows)
+	if err != nil {
+		return nil, err
+	}
+	return &domain.PassageInterlinear{Verses: verses}, nil
+}

@@ -244,6 +244,43 @@ type PassageText {
   verses: [PassageVerse!]!
 }
 
+# One run of a verse's English text; concatenating segments (a space before each with
+# spaceBefore) reproduces the plain BSB verse.
+type InterlinearSegment {
+  text: String!
+  spaceBefore: Boolean!
+}
+
+# One Hebrew/Greek source word. Words are in original-language order; id is the index in that order.
+type InterlinearWord {
+  id: Int!
+  language: String!
+  source: String!
+  translit: String!
+  parsing: String!
+  # Disambiguated STEPBible tag (e.g. H1254B); Berean's own plain number is kept server-side.
+  strongs: String!
+  # Short meaning (STEPBible Gloss, CC BY 4.0).
+  gloss: String!
+  # "tagged" (exact match) or "fallback" (most common sense for the plain number).
+  tagSource: String!
+  sourceOrder: Int!
+  # Index into the verse's segments of the English phrase this word belongs to; null = no phrase.
+  segment: Int
+}
+
+type InterlinearVerse {
+  verseId: Int!
+  chapter: Int!
+  verse: Int!
+  segments: [InterlinearSegment!]!
+  words: [InterlinearWord!]!
+}
+
+type PassageInterlinear {
+  verses: [InterlinearVerse!]!
+}
+
 # Filters for content queries
 input ContentFilter {
   contentType: ContentType
@@ -415,6 +452,10 @@ type Query {
 
   # Bible passage text for verse ordinals startVerseId..endVerseId (inclusive, capped server-side)
   passageText(startVerseId: Int!, endVerseId: Int!): PassageText!
+
+  # Original-language word alignment for verse ordinals startVerseId..endVerseId (inclusive, capped server-side).
+  # Verses without alignment data are absent from the result.
+  passageInterlinear(startVerseId: Int!, endVerseId: Int!): PassageInterlinear!
 
   # User queries
   userByID(id: ID!): User

@@ -83,3 +83,47 @@ func (r *GormBibleReferenceRepository) GetVerseTexts(ctx context.Context, transl
 	}
 	return out, nil
 }
+
+// GetInterlinearWords reads bible_word for an inclusive ordinal range, joined with
+// bible_lexicon for the gloss. The primary key (verse_id, bsb_sort) serves the range.
+func (r *GormBibleReferenceRepository) GetInterlinearWords(ctx context.Context, startID, endID int) ([]domain.InterlinearWordRow, error) {
+	var rows []struct {
+		VerseID       int    `gorm:"column:verse_id"`
+		BSBSort       int    `gorm:"column:bsb_sort"`
+		Language      string `gorm:"column:language"`
+		SourceSort    *int   `gorm:"column:source_sort"`
+		Source        string `gorm:"column:source"`
+		Translit      string `gorm:"column:translit"`
+		ParseShort    string `gorm:"column:parse_short"`
+		ParseFull     string `gorm:"column:parse_full"`
+		OrigStrongs   *int   `gorm:"column:orig_strongs"`
+		Strongs       string `gorm:"column:strongs"`
+		StrongsSource string `gorm:"column:strongs_source"`
+		SpanHead      *int   `gorm:"column:span_head"`
+		ChunkText     string `gorm:"column:chunk_text"`
+		SpaceBefore   bool   `gorm:"column:space_before"`
+		Gloss         string `gorm:"column:gloss"`
+	}
+	err := r.db.WithContext(ctx).
+		Table("bible_word AS w").
+		Select("w.verse_id", "w.bsb_sort", "w.language", "w.source_sort", "w.source", "w.translit", "w.parse_short",
+			"w.parse_full", "w.orig_strongs", "w.strongs", "w.strongs_source", "w.span_head", "w.chunk_text",
+			"w.space_before", "COALESCE(l.gloss, '') AS gloss").
+		Joins("LEFT JOIN bible_lexicon AS l ON l.tag = w.strongs").
+		Where("w.verse_id BETWEEN ? AND ?", startID, endID).
+		Order("w.verse_id, w.bsb_sort").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to load interlinear words: %w", err)
+	}
+	out := make([]domain.InterlinearWordRow, len(rows))
+	for i, x := range rows {
+		out[i] = domain.InterlinearWordRow{
+			VerseID: x.VerseID, BSBSort: x.BSBSort, Language: x.Language, SourceSort: x.SourceSort, Source: x.Source,
+			Translit: x.Translit, ParseShort: x.ParseShort, ParseFull: x.ParseFull, OrigStrongs: x.OrigStrongs,
+			Strongs: x.Strongs, StrongsSource: x.StrongsSource, SpanHead: x.SpanHead, ChunkText: x.ChunkText,
+			SpaceBefore: x.SpaceBefore, Gloss: x.Gloss,
+		}
+	}
+	return out, nil
+}

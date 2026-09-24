@@ -60,6 +60,8 @@ func main() {
 	// the path configurable, so the seeder change is small. Trade-off: a leaner repo,
 	// but seeding then needs the network and the source URL staying up.
 	bsbPath := flag.String("bsb", "../data/bible/bsb.tsv", "path to data/bible/bsb.tsv (verse_id<TAB>text)")
+	interlinearDir := flag.String("interlinear-dir", "../data/bible/interlinear", "directory holding the interlinear release files (see data/bible/README.md)")
+	manifestPath := flag.String("manifest", "../data/bible/sources.json", "path to the data manifest (data/bible/sources.json)")
 	flag.Parse()
 
 	dsn := os.Getenv("DATABASE_URL")
@@ -94,6 +96,14 @@ func main() {
 		log.Fatalf("failed to seed verse text: %v", err)
 	}
 	fmt.Printf("Seeded %d %s verses\n", len(verses), bsbTranslation)
+
+	loaded, err := seedInterlinear(db, *manifestPath, *interlinearDir)
+	if err != nil {
+		log.Fatalf("failed to seed interlinear data: %v", err)
+	}
+	if !loaded {
+		fmt.Printf("Interlinear files not found in %s — skipped (see data/bible/README.md to download them)\n", *interlinearDir)
+	}
 }
 
 // parseBSB parses bsb.tsv (header, then verse_id<TAB>text per line). Text may

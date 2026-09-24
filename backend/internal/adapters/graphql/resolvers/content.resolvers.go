@@ -249,6 +249,35 @@ func (r *queryResolver) PassageText(ctx context.Context, startVerseID int, endVe
 	return &model.PassageText{Translation: text.Translation, Copyright: text.Copyright, Verses: verses}, nil
 }
 
+// PassageInterlinear is the resolver for the passageInterlinear field.
+func (r *queryResolver) PassageInterlinear(ctx context.Context, startVerseID int, endVerseID int) (*model.PassageInterlinear, error) {
+	result, err := r.ContentService.PassageInterlinear(ctx, startVerseID, endVerseID)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("%w", err)
+		}
+		slog.Error("failed to load passage interlinear", "start", startVerseID, "end", endVerseID, "error", err)
+		return nil, fmt.Errorf("failed to load passage interlinear")
+	}
+
+	verses := make([]*model.InterlinearVerse, len(result.Verses))
+	for i, v := range result.Verses {
+		segments := make([]*model.InterlinearSegment, len(v.Segments))
+		for j, s := range v.Segments {
+			segments[j] = &model.InterlinearSegment{Text: s.Text, SpaceBefore: s.SpaceBefore}
+		}
+		words := make([]*model.InterlinearWord, len(v.Words))
+		for j, w := range v.Words {
+			words[j] = &model.InterlinearWord{
+				ID: w.ID, Language: w.Language, Source: w.Source, Translit: w.Translit, Parsing: w.Parsing,
+				Strongs: w.Strongs, Gloss: w.Gloss, TagSource: w.TagSource, SourceOrder: w.SourceOrder, Segment: w.Segment,
+			}
+		}
+		verses[i] = &model.InterlinearVerse{VerseID: v.VerseID, Chapter: v.Chapter, Verse: v.Verse, Segments: segments, Words: words}
+	}
+	return &model.PassageInterlinear{Verses: verses}, nil
+}
+
 // passageTitleError maps title-mutation service errors to client-safe messages.
 func passageTitleError(err error) error {
 	if errors.Is(err, domain.ErrNotFound) {
