@@ -145,6 +145,9 @@
 					>{#each iv.segments as seg, i (i)}{#if seg.spaceBefore}{' '}{/if}{#if iv.words.some((w) => w.segment === i)}<button
 								type="button"
 								data-segment="{iv.verseId}:{i}"
+								aria-describedby={active !== null && active === primaryWordKey(iv, i)
+									? 'interlinear-popover'
+									: undefined}
 								class="cursor-pointer border-0 bg-transparent p-0 font-[inherit] text-primary underline decoration-dotted underline-offset-4"
 								>{seg.text}</button
 							>{:else}<span>{seg.text}</span>{/if}{/each}{' '}</span

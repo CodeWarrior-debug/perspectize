@@ -65,7 +65,7 @@
 		<button
 			type="button"
 			aria-pressed={showOriginal}
-			class="mt-2 mr-3 text-[13px] font-semibold text-primary hover:underline"
+			class="mt-2 mr-3 text-[13px] font-semibold text-primary hover:underline aria-pressed:underline"
 			onclick={() => (showOriginal = !showOriginal)}
 		>
 			Show original language

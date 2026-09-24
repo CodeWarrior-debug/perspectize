@@ -285,7 +285,7 @@ describe('ActivityDetailsModal', () => {
 			expect(screen.getByRole('button', { name: /save title/i })).toBeDisabled();
 		});
 
-		it('offers original language for a passage and not for a YouTube video', () => {
+		it('offers original language for a passage', () => {
 			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
 			expect(screen.getByRole('button', { name: /show original language/i })).toBeInTheDocument();
 		});

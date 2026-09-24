@@ -105,6 +105,17 @@ describe('InterlinearPassage', () => {
 		await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
 	});
 
+	it('the phrase whose primary word is active is described by the popover; others are not', async () => {
+		render(InterlinearPassage, { props: { verses: [plain(1, 1, 'x')], interlinear: [gen11] } });
+		const god = screen.getByRole('button', { name: 'God' });
+		const created = screen.getByRole('button', { name: 'created' });
+		expect(god).not.toHaveAttribute('aria-describedby');
+		await fireEvent.mouseOver(god);
+		await screen.findByRole('tooltip');
+		expect(god).toHaveAttribute('aria-describedby', 'interlinear-popover');
+		expect(created).not.toHaveAttribute('aria-describedby');
+	});
+
 	it('a pointerdown outside the component clears a pinned popover (tap-away)', async () => {
 		render(InterlinearPassage, { props: { verses: [plain(1, 1, 'x')], interlinear: [gen11] } });
 		await fireEvent.click(screen.getByRole('button', { name: 'God' }));

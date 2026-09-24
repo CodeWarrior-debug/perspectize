@@ -45,13 +45,34 @@ describe('WordPopover', () => {
 		expect(tip.style.top).toBe('20px');
 	});
 
-	it('renders Hebrew right-to-left and Greek left-to-right', () => {
-		const { unmount } = render(WordPopover, { props: { word: hebrew, english: null, left: 0, top: 0, id: 'p' } });
-		expect(screen.getByText('בָּרָא')).toHaveAttribute('dir', 'rtl');
-		unmount();
+	it('renders Hebrew right-to-left', () => {
+		render(WordPopover, { props: { word: hebrew, english: null, left: 0, top: 0, id: 'p' } });
+		expect(screen.getByText('Hebrew')).toBeInTheDocument();
+		expect(screen.getByText(hebrew.source)).toHaveAttribute('dir', 'rtl');
+	});
+
+	it('renders Greek left-to-right', () => {
 		render(WordPopover, { props: { word: greek, english: null, left: 0, top: 0, id: 'p' } });
 		expect(screen.getByText('Greek')).toBeInTheDocument();
-		expect(screen.getByText('μονογενῆ')).toHaveAttribute('dir', 'ltr');
+		expect(screen.getByText(greek.source)).toHaveAttribute('dir', 'ltr');
+	});
+
+	it('omits the parsing line when parsing is empty', () => {
+		render(WordPopover, { props: { word: { ...hebrew, parsing: '' }, english: null, left: 0, top: 0, id: 'p' } });
+		expect(screen.queryByText(/third person masculine singular/)).not.toBeInTheDocument();
+		expect(screen.getByTestId('popover-gloss')).toBeInTheDocument();
+	});
+
+	it('shows the rendered-as line together with the gloss', () => {
+		render(WordPopover, { props: { word: hebrew, english: 'created', left: 0, top: 0, id: 'p' } });
+		expect(screen.getByTestId('popover-gloss')).toHaveTextContent('to create');
+		expect(screen.getByText(/Rendered here as/)).toBeInTheDocument();
+	});
+
+	it('shows the rendered-as line even when the gloss is empty', () => {
+		render(WordPopover, { props: { word: { ...hebrew, gloss: '' }, english: 'created', left: 0, top: 0, id: 'p' } });
+		expect(screen.queryByTestId('popover-gloss')).not.toBeInTheDocument();
+		expect(screen.getByText(/Rendered here as/)).toBeInTheDocument();
 	});
 
 	it('omits the rendered-as line and the meaning when there is none', () => {
