@@ -523,3 +523,71 @@ func TestGormContentRepository_List(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 }
+
+func TestGormContentRepository_SetDisplayTitleIfEmpty(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("first writer wins and gets own title", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectExec(`UPDATE content SET display_title = \$1 WHERE id = \$2 AND display_title IS NULL`).
+			WithArgs("Creation", 7).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+
+		got, err := NewGormContentRepository(db).SetDisplayTitleIfEmpty(ctx, 7, "Creation")
+		require.NoError(t, err)
+		assert.Equal(t, "Creation", got)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("losing writer gets the winning title, not an error", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectExec(`UPDATE content SET display_title`).WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(`SELECT "display_title" FROM "content"`).
+			WillReturnRows(sqlmock.NewRows([]string{"display_title"}).AddRow("Creation"))
+
+		got, err := NewGormContentRepository(db).SetDisplayTitleIfEmpty(ctx, 7, "The Beginning")
+		require.NoError(t, err)
+		assert.Equal(t, "Creation", got)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("missing row is ErrNotFound", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectExec(`UPDATE content SET display_title`).WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(`SELECT "display_title" FROM "content"`).
+			WillReturnRows(sqlmock.NewRows([]string{"display_title"}))
+
+		_, err := NewGormContentRepository(db).SetDisplayTitleIfEmpty(ctx, 404, "x")
+		assert.ErrorIs(t, err, domain.ErrNotFound)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("wraps update errors", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectExec(`UPDATE content SET display_title`).WillReturnError(errors.New("boom"))
+
+		_, err := NewGormContentRepository(db).SetDisplayTitleIfEmpty(ctx, 7, "x")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to set display title")
+	})
+}
+
+func TestGormContentRepository_ClearDisplayTitle(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("clears title", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectExec(`UPDATE content SET display_title = NULL WHERE id = \$1`).
+			WithArgs(7).WillReturnResult(sqlmock.NewResult(0, 1))
+
+		require.NoError(t, NewGormContentRepository(db).ClearDisplayTitle(ctx, 7))
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("missing row is ErrNotFound", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectExec(`UPDATE content SET display_title = NULL`).WillReturnResult(sqlmock.NewResult(0, 0))
+
+		assert.ErrorIs(t, NewGormContentRepository(db).ClearDisplayTitle(ctx, 404), domain.ErrNotFound)
+	})
+}
