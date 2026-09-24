@@ -47,11 +47,14 @@ const content = {
 	name: 'Stephen Paea breaking bench',
 	url: 'https://youtube.com/watch?v=abc123',
 	channelTitle: 'TBD tribute',
+	contentType: 'YOUTUBE',
+	primaryCategory: { label: 'Powerlifting' },
 	viewCount: 1300000,
 	likeCount: 26500,
 	length: 59,
 	lengthUnits: 'seconds',
 	publishedAt: '2026-02-24T00:00:00Z',
+	createdAt: '2026-02-20T12:00:00Z',
 	updatedAt: '2026-03-01T00:00:00Z',
 	description: 'A record-setting rep, filmed ringside.',
 	tags: ['tom brady', 'tom brady goat'],
@@ -74,6 +77,50 @@ describe('ActivityDetailsModal', () => {
 		expect(screen.getByText('1.3 M')).toBeInTheDocument(); // views
 		expect(screen.getByText('26.5 K')).toBeInTheDocument(); // likes
 		expect(screen.getByText('0:59')).toBeInTheDocument(); // duration
+	});
+
+	// Gap #11 in the UI gap audit: the modal had no Category or Date Added, and
+	// hard-coded "YouTube Video" regardless of content type -- even though all
+	// three were already on the ContentItem rows both callers pass in.
+	it('shows the primary category and the date added to Perspectize', () => {
+		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+
+		expect(screen.getByText('Category')).toBeInTheDocument();
+		expect(screen.getByText('Powerlifting')).toBeInTheDocument();
+		expect(screen.getByText('Date Added')).toBeInTheDocument();
+		expect(screen.getByText('Feb 20, 2026')).toBeInTheDocument();
+	});
+
+	it('shows an em dash for category and date added when the content has neither', () => {
+		render(ActivityDetailsModal, {
+			props: {
+				content: { ...content, primaryCategory: null, createdAt: undefined },
+				open: true,
+				onClose: vi.fn(),
+			},
+		});
+
+		const dashes = screen.getAllByText('—');
+		expect(dashes.length).toBeGreaterThanOrEqual(2);
+	});
+
+	it('labels the header "YouTube Video" for a YOUTUBE content item', () => {
+		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+		expect(screen.getByText('YouTube Video')).toBeInTheDocument();
+	});
+
+	it('labels the header "Claim" for a CLAIM content item', () => {
+		render(ActivityDetailsModal, {
+			props: { content: { ...content, contentType: 'CLAIM' }, open: true, onClose: vi.fn() },
+		});
+		expect(screen.getByText('Claim')).toBeInTheDocument();
+		expect(screen.queryByText('YouTube Video')).not.toBeInTheDocument();
+	});
+
+	it('falls back to "YouTube Video" when contentType is not provided (backward compatibility)', () => {
+		const { contentType, ...withoutType } = content;
+		render(ActivityDetailsModal, { props: { content: withoutType, open: true, onClose: vi.fn() } });
+		expect(screen.getByText('YouTube Video')).toBeInTheDocument();
 	});
 
 	it('shows a loading indicator for perspectives and avg rating while the aggregates query is in flight', () => {
