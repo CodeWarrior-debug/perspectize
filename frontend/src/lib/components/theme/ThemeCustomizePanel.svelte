@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button, Input, Label } from '$lib/components/shadcn';
 	import ColorWheel from './ColorWheel.svelte';
-	import { THEME_PRESETS, THEME_PRESET_TOKENS } from '$lib/theme/presets';
+	import { THEME_PRESETS, THEME_PRESET_TOKENS, presetSwatchColors } from '$lib/theme/presets';
 	import { downloadThemeCss } from '$lib/theme/export';
 	import { deriveTheme, type BaseThemeTokens } from '$lib/theme/derive';
 	import { formatColorForUnit, parseColorInput, type ColorUnit } from '$lib/theme/format';
@@ -125,7 +125,7 @@
 					: 'border-border hover:border-primary/50'}"
 			>
 				<div class="flex gap-1 mb-2">
-					{#each [THEME_PRESET_TOKENS[preset.id].primary, THEME_PRESET_TOKENS[preset.id].secondary, THEME_PRESET_TOKENS[preset.id].accent, THEME_PRESET_TOKENS[preset.id].background] as swatch}
+					{#each presetSwatchColors(THEME_PRESET_TOKENS[preset.id]) as swatch}
 						<span class="size-4 rounded-full border border-black/10" style="background:{swatch}"></span>
 					{/each}
 				</div>

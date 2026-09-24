@@ -1,5 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { THEME_PRESETS, DEFAULT_THEME_ID, THEME_PRESET_TOKENS, generatePresetCss } from '$lib/theme/presets';
+import {
+	THEME_PRESETS,
+	DEFAULT_THEME_ID,
+	THEME_PRESET_TOKENS,
+	generatePresetCss,
+	presetSwatchColors,
+} from '$lib/theme/presets';
+
+describe('presetSwatchColors', () => {
+	it.each(THEME_PRESETS)('preset "$id" previews four distinct colours: background, row hover, primary, text', (preset) => {
+		const tokens = THEME_PRESET_TOKENS[preset.id];
+		const swatches = presetSwatchColors(tokens);
+		expect(swatches).toEqual([tokens.background, tokens.rowHover, tokens.primary, tokens.foreground]);
+		expect(new Set(swatches).size).toBe(4);
+	});
+});
 
 describe('THEME_PRESET_TOKENS', () => {
 	it('derives a full token set for every preset', () => {
