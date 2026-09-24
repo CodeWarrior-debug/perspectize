@@ -601,6 +601,7 @@ describe('COL_TO_SORT / SORT_TO_COL', () => {
 		expect(COL_TO_SORT.duration).toBe('LENGTH');
 		expect(COL_TO_SORT.views).toBe('VIEW_COUNT');
 		expect(COL_TO_SORT.likes).toBe('LIKE_COUNT');
+		expect(COL_TO_SORT.percentLiked).toBe('PERCENT_LIKED');
 		expect(COL_TO_SORT.publishDate).toBe('PUBLISHED_AT');
 		expect(COL_TO_SORT.channel).toBe('CHANNEL_TITLE');
 		expect(COL_TO_SORT.createdAt).toBe('CREATED_AT');
@@ -612,6 +613,7 @@ describe('COL_TO_SORT / SORT_TO_COL', () => {
 		expect(SORT_TO_COL.LENGTH).toBe('duration');
 		expect(SORT_TO_COL.VIEW_COUNT).toBe('views');
 		expect(SORT_TO_COL.LIKE_COUNT).toBe('likes');
+		expect(SORT_TO_COL.PERCENT_LIKED).toBe('percentLiked');
 		expect(SORT_TO_COL.PUBLISHED_AT).toBe('publishDate');
 		expect(SORT_TO_COL.CHANNEL_TITLE).toBe('channel');
 		expect(SORT_TO_COL.CREATED_AT).toBe('createdAt');
@@ -646,6 +648,10 @@ describe('sortsToGraphQL', () => {
 
 	it('maps a single sort to the GraphQL shape', () => {
 		expect(sortsToGraphQL([{ col: 'views', dir: 'desc' }])).toEqual([{ field: 'VIEW_COUNT', order: 'DESC' }]);
+	});
+
+	it('round-trips percentLiked now that a backend ContentSortBy enum exists for it', () => {
+		expect(sortsToGraphQL([{ col: 'percentLiked', dir: 'desc' }])).toEqual([{ field: 'PERCENT_LIKED', order: 'DESC' }]);
 	});
 
 	it('preserves priority order across multiple columns', () => {

@@ -112,6 +112,24 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 			SQLRepr:         "(response->'items'->0->'statistics'->>'likeCount')::BIGINT",
 			NULLReplacement: int64(0),
 		}
+	case domain.ContentSortByPercentLiked:
+		return paginator.Rule{
+			Key: "PercentLiked",
+			// Computed the same way the frontend's percentLikedValueGetter does: likes as a
+			// fraction of views. NULL (and thus NULLReplacement, sorted like any other JSONB
+			// rule here) when views is missing/zero or likes is missing -- there's no
+			// meaningful rate to show.
+			Order: paginatorOrder,
+			SQLRepr: "CASE " +
+				"WHEN (response->'items'->0->'statistics'->>'viewCount') IS NULL " +
+				"  OR (response->'items'->0->'statistics'->>'likeCount') IS NULL " +
+				"  OR (response->'items'->0->'statistics'->>'viewCount')::BIGINT = 0 " +
+				"THEN NULL " +
+				"ELSE (response->'items'->0->'statistics'->>'likeCount')::FLOAT8 " +
+				"     / NULLIF((response->'items'->0->'statistics'->>'viewCount')::BIGINT, 0) " +
+				"END",
+			NULLReplacement: float64(-1),
+		}
 	case domain.ContentSortByPublishedAt:
 		return paginator.Rule{
 			Key:             "PublishedAt",

@@ -40,10 +40,9 @@ export const SORTABLE_COLUMNS: readonly TogglableColumn[] = [
 	{ colId: 'duration', label: 'Length' },
 	{ colId: 'views', label: 'Views' },
 	{ colId: 'likes', label: 'Likes' },
-	// Client-side only: no backend ContentSortBy enum value exists for this computed
-	// column, so it only sorts in "Loaded" mode and on the mobile card list. In "All
-	// Items" mode it's dropped by sortsToGraphQL (it's absent from COL_TO_SORT), same
-	// as it always was — this only fixes Loaded-mode/mobile, which silently ignored it.
+	// Sorts server-side via ContentSortBy.PERCENT_LIKED in "All Items" mode (see
+	// COL_TO_SORT in gridUrlState.ts) and client-side here (percentLikedValueGetter,
+	// below) for "Loaded" mode and the mobile card list.
 	{ colId: 'percentLiked', label: '% Liked' },
 	{ colId: 'publishDate', label: 'Date' },
 	{ colId: 'channel', label: 'Channel' },
