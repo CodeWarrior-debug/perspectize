@@ -9,8 +9,9 @@ import {
 	activeKey,
 	placePopover,
 	connectorLine,
+	englishOrderWords,
 } from '$lib/utils/interlinear';
-import type { InterlinearVerse } from '$lib/queries/bible';
+import type { InterlinearVerse, InterlinearWord } from '$lib/queries/bible';
 
 const verse: InterlinearVerse = {
 	verseId: 1,
@@ -184,5 +185,49 @@ describe('geometry', () => {
 			x2: 114, // 191 - 77
 			y2: 139, // 500 - 361
 		});
+	});
+});
+
+describe('englishOrderWords', () => {
+	const mk = (id: number, segment: number | null): InterlinearWord => ({
+		id,
+		language: 'heb',
+		source: `s${id}`,
+		translit: `t${id}`,
+		parsing: '',
+		strongs: 'H0001',
+		gloss: '',
+		tagSource: 'tagged',
+		sourceOrder: id,
+		segment,
+	});
+	const vs = (words: InterlinearWord[]): InterlinearVerse => ({
+		verseId: 9,
+		chapter: 1,
+		verse: 1,
+		segments: [],
+		words,
+	});
+	const ids = (words: InterlinearWord[]) => words.map((w) => w.id);
+
+	it('orders the fixture verse by English phrase; the marker precedes the phrase after it', () => {
+		// pos: id0=0, id1=2, id2=1, id3=-0.5 (next segmented word is id4, segment 0), id4=0
+		expect(ids(englishOrderWords(verse))).toEqual([3, 0, 4, 2, 1]);
+	});
+	it('a null-segment word in the middle sits just before the next phrase', () => {
+		expect(ids(englishOrderWords(vs([mk(0, 0), mk(1, null), mk(2, 1)])))).toEqual([0, 1, 2]);
+		expect(ids(englishOrderWords(vs([mk(0, 1), mk(1, null), mk(2, 0)])))).toEqual([1, 2, 0]);
+	});
+	it('a trailing null-segment word goes after its preceding phrase', () => {
+		expect(ids(englishOrderWords(vs([mk(0, 1), mk(1, 0), mk(2, null)])))).toEqual([1, 2, 0]);
+	});
+	it('keeps original order when no word has a segment', () => {
+		expect(ids(englishOrderWords(vs([mk(0, null), mk(1, null), mk(2, null)])))).toEqual([0, 1, 2]);
+	});
+	it('does not mutate the verse', () => {
+		const before = ids(verse.words);
+		const out = englishOrderWords(verse);
+		expect(out).not.toBe(verse.words);
+		expect(ids(verse.words)).toEqual(before);
 	});
 });

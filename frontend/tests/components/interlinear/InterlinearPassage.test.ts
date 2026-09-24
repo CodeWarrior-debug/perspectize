@@ -40,13 +40,13 @@ const plain = (verseId: number, verse: number, text: string) => ({ verseId, chap
 afterEach(() => vi.restoreAllMocks());
 
 describe('InterlinearPassage', () => {
-	it('renders the phrases of a verse with data, in English order, and one chip per source word in original order', () => {
+	it('renders the phrases of a verse with data, in English order, and one chip per source word, also in English order', () => {
 		render(InterlinearPassage, { props: { verses: [plain(1, 1, 'x')], interlinear: [gen11] } });
 		const phrases = screen.getAllByRole('button').filter((b) => b.hasAttribute('data-segment'));
 		expect(phrases.map((p) => p.textContent?.trim())).toEqual(['In the beginning', 'God', 'created']);
 		const chips = screen.getAllByRole('button').filter((b) => b.hasAttribute('data-chip'));
-		// original order: beginning, created, God, marker  (the Genesis 1:1 swap)
-		expect(chips.map((c) => c.getAttribute('data-chip'))).toEqual(['1:0', '1:1', '1:2', '1:3']);
+		// English order: beginning, God, [Obj.] (nothing follows it, so it trails its preceding phrase), created
+		expect(chips.map((c) => c.getAttribute('data-chip'))).toEqual(['1:0', '1:2', '1:3', '1:1']);
 		// the trailing English-only text is plain, not a button
 		expect(screen.getByText('the heavens and the earth.')).toBeInTheDocument();
 	});

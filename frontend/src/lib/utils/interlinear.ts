@@ -1,4 +1,4 @@
-import type { InterlinearVerse } from '$lib/queries/bible';
+import type { InterlinearVerse, InterlinearWord } from '$lib/queries/bible';
 
 /** 'H0430G' -> 'H430', 'H1254B' -> 'H1254'. Zero padding and the sense letter are internal. */
 export function formatStrongs(tag: string): string {
@@ -18,6 +18,32 @@ export function phraseWordIds(verse: InterlinearVerse, segment: number): number[
 export function primaryWordKey(verse: InterlinearVerse, segment: number): string | null {
 	const ids = phraseWordIds(verse, segment);
 	return ids.length ? wordKey(verse.verseId, ids[0]) : null;
+}
+
+/**
+ * The verse's words in the order of their matched English phrases (for the chips row), so the
+ * source words read left to right like the English above them. A word with no phrase sits just
+ * before the next phrased word (or just after the previous one when none follows). Ties keep
+ * original order. Returns a new array; `verse.words` is untouched.
+ */
+export function englishOrderWords(verse: InterlinearVerse): InterlinearWord[] {
+	const words = verse.words;
+	const pos = words.map((w, i) => {
+		if (w.segment !== null) return w.segment;
+		for (let j = i + 1; j < words.length; j++) {
+			const seg = words[j].segment;
+			if (seg !== null) return seg - 0.5;
+		}
+		for (let j = i - 1; j >= 0; j--) {
+			const seg = words[j].segment;
+			if (seg !== null) return seg + 0.5;
+		}
+		return 0; // no segmented word at all: equal positions, so sourceOrder keeps original order
+	});
+	return words
+		.map((w, i) => ({ w, p: pos[i] }))
+		.sort((a, b) => a.p - b.p || a.w.sourceOrder - b.w.sourceOrder)
+		.map((x) => x.w);
 }
 
 export interface InterlinearState {

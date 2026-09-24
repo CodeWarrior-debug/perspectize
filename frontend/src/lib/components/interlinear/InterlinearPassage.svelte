@@ -4,6 +4,7 @@
 	import {
 		activeKey,
 		connectorLine,
+		englishOrderWords,
 		formatStrongs,
 		initialInterlinearState,
 		placePopover,
@@ -19,7 +20,7 @@
 	const POPOVER_WIDTH = 260;
 
 	const byVerse = $derived(new Map(interlinear.map((v) => [v.verseId, v])));
-	// Words for the passage, verse by verse, each verse in original order (chips row).
+	// Verses that have data, in passage order; the chips row shows each verse's words in English (translated) order.
 	const chipVerses = $derived(verses.map((v) => byVerse.get(v.verseId)).filter((v): v is InterlinearVerse => !!v));
 	// The active word resolves only against verses that are on screen (rendered AND have data).
 	const visibleByVerse = $derived(new Map(chipVerses.map((v) => [v.verseId, v])));
@@ -173,7 +174,7 @@
 			>
 				{#each chipVerses as iv (iv.verseId)}
 					<span class="self-center text-[10px] text-muted-foreground">{iv.verse}</span>
-					{#each iv.words as w (w.id)}
+					{#each englishOrderWords(iv) as w (w.id)}
 						<button
 							type="button"
 							data-chip={wordKey(iv.verseId, w.id)}
