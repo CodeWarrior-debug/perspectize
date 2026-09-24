@@ -745,6 +745,7 @@
 			if (event.colDef.colId === 'perspectize') {
 				openPerspective(String(event.data.id), event.data.name);
 			} else if (event.colDef.colId === 'category') {
+				hover.close(); // don't leave the hover copy-popover open under the typeahead
 				const rect =
 					event.event?.target instanceof HTMLElement
 						? event.event.target.getBoundingClientRect()
