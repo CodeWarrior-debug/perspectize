@@ -142,3 +142,22 @@ describe('row tokens', () => {
 		);
 	});
 });
+
+describe('muted foreground', () => {
+	const oklabDistance = differenceEuclidean('oklab');
+
+	it.each(THEME_PRESETS)(
+		'preset "$id": muted text is a real, quieter level that stays readable on the muted surface',
+		(preset) => {
+			const full = deriveTheme(preset.base);
+			expect(full.mutedForeground).not.toBe(full.foreground);
+			expect(oklabDistance(full.mutedForeground, full.foreground)).toBeGreaterThanOrEqual(0.05);
+			expect(wcagContrast(full.muted, full.mutedForeground)).toBeGreaterThanOrEqual(4.5);
+			expect(wcagContrast(full.background, full.mutedForeground)).toBeGreaterThanOrEqual(4.5);
+			// "Muted" means quieter than the body text on the page, not merely a different colour.
+			expect(wcagContrast(full.background, full.mutedForeground)).toBeLessThan(
+				wcagContrast(full.background, full.foreground),
+			);
+		},
+	);
+});

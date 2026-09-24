@@ -172,6 +172,24 @@ function mix(fromHex: string, toHex: string, amount: number): string {
 	return formatHex(interpolate([fromHex, toHex], 'oklab')(amount)) ?? fromHex;
 }
 
+/** How far to pull the foreground toward the muted surface, strongest (most distinct) first. */
+const MUTED_TEXT_MIXES = [0.4, 0.3, 0.2, 0.12];
+
+/**
+ * A quiet-but-readable text level: the foreground pulled toward the muted surface, taking the
+ * quietest step that still clears AA on both the muted surface and the page. (Reusing the body
+ * colour, or a pure white/black, removes the muted level altogether.)
+ */
+function deriveMutedForeground(background: string, muted: string, foreground: string): string {
+	for (const amount of MUTED_TEXT_MIXES) {
+		const candidate = mix(foreground, muted, amount);
+		if (wcagContrast(muted, candidate) >= AA_NORMAL_TEXT && wcagContrast(background, candidate) >= AA_NORMAL_TEXT) {
+			return candidate;
+		}
+	}
+	return foreground;
+}
+
 /**
  * Row colours are opaque so hover looks identical on odd and even rows (an alpha overlay
  * composites differently over the zebra stripe). Dark themes often ship a primary that is
@@ -216,7 +234,7 @@ export function deriveTheme(base: BaseThemeTokens): FullThemeTokens {
 		secondaryHover: darken(secondary, -0.03),
 		secondaryForeground: pickForeground(secondary),
 		muted,
-		mutedForeground: pickForeground(muted),
+		mutedForeground: deriveMutedForeground(background, muted, foreground),
 		accent: base.accent,
 		accentForeground: pickForeground(base.accent),
 		destructive: base.destructive,
