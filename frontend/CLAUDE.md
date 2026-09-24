@@ -76,6 +76,8 @@ This project uses **Svelte 5 runes** exclusively. Do not use Svelte 4 syntax.
 
 **An `$effect` that writes a `$state` var and then reads that same var back (even just-assigned) loops.** Svelte 5 flags this as `effect_update_depth_exceeded` — assigning `foo = x` then reading `foo.length` later in the same effect re-triggers the effect indefinitely, even though the value is unchanged. Fix: read from a local `const` derived off the source (prop) instead of reading the `$state` var back. See `PerspectivePopover.svelte`'s `existingPerspective` reset effect.
 
+**An Escape handler inside a bits-ui dialog must run in the capture phase, or the dialog closes on the same keypress.** bits-ui's escape layer listens for `keydown` on `document` in the bubble phase and the dialog registered first, so a bubble-phase listener (including `<svelte:document onkeydown>`) runs too late for `stopPropagation` to help, and its `onEscapeKeydown` gets a cloned event so `defaultPrevented` is lost. Register `document.addEventListener('keydown', h, { capture: true })` in an `$effect` (with cleanup) and call `stopPropagation()` only while your inner element (popover, pin) is actually showing, so a second Escape still closes the dialog. See `interlinear/InterlinearPassage.svelte`; its test uses a bubble-phase `document` spy to prove the dialog never sees the first Escape.
+
 ## TanStack Query + GraphQL
 
 Queries use `graphql-request` with TanStack Svelte Query.
@@ -107,6 +109,8 @@ Queries use `graphql-request` with TanStack Svelte Query.
 **Do NOT:** Use `$query.data` (stores syntax) · Pass options object directly to `createQuery({...})` (must be function wrapper)
 
 **`queryKey` must mirror every variable `queryFn` actually sends.** If `queryFn` conditionally builds request variables (e.g. `mode === 'all' ? filter : undefined`), the `queryKey` object needs the *same* conditional — not a shortcut that hardcodes a fixed value for one branch. A `queryKey` field that doesn't change when the real request variable does means TanStack Query never sees a reason to refetch: the UI silently keeps serving stale cached data for that branch, no matter how the input changes (including back to empty/cleared). Caught in `ActivityTable.svelte`'s search box, which hardcoded `search: ''`/`filter: undefined` in the key for "Loaded" mode while `queryFn` unconditionally sent the real filter — so typing or clearing the search input never refetched.
+
+**`isLoading` is `false` for a paused (offline) query — branch on `isPending` for the loading state.** TanStack v5 defines `isLoading = isPending && isFetching`; while the network is offline a first fetch is paused (`isPending: true`, `isFetching: false`, no data, no error). A `{#if isLoading}…{:else if isError}…{:else if data}` chain then renders nothing at all. `interlinear/OriginalLanguage.svelte` uses `isPending`; its test covers `{ isPending: true, isLoading: false, isError: false, data: undefined }`.
 
 ## Icons (Lucide)
 
