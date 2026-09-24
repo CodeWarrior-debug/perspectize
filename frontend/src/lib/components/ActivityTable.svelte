@@ -485,11 +485,7 @@
 				maxWidth: 100,
 
 				filter: 'agTextColumnFilter',
-				valueGetter: (params) => {
-					const t = params.data?.contentType;
-					if (!t) return '';
-					return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
-				},
+				valueGetter: (params) => capitalizeContentType(params.data?.contentType),
 				filterValueGetter: (params) => {
 					return params.data?.contentType?.toLowerCase() ?? '';
 				},

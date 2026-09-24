@@ -500,8 +500,16 @@ describe('urlParamsToGraphQLFilter', () => {
 	});
 
 	it('maps f.type to contentType (uppercased)', () => {
-		const result = urlParamsToGraphQLFilter({ type: 'youtube' }, '');
-		expect(result).toEqual({ contentType: 'YOUTUBE' });
+		expect(urlParamsToGraphQLFilter({ type: 'claim' }, '')).toEqual({ contentType: 'CLAIM' });
+		expect(urlParamsToGraphQLFilter({ type: 'youtube_video' }, '')).toEqual({
+			contentType: 'YOUTUBE_VIDEO',
+		});
+	});
+
+	it('maps legacy f.type=youtube (bookmarked URLs) to YOUTUBE_VIDEO', () => {
+		expect(urlParamsToGraphQLFilter({ type: 'youtube' }, '')).toEqual({
+			contentType: 'YOUTUBE_VIDEO',
+		});
 	});
 
 	it('maps f.views range to minViewCount/maxViewCount', () => {
@@ -569,7 +577,7 @@ describe('urlParamsToGraphQLFilter', () => {
 		expect(result).toEqual({
 			search: 'cooking',
 			searchFields: ['TITLE', 'DESCRIPTION', 'CHANNEL_TITLE', 'TAGS'],
-			contentType: 'YOUTUBE',
+			contentType: 'YOUTUBE_VIDEO',
 			minViewCount: 1000,
 		});
 	});

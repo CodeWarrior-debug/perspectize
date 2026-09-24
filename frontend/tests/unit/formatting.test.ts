@@ -558,12 +558,12 @@ describe('typeCellRenderer', () => {
 
 	it('includes sr-only span with content type for filter matching', () => {
 		const result = typeCellRenderer({
-			data: { contentType: 'YOUTUBE' },
+			data: { contentType: 'YOUTUBE_VIDEO' },
 		}) as HTMLElement;
 
 		const hidden = result.querySelector('.sr-only');
 		expect(hidden).toBeTruthy();
-		expect(hidden?.textContent).toBe('YOUTUBE');
+		expect(hidden?.textContent).toBe('YOUTUBE_VIDEO');
 	});
 });
 

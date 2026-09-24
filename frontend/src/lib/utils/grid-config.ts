@@ -36,11 +36,19 @@ export function resolveSortOrder(sort: string | null | undefined): 'ASC' | 'DESC
 	return sort === 'asc' ? 'ASC' : 'DESC';
 }
 
+/** Display names for content types, keyed by the lower-cased non-display value. */
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+	youtube_video: 'YouTube Video',
+};
+
 /**
- * Capitalize first letter, lowercase rest — used by the type column valueGetter.
+ * Display label for a content type — used by the type column valueGetter.
+ * Known types use CONTENT_TYPE_LABELS; others get first letter capitalized, rest lowercased.
  */
 export function capitalizeContentType(contentType: string | undefined): string {
 	if (!contentType) return '';
+	const label = CONTENT_TYPE_LABELS[contentType.toLowerCase()];
+	if (label) return label;
 	return contentType.charAt(0).toUpperCase() + contentType.slice(1).toLowerCase();
 }
 

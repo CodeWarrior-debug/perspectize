@@ -27,7 +27,7 @@ function row(overrides: Partial<ContentItem>): ContentItem {
 		name: '',
 		addedByUserID: '1',
 		url: null,
-		contentType: 'YOUTUBE',
+		contentType: 'YOUTUBE_VIDEO',
 		length: null,
 		lengthUnits: null,
 		viewCount: null,
@@ -123,8 +123,12 @@ describe('resolveSortOrder', () => {
 // ---------------------------------------------------------------------------
 describe('capitalizeContentType', () => {
 	it('capitalizes first letter and lowercases rest', () => {
-		expect(capitalizeContentType('YOUTUBE')).toBe('Youtube');
-		expect(capitalizeContentType('youtube_video')).toBe('Youtube_video');
+		expect(capitalizeContentType('CLAIM')).toBe('Claim');
+	});
+
+	it('shows youtube_video as "YouTube Video" in any casing', () => {
+		expect(capitalizeContentType('YOUTUBE_VIDEO')).toBe('YouTube Video');
+		expect(capitalizeContentType('youtube_video')).toBe('YouTube Video');
 	});
 
 	it('returns empty string for undefined', () => {
