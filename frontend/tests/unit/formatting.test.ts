@@ -265,8 +265,8 @@ describe('nameCellRenderer', () => {
 });
 
 describe('formatCount', () => {
-	it('returns -- for null', () => {
-		expect(formatCount(null)).toBe('--');
+	it('returns — for null', () => {
+		expect(formatCount(null)).toBe('—');
 	});
 
 	it('returns number as string for counts under 1000', () => {
@@ -295,8 +295,8 @@ describe('formatCount', () => {
 });
 
 describe('formatCountExact', () => {
-	it('returns -- for null', () => {
-		expect(formatCountExact(null)).toBe('--');
+	it('returns an empty string (so no tooltip opens) for null', () => {
+		expect(formatCountExact(null)).toBe('');
 	});
 
 	it('formats small numbers without commas', () => {
@@ -400,8 +400,8 @@ describe('formatDateCompact', () => {
 });
 
 describe('formatPublishDate', () => {
-	it('returns -- for null', () => {
-		expect(formatPublishDate(null)).toBe('--');
+	it('returns — for null', () => {
+		expect(formatPublishDate(null)).toBe('—');
 	});
 
 	it('formats valid ISO date string', () => {
@@ -410,12 +410,12 @@ describe('formatPublishDate', () => {
 });
 
 describe('formatTags', () => {
-	it('returns -- for null', () => {
-		expect(formatTags(null)).toBe('--');
+	it('returns — for null', () => {
+		expect(formatTags(null)).toBe('—');
 	});
 
-	it('returns -- for empty array', () => {
-		expect(formatTags([])).toBe('--');
+	it('returns — for empty array', () => {
+		expect(formatTags([])).toBe('—');
 	});
 
 	it('formats single tag', () => {
@@ -428,12 +428,12 @@ describe('formatTags', () => {
 });
 
 describe('truncateDescription', () => {
-	it('returns -- for null', () => {
-		expect(truncateDescription(null)).toBe('--');
+	it('returns — for null', () => {
+		expect(truncateDescription(null)).toBe('—');
 	});
 
-	it('returns -- for empty string', () => {
-		expect(truncateDescription('')).toBe('--');
+	it('returns — for empty string', () => {
+		expect(truncateDescription('')).toBe('—');
 	});
 
 	it('returns full description if under max length', () => {
