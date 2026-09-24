@@ -157,3 +157,26 @@ def build_chunks(rows):
 
 def render(chunks):
     return "".join((" " if c.space_before else "") + c.text for c in chunks)
+
+
+def assign_span_heads(rows):
+    """For each row, the bsb_sort of the first row of its English phrase, or None."""
+    heads: list[int | None] = []
+    prev = None
+    prev_head = None
+    for r in rows:
+        if scrubbed_english(r):
+            head = r.bsb_sort
+        elif (
+            r.strongs is not None
+            and r.english.strip() == ""
+            and prev is not None
+            and prev_head is not None
+            and r.bsb_sort == prev.bsb_sort + 1
+        ):
+            head = prev_head
+        else:
+            head = None
+        heads.append(head)
+        prev, prev_head = r, head
+    return heads
