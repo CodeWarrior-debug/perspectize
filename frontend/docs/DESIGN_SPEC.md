@@ -95,6 +95,9 @@ Design these as a **Figma local styles / variables** set. These are the semantic
 | `border`                 | `#d4d4d4`               | Default borders (neutral-300)                     |
 | `input`                  | `#d4d4d4`               | Input borders (neutral-300)                       |
 | `ring`                   | `#1a365d`               | Focus ring (matches primary)                      |
+| `row-alt`                | `#f8f8f8`               | Activity grid zebra (derived in `derive.ts`)      |
+| `row-hover`              | `#e1e5eb`               | Activity grid row hover, opaque (derived)         |
+| `row-accent`             | `#1a365d`               | Activity grid hover bar (derived)                 |
 | `disabled`               | `0.5`                   | Disabled state opacity                            |
 
 ### Accent Palette (for data visualization, badges)
@@ -253,9 +256,9 @@ Design these **structural frames** that every page uses.
 
 1. **Search bar**: Move from standalone input to inline with the page title (title left, search right). On mobile it stacks below the title.
 2. **Card container**: Wrap the AG Grid in a card with `border`, `rounded-lg`, `shadow-sm`. This gives it visual definition instead of floating.
-3. **Table header row**: Navy background (#1a365d) with white text — ties to the app header.
-4. **Alternating rows**: Very subtle tint on odd rows — `rgba(26, 54, 93, 0.03)` (3% navy).
-5. **Row hover**: `rgba(26, 54, 93, 0.06)` (6% navy).
+3. **Table header row**: A quiet band — `muted` background, `foreground` labels at weight 600, no column dividers. Resize handles and filter buttons appear only on header hover/focus (a filter button also stays visible on a column with an active filter). Colours come from theme tokens, so the grid follows the theme picker.
+4. **Alternating rows**: Faint neutral tint on odd rows via `--color-row-alt` (the foreground mixed ~2.5% into the background).
+5. **Row hover**: Opaque `--color-row-hover` (primary mixed ~12% into the background; the foreground is used instead when primary is nearly the background, as in Midnight and Terminal) plus a 3px left bar in `--color-row-accent`, drawn on AG Grid's hover overlay. Opaque so hover looks identical on odd and even rows; unit tests pin hover ≠ zebra and text contrast for every preset.
 6. **Pagination**: Inside the card, at the bottom.
 
 #### Mobile (375px)
