@@ -239,6 +239,326 @@
 	--color-row-accent: #c9f5d9;
 }
 
+[data-theme='imp-reading-room-calm'] {
+	--color-background: #f8fafd;
+	--color-foreground: #1d2430;
+	--color-card: #f8fafd;
+	--color-card-foreground: #1d2430;
+	--color-popover: #f8fafd;
+	--color-popover-foreground: #1d2430;
+	--color-primary: #2c4a7a;
+	--color-primary-hover: #1c3a68;
+	--color-primary-foreground: #ffffff;
+	--color-secondary: #f0f3f9;
+	--color-secondary-hover: #fafdff;
+	--color-secondary-foreground: #171717;
+	--color-muted: #f0f3f9;
+	--color-muted-foreground: #171717;
+	--color-accent: #c9d7ea;
+	--color-accent-foreground: #171717;
+	--color-destructive: #b04a3a;
+	--color-destructive-hover: #953123;
+	--color-destructive-foreground: #ffffff;
+	--color-border: #dcd8cf;
+	--color-input: #dcd8cf;
+	--color-ring: #2c4a7a;
+	--color-rating-positive: #00a55f;
+	--color-rating-neutral: #d68128;
+	--color-rating-negative: #db2149;
+	--color-rating-undecided: #64748b;
+	--color-row-alt: #f2f4f7;
+	--color-row-hover: #dde4ed;
+	--color-row-accent: #2c4a7a;
+}
+
+[data-theme='imp-archive-sepia'] {
+	--color-background: #fcf3ea;
+	--color-foreground: #3a2f22;
+	--color-card: #fcf3ea;
+	--color-card-foreground: #3a2f22;
+	--color-popover: #fcf3ea;
+	--color-popover-foreground: #3a2f22;
+	--color-primary: #7c5a2e;
+	--color-primary-hover: #6a491c;
+	--color-primary-foreground: #ffffff;
+	--color-secondary: #f6e9d9;
+	--color-secondary-hover: #fff3e3;
+	--color-secondary-foreground: #171717;
+	--color-muted: #f6e9d9;
+	--color-muted-foreground: #171717;
+	--color-accent: #e8d9b8;
+	--color-accent-foreground: #171717;
+	--color-destructive: #a83f22;
+	--color-destructive-hover: #8d2502;
+	--color-destructive-foreground: #ffffff;
+	--color-border: #d9c8a6;
+	--color-input: #d9c8a6;
+	--color-ring: #7c5a2e;
+	--color-rating-positive: #3ba13a;
+	--color-rating-neutral: #ca8a05;
+	--color-rating-negative: #dc2912;
+	--color-rating-undecided: #6a728b;
+	--color-row-alt: #f7eee4;
+	--color-row-hover: #ece0d2;
+	--color-row-accent: #7c5a2e;
+}
+
+[data-theme='imp-garden-herbarium'] {
+	--color-background: #f5faf6;
+	--color-foreground: #1f2d22;
+	--color-card: #f5faf6;
+	--color-card-foreground: #1f2d22;
+	--color-popover: #f5faf6;
+	--color-popover-foreground: #1f2d22;
+	--color-primary: #2f6b45;
+	--color-primary-hover: #1c5a35;
+	--color-primary-foreground: #ffffff;
+	--color-secondary: #edf4ef;
+	--color-secondary-hover: #f7fef9;
+	--color-secondary-foreground: #171717;
+	--color-muted: #edf4ef;
+	--color-muted-foreground: #171717;
+	--color-accent: #cfe6d3;
+	--color-accent-foreground: #171717;
+	--color-destructive: #ab4032;
+	--color-destructive-hover: #90261b;
+	--color-destructive-foreground: #ffffff;
+	--color-border: #cfdcd0;
+	--color-input: #cfdcd0;
+	--color-ring: #2f6b45;
+	--color-rating-positive: #12a34b;
+	--color-rating-neutral: #c48e00;
+	--color-rating-negative: #da2f00;
+	--color-rating-undecided: #61758a;
+	--color-row-alt: #eff4f0;
+	--color-row-hover: #dce8df;
+	--color-row-accent: #2f6b45;
+}
+
+[data-theme='imp-mist'] {
+	--color-background: #f4f6f9;
+	--color-foreground: #1b2530;
+	--color-card: #f4f6f9;
+	--color-card-foreground: #1b2530;
+	--color-popover: #f4f6f9;
+	--color-popover-foreground: #1b2530;
+	--color-primary: #3b5b8c;
+	--color-primary-hover: #2b4a7a;
+	--color-primary-foreground: #ffffff;
+	--color-secondary: #eaeef3;
+	--color-secondary-hover: #f4f8fd;
+	--color-secondary-foreground: #171717;
+	--color-muted: #eaeef3;
+	--color-muted-foreground: #171717;
+	--color-accent: #d5e0ef;
+	--color-accent-foreground: #171717;
+	--color-destructive: #b04437;
+	--color-destructive-hover: #952b20;
+	--color-destructive-foreground: #ffffff;
+	--color-border: #d3d9e0;
+	--color-input: #d3d9e0;
+	--color-ring: #3b5b8c;
+	--color-rating-positive: #00a55e;
+	--color-rating-neutral: #d68128;
+	--color-rating-negative: #db2149;
+	--color-rating-undecided: #64748b;
+	--color-row-alt: #eef0f3;
+	--color-row-hover: #dce2ec;
+	--color-row-accent: #3b5b8c;
+}
+
+[data-theme='imp-linen-rose'] {
+	--color-background: #fbf5f6;
+	--color-foreground: #2a1d1f;
+	--color-card: #fbf5f6;
+	--color-card-foreground: #2a1d1f;
+	--color-popover: #fbf5f6;
+	--color-popover-foreground: #2a1d1f;
+	--color-primary: #8f3f4f;
+	--color-primary-hover: #7c2e3f;
+	--color-primary-foreground: #ffffff;
+	--color-secondary: #f6ebec;
+	--color-secondary-hover: #fff5f6;
+	--color-secondary-foreground: #171717;
+	--color-muted: #f6ebec;
+	--color-muted-foreground: #171717;
+	--color-accent: #ecd0d6;
+	--color-accent-foreground: #171717;
+	--color-destructive: #a6342f;
+	--color-destructive-hover: #8b1718;
+	--color-destructive-foreground: #ffffff;
+	--color-border: #e6d5d0;
+	--color-input: #e6d5d0;
+	--color-ring: #8f3f4f;
+	--color-rating-positive: #4d9f2a;
+	--color-rating-neutral: #cf8714;
+	--color-rating-negative: #dc252c;
+	--color-rating-undecided: #68738b;
+	--color-row-alt: #f5eff0;
+	--color-row-hover: #efdee0;
+	--color-row-accent: #8f3f4f;
+}
+
+[data-theme='imp-saffron-paper'] {
+	--color-background: #fffbf7;
+	--color-foreground: #231f16;
+	--color-card: #fffbf7;
+	--color-card-foreground: #231f16;
+	--color-popover: #fffbf7;
+	--color-popover-foreground: #231f16;
+	--color-primary: #a34e08;
+	--color-primary-hover: #8f3c00;
+	--color-primary-foreground: #ffffff;
+	--color-secondary: #ffeee5;
+	--color-secondary-hover: #fff8ef;
+	--color-secondary-foreground: #171717;
+	--color-muted: #ffeee5;
+	--color-muted-foreground: #171717;
+	--color-accent: #f6dfa8;
+	--color-accent-foreground: #171717;
+	--color-destructive: #b03a2a;
+	--color-destructive-hover: #951e10;
+	--color-destructive-foreground: #ffffff;
+	--color-border: #e6dcc0;
+	--color-input: #e6dcc0;
+	--color-ring: #a34e08;
+	--color-rating-positive: #42a035;
+	--color-rating-neutral: #cc890a;
+	--color-rating-negative: #dc271d;
+	--color-rating-undecided: #69728b;
+	--color-row-alt: #f9f5f1;
+	--color-row-hover: #f5e6dc;
+	--color-row-accent: #a34e08;
+}
+
+[data-theme='imp-midnight'] {
+	--color-background: #0f172c;
+	--color-foreground: #e6e9f2;
+	--color-card: #0f172c;
+	--color-card-foreground: #e6e9f2;
+	--color-popover: #0f172c;
+	--color-popover-foreground: #e6e9f2;
+	--color-primary: #8fb0ff;
+	--color-primary-hover: #a1c3ff;
+	--color-primary-foreground: #171717;
+	--color-secondary: #131e38;
+	--color-secondary-hover: #1a2540;
+	--color-secondary-foreground: #ffffff;
+	--color-muted: #131e38;
+	--color-muted-foreground: #ffffff;
+	--color-accent: #33406f;
+	--color-accent-foreground: #ffffff;
+	--color-destructive: #ef8a80;
+	--color-destructive-hover: #d37168;
+	--color-destructive-foreground: #171717;
+	--color-border: #2c3452;
+	--color-input: #2c3452;
+	--color-ring: #8fb0ff;
+	--color-rating-positive: #00a560;
+	--color-rating-neutral: #d58227;
+	--color-rating-negative: #db2147;
+	--color-rating-undecided: #64748b;
+	--color-row-alt: #131b30;
+	--color-row-hover: #1c2742;
+	--color-row-accent: #8fb0ff;
+}
+
+[data-theme='imp-slate-dark'] {
+	--color-background: #14181e;
+	--color-foreground: #e8eaed;
+	--color-card: #14181e;
+	--color-card-foreground: #e8eaed;
+	--color-popover: #14181e;
+	--color-popover-foreground: #e8eaed;
+	--color-primary: #7fb0e8;
+	--color-primary-hover: #91c3fc;
+	--color-primary-foreground: #171717;
+	--color-secondary: #181d24;
+	--color-secondary-hover: #1f242b;
+	--color-secondary-foreground: #ffffff;
+	--color-muted: #181d24;
+	--color-muted-foreground: #ffffff;
+	--color-accent: #2a3a52;
+	--color-accent-foreground: #ffffff;
+	--color-destructive: #ec8a80;
+	--color-destructive-hover: #d17168;
+	--color-destructive-foreground: #171717;
+	--color-border: #2f343c;
+	--color-input: #2f343c;
+	--color-ring: #7fb0e8;
+	--color-rating-positive: #00a55d;
+	--color-rating-neutral: #bb9300;
+	--color-rating-negative: #db214a;
+	--color-rating-undecided: #64748b;
+	--color-row-alt: #181c22;
+	--color-row-hover: #1f2832;
+	--color-row-accent: #7fb0e8;
+}
+
+[data-theme='imp-terminal'] {
+	--color-background: #0e1511;
+	--color-foreground: #dcebe2;
+	--color-card: #0e1511;
+	--color-card-foreground: #dcebe2;
+	--color-popover: #0e1511;
+	--color-popover-foreground: #dcebe2;
+	--color-primary: #6fd39a;
+	--color-primary-hover: #83e7ad;
+	--color-primary-foreground: #171717;
+	--color-secondary: #111a14;
+	--color-secondary-hover: #18211b;
+	--color-secondary-foreground: #ffffff;
+	--color-muted: #111a14;
+	--color-muted-foreground: #ffffff;
+	--color-accent: #1f3a2e;
+	--color-accent-foreground: #ffffff;
+	--color-destructive: #ee8c80;
+	--color-destructive-hover: #d37368;
+	--color-destructive-foreground: #171717;
+	--color-border: #24322b;
+	--color-input: #24322b;
+	--color-ring: #6fd39a;
+	--color-rating-positive: #0fa34c;
+	--color-rating-neutral: #c38e00;
+	--color-rating-negative: #da2f00;
+	--color-rating-undecided: #61758a;
+	--color-row-alt: #121915;
+	--color-row-hover: #19281f;
+	--color-row-accent: #6fd39a;
+}
+
+[data-theme='imp-dusk-plum'] {
+	--color-background: #1a1624;
+	--color-foreground: #ece7f5;
+	--color-card: #1a1624;
+	--color-card-foreground: #ece7f5;
+	--color-popover: #1a1624;
+	--color-popover-foreground: #ece7f5;
+	--color-primary: #b79cf0;
+	--color-primary-hover: #caafff;
+	--color-primary-foreground: #171717;
+	--color-secondary: #201a2d;
+	--color-secondary-hover: #272135;
+	--color-secondary-foreground: #ffffff;
+	--color-muted: #201a2d;
+	--color-muted-foreground: #ffffff;
+	--color-accent: #3a2f57;
+	--color-accent-foreground: #ffffff;
+	--color-destructive: #f08c88;
+	--color-destructive-hover: #d47370;
+	--color-destructive-foreground: #171717;
+	--color-border: #362f47;
+	--color-input: #362f47;
+	--color-ring: #b79cf0;
+	--color-rating-positive: #00a665;
+	--color-rating-neutral: #d48322;
+	--color-rating-negative: #dc2240;
+	--color-rating-undecided: #65748b;
+	--color-row-alt: #1e1a28;
+	--color-row-hover: #2a2439;
+	--color-row-accent: #b79cf0;
+}
+
 /* Hover tooltip — CSS-only tooltip matching the AG Grid column tooltip look
    (.tip-surface), for plain HTML elements outside the grid. Usage:
    class="hover-tooltip" data-tooltip="Some text" instead of a native title=. */

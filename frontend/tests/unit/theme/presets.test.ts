@@ -7,6 +7,13 @@ import {
 	presetSwatchColors,
 } from '$lib/theme/presets';
 
+describe('THEME_PRESETS', () => {
+	it('has unique ids and unique display names (the picker labels cards by name)', () => {
+		expect(new Set(THEME_PRESETS.map((p) => p.id)).size).toBe(THEME_PRESETS.length);
+		expect(new Set(THEME_PRESETS.map((p) => p.name)).size).toBe(THEME_PRESETS.length);
+	});
+});
+
 describe('presetSwatchColors', () => {
 	it.each(THEME_PRESETS)('preset "$id" previews four distinct colours: background, row hover, primary, text', (preset) => {
 		const tokens = THEME_PRESET_TOKENS[preset.id];
