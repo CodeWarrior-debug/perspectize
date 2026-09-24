@@ -134,7 +134,8 @@
 	</div>
 
 	<!-- Content Card -->
-	<div class="flex-1 min-h-0 w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 pb-4">
+	<!-- pb-20: keeps the card's pagination bar clear of the fixed Messages button. -->
+	<div class="flex-1 min-h-0 w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 pb-20">
 		{#if view === 'content'}
 			<div class="border rounded-lg shadow-sm overflow-hidden h-full flex flex-col">
 				<ActivityTable />
