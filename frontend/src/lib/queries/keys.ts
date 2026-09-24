@@ -27,6 +27,14 @@ export const queryKeys = {
 		banner: (id: string) => [...queryKeys.content.details(), 'banner', id] as const,
 	},
 
+	bible: {
+		all: () => [...queryKeys.all, 'bible'] as const,
+		passageText: (startVerseId: number, endVerseId: number) =>
+			[...queryKeys.bible.all(), 'passage', startVerseId, endVerseId] as const,
+		passageInterlinear: (startVerseId: number, endVerseId: number) =>
+			[...queryKeys.bible.all(), 'interlinear', startVerseId, endVerseId] as const,
+	},
+
 	users: {
 		all: () => [...queryKeys.all, 'users'] as const,
 		lists: () => [...queryKeys.users.all(), 'list'] as const,
@@ -44,8 +52,7 @@ export const queryKeys = {
 		all: () => [...queryKeys.all, 'perspectives'] as const,
 		lists: () => [...queryKeys.perspectives.all(), 'list'] as const,
 		listByUser: (userId: number) => [...queryKeys.perspectives.lists(), { userId }] as const,
-		listByContent: (contentId: number) =>
-			[...queryKeys.perspectives.lists(), { contentId }] as const,
+		listByContent: (contentId: number) => [...queryKeys.perspectives.lists(), { contentId }] as const,
 		activityFeed: (includePrivate: boolean) =>
 			[...queryKeys.perspectives.lists(), 'activityFeed', { includePrivate }] as const,
 		details: () => [...queryKeys.perspectives.all(), 'detail'] as const,
@@ -64,8 +71,7 @@ export const queryKeys = {
 		messages: {
 			all: () => [...queryKeys.messaging.all(), 'messages'] as const,
 			lists: () => [...queryKeys.messaging.messages.all(), 'list'] as const,
-			list: (threadId: string) =>
-				[...queryKeys.messaging.messages.lists(), { threadId }] as const,
+			list: (threadId: string) => [...queryKeys.messaging.messages.lists(), { threadId }] as const,
 		},
 	},
 } as const;
