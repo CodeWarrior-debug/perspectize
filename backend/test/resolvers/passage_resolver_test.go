@@ -21,6 +21,10 @@ import (
 
 type stubBibleRepo struct{}
 
+func (stubBibleRepo) GetInterlinearWords(ctx context.Context, startID, endID int) ([]domain.InterlinearWordRow, error) {
+	return nil, nil
+}
+
 func (stubBibleRepo) GetVerseTexts(ctx context.Context, translation string, startID, endID int) ([]domain.BibleVerseText, error) {
 	var out []domain.BibleVerseText
 	for id := startID; id <= endID && id <= 3; id++ {

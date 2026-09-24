@@ -582,6 +582,17 @@ type mockBibleReferenceRepo struct {
 	books []domain.BibleBook
 	err   error
 	texts []domain.BibleVerseText
+	words []domain.InterlinearWordRow
+}
+
+func (m *mockBibleReferenceRepo) GetInterlinearWords(ctx context.Context, startID, endID int) ([]domain.InterlinearWordRow, error) {
+	var out []domain.InterlinearWordRow
+	for _, w := range m.words {
+		if w.VerseID >= startID && w.VerseID <= endID {
+			out = append(out, w)
+		}
+	}
+	return out, m.err
 }
 
 func (m *mockBibleReferenceRepo) GetVerseTexts(ctx context.Context, translation string, startID, endID int) ([]domain.BibleVerseText, error) {
