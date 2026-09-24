@@ -94,6 +94,10 @@
 	--color-row-hover: #e1e2e4;
 	--color-row-accent: #1a365d;
 
+	/* Theme/Header band (derived: primary on light themes, tinted page colour on dark) */
+	--color-header: #1a365d;
+	--color-header-foreground: #ffffff;
+
 	/* Rating Colors */
 	--color-rating-positive: #16a34a;
 	--color-rating-neutral: #ca8a04;
@@ -141,6 +145,8 @@
 	--color-row-alt: #f6f0e6;
 	--color-row-hover: #e5dfd3;
 	--color-row-accent: #7c5a2e;
+	--color-header: #7c5a2e;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='garden'] {
@@ -173,6 +179,8 @@
 	--color-row-alt: #f5f6f2;
 	--color-row-hover: #e0e3df;
 	--color-row-accent: #2f4a3a;
+	--color-header: #2f4a3a;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='midnight'] {
@@ -205,6 +213,8 @@
 	--color-row-alt: #141823;
 	--color-row-hover: #242732;
 	--color-row-accent: #e8e6df;
+	--color-header: #0f1624;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='terminal'] {
@@ -237,6 +247,8 @@
 	--color-row-alt: #0d0f0e;
 	--color-row-hover: #1a1f1d;
 	--color-row-accent: #c9f5d9;
+	--color-header: #0a130f;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='imp-reading-room-calm'] {
@@ -269,6 +281,8 @@
 	--color-row-alt: #f5f4f1;
 	--color-row-hover: #dfe0e1;
 	--color-row-accent: #2c4a7a;
+	--color-header: #2c4a7a;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='imp-archive-sepia'] {
@@ -301,6 +315,8 @@
 	--color-row-alt: #f5efe4;
 	--color-row-hover: #e4ddd2;
 	--color-row-accent: #7c5a2e;
+	--color-header: #7c5a2e;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='imp-garden-herbarium'] {
@@ -333,6 +349,8 @@
 	--color-row-alt: #f0f4f0;
 	--color-row-hover: #dce2dc;
 	--color-row-accent: #2f6b45;
+	--color-header: #2f6b45;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='imp-mist'] {
@@ -365,6 +383,8 @@
 	--color-row-alt: #eef0f3;
 	--color-row-hover: #dadee3;
 	--color-row-accent: #3b5b8c;
+	--color-header: #3b5b8c;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='imp-linen-rose'] {
@@ -397,6 +417,8 @@
 	--color-row-alt: #f5f0ee;
 	--color-row-hover: #e5dcdb;
 	--color-row-accent: #8f3f4f;
+	--color-header: #8f3f4f;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='imp-saffron-paper'] {
@@ -429,6 +451,8 @@
 	--color-row-alt: #f9f7f0;
 	--color-row-hover: #e8e3da;
 	--color-row-accent: #a34e08;
+	--color-header: #a34e08;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='imp-midnight'] {
@@ -461,6 +485,8 @@
 	--color-row-alt: #131418;
 	--color-row-hover: #202128;
 	--color-row-accent: #7e96d7;
+	--color-header: #262c3c;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='imp-slate-dark'] {
@@ -493,6 +519,8 @@
 	--color-row-alt: #16171a;
 	--color-row-hover: #222428;
 	--color-row-accent: #5f89ba;
+	--color-header: #232c38;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='imp-terminal'] {
@@ -525,6 +553,8 @@
 	--color-row-alt: #0f1210;
 	--color-row-hover: #1b201d;
 	--color-row-accent: #51b67a;
+	--color-header: #1c3123;
+	--color-header-foreground: #ffffff;
 }
 
 [data-theme='imp-dusk-plum'] {
@@ -557,6 +587,8 @@
 	--color-row-alt: #151418;
 	--color-row-hover: #242128;
 	--color-row-accent: #a886cf;
+	--color-header: #30293b;
+	--color-header-foreground: #ffffff;
 }
 
 /* Hover tooltip — CSS-only tooltip matching the AG Grid column tooltip look
@@ -666,6 +698,12 @@
 /* Hover bar — drawn on AG Grid's own hover overlay so it sits on top of the opaque hover colour. */
 .ag-row-hover:not(.ag-full-width-row)::before {
 	box-shadow: inset 3px 0 0 var(--color-row-accent);
+}
+
+/* Header band: the theme's header colour with a barely-there top-to-bottom lift, so it reads as a surface not a flat slab. */
+.header-surface {
+	background-color: var(--color-header);
+	background-image: linear-gradient(to bottom, color-mix(in oklab, var(--color-header), white 7%), var(--color-header));
 }
 
 /* Mobile-specific utilities */
