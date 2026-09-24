@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { wcagContrast } from 'culori';
+import { differenceEuclidean, wcagContrast } from 'culori';
 import { deriveTheme, toCssVarMap, type BaseThemeTokens } from '$lib/theme/derive';
 import { THEME_PRESETS } from '$lib/theme/presets';
 
@@ -73,6 +73,20 @@ describe('deriveTheme', () => {
 	});
 });
 
+describe('authored neutrals', () => {
+	it('keeps an authored warm background instead of re-hueing it to a cool primary', () => {
+		const base = { ...READING_ROOM_BASE, primary: '#2c4a7a', background: '#fbfaf7', secondary: '#f5f3ee' };
+		const full = deriveTheme(base);
+		expect(full.background).toBe(base.background);
+		expect(full.secondary).toBe(base.secondary);
+	});
+
+	it('still tints a fully grey background toward the primary hue', () => {
+		const full = deriveTheme({ ...READING_ROOM_BASE, background: '#e5e5e5', secondary: '#dddddd' });
+		expect(full.background).not.toBe('#e5e5e5');
+	});
+});
+
 describe('toCssVarMap', () => {
 	it('maps every derived token to a --color-* CSS custom property', () => {
 		const full = deriveTheme(READING_ROOM_BASE);
@@ -81,5 +95,50 @@ describe('toCssVarMap', () => {
 		expect(vars['--color-background']).toBe(full.background);
 		expect(vars['--color-rating-positive']).toBe(full.ratingPositive);
 		expect(Object.keys(vars).length).toBeGreaterThanOrEqual(25);
+	});
+});
+
+describe('row tokens', () => {
+	const oklabDistance = differenceEuclidean('oklab');
+
+	it.each(THEME_PRESETS)(
+		'preset "$id": hover is opaque, clearly distinct from the zebra, and keeps text readable',
+		(preset) => {
+			const full = deriveTheme(preset.base);
+			expect(full.rowHover).toMatch(/^#[0-9a-f]{6}$/);
+			expect(full.rowAlt).toMatch(/^#[0-9a-f]{6}$/);
+			expect(full.rowHover).not.toBe(full.rowAlt);
+			expect(oklabDistance(full.rowHover, full.rowAlt)).toBeGreaterThanOrEqual(0.04);
+			expect(wcagContrast(full.foreground, full.rowHover)).toBeGreaterThanOrEqual(4.5);
+			expect(wcagContrast(full.foreground, full.rowAlt)).toBeGreaterThanOrEqual(4.5);
+		},
+	);
+
+	it('tints hover from the foreground when primary is nearly the page colour (dark presets)', () => {
+		const midnight = deriveTheme(THEME_PRESETS.find((p) => p.id === 'midnight')!.base);
+		expect(midnight.rowAccent).toBe(midnight.foreground);
+		const readingRoom = deriveTheme(READING_ROOM_BASE);
+		expect(readingRoom.rowAccent).toBe(readingRoom.primary);
+	});
+
+	it('keeps hover distinct from the zebra however dim the primary is (hover is not driven by primary lightness)', () => {
+		const base = THEME_PRESETS.find((p) => p.id === 'midnight')!.base;
+		for (const primary of ['#8fb0ff', '#5a83b2', '#3d5f8a', '#22334a']) {
+			const full = deriveTheme({ ...base, primary });
+			expect(oklabDistance(full.rowHover, full.rowAlt)).toBeGreaterThanOrEqual(0.04);
+			expect(wcagContrast(full.foreground, full.rowHover)).toBeGreaterThanOrEqual(4.5);
+		}
+		const light = THEME_PRESETS[0].base;
+		for (const primary of ['#1a365d', '#4a6a94', '#8aa4c8']) {
+			const full = deriveTheme({ ...light, primary });
+			expect(oklabDistance(full.rowHover, full.rowAlt)).toBeGreaterThanOrEqual(0.04);
+		}
+	});
+
+	it('exposes the row tokens as CSS variables', () => {
+		const vars = toCssVarMap(deriveTheme(READING_ROOM_BASE));
+		expect(Object.keys(vars)).toEqual(
+			expect.arrayContaining(['--color-row-alt', '--color-row-hover', '--color-row-accent']),
+		);
 	});
 });

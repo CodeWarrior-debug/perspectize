@@ -97,7 +97,7 @@
 			bind:value={searchQuery}
 			placeholder="Search more feelings — e.g. nervous"
 			disabled={atCap}
-			class="w-full rounded-md border border-border bg-white pl-8 pr-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+			class="w-full rounded-md border border-border bg-card pl-8 pr-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
 		/>
 	</div>
 
@@ -164,7 +164,7 @@
 						oninput={(e) => updateNote(f.emoji, e.currentTarget.value)}
 						placeholder="Why / nuance / observations…"
 						rows={2}
-						class="w-full rounded-md border border-border bg-white px-2.5 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+						class="w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
 					></textarea>
 				</div>
 			{/each}
