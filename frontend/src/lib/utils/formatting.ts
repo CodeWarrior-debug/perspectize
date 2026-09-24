@@ -415,7 +415,9 @@ export function perspectiveCellRenderer(params: {
 	if (hasPerspective) {
 		container.innerHTML = GLASSES_SVG;
 		container.title = 'Edit your perspective';
-		container.style.color = '#1a365d';
+		// --color-row-accent is the theme's primary where it is visible and the foreground where it isn't
+		// (Midnight, Terminal), so the icon never disappears into a dark page.
+		container.className += ' text-[var(--color-row-accent)]';
 	} else {
 		const span = document.createElement('span');
 		span.textContent = '+';

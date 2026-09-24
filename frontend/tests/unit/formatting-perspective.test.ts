@@ -214,14 +214,15 @@ describe('perspectiveCellRenderer function', () => {
 			expect(element.title).toBe('Edit your perspective');
 		});
 
-		it('has dark blue color style', () => {
+		it('colours the icon from the themed accent so it stays visible on dark presets', () => {
 			const map = new Map([['content-1', {}]]);
 			const element = perspectiveCellRenderer({
 				data: { id: 'content-1' },
 				context: { perspectivesByContentId: map },
 			});
-			// JSDOM normalizes hex to rgb
-			expect(element.style.color).toBe('rgb(26, 54, 93)');
+			// --color-row-accent is the theme's visible primary-or-foreground; a hard-coded navy vanished on Midnight.
+			expect(element.className).toContain('text-[var(--color-row-accent)]');
+			expect(element.style.color).toBe('');
 		});
 	});
 
@@ -315,7 +316,7 @@ describe('perspectiveCellRenderer function', () => {
 			expect(element.className).toContain('w-full');
 		});
 
-		it('container className is consistent regardless of perspective status', () => {
+		it('container layout classes are consistent regardless of perspective status', () => {
 			const map = new Map([['content-1', {}]]);
 			const withPerspective = perspectiveCellRenderer({
 				data: { id: 'content-1' },
@@ -325,7 +326,8 @@ describe('perspectiveCellRenderer function', () => {
 				data: { id: 'content-2' },
 				context: { perspectivesByContentId: map },
 			});
-			expect(withPerspective.className).toBe(withoutPerspective.className);
+			// Same layout classes in both states; the has-perspective state only adds the themed icon colour.
+			expect(withPerspective.className.startsWith(withoutPerspective.className)).toBe(true);
 		});
 	});
 
