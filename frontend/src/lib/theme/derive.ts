@@ -51,6 +51,8 @@ export type FullThemeTokens = BaseThemeTokens & DerivedTokens;
 const WHITE = '#ffffff';
 const NEAR_BLACK = '#171717';
 const AA_NORMAL_TEXT = 4.5;
+/** OKLCH chroma at or above which an authored neutral is treated as intentionally tinted. */
+const AUTHORED_TINT_CHROMA = 0.004;
 
 function oklch(hex: string): Oklch {
 	const c = toOklch(hex);
@@ -93,6 +95,9 @@ function clampForegroundForContrast(bgHex: string, fgHex: string): string {
 /** Tint a neutral toward the theme's primary hue; reduce chroma near lightness extremes. */
 function tintNeutralTowardHue(neutralHex: string, primaryHue: number): string {
 	const n = oklch(neutralHex);
+	// A neutral that already carries a deliberate tint (a warm paper, a cool graphite) keeps
+	// its own hue; re-hueing it to the primary would silently override the palette's intent.
+	if (n.c >= AUTHORED_TINT_CHROMA) return neutralHex;
 	const blendedHue = primaryHue;
 	// Chroma nudge shrinks as lightness approaches 0 or 1 (avoids muddy near-black/near-white).
 	const extremeFactor = 1 - Math.abs(n.l - 0.5) * 2; // 1 at L=0.5, 0 at L=0 or L=1
@@ -152,8 +157,14 @@ function darken(hexColor: string, amount: number): string {
 
 /** Zebra is a whisper of the foreground over the background, so it reads on light and dark alike. */
 const ROW_ALT_MIX = 0.025;
-/** Hover must be clearly stronger than the zebra; the unit tests pin the minimum distance. */
-const ROW_HOVER_MIX = 0.12;
+/**
+ * Hover is a foreground wash (so its distance from the zebra is set by the page's own contrast,
+ * not by how bright the primary is) with a hint of the accent colour for character. Driving it
+ * from the primary tied hover to the header colour: dimming the header shrank the hover.
+ * The unit tests pin the minimum distance from the zebra.
+ */
+const ROW_HOVER_FOREGROUND_MIX = 0.085;
+const ROW_HOVER_ACCENT_MIX = 0.03;
 /** Below this contrast a primary tint would be invisible against the page (Midnight, Terminal). */
 const MIN_ROW_ACCENT_CONTRAST = 1.5;
 
@@ -170,7 +181,7 @@ function deriveRowTokens(background: string, foreground: string, primary: string
 	const accent = wcagContrast(background, primary) >= MIN_ROW_ACCENT_CONTRAST ? primary : foreground;
 	return {
 		rowAlt: mix(background, foreground, ROW_ALT_MIX),
-		rowHover: mix(background, accent, ROW_HOVER_MIX),
+		rowHover: mix(mix(background, accent, ROW_HOVER_ACCENT_MIX), foreground, ROW_HOVER_FOREGROUND_MIX),
 		rowAccent: accent,
 	};
 }

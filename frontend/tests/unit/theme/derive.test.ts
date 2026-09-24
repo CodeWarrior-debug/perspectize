@@ -73,6 +73,20 @@ describe('deriveTheme', () => {
 	});
 });
 
+describe('authored neutrals', () => {
+	it('keeps an authored warm background instead of re-hueing it to a cool primary', () => {
+		const base = { ...READING_ROOM_BASE, primary: '#2c4a7a', background: '#fbfaf7', secondary: '#f5f3ee' };
+		const full = deriveTheme(base);
+		expect(full.background).toBe(base.background);
+		expect(full.secondary).toBe(base.secondary);
+	});
+
+	it('still tints a fully grey background toward the primary hue', () => {
+		const full = deriveTheme({ ...READING_ROOM_BASE, background: '#e5e5e5', secondary: '#dddddd' });
+		expect(full.background).not.toBe('#e5e5e5');
+	});
+});
+
 describe('toCssVarMap', () => {
 	it('maps every derived token to a --color-* CSS custom property', () => {
 		const full = deriveTheme(READING_ROOM_BASE);
@@ -105,6 +119,20 @@ describe('row tokens', () => {
 		expect(midnight.rowAccent).toBe(midnight.foreground);
 		const readingRoom = deriveTheme(READING_ROOM_BASE);
 		expect(readingRoom.rowAccent).toBe(readingRoom.primary);
+	});
+
+	it('keeps hover distinct from the zebra however dim the primary is (hover is not driven by primary lightness)', () => {
+		const base = THEME_PRESETS.find((p) => p.id === 'midnight')!.base;
+		for (const primary of ['#8fb0ff', '#5a83b2', '#3d5f8a', '#22334a']) {
+			const full = deriveTheme({ ...base, primary });
+			expect(oklabDistance(full.rowHover, full.rowAlt)).toBeGreaterThanOrEqual(0.04);
+			expect(wcagContrast(full.foreground, full.rowHover)).toBeGreaterThanOrEqual(4.5);
+		}
+		const light = THEME_PRESETS[0].base;
+		for (const primary of ['#1a365d', '#4a6a94', '#8aa4c8']) {
+			const full = deriveTheme({ ...light, primary });
+			expect(oklabDistance(full.rowHover, full.rowAlt)).toBeGreaterThanOrEqual(0.04);
+		}
 	});
 
 	it('exposes the row tokens as CSS variables', () => {

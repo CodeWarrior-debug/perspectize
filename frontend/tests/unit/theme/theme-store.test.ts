@@ -42,6 +42,24 @@ describe('createThemeStore', () => {
 		expect(persisted.activeThemeId).toBe(target.id);
 	});
 
+	it('remembers an unsaved preview until a preset is chosen or a theme is saved', () => {
+		const store = createThemeStore();
+		expect(store.pendingPreview()).toBeNull();
+
+		const tokens = { ...THEME_PRESETS[0].base, primary: '#123456' };
+		store.previewCustomTokens(tokens);
+		expect(store.pendingPreview()).toEqual(tokens);
+		// A preview never changes the persisted active theme.
+		expect(store.state.activeThemeId).toBe(DEFAULT_THEME_ID);
+
+		store.selectPreset(THEME_PRESETS[1].id);
+		expect(store.pendingPreview()).toBeNull();
+
+		store.previewCustomTokens(tokens);
+		store.saveCustomTheme('Saved', tokens);
+		expect(store.pendingPreview()).toBeNull();
+	});
+
 	it('saving a custom theme adds it to customThemes and activates it', () => {
 		const store = createThemeStore();
 		const tokens = THEME_PRESETS[0].base;

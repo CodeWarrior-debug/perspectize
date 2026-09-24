@@ -46,6 +46,24 @@ describe('ThemeCustomizePanel', () => {
 		expect(screen.getByRole('button', { name: 'Export CSS' })).toBeInTheDocument();
 	});
 
+	it('reopening the panel resumes the unsaved preview instead of reseeding from the preset', async () => {
+		const store = createThemeStore();
+		const first = render(ThemeCustomizePanel, { props: { store } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Customize' }));
+		// Switch the unit toggle to hex so the value is easy to assert.
+		await fireEvent.click(screen.getByRole('button', { name: 'HEX' }));
+		const hexInput = screen.getByLabelText('Primary value (hex)') as HTMLInputElement;
+		await fireEvent.focus(hexInput);
+		await fireEvent.input(hexInput, { target: { value: '#123456' } });
+		first.unmount();
+
+		render(ThemeCustomizePanel, { props: { store } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Customize' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'HEX' }));
+
+		expect((screen.getByLabelText('Primary value (hex)') as HTMLInputElement).value).toBe('#123456');
+	});
+
 	it('typing a valid hex into a token field previews it on the store (not yet saved)', async () => {
 		const store = createThemeStore();
 		render(ThemeCustomizePanel, { props: { store } });
