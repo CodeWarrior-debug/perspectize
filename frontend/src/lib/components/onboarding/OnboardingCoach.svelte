@@ -9,7 +9,6 @@
 	import { Button, Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '$lib/components/shadcn';
 	import OnboardingVideo from '$lib/components/onboarding/OnboardingVideo.svelte';
 	import AddVideoDialog from '$lib/components/AddVideoDialog.svelte';
-	import PerspectivePopover from '$lib/components/PerspectivePopover.svelte';
 	import { ONBOARDING_VIDEOS, CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
 	import {
 		advanceCoachStep,
@@ -263,15 +262,17 @@
 <AddVideoDialog bind:open={addVideoOpen} onSuccess={handleActionSuccess} />
 
 {#if perspectiveOpen && perspectiveTarget}
-	<PerspectivePopover
-		contentId={parseInt(perspectiveTarget.id, 10)}
-		contentName={perspectiveTarget.name}
-		existingPerspective={perspectivesByContentId.get(perspectiveTarget.id) ?? null}
-		{userId}
-		bind:open={perspectiveOpen}
-		onClose={() => {
-			perspectiveOpen = false;
-		}}
-		onSuccess={handleActionSuccess}
-	/>
+	{#await import('$lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
+		<PerspectivePopover
+			contentId={parseInt(perspectiveTarget.id, 10)}
+			contentName={perspectiveTarget.name}
+			existingPerspective={perspectivesByContentId.get(perspectiveTarget.id) ?? null}
+			{userId}
+			bind:open={perspectiveOpen}
+			onClose={() => {
+				perspectiveOpen = false;
+			}}
+			onSuccess={handleActionSuccess}
+		/>
+	{/await}
 {/if}

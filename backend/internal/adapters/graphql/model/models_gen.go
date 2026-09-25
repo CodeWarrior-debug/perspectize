@@ -54,6 +54,9 @@ type Content struct {
 	Description        *string        `json:"description,omitempty"`
 	Response           map[string]any `json:"response,omitempty"`
 	PrimaryCategory    *Category      `json:"primaryCategory,omitempty"`
+	VerseStartID       *int           `json:"verseStartID,omitempty"`
+	VerseEndID         *int           `json:"verseEndID,omitempty"`
+	DisplayTitle       *string        `json:"displayTitle,omitempty"`
 	PerspectiveCount   *int           `json:"perspectiveCount,omitempty"`
 	AverageRating      *float64       `json:"averageRating,omitempty"`
 	QualityRatingCount *int           `json:"qualityRatingCount,omitempty"`
@@ -92,6 +95,15 @@ type CreateClaimInput struct {
 	Text            string `json:"text"`
 	UserID          int    `json:"userID"`
 	ParentContentID int    `json:"parentContentID"`
+}
+
+type CreateContentFromPassageInput struct {
+	BookID       int `json:"bookID"`
+	StartChapter int `json:"startChapter"`
+	StartVerse   int `json:"startVerse"`
+	EndChapter   int `json:"endChapter"`
+	EndVerse     int `json:"endVerse"`
+	UserID       int `json:"userID"`
 }
 
 type CreateContentFromYouTubeInput struct {
@@ -156,6 +168,32 @@ type InboxEvent struct {
 	UnreadCount   int    `json:"unreadCount"`
 }
 
+type InterlinearSegment struct {
+	Text        string `json:"text"`
+	SpaceBefore bool   `json:"spaceBefore"`
+}
+
+type InterlinearVerse struct {
+	VerseID  int                   `json:"verseId"`
+	Chapter  int                   `json:"chapter"`
+	Verse    int                   `json:"verse"`
+	Segments []*InterlinearSegment `json:"segments"`
+	Words    []*InterlinearWord    `json:"words"`
+}
+
+type InterlinearWord struct {
+	ID          int    `json:"id"`
+	Language    string `json:"language"`
+	Source      string `json:"source"`
+	Translit    string `json:"translit"`
+	Parsing     string `json:"parsing"`
+	Strongs     string `json:"strongs"`
+	Gloss       string `json:"gloss"`
+	TagSource   string `json:"tagSource"`
+	SourceOrder int    `json:"sourceOrder"`
+	Segment     *int   `json:"segment,omitempty"`
+}
+
 type MessageConnection struct {
 	Items    []*Message `json:"items"`
 	PageInfo *PageInfo  `json:"pageInfo"`
@@ -210,6 +248,23 @@ type ParticipantChanged struct {
 }
 
 func (ParticipantChanged) IsThreadEvent() {}
+
+type PassageInterlinear struct {
+	Verses []*InterlinearVerse `json:"verses"`
+}
+
+type PassageText struct {
+	Translation string          `json:"translation"`
+	Copyright   string          `json:"copyright"`
+	Verses      []*PassageVerse `json:"verses"`
+}
+
+type PassageVerse struct {
+	VerseID int    `json:"verseId"`
+	Chapter int    `json:"chapter"`
+	Verse   int    `json:"verse"`
+	Text    string `json:"text"`
+}
 
 type Perspective struct {
 	ID                    string               `json:"id"`
@@ -267,6 +322,11 @@ type SendMessageInput struct {
 	ThreadID    string `json:"threadId"`
 	Body        string `json:"body"`
 	ClientNonce string `json:"clientNonce"`
+}
+
+type SetPassageDisplayTitleInput struct {
+	ContentID int    `json:"contentID"`
+	Title     string `json:"title"`
 }
 
 type SetPrimaryCategoryInput struct {

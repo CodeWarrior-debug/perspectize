@@ -27,6 +27,14 @@ export const queryKeys = {
 		banner: (id: string) => [...queryKeys.content.details(), 'banner', id] as const,
 	},
 
+	bible: {
+		all: () => [...queryKeys.all, 'bible'] as const,
+		passageText: (startVerseId: number, endVerseId: number) =>
+			[...queryKeys.bible.all(), 'passage', startVerseId, endVerseId] as const,
+		passageInterlinear: (startVerseId: number, endVerseId: number) =>
+			[...queryKeys.bible.all(), 'interlinear', startVerseId, endVerseId] as const,
+	},
+
 	users: {
 		all: () => [...queryKeys.all, 'users'] as const,
 		lists: () => [...queryKeys.users.all(), 'list'] as const,

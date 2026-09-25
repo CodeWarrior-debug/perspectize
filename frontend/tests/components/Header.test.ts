@@ -43,8 +43,8 @@ vi.mock('@tanstack/svelte-query', () => ({
 	})),
 }));
 
-// Mock AddVideoPopover component
-vi.mock('$lib/components/AddVideoPopover.svelte', () => ({
+// Mock AddContentPopover component
+vi.mock('$lib/components/AddContentPopover.svelte', () => ({
 	default: vi.fn(() => ({
 		$$: {},
 		$set: vi.fn(),
@@ -106,9 +106,9 @@ describe('Header component', () => {
 		expect(inner?.className).toContain('max-w-screen-xl');
 	});
 
-	it('renders AddVideoPopover component', () => {
+	it('renders AddContentPopover component', () => {
 		const { container } = render(Header);
-		// AddVideoPopover is mocked, so we just verify component renders
+		// AddContentPopover is mocked, so we just verify component renders
 		expect(container).toBeTruthy();
 	});
 

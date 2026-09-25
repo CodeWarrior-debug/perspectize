@@ -3,6 +3,7 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
 	import { extractVideoIdFromUrl, formatDuration, formatCount } from '$lib/utils/formatting';
+	import { BIBLE_PASSAGE_ICON_SVG } from '$lib/utils/icons';
 
 	interface CardRow {
 		id: string | number;
@@ -19,6 +20,8 @@
 		primaryCategory?: { label: string } | null;
 		viewCount?: number | null;
 		likeCount?: number | null;
+		contentType?: string;
+		displayTitle?: string | null;
 	}
 
 	let {
@@ -39,6 +42,8 @@
 		e.stopPropagation();
 		onAddPerspective(String(row.id));
 	}
+
+	const isPassage = (row: CardRow) => row.contentType === 'BIBLE_PASSAGE';
 
 	function thumbSrc(row: CardRow): string | null {
 		const videoId = extractVideoIdFromUrl(row.url);
@@ -61,17 +66,23 @@
 				class="relative h-16 w-24 flex-none overflow-hidden rounded-md bg-muted"
 				onclick={(e) => handleThumbClick(row, e)}
 			>
-				{#if thumbSrc(row)}
-					<img
-						src={thumbSrc(row)}
-						alt=""
-						class="h-full w-full object-cover"
-						onerror={(e) => e.currentTarget.remove()}
-					/>
+				{#if isPassage(row)}
+					<span class="flex h-full w-full items-center justify-center text-primary">
+						{@html BIBLE_PASSAGE_ICON_SVG}
+					</span>
+				{:else}
+					{#if thumbSrc(row)}
+						<img
+							src={thumbSrc(row)}
+							alt=""
+							class="h-full w-full object-cover"
+							onerror={(e) => e.currentTarget.remove()}
+						/>
+					{/if}
+					<span class="absolute right-1 bottom-1 flex items-center justify-center rounded bg-[rgba(23,23,23,0.65)] p-1">
+						<PlayIcon class="size-2.5 fill-white text-white" />
+					</span>
 				{/if}
-				<span class="absolute right-1 bottom-1 flex items-center justify-center rounded bg-[rgba(23,23,23,0.65)] p-1">
-					<PlayIcon class="size-2.5 fill-white text-white" />
-				</span>
 			</button>
 
 			<button
@@ -83,33 +94,41 @@
 				<div
 					class="line-clamp-2 font-[family-name:var(--font-family-serif)] text-sm leading-tight font-semibold text-foreground"
 				>
-					{row.name}
+					{(isPassage(row) && row.displayTitle) || row.name}
 				</div>
-				<div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-					{#if row.channelTitle}
-						<span>{row.channelTitle}</span>
+				{#if isPassage(row)}
+					{#if row.displayTitle}
+						<div data-testid={`card-subtitle-${row.id}`} class="mt-1 line-clamp-1 text-xs text-muted-foreground">
+							{row.name}
+						</div>
 					{/if}
-					{#if row.length}
-						{#if row.channelTitle}<span>&middot;</span>{/if}
-						<span>{formatDuration(row.length, row.lengthUnits)}</span>
-					{/if}
-					{#if row.primaryCategory}
-						{#if row.channelTitle || row.length}<span>&middot;</span>{/if}
-						<span class="rounded bg-muted px-1.5 py-0.5 text-foreground">{row.primaryCategory.label}</span>
-					{/if}
-				</div>
-				{#if row.viewCount != null || row.likeCount != null}
-					<div class="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-						{#if row.viewCount != null}
-							<span>{formatCount(row.viewCount)} views</span>
+				{:else}
+					<div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+						{#if row.channelTitle}
+							<span>{row.channelTitle}</span>
 						{/if}
-						{#if row.viewCount != null && row.likeCount != null}
-							<span>&middot;</span>
+						{#if row.length}
+							{#if row.channelTitle}<span>&middot;</span>{/if}
+							<span>{formatDuration(row.length, row.lengthUnits)}</span>
 						{/if}
-						{#if row.likeCount != null}
-							<span>{formatCount(row.likeCount)} likes</span>
+						{#if row.primaryCategory}
+							{#if row.channelTitle || row.length}<span>&middot;</span>{/if}
+							<span class="rounded bg-muted px-1.5 py-0.5 text-foreground">{row.primaryCategory.label}</span>
 						{/if}
 					</div>
+					{#if row.viewCount != null || row.likeCount != null}
+						<div class="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+							{#if row.viewCount != null}
+								<span>{formatCount(row.viewCount)} views</span>
+							{/if}
+							{#if row.viewCount != null && row.likeCount != null}
+								<span>&middot;</span>
+							{/if}
+							{#if row.likeCount != null}
+								<span>{formatCount(row.likeCount)} likes</span>
+							{/if}
+						</div>
+					{/if}
 				{/if}
 			</button>
 

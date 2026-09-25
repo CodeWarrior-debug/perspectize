@@ -72,7 +72,6 @@
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
-	import PerspectivePopover from '$lib/components/PerspectivePopover.svelte';
 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
 	import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
@@ -1144,18 +1143,23 @@
 	</div>
 </div>
 
-<!-- Perspective create/edit modal — rendered outside the grid for correct portal behavior -->
+<!-- Perspective create/edit modal — rendered outside the grid for correct portal behavior.
+     Dynamically imported: it's the only path into the Tiptap-based PerspectiveEditor
+     (~170KB gzipped), which would otherwise load eagerly on every visit to this page
+     even for users who never open the editor. -->
 {#if popoverOpen && popoverContentId !== null}
-	<PerspectivePopover
-		contentId={popoverContentId}
-		contentName={popoverContentName}
-		existingPerspective={popoverExistingPerspective}
-		userId={currentUserId ?? 0}
-		bind:open={popoverOpen}
-		onClose={() => {
-			popoverOpen = false;
-		}}
-	/>
+	{#await import('$lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
+		<PerspectivePopover
+			contentId={popoverContentId}
+			contentName={popoverContentName}
+			existingPerspective={popoverExistingPerspective}
+			userId={currentUserId ?? 0}
+			bind:open={popoverOpen}
+			onClose={() => {
+				popoverOpen = false;
+			}}
+		/>
+	{/await}
 {/if}
 
 <!-- Activity item details modal — rendered outside the grid for correct portal behavior -->
