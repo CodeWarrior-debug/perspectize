@@ -1,6 +1,4 @@
 <script lang="ts">
-	import ActivityTable from '$lib/components/ActivityTable.svelte';
-	import UserActivityView from '$lib/components/UserActivityView.svelte';
 	import { Input, Popover, PopoverContent, PopoverTrigger, buttonVariants } from '$lib/components/shadcn';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
@@ -114,9 +112,7 @@
 						<PopoverContent align="end" class="w-56 p-2">
 							<p class="text-xs font-medium text-muted-foreground px-2 pb-1">Search in</p>
 							{#each ALL_SEARCH_SCOPES as scope (scope)}
-								<label
-									class="flex items-center gap-2 px-2 py-1.5 rounded-sm text-sm cursor-pointer hover:bg-accent"
-								>
+								<label class="flex items-center gap-2 px-2 py-1.5 rounded-sm text-sm cursor-pointer hover:bg-accent">
 									<input
 										type="checkbox"
 										checked={gridParams.qFields.includes(scope)}
@@ -134,15 +130,25 @@
 	</div>
 
 	<!-- Content Card -->
-	<!-- pb-20: keeps the card's pagination bar clear of the fixed Messages button. -->
+	<!-- pb-20: keeps the card's pagination bar clear of the fixed Messages button.
+	     ActivityTable/UserActivityView are dynamically imported: this route's own
+	     module is what SvelteKit's client router loads up front to resolve `/`,
+	     before the root layout's ClerkLoading/ClerkLoaded gate even decides whether
+	     to render this page at all — so a static import here forces every visitor
+	     (including signed-out ones, who never see this content) to pay for AG Grid
+	     (~800KB) before anything paints. -->
 	<div class="flex-1 min-h-0 w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 pb-20">
 		{#if view === 'content'}
 			<div class="border border-border rounded-lg shadow-sm overflow-hidden h-full flex flex-col">
-				<ActivityTable />
+				{#await import('$lib/components/ActivityTable.svelte') then { default: ActivityTable }}
+					<ActivityTable />
+				{/await}
 			</div>
 		{:else}
 			<div class="border rounded-lg shadow-sm overflow-y-auto h-full">
-				<UserActivityView />
+				{#await import('$lib/components/UserActivityView.svelte') then { default: UserActivityView }}
+					<UserActivityView />
+				{/await}
 			</div>
 		{/if}
 	</div>
