@@ -44,6 +44,24 @@ export default defineConfig({
 	resolve: {
 		conditions: ['browser'],
 	},
+	build: {
+		rollupOptions: {
+			output: {
+				// Tiptap/ProseMirror (the perspective editor's rich-text engine, ~170KB
+				// gzipped) is only reachable through a dynamic import (PerspectivePopover),
+				// but Rollup's default chunking co-located a few of its small shared
+				// helper exports with code the always-loaded root layout imports
+				// statically — which pulled the whole editor bundle into every page's
+				// critical path. Force it into its own chunk so it stays isolated behind
+				// the dynamic import.
+				manualChunks(id) {
+					if (id.includes('node_modules/@tiptap') || id.includes('node_modules/prosemirror')) {
+						return 'tiptap-vendor';
+					}
+				},
+			},
+		},
+	},
 	test: {
 		// Coverage is a root-level (workspace) option, not a per-project one — it
 		// used to live under the 'unit' project's `test` block below, which typechecks
