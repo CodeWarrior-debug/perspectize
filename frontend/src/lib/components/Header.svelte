@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Show, SignInButton, UserButton } from 'svelte-clerk';
-	import AddVideoPopover from '$lib/components/AddVideoPopover.svelte';
+	import AddContentPopover from '$lib/components/AddContentPopover.svelte';
 	import SettingsDialog from '$lib/components/SettingsDialog.svelte';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { page } from '$app/state';
@@ -52,7 +52,7 @@
 		</div>
 		<div class="flex items-center gap-2 md:gap-4 shrink-0">
 			<Show when="signed-in">
-				<AddVideoPopover triggerVariant="outline" />
+				<AddContentPopover triggerVariant="outline" />
 				<button
 					type="button"
 					aria-label="Settings"

@@ -113,4 +113,47 @@ describe('activityItemCellRenderer', () => {
 		expect(result.hasAttribute('title')).toBe(false);
 		expect(result.querySelector('[data-testid="item-thumb"]')?.hasAttribute('title')).toBe(false);
 	});
+
+	describe('BIBLE_PASSAGE rows', () => {
+		const passage = {
+			id: '7',
+			name: 'Genesis 1:1-3',
+			url: 'https://www.biblegateway.com/passage/?search=Genesis+1%3A1-3',
+			contentType: 'BIBLE_PASSAGE',
+		};
+
+		it('renders an icon and the reference as title with no thumbnail image when untitled', () => {
+			const result = activityItemCellRenderer({ data: { ...passage, displayTitle: null } }) as HTMLElement;
+
+			expect(result.querySelector('img')).toBeNull();
+			expect(result.querySelector('svg[data-icon="bible-passage"]')).toBeTruthy();
+			expect(result.querySelector('[data-testid="item-title"]')?.textContent).toBe('Genesis 1:1-3');
+			expect(result.querySelector('[data-testid="item-subtitle"]')).toBeNull();
+		});
+
+		it('shows the display title as primary text with the reference as subtitle when set', () => {
+			const result = activityItemCellRenderer({ data: { ...passage, displayTitle: 'Creation' } }) as HTMLElement;
+
+			expect(result.querySelector('[data-testid="item-title"]')?.textContent).toBe('Creation');
+			expect(result.querySelector('[data-testid="item-subtitle"]')?.textContent).toBe('Genesis 1:1-3');
+			expect(result.querySelector('img')).toBeNull();
+		});
+
+		it('clicking the row opens details; clicking the icon opens the passage link only', () => {
+			const onOpenDetails = vi.fn();
+			const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+			const result = activityItemCellRenderer({
+				data: { ...passage, displayTitle: null },
+				context: { onOpenDetails },
+			}) as HTMLElement;
+
+			(result.querySelector('[data-testid="item-thumb"]') as HTMLElement).click();
+			expect(openSpy).toHaveBeenCalledWith(passage.url, '_blank', 'noopener,noreferrer');
+			expect(onOpenDetails).not.toHaveBeenCalled();
+
+			(result.querySelector('[data-testid="item-title"]') as HTMLElement).click();
+			expect(onOpenDetails).toHaveBeenCalledWith('7');
+			openSpy.mockRestore();
+		});
+	});
 });
