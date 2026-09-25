@@ -4,13 +4,45 @@ import {
   TYPES,
   type Applicability,
   type ColumnDef,
+  type SampleCell,
   type Ingestion,
   type Source
 } from './catalog.js';
 import { buildMatrix, buildSpec } from './emit.js';
-import { resolveGrid, typeLabel, type DraftState, type VisibilityRule } from './model.js';
+import {
+  bindingFor,
+  gapText,
+  resolveGrid,
+  samplesFor,
+  sortConflict,
+  sortValue,
+  typeLabel,
+  unitsFor,
+  type DraftState,
+  type GridPreview,
+  type SortKey,
+  type VisibilityRule
+} from './model.js';
 
 const STORAGE_KEY = 'perspectize.content-type-designer.v1';
+
+/** Seed the type currently being designed, so a fresh open / reset lands on a filled-in form. */
+const DEFAULT_SEED = 'bible';
+
+function seededState(typeId: string): DraftState {
+  const state = blankState();
+  const t = TYPES.find((x) => x.id === typeId);
+  if (!t) return state;
+  state.draft = { ...t, id: 'draft' };
+  state.seed = t.id;
+  state.decisions = {};
+  for (const col of COLUMNS) {
+    const binding = col.bindings[t.id];
+    if (binding) state.decisions[col.id] = { ...binding };
+  }
+  state.selected = ['draft'];
+  return state;
+}
 
 function blankState(): DraftState {
   return {
@@ -38,7 +70,7 @@ function blankState(): DraftState {
   };
 }
 
-let state: DraftState = load() ?? blankState();
+let state: DraftState = load() ?? seededState(DEFAULT_SEED);
 
 function load(): DraftState | null {
   try {
@@ -126,6 +158,7 @@ function renderIdentity(): HTMLElement {
     const t = TYPES.find((x) => x.id === seed.value);
     if (!t) return;
     state.draft = { ...t, id: 'draft' };
+    state.seed = t.id;
     state.decisions = {};
     for (const col of COLUMNS) {
       const b = col.bindings[t.id];
@@ -231,7 +264,12 @@ function renderColumnRow(col: ColumnDef): HTMLElement {
     field('Source', select<Source>(b.source, ['api', 'scrape', 'user', 'derived', 'internal'], (v) => (b.source = v))),
     field('Value path', input(b.path, (v) => (b.path = v), "response->>'field'")),
     field('Unit / format', input(b.unit ?? '', (v) => (b.unit = v || undefined), 'minutes, pages, minor units…')),
-    field('Tooltip override', input(b.tooltip ?? '', (v) => (b.tooltip = v || undefined), col.tooltip))
+    field('Tooltip override', input(b.tooltip ?? '', (v) => (b.tooltip = v || undefined), col.tooltip)),
+    field(
+      'Cell appearance',
+      input(b.appearance ?? '', (v) => (b.appearance = v || undefined), 'font, icon, subtitle, alignment, sort comparator…'),
+      'How the cell renders for this type — carried into the spec.'
+    )
   ]);
 
   const flags = el('div', { class: 'flags' }, [
@@ -250,7 +288,8 @@ function renderPreview(): HTMLElement {
   const ids = [state.draft.id, ...TYPES.map((t) => t.id)];
   for (const id of ids) {
     const active = state.selected.includes(id);
-    const chip = el('button', { class: `chip${active ? ' on' : ''}`, type: 'button' }, [typeLabel(id, state.draft)]);
+    const label = id === state.draft.id ? `${typeLabel(id, state.draft)} (draft)` : typeLabel(id, state.draft);
+    const chip = el('button', { class: `chip${active ? ' on' : ''}`, type: 'button' }, [label]);
     chip.addEventListener('click', () => {
       state.selected = active ? state.selected.filter((x) => x !== id) : [...state.selected, id];
       save();
@@ -274,6 +313,8 @@ function renderPreview(): HTMLElement {
     );
   }
 
+  const samples = renderSamples(state, grid);
+
   const warn = el('ul', { class: 'warnings' });
   for (const w of grid.warnings) {
     warn.append(el('li', { class: `w-${w.severity}` }, [w.message]));
@@ -296,8 +337,159 @@ function renderPreview(): HTMLElement {
       })
     ),
     headerStrip,
+    ...(samples ? [samples] : []),
     hiddenList,
     warn
+  ]);
+}
+
+function sampleCell(value: SampleCell | undefined, tooltip: string): HTMLElement {
+  if (value === undefined) return el('td', { class: 'unset', title: 'No sample value' }, ['·']);
+  if (typeof value === 'string') return el('td', { title: tooltip }, [value]);
+  return el('td', { title: tooltip }, [
+    el('span', { class: 'cell-title' }, [value.text]),
+    ...(value.sub ? [el('span', { class: 'cell-sub' }, [value.sub])] : [])
+  ]);
+}
+
+function cellText(value: SampleCell | undefined): string | undefined {
+  return value === undefined ? undefined : typeof value === 'string' ? value : value.text;
+}
+
+/** Cycle one column through asc → desc → off, keeping any other keys as lower priorities. */
+function toggleSort(colId: string): void {
+  const keys = state.sort ?? [];
+  const existing = keys.find((k) => k.colId === colId);
+  let next: SortKey[];
+  if (!existing) next = [{ colId, dir: 'asc' }];
+  else if (existing.dir === 'asc') next = keys.map((k) => (k.colId === colId ? { colId, dir: 'desc' } : k));
+  else next = keys.filter((k) => k.colId !== colId);
+  state.sort = next;
+  save();
+  render();
+}
+
+/** The alert raised when a sort would order numbers that mean different things. */
+function renderSortAlert(current: DraftState, grid: GridPreview): HTMLElement | null {
+  const conflicted = sortConflict(current.sort, grid);
+  if (!conflicted) return null;
+  const header = conflicted.header || conflicted.col.generic;
+  const units = unitsFor(conflicted);
+  const key = current.sort![0];
+
+  const actions: HTMLElement[] = [];
+  const typeCol = grid.visible.find((rc) => rc.col.id === 'type');
+  if (typeCol) {
+    const multi = el('button', { type: 'button', class: 'primary' }, [`Sort by Type, then ${header}`]);
+    multi.addEventListener('click', () => {
+      state.sort = [{ colId: 'type', dir: 'asc' }, key];
+      save();
+      render();
+    });
+    actions.push(multi);
+  }
+  for (const typeId of conflicted.bound) {
+    const unit = conflicted.aliases.find((a) => a.typeId === typeId)?.unit;
+    const only = el('button', { type: 'button' }, [`Only ${typeLabel(typeId, current.draft)}${unit ? ` (${unit})` : ''}`]);
+    only.addEventListener('click', () => {
+      state.selected = [typeId];
+      save();
+      render();
+    });
+    actions.push(only);
+  }
+  const cancel = el('button', { type: 'button' }, ['Cancel sort']);
+  cancel.addEventListener('click', () => {
+    state.sort = [];
+    save();
+    render();
+  });
+  actions.push(cancel);
+
+  return el('div', { class: 'sort-alert', role: 'alert' }, [
+    el('strong', {}, [`"${header}" mixes units: ${units.join(' · ')}.`]),
+    el('span', {}, [
+      ' Sorting it on its own would put 453 words next to 453 seconds as if they were the same number. Rows stay unsorted until you pick one:'
+    ]),
+    el('div', { class: 'row' }, actions)
+  ]);
+}
+
+/** Illustrative rows for the selected types that ship samples; null when none do. */
+function renderSamples(current: DraftState, grid: GridPreview): HTMLElement | null {
+  const visible = grid.visible;
+  const rows: { typeId: string; cells: Record<string, SampleCell> }[] = [];
+  for (const id of current.selected) {
+    for (const cells of samplesFor(id, current)) rows.push({ typeId: id, cells });
+  }
+  if (rows.length === 0) return null;
+
+  const valueOf = (row: (typeof rows)[number], colId: string): string | undefined => {
+    if (colId === 'type') return typeLabel(row.typeId, current.draft);
+    const col = visible.find((rc) => rc.col.id === colId)?.col;
+    if (!col || !bindingFor(col, row.typeId, current)) return undefined;
+    return cellText(row.cells[colId]);
+  };
+
+  const keys = (current.sort ?? []).filter((k) => visible.some((rc) => rc.col.id === k.colId && rc.col.sortable));
+  const alert = renderSortAlert(current, grid);
+  if (keys.length && !alert) {
+    rows.sort((a, b) => {
+      for (const k of keys) {
+        const va = sortValue(valueOf(a, k.colId));
+        const vb = sortValue(valueOf(b, k.colId));
+        if (va === vb) continue;
+        if (va === null) return 1; // blanks last in either direction
+        if (vb === null) return -1;
+        const cmp = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb));
+        if (cmp !== 0) return k.dir === 'asc' ? cmp : -cmp;
+      }
+      return 0;
+    });
+  }
+
+  const head = el(
+    'tr',
+    {},
+    visible.map((rc) => {
+      const idx = keys.findIndex((k) => k.colId === rc.col.id);
+      const key = keys[idx];
+      const units = unitsFor(rc);
+      const label = [
+        rc.header || '◎',
+        ...(key ? [` ${key.dir === 'asc' ? '▲' : '▼'}`] : []),
+        ...(key && keys.length > 1 ? [el('sup', {}, [String(idx + 1)])] : [])
+      ];
+      const th = el('th', { title: units.length > 1 ? `${rc.tooltip} — mixed units: ${units.join(' · ')}` : rc.tooltip }, label);
+      if (rc.col.sortable) {
+        th.classList.add('sortable');
+        if (units.length > 1) th.classList.add('mixed');
+        th.addEventListener('click', () => toggleSort(rc.col.id));
+      }
+      return th;
+    })
+  );
+  const body = rows.map(({ typeId, cells }) =>
+    el(
+      'tr',
+      {},
+      visible.map((rc) => {
+        if (rc.col.id === 'perspectize') return el('td', { class: 'center' }, ['◎']);
+        if (rc.col.id === 'type') return el('td', { class: 'muted' }, [typeLabel(typeId, current.draft)]);
+        const binding = bindingFor(rc.col, typeId, current);
+        if (!binding) return el('td', { class: 'gap', title: `Not bound — ${rc.col.gapFallback}` }, [gapText(rc.col)]);
+        const td = sampleCell(cells[rc.col.id], binding.tooltip ?? rc.col.tooltip);
+        if (rc.col.align) td.classList.add(rc.col.align);
+        return td;
+      })
+    )
+  );
+  return el('div', { class: 'samples' }, [
+    el('p', { class: 'muted small' }, [
+      'Sample rows — click a header to sort (again to reverse, a third time to clear); hover for its tooltip. "·" means the sample has no value for a bound column; a dashed header mixes units.'
+    ]),
+    ...(alert ? [alert] : []),
+    el('div', { class: 'sample-scroll' }, [el('table', {}, [el('thead', {}, [head]), el('tbody', {}, body)])])
   ]);
 }
 
@@ -396,7 +588,7 @@ function renderDerived(): void {
 
 const reset = document.getElementById('reset');
 reset?.addEventListener('click', () => {
-  state = blankState();
+  state = seededState(DEFAULT_SEED);
   save();
   render();
 });
