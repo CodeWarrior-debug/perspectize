@@ -2153,6 +2153,7 @@ enum ContentSortBy {
   NAME
   VIEW_COUNT
   LIKE_COUNT
+  PERCENT_LIKED
   PUBLISHED_AT
   CHANNEL_TITLE
   LENGTH
@@ -2330,13 +2331,25 @@ input CreatePerspectiveInput {
   review: String
 }
 
+"""
+Partial update: omit a field to leave it unchanged. For quality, agreement,
+importance, confidence, like, review, customFields and feelings, sending an
+explicit null clears the field (an empty feelings list or empty customFields
+object also clears). Every other field is a plain optional -- omit to leave
+unchanged, no way to clear it yet.
+"""
 input UpdatePerspectiveInput {
   id: IntID!
   contentID: IntID
+  "Omit = unchanged; null = clear."
   quality: Int
+  "Omit = unchanged; null = clear."
   agreement: Int
+  "Omit = unchanged; null = clear."
   importance: Int
+  "Omit = unchanged; null = clear."
   confidence: Int
+  "Omit = unchanged; null = clear."
   like: String
   privacy: Privacy
   description: String
@@ -2345,10 +2358,13 @@ input UpdatePerspectiveInput {
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRatingInput!]
+  "Omit = unchanged; null or [] = clear."
   feelings: [FeelingInput!]
   primaryPerspectiveID: IntID
   relatedPerspectiveIDs: [Int!]
+  "Omit = unchanged; null or {} = clear."
   customFields: JSON
+  "Omit = unchanged; null = clear."
   review: String
 }
 
@@ -11929,35 +11945,35 @@ func (ec *executionContext) unmarshalInputUpdatePerspectiveInput(ctx context.Con
 			if err != nil {
 				return it, err
 			}
-			it.Quality = data
+			it.Quality = graphql.OmittableOf(data)
 		case "agreement":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("agreement"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Agreement = data
+			it.Agreement = graphql.OmittableOf(data)
 		case "importance":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("importance"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Importance = data
+			it.Importance = graphql.OmittableOf(data)
 		case "confidence":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("confidence"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Confidence = data
+			it.Confidence = graphql.OmittableOf(data)
 		case "like":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("like"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Like = data
+			it.Like = graphql.OmittableOf(data)
 		case "privacy":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("privacy"))
 			data, err := ec.unmarshalOPrivacy2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPrivacy(ctx, v)
@@ -12013,7 +12029,7 @@ func (ec *executionContext) unmarshalInputUpdatePerspectiveInput(ctx context.Con
 			if err != nil {
 				return it, err
 			}
-			it.Feelings = data
+			it.Feelings = graphql.OmittableOf(data)
 		case "primaryPerspectiveID":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("primaryPerspectiveID"))
 			data, err := ec.unmarshalOIntID2ᚖint(ctx, v)
@@ -12034,14 +12050,14 @@ func (ec *executionContext) unmarshalInputUpdatePerspectiveInput(ctx context.Con
 			if err != nil {
 				return it, err
 			}
-			it.CustomFields = data
+			it.CustomFields = graphql.OmittableOf(data)
 		case "review":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("review"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Review = data
+			it.Review = graphql.OmittableOf(data)
 		}
 	}
 	return it, nil

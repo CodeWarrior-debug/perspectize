@@ -19,12 +19,29 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import { STANDARD_DIMENSIONS } from '$lib/utils/comparePerspectives';
+
+	/** Search-box description shown for each standard dimension, keyed by STANDARD_DIMENSIONS' key. */
+	const STANDARD_DIMENSION_DESCRIPTIONS: Record<(typeof STANDARD_DIMENSIONS)[number]['key'], string> = {
+		quality: 'How well made is this?',
+		agreement: 'Do you agree with it?',
+		importance: 'How much does this matter?',
+		confidence: 'How sure are you?',
+	};
 
 	const AVAILABLE_FIELDS: FieldDef[] = [
-		{ key: 'quality', label: 'Quality', kind: 'rating', existing: true, desc: 'How well made is this?' },
-		{ key: 'agreement', label: 'Agreement', kind: 'rating', existing: true, desc: 'Do you agree with it?' },
-		{ key: 'importance', label: 'Importance', kind: 'rating', existing: true, desc: 'How much does this matter?' },
-		{ key: 'confidence', label: 'Confidence', kind: 'rating', existing: true, desc: 'How sure are you?' },
+		// The 4 core dimensions read from STANDARD_DIMENSIONS (comparePerspectives.ts) --
+		// the single source of truth also used by PerspectivePopover's DEFAULT_FIELDS and
+		// Compare's getFieldLabel, so a renamed/relabeled dimension can't drift between
+		// them (see the UI gap audit, gap #17). Only the descriptions are local to this
+		// search box.
+		...STANDARD_DIMENSIONS.map((d) => ({
+			key: d.key,
+			label: d.label,
+			kind: 'rating' as const,
+			existing: true,
+			desc: STANDARD_DIMENSION_DESCRIPTIONS[d.key],
+		})),
 		{ key: 'originality', label: 'Originality', kind: 'rating', existing: false, desc: 'How fresh is the take?' },
 		{ key: 'clarity', label: 'Clarity', kind: 'rating', existing: false, desc: 'Is it easy to follow?' },
 		{ key: 'depth', label: 'Depth', kind: 'rating', existing: false, desc: 'How deep does it go?' },

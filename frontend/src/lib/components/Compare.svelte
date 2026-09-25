@@ -5,6 +5,7 @@
 	import { LIST_USERS, type UsersResponse } from '$lib/queries/users';
 	import {
 		LIST_PERSPECTIVES_BY_CONTENT,
+		MAX_PERSPECTIVES_PER_LIST,
 		type ListPerspectivesByContentResponse,
 	} from '$lib/queries/perspectives';
 	import { GET_CONTENT } from '$lib/queries/content';
@@ -59,6 +60,7 @@
 		queryFn: () =>
 			graphqlRequest<ListPerspectivesByContentResponse>(LIST_PERSPECTIVES_BY_CONTENT, {
 				contentID: Number(contentId),
+				first: MAX_PERSPECTIVES_PER_LIST,
 			}),
 	}));
 

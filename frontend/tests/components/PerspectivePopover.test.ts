@@ -424,6 +424,110 @@ describe('PerspectivePopover component', () => {
 		});
 	});
 
+	// Gap #2 in the UI gap audit: edit mode used to send `x ?? undefined` for
+	// every field, so a value the user cleared was dropped from the request
+	// entirely and the server read that as "leave unchanged" -- the old value
+	// came back on reopen. Edit mode now sends null for a cleared field.
+	describe('clearing fields in edit mode', () => {
+		it('removing the Quality field sends quality: null, not undefined or the old value', async () => {
+			renderPopover({
+				existingPerspective: {
+					id: '5',
+					quality: 7500,
+					agreement: 5000,
+					importance: null,
+					confidence: null,
+					like: null,
+				},
+			});
+			await tick();
+
+			await fireEvent.click(screen.getByLabelText('Remove Quality'));
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			const payload = mocks.mockUpdateMutate.mock.calls.at(-1)![0];
+			expect(payload.quality).toBeNull();
+			// The field the user didn't touch is still sent as its real value, not
+			// dropped -- edit mode sends the whole form state every time.
+			expect(payload.agreement).toBe(5000);
+		});
+
+		it('clearing the thumb (toggling it off) sends like: null, keeping the untouched rating', async () => {
+			renderPopover({
+				existingPerspective: {
+					id: '5',
+					quality: 7500, // kept, so the form still has a non-empty field to submit
+					agreement: null,
+					importance: null,
+					confidence: null,
+					like: 'THUMBS_UP',
+				},
+			});
+			await tick();
+
+			await fireEvent.click(screen.getByLabelText('Thumbs up')); // was pressed; this toggles it off
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			const payload = mocks.mockUpdateMutate.mock.calls.at(-1)![0];
+			expect(payload.like).toBeNull();
+			expect(payload.quality).toBe(7500);
+		});
+
+		it('emptying the review sends review: null, not undefined', async () => {
+			renderPopover({
+				existingPerspective: {
+					id: '5',
+					quality: 7500,
+					agreement: null,
+					importance: null,
+					confidence: null,
+					like: null,
+					review: 'This used to say something.',
+				},
+			});
+			await tick();
+
+			await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '' } });
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			const payload = mocks.mockUpdateMutate.mock.calls.at(-1)![0];
+			expect(payload.review).toBeNull();
+		});
+
+		it('removing the last custom field sends customFields: null, not undefined', async () => {
+			renderPopover({
+				existingPerspective: {
+					id: '5',
+					quality: 7500,
+					agreement: null,
+					importance: null,
+					confidence: null,
+					like: null,
+					customFields: { clarity: 8000 },
+				},
+			});
+			await tick();
+
+			await fireEvent.click(screen.getByLabelText('Remove Clarity'));
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			const payload = mocks.mockUpdateMutate.mock.calls.at(-1)![0];
+			expect(payload.customFields).toBeNull();
+		});
+
+		it('create mode still omits empty fields (sends undefined, not null) — only edit mode clears', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			await fireEvent.click(screen.getByLabelText('Thumbs up'));
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			const payload = mocks.mockCreateMutate.mock.calls.at(-1)![0];
+			expect(payload.review).toBeUndefined();
+			expect(payload.customFields).toBeUndefined();
+			expect('review' in payload ? payload.review === undefined : true).toBe(true);
+		});
+	});
+
 	describe('custom fields', () => {
 		it('shows the field title-cased but submits customFields with a fully lowercased key', async () => {
 			renderPopover({ existingPerspective: null });

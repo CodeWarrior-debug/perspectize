@@ -116,3 +116,27 @@ models:
     extraFields:
       PrimaryCategoryID:
         type: "*int"
+  # Tri-state update fields: an omitted key leaves the value unchanged; an
+  # explicit `null` clears it. Generated as graphql.Omittable[T]; the mapper
+  # (modelToUpdatePerspectiveInput in helpers.go) reads IsSet()/Value() to
+  # translate that into the ClearX flags perspective_service.go's Update()
+  # acts on. See the UI gap audit, gap #2, for why plain nullable pointers
+  # couldn't express "clear this field" (omitted and null both decoded to nil).
+  UpdatePerspectiveInput:
+    fields:
+      quality:
+        omittable: true
+      agreement:
+        omittable: true
+      importance:
+        omittable: true
+      confidence:
+        omittable: true
+      like:
+        omittable: true
+      review:
+        omittable: true
+      customFields:
+        omittable: true
+      feelings:
+        omittable: true

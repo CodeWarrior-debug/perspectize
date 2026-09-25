@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
@@ -450,6 +451,17 @@ func modelToCreatePerspectiveInput(userID int, input model.CreatePerspectiveInpu
 	return serviceInput
 }
 
+// omittablePtr splits a tri-state graphql.Omittable[*T] update field into a
+// (value, clear) pair: unset -> (nil, false) — leave unchanged; explicit
+// null -> (nil, true) — clear; a value -> (v, false) — apply it.
+func omittablePtr[T any](o graphql.Omittable[*T]) (*T, bool) {
+	v, set := o.ValueOK()
+	if !set {
+		return nil, false
+	}
+	return v, v == nil
+}
+
 // modelToUpdatePerspectiveInput converts a GraphQL UpdatePerspectiveInput into the
 // service-layer input. See modelToCreatePerspectiveInput for why this mapping lives
 // here instead of inline in the resolver.
@@ -457,11 +469,6 @@ func modelToUpdatePerspectiveInput(input model.UpdatePerspectiveInput) portservi
 	serviceInput := portservices.UpdatePerspectiveInput{
 		ID:                    input.ID,
 		ContentID:             input.ContentID,
-		Quality:               input.Quality,
-		Agreement:             input.Agreement,
-		Importance:            input.Importance,
-		Confidence:            input.Confidence,
-		Like:                  input.Like,
 		Privacy:               input.Privacy,
 		Description:           input.Description,
 		Category:              input.Category,
@@ -469,14 +476,29 @@ func modelToUpdatePerspectiveInput(input model.UpdatePerspectiveInput) portservi
 		Parts:                 input.Parts,
 		Labels:                input.Labels,
 		CategorizedRatings:    categorizedRatingInputsToDomain(input.CategorizedRatings),
-		Feelings:              feelingInputsToDomain(input.Feelings),
 		PrimaryPerspectiveID:  input.PrimaryPerspectiveID,
 		RelatedPerspectiveIDs: input.RelatedPerspectiveIDs,
-		Review:                input.Review,
 	}
 
-	if input.CustomFields != nil {
-		if data, err := json.Marshal(input.CustomFields); err == nil {
+	serviceInput.Quality, serviceInput.ClearQuality = omittablePtr(input.Quality)
+	serviceInput.Agreement, serviceInput.ClearAgreement = omittablePtr(input.Agreement)
+	serviceInput.Importance, serviceInput.ClearImportance = omittablePtr(input.Importance)
+	serviceInput.Confidence, serviceInput.ClearConfidence = omittablePtr(input.Confidence)
+	serviceInput.Like, serviceInput.ClearLike = omittablePtr(input.Like)
+	serviceInput.Review, serviceInput.ClearReview = omittablePtr(input.Review)
+
+	if feelings, set := input.Feelings.ValueOK(); set {
+		if len(feelings) == 0 {
+			serviceInput.ClearFeelings = true
+		} else {
+			serviceInput.Feelings = feelingInputsToDomain(feelings)
+		}
+	}
+
+	if customFields, set := input.CustomFields.ValueOK(); set {
+		if len(customFields) == 0 {
+			serviceInput.ClearCustomFields = true
+		} else if data, err := json.Marshal(customFields); err == nil {
 			serviceInput.CustomFields = data
 		}
 	}

@@ -3,38 +3,7 @@
  * Pure functions and constants that can be unit-tested without a browser.
  */
 import type { ContentItem } from '$lib/queries/content';
-
-/**
- * Maps AG Grid colId → GraphQL ContentSortBy enum value.
- * When a column isn't sortable on the backend, it falls back to NAME.
- */
-export const SORT_FIELD_MAP: Record<string, string> = {
-	item: 'NAME',
-	type: 'NAME', // type not sortable in backend, fallback to NAME
-	duration: 'NAME', // duration not sortable, fallback to NAME
-	views: 'VIEW_COUNT',
-	likes: 'LIKE_COUNT',
-	percentLiked: 'NAME', // computed client-side, not sortable in backend, fallback to NAME
-	publishDate: 'PUBLISHED_AT',
-	channel: 'NAME', // channel not sortable, fallback
-	createdAt: 'CREATED_AT',
-	updatedAt: 'UPDATED_AT',
-};
-
-/**
- * Resolve a sort field from the SORT_FIELD_MAP, with fallback.
- * Used by onSortChanged handler to convert AG Grid column IDs to backend sort enums.
- */
-export function resolveSortField(colId: string | undefined): string {
-	return SORT_FIELD_MAP[colId ?? 'updatedAt'] ?? 'UPDATED_AT';
-}
-
-/**
- * Resolve sort order from AG Grid sort direction.
- */
-export function resolveSortOrder(sort: string | null | undefined): 'ASC' | 'DESC' {
-	return sort === 'asc' ? 'ASC' : 'DESC';
-}
+import { percentLikedValueGetter, formatTags } from './formatting';
 
 /**
  * Capitalize first letter, lowercase rest — used by the type column valueGetter.
@@ -71,9 +40,13 @@ export const SORTABLE_COLUMNS: readonly TogglableColumn[] = [
 	{ colId: 'duration', label: 'Length' },
 	{ colId: 'views', label: 'Views' },
 	{ colId: 'likes', label: 'Likes' },
-	{ colId: 'publishDate', label: 'Published' },
+	// Sorts server-side via ContentSortBy.PERCENT_LIKED in "All Items" mode (see
+	// COL_TO_SORT in gridUrlState.ts) and client-side here (percentLikedValueGetter,
+	// below) for "Loaded" mode and the mobile card list.
+	{ colId: 'percentLiked', label: '% Liked' },
+	{ colId: 'publishDate', label: 'Date' },
 	{ colId: 'channel', label: 'Channel' },
-	{ colId: 'createdAt', label: 'Date added' },
+	{ colId: 'createdAt', label: 'Date Added' },
 	{ colId: 'updatedAt', label: 'Updated' },
 ] as const;
 
@@ -83,6 +56,7 @@ const SORT_VALUE_GETTERS: Record<string, (row: ContentItem) => string | number |
 	duration: (row) => row.length,
 	views: (row) => row.viewCount,
 	likes: (row) => row.likeCount,
+	percentLiked: (row) => percentLikedValueGetter({ data: row }),
 	publishDate: (row) => row.publishedAt,
 	channel: (row) => row.channelTitle?.toLowerCase() ?? null,
 	createdAt: (row) => row.createdAt,
@@ -118,134 +92,6 @@ export function compareContentBySorts(
 }
 
 /**
- * Compute next page, respecting bounds.
- * Returns the new page number, or current if at last page.
- */
-export function computeNextPage(currentPage: number, totalCount: number, pageSize: number): number {
-	const maxPage = Math.ceil(totalCount / pageSize) - 1;
-	if (currentPage < maxPage) {
-		return currentPage + 1;
-	}
-	return currentPage;
-}
-
-/**
- * Compute previous page, respecting bounds.
- * Returns the new page number, or current if at first page.
- */
-export function computePrevPage(currentPage: number): number {
-	if (currentPage > 0) {
-		return currentPage - 1;
-	}
-	return currentPage;
-}
-
-/**
- * Responsive tier type used by ActivityTable.
- */
-export type ResponsiveTier = 'xs' | 'sm' | 'md' | 'lg';
-
-/**
- * Derive responsive tier from window width.
- * xs: <445px, sm: 445-639px, md: 640-899px, lg: 900px+
- */
-export function deriveResponsiveTier(width: number): ResponsiveTier {
-	if (width >= 900) return 'lg';
-	if (width >= 640) return 'md';
-	if (width >= 445) return 'sm';
-	return 'xs';
-}
-
-/**
- * Determine which columns should be visible for a given responsive tier.
- * Returns { visible: string[], hidden: string[] } for use with setColumnsVisible.
- */
-export function getColumnVisibility(tier: ResponsiveTier): {
-	visible: string[];
-	hidden: string[];
-} {
-	const alwaysVisible = ['item', 'type', 'perspectize'];
-	const alwaysHidden = ['description', 'updatedAt', 'createdAt'];
-	const smCols = ['channel'];
-	const mdCols = ['duration', 'publishDate'];
-	const lgCols = ['views', 'likes', 'percentLiked', 'tags'];
-
-	const visible = [...alwaysVisible];
-	const hidden = [...alwaysHidden];
-
-	if (tier !== 'xs') {
-		visible.push(...smCols);
-	} else {
-		hidden.push(...smCols);
-	}
-
-	if (tier === 'md' || tier === 'lg') {
-		visible.push(...mdCols);
-	} else {
-		hidden.push(...mdCols);
-	}
-
-	if (tier === 'lg') {
-		visible.push(...lgCols);
-	} else {
-		hidden.push(...lgCols);
-	}
-
-	return { visible, hidden };
-}
-
-/**
- * Whether a tier is considered "mobile" (affects domLayout).
- */
-export function isMobileTier(tier: ResponsiveTier): boolean {
-	return tier === 'xs' || tier === 'sm';
-}
-
-/**
- * All column IDs defined in the ActivityTable, in order.
- */
-export const COLUMN_IDS = [
-	'perspectize',
-	'item',
-	'type',
-	'duration',
-	'views',
-	'likes',
-	'percentLiked',
-	'publishDate',
-	'channel',
-	'tags',
-	'description',
-	'updatedAt',
-	'createdAt',
-] as const;
-
-/**
- * Columns that should never be sortable (set sortable: false in colDef).
- */
-export const NON_SORTABLE_COLUMNS = ['perspectize', 'tags', 'description'] as const;
-
-/**
- * Column filter type mapping — which AG Grid filter each column uses.
- * false = no filter.
- */
-export const COLUMN_FILTERS: Record<string, string | false> = {
-	perspectize: false,
-	item: false, // search handled by page-level input
-	type: 'agTextColumnFilter',
-	duration: 'agNumberColumnFilter',
-	views: 'agNumberColumnFilter',
-	likes: 'agNumberColumnFilter',
-	percentLiked: false, // computed client-side; a real filter needs a backend field (see PR notes)
-	publishDate: 'agDateColumnFilter',
-	channel: 'agTextColumnFilter',
-	tags: 'agTextColumnFilter',
-	description: 'agTextColumnFilter',
-	updatedAt: 'agDateColumnFilter',
-	createdAt: 'agDateColumnFilter',
-};
-
-/**
  * Column-picker registry — the single source of truth for which columns the
  * user can toggle in ColumnPickerDialog. Kept here (not in the Svelte file) so
  * the dialog, the override-map builder in ActivityTable, and the tests all
@@ -271,7 +117,7 @@ export const DATA_COLUMNS: readonly TogglableColumn[] = [
 	{ colId: 'views', label: 'Views' },
 	{ colId: 'likes', label: 'Likes' },
 	{ colId: 'percentLiked', label: '% Liked' },
-	{ colId: 'publishDate', label: 'Published' },
+	{ colId: 'publishDate', label: 'Date' },
 	{ colId: 'channel', label: 'Channel' },
 	{ colId: 'tags', label: 'Tags' },
 	{ colId: 'description', label: 'Description' },
@@ -289,4 +135,125 @@ export const INTERNAL_COLUMNS: readonly TogglableColumn[] = [
 /** Every colId the user may toggle, given their admin status. */
 export function togglableColIds(isAdmin: boolean): string[] {
 	return [...DATA_COLUMNS.map((c) => c.colId), ...(isAdmin ? INTERNAL_COLUMNS.map((c) => c.colId) : [])];
+}
+
+// ---------------------------------------------------------------------------
+// Client-side filtering (mobile card list, "Loaded" mode)
+// ---------------------------------------------------------------------------
+
+/** The shape urlParamsToFilter (gridUrlState.ts) produces per colId. Mirrors AG Grid's own filter model. */
+interface AGFilterEntry {
+	filterType: 'text' | 'number' | 'date';
+	type: string;
+	filter?: number | string;
+	filterTo?: number;
+	dateFrom?: string;
+	dateTo?: string;
+}
+
+/** colId → the row field a filter on that column should match against. */
+const FILTER_VALUE_GETTERS: Record<string, (row: ContentItem) => string | number | null> = {
+	type: (row) => row.contentType?.toLowerCase() ?? null,
+	duration: (row) => row.length,
+	views: (row) => row.viewCount,
+	likes: (row) => row.likeCount,
+	publishDate: (row) => row.publishedAt,
+	channel: (row) => row.channelTitle?.toLowerCase() ?? null,
+	tags: (row) => formatTags(row.tags).toLowerCase(),
+	description: (row) => row.description?.toLowerCase() ?? null,
+	createdAt: (row) => row.createdAt,
+	updatedAt: (row) => row.updatedAt,
+};
+
+function matchesTextFilter(value: string | null, entry: AGFilterEntry): boolean {
+	const needle = String(entry.filter ?? '').toLowerCase();
+	switch (entry.type) {
+		case 'contains':
+			return value != null && value.includes(needle);
+		case 'notContains':
+			return value == null || !value.includes(needle);
+		case 'equals':
+			return value === needle;
+		case 'notEqual':
+			return value !== needle;
+		case 'startsWith':
+			return value != null && value.startsWith(needle);
+		case 'endsWith':
+			return value != null && value.endsWith(needle);
+		case 'blank':
+			return value == null || value === '';
+		case 'notBlank':
+			return value != null && value !== '';
+		default:
+			return true;
+	}
+}
+
+function matchesNumberFilter(value: number | null, entry: AGFilterEntry): boolean {
+	if (value == null) return false;
+	const target = Number(entry.filter);
+	switch (entry.type) {
+		case 'equals':
+			return value === target;
+		case 'notEqual':
+			return value !== target;
+		case 'greaterThan':
+			return value > target;
+		case 'greaterThanOrEqual':
+			return value >= target;
+		case 'lessThan':
+			return value < target;
+		case 'lessThanOrEqual':
+			return value <= target;
+		case 'inRange':
+			return value >= target && value <= (entry.filterTo ?? target);
+		default:
+			return true;
+	}
+}
+
+function matchesDateFilter(value: string | null, entry: AGFilterEntry): boolean {
+	if (!value) return false;
+	const t = new Date(value).getTime();
+	const from = entry.dateFrom ? new Date(entry.dateFrom).getTime() : undefined;
+	const to = entry.dateTo ? new Date(entry.dateTo).getTime() : undefined;
+	switch (entry.type) {
+		case 'equals':
+			return from !== undefined && t === from;
+		case 'greaterThan':
+			return from !== undefined && t > from;
+		case 'greaterThanOrEqual':
+			return from !== undefined && t >= from;
+		case 'lessThan':
+			return to !== undefined && t < to;
+		case 'lessThanOrEqual':
+			return to !== undefined && t <= to;
+		case 'inRange':
+			return from !== undefined && to !== undefined && t >= from && t <= to;
+		default:
+			return true;
+	}
+}
+
+/**
+ * Apply an AG-Grid-shaped filter model (as produced by urlParamsToFilter in
+ * gridUrlState.ts) to a plain row array, client-side. Used where there's no
+ * AG Grid instance to filter for us — the mobile card list in "Loaded" mode,
+ * which previously ignored column filters entirely (see the UI gap audit,
+ * gap #5). Unknown colIds are skipped (same policy as compareContentBySorts).
+ */
+export function filterContentRows(rows: ContentItem[], filterModel: Record<string, unknown>): ContentItem[] {
+	const entries = Object.entries(filterModel) as [string, AGFilterEntry][];
+	if (entries.length === 0) return rows;
+
+	return rows.filter((row) =>
+		entries.every(([colId, entry]) => {
+			const getValue = FILTER_VALUE_GETTERS[colId];
+			if (!getValue) return true;
+			const value = getValue(row);
+			if (entry.filterType === 'number') return matchesNumberFilter(value as number | null, entry);
+			if (entry.filterType === 'date') return matchesDateFilter(value as string | null, entry);
+			return matchesTextFilter(typeof value === 'string' ? value : value == null ? null : String(value), entry);
+		}),
+	);
 }

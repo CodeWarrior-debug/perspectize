@@ -177,6 +177,7 @@ enum ContentSortBy {
   NAME
   VIEW_COUNT
   LIKE_COUNT
+  PERCENT_LIKED
   PUBLISHED_AT
   CHANNEL_TITLE
   LENGTH
@@ -354,13 +355,25 @@ input CreatePerspectiveInput {
   review: String
 }
 
+"""
+Partial update: omit a field to leave it unchanged. For quality, agreement,
+importance, confidence, like, review, customFields and feelings, sending an
+explicit null clears the field (an empty feelings list or empty customFields
+object also clears). Every other field is a plain optional -- omit to leave
+unchanged, no way to clear it yet.
+"""
 input UpdatePerspectiveInput {
   id: IntID!
   contentID: IntID
+  "Omit = unchanged; null = clear."
   quality: Int
+  "Omit = unchanged; null = clear."
   agreement: Int
+  "Omit = unchanged; null = clear."
   importance: Int
+  "Omit = unchanged; null = clear."
   confidence: Int
+  "Omit = unchanged; null = clear."
   like: String
   privacy: Privacy
   description: String
@@ -369,10 +382,13 @@ input UpdatePerspectiveInput {
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRatingInput!]
+  "Omit = unchanged; null or [] = clear."
   feelings: [FeelingInput!]
   primaryPerspectiveID: IntID
   relatedPerspectiveIDs: [Int!]
+  "Omit = unchanged; null or {} = clear."
   customFields: JSON
+  "Omit = unchanged; null = clear."
   review: String
 }
 

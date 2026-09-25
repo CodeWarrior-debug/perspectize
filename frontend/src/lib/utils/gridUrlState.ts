@@ -106,6 +106,7 @@ export const COL_TO_SORT: Record<string, string> = {
 	duration: 'LENGTH', // New! Was NAME fallback
 	views: 'VIEW_COUNT',
 	likes: 'LIKE_COUNT',
+	percentLiked: 'PERCENT_LIKED',
 	publishDate: 'PUBLISHED_AT',
 	channel: 'CHANNEL_TITLE', // New! Was NAME fallback
 	createdAt: 'CREATED_AT',
@@ -118,6 +119,7 @@ export const SORT_TO_COL: Record<string, string> = {
 	LENGTH: 'duration',
 	VIEW_COUNT: 'views',
 	LIKE_COUNT: 'likes',
+	PERCENT_LIKED: 'percentLiked',
 	PUBLISHED_AT: 'publishDate',
 	CHANNEL_TITLE: 'channel',
 	CREATED_AT: 'createdAt',
@@ -228,7 +230,6 @@ type AGDateFilter = { filterType: 'date'; type: string; dateFrom?: string; dateT
 
 /** AG Grid colId → URL f.* param key */
 const COL_TO_FILTER_KEY: Record<string, string> = {
-	item: 'item',
 	type: 'type',
 	duration: 'duration',
 	views: 'views',
@@ -503,11 +504,6 @@ export function urlParamsToGraphQLFilter(
 		if (!value) continue;
 
 		switch (filterKey) {
-			case 'item':
-				result.search = value;
-				hasAny = true;
-				break;
-
 			case 'type':
 				result.contentType = value.toUpperCase();
 				hasAny = true;

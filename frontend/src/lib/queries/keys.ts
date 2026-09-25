@@ -50,11 +50,26 @@ export const queryKeys = {
 
 	perspectives: {
 		all: () => [...queryKeys.all, 'perspectives'] as const,
+		// Umbrella over EVERY perspective list, regardless of row shape. Safe for
+		// invalidate/cancel/remove (a shape-agnostic "everything's stale"); never pass
+		// this to setQueriesData/getQueriesData, since the three branches below cache
+		// different response shapes and an optimistic patch built for one would
+		// corrupt the others (see byUserLists' comment).
 		lists: () => [...queryKeys.perspectives.all(), 'list'] as const,
-		listByUser: (userId: number) => [...queryKeys.perspectives.lists(), { userId }] as const,
-		listByContent: (contentId: number) => [...queryKeys.perspectives.lists(), { contentId }] as const,
-		activityFeed: (includePrivate: boolean) =>
-			[...queryKeys.perspectives.lists(), 'activityFeed', { includePrivate }] as const,
+		// ListPerspectivesByUserResponse -- PerspectiveItem rows, the same shape
+		// createPerspective/updatePerspective return. The only branch that's safe to
+		// optimistically patch with a PerspectiveItem.
+		byUserLists: () => [...queryKeys.perspectives.lists(), 'byUser'] as const,
+		listByUser: (userId: number) => [...queryKeys.perspectives.byUserLists(), { userId }] as const,
+		// ListPerspectivesByContentResponse -- also PerspectiveItem rows.
+		byContentLists: () => [...queryKeys.perspectives.lists(), 'byContent'] as const,
+		listByContent: (contentId: number) => [...queryKeys.perspectives.byContentLists(), { contentId }] as const,
+		// ListActivityPerspectivesResponse -- ActivityPerspectiveItem rows (nested
+		// `content`, no rating fields: a DIFFERENT shape) and privacy-filtered by the
+		// server (includePrivate). Never patch this with a PerspectiveItem -- refetch
+		// it instead, so privacy scoping and the nested content stay correct.
+		activityFeeds: () => [...queryKeys.perspectives.lists(), 'activityFeed'] as const,
+		activityFeed: (includePrivate: boolean) => [...queryKeys.perspectives.activityFeeds(), { includePrivate }] as const,
 		details: () => [...queryKeys.perspectives.all(), 'detail'] as const,
 		detail: (id: string) => [...queryKeys.perspectives.details(), id] as const,
 	},
