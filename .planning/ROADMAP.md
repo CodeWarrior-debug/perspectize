@@ -705,6 +705,11 @@ Phases 11-15 planned from FEATURE_BACKLOG.md. Phase 16 added for mobile app rese
 - [ ] **Phase 14: AG Grid Power Features** - Advanced table features, column grouping, export
 - [ ] **Phase 15: Discover Page** - Content discovery and recommendation interface
 - [ ] **Phase 16: Mobile App Strategy** - Research native mobile approaches for SvelteKit SPA
+- [ ] **Phase 20: Bible Static Assets** - Serve immutable Bible verse text + interlinear from content-hashed per-book static chunks instead of GraphQL/Postgres; measure perf + cost before/after
+- [ ] **Phase 21: Query Cache Persistence & Optimistic Writes** - Persist TanStack Query cache to IndexedDB (per-user, wiped on sign-out) + optimistic perspective/content mutations
+- [ ] **Phase 22: TanStack DB Pilot (Perspectives)** - One-entity pilot of `@tanstack/svelte-db` query collections over existing GraphQL; adopt or revert on exit criteria
+- [ ] **Phase 23: Sync Engine Evaluation (GATED)** - ElectricSQL + TanStack DB Electric collection; only if real-time/collab or measured read-cost growth
+- [ ] **Phase 24: Local Database / Desktop (GATED)** - PGlite local Postgres and/or Tauri desktop shell; only on offline or distribution requirement
 
 ### Phase 18.1: Mobile Activity Page Redesign (INSERTED)
 
@@ -731,6 +736,48 @@ Plans:
 Plans:
 - [ ] 16-01-PLAN.md — Capacitor integration + PWA configuration (install deps, init platforms, manifest, service worker)
 - [ ] 16-02-PLAN.md — POC verification in iOS Simulator + recommendation document (checkpoint)
+
+### Local-First Data Strategy (Phases 20–24)
+
+Shared research: `.planning/phases/20-bible-static-assets/20-RESEARCH.md` (value-for-money ranking, TanStack DB Svelte-adapter lag check, local Postgres options). Ordered cheapest/safest first; 23–24 are gated on evidence, not scheduled.
+
+### Phase 20: Bible Static Assets
+**Goal**: Bible reads (verse text, then interlinear) come from content-hashed per-book static chunks cached by the browser/CDN, not GraphQL + Postgres, with a measured before/after on latency, API/DB load, and hosting cost.
+**Depends on**: Bible passage content + interlinear (shipped; `bible_verse_text`, `bible_word`, `bible_lexicon`)
+**Plans**: 2 plans
+
+**Success criteria (must_haves.truths):**
+- Warm-cache passage render never issues a `PassageText` GraphQL operation
+- Per-book verse chunk ≤ 80 KB gz (Psalms max measured at 79 KB); median ≈ 11 KB
+- `PassageText` operation count in prod logs drops ≥ 90% vs. 7-day baseline
+- Baseline and after-numbers recorded in `20-01-SUMMARY.md` with the same instrumentation
+- GraphQL `passageText` remains as fallback on chunk-load failure; no regression in existing tests
+
+Plans:
+- [ ] 20-01 — Verse-text static chunks + instrumentation + before/after measurement → `docs/superpowers/plans/2026-09-26-bible-static-assets-plan.md`
+- [ ] 20-02 — Interlinear (`bible_word`/`bible_lexicon`) per-book lazy chunks (TBD; reuses 20-01 pipeline, keep CC BY attribution)
+
+### Phase 21: Query Cache Persistence & Optimistic Writes
+**Goal**: Reloads render last-known user data instantly (IndexedDB-persisted TanStack Query cache, background revalidate); key mutations are optimistic.
+**Depends on**: Phase 20 (measurement harness reused)
+**Plans**: TBD
+
+**Success criteria:** cache keyed by Clerk user id and wiped on sign-out/user switch; no private perspective persisted for a non-owner; reload-to-content p50 improves vs. Phase 20 baseline.
+
+### Phase 22: TanStack DB Pilot (Perspectives)
+**Goal**: Evaluate `@tanstack/svelte-db` (pinned 0.1.x) `queryCollectionOptions` for perspectives across Activity grid, details modal, and compare page.
+**Depends on**: Phase 21
+**Plans**: TBD
+
+**Success criteria / exit:** every needed API verified present in the Svelte adapter before starting (it trails React ~32 releases); pilot adopted only if it deletes net code or invalidation bugs, else reverted and documented.
+
+### Phase 23: Sync Engine Evaluation (GATED)
+**Goal**: ElectricSQL shapes → TanStack DB Electric collections, writes still via GraphQL.
+**Gate**: real-time/collab requirement OR measured read-driven cost growth. Prereqs: logical replication on Sevalla/Neon, Clerk-scoped shape auth proxy.
+
+### Phase 24: Local Database / Desktop (GATED)
+**Goal**: PGlite (WASM Postgres, IndexedDB/OPFS) local store and/or Tauri desktop shell.
+**Gate**: explicit offline-first or desktop-distribution requirement. Not a performance play once Phases 20–22 land.
 
 ## Progress
 
@@ -771,3 +818,8 @@ Phases execute in numeric order: 1 -> 2 -> 2.1 -> 3 -> 3.1 -> 3.2 -> 3.3 -> 3.4 
 | 18. Server-Side Pagination & Filtering | 0/3 | Planned | - |
 | 18.1 Mobile Activity Page Redesign | 0/3 | Planned | - |
 | 19. Content Familiarity Tracking | 0/3 | Planned | - |
+| 20. Bible Static Assets | 0/2 | Planned | - |
+| 21. Query Cache Persistence & Optimistic Writes | 0/0 | Not started | - |
+| 22. TanStack DB Pilot (Perspectives) | 0/0 | Not started | - |
+| 23. Sync Engine Evaluation | 0/0 | Gated | - |
+| 24. Local Database / Desktop | 0/0 | Gated | - |
