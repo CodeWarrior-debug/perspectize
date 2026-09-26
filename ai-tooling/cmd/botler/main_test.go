@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/CodeWarrior-debug/perspectize/ai-tooling/evals"
 	"github.com/CodeWarrior-debug/perspectize/ai-tooling/llm"
 	"github.com/CodeWarrior-debug/perspectize/ai-tooling/llm/fake"
 	"github.com/stretchr/testify/assert"
@@ -151,4 +153,50 @@ func TestEval_BadArgs(t *testing.T) {
 	code, _, errOut := runWith(t, answerAll(1, "x"), nil, "eval", "--area", "nope", "--out", t.TempDir())
 	assert.Equal(t, 1, code)
 	assert.Contains(t, errOut, "no seed questions")
+}
+
+func TestToolsCall_ListPerspectivesUsesFixture(t *testing.T) {
+	code, out, _ := runWith(t, nil, nil, "tools", "list")
+	require.Equal(t, 0, code)
+	assert.Contains(t, out, "list_perspectives")
+
+	code, out, errOut := runWith(t, nil, nil, "tools", "call", "list_perspectives", "--as", "1", "--input", `{"scope":"content","content_id":101}`)
+	require.Equal(t, 0, code, errOut)
+	assert.Contains(t, out, "Deep Sea")
+	assert.Contains(t, out, "untrusted")
+	assert.NotContains(t, out, evals.Canary, "user 1 never sees user 2's private review")
+
+	code, out, _ = runWith(t, nil, nil, "tools", "call", "list_perspectives", "--input", `{"scope":"mine"}`)
+	require.Equal(t, 0, code)
+	assert.Contains(t, out, "isn't signed in", "the default is signed out")
+}
+
+func TestChat_AsBindsTheViewer(t *testing.T) {
+	p := &fake.Provider{Turns: []fake.Turn{
+		{Calls: []llm.ToolCall{{ID: "t1", Name: "list_perspectives", Input: json.RawMessage(`{"scope":"mine"}`)}}, Stop: llm.StopToolUse},
+		{Text: []string{"Your top pick is The Deep Sea Documentary."}, Stop: llm.StopEnd},
+	}}
+	code, _, errOut := runWith(t, p, nil, "chat", "--as", "1", "What did I rate highest?")
+	require.Equal(t, 0, code, errOut)
+	result := p.Requests()[1].Messages[2].Parts[0].Result.Content
+	assert.Contains(t, result, "Psalm 23", "user 1's own private perspective is visible to them")
+	assert.NotContains(t, result, evals.Canary)
+}
+
+func TestEval_DataSuite(t *testing.T) {
+	dir := t.TempDir()
+	p := answerAll(100, "Please sign in. [compare.pick-two]")
+	code, out, errOut := runWith(t, p, nil, "eval", "--suite", "data", "--runs", "1", "--out", dir)
+	require.Equal(t, 0, code, errOut)
+	assert.Contains(t, errOut, fmt.Sprintf("evaluating %d questions", len(evals.DataCases())))
+	assert.Contains(t, out, "pass rate")
+	assert.Contains(t, out, "FAIL", "a canned answer can't pass the tool-selection cases")
+}
+
+func TestEval_SuiteArgs(t *testing.T) {
+	code, _, _ := runWith(t, answerAll(1, "x"), nil, "eval", "--suite", "bogus")
+	assert.Equal(t, 2, code)
+	code, _, errOut := runWith(t, answerAll(1, "x"), nil, "eval", "--suite", "data", "--area", "compare")
+	assert.Equal(t, 2, code)
+	assert.Contains(t, errOut, "guide suite only")
 }

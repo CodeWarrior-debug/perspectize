@@ -151,8 +151,6 @@ type item struct {
 
 func runItems(ctx context.Context, model string, items []item, runs int) Report {
 	rep := Report{Model: model, RunsPerSeed: runs, StartedAt: time.Now().UTC()}
-	var passes, total int
-	var latency time.Duration
 	for _, it := range items {
 		sr := SeedReport{Area: it.area, Question: it.question, Trap: it.trap}
 		seedPasses := 0
@@ -170,21 +168,50 @@ func runItems(ctx context.Context, model string, items []item, runs int) Report 
 			if rr.Pass {
 				seedPasses++
 			}
-			rep.ModelCalls += rr.Calls
-			rep.Usage = rep.Usage.Add(rr.Usage)
-			latency += rr.Latency
 			sr.Runs = append(sr.Runs, rr)
 		}
 		if runs > 0 {
 			sr.PassRate = float64(seedPasses) / float64(runs)
 		}
-		passes += seedPasses
-		total += runs
 		rep.Seeds = append(rep.Seeds, sr)
 	}
+	summarize(&rep)
+	return rep
+}
+
+// Merge combines reports from the same model (say, the guide and data
+// suites) into one, recomputing the totals.
+func Merge(model string, reps ...Report) Report {
+	out := Report{Model: model}
+	for i, r := range reps {
+		if i == 0 {
+			out.RunsPerSeed, out.StartedAt = r.RunsPerSeed, r.StartedAt
+		}
+		out.Seeds = append(out.Seeds, r.Seeds...)
+	}
+	summarize(&out)
+	return out
+}
+
+// summarize recomputes a report's totals from its runs.
+func summarize(rep *Report) {
+	var passes, total int
+	var latency time.Duration
+	rep.ModelCalls, rep.Usage = 0, llm.Usage{}
+	for _, s := range rep.Seeds {
+		for _, r := range s.Runs {
+			if r.Pass {
+				passes++
+			}
+			total++
+			latency += r.Latency
+			rep.ModelCalls += r.Calls
+			rep.Usage = rep.Usage.Add(r.Usage)
+		}
+	}
+	rep.PassRate, rep.AvgLatency = 0, 0
 	if total > 0 {
 		rep.PassRate = float64(passes) / float64(total)
 		rep.AvgLatency = latency / time.Duration(total)
 	}
-	return rep
 }
