@@ -9,6 +9,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	auth "github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
 
@@ -61,6 +62,12 @@ func (d *DirectiveRoot) Owner(ctx context.Context, obj interface{}, next graphql
 			return nil, fmt.Errorf("resource not found")
 		}
 		if perspective.UserID != user.ID {
+			// Someone else's private perspective is invisible to this user
+			// (perspectiveByID returns null for it), so answer as if it didn't
+			// exist rather than confirming the id with "access denied".
+			if perspective.Privacy == domain.PrivacyPrivate {
+				return nil, fmt.Errorf("resource not found")
+			}
 			return nil, fmt.Errorf("access denied: you can only modify your own perspectives")
 		}
 	} else if strings.Contains(strings.ToLower(fieldName), "content") {

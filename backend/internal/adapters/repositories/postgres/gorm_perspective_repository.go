@@ -62,9 +62,13 @@ func (r *GormPerspectiveRepository) Update(ctx context.Context, p *domain.Perspe
 	return r.GetByID(ctx, model.ID)
 }
 
-// Delete removes a perspective by ID
-func (r *GormPerspectiveRepository) Delete(ctx context.Context, id int) error {
-	result := r.db.WithContext(ctx).Delete(&PerspectiveModel{}, id)
+// Delete removes a perspective by ID, scoped to its owner (see the port's doc
+// comment): DELETE ... WHERE id = ? AND user_id = ?.
+func (r *GormPerspectiveRepository) Delete(ctx context.Context, id int, ownerUserID int) error {
+	if ownerUserID <= 0 {
+		return domain.ErrNotFound
+	}
+	result := r.db.WithContext(ctx).Where("user_id = ?", ownerUserID).Delete(&PerspectiveModel{}, id)
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete perspective: %w", result.Error)
 	}

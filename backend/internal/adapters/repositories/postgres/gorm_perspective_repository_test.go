@@ -177,19 +177,29 @@ func TestGormPerspectiveRepository_Update(t *testing.T) {
 func TestGormPerspectiveRepository_Delete(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("succeeds when one row is removed", func(t *testing.T) {
+	t.Run("scopes the DELETE to the owner and succeeds when one row is removed", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`DELETE FROM "perspectives"`).WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec(`DELETE FROM "perspectives" WHERE user_id = \$1 AND "perspectives"."id" = \$2`).
+			WithArgs(42, 5).
+			WillReturnResult(sqlmock.NewResult(0, 1))
 
-		assert.NoError(t, NewGormPerspectiveRepository(db).Delete(ctx, 5))
+		assert.NoError(t, NewGormPerspectiveRepository(db).Delete(ctx, 5, 42))
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("zero rows affected means domain.ErrNotFound", func(t *testing.T) {
+	t.Run("zero rows affected (missing or not owned) means domain.ErrNotFound", func(t *testing.T) {
 		db, mock := newMockDB(t)
 		mock.ExpectExec(`DELETE FROM "perspectives"`).WillReturnResult(sqlmock.NewResult(0, 0))
 
-		err := NewGormPerspectiveRepository(db).Delete(ctx, 404)
+		err := NewGormPerspectiveRepository(db).Delete(ctx, 404, 42)
+		assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("non-positive owner never reaches the database", func(t *testing.T) {
+		db, mock := newMockDB(t)
+
+		err := NewGormPerspectiveRepository(db).Delete(ctx, 5, 0)
 		assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
 		assertAllExpectationsMet(t, mock)
 	})
@@ -198,7 +208,7 @@ func TestGormPerspectiveRepository_Delete(t *testing.T) {
 		db, mock := newMockDB(t)
 		mock.ExpectExec(`DELETE FROM "perspectives"`).WillReturnError(errors.New("p del boom"))
 
-		err := NewGormPerspectiveRepository(db).Delete(ctx, 5)
+		err := NewGormPerspectiveRepository(db).Delete(ctx, 5, 42)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to delete perspective")
 		assertAllExpectationsMet(t, mock)

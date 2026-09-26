@@ -84,7 +84,7 @@ func (m *mockPerspectiveService) Update(ctx context.Context, input portservices.
 	return nil, nil
 }
 
-func (m *mockPerspectiveService) Delete(ctx context.Context, id int) error {
+func (m *mockPerspectiveService) Delete(ctx context.Context, id int, actorUserID int) error {
 	return nil
 }
 
@@ -187,6 +187,29 @@ func TestOwner_PerspectiveNonOwnerDenied(t *testing.T) {
 	_, err := d.Owner(ctx, nil, successResolver, "id")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "access denied: you can only modify your own perspectives")
+}
+
+// Another user's PRIVATE perspective must look nonexistent, matching
+// perspectiveByID's null-for-non-owner behaviour, so the id isn't confirmed.
+func TestOwner_PerspectiveNonOwnerPrivateLooksNotFound(t *testing.T) {
+	mockPersp := &mockPerspectiveService{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
+			return &domain.Perspective{ID: 10, UserID: 99, Privacy: domain.PrivacyPrivate}, nil
+		},
+	}
+	d := directives.NewDirectiveRoot(nil, mockPersp)
+
+	ctx := withUserID(context.Background(), 42)
+	ctx = withFieldContext(ctx, "deletePerspective", map[string]interface{}{"id": "10"})
+
+	called := false
+	_, err := d.Owner(ctx, nil, func(ctx context.Context) (interface{}, error) {
+		called = true
+		return "success", nil
+	}, "id")
+	require.Error(t, err)
+	assert.Equal(t, "resource not found", err.Error())
+	assert.False(t, called, "resolver must not run for a non-owner")
 }
 
 // updatePerspective takes `input: UpdatePerspectiveInput!`; gqlgen binds that

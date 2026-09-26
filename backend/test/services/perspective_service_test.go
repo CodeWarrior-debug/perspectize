@@ -18,7 +18,7 @@ type mockPerspectiveRepository struct {
 	createFn    func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
 	getByIDFn   func(ctx context.Context, id int) (*domain.Perspective, error)
 	updateFn    func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
-	deleteFn    func(ctx context.Context, id int) error
+	deleteFn    func(ctx context.Context, id int, ownerUserID int) error
 	listFn      func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
 	aggregateFn func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
 
@@ -48,9 +48,9 @@ func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspe
 	return p, nil
 }
 
-func (m *mockPerspectiveRepository) Delete(ctx context.Context, id int) error {
+func (m *mockPerspectiveRepository) Delete(ctx context.Context, id int, ownerUserID int) error {
 	if m.deleteFn != nil {
-		return m.deleteFn(ctx, id)
+		return m.deleteFn(ctx, id, ownerUserID)
 	}
 	return nil
 }
@@ -359,21 +359,85 @@ func TestPerspectiveGetByID_InvalidID(t *testing.T) {
 
 // --- Delete Tests ---
 
-func TestPerspectiveDelete_Success(t *testing.T) {
+func TestPerspectiveDelete_OwnerSucceeds(t *testing.T) {
+	var gotID, gotOwner int
 	perspectiveRepo := &mockPerspectiveRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
-			return &domain.Perspective{ID: id}, nil
+			return &domain.Perspective{ID: id, UserID: 42}, nil
 		},
-		deleteFn: func(ctx context.Context, id int) error {
+		deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
+			gotID, gotOwner = id, ownerUserID
 			return nil
 		},
 	}
 	userRepo := &mockUserRepoForPerspective{}
 
 	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
-	err := svc.Delete(context.Background(), 1)
+	err := svc.Delete(context.Background(), 1, 42)
 
 	require.NoError(t, err)
+	assert.Equal(t, 1, gotID)
+	// The actor is forwarded so the repository can scope the DELETE by owner.
+	assert.Equal(t, 42, gotOwner)
+}
+
+func TestPerspectiveDelete_OwnerCanDeletePrivate(t *testing.T) {
+	deleted := false
+	perspectiveRepo := &mockPerspectiveRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
+			return &domain.Perspective{ID: id, UserID: 42, Privacy: domain.PrivacyPrivate}, nil
+		},
+		deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
+			deleted = true
+			return nil
+		},
+	}
+
+	svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{})
+	require.NoError(t, svc.Delete(context.Background(), 1, 42))
+	assert.True(t, deleted)
+}
+
+func TestPerspectiveDelete_NonOwnerForbidden(t *testing.T) {
+	for _, privacy := range []domain.Privacy{domain.PrivacyPublic, domain.PrivacyPrivate} {
+		t.Run(string(privacy), func(t *testing.T) {
+			deleteCalled := false
+			perspectiveRepo := &mockPerspectiveRepository{
+				getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
+					return &domain.Perspective{ID: id, UserID: 99, Privacy: privacy}, nil
+				},
+				deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
+					deleteCalled = true
+					return nil
+				},
+			}
+
+			svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{})
+			err := svc.Delete(context.Background(), 1, 42)
+
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, domain.ErrForbidden))
+			assert.False(t, deleteCalled, "repository Delete must not run for a non-owner")
+		})
+	}
+}
+
+func TestPerspectiveDelete_NoActorForbidden(t *testing.T) {
+	getCalled := false
+	perspectiveRepo := &mockPerspectiveRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
+			getCalled = true
+			return &domain.Perspective{ID: id, UserID: 0}, nil
+		},
+	}
+
+	svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{})
+	err := svc.Delete(context.Background(), 1, 0)
+
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrForbidden))
+	// A zero actor must never match a (corrupt) zero UserID row.
+	assert.False(t, getCalled)
 }
 
 func TestPerspectiveDelete_NotFound(t *testing.T) {
@@ -385,7 +449,26 @@ func TestPerspectiveDelete_NotFound(t *testing.T) {
 	userRepo := &mockUserRepoForPerspective{}
 
 	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
-	err := svc.Delete(context.Background(), 999)
+	err := svc.Delete(context.Background(), 999, 42)
+
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrNotFound))
+}
+
+func TestPerspectiveDelete_RepoScopedDeleteMissPropagatesNotFound(t *testing.T) {
+	// Row changed hands (or vanished) between GetByID and Delete: the
+	// owner-scoped DELETE matches nothing and reports ErrNotFound.
+	perspectiveRepo := &mockPerspectiveRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
+			return &domain.Perspective{ID: id, UserID: 42}, nil
+		},
+		deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
+			return domain.ErrNotFound
+		},
+	}
+
+	svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{})
+	err := svc.Delete(context.Background(), 1, 42)
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrNotFound))
@@ -396,7 +479,7 @@ func TestPerspectiveDelete_InvalidID(t *testing.T) {
 	userRepo := &mockUserRepoForPerspective{}
 
 	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
-	err := svc.Delete(context.Background(), 0)
+	err := svc.Delete(context.Background(), 0, 42)
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrInvalidInput))

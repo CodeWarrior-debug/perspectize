@@ -269,19 +269,28 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 	return updated, nil
 }
 
-// Delete removes a perspective by ID
-func (s *PerspectiveService) Delete(ctx context.Context, id int) error {
+// Delete removes a perspective on behalf of actorUserID. Only the owner may
+// delete — public or private alike. This is one of several independent guards
+// (the @owner directive before it, and the owner-scoped DELETE in the
+// repository after it); each must hold on its own so a regression in one layer
+// can't let a user remove someone else's perspective.
+func (s *PerspectiveService) Delete(ctx context.Context, id int, actorUserID int) error {
 	if id <= 0 {
 		return fmt.Errorf("%w: perspective id must be a positive integer", domain.ErrInvalidInput)
 	}
+	if actorUserID <= 0 {
+		return fmt.Errorf("%w: authentication required to delete a perspective", domain.ErrForbidden)
+	}
 
-	// Verify perspective exists
-	_, err := s.repo.GetByID(ctx, id)
+	existing, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to get perspective: %w", err)
 	}
+	if existing.UserID != actorUserID {
+		return fmt.Errorf("%w: you can only delete your own perspectives", domain.ErrForbidden)
+	}
 
-	if err := s.repo.Delete(ctx, id); err != nil {
+	if err := s.repo.Delete(ctx, id, actorUserID); err != nil {
 		return fmt.Errorf("failed to delete perspective: %w", err)
 	}
 

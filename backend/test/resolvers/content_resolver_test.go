@@ -183,7 +183,7 @@ type mockPerspectiveRepository struct {
 	createFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
 	getByIDFn func(ctx context.Context, id int) (*domain.Perspective, error)
 	updateFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
-	deleteFn  func(ctx context.Context, id int) error
+	deleteFn  func(ctx context.Context, id int, ownerUserID int) error
 	listFn    func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
 }
 
@@ -209,9 +209,9 @@ func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspe
 	return p, nil
 }
 
-func (m *mockPerspectiveRepository) Delete(ctx context.Context, id int) error {
+func (m *mockPerspectiveRepository) Delete(ctx context.Context, id int, ownerUserID int) error {
 	if m.deleteFn != nil {
-		return m.deleteFn(ctx, id)
+		return m.deleteFn(ctx, id, ownerUserID)
 	}
 	return nil
 }
