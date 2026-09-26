@@ -29,6 +29,85 @@
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
+		<script id="stale-chunk-recovery">
+			// Deploy-skew recovery. Each deploy deletes the previous build's hashed
+			// _app/immutable/* chunks, and _redirects answers any missing path with
+			// index.html as 200 text/html. So a page still running the *old* build (any
+			// tab that outlived a deploy: a resumed phone tab or home-screen app, a
+			// pinned/session-restored desktop tab, a back-forward-cache restore) fails
+			// its next lazy import with "Failed to fetch dynamically imported module"
+			// / a MIME-type error and sits blank until a manual refresh. Catch those
+			// failures and do the refresh for the user: once, with a sessionStorage
+			// guard so a genuinely broken deploy shows a reload banner instead of a
+			// reload loop. Must stay inline and above SvelteKit's bootstrap script so
+			// it also catches a failure of the entry chunks themselves.
+			(function () {
+				var KEY = 'perspectize-stale-reload-at';
+				var GUARD_MS = 30000;
+				var CHUNK_ERROR =
+					/Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Unable to preload CSS|Expected a JavaScript/i;
+				var reloading = false;
+
+				function showBanner() {
+					if (document.getElementById('stale-chunk-banner')) return;
+					var bar = document.createElement('div');
+					bar.id = 'stale-chunk-banner';
+					bar.setAttribute('role', 'alert');
+					bar.style.cssText =
+						'position:fixed;inset:0 0 auto 0;z-index:2147483647;display:flex;gap:12px;align-items:center;justify-content:center;padding:12px 16px;font:14px Geist,system-ui,sans-serif;background:Canvas;color:CanvasText;border-bottom:1px solid GrayText';
+					bar.textContent = 'Perspectize was updated. ';
+					var btn = document.createElement('button');
+					btn.type = 'button';
+					btn.textContent = 'Reload';
+					btn.style.cssText = 'font:inherit;padding:4px 12px;cursor:pointer';
+					btn.onclick = function () {
+						try {
+							sessionStorage.removeItem(KEY);
+						} catch (e) {}
+						location.reload();
+					};
+					bar.appendChild(btn);
+					(document.body || document.documentElement).appendChild(bar);
+				}
+
+				function recover() {
+					if (reloading) return;
+					var now = Date.now();
+					var last = now;
+					try {
+						last = Number(sessionStorage.getItem(KEY)) || 0;
+						sessionStorage.setItem(KEY, String(now));
+					} catch (e) {
+						// No storage means no loop guard — never auto-reload blind.
+					}
+					if (navigator.onLine !== false && now - last > GUARD_MS) {
+						reloading = true;
+						location.reload();
+					} else {
+						showBanner();
+					}
+				}
+
+				// Vite's dynamic-import wrapper (route nodes, AG Grid, Tiptap, ...).
+				window.addEventListener('vite:preloadError', recover);
+				// Bare import() failures, incl. SvelteKit's entry bootstrap below.
+				window.addEventListener('unhandledrejection', function (e) {
+					var r = e.reason;
+					var msg = r && (r.message || String(r));
+					if (msg && CHUNK_ERROR.test(msg)) recover();
+				});
+				// <script>/<link rel="modulepreload"|"stylesheet"> for a build asset.
+				window.addEventListener(
+					'error',
+					function (e) {
+						var t = e.target;
+						var url = t && t !== window && (t.src || t.href);
+						if (url && url.indexOf('/_app/') !== -1) recover();
+					},
+					true,
+				);
+			})();
+		</script>
 		<script>
 			// Apply the persisted theme before paint to avoid a flash of the default theme.
 			// Reads a cache written by lib/theme/store.svelte.ts — no derivation logic here.
