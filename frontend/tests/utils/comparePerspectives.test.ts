@@ -67,9 +67,11 @@ describe('compareRatings', () => {
 	it('compares every shared standard dimension', () => {
 		const left = makePerspective({ quality: 8000, agreement: 8000, importance: 8000, confidence: 8000 });
 		const right = makePerspective({ quality: 8000, agreement: 8000, importance: 8000, confidence: 8000 });
-		expect(compareRatings(left, right).map((r) => r.key).sort()).toEqual(
-			['agreement', 'confidence', 'importance', 'quality'].sort(),
-		);
+		expect(
+			compareRatings(left, right)
+				.map((r) => r.key)
+				.sort(),
+		).toEqual(['agreement', 'confidence', 'importance', 'quality'].sort());
 	});
 
 	it('compares shared numeric customFields keys', () => {
@@ -110,6 +112,26 @@ describe('filledInDifferently', () => {
 	it('excludes a dimension neither side filled in', () => {
 		const left = makePerspective({});
 		const right = makePerspective({});
+		expect(filledInDifferently(left, right)).toEqual([]);
+	});
+
+	it('lists a customFields key only the left side filled in, with a title-cased label', () => {
+		const left = makePerspective({ customFields: { 'story-pacing': 6000 } });
+		const right = makePerspective({ customFields: {} });
+		const rows = filledInDifferently(left, right);
+		expect(rows).toEqual([{ key: 'story-pacing', label: 'Story Pacing', side: 'left', display: 6.0 }]);
+	});
+
+	it('lists a customFields key only the right side filled in', () => {
+		const left = makePerspective({ customFields: null });
+		const right = makePerspective({ customFields: { pacing: 4000 } });
+		const rows = filledInDifferently(left, right);
+		expect(rows).toEqual([{ key: 'pacing', label: 'Pacing', side: 'right', display: 4.0 }]);
+	});
+
+	it('excludes a customFields key both sides filled in', () => {
+		const left = makePerspective({ customFields: { pacing: 6000 } });
+		const right = makePerspective({ customFields: { pacing: 4000 } });
 		expect(filledInDifferently(left, right)).toEqual([]);
 	});
 });

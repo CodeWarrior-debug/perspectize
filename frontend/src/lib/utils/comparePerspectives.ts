@@ -159,6 +159,22 @@ export function filledInDifferently(left: PerspectiveItem, right: PerspectiveIte
 			rows.push({ key, label, side: 'right', display: toDisplay(rightValue) });
 		}
 	}
+
+	// Same numeric-only custom field handling as compareRatings — a custom
+	// field only one side filled in was previously dropped entirely here,
+	// even though the matching "both filled it in" case already surfaces in
+	// compareRatings (compare-page-enhancements #3).
+	const leftCustom = numericCustomFields(left.customFields);
+	const rightCustom = numericCustomFields(right.customFields);
+	for (const [key, leftRaw] of leftCustom) {
+		if (!rightCustom.has(key)) rows.push({ key, label: getFieldLabel(key), side: 'left', display: toDisplay(leftRaw) });
+	}
+	for (const [key, rightRaw] of rightCustom) {
+		if (!leftCustom.has(key)) {
+			rows.push({ key, label: getFieldLabel(key), side: 'right', display: toDisplay(rightRaw) });
+		}
+	}
+
 	return rows;
 }
 
