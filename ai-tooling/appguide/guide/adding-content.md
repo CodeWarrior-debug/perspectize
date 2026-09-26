@@ -9,6 +9,7 @@
 **Steps:**
 1. Select **Add Content** in the header (visible when signed in).
 2. On a narrow screen this opens as a dialog; on a wider screen it opens as a popover. Both show the same fields: a link/reference input, and a type indicator.
+**Not supported:** Typing free text that looks like a claim rather than a link or Bible reference shows "Claims can't be added from here yet. Pick a type above to continue." and disables the **Add** button — claims can't be added from this form.
 **Sign-in required:** yes
 **Source:** `frontend/src/lib/components/Header.svelte`, `frontend/src/lib/components/AddContentPopover.svelte`, `frontend/src/lib/components/FormPopover.svelte`
 
