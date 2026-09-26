@@ -18,6 +18,7 @@
 		compareOverall,
 		summarize,
 		sortRatingRows,
+		agreementPercent,
 	} from '$lib/utils/comparePerspectives';
 	import ComparePickerRow from '$lib/components/ComparePickerRow.svelte';
 	import CompareOverallRow from '$lib/components/CompareOverallRow.svelte';
@@ -150,6 +151,7 @@
 			: { left: null, right: null, agree: false },
 	);
 	const summary = $derived(summarize(ratingRows));
+	const overallAgreementPercent = $derived(agreementPercent(ratingRows));
 
 	const loading = $derived(usersQuery.isLoading || perspectivesQuery.isLoading);
 	const hasComparison = $derived(perspectives.length >= 2 && !!leftPerspective && !!rightPerspective);
@@ -225,7 +227,7 @@
 			</span>
 		</div>
 
-		<CompareOverallRow {overall} />
+		<CompareOverallRow {overall} agreementPercent={overallAgreementPercent} />
 
 		<div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
 			<CompareTakeColumn

@@ -6,9 +6,11 @@ import {
 	compareOverall,
 	summarize,
 	sortRatingRows,
+	agreementPercent,
 	SIMILAR_THRESHOLD,
 	DIVERGES_THRESHOLD,
 } from '$lib/utils/comparePerspectives';
+import type { RatingRow } from '$lib/utils/comparePerspectives';
 import type { PerspectiveItem } from '$lib/queries/perspectives';
 
 function makePerspective(overrides: Partial<PerspectiveItem>): PerspectiveItem {
@@ -225,5 +227,28 @@ describe('thresholds', () => {
 	it('exposes the exact handoff-specified cutoffs', () => {
 		expect(SIMILAR_THRESHOLD).toBe(1.0);
 		expect(DIVERGES_THRESHOLD).toBe(3.0);
+	});
+});
+
+describe('agreementPercent', () => {
+	function makeRow(pctDiff: number): RatingRow {
+		return { key: 'k', label: 'K', leftDisplay: 0, rightDisplay: 0, delta: 0, pctDiff, status: 'similar' };
+	}
+
+	it('returns null when there are no shared rating dimensions', () => {
+		expect(agreementPercent([])).toBeNull();
+	});
+
+	it('is 100 when every shared dimension matches exactly', () => {
+		expect(agreementPercent([makeRow(0), makeRow(0)])).toBe(100);
+	});
+
+	it('is 0 when every shared dimension is maximally different', () => {
+		expect(agreementPercent([makeRow(100)])).toBe(0);
+	});
+
+	it('averages pctDiff across rows and inverts it', () => {
+		// avg pctDiff = (20 + 40) / 2 = 30 -> 70% aligned
+		expect(agreementPercent([makeRow(20), makeRow(40)])).toBe(70);
 	});
 });

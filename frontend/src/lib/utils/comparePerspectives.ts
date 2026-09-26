@@ -211,6 +211,20 @@ export function compareOverall(left: PerspectiveItem, right: PerspectiveItem): O
 	return { left: left.like, right: right.like, agree };
 }
 
+/**
+ * Single headline "how aligned are these two takes" number, in percent —
+ * the counterpart to the similar/diverges/conflict breakdown that has no
+ * one-number verdict of its own (compare-page-enhancements #5). Averages
+ * each shared dimension's pctDiff (already 0-100, see compareRatings) and
+ * inverts it, so 0% average difference reads as 100% aligned. Null when
+ * there are no shared rating dimensions to average — nothing to report.
+ */
+export function agreementPercent(rows: RatingRow[]): number | null {
+	if (rows.length === 0) return null;
+	const avgPctDiff = rows.reduce((sum, row) => sum + row.pctDiff, 0) / rows.length;
+	return Math.round(100 - avgPctDiff);
+}
+
 export function summarize(rows: RatingRow[]): ComparisonSummary {
 	const summary: ComparisonSummary = { similar: 0, diverges: 0, conflict: 0 };
 	for (const row of rows) summary[row.status]++;
