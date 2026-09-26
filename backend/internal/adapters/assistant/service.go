@@ -2,9 +2,9 @@
 // AssistantService port: validation, per-user limits, stream shaping (text
 // batching, a single terminal event), and usage logging.
 //
-// This adapter lives under backend/internal because later tools will call
-// backend services in-process; Go's internal/ rule means only backend code
-// may do that.
+// This adapter lives under backend/internal because its data tools call
+// backend services in-process (data.go); Go's internal/ rule means only
+// backend code may do that.
 package assistant
 
 import (
@@ -26,8 +26,9 @@ import (
 )
 
 // Asker is what the adapter needs from Jeeves; *jeeves.Assistant satisfies it.
+// The viewer is explicit so data tools are always scoped to the signed-in user.
 type Asker interface {
-	Ask(ctx context.Context, question string, onEvent func(llm.Event)) (agent.Result, error)
+	AskAs(ctx context.Context, viewer jeeves.Viewer, question string, onEvent func(llm.Event)) (agent.Result, error)
 }
 
 // Limiter is a per-key rate limiter (services.SlidingWindowLimiter fits).
@@ -151,7 +152,7 @@ func (s *Service) run(ctx context.Context, userID int, message string, out chan<
 	}
 
 	start := time.Now()
-	res, err := s.asker.Ask(ctx, message, func(e llm.Event) {
+	res, err := s.asker.AskAs(ctx, jeeves.Viewer{UserID: userID}, message, func(e llm.Event) {
 		switch e.Kind {
 		case llm.EventTextDelta:
 			buf.WriteString(e.Text)
@@ -200,14 +201,15 @@ const (
 )
 
 // NewJeeves builds the production service: Jeeves over the embedded app
-// guide, backed by the Anthropic provider (which reads ANTHROPIC_API_KEY
-// from the environment), with the given per-user limiter.
-func NewJeeves(model string, limiter Limiter) (*Service, error) {
+// guide and the given read-only data source, backed by the Anthropic
+// provider (which reads ANTHROPIC_API_KEY from the environment), with the
+// given per-user limiter.
+func NewJeeves(model string, limiter Limiter, data jeeves.PerspectizeData) (*Service, error) {
 	areas, _, err := appguide.Load()
 	if err != nil {
 		return nil, fmt.Errorf("assistant: load app guide: %w", err)
 	}
-	j, err := jeeves.New(jeeves.Config{Provider: anthropic.New(), Model: model, Areas: areas})
+	j, err := jeeves.New(jeeves.Config{Provider: anthropic.New(), Model: model, Areas: areas, Data: data})
 	if err != nil {
 		return nil, fmt.Errorf("assistant: %w", err)
 	}
