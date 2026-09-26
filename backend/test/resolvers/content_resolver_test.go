@@ -254,6 +254,10 @@ func (m *mockWikidataClient) Search(ctx context.Context, query string, language 
 	return []domain.WikidataSearchResult{}, nil
 }
 
+func (m *mockWikidataClient) GetWikipediaURL(ctx context.Context, qid string) (string, error) {
+	return "", nil
+}
+
 // graphqlResponse represents a generic GraphQL JSON response
 type graphqlResponse struct {
 	Data   json.RawMessage `json:"data"`

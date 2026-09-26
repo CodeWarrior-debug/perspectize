@@ -25,13 +25,14 @@ func (UserModel) TableName() string {
 
 // CategoryModel is the GORM persistence model for categories table
 type CategoryModel struct {
-	ID          int       `gorm:"primaryKey;autoIncrement"`
-	WikidataQID string    `gorm:"column:wikidata_qid;uniqueIndex;not null"`
-	Label       string    `gorm:"not null"`
-	Description string    `gorm:"column:description;default:''"`
-	EntityType  string    `gorm:"column:entity_type;default:''"`
-	CreatedAt   time.Time `gorm:"autoCreateTime"`
-	UpdatedAt   time.Time `gorm:"autoUpdateTime"`
+	ID           int       `gorm:"primaryKey;autoIncrement"`
+	WikidataQID  string    `gorm:"column:wikidata_qid;uniqueIndex;not null"`
+	Label        string    `gorm:"not null"`
+	Description  string    `gorm:"column:description;default:''"`
+	EntityType   string    `gorm:"column:entity_type;default:''"`
+	WikipediaURL string    `gorm:"column:wikipedia_url;default:''"`
+	CreatedAt    time.Time `gorm:"autoCreateTime"`
+	UpdatedAt    time.Time `gorm:"autoUpdateTime"`
 }
 
 // TableName returns the table name for CategoryModel

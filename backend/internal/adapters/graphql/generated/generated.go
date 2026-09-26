@@ -52,13 +52,14 @@ type ComplexityRoot struct {
 	}
 
 	Category struct {
-		CreatedAt   func(childComplexity int) int
-		Description func(childComplexity int) int
-		EntityType  func(childComplexity int) int
-		ID          func(childComplexity int) int
-		Label       func(childComplexity int) int
-		UpdatedAt   func(childComplexity int) int
-		WikidataQid func(childComplexity int) int
+		CreatedAt    func(childComplexity int) int
+		Description  func(childComplexity int) int
+		EntityType   func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Label        func(childComplexity int) int
+		UpdatedAt    func(childComplexity int) int
+		WikidataQid  func(childComplexity int) int
+		WikipediaURL func(childComplexity int) int
 	}
 
 	Content struct {
@@ -499,6 +500,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Category.WikidataQid(childComplexity), true
+	case "Category.wikipediaUrl":
+		if e.ComplexityRoot.Category.WikipediaURL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Category.WikipediaURL(childComplexity), true
 
 	case "Content.addedBy":
 		if e.ComplexityRoot.Content.AddedBy == nil {
@@ -2081,6 +2088,7 @@ type Category {
   label: String!
   description: String
   entityType: String
+  wikipediaUrl: String
   createdAt: String!
   updatedAt: String!
 }
@@ -2600,6 +2608,8 @@ func (ec *executionContext) childFields_Category(ctx context.Context, field grap
 		return ec.fieldContext_Category_description(ctx, field)
 	case "entityType":
 		return ec.fieldContext_Category_entityType(ctx, field)
+	case "wikipediaUrl":
+		return ec.fieldContext_Category_wikipediaUrl(ctx, field)
 	case "createdAt":
 		return ec.fieldContext_Category_createdAt(ctx, field)
 	case "updatedAt":
@@ -4102,6 +4112,29 @@ func (ec *executionContext) _Category_entityType(ctx context.Context, field grap
 	)
 }
 func (ec *executionContext) fieldContext_Category_entityType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Category", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Category_wikipediaUrl(ctx context.Context, field graphql.CollectedField, obj *model.Category) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Category_wikipediaUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.WikipediaURL, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Category_wikipediaUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Category", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
@@ -12261,6 +12294,11 @@ func (ec *executionContext) _Category(ctx context.Context, sel ast.SelectionSet,
 			}
 		case "entityType":
 			out.Values[i] = ec._Category_entityType(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "wikipediaUrl":
+			out.Values[i] = ec._Category_wikipediaUrl(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
