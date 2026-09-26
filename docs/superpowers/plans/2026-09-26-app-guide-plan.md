@@ -132,7 +132,7 @@ Keep the parser a simple line scanner: no Markdown library. Unknown `**Field:**`
 
 **Files:** `ai-tooling/appguide/lint.go`, `ai-tooling/appguide/appguide_test.go`
 
-- [ ] **Step 1: Write failing table-driven tests** for each rule in spec §Deterministic lint. Each case is an input area/seeds plus the expected rule name:
+- [x] **Step 1: Write failing table-driven tests** for each rule in spec §Deterministic lint. Each case is an input area/seeds plus the expected rule name:
 
 | Case | Expected rule |
 |---|---|
@@ -157,9 +157,11 @@ func Lint(areas []Area, seeds map[string][]Seed, repoRoot string) []Problem
 
 For `source-exists` tests, use `t.TempDir()` as `repoRoot` and create the files the test expects.
 
-- [ ] **Step 2: Run, confirm failing. Implement `lint.go`. Run, confirm passing. `gofmt -l .` shows no output.**
+- [x] **Step 2: Run, confirm failing. Implement `lint.go`. Run, confirm passing. `gofmt -l .` shows no output.**
 
-- [ ] **Step 3: Commit:** `feat(ai-tooling): add appguide lint rules`
+- [x] **Step 3: Commit:** `feat(ai-tooling): add appguide lint rules`
+
+**Additions (recorded during execution):** rule `seed-orphan` (a seed file with no matching area); `source-exists` also rejects absolute paths and paths escaping the repo root (`../`); `id-prefix` is skipped when `id-format` already failed, so one bad ID yields one problem.
 
 **Learn:**
 - *Concepts:* deterministic checks versus model-based checks; why the cheap objective gate runs first in a closed loop.
