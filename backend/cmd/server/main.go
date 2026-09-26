@@ -34,6 +34,7 @@ import (
 	gqltiming "github.com/CodeWarrior-debug/perspectize/backend/pkg/graphql"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/logger"
 	perfmw "github.com/CodeWarrior-debug/perspectize/backend/pkg/middleware"
+	"github.com/CodeWarrior-debug/perspectize/backend/pkg/telemetry"
 	"github.com/clerk/clerk-sdk-go/v2"
 	coderws "github.com/coder/websocket"
 	"github.com/go-chi/chi/v5"
@@ -41,34 +42,38 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
 	"github.com/vektah/gqlparser/v2/ast"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
 func main() {
 	// Configure structured JSON logging for Sevalla log viewer
 	logger.Setup()
 
-	// Initialize OTel tracing when OTEL_EXPORTER_OTLP_ENDPOINT is set.
-	// The OTLP HTTP exporter reads OTEL_EXPORTER_OTLP_ENDPOINT,
-	// OTEL_EXPORTER_OTLP_HEADERS, and OTEL_SERVICE_NAME automatically.
-	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
-		shutdown, err := initTracer(context.Background())
-		if err != nil {
-			slog.Warn("failed to initialize OpenTelemetry", "error", err)
-		} else {
-			defer shutdown(context.Background())
-			slog.Info("OpenTelemetry tracing enabled")
-		}
-	}
-
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
 		if os.Getenv("APP_ENV") != "production" {
 			slog.Warn(".env file not found", "hint", "set APP_ENV=production to suppress")
+		}
+	}
+
+	// Initialize OpenTelemetry (Tracer/Meter/Logger providers). This is a
+	// no-op, warn-and-continue setup: when OTEL_EXPORTER_OTLP_ENDPOINT is
+	// unset (local dev, CI), telemetry.Setup leaves the default no-op
+	// providers in place and returns a no-op shutdown.
+	telemetryShutdown, err := telemetry.Setup(context.Background(), telemetry.Config{
+		Environment: os.Getenv("APP_ENV"),
+	})
+	if err != nil {
+		slog.Warn("failed to initialize OpenTelemetry", "error", err)
+	} else {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := telemetryShutdown(ctx); err != nil {
+				slog.Warn("failed to shut down OpenTelemetry", "error", err)
+			}
+		}()
+		if telemetry.Enabled() {
+			slog.Info("OpenTelemetry enabled")
 		}
 	}
 
@@ -416,23 +421,4 @@ func isWebsocketHandshake(r *http.Request) bool {
 		strings.EqualFold(r.Header.Get("Upgrade"), "websocket") &&
 		strings.Contains(strings.ToLower(r.Header.Get("Connection")), "upgrade") &&
 		r.Header.Get("Sec-WebSocket-Key") != ""
-}
-
-// initTracer sets up an OTel TracerProvider with an OTLP HTTP exporter.
-// Returns a shutdown function that flushes pending spans on exit.
-func initTracer(ctx context.Context) (func(context.Context) error, error) {
-	exporter, err := otlptracehttp.New(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("creating OTLP exporter: %w", err)
-	}
-
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("perspectize-backend"),
-		)),
-	)
-	otel.SetTracerProvider(tp)
-	return tp.Shutdown, nil
 }
