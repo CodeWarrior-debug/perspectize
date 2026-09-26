@@ -96,3 +96,39 @@ jobs:
             echo "Code is not formatted. Run 'make fmt'"
             exit 1
           fi
+
+  ai-tooling:
+    name: AI Tooling
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-tooling
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: ai-tooling/go.mod
+          cache-dependency-path: ai-tooling/go.sum
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Verify formatting
+        run: |
+          gofmt -l .
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Code is not formatted. Run 'gofmt -w .' in ai-tooling/"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      # Includes TestEmbeddedGuideIsClean, which lints the app guide and checks
+      # every Source path against the checked-out frontend/.
+      - name: Run tests
+        run: go test -race ./...

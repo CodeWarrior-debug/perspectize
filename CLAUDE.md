@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Monorepo with two stacks:
 - **Backend:** `backend/` — Go GraphQL API (see `backend/CLAUDE.md`)
 - **Frontend:** `frontend/` — SvelteKit web app (see `frontend/CLAUDE.md`)
+- **AI tooling:** `ai-tooling/` — Go module for the Jeeves assistant, evals, and `botler` CLI; design stage (see `ai-tooling/CLAUDE.md` — **teaching mode is on there**)
 
 **CLAUDE.md structure:** Root file (this) contains shared concerns. Package-level files contain stack-specific instructions. Claude loads root + the relevant package file per session.
 
@@ -142,6 +143,8 @@ defer db.Close()
 
 **Vendored GSD is a frozen legacy subset** (`.claude/get-shit-done/`, curated `.claude/commands/gsd/`). Do not run `npx get-shit-done-cc` against this repo — a full install dumps ~200 unused command/agent/workflow files and bakes absolute paths into the command files. The `VERSION` marker tracks the toolchain maintainers run locally so the update-check hook stays quiet; it is not a claim that every vendored file is on that release. For phase CRUD / dependency analysis on newer GSD, use a personal global install.
 
+**`gsd:new-milestone` is destructive here:** its `phases clear --confirm` step deletes every `.planning/phases/` dir and it resets `STATE.md`, and `gsd-roadmapper` rewrites `STATE.md`. While v1.1 is in flight, run it non-destructively: skip the clear, keep STATE, write `.planning/vX.Y-REQUIREMENTS.md` + `.planning/vX.Y-research/` (never `.planning/research/`, which holds v1.0 research), and append phases to `ROADMAP.md` by hand.
+
 ## Self-Verification (MANDATORY)
 
 **Before claiming work is complete, pushing, or creating a PR**, you MUST run verification. No exceptions.
@@ -152,7 +155,8 @@ defer db.Close()
 2. **Format**: `gofmt -l .` in `backend/` — must return empty (CI's `Build` job fails otherwise). `make install-hooks` (once per checkout) auto-fixes this on every commit — see the shared git pre-commit hook further down this file.
 3. **Backend tests**: `go test ./...` in `backend/` — all must pass
 4. **Frontend tests**: `pnpm run test:run` in `frontend/` — all must pass
-5. **Stale references**: If renaming/moving files or paths, grep the entire repo for old names
+5. **AI tooling**: `go build ./...`, `gofmt -l .`, `go test ./...` in `ai-tooling/` (includes app-guide lint, which checks guide `Source` paths against `frontend/` — so frontend renames/moves can fail it)
+6. **Stale references**: If renaming/moving files or paths, grep the entire repo for old names
 
 Run the relevant subset (e.g., backend-only changes skip step 4). Report results explicitly — don't just say "tests pass", show the output summary.
 
@@ -192,6 +196,7 @@ See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow
 
 **Native PreToolUse hooks (`.claude/hooks/*.sh`, wired in `.claude/settings.json`; hookify plugin retired):**
 - **Secret protection:** `deny-env-read.sh` blocks any Bash command that reads a real `.env` file (deny-by-default; `.env.example` / `.env.test` stay readable). Pairs with `permissions.deny` Read rules. Real secret values are entered by humans only — see [.docs/SECURITY.md](.docs/SECURITY.md).
+  Matching is on the raw command text, so heredoc/script bodies that merely *mention* `.env` files get blocked too — rephrase ("secret files") rather than fighting the hook.
 - **Pre-PR:** `require-session-reflection-before-pr.sh` denies `gh pr create` until the `/revise-claude-md` command (from the `claude-md-management` plugin) has been run. It can't detect completion, so use `gh api` to create the PR after running the command. Example: `gh api repos/CodeWarrior-debug/perspectize/pulls -f title="..." -f body="..." -f head="branch" -f base="main"`
   - `/revise-claude-md` (also the Skill entry `claude-md-management:revise-claude-md` once the plugin is loaded). If it won't resolve — Skill says "Unknown skill" and typing it shows nothing — the plugin marketplace cache is stale: run `/reload-plugins` (and `/plugin` to refresh), then retry.
 - **Pre-commit tests:** `require-tests.sh` injects a non-blocking reminder on `git commit` to verify test coverage for new/modified frontend `src/` files. Config, styles, docs, and test files are exempt.
@@ -199,7 +204,7 @@ See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow
 - **Pre-commit gofmt (fallback):** `gofmt-precommit.sh` only fires when `core.hooksPath` isn't set to `.hooks` in the current checkout — see below for the real fix — and then reminds to run `make install-hooks` rather than to gofmt by hand.
 - **Matching is anchored on command position** (start of string or after a shell separator), not a raw substring search — a trigger phrase (e.g. `gh pr create`) appearing inside a quoted commit message or PR body elsewhere on the line does not fire the hook.
 
-**Shared git pre-commit hook (`.hooks/pre-commit`, real `core.hooksPath` hook — not a Claude Code hook):** Auto-formats staged `backend/*.go` (gofmt) and `frontend/src/*.{svelte,ts,js}` (prettier) files and re-stages them on every `git commit`, regardless of what tool/human is committing. Also **blocks** (does not auto-fix) new raw hex/rgb colour literals added to `frontend/src/lib/components/**` or `formatting.ts` — see `.docs/UI_THOROUGHNESS_CHECKLIST.md` §3.3; allowlist an intentional one inline with a `hex-ok: <reason>` comment. Not active by default — activate once per checkout with `make install-hooks` (from `backend/`, sets `core.hooksPath` to `.hooks`). This is what actually prevents the CI `Build` job's `gofmt -l .` check from failing (as it did on PR #366); the `.claude/hooks/gofmt-precommit.sh` PreToolUse reminder above is only a fallback for a checkout where this hasn't been activated yet.
+**Shared git pre-commit hook (`.hooks/pre-commit`, real `core.hooksPath` hook — not a Claude Code hook):** Auto-formats staged `backend/*.go` and `ai-tooling/*.go` (gofmt) and `frontend/src/*.{svelte,ts,js}` (prettier) files and re-stages them on every `git commit`, regardless of what tool/human is committing. Also **blocks** (does not auto-fix) new raw hex/rgb colour literals added to `frontend/src/lib/components/**` or `formatting.ts` — see `.docs/UI_THOROUGHNESS_CHECKLIST.md` §3.3; allowlist an intentional one inline with a `hex-ok: <reason>` comment. Not active by default — activate once per checkout with `make install-hooks` (from `backend/`, sets `core.hooksPath` to `.hooks`). This is what actually prevents the CI `Build` job's `gofmt -l .` check from failing (as it did on PR #366); the `.claude/hooks/gofmt-precommit.sh` PreToolUse reminder above is only a fallback for a checkout where this hasn't been activated yet.
 
 **Cloud/CI sessions start with `core.hooksPath` unset** — a fresh container checkout has never run `make install-hooks`, so commits made there get no gofmt/prettier auto-fix at all (the PreToolUse reminders above only fire on a matching Bash command, and there's no frontend-side reminder). Either run `make install-hooks` once per session, or manually run `gofmt -l .` (backend) / `pnpm exec prettier --check <files>` (frontend) before every commit and fix flagged files with `--write` before pushing.
 

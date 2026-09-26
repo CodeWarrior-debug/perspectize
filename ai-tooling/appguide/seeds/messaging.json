@@ -1,0 +1,7 @@
+[
+  { "question": "How do I check my messages?", "expect_ids": ["messaging.open"], "must_not_claim": [] },
+  { "question": "How do I message someone new?", "expect_ids": ["messaging.start-conversation"], "must_not_claim": [] },
+  { "question": "How do I start a group chat with three people?", "expect_ids": ["messaging.start-conversation"], "must_not_claim": [] },
+  { "question": "What does the green dot next to someone's name in a conversation mean?", "expect_ids": ["messaging.presence-typing-receipts"], "must_not_claim": [] },
+  { "question": "Can I react to a message with an emoji?", "expect_ids": [], "must_not_claim": ["emoji reaction", "react to a message"] }
+]

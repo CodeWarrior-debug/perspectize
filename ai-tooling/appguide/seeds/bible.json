@@ -1,0 +1,7 @@
+[
+  { "question": "How do I read a Bible passage that someone added?", "expect_ids": ["bible.read-passage"], "must_not_claim": [] },
+  { "question": "Why can't I see the text of this really long passage?", "expect_ids": ["bible.read-passage"], "must_not_claim": [] },
+  { "question": "Can I see the original Hebrew or Greek for a verse and what each word means?", "expect_ids": ["bible.original-language"], "must_not_claim": [] },
+  { "question": "Can I read this passage in the Berean Standard Bible on Bible Gateway?", "expect_ids": ["bible.passage-links", "bible.choose-bible-gateway-version"], "must_not_claim": ["Berean Standard Bible is a Bible Gateway version option", "BSB on Bible Gateway"] },
+  { "question": "Is there a Gill's or Barnes' commentary link for this passage?", "expect_ids": ["bible.passage-links"], "must_not_claim": ["Gill's commentary", "Barnes' commentary", "Calvin's commentary"] }
+]
