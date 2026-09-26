@@ -19,10 +19,11 @@ Confidence: `new` (introduced, not quizzed) → `shaky` → `solid`.
 | Closed loop: independent verifier + objective completion condition + failure feedback path + round cap | 2026-09-26 | 2026-09-26 | solid | Named verifier + completion condition; added feedback path, ground-truth checks, escalation cap. Follow-up: conflated open loop (no feedback) with non-terminating loop (feedback, no exit) — re-check |
 | Context discipline: small tasks in fresh subagents (vs. % caps) | 2026-09-26 | — | new | |
 | Guide format: concise plain English + scoped loading beats caveman compression | 2026-09-26 | — | new | Measurable later via evals A/B |
+| go:embed is directory-scoped (no `..`); Go `internal/` is subtree-private, one-way deps backend → ai-tooling | 2026-09-26 | 2026-09-26 | shaky | Asked for the answer; C# `internal` analogy given. Re-quiz |
 
 ## Pending (owner asked Claude to keep building without waiting — run these when the owner is back)
 
-- [ ] Task 1 quiz: (1) why the guide lives under `appguide/guide/` (go:embed no `..`); (2) why ai-tooling can't import `backend/internal/...` but backend can import ai-tooling
+- [x] Task 1 quiz — owner asked for the answer (go:embed dir-scoped, no `..`; Go `internal/` rule is subtree-private). Log: shaky → re-quiz later
 - [ ] Task 1 reading: pkg.go.dev/embed — "Directives" section
 - [ ] Task 2 quiz: (1) which lint rule most protects future evals, and why; (2) one guide error lint can't catch that the verifier can
 - [ ] Task 3 owner-implements: write `settings.change-theme` in `appguide/guide/settings.md` (reserved; Claude reviews it)
