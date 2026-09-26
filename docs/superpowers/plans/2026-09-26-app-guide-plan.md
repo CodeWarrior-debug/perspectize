@@ -42,11 +42,11 @@
 
 **Files:** `ai-tooling/go.mod`, `ai-tooling/appguide/appguide.go`, `ai-tooling/appguide/appguide_test.go`
 
-- [ ] **Step 1: Create the module**
+- [x] **Step 1: Create the module**
 
 Run from `ai-tooling/`: `go mod init github.com/CodeWarrior-debug/perspectize/ai-tooling`. Then edit `go.mod` so its `go` and `toolchain` lines match `backend/go.mod` (`go 1.26`, `toolchain go1.26.0`).
 
-- [ ] **Step 2: Write failing parser tests** in `appguide_test.go` (package `appguide`):
+- [x] **Step 2: Write failing parser tests** in `appguide_test.go` (package `appguide`):
 
 ```go
 const sampleArea = "# Compare Perspectives\n\n" +
@@ -77,9 +77,9 @@ func TestParseArea(t *testing.T) {
 
 Add cases for: multiple entries, missing optional fields, a multi-path `Source` line, and CRLF line endings.
 
-- [ ] **Step 3: Run the tests, confirm they fail** (`go test ./appguide/...`; expect undefined `ParseArea`). Run `go get github.com/stretchr/testify` first.
+- [x] **Step 3: Run the tests, confirm they fail** (`go test ./appguide/...`; expect undefined `ParseArea`). Run `go get github.com/stretchr/testify` first.
 
-- [ ] **Step 4: Implement `appguide.go`:**
+- [x] **Step 4: Implement `appguide.go`:**
 
 ```go
 // Package appguide loads Jeeves's task-oriented app guide and lints it.
@@ -115,9 +115,11 @@ func Load() ([]Area, map[string][]Seed, error) { /* ... */ }
 
 Keep the parser a simple line scanner: no Markdown library. Unknown `**Field:**` lines are kept for lint to flag.
 
-- [ ] **Step 5: Run the tests, confirm they pass. Run `gofmt -l .` and expect no output.**
+- [x] **Step 5: Run the tests, confirm they pass. Run `gofmt -l .` and expect no output.**
 
-- [ ] **Step 6: Commit:** `feat(ai-tooling): add appguide parser`
+- [x] **Step 6: Commit:** `feat(ai-tooling): add appguide parser`
+
+**Deviation (recorded during execution):** `go:embed` fails to compile when a glob matches nothing, so the package embeds the `guide` and `seeds` directories (each holds a README that `Load` skips) instead of `guide/*.md seeds/*.json`. Unknown `**Field:**` names are captured in `Entry.Unknown` / `Area.Unknown` for Task 2 lint.
 
 **Learn:**
 - *Concepts:* Go modules in a monorepo (why a separate `go.mod`); `go:embed` and why it can't use `..`; parsing a constrained format instead of arbitrary Markdown.
