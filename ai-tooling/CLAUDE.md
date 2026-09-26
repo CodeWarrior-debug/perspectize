@@ -36,5 +36,7 @@ Every ai-tooling spec and plan builds teaching in; it isn't bolted on afterwards
 7. Browser streaming via GraphQL subscription on the existing WebSocket transport — input on the subscription, batched text deltas.
 8. Users see "Jeevesbot" by default (renamable); code stays neutral (`assistant`); CLI is `botler`. Trademark check before launch.
 9. Go over TypeScript/Python/Rust/Mojo; gRPC not now (interface leaves room).
+10. Progressive tool discovery to avoid token bloat: in-app sends per-page tool sets; MCP exposes a small intent-level core + a discovery tool (`find_tools`), uses resources for reference content, treats `tools/list_changed` as an enhancement only. Evals record tool-definition tokens per session.
+11. Milestone is progressive: only the next phase is planned in detail; later phases are goal + scope + exit gate, re-planned from what the previous phase learned.
 
 **Open:** `botler` auth (dev-only header vs long-lived Clerk token); first capability; write access; free vs Pro; UI placement.

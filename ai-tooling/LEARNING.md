@@ -13,5 +13,6 @@ Confidence: `new` (introduced, not quizzed) → `shaky` → `solid`.
 | Provider port/adapter; normalizing tool-call + stream formats | 2026-09-26 | 2026-09-26 | solid | Named the OpenRouter/DeepSeek switch. Added: test fakes + SDK upgrades as sooner pain points |
 | In-process vs over-HTTP clients | 2026-09-26 | — | new | Go `internal/` rule forced HTTP for `botler` |
 | Latency: tool round-trips + model time dominate, not network hops | 2026-09-26 | — | new | |
+| Stateless API: tools + system + history resent every call → tool bloat compounds; progressive tool discovery | 2026-09-26 | 2026-09-26 | shaky | Knew the goal (avoid bloat); "stateless" reason was explained, not answered |
 | Evals: deterministic vs model-graded, fixtures, multiple runs per case | 2026-09-26 | — | new | |
 | Streaming transport: GraphQL subscription vs SSE | 2026-09-26 | — | new | |
