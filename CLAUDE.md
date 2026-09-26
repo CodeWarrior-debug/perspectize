@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Monorepo with two stacks:
 - **Backend:** `backend/` — Go GraphQL API (see `backend/CLAUDE.md`)
 - **Frontend:** `frontend/` — SvelteKit web app (see `frontend/CLAUDE.md`)
+- **AI tooling:** `ai-tooling/` — Go module for the Jeeves assistant, evals, and `botler` CLI; design stage (see `ai-tooling/CLAUDE.md` — **teaching mode is on there**)
 
 **CLAUDE.md structure:** Root file (this) contains shared concerns. Package-level files contain stack-specific instructions. Claude loads root + the relevant package file per session.
 
