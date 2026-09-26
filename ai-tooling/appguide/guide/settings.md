@@ -18,25 +18,25 @@
 **Steps:**
 1. Open **Settings** and select **General**.
 2. Switch on **Show onboarding next session**.
-**Notes:** This brings back the intro walkthrough the next time you sign in; it doesn't start it immediately in the current session.
+**Notes:** Turning this on brings the onboarding coach back.
 **Sign-in required:** yes
 **Source:** `frontend/src/lib/components/SettingsDialog.svelte`, `frontend/src/lib/queries/users/useSetOnboardingDisplayNextSession.ts`
 
 ## settings.manage-account
 **Task:** View or edit your account details
-**Where:** Header → avatar → account menu
+**Where:** Header → avatar
 **Steps:**
-1. Select your avatar in the header (next to the Settings icon).
-2. Select **Manage account**.
+1. Select your avatar in the header (next to the Settings icon) to open the account menu.
+2. Choose the option to manage your account.
 **Notes:** This opens Clerk's account management UI, not the Perspectize Settings dialog.
 **Sign-in required:** yes
 **Source:** `frontend/src/lib/components/Header.svelte`
 
 ## settings.sign-out
 **Task:** Sign out of Perspectize
-**Where:** Header → avatar → account menu
+**Where:** Header → avatar
 **Steps:**
-1. Select your avatar in the header (next to the Settings icon).
-2. Select **Sign out**.
+1. Select your avatar in the header (next to the Settings icon) to open the account menu.
+2. Choose the option to sign out.
 **Sign-in required:** yes
 **Source:** `frontend/src/lib/components/Header.svelte`
