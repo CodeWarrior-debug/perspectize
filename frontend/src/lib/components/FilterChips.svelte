@@ -3,6 +3,7 @@
 	import ListXIcon from '@lucide/svelte/icons/list-x';
 	import type { GridApi } from '@ag-grid-community/core';
 	import { formatDurationSeconds } from '$lib/utils/formatting';
+	import { COLUMN_LABELS } from '$lib/utils/grid-config';
 
 	interface FilterChip {
 		colId: string;
@@ -22,19 +23,6 @@
 		onRemove?: (colId: string) => void;
 		onClearAll?: () => void;
 	} = $props();
-
-	const COLUMN_LABELS: Record<string, string> = {
-		type: 'Type',
-		duration: 'Length',
-		views: 'Views',
-		likes: 'Likes',
-		publishDate: 'Date',
-		channel: 'Channel',
-		tags: 'Tags',
-		description: 'Description',
-		updatedAt: 'Updated',
-		createdAt: 'Date Added',
-	};
 
 	const TEXT_OPERATORS: Record<string, string> = {
 		contains: 'contains',

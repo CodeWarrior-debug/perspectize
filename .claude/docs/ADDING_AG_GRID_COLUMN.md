@@ -10,6 +10,16 @@ The [UI thoroughness checklist](../../.docs/UI_THOROUGHNESS_CHECKLIST.md) has
 the general version of this list, covering every surface a column can touch,
 not just the grid; this file is the grid-specific how-to.
 
+**`grid-config.ts`'s `COLUMNS` array is the single source of truth** for
+everything below except the AG Grid `ColDef` itself (sizing, renderers,
+filter UI type, tooltips) — the column picker, sort picker, server/client
+sort maps, URL filter keys, and filter-chip labels are all *derived* from
+one `ColumnMeta` entry per column, not five separately hand-maintained
+lists. Forgetting a step below now means the derived export is simply
+missing that colId (still visible immediately in the picker/sort-picker
+UI), not a silent, separately-drifting list — see `.docs/UI_THOROUGHNESS_CHECKLIST.md`
+§3.1 for why this replaced the older multi-registry design.
+
 ## Key files
 
 | File | Purpose |
@@ -17,16 +27,16 @@ not just the grid; this file is the grid-specific how-to.
 | `frontend/src/lib/components/ActivityTable.svelte` | Column definitions (`columnDefs`), the responsive `$effect`, click/hover handlers |
 | `frontend/src/lib/utils/formatting.ts` | Cell renderers, value formatters, value getters |
 | `frontend/src/lib/utils/activityTooltipSpecs.ts` | Hover-popover specs (`ACTIVITY_TOOLTIP_SPECS`) |
-| `frontend/src/lib/utils/grid-config.ts` | `DATA_COLUMNS`/`INTERNAL_COLUMNS` (column picker), `SORTABLE_COLUMNS`/`SORT_VALUE_GETTERS` (sort picker + client-side sort), `compareContentBySorts` |
-| `frontend/src/lib/utils/gridUrlState.ts` | `COL_TO_SORT`/`SORT_TO_COL` (server sort), `COL_TO_FILTER_KEY` (URL filter params), `urlParamsToGraphQLFilter` |
-| `frontend/src/lib/components/FilterChips.svelte` | `COLUMN_LABELS` for filter chips |
+| `frontend/src/lib/utils/grid-config.ts` | `COLUMNS`/`ColumnMeta` — the single source of truth. `DATA_COLUMNS`/`INTERNAL_COLUMNS` (column picker), `SORTABLE_COLUMNS`/`SORT_VALUE_GETTERS` (sort picker + client-side sort), `COL_TO_SORT`/`SORT_TO_COL` (server sort), `COL_TO_FILTER_KEY`/`COLUMN_LABELS` (URL filter keys + filter-chip labels), `compareContentBySorts`/`filterContentRows` — all derived from `COLUMNS` |
+| `frontend/src/lib/utils/gridUrlState.ts` | Re-exports `COL_TO_SORT`/`SORT_TO_COL`/`COL_TO_FILTER_KEY` from `grid-config.ts`; owns `urlParamsToGraphQLFilter` and URL (de)serialization |
+| `frontend/src/lib/components/FilterChips.svelte` | Imports `COLUMN_LABELS` from `grid-config.ts` for filter-chip text |
 | `frontend/src/lib/components/ColumnPickerDialog.svelte` | Renders `DATA_COLUMNS`/`INTERNAL_COLUMNS` |
 | `frontend/src/lib/components/SortPickerDialog.svelte` | Renders `SORTABLE_COLUMNS` |
 | `frontend/src/lib/components/ActivityCardList.svelte` | Mobile card view — has its own, much smaller field list |
 | `frontend/src/lib/components/ActivityDetailsModal.svelte` | Details modal — also has its own field list |
 | `frontend/src/lib/queries/content/index.ts` | GraphQL query fields and the `ContentItem` TypeScript interface |
 | `frontend/tests/unit/grid-config.test.ts`, `gridUrlState.test.ts`, `formatting.test.ts` | Unit tests for the above |
-| `frontend/tests/unit/column-registry-parity.test.ts`, `column-label-parity.test.ts` | Parity guards — read the real `columnDefs`/`headerName`s from source and fail if a registry drifts (see "Registries a column must be added to" below) |
+| `frontend/tests/unit/column-registry-parity.test.ts`, `column-label-parity.test.ts` | Parity guards — read the real `columnDefs`/`headerName`s from source and fail if `COLUMNS` drifts from them (kept as a belt-and-suspenders check even though the single source makes cross-registry drift structurally impossible — see "Registries a column must be added to" below) |
 | `backend/schema.graphql` | GraphQL schema (if new field, or a new `ContentSortBy`/`ContentFilter` value) |
 | `backend/internal/core/domain/content.go`, `pagination.go` | Domain model / sort enum (if new field or sortable) |
 | `backend/internal/adapters/repositories/postgres/helpers.go` | Sort rules for JSONB-derived and DB-column fields |
@@ -163,16 +173,17 @@ client sorting is required, server sorting is optional):
 **Client-side only** (e.g. a value computed purely from other loaded fields):
 1. Column def: `sortable: true`, with a `comparator` if the raw grid value
    isn't directly comparable.
-2. Add the colId to `SORTABLE_COLUMNS` in `grid-config.ts` (feeds the sort
-   picker and the mobile "Edit sorts" dialog).
-3. Add a `colId: (row) => value` entry to `SORT_VALUE_GETTERS` in the same
-   file (feeds `compareContentBySorts`, used for Loaded-mode client sort and
-   the mobile card list, which has no grid of its own).
-4. Do **not** add it to `COL_TO_SORT`/`SORT_TO_COL` in `gridUrlState.ts` —
-   `sortsToGraphQL` silently drops any colId missing from `COL_TO_SORT`, so
-   in "All Items" mode the sort has no effect. Leave a comment saying so
-   (see `percentLiked`'s entry for the pattern), or the next reader will
-   assume it's a bug.
+2. In `grid-config.ts`'s `COLUMNS` array, set `sortable: true` and a
+   `sortValue: (row) => value` on the column's `ColumnMeta` entry (feeds the
+   sort picker, the mobile "Edit sorts" dialog, and `compareContentBySorts`,
+   used for Loaded-mode client sort and the mobile card list, which has no
+   grid of its own).
+3. Do **not** set `serverSort` — a `ColumnMeta` entry with `sortable: true`
+   but no `serverSort` is intentionally left out of `COL_TO_SORT`, and
+   `sortsToGraphQL` silently drops any colId missing from it, so in "All
+   Items" mode the sort has no effect. Leave a comment saying so on the
+   entry (see `percentLiked`'s entry for the pattern), or the next reader
+   will assume it's a bug.
 
 **Server-side too** (needs a real backend sort, e.g. it's a persisted
 column, or the client-only limitation above isn't acceptable):
@@ -182,8 +193,11 @@ column, or the client-only limitation above isn't acceptable):
 4. Add a case to `contentSortRule()` in `helpers.go` — for a JSONB or
    computed field, this is where the SQL expression goes (see the
    `PERCENT_LIKED` case for a division that can be zero/NULL).
-5. `colId: 'BACKEND_ENUM_VALUE'` in both `COL_TO_SORT` and (reversed)
-   `SORT_TO_COL` in `gridUrlState.ts`.
+5. Set `serverSort: 'BACKEND_ENUM_VALUE'` on the same `ColumnMeta` entry in
+   `grid-config.ts` — this feeds both `COL_TO_SORT` and (reversed)
+   `SORT_TO_COL`. If two colIds ever share a `serverSort` value, `SORT_TO_COL`
+   keeps whichever appears first in `COLUMNS`, so order matters (see the
+   `NAME`/`type` vs `item` comment in `grid-config.ts`).
 6. If the field itself is new, `make graphql-gen` per Decision 1.
 
 ---
@@ -196,17 +210,21 @@ If yes:
    `agNumberColumnFilter`/`agDateColumnFilter` (numeric/date).
 2. Set it in the column def (`filter: 'agTextColumnFilter'`); the grid
    provides its own filter menu, no `floatingFilter` needed for this table.
-3. Add `colId: 'urlKey'` to `COL_TO_FILTER_KEY` in `gridUrlState.ts` — this
-   is what the URL `f.<urlKey>=` param and `filterToUrlParams`/
-   `urlParamsToFilter` use to round-trip the filter through the URL (needed
-   for "All Items" mode, and for the filter to survive a page reload in
-   either mode).
-4. Add a case to `urlParamsToGraphQLFilter`'s switch if the filter should
-   apply server-side in "All Items" mode (most numeric/date filters do;
-   text filters usually map to a `ContentFilter` field the backend already
-   supports — check `ContentFilter` in `schema.graphql` first).
-5. Add `colId: 'Label'` to `FilterChips.svelte`'s `COLUMN_LABELS`, matching
-   the column's `headerName` (see "One label everywhere," below).
+3. In `grid-config.ts`'s `COLUMNS` array, set `filterKey: 'urlKey'` on the
+   column's `ColumnMeta` entry — this is what the URL `f.<urlKey>=` param and
+   `filterToUrlParams`/`urlParamsToFilter` (re-exported from `gridUrlState.ts`)
+   use to round-trip the filter through the URL (needed for "All Items" mode,
+   and for the filter to survive a page reload in either mode). Also set
+   `filterRange: 'number'` or `'date'` if it's a range filter, so it lands
+   in `NUMBER_RANGE_COLS`/`DATE_RANGE_COLS`.
+4. Add a case to `urlParamsToGraphQLFilter`'s switch (`gridUrlState.ts`) if
+   the filter should apply server-side in "All Items" mode (most
+   numeric/date filters do; text filters usually map to a `ContentFilter`
+   field the backend already supports — check `ContentFilter` in
+   `schema.graphql` first).
+5. Make sure `label` on the same `ColumnMeta` entry is non-empty and matches
+   the column's `headerName` — that's what feeds `COLUMN_LABELS`, used by
+   `FilterChips.svelte` (see "One label everywhere," below).
 
 **Note:** free-text search (the page's search box) and column filters are
 two separate mechanisms — `q`/`qFields` vs `f.*`. Don't route a column
@@ -302,16 +320,23 @@ admin-only id/addedByUserID/url (all hidden).
 A column's label shows up in up to five places, and they used to disagree
 (UI gap audit, gap #9 — e.g. the grid header said "Date" while the column
 picker and sort picker said "Published"). Use the **grid header's
-`headerName`** as the canonical label everywhere else:
+`headerName`** as the canonical label, and set it **once** as `label` on the
+column's `ColumnMeta` entry in `grid-config.ts`'s `COLUMNS` array — every
+other place derives from that single field:
 
-- `DATA_COLUMNS`/`INTERNAL_COLUMNS` in `grid-config.ts` (column picker)
-- `SORTABLE_COLUMNS` in `grid-config.ts` (sort picker)
-- `COLUMN_LABELS` in `FilterChips.svelte` (filter chips)
-- `ActivityDetailsModal.svelte`'s own field labels, if the field is shown there
+- `DATA_COLUMNS`/`INTERNAL_COLUMNS` (column picker)
+- `SORTABLE_COLUMNS` (sort picker)
+- `COLUMN_LABELS`, imported by `FilterChips.svelte` (filter chips)
+- `ActivityDetailsModal.svelte`'s own field labels, if the field is shown
+  there — this one is still a separate, hand-written list, not derived from
+  `COLUMNS`
 
 `tests/unit/column-label-parity.test.ts` reads `headerName` out of
-`ActivityTable.svelte`'s source and fails if `DATA_COLUMNS`/
-`INTERNAL_COLUMNS`/`SORTABLE_COLUMNS` disagree with it for any shared colId.
+`ActivityTable.svelte`'s source and fails if `COLUMNS`' `label` disagrees
+with it for any shared colId — kept as a belt-and-suspenders check even
+though a single `label` field makes the derived exports disagreeing with
+*each other* structurally impossible; it still catches `COLUMNS` disagreeing
+with the actual `headerName` in the colDef.
 
 ---
 
@@ -324,14 +349,14 @@ the backend rows):
 - [ ] Renderer/formatter in `formatting.ts`, using theme tokens if it sets colour
 - [ ] Tooltip spec in `activityTooltipSpecs.ts` (or an explicit opt-out)
 - [ ] The responsive `$effect`'s tier lists
-- [ ] `DATA_COLUMNS`/`INTERNAL_COLUMNS` in `grid-config.ts` (column picker) — **the #1 thing this guide used to miss**
-- [ ] `SORTABLE_COLUMNS` + `SORT_VALUE_GETTERS` in `grid-config.ts`, if sortable
-- [ ] `COL_TO_SORT`/`SORT_TO_COL` in `gridUrlState.ts`, if sortable server-side
-- [ ] `COL_TO_FILTER_KEY` + `urlParamsToGraphQLFilter` in `gridUrlState.ts`, if filterable
-- [ ] `COLUMN_LABELS` in `FilterChips.svelte`, if filterable
+- [ ] One `ColumnMeta` entry added to `COLUMNS` in `grid-config.ts`, with:
+  - [ ] `picker: 'data'` or `'admin'` (column picker) — **the #1 thing this guide used to miss**, back when this was a separately hand-maintained list
+  - [ ] `label` matching the colDef's `headerName` (see "One label everywhere")
+  - [ ] `sortable: true` + `sortValue`, if sortable (sort picker + client-side sort)
+  - [ ] `serverSort`, if sortable server-side (`gridUrlState.ts`'s `COL_TO_SORT`/`SORT_TO_COL`)
+  - [ ] `filterKey` (+ `filterRange` if a number/date range), if filterable — feeds the URL `f.*` param and `urlParamsToGraphQLFilter`
 - [ ] Search scope (`SearchScopeKey`, `SCOPE_TO_GQL_FIELD`, `SCOPE_LABELS`), if searchable
-- [ ] Same label everywhere it appears (see "One label everywhere")
-- [ ] `ActivityCardList.svelte` and `ActivityDetailsModal.svelte`, if the column should also appear on mobile cards / the details modal — both have their own, separate field lists, not derived from the grid
+- [ ] `ActivityCardList.svelte` and `ActivityDetailsModal.svelte`, if the column should also appear on mobile cards / the details modal — both have their own, separate field lists, not derived from `COLUMNS`
 - [ ] Tests updated (see Testing, below) and both parity tests still pass
 
 ---
@@ -384,36 +409,21 @@ For a field that already exists in `ContentItem`, sortable client-side only, no 
 ```
 
 ```typescript
-// grid-config.ts
-export const DATA_COLUMNS: readonly TogglableColumn[] = [
-  // ...
-  { colId: 'commentCount', label: 'Comments' }, // must match headerName above
-];
-export const SORTABLE_COLUMNS: readonly TogglableColumn[] = [
-  // ...
-  { colId: 'commentCount', label: 'Comments' },
-];
-const SORT_VALUE_GETTERS: Record<string, (row: ContentItem) => string | number | null> = {
-  // ...
-  commentCount: (row) => row.commentCount,
-};
+// grid-config.ts — one ColumnMeta entry in the COLUMNS array, in columnDefs order
+{
+  colId: 'commentCount',
+  label: 'Comments',       // must match headerName above — feeds column
+                            // picker, sort picker, and FilterChips labels
+  picker: 'data',
+  sortable: true,
+  sortValue: (row) => row.commentCount,
+  filterKey: 'comments',   // URL f.comments= param
+  filterRange: 'number',
+},
 ```
 
-```typescript
-// gridUrlState.ts — filterable via a number-range URL filter
-const COL_TO_FILTER_KEY: Record<string, string> = {
-  // ...
-  commentCount: 'comments',
-};
-```
-
-```svelte
-<!-- FilterChips.svelte -->
-const COLUMN_LABELS: Record<string, string> = {
-  // ...
-  commentCount: 'Comments',
-};
-```
+No edits needed in `gridUrlState.ts` or `FilterChips.svelte` — `COL_TO_FILTER_KEY`,
+`NUMBER_RANGE_COLS`, and `COLUMN_LABELS` are all derived from `COLUMNS`.
 
 Then update `formatting.test.ts` if reusing an existing formatter with new edge cases.
 

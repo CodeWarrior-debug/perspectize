@@ -2,6 +2,7 @@
  * URL ↔ grid state synchronization utilities.
  * Serializes/deserializes AG Grid filter models to/from URL search params.
  */
+import { COL_TO_SORT, SORT_TO_COL, COL_TO_FILTER_KEY, NUMBER_RANGE_COLS, DATE_RANGE_COLS } from './grid-config';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -98,33 +99,13 @@ function serializeSortsForUrl(sorts: SortSpec[]): string {
 // ---------------------------------------------------------------------------
 // AG Grid colId ↔ GraphQL ContentSortBy bidirectional maps
 // ---------------------------------------------------------------------------
+//
+// COL_TO_SORT/SORT_TO_COL are re-exported from grid-config.ts, which is the
+// single source of truth for per-column metadata (see COLUMNS/ColumnMeta
+// there) — kept as named exports here since this is the URL/GraphQL codec
+// module callers of sortsToGraphQL etc. already import from.
 
-/** AG Grid colId → GraphQL ContentSortBy */
-export const COL_TO_SORT: Record<string, string> = {
-	item: 'NAME',
-	type: 'NAME', // Type column not independently sortable
-	duration: 'LENGTH', // New! Was NAME fallback
-	views: 'VIEW_COUNT',
-	likes: 'LIKE_COUNT',
-	percentLiked: 'PERCENT_LIKED',
-	publishDate: 'PUBLISHED_AT',
-	channel: 'CHANNEL_TITLE', // New! Was NAME fallback
-	createdAt: 'CREATED_AT',
-	updatedAt: 'UPDATED_AT',
-};
-
-/** GraphQL ContentSortBy → AG Grid colId (for URL → grid state) */
-export const SORT_TO_COL: Record<string, string> = {
-	NAME: 'item',
-	LENGTH: 'duration',
-	VIEW_COUNT: 'views',
-	LIKE_COUNT: 'likes',
-	PERCENT_LIKED: 'percentLiked',
-	PUBLISHED_AT: 'publishDate',
-	CHANNEL_TITLE: 'channel',
-	CREATED_AT: 'createdAt',
-	UPDATED_AT: 'updatedAt',
-};
+export { COL_TO_SORT, SORT_TO_COL };
 
 /**
  * Convert a SortSpec[] (URL/AG Grid shape) to the GraphQL `sorts` input list.
@@ -227,31 +208,16 @@ type AGDateFilter = { filterType: 'date'; type: string; dateFrom?: string; dateT
 // ---------------------------------------------------------------------------
 // Column mappings: AG Grid colId ↔ URL f.* param key
 // ---------------------------------------------------------------------------
+//
+// COL_TO_FILTER_KEY/NUMBER_RANGE_COLS/DATE_RANGE_COLS are re-exported from
+// grid-config.ts (see COLUMNS there) — see the note above COL_TO_SORT.
 
-/** AG Grid colId → URL f.* param key */
-const COL_TO_FILTER_KEY: Record<string, string> = {
-	type: 'type',
-	duration: 'duration',
-	views: 'views',
-	likes: 'likes',
-	publishDate: 'date',
-	channel: 'channel',
-	tags: 'tags',
-	description: 'desc',
-	createdAt: 'added',
-	updatedAt: 'updated',
-};
+export { COL_TO_FILTER_KEY, NUMBER_RANGE_COLS, DATE_RANGE_COLS };
 
 /** URL f.* param key → AG Grid colId */
 const FILTER_KEY_TO_COL: Record<string, string> = Object.fromEntries(
 	Object.entries(COL_TO_FILTER_KEY).map(([col, key]) => [key, col]),
 );
-
-/** Columns whose f.* params are number ranges (vs date ranges or text) */
-const NUMBER_RANGE_COLS = new Set(['duration', 'views', 'likes']);
-
-/** Columns whose f.* params are date ranges */
-const DATE_RANGE_COLS = new Set(['publishDate', 'createdAt', 'updatedAt']);
 
 // ---------------------------------------------------------------------------
 // filterToUrlParams — AG Grid FilterModel → URL f.* params
