@@ -30,6 +30,17 @@ Full structure: [.docs/ARCHITECTURE.md](../.docs/ARCHITECTURE.md)
 
 Domain layer rules: [.docs/DOMAIN_GUIDE.md](../.docs/DOMAIN_GUIDE.md)
 
+### Deep Modules
+
+Small interface, big hidden implementation (Ousterhout). Hexagonal says *where* code goes; this says how narrow each boundary should be.
+
+- **One file per domain** — `adapters/graphql/{content,perspective,user,category,messaging}.resolvers.go`. When `make graphql-gen` drops new stubs into `schema.resolvers.go`, move them to the matching domain file.
+- **Callers see ports, not structs** — services depend on `core/ports` interfaces; never reach into a repository's SQL helpers.
+- **Pull mapping down** — GraphQL model ↔ domain conversion lives once in `adapters/graphql/helpers.go` (e.g. `modelToCreatePerspectiveInput`), not inline in each resolver.
+- **No pass-through methods** — a service method that only forwards to the repo with no rule/validation is a smell; give it responsibility or call the port directly.
+
+Origin: PR #339.
+
 ## Stack
 
 Go 1.25+ (pinned via `toolchain` in go.mod + Dockerfile) · gqlgen (schema-first) · PostgreSQL 17 (GORM + pgx/v5) · golang-migrate · go-playground/validator · testify · log/slog · godotenv

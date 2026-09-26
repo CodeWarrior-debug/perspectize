@@ -111,18 +111,6 @@ This project follows **Hexagonal Architecture** (Ports and Adapters pattern):
 
 **Dependency Rule:** Dependencies point inward. Domain never depends on adapters. Adapters depend on domain ports.
 
-### Deep Modules (applies to backend AND frontend)
-
-From Ousterhout's *A Philosophy of Software Design*: prefer **deep modules** — a small, simple interface hiding a substantial implementation — over shallow ones whose interface is nearly as complex as what they do. Hexagonal architecture says *where* code goes; deep modules say *how big and how hidden* each unit should be.
-
-- **Group by domain, not by kind.** A domain's code lives together so its boundary is visible on the file system (backend: `content.resolvers.go`, `perspective.resolvers.go`, …; frontend: `lib/queries/content/`, `lib/queries/perspectives/`, … each holding its query defs *and* hooks).
-- **Expose a narrow entry point.** Callers import the module, not its internals (frontend: a domain folder's `index.ts`; backend: port interfaces in `core/ports/`).
-- **Pull complexity down, not out.** Repeated mapping/wiring belongs inside one helper behind the boundary (e.g. `adapters/graphql/helpers.go` perspective mappers), not duplicated at each call site.
-- **No pass-through layers.** A function/component that only forwards its arguments adds interface without hiding anything — inline it or give it real responsibility.
-- **Split monoliths along domain seams**, not arbitrary size limits (e.g. the one-file `schema.resolvers.go` → per-domain resolver files).
-
-Origin and worked example: PR #339.
-
 ## Domain Model
 
 ### Core Entities

@@ -26,7 +26,16 @@ frontend/src/
 └── app.html             # HTML shell
 ```
 
-**Deep modules apply here too** — group by domain, expose a narrow `index.ts`, no pass-through components. See [Deep Modules](../.docs/ARCHITECTURE.md#deep-modules-applies-to-backend-and-frontend).
+### Deep Modules
+
+Small interface, big hidden implementation (Ousterhout).
+
+- **One folder per domain** — `lib/queries/{content,perspectives,users,categories,…}/` holds the `gql` defs (`index.ts`) *and* that domain's hooks (`useCreatePerspective.ts`). Only `client.ts`/`keys.ts` are top-level.
+- **Import the domain, not its guts** — `import { LIST_CONTENT } from '$lib/queries/content'`; components call a hook, never `graphqlClient.request` + cache invalidation inline.
+- **Hide cache wiring in the hook** — query keys, `invalidateQueries`, optimistic updates live inside `useX`, so callers get `{ mutate, isPending }` and nothing else.
+- **No pass-through components** — a wrapper that only forwards props/snippets to one child adds surface without hiding anything; inline it or give it state/logic.
+
+Origin: PR #339.
 
 ## shadcn-svelte Components
 
