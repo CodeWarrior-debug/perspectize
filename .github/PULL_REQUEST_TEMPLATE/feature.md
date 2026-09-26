@@ -22,3 +22,12 @@ https://github.com/user-attachments/assets/<!-- video-id -->
 
 - [ ] <!-- How to verify this works -->
 - [ ] <!-- Edge cases considered -->
+
+## Follow-up Steps
+
+<!-- Manual actions needed after merge, in order if sequence matters. Delete section if none. -->
+
+- [ ] DB migration: `migrate up` against `<!-- environment(s) -->` (manual per .docs — never automated)
+- [ ] Task/script: <!-- e.g. backfill script, one-off command -->
+- [ ] <!-- Additional step -->
+
