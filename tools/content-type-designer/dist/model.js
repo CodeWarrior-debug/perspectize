@@ -88,12 +88,12 @@ function analyse(state, columns) {
                     .join(', ')} render the "${rc.col.gapFallback}" fallback. Consider a per-type substitute or dropping it from the default set.`
             });
         }
-        const units = new Set(rc.aliases.map((a) => a.unit).filter(Boolean));
-        if (units.size > 1) {
+        const units = unitKeysFor(rc);
+        if (units.length > 1) {
             warnings.push({
                 severity: 'info',
                 columnId: rc.col.id,
-                message: `"${rc.header}" mixes units across types (${[...units].join(' | ')}). Format per row from length_units. Sorting it alone raises the mixed-unit alert: filter to one type, or sort by Type first and "${rc.header}" second.`
+                message: `"${rc.header}" mixes units across types (${units.join(' | ')}). Format per row from length_units. Sorting it groups rows by unit first (${units.join(', ')}), each group ordered within itself, with a divider row naming the unit.`
             });
         }
         const sources = new Set(rc.bound.map((t) => bindingFor(rc.col, t, state)?.source).filter(Boolean));
@@ -164,22 +164,29 @@ export function samplesFor(id, state) {
 export function gapText(col) {
     return col.gapFallback === 'blank' ? '' : '—';
 }
-/** Distinct units a column carries across the current selection; >1 means sorting it alone is meaningless. */
-export function unitsFor(rc) {
-    return [...new Set(rc.aliases.map((a) => a.unit).filter(Boolean))];
+/**
+ * The stored length_units value a binding's unit describes — the first word of
+ * the free-text unit ("seconds → h:mm:ss" → "seconds"). Two types with the
+ * same key are directly comparable; different keys are not.
+ */
+export function unitKey(unit) {
+    return unit?.trim().split(/\s+/)[0]?.toLowerCase() || undefined;
+}
+/** Distinct unit keys a column carries across the current selection; >1 means a plain sort is meaningless. */
+export function unitKeysFor(rc) {
+    return [...new Set(rc.aliases.map((a) => unitKey(a.unit)).filter(Boolean))].sort();
 }
 /**
- * A sort is conflicted when its first key is a column whose units differ across
- * the selection — the rows would be ordered by numbers that mean different things.
- * Putting a unit-consistent column (Type) first resolves it: each type's rows
- * are then ordered within their own unit.
+ * The mixed-unit column leading the sort, if any. Such a sort is still applied —
+ * grouped by unit first (the backend's ORDER BY length_units, length), then
+ * ordered within each group — and the preview explains it rather than blocking.
  */
-export function sortConflict(keys, grid) {
+export function mixedPrimary(keys, grid) {
     const first = keys?.[0];
     if (!first)
         return null;
     const rc = grid.columns.find((c) => c.col.id === first.colId);
-    return rc && unitsFor(rc).length > 1 ? rc : null;
+    return rc && unitKeysFor(rc).length > 1 ? rc : null;
 }
 /** Parse a preview cell into something orderable: h:mm:ss → seconds, "1,204" / "4.1%" → number. */
 export function sortValue(text) {

@@ -145,14 +145,29 @@
       .samples th.sortable:hover { color: var(--accent); }
       .samples th.mixed { text-decoration: underline dashed var(--warn); text-underline-offset: 3px; }
       .samples th sup { font-size: 9px; margin-left: 1px; }
-      .sort-alert {
-        border: 1px solid var(--warn);
-        background: color-mix(in srgb, var(--warn) 10%, transparent);
-        border-radius: 8px;
-        padding: 10px 12px;
+      .sort-note {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        font-size: 12px;
+        color: var(--muted);
+        border-left: 3px solid var(--warn);
+        padding: 4px 0 4px 10px;
         margin: 6px 0;
       }
-      .sort-alert .row { flex-wrap: wrap; margin: 8px 0 0; }
+      .sort-note .row { flex-wrap: wrap; gap: 6px; margin: 0; }
+      .sort-note button { font-size: 12px; padding: 2px 8px; }
+      .sort-note button.link { border-color: transparent; background: none; text-decoration: underline; }
+      .samples tr.group-divider td {
+        background: var(--bg);
+        font-size: 11px;
+        color: var(--muted);
+        text-transform: none;
+        padding: 4px 10px;
+      }
+      .samples tr.group-divider strong { color: var(--ink); text-transform: uppercase; letter-spacing: 0.06em; }
       .cell-title { display: block; }
       .cell-sub { display: block; font-size: 11px; color: var(--muted); }
       ul.warnings { margin: 10px 0 0; padding-left: 18px; }
