@@ -54,30 +54,36 @@
 		value = value.map((f) => (f.emoji === emoji ? { ...f, note: note || null } : f));
 	}
 
-	// Radius/center are in px for a fixed-size wheel — no need for
-	// resize-driven recalculation since the wheel doesn't stretch.
-	const RADIUS = 96;
-	const CENTER = 120;
+	// Labels are always visible (not just on hover title) so the emotion name
+	// reads on touch devices, which have no hover state. 20 labeled items
+	// around one ring would collide arc-to-arc, so every other item sits on
+	// an outer ring — halves the angular density each ring has to absorb
+	// (36° apart instead of 18°) without shrinking the wheel to fit text.
+	const CENTER = 160;
+	const RADIUS_INNER = 82;
+	const RADIUS_OUTER = 138;
 
-	function wheelPosition(angleDeg: number): string {
+	function wheelPosition(angleDeg: number, ring: number): string {
+		const radius = ring === 0 ? RADIUS_INNER : RADIUS_OUTER;
 		const rad = ((angleDeg - 90) * Math.PI) / 180; // -90 so 0deg = top
-		const x = CENTER + RADIUS * Math.cos(rad);
-		const y = CENTER + RADIUS * Math.sin(rad);
+		const x = CENTER + radius * Math.cos(rad);
+		const y = CENTER + radius * Math.sin(rad);
 		return `left: ${x}px; top: ${y}px;`;
 	}
 </script>
 
 <div class="flex flex-col gap-4">
-	<!-- The wheel itself: 20 emoji positioned by angle, native text glyphs only -->
-	<div class="relative mx-auto" style="width: 240px; height: 240px;">
-		{#each FEEL_WHEEL as f (f.angle)}
+	<!-- The wheel itself: 20 emoji positioned by angle, alternating inner/outer
+	     ring so each item's always-visible label has room to breathe. -->
+	<div class="relative mx-auto" style="width: 320px; height: 320px;">
+		{#each FEEL_WHEEL as f, i (f.angle)}
 			{@const selected = isSelected(f.emoji)}
 			<button
 				type="button"
 				class="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 transition-transform"
 				class:opacity-40={selected}
 				class:scale-90={selected}
-				style={wheelPosition(f.angle)}
+				style={wheelPosition(f.angle, i % 2)}
 				disabled={atCap && !selected}
 				onclick={() => (selected ? removeFeeling(f.emoji) : addFeeling(f.emoji, f.label))}
 				aria-pressed={selected}
@@ -85,6 +91,9 @@
 				title={f.label}
 			>
 				<span class="text-2xl leading-none">{f.emoji}</span>
+				<span class="text-[9px] leading-none text-muted-foreground text-center max-w-[52px] truncate">
+					{f.label}
+				</span>
 			</button>
 		{/each}
 	</div>
