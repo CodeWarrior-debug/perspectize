@@ -20,7 +20,15 @@ const withSharedFeelings: FeelingComparison = {
 describe('CompareRatingTable', () => {
 	it('renders one row per rating dimension with its label and status', () => {
 		render(CompareRatingTable, {
-			props: { rows, filledInDifferently, feelings: noFeelings, sortDesc: false, onToggleSort: vi.fn() },
+			props: {
+				rows,
+				filledInDifferently,
+				feelings: noFeelings,
+				sortDesc: false,
+				onToggleSort: vi.fn(),
+				leftName: 'Alice',
+				rightName: 'Bob',
+			},
 		});
 		expect(screen.getByText('Quality')).toBeInTheDocument();
 		expect(screen.getByText('Agreement')).toBeInTheDocument();
@@ -30,14 +38,30 @@ describe('CompareRatingTable', () => {
 
 	it('shows the ascending sort label when sortDesc is false', () => {
 		render(CompareRatingTable, {
-			props: { rows, filledInDifferently, feelings: noFeelings, sortDesc: false, onToggleSort: vi.fn() },
+			props: {
+				rows,
+				filledInDifferently,
+				feelings: noFeelings,
+				sortDesc: false,
+				onToggleSort: vi.fn(),
+				leftName: 'Alice',
+				rightName: 'Bob',
+			},
 		});
 		expect(screen.getByText('Most similar first')).toBeInTheDocument();
 	});
 
 	it('shows the descending sort label when sortDesc is true', () => {
 		render(CompareRatingTable, {
-			props: { rows, filledInDifferently, feelings: noFeelings, sortDesc: true, onToggleSort: vi.fn() },
+			props: {
+				rows,
+				filledInDifferently,
+				feelings: noFeelings,
+				sortDesc: true,
+				onToggleSort: vi.fn(),
+				leftName: 'Alice',
+				rightName: 'Bob',
+			},
 		});
 		expect(screen.getByText('Most similar last')).toBeInTheDocument();
 	});
@@ -45,7 +69,15 @@ describe('CompareRatingTable', () => {
 	it('calls onToggleSort when the sort toggle is clicked', async () => {
 		const onToggleSort = vi.fn();
 		render(CompareRatingTable, {
-			props: { rows, filledInDifferently, feelings: noFeelings, sortDesc: false, onToggleSort },
+			props: {
+				rows,
+				filledInDifferently,
+				feelings: noFeelings,
+				sortDesc: false,
+				onToggleSort,
+				leftName: 'Alice',
+				rightName: 'Bob',
+			},
 		});
 		await fireEvent.click(screen.getByTestId('sort-toggle'));
 		expect(onToggleSort).toHaveBeenCalled();
@@ -53,18 +85,58 @@ describe('CompareRatingTable', () => {
 
 	it('renders the filled-in-differently sublist', () => {
 		render(CompareRatingTable, {
-			props: { rows, filledInDifferently, feelings: noFeelings, sortDesc: false, onToggleSort: vi.fn() },
+			props: {
+				rows,
+				filledInDifferently,
+				feelings: noFeelings,
+				sortDesc: false,
+				onToggleSort: vi.fn(),
+				leftName: 'Alice',
+				rightName: 'Bob',
+			},
 		});
 		expect(screen.getByText(/Confidence/)).toBeInTheDocument();
 	});
 
+	it('names who filled in a dimension differently instead of saying "left"/"right"', () => {
+		render(CompareRatingTable, {
+			props: {
+				rows,
+				filledInDifferently,
+				feelings: noFeelings,
+				sortDesc: false,
+				onToggleSort: vi.fn(),
+				leftName: 'Alice',
+				rightName: 'Bob',
+			},
+		});
+		expect(screen.getByText(/Alice filled in/)).toBeInTheDocument();
+		expect(screen.queryByText(/left filled in/)).not.toBeInTheDocument();
+	});
+
 	it('shows the matching-feelings row only when there are shared feelings', () => {
 		const { rerender } = render(CompareRatingTable, {
-			props: { rows, filledInDifferently, feelings: noFeelings, sortDesc: false, onToggleSort: vi.fn() },
+			props: {
+				rows,
+				filledInDifferently,
+				feelings: noFeelings,
+				sortDesc: false,
+				onToggleSort: vi.fn(),
+				leftName: 'Alice',
+				rightName: 'Bob',
+			},
 		});
 		expect(screen.queryByText('Matching feelings')).not.toBeInTheDocument();
 
-		rerender({ rows, filledInDifferently, feelings: withSharedFeelings, sortDesc: false, onToggleSort: vi.fn() });
+		rerender({
+			rows,
+			filledInDifferently,
+			feelings: withSharedFeelings,
+			sortDesc: false,
+			onToggleSort: vi.fn(),
+			leftName: 'Alice',
+			rightName: 'Bob',
+		});
 		expect(screen.getByText('Matching feelings')).toBeInTheDocument();
 	});
 });
