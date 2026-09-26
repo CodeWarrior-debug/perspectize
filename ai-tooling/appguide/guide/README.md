@@ -62,7 +62,7 @@ Any other `**Field:**` is a lint error.
 | Slug | Title | Status |
 |---|---|---|
 | `getting-started` | Getting Started | pending |
-| `activity` | Activity | pending |
+| `activity` | Activity | verified (1 round) |
 | `adding-content` | Adding Content | pending |
 | `perspectives` | Perspectives | pending |
 | `bible` | Bible Passages | pending |
