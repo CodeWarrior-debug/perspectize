@@ -67,7 +67,7 @@ Any other `**Field:**` is a lint error.
 | `activity` | Activity | verified (1 round) |
 | `adding-content` | Adding Content | verified (2 rounds) |
 | `perspectives` | Perspectives | verified (1 round) |
-| `bible` | Bible Passages | pending |
+| `bible` | Bible Passages | verified (2 rounds) |
 | `compare` | Compare Perspectives | verified (pilot, 3 rounds) |
 | `discover` | Discover | verified (3 rounds) |
 | `messaging` | Messaging | verified (1 round) |

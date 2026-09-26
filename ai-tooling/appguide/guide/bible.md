@@ -55,7 +55,7 @@
 1. Open a Bible-passage content item's details.
 2. Select **Show original language** below the passage text.
 3. In the passage text, select any underlined word or phrase to see its original-language word(s). Below the passage, each verse's original-language words also appear as their own row of chips, in English word order.
-4. Hover a chip (or an underlined phrase) to show its popover: Strongs number, the Hebrew or Greek script, a transliteration, its gloss, how it's rendered in the English text, and (when available) its grammatical parsing.
+4. Hover a chip (or an underlined phrase) to show its popover: Strongs number, the Hebrew or Greek script, a transliteration, its gloss, how it's rendered in the English text (when the word matches an English phrase), and (when available) its grammatical parsing.
 5. Select it once to pin the popover open (it stays even after you stop hovering); select the same word again to unpin it. Double-click a word, click elsewhere, or press Escape to dismiss the popover entirely.
 **Not supported:** Original-language data isn't available for every passage — when it isn't, a message says so and the plain text stays shown.
 **Notes:** Word alignment credits the Berean Standard Bible (public domain); word meanings and tags credit STEP Bible / Tyndale House (CC BY 4.0), shown under the original-language view.
