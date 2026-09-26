@@ -8,12 +8,20 @@
 		feelings,
 		sortDesc,
 		onToggleSort,
+		leftName,
+		rightName,
 	}: {
 		rows: RatingRow[];
 		filledInDifferently: FilledInDifferentlyRow[];
 		feelings: FeelingComparison;
 		sortDesc: boolean;
 		onToggleSort: () => void;
+		// Whose take filled in a dimension, for the "Filled in differently" rows
+		// below — named ("Alice"/"You") instead of raw "left"/"right", which
+		// only means anything relative to a picker column no longer visible in
+		// that sublist (compare-page-enhancements #4).
+		leftName: string;
+		rightName: string;
 	} = $props();
 
 	const STATUS_LABEL: Record<RatingRow['status'], string> = {
@@ -34,7 +42,9 @@
 
 <div class="mx-auto flex w-full max-w-[300px] flex-col gap-3">
 	{#if feelings.shared.length > 0}
-		<div class="flex items-center gap-2 rounded-full border border-[var(--color-rating-positive)] px-3 py-1.5 text-[13px]">
+		<div
+			class="flex items-center gap-2 rounded-full border border-[var(--color-rating-positive)] px-3 py-1.5 text-[13px]"
+		>
 			<span class="font-medium" style="color: var(--color-rating-positive);">Matching feelings</span>
 			{#each feelings.shared as f, i (`${f.emoji}:${f.label ?? ''}:${i}`)}
 				<span>{f.emoji} {f.label ?? ''}</span>
@@ -78,7 +88,7 @@
 			</span>
 			{#each filledInDifferently as row (row.key)}
 				<div class="text-[12.5px] text-foreground">
-					{row.label} &mdash; {row.side === 'left' ? 'left' : 'right'} filled in {fmt(row.display)}
+					{row.label} &mdash; {row.side === 'left' ? leftName : rightName} filled in {fmt(row.display)}
 				</div>
 			{/each}
 		</div>

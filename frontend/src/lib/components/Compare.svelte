@@ -240,6 +240,8 @@
 				feelings={feelingsComparison}
 				{sortDesc}
 				onToggleSort={() => (sortDesc = !sortDesc)}
+				leftName={displayName(leftId!)}
+				rightName={displayName(rightId!)}
 			/>
 			<CompareTakeColumn
 				name={displayName(rightId!)}
