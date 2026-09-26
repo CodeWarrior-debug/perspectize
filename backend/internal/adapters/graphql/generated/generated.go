@@ -46,6 +46,25 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	AssistantDone struct {
+		Citations    func(childComplexity int) int
+		InputTokens  func(childComplexity int) int
+		OutputTokens func(childComplexity int) int
+		Stop         func(childComplexity int) int
+	}
+
+	AssistantError struct {
+		Message func(childComplexity int) int
+	}
+
+	AssistantTextDelta struct {
+		Text func(childComplexity int) int
+	}
+
+	AssistantToolActivity struct {
+		Name func(childComplexity int) int
+	}
+
 	CategorizedRating struct {
 		Category func(childComplexity int) int
 		Rating   func(childComplexity int) int
@@ -326,8 +345,9 @@ type ComplexityRoot struct {
 	}
 
 	Subscription struct {
-		InboxEvents  func(childComplexity int) int
-		ThreadEvents func(childComplexity int, threadID string, sinceSeq *int) int
+		AssistantReply func(childComplexity int, input model.AssistantAskInput) int
+		InboxEvents    func(childComplexity int) int
+		ThreadEvents   func(childComplexity int, threadID string, sinceSeq *int) int
 	}
 
 	ThreadParticipant struct {
@@ -440,6 +460,7 @@ type QueryResolver interface {
 type SubscriptionResolver interface {
 	ThreadEvents(ctx context.Context, threadID string, sinceSeq *int) (<-chan model.ThreadEvent, error)
 	InboxEvents(ctx context.Context) (<-chan *model.InboxEvent, error)
+	AssistantReply(ctx context.Context, input model.AssistantAskInput) (<-chan model.AssistantEvent, error)
 }
 type ThreadParticipantResolver interface {
 	User(ctx context.Context, obj *model.ThreadParticipant) (*model.User, error)
@@ -465,6 +486,52 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	ec := newExecutionContext(nil, e, nil)
 	_ = ec
 	switch typeName + "." + field {
+
+	case "AssistantDone.citations":
+		if e.ComplexityRoot.AssistantDone.Citations == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantDone.Citations(childComplexity), true
+	case "AssistantDone.inputTokens":
+		if e.ComplexityRoot.AssistantDone.InputTokens == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantDone.InputTokens(childComplexity), true
+	case "AssistantDone.outputTokens":
+		if e.ComplexityRoot.AssistantDone.OutputTokens == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantDone.OutputTokens(childComplexity), true
+	case "AssistantDone.stop":
+		if e.ComplexityRoot.AssistantDone.Stop == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantDone.Stop(childComplexity), true
+
+	case "AssistantError.message":
+		if e.ComplexityRoot.AssistantError.Message == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantError.Message(childComplexity), true
+
+	case "AssistantTextDelta.text":
+		if e.ComplexityRoot.AssistantTextDelta.Text == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantTextDelta.Text(childComplexity), true
+
+	case "AssistantToolActivity.name":
+		if e.ComplexityRoot.AssistantToolActivity.Name == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantToolActivity.Name(childComplexity), true
 
 	case "CategorizedRating.category":
 		if e.ComplexityRoot.CategorizedRating.Category == nil {
@@ -1821,6 +1888,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.StreamReset.ThreadID(childComplexity), true
 
+	case "Subscription.assistantReply":
+		if e.ComplexityRoot.Subscription.AssistantReply == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_assistantReply_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Subscription.AssistantReply(childComplexity, args["input"].(model.AssistantAskInput)), true
 	case "Subscription.inboxEvents":
 		if e.ComplexityRoot.Subscription.InboxEvents == nil {
 			break
@@ -1984,6 +2062,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
 	ec := newExecutionContext(opCtx, e, make(chan graphql.DeferredResult))
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputAssistantAskInput,
 		ec.unmarshalInputCategorizedRatingInput,
 		ec.unmarshalInputContentFilter,
 		ec.unmarshalInputContentSortInput,
@@ -2730,6 +2809,50 @@ extend type Mutation {
 type Subscription {
   threadEvents(threadId: ID!, sinceSeq: IntID): ThreadEvent! @auth
   inboxEvents: InboxEvent! @auth
+}
+`, BuiltIn: false},
+	{Name: "../../../../assistant.graphql", Input: `# In-app assistant (Jeeves). Off unless the server sets JEEVES_ENABLED=true.
+# Streaming is a subscription over the existing authenticated WebSocket
+# transport. The question is the subscription's input (no separate mutation),
+# so there's no race between starting a reply and listening for it.
+
+input AssistantAskInput {
+  "The user's question. Max 4096 bytes."
+  message: String!
+  "Where the user is in the app (e.g. \"compare\"). Selects page tools later."
+  page: String
+}
+
+"A batch of answer text. Concatenate in order."
+type AssistantTextDelta {
+  text: String!
+}
+
+"The assistant is running a tool (e.g. reading the app guide)."
+type AssistantToolActivity {
+  name: String!
+}
+
+"Final event on success."
+type AssistantDone {
+  "Why generation stopped: end, max_tokens, refusal, tool_use, other."
+  stop: String!
+  "App-guide entry IDs cited in the answer, e.g. compare.pick-two."
+  citations: [String!]!
+  inputTokens: Int!
+  outputTokens: Int!
+}
+
+"Final event on failure. The message is safe to show the user."
+type AssistantError {
+  message: String!
+}
+
+union AssistantEvent = AssistantTextDelta | AssistantToolActivity | AssistantDone | AssistantError
+
+extend type Subscription {
+  "Ask Jeeves one question; streams events and completes after AssistantDone or AssistantError."
+  assistantReply(input: AssistantAskInput!): AssistantEvent! @auth
 }
 `, BuiltIn: false},
 }
@@ -4111,6 +4234,20 @@ func (ec *executionContext) field_Query_wikidataSearch_args(ctx context.Context,
 	return args, nil
 }
 
+func (ec *executionContext) field_Subscription_assistantReply_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.AssistantAskInput, error) {
+			return ec.unmarshalNAssistantAskInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐAssistantAskInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Subscription_threadEvents_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -4192,6 +4329,167 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 // endregion ***************************** args.gotpl *****************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _AssistantDone_stop(ctx context.Context, field graphql.CollectedField, obj *model.AssistantDone) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantDone_stop(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Stop, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantDone_stop(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantDone", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantDone_citations(ctx context.Context, field graphql.CollectedField, obj *model.AssistantDone) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantDone_citations(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Citations, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantDone_citations(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantDone", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantDone_inputTokens(ctx context.Context, field graphql.CollectedField, obj *model.AssistantDone) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantDone_inputTokens(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.InputTokens, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantDone_inputTokens(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantDone", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantDone_outputTokens(ctx context.Context, field graphql.CollectedField, obj *model.AssistantDone) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantDone_outputTokens(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.OutputTokens, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantDone_outputTokens(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantDone", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantError_message(ctx context.Context, field graphql.CollectedField, obj *model.AssistantError) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantError_message(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Message, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantError_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantError", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantTextDelta_text(ctx context.Context, field graphql.CollectedField, obj *model.AssistantTextDelta) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantTextDelta_text(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Text, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantTextDelta_text(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantTextDelta", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantToolActivity_name(ctx context.Context, field graphql.CollectedField, obj *model.AssistantToolActivity) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantToolActivity_name(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantToolActivity_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantToolActivity", field, false, false, errors.New("field of type String does not have child fields"))
+}
 
 func (ec *executionContext) _CategorizedRating_category(ctx context.Context, field graphql.CollectedField, obj *model.CategorizedRating) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
@@ -10111,6 +10409,63 @@ func (ec *executionContext) fieldContext_Subscription_inboxEvents(_ context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Subscription_assistantReply(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Subscription_assistantReply(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Subscription().AssistantReply(ctx, fc.Args["input"].(model.AssistantAskInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal model.AssistantEvent
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v model.AssistantEvent) graphql.Marshaler {
+			return ec.marshalNAssistantEvent2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐAssistantEvent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Subscription_assistantReply(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type AssistantEvent does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_assistantReply_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ThreadParticipant_user(ctx context.Context, field graphql.CollectedField, obj *model.ThreadParticipant) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -11694,6 +12049,43 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputAssistantAskInput(ctx context.Context, obj any) (model.AssistantAskInput, error) {
+	var it model.AssistantAskInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"message", "page"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "message":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("message"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Message = data
+		case "page":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("page"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Page = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCategorizedRatingInput(ctx context.Context, obj any) (model.CategorizedRatingInput, error) {
 	var it model.CategorizedRatingInput
 	if obj == nil {
@@ -12724,6 +13116,47 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 
 // region    ************************** interface.gotpl ***************************
 
+func (ec *executionContext) _AssistantEvent(ctx context.Context, sel ast.SelectionSet, obj model.AssistantEvent) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.AssistantToolActivity:
+		return ec._AssistantToolActivity(ctx, sel, &obj)
+	case *model.AssistantToolActivity:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._AssistantToolActivity(ctx, sel, obj)
+	case model.AssistantTextDelta:
+		return ec._AssistantTextDelta(ctx, sel, &obj)
+	case *model.AssistantTextDelta:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._AssistantTextDelta(ctx, sel, obj)
+	case model.AssistantError:
+		return ec._AssistantError(ctx, sel, &obj)
+	case *model.AssistantError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._AssistantError(ctx, sel, obj)
+	case model.AssistantDone:
+		return ec._AssistantDone(ctx, sel, &obj)
+	case *model.AssistantDone:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._AssistantDone(ctx, sel, obj)
+	default:
+		if typedObj, ok := obj.(graphql.Marshaler); ok {
+			return typedObj
+		} else {
+			panic(fmt.Errorf("unexpected type %T; non-generated variants of AssistantEvent must implement graphql.Marshaler", obj))
+		}
+	}
+}
+
 func (ec *executionContext) _ThreadEvent(ctx context.Context, sel ast.SelectionSet, obj model.ThreadEvent) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -12796,6 +13229,173 @@ func (ec *executionContext) _ThreadEvent(ctx context.Context, sel ast.SelectionS
 // endregion ************************** interface.gotpl ***************************
 
 // region    **************************** object.gotpl ****************************
+
+var assistantDoneImplementors = []string{"AssistantDone", "AssistantEvent"}
+
+func (ec *executionContext) _AssistantDone(ctx context.Context, sel ast.SelectionSet, obj *model.AssistantDone) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, assistantDoneImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AssistantDone")
+		case "stop":
+			out.Values[i] = ec._AssistantDone_stop(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "citations":
+			out.Values[i] = ec._AssistantDone_citations(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "inputTokens":
+			out.Values[i] = ec._AssistantDone_inputTokens(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "outputTokens":
+			out.Values[i] = ec._AssistantDone_outputTokens(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var assistantErrorImplementors = []string{"AssistantError", "AssistantEvent"}
+
+func (ec *executionContext) _AssistantError(ctx context.Context, sel ast.SelectionSet, obj *model.AssistantError) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, assistantErrorImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AssistantError")
+		case "message":
+			out.Values[i] = ec._AssistantError_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var assistantTextDeltaImplementors = []string{"AssistantTextDelta", "AssistantEvent"}
+
+func (ec *executionContext) _AssistantTextDelta(ctx context.Context, sel ast.SelectionSet, obj *model.AssistantTextDelta) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, assistantTextDeltaImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AssistantTextDelta")
+		case "text":
+			out.Values[i] = ec._AssistantTextDelta_text(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var assistantToolActivityImplementors = []string{"AssistantToolActivity", "AssistantEvent"}
+
+func (ec *executionContext) _AssistantToolActivity(ctx context.Context, sel ast.SelectionSet, obj *model.AssistantToolActivity) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, assistantToolActivityImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AssistantToolActivity")
+		case "name":
+			out.Values[i] = ec._AssistantToolActivity_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
 
 var categorizedRatingImplementors = []string{"CategorizedRating"}
 
@@ -15495,6 +16095,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		return ec._Subscription_threadEvents(ctx, fields[0])
 	case "inboxEvents":
 		return ec._Subscription_inboxEvents(ctx, fields[0])
+	case "assistantReply":
+		return ec._Subscription_assistantReply(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
@@ -16233,6 +16835,21 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
+func (ec *executionContext) unmarshalNAssistantAskInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐAssistantAskInput(ctx context.Context, v any) (model.AssistantAskInput, error) {
+	res, err := ec.unmarshalInputAssistantAskInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNAssistantEvent2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐAssistantEvent(ctx context.Context, sel ast.SelectionSet, v model.AssistantEvent) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AssistantEvent(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -16823,6 +17440,35 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]string, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNString2string(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalNThreadEvent2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐThreadEvent(ctx context.Context, sel ast.SelectionSet, v model.ThreadEvent) graphql.Marshaler {

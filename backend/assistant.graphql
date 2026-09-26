@@ -1,0 +1,43 @@
+# In-app assistant (Jeeves). Off unless the server sets JEEVES_ENABLED=true.
+# Streaming is a subscription over the existing authenticated WebSocket
+# transport. The question is the subscription's input (no separate mutation),
+# so there's no race between starting a reply and listening for it.
+
+input AssistantAskInput {
+  "The user's question. Max 4096 bytes."
+  message: String!
+  "Where the user is in the app (e.g. \"compare\"). Selects page tools later."
+  page: String
+}
+
+"A batch of answer text. Concatenate in order."
+type AssistantTextDelta {
+  text: String!
+}
+
+"The assistant is running a tool (e.g. reading the app guide)."
+type AssistantToolActivity {
+  name: String!
+}
+
+"Final event on success."
+type AssistantDone {
+  "Why generation stopped: end, max_tokens, refusal, tool_use, other."
+  stop: String!
+  "App-guide entry IDs cited in the answer, e.g. compare.pick-two."
+  citations: [String!]!
+  inputTokens: Int!
+  outputTokens: Int!
+}
+
+"Final event on failure. The message is safe to show the user."
+type AssistantError {
+  message: String!
+}
+
+union AssistantEvent = AssistantTextDelta | AssistantToolActivity | AssistantDone | AssistantError
+
+extend type Subscription {
+  "Ask Jeeves one question; streams events and completes after AssistantDone or AssistantError."
+  assistantReply(input: AssistantAskInput!): AssistantEvent! @auth
+}
