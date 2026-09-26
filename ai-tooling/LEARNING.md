@@ -20,6 +20,7 @@ Confidence: `new` (introduced, not quizzed) → `shaky` → `solid`.
 | Context discipline: small tasks in fresh subagents (vs. % caps) | 2026-09-26 | — | new | |
 | Guide format: concise plain English + scoped loading beats caveman compression | 2026-09-26 | — | new | Measurable later via evals A/B |
 | go:embed is directory-scoped (no `..`); Go `internal/` is subtree-private, one-way deps backend → ai-tooling | 2026-09-26 | 2026-09-26 | shaky | Asked for the answer; C# `internal` analogy given. Re-quiz |
+| Tracer bullets: thin real end-to-end slice first, then widen (≠ prototype, ≠ spike) | 2026-09-26 | — | new | Owner proposed it; applied as Tracer 1 (guide→loop→botler→eval) + Tracer 2 (backend→subscription→sidebar) |
 
 ## Pending (owner asked Claude to keep building without waiting — run these when the owner is back)
 

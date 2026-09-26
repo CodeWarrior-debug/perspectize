@@ -43,5 +43,6 @@ Every ai-tooling spec and plan builds teaching in; it isn't bolted on afterwards
 9. Go over TypeScript/Python/Rust/Mojo; gRPC not now (interface leaves room).
 10. Progressive tool discovery to avoid token bloat: in-app sends per-page tool sets; MCP exposes a small intent-level core + a discovery tool (`find_tools`), uses resources for reference content, treats `tools/list_changed` as an enhancement only. Evals record tool-definition tokens per session.
 11. Milestone is progressive: only the next phase is planned in detail; later phases are goal + scope + exit gate, re-planned from what the previous phase learned.
+12. **Tracer bullets:** build thin, real end-to-end slices before widening any layer. Tracer 1 = compare guide area → loader → Anthropic adapter → agent loop + `read_guide` → `botler chat` → one eval. Tracer 2 = backend imports ai-tooling → one GraphQL subscription → bare dev-flagged sidebar (pulls Bridge risks forward). Guide fan-out (other 8 areas) waits for Tracer 1.
 
 **Open:** `botler` auth (dev-only header vs long-lived Clerk token); first capability; write access; free vs Pro; UI placement.
