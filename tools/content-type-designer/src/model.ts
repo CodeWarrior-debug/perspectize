@@ -1,11 +1,13 @@
 import {
   COLUMNS,
   SAMPLES,
+  SAMPLE_FULL,
   TYPES,
   type Binding,
   type ColumnDef,
   type ContentTypeProfile,
   type SampleCell,
+  type SampleRow,
   type TypeId
 } from './catalog.js';
 
@@ -30,6 +32,35 @@ export interface DraftState {
   seed?: string;
   /** Preview sort, highest priority first. Empty/undefined = unsorted. */
   sort?: SortKey[];
+  /** Which fill state the sample rows show. Undefined = 'usual'. */
+  fullness?: Fullness;
+  /** Row shown in the details / perspective mocks. */
+  focus?: { typeId: string; index: number };
+  /** Text in the Add Content tester. */
+  addInput?: string;
+}
+
+/** full = every binding filled; usual = the sample as recorded; minimum = required fields only. */
+export type Fullness = 'full' | 'usual' | 'minimum';
+
+/**
+ * How one preview cell should be read:
+ * value — real sample data; placeholder — invented to show a "full" row;
+ * allowed-empty — blank, and the binding permits that; missing-required — blank but required.
+ */
+export type CellState = 'value' | 'placeholder' | 'allowed-empty' | 'missing-required';
+
+export interface PreviewCell {
+  state: CellState;
+  cell?: SampleCell;
+}
+
+export interface PreviewRow {
+  typeId: string;
+  /** Index into samplesFor(typeId), or -1 for the SAMPLE_FULL row. */
+  index: number;
+  row: SampleRow;
+  cells: Record<string, PreviewCell>;
 }
 
 export interface SortKey {
@@ -242,9 +273,55 @@ export function sharedWithOthers(state: DraftState): { col: ColumnDef; others: s
 }
 
 /** Sample rows for a type; the draft borrows the rows of the type it was seeded from. */
-export function samplesFor(id: string, state: DraftState): Record<string, SampleCell>[] {
+export function samplesFor(id: string, state: DraftState): SampleRow[] {
   const source = id === state.draft.id ? state.seed : id;
   return (source && SAMPLES[source as TypeId]) || [];
+}
+
+function fullRowFor(id: string, state: DraftState): SampleRow | undefined {
+  const source = id === state.draft.id ? state.seed : id;
+  return source ? SAMPLE_FULL[source as TypeId] : undefined;
+}
+
+/**
+ * Rows for the preview in the requested fill state. Full and minimum show one
+ * row per type (the point is the contrast, not the volume); usual shows every
+ * sample as recorded.
+ */
+export function previewRowsFor(id: string, state: DraftState, fullness: Fullness): PreviewRow[] {
+  const samples = samplesFor(id, state);
+  const full = fullRowFor(id, state);
+  const picked: { index: number; row: SampleRow }[] =
+    fullness === 'usual'
+      ? samples.map((row, index) => ({ index, row }))
+      : fullness === 'full' && full
+        ? [{ index: -1, row: full }]
+        : samples.length
+          ? [{ index: 0, row: samples[0] }]
+          : [];
+
+  return picked.map(({ index, row }) => {
+    const cells: Record<string, PreviewCell> = {};
+    for (const col of COLUMNS) {
+      const binding = bindingFor(col, id, state);
+      if (!binding) continue;
+      const cell = row[col.id];
+      const required = binding.applicability === 'required';
+      if (fullness === 'minimum' && !required) {
+        cells[col.id] = { state: 'allowed-empty' };
+      } else if (cell !== undefined) {
+        // Minimum keeps the required title but drops its image and subtitle —
+        // the thumbnail is never required, so the fallback tile is what shows.
+        const trimmed = fullness === 'minimum' && typeof cell === 'object' ? { text: cell.text } : cell;
+        cells[col.id] = { state: 'value', cell: trimmed };
+      } else if (fullness === 'full') {
+        cells[col.id] = { state: 'placeholder', cell: `‹${binding.label || col.generic}›` };
+      } else {
+        cells[col.id] = { state: required ? 'missing-required' : 'allowed-empty' };
+      }
+    }
+    return { typeId: id, index, row, cells };
+  });
 }
 
 /** Text a preview cell shows for a column the row's type does not bind. */

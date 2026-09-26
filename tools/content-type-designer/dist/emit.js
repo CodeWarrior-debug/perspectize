@@ -68,7 +68,13 @@ export function buildSpec(state) {
                 ? 'MUST relax the global `UNIQUE(url)` constraint — this type can share a URL with another type. Migration required: replace with `UNIQUE(url, content_type)` or a partial index.'
                 : 'Keep the existing global `UNIQUE(url)` constraint.'
         ],
-        ['Thumbnail strategy', d.thumbnail]
+        ['Thumbnail strategy', d.thumbnail],
+        [
+            'Add Content link detection',
+            d.detect && d.detect.hosts.length && d.detect.path
+                ? `Hosts ${d.detect.hosts.join(', ')}; path \`${d.detect.path}\` (group 1 = external id). Checked after the YouTube and Bible Gateway rules, before "any other link is never guessed".`
+                : 'None — this type is never auto-detected; the user picks it from the type menu.'
+        ]
     ]));
     if (d.ingestion === 'api' || d.ingestion === 'scrape') {
         out.push(`Adapter to build: \`backend/internal/adapters/${adapterPackage(d.enumValue)}/\` (\`client.go\`, \`parser.go\`) behind a port interface in \`backend/internal/core/ports/services/\`, wired in \`cmd/server/main.go\`.`);
@@ -118,6 +124,11 @@ export function buildSpec(state) {
             const b = state.decisions[c.id];
             return [`ContentSortBy${c.id[0].toUpperCase()}${c.id.slice(1)}`, `\`${b.path}\``];
         })));
+    }
+    if (d.detailOnly?.length) {
+        out.push('### Details modal only (never grid columns)');
+        out.push('');
+        out.push(table(['Field', 'Value path'], d.detailOnly.map((f) => [f.label, f.path])));
     }
     out.push('## 4. Fields deliberately not carried');
     out.push('');
@@ -251,7 +262,16 @@ export function buildSpec(state) {
         'Resolver: mutation handler in `schema.resolvers.go`.',
         'Frontend: types + queries in `src/lib/queries/content.ts`; mutation hook alongside `useAddVideo.ts`.',
         d.urlRequired ? `Frontend: URL validation for ${d.urlPattern} in \`src/lib/utils/\`.` : 'Frontend: form validation for the manual fields (no URL rule).',
-        `Frontend: \`typeCellRenderer\` icon (${d.icon}) and \`itemCellRenderer\` tile (${d.thumbnail}) in \`src/lib/utils/formatting.ts\`.`,
+        ...(d.detect && d.detect.hosts.length && d.detect.path
+            ? [
+                `Frontend: detection in \`src/lib/utils/detectContentType.ts\` — add \`{ type: '${d.enumValue}' }\` for hosts ${d.detect.hosts.join(', ')} matching \`${d.detect.path}\`, after the Bible Gateway check and before the "any other URL" fallthrough; add unit cases for each example in the tester.`,
+                `Frontend: \`AddContentPopover.svelte\` — chip label, a "${d.label}" option in the type menu, submit wiring, and the popover description text.`
+            ]
+            : []),
+        `Frontend: \`typeCellRenderer\` icon (${d.icon}) in \`src/lib/utils/formatting.ts\`; Item cell tile (${d.thumbnail}) in \`src/lib/utils/activityItemCellRenderer.ts\`.`,
+        ...(d.detailOnly?.length
+            ? [`Frontend: \`ActivityDetailsModal.svelte\` — a ${d.label} branch with the bound fields as tiles and ${d.detailOnly.map((f) => f.label).join(', ')} in a details list.`]
+            : []),
         `Frontend: column defs + tooltips in \`ActivityTable.svelte\` per section 5, with the alias swap from the per-type header table.`,
         'Tests: domain enum, service create paths, resolver mutation + filter-by-type, formatting renderers, query definitions.',
         'Verify: `go build ./...`, `go test ./...`, `pnpm run test:run`.'

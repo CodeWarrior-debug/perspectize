@@ -66,6 +66,23 @@ export interface ContentTypeProfile {
   /** Types where the same URL may legitimately exist under another type. */
   sharesUrlSpace: boolean;
   thumbnail: string;
+  /**
+   * How the Add Content card recognises a pasted link as this type. Checked
+   * after the app's built-in rules (YouTube, Bible Gateway) and before the
+   * "any other URL is never guessed" fallthrough in detectContentType.ts.
+   */
+  detect?: DetectRule;
+  /** Fields shown only in the details modal — never grid columns. */
+  detailOnly?: { label: string; path: string }[];
+}
+
+export interface DetectRule {
+  /** Exact hostnames accepted (lowercase). */
+  hosts: string[];
+  /** RegExp source matched against the URL pathname; capture group 1 is the external id. */
+  path: string;
+  /** Inputs offered as one-click examples in the Add Content tester. */
+  examples: string[];
 }
 
 export interface Binding {
@@ -342,7 +359,22 @@ export const TYPES: ContentTypeProfile[] = [
     accent: '#8E3B46',
     sharesUrlSpace: false,
     thumbnail:
-      'primaryImageSmall (images.metmuseum.org web-large JPEG, CC0). When blank (isPublicDomain = false, e.g. Monet 437127) fall back to Wikidata P18 → commons.wikimedia.org/wiki/Special:FilePath/<file>?width=400 with its Commons attribution, else a palette icon tile. Click opens url (objectURL)'
+      'primaryImageSmall (images.metmuseum.org web-large JPEG, CC0). When blank (isPublicDomain = false, e.g. Monet 437127) fall back to Wikidata P18 → commons.wikimedia.org/wiki/Special:FilePath/<file>?width=400 with its Commons attribution, else a palette icon tile. Click opens url (objectURL)',
+    detect: {
+      hosts: ['metmuseum.org', 'www.metmuseum.org'],
+      path: '^/art/collection/search/(\\d+)/?$',
+      examples: [
+        'https://www.metmuseum.org/art/collection/search/436535',
+        'https://www.metmuseum.org/art/collection/search/437127?ft=monet',
+        'https://www.metmuseum.org/art/collection/search?q=vermeer'
+      ]
+    },
+    detailOnly: [
+      { label: 'Artist bio', path: "response->>'artistDisplayBio'" },
+      { label: 'Dimensions', path: "response->>'dimensions'" },
+      { label: 'Credit line', path: "response->>'creditLine'" },
+      { label: 'Image rights', path: "response->>'isPublicDomain' (+ Commons attribution when the image is the fallback)" }
+    ]
   }
 ];
 
@@ -887,14 +919,17 @@ export const GROUP_LABELS: Record<ColumnDef['group'], string> = {
  * A preview cell: plain text, or text with a muted subtitle line (e.g. a
  * passage's reference under its user-set title).
  */
-export type SampleCell = string | { text: string; sub?: string };
+export type SampleCell = string | { text: string; sub?: string; img?: string; href?: string };
+
+/** A sample row: column id -> cell, plus optional `detail:<label>` keys for modal-only fields. */
+export type SampleRow = Record<string, SampleCell>;
 
 /**
  * Illustrative rows rendered under the header strip so a column decision can
  * be judged on real-looking values, not just its header. Keyed by column id;
  * a column a row does not mention renders the column's gap fallback.
  */
-export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
+export const SAMPLES: Partial<Record<TypeId, SampleRow[]>> = {
   // Illustrative only — made-up channels and figures, there so a mixed
   // YouTube + Bible passage selection has something to sort against.
   youtube: [
@@ -1040,29 +1075,37 @@ export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
   // painting with no open-access image (Monet 437127 → Commons fallback).
   painting: [
     {
-      item: { text: 'Wheat Field with Cypresses', sub: 'met:436535' },
+      item: { text: 'Wheat Field with Cypresses', sub: 'met:436535', img: 'https://images.metmuseum.org/CRDImages/ep/web-large/DP-42549-001.jpg', href: 'https://www.metmuseum.org/art/collection/search/436535' },
       genre: 'Oil on canvas',
       creator: 'Vincent van Gogh',
       venue: 'The Met · European Paintings',
       date: '1889',
       identifier: 'met:436535 · Q18689458',
+      'detail:Artist bio': 'Dutch, Zundert 1853–1890 Auvers-sur-Oise',
+      'detail:Dimensions': '28 13/16 × 36 3/4 in. (73.2 × 93.4 cm)',
+      'detail:Credit line': 'Purchase, The Annenberg Foundation Gift, 1993',
+      'detail:Image rights': 'Public domain (CC0)',
       tags: 'Landscapes, Cypresses, Summer',
       category: 'Post-Impressionism',
       createdAt: '2026-09-26'
     },
     {
-      item: { text: 'Young Woman with a Water Pitcher', sub: 'met:437881' },
+      item: { text: 'Young Woman with a Water Pitcher', sub: 'met:437881', img: 'https://images.metmuseum.org/CRDImages/ep/web-large/DP353257.jpg', href: 'https://www.metmuseum.org/art/collection/search/437881' },
       genre: 'Oil on canvas',
       creator: 'Johannes Vermeer',
       venue: 'The Met · European Paintings',
       date: 'ca. 1662',
       identifier: 'met:437881 · Q386453',
+      'detail:Artist bio': 'Dutch, Delft 1632–1675 Delft',
+      'detail:Dimensions': '18 x 16 in. (45.7 x 40.6 cm)',
+      'detail:Credit line': 'Marquand Collection, Gift of Henry G. Marquand, 1889',
+      'detail:Image rights': 'Public domain (CC0)',
       tags: 'Interiors, Women, Maps, Pitchers',
       category: 'Dutch Golden Age',
       createdAt: '2026-09-26'
     },
     {
-      item: { text: 'Washington Crossing the Delaware', sub: 'met:11417' },
+      item: { text: 'Washington Crossing the Delaware', sub: 'met:11417', img: 'https://images.metmuseum.org/CRDImages/ad/web-large/DP215410.jpg', href: 'https://www.metmuseum.org/art/collection/search/11417' },
       genre: 'Oil on canvas',
       creator: 'Emanuel Leutze',
       venue: 'The Met · The American Wing',
@@ -1073,7 +1116,7 @@ export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
       createdAt: '2026-09-26'
     },
     {
-      item: { text: 'The Harvesters', sub: 'met:435809' },
+      item: { text: 'The Harvesters', sub: 'met:435809', img: 'https://images.metmuseum.org/CRDImages/ep/web-large/DP119115.jpg', href: 'https://www.metmuseum.org/art/collection/search/435809' },
       genre: 'Oil on oak',
       creator: 'Pieter Bruegel the Elder',
       venue: 'The Met · European Paintings',
@@ -1083,15 +1126,49 @@ export const SAMPLES: Partial<Record<TypeId, Record<string, SampleCell>[]>> = {
       createdAt: '2026-09-26'
     },
     {
-      item: { text: 'Bridge over a Pond of Water Lilies', sub: 'met:437127 · image via Commons' },
+      item: { text: 'Bridge over a Pond of Water Lilies', sub: 'met:437127 · image via Commons', img: 'https://commons.wikimedia.org/wiki/Special:FilePath/Bridge%20Over%20a%20Pond%20of%20Water%20Lilies%2C%20Claude%20Monet%201899.jpg?width=400', href: 'https://www.metmuseum.org/art/collection/search/437127' },
       genre: 'Oil on canvas',
       creator: 'Claude Monet',
       venue: 'The Met · European Paintings',
       date: '1899',
       identifier: 'met:437127 · Q19905213',
+      'detail:Dimensions': '36 1/2 x 29 in. (92.7 x 73.7 cm)',
+      'detail:Image rights': 'Not open access at the Met — image from Wikimedia Commons (public domain)',
       tags: 'Bridges, Ponds, Water Lilies',
       category: 'Impressionism',
       createdAt: '2026-09-26'
     }
   ]
+};
+
+/**
+ * One fully populated row per type — every binding the type declares has a
+ * value — for the preview's "Full" state. Types without one get labelled
+ * placeholders for the missing cells instead.
+ */
+export const SAMPLE_FULL: Partial<Record<TypeId, SampleRow>> = {
+  painting: {
+    item: {
+      text: 'Young Woman with a Water Pitcher',
+      sub: 'met:437881',
+      img: 'https://images.metmuseum.org/CRDImages/ep/web-large/DP353257.jpg',
+      href: 'https://www.metmuseum.org/art/collection/search/437881'
+    },
+    genre: 'Oil on canvas',
+    creator: { text: 'Johannes Vermeer', sub: 'Dutch, Delft 1632–1675 Delft' },
+    venue: { text: 'The Met', sub: 'European Paintings' },
+    date: 'ca. 1662',
+    rating: '★★★★★',
+    status: 'Seen in person',
+    identifier: 'met:437881 · Q386453',
+    tags: 'Interiors, Women, Maps, Pitchers',
+    category: 'Dutch Golden Age',
+    createdAt: '2026-09-26',
+    updatedAt: '2026-09-26',
+    id: '4812',
+    'detail:Artist bio': 'Dutch, Delft 1632–1675 Delft',
+    'detail:Dimensions': '18 x 16 in. (45.7 x 40.6 cm)',
+    'detail:Credit line': 'Marquand Collection, Gift of Henry G. Marquand, 1889',
+    'detail:Image rights': 'Public domain (CC0)'
+  }
 };

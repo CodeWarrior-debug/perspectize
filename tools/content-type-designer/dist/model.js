@@ -1,4 +1,4 @@
-import { COLUMNS, SAMPLES, TYPES } from './catalog.js';
+import { COLUMNS, SAMPLES, SAMPLE_FULL, TYPES } from './catalog.js';
 export const ALL_TYPE_IDS = TYPES.map((t) => t.id);
 export function typeLabel(id, draft) {
     if (id === draft.id)
@@ -159,6 +159,52 @@ export function sharedWithOthers(state) {
 export function samplesFor(id, state) {
     const source = id === state.draft.id ? state.seed : id;
     return (source && SAMPLES[source]) || [];
+}
+function fullRowFor(id, state) {
+    const source = id === state.draft.id ? state.seed : id;
+    return source ? SAMPLE_FULL[source] : undefined;
+}
+/**
+ * Rows for the preview in the requested fill state. Full and minimum show one
+ * row per type (the point is the contrast, not the volume); usual shows every
+ * sample as recorded.
+ */
+export function previewRowsFor(id, state, fullness) {
+    const samples = samplesFor(id, state);
+    const full = fullRowFor(id, state);
+    const picked = fullness === 'usual'
+        ? samples.map((row, index) => ({ index, row }))
+        : fullness === 'full' && full
+            ? [{ index: -1, row: full }]
+            : samples.length
+                ? [{ index: 0, row: samples[0] }]
+                : [];
+    return picked.map(({ index, row }) => {
+        const cells = {};
+        for (const col of COLUMNS) {
+            const binding = bindingFor(col, id, state);
+            if (!binding)
+                continue;
+            const cell = row[col.id];
+            const required = binding.applicability === 'required';
+            if (fullness === 'minimum' && !required) {
+                cells[col.id] = { state: 'allowed-empty' };
+            }
+            else if (cell !== undefined) {
+                // Minimum keeps the required title but drops its image and subtitle —
+                // the thumbnail is never required, so the fallback tile is what shows.
+                const trimmed = fullness === 'minimum' && typeof cell === 'object' ? { text: cell.text } : cell;
+                cells[col.id] = { state: 'value', cell: trimmed };
+            }
+            else if (fullness === 'full') {
+                cells[col.id] = { state: 'placeholder', cell: `‹${binding.label || col.generic}›` };
+            }
+            else {
+                cells[col.id] = { state: required ? 'missing-required' : 'allowed-empty' };
+            }
+        }
+        return { typeId: id, index, row, cells };
+    });
 }
 /** Text a preview cell shows for a column the row's type does not bind. */
 export function gapText(col) {

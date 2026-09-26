@@ -64,6 +64,36 @@ Given a selection of types, the preview flags:
   type is filtered in.
 - **Header collisions** and **column crowding** (>10 defaults).
 
+## What a row looks like in the app
+
+Sections 4–6 show the new type the way a user would meet it:
+
+- **Row fill** (section 4): **Full**, **Usual** or **Minimum**. Full fills
+  every field the type declares, using a hand-written complete row
+  (`SAMPLE_FULL`) or labelled placeholders when a type has none. Usual shows
+  the samples as recorded. Minimum keeps only required fields. Each empty cell
+  shows whether it is allowed to be empty (hatched) or is required and missing
+  (red).
+- **Thumbnails**: the Item cell draws the thumbnail at the app's 40×32 size.
+  Clicking it opens the source page, and clicking the title opens the
+  mockups below. The images are embedded as data URIs by
+  `scripts/build_thumbs.py`, which writes `src/thumbs.ts`, so the preview
+  works offline and inside a claude.ai artifact (its CSP blocks remote
+  images). Re-run it after adding a sample `img`.
+- **Row details & perspective** (section 5): mockups of
+  `ActivityDetailsModal.svelte` and `PerspectivePopover.svelte`, built from
+  the bindings, the type's `detailOnly` fields and the focused row. They follow
+  the row fill state, so Minimum shows the sparsest details view.
+- **Add Content card** (section 6): a live input that runs `src/detect.ts`.
+  That file mirrors `frontend/src/lib/utils/detectContentType.ts` step by step
+  and inserts the drafted type's link rule (section 2: hosts plus a path
+  pattern) where the app would check it. The typed-Bible-reference step is an
+  approximation of the app's parser.
+
+These are illustrations drawn with the app's colour tokens, not the real
+Svelte components, so recheck them against the app when those components
+change.
+
 ## Seeded types
 
 Fourteen deliberately dissimilar types ship as seed data, so the catalog is not
@@ -113,4 +143,6 @@ Two deterministic documents, copyable or downloadable:
 | `src/catalog.ts` | The 14 seeded type profiles, the generic column catalog with per-type bindings, and sample rows |
 | `src/model.ts` | State shape, visibility resolution, gap analysis |
 | `src/emit.ts` | Deterministic markdown generation |
+| `src/detect.ts` | Mirror of the app's Add Content link detection, plus the draft's rule |
+| `src/thumbs.ts` | Generated inline thumbnails (`scripts/build_thumbs.py`) |
 | `src/main.ts` | Form rendering and localStorage persistence |
