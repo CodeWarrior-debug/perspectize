@@ -153,6 +153,20 @@ func contentDomainToModel(c *domain.Content) *ContentModel {
 	}
 }
 
+// hermeneuticApproachModelToDomain converts a GORM HermeneuticApproachModel to domain.HermeneuticApproach
+func hermeneuticApproachModelToDomain(m *HermeneuticApproachModel) *domain.HermeneuticApproach {
+	if m == nil {
+		return nil
+	}
+	return &domain.HermeneuticApproach{
+		ID:           m.ID,
+		Code:         m.Code,
+		Name:         m.Name,
+		Description:  m.Description,
+		DisplayOrder: m.DisplayOrder,
+	}
+}
+
 // perspectiveModelToDomain converts a GORM PerspectiveModel to domain.Perspective
 func perspectiveModelToDomain(m *PerspectiveModel) *domain.Perspective {
 	if m == nil {
@@ -242,6 +256,10 @@ func perspectiveModelToDomain(m *PerspectiveModel) *domain.Perspective {
 	// Review: direct copy
 	p.Review = m.Review
 
+	// HermeneuticApproachID / HermeneuticCustomText: direct copy
+	p.HermeneuticApproachID = m.HermeneuticApproachID
+	p.HermeneuticCustomText = m.HermeneuticCustomText
+
 	return p
 }
 
@@ -328,6 +346,10 @@ func perspectiveDomainToModel(p *domain.Perspective) *PerspectiveModel {
 
 	// Review: direct copy
 	m.Review = p.Review
+
+	// HermeneuticApproachID / HermeneuticCustomText: direct copy
+	m.HermeneuticApproachID = p.HermeneuticApproachID
+	m.HermeneuticCustomText = p.HermeneuticCustomText
 
 	return m
 }

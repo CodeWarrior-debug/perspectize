@@ -83,6 +83,7 @@
 	let popoverOpen = $state(false);
 	let popoverContentId = $state<number | null>(null);
 	let popoverContentName = $state('');
+	let popoverContentType = $state<string | null>(null);
 	let popoverExistingPerspective = $state<PerspectiveItem | null>(null);
 
 	// Popover state for Category column
@@ -120,16 +121,17 @@
 	 * Opens the perspective create/edit sheet for a content row. Shared by the AG Grid
 	 * Perspectize column (desktop) and the mobile card list, which has no grid column.
 	 */
-	function openPerspective(contentId: string, name: string) {
+	function openPerspective(contentId: string, name: string, contentType?: string | null) {
 		popoverContentId = parseInt(contentId, 10);
 		popoverContentName = name;
+		popoverContentType = contentType ?? null;
 		popoverExistingPerspective = perspectivesByContentId.get(contentId) ?? null;
 		popoverOpen = true;
 	}
 
 	function handleAddPerspectiveFromCard(contentId: string) {
 		const row = rowData.find((item) => String(item.id) === contentId);
-		openPerspective(contentId, row?.name ?? '');
+		openPerspective(contentId, row?.name ?? '', row?.contentType);
 	}
 
 	// Mobile card-list breakpoint (< 860px) — replaces the AG Grid entirely, per design handoff.
@@ -740,7 +742,7 @@
 			if (!event.data) return;
 
 			if (event.colDef.colId === 'perspectize') {
-				openPerspective(String(event.data.id), event.data.name);
+				openPerspective(String(event.data.id), event.data.name, event.data.contentType);
 			} else if (event.colDef.colId === 'category') {
 				hover.close(); // don't leave the hover copy-popover open under the typeahead
 				const rect =
@@ -1152,6 +1154,7 @@
 		<PerspectivePopover
 			contentId={popoverContentId}
 			contentName={popoverContentName}
+			contentType={popoverContentType}
 			existingPerspective={popoverExistingPerspective}
 			userId={currentUserId ?? 0}
 			bind:open={popoverOpen}

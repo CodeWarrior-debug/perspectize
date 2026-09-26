@@ -140,6 +140,10 @@ type CreatePerspectiveInput struct {
 	RelatedPerspectiveIDs []int                     `json:"relatedPerspectiveIDs,omitempty"`
 	CustomFields          map[string]any            `json:"customFields,omitempty"`
 	Review                *string                   `json:"review,omitempty"`
+	// Mutually exclusive with hermeneuticCustomText.
+	HermeneuticApproachID *int `json:"hermeneuticApproachID,omitempty"`
+	// Mutually exclusive with hermeneuticApproachID.
+	HermeneuticCustomText *string `json:"hermeneuticCustomText,omitempty"`
 }
 
 type CreateUserInput struct {
@@ -159,6 +163,13 @@ type FeelingInput struct {
 	Label     *string `json:"label,omitempty"`
 	Intensity int     `json:"intensity"`
 	Note      *string `json:"note,omitempty"`
+}
+
+type HermeneuticApproach struct {
+	ID          string  `json:"id"`
+	Code        string  `json:"code"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
 }
 
 type InboxEvent struct {
@@ -289,6 +300,8 @@ type Perspective struct {
 	RelatedPerspectiveIDs []int                `json:"relatedPerspectiveIDs,omitempty"`
 	CustomFields          map[string]any       `json:"customFields,omitempty"`
 	Review                *string              `json:"review,omitempty"`
+	HermeneuticApproachID *string              `json:"hermeneuticApproachID,omitempty"`
+	HermeneuticCustomText *string              `json:"hermeneuticCustomText,omitempty"`
 	CreatedAt             string               `json:"createdAt"`
 	UpdatedAt             string               `json:"updatedAt"`
 }
@@ -387,6 +400,10 @@ type UpdatePerspectiveInput struct {
 	CustomFields graphql.Omittable[map[string]any] `json:"customFields,omitempty"`
 	// Omit = unchanged; null = clear.
 	Review graphql.Omittable[*string] `json:"review,omitempty"`
+	// Omit = unchanged. Setting this clears hermeneuticCustomText; mutually exclusive with it.
+	HermeneuticApproachID *int `json:"hermeneuticApproachID,omitempty"`
+	// Omit = unchanged. Setting this clears hermeneuticApproachID; mutually exclusive with it.
+	HermeneuticCustomText *string `json:"hermeneuticCustomText,omitempty"`
 }
 
 type UpdateUserInput struct {

@@ -137,6 +137,19 @@ func parseStatCount(value, field string, contentID int) *int {
 }
 
 // categoryDomainToModel converts a domain Category to a GraphQL model Category
+// hermeneuticApproachDomainToModel converts a domain HermeneuticApproach to a GraphQL model HermeneuticApproach
+func hermeneuticApproachDomainToModel(a *domain.HermeneuticApproach) *model.HermeneuticApproach {
+	if a == nil {
+		return nil
+	}
+	return &model.HermeneuticApproach{
+		ID:          strconv.Itoa(a.ID),
+		Code:        a.Code,
+		Name:        a.Name,
+		Description: a.Description,
+	}
+}
+
 func categoryDomainToModel(c *domain.Category) *model.Category {
 	if c == nil {
 		return nil
@@ -171,6 +184,12 @@ func perspectiveDomainToModel(p *domain.Perspective) *model.Perspective {
 		CreatedAt:    p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:    p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
+
+	if p.HermeneuticApproachID != nil {
+		approachID := strconv.Itoa(*p.HermeneuticApproachID)
+		m.HermeneuticApproachID = &approachID
+	}
+	m.HermeneuticCustomText = p.HermeneuticCustomText
 
 	if p.ContentID != nil {
 		contentID := strconv.Itoa(*p.ContentID)
@@ -440,6 +459,8 @@ func modelToCreatePerspectiveInput(userID int, input model.CreatePerspectiveInpu
 		PrimaryPerspectiveID:  input.PrimaryPerspectiveID,
 		RelatedPerspectiveIDs: input.RelatedPerspectiveIDs,
 		Review:                input.Review,
+		HermeneuticApproachID: input.HermeneuticApproachID,
+		HermeneuticCustomText: input.HermeneuticCustomText,
 	}
 
 	if input.CustomFields != nil {
@@ -478,6 +499,8 @@ func modelToUpdatePerspectiveInput(input model.UpdatePerspectiveInput) portservi
 		CategorizedRatings:    categorizedRatingInputsToDomain(input.CategorizedRatings),
 		PrimaryPerspectiveID:  input.PrimaryPerspectiveID,
 		RelatedPerspectiveIDs: input.RelatedPerspectiveIDs,
+		HermeneuticApproachID: input.HermeneuticApproachID,
+		HermeneuticCustomText: input.HermeneuticCustomText,
 	}
 
 	serviceInput.Quality, serviceInput.ClearQuality = omittablePtr(input.Quality)

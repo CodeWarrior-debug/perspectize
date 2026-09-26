@@ -27,6 +27,8 @@ type CreatePerspectiveInput struct {
 	RelatedPerspectiveIDs []int
 	CustomFields          json.RawMessage
 	Review                *string
+	HermeneuticApproachID *int
+	HermeneuticCustomText *string
 }
 
 // UpdatePerspectiveInput contains the data needed to update a perspective
@@ -50,6 +52,8 @@ type UpdatePerspectiveInput struct {
 	RelatedPerspectiveIDs []int
 	CustomFields          json.RawMessage
 	Review                *string
+	HermeneuticApproachID *int
+	HermeneuticCustomText *string
 
 	// Clear* requests that the matching field be reset to "no value". Set only
 	// by the GraphQL adapter (modelToUpdatePerspectiveInput in helpers.go) when

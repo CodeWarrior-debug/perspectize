@@ -103,7 +103,7 @@ func newServer(t *testing.T) *testServer {
 	t.Cleanup(cancelListener)
 	t.Cleanup(func() { ts.cleanupRows(t) })
 
-	resolver := resolvers.NewResolver(nil, userService, nil, nil, ts.messaging, ts.hub, presence)
+	resolver := resolvers.NewResolver(nil, userService, nil, nil, nil, ts.messaging, ts.hub, presence)
 	directiveRoot := directives.NewDirectiveRoot(nil, nil)
 	gqlConfig := generated.Config{
 		Resolvers: resolver,

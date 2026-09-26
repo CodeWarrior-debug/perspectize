@@ -266,6 +266,7 @@
 		<PerspectivePopover
 			contentId={parseInt(perspectiveTarget.id, 10)}
 			contentName={perspectiveTarget.name}
+			contentType={perspectiveTarget.contentType}
 			existingPerspective={perspectivesByContentId.get(perspectiveTarget.id) ?? null}
 			{userId}
 			bind:open={perspectiveOpen}

@@ -77,6 +77,15 @@ type Perspective struct {
 	CustomFields          json.RawMessage // JSONB custom fields
 	Review                *string         // review text (freeform)
 
+	// HermeneuticApproachID is a choice from the hermeneutic_approach lookup
+	// table (see domain.HermeneuticApproach), and HermeneuticCustomText is the
+	// "in my own words" free-text alternative. At most one is set -- enforced
+	// by PerspectiveService, not a DB constraint. Meaningful only for a
+	// perspective on BIBLE_PASSAGE content; the frontend gates the field on
+	// content type, but nothing here restricts it further.
+	HermeneuticApproachID *int
+	HermeneuticCustomText *string
+
 	// Timestamps
 	CreatedAt time.Time
 	UpdatedAt time.Time

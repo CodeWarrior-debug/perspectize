@@ -16,6 +16,10 @@
 		Button,
 		Label,
 		Switch,
+		Select,
+		SelectTrigger,
+		SelectContent,
+		SelectItem,
 	} from '$lib/components/shadcn';
 	import RatingInput from '$lib/components/RatingInput.svelte';
 	import Thumbs from '$lib/components/Thumbs.svelte';
@@ -27,6 +31,7 @@
 	import type { FieldDef } from '$lib/components/AddFieldSearch.svelte';
 	import { useCreatePerspective } from '$lib/queries/perspectives/useCreatePerspective';
 	import { useUpdatePerspective } from '$lib/queries/perspectives/useUpdatePerspective';
+	import { useHermeneuticApproaches } from '$lib/queries/perspectives/useHermeneuticApproaches';
 	import type { PerspectiveItem } from '$lib/queries/perspectives';
 	import type { Feeling } from '$lib/components/FeelWheel.svelte';
 	import type { Component } from 'svelte';
@@ -43,6 +48,7 @@
 	let {
 		contentId,
 		contentName,
+		contentType = null,
 		existingPerspective = null,
 		userId,
 		open = $bindable(true),
@@ -51,6 +57,8 @@
 	}: {
 		contentId: number;
 		contentName: string;
+		/** Gates the hermeneutic field, shown only for BIBLE_PASSAGE content. */
+		contentType?: string | null;
 		existingPerspective?: PerspectiveItem | null;
 		userId: number;
 		open?: boolean;
@@ -60,6 +68,16 @@
 	} = $props();
 
 	const isEditMode = $derived(existingPerspective !== null);
+	const isBiblePassage = $derived(contentType === 'BIBLE_PASSAGE');
+
+	// Hermeneutic field (BIBLE_PASSAGE only): either a choice from the DB-backed
+	// lookup list, or a free-text "in my own words" answer -- never both (see
+	// backend PerspectiveService.validateHermeneutic).
+	const hermeneuticApproachesQuery = useHermeneuticApproaches();
+	const hermeneuticApproaches = $derived(hermeneuticApproachesQuery.data?.hermeneuticApproaches ?? []);
+	let hermeneuticApproachId = $state<number | null>(null);
+	let hermeneuticCustomText = $state('');
+	let hermeneuticMode = $state<'choice' | 'custom'>('choice');
 
 	// --- Core rating fields (backend-mapped) ---
 	let quality = $state<number | null>(null);
@@ -221,6 +239,10 @@
 			activeFields = [...DEFAULT_FIELDS];
 			dynamicValues = {};
 		}
+		const approachId = existingPerspective?.hermeneuticApproachID;
+		hermeneuticApproachId = approachId != null ? parseInt(approachId, 10) : null;
+		hermeneuticCustomText = existingPerspective?.hermeneuticCustomText ?? '';
+		hermeneuticMode = hermeneuticCustomText ? 'custom' : 'choice';
 	});
 
 	const isMobile = new MediaQuery('(max-width: 639px)');
@@ -278,6 +300,19 @@
 		return hasReviewContent(comment) ? sanitizeHtml(comment) : undefined;
 	}
 
+	// Hermeneutic field is BIBLE_PASSAGE-only and the two sub-fields are mutually
+	// exclusive: whichever mode is active wins, the other is sent as unset.
+	function getHermeneutic(): { hermeneuticApproachID?: number; hermeneuticCustomText?: string } {
+		if (!isBiblePassage) return {};
+		if (hermeneuticMode === 'choice' && hermeneuticApproachId != null) {
+			return { hermeneuticApproachID: hermeneuticApproachId };
+		}
+		if (hermeneuticMode === 'custom' && hermeneuticCustomText.trim()) {
+			return { hermeneuticCustomText: hermeneuticCustomText.trim() };
+		}
+		return {};
+	}
+
 	function handleSubmit(e: Event) {
 		e.preventDefault();
 
@@ -317,6 +352,7 @@
 					customFields: buildCustomFields() ?? null,
 					feelings: feelingsPayload ?? null,
 					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
+					...getHermeneutic(),
 				},
 				{
 					onSuccess: () => {
@@ -343,6 +379,7 @@
 					customFields: buildCustomFields(),
 					feelings: feelingsPayload,
 					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
+					...getHermeneutic(),
 				},
 				{
 					onSuccess: () => {
@@ -531,6 +568,60 @@
 				</div>
 			{:else}
 				<div class="text-center text-sm text-muted-foreground py-4">Loading feel-wheel…</div>
+			{/if}
+
+			{#if isBiblePassage}
+				<div class="flex flex-col gap-2 rounded-md border border-border px-3 py-2.5">
+					<div class="flex items-center justify-between">
+						<Label for="hermeneutic-approach">Hermeneutic</Label>
+						<div class="flex rounded-md border border-border p-0.5 text-xs">
+							<button
+								type="button"
+								class={[
+									'rounded px-2 py-1',
+									hermeneuticMode === 'choice' ? 'bg-accent font-medium' : 'text-muted-foreground',
+								]}
+								onclick={() => (hermeneuticMode = 'choice')}
+							>
+								Choose
+							</button>
+							<button
+								type="button"
+								class={[
+									'rounded px-2 py-1',
+									hermeneuticMode === 'custom' ? 'bg-accent font-medium' : 'text-muted-foreground',
+								]}
+								onclick={() => (hermeneuticMode = 'custom')}
+							>
+								In my own words
+							</button>
+						</div>
+					</div>
+					{#if hermeneuticMode === 'choice'}
+						<Select
+							type="single"
+							value={hermeneuticApproachId != null ? String(hermeneuticApproachId) : ''}
+							onValueChange={(v) => (hermeneuticApproachId = v ? parseInt(v, 10) : null)}
+						>
+							<SelectTrigger id="hermeneutic-approach" class="w-full" aria-label="Hermeneutic approach">
+								{hermeneuticApproaches.find((a) => a.id === String(hermeneuticApproachId))?.name ??
+									'Select an approach'}
+							</SelectTrigger>
+							<SelectContent>
+								{#each hermeneuticApproaches as approach (approach.id)}
+									<SelectItem value={approach.id}>{approach.name}</SelectItem>
+								{/each}
+							</SelectContent>
+						</Select>
+					{:else}
+						<textarea
+							id="hermeneutic-approach"
+							bind:value={hermeneuticCustomText}
+							placeholder="Describe your interpretive approach in your own words"
+							rows="3"
+							class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm resize-none"></textarea>
+					{/if}
+				</div>
 			{/if}
 
 			<div class="flex items-center justify-between rounded-md border border-border px-3 py-2">

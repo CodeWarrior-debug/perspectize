@@ -34,8 +34,21 @@ export interface PerspectiveItem {
 	relatedPerspectiveIDs: number[] | null;
 	customFields: Record<string, unknown> | null;
 	feelings: FeelingEntry[] | null;
+	hermeneuticApproachID?: string | null;
+	hermeneuticCustomText?: string | null;
 	createdAt: string;
 	updatedAt: string;
+}
+
+export interface HermeneuticApproach {
+	id: string;
+	code: string;
+	name: string;
+	description: string | null;
+}
+
+export interface ListHermeneuticApproachesResponse {
+	hermeneuticApproaches: HermeneuticApproach[];
 }
 
 export interface CreatePerspectiveResponse {
@@ -74,8 +87,21 @@ const PERSPECTIVE_FIELDS = gql`
 			intensity
 			note
 		}
+		hermeneuticApproachID
+		hermeneuticCustomText
 		createdAt
 		updatedAt
+	}
+`;
+
+export const LIST_HERMENEUTIC_APPROACHES = gql`
+	query ListHermeneuticApproaches {
+		hermeneuticApproaches {
+			id
+			code
+			name
+			description
+		}
 	}
 `;
 

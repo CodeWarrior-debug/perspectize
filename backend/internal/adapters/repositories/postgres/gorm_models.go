@@ -39,6 +39,21 @@ func (CategoryModel) TableName() string {
 	return "categories"
 }
 
+// HermeneuticApproachModel is the GORM persistence model for the
+// hermeneutic_approach lookup table.
+type HermeneuticApproachModel struct {
+	ID           int     `gorm:"primaryKey"`
+	Code         string  `gorm:"column:code;not null;uniqueIndex"`
+	Name         string  `gorm:"column:name;not null"`
+	Description  *string `gorm:"column:description"`
+	DisplayOrder int     `gorm:"column:display_order;not null;default:0"`
+}
+
+// TableName returns the table name for HermeneuticApproachModel
+func (HermeneuticApproachModel) TableName() string {
+	return "hermeneutic_approach"
+}
+
 // ContentModel is the GORM persistence model for content table
 type ContentModel struct {
 	ID                int             `gorm:"primaryKey;autoIncrement"`
@@ -94,6 +109,8 @@ type PerspectiveModel struct {
 	RelatedPerspectiveIDs Int64Array      `gorm:"type:integer[];column:related_perspective_ids"`
 	CustomFields          json.RawMessage `gorm:"type:jsonb;column:custom_fields;default:'{}'"`
 	Review                *string         `gorm:"column:review"`
+	HermeneuticApproachID *int            `gorm:"column:hermeneutic_approach_id"`
+	HermeneuticCustomText *string         `gorm:"column:hermeneutic_custom_text"`
 	CreatedAt             time.Time       `gorm:"autoCreateTime"`
 	UpdatedAt             time.Time       `gorm:"autoUpdateTime"`
 }

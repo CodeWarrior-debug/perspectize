@@ -48,6 +48,10 @@ export const queryKeys = {
 		search: (query: string) => [...queryKeys.categories.all(), 'search', query] as const,
 	},
 
+	hermeneuticApproaches: {
+		all: () => [...queryKeys.all, 'hermeneuticApproaches'] as const,
+	},
+
 	perspectives: {
 		all: () => [...queryKeys.all, 'perspectives'] as const,
 		// Umbrella over EVERY perspective list, regardless of row shape. Safe for

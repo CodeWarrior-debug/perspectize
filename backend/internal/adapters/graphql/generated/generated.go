@@ -101,6 +101,13 @@ type ComplexityRoot struct {
 		Note      func(childComplexity int) int
 	}
 
+	HermeneuticApproach struct {
+		Code        func(childComplexity int) int
+		Description func(childComplexity int) int
+		ID          func(childComplexity int) int
+		Name        func(childComplexity int) int
+	}
+
 	InboxEvent struct {
 		LastMessageAt func(childComplexity int) int
 		LatestSeq     func(childComplexity int) int
@@ -256,6 +263,8 @@ type ComplexityRoot struct {
 		CustomFields          func(childComplexity int) int
 		Description           func(childComplexity int) int
 		Feelings              func(childComplexity int) int
+		HermeneuticApproachID func(childComplexity int) int
+		HermeneuticCustomText func(childComplexity int) int
 		ID                    func(childComplexity int) int
 		Importance            func(childComplexity int) int
 		Labels                func(childComplexity int) int
@@ -279,20 +288,21 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Content            func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, sorts []*model.ContentSortInput, includeTotalCount *bool, filter *model.ContentFilter) int
-		ContentByID        func(childComplexity int, id string) int
-		Me                 func(childComplexity int) int
-		MessageThread      func(childComplexity int, id string) int
-		MessageThreads     func(childComplexity int, first *int, before *string) int
-		PassageInterlinear func(childComplexity int, startVerseID int, endVerseID int) int
-		PassageText        func(childComplexity int, startVerseID int, endVerseID int) int
-		PerspectiveByID    func(childComplexity int, id string) int
-		Perspectives       func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) int
-		ThreadMessages     func(childComplexity int, threadID string, first *int, before *int) int
-		UserByID           func(childComplexity int, id string) int
-		UserByUsername     func(childComplexity int, username string) int
-		Users              func(childComplexity int) int
-		WikidataSearch     func(childComplexity int, query string, language *string, limit *int) int
+		Content               func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, sorts []*model.ContentSortInput, includeTotalCount *bool, filter *model.ContentFilter) int
+		ContentByID           func(childComplexity int, id string) int
+		HermeneuticApproaches func(childComplexity int) int
+		Me                    func(childComplexity int) int
+		MessageThread         func(childComplexity int, id string) int
+		MessageThreads        func(childComplexity int, first *int, before *string) int
+		PassageInterlinear    func(childComplexity int, startVerseID int, endVerseID int) int
+		PassageText           func(childComplexity int, startVerseID int, endVerseID int) int
+		PerspectiveByID       func(childComplexity int, id string) int
+		Perspectives          func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) int
+		ThreadMessages        func(childComplexity int, threadID string, first *int, before *int) int
+		UserByID              func(childComplexity int, id string) int
+		UserByUsername        func(childComplexity int, username string) int
+		Users                 func(childComplexity int) int
+		WikidataSearch        func(childComplexity int, query string, language *string, limit *int) int
 	}
 
 	ReadReceiptChanged struct {
@@ -409,6 +419,7 @@ type QueryResolver interface {
 	UserByUsername(ctx context.Context, username string) (*model.User, error)
 	Users(ctx context.Context) ([]*model.User, error)
 	WikidataSearch(ctx context.Context, query string, language *string, limit *int) ([]*model.WikidataSearchResult, error)
+	HermeneuticApproaches(ctx context.Context) ([]*model.HermeneuticApproach, error)
 	PerspectiveByID(ctx context.Context, id string) (*model.Perspective, error)
 	Perspectives(ctx context.Context, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) (*model.PaginatedPerspectives, error)
 	MessageThreads(ctx context.Context, first *int, before *string) ([]*model.MessageThread, error)
@@ -688,6 +699,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.FeelingEntry.Note(childComplexity), true
+
+	case "HermeneuticApproach.code":
+		if e.ComplexityRoot.HermeneuticApproach.Code == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HermeneuticApproach.Code(childComplexity), true
+	case "HermeneuticApproach.description":
+		if e.ComplexityRoot.HermeneuticApproach.Description == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HermeneuticApproach.Description(childComplexity), true
+	case "HermeneuticApproach.id":
+		if e.ComplexityRoot.HermeneuticApproach.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HermeneuticApproach.ID(childComplexity), true
+	case "HermeneuticApproach.name":
+		if e.ComplexityRoot.HermeneuticApproach.Name == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HermeneuticApproach.Name(childComplexity), true
 
 	case "InboxEvent.lastMessageAt":
 		if e.ComplexityRoot.InboxEvent.LastMessageAt == nil {
@@ -1427,6 +1463,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Perspective.Feelings(childComplexity), true
+	case "Perspective.hermeneuticApproachID":
+		if e.ComplexityRoot.Perspective.HermeneuticApproachID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Perspective.HermeneuticApproachID(childComplexity), true
+	case "Perspective.hermeneuticCustomText":
+		if e.ComplexityRoot.Perspective.HermeneuticCustomText == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Perspective.HermeneuticCustomText(childComplexity), true
 	case "Perspective.id":
 		if e.ComplexityRoot.Perspective.ID == nil {
 			break
@@ -1553,6 +1601,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.ContentByID(childComplexity, args["id"].(string)), true
+	case "Query.hermeneuticApproaches":
+		if e.ComplexityRoot.Query.HermeneuticApproaches == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Query.HermeneuticApproaches(childComplexity), true
 
 	case "Query.me":
 		if e.ComplexityRoot.Query.Me == nil {
@@ -2060,8 +2114,22 @@ type Perspective {
   relatedPerspectiveIDs: [Int!]
   customFields: JSON
   review: String
+  # Hermeneutic field (BIBLE_PASSAGE perspectives): a choice from the
+  # hermeneuticApproaches lookup list, OR a free-text "in my own words"
+  # answer -- never both. See hermeneuticApproaches query.
+  hermeneuticApproachID: ID
+  hermeneuticCustomText: String
   createdAt: String!
   updatedAt: String!
+}
+
+# A fixed, database-stored interpretive lens a user may pick when giving a
+# perspective on a Bible passage (literal, allegorical, typological, ...).
+type HermeneuticApproach {
+  id: ID!
+  code: String!
+  name: String!
+  description: String
 }
 
 type PaginatedPerspectives {
@@ -2329,6 +2397,10 @@ input CreatePerspectiveInput {
   relatedPerspectiveIDs: [Int!]
   customFields: JSON
   review: String
+  "Mutually exclusive with hermeneuticCustomText."
+  hermeneuticApproachID: IntID
+  "Mutually exclusive with hermeneuticApproachID."
+  hermeneuticCustomText: String
 }
 
 """
@@ -2366,6 +2438,10 @@ input UpdatePerspectiveInput {
   customFields: JSON
   "Omit = unchanged; null = clear."
   review: String
+  "Omit = unchanged. Setting this clears hermeneuticCustomText; mutually exclusive with it."
+  hermeneuticApproachID: IntID
+  "Omit = unchanged. Setting this clears hermeneuticApproachID; mutually exclusive with it."
+  hermeneuticCustomText: String
 }
 
 input PerspectiveFilter {
@@ -2456,6 +2532,9 @@ type Query {
 
   # Category queries
   wikidataSearch(query: String!, language: String, limit: Int): [WikidataSearchResult!]!
+
+  # Hermeneutic approach lookup list, for the BIBLE_PASSAGE perspective form
+  hermeneuticApproaches: [HermeneuticApproach!]!
 
   # Perspective queries
   perspectiveByID(id: ID!): Perspective
@@ -2686,6 +2765,20 @@ func (ec *executionContext) childFields_FeelingEntry(ctx context.Context, field 
 		return ec.fieldContext_FeelingEntry_note(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type FeelingEntry", field.Name)
+}
+
+func (ec *executionContext) childFields_HermeneuticApproach(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_HermeneuticApproach_id(ctx, field)
+	case "code":
+		return ec.fieldContext_HermeneuticApproach_code(ctx, field)
+	case "name":
+		return ec.fieldContext_HermeneuticApproach_name(ctx, field)
+	case "description":
+		return ec.fieldContext_HermeneuticApproach_description(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type HermeneuticApproach", field.Name)
 }
 
 func (ec *executionContext) childFields_InboxEvent(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -2928,6 +3021,10 @@ func (ec *executionContext) childFields_Perspective(ctx context.Context, field g
 		return ec.fieldContext_Perspective_customFields(ctx, field)
 	case "review":
 		return ec.fieldContext_Perspective_review(ctx, field)
+	case "hermeneuticApproachID":
+		return ec.fieldContext_Perspective_hermeneuticApproachID(ctx, field)
+	case "hermeneuticCustomText":
+		return ec.fieldContext_Perspective_hermeneuticCustomText(ctx, field)
 	case "createdAt":
 		return ec.fieldContext_Perspective_createdAt(ctx, field)
 	case "updatedAt":
@@ -4889,6 +4986,98 @@ func (ec *executionContext) _FeelingEntry_note(ctx context.Context, field graphq
 }
 func (ec *executionContext) fieldContext_FeelingEntry_note(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("FeelingEntry", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _HermeneuticApproach_id(ctx context.Context, field graphql.CollectedField, obj *model.HermeneuticApproach) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HermeneuticApproach_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HermeneuticApproach_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HermeneuticApproach", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _HermeneuticApproach_code(ctx context.Context, field graphql.CollectedField, obj *model.HermeneuticApproach) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HermeneuticApproach_code(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Code, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HermeneuticApproach_code(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HermeneuticApproach", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _HermeneuticApproach_name(ctx context.Context, field graphql.CollectedField, obj *model.HermeneuticApproach) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HermeneuticApproach_name(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HermeneuticApproach_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HermeneuticApproach", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _HermeneuticApproach_description(ctx context.Context, field graphql.CollectedField, obj *model.HermeneuticApproach) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HermeneuticApproach_description(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Description, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_HermeneuticApproach_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HermeneuticApproach", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _InboxEvent_threadId(ctx context.Context, field graphql.CollectedField, obj *model.InboxEvent) (ret graphql.Marshaler) {
@@ -8469,6 +8658,52 @@ func (ec *executionContext) fieldContext_Perspective_review(_ context.Context, f
 	return graphql.NewScalarFieldContext("Perspective", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _Perspective_hermeneuticApproachID(ctx context.Context, field graphql.CollectedField, obj *model.Perspective) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Perspective_hermeneuticApproachID(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.HermeneuticApproachID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOID2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Perspective_hermeneuticApproachID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Perspective", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _Perspective_hermeneuticCustomText(ctx context.Context, field graphql.CollectedField, obj *model.Perspective) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Perspective_hermeneuticCustomText(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.HermeneuticCustomText, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Perspective_hermeneuticCustomText(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Perspective", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _Perspective_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Perspective) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8965,6 +9200,38 @@ func (ec *executionContext) fieldContext_Query_wikidataSearch(ctx context.Contex
 	if fc.Args, err = ec.field_Query_wikidataSearch_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_hermeneuticApproaches(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_hermeneuticApproaches(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Query().HermeneuticApproaches(ctx)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.HermeneuticApproach) graphql.Marshaler {
+			return ec.marshalNHermeneuticApproach2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐHermeneuticApproachᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_hermeneuticApproaches(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_HermeneuticApproach(ctx, field)
+		},
 	}
 	return fc, nil
 }
@@ -11498,7 +11765,7 @@ func (ec *executionContext) unmarshalInputCreatePerspectiveInput(ctx context.Con
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"userID", "contentID", "quality", "agreement", "importance", "confidence", "like", "privacy", "description", "category", "parts", "labels", "categorizedRatings", "feelings", "primaryPerspectiveID", "relatedPerspectiveIDs", "customFields", "review"}
+	fieldsInOrder := [...]string{"userID", "contentID", "quality", "agreement", "importance", "confidence", "like", "privacy", "description", "category", "parts", "labels", "categorizedRatings", "feelings", "primaryPerspectiveID", "relatedPerspectiveIDs", "customFields", "review", "hermeneuticApproachID", "hermeneuticCustomText"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11631,6 +11898,20 @@ func (ec *executionContext) unmarshalInputCreatePerspectiveInput(ctx context.Con
 				return it, err
 			}
 			it.Review = data
+		case "hermeneuticApproachID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("hermeneuticApproachID"))
+			data, err := ec.unmarshalOIntID2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.HermeneuticApproachID = data
+		case "hermeneuticCustomText":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("hermeneuticCustomText"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.HermeneuticCustomText = data
 		}
 	}
 	return it, nil
@@ -11918,7 +12199,7 @@ func (ec *executionContext) unmarshalInputUpdatePerspectiveInput(ctx context.Con
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"id", "contentID", "quality", "agreement", "importance", "confidence", "like", "privacy", "description", "category", "reviewStatus", "parts", "labels", "categorizedRatings", "feelings", "primaryPerspectiveID", "relatedPerspectiveIDs", "customFields", "review"}
+	fieldsInOrder := [...]string{"id", "contentID", "quality", "agreement", "importance", "confidence", "like", "privacy", "description", "category", "reviewStatus", "parts", "labels", "categorizedRatings", "feelings", "primaryPerspectiveID", "relatedPerspectiveIDs", "customFields", "review", "hermeneuticApproachID", "hermeneuticCustomText"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12058,6 +12339,20 @@ func (ec *executionContext) unmarshalInputUpdatePerspectiveInput(ctx context.Con
 				return it, err
 			}
 			it.Review = graphql.OmittableOf(data)
+		case "hermeneuticApproachID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("hermeneuticApproachID"))
+			data, err := ec.unmarshalOIntID2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.HermeneuticApproachID = data
+		case "hermeneuticCustomText":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("hermeneuticCustomText"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.HermeneuticCustomText = data
 		}
 	}
 	return it, nil
@@ -12657,6 +12952,59 @@ func (ec *executionContext) _FeelingEntry(ctx context.Context, sel ast.Selection
 			}
 		case "note":
 			out.Values[i] = ec._FeelingEntry_note(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var hermeneuticApproachImplementors = []string{"HermeneuticApproach"}
+
+func (ec *executionContext) _HermeneuticApproach(ctx context.Context, sel ast.SelectionSet, obj *model.HermeneuticApproach) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hermeneuticApproachImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HermeneuticApproach")
+		case "id":
+			out.Values[i] = ec._HermeneuticApproach_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "code":
+			out.Values[i] = ec._HermeneuticApproach_code(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._HermeneuticApproach_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "description":
+			out.Values[i] = ec._HermeneuticApproach_description(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -14167,6 +14515,16 @@ func (ec *executionContext) _Perspective(ctx context.Context, sel ast.SelectionS
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
+		case "hermeneuticApproachID":
+			out.Values[i] = ec._Perspective_hermeneuticApproachID(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "hermeneuticCustomText":
+			out.Values[i] = ec._Perspective_hermeneuticCustomText(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		case "createdAt":
 			out.Values[i] = ec._Perspective_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -14452,6 +14810,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_wikidataSearch(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "hermeneuticApproaches":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_hermeneuticApproaches(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -15599,6 +15979,32 @@ func (ec *executionContext) marshalNFeelingEntry2ᚖgithubᚗcomᚋCodeWarrior�
 func (ec *executionContext) unmarshalNFeelingInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingInput(ctx context.Context, v any) (*model.FeelingInput, error) {
 	res, err := ec.unmarshalInputFeelingInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNHermeneuticApproach2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐHermeneuticApproachᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.HermeneuticApproach) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNHermeneuticApproach2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐHermeneuticApproach(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNHermeneuticApproach2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐHermeneuticApproach(ctx context.Context, sel ast.SelectionSet, v *model.HermeneuticApproach) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._HermeneuticApproach(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v any) (string, error) {

@@ -38,6 +38,12 @@ vi.mock('$lib/queries/perspectives/useUpdatePerspective', () => ({
 	})),
 }));
 
+vi.mock('$lib/queries/perspectives/useHermeneuticApproaches', () => ({
+	useHermeneuticApproaches: vi.fn(() => ({
+		data: { hermeneuticApproaches: [] },
+	})),
+}));
+
 vi.mock('svelte-sonner', () => ({
 	toast: {
 		success: vi.fn(),

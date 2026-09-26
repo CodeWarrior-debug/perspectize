@@ -84,8 +84,22 @@ type Perspective {
   relatedPerspectiveIDs: [Int!]
   customFields: JSON
   review: String
+  # Hermeneutic field (BIBLE_PASSAGE perspectives): a choice from the
+  # hermeneuticApproaches lookup list, OR a free-text "in my own words"
+  # answer -- never both. See hermeneuticApproaches query.
+  hermeneuticApproachID: ID
+  hermeneuticCustomText: String
   createdAt: String!
   updatedAt: String!
+}
+
+# A fixed, database-stored interpretive lens a user may pick when giving a
+# perspective on a Bible passage (literal, allegorical, typological, ...).
+type HermeneuticApproach {
+  id: ID!
+  code: String!
+  name: String!
+  description: String
 }
 
 type PaginatedPerspectives {
@@ -353,6 +367,10 @@ input CreatePerspectiveInput {
   relatedPerspectiveIDs: [Int!]
   customFields: JSON
   review: String
+  "Mutually exclusive with hermeneuticCustomText."
+  hermeneuticApproachID: IntID
+  "Mutually exclusive with hermeneuticApproachID."
+  hermeneuticCustomText: String
 }
 
 """
@@ -390,6 +408,10 @@ input UpdatePerspectiveInput {
   customFields: JSON
   "Omit = unchanged; null = clear."
   review: String
+  "Omit = unchanged. Setting this clears hermeneuticCustomText; mutually exclusive with it."
+  hermeneuticApproachID: IntID
+  "Omit = unchanged. Setting this clears hermeneuticApproachID; mutually exclusive with it."
+  hermeneuticCustomText: String
 }
 
 input PerspectiveFilter {
@@ -480,6 +502,9 @@ type Query {
 
   # Category queries
   wikidataSearch(query: String!, language: String, limit: Int): [WikidataSearchResult!]!
+
+  # Hermeneutic approach lookup list, for the BIBLE_PASSAGE perspective form
+  hermeneuticApproaches: [HermeneuticApproach!]!
 
   # Perspective queries
   perspectiveByID(id: ID!): Perspective
