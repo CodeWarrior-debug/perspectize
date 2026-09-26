@@ -710,6 +710,7 @@ Phases 11-15 planned from FEATURE_BACKLOG.md. Phase 16 added for mobile app rese
 - [ ] **Phase 22: TanStack DB Pilot (Perspectives)** - One-entity pilot of `@tanstack/svelte-db` query collections over existing GraphQL; adopt or revert on exit criteria
 - [ ] **Phase 23: Sync Engine Evaluation (GATED)** - ElectricSQL + TanStack DB Electric collection; only if real-time/collab or measured read-cost growth
 - [ ] **Phase 24: Local Database / Desktop (GATED)** - PGlite local Postgres and/or Tauri desktop shell; only on offline or distribution requirement
+- [ ] **Phase 25: Observability & Release Tagging** - Working OTel traces (HTTP → GraphQL → SQL), per-operation latency/error metrics, trace-linked logs, Faro frontend RUM/errors, all to Grafana Cloud; release-please auto-tags so every signal carries frontend/backend versions
 
 ### Phase 18.1: Mobile Activity Page Redesign (INSERTED)
 
@@ -779,6 +780,28 @@ Plans:
 **Goal**: PGlite (WASM Postgres, IndexedDB/OPFS) local store and/or Tauri desktop shell.
 **Gate**: explicit offline-first or desktop-distribution requirement. Not a performance play once Phases 20–22 land.
 
+### Phase 25: Observability & Release Tagging
+**Goal**: Any slow or failing request can be followed from the browser click through the GraphQL operation, resolvers and SQL in one trace; per-operation p50/p95/p99 latency and error rate are graphable for 13 months; every span, metric, log and frontend event carries the frontend/backend release version that produced it. $0/mo on Grafana Cloud's free tier.
+**Depends on**: Phase 7.4 (Performance Monitoring — log lines this phase builds on). Independent of the Neon migration (instrumentation doesn't depend on the DB host).
+**Spec**: `docs/superpowers/specs/2026-09-26-observability-design.md`
+**Context**: `.planning/phases/25-observability-release-tagging/25-CONTEXT.md`
+**Plans**: 4 plans
+
+**Success criteria (must_haves.truths):**
+- One Grafana trace contains browser fetch → `/graphql` server span → GraphQL operation span → ≥1 resolver span → ≥1 `gorm.Query` span
+- `graphql.server.operation.duration` p95 is graphable per operation name and still queryable after trace retention (14d) expires
+- Every backend span/metric/log carries `service.version`; every Faro event carries `app.version`; backend spans carry `client.version`
+- With `OTEL_*` / `VITE_FARO_URL` unset: no telemetry network calls, all existing tests green
+- Merging a release-please PR creates `backend-vX.Y.Z` / `frontend-vX.Y.Z` tags; next deploy reports the new version in `app.build.info`
+- Active metric series < 5k after 7 days (operation name / client version cardinality bounded)
+- No GraphQL variables, SQL bind values, or `Authorization` values in any exported span (asserted in tests)
+
+Plans:
+- [ ] 25-01 — Backend tracing foundation: `pkg/buildinfo`, `pkg/telemetry`, bounded normalizer, otelhttp + CORS trace headers + client-version middleware, otelgqlgen, GORM plugin, outbound transports → `docs/superpowers/plans/2026-09-26-observability-plan.md` (Tasks 1–5)
+- [ ] 25-02 — Metrics & trace-linked logs: per-operation histogram, DB pool/runtime/build-info metrics, slog → OTLP → same plan (Tasks 6–8)
+- [ ] 25-03 — Frontend: version headers (HTTP + WS), Faro RUM/errors/tracing, CSP, hidden source-map upload → same plan (Tasks 9–11)
+- [ ] 25-04 — release-please auto-tagging, docs, Grafana dashboards + alerts, manual rollout (M1–M7) → same plan (Tasks 12–14)
+
 ## Progress
 
 **Execution Order:**
@@ -823,3 +846,4 @@ Phases execute in numeric order: 1 -> 2 -> 2.1 -> 3 -> 3.1 -> 3.2 -> 3.3 -> 3.4 
 | 22. TanStack DB Pilot (Perspectives) | 0/0 | Not started | - |
 | 23. Sync Engine Evaluation | 0/0 | Gated | - |
 | 24. Local Database / Desktop | 0/0 | Gated | - |
+| 25. Observability & Release Tagging | 0/4 | Planned | - |
