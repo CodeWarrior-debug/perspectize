@@ -84,9 +84,9 @@ evals ──► agent + jeeves + seeds  (deterministic checks)
 
 **Files:** `ai-tooling/cmd/botler/main.go`, `ai-tooling/cmd/botler/main_test.go`
 
-- [ ] Stdlib `flag` subcommands (same style as `backend/cmd/seed-bible`): `tools list`, `tools call <name> --input '<json>'` (no model), `chat "<question>"` (streams text; prints tool calls as `→ read_guide {"area":"compare"}`; prints usage at the end).
-- [ ] Tests: argument parsing; `tools list` / `tools call read_guide` output; `chat` with a fake provider injected.
-- [ ] Commit `feat(ai-tooling): add botler CLI (tools, chat)`.
+- [x] Stdlib `flag` subcommands (same style as `backend/cmd/seed-bible`): `tools list`, `tools call <name> --input '<json>'` (no model), `chat "<question>"` (streams text; prints tool calls as `→ read_guide {"area":"compare"}`; prints usage at the end).
+- [x] Tests: argument parsing; `tools list` / `tools call read_guide` output; `chat` with a fake provider injected.
+- [x] Commit `feat(ai-tooling): add botler CLI (tools, chat)`.
 - [ ] **Tracer checkpoint (live, where the key exists):** `go run ./cmd/botler chat "How do I compare two perspectives?"` cites `[compare.pick-two]`. Record the transcript and usage in the plan. If no key is available in this session, hand the command to the owner.
 
 **Learn:** *Quiz:* "Walk the call path from `botler chat` to the model and back, naming each package."
@@ -95,12 +95,17 @@ evals ──► agent + jeeves + seeds  (deterministic checks)
 
 **Files:** `ai-tooling/evals/evals.go`, `ai-tooling/evals/evals_test.go`, `botler eval` subcommand
 
-- [ ] Tests (fake provider): citation check pass and fail; unknown-ID citation fails; trap phrase check; 3 runs per seed with pass-rate math; report aggregates tokens and latency.
-- [ ] `botler eval --model <id> [--area compare] [--runs 3]` prints a table and writes `ai-tooling/evals/results/<timestamp>-<model>.json` (gitignored).
-- [ ] Commit `feat(ai-tooling): add minimal eval harness and botler eval`.
+- [x] Tests (fake provider): citation check pass and fail; unknown-ID citation fails; trap phrase check; 3 runs per seed with pass-rate math; report aggregates tokens and latency.
+- [x] `botler eval --model <id> [--area compare] [--runs 3]` prints a table and writes `ai-tooling/evals/results/<timestamp>-<model>.json` (gitignored).
+- [x] Commit `feat(ai-tooling): add minimal eval harness and botler eval`.
 - [ ] **Live baseline (where the key exists):** run it and record pass rate, tokens and latency in `ai-tooling/CLAUDE.md` under "Phase 25 learnings". That's the first Claude baseline (partial EVAL-04).
 
 **Learn:** *Concept:* deterministic eval checks and why the trap phrase is a *contract* between prompt and eval. *Quiz:* "Why run each seed 3 times? What does a 2/3 pass mean?"
+
+**Live steps pending (recorded during execution):** this cloud session has no `ANTHROPIC_API_KEY`. The owner either adds it to the environment settings (new session picks it up) or runs locally from `ai-tooling/`:
+`go run ./cmd/botler chat "How do I compare two perspectives?"` and then
+`go run ./cmd/botler eval --area compare --runs 3`.
+Added during execution: `jeeves.Assistant` (shared wiring for botler, evals, and later the backend); `botler eval` prints a table plus FAIL reasons and saves JSON to `ai-tooling/evals/results/` (gitignored).
 
 ## Task 7: Tracer review, then widen
 

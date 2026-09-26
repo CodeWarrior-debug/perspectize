@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -95,4 +97,58 @@ func TestChat_Refusal(t *testing.T) {
 	code, _, errOut := runWith(t, p, nil, "chat", "q")
 	assert.Equal(t, 0, code)
 	assert.Contains(t, errOut, "stop=refusal")
+}
+
+// answerAll returns a provider that answers every question in one turn.
+func answerAll(n int, text string) *fake.Provider {
+	turns := make([]fake.Turn, n)
+	for i := range turns {
+		turns[i] = fake.Turn{Text: []string{text}, Stop: llm.StopEnd, Usage: llm.Usage{InputTokens: 50, OutputTokens: 5}}
+	}
+	return &fake.Provider{Turns: turns}
+}
+
+func TestEval_CompareArea(t *testing.T) {
+	dir := t.TempDir()
+	// Cites pick-two AND says the unsupported phrase: passes traps and
+	// pick-two seeds, fails seeds expecting other entries.
+	p := answerAll(100, "Open **Compare** [compare.pick-two]. Perspectize doesn't support that.")
+	code, out, errOut := runWith(t, p, nil, "eval", "--area", "compare", "--runs", "2", "--out", dir)
+	require.Equal(t, 0, code, errOut)
+
+	assert.Contains(t, out, "PASS")
+	assert.Contains(t, out, "pass rate")
+	assert.Contains(t, errOut, "saved ")
+
+	files, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	raw, err := os.ReadFile(filepath.Join(dir, files[0].Name()))
+	require.NoError(t, err)
+	var rep struct {
+		Model       string `json:"model"`
+		RunsPerSeed int    `json:"runs_per_seed"`
+		Seeds       []struct {
+			Trap bool `json:"trap"`
+		} `json:"seeds"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &rep))
+	assert.Equal(t, defaultModel, rep.Model)
+	assert.Equal(t, 2, rep.RunsPerSeed)
+	assert.NotEmpty(t, rep.Seeds)
+	traps := 0
+	for _, s := range rep.Seeds {
+		if s.Trap {
+			traps++
+		}
+	}
+	assert.GreaterOrEqual(t, traps, 1, "compare seeds include a trap")
+}
+
+func TestEval_BadArgs(t *testing.T) {
+	code, _, _ := runWith(t, answerAll(1, "x"), nil, "eval", "--runs", "0")
+	assert.Equal(t, 2, code)
+	code, _, errOut := runWith(t, answerAll(1, "x"), nil, "eval", "--area", "nope", "--out", t.TempDir())
+	assert.Equal(t, 1, code)
+	assert.Contains(t, errOut, "no seed questions")
 }
