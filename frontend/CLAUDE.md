@@ -18,12 +18,26 @@ frontend/src/
 │   │   └── AGGridTest.svelte
 │   ├── queries/         # TanStack Query + graphql-request
 │   │   ├── client.ts    # GraphQLClient (VITE_GRAPHQL_URL)
-│   │   └── content.ts   # Content query definitions (gql)
+│   │   ├── keys.ts      # Cross-domain query keys
+│   │   └── content/     # One folder per domain: index.ts (gql defs) + its hooks
 │   ├── assets/          # Static assets (favicon)
 │   └── utils/           # Utility functions
 ├── app.css              # Global styles (Tailwind v4)
 └── app.html             # HTML shell
 ```
+
+### Deep Modules
+
+Small interface, lots of work hidden behind it (Ousterhout). Test: *how little must a caller know vs. how much does it handle?*
+
+**Independent of hexagonal.** The frontend isn't hexagonal (no ports/adapters — components call hooks directly), and doesn't need to be to have deep modules. Hexagonal is about dependency direction (backend); deep modules is about boundary quality (both stacks).
+
+- **One folder per domain** — `lib/queries/{content,perspectives,users,categories,…}/` holds the `gql` defs (`index.ts`) *and* that domain's hooks (`useCreatePerspective.ts`). Only `client.ts`/`keys.ts` are top-level.
+- **Import the domain, not its guts** — `import { LIST_CONTENT } from '$lib/queries/content'`; components call a hook, never `graphqlClient.request` + cache invalidation inline.
+- **Hide cache wiring in the hook** — query keys, `invalidateQueries`, optimistic updates live inside `useX`, so callers get `{ mutate, isPending }` and nothing else.
+- **No pass-through components** — a wrapper that only forwards props/snippets to one child adds surface without hiding anything; inline it or give it state/logic.
+
+Refs: Ousterhout, *A Philosophy of Software Design*; Matt Pocock, [How To Make Codebases AI Agents Love](https://www.aihero.dev/how-to-make-codebases-ai-agents-love) (why deep modules help agents navigate). Origin: PR #339.
 
 ## shadcn-svelte Components
 
