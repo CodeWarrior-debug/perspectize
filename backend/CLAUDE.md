@@ -91,7 +91,7 @@ Copy it to `backend/.env` and fill in real values by hand; the agent cannot read
 `.env` (see [../.docs/SECURITY.md](../.docs/SECURITY.md)). Production note: Sevalla
 may require `?sslmode=disable`.
 
-**Sevalla build strategy:** Dockerfile builder. Dockerfile path = `backend/Dockerfile` (relative to repo root, not context). Docker context = `backend`. Sevalla requires the redundant `backend/` prefix on the Dockerfile path even though context is already `backend`.
+**Sevalla build strategy:** Dockerfile builder. Dockerfile path = `backend/Dockerfile`. Docker context = **repo root** (`.`), not `backend`, because the backend imports the sibling `ai-tooling/` module (`replace ../ai-tooling`). What enters the context is controlled by the deny-by-default root `.dockerignore` (only `backend/` + `ai-tooling/`, secrets excluded). CI's `Docker Image` job builds it the same way and fails if secret files or `frontend/` leak into the build stage.
 
 **Database is remote (Sevalla)** — `DATABASE_URL` in `.env` points to `us-east1-001.proxy.sevalla.app`. No `make docker-up` needed for development. Migrations run against the remote DB.
 
