@@ -34,6 +34,8 @@ Every ai-tooling spec and plan builds teaching in; it isn't bolted on afterwards
 
 - **Guide loop pilot (compare):** 5 entries, 3 rounds. Each fresh verifier caught a different *position* error (above/below/under); position words are the main failure mode. Writers now re-check positions against markup order and drop positions users don't need.
 - **Guide token cost:** compare area as a `read_guide` result is ~3.2 KB (~800 tokens). Nine areas come to ~7k tokens, so scoped loading is a saving but not critical at this size.
+- **Guide fan-out (all 9 areas verified):** 54 entries, 46 seeds, ~34 KB as tool results (~8.6k tokens). Rounds to close: activity, perspectives, messaging 1; adding-content, bible, settings 2; compare, discover, getting-started 3. No area needed escalation.
+- **Failure modes seen, now in the writers' brief:** position words (above/below/under); sign-in values (the root layout gates every route); "not supported" claims that another area actually provides (the coach toggle in Settings); quoting third-party (Clerk) labels the repo doesn't render; timing claims copied from UI copy that the code contradicts. Verifiers used frontend unit tests as ground truth, a strong signal worth keeping.
 - **Tracer 1 code-complete** (llm, fake, agent, jeeves, anthropic adapter, botler tools/chat/eval, evals). Live `botler chat` and the Claude eval baseline are pending an `ANTHROPIC_API_KEY` in the environment.
 - **Deferred:** server-side refusal fallbacks (they need the beta Messages API throughout the adapter); refusals surface as `llm.StopRefusal` for now.
 

@@ -265,14 +265,14 @@ The source-path lint needs `frontend/` present; `actions/checkout` provides the 
 
 ## Task 5: Fan out the remaining areas
 
-> **Paused (tracer bullets, decision 12):** runs after Tracer 1 (`docs/superpowers/plans/2026-09-26-tracer-1-plan.md`) is working end to end, so format lessons from the tracer land before 8 more areas are written.
+> **Done after Tracer 1 was code-complete.** Originally paused (tracer bullets, decision 12): runs after Tracer 1 (`docs/superpowers/plans/2026-09-26-tracer-1-plan.md`) is working end to end, so format lessons from the tracer land before 8 more areas are written.
 
 **Areas:** `getting-started`, `activity`, `adding-content`, `perspectives`, `bible`, `discover`, `messaging`, `settings` (complete the owner's file with its remaining entries; keep the owner's entry intact).
 
-- [ ] **Step 1:** Run the Task 4 loop per area with the tuned prompts. Up to 3 writers at once, with verifiers dispatched as each writer's lint passes.
-- [ ] **Step 2:** Keep a status table in the main session (area → rounds → lint → verifier → done/escalated) and show it to the owner after each batch of 3.
-- [ ] **Step 3:** Handle split proposals: accept by creating the new slugs (update the README index), or reject with guidance.
-- [ ] **Step 4:** Commit per area: `docs(ai-tooling): app guide — {slug} area`.
+- [x] **Step 1:** Run the Task 4 loop per area with the tuned prompts. Up to 3 writers at once, with verifiers dispatched as each writer's lint passes.
+- [x] **Step 2:** Keep a status table in the main session (area → rounds → lint → verifier → done/escalated) and show it to the owner after each batch of 3.
+- [x] **Step 3:** Handle split proposals: accept by creating the new slugs (update the README index), or reject with guidance.
+- [x] **Step 4:** Commit per area: `docs(ai-tooling): app guide — {slug} area`.
 
 **Learn (after each batch of 3, rotating concepts):**
 - *Quiz examples:* "The `activity` writer returned a split proposal. What problem does that rule prevent?" "Pick one seed trap from this batch. What would a hallucinating Jeeves say, and how would the eval catch it?" "How many API calls would Jeeves make to answer a seed that needs two guide lookups in separate rounds?" (re-quizzes the shaky agent-loop concept).
@@ -281,9 +281,11 @@ The source-path lint needs `frontend/` present; `actions/checkout` provides the 
 
 ## Task 6: Phase checkpoint
 
-- [ ] **Step 1: Verification** (report actual output): in `ai-tooling/`, run `go build ./...`, `gofmt -l .` (expect empty) and `go test ./...` (all pass, including `TestEmbeddedGuideIsClean`). Also run `grep -rn "app-guide/" --include=*.md .` to find stale path references to the old folder name and fix any.
+- [x] **Step 1: Verification** (report actual output): in `ai-tooling/`, run `go build ./...`, `gofmt -l .` (expect empty) and `go test ./...` (all pass, including `TestEmbeddedGuideIsClean`). Also run `grep -rn "app-guide/" --include=*.md .` to find stale path references to the old folder name and fix any.
 - [ ] **Step 2: Owner spot-check (local session only).** The owner opens one area in the running app and follows two entries step by step. Cloud sessions skip this and hand it back.
 - [ ] **Step 3: `graphify update .`**
 - [ ] **Step 4: Phase review quiz** (5 questions spanning Tasks 1–5, weighted to `LEARNING.md` "shaky" rows), then update `LEARNING.md`.
-- [ ] **Step 5: Re-plan the rest of Phase 25** (progressive discovery): record what the loop taught (average rounds, common verifier failures, entry count, guide token size) in `ai-tooling/CLAUDE.md` under a "Phase 25 learnings" heading. Those numbers feed the next plan (loader, tools, `botler`, evals).
-- [ ] **Step 6: Commit:** `docs(ai-tooling): app guide phase checkpoint`
+- [x] **Step 5: Re-plan the rest of Phase 25** (progressive discovery): record what the loop taught (average rounds, common verifier failures, entry count, guide token size) in `ai-tooling/CLAUDE.md` under a "Phase 25 learnings" heading. Those numbers feed the next plan (loader, tools, `botler`, evals).
+- [x] **Step 6: Commit:** `docs(ai-tooling): app guide phase checkpoint`
+
+**Checkpoint results (recorded during execution):** `go build`, `gofmt -l .` (empty), `go vet`, `go test -race ./...` all clean in `ai-tooling/`, including `TestEmbeddedGuideIsClean`. The only stale-path grep hit is the intentional Task 1 quiz. Step 2 (owner spot-check in a local session) and Step 4 (phase quiz) wait for the owner. Step 3 (`graphify update .`) is skipped because graphify isn't installed in this cloud container; run it locally. Learnings are in `ai-tooling/CLAUDE.md` → Phase 25 learnings.
