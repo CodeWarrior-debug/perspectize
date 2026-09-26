@@ -220,6 +220,28 @@ export const TYPES = [
         accent: '#7B4B2A',
         sharesUrlSpace: false,
         thumbnail: 'none — book-with-cross icon tile (h-8 w-10, bg-muted text-primary); click opens url'
+    },
+    {
+        // Research 2026-09-26: The Met Collection API won on every axis that
+        // matters here — keyless, CC0 images, one request per painting, 80 req/s.
+        // Harvard (non-commercial only), Rijksmuseum (old API 410 Gone; new Linked
+        // Art API needs 3 hops per image), Europeana (per-item rights) and AIC
+        // (60 req/min, ~2k public-domain paintings) were ruled out as primary.
+        // Wikidata (~408k paintings with images) is the phase-2 source.
+        id: 'painting',
+        label: 'Painting',
+        plural: 'Paintings',
+        enumValue: 'PAINTING',
+        gist: 'A fine-art painting as a work held in a collection — not house, decorative or protective painting.',
+        ingestion: 'api',
+        enrichment: 'The Met Collection API — GET collectionapi.metmuseum.org/public/collection/v1/objects/{objectID}; keyless, CC0 open-access images; ~14k hits for search?medium=Paintings&hasImages=true. Accept only objectName = "Painting" (classification is blank for some departments, e.g. The American Wing). Phase 2: Wikidata (P31 = Q3305213) for paintings outside the Met',
+        urlRequired: true,
+        urlPattern: 'metmuseum.org/art/collection/search/<objectID> (phase 2: wikidata.org/wiki/<Q-id>)',
+        identity: 'met:<objectID>; also store the Wikidata QID from objectWikidata_URL as the cross-source dedup key',
+        icon: 'palette',
+        accent: '#8E3B46',
+        sharesUrlSpace: false,
+        thumbnail: 'primaryImageSmall (images.metmuseum.org web-large JPEG, CC0). When blank (isPublicDomain = false, e.g. Monet 437127) fall back to Wikidata P18 → commons.wikimedia.org/wiki/Special:FilePath/<file>?width=400 with its Commons attribution, else a palette icon tile. Click opens url (objectURL)'
     }
 ];
 const b = (label, applicability, source, path, defaultVisible, extra = {}) => ({ label, applicability, source, path, defaultVisible, ...extra });
@@ -267,6 +289,10 @@ export const COLUMNS = [
             bible: b('Passage', 'required', 'derived', 'display_title ?? name (CanonicalPassageName)', true, {
                 tooltip: 'Your title for the passage if one was set, otherwise the reference (e.g. "Micah 6:8"). Sorts in canonical Bible order, not A–Z.',
                 appearance: 'Icon tile instead of a thumbnail. Serif 13px title, line-clamp-2. When display_title is set, the reference appears as an 11px muted subtitle (line-clamp-1 on the title). Sort comparator: verse_start_id, so Genesis precedes 1 Corinthians.'
+            }),
+            painting: b('Painting', 'required', 'api', 'name + image_url (primaryImageSmall, Commons fallback)', true, {
+                tooltip: 'Title and image from The Met collection. Click opens the painting on metmuseum.org.',
+                appearance: 'Thumbnail in the existing slot with object-fit: contain on a neutral mat, not cover — cropping a painting misrepresents it (portraits are tall, Washington Crossing the Delaware is 1.7:1). Palette icon tile when no image. Commons-sourced images carry a small "ⓘ" with the attribution in the tooltip.'
             })
         }
     },
@@ -316,7 +342,11 @@ export const COLUMNS = [
             movie: b('Genre', 'optional', 'api', "response->'genres'->0->>'name'", false),
             book: b('Subject', 'optional', 'api', "response->'subjects'->>0", false),
             music: b('Genre', 'optional', 'api', "response->'tags'->0->>'name'", false),
-            podcast: b('Genre', 'optional', 'api', "response->>'primaryGenreName'", false)
+            podcast: b('Genre', 'optional', 'api', "response->>'primaryGenreName'", false),
+            painting: b('Medium', 'typical', 'api', "response->>'medium'", true, {
+                tooltip: 'Materials as the museum records them, e.g. "Oil on canvas", "Oil on oak", "Tempera and gold on wood".',
+                appearance: 'Plain text, line-clamp-1. Filter is free-text contains, not a set filter — the Met does not use a controlled vocabulary here.'
+            })
         }
     },
     {
@@ -341,7 +371,11 @@ export const COLUMNS = [
             purchase: b('Merchant', 'required', 'user', "response->>'merchant'", true),
             perspective: b('Holder', 'required', 'internal', "response->>'holder'", true, { tooltip: 'The person whose perspective this is' }),
             place: b('Operator', 'optional', 'api', "response->>'operator'", false),
-            paper: b('First author', 'required', 'api', "response->'authors'->0->>'name'", true)
+            paper: b('First author', 'required', 'api', "response->'authors'->0->>'name'", true),
+            painting: b('Artist', 'typical', 'api', "response->>'artistDisplayName'", true, {
+                tooltip: 'The artist as the museum attributes the work — may read "Workshop of…", "Attributed to…" or be blank for anonymous works.',
+                appearance: 'Name, with artistDisplayBio (e.g. "Dutch, Leiden 1606–1669 Amsterdam") as an 11px muted subtitle.'
+            })
         }
     },
     {
@@ -367,6 +401,10 @@ export const COLUMNS = [
             bible: b('Book', 'required', 'derived', 'bible_book.name (via verse_start_id)', false, {
                 tooltip: 'The book of the Bible, and its place among the 66. Already the first word of the reference, so off by default.',
                 appearance: 'Book name with a muted "#23 of 66". Sorts by bible_book.id (canonical order).'
+            }),
+            painting: b('Collection', 'typical', 'api', "response->>'repository'", false, {
+                tooltip: 'The museum that holds the painting, and its department. Constant while the Met is the only source, so off by default; turn on once Wikidata paintings arrive.',
+                appearance: 'Museum name with response->>\'department\' as a muted subtitle, e.g. "The Met · European Paintings".'
             })
         }
     },
@@ -422,7 +460,11 @@ export const COLUMNS = [
             purchase: b('Purchased', 'required', 'user', "response->>'purchasedAt'", true),
             perspective: b('Stated', 'typical', 'internal', "response->>'statedAt'", true),
             place: b('Visited', 'required', 'user', "response->>'visitedAt'", true),
-            paper: b('Published', 'required', 'api', "response->>'issued'", true)
+            paper: b('Published', 'required', 'api', "response->>'issued'", true),
+            painting: b('Painted', 'typical', 'api', "(response->>'objectBeginDate')::int", true, {
+                tooltip: 'When the painting was made, as the museum dates it — often approximate ("ca. 1662") or a range ("1884–86").',
+                appearance: 'Display response->>\'objectDate\' verbatim; never reformat to a full date. The value path is the sort key: integer objectBeginDate (negative for BCE) — note the Vermeer sample: shown "ca. 1662", sorted as 1657. Mixed with YouTube publishedAt this column spans centuries vs days — sort by Type first.'
+            })
         }
     },
     {
@@ -570,7 +612,8 @@ export const COLUMNS = [
             podcast: b('Listened', 'optional', 'user', "response->>'progressStatus'", false),
             article: b('Read', 'optional', 'user', "response->>'progressStatus'", false),
             paper: b('Read', 'optional', 'user', "response->>'progressStatus'", false),
-            claim: b('Verdict', 'typical', 'user', "response->>'verdict'", true, { tooltip: 'PLANNED — not written by CreateClaim today. Unverified / supported / contested / refuted' })
+            claim: b('Verdict', 'typical', 'user', "response->>'verdict'", true, { tooltip: 'PLANNED — not written by CreateClaim today. Unverified / supported / contested / refuted' }),
+            painting: b('Seen', 'optional', 'user', "response->>'progressStatus'", false, { tooltip: 'Want to see / seen in person / seen in reproduction only' })
         }
     },
     {
@@ -595,6 +638,10 @@ export const COLUMNS = [
             bible: b('Verse IDs', 'required', 'internal', 'verse_start_id–verse_end_id', false, {
                 tooltip: 'Global verse ordinals (Genesis 1:1 = 1, John 3:16 = 26,137, Revelation 22:21 = 31,102). Duplicates are caught by the canonical url.',
                 appearance: 'Monospace "18710–18724". Debug column — leave in the picker.'
+            }),
+            painting: b('Met ID', 'required', 'api', "response->>'objectID'", false, {
+                tooltip: 'The Met object ID; the Wikidata QID beside it (response->>\'wikidataQid\') is the key that will dedupe the same painting across sources.',
+                appearance: 'Monospace "met:436535 · Q18689458". Debug column — leave in the picker.'
             })
         }
     },
@@ -836,6 +883,67 @@ export const SAMPLES = {
             description: 'Then I saw a new heaven and a new earth, for the first heaven and earth had passed away…',
             category: 'New creation',
             createdAt: '2026-09-23'
+        }
+    ],
+    // Real Met records, fetched 2026-09-26 from /public/collection/v1/objects/{id}.
+    // Chosen to exercise the edge cases: an approximate date (Vermeer, sorted by
+    // objectBeginDate 1657), a blank classification (Leutze, The American Wing —
+    // why the gate is objectName), a non-oil-on-canvas medium (Bruegel), and a
+    // painting with no open-access image (Monet 437127 → Commons fallback).
+    painting: [
+        {
+            item: { text: 'Wheat Field with Cypresses', sub: 'met:436535' },
+            genre: 'Oil on canvas',
+            creator: 'Vincent van Gogh',
+            venue: 'The Met · European Paintings',
+            date: '1889',
+            identifier: 'met:436535 · Q18689458',
+            tags: 'Landscapes, Cypresses, Summer',
+            category: 'Post-Impressionism',
+            createdAt: '2026-09-26'
+        },
+        {
+            item: { text: 'Young Woman with a Water Pitcher', sub: 'met:437881' },
+            genre: 'Oil on canvas',
+            creator: 'Johannes Vermeer',
+            venue: 'The Met · European Paintings',
+            date: 'ca. 1662',
+            identifier: 'met:437881 · Q386453',
+            tags: 'Interiors, Women, Maps, Pitchers',
+            category: 'Dutch Golden Age',
+            createdAt: '2026-09-26'
+        },
+        {
+            item: { text: 'Washington Crossing the Delaware', sub: 'met:11417' },
+            genre: 'Oil on canvas',
+            creator: 'Emanuel Leutze',
+            venue: 'The Met · The American Wing',
+            date: '1851',
+            identifier: 'met:11417 · Q509806',
+            tags: 'Soldiers, American Revolution, George Washington',
+            category: 'History painting',
+            createdAt: '2026-09-26'
+        },
+        {
+            item: { text: 'The Harvesters', sub: 'met:435809' },
+            genre: 'Oil on oak',
+            creator: 'Pieter Bruegel the Elder',
+            venue: 'The Met · European Paintings',
+            date: '1565',
+            identifier: 'met:435809 · Q776175',
+            tags: 'Food, Landscapes, Working, Eating',
+            createdAt: '2026-09-26'
+        },
+        {
+            item: { text: 'Bridge over a Pond of Water Lilies', sub: 'met:437127 · image via Commons' },
+            genre: 'Oil on canvas',
+            creator: 'Claude Monet',
+            venue: 'The Met · European Paintings',
+            date: '1899',
+            identifier: 'met:437127 · Q19905213',
+            tags: 'Bridges, Ponds, Water Lilies',
+            category: 'Impressionism',
+            createdAt: '2026-09-26'
         }
     ]
 };

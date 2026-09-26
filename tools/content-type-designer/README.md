@@ -66,12 +66,12 @@ Given a selection of types, the preview flags:
 
 ## Seeded types
 
-Thirteen deliberately dissimilar types ship as seed data, so the catalog is not
+Fourteen deliberately dissimilar types ship as seed data, so the catalog is not
 quietly YouTube-shaped:
 
 YouTube video · Movie · Book · Blog article · Podcast episode · Music track ·
 Propositional truth claim · Joke · Purchase · Another person's perspective ·
-Place visit · Research paper · Bible passage
+Place visit · Research paper · Bible passage · Painting
 
 They differ on every axis that matters: API-enriched vs scraped vs manual vs
 internal-reference; URL-identified vs ISBN/DOI/GUID-identified vs text-hash
@@ -110,7 +110,7 @@ Two deterministic documents, copyable or downloadable:
 
 | File | Purpose |
 |---|---|
-| `src/catalog.ts` | The 13 seeded type profiles, the generic column catalog with per-type bindings, and sample rows |
+| `src/catalog.ts` | The 14 seeded type profiles, the generic column catalog with per-type bindings, and sample rows |
 | `src/model.ts` | State shape, visibility resolution, gap analysis |
 | `src/emit.ts` | Deterministic markdown generation |
 | `src/main.ts` | Form rendering and localStorage persistence |
