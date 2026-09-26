@@ -168,6 +168,57 @@ type PerspectiveAggregate struct {
 	AverageQuality *float64
 }
 
+// FeelingStats summarizes how many perspectives in scope (one content item,
+// or every perspective when unscoped) carry a given feeling -- matched by
+// exact Emoji grapheme and, if Label is set, case-insensitively narrowed
+// further by Label too -- plus the average and population standard
+// deviation of that feeling's Intensity across those perspectives.
+// TotalPerspectives is the perspective count over the same scope (matching
+// PerspectiveAggregate.Count), so PercentOfPerspectives is "of ALL
+// perspectives in scope", not just of those that set any feeling at all.
+// AverageIntensity/StdDevIntensity are nil when Count is 0; StdDevIntensity
+// is also nil when Count is 1 (standard deviation of one value is
+// undefined here, not 0). Counts public and private perspectives alike,
+// matching PerspectiveAggregate's privacy stance -- see its doc comment.
+type FeelingStats struct {
+	Emoji             string
+	Label             *string
+	Count             int
+	TotalPerspectives int
+	AverageIntensity  *float64
+	StdDevIntensity   *float64
+}
+
+// PercentOfPerspectives returns Count as a percentage (0-100) of
+// TotalPerspectives, or nil when TotalPerspectives is 0 (nothing to take a
+// percentage of).
+func (f *FeelingStats) PercentOfPerspectives() *float64 {
+	if f.TotalPerspectives == 0 {
+		return nil
+	}
+	pct := 100 * float64(f.Count) / float64(f.TotalPerspectives)
+	return &pct
+}
+
+// CustomFieldStats summarizes how many perspectives in scope set the given
+// top-level CustomFields key (any value). See FeelingStats for the scoping
+// and privacy rules this mirrors.
+type CustomFieldStats struct {
+	Key               string
+	Count             int
+	TotalPerspectives int
+}
+
+// PercentOfPerspectives returns Count as a percentage (0-100) of
+// TotalPerspectives, or nil when TotalPerspectives is 0.
+func (c *CustomFieldStats) PercentOfPerspectives() *float64 {
+	if c.TotalPerspectives == 0 {
+		return nil
+	}
+	pct := 100 * float64(c.Count) / float64(c.TotalPerspectives)
+	return &pct
+}
+
 // MarshalCategorizedRatings converts CategorizedRatings to JSON for storage
 func (p *Perspective) MarshalCategorizedRatings() ([]json.RawMessage, error) {
 	if len(p.CategorizedRatings) == 0 {

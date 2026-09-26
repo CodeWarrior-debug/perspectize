@@ -21,6 +21,9 @@ type mockPerspectiveRepository struct {
 	deleteFn    func(ctx context.Context, id int) error
 	listFn      func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
 	aggregateFn func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
+
+	feelingStatsFn     func(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error)
+	customFieldStatsFn func(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error)
 }
 
 func (m *mockPerspectiveRepository) Create(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
@@ -68,6 +71,20 @@ func (m *mockPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 		return m.aggregateFn(ctx, contentIDs)
 	}
 	return map[int]*domain.PerspectiveAggregate{}, nil
+}
+
+func (m *mockPerspectiveRepository) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+	if m.feelingStatsFn != nil {
+		return m.feelingStatsFn(ctx, contentID, emoji, label)
+	}
+	return &domain.FeelingStats{Emoji: emoji, Label: label}, nil
+}
+
+func (m *mockPerspectiveRepository) CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+	if m.customFieldStatsFn != nil {
+		return m.customFieldStatsFn(ctx, contentID, key)
+	}
+	return &domain.CustomFieldStats{Key: key}, nil
 }
 
 // mockUserRepoForPerspective implements repositories.UserRepository for perspective tests
@@ -571,5 +588,86 @@ func TestPerspectiveService_AggregateByContentIDs(t *testing.T) {
 		_, err := svc.AggregateByContentIDs(ctx, []int{1})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "db exploded")
+	})
+}
+
+func TestPerspectiveService_FeelingStats(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("passes through the repository's stats", func(t *testing.T) {
+		avg, stddev := 8500.0, 1200.0
+		contentID := 42
+		repo := &mockPerspectiveRepository{
+			feelingStatsFn: func(ctx context.Context, gotContentID *int, gotEmoji string, gotLabel *string) (*domain.FeelingStats, error) {
+				require.NotNil(t, gotContentID)
+				assert.Equal(t, 42, *gotContentID)
+				assert.Equal(t, "🥰", gotEmoji)
+				require.NotNil(t, gotLabel)
+				assert.Equal(t, "Love", *gotLabel)
+				return &domain.FeelingStats{
+					Emoji: "🥰", Label: gotLabel,
+					Count: 3, TotalPerspectives: 10,
+					AverageIntensity: &avg, StdDevIntensity: &stddev,
+				}, nil
+			},
+		}
+		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+
+		label := "Love"
+		got, err := svc.FeelingStats(ctx, &contentID, "🥰", &label)
+		require.NoError(t, err)
+		assert.Equal(t, 3, got.Count)
+		assert.Equal(t, 10, got.TotalPerspectives)
+		assert.Equal(t, &avg, got.AverageIntensity)
+		assert.Equal(t, &stddev, got.StdDevIntensity)
+		require.NotNil(t, got.PercentOfPerspectives())
+		assert.Equal(t, 30.0, *got.PercentOfPerspectives())
+	})
+
+	t.Run("rejects an empty emoji", func(t *testing.T) {
+		svc := services.NewPerspectiveService(&mockPerspectiveRepository{}, &mockUserRepoForPerspective{})
+		_, err := svc.FeelingStats(ctx, nil, "", nil)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	})
+
+	t.Run("wraps a repository error", func(t *testing.T) {
+		repo := &mockPerspectiveRepository{
+			feelingStatsFn: func(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+				return nil, fmt.Errorf("db exploded")
+			},
+		}
+		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+		_, err := svc.FeelingStats(ctx, nil, "🥰", nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "db exploded")
+	})
+}
+
+func TestPerspectiveService_CustomFieldStats(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("passes through the repository's stats", func(t *testing.T) {
+		repo := &mockPerspectiveRepository{
+			customFieldStatsFn: func(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+				assert.Nil(t, contentID)
+				assert.Equal(t, "mood", key)
+				return &domain.CustomFieldStats{Key: "mood", Count: 5, TotalPerspectives: 20}, nil
+			},
+		}
+		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+
+		got, err := svc.CustomFieldStats(ctx, nil, "mood")
+		require.NoError(t, err)
+		assert.Equal(t, 5, got.Count)
+		require.NotNil(t, got.PercentOfPerspectives())
+		assert.Equal(t, 25.0, *got.PercentOfPerspectives())
+	})
+
+	t.Run("rejects an empty key", func(t *testing.T) {
+		svc := services.NewPerspectiveService(&mockPerspectiveRepository{}, &mockUserRepoForPerspective{})
+		_, err := svc.CustomFieldStats(ctx, nil, "")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidInput)
 	})
 }
