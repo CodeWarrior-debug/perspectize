@@ -121,22 +121,51 @@ func KnownIDs(areas []appguide.Area) map[string]bool {
 // Run asks every case runs times, sequentially (gentle on rate limits and
 // keeps latency numbers honest), and aggregates the results.
 func Run(ctx context.Context, a Asker, model string, cases []Case, runs int, known map[string]bool) Report {
+	items := make([]item, len(cases))
+	for i, c := range cases {
+		c := c
+		items[i] = item{
+			area:     c.Area,
+			question: c.Seed.Question,
+			trap:     len(c.Seed.MustNotClaim) > 0,
+			ask: func(ctx context.Context) (agent.Result, error) {
+				return a.Ask(ctx, c.Seed.Question, func(llm.Event) {})
+			},
+			grade: func(res agent.Result) (bool, string) {
+				return Check(res.Final.Text(), c.Seed, known)
+			},
+		}
+	}
+	return runItems(ctx, model, items, runs)
+}
+
+// item is one question to ask and how to grade the answer. Guide seeds and
+// data cases both become items, so they share one runner and report format.
+type item struct {
+	area     string
+	question string
+	trap     bool
+	ask      func(context.Context) (agent.Result, error)
+	grade    func(agent.Result) (bool, string)
+}
+
+func runItems(ctx context.Context, model string, items []item, runs int) Report {
 	rep := Report{Model: model, RunsPerSeed: runs, StartedAt: time.Now().UTC()}
 	var passes, total int
 	var latency time.Duration
-	for _, c := range cases {
-		sr := SeedReport{Area: c.Area, Question: c.Seed.Question, Trap: len(c.Seed.MustNotClaim) > 0}
+	for _, it := range items {
+		sr := SeedReport{Area: it.area, Question: it.question, Trap: it.trap}
 		seedPasses := 0
 		for i := 0; i < runs; i++ {
 			start := time.Now()
-			res, err := a.Ask(ctx, c.Seed.Question, func(llm.Event) {})
+			res, err := it.ask(ctx)
 			rr := RunResult{Latency: time.Since(start), Stop: res.Stop, Calls: res.Calls, Usage: res.Usage}
 			if err != nil {
 				rr.Reason = "error: " + err.Error()
 			} else {
 				rr.Answer = res.Final.Text()
 				rr.Cited = Citations(rr.Answer)
-				rr.Pass, rr.Reason = Check(rr.Answer, c.Seed, known)
+				rr.Pass, rr.Reason = it.grade(res)
 			}
 			if rr.Pass {
 				seedPasses++
