@@ -1,0 +1,7 @@
+[
+  { "question": "How do I search for a video to add to Perspectize?", "expect_ids": ["discover.search"], "must_not_claim": [] },
+  { "question": "Can I filter trending videos by upload date?", "expect_ids": ["discover.browse-trending"], "must_not_claim": ["filter trending", "trending supports duration or date filters"] },
+  { "question": "Does clicking a Discover result open YouTube in a new tab?", "expect_ids": ["discover.watch-inline"], "must_not_claim": ["opens a new tab", "navigates to YouTube"] },
+  { "question": "How do I see more search results below the first page?", "expect_ids": ["discover.load-more"], "must_not_claim": [] },
+  { "question": "How do I add a video I found on Discover to my library?", "expect_ids": ["discover.add-video"], "must_not_claim": [] }
+]
