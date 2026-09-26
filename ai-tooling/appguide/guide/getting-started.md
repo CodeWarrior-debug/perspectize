@@ -32,7 +32,7 @@
 2. On step 1, select **Add video** to add one, or **Skip step** to move on.
 3. On step 2, select **Leave a perspective** on the suggested video, or **Skip step**.
 4. If you've dismissed the coach and want it back, open Settings and turn on **Show onboarding next session**.
-**Notes:** The X button, **Skip all**, and **Don't show again** all dismiss the coach for good, the same as finishing both steps. The **Show onboarding next session** toggle takes effect starting your next sign-in, not immediately.
+**Notes:** The X button, **Skip all**, and **Don't show again** all dismiss the coach for good, the same as finishing both steps. Turning on **Show onboarding next session** brings the coach back.
 **Sign-in required:** yes
 **Source:** `frontend/src/lib/components/onboarding/OnboardingShell.svelte`, `frontend/src/lib/components/onboarding/OnboardingCoach.svelte`, `frontend/src/lib/onboarding/eligibility.ts`, `frontend/src/lib/onboarding/coachGate.svelte.ts`, `frontend/src/lib/onboarding/steps.ts`, `frontend/src/lib/components/SettingsDialog.svelte`
 

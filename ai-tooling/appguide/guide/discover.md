@@ -59,6 +59,6 @@
 **Steps:**
 1. Find a video via search or trending that isn't already in your library.
 2. Select **Add to Perspectize** on that card.
-**Notes:** A card already in your library shows a disabled "In Library" state instead of the Add button. Once a video is added this way, its card shows a details panel (duration, views, likes, channel, category) with **Add perspective** and **Compare** buttons — these hand off to the perspective-writing and Compare areas rather than doing anything on Discover itself.
+**Notes:** A card already in your library shows a disabled "In Library" state instead of the Add button. Once a video is added this way, its card shows a details panel (duration, views, likes, channel, category) with **Add perspective** and **Compare** buttons: **Add perspective** opens the perspective editor right there on Discover; **Compare** navigates to the Compare page.
 **Sign-in required:** yes
 **Source:** `frontend/src/routes/discover/+page.svelte`, `frontend/src/lib/components/discover/VideoCard.svelte`, `frontend/src/lib/queries/content/useAddVideo.ts`
