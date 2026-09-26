@@ -154,7 +154,7 @@ See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow
 ## Resources
 
 **Monorepo docs:**
-- [Architecture](.docs/ARCHITECTURE.md) — System design and hexagonal architecture
+- [Architecture](.docs/ARCHITECTURE.md) — System design, hexagonal architecture, and the deep-modules principle (backend + frontend)
 - [Local Development](.docs/LOCAL_DEVELOPMENT.md) — Setup guide
 - [Agent Routing](.docs/AGENTS.md) — AI agent navigation guide
 - [Domain Guide](.docs/DOMAIN_GUIDE.md) — Domain layer rules and patterns

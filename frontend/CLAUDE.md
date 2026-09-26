@@ -18,12 +18,15 @@ frontend/src/
 │   │   └── AGGridTest.svelte
 │   ├── queries/         # TanStack Query + graphql-request
 │   │   ├── client.ts    # GraphQLClient (VITE_GRAPHQL_URL)
-│   │   └── content.ts   # Content query definitions (gql)
+│   │   ├── keys.ts      # Cross-domain query keys
+│   │   └── content/     # One folder per domain: index.ts (gql defs) + its hooks
 │   ├── assets/          # Static assets (favicon)
 │   └── utils/           # Utility functions
 ├── app.css              # Global styles (Tailwind v4)
 └── app.html             # HTML shell
 ```
+
+**Deep modules apply here too** — group by domain, expose a narrow `index.ts`, no pass-through components. See [Deep Modules](../.docs/ARCHITECTURE.md#deep-modules-applies-to-backend-and-frontend).
 
 ## shadcn-svelte Components
 
