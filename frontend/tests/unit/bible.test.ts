@@ -165,6 +165,7 @@ describe('passageIconLabels', () => {
 		expect(passageIconLabels({ verseStartID: 26137, verseEndID: 26137, displayTitle: null })).toEqual({
 			left: 'Jn',
 			right: '3:16',
+			rightIsTitle: false,
 		});
 	});
 
@@ -172,11 +173,12 @@ describe('passageIconLabels', () => {
 		expect(passageIconLabels({ verseStartID: 26137, verseEndID: 26137, displayTitle: 'For God so loved' })).toEqual({
 			left: 'Jn 3:16',
 			right: 'For God so loved',
+			rightIsTitle: true,
 		});
 	});
 
 	it('returns empty labels when verse ids are missing (icon renders with no overlay)', () => {
-		expect(passageIconLabels({ displayTitle: 'Creation' })).toEqual({ left: '', right: '' });
-		expect(passageIconLabels({})).toEqual({ left: '', right: '' });
+		expect(passageIconLabels({ displayTitle: 'Creation' })).toEqual({ left: '', right: '', rightIsTitle: false });
+		expect(passageIconLabels({})).toEqual({ left: '', right: '', rightIsTitle: false });
 	});
 });

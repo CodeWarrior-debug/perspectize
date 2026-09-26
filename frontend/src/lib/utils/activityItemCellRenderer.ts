@@ -1,5 +1,13 @@
 import { extractVideoIdFromUrl } from './formatting';
-import { BIBLE_PASSAGE_ICON_SVG_SCALABLE } from './icons';
+import {
+	BIBLE_PASSAGE_ICON_SVG_SCALABLE,
+	BIBLE_ICON_WRAPPER_CLASS,
+	BIBLE_ICON_LABEL_CLASS,
+	BIBLE_ICON_LEFT_CLASS,
+	BIBLE_ICON_RIGHT_CLASS,
+	BIBLE_ICON_REF_TEXT_CLASS,
+	BIBLE_ICON_TITLE_TEXT_CLASS,
+} from './icons';
 import { passageIconLabels } from './bible';
 
 /**
@@ -25,37 +33,32 @@ function renderPassageCell(opts: {
 
 	const iconBox = document.createElement('div');
 	iconBox.dataset.testid = 'item-thumb';
-	iconBox.className = 'relative flex h-8 w-10 flex-none items-center justify-center rounded bg-muted text-primary';
-	iconBox.innerHTML = BIBLE_PASSAGE_ICON_SVG_SCALABLE;
+	iconBox.className = 'flex h-8 w-10 flex-none items-center justify-center rounded bg-muted text-primary';
 	iconBox.addEventListener('click', (e) => {
 		e.stopPropagation();
 		if (url) window.open(url, '_blank', 'noopener,noreferrer');
 	});
 
-	// Page-flap text overlay — book/reference labels only, never the free-text
-	// displayTitle content directly as markup: everything below is set via
-	// textContent so a title like "</span><script>" can't inject into the DOM.
-	const { left, right } = passageIconLabels({ verseStartID, verseEndID, displayTitle });
-	if (left || right) {
-		const labels = document.createElement('div');
-		labels.className = 'absolute inset-0 flex items-center justify-center px-1 text-[9px] leading-none font-semibold';
-
-		const leftSpan = document.createElement('span');
-		leftSpan.className = 'flex-1 truncate text-right';
-		leftSpan.textContent = left;
-
-		const spacer = document.createElement('span');
-		spacer.className = 'w-1.5 flex-none';
-
-		const rightSpan = document.createElement('span');
-		rightSpan.className = 'flex-1 truncate text-left';
-		rightSpan.textContent = right;
-
-		labels.appendChild(leftSpan);
-		labels.appendChild(spacer);
-		labels.appendChild(rightSpan);
-		iconBox.appendChild(labels);
+	const book = document.createElement('div');
+	book.className = BIBLE_ICON_WRAPPER_CLASS;
+	book.innerHTML = BIBLE_PASSAGE_ICON_SVG_SCALABLE;
+	// textContent, not innerHTML: displayTitle is user-supplied free text.
+	const { left, right, rightIsTitle } = passageIconLabels({ verseStartID, verseEndID, displayTitle });
+	for (const [text, side, textClass] of [
+		[left, BIBLE_ICON_LEFT_CLASS, BIBLE_ICON_REF_TEXT_CLASS],
+		[right, BIBLE_ICON_RIGHT_CLASS, rightIsTitle ? BIBLE_ICON_TITLE_TEXT_CLASS : BIBLE_ICON_REF_TEXT_CLASS],
+	]) {
+		if (!text) continue;
+		const label = document.createElement('span');
+		label.className = `${BIBLE_ICON_LABEL_CLASS} ${side}`;
+		const inner = document.createElement('span');
+		inner.className = textClass;
+		inner.lang = 'en';
+		inner.textContent = text;
+		label.appendChild(inner);
+		book.appendChild(label);
 	}
+	iconBox.appendChild(book);
 
 	const textWrap = document.createElement('div');
 	textWrap.className = 'min-w-0 flex-1 text-left whitespace-normal';

@@ -185,12 +185,13 @@ export function passageIconLabels(passage: {
 	verseStartID?: number | null;
 	verseEndID?: number | null;
 	displayTitle?: string | null;
-}): { left: string; right: string } {
+}): { left: string; right: string; rightIsTitle: boolean } {
 	const ref =
 		passage.verseStartID != null && passage.verseEndID != null
 			? abbreviateReferenceFromVerseIds(passage.verseStartID, passage.verseEndID)
 			: null;
-	if (!ref) return { left: '', right: '' };
-	if (passage.displayTitle) return { left: `${ref.book} ${ref.chapterVerse}`, right: passage.displayTitle };
-	return { left: ref.book, right: ref.chapterVerse };
+	if (!ref) return { left: '', right: '', rightIsTitle: false };
+	if (passage.displayTitle)
+		return { left: `${ref.book} ${ref.chapterVerse}`, right: passage.displayTitle, rightIsTitle: true };
+	return { left: ref.book, right: ref.chapterVerse, rightIsTitle: false };
 }
