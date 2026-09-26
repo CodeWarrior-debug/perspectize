@@ -81,4 +81,13 @@ Phase 4 (Add Perspective Flow) is the final MVP feature. Phases 6, 8.1, 9, 10 ar
 TBD — See `/gsd:new-milestone` for full planning.
 
 ---
+
+## v1.2 — Jeeves AI Assistant (IN PROGRESS — parallel with v1.1)
+
+**Started:** 2026-09-26
+**Phases:** 25+ (progressive — only the next phase is planned in detail)
+**Summary:** In-app AI assistant on a provider-neutral `ai-tooling/` Go module: app guide, read-only tools, `botler` dev CLI, eval harness, streaming sidebar UI, then an OpenRouter pivot gated by evals. Jeeves moves out of "FUTURE FEATURES" above. Deferred to a later milestone: credits/BYOK billing and the remote MCP server (+ Chrome extension use case).
+**Details:** `.planning/PROJECT.md` (Current Milestone), `.planning/v1.2-REQUIREMENTS.md`, `ai-tooling/CLAUDE.md`.
+
+---
 *Last updated: 2026-02-16*
