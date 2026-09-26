@@ -42,6 +42,7 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
 	"github.com/vektah/gqlparser/v2/ast"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func main() {
@@ -283,16 +284,11 @@ func main() {
 	// Middleware stack (order matters: rate limit before auth to prevent DoS)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
+	r.Use(perfmw.ClientInfo)                             // tags every request (even unauthenticated/rate-limited) with client.version/platform
 	r.Use(apimw.GlobalRateLimit(secCfg.RateLimitPerMin)) // H-11: rate limiting before auth
-	r.Use(cors.Handler(cors.Options{                     // C-05: CORS restricted to config origins
-		AllowedOrigins:   secCfg.CORSOrigins,
-		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders:   []string{"Content-Type", "Authorization"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	}))
-	r.Use(apimw.SecureHeaders())       // M-14: security headers (HSTS, X-Content-Type-Options, X-Frame-Options)
-	r.Use(apimw.ContentTypeValidation) // M-15: CSRF protection via Content-Type
+	r.Use(cors.Handler(corsOptions(secCfg.CORSOrigins))) // C-05: CORS restricted to config origins
+	r.Use(apimw.SecureHeaders())                         // M-14: security headers (HSTS, X-Content-Type-Options, X-Frame-Options)
+	r.Use(apimw.ContentTypeValidation)                   // M-15: CSRF protection via Content-Type
 	r.Use(auth.Middleware(userRepo, tokenVerifier))
 	r.Use(graphqldl.Middleware(categoryService, perspectiveService)) // per-request GraphQL dataloaders (batches Content.primaryCategory, Content.perspectiveCount/averageRating)
 	r.Use(perfmw.RequestTimer)                                       // structured request timing (replaces chi Logger)
@@ -340,7 +336,7 @@ func main() {
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	server := &http.Server{
 		Addr:         addr,
-		Handler:      r, // chi router
+		Handler:      withTracing(r), // chi router, wrapped in an otelhttp root span
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -366,6 +362,48 @@ func main() {
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+// corsOptions builds the CORS configuration for the given allowlist of
+// origins. AllowedHeaders includes the W3C trace context headers
+// (traceparent/tracestate) and the client identity headers
+// (X-Client-Version/X-Client-Platform) so browser preflight doesn't reject
+// requests carrying them.
+func corsOptions(origins []string) cors.Options {
+	return cors.Options{
+		AllowedOrigins: origins,
+		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders: []string{
+			"Content-Type",
+			"Authorization",
+			"traceparent",
+			"tracestate",
+			"X-Client-Version",
+			"X-Client-Platform",
+		},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}
+}
+
+// withTracing wraps h in an otelhttp root span per request. WebSocket
+// handshakes are excluded (a span held open for the life of a subscription
+// would be useless), as are /health and /ready, which are polled far too
+// often to be worth a span each. The span name is "METHOD path" — the route
+// set is small and static (/graphql, /webhooks/clerk), so this doesn't
+// create high cardinality.
+func withTracing(h http.Handler) http.Handler {
+	return otelhttp.NewHandler(h, "http.server",
+		otelhttp.WithFilter(func(req *http.Request) bool {
+			if isWebsocketHandshake(req) {
+				return false
+			}
+			return req.URL.Path != "/health" && req.URL.Path != "/ready"
+		}),
+		otelhttp.WithSpanNameFormatter(func(_ string, req *http.Request) string {
+			return req.Method + " " + req.URL.Path
+		}),
+	)
 }
 
 // coderWebsocketImplementationFor builds the coder/websocket-backed
