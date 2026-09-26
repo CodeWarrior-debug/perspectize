@@ -19,3 +19,13 @@ Confidence: `new` (introduced, not quizzed) → `shaky` → `solid`.
 | Closed loop: independent verifier + objective completion condition + failure feedback path + round cap | 2026-09-26 | 2026-09-26 | solid | Named verifier + completion condition; added feedback path, ground-truth checks, escalation cap. Follow-up: conflated open loop (no feedback) with non-terminating loop (feedback, no exit) — re-check |
 | Context discipline: small tasks in fresh subagents (vs. % caps) | 2026-09-26 | — | new | |
 | Guide format: concise plain English + scoped loading beats caveman compression | 2026-09-26 | — | new | Measurable later via evals A/B |
+
+## Pending (owner asked Claude to keep building without waiting — run these when the owner is back)
+
+- [ ] Task 1 quiz: (1) why the guide lives under `appguide/guide/` (go:embed no `..`); (2) why ai-tooling can't import `backend/internal/...` but backend can import ai-tooling
+- [ ] Task 1 reading: pkg.go.dev/embed — "Directives" section
+- [ ] Task 2 quiz: (1) which lint rule most protects future evals, and why; (2) one guide error lint can't catch that the verifier can
+- [ ] Task 3 owner-implements: write `settings.change-theme` in `appguide/guide/settings.md` (reserved; Claude reviews it)
+- [ ] Task 3 quiz: (1) why "Not supported" lines; (2) which claim in your entry a verifier would check first, against which file
+- [ ] MCP Tools reading (modelcontextprotocol.io → Concepts → Tools, tool annotations) + one question
+- [ ] Re-quiz shaky rows above (agent loop call count, stateless API, in-app handshake, open vs non-terminating loop)

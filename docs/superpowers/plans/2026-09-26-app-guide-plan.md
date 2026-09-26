@@ -173,11 +173,11 @@ For `source-exists` tests, use `t.TempDir()` as `repoRoot` and create the files 
 
 **Files:** `ai-tooling/appguide/guide/README.md`, `ai-tooling/appguide/guide/settings.md` (one entry), `ai-tooling/appguide/seeds/settings.json` (placeholder seeds), `ai-tooling/appguide/guide_test.go`, `.github/workflows/ci.yml`, `.hooks/pre-commit`, `CLAUDE.md`
 
-- [ ] **Step 1: Write `guide/README.md`**: the entry format, field-rule table and style rules copied from the spec, plus an area index table (slug → title → status). This is also the writers' brief.
+- [x] **Step 1: Write `guide/README.md`**: the entry format, field-rule table and style rules copied from the spec, plus an area index table (slug → title → status). This is also the writers' brief.
 
-- [ ] **Step 2: 🧑‍💻 Owner implements** one entry in `guide/settings.md` (for example, changing the theme). Claude supplies only the area header and points to `SettingsDialog.svelte` / `theme/`. The owner reads the code, writes the entry, and adds 3 seeds to `seeds/settings.json` (including one trap). Claude then reviews it against the format and the code, commenting like a PR reviewer.
+- [ ] **Step 2: 🧑‍💻 Owner implements** *(deferred: the owner asked to keep building without waiting. `settings.change-theme` is reserved for the owner; tracked in `ai-tooling/LEARNING.md` → Pending)* one entry in `guide/settings.md` (for example, changing the theme). Claude supplies only the area header and points to `SettingsDialog.svelte` / `theme/`. The owner reads the code, writes the entry, and adds 3 seeds to `seeds/settings.json` (including one trap). Claude then reviews it against the format and the code, commenting like a PR reviewer.
 
-- [ ] **Step 3: Write `guide_test.go`:**
+- [x] **Step 3: Write `guide_test.go`:**
 
 ```go
 func TestEmbeddedGuideIsClean(t *testing.T) {
@@ -192,7 +192,7 @@ func TestEmbeddedGuideIsClean(t *testing.T) {
 
 Run it. It must pass with the owner's single entry.
 
-- [ ] **Step 4: CI job.** Add to `.github/workflows/ci.yml`:
+- [x] **Step 4: CI job.** Add to `.github/workflows/ci.yml`:
 
 ```yaml
   ai-tooling:
@@ -216,11 +216,13 @@ Run it. It must pass with the owner's single entry.
 
 The source-path lint needs `frontend/` present; `actions/checkout` provides the whole repo.
 
-- [ ] **Step 5: Hook.** In `.hooks/pre-commit`, change `-- 'backend/*.go'` to `-- 'backend/*.go' 'ai-tooling/*.go'`.
+- [x] **Step 5: Hook.** In `.hooks/pre-commit`, change `-- 'backend/*.go'` to `-- 'backend/*.go' 'ai-tooling/*.go'`.
 
-- [ ] **Step 6: Root `CLAUDE.md`.** In the Self-Verification checklist, add: "**AI tooling**: `go build ./...`, `gofmt -l .`, `go test ./...` in `ai-tooling/`." Update the `ai-tooling/CLAUDE.md` status line to "Phase 25 in progress: app guide."
+- [x] **Step 6: Root `CLAUDE.md`.** In the Self-Verification checklist, add: "**AI tooling**: `go build ./...`, `gofmt -l .`, `go test ./...` in `ai-tooling/`." Update the `ai-tooling/CLAUDE.md` status line to "Phase 25 in progress: app guide."
 
-- [ ] **Step 7: Commit:** `feat(ai-tooling): real-guide lint test, CI job, and pre-commit gofmt`
+- [x] **Step 7: Commit:** `feat(ai-tooling): real-guide lint test, CI job, and pre-commit gofmt`
+
+**Deviation:** Task 3 ran before the owner's entry existed, so the real-guide test passes with zero areas. The settings writer (Task 5) must leave `settings.change-theme` for the owner. CI job also runs `go vet` and `-race`. Hooks activated in-session with `git config core.hooksPath .hooks`.
 
 **Learn:**
 - *Concepts:* writing for a model reader (exact labels, "Not supported", stable IDs); how a CI gate turns the guide into something enforced rather than a document people hope stays right.
