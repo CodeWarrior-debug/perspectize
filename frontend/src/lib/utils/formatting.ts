@@ -448,7 +448,14 @@ export function perspectiveCellRenderer(params: {
  * Shows category label if assigned, or '+' icon for empty cells.
  */
 export function categoryCellRenderer(params: {
-	data?: { primaryCategory: { label: string; description: string | null; wikidataQid: string } | null };
+	data?: {
+		primaryCategory: {
+			label: string;
+			description: string | null;
+			wikidataQid: string;
+			wikipediaUrl?: string | null;
+		} | null;
+	};
 }): HTMLElement {
 	const container = document.createElement('div');
 	// h-full w-full required for flexbox centering to fill entire cell (Decision 6 gotcha)
@@ -456,10 +463,20 @@ export function categoryCellRenderer(params: {
 
 	const category = params.data?.primaryCategory;
 	if (category) {
-		const label = document.createElement('span');
+		// Label links out to Wikipedia when available; clicking elsewhere in the
+		// cell still opens the category-edit popover (see ActivityTable's grid
+		// cell click handler).
+		const label: HTMLElement = category.wikipediaUrl ? document.createElement('a') : document.createElement('span');
 		label.textContent = category.label;
 		label.title = category.description ?? category.wikidataQid;
 		label.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+		if (category.wikipediaUrl && label instanceof HTMLAnchorElement) {
+			label.href = category.wikipediaUrl;
+			label.target = '_blank';
+			label.rel = 'noopener noreferrer';
+			label.style.textDecoration = 'underline';
+			label.addEventListener('click', (e) => e.stopPropagation());
+		}
 		container.appendChild(label);
 	} else {
 		const plus = document.createElement('span');

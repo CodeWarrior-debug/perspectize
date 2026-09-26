@@ -17,9 +17,9 @@ function makeClient() {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function renderWith(component: Component<any>) {
+function renderWith(component: Component<any>, props: Record<string, unknown> = {}) {
 	return render(TestWrapper, {
-		props: { queryClient: makeClient(), component, props: {} },
+		props: { queryClient: makeClient(), component, props },
 	});
 }
 
@@ -27,6 +27,34 @@ describe('CategoryTypeahead', () => {
 	it('renders the Wikidata search input', () => {
 		renderWith(CategoryTypeahead);
 		expect(screen.getByPlaceholderText('Search Wikidata...')).toBeInTheDocument();
+	});
+
+	it('renders current category label as a link when wikipediaUrl is present', () => {
+		renderWith(CategoryTypeahead, {
+			contentId: 1,
+			currentCategory: {
+				label: 'Science',
+				wikidataQid: 'Q336',
+				wikipediaUrl: 'https://en.wikipedia.org/wiki/Science',
+			},
+			onSelect: () => {},
+			onClose: () => {},
+		});
+
+		const link = screen.getByRole('link', { name: 'Science' });
+		expect(link).toHaveAttribute('href', 'https://en.wikipedia.org/wiki/Science');
+	});
+
+	it('renders current category label as plain text when wikipediaUrl is absent', () => {
+		renderWith(CategoryTypeahead, {
+			contentId: 1,
+			currentCategory: { label: 'Science', wikidataQid: 'Q336' },
+			onSelect: () => {},
+			onClose: () => {},
+		});
+
+		expect(screen.queryByRole('link', { name: 'Science' })).not.toBeInTheDocument();
+		expect(screen.getByText('Science', { exact: false })).toBeInTheDocument();
 	});
 
 	describe('debounce', () => {

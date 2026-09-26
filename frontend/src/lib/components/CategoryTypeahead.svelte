@@ -12,7 +12,7 @@
 		debouncedTerm = $bindable(''),
 	}: {
 		contentId: number;
-		currentCategory: { label: string; wikidataQid: string } | null;
+		currentCategory: { label: string; wikidataQid: string; wikipediaUrl?: string | null } | null;
 		onSelect: (result: WikidataSearchResult) => void;
 		onClose: () => void;
 		/** Debounced search term; exposed as bindable for testing the debounce. */
@@ -86,7 +86,15 @@
 	<!-- Current category display -->
 	{#if currentCategory}
 		<div class="mt-2 border-t pt-2 text-xs text-muted-foreground">
-			Current: {currentCategory.label} ({currentCategory.wikidataQid})
+			Current:
+			{#if currentCategory.wikipediaUrl}
+				<a href={currentCategory.wikipediaUrl} target="_blank" rel="noopener noreferrer" class="underline">
+					{currentCategory.label}
+				</a>
+			{:else}
+				{currentCategory.label}
+			{/if}
+			({currentCategory.wikidataQid})
 		</div>
 	{/if}
 </div>
