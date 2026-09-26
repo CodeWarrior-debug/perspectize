@@ -3,7 +3,8 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
 	import { extractVideoIdFromUrl, formatDuration, formatCount } from '$lib/utils/formatting';
-	import { BIBLE_PASSAGE_ICON_SVG } from '$lib/utils/icons';
+	import { passageIconLabels } from '$lib/utils/bible';
+	import BiblePassageIcon from '$lib/components/BiblePassageIcon.svelte';
 
 	interface CardRow {
 		id: string | number;
@@ -22,6 +23,8 @@
 		likeCount?: number | null;
 		contentType?: string;
 		displayTitle?: string | null;
+		verseStartID?: number | null;
+		verseEndID?: number | null;
 	}
 
 	let {
@@ -67,9 +70,7 @@
 				onclick={(e) => handleThumbClick(row, e)}
 			>
 				{#if isPassage(row)}
-					<span class="flex h-full w-full items-center justify-center text-primary">
-						{@html BIBLE_PASSAGE_ICON_SVG}
-					</span>
+					<BiblePassageIcon {...passageIconLabels(row)} />
 				{:else}
 					{#if thumbSrc(row)}
 						<img
