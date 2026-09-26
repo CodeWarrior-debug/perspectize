@@ -7,6 +7,10 @@ import {
 	rangeToVerseIds,
 	verseIdsToRange,
 	TOTAL_VERSES,
+	abbreviateBookName,
+	formatChapterVerse,
+	abbreviateReferenceFromVerseIds,
+	passageIconLabels,
 	type PassageRange,
 } from '$lib/utils/bible';
 import { BIBLE_BOOKS } from '$lib/utils/bibleStructure';
@@ -117,5 +121,62 @@ describe('verse ordinals', () => {
 	it('returns null for cross-book or reversed id pairs', () => {
 		expect(verseIdsToRange(1, 31102)).toBeNull();
 		expect(verseIdsToRange(10, 5)).toBeNull();
+	});
+});
+
+describe('abbreviateBookName', () => {
+	it('picks the shortest known alias', () => {
+		expect(abbreviateBookName(43)).toBe('Jn'); // John
+		expect(abbreviateBookName(1)).toBe('Gn'); // Genesis
+	});
+
+	it('returns empty string for an unknown book id', () => {
+		expect(abbreviateBookName(9999)).toBe('');
+	});
+});
+
+describe('formatChapterVerse', () => {
+	it('formats a single verse, a same-chapter range, and a cross-chapter range', () => {
+		expect(formatChapterVerse({ bookId: 43, startChapter: 3, startVerse: 16, endChapter: 3, endVerse: 16 })).toBe(
+			'3:16',
+		);
+		expect(formatChapterVerse({ bookId: 43, startChapter: 3, startVerse: 16, endChapter: 3, endVerse: 18 })).toBe(
+			'3:16-18',
+		);
+		expect(formatChapterVerse({ bookId: 43, startChapter: 3, startVerse: 16, endChapter: 4, endVerse: 2 })).toBe(
+			'3:16-4:2',
+		);
+	});
+});
+
+describe('abbreviateReferenceFromVerseIds', () => {
+	it('splits a valid same-book range into book abbreviation + chapter:verse', () => {
+		expect(abbreviateReferenceFromVerseIds(26137, 26137)).toEqual({ book: 'Jn', chapterVerse: '3:16' });
+	});
+
+	it('returns null for a cross-book or reversed pair', () => {
+		expect(abbreviateReferenceFromVerseIds(1, 31102)).toBeNull();
+		expect(abbreviateReferenceFromVerseIds(10, 5)).toBeNull();
+	});
+});
+
+describe('passageIconLabels', () => {
+	it('splits book abbreviation and chapter:verse across the flaps when there is no title', () => {
+		expect(passageIconLabels({ verseStartID: 26137, verseEndID: 26137, displayTitle: null })).toEqual({
+			left: 'Jn',
+			right: '3:16',
+		});
+	});
+
+	it('puts the abbreviated reference on the left and the title on the right when a title is set', () => {
+		expect(passageIconLabels({ verseStartID: 26137, verseEndID: 26137, displayTitle: 'For God so loved' })).toEqual({
+			left: 'Jn 3:16',
+			right: 'For God so loved',
+		});
+	});
+
+	it('returns empty labels when verse ids are missing (icon renders with no overlay)', () => {
+		expect(passageIconLabels({ displayTitle: 'Creation' })).toEqual({ left: '', right: '' });
+		expect(passageIconLabels({})).toEqual({ left: '', right: '' });
 	});
 });

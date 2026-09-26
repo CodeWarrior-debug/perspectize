@@ -25,13 +25,17 @@
 	import CompareTakeColumn from '$lib/components/CompareTakeColumn.svelte';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
 	import { formatDuration, extractVideoIdFromUrl } from '$lib/utils/formatting';
-	import { BIBLE_PASSAGE_ICON_SVG } from '$lib/utils/icons';
+	import { passageIconLabels } from '$lib/utils/bible';
+	import BiblePassageIcon from '$lib/components/BiblePassageIcon.svelte';
 
 	interface CompareContentBanner {
 		id: string;
 		name: string;
 		url: string | null;
 		contentType?: string;
+		verseStartID?: number | null;
+		verseEndID?: number | null;
+		displayTitle?: string | null;
 		length: number | null;
 		lengthUnits: string | null;
 	}
@@ -176,9 +180,9 @@
 		<div class="flex items-center justify-between rounded-lg border border-border px-3.5 py-2.5">
 			<div class="flex items-center gap-2.5">
 				{#if isPassage}
-					<span class="flex h-8 w-10 flex-none items-center justify-center rounded bg-muted text-primary">
-						{@html BIBLE_PASSAGE_ICON_SVG}
-					</span>
+					<div class="h-8 w-10 flex-none overflow-hidden rounded bg-muted">
+						<BiblePassageIcon {...passageIconLabels(content ?? {})} />
+					</div>
 				{:else if contentVideoId}
 					<img
 						src={`https://i.ytimg.com/vi/${contentVideoId}/default.jpg`}

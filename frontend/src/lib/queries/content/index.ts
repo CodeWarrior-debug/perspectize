@@ -128,6 +128,9 @@ export const GET_CONTENT = gql`
 			name
 			url
 			contentType
+			verseStartID
+			verseEndID
+			displayTitle
 			length
 			lengthUnits
 			viewCount

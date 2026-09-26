@@ -1,5 +1,6 @@
 import { extractVideoIdFromUrl } from './formatting';
-import { BIBLE_PASSAGE_ICON_SVG } from './icons';
+import { BIBLE_PASSAGE_ICON_SVG_SCALABLE } from './icons';
+import { passageIconLabels } from './bible';
 
 /**
  * Bible passage variant of the Item cell: an icon tile instead of a thumbnail
@@ -12,9 +13,11 @@ function renderPassageCell(opts: {
 	name: string;
 	url: string | null;
 	displayTitle?: string | null;
+	verseStartID?: number | null;
+	verseEndID?: number | null;
 	onOpenDetails?: (contentId: string) => void;
 }): HTMLElement {
-	const { id, name, url, displayTitle, onOpenDetails } = opts;
+	const { id, name, url, displayTitle, verseStartID, verseEndID, onOpenDetails } = opts;
 
 	const cell = document.createElement('div');
 	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-2 cursor-pointer';
@@ -22,12 +25,37 @@ function renderPassageCell(opts: {
 
 	const iconBox = document.createElement('div');
 	iconBox.dataset.testid = 'item-thumb';
-	iconBox.className = 'flex h-8 w-10 flex-none items-center justify-center rounded bg-muted text-primary';
-	iconBox.innerHTML = BIBLE_PASSAGE_ICON_SVG;
+	iconBox.className = 'relative flex h-8 w-10 flex-none items-center justify-center rounded bg-muted text-primary';
+	iconBox.innerHTML = BIBLE_PASSAGE_ICON_SVG_SCALABLE;
 	iconBox.addEventListener('click', (e) => {
 		e.stopPropagation();
 		if (url) window.open(url, '_blank', 'noopener,noreferrer');
 	});
+
+	// Page-flap text overlay — book/reference labels only, never the free-text
+	// displayTitle content directly as markup: everything below is set via
+	// textContent so a title like "</span><script>" can't inject into the DOM.
+	const { left, right } = passageIconLabels({ verseStartID, verseEndID, displayTitle });
+	if (left || right) {
+		const labels = document.createElement('div');
+		labels.className = 'absolute inset-0 flex items-center justify-center px-1 text-[9px] leading-none font-semibold';
+
+		const leftSpan = document.createElement('span');
+		leftSpan.className = 'flex-1 truncate text-right';
+		leftSpan.textContent = left;
+
+		const spacer = document.createElement('span');
+		spacer.className = 'w-1.5 flex-none';
+
+		const rightSpan = document.createElement('span');
+		rightSpan.className = 'flex-1 truncate text-left';
+		rightSpan.textContent = right;
+
+		labels.appendChild(leftSpan);
+		labels.appendChild(spacer);
+		labels.appendChild(rightSpan);
+		iconBox.appendChild(labels);
+	}
 
 	const textWrap = document.createElement('div');
 	textWrap.className = 'min-w-0 flex-1 text-left whitespace-normal';
@@ -58,6 +86,8 @@ export interface ActivityItemCellRendererParams {
 		url: string | null;
 		contentType?: string;
 		displayTitle?: string | null;
+		verseStartID?: number | null;
+		verseEndID?: number | null;
 	};
 	context?: { onOpenDetails?: (contentId: string) => void };
 }
@@ -79,11 +109,11 @@ const PLAY_ICON_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="non
 export function activityItemCellRenderer(params: ActivityItemCellRendererParams): HTMLElement | string {
 	if (!params.data) return '';
 
-	const { id, name, url, contentType, displayTitle } = params.data;
+	const { id, name, url, contentType, displayTitle, verseStartID, verseEndID } = params.data;
 	const onOpenDetails = params.context?.onOpenDetails;
 
 	if (contentType === 'BIBLE_PASSAGE') {
-		return renderPassageCell({ id, name, url, displayTitle, onOpenDetails });
+		return renderPassageCell({ id, name, url, displayTitle, verseStartID, verseEndID, onOpenDetails });
 	}
 
 	// No native `title` attribute here (or on the thumbnail below) — the column's
