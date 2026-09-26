@@ -34,7 +34,7 @@ import {
 const STORAGE_KEY = 'perspectize.content-type-designer.v1';
 
 /** Seed the type currently being designed, so a fresh open / reset lands on a filled-in form. */
-const DEFAULT_SEED = 'bible';
+const DEFAULT_SEED = 'painting';
 
 function seededState(typeId: string): DraftState {
   const state = blankState();

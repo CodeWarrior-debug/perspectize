@@ -107,8 +107,10 @@ They differ on every axis that matters: API-enriched vs scraped vs manual vs
 internal-reference; URL-identified vs ISBN/DOI/GUID-identified vs text-hash
 identified; with and without duration, audience counts, money, and stance.
 
-A fresh open (or **Reset form**) lands on the Bible passage seed, the type
-currently being designed. Its bindings mirror `feature/bible-outbound-links`,
+A fresh open (or **Reset form**) lands on the Painting seed, the type
+currently being designed (see
+`docs/superpowers/specs/2026-09-26-painting-content-type-design.md`). The
+Bible passage seed's bindings mirror `feature/bible-outbound-links`,
 where every passage field is a real `content` column (`name`,
 `display_title`, `verse_start_id`/`verse_end_id`) or a `bible_book` join. Fields
 not written by `CreateFromPassage` yet are tagged `PLANNED (Qn)` in their

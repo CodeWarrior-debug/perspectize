@@ -5,7 +5,7 @@ import { THUMBS } from './thumbs.js';
 import { bindingFor, gapText, previewRowsFor, profileFor, resolveGrid, samplesFor, sortConflict, sortValue, typeLabel, unitsFor } from './model.js';
 const STORAGE_KEY = 'perspectize.content-type-designer.v1';
 /** Seed the type currently being designed, so a fresh open / reset lands on a filled-in form. */
-const DEFAULT_SEED = 'bible';
+const DEFAULT_SEED = 'painting';
 function seededState(typeId) {
     const state = blankState();
     const t = TYPES.find((x) => x.id === typeId);
