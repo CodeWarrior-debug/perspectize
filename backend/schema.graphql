@@ -493,4 +493,46 @@ type Query {
     includeTotalCount: Boolean = false
     filter: PerspectiveFilter
   ): PaginatedPerspectives!
+
+  # How many perspectives carry a given feeling (matched by exact emoji
+  # grapheme, e.g. "🥰" for Love; label narrows further, case-insensitively,
+  # for the rare case the same emoji is reused for two curated feelings --
+  # see FeelingEntry: label is prefilled for curated wheel/search entries),
+  # the average and population standard deviation of that feeling's
+  # intensity, and what percent of ALL perspectives in scope carry it
+  # (percentOfPerspectives = count / totalPerspectives -- "of those with any
+  # perspective", not just of those with any feelings at all). Scoped to one
+  # content item's perspectives when contentID is given, or platform-wide
+  # across every perspective when omitted. Counts public and private
+  # perspectives alike, matching PerspectiveAggregate's privacy stance.
+  feelingStats(contentID: IntID, emoji: String!, label: String): FeelingStats!
+
+  # How many perspectives set the given CustomFields top-level key (any
+  # value), and what percent of ALL perspectives in scope that is. Same
+  # scoping/privacy rules as feelingStats.
+  customFieldStats(contentID: IntID, key: String!): CustomFieldStats!
+}
+
+# See Query.feelingStats. averageIntensity/stdDevIntensity are null when
+# count is 0 (nothing to average); stdDevIntensity is also null when count
+# is 1 (standard deviation of a single value is undefined here, not 0).
+# percentOfPerspectives is null only when totalPerspectives is 0 (no
+# perspectives at all in scope to take a percentage of).
+type FeelingStats {
+  emoji: String!
+  label: String
+  count: Int!
+  totalPerspectives: Int!
+  averageIntensity: Float
+  stdDevIntensity: Float
+  percentOfPerspectives: Float
+}
+
+# See Query.customFieldStats. percentOfPerspectives is null only when
+# totalPerspectives is 0.
+type CustomFieldStats {
+  key: String!
+  count: Int!
+  totalPerspectives: Int!
+  percentOfPerspectives: Float
 }
