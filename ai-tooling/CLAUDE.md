@@ -2,7 +2,7 @@
 
 Go module (sibling to `backend/`) for Perspectize's AI assistant tooling: provider-neutral LLM layer, agent loop, tool registry, Jeeves tools, evals, and the `botler` dev CLI.
 
-**Status:** design discussion — no spec, plan, or code yet. Do not draft the spec/plan until the owner says go.
+**Status:** Milestone v1.2 (Phases 25–28, `.planning/ROADMAP.md`; requirements `.planning/v1.2-REQUIREMENTS.md`; research `.planning/v1.2-research/`). Phase 25 first plan ready: `docs/superpowers/plans/2026-09-26-app-guide-plan.md` (spec alongside in `docs/superpowers/specs/`). No code yet.
 
 ## Teaching mode (always on in this folder)
 

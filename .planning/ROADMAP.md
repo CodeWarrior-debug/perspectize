@@ -4,6 +4,7 @@
 
 - ✅ **v1.0 Frontend MVP** — Phases 1–9, 17 (Shipped 2026-02-16, formalized 2026-09-04)
 - 🚧 **v1.1 Platform Expansion** — Phases 4, 4.1, 6, 8.1, 10, 11–16 (Planned)
+- 🚧 **v1.2 Jeeves AI Assistant** — Phases 25–28 (runs in parallel with v1.1; 26–28 provisional)
 
 ## v1.0 Overview (ARCHIVED)
 
@@ -779,6 +780,49 @@ Plans:
 **Goal**: PGlite (WASM Postgres, IndexedDB/OPFS) local store and/or Tauri desktop shell.
 **Gate**: explicit offline-first or desktop-distribution requirement. Not a performance play once Phases 20–22 land.
 
+## v1.2 Jeeves AI Assistant (Phases 25–28)
+
+**Requirements:** `.planning/v1.2-REQUIREMENTS.md` · **Research:** `.planning/v1.2-research/SUMMARY.md` · **Decisions:** `ai-tooling/CLAUDE.md`
+
+**Planning note:** Phases are planned and executed through superpowers (`docs/superpowers/specs|plans/`), not GSD phase directories. Planning is progressive: only the next phase is detailed; 26–28 are re-scoped at each transition. Teaching mode applies (Learn blocks, phase quizzes, owner-implemented tasks).
+
+### Phase 25: AI Foundation
+**Goal**: Jeeves can answer how-to questions from a verified app guide and read perspectives through provider-neutral `ai-tooling`, exercised via the `botler` CLI and an eval baseline, with no production code depending on it yet
+**Depends on**: Nothing (ai-tooling is standalone)
+**Requirements**: GUIDE-01..04, CORE-01..05, TOOLS-01..04, CLI-01..03, EVAL-01..04
+**Success Criteria** (what must be TRUE):
+  1. Every user-facing frontend area has guide entries that passed the independent verifier; guide lint runs in CI
+  2. `botler chat` answers a how-to question citing a guide entry ID, and a perspective question using read-only tools
+  3. The privacy contract test passes for the GraphQL and fixture `PerspectizeData` implementations
+  4. `botler eval --model claude-…` produces a pass-rate/token/latency report; the Claude baseline and "following nicely" threshold are recorded
+**Plans**: First: `docs/superpowers/plans/2026-09-26-app-guide-plan.md`. Remaining plans are written after the app-guide checkpoint.
+
+### Phase 26: Bridge (provisional)
+**Goal**: The backend can safely import `ai-tooling`
+**Depends on**: Phase 25
+**Requirements**: BRIDGE-01, BRIDGE-02
+**Success Criteria**:
+  1. The Sevalla deploy succeeds with the repo-root Docker context; the root dockerignore keeps secret files out of the image
+  2. The perspective visibility check lives in `PerspectiveService`; the contract test passes for the in-process implementation
+
+### Phase 27: In-App Jeeves (provisional)
+**Goal**: Users chat with Jeeves in a streaming sidebar and can apply suggested changes only through confirm-to-apply
+**Depends on**: Phase 26
+**Requirements**: INAPP-01..10
+**Success Criteria**:
+  1. Stop cancels the upstream model call (verified by the usage log)
+  2. Only the current page's tools are sent; answers cite guide entries
+  3. Nothing is written without Apply; assistant output never renders images
+  4. Per-user rate and token limits are enforced for subscriptions, with clear messages
+
+### Phase 28: OpenRouter Pivot (provisional)
+**Goal**: Jeeves can run on eval-approved non-Claude models via OpenRouter
+**Depends on**: Phase 27 and the EVAL-04 threshold being met
+**Requirements**: PROV-01..03
+**Success Criteria**:
+  1. The OpenAI-compatible adapter passes the same loop and tool tests as the Anthropic adapter
+  2. The cross-model eval matrix is published; only models meeting the threshold (with tool support) are selectable
+
 ## Progress
 
 **Execution Order:**
@@ -823,3 +867,7 @@ Phases execute in numeric order: 1 -> 2 -> 2.1 -> 3 -> 3.1 -> 3.2 -> 3.3 -> 3.4 
 | 22. TanStack DB Pilot (Perspectives) | 0/0 | Not started | - |
 | 23. Sync Engine Evaluation | 0/0 | Gated | - |
 | 24. Local Database / Desktop | 0/0 | Gated | - |
+| 25. AI Foundation (v1.2) | 0/1+ | Planning | - |
+| 26. Bridge (v1.2) | 0/0 | Provisional | - |
+| 27. In-App Jeeves (v1.2) | 0/0 | Provisional | - |
+| 28. OpenRouter Pivot (v1.2) | 0/0 | Provisional | - |
