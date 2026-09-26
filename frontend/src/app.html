@@ -8,6 +8,24 @@
 			content="default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.services https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://localhost:8080 ws://localhost:8080 https://*.sevalla.app wss://*.sevalla.app https://api.perspectize.com wss://api.perspectize.com https://*.clerk.accounts.dev https://*.clerk.services https://www.googleapis.com; font-src 'self' data:; worker-src 'self' blob:; frame-src https://challenges.cloudflare.com https://*.clerk.accounts.dev; base-uri 'self'; form-action 'self';"
 		/>
 		<link rel="preload" href="/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin />
+		<style>
+			/* Static pre-hydration loading state: paints before any JS runs, so the
+			   LCP element isn't stuck waiting on the full CSR bundle (incl. Clerk)
+			   to load and execute. Hidden the instant #app-root gets real content. */
+			.ssr-loading {
+				display: flex;
+				height: 100vh;
+				align-items: center;
+				justify-content: center;
+				color: var(--color-muted-foreground, #525252);
+				font-family: Geist, system-ui, sans-serif;
+			}
+			/* SvelteKit's hydration bootstrap injects a <script> directly inside
+			   #app-root, so :empty never matches — key off any *rendered* child. */
+			#app-root:has(> :not(script)) ~ .ssr-loading {
+				display: none;
+			}
+		</style>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
@@ -32,6 +50,7 @@
 				}
 			})();
 		</script>
-		<div style="display: contents">%sveltekit.body%</div>
+		<div id="app-root" style="display: contents">%sveltekit.body%</div>
+		<p class="ssr-loading" aria-hidden="true">Loading...</p>
 	</body>
 </html>
