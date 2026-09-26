@@ -65,6 +65,11 @@ describe('AssistantPanel', () => {
 		expect(reply.stop).toHaveBeenCalledOnce();
 	});
 
+	it('labels the perspectives tool while it runs', async () => {
+		await openPanel(fakeReply({ status: 'responding', tool: 'list_perspectives' }));
+		expect(screen.getByTestId('assistant-tool').textContent).toMatch(/looking at perspectives/i);
+	});
+
 	it('renders the answer with citation chips and no images', async () => {
 		const reply = fakeReply({
 			status: 'done',

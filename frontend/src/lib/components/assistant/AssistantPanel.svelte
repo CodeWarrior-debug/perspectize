@@ -74,6 +74,8 @@
 			{/if}
 			{#if reply.tool === 'read_guide'}
 				<p class="mt-2 text-xs text-muted-foreground" data-testid="assistant-tool">Reading the app guide…</p>
+			{:else if reply.tool === 'list_perspectives'}
+				<p class="mt-2 text-xs text-muted-foreground" data-testid="assistant-tool">Looking at perspectives…</p>
 			{:else if reply.tool}
 				<p class="mt-2 text-xs text-muted-foreground" data-testid="assistant-tool">Working…</p>
 			{/if}
