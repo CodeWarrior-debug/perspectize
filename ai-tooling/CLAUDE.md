@@ -30,6 +30,13 @@ Every ai-tooling spec and plan builds teaching in; it isn't bolted on afterwards
 - `go:embed` fails to compile if a pattern matches no files — embed directories that always hold a README (`//go:embed guide seeds`), and skip READMEs in the loader.
 - Local `go` may be older than `go.mod`'s `toolchain go1.26.0`; `go` auto-downloads it through the proxy on first run in the module dir (takes ~a minute).
 
+## Phase 25 learnings
+
+- **Guide loop pilot (compare):** 5 entries, 3 rounds. Each fresh verifier caught a different *position* error (above/below/under); position words are the main failure mode. Writers now re-check positions against markup order and drop positions users don't need.
+- **Guide token cost:** compare area as a `read_guide` result is ~3.2 KB (~800 tokens). Nine areas come to ~7k tokens, so scoped loading is a saving but not critical at this size.
+- **Tracer 1 code-complete** (llm, fake, agent, jeeves, anthropic adapter, botler tools/chat/eval, evals). Live `botler chat` and the Claude eval baseline are pending an `ANTHROPIC_API_KEY` in the environment.
+- **Deferred:** server-side refusal fallbacks (they need the beta Messages API throughout the adapter); refusals surface as `llm.StopRefusal` for now.
+
 ## Locked decisions (from design discussion, 2026-09-26)
 
 1. In-app Jeeves first (Go backend runs Claude tool use), MCP server later.
