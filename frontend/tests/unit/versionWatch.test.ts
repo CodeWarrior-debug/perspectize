@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { isEditing, watchForNewVersion } from '$lib/utils/versionWatch';
+import { FOCUS_CHECK_INTERVAL_MS, isEditing, watchForNewVersion } from '$lib/utils/versionWatch';
 
 function setVisibility(state: DocumentVisibilityState) {
 	Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
@@ -64,6 +64,37 @@ describe('watchForNewVersion', () => {
 		pageShow(true);
 		await flush();
 		expect(reload).toHaveBeenCalledTimes(1);
+	});
+
+	it('checks when a desktop window regains focus (no visibilitychange fired)', async () => {
+		const reload = vi.fn();
+		stop = watchForNewVersion({ check: async () => true, reload });
+
+		window.dispatchEvent(new Event('focus'));
+		await flush();
+
+		expect(reload).toHaveBeenCalledTimes(1);
+	});
+
+	it('throttles focus checks to one per interval', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		try {
+			const check = vi.fn(async () => false);
+			stop = watchForNewVersion({ check, reload: vi.fn() });
+
+			window.dispatchEvent(new Event('focus'));
+			await flush();
+			window.dispatchEvent(new Event('focus'));
+			await flush();
+			expect(check).toHaveBeenCalledTimes(1);
+
+			vi.advanceTimersByTime(FOCUS_CHECK_INTERVAL_MS);
+			window.dispatchEvent(new Event('focus'));
+			await flush();
+			expect(check).toHaveBeenCalledTimes(2);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('keeps the page while the user is typing', async () => {

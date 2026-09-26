@@ -1,13 +1,18 @@
 /**
  * Reload a page that was resumed after a new deploy shipped.
  *
- * Mobile browsers keep a bookmarked / home-screen tab alive in memory (or in
- * the back-forward cache) for days. When it comes back to the foreground it is
- * still running the old build, whose lazily-imported chunks the new deploy has
- * deleted — so the next navigation or dynamic import dies and the page goes
- * blank. Checking `_app/version.json` the moment the page becomes visible
- * again lets us swap in the new build before the user touches anything.
+ * Any long-lived tab — a bookmarked/home-screen app on a phone, a pinned or
+ * session-restored desktop tab, a page restored from the back-forward cache —
+ * can outlive a deploy. When the user comes back to it, it is still running the
+ * old build, whose lazily-imported chunks the new deploy has deleted, so the
+ * next navigation or dynamic import dies and the page goes blank. Checking
+ * `_app/version.json` the moment the user returns (tab visible again, bfcache
+ * restore, or window focus for a desktop window that never left the screen)
+ * swaps in the new build before they touch anything.
  */
+
+/** Window focus fires on every click back into the window — don't refetch each time. */
+export const FOCUS_CHECK_INTERVAL_MS = 60_000;
 
 export interface VersionWatchOptions {
 	/** Resolves true when a newer build is deployed (SvelteKit's `updated.check`). */
@@ -27,6 +32,7 @@ export function isEditing(doc: Document): boolean {
 /** Starts watching; returns a cleanup function. */
 export function watchForNewVersion({ check, reload, doc = document, win = window }: VersionWatchOptions): () => void {
 	let inFlight = false;
+	let lastFocusCheck = 0;
 
 	async function checkNow() {
 		if (inFlight) return;
@@ -48,11 +54,21 @@ export function watchForNewVersion({ check, reload, doc = document, win = window
 	const onPageShow = (e: PageTransitionEvent) => {
 		if (e.persisted) void checkNow();
 	};
+	// Desktop: switching to another app while the browser window stays on screen
+	// (side-by-side, second monitor) never fires visibilitychange.
+	const onFocus = () => {
+		const now = Date.now();
+		if (now - lastFocusCheck < FOCUS_CHECK_INTERVAL_MS) return;
+		lastFocusCheck = now;
+		void checkNow();
+	};
 
 	doc.addEventListener('visibilitychange', onVisibility);
 	win.addEventListener('pageshow', onPageShow);
+	win.addEventListener('focus', onFocus);
 	return () => {
 		doc.removeEventListener('visibilitychange', onVisibility);
 		win.removeEventListener('pageshow', onPageShow);
+		win.removeEventListener('focus', onFocus);
 	};
 }

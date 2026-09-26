@@ -32,8 +32,9 @@
 		<script id="stale-chunk-recovery">
 			// Deploy-skew recovery. Each deploy deletes the previous build's hashed
 			// _app/immutable/* chunks, and _redirects answers any missing path with
-			// index.html as 200 text/html. So a page still running the *old* build (a
-			// mobile tab resumed from memory, or a bookmarked home-screen app) fails
+			// index.html as 200 text/html. So a page still running the *old* build (any
+			// tab that outlived a deploy: a resumed phone tab or home-screen app, a
+			// pinned/session-restored desktop tab, a back-forward-cache restore) fails
 			// its next lazy import with "Failed to fetch dynamically imported module"
 			// / a MIME-type error and sits blank until a manual refresh. Catch those
 			// failures and do the refresh for the user: once, with a sessionStorage
