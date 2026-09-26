@@ -16,6 +16,6 @@ Confidence: `new` (introduced, not quizzed) → `shaky` → `solid`.
 | Stateless API: tools + system + history resent every call → tool bloat compounds; progressive tool discovery | 2026-09-26 | 2026-09-26 | shaky | Knew the goal (avoid bloat); "stateless" reason was explained, not answered |
 | Evals: deterministic vs model-graded, fixtures, multiple runs per case | 2026-09-26 | — | new | |
 | Streaming transport: GraphQL subscription vs SSE | 2026-09-26 | — | new | |
-| Closed loop: independent verifier + objective completion condition + failure feedback path + round cap | 2026-09-26 | 2026-09-26 | solid | Named verifier + completion condition; added feedback path, ground-truth checks, escalation cap |
+| Closed loop: independent verifier + objective completion condition + failure feedback path + round cap | 2026-09-26 | 2026-09-26 | solid | Named verifier + completion condition; added feedback path, ground-truth checks, escalation cap. Follow-up: conflated open loop (no feedback) with non-terminating loop (feedback, no exit) — re-check |
 | Context discipline: small tasks in fresh subagents (vs. % caps) | 2026-09-26 | — | new | |
 | Guide format: concise plain English + scoped loading beats caveman compression | 2026-09-26 | — | new | Measurable later via evals A/B |
