@@ -70,5 +70,5 @@ Any other `**Field:**` is a lint error.
 | `bible` | Bible Passages | pending |
 | `compare` | Compare Perspectives | verified (pilot, 3 rounds) |
 | `discover` | Discover | pending |
-| `messaging` | Messaging | pending |
+| `messaging` | Messaging | verified (1 round) |
 | `settings` | Settings & Theme | pending (`settings.change-theme` reserved for the owner to write) |
