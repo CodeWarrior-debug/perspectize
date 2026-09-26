@@ -16,6 +16,15 @@ The owner is learning how AI tooling is built (LLM APIs, tool use, agent loops, 
 - **Keep it proportional.** Don't block urgent fixes with lessons. If the owner says "skip teaching", skip for that task only.
 - **Log it.** After a quiz, update `LEARNING.md` (concept, date, how it went) so future sessions — which don't share memory — can do spaced review.
 
+### Teaching in specs and plans
+
+Every ai-tooling spec and plan builds teaching in; it isn't bolted on afterwards:
+
+- **Spec:** a short "Learning objectives" section listing the concepts the work teaches.
+- **Plan, per task:** a `Learn` block with the concept(s) the task introduces, one directed reading (link, what to look for, time), and 1–3 quiz questions to ask *after* the task, before starting the next one.
+- **Plan, per phase:** a review checkpoint (a quiz spanning the phase, with `LEARNING.md` updated), and at least one **owner-implements** task (a small, well-scoped piece, e.g. one tool or one eval case) that the owner writes and Claude reviews. The owner can opt out of any of these.
+- **Execution:** subagents can't talk to the owner, so teaching happens in the main session at task boundaries. Prefer `superpowers:executing-plans` in the main session. If `subagent-driven-development` is used, the main session runs each task's `Learn` block with the owner before dispatching the next task.
+
 ## Locked decisions (from design discussion, 2026-09-26)
 
 1. In-app Jeeves first (Go backend runs Claude tool use), MCP server later.
