@@ -1,0 +1,7 @@
+[
+  { "question": "How do I get to the page that compares two people's takes on a video?", "expect_ids": ["compare.open", "compare.pick-two"], "must_not_claim": [] },
+  { "question": "Can I compare three or more perspectives on the same video at once?", "expect_ids": [], "must_not_claim": ["compare more than two", "compare three", "compare multiple perspectives at once"] },
+  { "question": "I picked the wrong side by accident, how do I swap the left and right perspectives?", "expect_ids": ["compare.swap-sides"], "must_not_claim": [] },
+  { "question": "What does it mean when a rating shows as 'Conflict' in the comparison table?", "expect_ids": ["compare.read-results"], "must_not_claim": [] },
+  { "question": "Can I sort the comparison so the most different ratings show first?", "expect_ids": ["compare.sort-differences"], "must_not_claim": [] }
+]
