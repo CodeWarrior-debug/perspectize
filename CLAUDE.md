@@ -26,6 +26,15 @@ qmd is fully retired — see the `## graphify` section near the bottom of this f
 - **Creating a PR:** Push the branch with `git push -u origin <branch>` and let the user create the PR via the GitHub UI button. Prepare the PR title and body as copyable text for the user.
 - **Updating a PR:** Output the updated title/body as copyable text so the user can paste it into the GitHub UI.
 
+### PR Creation: Cloud vs. Local Execution
+
+PR-creation autonomy depends on where the session is running:
+
+- **Cloud execution environment** (Claude Code on the web / managed remote container): Claude may create the PR itself, without waiting for explicit user request, whenever it judges the work complete and ready for review (push the branch, then `gh api ... /pulls` per the commands above, following the template rules below). Still never skip the pre-PR checklist (Self-Verification, `/revise-claude-md`, etc.).
+- **Local execution environment** (Claude Code running on the user's own machine): follow the rest of this file's rules as written — do NOT create a PR unless the user explicitly asks for one. Push the branch and hand the user the "Create a pull request" link, or prepare title/body as copyable text if `gh` isn't authenticated.
+
+If it's ambiguous which environment a session is running in, default to the local (ask-first) behavior.
+
 ```bash
 # Pull requests
 gh pr create --title "Title" --body "..."  # Use PR template (see below)
