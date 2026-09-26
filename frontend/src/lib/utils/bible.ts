@@ -176,22 +176,17 @@ export function abbreviateReferenceFromVerseIds(
 }
 
 /**
- * Left/right page-flap text for a Bible passage icon tile: with a display
- * title set, the left flap shows the abbreviated reference and the right
- * flap the title; otherwise the reference itself splits across the two
- * flaps — book abbreviation on the left, chapter:verse on the right.
+ * Page text for a Bible passage icon tile: book abbreviation on the left
+ * page, chapter:verse on the right.
  */
-export function passageIconLabels(passage: {
-	verseStartID?: number | null;
-	verseEndID?: number | null;
-	displayTitle?: string | null;
-}): { left: string; right: string; rightIsTitle: boolean } {
+export function passageIconLabels(passage: { verseStartID?: number | null; verseEndID?: number | null }): {
+	left: string;
+	right: string;
+} {
 	const ref =
 		passage.verseStartID != null && passage.verseEndID != null
 			? abbreviateReferenceFromVerseIds(passage.verseStartID, passage.verseEndID)
 			: null;
-	if (!ref) return { left: '', right: '', rightIsTitle: false };
-	if (passage.displayTitle)
-		return { left: `${ref.book} ${ref.chapterVerse}`, right: passage.displayTitle, rightIsTitle: true };
-	return { left: ref.book, right: ref.chapterVerse, rightIsTitle: false };
+	if (!ref) return { left: '', right: '' };
+	return { left: ref.book, right: ref.chapterVerse };
 }

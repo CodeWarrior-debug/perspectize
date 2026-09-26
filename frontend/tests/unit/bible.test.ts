@@ -161,24 +161,11 @@ describe('abbreviateReferenceFromVerseIds', () => {
 });
 
 describe('passageIconLabels', () => {
-	it('splits book abbreviation and chapter:verse across the flaps when there is no title', () => {
-		expect(passageIconLabels({ verseStartID: 26137, verseEndID: 26137, displayTitle: null })).toEqual({
-			left: 'Jn',
-			right: '3:16',
-			rightIsTitle: false,
-		});
+	it('puts the book abbreviation on the left page and chapter:verse on the right', () => {
+		expect(passageIconLabels({ verseStartID: 26137, verseEndID: 26137 })).toEqual({ left: 'Jn', right: '3:16' });
 	});
 
-	it('puts the abbreviated reference on the left and the title on the right when a title is set', () => {
-		expect(passageIconLabels({ verseStartID: 26137, verseEndID: 26137, displayTitle: 'For God so loved' })).toEqual({
-			left: 'Jn 3:16',
-			right: 'For God so loved',
-			rightIsTitle: true,
-		});
-	});
-
-	it('returns empty labels when verse ids are missing (icon renders with no overlay)', () => {
-		expect(passageIconLabels({ displayTitle: 'Creation' })).toEqual({ left: '', right: '', rightIsTitle: false });
-		expect(passageIconLabels({})).toEqual({ left: '', right: '', rightIsTitle: false });
+	it('returns empty labels when verse ids are missing (icon renders with no text)', () => {
+		expect(passageIconLabels({})).toEqual({ left: '', right: '' });
 	});
 });

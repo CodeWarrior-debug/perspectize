@@ -5,8 +5,7 @@ import {
 	BIBLE_ICON_LABEL_CLASS,
 	BIBLE_ICON_LEFT_CLASS,
 	BIBLE_ICON_RIGHT_CLASS,
-	BIBLE_ICON_REF_TEXT_CLASS,
-	BIBLE_ICON_TITLE_TEXT_CLASS,
+	bibleIconLabelLines,
 } from './icons';
 import { passageIconLabels } from './bible';
 
@@ -42,20 +41,20 @@ function renderPassageCell(opts: {
 	const book = document.createElement('div');
 	book.className = BIBLE_ICON_WRAPPER_CLASS;
 	book.innerHTML = BIBLE_PASSAGE_ICON_SVG_SCALABLE;
-	// textContent, not innerHTML: displayTitle is user-supplied free text.
-	const { left, right, rightIsTitle } = passageIconLabels({ verseStartID, verseEndID, displayTitle });
-	for (const [text, side, textClass] of [
-		[left, BIBLE_ICON_LEFT_CLASS, BIBLE_ICON_REF_TEXT_CLASS],
-		[right, BIBLE_ICON_RIGHT_CLASS, rightIsTitle ? BIBLE_ICON_TITLE_TEXT_CLASS : BIBLE_ICON_REF_TEXT_CLASS],
+	const { left, right } = passageIconLabels({ verseStartID, verseEndID });
+	for (const [text, side] of [
+		[left, BIBLE_ICON_LEFT_CLASS],
+		[right, BIBLE_ICON_RIGHT_CLASS],
 	]) {
 		if (!text) continue;
 		const label = document.createElement('span');
-		label.className = `${BIBLE_ICON_LABEL_CLASS} ${side}`;
-		const inner = document.createElement('span');
-		inner.className = textClass;
-		inner.lang = 'en';
-		inner.textContent = text;
-		label.appendChild(inner);
+		const { lines, sizeClass } = bibleIconLabelLines(text);
+		label.className = `${BIBLE_ICON_LABEL_CLASS} ${side} ${sizeClass}`;
+		for (const line of lines) {
+			const lineEl = document.createElement('span');
+			lineEl.textContent = line;
+			label.appendChild(lineEl);
+		}
 		book.appendChild(label);
 	}
 	iconBox.appendChild(book);
