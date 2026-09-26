@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
 	formatDuration,
 	formatDurationSeconds,
+	formatIsoDuration,
+	parseIsoDuration,
 	parseDurationInput,
 	formatDate,
 	formatDateCompact,
@@ -64,6 +66,59 @@ describe('formatDuration', () => {
 
 	it('formats with null units', () => {
 		expect(formatDuration(10, null)).toBe('10 null');
+	});
+});
+
+describe('parseIsoDuration', () => {
+	it('parses minutes and seconds', () => {
+		expect(parseIsoDuration('PT4M13S')).toBe(253);
+	});
+
+	it('parses hours, minutes, and seconds', () => {
+		expect(parseIsoDuration('PT1H2M10S')).toBe(3730);
+	});
+
+	it('parses seconds only', () => {
+		expect(parseIsoDuration('PT45S')).toBe(45);
+	});
+
+	it('parses hours only', () => {
+		expect(parseIsoDuration('PT2H')).toBe(7200);
+	});
+
+	it('returns null for null/undefined/empty input', () => {
+		expect(parseIsoDuration(null)).toBeNull();
+		expect(parseIsoDuration(undefined)).toBeNull();
+		expect(parseIsoDuration('')).toBeNull();
+	});
+
+	it('returns null for an unparseable string', () => {
+		expect(parseIsoDuration('not-a-duration')).toBeNull();
+		expect(parseIsoDuration('PT')).toBeNull();
+	});
+});
+
+describe('formatIsoDuration', () => {
+	it('formats minutes and seconds as M:SS', () => {
+		expect(formatIsoDuration('PT4M13S')).toBe('4:13');
+	});
+
+	it('formats sub-minute durations as M:SS with a leading 0', () => {
+		expect(formatIsoDuration('PT45S')).toBe('0:45');
+	});
+
+	it('formats hour-plus durations as H:MM:SS', () => {
+		expect(formatIsoDuration('PT1H2M10S')).toBe('1:02:10');
+	});
+
+	it('pads minutes and seconds under an hour-plus duration', () => {
+		expect(formatIsoDuration('PT2H5S')).toBe('2:00:05');
+	});
+
+	it('returns null for null/undefined/unparseable input', () => {
+		expect(formatIsoDuration(null)).toBeNull();
+		expect(formatIsoDuration(undefined)).toBeNull();
+		expect(formatIsoDuration('garbage')).toBeNull();
 	});
 });
 
