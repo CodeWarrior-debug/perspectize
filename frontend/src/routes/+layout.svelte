@@ -13,6 +13,8 @@
 	import MessagingWidget from '$lib/components/messaging/MessagingWidget.svelte';
 	import GuestLanding from '$lib/components/onboarding/GuestLanding.svelte';
 	import OnboardingShell from '$lib/components/onboarding/OnboardingShell.svelte';
+	import AssistantPanel from '$lib/components/assistant/AssistantPanel.svelte';
+	import { JEEVES_DEV } from '$lib/assistant/config';
 	import { reportWebVitals } from '$lib/vitals';
 	import { watchForNewVersion } from '$lib/utils/versionWatch';
 	import { pwaInfo } from 'virtual:pwa-info';
@@ -78,6 +80,9 @@
 					<InboxStreamMount />
 					<MessagingWidget />
 					<OnboardingShell />
+					{#if JEEVES_DEV}
+						<AssistantPanel />
+					{/if}
 					{@render children()}
 				</Show>
 			</div>

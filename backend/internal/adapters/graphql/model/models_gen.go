@@ -12,9 +12,53 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
 
+type AssistantEvent interface {
+	IsAssistantEvent()
+}
+
 type ThreadEvent interface {
 	IsThreadEvent()
 }
+
+type AssistantAskInput struct {
+	// The user's question. Max 4096 bytes.
+	Message string `json:"message"`
+	// Where the user is in the app (e.g. "compare"). Selects page tools later.
+	Page *string `json:"page,omitempty"`
+}
+
+// Final event on success.
+type AssistantDone struct {
+	// Why generation stopped: end, max_tokens, refusal, tool_use, other.
+	Stop string `json:"stop"`
+	// App-guide entry IDs cited in the answer, e.g. compare.pick-two.
+	Citations    []string `json:"citations"`
+	InputTokens  int      `json:"inputTokens"`
+	OutputTokens int      `json:"outputTokens"`
+}
+
+func (AssistantDone) IsAssistantEvent() {}
+
+// Final event on failure. The message is safe to show the user.
+type AssistantError struct {
+	Message string `json:"message"`
+}
+
+func (AssistantError) IsAssistantEvent() {}
+
+// A batch of answer text. Concatenate in order.
+type AssistantTextDelta struct {
+	Text string `json:"text"`
+}
+
+func (AssistantTextDelta) IsAssistantEvent() {}
+
+// The assistant is running a tool (e.g. reading the app guide).
+type AssistantToolActivity struct {
+	Name string `json:"name"`
+}
+
+func (AssistantToolActivity) IsAssistantEvent() {}
 
 type CategorizedRating struct {
 	Category string `json:"category"`

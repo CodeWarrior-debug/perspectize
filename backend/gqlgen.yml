@@ -4,6 +4,7 @@
 schema:
   - schema.graphql
   - messaging.graphql
+  - assistant.graphql
 
 exec:
   filename: internal/adapters/graphql/generated/generated.go

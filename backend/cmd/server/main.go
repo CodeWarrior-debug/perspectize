@@ -17,6 +17,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/assistant"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
 	graphqldl "github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/dataloader"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/directives"
@@ -207,6 +208,19 @@ func main() {
 		contentService, userService, perspectiveService, categoryService,
 		messagingService, hub, presence,
 	)
+	// In-app assistant (Jeeves): off unless JEEVES_ENABLED=true.
+	if cfg.Assistant.Enabled {
+		if os.Getenv("ANTHROPIC_API_KEY") == "" {
+			slog.Warn("JEEVES_ENABLED is true but ANTHROPIC_API_KEY is empty; assistant replies will fail")
+		}
+		assistantSvc, err := assistant.NewJeeves(cfg.Assistant.Model,
+			services.NewSlidingWindowLimiter(assistant.DefaultRateLimit, assistant.DefaultRateWindow))
+		if err != nil {
+			log.Fatalf("Failed to initialize assistant: %v", err)
+		}
+		resolver.Assistant = assistantSvc
+		slog.Info("assistant enabled", "model", cfg.Assistant.Model)
+	}
 	directiveRoot := directives.NewDirectiveRoot(contentService, perspectiveService)
 	gqlConfig := generated.Config{
 		Resolvers: resolver,
