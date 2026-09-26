@@ -1,0 +1,7 @@
+[
+  { "question": "I'm not signed in yet, what does the app show me?", "expect_ids": ["getting-started.guest-landing"], "must_not_claim": [] },
+  { "question": "How do I sign in or make an account?", "expect_ids": ["getting-started.sign-in"], "must_not_claim": [] },
+  { "question": "I just signed up, why is a panel telling me to add a video?", "expect_ids": ["getting-started.onboarding-coach"], "must_not_claim": [] },
+  { "question": "I dismissed the getting-started coach by accident, how do I bring it back?", "expect_ids": [], "must_not_claim": ["reopen the coach", "replay onboarding", "help button"] },
+  { "question": "Where do the links at the top of the page take me?", "expect_ids": ["getting-started.top-nav"], "must_not_claim": [] }
+]
