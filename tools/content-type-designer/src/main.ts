@@ -14,10 +14,11 @@ import {
   gapText,
   resolveGrid,
   samplesFor,
-  sortConflict,
+  mixedPrimary,
   sortValue,
   typeLabel,
-  unitsFor,
+  unitKey,
+  unitKeysFor,
   type DraftState,
   type GridPreview,
   type SortKey,
@@ -364,52 +365,35 @@ function toggleSort(colId: string): void {
   if (!existing) next = [{ colId, dir: 'asc' }];
   else if (existing.dir === 'asc') next = keys.map((k) => (k.colId === colId ? { colId, dir: 'desc' } : k));
   else next = keys.filter((k) => k.colId !== colId);
+  if (next[0]?.colId !== keys[0]?.colId) state.sortNoteDismissed = false;
   state.sort = next;
   save();
   render();
 }
 
-/** The alert raised when a sort would order numbers that mean different things. */
-function renderSortAlert(current: DraftState, grid: GridPreview): HTMLElement | null {
-  const conflicted = sortConflict(current.sort, grid);
-  if (!conflicted) return null;
-  const header = conflicted.header || conflicted.col.generic;
-  const units = unitsFor(conflicted);
-  const key = current.sort![0];
-
-  const actions: HTMLElement[] = [];
-  const typeCol = grid.visible.find((rc) => rc.col.id === 'type');
-  if (typeCol) {
-    const multi = el('button', { type: 'button', class: 'primary' }, [`Sort by Type, then ${header}`]);
-    multi.addEventListener('click', () => {
-      state.sort = [{ colId: 'type', dir: 'asc' }, key];
-      save();
-      render();
-    });
-    actions.push(multi);
-  }
-  for (const typeId of conflicted.bound) {
-    const unit = conflicted.aliases.find((a) => a.typeId === typeId)?.unit;
-    const only = el('button', { type: 'button' }, [`Only ${typeLabel(typeId, current.draft)}${unit ? ` (${unit})` : ''}`]);
+/** Non-blocking explanation shown while a mixed-unit column leads the sort. */
+function renderSortNote(current: DraftState, mixed: ReturnType<typeof mixedPrimary>): HTMLElement | null {
+  if (!mixed || current.sortNoteDismissed) return null;
+  const header = mixed.header || mixed.col.generic;
+  const actions: HTMLElement[] = mixed.bound.map((typeId) => {
+    const only = el('button', { type: 'button' }, [`Show only ${typeLabel(typeId, current.draft)}`]);
     only.addEventListener('click', () => {
       state.selected = [typeId];
       save();
       render();
     });
-    actions.push(only);
-  }
-  const cancel = el('button', { type: 'button' }, ['Cancel sort']);
-  cancel.addEventListener('click', () => {
-    state.sort = [];
+    return only;
+  });
+  const dismiss = el('button', { type: 'button', class: 'link' }, ['Dismiss']);
+  dismiss.addEventListener('click', () => {
+    state.sortNoteDismissed = true;
     save();
     render();
   });
-  actions.push(cancel);
-
-  return el('div', { class: 'sort-alert', role: 'alert' }, [
-    el('strong', {}, [`"${header}" mixes units: ${units.join(' · ')}.`]),
+  actions.push(dismiss);
+  return el('div', { class: 'sort-note', role: 'status' }, [
     el('span', {}, [
-      ' Sorting it on its own would put 453 words next to 453 seconds as if they were the same number. Rows stay unsorted until you pick one:'
+      `"${header}" mixes units, so it is sorted within each unit (${unitKeysFor(mixed).join(', ')}) — a divider marks each group.`
     ]),
     el('div', { class: 'row' }, actions)
   ]);
@@ -432,9 +416,17 @@ function renderSamples(current: DraftState, grid: GridPreview): HTMLElement | nu
   };
 
   const keys = (current.sort ?? []).filter((k) => visible.some((rc) => rc.col.id === k.colId && rc.col.sortable));
-  const alert = renderSortAlert(current, grid);
-  if (keys.length && !alert) {
+  const mixed = mixedPrimary(keys, grid);
+  const note = renderSortNote(current, mixed);
+  // A mixed-unit primary sort groups by unit key first, like the backend's
+  // ORDER BY length_units, length — so the numbers compared always share a unit.
+  const groupOf = (row: (typeof rows)[number]): string =>
+    mixed ? unitKey(bindingFor(mixed.col, row.typeId, current)?.unit) ?? '~' : '';
+  if (keys.length) {
     rows.sort((a, b) => {
+      const ga = groupOf(a);
+      const gb = groupOf(b);
+      if (ga !== gb) return (ga < gb ? -1 : 1) * (keys[0].dir === 'asc' ? 1 : -1);
       for (const k of keys) {
         const va = sortValue(valueOf(a, k.colId));
         const vb = sortValue(valueOf(b, k.colId));
@@ -454,7 +446,7 @@ function renderSamples(current: DraftState, grid: GridPreview): HTMLElement | nu
     visible.map((rc) => {
       const idx = keys.findIndex((k) => k.colId === rc.col.id);
       const key = keys[idx];
-      const units = unitsFor(rc);
+      const units = unitKeysFor(rc);
       const label = [
         rc.header || '◎',
         ...(key ? [` ${key.dir === 'asc' ? '▲' : '▼'}`] : []),
@@ -469,8 +461,29 @@ function renderSamples(current: DraftState, grid: GridPreview): HTMLElement | nu
       return th;
     })
   );
-  const body = rows.map(({ typeId, cells }) =>
-    el(
+  const body: HTMLElement[] = [];
+  let lastGroup: string | null = null;
+  for (const row of rows) {
+    const group = groupOf(row);
+    if (mixed && group !== lastGroup) {
+      lastGroup = group;
+      const members = rows.filter((r) => groupOf(r) === group);
+      const labels = [...new Set(members.map((r) => bindingFor(mixed.col, r.typeId, current)?.label ?? ''))].filter(Boolean);
+      const types = [...new Set(members.map((r) => typeLabel(r.typeId, current.draft)))];
+      body.push(
+        el('tr', { class: 'group-divider' }, [
+          el('td', { colSpan: visible.length }, [
+            el('strong', {}, [group === '~' ? 'No unit' : group]),
+            ` · ${labels.join(' / ')} · ${types.join(', ')} · ${members.length} row${members.length === 1 ? '' : 's'}`
+          ])
+        ])
+      );
+    }
+    body.push(renderSampleRow(row));
+  }
+
+  function renderSampleRow({ typeId, cells }: (typeof rows)[number]): HTMLElement {
+    return el(
       'tr',
       {},
       visible.map((rc) => {
@@ -482,13 +495,13 @@ function renderSamples(current: DraftState, grid: GridPreview): HTMLElement | nu
         if (rc.col.align) td.classList.add(rc.col.align);
         return td;
       })
-    )
-  );
+    );
+  }
   return el('div', { class: 'samples' }, [
     el('p', { class: 'muted small' }, [
       'Sample rows — click a header to sort (again to reverse, a third time to clear); hover for its tooltip. "·" means the sample has no value for a bound column; a dashed header mixes units.'
     ]),
-    ...(alert ? [alert] : []),
+    ...(note ? [note] : []),
     el('div', { class: 'sample-scroll' }, [el('table', {}, [el('thead', {}, [head]), el('tbody', {}, body)])])
   ]);
 }

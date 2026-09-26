@@ -1,6 +1,6 @@
 import { COLUMNS, GROUP_LABELS, TYPES } from './catalog.js';
 import { buildMatrix, buildSpec } from './emit.js';
-import { bindingFor, gapText, resolveGrid, samplesFor, sortConflict, sortValue, typeLabel, unitsFor } from './model.js';
+import { bindingFor, gapText, resolveGrid, samplesFor, mixedPrimary, sortValue, typeLabel, unitKey, unitKeysFor } from './model.js';
 const STORAGE_KEY = 'perspectize.content-type-designer.v1';
 /** Seed the type currently being designed, so a fresh open / reset lands on a filled-in form. */
 const DEFAULT_SEED = 'bible';
@@ -303,50 +303,36 @@ function toggleSort(colId) {
         next = keys.map((k) => (k.colId === colId ? { colId, dir: 'desc' } : k));
     else
         next = keys.filter((k) => k.colId !== colId);
+    if (next[0]?.colId !== keys[0]?.colId)
+        state.sortNoteDismissed = false;
     state.sort = next;
     save();
     render();
 }
-/** The alert raised when a sort would order numbers that mean different things. */
-function renderSortAlert(current, grid) {
-    const conflicted = sortConflict(current.sort, grid);
-    if (!conflicted)
+/** Non-blocking explanation shown while a mixed-unit column leads the sort. */
+function renderSortNote(current, mixed) {
+    if (!mixed || current.sortNoteDismissed)
         return null;
-    const header = conflicted.header || conflicted.col.generic;
-    const units = unitsFor(conflicted);
-    const key = current.sort[0];
-    const actions = [];
-    const typeCol = grid.visible.find((rc) => rc.col.id === 'type');
-    if (typeCol) {
-        const multi = el('button', { type: 'button', class: 'primary' }, [`Sort by Type, then ${header}`]);
-        multi.addEventListener('click', () => {
-            state.sort = [{ colId: 'type', dir: 'asc' }, key];
-            save();
-            render();
-        });
-        actions.push(multi);
-    }
-    for (const typeId of conflicted.bound) {
-        const unit = conflicted.aliases.find((a) => a.typeId === typeId)?.unit;
-        const only = el('button', { type: 'button' }, [`Only ${typeLabel(typeId, current.draft)}${unit ? ` (${unit})` : ''}`]);
+    const header = mixed.header || mixed.col.generic;
+    const actions = mixed.bound.map((typeId) => {
+        const only = el('button', { type: 'button' }, [`Show only ${typeLabel(typeId, current.draft)}`]);
         only.addEventListener('click', () => {
             state.selected = [typeId];
             save();
             render();
         });
-        actions.push(only);
-    }
-    const cancel = el('button', { type: 'button' }, ['Cancel sort']);
-    cancel.addEventListener('click', () => {
-        state.sort = [];
+        return only;
+    });
+    const dismiss = el('button', { type: 'button', class: 'link' }, ['Dismiss']);
+    dismiss.addEventListener('click', () => {
+        state.sortNoteDismissed = true;
         save();
         render();
     });
-    actions.push(cancel);
-    return el('div', { class: 'sort-alert', role: 'alert' }, [
-        el('strong', {}, [`"${header}" mixes units: ${units.join(' · ')}.`]),
+    actions.push(dismiss);
+    return el('div', { class: 'sort-note', role: 'status' }, [
         el('span', {}, [
-            ' Sorting it on its own would put 453 words next to 453 seconds as if they were the same number. Rows stay unsorted until you pick one:'
+            `"${header}" mixes units, so it is sorted within each unit (${unitKeysFor(mixed).join(', ')}) — a divider marks each group.`
         ]),
         el('div', { class: 'row' }, actions)
     ]);
@@ -370,9 +356,17 @@ function renderSamples(current, grid) {
         return cellText(row.cells[colId]);
     };
     const keys = (current.sort ?? []).filter((k) => visible.some((rc) => rc.col.id === k.colId && rc.col.sortable));
-    const alert = renderSortAlert(current, grid);
-    if (keys.length && !alert) {
+    const mixed = mixedPrimary(keys, grid);
+    const note = renderSortNote(current, mixed);
+    // A mixed-unit primary sort groups by unit key first, like the backend's
+    // ORDER BY length_units, length — so the numbers compared always share a unit.
+    const groupOf = (row) => mixed ? unitKey(bindingFor(mixed.col, row.typeId, current)?.unit) ?? '~' : '';
+    if (keys.length) {
         rows.sort((a, b) => {
+            const ga = groupOf(a);
+            const gb = groupOf(b);
+            if (ga !== gb)
+                return (ga < gb ? -1 : 1) * (keys[0].dir === 'asc' ? 1 : -1);
             for (const k of keys) {
                 const va = sortValue(valueOf(a, k.colId));
                 const vb = sortValue(valueOf(b, k.colId));
@@ -392,7 +386,7 @@ function renderSamples(current, grid) {
     const head = el('tr', {}, visible.map((rc) => {
         const idx = keys.findIndex((k) => k.colId === rc.col.id);
         const key = keys[idx];
-        const units = unitsFor(rc);
+        const units = unitKeysFor(rc);
         const label = [
             rc.header || '◎',
             ...(key ? [` ${key.dir === 'asc' ? '▲' : '▼'}`] : []),
@@ -407,24 +401,44 @@ function renderSamples(current, grid) {
         }
         return th;
     }));
-    const body = rows.map(({ typeId, cells }) => el('tr', {}, visible.map((rc) => {
-        if (rc.col.id === 'perspectize')
-            return el('td', { class: 'center' }, ['◎']);
-        if (rc.col.id === 'type')
-            return el('td', { class: 'muted' }, [typeLabel(typeId, current.draft)]);
-        const binding = bindingFor(rc.col, typeId, current);
-        if (!binding)
-            return el('td', { class: 'gap', title: `Not bound — ${rc.col.gapFallback}` }, [gapText(rc.col)]);
-        const td = sampleCell(cells[rc.col.id], binding.tooltip ?? rc.col.tooltip);
-        if (rc.col.align)
-            td.classList.add(rc.col.align);
-        return td;
-    })));
+    const body = [];
+    let lastGroup = null;
+    for (const row of rows) {
+        const group = groupOf(row);
+        if (mixed && group !== lastGroup) {
+            lastGroup = group;
+            const members = rows.filter((r) => groupOf(r) === group);
+            const labels = [...new Set(members.map((r) => bindingFor(mixed.col, r.typeId, current)?.label ?? ''))].filter(Boolean);
+            const types = [...new Set(members.map((r) => typeLabel(r.typeId, current.draft)))];
+            body.push(el('tr', { class: 'group-divider' }, [
+                el('td', { colSpan: visible.length }, [
+                    el('strong', {}, [group === '~' ? 'No unit' : group]),
+                    ` · ${labels.join(' / ')} · ${types.join(', ')} · ${members.length} row${members.length === 1 ? '' : 's'}`
+                ])
+            ]));
+        }
+        body.push(renderSampleRow(row));
+    }
+    function renderSampleRow({ typeId, cells }) {
+        return el('tr', {}, visible.map((rc) => {
+            if (rc.col.id === 'perspectize')
+                return el('td', { class: 'center' }, ['◎']);
+            if (rc.col.id === 'type')
+                return el('td', { class: 'muted' }, [typeLabel(typeId, current.draft)]);
+            const binding = bindingFor(rc.col, typeId, current);
+            if (!binding)
+                return el('td', { class: 'gap', title: `Not bound — ${rc.col.gapFallback}` }, [gapText(rc.col)]);
+            const td = sampleCell(cells[rc.col.id], binding.tooltip ?? rc.col.tooltip);
+            if (rc.col.align)
+                td.classList.add(rc.col.align);
+            return td;
+        }));
+    }
     return el('div', { class: 'samples' }, [
         el('p', { class: 'muted small' }, [
             'Sample rows — click a header to sort (again to reverse, a third time to clear); hover for its tooltip. "·" means the sample has no value for a bound column; a dashed header mixes units.'
         ]),
-        ...(alert ? [alert] : []),
+        ...(note ? [note] : []),
         el('div', { class: 'sample-scroll' }, [el('table', {}, [el('thead', {}, [head]), el('tbody', {}, body)])])
     ]);
 }

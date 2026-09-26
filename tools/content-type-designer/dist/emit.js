@@ -1,5 +1,5 @@
 import { COLUMNS, GROUP_LABELS, TYPES } from './catalog.js';
-import { bindingFor, gapText, resolveGrid, samplesFor, typeLabel, unitsFor } from './model.js';
+import { bindingFor, gapText, resolveGrid, samplesFor, typeLabel, unitKeysFor } from './model.js';
 const YES = 'yes';
 const NO = 'no';
 function esc(v) {
@@ -140,16 +140,18 @@ export function buildSpec(state) {
         rc.unbound.length ? rc.col.gapFallback : '—',
         rc.tooltip
     ])));
-    const mixedSorts = grid.visible.filter((rc) => rc.col.sortable && unitsFor(rc).length > 1);
+    const mixedSorts = grid.visible.filter((rc) => rc.col.sortable && unitKeysFor(rc).length > 1);
     if (mixedSorts.length) {
         out.push('### Mixed-unit sort policy');
         out.push('');
-        out.push('Sorting any of these columns on its own would order numbers that mean different things. The grid must not do it silently: when one becomes the *primary* sort key, show an alert and leave the order unchanged until the user picks one of:');
+        out.push('These columns carry different units in this selection. Sorting one of them is never blocked. It is applied grouped by unit first, then ordered within each group, so only numbers that share a unit are ever compared:');
         out.push('');
-        out.push('1. **Filter to one type** — one button per type, each named with its unit; the sort then applies within one unit.');
-        out.push('2. **Sort by Type, then the column** — a multi-column sort with the unit-consistent Type column as priority 1, so each type is ordered within its own unit.');
+        out.push('1. **Group by unit.** Order by `length_units`, then the value, in the requested direction. Groups follow the same direction, since `length_units` is simply the first sort key.');
+        out.push('2. **Divider row per group.** A full-width row names the unit, the per-type labels and the types in it, e.g. "WORDS · Words - BSB · Bible passage · 10 rows".');
+        out.push('3. **Non-blocking note.** A dismissible one-line note explains the grouping, with one "Show only <type>" shortcut per type. Dismissing it lasts until the primary sort column changes.');
+        out.push('4. **Single unit, no change.** When every loaded row shares a unit (e.g. one type filtered in), there is one group: no divider and no note.');
         out.push('');
-        out.push(table(['Column', 'Units in this selection'], mixedSorts.map((rc) => [rc.header || rc.col.generic, unitsFor(rc).join(' · ')])));
+        out.push(table(['Column', 'Units in this selection'], mixedSorts.map((rc) => [rc.header || rc.col.generic, unitKeysFor(rc).join(' · ')])));
     }
     const multi = state.selected.length > 1;
     if (multi) {
@@ -234,10 +236,10 @@ export function buildSpec(state) {
         'Repository: sort rules in `helpers.go`, virtual fields in `gorm_models.go`.',
         ...(mixedSorts.length
             ? [
-                'Domain + repository: add `ContentSortByContentType` (`CONTENT_TYPE`) so `buildContentSortRulesMulti` can take Type as priority 1 ahead of a mixed-unit column.',
-                `Frontend: in \`ActivityTable.svelte\` \`onSortChanged\`, when the primary sort column mixes units across the loaded types (${mixedSorts
+                'Repository: in `helpers.go`, make `ContentSortByLength` emit two paginator rules — `length_units` then `length`, both in the requested order — so server-side sorts group by unit. No new sort enum.',
+                `Frontend: in \`ActivityTable.svelte\`, make \`compareContentBySorts\` compare \`lengthUnits\` before \`length\`. When the primary sort column mixes units across the loaded rows (${mixedSorts
                     .map((rc) => rc.header || rc.col.generic)
-                    .join(', ')}), hold the sort and show the alert: filter to one type, or apply Type ▲ then the column via \`applyColumnState\` with \`sortIndex\` 0/1.`
+                    .join(', ')}), insert a synthetic divider row per unit into \`sortedRowData\`, rendered via \`isFullWidthRow\` + \`fullWidthCellRenderer\`, and show the dismissible sort note with "Show only <type>" shortcuts.`
             ]
             : []),
         'Resolver: mutation handler in `schema.resolvers.go`.',

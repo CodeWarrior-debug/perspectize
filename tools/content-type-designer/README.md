@@ -51,11 +51,12 @@ Given a selection of types, the preview flags:
 - **Sparse columns** — a default column populated for under half the selection.
 - **Mixed units** — e.g. Length across video seconds, book pages and Bible
   passage words (BSB), which must never be sorted as one numeric axis. The
-  sample table enforces the policy. Sorting such a column as the primary key
-  raises an alert and leaves the order unchanged until you pick one of two
-  fixes. **Filter to one type** keeps a single unit. **Sort by Type, then the
-  column** is a multi-column sort that puts the unit-consistent Type column
-  first. The spec emits that policy and the backend/frontend steps it needs.
+  sample table shows the policy. Sorting such a column is never blocked. Rows
+  are grouped by unit (`length_units`), each group is ordered within itself,
+  and a divider row names each unit. A dismissible note explains the grouping
+  and offers a "Show only <type>" shortcut per type. The spec emits the
+  backend (two-key Length sort rule) and frontend (comparator, full-width
+  divider rows) steps it needs.
 - **Mixed provenance** — a column that is fetched for some types and
   user-entered for others (Rating is the standing example).
 - **Lost required fields** — a type declaring a field required and
