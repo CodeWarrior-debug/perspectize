@@ -40,9 +40,9 @@
 2. Check the **Overall** row for whether both thumbs (up/down) agree.
 3. Check the rating table in the middle column: each dimension (Quality, Agreement, Importance, Confidence, and any custom fields both perspectives filled in) shows both values, the percent difference, and a status label (Similar, Diverges, or Conflict).
 4. Look under "Filled in differently" for any dimension only one side rated.
-5. Look at "Matching feelings" (shared emoji reactions) and "Unique feelings" under each side's written review.
+5. Look for "Matching feelings" (shared emoji reactions) above the rating rows, and "Unique feelings" under each side's written review.
 6. Read each side's full written review in its own column.
-**Notes:** The counts above the picker row ("similar", "diverge", "conflict") summarize the rating table's statuses.
+**Notes:** The counts below the picker row ("similar", "diverge", "conflict") summarize the rating table's statuses.
 **Sign-in required:** yes
 **Source:** `frontend/src/lib/components/Compare.svelte`, `frontend/src/lib/components/CompareOverallRow.svelte`, `frontend/src/lib/components/CompareRatingTable.svelte`, `frontend/src/lib/components/CompareTakeColumn.svelte`, `frontend/src/lib/utils/comparePerspectives.ts`
 

@@ -235,21 +235,27 @@ The source-path lint needs `frontend/` present; `actions/checkout` provides the 
 
 **Area:** `compare` (small and self-contained). Run this pilot before fanning out.
 
-- [ ] **Step 1: Dispatch a writer.** Agent tool, `subagent_type: general-purpose`, `model: sonnet`. Prompt (template, reused in Task 5):
+- [x] **Step 1: Dispatch a writer.** Agent tool, `subagent_type: general-purpose`, `model: sonnet`. Prompt (template, reused in Task 5):
 
   > You are writing one area of Perspectize's app guide for an AI assistant. Read `ai-tooling/appguide/guide/README.md` (format and rules; follow them exactly) and `guide/settings.md` (an example). Area: `{slug}`, starting files: `{files from the spec table}`. Read the code and anything it imports that renders UI. Write `ai-tooling/appguide/guide/{slug}.md` covering every user-facing task in this area, and `ai-tooling/appguide/seeds/{slug}.json` (3–5 seeds, at least one trap). Only describe what the code does today. If you can't confirm something from code, leave it out and list it under "unconfirmed" in your reply. If the area is too big (you expect more than ~15 entries or you're getting deep into context), stop and return a split proposal instead. Don't commit. Don't chain shell commands. Reply in 200 words or fewer: entries written (IDs), unconfirmed items, anything surprising.
 
-- [ ] **Step 2: Lint gate.** The controller runs `go test ./appguide/...` in `ai-tooling/`. Any problems go back to the same writer (SendMessage) with the exact problem list.
+- [x] **Step 2: Lint gate.** The controller runs `go test ./appguide/...` in `ai-tooling/`. Any problems go back to the same writer (SendMessage) with the exact problem list.
 
-- [ ] **Step 3: Dispatch an independent verifier.** A fresh agent, `model: sonnet`. Use `subagent_type: gsd-doc-verifier` if its input contract fits (read `.claude/agents/gsd-doc-verifier.md` first); otherwise `general-purpose` with this prompt:
+- [x] **Step 3: Dispatch an independent verifier.** A fresh agent, `model: sonnet`. Use `subagent_type: gsd-doc-verifier` if its input contract fits (read `.claude/agents/gsd-doc-verifier.md` first); otherwise `general-purpose` with this prompt:
 
   > Independently verify `ai-tooling/appguide/guide/{slug}.md` and `seeds/{slug}.json` against the Perspectize frontend code. You have not seen how they were written. For every entry, check route, Where, each Step (including **bold** UI labels), Not supported and Sign-in required against the Source files and what they import. For each entry return `pass` with the file:line evidence, or `fail` with the specific wrong or unsupported claim. For seeds, check that the trap really is unsupported and that `expect_ids` are the right entries. Don't edit files. Return JSON: `{"entries":[{"id","verdict","evidence_or_reason"}],"seeds":[{"question","verdict","reason"}]}` followed by at most 100 words of summary.
 
-- [ ] **Step 4: Feedback loop.** Send failures to the writer, then re-lint and re-verify with a *fresh* verifier each round. Stop at all-pass (done) or after 3 rounds (escalate: show the owner the open disagreements and let them decide).
+- [x] **Step 4: Feedback loop.** Send failures to the writer, then re-lint and re-verify with a *fresh* verifier each round. Stop at all-pass (done) or after 3 rounds (escalate: show the owner the open disagreements and let them decide).
 
-- [ ] **Step 5: Owner review of the pilot.** Show the owner the final `compare.md`, the verifier JSON, and round count. Tune the writer or verifier prompt if the pilot exposed gaps (record the changes in this plan).
+- [x] **Step 5: Owner review of the pilot.** Show the owner the final `compare.md`, the verifier JSON, and round count. Tune the writer or verifier prompt if the pilot exposed gaps (record the changes in this plan).
 
-- [ ] **Step 6: Commit:** `docs(ai-tooling): app guide — compare area`
+- [x] **Step 6: Commit:** `docs(ai-tooling): app guide — compare area`
+
+**Pilot results (recorded during execution):**
+- 5 entries, 5 seeds; **3 rounds** to close. Round 1 failed `compare.read-results` (summary counts "above" the picker, actually below); round 2's **fresh** verifier caught a *different* position error in the same entry (Matching feelings location) that round 1 missed; round 3 passed everything.
+- Lessons folded into the Task 5 prompts: (1) position words (above/below/under) are the main error source, so writers re-check each against markup order and drop positions users don't need; (2) verifiers are told to scrutinize position words; (3) always a fresh verifier per round, since each one samples different claims.
+- `gsd-doc-verifier` wasn't used: its contract writes a result file and returns one line; a general-purpose Sonnet agent with the Task 4 prompt returns per-entry JSON.
+- Owner review (Step 5) deferred to the owner's return (tracked in `ai-tooling/LEARNING.md` → Pending).
 
 **Learn:**
 - *Concepts:* closed loop versus open loop versus a loop that never finishes (the owner's shaky spot, see `LEARNING.md`); verifier independence; context discipline in practice (look at how little the controller kept).

@@ -66,7 +66,7 @@ Any other `**Field:**` is a lint error.
 | `adding-content` | Adding Content | pending |
 | `perspectives` | Perspectives | pending |
 | `bible` | Bible Passages | pending |
-| `compare` | Compare Perspectives | pending (pilot) |
+| `compare` | Compare Perspectives | verified (pilot, 3 rounds) |
 | `discover` | Discover | pending |
 | `messaging` | Messaging | pending |
 | `settings` | Settings & Theme | pending (`settings.change-theme` reserved for the owner to write) |
