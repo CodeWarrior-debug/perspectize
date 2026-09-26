@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { VideoItem } from '$lib/services/youtubeApi';
 	import { toWatchUrl } from '$lib/services/youtubeApi';
+	import type { ContentItem } from '$lib/queries/content';
 	import { Button } from '$lib/components/shadcn';
 	import VideoCard from './VideoCard.svelte';
 
@@ -15,6 +16,8 @@
 		isLoading = false,
 		isLoadingMore = false,
 		query = '',
+		addedContentByVideoId = new Map(),
+		userId = null,
 	}: {
 		items: VideoItem[];
 		nextPageToken?: string;
@@ -27,6 +30,10 @@
 		isLoadingMore?: boolean;
 		/** The active search query, if any — used to tailor the empty-state message. */
 		query?: string;
+		/** Full content metadata for videos added THIS session, keyed by video id. */
+		addedContentByVideoId?: Map<string, ContentItem>;
+		/** Numeric Clerk-derived user id, threaded down to PerspectivePopover via VideoCard. */
+		userId?: number | null;
 	} = $props();
 </script>
 
@@ -72,6 +79,8 @@
 					isInLibrary={libraryUrls.has(toWatchUrl(video.id))}
 					isPending={pendingId === video.id}
 					{onAdd}
+					addedContent={addedContentByVideoId.get(video.id) ?? null}
+					{userId}
 				/>
 			{/each}
 
