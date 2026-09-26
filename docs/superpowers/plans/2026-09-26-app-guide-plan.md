@@ -259,6 +259,8 @@ The source-path lint needs `frontend/` present; `actions/checkout` provides the 
 
 ## Task 5: Fan out the remaining areas
 
+> **Paused (tracer bullets, decision 12):** runs after Tracer 1 (`docs/superpowers/plans/2026-09-26-tracer-1-plan.md`) is working end to end, so format lessons from the tracer land before 8 more areas are written.
+
 **Areas:** `getting-started`, `activity`, `adding-content`, `perspectives`, `bible`, `discover`, `messaging`, `settings` (complete the owner's file with its remaining entries; keep the owner's entry intact).
 
 - [ ] **Step 1:** Run the Task 4 loop per area with the tuned prompts. Up to 3 writers at once, with verifiers dispatched as each writer's lint passes.
