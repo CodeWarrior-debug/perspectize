@@ -25,6 +25,14 @@ function storageNote(col) {
             return 'computed at read time — not stored';
     }
 }
+/**
+ * Go package directory for the enrichment adapter. The draft's id is always
+ * 'draft' in the form, so derive it from the enum instead (PODCAST_EPISODE →
+ * podcastepisode; Go package names are lowercase with no underscores).
+ */
+function adapterPackage(enumValue) {
+    return enumValue.toLowerCase().replace(/[^a-z0-9]/g, '') || 'newtype';
+}
 export function buildSpec(state) {
     const d = state.draft;
     const grid = resolveGrid(state);
@@ -63,7 +71,7 @@ export function buildSpec(state) {
         ['Thumbnail strategy', d.thumbnail]
     ]));
     if (d.ingestion === 'api' || d.ingestion === 'scrape') {
-        out.push(`Adapter to build: \`backend/internal/adapters/${d.id}/\` (\`client.go\`, \`parser.go\`) behind a port interface in \`backend/internal/core/ports/services/\`, wired in \`cmd/server/main.go\`.`);
+        out.push(`Adapter to build: \`backend/internal/adapters/${adapterPackage(d.enumValue)}/\` (\`client.go\`, \`parser.go\`) behind a port interface in \`backend/internal/core/ports/services/\`, wired in \`cmd/server/main.go\`.`);
     }
     else if (d.ingestion === 'manual' || d.ingestion === 'url-only') {
         out.push('No external adapter. All fields come from the create form, so form validation is the only guard on data quality.');
@@ -223,7 +231,7 @@ export function buildSpec(state) {
             ? `Domain: add sort enums in \`domain/pagination.go\` for ${sortables.map((c) => c.id).join(', ')}.`
             : 'Domain: no new sort enums.',
         d.ingestion === 'api' || d.ingestion === 'scrape'
-            ? `Adapter: \`backend/internal/adapters/${d.id}/\` against ${d.enrichment}.`
+            ? `Adapter: \`backend/internal/adapters/${adapterPackage(d.enumValue)}/\` against ${d.enrichment}.`
             : 'Adapter: none.',
         `Schema: add \`${d.enumValue}\` to the ContentType enum and a \`createContentFrom${d.label.replace(/[^A-Za-z0-9]/g, '')}\` mutation + input in \`backend/schema.graphql\`, then \`make graphql-gen\`.`,
         `Service: \`CreateFrom${d.label.replace(/[^A-Za-z0-9]/g, '')}\` in \`content_service.go\` — dedupe on ${d.identity}, validate, enrich, persist.`,
