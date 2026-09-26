@@ -73,8 +73,15 @@ type PerspectiveService interface {
 	// Create creates a new perspective with validation
 	Create(ctx context.Context, input CreatePerspectiveInput) (*domain.Perspective, error)
 
-	// GetByID retrieves a perspective by ID
+	// GetByID retrieves a perspective by ID with no visibility check. Only for
+	// callers that authorize by other means (ownership checks before
+	// update/delete); read paths use GetVisible.
 	GetByID(ctx context.Context, id int) (*domain.Perspective, error)
+
+	// GetVisible retrieves a perspective the viewer may see: public rows, or
+	// private rows the viewer owns. A hidden row returns domain.ErrNotFound so
+	// its existence isn't disclosed. viewerID is nil for anonymous callers.
+	GetVisible(ctx context.Context, viewerID *int, id int) (*domain.Perspective, error)
 
 	// Update updates an existing perspective
 	Update(ctx context.Context, input UpdatePerspectiveInput) (*domain.Perspective, error)

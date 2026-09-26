@@ -357,6 +357,52 @@ func TestPerspectiveGetByID_InvalidID(t *testing.T) {
 	assert.True(t, errors.Is(err, domain.ErrInvalidInput))
 }
 
+// --- GetVisible Tests (BRIDGE-02) ---
+
+func TestPerspectiveGetVisible(t *testing.T) {
+	private := &domain.Perspective{ID: 1, UserID: 7, Privacy: domain.PrivacyPrivate}
+	public := &domain.Perspective{ID: 2, UserID: 7, Privacy: domain.PrivacyPublic}
+	rows := map[int]*domain.Perspective{1: private, 2: public}
+	repo := &mockPerspectiveRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
+			if p, ok := rows[id]; ok {
+				return p, nil
+			}
+			return nil, domain.ErrNotFound
+		},
+	}
+	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+	owner, other := 7, 8
+
+	tests := []struct {
+		name    string
+		viewer  *int
+		id      int
+		want    *domain.Perspective
+		wantErr error
+	}{
+		{"owner sees their private perspective", &owner, 1, private, nil},
+		{"another user gets not-found for a private perspective", &other, 1, nil, domain.ErrNotFound},
+		{"anonymous gets not-found for a private perspective", nil, 1, nil, domain.ErrNotFound},
+		{"another user sees a public perspective", &other, 2, public, nil},
+		{"anonymous sees a public perspective", nil, 2, public, nil},
+		{"a missing id is not-found", &owner, 99, nil, domain.ErrNotFound},
+		{"an invalid id is invalid input", &owner, 0, nil, domain.ErrInvalidInput},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := svc.GetVisible(context.Background(), tt.viewer, tt.id)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 // --- Delete Tests ---
 
 func TestPerspectiveDelete_Success(t *testing.T) {

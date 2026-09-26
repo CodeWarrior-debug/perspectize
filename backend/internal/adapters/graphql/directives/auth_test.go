@@ -80,6 +80,10 @@ func (m *mockPerspectiveService) GetByID(ctx context.Context, id int) (*domain.P
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockPerspectiveService) GetVisible(ctx context.Context, viewerID *int, id int) (*domain.Perspective, error) {
+	return m.GetByID(ctx, id)
+}
+
 func (m *mockPerspectiveService) Update(ctx context.Context, input portservices.UpdatePerspectiveInput) (*domain.Perspective, error) {
 	return nil, nil
 }

@@ -141,6 +141,21 @@ func (s *PerspectiveService) GetByID(ctx context.Context, id int) (*domain.Persp
 	return perspective, nil
 }
 
+// GetVisible retrieves a perspective if the viewer may see it. Private
+// perspectives are visible only to their owner; anyone else (including an
+// anonymous viewer) gets domain.ErrNotFound. See
+// docs/superpowers/specs/2026-09-09-perspective-privacy-design.md.
+func (s *PerspectiveService) GetVisible(ctx context.Context, viewerID *int, id int) (*domain.Perspective, error) {
+	perspective, err := s.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if perspective.Privacy == domain.PrivacyPrivate && (viewerID == nil || *viewerID != perspective.UserID) {
+		return nil, fmt.Errorf("failed to get perspective: %w", domain.ErrNotFound)
+	}
+	return perspective, nil
+}
+
 // Update updates an existing perspective
 // applyRating implements the tri-state update rule for one rating field:
 // clear wins, then a provided value is validated and applied, otherwise the
