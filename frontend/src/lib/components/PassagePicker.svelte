@@ -21,12 +21,30 @@
 
 	const clampVerse = (chapter: number, verse: number) => Math.min(verse, book.versesPerChapter[chapter - 1] ?? verse);
 
+	// Most passages picked are a single verse or a short range typed start-first. Until the user
+	// deliberately edits an end field, treat the end as "following" the start so it never has to be
+	// re-picked by hand after every start change. One explicit end edit opts the range out of this
+	// for the rest of the session, so a real multi-verse selection is never silently overwritten.
+	let endTouched = $state(false);
+
 	function setBook(e: Event) {
+		endTouched = false;
 		onchange(defaultRange(Number((e.currentTarget as HTMLSelectElement).value)));
 	}
 
 	function setField(field: 'startChapter' | 'startVerse' | 'endChapter' | 'endVerse', e: Event) {
-		const next = { ...range, [field]: Number((e.currentTarget as HTMLSelectElement).value) };
+		const value = Number((e.currentTarget as HTMLSelectElement).value);
+		const next = { ...range, [field]: value };
+
+		if (field === 'endChapter' || field === 'endVerse') {
+			endTouched = true;
+		} else if (!endTouched) {
+			// Keep the end glued to the start so the passage stays a valid single point
+			// until the user opts into a range by touching an end field themselves.
+			next.endChapter = next.startChapter;
+			next.endVerse = next.startVerse;
+		}
+
 		// A chapter change can leave the verse past that chapter's last verse.
 		next.startVerse = clampVerse(next.startChapter, next.startVerse);
 		next.endVerse = clampVerse(next.endChapter, next.endVerse);

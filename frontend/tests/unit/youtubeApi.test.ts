@@ -36,6 +36,7 @@ describe('youtubeApi', () => {
 				publishedAt: '2024-01-01T00:00:00Z',
 				description: 'Search description',
 				thumbnails,
+				duration: undefined,
 			});
 		});
 
@@ -60,7 +61,24 @@ describe('youtubeApi', () => {
 				publishedAt: '2024-02-02T00:00:00Z',
 				description: 'Trending description',
 				thumbnails,
+				duration: 'PT10M',
 			});
+		});
+
+		it('leaves duration undefined for a trending item with no contentDetails', () => {
+			const item: TrendingItem = {
+				id: 'no-duration',
+				snippet: {
+					publishedAt: '2024-02-02T00:00:00Z',
+					channelId: 'chan2',
+					title: 'No duration',
+					description: 'desc',
+					thumbnails,
+					channelTitle: 'Channel',
+				},
+			};
+
+			expect(toVideoItem(item).duration).toBeUndefined();
 		});
 
 		it('produces the same VideoItem shape from both source shapes', () => {

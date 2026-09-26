@@ -231,6 +231,14 @@ func (m *mockPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 	return map[int]*domain.PerspectiveAggregate{}, nil
 }
 
+func (m *mockPerspectiveRepository) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+	return &domain.FeelingStats{Emoji: emoji, Label: label}, nil
+}
+
+func (m *mockPerspectiveRepository) CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+	return &domain.CustomFieldStats{Key: key}, nil
+}
+
 // mockCategoryRepository implements repositories.CategoryRepository for testing
 type mockCategoryRepository struct{}
 

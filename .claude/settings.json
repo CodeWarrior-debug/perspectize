@@ -90,6 +90,9 @@
       "Read(.claude/sv-profile/**)"
     ]
   },
+  "enabledMcpjsonServers": [
+    "sevalla"
+  ],
   "hooks": {
     "SessionStart": [
       {
@@ -134,9 +137,15 @@
     "hookify@claude-plugins-official": false,
     "claude-md-management@claude-plugins-official": true,
     "context7@claude-plugins-official": false,
-    "frontend-design@claude-plugins-official": true
+    "frontend-design@claude-plugins-official": true,
+    "superpowers@superpowers-dev": true
   },
-  "enabledMcpjsonServers": [
-    "sevalla"
-  ]
+  "extraKnownMarketplaces": {
+    "superpowers-dev": {
+      "source": {
+        "source": "github",
+        "repo": "obra/superpowers"
+      }
+    }
+  }
 }

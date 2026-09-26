@@ -42,6 +42,8 @@ A future **Discover** page would be a separate page for finding new content outs
 
 This is distinct from the Activity page's local search/filter. Discover reaches out to YouTube; Activity shows what's already tracked.
 
+Discover shipped (Browse still pending); PR #449 landed the duration badge, inline player, and "Add to Perspectize" details card. Remaining maturity work (search-result stats, `contentByUrls` lookup, perspective activity on tracked cards, post-add write-a-perspective, grid layout + URL state, Browse by category) is tracked in [#450](https://github.com/CodeWarrior-debug/perspectize/issues/450).
+
 ---
 
 ## Unpopulated Nested GraphQL Fields — N+1 Guardrail Needed Before Implementing

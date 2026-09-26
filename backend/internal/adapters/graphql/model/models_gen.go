@@ -148,6 +148,13 @@ type CreateUserInput struct {
 	Email    *string `json:"email,omitempty"`
 }
 
+type CustomFieldStats struct {
+	Key                   string   `json:"key"`
+	Count                 int      `json:"count"`
+	TotalPerspectives     int      `json:"totalPerspectives"`
+	PercentOfPerspectives *float64 `json:"percentOfPerspectives,omitempty"`
+}
+
 type FeelingEntry struct {
 	Emoji     string  `json:"emoji"`
 	Label     *string `json:"label,omitempty"`
@@ -160,6 +167,16 @@ type FeelingInput struct {
 	Label     *string `json:"label,omitempty"`
 	Intensity int     `json:"intensity"`
 	Note      *string `json:"note,omitempty"`
+}
+
+type FeelingStats struct {
+	Emoji                 string   `json:"emoji"`
+	Label                 *string  `json:"label,omitempty"`
+	Count                 int      `json:"count"`
+	TotalPerspectives     int      `json:"totalPerspectives"`
+	AverageIntensity      *float64 `json:"averageIntensity,omitempty"`
+	StdDevIntensity       *float64 `json:"stdDevIntensity,omitempty"`
+	PercentOfPerspectives *float64 `json:"percentOfPerspectives,omitempty"`
 }
 
 type InboxEvent struct {

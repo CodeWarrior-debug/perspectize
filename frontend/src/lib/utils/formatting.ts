@@ -19,6 +19,42 @@ export function formatDuration(length: number | null, lengthUnits: string | null
 }
 
 /**
+ * Parse a YouTube ISO 8601 duration string (e.g. "PT4M13S", "PT1H2M10S",
+ * "PT45S") into total seconds. Returns null if the string doesn't match the
+ * expected `PT[nH][nM][nS]` shape (including an empty match, e.g. "PT").
+ */
+export function parseIsoDuration(iso: string | null | undefined): number | null {
+	if (!iso) return null;
+	const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso);
+	if (!match) return null;
+	const [, hoursStr, minutesStr, secondsStr] = match;
+	if (!hoursStr && !minutesStr && !secondsStr) return null;
+	const hours = parseInt(hoursStr ?? '0', 10);
+	const minutes = parseInt(minutesStr ?? '0', 10);
+	const seconds = parseInt(secondsStr ?? '0', 10);
+	return hours * 3600 + minutes * 60 + seconds;
+}
+
+/**
+ * Format a YouTube ISO 8601 duration (from `contentDetails.duration` on a
+ * trending/videos.list result) as "M:SS" or "H:MM:SS", for the Discover
+ * page's duration badge. Returns null when unparseable so callers can skip
+ * rendering the badge entirely — unlike `formatDuration` below, which is for
+ * AG Grid cells where an EMPTY_VALUE dash placeholder is expected instead.
+ */
+export function formatIsoDuration(iso: string | null | undefined): string | null {
+	const totalSeconds = parseIsoDuration(iso);
+	if (totalSeconds === null) return null;
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+	if (hours > 0) {
+		return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+	}
+	return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+/**
  * Format ISO date string to locale string.
  */
 export function formatDate(isoString: string): string {

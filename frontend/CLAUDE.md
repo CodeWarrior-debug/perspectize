@@ -18,12 +18,26 @@ frontend/src/
 │   │   └── AGGridTest.svelte
 │   ├── queries/         # TanStack Query + graphql-request
 │   │   ├── client.ts    # GraphQLClient (VITE_GRAPHQL_URL)
-│   │   └── content.ts   # Content query definitions (gql)
+│   │   ├── keys.ts      # Cross-domain query keys
+│   │   └── content/     # One folder per domain: index.ts (gql defs) + its hooks
 │   ├── assets/          # Static assets (favicon)
 │   └── utils/           # Utility functions
 ├── app.css              # Global styles (Tailwind v4)
 └── app.html             # HTML shell
 ```
+
+### Deep Modules
+
+Small interface, lots of work hidden behind it (Ousterhout). Test: *how little must a caller know vs. how much does it handle?*
+
+**Independent of hexagonal.** The frontend isn't hexagonal (no ports/adapters — components call hooks directly), and doesn't need to be to have deep modules. Hexagonal is about dependency direction (backend); deep modules is about boundary quality (both stacks).
+
+- **One folder per domain** — `lib/queries/{content,perspectives,users,categories,…}/` holds the `gql` defs (`index.ts`) *and* that domain's hooks (`useCreatePerspective.ts`). Only `client.ts`/`keys.ts` are top-level.
+- **Import the domain, not its guts** — `import { LIST_CONTENT } from '$lib/queries/content'`; components call a hook, never `graphqlClient.request` + cache invalidation inline.
+- **Hide cache wiring in the hook** — query keys, `invalidateQueries`, optimistic updates live inside `useX`, so callers get `{ mutate, isPending }` and nothing else.
+- **No pass-through components** — a wrapper that only forwards props/snippets to one child adds surface without hiding anything; inline it or give it state/logic.
+
+Refs: Ousterhout, *A Philosophy of Software Design*; Matt Pocock, [How To Make Codebases AI Agents Love](https://www.aihero.dev/how-to-make-codebases-ai-agents-love) (why deep modules help agents navigate). Origin: PR #339.
 
 ## shadcn-svelte Components
 
@@ -177,6 +191,13 @@ Full setup and examples: [docs/AG_GRID.md](docs/AG_GRID.md)
 Symptom in the browser: `Failed to load module script: Expected a JavaScript-or-Wasm module script but the server responded with a MIME type of "text/html"` on the deployed site (not reproducible locally, since there's no CDN layer). **This is a caching/hosting-config issue, not a service worker issue** — check for it (`curl -I` the failing chunk URL, or a live `fetch()` from the deployed page) before assuming a PWA/SW root cause; a registered SW isn't even required to hit it. Verify after touching either file: `pnpm run build` then confirm both `build/_headers` and `build/_redirects` exist.
 
 **`_headers` block overlap MERGES `Cache-Control`, it doesn't override.** Cloudflare Pages/Sevalla applies every `_headers` block whose path pattern matches a request — if two blocks both match (e.g. `/_app/immutable/*` and a `/*` catch-all, for any chunk that currently exists), their `Cache-Control` values are concatenated with a comma into one nonsensical header, not resolved by specificity. Confirmed live against the deployed site. Only one splat (`*`) is allowed per rule and there's no exclusion/negation syntax, so a broad catch-all can never be scoped to exclude a narrower pattern underneath it. Design around this by making the catch-all's value safe to merge: include a bare `no-cache` token (forces revalidation unconditionally, regardless of what other directives — like a long `max-age` — end up concatenated alongside it) rather than relying on directive order or assuming the more specific rule wins.
+
+**Fresh cache headers don't cover a page that is already running.** Any tab that outlives a deploy is still on the old build when the user comes back to it. This isn't mobile-specific: it covers a phone tab or home-screen app resumed from memory, a pinned or session-restored desktop tab, and back-forward-cache restores. Its next lazy import asks for a chunk the new deploy deleted, gets the `_redirects` HTML, and the page goes blank until a manual refresh. `_headers` can't fix this, and `_redirects` can't answer 404 for `/_app/*` (Cloudflare-style `_redirects` only supports 200/3xx). Recovery happens on the client in three layers. Keep all three:
+- `app.html` `#stale-chunk-recovery` (inline, above SvelteKit's bootstrap): on `vite:preloadError`, a chunk-load `unhandledrejection`, or a failed `/_app/` `<script>`/`<link>`, it reloads once. A 30s `sessionStorage` guard stops reload loops by showing a "Reload" banner instead. It never auto-reloads when offline or when storage is unavailable.
+- `lib/utils/versionWatch.ts` (mounted in `+layout.svelte`): checks `_app/version.json` when the tab becomes visible, is restored from bfcache, or the window regains focus (at most once a minute; a desktop window left on screen never fires `visibilitychange`), and reloads if a newer build exists. It skips the reload while an input or contenteditable has focus.
+- `kit.version.pollInterval` (`svelte.config.js`) plus the layout's `beforeNavigate`: once `updated.current` is true, the next in-app navigation becomes a full page load.
+
+**The PWA service worker is built but never registered.** Nothing injects `registerSW.js`, so production has no SW, and #312's `skipWaiting`/`clientsClaim` never took effect. Before wiring registration up, note that `sw.js` routes navigations to a non-precached `/`, which fails install. A precaching SW that activates mid-session also deletes the old build's chunks, which brings back the version-skew problem above.
 
 ## Self-Verification (Chrome DevTools MCP)
 

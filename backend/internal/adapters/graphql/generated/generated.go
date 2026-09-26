@@ -95,11 +95,28 @@ type ComplexityRoot struct {
 		Content        func(childComplexity int) int
 	}
 
+	CustomFieldStats struct {
+		Count                 func(childComplexity int) int
+		Key                   func(childComplexity int) int
+		PercentOfPerspectives func(childComplexity int) int
+		TotalPerspectives     func(childComplexity int) int
+	}
+
 	FeelingEntry struct {
 		Emoji     func(childComplexity int) int
 		Intensity func(childComplexity int) int
 		Label     func(childComplexity int) int
 		Note      func(childComplexity int) int
+	}
+
+	FeelingStats struct {
+		AverageIntensity      func(childComplexity int) int
+		Count                 func(childComplexity int) int
+		Emoji                 func(childComplexity int) int
+		Label                 func(childComplexity int) int
+		PercentOfPerspectives func(childComplexity int) int
+		StdDevIntensity       func(childComplexity int) int
+		TotalPerspectives     func(childComplexity int) int
 	}
 
 	InboxEvent struct {
@@ -282,6 +299,8 @@ type ComplexityRoot struct {
 	Query struct {
 		Content            func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, sorts []*model.ContentSortInput, includeTotalCount *bool, filter *model.ContentFilter) int
 		ContentByID        func(childComplexity int, id string) int
+		CustomFieldStats   func(childComplexity int, contentID *int, key string) int
+		FeelingStats       func(childComplexity int, contentID *int, emoji string, label *string) int
 		Me                 func(childComplexity int) int
 		MessageThread      func(childComplexity int, id string) int
 		MessageThreads     func(childComplexity int, first *int, before *string) int
@@ -412,6 +431,8 @@ type QueryResolver interface {
 	WikidataSearch(ctx context.Context, query string, language *string, limit *int) ([]*model.WikidataSearchResult, error)
 	PerspectiveByID(ctx context.Context, id string) (*model.Perspective, error)
 	Perspectives(ctx context.Context, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) (*model.PaginatedPerspectives, error)
+	FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*model.FeelingStats, error)
+	CustomFieldStats(ctx context.Context, contentID *int, key string) (*model.CustomFieldStats, error)
 	MessageThreads(ctx context.Context, first *int, before *string) ([]*model.MessageThread, error)
 	MessageThread(ctx context.Context, id string) (*model.MessageThread, error)
 	ThreadMessages(ctx context.Context, threadID string, first *int, before *int) (*model.MessageConnection, error)
@@ -671,6 +692,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.CreateContentResult.Content(childComplexity), true
 
+	case "CustomFieldStats.count":
+		if e.ComplexityRoot.CustomFieldStats.Count == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomFieldStats.Count(childComplexity), true
+	case "CustomFieldStats.key":
+		if e.ComplexityRoot.CustomFieldStats.Key == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomFieldStats.Key(childComplexity), true
+	case "CustomFieldStats.percentOfPerspectives":
+		if e.ComplexityRoot.CustomFieldStats.PercentOfPerspectives == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomFieldStats.PercentOfPerspectives(childComplexity), true
+	case "CustomFieldStats.totalPerspectives":
+		if e.ComplexityRoot.CustomFieldStats.TotalPerspectives == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomFieldStats.TotalPerspectives(childComplexity), true
+
 	case "FeelingEntry.emoji":
 		if e.ComplexityRoot.FeelingEntry.Emoji == nil {
 			break
@@ -695,6 +741,49 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.FeelingEntry.Note(childComplexity), true
+
+	case "FeelingStats.averageIntensity":
+		if e.ComplexityRoot.FeelingStats.AverageIntensity == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingStats.AverageIntensity(childComplexity), true
+	case "FeelingStats.count":
+		if e.ComplexityRoot.FeelingStats.Count == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingStats.Count(childComplexity), true
+	case "FeelingStats.emoji":
+		if e.ComplexityRoot.FeelingStats.Emoji == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingStats.Emoji(childComplexity), true
+	case "FeelingStats.label":
+		if e.ComplexityRoot.FeelingStats.Label == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingStats.Label(childComplexity), true
+	case "FeelingStats.percentOfPerspectives":
+		if e.ComplexityRoot.FeelingStats.PercentOfPerspectives == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingStats.PercentOfPerspectives(childComplexity), true
+	case "FeelingStats.stdDevIntensity":
+		if e.ComplexityRoot.FeelingStats.StdDevIntensity == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingStats.StdDevIntensity(childComplexity), true
+	case "FeelingStats.totalPerspectives":
+		if e.ComplexityRoot.FeelingStats.TotalPerspectives == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingStats.TotalPerspectives(childComplexity), true
 
 	case "InboxEvent.lastMessageAt":
 		if e.ComplexityRoot.InboxEvent.LastMessageAt == nil {
@@ -1560,6 +1649,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.ContentByID(childComplexity, args["id"].(string)), true
+	case "Query.customFieldStats":
+		if e.ComplexityRoot.Query.CustomFieldStats == nil {
+			break
+		}
+
+		args, err := ec.field_Query_customFieldStats_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.CustomFieldStats(childComplexity, args["contentID"].(*int), args["key"].(string)), true
+	case "Query.feelingStats":
+		if e.ComplexityRoot.Query.FeelingStats == nil {
+			break
+		}
+
+		args, err := ec.field_Query_feelingStats_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.FeelingStats(childComplexity, args["contentID"].(*int), args["emoji"].(string), args["label"].(*string)), true
 
 	case "Query.me":
 		if e.ComplexityRoot.Query.Me == nil {
@@ -2477,6 +2588,48 @@ type Query {
     includeTotalCount: Boolean = false
     filter: PerspectiveFilter
   ): PaginatedPerspectives!
+
+  # How many perspectives carry a given feeling (matched by exact emoji
+  # grapheme, e.g. "🥰" for Love; label narrows further, case-insensitively,
+  # for the rare case the same emoji is reused for two curated feelings --
+  # see FeelingEntry: label is prefilled for curated wheel/search entries),
+  # the average and population standard deviation of that feeling's
+  # intensity, and what percent of ALL perspectives in scope carry it
+  # (percentOfPerspectives = count / totalPerspectives -- "of those with any
+  # perspective", not just of those with any feelings at all). Scoped to one
+  # content item's perspectives when contentID is given, or platform-wide
+  # across every perspective when omitted. Counts public and private
+  # perspectives alike, matching PerspectiveAggregate's privacy stance.
+  feelingStats(contentID: IntID, emoji: String!, label: String): FeelingStats!
+
+  # How many perspectives set the given CustomFields top-level key (any
+  # value), and what percent of ALL perspectives in scope that is. Same
+  # scoping/privacy rules as feelingStats.
+  customFieldStats(contentID: IntID, key: String!): CustomFieldStats!
+}
+
+# See Query.feelingStats. averageIntensity/stdDevIntensity are null when
+# count is 0 (nothing to average); stdDevIntensity is also null when count
+# is 1 (standard deviation of a single value is undefined here, not 0).
+# percentOfPerspectives is null only when totalPerspectives is 0 (no
+# perspectives at all in scope to take a percentage of).
+type FeelingStats {
+  emoji: String!
+  label: String
+  count: Int!
+  totalPerspectives: Int!
+  averageIntensity: Float
+  stdDevIntensity: Float
+  percentOfPerspectives: Float
+}
+
+# See Query.customFieldStats. percentOfPerspectives is null only when
+# totalPerspectives is 0.
+type CustomFieldStats {
+  key: String!
+  count: Int!
+  totalPerspectives: Int!
+  percentOfPerspectives: Float
 }
 `, BuiltIn: false},
 	{Name: "../../../../messaging.graphql", Input: `# ---- Messaging ----
@@ -2684,6 +2837,20 @@ func (ec *executionContext) childFields_CreateContentResult(ctx context.Context,
 	return nil, fmt.Errorf("no field named %q was found under type CreateContentResult", field.Name)
 }
 
+func (ec *executionContext) childFields_CustomFieldStats(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "key":
+		return ec.fieldContext_CustomFieldStats_key(ctx, field)
+	case "count":
+		return ec.fieldContext_CustomFieldStats_count(ctx, field)
+	case "totalPerspectives":
+		return ec.fieldContext_CustomFieldStats_totalPerspectives(ctx, field)
+	case "percentOfPerspectives":
+		return ec.fieldContext_CustomFieldStats_percentOfPerspectives(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type CustomFieldStats", field.Name)
+}
+
 func (ec *executionContext) childFields_FeelingEntry(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "emoji":
@@ -2696,6 +2863,26 @@ func (ec *executionContext) childFields_FeelingEntry(ctx context.Context, field 
 		return ec.fieldContext_FeelingEntry_note(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type FeelingEntry", field.Name)
+}
+
+func (ec *executionContext) childFields_FeelingStats(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "emoji":
+		return ec.fieldContext_FeelingStats_emoji(ctx, field)
+	case "label":
+		return ec.fieldContext_FeelingStats_label(ctx, field)
+	case "count":
+		return ec.fieldContext_FeelingStats_count(ctx, field)
+	case "totalPerspectives":
+		return ec.fieldContext_FeelingStats_totalPerspectives(ctx, field)
+	case "averageIntensity":
+		return ec.fieldContext_FeelingStats_averageIntensity(ctx, field)
+	case "stdDevIntensity":
+		return ec.fieldContext_FeelingStats_stdDevIntensity(ctx, field)
+	case "percentOfPerspectives":
+		return ec.fieldContext_FeelingStats_percentOfPerspectives(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type FeelingStats", field.Name)
 }
 
 func (ec *executionContext) childFields_InboxEvent(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -3617,6 +3804,58 @@ func (ec *executionContext) field_Query_content_args(ctx context.Context, rawArg
 		return nil, err
 	}
 	args["filter"] = arg8
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_customFieldStats_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "contentID",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOIntID2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["contentID"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "key",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["key"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_feelingStats_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "contentID",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOIntID2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["contentID"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "emoji",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["emoji"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "label",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["label"] = arg2
 	return args, nil
 }
 
@@ -4832,6 +5071,98 @@ func (ec *executionContext) fieldContext_CreateContentResult_alreadyExisted(_ co
 	return graphql.NewScalarFieldContext("CreateContentResult", field, false, false, errors.New("field of type Boolean does not have child fields"))
 }
 
+func (ec *executionContext) _CustomFieldStats_key(ctx context.Context, field graphql.CollectedField, obj *model.CustomFieldStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CustomFieldStats_key(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Key, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CustomFieldStats_key(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CustomFieldStats", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CustomFieldStats_count(ctx context.Context, field graphql.CollectedField, obj *model.CustomFieldStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CustomFieldStats_count(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Count, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CustomFieldStats_count(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CustomFieldStats", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _CustomFieldStats_totalPerspectives(ctx context.Context, field graphql.CollectedField, obj *model.CustomFieldStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CustomFieldStats_totalPerspectives(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TotalPerspectives, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CustomFieldStats_totalPerspectives(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CustomFieldStats", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _CustomFieldStats_percentOfPerspectives(ctx context.Context, field graphql.CollectedField, obj *model.CustomFieldStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CustomFieldStats_percentOfPerspectives(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PercentOfPerspectives, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_CustomFieldStats_percentOfPerspectives(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CustomFieldStats", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
 func (ec *executionContext) _FeelingEntry_emoji(ctx context.Context, field graphql.CollectedField, obj *model.FeelingEntry) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4922,6 +5253,167 @@ func (ec *executionContext) _FeelingEntry_note(ctx context.Context, field graphq
 }
 func (ec *executionContext) fieldContext_FeelingEntry_note(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("FeelingEntry", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingStats_emoji(ctx context.Context, field graphql.CollectedField, obj *model.FeelingStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingStats_emoji(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Emoji, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingStats_emoji(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingStats", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingStats_label(ctx context.Context, field graphql.CollectedField, obj *model.FeelingStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingStats_label(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Label, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingStats_label(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingStats", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingStats_count(ctx context.Context, field graphql.CollectedField, obj *model.FeelingStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingStats_count(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Count, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingStats_count(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingStats", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingStats_totalPerspectives(ctx context.Context, field graphql.CollectedField, obj *model.FeelingStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingStats_totalPerspectives(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TotalPerspectives, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingStats_totalPerspectives(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingStats", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingStats_averageIntensity(ctx context.Context, field graphql.CollectedField, obj *model.FeelingStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingStats_averageIntensity(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.AverageIntensity, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingStats_averageIntensity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingStats", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingStats_stdDevIntensity(ctx context.Context, field graphql.CollectedField, obj *model.FeelingStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingStats_stdDevIntensity(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.StdDevIntensity, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingStats_stdDevIntensity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingStats", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingStats_percentOfPerspectives(ctx context.Context, field graphql.CollectedField, obj *model.FeelingStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingStats_percentOfPerspectives(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PercentOfPerspectives, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingStats_percentOfPerspectives(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingStats", field, false, false, errors.New("field of type Float does not have child fields"))
 }
 
 func (ec *executionContext) _InboxEvent_threadId(ctx context.Context, field graphql.CollectedField, obj *model.InboxEvent) (ret graphql.Marshaler) {
@@ -9090,6 +9582,94 @@ func (ec *executionContext) fieldContext_Query_perspectives(ctx context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_feelingStats(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_feelingStats(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().FeelingStats(ctx, fc.Args["contentID"].(*int), fc.Args["emoji"].(string), fc.Args["label"].(*string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.FeelingStats) graphql.Marshaler {
+			return ec.marshalNFeelingStats2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingStats(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_feelingStats(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_FeelingStats(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_feelingStats_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_customFieldStats(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_customFieldStats(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().CustomFieldStats(ctx, fc.Args["contentID"].(*int), fc.Args["key"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.CustomFieldStats) graphql.Marshaler {
+			return ec.marshalNCustomFieldStats2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCustomFieldStats(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_customFieldStats(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CustomFieldStats(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_customFieldStats_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_messageThreads(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -12666,6 +13246,59 @@ func (ec *executionContext) _CreateContentResult(ctx context.Context, sel ast.Se
 	return out
 }
 
+var customFieldStatsImplementors = []string{"CustomFieldStats"}
+
+func (ec *executionContext) _CustomFieldStats(ctx context.Context, sel ast.SelectionSet, obj *model.CustomFieldStats) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, customFieldStatsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CustomFieldStats")
+		case "key":
+			out.Values[i] = ec._CustomFieldStats_key(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "count":
+			out.Values[i] = ec._CustomFieldStats_count(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalPerspectives":
+			out.Values[i] = ec._CustomFieldStats_totalPerspectives(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "percentOfPerspectives":
+			out.Values[i] = ec._CustomFieldStats_percentOfPerspectives(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var feelingEntryImplementors = []string{"FeelingEntry"}
 
 func (ec *executionContext) _FeelingEntry(ctx context.Context, sel ast.SelectionSet, obj *model.FeelingEntry) graphql.Marshaler {
@@ -12695,6 +13328,74 @@ func (ec *executionContext) _FeelingEntry(ctx context.Context, sel ast.Selection
 			}
 		case "note":
 			out.Values[i] = ec._FeelingEntry_note(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var feelingStatsImplementors = []string{"FeelingStats"}
+
+func (ec *executionContext) _FeelingStats(ctx context.Context, sel ast.SelectionSet, obj *model.FeelingStats) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, feelingStatsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FeelingStats")
+		case "emoji":
+			out.Values[i] = ec._FeelingStats_emoji(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "label":
+			out.Values[i] = ec._FeelingStats_label(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "count":
+			out.Values[i] = ec._FeelingStats_count(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalPerspectives":
+			out.Values[i] = ec._FeelingStats_totalPerspectives(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "averageIntensity":
+			out.Values[i] = ec._FeelingStats_averageIntensity(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "stdDevIntensity":
+			out.Values[i] = ec._FeelingStats_stdDevIntensity(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "percentOfPerspectives":
+			out.Values[i] = ec._FeelingStats_percentOfPerspectives(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -14546,6 +15247,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "feelingStats":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_feelingStats(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "customFieldStats":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_customFieldStats(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "messageThreads":
 			field := field
 
@@ -15624,6 +16369,16 @@ func (ec *executionContext) unmarshalNCreateUserInput2githubᚗcomᚋCodeWarrior
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNCustomFieldStats2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCustomFieldStats(ctx context.Context, sel ast.SelectionSet, v *model.CustomFieldStats) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CustomFieldStats(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNFeelingEntry2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingEntry(ctx context.Context, sel ast.SelectionSet, v *model.FeelingEntry) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -15637,6 +16392,16 @@ func (ec *executionContext) marshalNFeelingEntry2ᚖgithubᚗcomᚋCodeWarrior�
 func (ec *executionContext) unmarshalNFeelingInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingInput(ctx context.Context, v any) (*model.FeelingInput, error) {
 	res, err := ec.unmarshalInputFeelingInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFeelingStats2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingStats(ctx context.Context, sel ast.SelectionSet, v *model.FeelingStats) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._FeelingStats(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v any) (string, error) {
