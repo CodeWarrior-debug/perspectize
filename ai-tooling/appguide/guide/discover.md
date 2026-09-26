@@ -10,7 +10,7 @@
 1. Go to **Discover** from the header.
 2. Type into the search box (placeholder "Search Content Sources...").
 **Notes:** Search runs automatically shortly after you stop typing — there's no separate search button. Press **Cmd+K**/**Ctrl+K** anywhere on the page to jump back into the search box; press **Escape** to clear the query and return to trending (unless a filter dropdown is open, in which case Escape just closes that dropdown).
-**Sign-in required:** no
+**Sign-in required:** yes
 **Source:** `frontend/src/routes/discover/+page.svelte`, `frontend/src/lib/components/discover/SearchBar.svelte`
 
 ## discover.browse-trending
@@ -20,7 +20,7 @@
 1. Go to **Discover** with an empty search box.
 **Notes:** Results are labeled "Showing Trending Content". Clearing the search box (the **X** button, or Escape) returns you to this view.
 **Not supported:** Trending results can't be narrowed with the duration/upload-date/sort filters — those only apply to a search.
-**Sign-in required:** no
+**Sign-in required:** yes
 **Source:** `frontend/src/routes/discover/+page.svelte`, `frontend/src/lib/components/discover/VideoResultsGrid.svelte`
 
 ## discover.filter-search
@@ -32,7 +32,7 @@
 3. Use the upload-date dropdown ("Any time", "Last hour", "Today", "This week", "This month", "This year") to filter by recency.
 4. Use the sort dropdown ("Relevance", "Upload date", "View count", "Rating") to change result order.
 **Notes:** A **Clear Filters** link appears once any filter differs from the defaults, and resets all three at once.
-**Sign-in required:** no
+**Sign-in required:** yes
 **Source:** `frontend/src/lib/components/discover/FilterBar.svelte`, `frontend/src/lib/services/youtubeApi.ts`
 
 ## discover.watch-inline
@@ -41,7 +41,7 @@
 **Steps:**
 1. Select anywhere on a result card (or focus it and press Enter/Space).
 **Notes:** The card plays the video in an embedded YouTube player in place; you don't navigate away or open a new tab. Selecting the **Add to Perspectize**, **Add perspective**, or **Compare** control on the same card does not trigger playback.
-**Sign-in required:** no
+**Sign-in required:** yes
 **Source:** `frontend/src/lib/components/discover/VideoCard.svelte`
 
 ## discover.load-more
@@ -50,7 +50,7 @@
 **Steps:**
 1. Search or browse trending until results appear.
 2. Select **Load More** (shown when more results are available).
-**Sign-in required:** no
+**Sign-in required:** yes
 **Source:** `frontend/src/routes/discover/+page.svelte`, `frontend/src/lib/components/discover/VideoResultsGrid.svelte`
 
 ## discover.add-video
