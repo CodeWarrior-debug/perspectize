@@ -13,7 +13,7 @@ import (
 // run against config file values only. t.Setenv restores originals on cleanup.
 func clearConfigEnvVars(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"DATABASE_URL", "DATABASE_PASSWORD", "YOUTUBE_API_KEY", "YOUTUBE_API_CACHE_TTL_SECONDS", "MESSAGE_RETENTION_MAX", "MESSAGE_RETENTION_SWEEP_MINUTES"} {
+	for _, key := range []string{"DATABASE_URL", "DATABASE_PASSWORD", "YOUTUBE_API_KEY", "YOUTUBE_API_CACHE_TTL_SECONDS", "MESSAGE_RETENTION_MAX", "MESSAGE_RETENTION_SWEEP_MINUTES", "JEEVES_ENABLED", "ASSISTANT_MODEL"} {
 		t.Setenv(key, "")
 	}
 }
@@ -209,4 +209,25 @@ func TestDatabaseConfig_GetDSN_FromRealConfig(t *testing.T) {
 	// Verify it's a valid PostgreSQL connection string format
 	expected := "host=localhost port=5432 user=testuser password=testpass dbname=testdb sslmode=disable"
 	assert.Equal(t, expected, dsn)
+}
+
+func TestLoad_Assistant(t *testing.T) {
+	clearConfigEnvVars(t)
+
+	cfg, err := config.Load("nonexistent.json")
+	assert.NoError(t, err)
+	assert.False(t, cfg.Assistant.Enabled, "assistant is off by default")
+	assert.Equal(t, config.DefaultAssistantModel, cfg.Assistant.Model)
+
+	t.Setenv("JEEVES_ENABLED", "true")
+	t.Setenv("ASSISTANT_MODEL", "claude-sonnet-5")
+	cfg, err = config.Load("nonexistent.json")
+	assert.NoError(t, err)
+	assert.True(t, cfg.Assistant.Enabled)
+	assert.Equal(t, "claude-sonnet-5", cfg.Assistant.Model)
+
+	t.Setenv("JEEVES_ENABLED", "yes-please")
+	cfg, err = config.Load("nonexistent.json")
+	assert.NoError(t, err)
+	assert.False(t, cfg.Assistant.Enabled, "only true/1 enable it")
 }

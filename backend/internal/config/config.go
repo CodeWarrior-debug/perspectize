@@ -22,7 +22,21 @@ type Config struct {
 	// MessageRetentionSweepMinutes is how often the retention sweep runs when
 	// enabled. Defaults to 15. Set via MESSAGE_RETENTION_SWEEP_MINUTES.
 	MessageRetentionSweepMinutes int `json:"message_retention_sweep_minutes"`
+
+	// Assistant configures the in-app assistant (Jeeves). Off unless
+	// JEEVES_ENABLED=true. The API key is read by the provider SDK directly
+	// from ANTHROPIC_API_KEY and never stored here.
+	Assistant AssistantConfig `json:"assistant"`
 }
+
+// AssistantConfig holds in-app assistant settings.
+type AssistantConfig struct {
+	Enabled bool   `json:"enabled"` // JEEVES_ENABLED
+	Model   string `json:"model"`   // ASSISTANT_MODEL
+}
+
+// DefaultAssistantModel is used when ASSISTANT_MODEL is unset.
+const DefaultAssistantModel = "claude-opus-5"
 
 // DefaultMessageRetentionSweepMinutes is the sweep cadence when retention is
 // enabled but MESSAGE_RETENTION_SWEEP_MINUTES is unset or invalid.
@@ -119,6 +133,16 @@ func Load(configPath string) (*Config, error) {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			cfg.MessageRetentionSweepMinutes = n
 		}
+	}
+
+	if v := os.Getenv("JEEVES_ENABLED"); v != "" {
+		cfg.Assistant.Enabled = v == "true" || v == "1"
+	}
+	if v := os.Getenv("ASSISTANT_MODEL"); v != "" {
+		cfg.Assistant.Model = v
+	}
+	if cfg.Assistant.Model == "" {
+		cfg.Assistant.Model = DefaultAssistantModel
 	}
 
 	return &cfg, nil

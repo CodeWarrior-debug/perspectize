@@ -28,6 +28,11 @@ type Resolver struct {
 	Messaging portservices.MessagingService
 	Hub       *realtime.Hub
 	Presence  *realtime.PresenceTracker
+
+	// Assistant is the in-app assistant (Jeeves). Nil when JEEVES_ENABLED is
+	// off; the subscription then returns ErrAssistantDisabled. Set after
+	// NewResolver so existing callers and tests are unaffected.
+	Assistant portservices.AssistantService
 }
 
 // NewResolver creates a new resolver with dependencies
