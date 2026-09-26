@@ -22,6 +22,8 @@ qmd is fully retired — see the `## graphify` section near the bottom of this f
 
 **Always use `gh` CLI** for GitHub operations. Do not use MCP plugins.
 
+**Claude Code cloud sessions:** `gh` CLI is unavailable there — use the GitHub MCP tools (`mcp__github__*`) instead; the `gh api ... /pulls` examples below don't apply. Note `require-session-reflection-before-pr.sh` only pattern-matches a Bash `gh pr create` command, so it doesn't block PR creation via the MCP tool — but still run `/revise-claude-md` first, by convention, and include a Session Learnings section in the PR body.
+
 **Note:** In Claude Code web sessions, `gh` CLI may not be authenticated. If `gh` auth fails:
 - **Creating a PR:** Push the branch with `git push -u origin <branch>` and let the user create the PR via the GitHub UI button. Prepare the PR title and body as copyable text for the user.
 - **Updating a PR:** Output the updated title/body as copyable text so the user can paste it into the GitHub UI.
@@ -189,6 +191,8 @@ See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow
 - **Matching is anchored on command position** (start of string or after a shell separator), not a raw substring search — a trigger phrase (e.g. `gh pr create`) appearing inside a quoted commit message or PR body elsewhere on the line does not fire the hook.
 
 **Shared git pre-commit hook (`.hooks/pre-commit`, real `core.hooksPath` hook — not a Claude Code hook):** Auto-formats staged `backend/*.go` (gofmt) and `frontend/src/*.{svelte,ts,js}` (prettier) files and re-stages them on every `git commit`, regardless of what tool/human is committing. Also **blocks** (does not auto-fix) new raw hex/rgb colour literals added to `frontend/src/lib/components/**` or `formatting.ts` — see `.docs/UI_THOROUGHNESS_CHECKLIST.md` §3.3; allowlist an intentional one inline with a `hex-ok: <reason>` comment. Not active by default — activate once per checkout with `make install-hooks` (from `backend/`, sets `core.hooksPath` to `.hooks`). This is what actually prevents the CI `Build` job's `gofmt -l .` check from failing (as it did on PR #366); the `.claude/hooks/gofmt-precommit.sh` PreToolUse reminder above is only a fallback for a checkout where this hasn't been activated yet.
+
+**Cloud/CI sessions start with `core.hooksPath` unset** — a fresh container checkout has never run `make install-hooks`, so commits made there get no gofmt/prettier auto-fix at all (the PreToolUse reminders above only fire on a matching Bash command, and there's no frontend-side reminder). Either run `make install-hooks` once per session, or manually run `gofmt -l .` (backend) / `pnpm exec prettier --check <files>` (frontend) before every commit and fix flagged files with `--write` before pushing.
 
 **Cowork session cleanup:** Claude cowork (claude.ai web) sessions leave `_tmp_*` files and conversation transcript `.txt` files in the repo root and `frontend/`. Delete these before committing.
 
