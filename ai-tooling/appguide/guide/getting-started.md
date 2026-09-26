@@ -31,10 +31,10 @@
 1. Sign in as a new user, or as a user who hasn't yet added a video and left a perspective — the checklist coach opens automatically, showing "Getting started · Step 1 of 2".
 2. On step 1, select **Add video** to add one, or **Skip step** to move on.
 3. On step 2, select **Leave a perspective** on the suggested video, or **Skip step**.
-**Not supported:** Reopening the coach once it's been dismissed — there's no in-app control yet to bring it back.
-**Notes:** The X button, **Skip all**, and **Don't show again** all dismiss the coach for good, the same as finishing both steps.
+4. If you've dismissed the coach and want it back, open Settings and turn on **Show onboarding next session**.
+**Notes:** The X button, **Skip all**, and **Don't show again** all dismiss the coach for good, the same as finishing both steps. The **Show onboarding next session** toggle takes effect starting your next sign-in, not immediately.
 **Sign-in required:** yes
-**Source:** `frontend/src/lib/components/onboarding/OnboardingShell.svelte`, `frontend/src/lib/components/onboarding/OnboardingCoach.svelte`, `frontend/src/lib/onboarding/eligibility.ts`, `frontend/src/lib/onboarding/coachGate.svelte.ts`, `frontend/src/lib/onboarding/steps.ts`
+**Source:** `frontend/src/lib/components/onboarding/OnboardingShell.svelte`, `frontend/src/lib/components/onboarding/OnboardingCoach.svelte`, `frontend/src/lib/onboarding/eligibility.ts`, `frontend/src/lib/onboarding/coachGate.svelte.ts`, `frontend/src/lib/onboarding/steps.ts`, `frontend/src/lib/components/SettingsDialog.svelte`
 
 ## getting-started.top-nav
 **Task:** Navigate to a top-level area of the app
