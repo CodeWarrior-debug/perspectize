@@ -1,6 +1,6 @@
 # Wikipedia Topic Link Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Give every `Category` (topic) a standard, clickable Wikipedia link, derived automatically from its Wikidata QID at the moment a category is set as a content's primary category — no manual entry, no separate lookup step for the user.
 
@@ -63,14 +63,14 @@ If the resulting visual inconsistency across a list/table is a problem, the acce
 - Create: `backend/migrations/00002X_add_category_wikipedia_url.up.sql` / `.down.sql`
 - Modify: `backend/internal/core/domain/category.go`
 
-- [ ] **Step 1:** Confirm the next free migration number (`ls backend/migrations | tail -5` + check open branches/PRs for collisions), then create the migration:
+- [x] **Step 1:** Confirm the next free migration number (`ls backend/migrations | tail -5` + check open branches/PRs for collisions), then create the migration:
   ```sql
   -- up
   ALTER TABLE categories ADD COLUMN IF NOT EXISTS wikipedia_url TEXT DEFAULT '';
   -- down
   ALTER TABLE categories DROP COLUMN IF EXISTS wikipedia_url;
   ```
-- [ ] **Step 2:** Add `WikipediaURL string` to `domain.Category` in `category.go`.
+- [x] **Step 2:** Add `WikipediaURL string` to `domain.Category` in `category.go`.
 
 ## Task 2: Backend — Wikidata sitelink resolver
 
@@ -79,19 +79,19 @@ If the resulting visual inconsistency across a list/table is a problem, the acce
 - Modify: `backend/internal/adapters/wikidata/client.go`
 - Test: sitelink resolution unit test
 
-- [ ] **Step 1:** Add a method to the `WikidataClient` port, e.g. `GetWikipediaURL(ctx context.Context, qid string) (string, error)`.
-- [ ] **Step 2:** Implement it in `client.go` using `action=wbgetentities&ids=<qid>&props=sitelinks&sitefilter=enwiki&format=json`. Parse `entities.<qid>.sitelinks.enwiki.title`, and build `https://en.wikipedia.org/wiki/<url-escaped title with spaces as underscores>`. Return `""` (no error) if the `enwiki` sitelink is absent.
-- [ ] **Step 3:** Reuse the existing retry/backoff (`doSearch`-style helper) for the new request path; add an `APIError` on non-200.
-- [ ] **Step 4:** Unit test: known QID with sitelink, QID without `enwiki` sitelink, HTTP error.
+- [x] **Step 1:** Add a method to the `WikidataClient` port, e.g. `GetWikipediaURL(ctx context.Context, qid string) (string, error)`.
+- [x] **Step 2:** Implement it in `client.go` using `action=wbgetentities&ids=<qid>&props=sitelinks&sitefilter=enwiki&format=json`. Parse `entities.<qid>.sitelinks.enwiki.title`, and build `https://en.wikipedia.org/wiki/<url-escaped title with spaces as underscores>`. Return `""` (no error) if the `enwiki` sitelink is absent.
+- [x] **Step 3:** Reuse the existing retry/backoff (`doSearch`-style helper) for the new request path; add an `APIError` on non-200.
+- [x] **Step 4:** Unit test: known QID with sitelink, QID without `enwiki` sitelink, HTTP error.
 
 ## Task 3: Backend — wire into `SetPrimaryCategory`
 
 **Files:**
 - Modify: `backend/internal/core/services/category_service.go`
 
-- [ ] **Step 1:** After validating input and before/around building `domain.Category`, call `s.wikidataClient.GetWikipediaURL(ctx, input.QID)`. On error, log via `slog` and proceed with an empty string — never fail the mutation because of this lookup.
-- [ ] **Step 2:** Set `category.WikipediaURL` from the result before `Upsert`.
-- [ ] **Step 3:** Test: `SetPrimaryCategory` persists a non-empty URL for a resolvable QID, and still succeeds (URL empty) when the resolver returns an error — update/add a mock `WikidataClient` in `test/` implementing the new port method.
+- [x] **Step 1:** After validating input and before/around building `domain.Category`, call `s.wikidataClient.GetWikipediaURL(ctx, input.QID)`. On error, log via `slog` and proceed with an empty string — never fail the mutation because of this lookup.
+- [x] **Step 2:** Set `category.WikipediaURL` from the result before `Upsert`.
+- [x] **Step 3:** Test: `SetPrimaryCategory` persists a non-empty URL for a resolvable QID, and still succeeds (URL empty) when the resolver returns an error — update/add a mock `WikidataClient` in `test/` implementing the new port method.
 
 ## Task 4: Backend — persistence + GraphQL exposure
 
@@ -101,11 +101,11 @@ If the resulting visual inconsistency across a list/table is a problem, the acce
 - Modify: `backend/schema.graphql`
 - Modify: category resolver's domain→model mapping
 
-- [ ] **Step 1:** Add `WikipediaURL string \`gorm:"column:wikipedia_url"\`` to the GORM category model.
-- [ ] **Step 2:** Update both mapper directions (domain↔GORM) for the new field.
-- [ ] **Step 3:** Add `wikipediaUrl: String` to `type Category` in `schema.graphql`, run `make graphql-gen`, resolve the stray `schema.resolvers.go` per the known gotcha (diff for any new stub before deleting).
-- [ ] **Step 4:** Populate `wikipediaUrl` in the resolver's `domainToModel`/equivalent for `Category`.
-- [ ] **Step 5:** Resolver/integration test confirming `wikipediaUrl` round-trips through a `setPrimaryCategory` mutation + category query.
+- [x] **Step 1:** Add `WikipediaURL string \`gorm:"column:wikipedia_url"\`` to the GORM category model.
+- [x] **Step 2:** Update both mapper directions (domain↔GORM) for the new field.
+- [x] **Step 3:** Add `wikipediaUrl: String` to `type Category` in `schema.graphql`, run `make graphql-gen`, resolve the stray `schema.resolvers.go` per the known gotcha (diff for any new stub before deleting).
+- [x] **Step 4:** Populate `wikipediaUrl` in the resolver's `domainToModel`/equivalent for `Category`.
+- [x] **Step 5:** Resolver/integration test confirming `wikipediaUrl` round-trips through a `setPrimaryCategory` mutation + category query.
 
 ## Task 5: Frontend — surface the link
 
@@ -115,10 +115,10 @@ If the resulting visual inconsistency across a list/table is a problem, the acce
 - Modify: `frontend/src/lib/components/ActivityTable.svelte`
 - Modify corresponding test files
 
-- [ ] **Step 1:** Add `wikipediaUrl` to the `Category` GraphQL selection/type in `categories/index.ts`.
-- [ ] **Step 2:** In `CategoryTypeahead.svelte`, when a category is selected/displayed, render its label as a link to `wikipediaUrl` (opens in new tab) when present; fall back to plain text when empty.
-- [ ] **Step 3:** In `ActivityTable.svelte`, same treatment for the primary-category cell.
-- [ ] **Step 4:** Update/add component tests to assert the link renders (and gracefully doesn't, when `wikipediaUrl` is empty).
+- [x] **Step 1:** Add `wikipediaUrl` to the `Category` GraphQL selection/type in `categories/index.ts`.
+- [x] **Step 2:** In `CategoryTypeahead.svelte`, when a category is selected/displayed, render its label as a link to `wikipediaUrl` (opens in new tab) when present; fall back to plain text when empty.
+- [x] **Step 3:** In `ActivityTable.svelte`, same treatment for the primary-category cell.
+- [x] **Step 4:** Update/add component tests to assert the link renders (and gracefully doesn't, when `wikipediaUrl` is empty).
 
 ---
 
