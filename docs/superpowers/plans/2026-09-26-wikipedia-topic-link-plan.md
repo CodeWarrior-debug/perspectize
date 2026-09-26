@@ -14,6 +14,12 @@ If a QID has no `enwiki` sitelink (rare, but possible for very obscure Wikidata 
 
 **Spec:** No separate spec doc exists for this; this plan is self-contained given the investigation above.
 
+## Decision: Category label casing
+
+Category labels come from Wikidata verbatim (e.g. "iPhone", "NASA", "photosynthesis" as a lowercase common noun, "Mercury (planet)"), and are inconsistent in casing across topics as a result. **Decision: do not renormalize casing — display the Wikidata label as-is.** Wikidata's stored casing is the canonical/correct form for that specific entity; a blanket rule breaks recognizable names — Title Case mangles acronyms and mixed-case proper nouns (e.g. "iPhone" → "Iphone"), and forced lowercase does the same to acronyms.
+
+If the resulting visual inconsistency across a list/table is a problem, the acceptable fallback is a **presentational-only** `text-transform: capitalize` in CSS (uppercases just the first character of the *rendered* string, leaves the rest untouched) — never a data transform, and never full Title Case. This is a UI/CSS decision, not a backend one; it is out of scope for this plan's tasks and left to whichever component renders the category label to apply if/when the inconsistency is judged worth addressing.
+
 ## Global Constraints
 
 - **Migration numbering:** Latest existing migration is `000026_add_bible_interlinear_tables`. Re-check `ls backend/migrations | tail -5` and `git log --all --oneline -- 'backend/migrations/*'` immediately before creating the new migration — another in-flight branch may have already claimed `000027`.
