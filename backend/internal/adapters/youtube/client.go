@@ -12,6 +12,7 @@ import (
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // Client implements the YouTubeClient interface for YouTube Data API v3
@@ -25,7 +26,7 @@ type Client struct {
 func NewClient(apiKey string) *Client {
 	return &Client{
 		apiKey:     apiKey,
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)},
 		baseURL:    "https://www.googleapis.com/youtube/v3",
 	}
 }

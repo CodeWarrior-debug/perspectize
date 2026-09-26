@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
@@ -41,8 +42,10 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
+	"github.com/ravilushqa/otelgqlgen"
 	"github.com/vektah/gqlparser/v2/ast"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -115,6 +118,14 @@ func main() {
 
 	// Register slow query logger (logs queries >100ms)
 	database.RegisterSlowQueryLogger(db)
+
+	// Register the in-house GORM tracing callbacks: one span per SQL
+	// statement, no bind-variable recording (db.query.text is always the
+	// parameterized statement, never Dialector.Explain()'d). Warn-and-
+	// continue: a failure here must not prevent the server from starting.
+	if err := instrumentDB(db); err != nil {
+		slog.Warn("gorm tracing callbacks not registered", "error", err)
+	}
 
 	// Test connection
 	if err := database.PingGORM(context.Background(), db); err != nil {
@@ -276,6 +287,7 @@ func main() {
 	if os.Getenv("APP_ENV") != "production" {
 		srv.Use(extension.Introspection{})
 	}
+	instrumentGraphQL(srv)
 	srv.AroundOperations(gqltiming.OperationTimer())
 
 	// Setup chi router
@@ -404,6 +416,31 @@ func withTracing(h http.Handler) http.Handler {
 			return req.Method + " " + req.URL.Path
 		}),
 	)
+}
+
+// instrumentGraphQL registers otelgqlgen on srv so every operation gets a
+// span, and every field with a real resolver gets a child span
+// (fc.IsResolver — trivial struct-field reads on batched/dataloaded types
+// like Content.primaryCategory don't get their own span, which keeps list
+// queries from ballooning into hundreds of spans). Variables are never
+// recorded (WithoutVariables). Must run before srv.AroundOperations(...) so
+// the operation span is already in context for OperationTimer/OperationMetrics.
+func instrumentGraphQL(srv *handler.Server) {
+	srv.Use(otelgqlgen.Middleware(
+		otelgqlgen.WithoutVariables(),
+		otelgqlgen.WithCreateSpanFromFields(func(fc *graphql.FieldContext) bool {
+			return fc.IsResolver
+		}),
+	))
+}
+
+// instrumentDB registers the in-house GORM tracing callbacks (pkg/database):
+// one span per SQL statement, query bind variables never recorded. A nil
+// TracerProvider means the callbacks resolve otel.GetTracerProvider() (or
+// the specific provider passed) lazily on every call, so this can run
+// before telemetry.Setup installs the global provider.
+func instrumentDB(db *gorm.DB) error {
+	return database.RegisterTracing(db, nil)
 }
 
 // coderWebsocketImplementationFor builds the coder/websocket-backed
