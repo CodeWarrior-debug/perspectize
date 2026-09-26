@@ -1,0 +1,7 @@
+[
+  { "question": "How do I add a YouTube video to my library?", "expect_ids": ["adding-content.add-youtube-video"], "must_not_claim": [] },
+  { "question": "Can I paste in a Bible Gateway link to add a passage?", "expect_ids": ["adding-content.add-bible-passage"], "must_not_claim": [] },
+  { "question": "I typed a claim like 'the earth is round' into Add Content — why won't it add?", "expect_ids": ["adding-content.switch-or-clear-type"], "must_not_claim": ["claims can be added", "add a claim"] },
+  { "question": "Where's the button to add content?", "expect_ids": ["adding-content.open-add-content"], "must_not_claim": [] },
+  { "question": "Can I add a podcast episode or article instead of a YouTube video?", "expect_ids": [], "must_not_claim": ["podcast", "article", "add a podcast", "add an article"] }
+]
