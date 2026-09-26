@@ -64,7 +64,8 @@
 	const isEditMode = $derived(existingPerspective !== null);
 
 	// Delete is offered only when the perspective provably belongs to the signed-in
-	// user (userId is the session user from every caller). A perspective with a
+	// user (userId is the session user from every caller) — whatever its privacy
+	// (public, private, or any shared state added later); privacy never factors in. A perspective with a
 	// missing/mismatched userID never shows the option, so no one is led to think
 	// they can delete someone else's. The server enforces this independently.
 	const canDelete = $derived(

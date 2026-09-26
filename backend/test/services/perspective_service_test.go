@@ -381,25 +381,34 @@ func TestPerspectiveDelete_OwnerSucceeds(t *testing.T) {
 	assert.Equal(t, 42, gotOwner)
 }
 
-func TestPerspectiveDelete_OwnerCanDeletePrivate(t *testing.T) {
-	deleted := false
-	perspectiveRepo := &mockPerspectiveRepository{
-		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
-			return &domain.Perspective{ID: id, UserID: 42, Privacy: domain.PrivacyPrivate}, nil
-		},
-		deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
-			deleted = true
-			return nil
-		},
-	}
+// Deletion depends only on ownership, never on privacy: the owner can delete
+// a public, private, or (future) shared perspective alike. "SHARED" isn't a
+// real Privacy value yet; it stands in for any state added later.
+var deletePrivacyCases = []domain.Privacy{domain.PrivacyPublic, domain.PrivacyPrivate, domain.Privacy("SHARED")}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{})
-	require.NoError(t, svc.Delete(context.Background(), 1, 42))
-	assert.True(t, deleted)
+func TestPerspectiveDelete_OwnerCanDeleteAnyPrivacy(t *testing.T) {
+	for _, privacy := range deletePrivacyCases {
+		t.Run(string(privacy), func(t *testing.T) {
+			deleted := false
+			perspectiveRepo := &mockPerspectiveRepository{
+				getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
+					return &domain.Perspective{ID: id, UserID: 42, Privacy: privacy}, nil
+				},
+				deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
+					deleted = true
+					return nil
+				},
+			}
+
+			svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{})
+			require.NoError(t, svc.Delete(context.Background(), 1, 42))
+			assert.True(t, deleted)
+		})
+	}
 }
 
 func TestPerspectiveDelete_NonOwnerForbidden(t *testing.T) {
-	for _, privacy := range []domain.Privacy{domain.PrivacyPublic, domain.PrivacyPrivate} {
+	for _, privacy := range deletePrivacyCases {
 		t.Run(string(privacy), func(t *testing.T) {
 			deleteCalled := false
 			perspectiveRepo := &mockPerspectiveRepository{

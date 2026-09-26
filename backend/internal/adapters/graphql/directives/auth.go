@@ -62,13 +62,14 @@ func (d *DirectiveRoot) Owner(ctx context.Context, obj interface{}, next graphql
 			return nil, fmt.Errorf("resource not found")
 		}
 		if perspective.UserID != user.ID {
-			// Someone else's private perspective is invisible to this user
-			// (perspectiveByID returns null for it), so answer as if it didn't
-			// exist rather than confirming the id with "access denied".
-			if perspective.Privacy == domain.PrivacyPrivate {
-				return nil, fmt.Errorf("resource not found")
+			// Only a PUBLIC perspective is known to be visible to this user.
+			// Anything else (PRIVATE today, or a future shared/unlisted state)
+			// answers as if it didn't exist rather than confirming the id with
+			// "access denied" -- matching perspectiveByID's null for non-owners.
+			if perspective.Privacy == domain.PrivacyPublic {
+				return nil, fmt.Errorf("access denied: you can only modify your own perspectives")
 			}
-			return nil, fmt.Errorf("access denied: you can only modify your own perspectives")
+			return nil, fmt.Errorf("resource not found")
 		}
 	} else if strings.Contains(strings.ToLower(fieldName), "content") {
 		content, err := d.contentService.GetByID(ctx, resourceID)

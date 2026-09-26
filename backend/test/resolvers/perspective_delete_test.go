@@ -16,7 +16,9 @@ import (
 const deletePerspectiveMutation = `mutation { deletePerspective(id: "100") }`
 
 func TestDeletePerspective_OwnerDeletes(t *testing.T) {
-	for _, privacy := range []domain.Privacy{domain.PrivacyPublic, domain.PrivacyPrivate} {
+	// "SHARED" isn't a real Privacy value yet; it stands in for any future
+	// state -- deletion must stay owner-only regardless of privacy.
+	for _, privacy := range []domain.Privacy{domain.PrivacyPublic, domain.PrivacyPrivate, domain.Privacy("SHARED")} {
 		t.Run(string(privacy), func(t *testing.T) {
 			var gotID, gotOwner int
 			repo := &mockPerspectiveRepository{
@@ -46,8 +48,9 @@ func TestDeletePerspective_NonOwnerCannotDelete(t *testing.T) {
 		wantMsg string
 	}{
 		{domain.PrivacyPublic, "access denied"},
-		// Someone else's private perspective is indistinguishable from a missing one.
+		// Someone else's non-public perspective is indistinguishable from a missing one.
 		{domain.PrivacyPrivate, "resource not found"},
+		{domain.Privacy("SHARED"), "resource not found"},
 	}
 	for _, tc := range tests {
 		t.Run(string(tc.privacy), func(t *testing.T) {

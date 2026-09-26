@@ -886,24 +886,23 @@ describe('PerspectivePopover component', () => {
 			updatedAt: '2026-01-01T00:00:00Z',
 		};
 
-		it("offers delete on the signed-in user's own perspective", async () => {
-			renderPopover({ existingPerspective: own, userId: 42 });
+		// Ownership alone decides — privacy never grants or removes the option.
+		// 'SHARED' isn't a real privacy value yet; it stands in for any future one.
+		it.each(['PUBLIC', 'PRIVATE', 'SHARED'])("offers delete on the user's own %s perspective", async (privacy) => {
+			renderPopover({ existingPerspective: { ...own, privacy }, userId: 42 });
 			await tick();
 			expect(screen.getByRole('button', { name: 'Delete perspective' })).toBeInTheDocument();
 		});
 
-		it("offers delete on the user's own PRIVATE perspective too", async () => {
-			renderPopover({ existingPerspective: { ...own, privacy: 'PRIVATE' }, userId: 42 });
-			await tick();
-			expect(screen.getByRole('button', { name: 'Delete perspective' })).toBeInTheDocument();
-		});
-
-		it("never shows delete for another user's perspective", async () => {
-			renderPopover({ existingPerspective: { ...own, userID: '99' }, userId: 42 });
-			await tick();
-			expect(screen.queryByRole('button', { name: 'Delete perspective' })).not.toBeInTheDocument();
-			expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
-		});
+		it.each(['PUBLIC', 'PRIVATE', 'SHARED'])(
+			"never shows delete for another user's %s perspective",
+			async (privacy) => {
+				renderPopover({ existingPerspective: { ...own, userID: '99', privacy }, userId: 42 });
+				await tick();
+				expect(screen.queryByRole('button', { name: 'Delete perspective' })).not.toBeInTheDocument();
+				expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+			},
+		);
 
 		it('never shows delete when the owner is unknown or the viewer is signed out', async () => {
 			const { unmount } = renderPopover({ existingPerspective: { ...own, userID: undefined }, userId: 42 });
