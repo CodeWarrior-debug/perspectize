@@ -25,6 +25,11 @@ Every ai-tooling spec and plan builds teaching in; it isn't bolted on afterwards
 - **Plan, per phase:** a review checkpoint (a quiz spanning the phase, with `LEARNING.md` updated), and at least one **owner-implements** task (a small, well-scoped piece, e.g. one tool or one eval case) that the owner writes and Claude reviews. The owner can opt out of any of these.
 - **Execution:** subagents can't talk to the owner, so teaching happens in the main session at task boundaries. Prefer `superpowers:executing-plans` in the main session. If `subagent-driven-development` is used, the main session runs each task's `Learn` block with the owner before dispatching the next task.
 
+## Gotchas
+
+- `go:embed` fails to compile if a pattern matches no files — embed directories that always hold a README (`//go:embed guide seeds`), and skip READMEs in the loader.
+- Local `go` may be older than `go.mod`'s `toolchain go1.26.0`; `go` auto-downloads it through the proxy on first run in the module dir (takes ~a minute).
+
 ## Locked decisions (from design discussion, 2026-09-26)
 
 1. In-app Jeeves first (Go backend runs Claude tool use), MCP server later.

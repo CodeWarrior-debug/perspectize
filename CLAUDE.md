@@ -143,6 +143,8 @@ defer db.Close()
 
 **Vendored GSD is a frozen legacy subset** (`.claude/get-shit-done/`, curated `.claude/commands/gsd/`). Do not run `npx get-shit-done-cc` against this repo — a full install dumps ~200 unused command/agent/workflow files and bakes absolute paths into the command files. The `VERSION` marker tracks the toolchain maintainers run locally so the update-check hook stays quiet; it is not a claim that every vendored file is on that release. For phase CRUD / dependency analysis on newer GSD, use a personal global install.
 
+**`gsd:new-milestone` is destructive here:** its `phases clear --confirm` step deletes every `.planning/phases/` dir and it resets `STATE.md`, and `gsd-roadmapper` rewrites `STATE.md`. While v1.1 is in flight, run it non-destructively: skip the clear, keep STATE, write `.planning/vX.Y-REQUIREMENTS.md` + `.planning/vX.Y-research/` (never `.planning/research/`, which holds v1.0 research), and append phases to `ROADMAP.md` by hand.
+
 ## Self-Verification (MANDATORY)
 
 **Before claiming work is complete, pushing, or creating a PR**, you MUST run verification. No exceptions.
@@ -193,6 +195,7 @@ See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow
 
 **Native PreToolUse hooks (`.claude/hooks/*.sh`, wired in `.claude/settings.json`; hookify plugin retired):**
 - **Secret protection:** `deny-env-read.sh` blocks any Bash command that reads a real `.env` file (deny-by-default; `.env.example` / `.env.test` stay readable). Pairs with `permissions.deny` Read rules. Real secret values are entered by humans only — see [.docs/SECURITY.md](.docs/SECURITY.md).
+  Matching is on the raw command text, so heredoc/script bodies that merely *mention* `.env` files get blocked too — rephrase ("secret files") rather than fighting the hook.
 - **Pre-PR:** `require-session-reflection-before-pr.sh` denies `gh pr create` until the `/revise-claude-md` command (from the `claude-md-management` plugin) has been run. It can't detect completion, so use `gh api` to create the PR after running the command. Example: `gh api repos/CodeWarrior-debug/perspectize/pulls -f title="..." -f body="..." -f head="branch" -f base="main"`
   - `/revise-claude-md` (also the Skill entry `claude-md-management:revise-claude-md` once the plugin is loaded). If it won't resolve — Skill says "Unknown skill" and typing it shows nothing — the plugin marketplace cache is stale: run `/reload-plugins` (and `/plugin` to refresh), then retry.
 - **Pre-commit tests:** `require-tests.sh` injects a non-blocking reminder on `git commit` to verify test coverage for new/modified frontend `src/` files. Config, styles, docs, and test files are exempt.
