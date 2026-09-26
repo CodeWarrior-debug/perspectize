@@ -43,6 +43,8 @@ Every ai-tooling spec and plan builds teaching in; it isn't bolted on afterwards
 - **Tracer 3 code-complete:** `list_perspectives` (read-only) behind `PerspectizeData`, with an explicit `Viewer` on every call. `datacontract.Run` is the shared privacy contract; `memdata` and the backend adapter both run it. BRIDGE-02 moved the single-row check into `PerspectiveService.GetVisible`.
 - **Mutation-test a contract before trusting it:** break the implementation on purpose and confirm the contract fails. It caught 8 leaks when both privacy layers were disabled, and passed with either layer alone, which proves each layer independently.
 - **Bind identity in code, never in tool input:** tools that read user data are built per request with the viewer in a closure, and the schema forbids extra properties, so the model can't ask as someone else.
+- **Tracer 4 code-complete:** `botler eval --suite data` grades 7 data cases (tool choice and arguments, privacy, planted instructions) against `evals.FixtureData`; `botler chat/tools call --as ID` act as a fixture user. The first live baseline for both suites is pending the API key.
+- **Canary strings make leaks checkable:** a unique string in another user's private review, and a unique marker a planted instruction asks for, are forbidden in every data case, so any leak or obeyed injection fails whatever the question.
 - **Deferred:** server-side refusal fallbacks (they need the beta Messages API throughout the adapter); refusals surface as `llm.StopRefusal` for now.
 
 ## Locked decisions (from design discussion, 2026-09-26)
