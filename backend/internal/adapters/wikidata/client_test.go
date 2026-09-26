@@ -192,6 +192,95 @@ func TestClient_Search_ExhaustsRetries(t *testing.T) {
 	assert.Equal(t, maxRetries+1, attempts, "should have attempted initial + retries")
 }
 
+func TestClient_GetWikipediaURL(t *testing.T) {
+	tests := []struct {
+		name           string
+		qid            string
+		serverResponse string
+		serverStatus   int
+		wantURL        string
+		wantErr        bool
+	}{
+		{
+			name: "resolves enwiki sitelink to a URL",
+			qid:  "Q42",
+			serverResponse: `{
+				"entities": {
+					"Q42": {
+						"sitelinks": {
+							"enwiki": {"title": "Douglas Adams"}
+						}
+					}
+				}
+			}`,
+			serverStatus: http.StatusOK,
+			wantURL:      "https://en.wikipedia.org/wiki/Douglas_Adams",
+		},
+		{
+			name: "no enwiki sitelink returns empty string, no error",
+			qid:  "Q999999",
+			serverResponse: `{
+				"entities": {
+					"Q999999": {
+						"sitelinks": {}
+					}
+				}
+			}`,
+			serverStatus: http.StatusOK,
+			wantURL:      "",
+		},
+		{
+			name:           "entity missing entirely returns empty string, no error",
+			qid:            "Q1",
+			serverResponse: `{"entities": {}}`,
+			serverStatus:   http.StatusOK,
+			wantURL:        "",
+		},
+		{
+			name:           "HTTP error returns error",
+			qid:            "Q42",
+			serverResponse: `{"error": "bad request"}`,
+			serverStatus:   http.StatusBadRequest,
+			wantErr:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "wbgetentities", r.URL.Query().Get("action"))
+				assert.Equal(t, "sitelinks", r.URL.Query().Get("props"))
+				assert.Equal(t, "enwiki", r.URL.Query().Get("sitefilter"))
+				assert.Equal(t, tt.qid, r.URL.Query().Get("ids"))
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.serverStatus)
+				w.Write([]byte(tt.serverResponse))
+			}))
+			defer server.Close()
+
+			client := NewClient()
+			client.baseURL = server.URL
+
+			got, err := client.GetWikipediaURL(context.Background(), tt.qid)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantURL, got)
+		})
+	}
+}
+
+func TestClient_GetWikipediaURL_EmptyQID(t *testing.T) {
+	client := NewClient()
+	_, err := client.GetWikipediaURL(context.Background(), "")
+	require.Error(t, err)
+}
+
 func TestAPIError(t *testing.T) {
 	err := &APIError{
 		StatusCode: 429,

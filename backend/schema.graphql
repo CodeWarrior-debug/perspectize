@@ -105,6 +105,7 @@ type Category {
   label: String!
   description: String
   entityType: String
+  wikipediaUrl: String
   createdAt: String!
   updatedAt: String!
 }

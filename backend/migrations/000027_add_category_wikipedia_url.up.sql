@@ -1,0 +1,1 @@
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS wikipedia_url TEXT NOT NULL DEFAULT '';

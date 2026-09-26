@@ -855,4 +855,40 @@ describe('categoryCellRenderer', () => {
 		expect(result.style.height).toBe('100%');
 		expect(result.style.width).toBe('100%');
 	});
+
+	it('renders label as a link to wikipediaUrl when present', () => {
+		const result = categoryCellRenderer({
+			data: {
+				primaryCategory: {
+					label: 'Science',
+					description: 'Natural science',
+					wikidataQid: 'Q336',
+					wikipediaUrl: 'https://en.wikipedia.org/wiki/Science',
+				},
+			},
+		});
+
+		const link = result.querySelector('a');
+		expect(link).toBeTruthy();
+		expect(link?.textContent).toBe('Science');
+		expect(link?.href).toBe('https://en.wikipedia.org/wiki/Science');
+		expect(link?.target).toBe('_blank');
+		expect(link?.rel).toBe('noopener noreferrer');
+	});
+
+	it('renders plain span (no link) when wikipediaUrl is absent', () => {
+		const result = categoryCellRenderer({
+			data: {
+				primaryCategory: {
+					label: 'Science',
+					description: 'Natural science',
+					wikidataQid: 'Q336',
+					wikipediaUrl: null,
+				},
+			},
+		});
+
+		expect(result.querySelector('a')).toBeNull();
+		expect(result.querySelector('span')?.textContent).toBe('Science');
+	});
 });

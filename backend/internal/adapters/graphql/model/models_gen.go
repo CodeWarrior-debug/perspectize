@@ -27,13 +27,14 @@ type CategorizedRatingInput struct {
 }
 
 type Category struct {
-	ID          string  `json:"id"`
-	WikidataQid string  `json:"wikidataQid"`
-	Label       string  `json:"label"`
-	Description *string `json:"description,omitempty"`
-	EntityType  *string `json:"entityType,omitempty"`
-	CreatedAt   string  `json:"createdAt"`
-	UpdatedAt   string  `json:"updatedAt"`
+	ID           string  `json:"id"`
+	WikidataQid  string  `json:"wikidataQid"`
+	Label        string  `json:"label"`
+	Description  *string `json:"description,omitempty"`
+	EntityType   *string `json:"entityType,omitempty"`
+	WikipediaURL *string `json:"wikipediaUrl,omitempty"`
+	CreatedAt    string  `json:"createdAt"`
+	UpdatedAt    string  `json:"updatedAt"`
 }
 
 type Content struct {
