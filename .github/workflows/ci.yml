@@ -132,3 +132,36 @@ jobs:
       # every Source path against the checked-out frontend/.
       - name: Run tests
         run: go test -race ./...
+
+  # Builds the production image the way Sevalla does: repo-root context,
+  # backend/Dockerfile. Catches context/COPY mistakes before a deploy does,
+  # and asserts the root .dockerignore keeps secrets and frontend/ out.
+  docker-image:
+    name: Docker Image (repo-root context)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # Plant decoy secret files so the ignore rules are actually exercised.
+      - name: Plant decoy secret files
+        run: |
+          echo "DECOY=1" > backend/.env
+          echo "DECOY=1" > ai-tooling/.env.local
+          echo "DECOY=1" > .env
+
+      - name: Build builder stage
+        run: docker build -f backend/Dockerfile --target builder -t perspectize-builder .
+
+      - name: Assert build context excludes secrets and frontend
+        run: |
+          leaks=$(docker run --rm perspectize-builder sh -c 'find /app -name ".env*" -o -path "/app/frontend" | head -20')
+          if [ -n "$leaks" ]; then
+            echo "Build context leaked files into the image build stage:"
+            echo "$leaks"
+            exit 1
+          fi
+
+      - name: Build final image
+        run: docker build -f backend/Dockerfile -t perspectize-backend .
