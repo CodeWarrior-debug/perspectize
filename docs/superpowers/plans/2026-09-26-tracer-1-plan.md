@@ -39,8 +39,8 @@ evals ──► agent + jeeves + seeds  (deterministic checks)
 
 **Files:** `ai-tooling/llm/llm.go`, `ai-tooling/llm/fake/fake.go`, `ai-tooling/llm/fake/fake_test.go`
 
-- [ ] Write tests for the fake provider: it replays scripted turns (text deltas, tool calls, stop), invokes `onEvent` in order, and honours `ctx` cancellation.
-- [ ] Implement the types (doc-comment every exported type) and the fake. Run tests, gofmt, vet. Commit `feat(ai-tooling): add provider-neutral llm types and fake provider`.
+- [x] Write tests for the fake provider: it replays scripted turns (text deltas, tool calls, stop), invokes `onEvent` in order, and honours `ctx` cancellation.
+- [x] Implement the types (doc-comment every exported type) and the fake. Run tests, gofmt, vet. Commit `feat(ai-tooling): add provider-neutral llm types and fake provider`.
 
 **Learn:** *Concept:* ports and adapters again, now for LLMs. Why the fake exists (fast tests, no API cost, deterministic). *Quiz:* (1) Why is `Input` a `json.RawMessage` and not `map[string]any`? (2) What would you have to change if `Part` were `anthropic.ContentBlockParamUnion`?
 
@@ -48,9 +48,9 @@ evals ──► agent + jeeves + seeds  (deterministic checks)
 
 **Files:** `ai-tooling/agent/registry.go`, `ai-tooling/agent/loop.go`, `ai-tooling/agent/*_test.go`; add `github.com/google/jsonschema-go`.
 
-- [ ] Registry tests: register a tool; unknown tool gives an error result (`IsError`), not a crash; input failing the schema gives an error result with the validation message; a handler error gives an error result; output over 16 KB is truncated with a marker.
-- [ ] Loop tests (fake provider): single text turn; one tool round (**2 provider calls**); two parallel tool calls in one round (**2 calls**, one results message); round cap reached returns `ErrRoundCap` with the partial message; context cancelled mid-loop stops at once; usage summed across calls.
-- [ ] Implement, run tests, gofmt, vet, commit `feat(ai-tooling): add agent loop and tool registry`.
+- [x] Registry tests: register a tool; unknown tool gives an error result (`IsError`), not a crash; input failing the schema gives an error result with the validation message; a handler error gives an error result; output over 16 KB is truncated with a marker.
+- [x] Loop tests (fake provider): single text turn; one tool round (**2 provider calls**); two parallel tool calls in one round (**2 calls**, one results message); round cap reached returns `ErrRoundCap` with the partial message; context cancelled mid-loop stops at once; usage summed across calls.
+- [x] Implement, run tests, gofmt, vet, commit `feat(ai-tooling): add agent loop and tool registry`.
 
 **Learn:** *Concept:* the tool-use handshake, where the model requests and your code executes (your shaky Q1). *Quiz:* re-ask "2 tool rounds → how many API calls?" and "why must all parallel results go in ONE user message?"
 
@@ -58,8 +58,8 @@ evals ──► agent + jeeves + seeds  (deterministic checks)
 
 **Files:** `ai-tooling/jeeves/guide_tool.go`, `ai-tooling/jeeves/prompt.go`, `ai-tooling/jeeves/*_test.go`
 
-- [ ] Tests: `{"area":"compare"}` returns all 5 entries; `{"id":"compare.pick-two"}` returns one; an unknown area or ID gives an error result listing valid areas; the system prompt contains every area slug and summary, the citation rule and the exact unsupported phrase; the prompt is **byte-stable** across calls (a prompt-caching prerequisite).
-- [ ] Implement, test, commit `feat(ai-tooling): add read_guide tool and Jeeves system prompt`.
+- [x] Tests: `{"area":"compare"}` returns all 5 entries; `{"id":"compare.pick-two"}` returns one; an unknown area or ID gives an error result listing valid areas; the system prompt contains every area slug and summary, the citation rule and the exact unsupported phrase; the prompt is **byte-stable** across calls (a prompt-caching prerequisite).
+- [x] Implement, test, commit `feat(ai-tooling): add read_guide tool and Jeeves system prompt`.
 
 **Learn:** *Concept:* why the full guide isn't pasted into the prompt (progressive discovery, token budget); prompt-cache prefix stability. *Quiz:* "What silently breaks prompt caching if the system prompt includes today's date?"
 
@@ -67,10 +67,16 @@ evals ──► agent + jeeves + seeds  (deterministic checks)
 
 **Files:** `ai-tooling/llm/anthropic/anthropic.go`, `ai-tooling/llm/anthropic/anthropic_test.go`; add `github.com/anthropics/anthropic-sdk-go` (the v1.75.0 line per STACK.md).
 
-- [ ] Load the `claude-api` skill and read `go/claude-api/{README,streaming,tool-use}.md`.
-- [ ] Unit tests with **no network**: neutral `Request` → SDK params translation (system with a cache-control breakpoint, tools, messages with tool calls/results, adaptive thinking); SDK stream events → neutral events + final message; stop-reason mapping including refusal.
-- [ ] A live smoke test that skips unless `ANTHROPIC_API_KEY` is set: one text turn and one tool round against the real API.
-- [ ] Implement with streaming (`Messages.NewStreaming` + `Accumulate`, or the beta equivalent if fallbacks are enabled). Test, commit `feat(ai-tooling): add Anthropic provider adapter`.
+- [x] Load the `claude-api` skill and read `go/claude-api/{README,streaming,tool-use}.md`.
+- [x] Unit tests with **no network**: neutral `Request` → SDK params translation (system with a cache-control breakpoint, tools, messages with tool calls/results, adaptive thinking); SDK stream events → neutral events + final message; stop-reason mapping including refusal.
+- [x] A live smoke test that skips unless `ANTHROPIC_API_KEY` is set: one text turn and one tool round against the real API.
+- [x] Implement with streaming (`Messages.NewStreaming` + `Accumulate`, or the beta equivalent if fallbacks are enabled). Test, commit `feat(ai-tooling): add Anthropic provider adapter`.
+
+**Recorded during execution:**
+- SDK v1.75.0, non-beta `Messages.NewStreaming` + `Message.Accumulate`. Tests run the **real SDK** against an `httptest` SSE server (thinking + text + streamed tool input; refusal; HTTP 400; a foreign opaque block dropped), with no network. `TestLive_Smoke` skips without `ANTHROPIC_API_KEY`.
+- Thinking and other non-text/non-tool blocks round-trip as `PartOpaque` (the JSON of `ContentBlockUnion.ToParam()`, unmarshalled back into `ContentBlockParamUnion`). A test proves the signature comes back unchanged.
+- **Server-side refusal fallbacks deferred:** they need the beta Messages API (`Beta*` types throughout the adapter). The tracer uses the GA API; refusals map to `llm.StopRefusal` and surface to the caller. Revisit when widening (tracked here).
+- Leak check: `grep -rln anthropic-sdk-go --include=*.go` matches only `llm/anthropic/`.
 
 **Learn:** *Concept:* streaming events versus the final message; why thinking blocks must be passed back unchanged within a turn. *Reading (~10 min):* the Claude docs pages on streaming and tool use; focus on the event types and where `tool_use` blocks appear. *Quiz:* "Where exactly does SDK-specific code stop in our tree, and how would you prove it with grep?"
 
