@@ -44,6 +44,8 @@ Any other `**Field:**` is a lint error.
 - If you can't confirm something from code, **leave it out** and report it as unconfirmed.
 - Quote UI labels exactly as rendered. If a label is dynamic or can't be resolved statically, describe the control by position instead of quoting.
 - Skip admin/dev-only UI and backend behavior with no UI.
+- **Sign-in:** the root layout (`frontend/src/routes/+layout.svelte`) shows the guest landing page on every route while signed out, so every in-app task is `Sign-in required: yes`. Only the guest landing and sign-in entries are `no`.
+- Before writing a `Not supported` line or a trap seed, search the whole frontend (Settings included) for the feature. A feature that "doesn't exist" in one component often lives in another.
 - Not caveman-compressed: savings are negligible with caching and scoped loading, and terse fragments hurt accuracy.
 
 ## Eval seeds
