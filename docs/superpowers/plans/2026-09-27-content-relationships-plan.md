@@ -1,195 +1,127 @@
-# Content Relationships (Bridge Table) Implementation Plan
+# Content Relationship Perspectives Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** DRAFT — awaiting review. Do not execute until the Open Questions are answered.
+**Status:** Design agreed 2026-09-27. **First trial runs against the local Docker Postgres approach being introduced in a separate PR.** Do not apply this migration to the shared Sevalla database until that trial has validated the model.
 
-**Goal:** Let users link two pieces of content (initially claim ↔ claim, where "questions" are simply claims phrased as questions) and let each user rate every link for **relevance** and **importance** on the 0–10000 scale. A claim's default view (built later) can then list its related claims, ranked by those ratings.
-
-**Architecture:** Two new tables behind a new port and service. Links are generic (any content ↔ any content) so future types reuse them. Ratings are per user per link. Aggregates are computed at read time. Visibility follows content privacy: a link is readable only when the viewer can read **both** endpoints.
+**Goal:** Let each user record their perspective on how two pieces of content relate: how relevant and how important one is to the other, which typed relationships hold (each rated 0–10000), user-named custom ratings, and an HTML review. This powers a future claim view listing related claims and questions, ranked by these ratings.
 
 **Tech Stack:** Go 1.25+, gqlgen, GORM, golang-migrate SQL, Svelte 5 runes, TanStack Svelte Query.
 
-**Depends on:** `2026-09-27-private-claims-plan.md` (content.privacy, migration 000028), which is on the same branch.
+**Depends on:** `2026-09-27-private-claims-plan.md` (content.privacy, migration 000028).
 
-## Design Decisions
+## Agreed Design
 
-1. **Bridge tables, not perspectives.** A perspective is one user's view of one content row. A relationship rating is one user's view of a *link between two rows*. Making each link a content row would pollute content lists, so a dedicated table is used.
-2. **Content-generic, not claim-only.** Columns are `from_content_id` / `to_content_id` referencing `content`. Nothing restricts endpoints to CLAIM at the DB level; the service decides which type pairs are allowed (initially CLAIM ↔ CLAIM, see Open Question 1).
-3. **Extensible `kind`.** A text column with a CHECK constraint, bound to a Go enum and a GraphQL enum. The initial kind is `related`. Adding a kind is a one-line enum plus constraint change. Future candidates: `supports`, `contradicts`, `refines`, `duplicates`.
-4. **Direction.** Each kind declares whether it is symmetric. `related` is symmetric, so the service stores it in canonical order (`from < to`) and the unique key `(from, to, kind)` prevents A→B and B→A duplicates. Directional kinds (e.g. `supports`) keep the order as given.
-5. **Idempotent create.** Linking an already-linked pair returns the existing link rather than an error, the same pattern as `CreateContentFromPassage`.
-6. **Ratings are nullable per dimension.** A user may set only relevance or only importance. Values are CHECKed to 0–10000 (same range as perspective ratings).
-7. **Ratings stay private to their author; averages are public.** Readers see averages and counts; only your own rating comes back as `myRating`. This mirrors how perspective aggregates count everything but expose no individual private rows.
-8. **Ranking.** Default order is by average relevance × average importance, descending, then by link id. Links with no ratings sort last. Computed in SQL.
-9. **Cascades.**
-   - Deleting a content row deletes its links, and deleting a link deletes its ratings.
-   - Deleting a user deletes that user's ratings. The links they created stay, with `created_by_user_id` set to NULL, because other users' ratings depend on those links.
+### New content type: QUESTION
+- A separate type from CLAIM. A claim is concluded on through ordinary perspectives (like / agreement / confidence). A question is not; it is answered and weighed through relationship perspectives.
+- Created private by default, like claims.
+- Add Content autodetects free text ending in `?` as a question.
+- No question-status or "concluded" view (decided: not building).
 
-## Schema (migration `000029_add_content_relationships`)
+### Table: `content_relationship_perspectives`
+Mirrors the `perspectives` table's patterns.
 
-Confirm the number at execution time: `ls backend/migrations | tail`, and check other branches for a colliding migration.
+| column | type | notes |
+|---|---|---|
+| `id` | serial PK | |
+| `user_id` | int NOT NULL FK users ON DELETE CASCADE | |
+| `content_id` | int NOT NULL FK content ON DELETE CASCADE | the item being considered (anchor) |
+| `related_content_id` | int NOT NULL FK content ON DELETE CASCADE | |
+| `relevance` | int NULL, 0–10000 | |
+| `importance` | int NULL, 0–10000 | how much `related_content_id` matters **to** `content_id` (asymmetric) |
+| `relationship_types` | jsonb NOT NULL DEFAULT `'{}'` | fixed vocabulary, lowercase keys → 0–10000 |
+| `custom_fields` | jsonb NOT NULL DEFAULT `'{}'` | user-named, lowercase keys → 0–10000 (same as `perspectives.custom_fields`) |
+| `review` | text NULL | HTML, sanitized with the same sanitizer as `perspectives.review` |
+| `privacy` | text NOT NULL DEFAULT `'public'` CHECK public/private | same as `perspectives.privacy` |
+| `created_at` / `updated_at` | timestamptz | |
 
-```sql
-CREATE TABLE IF NOT EXISTS public.content_relationships (
-    id                 serial PRIMARY KEY,
-    from_content_id    int  NOT NULL REFERENCES public.content(id) ON DELETE CASCADE,
-    to_content_id      int  NOT NULL REFERENCES public.content(id) ON DELETE CASCADE,
-    kind               text NOT NULL,
-    created_by_user_id int  NULL REFERENCES public.users(id) ON DELETE SET NULL,
-    created_at         timestamptz NOT NULL DEFAULT now(),
-    updated_at         timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT content_relationships_no_self CHECK (from_content_id <> to_content_id),
-    CONSTRAINT content_relationships_kind_check CHECK (kind IN ('related')),
-    CONSTRAINT content_relationships_unique UNIQUE (from_content_id, to_content_id, kind)
-);
-CREATE INDEX IF NOT EXISTS idx_content_relationships_to ON public.content_relationships (to_content_id);
--- (from_content_id, …) is covered by the unique index.
+- Unique `(user_id, content_id, related_content_id)`; CHECK `content_id <> related_content_id`.
+- Index on `related_content_id` for reverse lookups.
 
-CREATE TABLE IF NOT EXISTS public.content_relationship_ratings (
-    relationship_id int NOT NULL REFERENCES public.content_relationships(id) ON DELETE CASCADE,
-    user_id         int NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    relevance       int NULL CHECK (relevance  BETWEEN 0 AND 10000),
-    importance      int NULL CHECK (importance BETWEEN 0 AND 10000),
-    created_at      timestamptz NOT NULL DEFAULT now(),
-    updated_at      timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (relationship_id, user_id)
-);
-CREATE INDEX IF NOT EXISTS idx_content_relationship_ratings_user ON public.content_relationship_ratings (user_id);
-```
+**How to read a row:** from `content_id`'s point of view, `related_content_id` is this relevant, this important, and relates to it as these types.
+- **Empty `relationship_types` means related in an unspecified way.**
+- **Rows are ordered on purpose:** importance is not symmetric.
 
-The down migration drops both tables (ratings first). Nothing is backfilled. The migration must be applied manually per environment; never run `make migrate-up`.
+### Relationship type vocabulary (read "related ___ content")
 
-## GraphQL (sketch)
+| group | types |
+|---|---|
+| Evidential | `proves`, `disproves`, `supports`, `undermines`, `prerequisite`, `contradicts`* |
+| Sourcing / interpretation | `source`, `explains` |
+| Scope | `duplicates`*, `overlaps`*, `broader`, `narrower` |
+| Question fit | `would_settle`, `answers`, `too_broad`, `too_narrow`, `loaded` |
 
-```graphql
-enum ContentRelationshipKind { RELATED }
+\* symmetric.
+- The vocabulary lives in a Go enum, validated in the service.
+- Adding a type is a code change, not a migration.
 
-type ContentRelationship {
-  id: ID!
-  kind: ContentRelationshipKind!
-  fromContent: Content!
-  toContent: Content!
-  # Convenience: the endpoint that isn't the content you queried from (null when not queried from one side).
-  otherContent: Content
-  createdByUserID: ID
-  ratingCount: Int!
-  averageRelevance: Float
-  averageImportance: Float
-  myRating: ContentRelationshipRating   # null when anonymous or unrated
-  createdAt: String!
-}
+### Visibility and aggregation
+- A row is readable when the viewer can read **both** content endpoints and the row is public or owned by the viewer.
+- A content item's related list comes from rows anchored on it. Rows anchored the other way contribute to relevance, and symmetric types count either way.
+- Default ranking is by average relevance × average importance.
+- Averages are exposed per relationship type and per custom field.
 
-type ContentRelationshipRating {
-  relevance: Int
-  importance: Int
-  updatedAt: String!
-}
+### Worked examples
+The design conversation used five scenarios as acceptance examples:
+1. **O.J. Simpson:** a claim with glove and motive/means/ability questions.
+2. **Coffee and health:** scope, overlap, a too-broad question.
+3. **Faith and works:** Bible passages as related content, `explains`.
+4. **EV ownership cost:** a YouTube source, duplicates, one-way importance.
+5. **Moon landing:** unspecified relatedness, a loaded question, both sides agreeing a claim would disprove the landing if true.
 
-input CreateContentRelationshipInput {
-  fromContentID: IntID!
-  toContentID: IntID!
-  kind: ContentRelationshipKind = RELATED
-}
-
-input RateContentRelationshipInput {
-  relationshipID: IntID!
-  relevance: Int      # omitted = unchanged; explicit null = clear
-  importance: Int
-}
-
-extend type Query {
-  contentRelationships(contentID: IntID!, kind: ContentRelationshipKind, first: Int = 20): [ContentRelationship!]!
-}
-
-extend type Mutation {
-  createContentRelationship(input: CreateContentRelationshipInput!): ContentRelationship! @auth
-  rateContentRelationship(input: RateContentRelationshipInput!): ContentRelationship! @auth
-  deleteContentRelationship(id: ID!): Boolean! @auth   # creator only, and only while no one else has rated it (Open Question 3)
-}
-```
-
-Endpoint `Content` fields resolve through the existing content lookup with the privacy rule applied. Consider a dataloader if N+1 shows up. The list is capped (`first` ≤ 100); full cursor pagination is deferred until someone needs it.
+Use them as seed data for the local Docker trial and as test fixtures.
 
 ## Tasks
 
-### Task 1: Migration
-- [ ] Write `000029_add_content_relationships.{up,down}.sql` as above (idempotent).
+### Task 1: QUESTION content type
+- [ ] `domain.ContentTypeQuestion = "QUESTION"`.
+- [ ] `createQuestion` mutation, mirroring `createClaim`: private, owner from the session, trimmed text.
+- [ ] Add Content: detect text ending in `?`, add Question to the type picker, and add a `useCreateQuestion` hook.
+- [ ] Tests for each layer.
 
-### Task 2: Domain + ports
-- [ ] `domain/content_relationship.go`:
-  - `ContentRelationshipKind` enum (UPPERCASE) with an `IsSymmetric()` method
-  - `ContentRelationship` struct, including aggregate fields and an optional `MyRating`
-  - `ContentRelationshipRating` struct
-  - `ContentRelationshipListParams` (ContentID, Kind, Limit, ViewerID)
-- [ ] `ports/repositories/content_relationship_repository.go`:
-  - `GetOrCreate`
-  - `GetByID(id, viewerID)`
-  - `ListForContent(params)`
-  - `UpsertRating`
-  - `Delete`
-  - `CountRatingsByOthers`
-- [ ] `ports/services/content_relationship_service.go`: `Create`, `Rate`, `List`, `Delete`.
-- [ ] Bind the kind enum in `gqlgen.yml`, with a DB converter (lowercase ↔ UPPERCASE).
+### Task 2: Migration (local Docker first)
+- [ ] `backend/migrations/0000NN_add_content_relationship_perspectives.{up,down}.sql`. Take the next free number at execution time and check other branches for collisions.
+- [ ] Write idempotent DDL.
+- [ ] Apply to the local Docker Postgres only; manual `migrate up` elsewhere after the trial.
 
-### Task 3: Repository (GORM)
-- [ ] GORM models and mappers.
-- [ ] `ListForContent`:
-  - select links where the content is either endpoint
-  - JOIN both endpoints' content rows and apply the "public OR owned by viewer" predicate to **each**
-  - LEFT JOIN a ratings aggregate (count, avg relevance, avg importance)
-  - LEFT JOIN the viewer's own rating
-  - order by the ranking rule
-- [ ] `GetOrCreate` with `ON CONFLICT (from, to, kind) DO NOTHING`, then re-read.
-- [ ] `UpsertRating` with `ON CONFLICT (relationship_id, user_id) DO UPDATE`, touching `updated_at`.
-- [ ] sqlmock tests, mirroring `gorm_content_repository_test.go`.
+### Task 3: Domain, ports, repository
+- [ ] Add a `RelationshipType` enum with an `IsSymmetric()` method, plus the `ContentRelationshipPerspective` struct.
+- [ ] Repository:
+  - `Upsert` on the unique key
+  - `GetByID`
+  - `ListForContent(contentID, viewerID, limit)`: includes both orientations, applies the visibility joins, and returns aggregates
+  - `Delete` (owner only)
+- [ ] GORM model and mappers (JSONB maps like `CustomFields`).
+- [ ] sqlmock tests.
 
 ### Task 4: Service
-- [ ] `Create`:
-  - reject self-links
-  - both endpoints must exist **and be readable by the caller** (otherwise not found, never "forbidden", so private rows aren't disclosed)
-  - enforce allowed type pairs
-  - normalize order for symmetric kinds
-  - idempotent
-- [ ] `Rate`: the link must be readable; each value 0–10000; at least one field present.
-- [ ] `Delete`: creator only, blocked when others have rated it.
-- [ ] Unit tests with mock repositories.
+- [ ] Both endpoints must exist and be readable by the caller (not found otherwise).
+- [ ] Reject self-links.
+- [ ] Validate that ratings and all map values are 0–10000.
+- [ ] Validate `relationship_types` keys against the vocabulary.
+- [ ] Lowercase `custom_fields` keys.
+- [ ] Sanitize `review`.
+- [ ] Unit tests built from the scenario fixtures.
 
-### Task 5: Schema + resolvers
-- [ ] Add the schema above, run `make graphql-gen`, and move stubs from the stray `schema.resolvers.go` into a new `content_relationship.resolvers.go`.
-- [ ] Resolvers read the viewer from `auth.ForContext`; mutations use `auth.RequireAuth`.
-- [ ] Wire the service in `cmd/server/main.go`. Add it to `Resolver` without breaking the existing `NewResolver` callers in tests: an option or setter, or update every call site (decide at execution time).
-- [ ] Resolver tests:
-  - someone else's private endpoint hides the link
-  - `myRating` comes back only for the viewer
-  - rating range validation
-  - idempotent create returns the same id
+### Task 5: GraphQL
+- [ ] Add a `ContentRelationshipPerspective` type.
+- [ ] Add a `relatedContent(contentID)` query returning related items with aggregates and `myPerspective`.
+- [ ] Mutations, all `@auth`:
+  - `upsertContentRelationshipPerspective`
+  - `deleteContentRelationshipPerspective` (owner only)
+- [ ] Add a new `content_relationship.resolvers.go`; wire the service in `main.go`.
+- [ ] Resolver tests.
 
-### Task 6: Frontend data layer (no UI)
-- [ ] `frontend/src/lib/queries/content/relationships.ts`: gql documents and types.
-- [ ] Hooks:
-  - `useContentRelationships(contentId)`, using a query key mirroring its variables
-  - `useCreateContentRelationship`
-  - `useRateContentRelationship`, which invalidates that content's relationship list
-- [ ] Unit tests in the style of `hooks-useCreateClaim.test.ts`.
+### Task 6: Frontend data layer (no UI yet)
+- [ ] gql documents, types and hooks for the query and mutations.
+- [ ] Unit tests.
 
-### Task 7: Verify + ship
-- [ ] `go build ./...`, `gofmt -l .`, `go test ./...`, `pnpm run test:run`, `pnpm run check`.
-- [ ] Commit per logical change and push. The PR notes the manual `migrate up` for 000028 and 000029.
+### Task 7: Seed + verify
+- [ ] Seed script loading the five scenarios into the local Docker DB.
+- [ ] Run the headless checklist: `go build`, `gofmt -l .`, `go test ./...`, `pnpm run test:run`, `pnpm run check`.
 
 ## Out of Scope
-
-- The claim default view that renders related claims and questions (separate UI plan).
-- Rating UI.
-- Suggesting related claims automatically (AI or similarity).
-- The public gate for claims.
-- Question status / concluded views (decided: not building).
-- Cursor pagination for relationships.
-
-## Open Questions (need answers before execution)
-
-1. **Allowed endpoints:** CLAIM ↔ CLAIM only at first, or also claim ↔ any content (e.g. a claim related to a YouTube video)? The tables support both, so this is a service-level rule.
-2. **Kinds at launch:** only `RELATED`, or also directional `SUPPORTS` / `CONTRADICTS` now?
-3. **Deleting links:** allow the creator to delete while unrated by others (as planned), or no deletes at all in v1?
-4. **Who can create links:** any signed-in user between any two readable rows, or only owners of at least one endpoint?
-5. **Rating visibility:** are averages and counts public to anyone who can read the link (as planned), or visible only after N ratings?
+- Claim/question view UI and rating UI.
+- The public/uniqueness gate for claims (`duplicates` data will feed it later).
+- AI-suggested relationships.
+- Cursor pagination.
