@@ -1,4 +1,4 @@
-import { BIBLE_PASSAGE_ICON_SVG } from './icons';
+import { BIBLE_PASSAGE_ICON_SVG, MUSIC_TRACK_ICON_SVG } from './icons';
 
 /** The one "no value" glyph for grid cells; keep new formatters on it. */
 export const EMPTY_VALUE = '—';
@@ -335,12 +335,17 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 	const container = document.createElement('div');
 	container.className = 'flex items-center justify-center h-full w-full';
 
-	if (params.data.contentType === 'BIBLE_PASSAGE') {
+	const iconTypes: Record<string, { svg: string; label: string }> = {
+		BIBLE_PASSAGE: { svg: BIBLE_PASSAGE_ICON_SVG, label: 'Bible Passage' },
+		YOUTUBE_MUSIC: { svg: MUSIC_TRACK_ICON_SVG, label: 'YouTube Music Track' },
+	};
+	const iconType = iconTypes[params.data.contentType];
+	if (iconType) {
 		container.classList.add('text-primary');
-		container.innerHTML = BIBLE_PASSAGE_ICON_SVG;
+		container.innerHTML = iconType.svg;
 		const label = document.createElement('span');
 		label.className = 'sr-only';
-		label.textContent = 'Bible Passage';
+		label.textContent = iconType.label;
 		container.appendChild(label);
 		return container;
 	}

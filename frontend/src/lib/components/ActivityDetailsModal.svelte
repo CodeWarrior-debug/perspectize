@@ -19,6 +19,7 @@
 	import PassageText from '$lib/components/PassageText.svelte';
 	import PassagePositionBar from '$lib/components/PassagePositionBar.svelte';
 	import PassageLinks from '$lib/components/PassageLinks.svelte';
+	import MusicTrackPanel from '$lib/components/MusicTrackPanel.svelte';
 	import { useSetPassageDisplayTitle } from '$lib/queries/bible/useSetPassageDisplayTitle';
 
 	interface ModalContent {
@@ -53,6 +54,7 @@
 	} = $props();
 
 	const isPassage = $derived(content?.contentType === 'BIBLE_PASSAGE');
+	const isMusic = $derived(content?.contentType === 'YOUTUBE_MUSIC');
 	const hasVerseRange = $derived(isPassage && content?.verseStartID != null && content?.verseEndID != null);
 	const setPassageTitle = useSetPassageDisplayTitle();
 	let titleDraft = $state('');
@@ -115,7 +117,13 @@
 		<DialogContent showCloseButton={false} class="max-w-[560px] gap-0 overflow-hidden rounded-xl p-0">
 			<div class="flex items-start justify-between gap-3 bg-primary px-[22px] py-[18px]">
 				<DialogTitle class="text-xs font-semibold tracking-wide text-primary-foreground/70 uppercase">
-					{content.contentType === 'CLAIM' ? 'Claim' : isPassage ? 'Bible Passage' : 'YouTube Video'}
+					{content.contentType === 'CLAIM'
+						? 'Claim'
+						: isPassage
+							? 'Bible Passage'
+							: isMusic
+								? 'YouTube Music Track'
+								: 'YouTube Video'}
 				</DialogTitle>
 				<DialogClose class="text-primary-foreground/80 hover:text-primary-foreground">
 					<XIcon class="size-[18px]" />
@@ -189,6 +197,10 @@
 							<div class="mt-1 text-[13px] text-muted-foreground">{content.channelTitle}</div>
 						</div>
 					</div>
+				{/if}
+
+				{#if isMusic}
+					<MusicTrackPanel contentId={content.id} name={content.name} url={content.url} {open} />
 				{/if}
 
 				<!-- A passage's stored url is its version-less dedupe key; PassageLinks shows versioned links instead. -->
