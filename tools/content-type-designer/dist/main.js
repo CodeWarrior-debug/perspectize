@@ -56,6 +56,13 @@ function load() {
         const parsed = JSON.parse(raw);
         if (!parsed.draft || !parsed.decisions)
             return null;
+        // Drafts saved before a field existed pick it up from their seed, once.
+        const seed = TYPES.find((t) => t.id === parsed.seed);
+        if (seed) {
+            parsed.draft.discover ??= seed.discover && { ...seed.discover, filters: [...seed.discover.filters] };
+            parsed.draft.detect ??= seed.detect;
+            parsed.draft.detailOnly ??= seed.detailOnly;
+        }
         return parsed;
     }
     catch {
@@ -794,7 +801,7 @@ function renderNotes() {
         save();
         renderDerived();
     });
-    return section('7 · Process notes', 'Carried into the emitted spec verbatim.', [
+    return section('8 · Process notes', 'Carried into the emitted spec verbatim.', [
         field('Testing approach', testing),
         field('Conventions to ignore for this work only', dev)
     ]);
@@ -843,10 +850,124 @@ function renderOutput() {
     });
     paint();
     renderOutput.repaint = paint;
-    return section('8 · Output', 'Deterministic — the same answers always produce the same text. No model is called.', [
+    return section('9 · Output', 'Deterministic — the same answers always produce the same text. No model is called.', [
         tabs,
         el('div', { class: 'row' }, [copy, download]),
         pre
+    ]);
+}
+/* ------------------------------------------------------------- discover */
+const PLACEMENTS = {
+    'search-and-feed': 'Search and a feed',
+    'feed-only': 'Feed only',
+    'search-only': 'Search only',
+    'not-on-discover': 'Not on Discover'
+};
+function blankDiscover() {
+    return { placement: 'not-on-discover', status: 'proposed', search: '', feedLabel: '', feedKind: 'none', feedSource: '', refresh: '', fetchFrom: 'backend', filters: [], reason: '' };
+}
+function renderDiscover() {
+    const d = state.draft;
+    const blurb = 'Every type needs a decision here, even if the answer is "not on Discover". Say what the page shows when the search box is empty, and what "trending" actually counts.';
+    if (!d.discover) {
+        const decide = el('button', { type: 'button', class: 'primary' }, ['Decide']);
+        decide.addEventListener('click', () => {
+            d.discover = blankDiscover();
+            save();
+            render();
+        });
+        return section('7 · Discover page', blurb, [el('p', { class: 'w-error' }, ['Not decided. The spec lists this as a must-fix until it is.']), decide]);
+    }
+    const dc = d.discover;
+    const hasSearch = dc.placement === 'search-and-feed' || dc.placement === 'search-only';
+    const hasFeed = dc.placement === 'search-and-feed' || dc.placement === 'feed-only';
+    const missing = [];
+    if (!dc.reason.trim())
+        missing.push('why this placement');
+    if (hasSearch && !dc.search.trim())
+        missing.push('the search endpoint');
+    if (hasFeed && (!dc.feedLabel.trim() || !dc.feedSource.trim()))
+        missing.push('the feed heading and source');
+    if (hasFeed && dc.feedKind === 'trending' && !/view|popular|rank|count|play|chart/i.test(dc.feedSource))
+        missing.push('what "trending" counts');
+    return section('7 · Discover page', blurb, [
+        grid2([
+            field('Placement', select(dc.placement, Object.keys(PLACEMENTS), (v) => (dc.placement = v), PLACEMENTS)),
+            field('Status', select(dc.status, ['proposed', 'shipped'], (v) => (dc.status = v), { proposed: 'Proposed', shipped: 'Shipped (the app does this today)' })),
+            ...(hasSearch
+                ? [field('Search', input(dc.search, (v) => (dc.search = v), 'endpoint, and how a result becomes a card'), 'Does a result carry title and image, or only an id to look up?')]
+                : []),
+            ...(hasSearch
+                ? [field('Filters', input(dc.filters.join(', '), (v) => (dc.filters = v.split(',').map((f) => f.trim()).filter(Boolean)), 'Era, Department'), 'Comma-separated.')]
+                : []),
+            ...(hasFeed
+                ? [
+                    field('Feed heading', input(dc.feedLabel, (v) => (dc.feedLabel = v), 'Trending, Verse of the day…')),
+                    field('Feed kind', select(dc.feedKind, ['trending', 'daily', 'curated', 'recent', 'none'], (v) => (dc.feedKind = v), {
+                        trending: 'Trending — ranked by a popularity signal',
+                        daily: 'Daily pick from the source',
+                        curated: 'Curated list',
+                        recent: 'Recently added',
+                        none: 'None'
+                    })),
+                    field('Feed source & ranking signal', input(dc.feedSource, (v) => (dc.feedSource = v), 'endpoint + what it counts'), 'If it says trending, name the number it ranks by.'),
+                    field('Refresh', input(dc.refresh, (v) => (dc.refresh = v), 'daily backend job'))
+                ]
+                : []),
+            field('Feed fetched from', select(dc.fetchFrom, ['browser', 'backend'], (v) => (dc.fetchFrom = v), {
+                browser: 'Browser (needs CORS + a connect-src entry)',
+                backend: 'Backend (cached)'
+            })),
+            field('Why this placement', input(dc.reason, (v) => (dc.reason = v), 'Browsed or pasted? What would a user look for here?'))
+        ]),
+        ...(missing.length ? [el('p', { class: 'w-warn' }, [`Still to fill in: ${missing.join('; ')}.`])] : []),
+        renderDiscoverMock()
+    ]);
+}
+/** A strip of the Discover page as this type would add to it. */
+function renderDiscoverMock() {
+    const d = state.draft;
+    const dc = d.discover;
+    const tabs = TYPES.filter((t) => t.id !== state.seed && t.discover && t.discover.placement !== 'not-on-discover');
+    const own = dc && dc.placement !== 'not-on-discover';
+    const strip = el('div', { class: 'm-tabs' }, [
+        ...tabs.map((t) => t.discover.status === 'shipped'
+            ? el('span', { class: 'm-tab' }, [t.label])
+            : el('span', { class: 'm-tab proposed', title: 'Proposed, not built' }, [t.label])),
+        ...(own ? [el('span', { class: 'm-tab on' }, [`${d.label || 'New type'}`, el('sup', {}, ['new'])])] : [])
+    ]);
+    // A daily pick is one item; a feed or search shows a grid.
+    const rows = samplesFor(d.id, state).slice(0, dc?.feedKind === 'daily' && dc.placement === 'feed-only' ? 1 : 4);
+    const contain = /object-fit:\s*contain/.test(bindingFor(COLUMNS.find((c) => c.id === 'item'), d.id, state)?.appearance ?? '');
+    let body;
+    if (!dc)
+        body = el('p', { class: 'm-muted small' }, ['No Discover decision yet.']);
+    else if (!own)
+        body = el('p', { class: 'm-muted small' }, [`${d.label || 'This type'} does not appear on Discover. ${dc.reason}`]);
+    else {
+        const hasSearch = dc.placement !== 'feed-only';
+        const cards = rows.map((row) => el('div', { class: 'd-card' }, [
+            el('div', { class: `d-img${contain ? ' contain' : ''}` }, [thumbBox(d.id, row.item, 'modal', contain)]),
+            el('div', { class: 'd-title' }, [cellText(row.item) ?? '']),
+            el('div', { class: 'm-muted small' }, [[cellText(row.creator), cellText(row.date)].filter(Boolean).join(' · ') || cellText(row.description) || '']),
+            el('span', { class: 'm-btn primary d-add' }, ['Add to Library'])
+        ]));
+        body = el('div', {}, [
+            ...(hasSearch
+                ? [
+                    el('div', { class: 'm-inputwrap d-search' }, [el('span', { class: 'd-input' }, [`Search ${d.plural || 'items'}…`])]),
+                    ...(dc.filters.length ? [el('div', { class: 'd-filters' }, dc.filters.map((f) => el('span', { class: 'd-filter' }, [`${f} ▾`])))] : [])
+                ]
+                : []),
+            ...(dc.placement !== 'search-only'
+                ? [el('div', { class: 'd-feedhead' }, [el('span', {}, [`Showing ${dc.feedLabel || 'feed'}`]), el('span', { class: 'm-muted small' }, [dc.refresh])])]
+                : []),
+            cards.length ? el('div', { class: 'd-grid' }, cards) : el('p', { class: 'm-muted small' }, ['No sample rows to show as cards.'])
+        ]);
+    }
+    return el('figure', { id: 'discover-mock' }, [
+        el('div', { class: 'appmock' }, [el('div', { class: 'm-body' }, [el('div', { class: 'm-pop-title' }, ['Discover']), strip, body])]),
+        el('figcaption', {}, ['Mockup of routes/discover/+page.svelte with this type added. Cards use the sample rows; the real feed comes from the source above.'])
     ]);
 }
 /* ------------------------------------------------------------------ layout */
@@ -860,7 +981,7 @@ function render() {
     const root = document.getElementById('app');
     if (!root)
         return;
-    root.replaceChildren(renderIdentity(), renderIngestion(), renderColumns(), renderPreview(), renderSurfaces(), renderAddCard(), renderNotes(), renderOutput());
+    root.replaceChildren(renderIdentity(), renderIngestion(), renderColumns(), renderPreview(), renderSurfaces(), renderAddCard(), renderDiscover(), renderNotes(), renderOutput());
 }
 /** Text-only inputs do not change layout, so they just repaint the output. */
 function renderDerived() {
@@ -871,6 +992,7 @@ function renderDerived() {
         preview.replaceWith(renderPreview());
     document.getElementById('surfaces')?.replaceWith(renderSurfaces());
     document.getElementById('addcard')?.replaceWith(renderAddCard());
+    document.getElementById('discover-mock')?.replaceWith(renderDiscoverMock());
 }
 const reset = document.getElementById('reset');
 reset?.addEventListener('click', () => {

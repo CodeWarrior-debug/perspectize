@@ -90,6 +90,14 @@ Sections 4–6 show the new type the way a user would meet it:
   pattern) where the app would check it. The typed-Bible-reference step is an
   approximation of the app's parser.
 
+- **Discover page** (section 7): a required decision for every type:
+  search, a feed, both, or not on Discover, with a reason. It covers what the
+  feed ranks by (a source with no popularity data is "featured", not
+  "trending") and whether the feed is fetched by the browser or the backend.
+  The spec lists a missing decision as MUST FIX. The mockup shows the type as
+  a new Discover tab using its sample rows; proposed tabs have a dashed
+  outline.
+
 These are illustrations drawn with the app's colour tokens, not the real
 Svelte components, so recheck them against the app when those components
 change.

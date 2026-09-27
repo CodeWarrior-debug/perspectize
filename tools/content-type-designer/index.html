@@ -333,6 +333,24 @@
       table.trace tr.t-skipped td { color: var(--muted); }
       table.trace td.new { color: var(--accent); }
       @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      /* ---- discover mock ---- */
+      #discover-mock { margin-top: 14px; }
+      .m-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+      .m-tab { border: 1px solid var(--app-border); border-radius: 999px; padding: 3px 12px; font-size: 13px; color: var(--app-muted-fg); }
+      .m-tab.proposed { border-style: dashed; }
+      .m-tab.on { background: var(--app-primary); border-color: var(--app-primary); color: var(--app-primary-fg); }
+      .m-tab sup { font-size: 9px; margin-left: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+      .d-search { margin: 0 0 8px; }
+      .d-input { display: block; border: 1px solid var(--app-border); border-radius: 7px; padding: 7px 10px; font-size: 13px; color: var(--app-muted-fg); }
+      .d-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+      .d-filter { border: 1px solid var(--app-border); border-radius: 7px; padding: 3px 10px; font-size: 12px; }
+      .d-feedhead { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; font-weight: 500; margin-bottom: 8px; }
+      .d-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(170px, 100%), 1fr)); gap: 12px; }
+      .d-card { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+      .d-img .thumb-link, .d-img > .thumb { display: flex; width: 100%; }
+      .d-img .thumb { width: 100%; height: auto; aspect-ratio: 16 / 9; max-width: 100%; }
+      .d-title { font: 600 13px/1.4 var(--app-serif); }
+      .d-add { align-self: flex-start; padding: 4px 10px; font-size: 12px; }
     </style>
   </head>
   <body>

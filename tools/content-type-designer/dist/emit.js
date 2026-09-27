@@ -33,6 +33,12 @@ function storageNote(col) {
 function adapterPackage(enumValue) {
     return enumValue.toLowerCase().replace(/[^a-z0-9]/g, '') || 'newtype';
 }
+const DISCOVER_LABELS = {
+    'search-and-feed': 'Search and a feed',
+    'feed-only': 'Feed only',
+    'search-only': 'Search only',
+    'not-on-discover': 'Not on Discover'
+};
 export function buildSpec(state) {
     const d = state.draft;
     const grid = resolveGrid(state);
@@ -86,6 +92,31 @@ export function buildSpec(state) {
         out.push('No external adapter. The service resolves an existing `content` row (and a person record) instead of fetching.');
     }
     out.push('');
+    out.push('### Discover page');
+    out.push('');
+    const dc = d.discover;
+    if (!dc) {
+        out.push('**Not decided.** Every type needs a Discover decision, even "not on Discover". See section 6.');
+        out.push('');
+    }
+    else {
+        const hasSearch = dc.placement === 'search-and-feed' || dc.placement === 'search-only';
+        const hasFeed = dc.placement === 'search-and-feed' || dc.placement === 'feed-only';
+        out.push(table(['Decision', 'Value'], [
+            ['Placement', `${DISCOVER_LABELS[dc.placement]} (${dc.status})`],
+            ...(hasSearch ? [['Search', dc.search || '(missing)'], ['Filters', dc.filters.join(', ') || 'none']] : []),
+            ...(hasFeed
+                ? [
+                    ['Feed heading', dc.feedLabel || '(missing)'],
+                    ['Feed kind', dc.feedKind],
+                    ['Feed source & ranking signal', dc.feedSource || '(missing)'],
+                    ['Refresh', dc.refresh || '(missing)']
+                ]
+                : []),
+            ['Feed fetched from', dc.fetchFrom],
+            ['Why', dc.reason || '(missing)']
+        ]));
+    }
     out.push('## 3. Fields for this type');
     out.push('');
     out.push(table(['Column', 'Label for this type', 'Applicability', 'Source', 'Value path', 'Unit', 'Storage', 'Sortable', 'Default on'], chosen.map((col) => {
@@ -211,6 +242,10 @@ export function buildSpec(state) {
     }
     out.push('## 6. Consistency review');
     out.push('');
+    if (!d.discover)
+        out.push('- **MUST FIX**: no Discover page decision. Decide placement (search, feed, both, or not on Discover) and say why.');
+    else if (!d.discover.reason.trim())
+        out.push('- **MUST FIX**: the Discover decision has no reason.');
     if (grid.warnings.length === 0) {
         out.push('No gaps flagged for this selection.');
     }
@@ -268,6 +303,7 @@ export function buildSpec(state) {
                 `Frontend: \`AddContentPopover.svelte\` — chip label, a "${d.label}" option in the type menu, submit wiring, and the popover description text.`
             ]
             : []),
+        ...discoverSteps(d),
         `Frontend: \`typeCellRenderer\` icon (${d.icon}) in \`src/lib/utils/formatting.ts\`; Item cell tile (${d.thumbnail}) in \`src/lib/utils/activityItemCellRenderer.ts\`.`,
         ...(d.detailOnly?.length
             ? [`Frontend: \`ActivityDetailsModal.svelte\` — a ${d.label} branch with the bound fields as tiles and ${d.detailOnly.map((f) => f.label).join(', ')} in a details list.`]
@@ -300,5 +336,25 @@ export function buildMatrix(state) {
         '',
         table(['Column', ...ids.map((id) => (id === state.draft.id ? `${typeLabel(id, state.draft)} (draft)` : typeLabel(id, state.draft)))], rows)
     ].join('\n');
+}
+function discoverSteps(d) {
+    const dc = d.discover;
+    if (!dc)
+        return ['Discover: decide placement first (section 7 of the tool).'];
+    if (dc.placement === 'not-on-discover')
+        return [];
+    const steps = [];
+    const hasSearch = dc.placement !== 'feed-only';
+    const hasFeed = dc.placement !== 'search-only';
+    steps.push(`Discover: a ${d.label} source in \`routes/discover/+page.svelte\` (the page's view union today is 'search' | 'trending'), a card component beside \`discover/VideoCard.svelte\`, and "already in library" matching on the normalised url.`);
+    if (hasSearch)
+        steps.push(`Discover search: client in \`src/lib/services/\` beside \`youtubeApi.ts\` — ${dc.search}${dc.filters.length ? ` Filters: ${dc.filters.join(', ')}.` : ''}`);
+    if (hasFeed && dc.fetchFrom === 'backend')
+        steps.push(`Discover feed "${dc.feedLabel}": backend fetch + cache (${dc.refresh}) exposed through GraphQL — ${dc.feedSource}`);
+    if (hasFeed && dc.fetchFrom === 'browser')
+        steps.push(`Discover feed "${dc.feedLabel}": browser fetch (${dc.refresh}) — ${dc.feedSource}`);
+    if (dc.fetchFrom === 'browser' || hasSearch)
+        steps.push('CSP: add the browser-called API host to `connect-src` in `frontend/src/app.html`.');
+    return steps;
 }
 //# sourceMappingURL=emit.js.map

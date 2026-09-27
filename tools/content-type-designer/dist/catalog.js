@@ -23,7 +23,19 @@ export const TYPES = [
         icon: 'play-badge',
         accent: '#FF0033',
         sharesUrlSpace: false,
-        thumbnail: 'i.ytimg.com/vi/<id>/mqdefault.jpg'
+        thumbnail: 'i.ytimg.com/vi/<id>/mqdefault.jpg',
+        discover: {
+            placement: 'search-and-feed',
+            status: 'shipped',
+            search: 'YouTube Data API search.list (q + videoDuration, publishedAfter, order); results carry title and thumbnail, paged by nextPageToken',
+            feedLabel: 'Trending',
+            feedKind: 'trending',
+            feedSource: 'videos.list?chart=mostPopular&regionCode=US — YouTube\'s own popularity chart',
+            refresh: 'on page open; cached 1 h (staleTime)',
+            fetchFrom: 'browser',
+            filters: ['Duration', 'Upload date', 'Sort'],
+            reason: 'What the page does today: routes/discover/+page.svelte, lib/services/youtubeApi.ts.'
+        }
     },
     {
         id: 'movie',
@@ -219,7 +231,19 @@ export const TYPES = [
         icon: 'book-cross',
         accent: '#7B4B2A',
         sharesUrlSpace: false,
-        thumbnail: 'none — book-with-cross icon tile (h-8 w-10, bg-muted text-primary); click opens url'
+        thumbnail: 'none — book-with-cross icon tile (h-8 w-10, bg-muted text-primary); click opens url',
+        discover: {
+            placement: 'feed-only',
+            status: 'proposed',
+            search: '',
+            feedLabel: 'Verse of the day',
+            feedKind: 'daily',
+            feedSource: 'biblegateway.com/votd/get/?format=json&version=NIV (keyless, undocumented widget feed; BSB is not an accepted version) — keep only votd.reference, parse it with the existing reference parser, show the passage text from seeded BSB. Fallback: labs.bible.org/api/?passage=votd&type=json',
+            refresh: 'once a day, cached by the backend',
+            fetchFrom: 'backend',
+            filters: [],
+            reason: 'Searching passages is already covered: the Add Content card parses typed references. A daily verse is the one discovery feed the type naturally has. Backend fetch because Bible Gateway sends no CORS header, and caching keeps the card up if the undocumented feed breaks.'
+        }
     },
     {
         // Research 2026-09-26: The Met Collection API won on every axis that
@@ -250,6 +274,18 @@ export const TYPES = [
                 'https://www.metmuseum.org/art/collection/search/437127?ft=monet',
                 'https://www.metmuseum.org/art/collection/search?q=vermeer'
             ]
+        },
+        discover: {
+            placement: 'search-and-feed',
+            status: 'proposed',
+            search: 'Met /search?medium=Paintings&hasImages=true&q=… returns object IDs only; fetch /objects/{id} per card (~24 a page, client-side paging over the ID list). Re-check objectName = "Painting" and a non-blank image (both filters leak: a gold icon and a fan came back for medium=Paintings; hasImages kept Monet 437127), and skip 404s (search returns deleted IDs, e.g. 12765).',
+            feedLabel: 'Trending paintings',
+            feedKind: 'trending',
+            feedSource: 'The Met has no popularity data. Rank the 421 Met highlights (isHighlight=true&medium=Paintings) by 7-day English Wikipedia pageviews: Met objectWikidata_URL → enwiki sitelink → wikimedia.org/api/rest_v1/metrics/pageviews/per-article. Highlights with no enwiki article (2 of the 6 samples) sort after, by title; label the feed "Featured" if pageviews are unavailable.',
+            refresh: 'daily backend job; the page reads the stored ranking',
+            fetchFrom: 'backend',
+            filters: ['Era (dateBegin/dateEnd)', 'Department', 'On view now (isOnView)'],
+            reason: 'Paintings are browsed, not pasted: most users will find one on Discover rather than arrive with a Met URL. Ranking runs on the backend because it takes ~840 lookups; search can stay in the browser (the Met sends Access-Control-Allow-Origin: *, add collectionapi.metmuseum.org to connect-src).'
         },
         detailOnly: [
             { label: 'Artist bio', path: "response->>'artistDisplayBio'" },
