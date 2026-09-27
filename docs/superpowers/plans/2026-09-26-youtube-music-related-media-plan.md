@@ -106,13 +106,13 @@
 - [ ] **GraphQL.** Add `Content.lyrics: LyricsAvailability` (nullable, since the row may not have been checked yet) and `mutation refreshLyricsAvailability(contentId: ID!)`.
   - The mutation only re-checks when the stored result is "not available" and `checkedAt` is more than 30 days old. Otherwise it returns the stored value.
 - [ ] **Frontend.** Build `LyricsLinks.svelte` in the details modal, implementing the spec's decision-10 state table exactly.
-  - "Open lyrics" appears **only** when `available && lrclibId` and per-track pages are confirmed (`LRCLIB_TRACK_PAGES` constant, set from the browser check below).
+  - "Open lyrics" appears **only** when `available && lrclibId` and per-track pages are confirmed (confirmed; link `https://lrclib.net/tracks/<lrclibId>`, search `https://lrclib.net/search/<encodeURIComponent(title + ' ' + artist)>`).
   - Every search link carries its "Opens a search results page, not this song directly." helper text.
   - Searches are always built from title + artist and are never artist-only.
   - The YouTube Music link reads "Open song in YouTube Music" with "Lyrics tab shown there if available."
   - Opening the modal calls the refresh mutation when the stored result is stale.
   - Tests cover each row of the state table, including that "Open lyrics" never renders for a search URL, that no search URL is artist-only, and the stale-refresh trigger.
-- [ ] **Before choosing the link target,** open `lrclib.net/lyrics/<id>` in a real browser to confirm per-track pages exist. Record the result in the spec's open question.
+- [x] **Link target verified 2026-09-27:** per-track pages exist at `/tracks/:id`. See spec decision 10.
 
 ## Task 10 — Verify
 

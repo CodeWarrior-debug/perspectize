@@ -39,7 +39,7 @@ Pasting a YouTube Music link into Add Content produces a **music track** item th
 
       The label "Open lyrics" is reserved for the confirmed per-track destination.
     - Applies to `YOUTUBE_MUSIC` and `MUSIC_TRACK` rows.
-    - **Open question:** does LRCLIB have per-track web pages? Its site looks like a single-page app. Verify in a real browser before choosing the link target.
+    - **Resolved 2026-09-27:** LRCLIB has per-track pages. `https://lrclib.net/tracks/<lrclibId>` renders that song's plain and synced lyrics, and search is `https://lrclib.net/search/<url-encoded title artist>`. Both were verified in a headless browser, and the routes were confirmed in LRCLIB's app bundle. Guessed paths like `/lyrics/<id>` and `/search?q=` render a blank page and must not be used. Its metadata is volunteer-entered and messy: the top search hit for Bohemian Rhapsody had the artist set to "Bohemian Rhapsody - Queen", and a 3:38 cut was listed. The ±3s duration match is therefore required, not optional.
 
 ## Flow states (expected share)
 
