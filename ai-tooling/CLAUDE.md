@@ -14,7 +14,7 @@ The owner is learning how AI tooling is built (LLM APIs, tool use, agent loops, 
 - **Assign reading with direction.** Link a specific page, say what to look for, and estimate time ("MCP spec → Tools section, focus on how `inputSchema` is declared, ~10 min"). Prefer primary sources (Anthropic docs, MCP spec, Go docs). Pointing the owner at something *you* wrote in the repo, then quizzing on it, is also good.
 - **Spaced review.** Revisit earlier concepts occasionally, weighted toward ones answered shakily.
 - **Keep it proportional.** Don't block urgent fixes with lessons. If the owner says "skip teaching", skip for that task only.
-- **Log it.** After a quiz, update `LEARNING.md` (concept, date, how it went) so future sessions — which don't share memory — can do spaced review.
+- **Log it.** After a quiz, update `LEARNING.md` (concept, date, how it went) so future sessions — which don't share memory — can do spaced review. **Batch it:** commit log updates locally, but don't push each one (every push redeploys previews on the open PR stack). Push once at the end of a teaching session, or with the next code push.
 
 ### Teaching in specs and plans
 
