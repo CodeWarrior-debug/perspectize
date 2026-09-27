@@ -182,6 +182,7 @@ See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow
 **How-to guides:**
 - [Adding an AG Grid Column](.claude/docs/ADDING_AG_GRID_COLUMN.md) — Decision checklist for adding columns to the ActivityTable
 - [Adding a Content Type](.claude/docs/ADDING_CONTENT_TYPE.md) — End-to-end guide for new content types (backend + frontend)
+- [Content Type Designer](tools/content-type-designer/README.md) — Plan a new type's columns, tooltips and details view before coding. `dist/` is committed: after editing `src/` run `npx tsc -p tsconfig.json` in that dir and commit both (don't commit its package-lock.json). ES modules won't load from file:// — serve it (`python3 -m http.server`) to test; Playwright is at /opt/node22/lib/node_modules/playwright in cloud sessions.
 - [Code to Figma Canvas](.claude/docs/CODE_TO_FIGMA_CANVAS.md) — Capture running app into Figma to keep designs in sync
 
 **Planning & backlog:**
