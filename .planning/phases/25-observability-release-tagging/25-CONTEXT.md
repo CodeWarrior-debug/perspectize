@@ -27,8 +27,11 @@
 - CORS `AllowedHeaders` is `Content-Type, Authorization` only. Browser trace propagation
   needs `traceparent`/`tracestate` added.
 - The CSP `connect-src` in `frontend/src/app.html` must gain the Faro collector host.
-- One anonymous GraphQL `query(` exists in `frontend/src/lib/queries`. Name it so it gets its
-  own per-operation metrics.
+- ~~One anonymous GraphQL `query(` exists in `frontend/src/lib/queries`.~~ Corrected during 25-02:
+  that grep hit was a code-level call, not a GraphQL operation — every frontend operation is
+  already named, so each gets its own per-operation metrics.
+- `graphql.server.operation.duration` for **subscriptions** measures time to the first event,
+  which can be long — filter `graphql.operation.type!="subscription"` on latency panels.
 
 ## Decisions (locked)
 
