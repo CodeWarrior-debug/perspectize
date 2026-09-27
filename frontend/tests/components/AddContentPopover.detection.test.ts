@@ -6,10 +6,12 @@ import AddContentPopover from '$lib/components/AddContentPopover.svelte';
 const mocks = vi.hoisted(() => ({
 	video: { mutate: vi.fn(), isPending: false, isSuccess: false },
 	passage: { mutate: vi.fn(), isPending: false, isSuccess: false },
+	claim: { mutate: vi.fn(), isPending: false, isSuccess: false },
 }));
 
 vi.mock('$lib/queries/content/useAddVideo', () => ({ useAddVideo: () => mocks.video }));
 vi.mock('$lib/queries/content/useAddPassage', () => ({ useAddPassage: () => mocks.passage }));
+vi.mock('$lib/queries/content/useCreateClaim', () => ({ useCreateClaim: () => mocks.claim }));
 
 const JOHN = 43;
 const YT = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
@@ -23,7 +25,9 @@ async function openWith(text?: string) {
 }
 
 async function type(text: string) {
-	await fireEvent.input(screen.getByPlaceholderText(/paste a link or type a reference/i), { target: { value: text } });
+	await fireEvent.input(screen.getByPlaceholderText(/paste a link, type a reference, or write a claim/i), {
+		target: { value: text },
+	});
 	await tick();
 }
 
@@ -36,7 +40,7 @@ const pick = async (label: RegExp | string, value: string | number) => {
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	for (const m of [mocks.video, mocks.passage]) {
+	for (const m of [mocks.video, mocks.passage, mocks.claim]) {
 		m.isPending = false;
 		m.isSuccess = false;
 	}
@@ -97,10 +101,22 @@ describe('AddContentPopover detection states', () => {
 		expect(submit()).toBeDisabled();
 	});
 
-	it('claim-like text: chip says Claim, explained, submit disabled', async () => {
-		await openWith('Grace is unearned favor');
+	it('claim-like text: chip says Claim, private note, submits the trimmed text', async () => {
+		await openWith('  Grace is unearned favor  ');
 		expect(chip()).toHaveTextContent('Detected: Claim');
-		expect(screen.getByText(/claims can't be added from here yet/i)).toBeInTheDocument();
+		expect(screen.getByText(/claims are private/i)).toBeInTheDocument();
+		expect(submit()).toBeEnabled();
+		await fireEvent.click(submit());
+		expect(mocks.claim.mutate).toHaveBeenCalledWith({ text: 'Grace is unearned favor', userID: 0 });
+		expect(mocks.video.mutate).not.toHaveBeenCalled();
+		expect(mocks.passage.mutate).not.toHaveBeenCalled();
+	});
+
+	it('manually picking Claim on a single word keeps submit disabled with a hint', async () => {
+		await openWith('grace');
+		await pick(/change type/i, 'CLAIM');
+		expect(chip()).toHaveTextContent('Type: Claim');
+		expect(screen.getByText(/at least two words/i)).toBeInTheDocument();
 		expect(submit()).toBeDisabled();
 	});
 });
@@ -189,7 +205,7 @@ describe('AddContentPopover clear buttons', () => {
 		await pick('End verse', 20);
 		await fireEvent.click(screen.getByRole('button', { name: /clear all/i }));
 		await tick();
-		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toHaveValue('');
+		expect(screen.getByPlaceholderText(/paste a link, type a reference, or write a claim/i)).toHaveValue('');
 		expect(chip()).toHaveTextContent('Select a type');
 		expect(screen.queryByTestId('passage-picker')).toBeNull();
 	});
@@ -208,7 +224,7 @@ describe('AddContentPopover clear buttons', () => {
 		expect(screen.getByLabelText('Start chapter')).toHaveValue('1');
 		expect(screen.getByLabelText('Start verse')).toHaveValue('1');
 		expect(screen.getByLabelText('End verse')).toHaveValue('1');
-		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toHaveValue('');
+		expect(screen.getByPlaceholderText(/paste a link, type a reference, or write a claim/i)).toHaveValue('');
 	});
 
 	it('Clear type is disabled when no type is selected', async () => {
