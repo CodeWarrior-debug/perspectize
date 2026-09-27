@@ -33,7 +33,7 @@ func renderer(id, title, videoType string, byline []map[string]any) map[string]a
 		"longBylineText": map[string]any{"runs": byline},
 		"lengthText":     map[string]any{"runs": []map[string]any{{"text": "5:55"}}},
 		"navigationEndpoint": map[string]any{"watchEndpoint": map[string]any{
-			"videoId": id,
+			"videoId":                            id,
 			"watchEndpointMusicSupportedConfigs": map[string]any{"watchEndpointMusicConfig": map[string]any{"musicVideoType": videoType}},
 		}},
 	}
