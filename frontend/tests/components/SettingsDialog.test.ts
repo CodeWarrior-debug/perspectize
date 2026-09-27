@@ -99,4 +99,41 @@ describe('SettingsDialog', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Customize Theme' }));
 		expect(screen.queryByText('Show onboarding next session')).toBeNull();
 	});
+
+	describe('Feedback section', () => {
+		async function openFeedback() {
+			render(SettingsDialog, { props: { open: true, store: fakeStore } });
+			await fireEvent.click(screen.getByRole('button', { name: 'Feedback' }));
+		}
+
+		it('links feature requests and bug reports straight to GitHub issue templates', async () => {
+			await openFeedback();
+			const feature = screen.getByRole('link', { name: 'Open a feature request' });
+			const bug = screen.getByRole('link', { name: 'Report a bug' });
+			expect(feature.getAttribute('href')).toContain('template=feature_request.md');
+			expect(bug.getAttribute('href')).toContain('template=bug_report.md');
+			expect(feature.getAttribute('target')).toBe('_blank');
+			expect(bug.getAttribute('rel')).toContain('noopener');
+		});
+
+		it('keeps the content-type submit disabled until a name is entered', async () => {
+			await openFeedback();
+			const submit = screen.getByRole('button', { name: 'Continue on GitHub' });
+			expect(submit).toBeDisabled();
+			await fireEvent.input(screen.getByLabelText('Content type'), { target: { value: 'Podcast' } });
+			expect(submit).not.toBeDisabled();
+		});
+
+		it('opens a prefilled content-type issue on submit', async () => {
+			const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+			await openFeedback();
+			await fireEvent.input(screen.getByLabelText('Content type'), { target: { value: 'Podcast' } });
+			await fireEvent.click(screen.getByRole('button', { name: 'Continue on GitHub' }));
+			expect(openSpy).toHaveBeenCalledTimes(1);
+			const url = new URL(openSpy.mock.calls[0][0] as string);
+			expect(url.searchParams.get('template')).toBe('content_type_request.md');
+			expect(url.searchParams.get('title')).toBe('[Content Type] Podcast');
+			openSpy.mockRestore();
+		});
+	});
 });
