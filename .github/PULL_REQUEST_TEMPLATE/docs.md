@@ -14,3 +14,10 @@
 - [ ] Markdown renders correctly
 - [ ] Links are valid
 - [ ] Content is accurate
+
+## Follow-up Steps
+
+<!-- Manual actions needed after merge, in order if sequence matters. Delete section if none. -->
+
+- [ ] <!-- e.g. update linked doc, announce change -->
+

@@ -1,5 +1,13 @@
 import { extractVideoIdFromUrl } from './formatting';
-import { BIBLE_PASSAGE_ICON_SVG } from './icons';
+import {
+	BIBLE_PASSAGE_ICON_SVG_SCALABLE,
+	BIBLE_ICON_WRAPPER_CLASS,
+	BIBLE_ICON_LABEL_CLASS,
+	BIBLE_ICON_LEFT_CLASS,
+	BIBLE_ICON_RIGHT_CLASS,
+	bibleIconLabelLines,
+} from './icons';
+import { passageIconLabels } from './bible';
 
 /**
  * Bible passage variant of the Item cell: an icon tile instead of a thumbnail
@@ -12,9 +20,11 @@ function renderPassageCell(opts: {
 	name: string;
 	url: string | null;
 	displayTitle?: string | null;
+	verseStartID?: number | null;
+	verseEndID?: number | null;
 	onOpenDetails?: (contentId: string) => void;
 }): HTMLElement {
-	const { id, name, url, displayTitle, onOpenDetails } = opts;
+	const { id, name, url, displayTitle, verseStartID, verseEndID, onOpenDetails } = opts;
 
 	const cell = document.createElement('div');
 	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-2 cursor-pointer';
@@ -23,11 +33,31 @@ function renderPassageCell(opts: {
 	const iconBox = document.createElement('div');
 	iconBox.dataset.testid = 'item-thumb';
 	iconBox.className = 'flex h-8 w-10 flex-none items-center justify-center rounded bg-muted text-primary';
-	iconBox.innerHTML = BIBLE_PASSAGE_ICON_SVG;
 	iconBox.addEventListener('click', (e) => {
 		e.stopPropagation();
 		if (url) window.open(url, '_blank', 'noopener,noreferrer');
 	});
+
+	const book = document.createElement('div');
+	book.className = BIBLE_ICON_WRAPPER_CLASS;
+	book.innerHTML = BIBLE_PASSAGE_ICON_SVG_SCALABLE;
+	const { left, right } = passageIconLabels({ verseStartID, verseEndID });
+	for (const [text, side] of [
+		[left, BIBLE_ICON_LEFT_CLASS],
+		[right, BIBLE_ICON_RIGHT_CLASS],
+	]) {
+		if (!text) continue;
+		const label = document.createElement('span');
+		const { lines, sizeClass } = bibleIconLabelLines(text);
+		label.className = `${BIBLE_ICON_LABEL_CLASS} ${side} ${sizeClass}`;
+		for (const line of lines) {
+			const lineEl = document.createElement('span');
+			lineEl.textContent = line;
+			label.appendChild(lineEl);
+		}
+		book.appendChild(label);
+	}
+	iconBox.appendChild(book);
 
 	const textWrap = document.createElement('div');
 	textWrap.className = 'min-w-0 flex-1 text-left whitespace-normal';
@@ -58,6 +88,8 @@ export interface ActivityItemCellRendererParams {
 		url: string | null;
 		contentType?: string;
 		displayTitle?: string | null;
+		verseStartID?: number | null;
+		verseEndID?: number | null;
 	};
 	context?: { onOpenDetails?: (contentId: string) => void };
 }
@@ -79,11 +111,11 @@ const PLAY_ICON_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="non
 export function activityItemCellRenderer(params: ActivityItemCellRendererParams): HTMLElement | string {
 	if (!params.data) return '';
 
-	const { id, name, url, contentType, displayTitle } = params.data;
+	const { id, name, url, contentType, displayTitle, verseStartID, verseEndID } = params.data;
 	const onOpenDetails = params.context?.onOpenDetails;
 
 	if (contentType === 'BIBLE_PASSAGE') {
-		return renderPassageCell({ id, name, url, displayTitle, onOpenDetails });
+		return renderPassageCell({ id, name, url, displayTitle, verseStartID, verseEndID, onOpenDetails });
 	}
 
 	// No native `title` attribute here (or on the thumbnail below) — the column's

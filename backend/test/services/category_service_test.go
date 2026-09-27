@@ -45,7 +45,8 @@ func (m *mockCategoryRepository) GetByIDs(ctx context.Context, ids []int) ([]*do
 
 // mockWikidataClient implements services.WikidataClient for testing
 type mockWikidataClient struct {
-	searchFn func(ctx context.Context, query string, language string, limit int) ([]domain.WikidataSearchResult, error)
+	searchFn          func(ctx context.Context, query string, language string, limit int) ([]domain.WikidataSearchResult, error)
+	getWikipediaURLFn func(ctx context.Context, qid string) (string, error)
 }
 
 func (m *mockWikidataClient) Search(ctx context.Context, query string, language string, limit int) ([]domain.WikidataSearchResult, error) {
@@ -53,6 +54,13 @@ func (m *mockWikidataClient) Search(ctx context.Context, query string, language 
 		return m.searchFn(ctx, query, language, limit)
 	}
 	return []domain.WikidataSearchResult{}, nil
+}
+
+func (m *mockWikidataClient) GetWikipediaURL(ctx context.Context, qid string) (string, error) {
+	if m.getWikipediaURLFn != nil {
+		return m.getWikipediaURLFn(ctx, qid)
+	}
+	return "", nil
 }
 
 // mockContentRepoForCategory implements repositories.ContentRepository for category tests
@@ -130,6 +138,65 @@ func TestSetPrimaryCategory_Success(t *testing.T) {
 	assert.Equal(t, "Test Video", result.Name)
 	require.NotNil(t, result.PrimaryCategoryID)
 	assert.Equal(t, upsertedCatID, *result.PrimaryCategoryID)
+}
+
+func TestSetPrimaryCategory_PersistsWikipediaURL(t *testing.T) {
+	var upsertedCategory *domain.Category
+	categoryRepo := &mockCategoryRepository{
+		upsertFn: func(ctx context.Context, category *domain.Category) (*domain.Category, error) {
+			category.ID = 42
+			upsertedCategory = category
+			return category, nil
+		},
+	}
+	contentRepo := &mockContentRepoForCategory{}
+	wikidataClient := &mockWikidataClient{
+		getWikipediaURLFn: func(ctx context.Context, qid string) (string, error) {
+			return "https://en.wikipedia.org/wiki/Science", nil
+		},
+	}
+	svc := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
+
+	input := portservices.SetPrimaryCategoryInput{
+		ContentID: 1,
+		QID:       "Q336",
+		Label:     "Science",
+	}
+
+	_, err := svc.SetPrimaryCategory(context.Background(), input)
+	require.NoError(t, err)
+	require.NotNil(t, upsertedCategory)
+	assert.Equal(t, "https://en.wikipedia.org/wiki/Science", upsertedCategory.WikipediaURL)
+}
+
+func TestSetPrimaryCategory_ToleratesWikipediaResolverError(t *testing.T) {
+	var upsertedCategory *domain.Category
+	categoryRepo := &mockCategoryRepository{
+		upsertFn: func(ctx context.Context, category *domain.Category) (*domain.Category, error) {
+			category.ID = 42
+			upsertedCategory = category
+			return category, nil
+		},
+	}
+	contentRepo := &mockContentRepoForCategory{}
+	wikidataClient := &mockWikidataClient{
+		getWikipediaURLFn: func(ctx context.Context, qid string) (string, error) {
+			return "", errors.New("wikidata unavailable")
+		},
+	}
+	svc := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
+
+	input := portservices.SetPrimaryCategoryInput{
+		ContentID: 1,
+		QID:       "Q336",
+		Label:     "Science",
+	}
+
+	result, err := svc.SetPrimaryCategory(context.Background(), input)
+	require.NoError(t, err, "a Wikipedia resolver error must never fail SetPrimaryCategory")
+	require.NotNil(t, result)
+	require.NotNil(t, upsertedCategory)
+	assert.Empty(t, upsertedCategory.WikipediaURL)
 }
 
 func TestSetPrimaryCategory_InvalidContentID(t *testing.T) {

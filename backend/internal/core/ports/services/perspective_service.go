@@ -88,4 +88,14 @@ type PerspectiveService interface {
 	// AggregateByContentIDs computes the public-perspective count and average
 	// Quality rating for each given content ID, batched into a single query.
 	AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
+
+	// FeelingStats computes count/average/stddev for perspectives carrying the
+	// given feeling (see domain.FeelingStats), scoped to one content ID or,
+	// when contentID is nil, every perspective.
+	FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error)
+
+	// CustomFieldStats computes how many perspectives set the given
+	// CustomFields top-level key (see domain.CustomFieldStats), scoped to one
+	// content ID or, when contentID is nil, every perspective.
+	CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error)
 }
