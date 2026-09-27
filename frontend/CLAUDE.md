@@ -225,6 +225,10 @@ Symptom in the browser: `Failed to load module script: Expected a JavaScript-or-
 
 **AG Grid testing strategy:** AG Grid doesn't render in jsdom — no lifecycle hooks, no Grid API, no cell rendering. Test AG Grid logic by extracting pure functions into `$lib/utils/grid-config.ts` (sort mapping, pagination bounds, responsive tiers, comparators, column metadata). Test renderers/formatters via `$lib/utils/formatting.ts`. For grid integration (filter UI, sort clicks, responsive `$effect` blocks), use Playwright E2E or Vitest Browser Mode (`tests/browser/`, see below). See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) testing section.
 
+**Custom AG Grid filter/cell components (vanilla `IFilterComp` classes) *are* jsdom-testable** — instantiate, call `init()` with a stub `filterChangedCallback`, and assert on `getGui()`. Mount the GUI first (`document.body.replaceChildren(filter.getGui())`): `.click()` on a detached checkbox fires no `change` event (see `tests/unit/contentTypeFilter.test.ts`).
+
+**No Set Filter in AG Grid Community.** For a column with a small fixed set of values, use a custom checkbox filter like `ContentTypeFilter` (`$lib/utils/contentTypeFilter.ts`, `{ filterType: 'set', values }` model) plus `filterSet: true` on its `ColumnMeta` — see ADDING_AG_GRID_COLUMN.md Decision 6.
+
 **Vitest Browser Mode (`tests/browser/`, config in `vitest.config.browser.ts`) is not run in CI** — `frontend-test.yml` only runs `test:coverage` on the unit project. A browser-test assertion can be wrong from the day it's written and nothing catches it (`ag-grid-integration.test.ts` had stale `formatCount` expectations that never once passed). Run `pnpm run test:browser` locally before trusting a browser test file.
 
 **Vitest Browser Mode capture gotchas:**
