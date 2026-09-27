@@ -17,8 +17,19 @@
         --err: #b3261e;
         --ok: #1f7a4d;
       }
+      :root[data-theme="dark"] {
+        --bg: #14171b;
+        --panel: #1c2026;
+        --ink: #e8eaed;
+        --muted: #98a1ad;
+        --line: #2c333c;
+        --accent: #7aa2f7;
+        --warn: #e0a341;
+        --err: #f2807a;
+        --ok: #6bcf9a;
+      }
       @media (prefers-color-scheme: dark) {
-        :root {
+        :root:not([data-theme="light"]) {
           --bg: #14171b;
           --panel: #1c2026;
           --ink: #e8eaed;
@@ -171,14 +182,160 @@
         white-space: pre-wrap;
         font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
       }
+
+      /* ---- single-type view ---------------------------------------------- */
+      .solo-tabs { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 12px; }
+      .tab-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+      .tab-group-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-right: 2px; }
+      .solo-summary { margin: 6px 0 8px; }
+      .col-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+      .colchip {
+        font: inherit; font-size: 12px; cursor: pointer; border-radius: 999px; padding: 3px 10px;
+        background: transparent; color: var(--muted); border: 1px dashed var(--line);
+      }
+      .colchip.on { color: var(--ink); border-style: solid; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+      .colchip.forced { border-color: var(--warn); }
+      .colchip.locked { cursor: default; opacity: 0.75; }
+      .colchip sup { font-size: 9px; color: var(--warn); margin-left: 3px; }
+
+      /* ---- app-like grid -------------------------------------------------- */
+      .app-grid { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; margin: 8px 0 10px; }
+      .app-grid table { border-collapse: collapse; width: 100%; font-size: 13px; }
+      .app-grid th, .app-grid td {
+        text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; max-width: 280px;
+      }
+      .app-grid th { font-size: 12px; background: var(--bg); white-space: nowrap; font-weight: 600; }
+      .app-grid tr:last-child td { border-bottom: 0; }
+      .app-grid tbody tr:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+      .app-grid td.right { text-align: right; font-variant-numeric: tabular-nums; }
+      .app-grid td.center { text-align: center; }
+      .app-grid td.gap, .app-grid td.unset { color: var(--muted); }
+      .app-grid th.sortable { cursor: pointer; user-select: none; }
+      .app-grid th.sortable:hover { color: var(--accent); }
+      .app-grid th.mixed { text-decoration: underline dashed var(--warn); text-underline-offset: 3px; }
+      td.perspectize { color: var(--accent); font-size: 16px; }
+      .tip-anchor { outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: -1px; }
+      .item-cell { display: flex; align-items: center; gap: 8px; min-width: 190px; }
+      .title-link { font-family: Georgia, "Times New Roman", serif; font-weight: 600; cursor: pointer; }
+      .title-link:hover { color: var(--accent); text-decoration: underline; }
+
+      .media {
+        --type-accent: #3b6fd4;
+        position: relative; flex: none; display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+        border-radius: 4px; overflow: hidden; color: #fff; cursor: pointer;
+        background: linear-gradient(150deg, var(--type-accent), color-mix(in srgb, var(--type-accent) 35%, #000));
+      }
+      .media.mini.media-poster { width: 24px; height: 36px; }
+      .media.mini.media-still, .media.mini.media-thumb { width: 48px; height: 27px; }
+      .media-poster:not(.mini) { width: 72px; height: 108px; }
+      .media-still:not(.mini), .media-thumb:not(.mini) { width: 120px; height: 68px; }
+      .media-initials { font: 700 20px/1 Georgia, serif; opacity: 0.9; }
+      .media-caption { position: absolute; bottom: 3px; font-size: 9px; opacity: 0.75; letter-spacing: 0.02em; }
+
+      /* ---- app-style popover (CellPopover .tip-surface) ------------------- */
+      .tip-surface {
+        position: fixed; z-index: 1000; max-width: 340px; padding: 10px; border-radius: 6px;
+        background: rgba(45, 45, 45, 0.94); color: #f3f3f3; font-size: 13px; line-height: 1.45;
+        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28);
+      }
+      .tip-surface[hidden] { display: none; }
+      .tip-title { font-weight: 700; margin-bottom: 3px; }
+      .tip-body p { margin: 0 0 3px; }
+      .tip-body.spoiler, .modal-text.spoiler { filter: blur(5px); transition: filter 0.2s 0.6s; }
+      .tip-body.spoiler:hover, .modal-text.spoiler:hover, .modal-text.spoiler:focus { filter: none; }
+      .tip-items { display: flex; flex-direction: column; gap: 3px; margin: 4px 0; }
+      .tip-items label { display: flex; gap: 6px; align-items: center; }
+      .tip-items input { width: auto; }
+      .tip-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+      .tip-actions button {
+        font: inherit; font-size: 12px; padding: 2px 8px; border-radius: 4px; cursor: pointer;
+        background: rgba(255, 255, 255, 0.1); color: #fff; border: 1px solid rgba(255, 255, 255, 0.25);
+      }
+      .tip-status { font-size: 11px; color: #c9c9c9; }
+      .tip-meta {
+        margin-top: 8px; padding-top: 6px; border-top: 1px dashed rgba(255, 255, 255, 0.25);
+        font-size: 11px; color: #b8c4d6; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .tip-meta div { margin-bottom: 2px; word-break: break-word; }
+      .tip-pin { margin-top: 6px; font-size: 10px; color: #aaa; }
+
+      /* ---- details modal mock (ActivityDetailsModal) ---------------------- */
+      .modal-backdrop {
+        position: fixed; inset: 0; z-index: 900; background: rgba(10, 12, 16, 0.55);
+        display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; overflow-y: auto;
+      }
+      .modal { width: 100%; max-width: 560px; border-radius: 12px; overflow: hidden; background: var(--panel); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35); }
+      .modal-head {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 22px;
+        background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+      }
+      .modal-head-right { display: flex; align-items: center; gap: 12px; }
+      .modal-toggle { display: flex; align-items: center; gap: 5px; text-transform: none; letter-spacing: 0; font-weight: 400; cursor: pointer; }
+      .modal-toggle input { width: auto; }
+      .modal-close { background: transparent; border: 0; color: #fff; font-size: 16px; padding: 0 2px; }
+      .modal-body { padding: 22px; max-height: 80vh; overflow-y: auto; }
+      .modal-hero { display: flex; gap: 14px; align-items: flex-start; }
+      .modal-titles { min-width: 0; }
+      .crumbs { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+      .crumbs a { color: var(--accent); text-decoration: none; }
+      .modal-title { font: 700 17px/1.25 Georgia, "Times New Roman", serif; }
+      .tagline { font-style: italic; color: var(--muted); font-size: 13px; margin-top: 3px; }
+      .modal-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+      .modal-links { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 14px; font-size: 13px; word-break: break-all; }
+      .modal-links a { color: var(--accent); text-decoration: none; }
+      .modal-links a:hover { text-decoration: underline; }
+      .pill-link { border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; word-break: normal; }
+      .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+      .tile { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 9px 12px; cursor: default; }
+      .tile-unbound { opacity: 0.55; }
+      .tile-label, .modal-label { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+      .modal-label.has-tip { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+      .tile-value { font: 700 15px/1.35 Georgia, "Times New Roman", serif; margin-top: 2px; word-break: break-word; }
+      .tile-source { font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent); margin-top: 4px; word-break: break-word; }
+      .modal-footer {
+        display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;
+        margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 14px;
+      }
+      .modal-actions, .modal-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+      .modal-nav { justify-content: space-between; margin-top: 16px; }
+      button.outline { border-color: var(--accent); color: var(--accent); background: transparent; font-weight: 600; font-size: 13px; }
+      button.outline:disabled { opacity: 0.45; cursor: not-allowed; }
+      .modal-section { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+      .modal-section .modal-label { margin-bottom: 6px; }
+      .modal-text { font: 13px/1.55 Georgia, "Times New Roman", serif; white-space: pre-wrap; outline: none; }
+      .modal-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+      .mchip { font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; }
+      .modal-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 12px; font-size: 13px; }
+      .person { display: flex; align-items: center; gap: 8px; }
+      .avatar {
+        width: 26px; height: 26px; flex: none; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+        font-size: 10px; font-weight: 700; background: var(--bg); border: 1px solid var(--line);
+      }
+      .modal-list { display: flex; flex-direction: column; font-size: 13px; }
+      .mrow { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px dashed var(--line); }
+      .mrow:last-child { border-bottom: 0; }
+      .mrow-action { color: var(--muted); font-size: 12px; white-space: nowrap; }
+      .mrow.in-app .mrow-action { color: var(--ok); }
+      .attribution { display: flex; align-items: center; gap: 10px; margin-top: 16px; font-size: 11px; color: var(--muted); }
+      .tmdb-mark {
+        flex: none; font: 800 11px/1 ui-sans-serif, system-ui, sans-serif; color: #0d253f; padding: 4px 7px; border-radius: 4px;
+        background: linear-gradient(90deg, #90cea1, #01b4e4);
+      }
+      .design-notes { margin-top: 16px; border: 1px dashed var(--warn); border-radius: 8px; padding: 10px 12px; font-size: 12px; }
+      .design-notes ul { margin: 6px 0 0; padding-left: 18px; }
+      @media (max-width: 560px) {
+        header, main { padding-left: 16px; padding-right: 16px; }
+        .tiles { grid-template-columns: 1fr; }
+        .modal-body { padding: 16px; }
+      }
     </style>
   </head>
   <body>
     <header>
       <h1>Content Type Designer</h1>
       <p>
-        Answer the decisions below for a new content type, then check the grid preview with other types selected.
-        Output is fully deterministic — no model call, no tokens.
+        Pick a type to see the columns it shows on its own, hover for tooltips, and open its details view. Then design or
+        edit a type below and check it with other types selected. Output is fully deterministic — no model call, no tokens.
       </p>
       <button id="reset" type="button">Reset form</button>
     </header>

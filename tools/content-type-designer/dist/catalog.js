@@ -26,20 +26,23 @@ export const TYPES = [
         thumbnail: 'i.ytimg.com/vi/<id>/mqdefault.jpg'
     },
     {
+        // TMDB family (2026-09-27 plan): movie, TV show, TV season, TV episode.
+        // Every level has its own canonical themoviedb.org URL, so the family keeps
+        // the global UNIQUE(url) — the url is regenerated from ids, never stored as pasted.
         id: 'movie',
         label: 'Movie',
         plural: 'Movies',
         enumValue: 'MOVIE',
         gist: 'A theatrical or streaming feature film, independent of where it is watched.',
         ingestion: 'api',
-        enrichment: 'TMDB (/search/movie then /movie/{id})',
+        enrichment: 'TMDB /search/movie, then /movie/{id}?append_to_response=credits,release_dates,external_ids,keywords',
         urlRequired: false,
-        urlPattern: 'optional: themoviedb.org/movie/<id> | imdb.com/title/<tt>',
-        identity: 'tmdbId (fallback: title + release year)',
+        urlPattern: 'optional input: themoviedb.org/movie/<id>[-slug] | imdb.com/title/<tt> (resolved via /find) — or search by title; stored url is always regenerated as themoviedb.org/movie/<id>',
+        identity: 'TMDB movie id (enforced through the canonical url UNIQUE)',
         icon: 'film',
         accent: '#0F9D8C',
-        sharesUrlSpace: true,
-        thumbnail: 'TMDB poster_path (w185)'
+        sharesUrlSpace: false,
+        thumbnail: 'TMDB poster_path — 2:3 tile (w92 in the grid, w342 in details)'
     },
     {
         id: 'book',
@@ -220,8 +223,59 @@ export const TYPES = [
         accent: '#7B4B2A',
         sharesUrlSpace: false,
         thumbnail: 'none — book-with-cross icon tile (h-8 w-10, bg-muted text-primary); click opens url'
+    },
+    {
+        id: 'tvShow',
+        label: 'TV show',
+        plural: 'TV shows',
+        enumValue: 'TV_SHOW',
+        gist: 'A television or streaming series as a whole — every season and episode under one TMDB tv id.',
+        ingestion: 'api',
+        enrichment: 'TMDB /search/tv, then /tv/{id}?append_to_response=credits,content_ratings,external_ids,keywords',
+        urlRequired: false,
+        urlPattern: 'optional input: themoviedb.org/tv/<id>[-slug] | imdb.com/title/<tt> (via /find) — stored url regenerated as themoviedb.org/tv/<id>',
+        identity: 'TMDB tv id',
+        icon: 'tv',
+        accent: '#1E7FA8',
+        sharesUrlSpace: false,
+        thumbnail: 'TMDB poster_path — 2:3 tile'
+    },
+    {
+        id: 'tvSeason',
+        label: 'TV season',
+        plural: 'TV seasons',
+        enumValue: 'TV_SEASON',
+        gist: 'One season of a series (season 0 is "Specials"), addressed by show id + season number.',
+        ingestion: 'api',
+        enrichment: 'TMDB /tv/{id}/season/{n} (episodes, air dates, runtimes) + the parent /tv/{id} for network, genres and certification',
+        urlRequired: false,
+        urlPattern: 'optional input: themoviedb.org/tv/<id>/season/<n> — or pick show → season; stored url regenerated',
+        identity: 'TMDB tv id + season_number (TMDB also issues a season _id — store it, dedupe on the pair)',
+        icon: 'layers',
+        accent: '#3A6EA5',
+        sharesUrlSpace: false,
+        thumbnail: 'season poster_path, falling back to the show poster — 2:3 tile'
+    },
+    {
+        id: 'tvEpisode',
+        label: 'TV episode',
+        plural: 'TV episodes',
+        enumValue: 'TV_EPISODE',
+        gist: 'A single episode of a series, addressed by show id + season number + episode number.',
+        ingestion: 'api',
+        enrichment: 'TMDB /tv/{id}/season/{n}/episode/{e}?append_to_response=credits,external_ids + the parent /tv/{id}',
+        urlRequired: false,
+        urlPattern: 'optional input: themoviedb.org/tv/<id>/season/<n>/episode/<e> — or pick show → season → episode; stored url regenerated',
+        identity: 'TMDB tv id + season_number + episode_number',
+        icon: 'clapperboard',
+        accent: '#5A55B5',
+        sharesUrlSpace: false,
+        thumbnail: 'still_path — 16:9 tile (same shape as a YouTube thumbnail), falling back to the season/show poster'
     }
 ];
+/** The TMDB family — one enrichment source, four levels of the same catalogue. */
+export const TMDB_TYPES = ['movie', 'tvShow', 'tvSeason', 'tvEpisode'];
+const isTmdb = (id) => TMDB_TYPES.includes(id);
 const b = (label, applicability, source, path, defaultVisible, extra = {}) => ({ label, applicability, source, path, defaultVisible, ...extra });
 export const COLUMNS = [
     {
@@ -253,7 +307,11 @@ export const COLUMNS = [
         pinned: true,
         bindings: {
             youtube: b('Video', 'required', 'api', 'name + snippet.thumbnails', true, { tooltip: 'Video title and thumbnail from the YouTube API' }),
-            movie: b('Film', 'required', 'api', 'name + poster_path', true, { tooltip: 'Title and poster from TMDB' }),
+            movie: b('Film', 'required', 'api', 'name (title) + poster_path', true, {
+                tooltip: 'Film title and poster from TMDB. Click the title for details; click the poster to open TMDB.',
+                cellTip: 'Title, original title when it differs, release year. Copy copies the title.',
+                appearance: '2:3 poster tile (24×36, w92) instead of a 16:9 thumbnail; title line-clamp-2; release year as an 11px muted subtitle.'
+            }),
             book: b('Book', 'required', 'api', 'name + cover edition', true, { tooltip: 'Title and cover from Open Library' }),
             article: b('Article', 'required', 'scrape', 'name + og:image', true, { tooltip: 'Headline and lead image scraped from the page' }),
             podcast: b('Episode', 'required', 'api', 'name + episode artwork', true, { tooltip: 'Episode title and show artwork' }),
@@ -264,6 +322,21 @@ export const COLUMNS = [
             perspective: b('Take', 'required', 'internal', 'name (summary of the take)', true, { tooltip: 'One-line summary of the perspective held' }),
             place: b('Place', 'required', 'api', 'name + map tile', true, { tooltip: 'Place name and location tile' }),
             paper: b('Paper', 'required', 'api', 'name (title)', true, { tooltip: 'Paper title from Crossref' }),
+            tvShow: b('Show', 'required', 'api', 'name + poster_path', true, {
+                tooltip: 'Series title and poster from TMDB. Click the title for details; click the poster to open TMDB.',
+                cellTip: 'Title, original title when it differs, air years. Copy copies the title.',
+                appearance: '2:3 poster tile; subtitle = air years, open-ended while running ("2022–").'
+            }),
+            tvSeason: b('Season', 'required', 'api', 'name + poster_path (season, else show)', true, {
+                tooltip: 'Season name from TMDB — usually "Season N", but can be "Specials" or a named arc.',
+                cellTip: 'Show › season name, episode count. Copy copies "Show — Season N".',
+                appearance: '2:3 poster tile; title = season name; subtitle = show name, so the row still reads when the Show column is hidden (mixed-type views).'
+            }),
+            tvEpisode: b('Episode', 'required', 'api', 'name + still_path', true, {
+                tooltip: 'Episode title and still frame from TMDB. Click the title for details; click the still to open TMDB.',
+                cellTip: 'Show › S5 E14 › title. Copy copies "Show S05E14 — Title".',
+                appearance: '16:9 still tile (48×27, w185) — the YouTube thumbnail shape, not a poster; subtitle "Show · S5 E14" so the title never floats alone.'
+            }),
             bible: b('Passage', 'required', 'derived', 'display_title ?? name (CanonicalPassageName)', true, {
                 tooltip: 'Your title for the passage if one was set, otherwise the reference (e.g. "Micah 6:8"). Sorts in canonical Bible order, not A–Z.',
                 appearance: 'Icon tile instead of a thumbnail. Serif 13px title, line-clamp-2. When display_title is set, the reference appears as an 11px muted subtitle (line-clamp-1 on the title). Sort comparator: verse_start_id, so Genesis precedes 1 Corinthians.'
@@ -282,7 +355,62 @@ export const COLUMNS = [
         gapFallback: 'em-dash',
         width: 72,
         pinned: true,
+        hideWhenSolo: true,
         bindings: Object.fromEntries(TYPES.map((t) => [t.id, b('Type', 'required', 'derived', 'content_type', true)]))
+    },
+    {
+        id: 'series',
+        generic: 'Series',
+        group: 'identity',
+        valueType: 'ref',
+        tooltip: 'The larger work this item belongs to',
+        storage: 'jsonb',
+        sortable: true,
+        filterable: true,
+        gapFallback: 'em-dash',
+        bindings: {
+            tvSeason: b('Show', 'required', 'api', "response->>'showName' (+ response->>'tmdbShowId')", true, {
+                tooltip: "The series this season belongs to. Links to the show's Perspectize row when one exists, otherwise to TMDB.",
+                cellTip: 'Show name, air years, and whether the show itself is in Perspectize yet. Copy copies the show name.',
+                appearance: 'Link-styled text, no poster. Sorts A–Z by show name.',
+                carriedBy: 'Item subtitle'
+            }),
+            tvEpisode: b('Show', 'required', 'api', "response->>'showName' (+ response->>'tmdbShowId')", true, {
+                tooltip: "The series this episode belongs to. Links to the show's Perspectize row when one exists, otherwise to TMDB.",
+                cellTip: 'Show name, air years, and whether the show itself is in Perspectize yet. Copy copies the show name.',
+                appearance: 'Link-styled text, no poster. Sorts A–Z by show name, then by No.',
+                carriedBy: 'Item subtitle'
+            }),
+            movie: b('Collection', 'optional', 'api', "response->'belongs_to_collection'->>'name'", false, {
+                tooltip: 'TMDB collection (franchise), e.g. "Dune Collection". Blank for standalone films.'
+            })
+        }
+    },
+    {
+        id: 'position',
+        generic: 'No.',
+        group: 'identity',
+        valueType: 'text',
+        tooltip: 'Where this item sits inside its series',
+        storage: 'jsonb',
+        sortable: true,
+        filterable: false,
+        gapFallback: 'em-dash',
+        width: 84,
+        bindings: {
+            tvEpisode: b('No.', 'required', 'api', "response->>'seasonNumber' + response->>'episodeNumber'", true, {
+                unit: 'season·episode',
+                tooltip: 'Season and episode number. Sorts by season, then episode — not as text, so S1 E10 follows S1 E9.',
+                cellTip: 'Absolute position too ("episode 60 of 62"). Copy copies "S05E14".',
+                appearance: 'Monospace "S5 · E14", tabular figures. Sort key: season_number × 1000 + episode_number.',
+                carriedBy: 'Item subtitle'
+            }),
+            tvSeason: b('No.', 'required', 'api', "response->>'seasonNumber'", false, {
+                unit: 'season',
+                tooltip: 'Season number; 0 is "Specials". Usually repeats the season name, so off by default.',
+                appearance: '"S5"; season 0 renders "S0 · Specials" and sorts last, not first.'
+            })
+        }
     },
     {
         id: 'category',
@@ -294,7 +422,14 @@ export const COLUMNS = [
         sortable: true,
         filterable: true,
         gapFallback: 'em-dash',
-        bindings: Object.fromEntries(TYPES.map((t) => [t.id, b('Category', 'optional', 'user', 'primary_category_id', true)]))
+        bindings: Object.fromEntries(TYPES.map((t) => [
+            t.id,
+            isTmdb(t.id)
+                ? b('Category', 'optional', 'user', 'primary_category_id', false, {
+                    tooltip: 'Wikidata category — off by default for TMDB types, where Genre does the same job from the source.'
+                })
+                : b('Category', 'optional', 'user', 'primary_category_id', true)
+        ]))
     },
     {
         id: 'genre',
@@ -313,10 +448,58 @@ export const COLUMNS = [
                 tooltip: 'Canonical division of the book: Torah, History, Wisdom, Major/Minor Prophets, Gospels, Acts, Pauline/General Epistles, Apocalyptic. OT/NT shown after it. From data/bible/books.json, not user-entered.',
                 appearance: 'Division as a quiet pill; testament as a muted "· OT" / "· NT" suffix. Filter is a set filter over the 10 divisions in canonical order, not alphabetical.'
             }),
-            movie: b('Genre', 'optional', 'api', "response->'genres'->0->>'name'", false),
+            movie: b('Genre', 'typical', 'api', "response->'genres'[].name", true, {
+                tooltip: 'TMDB movie genres — the first is shown, all are in the popover.',
+                cellTip: 'Multi mode: every genre as a checklist, "Copy selected" / "Copy all", nothing copied by default.',
+                appearance: 'First genre as a quiet pill with a "+2" counter when there are more.'
+            }),
+            tvShow: b('Genre', 'typical', 'api', "response->'genres'[].name", true, {
+                tooltip: 'TMDB TV genres — a separate list from movie genres ("Sci-Fi & Fantasy", not "Science Fiction").',
+                cellTip: 'Multi mode: every genre as a checklist, "Copy selected" / "Copy all".',
+                appearance: 'Same pill + counter as movies. The genre filter must map TV and movie genre names onto one list.'
+            }),
+            tvSeason: b('Genre', 'optional', 'derived', "parent show response->'genres'", false, {
+                tooltip: 'Inherited from the show — TMDB has no per-season genres.'
+            }),
+            tvEpisode: b('Genre', 'optional', 'derived', "parent show response->'genres'", false, {
+                tooltip: 'Inherited from the show — TMDB has no per-episode genres.'
+            }),
             book: b('Subject', 'optional', 'api', "response->'subjects'->>0", false),
             music: b('Genre', 'optional', 'api', "response->'tags'->0->>'name'", false),
             podcast: b('Genre', 'optional', 'api', "response->>'primaryGenreName'", false)
+        }
+    },
+    {
+        id: 'certification',
+        generic: 'Age rating',
+        group: 'identity',
+        valueType: 'enum',
+        tooltip: 'Official audience certification (US: MPA for films, TV Parental Guidelines for series)',
+        storage: 'jsonb',
+        sortable: true,
+        filterable: true,
+        gapFallback: 'em-dash',
+        align: 'center',
+        bindings: {
+            movie: b('Rated', 'typical', 'api', "release_dates.results[iso_3166_1='US'] → type 3 (theatrical) certification", true, {
+                unit: 'MPA scale',
+                tooltip: 'US MPA rating from TMDB release_dates (theatrical). Blank when TMDB has none — blank is not "Unrated".',
+                cellTip: 'Rating plus the country it came from ("US · theatrical"). Copy copies "PG-13".',
+                appearance: 'Bordered monospace badge "PG-13". Sort comparator follows the scale G < PG < PG-13 < R < NC-17, not A–Z.'
+            }),
+            tvShow: b('TV rating', 'typical', 'api', "content_ratings.results[iso_3166_1='US'].rating", false, {
+                unit: 'TV Parental Guidelines',
+                tooltip: 'US TV Parental Guidelines rating from TMDB content_ratings.',
+                appearance: 'Same badge; comparator TV-Y < TV-Y7 < TV-G < TV-PG < TV-14 < TV-MA.'
+            }),
+            tvSeason: b('TV rating', 'optional', 'derived', 'parent show content_ratings (US)', false, {
+                unit: 'TV Parental Guidelines',
+                tooltip: 'Inherited from the show — TMDB certifies series, not seasons.'
+            }),
+            tvEpisode: b('TV rating', 'optional', 'derived', 'parent show content_ratings (US)', false, {
+                unit: 'TV Parental Guidelines',
+                tooltip: 'Inherited from the show — TMDB certifies series, not episodes.'
+            })
         }
     },
     {
@@ -331,7 +514,17 @@ export const COLUMNS = [
         gapFallback: 'em-dash',
         bindings: {
             youtube: b('Channel', 'required', 'api', "response->>'channelTitle'", true),
-            movie: b('Director', 'typical', 'api', "response->'credits'->>'director'", true),
+            movie: b('Director', 'typical', 'api', "credits.crew[job='Director'].name", true, {
+                tooltip: 'Director(s) from TMDB credits; co-directors are joined with "&".',
+                cellTip: 'Director(s) and writer(s). Copy copies the director names.'
+            }),
+            tvShow: b('Created by', 'typical', 'api', "response->'created_by'[].name", false, {
+                tooltip: 'Series creators from TMDB created_by. Often empty for unscripted TV.'
+            }),
+            tvEpisode: b('Director', 'typical', 'api', "credits.crew[job='Director'].name", true, {
+                tooltip: 'Episode director from TMDB credits. Writers are in the popover and the details view.',
+                cellTip: 'Director(s) and writer(s) of this episode. Copy copies the director names.'
+            }),
             book: b('Author', 'required', 'api', "response->>'author'", true),
             article: b('Author', 'typical', 'scrape', "response->>'author'", true, { tooltip: 'Byline from the page, when one is published' }),
             podcast: b('Show', 'required', 'api', "response->>'showTitle'", true),
@@ -357,6 +550,12 @@ export const COLUMNS = [
         bindings: {
             youtube: b('Platform', 'optional', 'derived', "'YouTube'", false),
             movie: b('Studio', 'optional', 'api', "response->'production_companies'->0->>'name'", false),
+            tvShow: b('Network', 'typical', 'api', "response->'networks'->0->>'name'", true, {
+                tooltip: 'Original broadcaster or streamer (TMDB networks) — where it premiered, not where it streams today.',
+                appearance: 'Network name, with a 16px monochrome logo when TMDB has a logo_path.'
+            }),
+            tvSeason: b('Network', 'optional', 'derived', 'parent show networks[0]', false),
+            tvEpisode: b('Network', 'optional', 'derived', 'parent show networks[0]', false),
             book: b('Publisher', 'typical', 'api', "response->>'publisher'", false),
             article: b('Site', 'required', 'scrape', "response->>'siteName'", true),
             podcast: b('Network', 'optional', 'api', "response->>'network'", false),
@@ -383,7 +582,24 @@ export const COLUMNS = [
         align: 'right',
         bindings: {
             youtube: b('Length', 'required', 'api', 'length + length_units', true, { unit: 'seconds → h:mm:ss', tooltip: 'Video duration from the YouTube API' }),
-            movie: b('Runtime', 'required', 'api', 'length + length_units', true, { unit: 'minutes', tooltip: 'Theatrical runtime from TMDB' }),
+            movie: b('Runtime', 'required', 'api', 'length + length_units', true, {
+                unit: 'minutes',
+                tooltip: 'Runtime from TMDB, in minutes.',
+                cellTip: 'Exact minutes ("167 min"). Copy copies 167.',
+                appearance: '"2h 47m", right-aligned; sorts on the minute value.'
+            }),
+            tvSeason: b('Runtime', 'typical', 'derived', "Σ response->'episodes'[].runtime → length, length_units = 'minutes'", true, {
+                unit: 'minutes',
+                tooltip: "Total runtime of the season: the sum of its episodes' TMDB runtimes. Episodes with no runtime are skipped, so read it as a floor.",
+                cellTip: 'Total and average per episode ("12h 32m · ~47m each"). Copy copies the minutes.',
+                appearance: '"12h 32m", right-aligned.'
+            }),
+            tvEpisode: b('Runtime', 'typical', 'api', "response->>'runtime' → length", true, {
+                unit: 'minutes',
+                tooltip: 'Episode runtime from TMDB, in minutes.',
+                cellTip: 'Exact minutes. Copy copies the number.',
+                appearance: '"47m", right-aligned.'
+            }),
             book: b('Pages', 'typical', 'api', 'length + length_units', true, { unit: 'pages', tooltip: 'Page count of the referenced edition' }),
             article: b('Read time', 'typical', 'derived', 'length + length_units', true, { unit: 'minutes (words ÷ 220)', tooltip: 'Estimated read time from word count' }),
             podcast: b('Length', 'required', 'api', 'length + length_units', true, { unit: 'seconds → h:mm:ss' }),
@@ -401,6 +617,30 @@ export const COLUMNS = [
         }
     },
     {
+        id: 'episodes',
+        generic: 'Episodes',
+        group: 'scale',
+        valueType: 'number',
+        tooltip: 'How many episodes the item contains',
+        storage: 'jsonb',
+        sortable: true,
+        filterable: true,
+        gapFallback: 'em-dash',
+        align: 'right',
+        bindings: {
+            tvShow: b('Episodes', 'typical', 'api', "response->>'number_of_episodes' (+ number_of_seasons)", true, {
+                unit: 'episodes',
+                tooltip: 'Episodes aired so far across all regular seasons (TMDB number_of_episodes). The season count sits underneath.',
+                cellTip: 'Per-season breakdown ("S1 7 · S2 13 · …"). Copy copies the episode count.',
+                appearance: '"62" with an 11px muted "5 seasons" subtitle.'
+            }),
+            tvSeason: b('Episodes', 'typical', 'api', "jsonb_array_length(response->'episodes')", true, {
+                unit: 'episodes',
+                tooltip: 'Episodes in this season on TMDB — for a current season this includes announced, not-yet-aired ones.'
+            })
+        }
+    },
+    {
         id: 'date',
         generic: 'Date',
         group: 'temporal',
@@ -412,7 +652,21 @@ export const COLUMNS = [
         gapFallback: 'substitute',
         bindings: {
             youtube: b('Published', 'required', 'api', "response->>'publishedAt'", true),
-            movie: b('Released', 'required', 'api', "response->>'releaseDate'", true),
+            movie: b('Released', 'required', 'api', "response->>'release_date'", true, {
+                tooltip: 'Primary release date from TMDB. The US theatrical date can differ; both are in the details view.',
+                cellTip: 'Primary and US theatrical dates. Copy copies the ISO date.'
+            }),
+            tvShow: b('First aired', 'required', 'api', "response->>'first_air_date'", true, {
+                tooltip: 'Premiere date of the series. The last air date and the next episode are in the details view.',
+                cellTip: 'First and last air dates, and the next episode when one is scheduled.'
+            }),
+            tvSeason: b('Premiered', 'typical', 'api', "response->>'air_date'", true, {
+                tooltip: "Air date of the season's first episode.",
+                cellTip: 'Premiere and finale dates.'
+            }),
+            tvEpisode: b('Aired', 'required', 'api', "response->>'air_date'", true, {
+                tooltip: 'Original air date. A future date means announced but not aired yet.'
+            }),
             book: b('Published', 'typical', 'api', "response->>'firstPublishDate'", true),
             article: b('Published', 'typical', 'scrape', "response->>'publishedTime'", true),
             podcast: b('Aired', 'required', 'api', "response->>'pubDate'", true),
@@ -423,6 +677,30 @@ export const COLUMNS = [
             perspective: b('Stated', 'typical', 'internal', "response->>'statedAt'", true),
             place: b('Visited', 'required', 'user', "response->>'visitedAt'", true),
             paper: b('Published', 'required', 'api', "response->>'issued'", true)
+        }
+    },
+    {
+        id: 'releaseStatus',
+        generic: 'Release status',
+        group: 'temporal',
+        valueType: 'enum',
+        tooltip: 'Where the item is in its production / release lifecycle, per the source',
+        storage: 'jsonb',
+        sortable: true,
+        filterable: true,
+        gapFallback: 'em-dash',
+        bindings: {
+            tvShow: b('Status', 'typical', 'api', "response->>'status'", true, {
+                tooltip: 'TMDB series status: Returning Series, In Production, Planned, Ended, Canceled or Pilot. It goes stale until "Update source data" runs.',
+                cellTip: 'Status, plus "Next: S3 E1 · <date>" when TMDB has next_episode_to_air.',
+                appearance: 'Dot + label: green Returning, grey Ended, red Canceled.'
+            }),
+            movie: b('Status', 'optional', 'api', "response->>'status'", false, {
+                tooltip: 'Rumored / Planned / In Production / Post Production / Released / Canceled. Almost always "Released" for something watched, so off by default.'
+            }),
+            tvEpisode: b('Episode type', 'optional', 'api', "response->>'episode_type'", false, {
+                tooltip: 'TMDB episode_type: standard, mid_season or finale. Handy for finding finales.'
+            })
         }
     },
     {
@@ -441,7 +719,9 @@ export const COLUMNS = [
             podcast: b('Plays', 'optional', 'api', "response->>'playCount'", false, { tooltip: 'Rarely published; usually blank' }),
             music: b('Plays', 'optional', 'api', "response->>'playCount'", false),
             paper: b('Citations', 'typical', 'api', "response->>'citationCount'", true, { tooltip: 'Citation count from OpenAlex' }),
-            movie: b('Votes', 'optional', 'api', "response->>'voteCount'", false, { tooltip: 'Number of TMDB ratings' })
+            movie: b('Votes', 'optional', 'api', "response->>'vote_count'", false, { tooltip: 'Number of TMDB user votes behind the Score.' }),
+            tvShow: b('Votes', 'optional', 'api', "response->>'vote_count'", false, { tooltip: 'Number of TMDB user votes behind the Score.' }),
+            tvEpisode: b('Votes', 'optional', 'api', "response->>'vote_count'", false, { tooltip: 'Number of TMDB user votes behind the Score.' })
         }
     },
     {
@@ -457,7 +737,24 @@ export const COLUMNS = [
         align: 'right',
         bindings: {
             youtube: b('% Liked', 'typical', 'derived', 'likeCount ÷ viewCount', true, { tooltip: 'Likes as a percentage of views' }),
-            movie: b('Score', 'typical', 'api', "response->>'voteAverage' × 10", true, { tooltip: 'TMDB average score, scaled to a percentage' }),
+            movie: b('Score', 'typical', 'api', "response->>'vote_average' × 10", true, {
+                tooltip: 'TMDB user score (vote_average × 10). Community votes, not critics.',
+                cellTip: 'Score with its vote count ("81% from 6,912 votes"). Copy copies the raw 0–10 average.',
+                appearance: '"81%" right-aligned; muted when vote_count < 50, too few votes to mean much.'
+            }),
+            tvShow: b('Score', 'typical', 'api', "response->>'vote_average' × 10", true, {
+                tooltip: 'TMDB user score for the series as a whole (vote_average × 10).',
+                cellTip: 'Score with its vote count. Copy copies the raw 0–10 average.',
+                appearance: 'As for films.'
+            }),
+            tvSeason: b('Score', 'optional', 'api', "response->>'vote_average' × 10", false, {
+                tooltip: 'TMDB season score. Seasons carry no vote count, so 3 votes and 3,000 look the same — off by default.'
+            }),
+            tvEpisode: b('Score', 'typical', 'api', "response->>'vote_average' × 10", true, {
+                tooltip: 'TMDB user score for this episode (vote_average × 10).',
+                cellTip: 'Score with its vote count. Copy copies the raw 0–10 average.',
+                appearance: 'As for films; episode vote counts are small, so the muted state is common.'
+            }),
             book: b('Score', 'optional', 'api', "response->>'ratingsAverage' × 20", false)
         }
     },
@@ -565,7 +862,14 @@ export const COLUMNS = [
         gapFallback: 'em-dash',
         bindings: {
             book: b('Reading', 'typical', 'user', "response->>'progressStatus'", true, { tooltip: 'Want to read / reading / finished / abandoned' }),
-            movie: b('Watched', 'typical', 'user', "response->>'progressStatus'", true),
+            movie: b('Watched', 'typical', 'user', "response->>'progressStatus'", false, {
+                tooltip: 'Want to watch / watched — yours, never fetched. Off by default to keep the film view at 10 columns.'
+            }),
+            tvShow: b('Watching', 'optional', 'user', "response->>'progressStatus'", false, {
+                tooltip: 'Plan to watch / watching / caught up / finished / dropped. "Caught up" exists because a returning show cannot be finished.'
+            }),
+            tvSeason: b('Watched', 'optional', 'user', "response->>'progressStatus'", false),
+            tvEpisode: b('Watched', 'optional', 'user', "response->>'progressStatus'", false),
             youtube: b('Watched', 'optional', 'user', "response->>'progressStatus'", false),
             podcast: b('Listened', 'optional', 'user', "response->>'progressStatus'", false),
             article: b('Read', 'optional', 'user', "response->>'progressStatus'", false),
@@ -585,7 +889,13 @@ export const COLUMNS = [
         gapFallback: 'em-dash',
         bindings: {
             youtube: b('Video ID', 'required', 'api', "response->>'videoId'", false),
-            movie: b('TMDB ID', 'required', 'api', "response->>'tmdbId'", false),
+            movie: b('TMDB ID', 'required', 'api', "response->>'tmdbId'", false, {
+                tooltip: 'TMDB movie id — the dedupe key. The IMDb id (tt…) is stored beside it from external_ids.',
+                appearance: 'Monospace "693134"; the popover links themoviedb.org/movie/693134.'
+            }),
+            tvShow: b('TMDB ID', 'required', 'api', "response->>'tmdbId'", false, { appearance: 'Monospace "tv/1396".' }),
+            tvSeason: b('TMDB key', 'required', 'api', "tmdbShowId + seasonNumber", false, { appearance: 'Monospace "tv/1396/season/5".' }),
+            tvEpisode: b('TMDB key', 'required', 'api', "tmdbShowId + seasonNumber + episodeNumber", false, { appearance: 'Monospace "tv/1396/S05E14".' }),
             book: b('ISBN', 'typical', 'api', "response->>'isbn13'", false),
             podcast: b('GUID', 'required', 'api', "response->>'guid'", false),
             music: b('ISRC', 'typical', 'api', "response->>'isrc'", false),
@@ -608,13 +918,17 @@ export const COLUMNS = [
         sortable: false,
         filterable: true,
         gapFallback: 'blank',
-        bindings: Object.fromEntries(TYPES.map((t) => [
+        bindings: Object.fromEntries(TYPES.filter((t) => t.id !== 'tvSeason' && t.id !== 'tvEpisode').map((t) => [
             t.id,
-            t.id === 'bible'
-                ? b('Tags', 'optional', 'derived', '[testament, division] → tags', false, {
-                    tooltip: 'PLANNED (Q10, answer box unchecked) — e.g. "Old Testament, Major Prophets". Redundant with Genre while that column exists.'
+            isTmdb(t.id)
+                ? b('Keywords', 'optional', 'api', "keywords (append_to_response=keywords)", false, {
+                    tooltip: 'TMDB keywords — community-curated, sometimes noisy. TMDB has none for seasons or episodes.'
                 })
-                : b('Tags', 'optional', t.ingestion === 'api' ? 'api' : 'user', "response->'tags'", false)
+                : t.id === 'bible'
+                    ? b('Tags', 'optional', 'derived', '[testament, division] → tags', false, {
+                        tooltip: 'PLANNED (Q10, answer box unchecked) — e.g. "Old Testament, Major Prophets". Redundant with Genre while that column exists.'
+                    })
+                    : b('Tags', 'optional', t.ingestion === 'api' ? 'api' : 'user', "response->'tags'", false)
         ]))
     },
     {
@@ -629,7 +943,13 @@ export const COLUMNS = [
         gapFallback: 'blank',
         bindings: {
             youtube: b('Description', 'typical', 'api', "response->>'description'", false),
-            movie: b('Synopsis', 'typical', 'api', "response->>'overview'", false),
+            movie: b('Synopsis', 'typical', 'api', "response->>'overview'", false, { tooltip: 'TMDB overview. The tagline sits above it in the details view.' }),
+            tvShow: b('Overview', 'typical', 'api', "response->>'overview'", false),
+            tvSeason: b('Overview', 'optional', 'api', "response->>'overview'", false, { tooltip: 'Season overview — often empty on TMDB.' }),
+            tvEpisode: b('Overview', 'typical', 'api', "response->>'overview'", false, {
+                tooltip: 'Episode overview. It spoils the plot, so it is off by default and blurred until hovered.',
+                appearance: 'Blurred (filter: blur) in the popover and the details view until hovered or focused for 600ms.'
+            }),
             book: b('Blurb', 'optional', 'api', "response->>'description'", false),
             article: b('Excerpt', 'typical', 'scrape', "response->>'excerpt'", false),
             podcast: b('Show notes', 'typical', 'api', "response->>'summary'", false),
@@ -700,6 +1020,374 @@ export const GROUP_LABELS = {
  * a column a row does not mention renders the column's gap fallback.
  */
 export const SAMPLES = {
+    // TMDB family. Titles, ids, credits, dates and episode numbers are real;
+    // scores, vote counts, budgets/revenue, whole-season runtimes, perspective
+    // counts and "added" dates are illustrative. Extra keys (cast, writers, tagline,
+    // seasonList, episodeList, prev/next…) feed the details view only.
+    movie: [
+        {
+            year: '2024',
+            item: { text: 'Dune: Part Two', sub: '2024', tip: 'Dune: Part Two (2024)', copy: 'Dune: Part Two' },
+            series: 'Dune Collection',
+            genre: { text: 'Science Fiction +1', items: ['Science Fiction', 'Adventure'] },
+            certification: { text: 'PG-13', tip: 'PG-13 · US · theatrical', copy: 'PG-13', sort: 3 },
+            creator: { text: 'Denis Villeneuve', tip: 'Directed by Denis Villeneuve · Written by Denis Villeneuve, Jon Spaihts', copy: 'Denis Villeneuve' },
+            venue: 'Legendary Pictures',
+            length: { text: '2h 47m', tip: '167 min', copy: '167', sort: 167 },
+            date: { text: '2024-02-27', tip: 'Primary release 2024-02-27 · US theatrical 2024-03-01', copy: '2024-02-27' },
+            releaseStatus: 'Released',
+            audience: { text: '6,912', sort: 6912 },
+            approval: { text: '81%', tip: '81% from 6,912 votes', copy: '8.1', sort: 81 },
+            rating: '5 / 5',
+            identifier: { text: '693134', tip: 'themoviedb.org/movie/693134 · IMDb tt15239678', copy: '693134' },
+            tags: { text: 'desert, messiah, sequel +3', items: ['desert', 'messiah', 'sequel', 'based on novel or book', 'space opera', 'prophecy'] },
+            description: 'Paul Atreides unites with the Fremen while on a path of revenge against the conspirators who destroyed his family.',
+            createdAt: '2026-09-21',
+            tmdbUrl: 'https://www.themoviedb.org/movie/693134',
+            imdb: 'tt15239678',
+            tagline: 'Long live the fighters.',
+            writers: 'Denis Villeneuve; Jon Spaihts',
+            cast: 'Timothée Chalamet — Paul Atreides; Zendaya — Chani; Rebecca Ferguson — Lady Jessica; Javier Bardem — Stilgar; Austin Butler — Feyd-Rautha',
+            budget: '$190,000,000',
+            revenue: '$714,444,358',
+            usRelease: '2024-03-01 (theatrical)',
+            perspectives: '3',
+            avgRating: '4.3',
+            updatedAt: '2026-09-25'
+        },
+        {
+            year: '2023',
+            item: { text: 'Oppenheimer', sub: '2023', copy: 'Oppenheimer' },
+            genre: { text: 'Drama +1', items: ['Drama', 'History'] },
+            certification: { text: 'R', tip: 'R · US · theatrical', copy: 'R', sort: 4 },
+            creator: { text: 'Christopher Nolan', tip: 'Written and directed by Christopher Nolan', copy: 'Christopher Nolan' },
+            venue: 'Syncopy',
+            length: { text: '3h 1m', tip: '181 min', copy: '181', sort: 181 },
+            date: { text: '2023-07-19', tip: 'Primary release 2023-07-19 · US theatrical 2023-07-21', copy: '2023-07-19' },
+            releaseStatus: 'Released',
+            audience: { text: '10,433', sort: 10433 },
+            approval: { text: '81%', tip: '81% from 10,433 votes', copy: '8.1', sort: 81 },
+            identifier: { text: '872585', copy: '872585' },
+            tags: { text: 'atomic bomb, biography +2', items: ['atomic bomb', 'biography', 'physicist', 'world war ii'] },
+            description: 'The story of J. Robert Oppenheimer and the development of the atomic bomb during the Second World War.',
+            createdAt: '2026-09-14',
+            tmdbUrl: 'https://www.themoviedb.org/movie/872585',
+            imdb: 'tt15398776',
+            tagline: 'The world forever changes.',
+            writers: 'Christopher Nolan',
+            cast: 'Cillian Murphy — J. Robert Oppenheimer; Emily Blunt — Kitty Oppenheimer; Matt Damon — Leslie Groves; Robert Downey Jr. — Lewis Strauss',
+            budget: '$100,000,000',
+            revenue: '$975,000,000',
+            usRelease: '2023-07-21 (theatrical)',
+            perspectives: '5',
+            avgRating: '4.0',
+            updatedAt: '2026-09-14'
+        },
+        {
+            year: '2001',
+            item: { text: 'Spirited Away', sub: '2001 · 千と千尋の神隠し', tip: 'Spirited Away (2001) · original title 千と千尋の神隠し', copy: 'Spirited Away' },
+            genre: { text: 'Animation +2', items: ['Animation', 'Family', 'Fantasy'] },
+            certification: { text: 'PG', tip: 'PG · US · theatrical', copy: 'PG', sort: 2 },
+            creator: { text: 'Hayao Miyazaki', tip: 'Written and directed by Hayao Miyazaki', copy: 'Hayao Miyazaki' },
+            venue: 'Studio Ghibli',
+            length: { text: '2h 5m', tip: '125 min', copy: '125', sort: 125 },
+            date: '2001-07-20',
+            releaseStatus: 'Released',
+            audience: { text: '17,120', sort: 17120 },
+            approval: { text: '85%', tip: '85% from 17,120 votes', copy: '8.5', sort: 85 },
+            rating: '5 / 5',
+            identifier: { text: '129', copy: '129' },
+            tags: { text: 'witch, spirit +2', items: ['witch', 'spirit', 'bathhouse', 'coming of age'] },
+            description: 'A ten-year-old girl wanders into a world of spirits and must work in a bathhouse to free her parents.',
+            createdAt: '2026-09-06',
+            tmdbUrl: 'https://www.themoviedb.org/movie/129',
+            imdb: 'tt0245429',
+            originalTitle: '千と千尋の神隠し',
+            writers: 'Hayao Miyazaki',
+            cast: 'Rumi Hiiragi — Chihiro (voice); Miyu Irino — Haku (voice); Mari Natsuki — Yubaba (voice)',
+            budget: '$19,000,000',
+            revenue: '$274,925,095',
+            perspectives: '1',
+            avgRating: '5.0',
+            updatedAt: '2026-09-06'
+        },
+        {
+            year: '2010',
+            item: { text: 'Inception', sub: '2010', copy: 'Inception' },
+            genre: { text: 'Action +2', items: ['Action', 'Science Fiction', 'Adventure'] },
+            certification: { text: 'PG-13', tip: 'PG-13 · US · theatrical', copy: 'PG-13', sort: 3 },
+            creator: { text: 'Christopher Nolan', tip: 'Written and directed by Christopher Nolan', copy: 'Christopher Nolan' },
+            venue: 'Legendary Pictures',
+            length: { text: '2h 28m', tip: '148 min', copy: '148', sort: 148 },
+            date: '2010-07-15',
+            releaseStatus: 'Released',
+            audience: { text: '37,504', sort: 37504 },
+            approval: { text: '84%', tip: '84% from 37,504 votes', copy: '8.4', sort: 84 },
+            identifier: { text: '27205', copy: '27205' },
+            tags: { text: 'dream, heist +2', items: ['dream', 'heist', 'subconscious', 'mind'] },
+            description: 'A thief who steals secrets through dream-sharing is offered a chance to have his record erased — if he can plant an idea instead.',
+            createdAt: '2026-08-30',
+            tmdbUrl: 'https://www.themoviedb.org/movie/27205',
+            imdb: 'tt1375666',
+            tagline: 'Your mind is the scene of the crime.',
+            writers: 'Christopher Nolan',
+            cast: 'Leonardo DiCaprio — Dom Cobb; Joseph Gordon-Levitt — Arthur; Elliot Page — Ariadne; Tom Hardy — Eames',
+            budget: '$160,000,000',
+            revenue: '$839,030,630',
+            perspectives: '2',
+            avgRating: '4.5',
+            updatedAt: '2026-09-02'
+        }
+    ],
+    tvShow: [
+        {
+            item: { text: 'Breaking Bad', sub: '2008–2013', copy: 'Breaking Bad' },
+            genre: { text: 'Drama +1', items: ['Drama', 'Crime'] },
+            certification: { text: 'TV-MA', copy: 'TV-MA', sort: 6 },
+            creator: 'Vince Gilligan',
+            venue: 'AMC',
+            episodes: { text: '62', sub: '5 seasons', tip: 'S1 7 · S2 13 · S3 13 · S4 13 · S5 16 (+ Specials)', copy: '62', sort: 62 },
+            date: { text: '2008-01-20', tip: 'First aired 2008-01-20 · Last aired 2013-09-29', copy: '2008-01-20' },
+            releaseStatus: { text: '● Ended', copy: 'Ended' },
+            audience: { text: '15,208', sort: 15208 },
+            approval: { text: '89%', tip: '89% from 15,208 votes', copy: '8.9', sort: 89 },
+            rating: '5 / 5',
+            identifier: { text: 'tv/1396', copy: '1396' },
+            tags: { text: 'drug dealer, chemistry +2', items: ['drug dealer', 'chemistry teacher', 'new mexico', 'cancer'] },
+            description: 'A high-school chemistry teacher diagnosed with terminal cancer turns to making methamphetamine to secure his family’s future.',
+            createdAt: '2026-09-01',
+            tmdbUrl: 'https://www.themoviedb.org/tv/1396',
+            imdb: 'tt0903747',
+            years: '2008–2013',
+            lastAired: '2013-09-29 · S5 E16 “Felina”',
+            seasonList: 'Specials · 11 eps; Season 1 · 7 eps · 2008; Season 2 · 13 eps · 2009; Season 3 · 13 eps · 2010; Season 4 · 13 eps · 2011; Season 5 · 16 eps · 2012 ✓',
+            cast: 'Bryan Cranston — Walter White; Aaron Paul — Jesse Pinkman; Anna Gunn — Skyler White; Dean Norris — Hank Schrader',
+            perspectives: '4',
+            avgRating: '4.8',
+            updatedAt: '2026-09-20'
+        },
+        {
+            item: { text: 'Severance', sub: '2022–', copy: 'Severance' },
+            genre: { text: 'Drama +2', items: ['Drama', 'Mystery', 'Sci-Fi & Fantasy'] },
+            certification: { text: 'TV-MA', copy: 'TV-MA', sort: 6 },
+            creator: 'Dan Erickson',
+            venue: 'Apple TV+',
+            episodes: { text: '19', sub: '2 seasons', tip: 'S1 9 · S2 10', copy: '19', sort: 19 },
+            date: { text: '2022-02-18', tip: 'First aired 2022-02-18 · Last aired 2025-03-21 · no next episode scheduled on TMDB', copy: '2022-02-18' },
+            releaseStatus: { text: '● Returning Series', tip: 'Returning Series — renewed; no next episode date on TMDB yet', copy: 'Returning Series' },
+            audience: { text: '2,410', sort: 2410 },
+            approval: { text: '84%', tip: '84% from 2,410 votes', copy: '8.4', sort: 84 },
+            identifier: { text: 'tv/95396', copy: '95396' },
+            tags: { text: 'workplace, memory +1', items: ['workplace', 'memory', 'corporation'] },
+            description: 'Office workers whose memories have been surgically split between work and personal life begin to question the arrangement.',
+            createdAt: '2026-09-17',
+            tmdbUrl: 'https://www.themoviedb.org/tv/95396',
+            imdb: 'tt11280740',
+            years: '2022–',
+            lastAired: '2025-03-21 · S2 E10 “Cold Harbor”',
+            nextEpisode: 'None scheduled on TMDB',
+            seasonList: 'Season 1 · 9 eps · 2022 ✓; Season 2 · 10 eps · 2025',
+            cast: 'Adam Scott — Mark Scout; Britt Lower — Helly R.; Zach Cherry — Dylan G.; John Turturro — Irving B.',
+            perspectives: '2',
+            avgRating: '4.5',
+            updatedAt: '2026-09-17'
+        },
+        {
+            item: { text: 'The Office', sub: '2005–2013', tip: 'The Office (US, 2005–2013)', copy: 'The Office' },
+            genre: { text: 'Comedy', items: ['Comedy'] },
+            certification: { text: 'TV-14', copy: 'TV-14', sort: 5 },
+            creator: 'Greg Daniels',
+            venue: 'NBC',
+            episodes: { text: '201', sub: '9 seasons', tip: 'S1 6 · S2 22 · S3 25 · S4 19 · S5 28 · S6 26 · S7 26 · S8 24 · S9 25 (TMDB splits some double episodes)', copy: '201', sort: 201 },
+            date: { text: '2005-03-24', tip: 'First aired 2005-03-24 · Last aired 2013-05-16', copy: '2005-03-24' },
+            releaseStatus: { text: '● Ended', copy: 'Ended' },
+            audience: { text: '4,121', sort: 4121 },
+            approval: { text: '86%', tip: '86% from 4,121 votes', copy: '8.6', sort: 86 },
+            identifier: { text: 'tv/2316', copy: '2316' },
+            description: 'A mockumentary about the everyday lives of the employees of a paper company’s Scranton branch.',
+            createdAt: '2026-09-09',
+            tmdbUrl: 'https://www.themoviedb.org/tv/2316',
+            imdb: 'tt0386676',
+            years: '2005–2013',
+            lastAired: '2013-05-16 · S9 E23 “Finale”',
+            seasonList: 'Season 1 · 6 eps · 2005; Season 2 · 22 eps · 2005 ✓; Season 3 · 25 eps · 2006; … 6 more',
+            cast: 'Steve Carell — Michael Scott; Rainn Wilson — Dwight Schrute; John Krasinski — Jim Halpert; Jenna Fischer — Pam Beesly',
+            perspectives: '1',
+            avgRating: '4.0',
+            updatedAt: '2026-09-09'
+        }
+    ],
+    tvSeason: [
+        {
+            item: { text: 'Season 5', sub: 'Breaking Bad', tip: 'Breaking Bad › Season 5 · 16 episodes', copy: 'Breaking Bad — Season 5' },
+            series: { text: 'Breaking Bad', tip: 'Breaking Bad (2008–2013) · in Perspectize ✓', copy: 'Breaking Bad' },
+            position: { text: 'S5', sort: 5 },
+            genre: { text: 'Drama +1', items: ['Drama', 'Crime'] },
+            certification: { text: 'TV-MA', sort: 6 },
+            creator: 'Vince Gilligan',
+            venue: 'AMC',
+            length: { text: '12h 32m', tip: '752 min total · ~47m per episode', copy: '752', sort: 752 },
+            episodes: { text: '16', sort: 16 },
+            date: { text: '2012-07-15', tip: 'Premiered 2012-07-15 · Finale 2013-09-29', copy: '2012-07-15' },
+            approval: { text: '88%', tip: '88% — TMDB gives no vote count for seasons', copy: '8.8', sort: 88 },
+            identifier: { text: 'tv/1396/season/5', copy: '1396/5' },
+            description: 'Walt and Jesse build a new operation — and the walls start closing in.',
+            createdAt: '2026-09-12',
+            tmdbUrl: 'https://www.themoviedb.org/tv/1396/season/5',
+            finale: '2013-09-29',
+            episodeList: 'E1 · Live Free or Die · 2012-07-15; E2 · Madrigal · 2012-07-22; E3 · Hazard Pay · 2012-07-29; … ; E14 · Ozymandias · 2013-09-15 ✓; E15 · Granite State · 2013-09-22; E16 · Felina · 2013-09-29 ✓',
+            perspectives: '2',
+            avgRating: '4.5',
+            updatedAt: '2026-09-12'
+        },
+        {
+            item: { text: 'Season 1', sub: 'Severance', tip: 'Severance › Season 1 · 9 episodes', copy: 'Severance — Season 1' },
+            series: { text: 'Severance', tip: 'Severance (2022–) · in Perspectize ✓', copy: 'Severance' },
+            position: { text: 'S1', sort: 1 },
+            genre: { text: 'Drama +2', items: ['Drama', 'Mystery', 'Sci-Fi & Fantasy'] },
+            certification: { text: 'TV-MA', sort: 6 },
+            creator: 'Dan Erickson',
+            venue: 'Apple TV+',
+            length: { text: '7h 32m', tip: '452 min total · ~50m per episode', copy: '452', sort: 452 },
+            episodes: { text: '9', sort: 9 },
+            date: { text: '2022-02-18', tip: 'Premiered 2022-02-18 (E1 and E2 together) · Finale 2022-04-08', copy: '2022-02-18' },
+            approval: { text: '86%', tip: '86% — TMDB gives no vote count for seasons', copy: '8.6', sort: 86 },
+            identifier: { text: 'tv/95396/season/1', copy: '95396/1' },
+            createdAt: '2026-09-18',
+            tmdbUrl: 'https://www.themoviedb.org/tv/95396/season/1',
+            finale: '2022-04-08',
+            episodeList: 'E1 · Good News About Hell · 2022-02-18; E2 · Half Loop · 2022-02-18; E3 · In Perpetuity · 2022-02-25; … ; E9 · The We We Are · 2022-04-08 ✓',
+            perspectives: '1',
+            avgRating: '5.0',
+            updatedAt: '2026-09-18'
+        },
+        {
+            item: { text: 'Season 2', sub: 'The Office', tip: 'The Office › Season 2 · 22 episodes', copy: 'The Office — Season 2' },
+            series: { text: 'The Office', tip: 'The Office (2005–2013) · in Perspectize ✓', copy: 'The Office' },
+            position: { text: 'S2', sort: 2 },
+            genre: { text: 'Comedy', items: ['Comedy'] },
+            certification: { text: 'TV-14', sort: 5 },
+            creator: 'Greg Daniels',
+            venue: 'NBC',
+            length: { text: '8h 4m', tip: '484 min total · ~22m per episode', copy: '484', sort: 484 },
+            episodes: { text: '22', sort: 22 },
+            date: { text: '2005-09-20', tip: 'Premiered 2005-09-20 · Finale 2006-05-11', copy: '2005-09-20' },
+            approval: { text: '84%', tip: '84% — TMDB gives no vote count for seasons', copy: '8.4', sort: 84 },
+            rating: '4 / 5',
+            identifier: { text: 'tv/2316/season/2', copy: '2316/2' },
+            createdAt: '2026-09-10',
+            tmdbUrl: 'https://www.themoviedb.org/tv/2316/season/2',
+            finale: '2006-05-11',
+            episodeList: 'E1 · The Dundies · 2005-09-20 ✓; E2 · Sexual Harassment · 2005-09-27; E3 · Office Olympics · 2005-10-04; … ; E22 · Casino Night · 2006-05-11',
+            perspectives: '1',
+            avgRating: '4.0',
+            updatedAt: '2026-09-10'
+        }
+    ],
+    tvEpisode: [
+        {
+            item: { text: 'Ozymandias', sub: 'Breaking Bad · S5 E14', tip: 'Breaking Bad › Season 5 › E14 “Ozymandias”', copy: 'Breaking Bad S05E14 — Ozymandias' },
+            series: { text: 'Breaking Bad', tip: 'Breaking Bad (2008–2013) · in Perspectize ✓', copy: 'Breaking Bad' },
+            position: { text: 'S5 · E14', tip: 'Season 5, episode 14 · episode 60 of 62', copy: 'S05E14', sort: 5014 },
+            genre: { text: 'Drama +1', items: ['Drama', 'Crime'] },
+            certification: { text: 'TV-MA', sort: 6 },
+            creator: { text: 'Rian Johnson', tip: 'Directed by Rian Johnson · Written by Moira Walley-Beckett', copy: 'Rian Johnson' },
+            venue: 'AMC',
+            length: { text: '47m', tip: '47 min', copy: '47', sort: 47 },
+            date: '2013-09-15',
+            releaseStatus: 'standard',
+            audience: { text: '1,610', sort: 1610 },
+            approval: { text: '93%', tip: '93% from 1,610 votes', copy: '9.3', sort: 93 },
+            rating: '5 / 5',
+            identifier: { text: 'tv/1396/S05E14', copy: '1396/5/14' },
+            description: 'Everything Walt has built comes apart in a single afternoon in the desert.',
+            createdAt: '2026-09-13',
+            tmdbUrl: 'https://www.themoviedb.org/tv/1396/season/5/episode/14',
+            seasonName: 'Season 5',
+            writers: 'Moira Walley-Beckett',
+            guestStars: 'Steven Michael Quezada — Steven Gomez; Michael Bowen — Jack Welker',
+            prev: 'S5 E13 · To’hajiilee',
+            next: 'S5 E15 · Granite State',
+            perspectives: '6',
+            avgRating: '4.9',
+            updatedAt: '2026-09-13'
+        },
+        {
+            item: { text: 'Felina', sub: 'Breaking Bad · S5 E16', tip: 'Breaking Bad › Season 5 › E16 “Felina” · series finale', copy: 'Breaking Bad S05E16 — Felina' },
+            series: { text: 'Breaking Bad', tip: 'Breaking Bad (2008–2013) · in Perspectize ✓', copy: 'Breaking Bad' },
+            position: { text: 'S5 · E16', tip: 'Season 5, episode 16 · episode 62 of 62', copy: 'S05E16', sort: 5016 },
+            genre: { text: 'Drama +1', items: ['Drama', 'Crime'] },
+            certification: { text: 'TV-MA', sort: 6 },
+            creator: { text: 'Vince Gilligan', tip: 'Written and directed by Vince Gilligan', copy: 'Vince Gilligan' },
+            venue: 'AMC',
+            length: { text: '55m', tip: '55 min', copy: '55', sort: 55 },
+            date: '2013-09-29',
+            releaseStatus: 'finale',
+            audience: { text: '1,122', sort: 1122 },
+            approval: { text: '91%', tip: '91% from 1,122 votes', copy: '9.1', sort: 91 },
+            identifier: { text: 'tv/1396/S05E16', copy: '1396/5/16' },
+            description: 'Walt returns to New Mexico to settle his affairs one last time.',
+            createdAt: '2026-09-15',
+            tmdbUrl: 'https://www.themoviedb.org/tv/1396/season/5/episode/16',
+            seasonName: 'Season 5',
+            writers: 'Vince Gilligan',
+            guestStars: 'Jesse Plemons — Todd Alquist; Laura Fraser — Lydia Rodarte-Quayle',
+            prev: 'S5 E15 · Granite State',
+            perspectives: '3',
+            avgRating: '4.7',
+            updatedAt: '2026-09-15'
+        },
+        {
+            item: { text: 'The We We Are', sub: 'Severance · S1 E9', tip: 'Severance › Season 1 › E9 “The We We Are” · season finale', copy: 'Severance S01E09 — The We We Are' },
+            series: { text: 'Severance', tip: 'Severance (2022–) · in Perspectize ✓', copy: 'Severance' },
+            position: { text: 'S1 · E9', tip: 'Season 1, episode 9 · episode 9 of 19', copy: 'S01E09', sort: 1009 },
+            genre: { text: 'Drama +2', items: ['Drama', 'Mystery', 'Sci-Fi & Fantasy'] },
+            certification: { text: 'TV-MA', sort: 6 },
+            creator: { text: 'Ben Stiller', tip: 'Directed by Ben Stiller · Written by Dan Erickson', copy: 'Ben Stiller' },
+            venue: 'Apple TV+',
+            length: { text: '40m', tip: '40 min', copy: '40', sort: 40 },
+            date: '2022-04-08',
+            releaseStatus: 'finale',
+            audience: { text: '402', sort: 402 },
+            approval: { text: '92%', tip: '92% from 402 votes', copy: '9.2', sort: 92 },
+            identifier: { text: 'tv/95396/S01E09', copy: '95396/1/9' },
+            description: 'The innies get a few hours on the outside, and each learns something they were never meant to.',
+            createdAt: '2026-09-19',
+            tmdbUrl: 'https://www.themoviedb.org/tv/95396/season/1/episode/9',
+            seasonName: 'Season 1',
+            writers: 'Dan Erickson',
+            prev: 'S1 E8 · What’s for Dinner?',
+            next: 'S2 E1 · Hello, Ms. Cobel',
+            perspectives: '2',
+            avgRating: '5.0',
+            updatedAt: '2026-09-19'
+        },
+        {
+            item: { text: 'The Dundies', sub: 'The Office · S2 E1', tip: 'The Office › Season 2 › E1 “The Dundies”', copy: 'The Office S02E01 — The Dundies' },
+            series: { text: 'The Office', tip: 'The Office (2005–2013) · in Perspectize ✓', copy: 'The Office' },
+            position: { text: 'S2 · E1', tip: 'Season 2, episode 1 · episode 7 of 201', copy: 'S02E01', sort: 2001 },
+            genre: { text: 'Comedy', items: ['Comedy'] },
+            certification: { text: 'TV-14', sort: 5 },
+            creator: { text: 'Greg Daniels', tip: 'Directed by Greg Daniels · Written by Mindy Kaling', copy: 'Greg Daniels' },
+            venue: 'NBC',
+            length: { text: '22m', tip: '22 min', copy: '22', sort: 22 },
+            date: '2005-09-20',
+            releaseStatus: 'standard',
+            audience: { text: '288', sort: 288 },
+            approval: { text: '78%', tip: '78% from 288 votes', copy: '7.8', sort: 78 },
+            identifier: { text: 'tv/2316/S02E01', copy: '2316/2/1' },
+            description: 'Michael hosts the annual office awards at a local restaurant.',
+            createdAt: '2026-09-10',
+            tmdbUrl: 'https://www.themoviedb.org/tv/2316/season/2/episode/1',
+            seasonName: 'Season 2',
+            writers: 'Mindy Kaling',
+            prev: 'S1 E6 · Hot Girl',
+            next: 'S2 E2 · Sexual Harassment',
+            perspectives: '1',
+            avgRating: '4.0',
+            updatedAt: '2026-09-10'
+        }
+    ],
     // Illustrative only — made-up channels and figures, there so a mixed
     // YouTube + Bible passage selection has something to sort against.
     youtube: [
