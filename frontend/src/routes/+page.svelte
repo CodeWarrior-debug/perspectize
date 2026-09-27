@@ -10,6 +10,7 @@
 		ALL_SEARCH_SCOPES,
 		type SearchScopeKey,
 	} from '$lib/utils/gridUrlState';
+	import { OPEN_CONTENT_PARAM } from '$lib/utils/contentLinks';
 
 	// Derive current grid params from URL
 	const gridParams = $derived(parseGridParams(page.url.searchParams));
@@ -17,6 +18,10 @@
 	// "All Content" (existing grid) vs "By User" (new grouped activity view).
 	// Session-only, not persisted to the URL — mirrors the column picker's scope.
 	let view = $state<'content' | 'byUser'>('content');
+	// A `?open=<id>` deep link is handled by the All Content grid's details modal.
+	$effect(() => {
+		if (page.url.searchParams.has(OPEN_CONTENT_PARAM)) view = 'content';
+	});
 
 	// Local search input state (tracks what user has typed)
 	// Initialized from URL on mount; user typing updates this independently of URL
