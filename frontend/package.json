@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build",
+		"build": "vite build && node scripts/strip-sourcemaps.mjs",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -23,7 +23,7 @@
 		"cap:sync": "cap sync",
 		"cap:open:ios": "cap open ios",
 		"cap:open:android": "cap open android",
-		"mobile:build": "vite build && cap sync"
+		"mobile:build": "vite build && node scripts/strip-sourcemaps.mjs && cap sync"
 	},
 	"devDependencies": {
 		"@capacitor/android": "^8.5.2",

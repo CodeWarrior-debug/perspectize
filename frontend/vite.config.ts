@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { faroSourcemapConfig } from './scripts/faro-sourcemaps';
 
 // Build info (src/lib/buildInfo.ts): package.json version + short git SHA. Separate from
 // SvelteKit's kit.version (stale-tab reload hash, see src/lib/utils/versionWatch.ts).
@@ -18,6 +19,10 @@ function gitSha(): string {
 		return 'unknown'; // Sevalla build without .git
 	}
 }
+
+// Opt-in Faro source-map upload: empty (no sourcemaps, no plugin) unless
+// FARO_SOURCEMAP_API_KEY is set; throws if the key is set without its companion vars.
+const faro = faroSourcemapConfig(process.env);
 
 export default defineConfig({
 	// The vitest 'unit' project below `extends` this file, so it inherits these too.
@@ -61,11 +66,13 @@ export default defineConfig({
 				],
 			},
 		}),
+		...faro.plugins,
 	],
 	resolve: {
 		conditions: ['browser'],
 	},
 	build: {
+		...(faro.sourcemap ? { sourcemap: faro.sourcemap } : {}),
 		rollupOptions: {
 			output: {
 				// Tiptap/ProseMirror (the perspective editor's rich-text engine, ~170KB
