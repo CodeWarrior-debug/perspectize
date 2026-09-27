@@ -70,6 +70,11 @@ type ContentListParams struct {
 	Sorts             []ContentSortRule
 	IncludeTotalCount bool
 	Filter            *ContentFilter
+
+	// ViewerID is the authenticated caller's local user id, or nil when
+	// anonymous. The repository always limits results to public rows plus
+	// the viewer's own private rows.
+	ViewerID *int
 }
 
 // PaginatedContent represents a paginated list of content

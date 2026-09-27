@@ -311,9 +311,18 @@ func (r *mutationResolver) UpdateContentSourceData(ctx context.Context, contentI
 
 // CreateClaim is the resolver for the createClaim field.
 func (r *mutationResolver) CreateClaim(ctx context.Context, input model.CreateClaimInput) (*model.Content, error) {
+	// Identity comes from the session; a client-supplied userID only has to match it.
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	if input.UserID != 0 && input.UserID != authUser.ID {
+		return nil, fmt.Errorf("access denied: cannot create content for another user")
+	}
+
 	content, err := r.ContentService.CreateClaim(ctx, portservices.CreateClaimInput{
 		Text:            input.Text,
-		UserID:          input.UserID,
+		UserID:          authUser.ID,
 		ParentContentID: input.ParentContentID,
 	})
 	if err != nil {
@@ -325,10 +334,10 @@ func (r *mutationResolver) CreateClaim(ctx context.Context, input model.CreateCl
 		}
 		slog.Error("creating claim failed",
 			"error", err,
-			"userID", input.UserID,
+			"userID", authUser.ID,
 			"parentContentID", input.ParentContentID,
 		)
-		return nil, fmt.Errorf("failed to create claim: %v", err)
+		return nil, fmt.Errorf("failed to create claim")
 	}
 
 	return domainToModel(content), nil
@@ -351,6 +360,15 @@ func (r *queryResolver) ContentByID(ctx context.Context, id string) (*model.Cont
 		}
 		slog.Error("getting content failed", "id", id, "error", err)
 		return nil, fmt.Errorf("failed to get content")
+	}
+
+	// Private content is visible only to its owner; return nil (not an error)
+	// so the id's existence isn't disclosed — same convention as PerspectiveByID.
+	if content.Privacy == domain.PrivacyPrivate {
+		viewer, ok := auth.ForContext(ctx)
+		if !ok || viewer.ID != content.AddedByUserID {
+			return nil, nil
+		}
 	}
 
 	return domainToModel(content), nil
@@ -416,6 +434,11 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		params.Filter.CreatedBefore = filter.CreatedBefore
 		params.Filter.UpdatedAfter = filter.UpdatedAfter
 		params.Filter.UpdatedBefore = filter.UpdatedBefore
+	}
+
+	if viewer, ok := auth.ForContext(ctx); ok {
+		id := viewer.ID
+		params.ViewerID = &id
 	}
 
 	result, err := r.ContentService.ListContent(ctx, params)

@@ -58,6 +58,7 @@ type Content struct {
 	VerseStartID       *int           `json:"verseStartID,omitempty"`
 	VerseEndID         *int           `json:"verseEndID,omitempty"`
 	DisplayTitle       *string        `json:"displayTitle,omitempty"`
+	Privacy            domain.Privacy `json:"privacy"`
 	PerspectiveCount   *int           `json:"perspectiveCount,omitempty"`
 	AverageRating      *float64       `json:"averageRating,omitempty"`
 	QualityRatingCount *int           `json:"qualityRatingCount,omitempty"`
@@ -95,7 +96,7 @@ type ContentSortInput struct {
 type CreateClaimInput struct {
 	Text            string `json:"text"`
 	UserID          int    `json:"userID"`
-	ParentContentID int    `json:"parentContentID"`
+	ParentContentID *int   `json:"parentContentID,omitempty"`
 }
 
 type CreateContentFromPassageInput struct {

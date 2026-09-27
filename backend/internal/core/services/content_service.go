@@ -158,47 +158,47 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID int) (*
 	return updated, nil
 }
 
-// CreateClaim creates a new claim content entry associated with a parent content item.
-// The claim text is stored raw (preserving @this/@here tokens for display-time resolution).
-// The parent content ID and raw text are stored in the response JSONB column.
+// CreateClaim creates a new claim content entry. Claims are always created
+// PrivacyPrivate (visible only to their owner) until a future public gate
+// promotes them. ParentContentID is optional; when set it must exist.
+// The claim text is stored raw (preserving @this/@here tokens for display-time
+// resolution) in both Name and response.text.
 func (s *ContentService) CreateClaim(ctx context.Context, input portservices.CreateClaimInput) (*domain.Content, error) {
-	if input.Text == "" {
+	text := strings.TrimSpace(input.Text)
+	if text == "" {
 		return nil, fmt.Errorf("%w: claim text cannot be empty", domain.ErrInvalidInput)
 	}
 	if input.UserID <= 0 {
 		return nil, fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
 	}
-	if input.ParentContentID <= 0 {
-		return nil, fmt.Errorf("%w: parent content id must be a positive integer", domain.ErrInvalidInput)
-	}
 
-	// Validate parent content exists
-	_, err := s.repo.GetByID(ctx, input.ParentContentID)
-	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
-			return nil, fmt.Errorf("%w: parent content not found", domain.ErrNotFound)
+	responsePayload := map[string]interface{}{"text": text}
+	if input.ParentContentID != nil {
+		parentID := *input.ParentContentID
+		if parentID <= 0 {
+			return nil, fmt.Errorf("%w: parent content id must be a positive integer", domain.ErrInvalidInput)
 		}
-		return nil, fmt.Errorf("failed to validate parent content: %w", err)
+		if _, err := s.repo.GetByID(ctx, parentID); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				return nil, fmt.Errorf("%w: parent content not found", domain.ErrNotFound)
+			}
+			return nil, fmt.Errorf("failed to validate parent content: %w", err)
+		}
+		responsePayload["parentContentId"] = parentID
 	}
 
-	// Build response JSONB: stores parentContentId and raw text for reference resolution
-	responsePayload := map[string]interface{}{
-		"parentContentId": input.ParentContentID,
-		"text":            input.Text,
-	}
 	responseJSON, err := json.Marshal(responsePayload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal claim response: %w", err)
 	}
 
-	content := &domain.Content{
-		Name:          input.Text,
+	created, err := s.repo.Create(ctx, &domain.Content{
+		Name:          text,
 		ContentType:   domain.ContentTypeClaim,
 		AddedByUserID: input.UserID,
 		Response:      responseJSON,
-	}
-
-	created, err := s.repo.Create(ctx, content)
+		Privacy:       domain.PrivacyPrivate,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to save claim: %w", err)
 	}

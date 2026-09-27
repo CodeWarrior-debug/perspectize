@@ -465,7 +465,7 @@ func TestGormContentRepository_List(t *testing.T) {
 		{
 			"TITLE and DESCRIPTION are OR'd",
 			[]domain.ContentSearchField{domain.ContentSearchFieldTitle, domain.ContentSearchFieldDescription},
-			`WHERE name ILIKE \$1 OR response->'items'->0->'snippet'->>'description' ILIKE \$2`,
+			`WHERE \(name ILIKE \$1 OR response->'items'->0->'snippet'->>'description' ILIKE \$2\) AND content\.privacy = \$3`,
 		},
 		{
 			"all four fields are OR'd",
@@ -473,12 +473,12 @@ func TestGormContentRepository_List(t *testing.T) {
 				domain.ContentSearchFieldTitle, domain.ContentSearchFieldDescription,
 				domain.ContentSearchFieldChannelTitle, domain.ContentSearchFieldTags,
 			},
-			`WHERE name ILIKE \$1 OR response->'items'->0->'snippet'->>'description' ILIKE \$2 OR response->'items'->0->'snippet'->>'channelTitle' ILIKE \$3 OR \(response->'items'->0->'snippet'->'tags'\)::text ILIKE \$4`,
+			`WHERE \(name ILIKE \$1 OR response->'items'->0->'snippet'->>'description' ILIKE \$2 OR response->'items'->0->'snippet'->>'channelTitle' ILIKE \$3 OR \(response->'items'->0->'snippet'->'tags'\)::text ILIKE \$4\) AND content\.privacy = \$5`,
 		},
 		{
 			"CHANNEL_TITLE and TAGS only (title/description excluded)",
 			[]domain.ContentSearchField{domain.ContentSearchFieldChannelTitle, domain.ContentSearchFieldTags},
-			`WHERE response->'items'->0->'snippet'->>'channelTitle' ILIKE \$1 OR \(response->'items'->0->'snippet'->'tags'\)::text ILIKE \$2`,
+			`WHERE \(response->'items'->0->'snippet'->>'channelTitle' ILIKE \$1 OR \(response->'items'->0->'snippet'->'tags'\)::text ILIKE \$2\) AND content\.privacy = \$3`,
 		},
 	}
 
@@ -589,5 +589,48 @@ func TestGormContentRepository_ClearDisplayTitle(t *testing.T) {
 		mock.ExpectExec(`UPDATE content SET display_title = NULL`).WillReturnResult(sqlmock.NewResult(0, 0))
 
 		assert.ErrorIs(t, NewGormContentRepository(db).ClearDisplayTitle(ctx, 404), domain.ErrNotFound)
+	})
+}
+
+func TestGormContentRepository_List_Visibility(t *testing.T) {
+	ctx := context.Background()
+	params := func(viewer *int) domain.ContentListParams {
+		return domain.ContentListParams{
+			SortBy:    domain.ContentSortByCreatedAt,
+			SortOrder: domain.SortOrderDesc,
+			ViewerID:  viewer,
+		}
+	}
+
+	t.Run("anonymous sees public only", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`SELECT \* FROM "content" WHERE content\.privacy = \$1 ORDER BY`).
+			WithArgs("public", int64(11)).WillReturnRows(contentRows())
+		_, err := NewGormContentRepository(db).List(ctx, params(nil))
+		require.NoError(t, err)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("viewer sees public plus own private", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		viewer := 42
+		mock.ExpectQuery(`WHERE \(content\.privacy = \$1 OR content\.added_by_user_id = \$2\) ORDER BY`).
+			WithArgs("public", 42, int64(11)).WillReturnRows(contentRows())
+		_, err := NewGormContentRepository(db).List(ctx, params(&viewer))
+		require.NoError(t, err)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("total count uses the same predicate", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		viewer := 42
+		p := params(&viewer)
+		p.IncludeTotalCount = true
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "content" WHERE \(content\.privacy = \$1 OR content\.added_by_user_id = \$2\)`).
+			WithArgs("public", 42).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+		mock.ExpectQuery(`SELECT \* FROM "content"`).WillReturnRows(contentRows())
+		_, err := NewGormContentRepository(db).List(ctx, p)
+		require.NoError(t, err)
+		assertAllExpectationsMet(t, mock)
 	})
 }

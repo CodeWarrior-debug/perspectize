@@ -64,6 +64,7 @@ func domainToModel(c *domain.Content) *model.Content {
 		VerseStartID:      c.VerseStartID,
 		VerseEndID:        c.VerseEndID,
 		DisplayTitle:      c.DisplayTitle,
+		Privacy:           contentPrivacy(c.Privacy),
 	}
 
 	// Parse the raw response JSON into a map for GraphQL
@@ -560,4 +561,13 @@ func nilIfEmpty(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// contentPrivacy maps an unset domain privacy to PUBLIC for the non-null
+// GraphQL field.
+func contentPrivacy(p domain.Privacy) domain.Privacy {
+	if p == "" {
+		return domain.PrivacyPublic
+	}
+	return p
 }

@@ -140,6 +140,10 @@ type Content {
   verseStartID: Int
   verseEndID: Int
   displayTitle: String
+  # Who can read this row. CLAIM content starts PRIVATE (owner-only); everything
+  # else is PUBLIC. Private rows are omitted from lists and contentByID for
+  # anyone but their owner.
+  privacy: Privacy!
   # Aggregates computed from ALL perspectives on this content — public and
   # private alike (privacy controls readability, not whether a perspective
   # counts here). Resolved on demand (batched per-request via dataloader)
@@ -409,8 +413,8 @@ input SetPrimaryCategoryInput {
 
 input CreateClaimInput {
   text: String!            # The claim text (may contain @this/@here tokens)
-  userID: IntID!           # Who created the claim
-  parentContentID: IntID!  # The content item this claim is about
+  userID: IntID!           # 0 = derive from session; non-zero must match the session user
+  parentContentID: IntID   # Optional: the content item this claim is about
 }
 
 type Mutation {
