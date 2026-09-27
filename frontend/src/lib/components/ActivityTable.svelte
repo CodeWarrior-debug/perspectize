@@ -72,6 +72,7 @@
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
+	import { ContentTypeFilter } from '$lib/utils/contentTypeFilter';
 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
 	import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
@@ -493,11 +494,8 @@
 				flex: 0.5,
 				maxWidth: 100,
 
-				filter: 'agTextColumnFilter',
+				filter: ContentTypeFilter,
 				valueGetter: (params) => capitalizeContentType(params.data?.contentType),
-				filterValueGetter: (params) => {
-					return params.data?.contentType?.toLowerCase() ?? '';
-				},
 				cellRenderer: typeCellRenderer,
 				headerTooltip: 'Content type',
 			},

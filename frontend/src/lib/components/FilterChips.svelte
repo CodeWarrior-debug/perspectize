@@ -3,7 +3,7 @@
 	import ListXIcon from '@lucide/svelte/icons/list-x';
 	import type { GridApi } from '@ag-grid-community/core';
 	import { formatDurationSeconds } from '$lib/utils/formatting';
-	import { COLUMN_LABELS } from '$lib/utils/grid-config';
+	import { COLUMN_LABELS, contentTypeLabel } from '$lib/utils/grid-config';
 
 	interface FilterChip {
 		colId: string;
@@ -99,6 +99,9 @@
 	}
 
 	function formatFilterValue(filter: any, colId?: string): string {
+		if (filter.filterType === 'set') {
+			return (filter.values ?? []).map(contentTypeLabel).join(' or ');
+		}
 		if (filter.operator && filter.conditions) {
 			const parts = filter.conditions.map((c: any) => formatSingleCondition(c, colId));
 			return parts.join(` ${filter.operator.toLowerCase()} `);
