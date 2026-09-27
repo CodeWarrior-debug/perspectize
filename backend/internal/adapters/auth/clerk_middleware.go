@@ -9,6 +9,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	repositories "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/demo"
 	clerkhttp "github.com/clerk/clerk-sdk-go/v2/http"
 	clerkuser "github.com/clerk/clerk-sdk-go/v2/user"
 )
@@ -34,7 +35,10 @@ func Middleware(userRepo repositories.UserRepository, verifier portservices.Toke
 // rejecting the request, so public queries keep working.
 func newAuthHandler(userRepo repositories.UserRepository, verifier portservices.TokenVerifier, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, err := verifier.Verify(r.Context(), "")
+		// Clerk-verified requests already carry session claims on the context,
+		// which the Clerk verifier prefers; the raw bearer token is passed for
+		// verifiers that resolve it themselves (demo mode's "demo.<persona>").
+		id, err := verifier.Verify(r.Context(), bearerToken(r))
 		if err != nil || id.ClerkID == "" {
 			// No valid session — pass through as unauthenticated
 			next.ServeHTTP(w, r)
@@ -45,6 +49,13 @@ func newAuthHandler(userRepo repositories.UserRepository, verifier portservices.
 		clerkUserID := id.ClerkID
 		user, err := userRepo.GetByClerkID(r.Context(), clerkUserID)
 		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) && demo.IsDemoClerkID(clerkUserID) {
+				// Demo personas exist only once seeded (cmd/seed-demo); they
+				// have no Clerk profile to fetch, so never create them on demand.
+				slog.Warn("demo persona not seeded", "clerk_user_id", clerkUserID)
+				next.ServeHTTP(w, r)
+				return
+			}
 			if errors.Is(err, domain.ErrNotFound) {
 				// On-demand creation: webhook may not have fired yet
 				clerkUsr, fetchErr := clerkuser.Get(r.Context(), clerkUserID)
@@ -155,4 +166,14 @@ func newAuthHandler(userRepo repositories.UserRepository, verifier portservices.
 		ctx := withUser(r.Context(), authUser)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// bearerToken returns the token from an "Authorization: Bearer <token>"
+// header, or "" when absent.
+func bearerToken(r *http.Request) string {
+	h := r.Header.Get("Authorization")
+	if len(h) > 7 && strings.EqualFold(h[:7], "Bearer ") {
+		return strings.TrimSpace(h[7:])
+	}
+	return ""
 }
