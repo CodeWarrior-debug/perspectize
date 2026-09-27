@@ -45,6 +45,8 @@ import (
 	"github.com/ravilushqa/otelgqlgen"
 	"github.com/vektah/gqlparser/v2/ast"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	otelruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
+	"go.opentelemetry.io/otel"
 	"gorm.io/gorm"
 )
 
@@ -77,6 +79,14 @@ func main() {
 			}
 		}()
 		if telemetry.Enabled() {
+			// stdout JSON stays as-is; Info+ records are also exported via OTLP.
+			logger.EnableOTLP(nil)
+			if err := otelruntime.Start(otelruntime.WithMeterProvider(otel.GetMeterProvider())); err != nil {
+				slog.Warn("go runtime metrics not started", "error", err)
+			}
+			if _, err := telemetry.RegisterBuildInfo(telemetry.Meter()); err != nil {
+				slog.Warn("app.build.info metric not registered", "error", err)
+			}
 			slog.Info("OpenTelemetry enabled")
 		}
 	}
@@ -115,6 +125,11 @@ func main() {
 	}
 	sqlDB, _ := db.DB()
 	defer sqlDB.Close()
+
+	// Pool gauges (idle/used/max/wait) — no-op until a MeterProvider is installed.
+	if _, err := database.RegisterPoolMetrics(telemetry.Meter(), sqlDB); err != nil {
+		slog.Warn("db pool metrics not registered", "error", err)
+	}
 
 	// Register slow query logger (logs queries >100ms)
 	database.RegisterSlowQueryLogger(db)
@@ -288,7 +303,7 @@ func main() {
 		srv.Use(extension.Introspection{})
 	}
 	instrumentGraphQL(srv)
-	srv.AroundOperations(gqltiming.OperationTimer())
+	srv.AroundOperations(operationMetrics())
 
 	// Setup chi router
 	r := chi.NewRouter()
@@ -424,7 +439,7 @@ func withTracing(h http.Handler) http.Handler {
 // like Content.primaryCategory don't get their own span, which keeps list
 // queries from ballooning into hundreds of spans). Variables are never
 // recorded (WithoutVariables). Must run before srv.AroundOperations(...) so
-// the operation span is already in context for OperationTimer/OperationMetrics.
+// the operation span is already in context for OperationMetrics.
 func instrumentGraphQL(srv *handler.Server) {
 	srv.Use(otelgqlgen.Middleware(
 		otelgqlgen.WithoutVariables(),
@@ -432,6 +447,20 @@ func instrumentGraphQL(srv *handler.Server) {
 			return fc.IsResolver
 		}),
 	))
+}
+
+// maxOperationNames caps distinct graphql.operation.name values on the
+// operation histogram (spec cardinality budget); extras report as "other".
+const maxOperationNames = 200
+
+// operationMetrics builds the per-operation latency/error histogram
+// middleware against the global Meter (delegates once telemetry.Setup
+// installs a real MeterProvider).
+func operationMetrics() graphql.OperationMiddleware {
+	return gqltiming.OperationMetrics(
+		telemetry.Meter(),
+		telemetry.NewBoundedSet(maxOperationNames, telemetry.OperationNamePattern),
+	)
 }
 
 // instrumentDB registers the in-house GORM tracing callbacks (pkg/database):

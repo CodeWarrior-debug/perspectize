@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
@@ -122,14 +121,4 @@ func operationTypeOf(oc *graphql.OperationContext) string {
 	default:
 		return unknownOperationType
 	}
-}
-
-// OperationTimer is retained for the current main.go call site.
-//
-// Deprecated: use OperationMetrics with an explicit Meter and BoundedSet.
-func OperationTimer() graphql.OperationMiddleware {
-	return OperationMetrics(
-		otel.GetMeterProvider().Meter("github.com/CodeWarrior-debug/perspectize/backend"),
-		telemetry.NewBoundedSet(200, telemetry.OperationNamePattern),
-	)
 }

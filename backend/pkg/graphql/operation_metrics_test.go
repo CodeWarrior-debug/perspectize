@@ -330,8 +330,3 @@ func TestOperationMetrics_HandlerRunsSafelyUnderConcurrentSubscriptionCalls(t *t
 	require.True(t, ok)
 	assert.Len(t, hist.DataPoints, 1)
 }
-
-func TestOperationTimer_ReturnsMiddleware(t *testing.T) {
-	mw := gqltiming.OperationTimer()
-	assert.NotNil(t, mw)
-}

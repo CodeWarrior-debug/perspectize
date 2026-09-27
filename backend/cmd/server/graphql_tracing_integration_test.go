@@ -30,7 +30,6 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/database"
-	gqltiming "github.com/CodeWarrior-debug/perspectize/backend/pkg/graphql"
 )
 
 // distinctSearchTerm is a literal that must never appear in any span or
@@ -124,7 +123,7 @@ func newTracingHarness(t *testing.T) *tracingHarness {
 	srv.AddTransport(transport.POST{})
 	srv.SetQueryCache(lru.New[*ast.QueryDocument](100))
 	instrumentGraphQL(srv)
-	srv.AroundOperations(gqltiming.OperationTimer())
+	srv.AroundOperations(operationMetrics())
 
 	r := chi.NewRouter()
 	r.Handle("/graphql", srv)
