@@ -98,6 +98,23 @@ describe('CompareRatingTable', () => {
 		expect(screen.getByText(/Confidence/)).toBeInTheDocument();
 	});
 
+	it('renders a visual 0-10 scale per row with an accessible summary', () => {
+		render(CompareRatingTable, {
+			props: {
+				rows,
+				filledInDifferently,
+				feelings: noFeelings,
+				sortDesc: false,
+				onToggleSort: vi.fn(),
+				leftName: 'Alice',
+				rightName: 'Bob',
+			},
+		});
+		const scale = screen.getByTestId('rating-scale-quality');
+		expect(scale).toHaveAttribute('role', 'img');
+		expect(scale).toHaveAttribute('aria-label', '8.0 vs 7.0, 10.0% different');
+	});
+
 	it('names who filled in a dimension differently instead of saying "left"/"right"', () => {
 		render(CompareRatingTable, {
 			props: {
