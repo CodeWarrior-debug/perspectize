@@ -1,101 +1,81 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import SearchBar from '$lib/components/discover/SearchBar.svelte';
 import SearchBarHost from './fixtures/SearchBarHost.svelte';
 
-// Note: SearchBar exposes `debouncedQuery` as a $bindable prop (per the task
-// brief). Programmatic render() here can't observe two-way bound prop writes
-// without a dedicated host wrapper component, so most of this file sticks to
-// DOM-observable behavior — the debounce-timing test below uses
-// ./fixtures/SearchBarHost.svelte (a component that actually owns the bound
-// state) to observe the write.
+const PLACEHOLDER = 'Search YouTube, or paste a video link';
+
 describe('SearchBar', () => {
-	it('renders with the expected placeholder text', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('renders the search box and a disabled search button when empty', () => {
 		render(SearchBar);
-		expect(screen.getByPlaceholderText('Search Content Sources...')).toBeInTheDocument();
+		expect(screen.getByPlaceholderText(PLACEHOLDER)).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /Search on YouTube/ })).toBeDisabled();
 	});
 
-	it('reflects typed input in the field', async () => {
-		render(SearchBar, { props: { value: '' } });
-		const input = screen.getByPlaceholderText('Search Content Sources...') as HTMLInputElement;
+	it('opens youtube.com results in a new tab on submit, and never calls fetch', async () => {
+		const open = vi.spyOn(window, 'open').mockReturnValue(null);
+		const fetchSpy = vi.spyOn(globalThis, 'fetch');
+		render(SearchBar, { props: { value: 'lo-fi jazz' } });
 
+		await fireEvent.click(screen.getByRole('button', { name: /Search on YouTube/ }));
+
+		expect(open).toHaveBeenCalledWith(
+			'https://www.youtube.com/results?search_query=lo-fi%20jazz',
+			'_blank',
+			'noopener,noreferrer',
+		);
+		expect(fetchSpy).not.toHaveBeenCalled();
+	});
+
+	it('submits on Enter from the input', async () => {
+		const open = vi.spyOn(window, 'open').mockReturnValue(null);
+		render(SearchBar, { props: { value: 'svelte' } });
+
+		await fireEvent.submit(screen.getByRole('search'));
+
+		expect(open).toHaveBeenCalledTimes(1);
+	});
+
+	it('does nothing on submit when the box only holds whitespace', async () => {
+		const open = vi.spyOn(window, 'open').mockReturnValue(null);
+		render(SearchBar, { props: { value: '   ' } });
+
+		await fireEvent.submit(screen.getByRole('search'));
+
+		expect(open).not.toHaveBeenCalled();
+	});
+
+	it('turns into "Add to Perspectize" for a pasted YouTube link and adds it instead of searching', async () => {
+		const open = vi.spyOn(window, 'open').mockReturnValue(null);
+		const onAddUrl = vi.fn();
+		render(SearchBarHost, { props: { onAddUrl } });
+		const input = screen.getByPlaceholderText(PLACEHOLDER);
+
+		await fireEvent.input(input, { target: { value: ' https://www.youtube.com/watch?v=dQw4w9WgXcQ ' } });
+		const add = screen.getByRole('button', { name: /Add to Perspectize/ });
+		await fireEvent.click(add);
+
+		expect(onAddUrl).toHaveBeenCalledWith('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+		expect(open).not.toHaveBeenCalled();
+	});
+
+	it('disables the add button while an add is in flight', () => {
+		render(SearchBar, { props: { value: 'https://youtu.be/dQw4w9WgXcQ', isAdding: true } });
+		expect(screen.getByRole('button', { name: /Adding/ })).toBeDisabled();
+	});
+
+	it('clears the bound value from the clear button', async () => {
+		render(SearchBarHost);
+		const input = screen.getByPlaceholderText(PLACEHOLDER);
 		await fireEvent.input(input, { target: { value: 'svelte' } });
-
-		expect(input.value).toBe('svelte');
-	});
-
-	it('does not show a clear button when there is no input', () => {
-		render(SearchBar, { props: { value: '' } });
-		expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument();
-	});
-
-	it('shows a clear button once there is input', () => {
-		render(SearchBar, { props: { value: 'svelte' } });
-		expect(screen.getByRole('button', { name: 'Clear search' })).toBeInTheDocument();
-	});
-
-	it('clears the input value when the clear button is clicked', async () => {
-		render(SearchBar, { props: { value: 'svelte' } });
-		const input = screen.getByPlaceholderText('Search Content Sources...') as HTMLInputElement;
+		expect(screen.getByTestId('bound-value')).toHaveTextContent('svelte');
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
 
-		expect(input.value).toBe('');
-		expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument();
-	});
-
-	it('autofocuses the input on mount', () => {
-		render(SearchBar);
-		const input = screen.getByPlaceholderText('Search Content Sources...');
-		expect(document.activeElement).toBe(input);
-	});
-
-	describe('debouncing', () => {
-		beforeEach(() => {
-			vi.useFakeTimers();
-		});
-
-		afterEach(() => {
-			vi.useRealTimers();
-		});
-
-		it('does not propagate to debouncedQuery before the 300ms delay elapses', async () => {
-			render(SearchBarHost);
-			const input = screen.getByPlaceholderText('Search Content Sources...');
-
-			await fireEvent.input(input, { target: { value: 'svelte' } });
-			await vi.advanceTimersByTimeAsync(299);
-
-			expect(screen.getByTestId('debounced-query')).toHaveTextContent('');
-		});
-
-		it('propagates to debouncedQuery 300ms after typing stops', async () => {
-			render(SearchBarHost);
-			const input = screen.getByPlaceholderText('Search Content Sources...');
-
-			await fireEvent.input(input, { target: { value: 'svelte' } });
-			await vi.advanceTimersByTimeAsync(300);
-
-			expect(screen.getByTestId('debounced-query')).toHaveTextContent('svelte');
-		});
-
-		it('resets the debounce timer on each keystroke, so only the final value propagates', async () => {
-			render(SearchBarHost);
-			const input = screen.getByPlaceholderText('Search Content Sources...');
-
-			await fireEvent.input(input, { target: { value: 's' } });
-			await vi.advanceTimersByTimeAsync(200);
-			await fireEvent.input(input, { target: { value: 'sv' } });
-			await vi.advanceTimersByTimeAsync(200);
-			await fireEvent.input(input, { target: { value: 'svelte' } });
-
-			// 200ms after the last keystroke: still within the 300ms window, so no propagation yet.
-			await vi.advanceTimersByTimeAsync(200);
-			expect(screen.getByTestId('debounced-query')).toHaveTextContent('');
-
-			// The remaining 100ms completes the 300ms window from the final keystroke.
-			await vi.advanceTimersByTimeAsync(100);
-			expect(screen.getByTestId('debounced-query')).toHaveTextContent('svelte');
-		});
+		expect(screen.getByTestId('bound-value')).toHaveTextContent('');
 	});
 });

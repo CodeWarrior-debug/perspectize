@@ -25,4 +25,8 @@ describe('app.html Content-Security-Policy', () => {
 		expect(directive('frame-src')).toContain('https://www.youtube.com');
 		expect(directive('frame-src')).toContain('https://www.youtube-nocookie.com');
 	});
+
+	it('does not let the browser call the YouTube Data API (trending is served by the backend)', () => {
+		expect(directive('connect-src').some((src) => src.includes('googleapis.com'))).toBe(false);
+	});
 });
