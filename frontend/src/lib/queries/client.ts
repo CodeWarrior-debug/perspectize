@@ -1,7 +1,8 @@
 import { GraphQLClient } from 'graphql-request';
 import { clientInfoHeaders } from '$lib/buildInfo';
 
-const GRAPHQL_ENDPOINT = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8080/graphql';
+/** GraphQL HTTP endpoint (VITE_GRAPHQL_URL build var, localhost fallback). */
+export const GRAPHQL_ENDPOINT = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8080/graphql';
 
 if (!import.meta.env.VITE_GRAPHQL_URL && import.meta.env.PROD) {
 	console.error(

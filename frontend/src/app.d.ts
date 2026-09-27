@@ -20,6 +20,10 @@ interface ImportMetaEnv {
 	readonly VITE_ONBOARDING_VIDEO_GUEST_PRODUCT?: string;
 	readonly VITE_ONBOARDING_VIDEO_HOW_ADD_VIDEO?: string;
 	readonly VITE_ONBOARDING_VIDEO_HOW_PERSPECTIVE?: string;
+	/** Grafana Faro collector URL; unset = telemetry disabled. */
+	readonly VITE_FARO_URL?: string;
+	/** Deployment environment reported to Faro (falls back to the Vite mode). */
+	readonly VITE_APP_ENV?: string;
 }
 
 interface ImportMeta {

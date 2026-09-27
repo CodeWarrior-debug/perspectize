@@ -13,7 +13,7 @@
 	import MessagingWidget from '$lib/components/messaging/MessagingWidget.svelte';
 	import GuestLanding from '$lib/components/onboarding/GuestLanding.svelte';
 	import OnboardingShell from '$lib/components/onboarding/OnboardingShell.svelte';
-	import { reportWebVitals } from '$lib/vitals';
+	import { initTelemetry } from '$lib/telemetry';
 	import { watchForNewVersion } from '$lib/utils/versionWatch';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import '../app.css';
@@ -44,7 +44,7 @@
 	});
 
 	onMount(() => {
-		reportWebVitals();
+		void initTelemetry();
 		return watchForNewVersion({
 			check: () => updated.check(),
 			reload: () => location.reload(),

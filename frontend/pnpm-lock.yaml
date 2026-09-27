@@ -117,9 +117,6 @@ importers:
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
-      web-vitals:
-        specifier: ^6.2.2
-        version: 6.2.2
     devDependencies:
       '@capacitor/android':
         specifier: ^8.5.2
