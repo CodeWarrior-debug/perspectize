@@ -24,6 +24,7 @@
 	import CompareOverallRow from '$lib/components/CompareOverallRow.svelte';
 	import CompareRatingTable from '$lib/components/CompareRatingTable.svelte';
 	import CompareTakeColumn from '$lib/components/CompareTakeColumn.svelte';
+	import { Button } from '$lib/components/shadcn';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
 	import { formatDuration, extractVideoIdFromUrl } from '$lib/utils/formatting';
 
@@ -157,6 +158,13 @@
 	const hasComparison = $derived(perspectives.length >= 2 && !!leftPerspective && !!rightPerspective);
 	const hasNoPerspectives = $derived(!loading && perspectives.length === 0);
 
+	// The page otherwise silently defaults to comparing OTHER people's takes
+	// even when the signed-in viewer has never weighed in themselves —
+	// nudge them to add one instead of leaving it unsaid (compare-page
+	// enhancements #8). Not shown when signed out; there's nowhere for them
+	// to add a perspective from.
+	const viewerHasPerspective = $derived(meCtx.me ? perspectives.some((p) => p.userID === meCtx.me!.id) : true);
+
 	const contentVideoId = $derived(extractVideoIdFromUrl(content?.url ?? null));
 </script>
 
@@ -202,6 +210,18 @@
 			No other perspectives on this content yet to compare against.
 		</div>
 	{:else}
+		{#if meCtx.me && !viewerHasPerspective}
+			<div
+				class="flex items-center justify-between gap-3 rounded-lg border border-border bg-accent px-3.5 py-2.5"
+				data-testid="add-perspective-cta"
+			>
+				<p class="text-[12.5px] text-muted-foreground">
+					You haven't shared a perspective on this yet — these are all other people's takes.
+				</p>
+				<Button href="/" size="sm" variant="outline">Add yours</Button>
+			</div>
+		{/if}
+
 		<ComparePickerRow
 			{options}
 			leftId={leftId!}

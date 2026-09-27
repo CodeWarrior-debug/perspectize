@@ -405,4 +405,84 @@ describe('Compare', () => {
 		const leftAvatar = leftSelect.parentElement?.querySelector('span[style*="background-color"]');
 		expect(leftAvatar).toHaveStyle({ backgroundColor: 'var(--color-primary)' });
 	});
+
+	it("prompts the signed-in viewer to add their own perspective when they haven't shared one", async () => {
+		mockRequest.mockImplementation((query: string) => {
+			if (query.includes('ListUsers'))
+				return Promise.resolve({
+					users: [
+						{ id: '1', username: 'me' },
+						{ id: '2', username: 'Jamie Lee' },
+						{ id: '3', username: 'Sam Rivera' },
+					],
+				});
+			if (query.includes('ListPerspectivesByContent')) {
+				return Promise.resolve({
+					perspectives: {
+						items: [
+							{
+								id: 'p2',
+								userID: '2',
+								contentID: '10',
+								quality: 8000,
+								agreement: null,
+								importance: null,
+								confidence: null,
+								like: 'THUMBS_UP',
+								review: 'Great',
+								privacy: 'PUBLIC',
+								description: null,
+								primaryPerspectiveID: null,
+								relatedPerspectiveIDs: null,
+								customFields: null,
+								feelings: null,
+								createdAt: '2026-01-01T00:00:00Z',
+								updatedAt: '2026-01-01T00:00:00Z',
+							},
+							{
+								id: 'p3',
+								userID: '3',
+								contentID: '10',
+								quality: 6000,
+								agreement: null,
+								importance: null,
+								confidence: null,
+								like: 'THUMBS_UP',
+								review: 'Fine',
+								privacy: 'PUBLIC',
+								description: null,
+								primaryPerspectiveID: null,
+								relatedPerspectiveIDs: null,
+								customFields: null,
+								feelings: null,
+								createdAt: '2026-01-01T00:00:00Z',
+								updatedAt: '2026-01-02T00:00:00Z',
+							},
+						],
+					},
+				});
+			}
+			if (query.includes('GetContent')) return Promise.resolve(contentResponse);
+			if (query.includes('query Me')) return Promise.resolve(meResponse);
+			return Promise.resolve({});
+		});
+
+		renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+		await waitFor(() => {
+			expect(screen.getByTestId('add-perspective-cta')).toBeInTheDocument();
+		});
+		expect(screen.getByRole('link', { name: 'Add yours' })).toHaveAttribute('href', '/');
+	});
+
+	it('does not prompt when the viewer already has a perspective on this content', async () => {
+		threeUserFixture();
+
+		renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+		await waitFor(() => {
+			expect(screen.getByTestId('picker-left')).toBeInTheDocument();
+		});
+		expect(screen.queryByTestId('add-perspective-cta')).not.toBeInTheDocument();
+	});
 });
