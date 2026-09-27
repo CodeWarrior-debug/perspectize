@@ -23,6 +23,13 @@ Pasting a YouTube Music link into Add Content produces a **music track** item th
 7. **Prompting is sparing.** The app offers promotion at most once per add, as a toast action ("This song also has an official video — add it separately?"). The same action is always available in the details modal. It never prompts in bulk.
 8. **The player uses the primary video ID with fallback.** It embeds a `youtube-nocookie.com` iframe, and on an embed error (the label disabled embedding) tries the next playable reference. When every option fails, it shows "Open in YouTube Music".
 9. **`relatedMedia` is a cross-type field.** Only YT Music writes it in this plan. Podcast and book use are deferred.
+10. **Lyrics are linked out, never displayed.** The app never stores or renders lyrics text.
+    - **Check:** the backend calls the LRCLIB API (`/api/search`, matching artist + title ±3s duration) only to learn whether lyrics exist, then discards the text.
+    - **Persist only the result**, in `response.lyrics = {available, lrclibId, hasSynced, checkedAt}`.
+    - **When to check:** at add time, asynchronously, so the add is never blocked. A row marked "not available" is re-checked lazily when its modal opens and `checkedAt` is more than 30 days old. A row marked "available" is never re-checked.
+    - **UI:** "Open lyrics" opens the LRCLIB page in a new tab, or LRCLIB search on `artist title` if per-track pages don't exist. When nothing was found, it shows "No lyrics found" plus a "Search anyway" link. A "Lyrics on YouTube Music" link opens the track's `music.youtube.com` page, whose lyrics tab is licensed.
+    - Applies to `YOUTUBE_MUSIC` and `MUSIC_TRACK` rows.
+    - **Open question:** does LRCLIB have per-track web pages? Its site looks like a single-page app. Verify in a real browser before choosing the link target.
 
 ## Flow states (expected share)
 
@@ -41,7 +48,7 @@ Pasting a YouTube Music link into Add Content produces a **music track** item th
 
 - Treating plain `youtube.com` links as songs when InnerTube reports that they are one.
 - Picking a track from an album or playlist.
-- Lyrics (no source exists).
+- Displaying lyrics text in-app, including synced highlighting. This is out of scope because of display-rights liability; the app links out instead (decision 10).
 - `relatedMedia` for other content types.
 - Players for other content types. A separate plan will cover podcast `<audio>` and embeds for YouTube videos.
 

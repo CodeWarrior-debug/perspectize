@@ -96,7 +96,24 @@
 - [ ] Update the CSP in `app.html` (`frame-src`) for `https://www.youtube-nocookie.com`, and `img-src` for `coverartarchive.org` and `archive.org`.
 - [ ] Add component tests for the player's fallback sequence, the prompt showing once, and the promote/open button states.
 
-## Task 9 — Verify
+## Task 9 — Lyrics availability (link out, no text stored)
+
+- [ ] **Port and adapter.** Add port `LyricsClient.Check(ctx, artist, title string, durationSec int) (*LyricsAvailability, error)`, returning `{Available, LRCLibID, HasSynced}`.
+  - Build the adapter in `adapters/lrclib/`: call `GET https://lrclib.net/api/search`, match artist + title and duration ±3s, and send a project User-Agent.
+  - **The adapter must drop `plainLyrics` and `syncedLyrics` while parsing.** Add a test asserting that no lyrics text leaves the adapter.
+- [ ] **Service.** Add `ContentService.CheckLyrics(ctx, contentID)`, which writes `response.lyrics = {available, lrclibId, hasSynced, checkedAt}`.
+  - After `CreateFromYouTubeMusic` succeeds (and for `MUSIC_TRACK`), call it asynchronously in a goroutine with its own timeout. A failure is logged and doesn't block the add.
+- [ ] **GraphQL.** Add `Content.lyrics: LyricsAvailability` (nullable, since the row may not have been checked yet) and `mutation refreshLyricsAvailability(contentId: ID!)`.
+  - The mutation only re-checks when the stored result is "not available" and `checkedAt` is more than 30 days old. Otherwise it returns the stored value.
+- [ ] **Frontend.** In the details modal for music rows:
+  - When available, show "Open lyrics", linking to the LRCLIB track page or search.
+  - When not available, show "No lyrics found" plus a "Search anyway" link.
+  - Always show a "Lyrics on YouTube Music" link.
+  - Opening the modal calls the refresh mutation when the stored result is stale.
+  - Add tests for all three states and the stale-refresh trigger.
+- [ ] **Before choosing the link target,** open `lrclib.net/lyrics/<id>` in a real browser to confirm per-track pages exist. Record the result in the spec's open question.
+
+## Task 10 — Verify
 
 - [ ] Run these and record the output summaries: `go build ./...`, `gofmt -l .` (empty), `go test ./...`, and `pnpm install` then `pnpm run test:run` in `frontend/`.
 - [ ] Run `graphify update .`.
