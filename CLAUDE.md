@@ -77,6 +77,14 @@ Because PRs are created via `gh api` (not `gh pr create`), GitHub's template pic
 
 GitHub Projects v2: See [.docs/GITHUB_PROJECTS.md](.docs/GITHUB_PROJECTS.md).
 
+### `needs-local-session-takeover` label
+
+Marks a PR opened from a **cloud** session whose remaining work needs the user's machine (Docker, local-only MCP servers such as Sevalla, Clerk sign-in / browser verification). The PR body lists that work as a checklist and links the originating session.
+
+- **Taking it over:** from a local checkout, `git pull` the PR branch, then run `claude --teleport` and pick the session linked in the PR body — this resumes that cloud session locally with its full history. (Alternatively start a local session and work from the PR checklist.)
+- **Cloud sessions:** apply the label (and list the local-only steps) instead of claiming unverified work is done.
+- **Local sessions:** remove the label once every checklist item under "Local session takeover" is done.
+
 ### PR Merge Preferences
 
 ```bash
