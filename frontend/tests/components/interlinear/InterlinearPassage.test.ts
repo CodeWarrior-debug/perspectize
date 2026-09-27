@@ -116,13 +116,15 @@ describe('InterlinearPassage', () => {
 		expect(created).not.toHaveAttribute('aria-describedby');
 	});
 
-	it('a verse with data has no superscript number in the text; the chips row keeps it; a plain verse keeps its superscript', () => {
+	it('every verse keeps its superscript number in the text (so long passages stay navigable); the chips row keeps it too', () => {
 		const { container } = render(InterlinearPassage, {
 			props: { verses: [plain(1, 1, 'ignored'), plain(2, 2, 'Now the earth was formless.')], interlinear: [gen11] },
 		});
 		const sups = Array.from(container.querySelectorAll('sup'));
-		expect(sups.map((s) => s.textContent)).toEqual(['2']); // only the plain verse
-		expect(container.querySelector('[data-segment="1:0"]')!.closest('span')!.querySelector('sup')).toBeNull();
+		expect(sups.map((s) => s.textContent)).toEqual(['1', '2']);
+		expect(container.querySelector('[data-segment="1:0"]')!.closest('span')!.querySelector('sup')?.textContent).toBe(
+			'1',
+		);
 		// verse 1's number survives as the small label at the start of its chips
 		const chip = container.querySelector('[data-chip="1:0"]')!;
 		expect(chip.previousElementSibling?.textContent).toBe('1');
