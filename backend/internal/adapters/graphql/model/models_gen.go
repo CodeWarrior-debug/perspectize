@@ -437,6 +437,21 @@ type WikidataSearchResult struct {
 	EntityType  *string `json:"entityType,omitempty"`
 }
 
+type YouTubeTrendingPage struct {
+	Items         []*YouTubeTrendingVideo `json:"items"`
+	NextPageToken *string                 `json:"nextPageToken,omitempty"`
+}
+
+type YouTubeTrendingVideo struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	ChannelTitle string `json:"channelTitle"`
+	Description  string `json:"description"`
+	PublishedAt  string `json:"publishedAt"`
+	ThumbnailURL string `json:"thumbnailUrl"`
+	Duration     string `json:"duration"`
+}
+
 type ParticipantChangeKind string
 
 const (

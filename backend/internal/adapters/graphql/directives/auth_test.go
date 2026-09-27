@@ -25,6 +25,10 @@ func (m *mockContentService) CreateFromYouTube(ctx context.Context, url string, 
 	return nil, nil
 }
 
+func (m *mockContentService) YouTubeTrending(ctx context.Context, regionCode, pageToken string) (*portservices.TrendingPage, error) {
+	return nil, nil
+}
+
 func (m *mockContentService) GetByID(ctx context.Context, id int) (*domain.Content, error) {
 	if m.getByIDFn != nil {
 		return m.getByIDFn(ctx, id)

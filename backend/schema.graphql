@@ -110,6 +110,23 @@ type Category {
   updatedAt: String!
 }
 
+# One video from YouTube's most-popular chart (Discover page Trending feed).
+type YouTubeTrendingVideo {
+  id: String!
+  title: String!
+  channelTitle: String!
+  description: String!
+  publishedAt: String!
+  thumbnailUrl: String!
+  # ISO 8601 duration, e.g. "PT4M13S"
+  duration: String!
+}
+
+type YouTubeTrendingPage {
+  items: [YouTubeTrendingVideo!]!
+  nextPageToken: String
+}
+
 type WikidataSearchResult {
   qid: String!
   label: String!
@@ -481,6 +498,10 @@ type Query {
 
   # Category queries
   wikidataSearch(query: String!, language: String, limit: Int): [WikidataSearchResult!]!
+
+  # Discover page: YouTube's Trending chart, served from the backend cache so
+  # visitors share one API call per page per hour. regionCode defaults to US.
+  youtubeTrending(regionCode: String, pageToken: String): YouTubeTrendingPage!
 
   # Perspective queries
   perspectiveByID(id: ID!): Perspective

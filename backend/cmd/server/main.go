@@ -142,11 +142,14 @@ func main() {
 	// Wrap the raw YouTube client with an in-memory TTL cache to avoid
 	// re-spending API quota on repeat lookups of the same video. TTL is
 	// configurable via YOUTUBE_API_CACHE_TTL_SECONDS (default 6 hours).
+	// The same client also caches the Discover page's Trending chart
+	// (YOUTUBE_TRENDING_CACHE_TTL_SECONDS, default 1 hour).
 	youtubeClient := youtube.NewCachingClient(
 		youtube.NewClient(cfg.YouTube.APIKey),
 		time.Duration(cfg.YouTube.CacheTTLSeconds)*time.Second,
+		youtube.WithTrendingTTL(time.Duration(cfg.YouTube.TrendingCacheTTLSeconds)*time.Second),
 	)
-	slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds)
+	slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds, "trendingTTLSeconds", cfg.YouTube.TrendingCacheTTLSeconds)
 	wikidataClient := wikidata.NewClient()
 	contentRepo := postgres.NewGormContentRepository(db)
 	userRepo := postgres.NewGormUserRepository(db)
@@ -157,7 +160,7 @@ func main() {
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
 
 	// Initialize services
-	contentService := services.NewContentService(contentRepo, youtubeClient, services.WithBibleReference(bibleReferenceRepo))
+	contentService := services.NewContentService(contentRepo, youtubeClient, services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(youtubeClient))
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)

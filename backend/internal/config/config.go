@@ -52,10 +52,19 @@ type YouTubeConfig struct {
 	// the in-memory YouTube response cache before it's re-fetched from the
 	// API. Default is 6 hours — see YOUTUBE_API_CACHE_TTL_SECONDS in .env.example.
 	CacheTTLSeconds int `json:"cache_ttl_seconds"`
+
+	// TrendingCacheTTLSeconds controls how long a page of YouTube's
+	// most-popular chart (the Discover page's Trending feed) is cached.
+	// Default is 1 hour — see YOUTUBE_TRENDING_CACHE_TTL_SECONDS.
+	TrendingCacheTTLSeconds int `json:"trending_cache_ttl_seconds"`
 }
 
 // DefaultYouTubeCacheTTLSeconds is 6 hours, expressed in seconds.
 const DefaultYouTubeCacheTTLSeconds = 6 * 60 * 60
+
+// DefaultYouTubeTrendingCacheTTLSeconds is 1 hour, expressed in seconds. The
+// chart moves through the day, so this is much shorter than the metadata TTL.
+const DefaultYouTubeTrendingCacheTTLSeconds = 60 * 60
 
 // LoggingConfig holds logging configuration
 type LoggingConfig struct {
@@ -68,7 +77,7 @@ type LoggingConfig struct {
 func Load(configPath string) (*Config, error) {
 	cfg := Config{
 		Server:  ServerConfig{Port: 8080, Host: ""},
-		YouTube: YouTubeConfig{CacheTTLSeconds: DefaultYouTubeCacheTTLSeconds},
+		YouTube: YouTubeConfig{CacheTTLSeconds: DefaultYouTubeCacheTTLSeconds, TrendingCacheTTLSeconds: DefaultYouTubeTrendingCacheTTLSeconds},
 	}
 
 	// Read config file (optional in production where env vars provide all config)
@@ -104,6 +113,11 @@ func Load(configPath string) (*Config, error) {
 	if ttlStr := os.Getenv("YOUTUBE_API_CACHE_TTL_SECONDS"); ttlStr != "" {
 		if v, err := strconv.Atoi(ttlStr); err == nil && v >= 0 {
 			cfg.YouTube.CacheTTLSeconds = v
+		}
+	}
+	if ttlStr := os.Getenv("YOUTUBE_TRENDING_CACHE_TTL_SECONDS"); ttlStr != "" {
+		if v, err := strconv.Atoi(ttlStr); err == nil && v >= 0 {
+			cfg.YouTube.TrendingCacheTTLSeconds = v
 		}
 	}
 

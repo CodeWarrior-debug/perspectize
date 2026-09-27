@@ -59,4 +59,9 @@ type ContentService interface {
 
 	// UpdateSourceData refreshes an existing content item's metadata from its source
 	UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error)
+
+	// YouTubeTrending returns one page of YouTube's most-popular chart for a
+	// region (ISO 3166-1 alpha-2, e.g. "US"). Served from the backend cache, so
+	// Discover visitors share one API call per page per TTL.
+	YouTubeTrending(ctx context.Context, regionCode, pageToken string) (*TrendingPage, error)
 }

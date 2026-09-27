@@ -20,6 +20,7 @@ type ContentService struct {
 	repo          repositories.ContentRepository
 	youtubeClient portservices.YouTubeClient
 	bibleRepo     repositories.BibleReferenceRepository
+	trending      portservices.YouTubeTrendingClient
 }
 
 // ContentServiceOption configures optional ContentService dependencies.
@@ -28,6 +29,12 @@ type ContentServiceOption func(*ContentService)
 // WithBibleReference enables BIBLE_PASSAGE creation by supplying the reference-data repository.
 func WithBibleReference(repo repositories.BibleReferenceRepository) ContentServiceOption {
 	return func(s *ContentService) { s.bibleRepo = repo }
+}
+
+// WithYouTubeTrending enables the Discover page's Trending feed. Pass the
+// caching client so every caller shares its cache.
+func WithYouTubeTrending(client portservices.YouTubeTrendingClient) ContentServiceOption {
+	return func(s *ContentService) { s.trending = client }
 }
 
 // NewContentService creates a new content service
@@ -408,4 +415,23 @@ func (s *ContentService) PassageInterlinear(ctx context.Context, startVerseID, e
 		return nil, err
 	}
 	return &domain.PassageInterlinear{Verses: verses}, nil
+}
+
+// YouTubeTrending returns one page of YouTube's most-popular chart. The region
+// defaults to "US" and must be a two-letter ISO 3166-1 code.
+func (s *ContentService) YouTubeTrending(ctx context.Context, regionCode, pageToken string) (*portservices.TrendingPage, error) {
+	if s.trending == nil {
+		return nil, fmt.Errorf("%w: trending is not configured", domain.ErrYouTubeAPI)
+	}
+	region := strings.ToUpper(strings.TrimSpace(regionCode))
+	if region == "" {
+		region = "US"
+	}
+	if len(region) != 2 || region[0] < 'A' || region[0] > 'Z' || region[1] < 'A' || region[1] > 'Z' {
+		return nil, fmt.Errorf("%w: regionCode must be a two-letter country code", domain.ErrInvalidInput)
+	}
+	if len(pageToken) > 128 {
+		return nil, fmt.Errorf("%w: pageToken is too long", domain.ErrInvalidInput)
+	}
+	return s.trending.GetTrending(ctx, region, strings.TrimSpace(pageToken))
 }

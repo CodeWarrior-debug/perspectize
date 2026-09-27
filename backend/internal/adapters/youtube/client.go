@@ -150,3 +150,100 @@ func (c *Client) GetVideoMetadata(ctx context.Context, videoID string) (*service
 func (c *Client) ExtractVideoID(url string) (string, error) {
 	return ExtractVideoID(url)
 }
+
+// trendingAPIResponse is the slice of a videos.list?chart=mostPopular
+// response the Discover page needs.
+type trendingAPIResponse struct {
+	NextPageToken string `json:"nextPageToken"`
+	Items         []struct {
+		ID      string `json:"id"`
+		Snippet struct {
+			Title        string `json:"title"`
+			Description  string `json:"description"`
+			ChannelTitle string `json:"channelTitle"`
+			PublishedAt  string `json:"publishedAt"`
+			Thumbnails   map[string]struct {
+				URL string `json:"url"`
+			} `json:"thumbnails"`
+		} `json:"snippet"`
+		ContentDetails struct {
+			Duration string `json:"duration"`
+		} `json:"contentDetails"`
+	} `json:"items"`
+}
+
+// trendingPageSize matches the 25-per-page the Discover grid was built around.
+const trendingPageSize = 25
+
+// GetTrending fetches one page of YouTube's most-popular chart for a region
+// (videos.list chart=mostPopular — 1 quota unit per call).
+func (c *Client) GetTrending(ctx context.Context, regionCode, pageToken string) (*services.TrendingPage, error) {
+	q := url.Values{}
+	q.Set("part", "snippet,contentDetails")
+	q.Set("chart", "mostPopular")
+	q.Set("regionCode", regionCode)
+	q.Set("maxResults", fmt.Sprint(trendingPageSize))
+	if pageToken != "" {
+		q.Set("pageToken", pageToken)
+	}
+	q.Set("key", c.apiKey)
+	endpoint := c.baseURL + "/videos?" + q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		sanitized := sanitizeYouTubeError(err)
+		slog.Error("YouTube trending request failed", "error", sanitized, "regionCode", regionCode)
+		return nil, fmt.Errorf("failed to fetch trending videos: %s", sanitized)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		slog.Error("YouTube trending returned error", "status", resp.StatusCode, "regionCode", regionCode)
+		return nil, fmt.Errorf("%w: status %d", domain.ErrYouTubeAPI, resp.StatusCode)
+	}
+
+	var apiResponse trendingAPIResponse
+	if err := json.Unmarshal(body, &apiResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse YouTube trending response: %w", err)
+	}
+
+	page := &services.TrendingPage{
+		Items:         make([]services.TrendingVideo, 0, len(apiResponse.Items)),
+		NextPageToken: apiResponse.NextPageToken,
+	}
+	for _, item := range apiResponse.Items {
+		page.Items = append(page.Items, services.TrendingVideo{
+			ID:           item.ID,
+			Title:        item.Snippet.Title,
+			ChannelTitle: item.Snippet.ChannelTitle,
+			Description:  item.Snippet.Description,
+			PublishedAt:  item.Snippet.PublishedAt,
+			ThumbnailURL: bestThumbnail(item.Snippet.Thumbnails),
+			Duration:     item.ContentDetails.Duration,
+		})
+	}
+	return page, nil
+}
+
+// bestThumbnail picks the medium (320x180) thumbnail the Discover card is
+// sized for, falling back to larger then smaller sizes.
+func bestThumbnail(thumbs map[string]struct {
+	URL string `json:"url"`
+}) string {
+	for _, size := range []string{"medium", "high", "standard", "maxres", "default"} {
+		if t, ok := thumbs[size]; ok && t.URL != "" {
+			return t.URL
+		}
+	}
+	return ""
+}
