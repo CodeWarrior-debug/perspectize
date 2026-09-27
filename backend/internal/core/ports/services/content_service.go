@@ -29,6 +29,20 @@ type ContentService interface {
 	// CreateFromYouTube creates content from a YouTube URL, attributed to the given user
 	CreateFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error)
 
+	// CreateFromYouTubeMusic creates a YOUTUBE_MUSIC row from a music.youtube.com track URL.
+	// Duplicates (by URL or ISRC) return the existing row along with ErrAlreadyExists.
+	CreateFromYouTubeMusic(ctx context.Context, url string, userID int) (*domain.Content, error)
+
+	// PromoteRelatedMedia makes a related video its own YOUTUBE row (or finds it) and links both ways.
+	PromoteRelatedMedia(ctx context.Context, contentID int, videoID string, userID int) (*domain.Content, error)
+
+	// MarkRelatedMediaUnavailable records that a related video failed to play.
+	MarkRelatedMediaUnavailable(ctx context.Context, contentID int, videoID string) error
+
+	// CheckLyrics refreshes and stores lyrics availability (never lyrics text). Without force,
+	// a stored result is reused until it is due for a re-check.
+	CheckLyrics(ctx context.Context, contentID int, force bool) (*domain.LyricsAvailability, error)
+
 	// CreateFromPassage finds or creates the BIBLE_PASSAGE content row for a verse range.
 	// If the range already exists, returns the existing content along with ErrAlreadyExists.
 	CreateFromPassage(ctx context.Context, input CreatePassageInput) (*domain.Content, error)

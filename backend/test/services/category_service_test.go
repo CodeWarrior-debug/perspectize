@@ -350,3 +350,11 @@ func (m *mockContentRepoForCategory) SetDisplayTitleIfEmpty(ctx context.Context,
 func (m *mockContentRepoForCategory) ClearDisplayTitle(ctx context.Context, contentID int) error {
 	return nil
 }
+
+func (m *mockContentRepoForCategory) GetByISRC(ctx context.Context, isrc string) (*domain.Content, error) {
+	return nil, domain.ErrNotFound
+}
+
+func (m *mockContentRepoForCategory) SetResponseKey(ctx context.Context, contentID int, key string, value json.RawMessage) error {
+	return nil
+}
