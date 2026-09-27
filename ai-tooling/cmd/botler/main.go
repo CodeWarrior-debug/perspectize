@@ -2,9 +2,12 @@
 // without a model, chat through the full agent loop, and run evals.
 //
 //	botler tools list
-//	botler tools call <name> --input '<json>'
-//	botler chat [--model M] [--name N] <question...>
+//	botler tools call <name> [--as ID] --input '<json>'
+//	botler chat [--model M] [--name N] [--as ID] <question...>
+//	botler eval [--suite guide|data|all] ...
 //
+// Data tools read evals.FixtureData, a fixed dataset, never a real
+// database. --as picks the fixture user to act as (default: signed out).
 // chat reads ANTHROPIC_API_KEY from the environment. The model comes from
 // --model, then ASSISTANT_MODEL, then defaultModel.
 package main
@@ -35,11 +38,16 @@ const defaultModel = "claude-opus-5"
 const usageText = `usage: botler <command>
 
   tools list                          list Jeeves's tools
-  tools call <name> --input '<json>'  run one tool directly (no model)
-  chat [--model M] [--name N] <q...>  ask Jeeves one question (streams)
-  eval [--model M] [--area A] [--runs N] [--out DIR]
-                                      run guide seed questions, grade them,
+  tools call <name> [--as ID] --input '<json>'
+                                      run one tool directly (no model)
+  chat [--model M] [--name N] [--as ID] <q...>
+                                      ask Jeeves one question (streams)
+  eval [--suite guide|data|all] [--model M] [--area A] [--runs N] [--out DIR]
+                                      run eval questions, grade them,
                                       print a report, save JSON to DIR
+
+  Data tools read fixed fixture data, never a real database. --as ID acts
+  as fixture user ID (1 is "you"); the default is signed out.
 `
 
 // deps are the side-effecting pieces, swapped out in tests.
@@ -74,7 +82,8 @@ func run(args []string, stdout, stderr io.Writer, d deps) int {
 	}
 }
 
-// newAssistant builds Jeeves over the embedded guide. provider may be nil
+// newAssistant builds Jeeves the way the backend does (guide plus data
+// tools), over the embedded guide and the fixture data. provider may be nil
 // for commands that never call a model.
 func newAssistant(p llm.Provider, model, name string) (*jeeves.Assistant, error) {
 	areas, _, err := appguide.Load()
@@ -84,7 +93,7 @@ func newAssistant(p llm.Provider, model, name string) (*jeeves.Assistant, error)
 	if p == nil {
 		p = noProvider{}
 	}
-	return jeeves.New(jeeves.Config{Provider: p, Model: model, Areas: areas, Name: name})
+	return jeeves.New(jeeves.Config{Provider: p, Model: model, Areas: areas, Name: name, Data: evals.FixtureData()})
 }
 
 func runTools(args []string, stdout, stderr io.Writer) int {
@@ -107,15 +116,21 @@ func runTools(args []string, stdout, stderr io.Writer) int {
 		fs := flag.NewFlagSet("tools call", flag.ContinueOnError)
 		fs.SetOutput(stderr)
 		input := fs.String("input", "{}", "tool input as JSON")
+		as := fs.Int("as", 0, "fixture user ID to act as (default: signed out)")
 		if len(args) < 2 || strings.HasPrefix(args[1], "-") {
-			fmt.Fprintln(stderr, "usage: botler tools call <name> --input '<json>'")
+			fmt.Fprintln(stderr, "usage: botler tools call <name> [--as ID] --input '<json>'")
 			return 2
 		}
 		name := args[1]
 		if err := fs.Parse(args[2:]); err != nil {
 			return 2
 		}
-		res := a.Tools().Call(context.Background(), llm.ToolCall{ID: "cli", Name: name, Input: json.RawMessage(*input)})
+		tools, err := a.ToolsFor(jeeves.Viewer{UserID: *as})
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		res := tools.Call(context.Background(), llm.ToolCall{ID: "cli", Name: name, Input: json.RawMessage(*input)})
 		if res.IsError {
 			fmt.Fprintln(stderr, res.Content)
 			return 1
@@ -133,12 +148,13 @@ func runChat(args []string, stdout, stderr io.Writer, d deps) int {
 	fs.SetOutput(stderr)
 	model := fs.String("model", "", "model ID (default: $ASSISTANT_MODEL or "+defaultModel+")")
 	name := fs.String("name", "", "assistant display name (default: "+jeeves.DefaultName+")")
+	as := fs.Int("as", 0, "fixture user ID to act as (default: signed out)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	question := strings.TrimSpace(strings.Join(fs.Args(), " "))
 	if question == "" {
-		fmt.Fprintln(stderr, "usage: botler chat [--model M] [--name N] <question...>")
+		fmt.Fprintln(stderr, "usage: botler chat [--model M] [--name N] [--as ID] <question...>")
 		return 2
 	}
 	m := resolveModel(*model, d)
@@ -153,7 +169,7 @@ func runChat(args []string, stdout, stderr io.Writer, d deps) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	res, err := a.Ask(ctx, question, func(e llm.Event) {
+	res, err := a.AskAs(ctx, jeeves.Viewer{UserID: *as}, question, func(e llm.Event) {
 		switch e.Kind {
 		case llm.EventTextDelta:
 			fmt.Fprint(stdout, e.Text)
@@ -194,7 +210,8 @@ func runEval(args []string, stdout, stderr io.Writer, d deps) int {
 	fs := flag.NewFlagSet("eval", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	model := fs.String("model", "", "model ID (default: $ASSISTANT_MODEL or "+defaultModel+")")
-	area := fs.String("area", "", "only this guide area (default: all)")
+	suite := fs.String("suite", "guide", "which questions: guide, data or all")
+	area := fs.String("area", "", "only this guide area (guide suite; default: all)")
 	runs := fs.Int("runs", 3, "runs per seed question")
 	out := fs.String("out", filepath.Join("evals", "results"), "directory for the JSON report")
 	if err := fs.Parse(args); err != nil {
@@ -204,6 +221,15 @@ func runEval(args []string, stdout, stderr io.Writer, d deps) int {
 		fmt.Fprintln(stderr, "--runs must be at least 1")
 		return 2
 	}
+	guide, data := *suite == "guide" || *suite == "all", *suite == "data" || *suite == "all"
+	if !guide && !data {
+		fmt.Fprintf(stderr, "--suite must be guide, data or all, not %q\n", *suite)
+		return 2
+	}
+	if *area != "" && !guide {
+		fmt.Fprintln(stderr, "--area applies to the guide suite only")
+		return 2
+	}
 	m := resolveModel(*model, d)
 
 	areas, seeds, err := appguide.Load()
@@ -211,12 +237,20 @@ func runEval(args []string, stdout, stderr io.Writer, d deps) int {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
-	cases := evals.Cases(areas, seeds, *area)
-	if len(cases) == 0 {
-		fmt.Fprintf(stderr, "no seed questions found (area %q)\n", *area)
-		return 1
+	var cases []evals.Case
+	if guide {
+		if cases = evals.Cases(areas, seeds, *area); len(cases) == 0 {
+			fmt.Fprintf(stderr, "no seed questions found (area %q)\n", *area)
+			return 1
+		}
 	}
-	a, err := jeeves.New(jeeves.Config{Provider: d.newProvider(), Model: m, Areas: areas})
+	var dataCases []evals.DataCase
+	if data {
+		dataCases = evals.DataCases()
+	}
+	// Evals build Jeeves exactly as the backend does, so the prompt under
+	// test is the production prompt.
+	a, err := jeeves.New(jeeves.Config{Provider: d.newProvider(), Model: m, Areas: areas, Data: evals.FixtureData()})
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
@@ -224,8 +258,16 @@ func runEval(args []string, stdout, stderr io.Writer, d deps) int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	fmt.Fprintf(stderr, "evaluating %d questions × %d runs on %s…\n", len(cases), *runs, m)
-	rep := evals.Run(ctx, a, m, cases, *runs, evals.KnownIDs(areas))
+	fmt.Fprintf(stderr, "evaluating %d questions × %d runs on %s…\n", len(cases)+len(dataCases), *runs, m)
+	known := evals.KnownIDs(areas)
+	var reps []evals.Report
+	if guide {
+		reps = append(reps, evals.Run(ctx, a, m, cases, *runs, known))
+	}
+	if data {
+		reps = append(reps, evals.RunData(ctx, a, m, dataCases, *runs, known))
+	}
+	rep := evals.Merge(m, reps...)
 
 	printReport(stdout, rep)
 	path, err := saveReport(*out, rep)

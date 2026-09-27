@@ -52,7 +52,7 @@ func New(cfg Config) (*Assistant, error) {
 		model:    cfg.Model,
 		system:   SystemPrompt(cfg.Areas, cfg.Name, cfg.Data != nil),
 	}
-	tools, err := a.toolsFor(Viewer{})
+	tools, err := a.ToolsFor(Viewer{})
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func New(cfg Config) (*Assistant, error) {
 
 // toolsFor builds the tool set for one viewer. Registration order is fixed
 // (read_guide first) so the tool list stays byte-stable for prompt caching.
-func (a *Assistant) toolsFor(v Viewer) (*agent.Registry, error) {
+func (a *Assistant) ToolsFor(v Viewer) (*agent.Registry, error) {
 	r := agent.NewRegistry()
 	if err := r.Register(ReadGuideTool(a.areas)); err != nil {
 		return nil, err
@@ -92,7 +92,7 @@ func (a *Assistant) AskAs(ctx context.Context, viewer Viewer, question string, o
 	tools := a.tools
 	if a.data != nil && !viewer.Anonymous() {
 		var err error
-		if tools, err = a.toolsFor(viewer); err != nil {
+		if tools, err = a.ToolsFor(viewer); err != nil {
 			return agent.Result{}, err
 		}
 	}
