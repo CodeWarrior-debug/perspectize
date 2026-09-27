@@ -123,3 +123,13 @@ func TestAssistant_NoDataMeansGuideOnly(t *testing.T) {
 	assert.Len(t, a.Tools().Specs(), 1)
 	assert.NotContains(t, a.System(), jeeves.ListPerspectivesToolName)
 }
+
+func TestTools_ReadOnlySetCoversEveryTool(t *testing.T) {
+	r, err := jeeves.Tools(nil, memdata.New(nil), jeeves.Viewer{UserID: 1})
+	require.NoError(t, err)
+	specs := r.Specs()
+	require.Len(t, specs, 2)
+	for _, s := range specs {
+		assert.True(t, jeeves.ReadOnlyTools[s.Name], "%s must be marked read-only or kept out of external surfaces", s.Name)
+	}
+}

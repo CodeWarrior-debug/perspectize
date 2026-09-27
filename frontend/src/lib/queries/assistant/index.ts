@@ -35,4 +35,30 @@ export const ASSISTANT_REPLY_SUBSCRIPTION = gql`
 	}
 `;
 
+/** A read-only assistant tool the browser's own agent may call (WebMCP). */
+export type AssistantToolSpec = {
+	name: string;
+	description: string;
+	/** JSON Schema as JSON text. */
+	inputSchema: string;
+	untrustedContent: boolean;
+};
+
+export const ASSISTANT_TOOLS_QUERY = gql`
+	query AssistantTools {
+		assistantTools {
+			name
+			description
+			inputSchema
+			untrustedContent
+		}
+	}
+`;
+
+export const RUN_ASSISTANT_TOOL_QUERY = gql`
+	query RunAssistantTool($name: String!, $input: String!) {
+		runAssistantTool(name: $name, input: $input)
+	}
+`;
+
 export { useAssistantReply, type AssistantStatus } from './useAssistantReply.svelte';

@@ -33,6 +33,9 @@ type Config struct {
 type AssistantConfig struct {
 	Enabled bool   `json:"enabled"` // JEEVES_ENABLED
 	Model   string `json:"model"`   // ASSISTANT_MODEL
+	// WebMCP exposes the assistant's read-only tools to the browser's own
+	// agent (no model or API key needed). WEBMCP_ENABLED.
+	WebMCP bool `json:"webmcp"`
 }
 
 // DefaultAssistantModel is used when ASSISTANT_MODEL is unset.
@@ -137,6 +140,9 @@ func Load(configPath string) (*Config, error) {
 
 	if v := os.Getenv("JEEVES_ENABLED"); v != "" {
 		cfg.Assistant.Enabled = v == "true" || v == "1"
+	}
+	if v := os.Getenv("WEBMCP_ENABLED"); v != "" {
+		cfg.Assistant.WebMCP = v == "true" || v == "1"
 	}
 	if v := os.Getenv("ASSISTANT_MODEL"); v != "" {
 		cfg.Assistant.Model = v

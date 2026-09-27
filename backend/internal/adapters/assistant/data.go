@@ -2,6 +2,7 @@ package assistant
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -9,6 +10,10 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
+
+// errReadFailed is the only error text a data tool returns for a backend
+// failure; details stay in the logs.
+var errReadFailed = errors.New("couldn't read perspectives right now; try again shortly")
 
 // ratingScale converts stored ratings (0–10000) to the 0–10 scale users see.
 const ratingScale = 1000.0
@@ -61,7 +66,10 @@ func (d *PerspectiveData) ListPerspectives(ctx context.Context, viewer jeeves.Vi
 
 	res, err := d.perspectives.ListPerspectives(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("assistant data: list perspectives: %w", err)
+		// The tool result reaches the model (and, via WebMCP, the browser's
+		// agent), so log the real error and return a plain one.
+		slog.ErrorContext(ctx, "assistant data: list perspectives", "viewer_id", viewer.UserID, "error", err)
+		return nil, errReadFailed
 	}
 
 	titles := map[int]string{}

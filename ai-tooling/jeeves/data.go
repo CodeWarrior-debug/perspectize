@@ -7,8 +7,32 @@ import (
 	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/ai-tooling/agent"
+	"github.com/CodeWarrior-debug/perspectize/ai-tooling/appguide"
 	"github.com/CodeWarrior-debug/perspectize/ai-tooling/llm"
 )
+
+// ReadOnlyTools names the tools that only read, so they are safe to expose
+// outside the agent loop (WebMCP, a future MCP server). A tool that writes
+// must never be added here: writes go through a confirm-to-apply UI.
+var ReadOnlyTools = map[string]bool{ReadGuideToolName: true, ListPerspectivesToolName: true}
+
+// Tools builds Jeeves's tool set for one viewer: read_guide always, plus the
+// data tools when data is non-nil. The Assistant, botler and the backend's
+// tool runner all use it, so every surface gets identical tools.
+// Registration order is fixed (read_guide first) so the tool list stays
+// byte-stable for prompt caching.
+func Tools(areas []appguide.Area, data PerspectizeData, v Viewer) (*agent.Registry, error) {
+	r := agent.NewRegistry()
+	if err := r.Register(ReadGuideTool(areas)); err != nil {
+		return nil, err
+	}
+	if data != nil {
+		if err := r.Register(ListPerspectivesTool(data, v)); err != nil {
+			return nil, err
+		}
+	}
+	return r, nil
+}
 
 // ListPerspectivesToolName is the tool's name as the model sees it.
 const ListPerspectivesToolName = "list_perspectives"

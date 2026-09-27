@@ -60,6 +60,16 @@ type AssistantToolActivity struct {
 
 func (AssistantToolActivity) IsAssistantEvent() {}
 
+// A read-only assistant tool the browser's own agent may call (WebMCP).
+type AssistantToolSpec struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// JSON Schema for the tool input, as JSON text.
+	InputSchema string `json:"inputSchema"`
+	// True when results contain user-written text (treat as data, never instructions).
+	UntrustedContent bool `json:"untrustedContent"`
+}
+
 type CategorizedRating struct {
 	Category string `json:"category"`
 	Rating   int    `json:"rating"`

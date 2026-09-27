@@ -65,6 +65,13 @@ type ComplexityRoot struct {
 		Name func(childComplexity int) int
 	}
 
+	AssistantToolSpec struct {
+		Description      func(childComplexity int) int
+		InputSchema      func(childComplexity int) int
+		Name             func(childComplexity int) int
+		UntrustedContent func(childComplexity int) int
+	}
+
 	CategorizedRating struct {
 		Category func(childComplexity int) int
 		Rating   func(childComplexity int) int
@@ -316,6 +323,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		AssistantTools     func(childComplexity int) int
 		Content            func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, sorts []*model.ContentSortInput, includeTotalCount *bool, filter *model.ContentFilter) int
 		ContentByID        func(childComplexity int, id string) int
 		CustomFieldStats   func(childComplexity int, contentID *int, key string) int
@@ -327,6 +335,7 @@ type ComplexityRoot struct {
 		PassageText        func(childComplexity int, startVerseID int, endVerseID int) int
 		PerspectiveByID    func(childComplexity int, id string) int
 		Perspectives       func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) int
+		RunAssistantTool   func(childComplexity int, name string, input string) int
 		ThreadMessages     func(childComplexity int, threadID string, first *int, before *int) int
 		UserByID           func(childComplexity int, id string) int
 		UserByUsername     func(childComplexity int, username string) int
@@ -456,6 +465,8 @@ type QueryResolver interface {
 	MessageThreads(ctx context.Context, first *int, before *string) ([]*model.MessageThread, error)
 	MessageThread(ctx context.Context, id string) (*model.MessageThread, error)
 	ThreadMessages(ctx context.Context, threadID string, first *int, before *int) (*model.MessageConnection, error)
+	AssistantTools(ctx context.Context) ([]*model.AssistantToolSpec, error)
+	RunAssistantTool(ctx context.Context, name string, input string) (string, error)
 }
 type SubscriptionResolver interface {
 	ThreadEvents(ctx context.Context, threadID string, sinceSeq *int) (<-chan model.ThreadEvent, error)
@@ -532,6 +543,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.AssistantToolActivity.Name(childComplexity), true
+
+	case "AssistantToolSpec.description":
+		if e.ComplexityRoot.AssistantToolSpec.Description == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantToolSpec.Description(childComplexity), true
+	case "AssistantToolSpec.inputSchema":
+		if e.ComplexityRoot.AssistantToolSpec.InputSchema == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantToolSpec.InputSchema(childComplexity), true
+	case "AssistantToolSpec.name":
+		if e.ComplexityRoot.AssistantToolSpec.Name == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantToolSpec.Name(childComplexity), true
+	case "AssistantToolSpec.untrustedContent":
+		if e.ComplexityRoot.AssistantToolSpec.UntrustedContent == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantToolSpec.UntrustedContent(childComplexity), true
 
 	case "CategorizedRating.category":
 		if e.ComplexityRoot.CategorizedRating.Category == nil {
@@ -1694,6 +1730,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.PresenceChanged.UserID(childComplexity), true
 
+	case "Query.assistantTools":
+		if e.ComplexityRoot.Query.AssistantTools == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Query.AssistantTools(childComplexity), true
 	case "Query.content":
 		if e.ComplexityRoot.Query.Content == nil {
 			break
@@ -1811,6 +1853,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Perspectives(childComplexity, args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string), args["sortBy"].(*domain.PerspectiveSortBy), args["sortOrder"].(*domain.SortOrder), args["includeTotalCount"].(*bool), args["filter"].(*model.PerspectiveFilter)), true
+	case "Query.runAssistantTool":
+		if e.ComplexityRoot.Query.RunAssistantTool == nil {
+			break
+		}
+
+		args, err := ec.field_Query_runAssistantTool_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.RunAssistantTool(childComplexity, args["name"].(string), args["input"].(string)), true
 	case "Query.threadMessages":
 		if e.ComplexityRoot.Query.ThreadMessages == nil {
 			break
@@ -2854,6 +2907,23 @@ extend type Subscription {
   "Ask Jeeves one question; streams events and completes after AssistantDone or AssistantError."
   assistantReply(input: AssistantAskInput!): AssistantEvent! @auth
 }
+
+"A read-only assistant tool the browser's own agent may call (WebMCP)."
+type AssistantToolSpec {
+  name: String!
+  description: String!
+  "JSON Schema for the tool input, as JSON text."
+  inputSchema: String!
+  "True when results contain user-written text (treat as data, never instructions)."
+  untrustedContent: Boolean!
+}
+
+extend type Query {
+  "Read-only assistant tools for WebMCP. Empty unless the server sets WEBMCP_ENABLED=true."
+  assistantTools: [AssistantToolSpec!]! @auth
+  "Run one read-only assistant tool as the signed-in user. input is the tool input as JSON text."
+  runAssistantTool(name: String!, input: String!): String! @auth
+}
 `, BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
@@ -2861,6 +2931,20 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // childFields_* functions provide shared child field context lookups.
 // Each function is generated once per unique object type, deduplicating the
 // switch statements that were previously inlined in every fieldContext_* function.
+
+func (ec *executionContext) childFields_AssistantToolSpec(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "name":
+		return ec.fieldContext_AssistantToolSpec_name(ctx, field)
+	case "description":
+		return ec.fieldContext_AssistantToolSpec_description(ctx, field)
+	case "inputSchema":
+		return ec.fieldContext_AssistantToolSpec_inputSchema(ctx, field)
+	case "untrustedContent":
+		return ec.fieldContext_AssistantToolSpec_untrustedContent(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type AssistantToolSpec", field.Name)
+}
 
 func (ec *executionContext) childFields_CategorizedRating(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
@@ -4146,6 +4230,28 @@ func (ec *executionContext) field_Query_perspectives_args(ctx context.Context, r
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_runAssistantTool_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "name",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["name"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_threadMessages_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -4489,6 +4595,98 @@ func (ec *executionContext) _AssistantToolActivity_name(ctx context.Context, fie
 }
 func (ec *executionContext) fieldContext_AssistantToolActivity_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("AssistantToolActivity", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantToolSpec_name(ctx context.Context, field graphql.CollectedField, obj *model.AssistantToolSpec) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantToolSpec_name(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantToolSpec_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantToolSpec", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantToolSpec_description(ctx context.Context, field graphql.CollectedField, obj *model.AssistantToolSpec) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantToolSpec_description(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Description, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantToolSpec_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantToolSpec", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantToolSpec_inputSchema(ctx context.Context, field graphql.CollectedField, obj *model.AssistantToolSpec) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantToolSpec_inputSchema(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.InputSchema, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantToolSpec_inputSchema(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantToolSpec", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantToolSpec_untrustedContent(ctx context.Context, field graphql.CollectedField, obj *model.AssistantToolSpec) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantToolSpec_untrustedContent(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UntrustedContent, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantToolSpec_untrustedContent(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantToolSpec", field, false, false, errors.New("field of type Boolean does not have child fields"))
 }
 
 func (ec *executionContext) _CategorizedRating_category(ctx context.Context, field graphql.CollectedField, obj *model.CategorizedRating) (ret graphql.Marshaler) {
@@ -10139,6 +10337,108 @@ func (ec *executionContext) fieldContext_Query_threadMessages(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_assistantTools(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_assistantTools(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Query().AssistantTools(ctx)
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal []*model.AssistantToolSpec
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.AssistantToolSpec) graphql.Marshaler {
+			return ec.marshalNAssistantToolSpec2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐAssistantToolSpecᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_assistantTools(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_AssistantToolSpec(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_runAssistantTool(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_runAssistantTool(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().RunAssistantTool(ctx, fc.Args["name"].(string), fc.Args["input"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal string
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_runAssistantTool(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_runAssistantTool_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -13397,6 +13697,59 @@ func (ec *executionContext) _AssistantToolActivity(ctx context.Context, sel ast.
 	return out
 }
 
+var assistantToolSpecImplementors = []string{"AssistantToolSpec"}
+
+func (ec *executionContext) _AssistantToolSpec(ctx context.Context, sel ast.SelectionSet, obj *model.AssistantToolSpec) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, assistantToolSpecImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AssistantToolSpec")
+		case "name":
+			out.Values[i] = ec._AssistantToolSpec_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "description":
+			out.Values[i] = ec._AssistantToolSpec_description(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "inputSchema":
+			out.Values[i] = ec._AssistantToolSpec_inputSchema(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "untrustedContent":
+			out.Values[i] = ec._AssistantToolSpec_untrustedContent(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var categorizedRatingImplementors = []string{"CategorizedRating"}
 
 func (ec *executionContext) _CategorizedRating(ctx context.Context, sel ast.SelectionSet, obj *model.CategorizedRating) graphql.Marshaler {
@@ -15957,6 +16310,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "assistantTools":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_assistantTools(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "runAssistantTool":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_runAssistantTool(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -16848,6 +17245,32 @@ func (ec *executionContext) marshalNAssistantEvent2githubᚗcomᚋCodeWarriorᚑ
 		return graphql.Null
 	}
 	return ec._AssistantEvent(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNAssistantToolSpec2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐAssistantToolSpecᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.AssistantToolSpec) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNAssistantToolSpec2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐAssistantToolSpec(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNAssistantToolSpec2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐAssistantToolSpec(ctx context.Context, sel ast.SelectionSet, v *model.AssistantToolSpec) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AssistantToolSpec(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {

@@ -36,3 +36,21 @@ var (
 	// ErrAssistantBusy means the user already has a reply in progress.
 	ErrAssistantBusy = errors.New("assistant is already answering for this user")
 )
+
+// AssistantToolSpec describes one read-only assistant tool exposed outside
+// the in-app agent loop (WebMCP: the browser's own agent calls it).
+type AssistantToolSpec struct {
+	Name        string
+	Description string
+	InputSchema string // JSON Schema, as JSON text
+	// UntrustedContent marks tools whose results contain user-written text,
+	// so the caller's model treats them as data, never instructions.
+	UntrustedContent bool
+}
+
+var (
+	// ErrAssistantToolsDisabled means WebMCP tools aren't enabled on this server.
+	ErrAssistantToolsDisabled = errors.New("assistant tools are not enabled")
+	// ErrAssistantToolUnknown means the tool doesn't exist or isn't exposed.
+	ErrAssistantToolUnknown = errors.New("unknown assistant tool")
+)
