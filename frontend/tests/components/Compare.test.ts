@@ -485,4 +485,108 @@ describe('Compare', () => {
 		});
 		expect(screen.queryByTestId('add-perspective-cta')).not.toBeInTheDocument();
 	});
+
+	it("links the content banner to the content's source URL when one exists", async () => {
+		mockRequest.mockImplementation((query: string) => {
+			if (query.includes('ListUsers')) return Promise.resolve({ users: [{ id: '1', username: 'me' }] });
+			if (query.includes('ListPerspectivesByContent')) {
+				return Promise.resolve({
+					perspectives: {
+						items: [
+							{
+								id: 'p1',
+								userID: '1',
+								contentID: '10',
+								quality: 8000,
+								agreement: null,
+								importance: null,
+								confidence: null,
+								like: null,
+								review: 'x',
+								privacy: 'PUBLIC',
+								description: null,
+								primaryPerspectiveID: null,
+								relatedPerspectiveIDs: null,
+								customFields: null,
+								feelings: null,
+								createdAt: '2026-01-01T00:00:00Z',
+								updatedAt: '2026-01-01T00:00:00Z',
+							},
+						],
+					},
+				});
+			}
+			if (query.includes('GetContent'))
+				return Promise.resolve({ contentByID: { ...contentResponse.contentByID, url: 'https://youtu.be/abc123' } });
+			if (query.includes('query Me')) return Promise.resolve(meResponse);
+			return Promise.resolve({});
+		});
+
+		renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+		await waitFor(() => {
+			expect(screen.getByText('Video')).toBeInTheDocument();
+		});
+		expect(screen.getByRole('link', { name: /Video/ })).toHaveAttribute('href', 'https://youtu.be/abc123');
+	});
+
+	it('shows a retry action when the comparison fails to load', async () => {
+		mockRequest.mockImplementation((query: string) => {
+			if (query.includes('ListUsers')) return Promise.reject(new Error('network error'));
+			if (query.includes('ListPerspectivesByContent')) return Promise.reject(new Error('network error'));
+			if (query.includes('GetContent')) return Promise.resolve(contentResponse);
+			if (query.includes('query Me')) return Promise.resolve(meResponse);
+			return Promise.resolve({});
+		});
+
+		renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+		await waitFor(() => {
+			expect(screen.getByText('Failed to load this comparison.')).toBeInTheDocument();
+		});
+		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+	});
+
+	it('shows a retry action for the content banner when only the content query fails', async () => {
+		mockRequest.mockImplementation((query: string) => {
+			if (query.includes('ListUsers')) return Promise.resolve({ users: [{ id: '1', username: 'me' }] });
+			if (query.includes('ListPerspectivesByContent')) {
+				return Promise.resolve({
+					perspectives: {
+						items: [
+							{
+								id: 'p1',
+								userID: '1',
+								contentID: '10',
+								quality: 8000,
+								agreement: null,
+								importance: null,
+								confidence: null,
+								like: null,
+								review: 'x',
+								privacy: 'PUBLIC',
+								description: null,
+								primaryPerspectiveID: null,
+								relatedPerspectiveIDs: null,
+								customFields: null,
+								feelings: null,
+								createdAt: '2026-01-01T00:00:00Z',
+								updatedAt: '2026-01-01T00:00:00Z',
+							},
+						],
+					},
+				});
+			}
+			if (query.includes('GetContent')) return Promise.reject(new Error('network error'));
+			if (query.includes('query Me')) return Promise.resolve(meResponse);
+			return Promise.resolve({});
+		});
+
+		renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+		await waitFor(() => {
+			expect(screen.getByText("Couldn't load this content's details.")).toBeInTheDocument();
+		});
+		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+	});
 });

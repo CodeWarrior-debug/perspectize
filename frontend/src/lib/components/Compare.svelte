@@ -180,28 +180,60 @@
 		Where ratings align, conflict, or were filled in differently.
 	</p>
 
-	{#if content}
-		<div class="flex items-center justify-between rounded-lg border border-border px-3.5 py-2.5">
-			<div class="flex items-center gap-2.5">
-				{#if contentVideoId}
-					<img
-						src={`https://i.ytimg.com/vi/${contentVideoId}/default.jpg`}
-						alt=""
-						class="h-8 w-10 flex-none rounded object-cover"
-					/>
-				{/if}
-				<span class="text-[13px] font-medium text-foreground">{content.name}</span>
-			</div>
-			{#if content.length != null && content.lengthUnits != null}
-				<span class="text-[12px] text-muted-foreground">{formatDuration(content.length, content.lengthUnits)}</span>
+	{#snippet contentBannerInner()}
+		<div class="flex items-center gap-2.5">
+			{#if contentVideoId}
+				<img
+					src={`https://i.ytimg.com/vi/${contentVideoId}/default.jpg`}
+					alt=""
+					class="h-8 w-10 flex-none rounded object-cover"
+				/>
 			{/if}
+			<span class="text-[13px] font-medium text-foreground">{content!.name}</span>
+		</div>
+		{#if content!.length != null && content!.lengthUnits != null}
+			<span class="text-[12px] text-muted-foreground">{formatDuration(content!.length, content!.lengthUnits)}</span>
+		{/if}
+	{/snippet}
+
+	{#if content}
+		{#if content.url}
+			<a
+				href={content.url}
+				target="_blank"
+				rel="noopener noreferrer"
+				class="flex items-center justify-between rounded-lg border border-border px-3.5 py-2.5 hover:bg-primary/[0.06]"
+			>
+				{@render contentBannerInner()}
+			</a>
+		{:else}
+			<div class="flex items-center justify-between rounded-lg border border-border px-3.5 py-2.5">
+				{@render contentBannerInner()}
+			</div>
+		{/if}
+	{:else if contentQuery.isError}
+		<div class="flex items-center justify-between gap-3 rounded-lg border border-border px-3.5 py-2.5">
+			<span class="text-[12.5px] text-muted-foreground">Couldn't load this content's details.</span>
+			<Button size="sm" variant="outline" onclick={() => contentQuery.refetch()}>Retry</Button>
 		</div>
 	{/if}
 
 	{#if loading}
 		<div class="py-12 text-center text-muted-foreground">Loading comparison…</div>
 	{:else if usersQuery.isError || perspectivesQuery.isError}
-		<div class="py-12 text-center text-muted-foreground">Failed to load this comparison. Please try again.</div>
+		<div class="flex flex-col items-center gap-3 py-12 text-center text-muted-foreground">
+			<p>Failed to load this comparison.</p>
+			<Button
+				size="sm"
+				variant="outline"
+				onclick={() => {
+					usersQuery.refetch();
+					perspectivesQuery.refetch();
+				}}
+			>
+				Retry
+			</Button>
+		</div>
 	{:else if hasNoPerspectives}
 		<div class="rounded-lg border border-border bg-accent p-6 text-center text-[13.5px] text-muted-foreground">
 			No one has shared a perspective on this content yet.
