@@ -117,7 +117,7 @@ Error handling & DB query patterns: [.docs/GO_PATTERNS.md](../.docs/GO_PATTERNS.
 
 ## CORS
 
-CORS middleware is configured in `cmd/server/main.go` for local development. Currently allows all origins (`*`). Restrict to frontend's production origin before deploying.
+`corsOptions()` in `cmd/server/main.go`; origins come from security config. `AllowedHeaders` must list every custom header the frontend sends (`traceparent`, `tracestate`, `X-Client-Version`, `X-Client-Platform`) or browser preflight rejects the request.
 
 ## Gotchas
 
@@ -132,6 +132,10 @@ CORS middleware is configured in `cmd/server/main.go` for local development. Cur
 **Non-schema model fields:** use `extraFields` under a type in `gqlgen.yml` (e.g. `Content.PrimaryCategoryID`) to carry data (like an FK) onto a generated model for a resolver to use, then `go run github.com/99designs/gqlgen generate`. Populate it in `domainToModel`.
 
 **Directive arg introspection:** `graphql.GetFieldContext(ctx).Args["input"]` is the *typed* input struct (e.g. `model.UpdatePerspectiveInput`), not `map[string]interface{}`. Directive/middleware code that digs a value out of an input object must read the struct (by `json` tag via reflection), not just type-assert to a map — a map-only assertion silently fails for every real request. See `directives/auth.go` `extractResourceID`/`fieldByJSONTag`.
+
+**Metric cardinality:** any metric attribute whose value comes from request input (operation name, client version/platform) must go through `telemetry.BoundedSet` (`pkg/telemetry/bounded.go`).
+
+**GORM tracing is in-house** (`pkg/database/tracing.go`). Don't add `gorm.io/plugin/opentelemetry` — it pulls ClickHouse + MySQL drivers into the binary. SQL spans are named `"<VERB> <table>"` (e.g. `SELECT content`), not `gorm.Query`.
 
 **Cursor pagination:** Opaque base64 (`cursor:<id>`), keyset (not OFFSET), fetch `limit+1` for `hasNextPage`, whitelist sort columns (SQL injection prevention). Helpers in `helpers.go`.
 

@@ -147,6 +147,10 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 
 **Browser verification is local-only.** Driving the running app via the Chrome DevTools MCP (`.docs/VERIFICATION.md` §3) needs `.claude/.env` and `.claude/sv-profile/` — both gitignored and hand-provisioned per machine. Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in; run only the headless checklist (build, backend tests, frontend tests) and hand UI-behavior checks back to a local session.
 
+**CI trigger:** `ci.yml` runs only on PRs and pushes to `main` — pushing a feature branch runs nothing.
+
+**DB-backed tests in cloud sessions:** integration tests (`backend/test/**`, `cmd/server/*_integration_test.go`) skip without `DATABASE_URL`. Don't provision Postgres in cloud sessions (the permission classifier denies creating roles/DBs) — open a PR and let CI's Postgres service run them.
+
 See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow, and [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md) for uploading `sv-` screenshots to a release and linking them in the PR.
 
 **Authenticated self-verify:** `.env*` files (except `.env.example`) are unreadable by design — that's expected, not a broken setup. Logged-in browser verification uses the persistent Chrome profile from `.claude/scripts/sv-chrome.sh`; see [.docs/VERIFICATION.md](.docs/VERIFICATION.md) §0. Never attempt to log in or enter credentials — ask the human to re-run the one-time login if signed out.
@@ -181,6 +185,7 @@ See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow
 
 **Native PreToolUse hooks (`.claude/hooks/*.sh`, wired in `.claude/settings.json`; hookify plugin retired):**
 - **Secret protection:** `deny-env-read.sh` blocks any Bash command that reads a real `.env` file (deny-by-default; `.env.example` / `.env.test` stay readable). Pairs with `permissions.deny` Read rules. Real secret values are entered by humans only — see [.docs/SECURITY.md](.docs/SECURITY.md).
+  - Matches the substring `.env` **anywhere in the Bash command** — including commit messages and heredocs (e.g. `deployment.environment.name`). A block on a non-secret command means reword the text (or use the Edit/Write tools for file edits); don't route around the hook.
 - **Pre-PR:** `require-session-reflection-before-pr.sh` denies `gh pr create` until the `/revise-claude-md` command (from the `claude-md-management` plugin) has been run. It can't detect completion, so use `gh api` to create the PR after running the command. Example: `gh api repos/CodeWarrior-debug/perspectize/pulls -f title="..." -f body="..." -f head="branch" -f base="main"`
   - `/revise-claude-md` (also the Skill entry `claude-md-management:revise-claude-md` once the plugin is loaded). If it won't resolve — Skill says "Unknown skill" and typing it shows nothing — the plugin marketplace cache is stale: run `/reload-plugins` (and `/plugin` to refresh), then retry.
 - **Pre-commit tests:** `require-tests.sh` injects a non-blocking reminder on `git commit` to verify test coverage for new/modified frontend `src/` files. Config, styles, docs, and test files are exempt.
