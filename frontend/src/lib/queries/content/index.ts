@@ -1,9 +1,10 @@
 import { gql } from 'graphql-request';
+import type { LyricsAvailability } from '$lib/utils/lyricsLinks';
 
 export type { ContentFilterInput } from '$lib/utils/gridUrlState';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
-export type ContentType = 'YOUTUBE' | 'CLAIM' | 'BIBLE_PASSAGE';
+export type ContentType = 'YOUTUBE' | 'CLAIM' | 'BIBLE_PASSAGE' | 'YOUTUBE_MUSIC';
 
 export interface ContentItem {
 	id: string;
@@ -53,11 +54,44 @@ export interface ContentSortInput {
 	order: 'ASC' | 'DESC';
 }
 
+export interface CreateContentResult {
+	content: ContentItem;
+	alreadyExisted: boolean;
+}
+
 export interface CreateContentResponse {
-	createContentFromYouTube: {
-		content: ContentItem;
-		alreadyExisted: boolean;
+	createContentFromYouTube: CreateContentResult;
+}
+
+export interface CreateMusicContentResponse {
+	createContentFromYouTubeMusic: CreateContentResult & {
+		content: ContentItem & { relatedMedia: RelatedMedia[] };
 	};
+}
+
+export type RelatedMediaKind = 'audio' | 'official_video' | 'lyric_video' | 'live' | 'other';
+
+// A reference to another upload of the same song. Not a content row unless a
+// user promoted it, in which case contentId is set.
+export interface RelatedMedia {
+	provider: string;
+	videoId: string;
+	kind: RelatedMediaKind | string;
+	title: string | null;
+	contentId: string | null;
+	unavailable: boolean;
+}
+
+export type { LyricsAvailability };
+
+// The details-modal view of a YOUTUBE_MUSIC row. `response` carries artist/album.
+export interface MusicTrack {
+	id: string;
+	name: string;
+	url: string | null;
+	relatedMedia: RelatedMedia[];
+	lyrics: LyricsAvailability | null;
+	response: { artist?: string; album?: string; videoId?: string; coverImageUrl?: string } | null;
 }
 
 export interface UpdateContentSourceDataResponse {
@@ -196,6 +230,96 @@ export const CREATE_CONTENT_FROM_YOUTUBE = gql`
 				updatedAt
 			}
 			alreadyExisted
+		}
+	}
+`;
+
+export const CREATE_CONTENT_FROM_YOUTUBE_MUSIC = gql`
+	mutation CreateContentFromYouTubeMusic($input: CreateContentFromYouTubeInput!) {
+		createContentFromYouTubeMusic(input: $input) {
+			content {
+				id
+				name
+				url
+				contentType
+				length
+				lengthUnits
+				viewCount
+				likeCount
+				channelTitle
+				publishedAt
+				tags
+				description
+				primaryCategory {
+					id
+					wikidataQid
+					label
+					description
+					entityType
+				}
+				relatedMedia {
+					videoId
+					kind
+					contentId
+				}
+				createdAt
+				updatedAt
+			}
+			alreadyExisted
+		}
+	}
+`;
+
+const MUSIC_TRACK_FIELDS = `
+	id
+	name
+	url
+	response
+	relatedMedia {
+		provider
+		videoId
+		kind
+		title
+		contentId
+		unavailable
+	}
+	lyrics {
+		available
+		lrclibId
+		hasSynced
+		checkedAt
+	}
+`;
+
+export const GET_MUSIC_TRACK = gql`
+	query GetMusicTrack($id: ID!) {
+		contentByID(id: $id) {
+			${MUSIC_TRACK_FIELDS}
+		}
+	}
+`;
+
+export const REFRESH_LYRICS_AVAILABILITY = gql`
+	mutation RefreshLyricsAvailability($contentId: IntID!) {
+		refreshLyricsAvailability(contentId: $contentId) {
+			${MUSIC_TRACK_FIELDS}
+		}
+	}
+`;
+
+export const MARK_RELATED_MEDIA_UNAVAILABLE = gql`
+	mutation MarkRelatedMediaUnavailable($contentId: IntID!, $videoId: String!) {
+		markRelatedMediaUnavailable(contentId: $contentId, videoId: $videoId) {
+			${MUSIC_TRACK_FIELDS}
+		}
+	}
+`;
+
+export const PROMOTE_RELATED_MEDIA = gql`
+	mutation PromoteRelatedMedia($contentId: IntID!, $videoId: String!) {
+		promoteRelatedMedia(contentId: $contentId, videoId: $videoId) {
+			id
+			name
 		}
 	}
 `;

@@ -25,6 +25,8 @@ export const queryKeys = {
 		// share a cache key, or whichever query populates the cache first wins
 		// for the shared staleTime window and the other reads wrong fields.
 		banner: (id: string) => [...queryKeys.content.details(), 'banner', id] as const,
+		// YOUTUBE_MUSIC details (related media + lyrics availability); separate key for the same reason.
+		music: (id: string) => [...queryKeys.content.details(), 'music', id] as const,
 	},
 
 	bible: {
