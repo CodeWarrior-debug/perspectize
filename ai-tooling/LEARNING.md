@@ -9,11 +9,11 @@ Confidence: `new` (introduced, not quizzed) → `shaky` → `solid`.
 | CLI vs MCP: who each serves, context-token cost, shell requirement | 2026-09-26 | — | new | |
 | In-app assistant = direct API tool use (no CLI/MCP needed) | 2026-09-26 | 2026-09-26 | shaky | Got in-process service access; missed that CLI/MCP bridge *external* agents and the model-requests/backend-executes handshake |
 | Tool = name + description + JSON Schema + handler (shared by API tool use and MCP) | 2026-09-26 | — | new | |
-| Agent loop: model → tool calls → tool results → repeat | 2026-09-26 | 2026-09-26 | shaky | Asked for the answer (calls = tool rounds + 1; parallel calls share a round; each call resends history). Re-quiz soon |
+| Agent loop: model → tool calls → tool results → repeat | 2026-09-26 | 2026-09-27 | solid | 09-27: calls = rounds + 1 and parallel calls share a round, both unprompted. Missed that the final call resends everything (see stateless row) |
 | Provider port/adapter; normalizing tool-call + stream formats | 2026-09-26 | 2026-09-26 | solid | Named the OpenRouter/DeepSeek switch. Added: test fakes + SDK upgrades as sooner pain points |
 | In-process vs over-HTTP clients | 2026-09-26 | — | new | Go `internal/` rule forced HTTP for `botler` |
 | Latency: tool round-trips + model time dominate, not network hops | 2026-09-26 | — | new | |
-| Stateless API: tools + system + history resent every call → tool bloat compounds; progressive tool discovery | 2026-09-26 | 2026-09-26 | shaky | Knew the goal (avoid bloat); "stateless" reason was explained, not answered |
+| Stateless API: tools + system + history resent every call → tool bloat compounds; progressive tool discovery | 2026-09-26 | 2026-09-27 | shaky | 09-27: first said the last call sends only the tool result ("it already has the prompt"); after the lesson answered cost questions correctly. Re-check unprompted next session |
 | Evals: deterministic vs model-graded, fixtures, multiple runs per case | 2026-09-26 | — | new | |
 | Streaming transport: GraphQL subscription vs SSE | 2026-09-26 | — | new | |
 | Closed loop: independent verifier + objective completion condition + failure feedback path + round cap | 2026-09-26 | 2026-09-26 | solid | Named verifier + completion condition; added feedback path, ground-truth checks, escalation cap. Follow-up: conflated open loop (no feedback) with non-terminating loop (feedback, no exit) — re-check |
@@ -21,6 +21,7 @@ Confidence: `new` (introduced, not quizzed) → `shaky` → `solid`.
 | Guide format: concise plain English + scoped loading beats caveman compression | 2026-09-26 | — | new | Measurable later via evals A/B |
 | go:embed is directory-scoped (no `..`); Go `internal/` is subtree-private, one-way deps backend → ai-tooling | 2026-09-26 | 2026-09-26 | shaky | Asked for the answer; C# `internal` analogy given. Re-quiz |
 | Tracer bullets: thin real end-to-end slice first, then widen (≠ prototype, ≠ spike) | 2026-09-26 | — | new | Owner proposed it; applied as Tracer 1 (guide→loop→botler→eval) + Tracer 2 (backend→subscription→sidebar) |
+| Prompt caching: byte-identical prefix, why timestamps / map order / tool order break it silently | 2026-09-27 | 2026-09-27 | solid | All 3 right. Added: extra tools also hurt tool-choice accuracy; cache breaks show only in cost and latency, hence the byte-stability test |
 | WebMCP (in-page browser tools) vs remote MCP server (HTTP + OAuth) | 2026-09-27 | 2026-09-27 | solid | Correct: page tools reuse the frontend's Clerk session. Added: they run on our origin, so the agent never holds a credential; OAuth is for apps *outside* our origin needing delegated access. Follow-up: the agent acts with the user's full rights, so writes still need our confirm UI |
 
 ## Pending (owner asked Claude to keep building without waiting — run these when the owner is back)
