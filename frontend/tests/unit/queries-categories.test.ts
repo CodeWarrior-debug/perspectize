@@ -42,6 +42,7 @@ describe('Category GraphQL query definitions', () => {
 				label: 'human',
 				description: 'common name of Homo sapiens',
 				entityType: 'item',
+				wikipediaUrl: 'https://en.wikipedia.org/wiki/Human',
 				createdAt: '2026-01-01T12:00:00Z',
 				updatedAt: '2026-01-01T12:00:00Z',
 			};
@@ -71,6 +72,7 @@ describe('Category GraphQL query definitions', () => {
 						label: 'human',
 						description: 'common name of Homo sapiens',
 						entityType: 'item',
+						wikipediaUrl: 'https://en.wikipedia.org/wiki/Human',
 					},
 					createdAt: '2024-01-01',
 					updatedAt: '2024-01-01',

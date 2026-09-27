@@ -30,6 +30,19 @@ Full structure: [.docs/ARCHITECTURE.md](../.docs/ARCHITECTURE.md)
 
 Domain layer rules: [.docs/DOMAIN_GUIDE.md](../.docs/DOMAIN_GUIDE.md)
 
+### Deep Modules
+
+Small interface, lots of work hidden behind it (Ousterhout). Test: *how little must a caller know vs. how much does it handle?*
+
+**Not the same as hexagonal — they stack.** Hexagonal decides *which way dependencies point* (core never imports adapters). Deep modules decides *whether each boundary is worth having*. Code can be perfectly hexagonal yet shallow: a port that mirrors every SQL query 1:1, or a service method that only calls the repo. Hexagonal draws the walls; deep modules makes each door earn its place.
+
+- **One file per domain** — `adapters/graphql/{content,perspective,user,category,messaging}.resolvers.go`. When `make graphql-gen` drops new stubs into `schema.resolvers.go`, move them to the matching domain file.
+- **Callers see ports, not structs** — services depend on `core/ports` interfaces; never reach into a repository's SQL helpers.
+- **Pull mapping down** — GraphQL model ↔ domain conversion lives once in `adapters/graphql/helpers.go` (e.g. `modelToCreatePerspectiveInput`), not inline in each resolver.
+- **No pass-through methods** — a service method that only forwards to the repo with no rule/validation is a smell; give it responsibility or call the port directly.
+
+Refs: Ousterhout, *A Philosophy of Software Design*; Matt Pocock, [How To Make Codebases AI Agents Love](https://www.aihero.dev/how-to-make-codebases-ai-agents-love) (why deep modules help agents navigate). Origin: PR #339.
+
 ## Stack
 
 Go 1.25+ (pinned via `toolchain` in go.mod + Dockerfile) · gqlgen (schema-first) · PostgreSQL 17 (GORM + pgx/v5) · golang-migrate · go-playground/validator · testify · log/slog · godotenv

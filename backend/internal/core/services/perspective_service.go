@@ -330,3 +330,32 @@ func (s *PerspectiveService) AggregateByContentIDs(ctx context.Context, contentI
 	}
 	return aggregates, nil
 }
+
+// FeelingStats computes feeling count/average/stddev intensity — see
+// domain.FeelingStats and the repository's FeelingStats doc comment. A thin
+// passthrough with input validation; no auth restriction needed since this
+// never exposes any individual perspective's content, only an aggregate.
+func (s *PerspectiveService) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+	if emoji == "" {
+		return nil, fmt.Errorf("%w: emoji is required", domain.ErrInvalidInput)
+	}
+	stats, err := s.repo.FeelingStats(ctx, contentID, emoji, label)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute feeling stats: %w", err)
+	}
+	return stats, nil
+}
+
+// CustomFieldStats computes how many perspectives set the given
+// CustomFields key — see domain.CustomFieldStats and the repository's
+// CustomFieldStats doc comment.
+func (s *PerspectiveService) CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+	if key == "" {
+		return nil, fmt.Errorf("%w: key is required", domain.ErrInvalidInput)
+	}
+	stats, err := s.repo.CustomFieldStats(ctx, contentID, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute custom field stats: %w", err)
+	}
+	return stats, nil
+}

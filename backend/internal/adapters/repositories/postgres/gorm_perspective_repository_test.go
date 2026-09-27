@@ -397,3 +397,80 @@ func TestGormPerspectiveRepository_AggregateByContentIDs(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 }
+
+func TestGormPerspectiveRepository_FeelingStats(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("matches by emoji and label, forces stddev nil at count 1", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		avg := 8500.0
+		rows := sqlmock.NewRows([]string{"count", "avg_intensity", "stddev_intensity"}).
+			AddRow(1, avg, 0.0)
+		mock.ExpectQuery(`(?s)SELECT.*COUNT\(DISTINCT p\.id\) AS count.*FROM perspectives p.*CROSS JOIN LATERAL unnest\(p\.feelings\) AS f.*WHERE f->>'emoji' = \$1.*AND lower\(f->>'label'\) = lower\(\$2\).*AND p\.content_id = \$3`).
+			WithArgs("🥰", "Love", 11).
+			WillReturnRows(rows)
+
+		countRows := sqlmock.NewRows([]string{"count"}).AddRow(4)
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "perspectives" WHERE content_id = \$1`).
+			WithArgs(11).
+			WillReturnRows(countRows)
+
+		label := "Love"
+		contentID := 11
+		got, err := NewGormPerspectiveRepository(db).FeelingStats(ctx, &contentID, "🥰", &label)
+		require.NoError(t, err)
+		assert.Equal(t, 1, got.Count)
+		assert.Equal(t, 4, got.TotalPerspectives)
+		require.NotNil(t, got.AverageIntensity)
+		assert.Equal(t, avg, *got.AverageIntensity)
+		assert.Nil(t, got.StdDevIntensity) // forced nil at count == 1, not the DB's 0
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("no content scope omits the content_id filter and label", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		avg, stddev := 6000.0, 1500.0
+		rows := sqlmock.NewRows([]string{"count", "avg_intensity", "stddev_intensity"}).
+			AddRow(5, avg, stddev)
+		mock.ExpectQuery(`(?s)SELECT.*FROM perspectives p.*WHERE f->>'emoji' = \$1$`).
+			WithArgs("🤬").
+			WillReturnRows(rows)
+
+		countRows := sqlmock.NewRows([]string{"count"}).AddRow(20)
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "perspectives"$`).
+			WillReturnRows(countRows)
+
+		got, err := NewGormPerspectiveRepository(db).FeelingStats(ctx, nil, "🤬", nil)
+		require.NoError(t, err)
+		assert.Equal(t, 5, got.Count)
+		assert.Equal(t, 20, got.TotalPerspectives)
+		assert.Equal(t, &stddev, got.StdDevIntensity)
+		require.NotNil(t, got.PercentOfPerspectives())
+		assert.Equal(t, 25.0, *got.PercentOfPerspectives())
+		assertAllExpectationsMet(t, mock)
+	})
+}
+
+func TestGormPerspectiveRepository_CustomFieldStats(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("uses jsonb_exists, not the bare ? operator (avoids GORM Raw placeholder collision)", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		rows := sqlmock.NewRows([]string{"count"}).AddRow(2)
+		mock.ExpectQuery(`(?s)SELECT COUNT\(\*\) AS count.*FROM perspectives p.*WHERE jsonb_exists\(p\.custom_fields, \$1\).*AND p\.content_id = \$2`).
+			WithArgs("mood", 11).
+			WillReturnRows(rows)
+
+		countRows := sqlmock.NewRows([]string{"count"}).AddRow(4)
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "perspectives" WHERE content_id = \$1`).
+			WithArgs(11).
+			WillReturnRows(countRows)
+
+		contentID := 11
+		got, err := NewGormPerspectiveRepository(db).CustomFieldStats(ctx, &contentID, "mood")
+		require.NoError(t, err)
+		assert.Equal(t, 2, got.Count)
+		assert.Equal(t, 4, got.TotalPerspectives)
+		assertAllExpectationsMet(t, mock)
+	})
+}

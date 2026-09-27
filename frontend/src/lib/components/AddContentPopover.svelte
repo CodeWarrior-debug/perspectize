@@ -8,8 +8,11 @@
 	import { detectContentType } from '$lib/utils/detectContentType';
 	import type { PassageRange } from '$lib/utils/bible';
 	import { defaultRange, isRangeInBounds, isRangeOrdered } from '$lib/utils/passageRange';
+	import { untrack } from 'svelte';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ClipboardPasteIcon from '@lucide/svelte/icons/clipboard-paste';
+	import EraserIcon from '@lucide/svelte/icons/eraser';
+	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 
 	type ChosenType = 'YOUTUBE' | 'BIBLE_PASSAGE';
 
@@ -26,6 +29,9 @@
 	let manualType = $state<ChosenType | null>(null);
 	// User's edits in the picker; wins over the range parsed from the input.
 	let rangeOverride = $state<PassageRange | null>(null);
+	// Bumped to remount PassagePicker, wiping its internal "has the user touched
+	// an end field" tracking along with the visible fields it's keyed on.
+	let pickerResetToken = $state(0);
 
 	$effect(() => {
 		if (open) {
@@ -33,6 +39,10 @@
 			error = '';
 			manualType = null;
 			rangeOverride = null;
+			// Read the prior value via untrack so this effect doesn't depend on the
+			// state it writes — otherwise the write re-triggers the effect forever
+			// (effect_update_depth_exceeded).
+			pickerResetToken = untrack(() => pickerResetToken) + 1;
 		}
 	});
 
@@ -71,6 +81,30 @@
 	function resetOverrides() {
 		manualType = null;
 		rangeOverride = null;
+		error = '';
+	}
+
+	// "All" — back to the just-opened state: no type, no text, no picker edits.
+	function clearAll() {
+		input = '';
+		resetOverrides();
+		pickerResetToken++;
+	}
+
+	// "Type" — clear only the fields the current type actually uses, keeping the
+	// chosen type itself so the user doesn't lose their place (e.g. re-typing a
+	// passage reference after a typo shouldn't require re-selecting the type).
+	function clearType() {
+		if (effectiveType === 'YOUTUBE' || effectiveType === 'BIBLE_PASSAGE') {
+			// Clearing the text would otherwise make autodetection fall back to "no
+			// type" — pin the type explicitly so the user stays on the same type.
+			manualType = effectiveType;
+			input = '';
+		}
+		if (effectiveType === 'BIBLE_PASSAGE') {
+			rangeOverride = defaultRange(1);
+			pickerResetToken++;
+		}
 		error = '';
 	}
 
@@ -165,6 +199,30 @@
 					<option value="YOUTUBE">YouTube</option>
 					<option value="BIBLE_PASSAGE">Bible passage</option>
 				</select>
+				<div class="ml-auto flex items-center gap-1">
+					<button
+						type="button"
+						onclick={clearType}
+						disabled={isPending || (effectiveType !== 'YOUTUBE' && effectiveType !== 'BIBLE_PASSAGE')}
+						aria-label="Clear type"
+						title="Clear this type's fields"
+						class="text-muted-foreground hover:text-foreground flex items-center gap-1 rounded-md px-1.5 py-1 transition-colors disabled:pointer-events-none disabled:opacity-40"
+					>
+						<RotateCcwIcon class="size-3.5" />
+						Type
+					</button>
+					<button
+						type="button"
+						onclick={clearAll}
+						disabled={isPending || (!input && !manualType && !rangeOverride)}
+						aria-label="Clear all"
+						title="Clear everything"
+						class="text-muted-foreground hover:text-foreground flex items-center gap-1 rounded-md px-1.5 py-1 transition-colors disabled:pointer-events-none disabled:opacity-40"
+					>
+						<EraserIcon class="size-3.5" />
+						All
+					</button>
+				</div>
 			</div>
 
 			{#if effectiveType === 'CLAIM'}
@@ -172,7 +230,9 @@
 			{/if}
 
 			{#if effectiveType === 'BIBLE_PASSAGE'}
-				<PassagePicker {range} onchange={(r) => (rangeOverride = r)} disabled={isPending} />
+				{#key pickerResetToken}
+					<PassagePicker {range} onchange={(r) => (rangeOverride = r)} disabled={isPending} />
+				{/key}
 			{/if}
 		</div>
 	{/snippet}
