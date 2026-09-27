@@ -152,8 +152,32 @@ type Content {
   # less than perspectiveCount since Quality is optional. Meant for a tooltip
   # on the average rating display ("N quality ratings").
   qualityRatingCount: Int
+  # YOUTUBE_MUSIC: other uploads of the same song. References only; they are not
+  # content rows unless a user promotes one (contentId is then set). Empty otherwise.
+  relatedMedia: [RelatedMedia!]!
+  # YOUTUBE_MUSIC: whether LRCLIB has lyrics. Lyrics text is never stored or served.
+  # Null until the first check has run.
+  lyrics: LyricsAvailability
   createdAt: String!
   updatedAt: String!
+}
+
+type RelatedMedia {
+  provider: String!
+  videoId: String!
+  # audio | official_video | lyric_video | live | other
+  kind: String!
+  title: String
+  contentId: ID
+  unavailable: Boolean!
+}
+
+type LyricsAvailability {
+  available: Boolean!
+  # LRCLIB track id; the lyrics page is https://lrclib.net/tracks/<lrclibId>
+  lrclibId: Int
+  hasSynced: Boolean!
+  checkedAt: String!
 }
 
 # Pagination types
@@ -198,6 +222,7 @@ enum ContentType {
   YOUTUBE
   CLAIM
   BIBLE_PASSAGE
+  YOUTUBE_MUSIC
 }
 
 # Text columns that ContentFilter.search can be scoped to.
@@ -415,6 +440,15 @@ input CreateClaimInput {
 type Mutation {
   createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   updateContentSourceData(contentId: IntID!): Content! @auth
+
+  # YouTube Music mutations
+  createContentFromYouTubeMusic(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
+  # Explicit user action: make a related video its own YOUTUBE item. Returns that item.
+  promoteRelatedMedia(contentId: IntID!, videoId: String!): Content! @auth
+  # Called by the player when a related video cannot be embedded. Returns the track.
+  markRelatedMediaUnavailable(contentId: IntID!, videoId: String!): Content! @auth
+  # Re-checks lyrics availability only when the stored result is due. Returns the track.
+  refreshLyricsAvailability(contentId: IntID!): Content! @auth
 
   # Bible passage mutations
   createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth

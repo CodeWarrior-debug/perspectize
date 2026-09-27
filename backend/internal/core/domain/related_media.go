@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+)
 
 // RelatedMediaKind classifies an upload related to a content item.
 type RelatedMediaKind string
@@ -79,4 +83,32 @@ func (l *LyricsAvailability) NeedsRecheck(now time.Time) bool {
 		return true
 	}
 	return !l.Available && now.Sub(l.CheckedAt) > LyricsRecheckAfter
+}
+
+// ReadRelatedMedia reads the relatedMedia key of a content response.
+func ReadRelatedMedia(response json.RawMessage) ([]RelatedMedia, error) {
+	if len(response) == 0 {
+		return nil, nil
+	}
+	var holder struct {
+		RelatedMedia []RelatedMedia `json:"relatedMedia"`
+	}
+	if err := json.Unmarshal(response, &holder); err != nil {
+		return nil, fmt.Errorf("failed to read related media: %w", err)
+	}
+	return holder.RelatedMedia, nil
+}
+
+// ReadLyricsAvailability reads the lyrics key of a content response; nil if never checked.
+func ReadLyricsAvailability(response json.RawMessage) *LyricsAvailability {
+	if len(response) == 0 {
+		return nil
+	}
+	var holder struct {
+		Lyrics *LyricsAvailability `json:"lyrics"`
+	}
+	if err := json.Unmarshal(response, &holder); err != nil {
+		return nil
+	}
+	return holder.Lyrics
 }

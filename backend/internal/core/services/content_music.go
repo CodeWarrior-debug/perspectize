@@ -230,16 +230,7 @@ func (s *ContentService) linkExistingVideos(ctx context.Context, refs []domain.R
 }
 
 func readRelatedMedia(c *domain.Content) ([]domain.RelatedMedia, error) {
-	var holder struct {
-		RelatedMedia []domain.RelatedMedia `json:"relatedMedia"`
-	}
-	if len(c.Response) == 0 {
-		return nil, nil
-	}
-	if err := json.Unmarshal(c.Response, &holder); err != nil {
-		return nil, fmt.Errorf("failed to read related media: %w", err)
-	}
-	return holder.RelatedMedia, nil
+	return domain.ReadRelatedMedia(c.Response)
 }
 
 func (s *ContentService) writeRelatedMedia(ctx context.Context, contentID int, refs []domain.RelatedMedia) error {
@@ -328,13 +319,6 @@ func (s *ContentService) MarkRelatedMediaUnavailable(ctx context.Context, conten
 	return s.writeRelatedMedia(ctx, contentID, refs)
 }
 
-// musicSummary reads the fields a lyrics check needs from a music row.
-type musicSummary struct {
-	Artist  string                     `json:"artist"`
-	Artists []string                   `json:"artists"`
-	Lyrics  *domain.LyricsAvailability `json:"lyrics"`
-}
-
 func readMusicSummary(c *domain.Content) musicSummary {
 	var m musicSummary
 	if len(c.Response) > 0 {
@@ -343,18 +327,10 @@ func readMusicSummary(c *domain.Content) musicSummary {
 	return m
 }
 
-// LyricsAvailabilityOf returns the stored lyrics result for a music row, or nil if unchecked.
-func LyricsAvailabilityOf(c *domain.Content) *domain.LyricsAvailability {
-	return readMusicSummary(c).Lyrics
-}
-
-// RelatedMediaOf returns a row's related media; empty on unreadable data.
-func RelatedMediaOf(c *domain.Content) []domain.RelatedMedia {
-	refs, err := readRelatedMedia(c)
-	if err != nil {
-		return nil
-	}
-	return refs
+type musicSummary struct {
+	Artist  string                     `json:"artist"`
+	Artists []string                   `json:"artists"`
+	Lyrics  *domain.LyricsAvailability `json:"lyrics"`
 }
 
 // CheckLyrics looks up lyrics availability and stores only the result. Unless force is
