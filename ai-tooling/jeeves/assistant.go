@@ -60,19 +60,10 @@ func New(cfg Config) (*Assistant, error) {
 	return a, nil
 }
 
-// toolsFor builds the tool set for one viewer. Registration order is fixed
-// (read_guide first) so the tool list stays byte-stable for prompt caching.
+// ToolsFor builds the tool set for one viewer (botler's --as uses it
+// directly; AskAs uses it per question).
 func (a *Assistant) ToolsFor(v Viewer) (*agent.Registry, error) {
-	r := agent.NewRegistry()
-	if err := r.Register(ReadGuideTool(a.areas)); err != nil {
-		return nil, err
-	}
-	if a.data != nil {
-		if err := r.Register(ListPerspectivesTool(a.data, v)); err != nil {
-			return nil, err
-		}
-	}
-	return r, nil
+	return Tools(a.areas, a.data, v)
 }
 
 // System returns the system prompt (for inspection and tests).
