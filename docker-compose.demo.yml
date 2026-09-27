@@ -1,0 +1,82 @@
+# Perspectize demo stack — persistent Postgres, seeded demo personas, the
+# production backend image in DEMO_MODE, and a demo-mode frontend build.
+#
+#   make demo-up      build + start (http://localhost:4173), seed if missing
+#   make demo-reset   restore demo-persona data to the pristine seed
+#   make demo-test    reset, then run the Playwright tours/flows as E2E tests
+#   make demo-record  reset, then record the tours as videos
+#   make demo-down    stop (data kept in the demo_pgdata volume)
+#   make demo-wipe    stop and delete the volume
+#
+# Nothing here talks to Clerk, YouTube or the shared Sevalla database:
+# demo tokens are unsigned and YouTube metadata comes from offline fixtures.
+# The backend refuses DEMO_MODE with APP_ENV=production — never deploy this
+# stack publicly with real user data in it.
+name: perspectize-demo
+
+x-database-url: &database-url postgres://demo:demo@postgres:5432/perspectize_demo?sslmode=disable
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: perspectize_demo
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - demo_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d perspectize_demo"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    image: migrate/migrate:v4.18.3
+    command: ["-path", "/migrations", "-database", *database-url, "up"]
+    volumes:
+      - ./backend/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.demo
+    environment:
+      DATABASE_URL: *database-url
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: *database-url
+      APP_ENV: development
+      DEMO_MODE: "true"
+      CORS_ORIGINS: http://localhost:4173
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.demo
+      args:
+        VITE_GRAPHQL_URL: http://localhost:8081/graphql
+    ports:
+      - "127.0.0.1:4173:80"
+    depends_on:
+      - backend
+
+volumes:
+  demo_pgdata:
