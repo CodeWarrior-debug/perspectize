@@ -202,8 +202,11 @@ func TestDisabled(t *testing.T) {
 }
 
 func TestNewJeeves_BuildsWithoutNetwork(t *testing.T) {
-	s, err := NewJeeves("claude-opus-5", allowAll{}, nil)
+	s, err := NewJeeves(JeevesConfig{Model: "claude-opus-5", Limiter: allowAll{}, MaxRounds: 4})
 	require.NoError(t, err)
 	assert.NotNil(t, s)
 	assert.Equal(t, "claude-opus-5", s.model)
+
+	_, err = NewJeeves(JeevesConfig{Model: "claude-opus-5", Limiter: allowAll{}, MaxRounds: 99})
+	assert.Error(t, err, "an out-of-range cap fails at startup")
 }

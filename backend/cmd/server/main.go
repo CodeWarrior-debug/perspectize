@@ -213,9 +213,12 @@ func main() {
 		if os.Getenv("ANTHROPIC_API_KEY") == "" {
 			slog.Warn("JEEVES_ENABLED is true but ANTHROPIC_API_KEY is empty; assistant replies will fail")
 		}
-		assistantSvc, err := assistant.NewJeeves(cfg.Assistant.Model,
-			services.NewSlidingWindowLimiter(assistant.DefaultRateLimit, assistant.DefaultRateWindow),
-			assistant.NewPerspectiveData(perspectiveService, contentService))
+		assistantSvc, err := assistant.NewJeeves(assistant.JeevesConfig{
+			Model:     cfg.Assistant.Model,
+			MaxRounds: cfg.Assistant.MaxRounds,
+			Limiter:   services.NewSlidingWindowLimiter(assistant.DefaultRateLimit, assistant.DefaultRateWindow),
+			Data:      assistant.NewPerspectiveData(perspectiveService, contentService),
+		})
 		if err != nil {
 			log.Fatalf("Failed to initialize assistant: %v", err)
 		}

@@ -48,6 +48,8 @@ Every ai-tooling spec and plan builds teaching in; it isn't bolted on afterwards
 - **Tracer 5 code-complete (WebMCP):** the page registers Jeeves's read-only tools with the browser's own agent (`document.modelContext.registerTool`). Calls run on the backend through `jeeves.Tools` as the signed-in user (`runAssistantTool`), behind `WEBMCP_ENABLED` and `VITE_WEBMCP`. No model or API key is involved: the browser's agent is the model.
 - **Share the registry, not the code:** every surface (in-app loop, botler, WebMCP) builds tools with `jeeves.Tools`, and external surfaces expose only `jeeves.ReadOnlyTools`. One schema check, one privacy path, one place to add a tool.
 - **Tool results are an output channel:** anything in a tool error reaches a model (ours, or the user's browser agent), so tools return plain messages and log details.
+- **Tracer 6 code-complete (round cap):** the cap comes from config (`jeeves.Config.MaxRounds`, `ASSISTANT_MAX_ROUNDS`, `botler --max-rounds`, range 0..20). Hitting it runs a wrap-up turn with `tool_choice: none` instead of failing (`Result.CapReached`). Eval reports show `MAX CALLS` and cap hits, so the default of 6 can be re-set from the live baseline.
+- **Refusing a tool still needs a result:** when the loop won't run a requested tool, it answers that `tool_use` with an error `tool_result`, or the next request is rejected.
 - **Deferred:** server-side refusal fallbacks (they need the beta Messages API throughout the adapter); refusals surface as `llm.StopRefusal` for now.
 
 ## Locked decisions (from design discussion, 2026-09-26)

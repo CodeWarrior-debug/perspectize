@@ -13,7 +13,7 @@ import (
 // run against config file values only. t.Setenv restores originals on cleanup.
 func clearConfigEnvVars(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"DATABASE_URL", "DATABASE_PASSWORD", "YOUTUBE_API_KEY", "YOUTUBE_API_CACHE_TTL_SECONDS", "MESSAGE_RETENTION_MAX", "MESSAGE_RETENTION_SWEEP_MINUTES", "JEEVES_ENABLED", "ASSISTANT_MODEL", "WEBMCP_ENABLED"} {
+	for _, key := range []string{"DATABASE_URL", "DATABASE_PASSWORD", "YOUTUBE_API_KEY", "YOUTUBE_API_CACHE_TTL_SECONDS", "MESSAGE_RETENTION_MAX", "MESSAGE_RETENTION_SWEEP_MINUTES", "JEEVES_ENABLED", "ASSISTANT_MODEL", "WEBMCP_ENABLED", "ASSISTANT_MAX_ROUNDS"} {
 		t.Setenv(key, "")
 	}
 }
@@ -237,4 +237,14 @@ func TestLoad_Assistant(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, cfg.Assistant.WebMCP)
 	assert.False(t, cfg.Assistant.Enabled, "WebMCP is independent of JEEVES_ENABLED")
+
+	assert.Equal(t, 0, cfg.Assistant.MaxRounds, "0 means the ai-tooling default")
+	t.Setenv("ASSISTANT_MAX_ROUNDS", "4")
+	cfg, err = config.Load("nonexistent.json")
+	assert.NoError(t, err)
+	assert.Equal(t, 4, cfg.Assistant.MaxRounds)
+
+	t.Setenv("ASSISTANT_MAX_ROUNDS", "six")
+	_, err = config.Load("nonexistent.json")
+	assert.Error(t, err, "a non-number fails at startup instead of being ignored")
 }

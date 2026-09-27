@@ -110,3 +110,34 @@ func TestCases_FromLoad(t *testing.T) {
 	require.Len(t, only, 2)
 	assert.Equal(t, "compare", only[0].Area)
 }
+
+// scriptedAsker returns canned results in order.
+type scriptedAsker struct {
+	results []agent.Result
+	n       int
+}
+
+func (s *scriptedAsker) Ask(context.Context, string, func(llm.Event)) (agent.Result, error) {
+	r := s.results[s.n]
+	s.n++
+	return r, nil
+}
+
+func TestRun_ReportsMaxCallsAndCapReached(t *testing.T) {
+	answer := func(calls int, capped bool) agent.Result {
+		m := llm.Message{Role: llm.RoleAssistant, Parts: []llm.Part{llm.TextPart("[compare.pick-two]")}}
+		return agent.Result{Final: m, Calls: calls, CapReached: capped}
+	}
+	a := &scriptedAsker{results: []agent.Result{answer(2, false), answer(8, true), answer(3, false)}}
+	cases := []Case{{Area: "compare", Seed: appguide.Seed{Question: "q", ExpectIDs: []string{"compare.pick-two"}}}}
+
+	rep := Run(context.Background(), a, "m", cases, 3, known)
+	assert.Equal(t, 8, rep.MaxCalls)
+	assert.Equal(t, 1, rep.CapReached)
+	assert.Equal(t, 8, rep.Seeds[0].MaxCalls)
+	assert.True(t, rep.Seeds[0].Runs[1].CapReached)
+
+	merged := Merge("m", rep, Report{Seeds: []SeedReport{{Runs: []RunResult{{Calls: 9, CapReached: true}}}}})
+	assert.Equal(t, 9, merged.MaxCalls)
+	assert.Equal(t, 2, merged.CapReached)
+}

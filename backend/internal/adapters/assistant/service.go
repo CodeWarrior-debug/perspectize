@@ -169,7 +169,7 @@ func (s *Service) run(ctx context.Context, userID int, message string, out chan<
 	// Log usage even when the client has gone (Stop): the tokens were spent.
 	logCtx := context.WithoutCancel(ctx)
 	attrs := []any{
-		"user_id", userID, "model", s.model, "stop", res.Stop, "model_calls", res.Calls,
+		"user_id", userID, "model", s.model, "stop", res.Stop, "model_calls", res.Calls, "cap_reached", res.CapReached,
 		"input_tokens", res.Usage.InputTokens, "output_tokens", res.Usage.OutputTokens,
 		"cache_read_tokens", res.Usage.CacheReadTokens, "latency_ms", time.Since(start).Milliseconds(),
 	}
@@ -200,18 +200,28 @@ const (
 	DefaultRateWindow = time.Hour
 )
 
+// JeevesConfig configures the production service.
+type JeevesConfig struct {
+	Model     string
+	MaxRounds int // 0 = ai-tooling default; jeeves.New rejects values outside 0..20
+	Limiter   Limiter
+	Data      jeeves.PerspectizeData // read-only data tools; nil = guide only
+}
+
 // NewJeeves builds the production service: Jeeves over the embedded app
-// guide and the given read-only data source, backed by the Anthropic
-// provider (which reads ANTHROPIC_API_KEY from the environment), with the
-// given per-user limiter.
-func NewJeeves(model string, limiter Limiter, data jeeves.PerspectizeData) (*Service, error) {
+// guide and the configured data source, backed by the Anthropic provider
+// (which reads ANTHROPIC_API_KEY from the environment), with the given
+// per-user limiter.
+func NewJeeves(cfg JeevesConfig) (*Service, error) {
 	areas, _, err := appguide.Load()
 	if err != nil {
 		return nil, fmt.Errorf("assistant: load app guide: %w", err)
 	}
-	j, err := jeeves.New(jeeves.Config{Provider: anthropic.New(), Model: model, Areas: areas, Data: data})
+	j, err := jeeves.New(jeeves.Config{
+		Provider: anthropic.New(), Model: cfg.Model, Areas: areas, Data: cfg.Data, MaxRounds: cfg.MaxRounds,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("assistant: %w", err)
 	}
-	return New(j, WithLimiter(limiter), WithModel(model)), nil
+	return New(j, WithLimiter(cfg.Limiter), WithModel(cfg.Model)), nil
 }

@@ -118,6 +118,25 @@ func TestStream_ToolTurn(t *testing.T) {
 	assert.Equal(t, []any{"area"}, schema["required"])
 }
 
+func TestStream_ToolChoiceNone(t *testing.T) {
+	p, got := server(t, toolTurn, toolTurn)
+	req := llm.Request{
+		Model: "m", MaxTokens: 10,
+		Tools:    []llm.ToolSpec{{Name: "read_guide", Description: "guide", InputSchema: guideSchema}},
+		Messages: []llm.Message{{Role: llm.RoleUser, Parts: []llm.Part{llm.TextPart("q")}}},
+	}
+	_, err := p.Stream(context.Background(), req, func(llm.Event) {})
+	require.NoError(t, err)
+	_, hasChoice := (*got)[0]["tool_choice"]
+	assert.False(t, hasChoice, "the default (auto) sends no tool_choice")
+
+	req.ToolChoice = llm.ToolChoiceNone
+	_, err = p.Stream(context.Background(), req, func(llm.Event) {})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"type": "none"}, (*got)[1]["tool_choice"])
+	assert.NotEmpty(t, (*got)[1]["tools"], "tool definitions are still sent")
+}
+
 func TestStream_ThinkingBlockRoundTrips(t *testing.T) {
 	p, got := server(t, toolTurn, toolTurn)
 	req := llm.Request{Model: "m", MaxTokens: 10, Messages: []llm.Message{{Role: llm.RoleUser, Parts: []llm.Part{llm.TextPart("q")}}}}

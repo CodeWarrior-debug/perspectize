@@ -101,6 +101,10 @@ func toParams(req llm.Request) (sdk.MessageNewParams, error) {
 		}
 		params.Tools = append(params.Tools, sdk.ToolUnionParam{OfTool: &tp})
 	}
+	if req.ToolChoice == llm.ToolChoiceNone {
+		none := sdk.NewToolChoiceNoneParam()
+		params.ToolChoice = sdk.ToolChoiceUnionParam{OfNone: &none}
+	}
 	for _, m := range req.Messages {
 		mp, err := messageParam(m)
 		if err != nil {

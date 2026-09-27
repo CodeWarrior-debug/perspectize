@@ -97,7 +97,46 @@ func TestLoop_ParallelCalls_OneResultsMessage(t *testing.T) {
 	assert.Equal(t, "b", results.Parts[1].Result.CallID)
 }
 
-func TestLoop_RoundCap(t *testing.T) {
+func TestLoop_RoundCap_WrapsUpWithoutTools(t *testing.T) {
+	var ran atomic.Int32
+	counting := echoTool("echo")
+	inner := counting.Handler
+	counting.Handler = func(ctx context.Context, in json.RawMessage) (string, error) {
+		ran.Add(1)
+		return inner(ctx, in)
+	}
+	c1 := llm.ToolCall{ID: "t1", Name: "echo", Input: json.RawMessage(`{"area":"a"}`)}
+	c2 := llm.ToolCall{ID: "t2", Name: "echo", Input: json.RawMessage(`{"area":"b"}`)}
+	c3 := llm.ToolCall{ID: "t3", Name: "echo", Input: json.RawMessage(`{"area":"c"}`)}
+	p := &fake.Provider{Turns: []fake.Turn{
+		{Calls: []llm.ToolCall{c1}, Stop: llm.StopToolUse},
+		{Calls: []llm.ToolCall{c2}, Stop: llm.StopToolUse},
+		{Calls: []llm.ToolCall{c3}, Stop: llm.StopToolUse}, // over the cap of 2
+		{Text: []string{"From what I found: a and b."}, Stop: llm.StopEnd},
+	}}
+	l := newLoop(t, p, counting)
+	l.MaxRounds = 2
+
+	res, err := l.Run(context.Background(), userAsk("q"), noEvents)
+	require.NoError(t, err, "hitting the cap still produces an answer")
+	assert.True(t, res.CapReached)
+	assert.Equal(t, "From what I found: a and b.", res.Final.Text())
+	assert.Equal(t, 4, res.Calls, "2 tool rounds, the over-cap request, then the wrap-up")
+	assert.EqualValues(t, 2, ran.Load(), "the over-cap tool call is never run")
+
+	reqs := p.Requests()
+	require.Len(t, reqs, 4)
+	assert.Equal(t, llm.ToolChoiceAuto, reqs[2].ToolChoice)
+	final := reqs[3]
+	assert.Equal(t, llm.ToolChoiceNone, final.ToolChoice, "wrap-up forbids tools")
+	assert.NotEmpty(t, final.Tools, "definitions stay: the history contains tool calls")
+	last := final.Messages[len(final.Messages)-1]
+	require.Len(t, last.Parts, 1)
+	assert.Equal(t, "t3", last.Parts[0].Result.CallID, "every tool_use gets a tool_result")
+	assert.True(t, last.Parts[0].Result.IsError)
+}
+
+func TestLoop_RoundCap_StubbornModel(t *testing.T) {
 	c := llm.ToolCall{ID: "t", Name: "echo", Input: json.RawMessage(`{"area":"x"}`)}
 	turns := make([]fake.Turn, 10)
 	for i := range turns {
@@ -108,8 +147,20 @@ func TestLoop_RoundCap(t *testing.T) {
 	l.MaxRounds = 2
 
 	res, err := l.Run(context.Background(), userAsk("q"), noEvents)
-	assert.ErrorIs(t, err, ErrRoundCap)
-	assert.Equal(t, 3, res.Calls, "2 tool rounds executed, cap hit on the 3rd request for tools")
+	assert.ErrorIs(t, err, ErrRoundCap, "still asking for tools after the wrap-up")
+	assert.True(t, res.CapReached)
+	assert.Equal(t, 4, res.Calls)
+}
+
+func TestLoop_DefaultCap(t *testing.T) {
+	c := llm.ToolCall{ID: "t", Name: "echo", Input: json.RawMessage(`{"area":"x"}`)}
+	turns := make([]fake.Turn, 20)
+	for i := range turns {
+		turns[i] = fake.Turn{Calls: []llm.ToolCall{c}, Stop: llm.StopToolUse}
+	}
+	p := &fake.Provider{Turns: turns}
+	res, _ := newLoop(t, p, echoTool("echo")).Run(context.Background(), userAsk("q"), noEvents)
+	assert.Equal(t, DefaultMaxRounds+2, res.Calls, "MaxRounds 0 means DefaultMaxRounds")
 }
 
 func TestLoop_CancelDuringTool(t *testing.T) {
