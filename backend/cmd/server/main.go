@@ -260,6 +260,18 @@ func main() {
 		Implementation:        coderWebsocketImplementationFor(secCfg.CORSOrigins),
 		KeepAlivePingInterval: 10 * time.Second,
 		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
+			// Browsers can't set custom headers on a WebSocket upgrade, so the
+			// frontend sends its version/platform in connection_init instead.
+			// Normalize through the same bounded sets as the HTTP ClientInfo
+			// middleware and store them so subscription operations see them.
+			// (No span attrs here: withTracing skips WS handshakes, so there is
+			// no active span on this context.)
+			clientVersion, clientPlatform := perfmw.NormalizeClientInfo(
+				initPayload.GetString("clientVersion"),
+				initPayload.GetString("clientPlatform"),
+			)
+			ctx = perfmw.WithClientInfo(ctx, clientVersion, clientPlatform)
+
 			token := initPayload.Authorization()
 			if token == "" {
 				if v, ok := initPayload["authToken"].(string); ok {

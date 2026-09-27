@@ -1,6 +1,7 @@
 package middleware_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -156,4 +157,40 @@ func TestNewClientInfo_RecordsCounterWithAttributes(t *testing.T) {
 	platform, ok := attrSet.Value("client.platform")
 	require.True(t, ok)
 	assert.Equal(t, "web", platform.AsString())
+}
+
+func TestNormalizeClientInfo_ValidValuesPassThrough(t *testing.T) {
+	version, platform := middleware.NormalizeClientInfo("1.4.2", "ios")
+	assert.Equal(t, "1.4.2", version)
+	assert.Equal(t, "ios", platform)
+}
+
+func TestNormalizeClientInfo_MissingValuesBecomeUnknown(t *testing.T) {
+	version, platform := middleware.NormalizeClientInfo("", "")
+	assert.Equal(t, "unknown", version)
+	assert.Equal(t, "unknown", platform)
+}
+
+func TestNormalizeClientInfo_GarbageBecomesOther(t *testing.T) {
+	version, platform := middleware.NormalizeClientInfo("not a version; DROP TABLE", strings.Repeat("x", 4096))
+	assert.Equal(t, "other", version)
+	assert.Equal(t, "other", platform)
+}
+
+func TestWithClientInfo_RoundTripsThroughClientInfoFrom(t *testing.T) {
+	ctx := middleware.WithClientInfo(context.Background(), "3.1.0", "web")
+	version, platform := middleware.ClientInfoFrom(ctx)
+	assert.Equal(t, "3.1.0", version)
+	assert.Equal(t, "web", platform)
+}
+
+func TestWithClientInfo_OverridesEarlierValue(t *testing.T) {
+	// The WS upgrade request passes through the HTTP ClientInfo middleware
+	// without headers (browsers can't set them on a WebSocket), so the
+	// connection_init values must replace the "unknown" stored there.
+	ctx := middleware.WithClientInfo(context.Background(), "unknown", "unknown")
+	ctx = middleware.WithClientInfo(ctx, "3.1.0", "android")
+	version, platform := middleware.ClientInfoFrom(ctx)
+	assert.Equal(t, "3.1.0", version)
+	assert.Equal(t, "android", platform)
 }

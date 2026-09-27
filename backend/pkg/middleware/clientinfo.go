@@ -122,13 +122,9 @@ func NewClientInfo(meter metric.Meter) func(http.Handler) http.Handler {
 
 func withClientInfo(next http.Handler, counterFn func() metric.Int64Counter) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		version := normalizeClientHeader(r.Header.Get("X-Client-Version"), clientVersions)
-		platform := normalizeClientHeader(r.Header.Get("X-Client-Platform"), clientPlatforms)
+		version, platform := NormalizeClientInfo(r.Header.Get("X-Client-Version"), r.Header.Get("X-Client-Platform"))
 
-		ctx := context.WithValue(r.Context(), clientInfoContextKey{}, clientInfo{
-			version:  version,
-			platform: platform,
-		})
+		ctx := WithClientInfo(r.Context(), version, platform)
 
 		attrs := []attribute.KeyValue{
 			attribute.String("client.version", version),
@@ -142,6 +138,25 @@ func withClientInfo(next http.Handler, counterFn func() metric.Int64Counter) htt
 		}
 
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// NormalizeClientInfo maps raw client version/platform values (from HTTP
+// headers or the graphql-ws connection_init payload) to cardinality-safe
+// attribute values, using the same process-wide bounded sets as the
+// ClientInfo middleware. A missing (empty) value becomes "unknown".
+func NormalizeClientInfo(version, platform string) (string, string) {
+	return normalizeClientHeader(version, clientVersions), normalizeClientHeader(platform, clientPlatforms)
+}
+
+// WithClientInfo returns a copy of ctx carrying the given (already
+// normalized) client version and platform, retrievable via ClientInfoFrom.
+// Used by the ClientInfo middleware and by the WebSocket InitFunc, whose
+// values replace the "unknown" set on the header-less upgrade request.
+func WithClientInfo(ctx context.Context, version, platform string) context.Context {
+	return context.WithValue(ctx, clientInfoContextKey{}, clientInfo{
+		version:  version,
+		platform: platform,
 	})
 }
 

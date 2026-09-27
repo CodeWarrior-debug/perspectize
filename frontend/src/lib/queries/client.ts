@@ -1,4 +1,5 @@
 import { GraphQLClient } from 'graphql-request';
+import { clientInfoHeaders } from '$lib/buildInfo';
 
 const GRAPHQL_ENDPOINT = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8080/graphql';
 
@@ -28,14 +29,12 @@ export async function getAuthToken(): Promise<string | null> {
 
 /**
  * Make a GraphQL request with optional auth.
- * Automatically includes Bearer token if user is signed in.
+ * Automatically includes Bearer token if user is signed in, plus the
+ * X-Client-Version / X-Client-Platform headers on every request.
  */
-export async function graphqlRequest<T>(
-	document: string,
-	variables?: Record<string, unknown>,
-): Promise<T> {
+export async function graphqlRequest<T>(document: string, variables?: Record<string, unknown>): Promise<T> {
 	const token = await getAuthToken();
-	const headers: Record<string, string> = {};
+	const headers: Record<string, string> = clientInfoHeaders();
 	if (token) {
 		headers['Authorization'] = `Bearer ${token}`;
 	}
