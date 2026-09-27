@@ -14,7 +14,8 @@
 	import GuestLanding from '$lib/components/onboarding/GuestLanding.svelte';
 	import OnboardingShell from '$lib/components/onboarding/OnboardingShell.svelte';
 	import AssistantPanel from '$lib/components/assistant/AssistantPanel.svelte';
-	import { JEEVES_DEV } from '$lib/assistant/config';
+	import WebMCPTools from '$lib/components/assistant/WebMCPTools.svelte';
+	import { JEEVES_DEV, WEBMCP } from '$lib/assistant/config';
 	import { reportWebVitals } from '$lib/vitals';
 	import { watchForNewVersion } from '$lib/utils/versionWatch';
 	import { pwaInfo } from 'virtual:pwa-info';
@@ -82,6 +83,9 @@
 					<OnboardingShell />
 					{#if JEEVES_DEV}
 						<AssistantPanel />
+					{/if}
+					{#if WEBMCP}
+						<WebMCPTools />
 					{/if}
 					{@render children()}
 				</Show>

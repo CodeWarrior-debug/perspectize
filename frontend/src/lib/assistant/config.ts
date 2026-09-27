@@ -5,6 +5,13 @@
  */
 export const JEEVES_DEV = import.meta.env.VITE_JEEVES_DEV === 'true';
 
+/**
+ * WebMCP: register the assistant's read-only tools with the browser's own
+ * agent (document.modelContext). Dev-only for now: VITE_WEBMCP=true at build
+ * time, and the backend must run with WEBMCP_ENABLED=true.
+ */
+export const WEBMCP = import.meta.env.VITE_WEBMCP === 'true';
+
 /** What users see unless they rename the assistant (renaming comes later). */
 export const ASSISTANT_NAME = 'Jeevesbot';
 
