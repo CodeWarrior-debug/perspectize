@@ -20,6 +20,7 @@
 		sortRatingRows,
 		agreementPercent,
 	} from '$lib/utils/comparePerspectives';
+	import { identityColor } from '$lib/utils/compareIdentity';
 	import ComparePickerRow from '$lib/components/ComparePickerRow.svelte';
 	import CompareOverallRow from '$lib/components/CompareOverallRow.svelte';
 	import CompareRatingTable from '$lib/components/CompareRatingTable.svelte';
@@ -252,7 +253,7 @@
 		<div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
 			<CompareTakeColumn
 				name={displayName(leftId!)}
-				avatarColor={leftId === meCtx.me?.id ? 'var(--color-primary)' : 'var(--color-logo-purple)'}
+				avatarColor={identityColor(leftId!, meCtx.me?.id ?? null)}
 				review={leftPerspective!.review}
 				uniqueFeelings={feelingsComparison.leftOnly}
 			/>
@@ -267,7 +268,7 @@
 			/>
 			<CompareTakeColumn
 				name={displayName(rightId!)}
-				avatarColor={rightId === meCtx.me?.id ? 'var(--color-primary)' : 'var(--color-logo-purple)'}
+				avatarColor={identityColor(rightId!, meCtx.me?.id ?? null)}
 				review={rightPerspective!.review}
 				uniqueFeelings={feelingsComparison.rightOnly}
 			/>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ArrowLeftRightIcon from '@lucide/svelte/icons/arrow-left-right';
+	import { identityColor, nameInitials } from '$lib/utils/compareIdentity';
 
 	let {
 		options,
@@ -25,16 +26,7 @@
 	// Color by identity (the viewer, "You", is always primary-colored) — not
 	// by side/position — so a Swap doesn't change "You"'s avatar color.
 	function avatarColor(id: string): string {
-		return id === viewerId ? 'var(--color-primary)' : 'var(--color-logo-purple)';
-	}
-
-	function initials(name: string): string {
-		return name
-			.split(' ')
-			.map((part) => part[0])
-			.join('')
-			.slice(0, 2)
-			.toUpperCase();
+		return identityColor(id, viewerId);
 	}
 
 	const leftName = $derived(options.find((o) => o.id === leftId)?.name ?? '');
@@ -47,7 +39,7 @@
 			class="flex size-[26px] flex-none items-center justify-center rounded-full text-[11px] font-semibold text-white"
 			style="background-color: {avatarColor(leftId)};"
 		>
-			{initials(leftName)}
+			{nameInitials(leftName)}
 		</span>
 		<select
 			data-testid="picker-left"
@@ -76,7 +68,7 @@
 			class="flex size-[26px] flex-none items-center justify-center rounded-full text-[11px] font-semibold text-white"
 			style="background-color: {avatarColor(rightId)};"
 		>
-			{initials(rightName)}
+			{nameInitials(rightName)}
 		</span>
 		<select
 			data-testid="picker-right"
