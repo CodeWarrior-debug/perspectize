@@ -18,6 +18,7 @@ export interface CategoryItem {
 	label: string;
 	description: string | null;
 	entityType: string | null;
+	wikipediaUrl: string | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -48,6 +49,7 @@ export const SET_PRIMARY_CATEGORY = gql`
 				label
 				description
 				entityType
+				wikipediaUrl
 			}
 		}
 	}

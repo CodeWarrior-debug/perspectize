@@ -161,6 +161,12 @@ func (m *mockPerspectiveRepoForUser) ReassignByUser(ctx context.Context, fromUse
 func (m *mockPerspectiveRepoForUser) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 	return map[int]*domain.PerspectiveAggregate{}, nil
 }
+func (m *mockPerspectiveRepoForUser) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+	return &domain.FeelingStats{Emoji: emoji, Label: label}, nil
+}
+func (m *mockPerspectiveRepoForUser) CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+	return &domain.CustomFieldStats{Key: key}, nil
+}
 
 // newTestUserService creates a UserService with default mocks for content/perspective repos
 func newTestUserService(repo *mockUserRepository) *services.UserService {

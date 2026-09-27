@@ -141,3 +141,52 @@ export function formatReference(range: PassageRange): string {
 	}
 	return `${book.name} ${range.startChapter}:${range.startVerse}-${range.endChapter}:${range.endVerse}`;
 }
+
+/** Shortest known alias for a book (e.g. "Jn" for John) — used where space is tight (icon tiles). */
+export function abbreviateBookName(bookId: number): string {
+	const book = bookById(bookId);
+	if (!book) return '';
+	if (book.aliases.length === 0) return book.name;
+	return book.aliases.reduce((shortest, alias) => (alias.length < shortest.length ? alias : shortest));
+}
+
+/** The chapter:verse (or chapter:verse-verse) portion of a range, without the book name. */
+export function formatChapterVerse(range: PassageRange): string {
+	if (range.startChapter === range.endChapter && range.startVerse === range.endVerse) {
+		return `${range.startChapter}:${range.startVerse}`;
+	}
+	if (range.startChapter === range.endChapter) {
+		return `${range.startChapter}:${range.startVerse}-${range.endVerse}`;
+	}
+	return `${range.startChapter}:${range.startVerse}-${range.endChapter}:${range.endVerse}`;
+}
+
+/**
+ * Abbreviated reference for a verse-ordinal pair (book abbreviation + chapter:verse),
+ * split into its two halves for the icon tile's book-flap layout. Returns null if the
+ * ordinals don't resolve to a valid same-book range.
+ */
+export function abbreviateReferenceFromVerseIds(
+	startVerseId: number,
+	endVerseId: number,
+): { book: string; chapterVerse: string } | null {
+	const range = verseIdsToRange(startVerseId, endVerseId);
+	if (!range) return null;
+	return { book: abbreviateBookName(range.bookId), chapterVerse: formatChapterVerse(range) };
+}
+
+/**
+ * Page text for a Bible passage icon tile: book abbreviation on the left
+ * page, chapter:verse on the right.
+ */
+export function passageIconLabels(passage: { verseStartID?: number | null; verseEndID?: number | null }): {
+	left: string;
+	right: string;
+} {
+	const ref =
+		passage.verseStartID != null && passage.verseEndID != null
+			? abbreviateReferenceFromVerseIds(passage.verseStartID, passage.verseEndID)
+			: null;
+	if (!ref) return { left: '', right: '' };
+	return { left: ref.book, right: ref.chapterVerse };
+}
