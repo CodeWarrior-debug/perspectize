@@ -133,3 +133,67 @@ func TestAssistantReply_CancelClosesStream(t *testing.T) {
 	cancel()
 	collect(t, ch) // must close promptly
 }
+
+// fakeTools records the viewer each tool call ran as.
+type fakeTools struct {
+	gotUser  int
+	gotName  string
+	gotInput string
+	err      error
+}
+
+var _ portservices.AssistantToolService = (*fakeTools)(nil)
+
+func (f *fakeTools) Specs() []domain.AssistantToolSpec {
+	return []domain.AssistantToolSpec{
+		{Name: "read_guide", Description: "Read the guide.", InputSchema: `{"type":"object"}`},
+		{Name: "list_perspectives", Description: "Read perspectives.", InputSchema: `{"type":"object"}`, UntrustedContent: true},
+	}
+}
+
+func (f *fakeTools) Run(_ context.Context, userID int, name, input string) (string, error) {
+	f.gotUser, f.gotName, f.gotInput = userID, name, input
+	return "result", f.err
+}
+
+func toolsResolver(t portservices.AssistantToolService) *resolvers.Resolver {
+	r := resolvers.NewResolver(nil, nil, nil, nil, nil, nil, nil)
+	r.ToolRunner = t
+	return r
+}
+
+func TestAssistantTools_ListsSpecs(t *testing.T) {
+	got, err := toolsResolver(&fakeTools{}).Query().AssistantTools(authedCtx(1))
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, &model.AssistantToolSpec{Name: "list_perspectives", Description: "Read perspectives.",
+		InputSchema: `{"type":"object"}`, UntrustedContent: true}, got[1])
+}
+
+func TestAssistantTools_DisabledIsEmpty(t *testing.T) {
+	got, err := toolsResolver(nil).Query().AssistantTools(authedCtx(1))
+	require.NoError(t, err)
+	assert.NotNil(t, got, "a non-null list in the schema")
+	assert.Empty(t, got)
+}
+
+func TestRunAssistantTool_RunsAsTheSignedInUser(t *testing.T) {
+	fake := &fakeTools{}
+	out, err := toolsResolver(fake).Query().RunAssistantTool(authedCtx(7), "list_perspectives", `{"scope":"mine"}`)
+	require.NoError(t, err)
+	assert.Equal(t, "result", out)
+	assert.Equal(t, 7, fake.gotUser)
+	assert.Equal(t, "list_perspectives", fake.gotName)
+	assert.Equal(t, `{"scope":"mine"}`, fake.gotInput)
+}
+
+func TestRunAssistantTool_Errors(t *testing.T) {
+	_, err := toolsResolver(&fakeTools{}).Query().RunAssistantTool(context.Background(), "read_guide", `{}`)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+
+	_, err = toolsResolver(nil).Query().RunAssistantTool(authedCtx(1), "read_guide", `{}`)
+	assert.ErrorIs(t, err, domain.ErrAssistantToolsDisabled)
+
+	_, err = toolsResolver(&fakeTools{err: domain.ErrAssistantToolUnknown}).Query().RunAssistantTool(authedCtx(1), "x", `{}`)
+	assert.ErrorIs(t, err, domain.ErrAssistantToolUnknown)
+}

@@ -222,6 +222,15 @@ func main() {
 		resolver.Assistant = assistantSvc
 		slog.Info("assistant enabled", "model", cfg.Assistant.Model)
 	}
+	if cfg.Assistant.WebMCP {
+		// Read-only tools for the browser's own agent: no model, no API key.
+		toolRunner, err := assistant.NewToolRunner(assistant.NewPerspectiveData(perspectiveService, contentService))
+		if err != nil {
+			log.Fatalf("Failed to initialize assistant tools: %v", err)
+		}
+		resolver.ToolRunner = toolRunner
+		slog.Info("assistant WebMCP tools enabled")
+	}
 	directiveRoot := directives.NewDirectiveRoot(contentService, perspectiveService)
 	gqlConfig := generated.Config{
 		Resolvers: resolver,

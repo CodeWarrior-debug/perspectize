@@ -33,6 +33,10 @@ type Resolver struct {
 	// off; the subscription then returns ErrAssistantDisabled. Set after
 	// NewResolver so existing callers and tests are unaffected.
 	Assistant portservices.AssistantService
+
+	// ToolRunner runs the assistant's read-only tools for the browser's
+	// own agent (WebMCP). Nil when WEBMCP_ENABLED is off.
+	ToolRunner portservices.AssistantToolService
 }
 
 // NewResolver creates a new resolver with dependencies

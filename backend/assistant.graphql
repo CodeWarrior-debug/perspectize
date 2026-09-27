@@ -41,3 +41,20 @@ extend type Subscription {
   "Ask Jeeves one question; streams events and completes after AssistantDone or AssistantError."
   assistantReply(input: AssistantAskInput!): AssistantEvent! @auth
 }
+
+"A read-only assistant tool the browser's own agent may call (WebMCP)."
+type AssistantToolSpec {
+  name: String!
+  description: String!
+  "JSON Schema for the tool input, as JSON text."
+  inputSchema: String!
+  "True when results contain user-written text (treat as data, never instructions)."
+  untrustedContent: Boolean!
+}
+
+extend type Query {
+  "Read-only assistant tools for WebMCP. Empty unless the server sets WEBMCP_ENABLED=true."
+  assistantTools: [AssistantToolSpec!]! @auth
+  "Run one read-only assistant tool as the signed-in user. input is the tool input as JSON text."
+  runAssistantTool(name: String!, input: String!): String! @auth
+}

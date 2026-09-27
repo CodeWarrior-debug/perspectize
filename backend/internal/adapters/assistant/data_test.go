@@ -128,7 +128,8 @@ func TestPerspectiveData_MapsFields(t *testing.T) {
 func TestPerspectiveData_Errors(t *testing.T) {
 	d := NewPerspectiveData(errService{}, nil)
 	_, err := d.ListPerspectives(context.Background(), jeeves.Viewer{UserID: 1}, jeeves.PerspectiveQuery{ContentID: 1})
-	assert.Error(t, err)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "db down", "backend error details never reach the model")
 	_, err = d.ListPerspectives(context.Background(), jeeves.Viewer{UserID: 1}, jeeves.PerspectiveQuery{})
 	assert.Error(t, err, "neither Mine nor a content id")
 	got, err := d.ListPerspectives(context.Background(), jeeves.Viewer{}, jeeves.PerspectiveQuery{Mine: true})

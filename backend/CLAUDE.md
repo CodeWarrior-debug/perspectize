@@ -134,7 +134,7 @@ CORS middleware is configured in `cmd/server/main.go` for local development. Cur
 
 ## Gotchas
 
-**Perspective privacy is enforced in the resolver, not the service:** `PerspectiveByID` checks `PrivacyPrivate`; `PerspectiveService.GetByID` doesn't, and `ListPerspectives` is only safe with `ViewerID` set. Code calling services directly (e.g. in-process Jeeves tools) must apply the check (planned fix: BRIDGE-02).
+**Perspective privacy lives in the service (BRIDGE-02):** read one perspective with `PerspectiveService.GetVisible(ctx, viewerID, id)`, which hides other users' private rows as `ErrNotFound`. `GetByID` is unchecked on purpose (ownership checks before update/delete) — never use it on a read path. `ListPerspectives` scopes rows itself but is only correct with `ViewerID` set to the signed-in user.
 
 **GraphQL defaults:** gqlgen passes `first: Int = 10` as non-nil pointer (value `10`), not `nil`. Tests must expect the default value.
 

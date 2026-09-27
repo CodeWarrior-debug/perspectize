@@ -13,6 +13,40 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
 
+// AssistantTools is the resolver for the assistantTools field.
+func (r *queryResolver) AssistantTools(ctx context.Context) ([]*model.AssistantToolSpec, error) {
+	if _, ok := auth.ForContext(ctx); !ok {
+		return nil, domain.ErrForbidden
+	}
+	if r.ToolRunner == nil {
+		return []*model.AssistantToolSpec{}, nil
+	}
+	specs := r.ToolRunner.Specs()
+	out := make([]*model.AssistantToolSpec, len(specs))
+	for i, s := range specs {
+		out[i] = &model.AssistantToolSpec{
+			Name:             s.Name,
+			Description:      s.Description,
+			InputSchema:      s.InputSchema,
+			UntrustedContent: s.UntrustedContent,
+		}
+	}
+	return out, nil
+}
+
+// RunAssistantTool is the resolver for the runAssistantTool field.
+func (r *queryResolver) RunAssistantTool(ctx context.Context, name string, input string) (string, error) {
+	actor, ok := auth.ForContext(ctx)
+	if !ok {
+		return "", domain.ErrForbidden
+	}
+	if r.ToolRunner == nil {
+		return "", domain.ErrAssistantToolsDisabled
+	}
+	// The viewer is the signed-in actor, never anything in input.
+	return r.ToolRunner.Run(ctx, actor.ID, name, input)
+}
+
 // AssistantReply is the resolver for the assistantReply field.
 func (r *subscriptionResolver) AssistantReply(ctx context.Context, input model.AssistantAskInput) (<-chan model.AssistantEvent, error) {
 	actor, ok := auth.ForContext(ctx)
