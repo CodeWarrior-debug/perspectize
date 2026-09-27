@@ -27,7 +27,17 @@ Pasting a YouTube Music link into Add Content produces a **music track** item th
     - **Check:** the backend calls the LRCLIB API (`/api/search`, matching artist + title ±3s duration) only to learn whether lyrics exist, then discards the text.
     - **Persist only the result**, in `response.lyrics = {available, lrclibId, hasSynced, checkedAt}`.
     - **When to check:** at add time, asynchronously, so the add is never blocked. A row marked "not available" is re-checked lazily when its modal opens and `checkedAt` is more than 30 days old. A row marked "available" is never re-checked.
-    - **UI:** "Open lyrics" opens the LRCLIB page in a new tab, or LRCLIB search on `artist title` if per-track pages don't exist. When nothing was found, it shows "No lyrics found" plus a "Search anyway" link. A "Lyrics on YouTube Music" link opens the track's `music.youtube.com` page, whose lyrics tab is licensed.
+    - **UI rule: every link's label says where it goes.** No link lands anywhere other than what it names without saying so first. Searches always use title + artist and never artist alone.
+
+      | State | Option shown | Label / warning |
+      |---|---|---|
+      | Lyrics found **and** LRCLIB has per-track pages | Open lyrics | "Open lyrics" — opens this song's lyrics |
+      | Lyrics found, **no** per-track pages | Search lyrics | "Search lyrics for '<Title>' – <Artist>" + helper text: "Opens a search results page, not this song directly." |
+      | Not found | Search anyway | "No lyrics found for this song." + "Search LRCLIB for '<Title>' – <Artist>" with the same search-results warning |
+      | Not yet checked or check failed | Search lyrics | Same as the search row |
+      | Always, for YouTube-backed rows | YouTube Music | "Open song in YouTube Music" + helper text: "Lyrics tab shown there if available." |
+
+      The label "Open lyrics" is reserved for the confirmed per-track destination.
     - Applies to `YOUTUBE_MUSIC` and `MUSIC_TRACK` rows.
     - **Open question:** does LRCLIB have per-track web pages? Its site looks like a single-page app. Verify in a real browser before choosing the link target.
 
