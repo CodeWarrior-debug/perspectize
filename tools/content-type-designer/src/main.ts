@@ -1017,7 +1017,17 @@ function renderDiscover(): HTMLElement {
       field('Placement', select<DiscoverPlacement>(dc.placement, Object.keys(PLACEMENTS) as DiscoverPlacement[], (v) => (dc.placement = v), PLACEMENTS)),
       field('Status', select<'shipped' | 'proposed'>(dc.status, ['proposed', 'shipped'], (v) => (dc.status = v), { proposed: 'Proposed', shipped: 'Shipped (the app does this today)' })),
       ...(hasSearch
-        ? [field('Search', input(dc.search, (v) => (dc.search = v), 'endpoint, and how a result becomes a card'), 'Does a result carry title and image, or only an id to look up?')]
+        ? [
+            field(
+              'Search mode',
+              select<'in-app' | 'hand-off'>(dc.searchMode ?? 'in-app', ['in-app', 'hand-off'], (v) => (dc.searchMode = v), {
+                'in-app': 'In-app — the app calls a search API',
+                'hand-off': "Hand-off — open the source's own search in a new tab"
+              }),
+              'Hand off when the search API is too scarce or costly (YouTube: 100 calls a day for the whole site).'
+            ),
+            field('Search', input(dc.search, (v) => (dc.search = v), 'endpoint, and how a result becomes a card'), 'Does a result carry title and image, or only an id to look up?')
+          ]
         : []),
       ...(hasSearch
         ? [field('Filters', input(dc.filters.join(', '), (v) => (dc.filters = v.split(',').map((f) => f.trim()).filter(Boolean)), 'Era, Department'), 'Comma-separated.')]
@@ -1081,13 +1091,17 @@ function renderDiscoverMock(): HTMLElement {
         el('div', { class: `d-img${contain ? ' contain' : ''}` }, [thumbBox(d.id, row.item, 'modal', contain)]),
         el('div', { class: 'd-title' }, [cellText(row.item) ?? '']),
         el('div', { class: 'm-muted small' }, [[cellText(row.creator), cellText(row.date)].filter(Boolean).join(' · ') || cellText(row.description) || '']),
-        el('span', { class: 'm-btn primary d-add' }, ['Add to Library'])
+        el('span', { class: 'm-btn primary d-add' }, ['Add to Perspectize'])
       ])
     );
     body = el('div', {}, [
       ...(hasSearch
         ? [
-            el('div', { class: 'm-inputwrap d-search' }, [el('span', { class: 'd-input' }, [`Search ${d.plural || 'items'}…`])]),
+            el('div', { class: 'm-inputwrap d-search' }, [
+              el('span', { class: 'd-input' }, [
+                dc.searchMode === 'hand-off' ? `Search ${d.label || 'the source'}, or paste a link   ↗ opens in a new tab` : `Search ${d.plural || 'items'}…`
+              ])
+            ]),
             ...(dc.filters.length ? [el('div', { class: 'd-filters' }, dc.filters.map((f) => el('span', { class: 'd-filter' }, [`${f} ▾`])))] : [])
           ]
         : []),

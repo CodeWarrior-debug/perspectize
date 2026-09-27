@@ -71,13 +71,14 @@ Adapter to build: `backend/internal/adapters/painting/` (`client.go`, `parser.go
 | Decision | Value |
 | --- | --- |
 | Placement | Search and a feed (proposed) |
+| Search mode | in-app |
 | Search | Met /search?medium=Paintings&hasImages=true&q=… returns object IDs only; fetch /objects/{id} per card (~24 a page, client-side paging over the ID list). Re-check objectName = "Painting" and a non-blank image (both filters leak: a gold icon and a fan came back for medium=Paintings; hasImages kept Monet 437127), and skip 404s (search returns deleted IDs, e.g. 12765). |
 | Filters | Era (dateBegin/dateEnd), Department, On view now (isOnView) |
 | Feed heading | Trending paintings |
 | Feed kind | trending |
 | Feed source & ranking signal | The Met has no popularity data. Rank the 421 Met highlights (isHighlight=true&medium=Paintings) by 7-day English Wikipedia pageviews: Met objectWikidata_URL → enwiki sitelink → wikimedia.org/api/rest_v1/metrics/pageviews/per-article. Highlights with no enwiki article (2 of the 6 samples) sort after, by title; label the feed "Featured" if pageviews are unavailable. |
 | Refresh | daily backend job; the page reads the stored ranking |
-| Fetched from | backend |
+| Feed fetched from | backend |
 | Why | Paintings are browsed, not pasted: most users will find one on Discover rather than arrive with a Met URL. Ranking runs on the backend because it takes ~840 lookups; search can stay in the browser (the Met sends Access-Control-Allow-Origin: *, add collectionapi.metmuseum.org to connect-src). |
 
 ## 3. Fields for this type

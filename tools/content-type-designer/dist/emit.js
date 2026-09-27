@@ -104,7 +104,13 @@ export function buildSpec(state) {
         const hasFeed = dc.placement === 'search-and-feed' || dc.placement === 'feed-only';
         out.push(table(['Decision', 'Value'], [
             ['Placement', `${DISCOVER_LABELS[dc.placement]} (${dc.status})`],
-            ...(hasSearch ? [['Search', dc.search || '(missing)'], ['Filters', dc.filters.join(', ') || 'none']] : []),
+            ...(hasSearch
+                ? [
+                    ['Search mode', dc.searchMode === 'hand-off' ? 'hand-off (opens the source site; pasted links are added)' : 'in-app'],
+                    ['Search', dc.search || '(missing)'],
+                    ['Filters', dc.filters.join(', ') || 'none']
+                ]
+                : []),
             ...(hasFeed
                 ? [
                     ['Feed heading', dc.feedLabel || '(missing)'],
@@ -347,13 +353,16 @@ function discoverSteps(d) {
     const hasSearch = dc.placement !== 'feed-only';
     const hasFeed = dc.placement !== 'search-only';
     steps.push(`Discover: a ${d.label} source in \`routes/discover/+page.svelte\` (the page's view union today is 'search' | 'trending'), a card component beside \`discover/VideoCard.svelte\`, and "already in library" matching on the normalised url.`);
-    if (hasSearch)
+    const handOff = dc.searchMode === 'hand-off';
+    if (hasSearch && handOff)
+        steps.push(`Discover search hand-off: the search box opens the source's own search in a new tab (see \`discover/SearchBar.svelte\`), and a pasted ${d.label} link in the same box is added directly — ${dc.search}`);
+    if (hasSearch && !handOff)
         steps.push(`Discover search: client in \`src/lib/services/\` beside \`youtubeApi.ts\` — ${dc.search}${dc.filters.length ? ` Filters: ${dc.filters.join(', ')}.` : ''}`);
     if (hasFeed && dc.fetchFrom === 'backend')
         steps.push(`Discover feed "${dc.feedLabel}": backend fetch + cache (${dc.refresh}) exposed through GraphQL — ${dc.feedSource}`);
     if (hasFeed && dc.fetchFrom === 'browser')
         steps.push(`Discover feed "${dc.feedLabel}": browser fetch (${dc.refresh}) — ${dc.feedSource}`);
-    if (dc.fetchFrom === 'browser' || hasSearch)
+    if (dc.fetchFrom === 'browser' || (hasSearch && !handOff))
         steps.push('CSP: add the browser-called API host to `connect-src` in `frontend/src/app.html`.');
     return steps;
 }

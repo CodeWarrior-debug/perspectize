@@ -119,10 +119,10 @@ Every type gets an explicit answer, even when the answer is "not on Discover". D
 
 - **Placement:** search and a feed, feed only, search only, or not on Discover. Say why: is this type usually *browsed* (it belongs on Discover) or *pasted/typed* (the Add Content card covers it)?
 - **Feed:** what the page shows for this type when the search box is empty. If it is called "trending", name the number it ranks by. A source with no popularity data is "featured" or "curated", not trending.
-- **Search:** does a result carry title and image, or only an id that needs a second request per card? Which filters make sense for this type?
+- **Search:** in-app, or handed off to the source's own site? Hand off when the search API is scarce or costly: YouTube's `search.list` allows 100 calls a day for the whole project, so Discover opens youtube.com in a new tab and adds a pasted link directly. For in-app search: does a result carry title and image, or only an id that needs a second request per card? Which filters make sense for this type?
 - **Feed fetched from:** browser (the API must send CORS headers, and its host goes in `connect-src` in `frontend/src/app.html`) or backend (no CORS, heavy ranking work, or an undocumented feed worth caching).
 
-Worked examples live in `tools/content-type-designer` (section 7): YouTube (shipped: search + Trending chart), Bible passage (proposed: Verse of the day only, from Bible Gateway's feed, fetched and cached by the backend), Painting (proposed: Met search + highlights ranked by Wikipedia pageviews).
+Worked examples live in `tools/content-type-designer` (section 7): YouTube (search hands off to youtube.com; Trending chart served from the backend cache), Bible passage (proposed: Verse of the day only, from Bible Gateway's feed, fetched and cached by the backend), Painting (proposed: Met search + highlights ranked by Wikipedia pageviews).
 
 ## Implementation Steps
 

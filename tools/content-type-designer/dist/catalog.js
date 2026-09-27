@@ -27,14 +27,15 @@ export const TYPES = [
         discover: {
             placement: 'search-and-feed',
             status: 'shipped',
-            search: 'YouTube Data API search.list (q + videoDuration, publishedAfter, order); results carry title and thumbnail, paged by nextPageToken',
-            feedLabel: 'Trending',
+            search: 'youtube.com/results?search_query=… in a new tab. search.list is capped at 100 calls/day per project (signing users in does not change that), so the app never calls it; a YouTube link pasted into the same box is added directly',
+            searchMode: 'hand-off',
+            feedLabel: 'Trending on YouTube',
             feedKind: 'trending',
-            feedSource: 'videos.list?chart=mostPopular&regionCode=US — YouTube\'s own popularity chart',
-            refresh: 'on page open; cached 1 h (staleTime)',
-            fetchFrom: 'browser',
-            filters: ['Duration', 'Upload date', 'Sort'],
-            reason: 'What the page does today: routes/discover/+page.svelte, lib/services/youtubeApi.ts.'
+            feedSource: 'videos.list?chart=mostPopular&regionCode=US (1 unit per call) — YouTube\'s own popularity chart, via the youtubeTrending GraphQL query',
+            refresh: 'backend cache per region + page, 1 h (YOUTUBE_TRENDING_CACHE_TTL_SECONDS)',
+            fetchFrom: 'backend',
+            filters: [],
+            reason: 'Shipped on claude/content-type-visual-media-wrao93: routes/discover/+page.svelte, lib/services/youtubeApi.ts, youtube.CachingClient.GetTrending.'
         }
     },
     {
