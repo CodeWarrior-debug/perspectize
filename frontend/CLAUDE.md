@@ -92,6 +92,10 @@ This project uses **Svelte 5 runes** exclusively. Do not use Svelte 4 syntax.
 
 **An Escape handler inside a bits-ui dialog must run in the capture phase, or the dialog closes on the same keypress.** bits-ui's escape layer listens for `keydown` on `document` in the bubble phase and the dialog registered first, so a bubble-phase listener (including `<svelte:document onkeydown>`) runs too late for `stopPropagation` to help, and its `onEscapeKeydown` gets a cloned event so `defaultPrevented` is lost. Register `document.addEventListener('keydown', h, { capture: true })` in an `$effect` (with cleanup) and call `stopPropagation()` only while your inner element (popover, pin) is actually showing, so a second Escape still closes the dialog. See `interlinear/InterlinearPassage.svelte`; its test uses a bubble-phase `document` spy to prove the dialog never sees the first Escape.
 
+## Auth (Clerk + demo mode)
+
+**Don't import `svelte-clerk` in new components.** Use the facade: `useAuthState()` (`$lib/auth/useAuthState`), `getAuthToken()` (`$lib/auth`), and `components/auth/{AuthShow,SignInTrigger,UserMenu}.svelte`. With `VITE_DEMO_MODE=true` there is no `ClerkProvider` in the tree, so a direct `useClerkContext()`/`<Show>` crashes demo mode (and the `demo-e2e` CI job). `$lib/auth` itself must stay free of `svelte-clerk` imports — importing the real package into a plain module breaks unit tests that load it (`$env/dynamic/public` is undefined under Vitest). See [../.docs/DEMO_MODE.md](../.docs/DEMO_MODE.md).
+
 ## TanStack Query + GraphQL
 
 Queries use `graphql-request` with TanStack Svelte Query.
