@@ -36,6 +36,10 @@ type AssistantConfig struct {
 	// WebMCP exposes the assistant's read-only tools to the browser's own
 	// agent (no model or API key needed). WEBMCP_ENABLED.
 	WebMCP bool `json:"webmcp"`
+	// MaxRounds caps tool rounds per question; 0 means the ai-tooling
+	// default. The range (0..20) is checked when the assistant is built at
+	// startup. ASSISTANT_MAX_ROUNDS.
+	MaxRounds int `json:"max_rounds"`
 }
 
 // DefaultAssistantModel is used when ASSISTANT_MODEL is unset.
@@ -140,6 +144,13 @@ func Load(configPath string) (*Config, error) {
 
 	if v := os.Getenv("JEEVES_ENABLED"); v != "" {
 		cfg.Assistant.Enabled = v == "true" || v == "1"
+	}
+	if v := os.Getenv("ASSISTANT_MAX_ROUNDS"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("ASSISTANT_MAX_ROUNDS must be a whole number, got %q", v)
+		}
+		cfg.Assistant.MaxRounds = n
 	}
 	if v := os.Getenv("WEBMCP_ENABLED"); v != "" {
 		cfg.Assistant.WebMCP = v == "true" || v == "1"
