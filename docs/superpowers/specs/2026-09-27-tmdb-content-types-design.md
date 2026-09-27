@@ -112,9 +112,41 @@ With the four TMDB types selected and the majority rule, the table shows ◎ · 
 - Non-US certifications: US is the first cut, and a user-region setting can come later.
 - Auto-adding children (a show's seasons, a season's episodes).
 
+### 9. Specials (season 0) and the custom sort
+
+Specials are allowed: they can be added as a season, and their episodes as episodes. TMDB numbers them season 0, so a plain numeric sort puts them **first**, ahead of Season 1. That is wrong for how people read a show: specials are extras, recaps, minisodes and webisodes, usually made after or alongside the run. So every season/episode ordering in Perspectize uses one rule: **regular seasons in order, then Specials last**.
+
+The sort key, used in the grid, the SQL sort rule and every list:
+
+| Row | Key | Examples |
+|---|---|---|
+| Season | `seasonNumber = 0 ? 10000 : seasonNumber` | S1 → 1, S5 → 5, Specials → 10000 |
+| Episode | `(seasonNumber = 0 ? 10000 : seasonNumber) × 1000 + episodeNumber` | S5 E14 → 5014, S0 E3 → 10000003 |
+
+SQL rule (`helpers.go`, sort enum `ContentSortByPosition`), ascending:
+
+```sql
+CASE WHEN (response->>'seasonNumber')::int = 0 THEN 1 ELSE 0 END,
+(response->>'seasonNumber')::int,
+(response->>'episodeNumber')::int NULLS FIRST
+```
+
+Descending flips the whole key, so Specials come first when sorting newest-season-first. That is correct: Specials count as "after" the run.
+
+Where the rule applies:
+- The **No.** column (`S0 · Specials` / `S0 · E3`) and its sort.
+- The show's **Seasons list**, where Specials are the last row.
+- The season's **Episodes list** for Specials, ordered by episode number.
+- **Prev / next** on an episode stays inside its lane. Regular episodes walk S1 E1 → … → the final episode and never step into Specials. Specials walk S0 E1 → S0 E2 … among themselves. A special's air date often falls mid-run, so it is shown in its details view ("aired between S2 E8 and S2 E9" when TMDB dates allow), not used for ordering.
+- The **Item subtitle** reads "Breaking Bad · Special 3", not "S0 E3".
+
+Why not sort by air date instead: it would interleave specials correctly, but it breaks for same-day double episodes (Severance S1 E1–E2), for missing air dates, and for shows TMDB has only partly dated. Season and episode numbers are always present.
+
 ## Open questions
 
-1. ~~Parent rows~~ **Decided 2026-09-27:** force-add, with a `parent_content_id` foreign key (§3).
-2. **Aggregation.** Should a show's details view roll up perspectives on its seasons and episodes? The FK from §3 makes it cheap; the open question is only whether the UI wants it.
-3. **Specials (season 0).** Allow them, or hide them from the add flow? The recommendation is to allow them, and sort them last.
-4. **Your rating vs TMDB Score.** Both are on by default. Is that one rating column too many for a 10-column view? The alternative is to put Watched in place of Your rating.
+All four questions from the first draft are decided (2026-09-27):
+
+1. **Parent rows:** force-add, with a `parent_content_id` foreign key (§3).
+2. **Aggregation: no rollup.** A show's details view shows perspectives on the show only. A perspective on "Ozymandias" is about that episode, not about Breaking Bad, and averaging across levels would blur exactly what Perspectize keeps apart. The Seasons and Episodes lists already mark which children have their own rows, and each opens its own perspectives. The FK keeps a rollup cheap if it is ever wanted.
+3. **Specials:** allowed, sorted last (§9).
+4. **Your rating and TMDB Score are both on by default.** They answer different questions: what you think, and what the TMDB crowd thinks.

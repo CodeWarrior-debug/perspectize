@@ -26,7 +26,7 @@
 
 ## PR A: Backend
 
-- [ ] **A1 Domain:** add the `ContentTypeMovie/TVShow/TVSeason/TVEpisode` constants and the sort enums for `episodes`, `position` (season×1000+episode), `certification` (scale order) and `releaseStatus`.
+- [ ] **A1 Domain:** add the `ContentTypeMovie/TVShow/TVSeason/TVEpisode` constants and the sort enums for `episodes`, `position` (Specials-last key from spec §9: season 0 → 10000, then ×1000 + episode), `certification` (scale order) and `releaseStatus`. Table-driven tests for the position key: S1 < S5 < Specials, S5 E14 < S5 E16 < S0 E1, and descending puts Specials first.
 - [ ] **A2 Port + adapter:** `adapters/tmdb/` (`client.go`, `parser.go`, `canonical.go`) with the four fetches from spec §4. Parse TMDB/IMDb URLs to ids (IMDb via `/find`). Table-driven parser tests against recorded JSON fixtures.
 - [ ] **A3 Schema:** four enum values, plus `createContentFromTMDB(input: { kind, tmdbId, seasonNumber?, episodeNumber?, url? })` and a `searchTMDB(query, kind)` query. Run `make graphql-gen`.
 - [ ] **A0 Migration `0000NN_add_content_parent_id`:** `ALTER TABLE content ADD COLUMN IF NOT EXISTS parent_content_id BIGINT NULL REFERENCES content(id) ON DELETE RESTRICT;` plus `CREATE INDEX IF NOT EXISTS idx_content_parent_content_id ON content(parent_content_id) WHERE parent_content_id IS NOT NULL;`, and the matching down. Add `ParentContentID *int64` to the domain and GORM models, and `parent: Content` to the GraphQL `Content` type.
@@ -41,6 +41,7 @@
 - [ ] **B1 Types and queries** for the new fields in `src/lib/queries/content/`.
 - [ ] **B2 Column defs** in `ActivityTable.svelte` for `series`, `position`, `episodes`, `certification` and `releaseStatus`. Each has per-type header labels and `headerTooltip` from the catalog.
 - [ ] **B3 `hideWhenSolo`:** hide the Type column when the type filter has exactly one type.
+- [ ] **B3b Position:** render the No. cell (`S5 · E14`, `S0 · Specials`, `S0 · E3`) and give its comparator the §9 key. Order the Seasons/Episodes lists the same way. Prev/next stays within a lane (regular or Specials).
 - [ ] **B4 Item renderer:** 2:3 poster for movie/show/season, 16:9 still for episode. Subtitles as in spec §5; title click opens details and media click opens TMDB.
 - [ ] **B5 Popovers:** per-column `tooltipSpec` (raw copy values; multi mode for genres and keywords; score + vote count; spoiler blur).
 - [ ] **B6 Per-type default column sets** from the spec §5 table, plus Category off by default for TMDB types.

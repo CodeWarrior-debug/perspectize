@@ -536,15 +536,15 @@ export const COLUMNS: ColumnDef[] = [
     bindings: {
       tvEpisode: b('No.', 'required', 'api', "response->>'seasonNumber' + response->>'episodeNumber'", true, {
         unit: 'season·episode',
-        tooltip: 'Season and episode number. Sorts by season, then episode — not as text, so S1 E10 follows S1 E9.',
+        tooltip: 'Season and episode number. Sorts by season, then episode (so S1 E10 follows S1 E9), with Specials (season 0) after every regular season.',
         cellTip: 'Absolute position too ("episode 60 of 62"). Copy copies "S05E14".',
-        appearance: 'Monospace "S5 · E14", tabular figures. Sort key: season_number × 1000 + episode_number.',
+        appearance: 'Monospace "S5 · E14"; specials read "S0 · E3". Sort key: (season 0 → 10000, else season) × 1000 + episode, so Specials sort last ascending and first descending.',
         carriedBy: 'Item subtitle'
       }),
       tvSeason: b('No.', 'required', 'api', "response->>'seasonNumber'", false, {
         unit: 'season',
-        tooltip: 'Season number; 0 is "Specials". Usually repeats the season name, so off by default.',
-        appearance: '"S5"; season 0 renders "S0 · Specials" and sorts last, not first.'
+        tooltip: 'Season number. Specials (season 0) sort after every regular season. Usually repeats the season name, so off by default.',
+        appearance: '"S5"; season 0 renders "S0 · Specials". Sort key: season 0 → 10000, else the season number.'
       })
     }
   },
@@ -1348,7 +1348,7 @@ export const SAMPLES: Partial<Record<TypeId, SampleRow[]>> = {
       imdb: 'tt0903747',
       years: '2008–2013',
       lastAired: '2013-09-29 · S5 E16 “Felina”',
-      seasonList: 'Specials · 11 eps; Season 1 · 7 eps · 2008; Season 2 · 13 eps · 2009; Season 3 · 13 eps · 2010; Season 4 · 13 eps · 2011; Season 5 · 16 eps · 2012 ✓',
+      seasonList: 'Season 1 · 7 eps · 2008; Season 2 · 13 eps · 2009; Season 3 · 13 eps · 2010; Season 4 · 13 eps · 2011; Season 5 · 16 eps · 2012 ✓; Specials · 11 eps (season 0 — always last) ✓',
       cast: 'Bryan Cranston — Walter White; Aaron Paul — Jesse Pinkman; Anna Gunn — Skyler White; Dean Norris — Hank Schrader',
       perspectives: '4',
       avgRating: '4.8',
@@ -1427,6 +1427,25 @@ export const SAMPLES: Partial<Record<TypeId, SampleRow[]>> = {
       perspectives: '2',
       avgRating: '4.5',
       updatedAt: '2026-09-12'
+    },
+    {
+      item: { text: 'Specials', sub: 'Breaking Bad', tip: 'Breaking Bad › Specials (season 0) · extras, sorted after Season 5', copy: 'Breaking Bad — Specials' },
+      series: { text: 'Breaking Bad', tip: 'Breaking Bad (2008–2013)', copy: 'Breaking Bad' },
+      position: { text: 'S0 · Specials', tip: 'Season 0 on TMDB, sorted after every regular season', copy: 'S00', sort: 10000 },
+      genre: { text: 'Drama +1', items: ['Drama', 'Crime'] },
+      certification: { text: 'TV-MA', sort: 6 },
+      creator: 'Vince Gilligan',
+      venue: 'AMC',
+      episodes: { text: '11', sort: 11 },
+      date: { text: '2009-02-17', tip: 'Illustrative: specials air throughout the run, so this date says little about order', copy: '2009-02-17' },
+      identifier: { text: 'tv/1396/season/0', copy: '1396/0' },
+      description: 'Minisodes and extras released alongside the series.',
+      createdAt: '2026-09-22',
+      tmdbUrl: 'https://www.themoviedb.org/tv/1396/season/0',
+      episodeList: 'E1; E2; E3; … ; E11 — minisodes and extras, titles from TMDB, in episode-number order',
+      perspectives: '0',
+      avgRating: '—',
+      updatedAt: '2026-09-22'
     },
     {
       item: { text: 'Season 1', sub: 'Severance', tip: 'Severance › Season 1 · 9 episodes', copy: 'Severance — Season 1' },
