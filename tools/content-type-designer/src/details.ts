@@ -178,7 +178,7 @@ export const DETAILS: Partial<Record<TypeId, DetailsLayout>> = {
     actions: SOURCE_ACTIONS,
     attribution: TMDB_ATTRIBUTION,
     notes: [
-      'The seasons list is the way down the hierarchy: each row opens that season if it is in Perspectize, or adds it.',
+      'The seasons list is the way down the hierarchy: each row opens that season if it is in Perspectize, or adds it. Parents are force-added upward only — a show never adds its seasons.',
       'Status and next episode go stale — the "Update source data" cooldown matters more here than for films.'
     ]
   },
@@ -211,7 +211,7 @@ export const DETAILS: Partial<Record<TypeId, DetailsLayout>> = {
     actions: SOURCE_ACTIONS,
     attribution: TMDB_ATTRIBUTION,
     notes: [
-      'Breadcrumb links up to the show (its Perspectize row if present, otherwise TMDB).',
+      'Breadcrumb opens the show’s own row — it always exists, because adding a season force-adds its show (parent_content_id).',
       'Network / genre / certification are inherited from the show and not repeated as tiles.'
     ]
   },
@@ -243,7 +243,8 @@ export const DETAILS: Partial<Record<TypeId, DetailsLayout>> = {
     notes: [
       'Still (16:9), not a poster — episodes look like YouTube rows, which is correct: they are single viewings.',
       'Overview is blurred until hovered: episode synopses spoil plots.',
-      'Prev / next walk the season in order and cross into the next season at a finale.'
+      'Prev / next walk the season in order and cross into the next season at a finale.',
+      'Breadcrumb opens the season and show rows, which always exist: adding an episode force-adds both.'
     ]
   }
 };

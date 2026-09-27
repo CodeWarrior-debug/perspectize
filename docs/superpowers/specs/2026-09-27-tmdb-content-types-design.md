@@ -21,13 +21,23 @@ Perspectize takes three content types today: `YOUTUBE`, `CLAIM` and `BIBLE_PASSA
 | TV season | tv id + season_number | `https://www.themoviedb.org/tv/<id>/season/<n>` |
 | TV episode | tv id + season_number + episode_number | `https://www.themoviedb.org/tv/<id>/season/<n>/episode/<e>` |
 
-This is the Bible passage pattern (`CanonicalPassageURL`): the canonical URL *is* the dedupe key. The four URL shapes never collide, so the **global `UNIQUE(url)` stays** and no constraint migration is needed. Pasted inputs — TMDB URLs with slugs, `imdb.com/title/tt…` (resolved through TMDB `/find`), or a title search — are parsed to ids and then discarded. The season's own TMDB `_id` and the IMDb id are stored in `response` for linking, not for dedupe.
+This is the Bible passage pattern (`CanonicalPassageURL`): the canonical URL *is* the dedupe key. The four URL shapes never collide, so the **global `UNIQUE(url)` stays** and needs no constraint change. Pasted inputs — TMDB URLs with slugs, `imdb.com/title/tt…` (resolved through TMDB `/find`), or a title search — are parsed to ids and then discarded. The season's own TMDB `_id` and the IMDb id are stored in `response` for linking, not for dedupe.
 
-### 3. Hierarchy: soft parent links, no auto-created parents
+### 3. Hierarchy: parents are always added, linked by a real foreign key
 
-Seasons and episodes store `tmdbShowId`, `showName`, `seasonNumber` (and `episodeNumber`) in `response`. Adding an episode does **not** create its show or season rows. The **Show** cell and the details breadcrumb link to the parent's Perspectize row when it exists, and to TMDB when it does not. The show's details view lists its seasons, and the season's lists its episodes. Each entry is marked "in Perspectize › open" or "+ Add", which is how a user walks down the hierarchy.
+**Adding a season adds its show. Adding an episode adds its season and its show.** This happens in the same transaction and is not optional. Each parent goes through the same find-or-create path as a direct add: an existing row is reused, a missing one is created. The adding user is recorded as the submitter, and `response.addedVia = "parent"` notes why the row exists.
 
-No `parent_content_id` column yet. That keeps this change migration-free. Promote the fields to a real column only if "all perspectives under this show" becomes a query (see Open questions).
+Why force rather than offer:
+- **Every season and episode always has its parent row.** That lets the link be a real column instead of a TMDB id in JSON. Migration `0000NN_add_content_parent_id`: `content.parent_content_id BIGINT NULL REFERENCES content(id) ON DELETE RESTRICT`, plus an index. Seasons point at their show; episodes point at their season.
+- **Rollups become plain queries.** "All perspectives under Breaking Bad" is a two-level join (show ← seasons ← episodes), with no JSONB matching and no gaps where a parent was skipped.
+- **Every Show link and breadcrumb resolves inside Perspectize.** Nothing half-links out to TMDB depending on what someone happened to add first.
+- **The cost is small.** One extra TMDB call per season when an episode is added (`/tv/{id}/season/{n}`), which the episode add would need soon anyway for prev/next. It adds at most two quiet rows, and each one is a real, perspectiveable item.
+
+Details:
+- `response` still keeps `tmdbShowId`, `showName`, `seasonNumber` and `episodeNumber`. The ids stay the canonical-URL source; `showName` is a denormalised display and sort value, refreshed with source data.
+- Deleting a show or season that still has children is refused (`RESTRICT`). There is no delete-content flow today, so this only sets the rule for when one exists.
+- Force-add is not recursive downwards. Adding a show never adds its seasons, and adding a season never adds its episodes. The details lists offer "+ Add" for those.
+- `ON DELETE RESTRICT` and the nullable column make the migration safe to apply to a database that already has content: existing rows keep `NULL`. It must be applied manually per environment (never `make migrate-up`). The number must be re-checked at implementation time: `000028` and `000029` are claimed by in-flight branches (privacy, YouTube Music ISRC), so `000030` is the likely slot.
 
 ### 4. Ingestion and backend
 
@@ -64,7 +74,7 @@ New generic columns (per-type labels in brackets):
 - `certification` "Age rating" (Rated / TV rating)
 - `releaseStatus` "Release status" (Status / Episode type)
 
-All five live in `response` JSONB, so none needs a migration.
+All five live in `response` JSONB. The only migration in this design is the parent FK in §3; the Show column reads the parent row through it.
 
 ### 6. Tooltips and popovers
 
@@ -100,11 +110,11 @@ With the four TMDB types selected and the majority rule, the table shows ◎ · 
 - Watch-provider / "where to stream" data (TMDB `/watch/providers`, JustWatch-attributed).
 - People as content (actors, directors).
 - Non-US certifications: US is the first cut, and a user-region setting can come later.
-- Auto-creating parent show or season rows.
+- Auto-adding children (a show's seasons, a season's episodes).
 
 ## Open questions
 
-1. **Parent rows.** Should adding an episode offer, in the same dialog, to add its show too? The recommendation is to offer it with a checkbox that is off by default.
-2. **Aggregation.** Should a show's details view roll up perspectives on its seasons and episodes? That is the trigger for promoting `tmdbShowId` to an indexed column (migration).
+1. ~~Parent rows~~ **Decided 2026-09-27:** force-add, with a `parent_content_id` foreign key (§3).
+2. **Aggregation.** Should a show's details view roll up perspectives on its seasons and episodes? The FK from §3 makes it cheap; the open question is only whether the UI wants it.
 3. **Specials (season 0).** Allow them, or hide them from the add flow? The recommendation is to allow them, and sort them last.
 4. **Your rating vs TMDB Score.** Both are on by default. Is that one rating column too many for a 10-column view? The alternative is to put Watched in place of Your rating.

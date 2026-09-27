@@ -368,7 +368,7 @@ export const TYPES: ContentTypeProfile[] = [
     enrichment: 'TMDB /tv/{id}/season/{n} (episodes, air dates, runtimes) + the parent /tv/{id} for network, genres and certification',
     urlRequired: false,
     urlPattern: 'optional input: themoviedb.org/tv/<id>/season/<n> — or pick show → season; stored url regenerated',
-    identity: 'TMDB tv id + season_number (TMDB also issues a season _id — store it, dedupe on the pair)',
+    identity: 'TMDB tv id + season_number (TMDB also issues a season _id — store it, dedupe on the pair). Adding a season force-adds its show; parent_content_id → show',
     icon: 'layers',
     accent: '#3A6EA5',
     sharesUrlSpace: false,
@@ -384,7 +384,7 @@ export const TYPES: ContentTypeProfile[] = [
     enrichment: 'TMDB /tv/{id}/season/{n}/episode/{e}?append_to_response=credits,external_ids + the parent /tv/{id}',
     urlRequired: false,
     urlPattern: 'optional input: themoviedb.org/tv/<id>/season/<n>/episode/<e> — or pick show → season → episode; stored url regenerated',
-    identity: 'TMDB tv id + season_number + episode_number',
+    identity: 'TMDB tv id + season_number + episode_number. Adding an episode force-adds its season and show; parent_content_id → season',
     icon: 'clapperboard',
     accent: '#5A55B5',
     sharesUrlSpace: false,
@@ -497,20 +497,23 @@ export const COLUMNS: ColumnDef[] = [
     group: 'identity',
     valueType: 'ref',
     tooltip: 'The larger work this item belongs to',
-    storage: 'jsonb',
+    // Decision 2026-09-27: parents are force-added, so seasons/episodes link
+    // through a real content.parent_content_id FK (migration). Movie's
+    // Collection binding is still a response JSONB path.
+    storage: 'promoted-column',
     sortable: true,
     filterable: true,
     gapFallback: 'em-dash',
     bindings: {
-      tvSeason: b('Show', 'required', 'api', "response->>'showName' (+ response->>'tmdbShowId')", true, {
-        tooltip: "The series this season belongs to. Links to the show's Perspectize row when one exists, otherwise to TMDB.",
-        cellTip: 'Show name, air years, and whether the show itself is in Perspectize yet. Copy copies the show name.',
+      tvSeason: b('Show', 'required', 'derived', 'parent_content_id → content.name (the show; response.showName is the denormalised sort value)', true, {
+        tooltip: "The series this season belongs to. Opens the show's own row, which always exists: adding a season adds its show.",
+        cellTip: 'Show name and air years. Copy copies the show name.',
         appearance: 'Link-styled text, no poster. Sorts A–Z by show name.',
         carriedBy: 'Item subtitle'
       }),
-      tvEpisode: b('Show', 'required', 'api', "response->>'showName' (+ response->>'tmdbShowId')", true, {
-        tooltip: "The series this episode belongs to. Links to the show's Perspectize row when one exists, otherwise to TMDB.",
-        cellTip: 'Show name, air years, and whether the show itself is in Perspectize yet. Copy copies the show name.',
+      tvEpisode: b('Show', 'required', 'derived', 'parent_content_id → season → parent_content_id → content.name (response.showName for sort)', true, {
+        tooltip: "The series this episode belongs to. Opens the show's own row, which always exists: adding an episode adds its season and show.",
+        cellTip: 'Show name and air years. Copy copies the show name.',
         appearance: 'Link-styled text, no poster. Sorts A–Z by show name, then by No.',
         carriedBy: 'Item subtitle'
       }),
@@ -1405,7 +1408,7 @@ export const SAMPLES: Partial<Record<TypeId, SampleRow[]>> = {
   tvSeason: [
     {
       item: { text: 'Season 5', sub: 'Breaking Bad', tip: 'Breaking Bad › Season 5 · 16 episodes', copy: 'Breaking Bad — Season 5' },
-      series: { text: 'Breaking Bad', tip: 'Breaking Bad (2008–2013) · in Perspectize ✓', copy: 'Breaking Bad' },
+      series: { text: 'Breaking Bad', tip: 'Breaking Bad (2008–2013) · added with this item if it was new', copy: 'Breaking Bad' },
       position: { text: 'S5', sort: 5 },
       genre: { text: 'Drama +1', items: ['Drama', 'Crime'] },
       certification: { text: 'TV-MA', sort: 6 },
@@ -1427,7 +1430,7 @@ export const SAMPLES: Partial<Record<TypeId, SampleRow[]>> = {
     },
     {
       item: { text: 'Season 1', sub: 'Severance', tip: 'Severance › Season 1 · 9 episodes', copy: 'Severance — Season 1' },
-      series: { text: 'Severance', tip: 'Severance (2022–) · in Perspectize ✓', copy: 'Severance' },
+      series: { text: 'Severance', tip: 'Severance (2022–) · added with this item if it was new', copy: 'Severance' },
       position: { text: 'S1', sort: 1 },
       genre: { text: 'Drama +2', items: ['Drama', 'Mystery', 'Sci-Fi & Fantasy'] },
       certification: { text: 'TV-MA', sort: 6 },
@@ -1448,7 +1451,7 @@ export const SAMPLES: Partial<Record<TypeId, SampleRow[]>> = {
     },
     {
       item: { text: 'Season 2', sub: 'The Office', tip: 'The Office › Season 2 · 22 episodes', copy: 'The Office — Season 2' },
-      series: { text: 'The Office', tip: 'The Office (2005–2013) · in Perspectize ✓', copy: 'The Office' },
+      series: { text: 'The Office', tip: 'The Office (2005–2013) · added with this item if it was new', copy: 'The Office' },
       position: { text: 'S2', sort: 2 },
       genre: { text: 'Comedy', items: ['Comedy'] },
       certification: { text: 'TV-14', sort: 5 },
@@ -1472,7 +1475,7 @@ export const SAMPLES: Partial<Record<TypeId, SampleRow[]>> = {
   tvEpisode: [
     {
       item: { text: 'Ozymandias', sub: 'Breaking Bad · S5 E14', tip: 'Breaking Bad › Season 5 › E14 “Ozymandias”', copy: 'Breaking Bad S05E14 — Ozymandias' },
-      series: { text: 'Breaking Bad', tip: 'Breaking Bad (2008–2013) · in Perspectize ✓', copy: 'Breaking Bad' },
+      series: { text: 'Breaking Bad', tip: 'Breaking Bad (2008–2013) · added with this item if it was new', copy: 'Breaking Bad' },
       position: { text: 'S5 · E14', tip: 'Season 5, episode 14 · episode 60 of 62', copy: 'S05E14', sort: 5014 },
       genre: { text: 'Drama +1', items: ['Drama', 'Crime'] },
       certification: { text: 'TV-MA', sort: 6 },
@@ -1499,7 +1502,7 @@ export const SAMPLES: Partial<Record<TypeId, SampleRow[]>> = {
     },
     {
       item: { text: 'Felina', sub: 'Breaking Bad · S5 E16', tip: 'Breaking Bad › Season 5 › E16 “Felina” · series finale', copy: 'Breaking Bad S05E16 — Felina' },
-      series: { text: 'Breaking Bad', tip: 'Breaking Bad (2008–2013) · in Perspectize ✓', copy: 'Breaking Bad' },
+      series: { text: 'Breaking Bad', tip: 'Breaking Bad (2008–2013) · added with this item if it was new', copy: 'Breaking Bad' },
       position: { text: 'S5 · E16', tip: 'Season 5, episode 16 · episode 62 of 62', copy: 'S05E16', sort: 5016 },
       genre: { text: 'Drama +1', items: ['Drama', 'Crime'] },
       certification: { text: 'TV-MA', sort: 6 },
@@ -1524,7 +1527,7 @@ export const SAMPLES: Partial<Record<TypeId, SampleRow[]>> = {
     },
     {
       item: { text: 'The We We Are', sub: 'Severance · S1 E9', tip: 'Severance › Season 1 › E9 “The We We Are” · season finale', copy: 'Severance S01E09 — The We We Are' },
-      series: { text: 'Severance', tip: 'Severance (2022–) · in Perspectize ✓', copy: 'Severance' },
+      series: { text: 'Severance', tip: 'Severance (2022–) · added with this item if it was new', copy: 'Severance' },
       position: { text: 'S1 · E9', tip: 'Season 1, episode 9 · episode 9 of 19', copy: 'S01E09', sort: 1009 },
       genre: { text: 'Drama +2', items: ['Drama', 'Mystery', 'Sci-Fi & Fantasy'] },
       certification: { text: 'TV-MA', sort: 6 },
@@ -1549,7 +1552,7 @@ export const SAMPLES: Partial<Record<TypeId, SampleRow[]>> = {
     },
     {
       item: { text: 'The Dundies', sub: 'The Office · S2 E1', tip: 'The Office › Season 2 › E1 “The Dundies”', copy: 'The Office S02E01 — The Dundies' },
-      series: { text: 'The Office', tip: 'The Office (2005–2013) · in Perspectize ✓', copy: 'The Office' },
+      series: { text: 'The Office', tip: 'The Office (2005–2013) · added with this item if it was new', copy: 'The Office' },
       position: { text: 'S2 · E1', tip: 'Season 2, episode 1 · episode 7 of 201', copy: 'S02E01', sort: 2001 },
       genre: { text: 'Comedy', items: ['Comedy'] },
       certification: { text: 'TV-14', sort: 5 },
