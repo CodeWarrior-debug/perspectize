@@ -504,7 +504,9 @@ pnpm add --dir frontend @grafana/faro-web-sdk@2.12.1 @grafana/faro-web-tracing@2
   web vitals, plus `new TracingInstrumentation({ instrumentationOptions: { propagateTraceHeaderCorsUrls: [apiOriginRegex] } })`.
   Set the session attribute `platform` to `clientPlatform()`.
 - [ ] **Step 4: CSP.** Add the Faro collector origin to `connect-src` in `app.html`, e.g.
-  `https://faro-collector-prod-*.grafana.net`. Confirm the exact host from the Grafana app
+  `https://*.grafana.net` (CSP only allows `*` as a whole leading label — a mid-label pattern
+  like `faro-collector-prod-*.grafana.net` is invalid and silently dropped by browsers).
+  Optionally tighten to the exact collector host from the Grafana app
   settings in Manual step M3. Update `csp.test.ts` to assert it.
 - [ ] **Step 5:** Remove `vitals.ts` and its import. Leave the `web-vitals` dependency in
   place only if something else imports it (grep). Otherwise remove it from `package.json`.
