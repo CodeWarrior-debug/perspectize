@@ -200,3 +200,29 @@ func TestEval_SuiteArgs(t *testing.T) {
 	assert.Equal(t, 2, code)
 	assert.Contains(t, errOut, "guide suite only")
 }
+
+func TestChat_MaxRoundsWrapsUp(t *testing.T) {
+	call := llm.ToolCall{ID: "t", Name: "read_guide", Input: json.RawMessage(`{"area":"compare"}`)}
+	p := &fake.Provider{Turns: []fake.Turn{
+		{Calls: []llm.ToolCall{call}, Stop: llm.StopToolUse},
+		{Calls: []llm.ToolCall{call}, Stop: llm.StopToolUse},
+		{Text: []string{"Open Compare."}, Stop: llm.StopEnd},
+	}}
+	code, out, errOut := runWith(t, p, nil, "chat", "--max-rounds", "1", "How do I compare?")
+	require.Equal(t, 0, code, errOut)
+	assert.Equal(t, "Open Compare.\n", out)
+	assert.Contains(t, errOut, "cap_reached=true")
+	assert.Equal(t, llm.ToolChoiceNone, p.Requests()[2].ToolChoice)
+
+	code, _, errOut = runWith(t, p, nil, "chat", "--max-rounds", "99", "q")
+	assert.Equal(t, 1, code, "out-of-range cap is rejected")
+	assert.Contains(t, errOut, "max rounds")
+}
+
+func TestEval_PrintsMaxCalls(t *testing.T) {
+	p := answerAll(100, "Open **Compare** [compare.pick-two].")
+	code, out, errOut := runWith(t, p, nil, "eval", "--area", "compare", "--runs", "1", "--out", t.TempDir())
+	require.Equal(t, 0, code, errOut)
+	assert.Contains(t, out, "MAX CALLS")
+	assert.Contains(t, out, "runs that hit the round cap: 0")
+}

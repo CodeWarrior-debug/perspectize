@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/CodeWarrior-debug/perspectize/ai-tooling/agent"
 	"github.com/CodeWarrior-debug/perspectize/ai-tooling/llm"
 	"github.com/CodeWarrior-debug/perspectize/ai-tooling/llm/fake"
 	"github.com/stretchr/testify/assert"
@@ -41,4 +42,23 @@ func TestNew_Validates(t *testing.T) {
 	assert.Error(t, err, "provider required")
 	_, err = New(Config{Provider: &fake.Provider{}, Areas: testAreas()})
 	assert.Error(t, err, "model required")
+	_, err = New(Config{Provider: &fake.Provider{}, Model: "m", MaxRounds: -1})
+	assert.Error(t, err, "negative max rounds")
+	_, err = New(Config{Provider: &fake.Provider{}, Model: "m", MaxRounds: agent.MaxAllowedRounds + 1})
+	assert.Error(t, err, "max rounds above the allowed ceiling")
+}
+
+func TestAssistant_MaxRoundsIsHonoured(t *testing.T) {
+	call := llm.ToolCall{ID: "t", Name: ReadGuideToolName, Input: json.RawMessage(`{"area":"compare"}`)}
+	p := &fake.Provider{Turns: []fake.Turn{
+		{Calls: []llm.ToolCall{call}, Stop: llm.StopToolUse},
+		{Calls: []llm.ToolCall{call}, Stop: llm.StopToolUse}, // over a cap of 1
+		{Text: []string{"Open **Compare** [compare.pick-two]."}, Stop: llm.StopEnd},
+	}}
+	a, err := New(Config{Provider: p, Model: "m", Areas: testAreas(), MaxRounds: 1})
+	require.NoError(t, err)
+	res, err := a.Ask(context.Background(), "q", func(llm.Event) {})
+	require.NoError(t, err)
+	assert.True(t, res.CapReached)
+	assert.Equal(t, 3, res.Calls)
 }

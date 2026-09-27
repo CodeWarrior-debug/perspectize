@@ -40,6 +40,9 @@ type RunResult struct {
 	Calls   int           `json:"model_calls"`
 	Usage   llm.Usage     `json:"usage"`
 	Latency time.Duration `json:"latency_ns"`
+	// CapReached means the run hit the round cap and answered from a
+	// wrap-up turn with tools disabled.
+	CapReached bool `json:"cap_reached,omitempty"`
 }
 
 // SeedReport aggregates the runs of one case.
@@ -48,6 +51,7 @@ type SeedReport struct {
 	Question string      `json:"question"`
 	Trap     bool        `json:"trap"`
 	PassRate float64     `json:"pass_rate"`
+	MaxCalls int         `json:"max_model_calls"`
 	Runs     []RunResult `json:"runs"`
 }
 
@@ -60,7 +64,11 @@ type Report struct {
 	ModelCalls  int           `json:"model_calls"`
 	Usage       llm.Usage     `json:"usage"`
 	AvgLatency  time.Duration `json:"avg_latency_ns"`
-	Seeds       []SeedReport  `json:"seeds"`
+	// MaxCalls is the most model calls any run needed, and CapReached how
+	// many runs hit the round cap: the data to set the cap from.
+	MaxCalls   int          `json:"max_model_calls"`
+	CapReached int          `json:"cap_reached_runs"`
+	Seeds      []SeedReport `json:"seeds"`
 }
 
 // Citations returns the unique [area.task] IDs in text, in first-seen order.
@@ -157,7 +165,7 @@ func runItems(ctx context.Context, model string, items []item, runs int) Report 
 		for i := 0; i < runs; i++ {
 			start := time.Now()
 			res, err := it.ask(ctx)
-			rr := RunResult{Latency: time.Since(start), Stop: res.Stop, Calls: res.Calls, Usage: res.Usage}
+			rr := RunResult{Latency: time.Since(start), Stop: res.Stop, Calls: res.Calls, Usage: res.Usage, CapReached: res.CapReached}
 			if err != nil {
 				rr.Reason = "error: " + err.Error()
 			} else {
@@ -168,6 +176,7 @@ func runItems(ctx context.Context, model string, items []item, runs int) Report 
 			if rr.Pass {
 				seedPasses++
 			}
+			sr.MaxCalls = max(sr.MaxCalls, rr.Calls)
 			sr.Runs = append(sr.Runs, rr)
 		}
 		if runs > 0 {
@@ -197,9 +206,13 @@ func Merge(model string, reps ...Report) Report {
 func summarize(rep *Report) {
 	var passes, total int
 	var latency time.Duration
-	rep.ModelCalls, rep.Usage = 0, llm.Usage{}
+	rep.ModelCalls, rep.Usage, rep.MaxCalls, rep.CapReached = 0, llm.Usage{}, 0, 0
 	for _, s := range rep.Seeds {
 		for _, r := range s.Runs {
+			rep.MaxCalls = max(rep.MaxCalls, r.Calls)
+			if r.CapReached {
+				rep.CapReached++
+			}
 			if r.Pass {
 				passes++
 			}

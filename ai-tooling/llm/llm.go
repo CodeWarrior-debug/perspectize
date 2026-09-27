@@ -108,7 +108,19 @@ type Request struct {
 	Messages  []Message
 	Tools     []ToolSpec
 	MaxTokens int
+	// ToolChoice constrains tool use for this call. The zero value lets the
+	// model decide; ToolChoiceNone forbids tool calls while keeping the tool
+	// definitions (needed when the history already contains tool calls).
+	ToolChoice ToolChoice
 }
+
+// ToolChoice constrains whether the model may call tools on one request.
+type ToolChoice string
+
+const (
+	ToolChoiceAuto ToolChoice = ""     // the model decides (default)
+	ToolChoiceNone ToolChoice = "none" // answer in text only
+)
 
 // Stop is why the model stopped generating.
 type Stop string

@@ -26,6 +26,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/CodeWarrior-debug/perspectize/ai-tooling/agent"
 	"github.com/CodeWarrior-debug/perspectize/ai-tooling/appguide"
 	"github.com/CodeWarrior-debug/perspectize/ai-tooling/evals"
 	"github.com/CodeWarrior-debug/perspectize/ai-tooling/jeeves"
@@ -40,9 +41,10 @@ const usageText = `usage: botler <command>
   tools list                          list Jeeves's tools
   tools call <name> [--as ID] --input '<json>'
                                       run one tool directly (no model)
-  chat [--model M] [--name N] [--as ID] <q...>
+  chat [--model M] [--name N] [--as ID] [--max-rounds N] <q...>
                                       ask Jeeves one question (streams)
-  eval [--suite guide|data|all] [--model M] [--area A] [--runs N] [--out DIR]
+  eval [--suite guide|data|all] [--model M] [--area A] [--runs N]
+       [--max-rounds N] [--out DIR]
                                       run eval questions, grade them,
                                       print a report, save JSON to DIR
 
@@ -85,7 +87,7 @@ func run(args []string, stdout, stderr io.Writer, d deps) int {
 // newAssistant builds Jeeves the way the backend does (guide plus data
 // tools), over the embedded guide and the fixture data. provider may be nil
 // for commands that never call a model.
-func newAssistant(p llm.Provider, model, name string) (*jeeves.Assistant, error) {
+func newAssistant(p llm.Provider, model, name string, maxRounds int) (*jeeves.Assistant, error) {
 	areas, _, err := appguide.Load()
 	if err != nil {
 		return nil, err
@@ -93,11 +95,11 @@ func newAssistant(p llm.Provider, model, name string) (*jeeves.Assistant, error)
 	if p == nil {
 		p = noProvider{}
 	}
-	return jeeves.New(jeeves.Config{Provider: p, Model: model, Areas: areas, Name: name, Data: evals.FixtureData()})
+	return jeeves.New(jeeves.Config{Provider: p, Model: model, Areas: areas, Name: name, Data: evals.FixtureData(), MaxRounds: maxRounds})
 }
 
 func runTools(args []string, stdout, stderr io.Writer) int {
-	a, err := newAssistant(nil, defaultModel, "")
+	a, err := newAssistant(nil, defaultModel, "", 0)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
@@ -149,6 +151,7 @@ func runChat(args []string, stdout, stderr io.Writer, d deps) int {
 	model := fs.String("model", "", "model ID (default: $ASSISTANT_MODEL or "+defaultModel+")")
 	name := fs.String("name", "", "assistant display name (default: "+jeeves.DefaultName+")")
 	as := fs.Int("as", 0, "fixture user ID to act as (default: signed out)")
+	maxRounds := fs.Int("max-rounds", 0, fmt.Sprintf("tool rounds before a wrap-up answer (default %d, max %d)", agent.DefaultMaxRounds, agent.MaxAllowedRounds))
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -159,7 +162,7 @@ func runChat(args []string, stdout, stderr io.Writer, d deps) int {
 	}
 	m := resolveModel(*model, d)
 
-	a, err := newAssistant(d.newProvider(), m, *name)
+	a, err := newAssistant(d.newProvider(), m, *name, *maxRounds)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
@@ -183,8 +186,8 @@ func runChat(args []string, stdout, stderr io.Writer, d deps) int {
 		return 1
 	}
 	u := res.Usage
-	fmt.Fprintf(stderr, "[model=%s stop=%s calls=%d in=%d out=%d cache_read=%d cache_write=%d]\n",
-		m, res.Stop, res.Calls, u.InputTokens, u.OutputTokens, u.CacheReadTokens, u.CacheWriteTokens)
+	fmt.Fprintf(stderr, "[model=%s stop=%s calls=%d cap_reached=%t in=%d out=%d cache_read=%d cache_write=%d]\n",
+		m, res.Stop, res.Calls, res.CapReached, u.InputTokens, u.OutputTokens, u.CacheReadTokens, u.CacheWriteTokens)
 	return 0
 }
 
@@ -213,6 +216,7 @@ func runEval(args []string, stdout, stderr io.Writer, d deps) int {
 	suite := fs.String("suite", "guide", "which questions: guide, data or all")
 	area := fs.String("area", "", "only this guide area (guide suite; default: all)")
 	runs := fs.Int("runs", 3, "runs per seed question")
+	maxRounds := fs.Int("max-rounds", 0, fmt.Sprintf("tool rounds before a wrap-up answer (default %d, max %d)", agent.DefaultMaxRounds, agent.MaxAllowedRounds))
 	out := fs.String("out", filepath.Join("evals", "results"), "directory for the JSON report")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -250,7 +254,7 @@ func runEval(args []string, stdout, stderr io.Writer, d deps) int {
 	}
 	// Evals build Jeeves exactly as the backend does, so the prompt under
 	// test is the production prompt.
-	a, err := jeeves.New(jeeves.Config{Provider: d.newProvider(), Model: m, Areas: areas, Data: evals.FixtureData()})
+	a, err := jeeves.New(jeeves.Config{Provider: d.newProvider(), Model: m, Areas: areas, Data: evals.FixtureData(), MaxRounds: *maxRounds})
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
@@ -281,7 +285,7 @@ func runEval(args []string, stdout, stderr io.Writer, d deps) int {
 
 func printReport(w io.Writer, rep evals.Report) {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "PASS\tTRAP\tAVG IN\tAVG OUT\tAVG LATENCY\tQUESTION")
+	fmt.Fprintln(tw, "PASS\tTRAP\tMAX CALLS\tAVG IN\tAVG OUT\tAVG LATENCY\tQUESTION")
 	for _, s := range rep.Seeds {
 		var in, outTok int
 		var lat time.Duration
@@ -299,13 +303,14 @@ func printReport(w io.Writer, rep evals.Report) {
 		if s.Trap {
 			trap = "yes"
 		}
-		fmt.Fprintf(tw, "%d/%d\t%s\t%d\t%d\t%s\t%s\n", passes, n, trap, in/n, outTok/n,
+		fmt.Fprintf(tw, "%d/%d\t%s\t%d\t%d\t%d\t%s\t%s\n", passes, n, trap, s.MaxCalls, in/n, outTok/n,
 			(lat / time.Duration(n)).Round(time.Millisecond), truncate(s.Question, 60))
 	}
 	tw.Flush()
 	fmt.Fprintf(w, "\nmodel %s — pass rate %.0f%% — %d model calls — tokens in %d / out %d (cache read %d) — avg latency %s\n",
 		rep.Model, rep.PassRate*100, rep.ModelCalls, rep.Usage.InputTokens, rep.Usage.OutputTokens,
 		rep.Usage.CacheReadTokens, rep.AvgLatency.Round(time.Millisecond))
+	fmt.Fprintf(w, "max model calls in one run: %d — runs that hit the round cap: %d\n", rep.MaxCalls, rep.CapReached)
 	for _, s := range rep.Seeds {
 		for _, r := range s.Runs {
 			if !r.Pass {

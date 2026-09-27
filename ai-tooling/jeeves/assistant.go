@@ -3,6 +3,7 @@ package jeeves
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/CodeWarrior-debug/perspectize/ai-tooling/agent"
 	"github.com/CodeWarrior-debug/perspectize/ai-tooling/appguide"
@@ -23,17 +24,22 @@ type Config struct {
 	// Data, when set, adds the read-only data tools (list_perspectives),
 	// bound per request to the viewer passed to AskAs.
 	Data PerspectizeData
+
+	// MaxRounds caps tool rounds per question (0 = agent.DefaultMaxRounds,
+	// at most agent.MaxAllowedRounds). Hitting it triggers a wrap-up answer.
+	MaxRounds int
 }
 
 // Assistant is Jeeves: system prompt + tools + agent loop, ready to ask.
 // botler, evals and (later) the backend all build it the same way.
 type Assistant struct {
-	provider llm.Provider
-	areas    []appguide.Area
-	data     PerspectizeData
-	tools    *agent.Registry // tool set for an anonymous viewer
-	model    string
-	system   string
+	provider  llm.Provider
+	areas     []appguide.Area
+	data      PerspectizeData
+	tools     *agent.Registry // tool set for an anonymous viewer
+	model     string
+	system    string
+	maxRounds int
 }
 
 // New builds an Assistant: read_guide always, plus the data tools when
@@ -45,12 +51,16 @@ func New(cfg Config) (*Assistant, error) {
 	if cfg.Model == "" {
 		return nil, errors.New("jeeves: model required")
 	}
+	if cfg.MaxRounds < 0 || cfg.MaxRounds > agent.MaxAllowedRounds {
+		return nil, fmt.Errorf("jeeves: max rounds must be 0..%d, got %d", agent.MaxAllowedRounds, cfg.MaxRounds)
+	}
 	a := &Assistant{
-		provider: cfg.Provider,
-		areas:    cfg.Areas,
-		data:     cfg.Data,
-		model:    cfg.Model,
-		system:   SystemPrompt(cfg.Areas, cfg.Name, cfg.Data != nil),
+		maxRounds: cfg.MaxRounds,
+		provider:  cfg.Provider,
+		areas:     cfg.Areas,
+		data:      cfg.Data,
+		model:     cfg.Model,
+		system:    SystemPrompt(cfg.Areas, cfg.Name, cfg.Data != nil),
 	}
 	tools, err := a.ToolsFor(Viewer{})
 	if err != nil {
@@ -87,7 +97,7 @@ func (a *Assistant) AskAs(ctx context.Context, viewer Viewer, question string, o
 			return agent.Result{}, err
 		}
 	}
-	loop := &agent.Loop{Provider: a.provider, Tools: tools}
+	loop := &agent.Loop{Provider: a.provider, Tools: tools, MaxRounds: a.maxRounds}
 	return loop.Run(ctx, llm.Request{
 		Model:     a.model,
 		System:    a.system,
