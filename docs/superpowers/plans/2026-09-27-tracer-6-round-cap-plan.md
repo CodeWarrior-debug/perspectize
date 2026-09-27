@@ -14,30 +14,37 @@
 
 ## Task 1: Neutral `ToolChoice` and the Anthropic mapping
 
-- [ ] `llm.Request.ToolChoice` with `llm.ToolChoiceNone`.
-- [ ] The adapter sets `tool_choice: {"type":"none"}` when asked; the SSE test server asserts the request body.
+- [x] `llm.Request.ToolChoice` with `llm.ToolChoiceNone`.
+- [x] The adapter sets `tool_choice: {"type":"none"}` when asked; the SSE test server asserts the request body.
 
 **Learn:** *Quiz:* "Why keep the tool definitions on the final call instead of dropping them?"
 
 ## Task 2: Graceful cap in the loop
 
-- [ ] At the cap: an error `tool_result` for every pending call, then one final call with `ToolChoice: none`. `Result.CapReached = true`, nil error.
-- [ ] Still asking for tools after that returns `ErrRoundCap`.
-- [ ] `agent.MaxAllowedRounds = 20`.
-- [ ] Tests: the wrap-up answer returns with `CapReached`; every `tool_use` gets a `tool_result`; the final request has `ToolChoice none`; the pending tools never run; a stubborn model returns `ErrRoundCap`; a custom `MaxRounds` is honoured.
+- [x] At the cap: an error `tool_result` for every pending call, then one final call with `ToolChoice: none`. `Result.CapReached = true`, nil error.
+- [x] Still asking for tools after that returns `ErrRoundCap`.
+- [x] `agent.MaxAllowedRounds = 20`.
+- [x] Tests: the wrap-up answer returns with `CapReached`; every `tool_use` gets a `tool_result`; the final request has `ToolChoice none`; the pending tools never run; a stubborn model returns `ErrRoundCap`; a custom `MaxRounds` is honoured.
 
 **Learn:** *Quiz:* "The loop refuses to run the last requested tools. Why must it still send a `tool_result` for each?"
 
 ## Task 3: Configuration
 
-- [ ] `jeeves.Config.MaxRounds` (validated `0..20`).
-- [ ] Backend `ASSISTANT_MAX_ROUNDS` (validated at startup). `NewJeeves` takes a `JeevesConfig`. The usage log gains `cap_reached`.
-- [ ] `botler chat/eval --max-rounds`.
+- [x] `jeeves.Config.MaxRounds` (validated `0..20`).
+- [x] Backend `ASSISTANT_MAX_ROUNDS` (validated at startup). `NewJeeves` takes a `JeevesConfig`. The usage log gains `cap_reached`.
+- [x] `botler chat/eval --max-rounds`.
 
 ## Task 4: Measurement
 
-- [ ] `RunResult.CapReached`, `SeedReport.MaxCalls`, `Report.MaxCalls` and `Report.CapReached`; `botler eval` prints them.
+- [x] `RunResult.CapReached`, `SeedReport.MaxCalls`, `Report.MaxCalls` and `Report.CapReached`; `botler eval` prints them.
 
 ## Task 5: Baseline (owner, needs the API key)
 
 - [ ] `botler eval --suite all --runs 3`, then read `MAX CALLS`. Record the distribution in `ai-tooling/CLAUDE.md`, and set `ASSISTANT_MAX_ROUNDS` from it if 6 is clearly wrong.
+
+## Notes (recorded at code-complete)
+
+- **Call count at the cap** is `MaxRounds` tool rounds, the over-cap request, then the wrap-up: `MaxRounds + 2` calls. The default is therefore at most 8 calls per question.
+- **Range check** happens in `jeeves.New`, which runs at backend startup, so the config loader only rejects non-numbers. There's one source of truth for the range: `agent.MaxAllowedRounds`.
+- **`ToolChoice` is neutral**, and only the Anthropic adapter knows `tool_choice: none`. The fake provider records it, so the loop tests assert it without a network.
+
