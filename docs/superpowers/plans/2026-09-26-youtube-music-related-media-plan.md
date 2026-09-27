@@ -29,31 +29,31 @@
 
 ## Task 1 — Domain: content type and related media
 
-- [ ] Add `ContentTypeYouTubeMusic ContentType = "YOUTUBE_MUSIC"` in `backend/internal/core/domain/content.go`, along with the DB converter (`youtube_music`).
-- [ ] Add `RelatedMedia{Provider, VideoID, Kind, Title, AddedFrom, ContentID *int, Unavailable bool}` and `RelatedMediaKind` constants (`audio`, `official_video`, `lyric_video`, `live`, `other`) in a new `domain/related_media.go`.
-- [ ] Add pure helpers with table-driven tests in `test/domain/`: `AddRelatedMedia(existing, ref)`, which dedupes by `provider + videoId`, and `LinkRelatedMedia(videoId, contentID)`.
+- [x] Add `ContentTypeYouTubeMusic ContentType = "YOUTUBE_MUSIC"` in `backend/internal/core/domain/content.go`, along with the DB converter (`youtube_music`).
+- [x] Add `RelatedMedia{Provider, VideoID, Kind, Title, AddedFrom, ContentID *int, Unavailable bool}` and `RelatedMediaKind` constants (`audio`, `official_video`, `lyric_video`, `live`, `other`) in a new `domain/related_media.go`.
+- [x] Add pure helpers with table-driven tests in `test/domain/`: `AddRelatedMedia(existing, ref)`, which dedupes by `provider + videoId`, and `LinkRelatedMedia(videoId, contentID)`.
 
 ## Task 2 — URL classification
 
-- [ ] In `adapters/youtube/parser.go`, add `ClassifyURL(url) (kind URLKind, videoID string, err error)`. It returns `video | musicTrack | musicCollection | invalid`:
+- [x] In `adapters/youtube/parser.go`, add `ClassifyURL(url) (kind URLKind, videoID string, err error)`. It returns `video | musicTrack | musicCollection | invalid`:
   - `music.youtube.com/watch?v=` returns `musicTrack`, and a `list=` parameter is ignored.
   - `/playlist` and `/browse/` return `musicCollection`.
   - Every existing pattern returns `video`.
-- [ ] Add `NormalizeYouTubeMusicURL(id)`, which returns `https://music.youtube.com/watch?v=<id>`.
-- [ ] Extend `test/youtube/parser_test.go` with all of the shapes above. The existing cases must stay green.
+- [x] Add `NormalizeYouTubeMusicURL(id)`, which returns `https://music.youtube.com/watch?v=<id>`.
+- [x] Extend `test/youtube/parser_test.go` with all of the shapes above. The existing cases must stay green.
 
 ## Task 3 — Ports and adapters
 
-- [ ] Add port `YTMusicClient.GetTrack(ctx, videoID) (*YTMusicTrack, error)`. It returns artist, album, `isSong`, and counterpart video IDs with their kinds.
-- [ ] Add port `MusicBrainzClient.FindRecording(ctx, artist, title string, durationSec int) (*Recording, error)`. It returns ISRC, release date, genre tags and release MBID; the cover URL comes from Cover Art Archive.
-- [ ] Add adapter `adapters/ytmusic/`, which POSTs to the InnerTube `next` endpoint with a WEB_REMIX client context. Use the ytmusicapi parsing as the reference. Apply a timeout of ≤3s.
-- [ ] Add adapter `adapters/musicbrainz/`, with a 1 request/second limiter and a required User-Agent. Match on duration ±3s and choose the highest score ≥90. Otherwise return `ErrNotFound`.
-- [ ] Add parser tests against recorded JSON fixtures in `test/ytmusic/` and `test/musicbrainz/`.
-- [ ] Wire both adapters in `cmd/server/main.go` through a `ContentServiceOption`, `WithMusicEnrichment(yt, mb)`.
+- [x] Add port `YTMusicClient.GetTrack(ctx, videoID) (*YTMusicTrack, error)`. It returns artist, album, `isSong`, and counterpart video IDs with their kinds.
+- [x] Add port `MusicBrainzClient.FindRecording(ctx, artist, title string, durationSec int) (*Recording, error)`. It returns ISRC, release date, genre tags and release MBID; the cover URL comes from Cover Art Archive.
+- [x] Add adapter `adapters/ytmusic/`, which POSTs to the InnerTube `next` endpoint with a WEB_REMIX client context. Use the ytmusicapi parsing as the reference. Apply a timeout of ≤3s.
+- [x] Add adapter `adapters/musicbrainz/`, with a 1 request/second limiter and a required User-Agent. Match on duration ±3s and choose the highest score ≥90. Otherwise return `ErrNotFound`.
+- [x] Add parser tests against recorded JSON fixtures in `test/ytmusic/` and `test/musicbrainz/`.
+- [x] Wire both adapters in `cmd/server/main.go` through a `ContentServiceOption`, `WithMusicEnrichment(yt, mb)`.
 
 ## Task 4 — Service: `CreateFromYouTubeMusic`
 
-- [ ] Implement the flow in `content_service.go`:
+- [x] Implement the flow in `content_service.go`:
   1. Classify the URL. Return `ErrInvalidURL` for anything that isn't `musicTrack`. For `musicCollection`, return a new `ErrNotATrack`.
   2. Build the canonical URL. If it already exists, add the pasted ID to the existing row's related media and return `ErrAlreadyExists`.
   3. Call the Data API `GetVideoMetadata`. This call is **fatal** on error.
@@ -61,51 +61,51 @@
   5. Call `MusicBrainzClient.FindRecording` when an artist is known. If it finds an ISRC and a row with that ISRC exists, append the related media to that row and return `ErrAlreadyExists`.
   6. Seed `relatedMedia` from the InnerTube counterparts. For each one whose canonical `YOUTUBE` URL already exists, set `contentId`.
   7. Upsert with `ContentTypeYouTubeMusic`.
-- [ ] Add a `GetByISRC(ctx, isrc)` repo method that queries `response->>'isrc'` for the `youtube_music` type. Update every mock that implements `ContentRepository`.
-- [ ] Add service tests with mocks, one per spec flow state: full, no-MB-match, InnerTube-down, ISRC-dupe, URL-dupe, existing-video-link, not-a-track, Data API failure.
+- [x] Add a `GetByISRC(ctx, isrc)` repo method that queries `response->>'isrc'` for the `youtube_music` type. Update every mock that implements `ContentRepository`.
+- [x] Add service tests with mocks, one per spec flow state: full, no-MB-match, InnerTube-down, ISRC-dupe, URL-dupe, existing-video-link, not-a-track, Data API failure.
 
 ## Task 5 — Migration
 
-- [ ] Write an idempotent migration `NNNNNN_youtube_music_isrc_index` that runs `CREATE INDEX IF NOT EXISTS idx_content_isrc ON content ((response->>'isrc')) WHERE content_type = 'youtube_music';`, with a matching down file. No constraint changes are needed.
-- [ ] If `content_type` is a DB enum or check constraint, add `youtube_music` idempotently. Check first.
-- [ ] Do not apply it. Flag it in the PR body.
+- [x] Write an idempotent migration `NNNNNN_youtube_music_isrc_index` that runs `CREATE INDEX IF NOT EXISTS idx_content_isrc ON content ((response->>'isrc')) WHERE content_type = 'youtube_music';`, with a matching down file. No constraint changes are needed.
+- [x] If `content_type` is a DB enum or check constraint, add `youtube_music` idempotently. Check first.
+- [x] Do not apply it. Flag it in the PR body.
 
 ## Task 6 — GraphQL
 
-- [ ] Add `YOUTUBE_MUSIC` to the `ContentType` enum.
-- [ ] Add `createContentFromYouTubeMusic(input: CreateContentFromUrlInput!)`. Make it `@auth`-gated and derive the user ID the same way `CreateContentFromYouTube` does.
-- [ ] Add a `RelatedMedia` type and a `Content.relatedMedia: [RelatedMedia!]!` field, resolved from `response`.
-- [ ] Add `promoteRelatedMedia(contentId: ID!, videoId: String!): Content!`. It calls `CreateFromYouTube` and then links both directions in one transaction. If the video already exists, it returns the existing row, linked.
-- [ ] Add `markRelatedMediaUnavailable(contentId: ID!, videoId: String!)` for the player's lazy check.
-- [ ] Add resolver tests in `test/resolvers/`.
+- [x] Add `YOUTUBE_MUSIC` to the `ContentType` enum.
+- [x] Add `createContentFromYouTubeMusic(input: CreateContentFromUrlInput!)`. Make it `@auth`-gated and derive the user ID the same way `CreateContentFromYouTube` does.
+- [x] Add a `RelatedMedia` type and a `Content.relatedMedia: [RelatedMedia!]!` field, resolved from `response`.
+- [x] Add `promoteRelatedMedia(contentId: ID!, videoId: String!): Content!`. It calls `CreateFromYouTube` and then links both directions in one transaction. If the video already exists, it returns the existing row, linked.
+- [x] Add `markRelatedMediaUnavailable(contentId: ID!, videoId: String!)` for the player's lazy check.
+- [x] Add resolver tests in `test/resolvers/`.
 
 ## Task 7 — Frontend: Add Content routing
 
-- [ ] Add `classifyYouTubeUrl()` in `src/lib/utils/youtube.ts`, mirroring the backend, with unit tests.
-- [ ] In `AddVideoDialog.svelte`, call the music mutation for `musicTrack` links. For `musicCollection`, show "Paste a song link, not an album or playlist".
-- [ ] After a successful add, if `relatedMedia` contains an `official_video` with no `contentId`, show one toast with an "Add video separately" action that calls `promoteRelatedMedia`. Show it once per add and never for a duplicate.
+- [x] Add `classifyYouTubeUrl()` in `src/lib/utils/youtube.ts`, mirroring the backend, with unit tests.
+- [x] In `AddVideoDialog.svelte`, call the music mutation for `musicTrack` links. For `musicCollection`, show "Paste a song link, not an album or playlist".
+- [x] After a successful add, if `relatedMedia` contains an `official_video` with no `contentId`, show one toast with an "Add video separately" action that calls `promoteRelatedMedia`. Show it once per add and never for a duplicate.
 
 ## Task 8 — Frontend: player and related media
 
-- [ ] Build `MediaPlayer.svelte`, which takes a primary video ID and a fallback list. It renders a `youtube-nocookie` iframe with `enablejsapi=1`.
+- [x] Build `MediaPlayer.svelte`, which takes a primary video ID and a fallback list. It renders a `youtube-nocookie` iframe with `enablejsapi=1`.
   - On an `onError` of 101/150 (embedding disabled), it calls `markRelatedMediaUnavailable` and advances to the next reference.
   - Once every option is exhausted, it shows "Open in YouTube Music".
-- [ ] Mount the player in the details modal for `YOUTUBE_MUSIC` rows.
-- [ ] Add a related-media list under the player. Each entry shows its kind chip and title, and offers either "Add as its own item" or "Open in Perspectize" when `contentId` is set. Unavailable entries are greyed out.
-- [ ] Add icon/thumbnail rendering in `activityItemCellRenderer.ts` / `formatting.ts`: the `note` icon, plus the Cover Art Archive URL when one is present and `i.ytimg` otherwise. The Artist label comes from the Creator column.
-- [ ] Update the CSP in `app.html` (`frame-src`) for `https://www.youtube-nocookie.com`, and `img-src` for `coverartarchive.org` and `archive.org`.
-- [ ] Add component tests for the player's fallback sequence, the prompt showing once, and the promote/open button states.
+- [x] Mount the player in the details modal for `YOUTUBE_MUSIC` rows.
+- [x] Add a related-media list under the player. Each entry shows its kind chip and title, and offers either "Add as its own item" or "Open in Perspectize" when `contentId` is set. Unavailable entries are greyed out.
+- [ ] Add icon/thumbnail rendering in `activityItemCellRenderer.ts` / `formatting.ts`: the `note` icon, plus the Cover Art Archive URL when one is present and `i.ytimg` otherwise. The Artist label comes from the Creator column. _(Partly done: the grid Type column shows the music icon. The Item thumbnail still uses `i.ytimg`; switching it to `coverImageUrl` is still to do.)_
+- [x] Update the CSP in `app.html` (`frame-src`) for `https://www.youtube-nocookie.com`, and `img-src` for `coverartarchive.org` and `archive.org`.
+- [x] Add component tests for the player's fallback sequence, the prompt showing once, and the promote/open button states.
 
 ## Task 9 — Lyrics availability (link out, no text stored)
 
-- [ ] **Port and adapter.** Add port `LyricsClient.Check(ctx, artist, title string, durationSec int) (*LyricsAvailability, error)`, returning `{Available, LRCLibID, HasSynced}`.
+- [x] **Port and adapter.** Add port `LyricsClient.Check(ctx, artist, title string, durationSec int) (*LyricsAvailability, error)`, returning `{Available, LRCLibID, HasSynced}`.
   - Build the adapter in `adapters/lrclib/`: call `GET https://lrclib.net/api/search`, match artist + title and duration ±3s, and send a project User-Agent.
   - **The adapter must drop `plainLyrics` and `syncedLyrics` while parsing.** Add a test asserting that no lyrics text leaves the adapter.
-- [ ] **Service.** Add `ContentService.CheckLyrics(ctx, contentID)`, which writes `response.lyrics = {available, lrclibId, hasSynced, checkedAt}`.
+- [x] **Service.** Add `ContentService.CheckLyrics(ctx, contentID)`, which writes `response.lyrics = {available, lrclibId, hasSynced, checkedAt}`.
   - After `CreateFromYouTubeMusic` succeeds (and for `MUSIC_TRACK`), call it asynchronously in a goroutine with its own timeout. A failure is logged and doesn't block the add.
-- [ ] **GraphQL.** Add `Content.lyrics: LyricsAvailability` (nullable, since the row may not have been checked yet) and `mutation refreshLyricsAvailability(contentId: ID!)`.
+- [x] **GraphQL.** Add `Content.lyrics: LyricsAvailability` (nullable, since the row may not have been checked yet) and `mutation refreshLyricsAvailability(contentId: ID!)`.
   - The mutation only re-checks when the stored result is "not available" and `checkedAt` is more than 30 days old. Otherwise it returns the stored value.
-- [ ] **Frontend.** Build `LyricsLinks.svelte` in the details modal, implementing the spec's decision-10 state table exactly.
+- [x] **Frontend.** Build `LyricsLinks.svelte` in the details modal, implementing the spec's decision-10 state table exactly.
   - "Open lyrics" appears **only** when `available && lrclibId` and per-track pages are confirmed (confirmed; link `https://lrclib.net/tracks/<lrclibId>`, search `https://lrclib.net/search/<encodeURIComponent(title + ' ' + artist)>`).
   - Every search link carries its "Opens a search results page, not this song directly." helper text.
   - Searches are always built from title + artist and are never artist-only.
@@ -116,6 +116,6 @@
 
 ## Task 10 — Verify
 
-- [ ] Run these and record the output summaries: `go build ./...`, `gofmt -l .` (empty), `go test ./...`, and `pnpm install` then `pnpm run test:run` in `frontend/`.
-- [ ] Run `graphify update .`.
+- [x] Run these and record the output summaries: `go build ./...`, `gofmt -l .` (empty), `go test ./...`, and `pnpm install` then `pnpm run test:run` in `frontend/`.
+- [ ] Run `graphify update .`. _(Not run: `graphify` isn't installed in the cloud session. Run it locally.)_
 - [ ] PR (`feat` template): state the manual migration and the unofficial InnerTube dependency, and leave the UI demo screenshots for a local session. Cloud sessions can't sign in through Clerk.
