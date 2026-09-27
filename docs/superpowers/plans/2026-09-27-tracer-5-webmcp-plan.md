@@ -17,8 +17,8 @@
 
 ## Task 1: ai-tooling, a standalone tool set
 
-- [ ] `jeeves.Tools(areas, data, viewer)` builds the registry that `Assistant.ToolsFor` uses today, so callers without a model (the backend runner) get identical tools.
-- [ ] `jeeves.ReadOnlyTools` names the tools safe to expose outside the agent loop.
+- [x] `jeeves.Tools(areas, data, viewer)` builds the registry that `Assistant.ToolsFor` uses today, so callers without a model (the backend runner) get identical tools.
+- [x] `jeeves.ReadOnlyTools` names the tools safe to expose outside the agent loop.
 
 **Learn:** *Quiz:* "Why share the registry instead of rewriting the tools in TypeScript?"
 
@@ -26,18 +26,26 @@
 
 **Files:** `backend/internal/adapters/assistant/tools.go` (+ test), `backend/assistant.graphql`, resolvers, `main.go`.
 
-- [ ] `ToolRunner`: `Specs()` lists the allow-listed tools; `Run(ctx, userID, name, inputJSON)` builds the viewer-bound registry and calls the tool. Unknown or non-allow-listed names are rejected. Schema validation is the registry's. It needs no API key, so it's wired whenever the guide loads, independent of `JEEVES_ENABLED`, behind its own `WEBMCP_ENABLED` flag.
-- [ ] GraphQL: `assistantTools: [AssistantToolSpec!]! @auth` (name, description, inputSchema as a JSON string, readOnly, untrustedContent) and `runAssistantTool(name: String!, input: String!): String! @auth`. It's a query, since tools are read-only.
-- [ ] Tests: allow-list, viewer binding (user 1 never gets user 2's private rows), bad input returns a GraphQL error, disabled returns a clear error.
+- [x] `ToolRunner`: `Specs()` lists the allow-listed tools; `Run(ctx, userID, name, inputJSON)` builds the viewer-bound registry and calls the tool. Unknown or non-allow-listed names are rejected. Schema validation is the registry's. It needs no API key, so it's wired whenever the guide loads, independent of `JEEVES_ENABLED`, behind its own `WEBMCP_ENABLED` flag.
+- [x] GraphQL: `assistantTools: [AssistantToolSpec!]! @auth` (name, description, inputSchema as a JSON string, readOnly, untrustedContent) and `runAssistantTool(name: String!, input: String!): String! @auth`. It's a query, since tools are read-only.
+- [x] Tests: allow-list, viewer binding (user 1 never gets user 2's private rows), bad input returns a GraphQL error, disabled returns a clear error.
 
 ## Task 3: Frontend registration
 
 **Files:** `frontend/src/lib/assistant/webmcp.ts` (+ test), layout mount.
 
-- [ ] `registerWebMCP(request)`: feature-detect, fetch `assistantTools`, register each with `execute` that calls `runAssistantTool` through `graphqlRequest` (Clerk token attached), with `annotations.readOnlyHint` and `untrustedContentHint` from the spec. It returns a cleanup that aborts the signal.
-- [ ] Mount it in the signed-in layout behind `VITE_WEBMCP`, cleaned up on sign-out or unmount.
-- [ ] Tests with a fake `modelContext`: no-op without WebMCP, registers every listed tool, execute round-trips through the request function, cleanup aborts, and the `navigator` alias is supported.
+- [x] `registerWebMCP(request)`: feature-detect, fetch `assistantTools`, register each with `execute` that calls `runAssistantTool` through `graphqlRequest` (Clerk token attached), with `annotations.readOnlyHint` and `untrustedContentHint` from the spec. It returns a cleanup that aborts the signal.
+- [x] Mount it in the signed-in layout behind `VITE_WEBMCP`, cleaned up on sign-out or unmount.
+- [x] Tests with a fake `modelContext`: no-op without WebMCP, registers every listed tool, execute round-trips through the request function, cleanup aborts, and the `navigator` alias is supported.
 
 ## Task 4: Live checkpoint (owner, local)
 
 - [ ] Chrome with the WebMCP flag or origin trial, `VITE_WEBMCP=true` and `WEBMCP_ENABLED=true`. Sign in and ask the browser's agent "What have I rated highest on Perspectize?". It should call `list_perspectives`.
+
+## Notes (recorded at code-complete)
+
+- **Error hygiene fix found on the way:** the backend data adapter used to wrap raw database errors into tool results, which reach the model and, through WebMCP, the browser's agent. It now logs the real error and returns a plain message. A test asserts no backend detail leaks.
+- **Resolver field is `ToolRunner`**, not `AssistantTools`. gqlgen's generated `AssistantTools` query method shadows a same-named field on the embedded `*Resolver`.
+- **Stray `schema.resolvers.go` again:** it had 0 stubs and was deleted, per the backend CLAUDE.md gotcha. The new stubs landed in `assistant.resolvers.go`.
+- **`jeeves.ReadOnlyTools` is the gate** for every external surface. A test fails if a new tool is added to `jeeves.Tools` without being classified.
+

@@ -45,11 +45,14 @@ Every ai-tooling spec and plan builds teaching in; it isn't bolted on afterwards
 - **Bind identity in code, never in tool input:** tools that read user data are built per request with the viewer in a closure, and the schema forbids extra properties, so the model can't ask as someone else.
 - **Tracer 4 code-complete:** `botler eval --suite data` grades 7 data cases (tool choice and arguments, privacy, planted instructions) against `evals.FixtureData`; `botler chat/tools call --as ID` act as a fixture user. The first live baseline for both suites is pending the API key.
 - **Canary strings make leaks checkable:** a unique string in another user's private review, and a unique marker a planted instruction asks for, are forbidden in every data case, so any leak or obeyed injection fails whatever the question.
+- **Tracer 5 code-complete (WebMCP):** the page registers Jeeves's read-only tools with the browser's own agent (`document.modelContext.registerTool`). Calls run on the backend through `jeeves.Tools` as the signed-in user (`runAssistantTool`), behind `WEBMCP_ENABLED` and `VITE_WEBMCP`. No model or API key is involved: the browser's agent is the model.
+- **Share the registry, not the code:** every surface (in-app loop, botler, WebMCP) builds tools with `jeeves.Tools`, and external surfaces expose only `jeeves.ReadOnlyTools`. One schema check, one privacy path, one place to add a tool.
+- **Tool results are an output channel:** anything in a tool error reaches a model (ours, or the user's browser agent), so tools return plain messages and log details.
 - **Deferred:** server-side refusal fallbacks (they need the beta Messages API throughout the adapter); refusals surface as `llm.StopRefusal` for now.
 
 ## Locked decisions (from design discussion, 2026-09-26)
 
-1. In-app Jeeves first (Go backend runs Claude tool use), MCP server later.
+1. In-app Jeeves first (Go backend runs Claude tool use), MCP server later. WebMCP (in-page tools for the browser's agent, tracer 5) came first because it reuses the Clerk session and needs no OAuth.
 2. Code lives here, as its own Go module; backend imports it in the in-app phase (Docker build context must then move to repo root — Sevalla setting).
 3. Provider-neutral core: own message/event types; Anthropic adapter first, OpenRouter/BYOK later. SDK types never leak outside an adapter.
 4. `botler` dev CLI talks to the backend over GraphQL (Go forbids importing `backend/internal`).
