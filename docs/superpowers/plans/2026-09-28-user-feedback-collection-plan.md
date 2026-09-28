@@ -14,10 +14,10 @@ Enable users to report bugs and request features directly from the app via a dia
 
 ## Backend Tasks
 
-- [ ] Database migration: Create `feedback` table with user_id, type, title, description, page_url, screenshot_url, app_version, status, admin_notes, timestamps
+- [ ] Database migration: Create `feedback` table with user_id, type, title, description, page_url, screenshot_url, app_version, status, admin_notes, github_issue_url, timestamps
 - [ ] GraphQL schema updates: Add `Feedback` type, `FeedbackType` enum (BUG, FEATURE), `FeedbackStatus` enum (OPEN, ACKNOWLEDGED, IN_PROGRESS, RESOLVED, WONTFIX)
 - [ ] GraphQL mutations: `submitFeedback(input: SubmitFeedbackInput!): Feedback!`
-- [ ] GraphQL mutations: `updateFeedbackStatus(feedbackID: ID!, status: FeedbackStatus!, adminNotes: String): Feedback!` (admin-only)
+- [ ] GraphQL mutations: `updateFeedbackStatus(feedbackID: ID!, status: FeedbackStatus!, adminNotes: String, githubIssueURL: String): Feedback!` (admin-only)
 - [ ] GraphQL query: `feedbackList(first: Int, after: String, type: FeedbackType, status: FeedbackStatus, sortBy: FeedbackSortBy): FeedbackConnection!` (admin-only)
 - [ ] `FeedbackRepository` implementation (GORM) — List, Get, Create, UpdateStatus methods with pagination support
 - [ ] `FeedbackService` implementation — business logic (validation, authorization checks)
@@ -42,7 +42,7 @@ Enable users to report bugs and request features directly from the app via a dia
 - [ ] Create `frontend/src/lib/pages/admin/+page.svelte` for `/admin/feedback` route
   - Filters: Type (All/Bug/Feature), Status (All/Open/Acknowledged/In Progress/Resolved/Won't Fix)
   - Table: Type, Title, User email, Status (dropdown), Created at
-  - Expandable row detail view: Full description, screenshot, page URL, app version, admin notes textarea, status dropdown with save, delete button
+  - Expandable row detail view: Full description, screenshot, page URL, app version, admin notes textarea, status dropdown with save, GitHub issue URL field (manual paste), delete button
   - Pagination: Use cursor-based pagination (gqlgen + TanStack Query)
   - Sort: By created_at (descending default)
 - [ ] `frontend/src/lib/services/feedbackApi.ts` — GraphQL client helpers for submitFeedback, feedbackList, updateFeedbackStatus
@@ -91,8 +91,9 @@ Enable users to report bugs and request features directly from the app via a dia
 **Phase 1.5 blocker (screenshot upload):** If no pre-signed URL CDN available, defer screenshot field to Phase 1.5. Dialog and admin pages work without it — just skip screenshot upload in FeedbackDialog and set `screenshot_url` to NULL.
 
 **Future phases (not this plan):**
-- Phase 2: GitHub issue creation from admin panel (needs GitHub token stored as secret)
-- Phase 3: Sentiment analysis, trending feedback dashboard, Slack digest
+- Phase 1.5: GitHub issue URL auto-linking when issue is manually created by admin
+- Phase 2: GitHub issue auto-creation from admin panel (one-click "Create issue" button, needs GitHub token stored as secret)
+- Phase 3: Sentiment analysis, trending feedback dashboard, Slack digest for new high-priority feedback
 
 ---
 

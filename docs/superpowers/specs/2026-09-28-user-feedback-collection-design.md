@@ -212,19 +212,32 @@ export const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'dev';
 
 ---
 
-## 3. Phase 2: GitHub Issue Automation (Future)
+## 3. Phase 1.5: GitHub Issue Linking (Optional)
 
-Not in this plan, but designed for it:
+Not in MVP Phase 1, but designed for it:
+
+- **Admin field:** `github_issue_url` (optional TEXT column, indexed)
+- **Admin action:** Manually paste or enter a GitHub issue URL on a feedback detail
+- **Flow:**
+  1. Admin reviews feedback
+  2. Admin decides it matches an existing GitHub issue or creates one manually
+  3. Admin pastes the GitHub issue URL into `github_issue_url` field
+  4. Feedback detail shows "Linked issue: #123" with a clickable link
+- **Benefit:** Closes the loop — feedback author can see their report was tracked; admins have a canonical source of truth (GitHub issues remain the single source of truth for bug/feature tracking)
+
+## 4. Phase 2: GitHub Issue Automation (Future)
+
+Future enhancement (post-Phase-1):
 
 - **Admin button:** "Create issue" on a feedback detail
 - **Requires:** GitHub token stored in server env (`GITHUB_TOKEN`)
 - **Flow:**
-  1. Admin clicks "Create issue"
-  2. Backend reads `feedback` row
-  3. GitHub issue created using issue template (bug_report.md or feature_request.md)
-  4. Issue link stored in `feedback.github_issue_url`
-  5. Admin is notified (optional: ping them via Slack)
-- **Caveat:** Only create issues for well-formed feedback (title + description filled, no PII/secrets). Admin reviews before creating.
+  1. Admin reviews feedback
+  2. Admin clicks "Create issue" button
+  3. Backend creates GitHub issue using bug_report.md or feature_request.md template
+  4. Issue link auto-populated in `feedback.github_issue_url`
+  5. Feedback author is notified (optional: Slack ping to admins)
+- **Caveat:** Only create issues for well-formed feedback. Admin reviews before creating. Sensitive details (internal paths, security findings) stay in private `admin_notes` field, never in public GitHub issue.
 
 ---
 
