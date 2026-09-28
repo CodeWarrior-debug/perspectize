@@ -69,7 +69,7 @@ gh api repos/CodeWarrior-debug/perspectize/pulls/123/comments
 | `chore`/`build`/`ci` | `chore.md` | Summary, Changes, Verification |
 | `docs` | `docs.md` | Summary, Files Changed, Verification |
 
-Because PRs are created via `gh api` (not `gh pr create`), GitHub's template picker never runs — read the matching template file yourself and shape the `-F body=@<file>` content to its sections before creating the PR. Any UI-visible change should fill in the Demo screenshot table (see [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md) for the `sv-` upload workflow) rather than leaving it blank.
+Because PRs are created via `gh api` (not `gh pr create`), GitHub's template picker never runs — read the matching template file yourself and shape the `-F body=@<file>` content to its sections before creating the PR. Any UI-visible change should fill in the Demo screenshot table (see [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md) for the `sv-` upload workflow) rather than leaving it blank — see the `needs-demo-video` / `ready for review` labeling rule under Self-Verification below; a cloud session can't produce this evidence itself, so it labels instead.
 
 **Issues** — use templates from `.github/ISSUE_TEMPLATE/` (feature_request.md or bug_report.md).
 
@@ -161,6 +161,14 @@ defer db.Close()
 Run the relevant subset (e.g., backend-only changes skip step 4). Report results explicitly — don't just say "tests pass", show the output summary.
 
 **Browser verification is local-only.** Driving the running app via the Chrome DevTools MCP (`.docs/VERIFICATION.md` §3) needs `.claude/.env` and `.claude/sv-profile/` — both gitignored and hand-provisioned per machine. Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in; run only the headless checklist (build, backend tests, frontend tests) and hand UI-behavior checks back to a local session.
+
+**"ready for review" requires a demo, unless the user says otherwise.** This applies to any PR with **code** changes — `backend/`, `frontend/`, `ai-tooling/`, migrations, workflow YAML, anything that isn't `docs/`, `.planning/`, or a markdown-only diff. Docs-only PRs (spec/plan/research records) don't need one; a `docs` commit type is a decent proxy but check the actual diff, not just the title.
+
+- A qualifying PR is `ready for review` only once it has either: (a) `sv-` screenshots/video actually captured and linked in the Demo section (see [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md)), or (b) an explicit, specific justification for why none applies — "dark by default, no UI surface", "no visible UI change", not a generic "N/A". A Demo section that just says screenshots are still needed does not qualify, no matter how green CI is.
+- **A cloud session cannot produce that evidence** (no Clerk sign-in, per above). So a cloud session finishing a code-change PR must apply the `needs-demo-video` label at creation time (`gh api repos/CodeWarrior-debug/perspectize/issues/<n>/labels -f "labels[]=needs-demo-video"` — `gh pr edit` fails here, see below) rather than leaving the PR unlabeled or self-declaring it ready. This is what flags the PR for a local session to pick up and finish.
+- A local session that adds the missing evidence swaps the label: remove `needs-demo-video`, add `ready for review`, and paste the linked evidence into the PR's Demo section (don't just upload assets and leave the placeholder text).
+- `needs-demo-video` and `ready for review` are **mutually exclusive** — never both on the same PR. If a PR is blocked by something else (merge conflict, a real failing/un-run CI check, an unresolved bug), it's fine for it to carry neither label rather than force-fitting one.
+- An owner-only follow-up that needs a credential no agent has (`ANTHROPIC_API_KEY`, a Chrome origin-trial flag, a live Sevalla checkpoint) does **not** by itself block `ready for review` — that's normal handoff, not a missing demo. What blocks it is *this PR's own visible surface* going unverified.
 
 See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow, and [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md) for uploading `sv-` screenshots to a release and linking them in the PR.
 
