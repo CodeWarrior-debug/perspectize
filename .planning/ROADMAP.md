@@ -711,7 +711,7 @@ Phases 11-15 planned from FEATURE_BACKLOG.md. Phase 16 added for mobile app rese
 - [ ] **Phase 22: TanStack DB Pilot (Perspectives)** - One-entity pilot of `@tanstack/svelte-db` query collections over existing GraphQL; adopt or revert on exit criteria
 - [ ] **Phase 23: Sync Engine Evaluation (GATED)** - ElectricSQL + TanStack DB Electric collection; only if real-time/collab or measured read-cost growth
 - [ ] **Phase 24: Local Database / Desktop (GATED)** - PGlite local Postgres and/or Tauri desktop shell; only on offline or distribution requirement
-- [ ] **Phase 25: Observability & Release Tagging** - Working OTel traces (HTTP → GraphQL → SQL), per-operation latency/error metrics, trace-linked logs, Faro frontend RUM/errors, all to Grafana Cloud; release-please auto-tags so every signal carries frontend/backend versions
+- [ ] **Phase 25: Observability & Release Tagging** - Working OTel traces (HTTP → GraphQL → SQL), per-operation latency/error metrics, trace-linked logs, Faro frontend RUM/errors, all to Grafana Cloud; every signal carries the frontend/backend build version (unified on #495's `v<date>-<sha7>` tag)
 
 ### Phase 18.1: Mobile Activity Page Redesign (INSERTED)
 
@@ -793,15 +793,15 @@ Plans:
 - `graphql.server.operation.duration` p95 is graphable per operation name and still queryable after trace retention (14d) expires
 - Every backend span/metric/log carries `service.version`; every Faro event carries `app.version`; backend spans carry `client.version`
 - With `OTEL_*` / `VITE_FARO_URL` unset: no telemetry network calls, all existing tests green
-- Merging a release-please PR creates `backend-vX.Y.Z` / `frontend-vX.Y.Z` tags; next deploy reports the new version in `app.build.info`
+- Frontend `app.version` / `X-Client-Version` equal the deployed commit's `v<date>-<sha7>` tag (#495); backend `app.build.info` revision changes on every deploy (release-please dropped 2026-09-28)
 - Active metric series < 5k after 7 days (operation name / client version cardinality bounded)
 - No GraphQL variables, SQL bind values, or `Authorization` values in any exported span (asserted in tests)
 
 Plans:
-- [ ] 25-01 — Backend tracing foundation: `pkg/buildinfo`, `pkg/telemetry`, bounded normalizer, otelhttp + CORS trace headers + client-version middleware, otelgqlgen, GORM plugin, outbound transports → `docs/superpowers/plans/2026-09-26-observability-plan.md` (Tasks 1–5)
-- [ ] 25-02 — Metrics & trace-linked logs: per-operation histogram, DB pool/runtime/build-info metrics, slog → OTLP → same plan (Tasks 6–8)
-- [ ] 25-03 — Frontend: version headers (HTTP + WS), Faro RUM/errors/tracing, CSP, hidden source-map upload → same plan (Tasks 9–11)
-- [ ] 25-04 — release-please auto-tagging, docs, Grafana dashboards + alerts, manual rollout (M1–M7) → same plan (Tasks 12–14)
+- [x] 25-01 — Backend tracing foundation: `pkg/buildinfo`, `pkg/telemetry`, bounded normalizer, otelhttp + CORS trace headers + client-version middleware, otelgqlgen, GORM plugin, outbound transports → `docs/superpowers/plans/2026-09-26-observability-plan.md` (Tasks 1–5)
+- [x] 25-02 — Metrics & trace-linked logs: per-operation histogram, DB pool/runtime/build-info metrics, slog → OTLP → same plan (Tasks 6–8)
+- [x] 25-03 — Frontend: version headers (HTTP + WS), Faro RUM/errors/tracing, CSP, hidden source-map upload → same plan (Tasks 9–11)
+- [ ] 25-04 — unify build version on #495's tag (replaces release-please), docs, Grafana dashboards + alerts, manual rollout (M1–M6) → same plan (Tasks 12–14)
 
 ## Progress
 
@@ -847,4 +847,4 @@ Phases execute in numeric order: 1 -> 2 -> 2.1 -> 3 -> 3.1 -> 3.2 -> 3.3 -> 3.4 
 | 22. TanStack DB Pilot (Perspectives) | 0/0 | Not started | - |
 | 23. Sync Engine Evaluation | 0/0 | Gated | - |
 | 24. Local Database / Desktop | 0/0 | Gated | - |
-| 25. Observability & Release Tagging | 0/4 | Planned | - |
+| 25. Observability & Release Tagging | 3/4 | In Progress (PR #463) | - |

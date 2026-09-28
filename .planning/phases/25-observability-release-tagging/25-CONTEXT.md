@@ -22,8 +22,10 @@
   error reporting.
 - No version is stamped on anything. `backend/.dockerignore` excludes `.git`, so
   `debug.ReadBuildInfo()` has no VCS info. Sevalla builds both services from git (not in
-  GitHub Actions), so build-args may not be available. That is why versions live in source,
-  rewritten by release-please.
+  GitHub Actions), so build-args may not be available. (Original plan: versions in source,
+  rewritten by release-please. Superseded 2026-09-28: #495 confirmed Sevalla injects
+  `SVL_DEPLOYMENT_COMMIT_SHA` at runtime and added the `v<date>-<sha7>` tag, so Phase 25
+  unified on that.)
 - CORS `AllowedHeaders` is `Content-Type, Authorization` only. Browser trace propagation
   needs `traceparent`/`tracestate` added.
 - The CSP `connect-src` in `frontend/src/app.html` must gain the Faro collector host.
@@ -43,7 +45,7 @@
 | Error tracking | Faro + span status; Sentry deferred | Add Sentry only if Faro grouping is not enough |
 | Long-term trends | App-owned metrics (13-month retention), not traces (14 days) | Stay within free-tier retention |
 | Cardinality | `BoundedSet` normalizer on every attribute from request input | Keeps under the 10k series limit; resists spoofed operation names |
-| Versioning | release-please manifest mode, tags `backend-vX.Y.Z` / `frontend-vX.Y.Z` | Reuses existing conventional commits; version-in-source works whoever builds |
+| Versioning | **Revised 2026-09-28:** unify on #495's `v<date>-<sha7>` tag (`tag-main.yml`). Frontend resolves it at build time; the backend uses `pkg/buildinfo` (commit: ldflags value, else `SVL_DEPLOYMENT_COMMIT_SHA`; version: ldflags value, else `BUILD_TAG`, else the short SHA). release-please dropped. | One version identifier across git tags, `/version`, the zzzv hotkey, spans and Faro; no competing semver scheme |
 | Sampling | 100% head sampling via env (`parentbased_traceidratio`) | Low volume; no Collector yet |
 
 ## Deferred ideas

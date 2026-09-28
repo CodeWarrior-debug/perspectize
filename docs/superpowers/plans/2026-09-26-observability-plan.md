@@ -1,25 +1,30 @@
 # Observability & Release Tagging Implementation Plan
 
+> ⚠️ Written without superpowers loaded — a superpowers-enabled session should review via writing-plans before this is executed.
+> (Tasks 1–11 were executed by hand in the superpowers style in PR #463; Task 12 was
+> rewritten on 2026-09-28 after #495. Review the remaining 25-04 tasks before running them.)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Turn the existing (inert) OpenTelemetry setup into working traces, per-operation
 performance metrics, trace-linked logs and frontend error/vitals monitoring, all sent to
-Grafana Cloud. Also stamp every signal with the frontend and backend release versions,
-produced automatically from conventional commits.
+Grafana Cloud. Also stamp every signal with the frontend and backend build version, using
+the single `v<date>-<sha7>` tag scheme from #495.
 
 **Architecture:** A new `backend/pkg/telemetry` package owns the Tracer, Meter and Logger
 providers and is a no-op without `OTEL_EXPORTER_OTLP_ENDPOINT`. Spans come from `otelhttp`
 (router and outbound clients), `otelgqlgen` (operations and resolver fields) and the GORM
 OpenTelemetry plugin. Metrics are app-owned histograms and gauges whose attribute values are
 capped by a bounded normalizer. The frontend uses the Grafana Faro Web SDK, which sends W3C
-`traceparent` to the API origin only. release-please writes versions into source files, so
-Sevalla's git-driven builds pick them up without build args.
+`traceparent` to the API origin only. Versions come from #495's build tag: the frontend
+resolves it from git at build time, and the backend reads Sevalla's runtime commit env.
+(Originally release-please; dropped 2026-09-28, see Task 12.)
 
 **Tech Stack:** Go 1.26, OpenTelemetry Go SDK v1.46 (+ contrib v0.71: `otelhttp`, `runtime`;
 `otelslog` bridge v0.20; OTLP HTTP trace, metric and log exporters),
-`github.com/ravilushqa/otelgqlgen` v0.19, `gorm.io/plugin/opentelemetry` v0.1.16,
-`@grafana/faro-web-sdk` / `@grafana/faro-web-tracing` v2.12,
-`@grafana/faro-rollup-plugin` v0.13, `googleapis/release-please-action` v4, Grafana Cloud.
+`github.com/ravilushqa/otelgqlgen` v0.19, in-house GORM tracing callbacks (replaced
+`gorm.io/plugin/opentelemetry` during 25-01), `@grafana/faro-web-sdk` / `@grafana/faro-web-tracing` v2.12,
+`@grafana/faro-rollup-plugin` v0.13, Grafana Cloud.
 
 **Spec:** `docs/superpowers/specs/2026-09-26-observability-design.md`
 
@@ -58,7 +63,7 @@ below).
 - Test: `backend/pkg/buildinfo/buildinfo_test.go`
 
 **Interfaces:**
-- Produces: `buildinfo.Version` (string, rewritten by release-please),
+- Produces: `buildinfo.Version` (string; later resolved per Task 12's revision),
   `buildinfo.Commit` (string, set by `-ldflags -X`), `buildinfo.Info() (version, commit string)`.
   Consumed by Task 2 (resource) and Task 7 (`app.build.info`).
 
@@ -533,46 +538,42 @@ pnpm add --dir frontend @grafana/faro-web-sdk@2.12.1 @grafana/faro-web-tracing@2
 
 ## 25-04 — Release tagging, rollout, dashboards & alerts
 
-### Task 12: release-please (manifest, two components) + Docker `GIT_SHA`
+### Task 12: Unify version identity on #495's build tag (replaces release-please)
+
+> **Revised 2026-09-28 (user decision).** The original Task 12 (release-please manifest,
+> `backend-vX.Y.Z`/`frontend-vX.Y.Z` tags, Docker `GIT_SHA` build arg) is **dropped**. #495
+> already tags every green `main` commit `v<YYYY.MM.DD>-<short7sha>` (`tag-main.yml`) and
+> confirmed Sevalla injects `SVL_DEPLOYMENT_COMMIT_SHA` at runtime. So the commit comes from
+> the runtime env, and no build args are needed. See the spec's "Versioning & CI
+> auto-tagging" section.
 
 **Files:**
-- Create: `release-please-config.json`, `.release-please-manifest.json`
-- Create: `.github/workflows/release-please.yml`
-- Modify: `backend/Dockerfile`
+- Modify: `backend/pkg/buildinfo/buildinfo.go` (+ tests): the single resolver.
+  - Commit: `-ldflags` value, else `SVL_DEPLOYMENT_COMMIT_SHA`, else `unknown`.
+  - Version: `-ldflags` value, else `BUILD_TAG`, else the short commit SHA, else `unknown`.
+  - Branch: from `SVL_DEPLOYMENT_BRANCH`.
+  - Env is read lazily. Remove the `x-release-please-version` marker.
+- Modify: `backend/internal/core/services/build_info_service.go`: `GET /version` takes
+  commit, tag and branch from `pkg/buildinfo`, so it can never disagree with telemetry.
+- Modify: `frontend/src/lib/buildInfo.ts`: `APP_VERSION` = `__BUILD_INFO__.tag` and
+  `GIT_SHA` = `__BUILD_INFO__.commitShort`. The exported API is unchanged.
+- Modify: `frontend/vite.config.ts` and `frontend/src/app.d.ts`: remove the
+  `__APP_VERSION__`/`__GIT_SHA__` defines, which duplicated `__BUILD_INFO__`.
+- No workflow, Dockerfile or `package.json` version changes.
 
-- [ ] **Step 1: Config**
-
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "include-component-in-tag": true,
-  "separate-pull-requests": false,
-  "packages": {
-    "backend":  { "release-type": "simple", "component": "backend",
-                  "extra-files": ["pkg/buildinfo/buildinfo.go"] },
-    "frontend": { "release-type": "node",   "component": "frontend" }
-  }
-}
-```
-
-  Manifest: `{ "backend": "0.1.0", "frontend": "0.0.1" }`, matching the current
-  `package.json` and Task 1's literal.
-- [ ] **Step 2: Workflow** on `push: branches: [main]` using
-  `googleapis/release-please-action@v4` with `config-file` and `manifest-file`, and
-  `permissions: contents: write, pull-requests: write`. Pin the action by SHA, following
-  the repo's existing action-pinning style in `ci.yml`/`trivy.yml`.
-- [ ] **Step 3: Dockerfile.** Add `ARG GIT_SHA=""` in the builder stage and extend ldflags:
-  `-ldflags="-s -w -X github.com/CodeWarrior-debug/perspectize/backend/pkg/buildinfo.Commit=${GIT_SHA}"`.
-  Leave `.dockerignore`'s `.git/` exclusion as is.
-- [ ] **Step 4: Check Sevalla build context.** Using the `sevalla-mcp-ops` agent, check
-  whether the backend app and the static site expose a commit SHA variable at build time.
-  If they do, map it: Docker build arg `GIT_SHA` for the backend, env `GIT_SHA` for the
-  static site. If they don't, record "commit = unknown in prod; version is authoritative"
-  in `.docs/OBSERVABILITY.md`. Either way no code changes.
-- [ ] **Step 5: Verify locally:** `docker build --build-arg GIT_SHA=abc123 backend`, if
-  Docker is available. Otherwise `go build -ldflags "-X ...Commit=abc123" ./cmd/server`
-  and a `buildinfo` test run with the same ldflags.
-- [ ] **Step 6:** Commit: `ci: automate backend/frontend release tagging with release-please`.
+- [ ] **Step 1:** Write `pkg/buildinfo` precedence tests (ldflags vs. env vs. fallback,
+  short-SHA lowercasing), then implement.
+- [ ] **Step 2:** Rewire `BuildInfoService` onto `pkg/buildinfo` and update #495's
+  service tests. One semantic change: `tag` becomes the short SHA when only
+  `SVL_DEPLOYMENT_COMMIT_SHA` is set, where it was `unknown` before.
+- [ ] **Step 3:** Frontend `buildInfo.ts` onto `__BUILD_INFO__`. Tests assert the tag
+  format (or `unknown`) and that `APP_VERSION` ends with `GIT_SHA`. The tag is 18 chars,
+  so it fits the backend's `ClientVersionPattern` (`^[0-9A-Za-z.+-]{1,32}$`) with no
+  backend change.
+- [ ] **Step 4:** Run full verification on both stacks. Commit:
+  `refactor: unify build version on the v<date>-<sha> tag`.
+- [ ] **Optional follow-up:** set `BUILD_TAG` on the Sevalla backend, e.g. from a deploy
+  hook once one exists, so `service.version` shows the full tag instead of the short SHA.
 
 ### Task 13: Docs + CLAUDE.md pointer
 
@@ -587,9 +588,10 @@ pnpm add --dir frontend @grafana/faro-web-sdk@2.12.1 @grafana/faro-web-tracing@2
   - how to read a trace in Grafana (Explore → Tempo → `service.name=perspectize-backend`)
   - the cardinality rule
   - how to lower the sampling rate
-  - the release-please flow (merge the release PR → tags → the next Sevalla deploy
-    carries the version)
-  - the Sevalla SHA finding from Task 12
+  - how versions work: the `v<date>-<sha7>` tag from `tag-main.yml`; the frontend
+    resolves it at build time; the backend reads `SVL_DEPLOYMENT_COMMIT_SHA` and falls
+    back to the short SHA unless `BUILD_TAG` is set
+  - the zzzv hotkey and `GET /version` (#495) as the quick way to see what's deployed
 - [ ] **Step 2:** Commit: `docs: observability runbook`.
 
 ### Task 14: Dashboards & alerts as code
@@ -628,7 +630,7 @@ pnpm add --dir frontend @grafana/faro-web-sdk@2.12.1 @grafana/faro-web-tracing@2
 | M4 | Create a source-map API key → `FARO_SOURCEMAP_API_KEY`, `FARO_APP_ID`, `FARO_STACK_ID`, `FARO_API_ENDPOINT` on the static site. | after Task 11 merge |
 | M5 | Redeploy both. Check that a trace appears end to end (browser fetch → `/graphql` → `gorm.Query`) and that a log line in Loki links to it. Then build and export dashboards and alerts (Task 14). | after M2–M4 |
 | M6 | Set alert contact point (email/phone). | with M5 |
-| M7 | Enable repo Settings → Actions → "Allow GitHub Actions to create and approve pull requests" (needed for release-please). | before Task 12 merge |
+| M7 | ~~Allow GitHub Actions to create PRs (release-please)~~ — no longer needed; release-please dropped 2026-09-28. Optional instead: set `BUILD_TAG` on the Sevalla backend for full tags in `service.version`. | optional |
 
 ## Done when (maps to Phase 25 `must_haves.truths`)
 
@@ -639,8 +641,9 @@ pnpm add --dir frontend @grafana/faro-web-sdk@2.12.1 @grafana/faro-web-tracing@2
 - [ ] Every backend span, metric and log carries `service.version`. Every Faro event
       carries `app.version`. Backend spans carry `client.version`
 - [ ] Unset `OTEL_*`/`VITE_FARO_URL` → no network calls to Grafana, all tests green
-- [ ] Merging a release-please PR creates `backend-vX.Y.Z` / `frontend-vX.Y.Z` tags, and the
-      next deploy reports the new version in `app.build.info`
+- [ ] Frontend `app.version` / `X-Client-Version` equal the `v<date>-<sha7>` tag of the
+      deployed commit, and the backend's `app.build.info` `vcs.ref.head.revision` changes
+      on each deploy (its `service.version` is `BUILD_TAG` or the short SHA)
 - [ ] Active metric series < 5k in Grafana's usage dashboard after 7 days
 - [ ] No GraphQL variables, SQL parameters or `Authorization` values appear in any exported
       span (asserted in tests)

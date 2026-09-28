@@ -1,7 +1,11 @@
 # Observability, Performance Graphs & Release Tagging — Design Spec
 
-**Date:** 2026-09-26
-**Status:** Draft — awaiting approval for execution
+> ⚠️ Written without superpowers loaded — a superpowers-enabled session should review via writing-plans before this is executed.
+> (The superpowers plugin was not available in the cloud session that wrote this spec and
+> executed 25-01…25-03 by hand; review before running 25-04.)
+
+**Date:** 2026-09-26 (versioning section revised 2026-09-28)
+**Status:** 25-01…25-03 implemented in PR #463; 25-04 pending
 **Required execution sub-skill:** `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans`
 **Plan:** `docs/superpowers/plans/2026-09-26-observability-plan.md`
 **Roadmap:** `.planning/ROADMAP.md` → Phase 25: Observability & Release Tagging
@@ -162,21 +166,31 @@ Browser / Capacitor app                              Grafana Cloud
 
 ### Versioning & CI auto-tagging
 
-- **release-please (manifest mode)**, with two components tagged `backend-vX.Y.Z` and
-  `frontend-vX.Y.Z`, driven by the repo's existing conventional commits. Each merge to
-  `main` updates a release PR. Merging that PR creates the tag, the GitHub Release and the
-  changelog.
-- **The version lives in source, not in build args.** release-please rewrites
-  `frontend/package.json` `version` and `backend/pkg/buildinfo/buildinfo.go` (marked with
-  `x-release-please-version`). This matters because **Sevalla builds both services directly
-  from git, not in GitHub Actions**, and `backend/.dockerignore` excludes `.git`, so
-  `debug.ReadBuildInfo()` has no VCS data. A version in source works no matter who runs the
-  build.
-- **Commit SHA is best effort:**
-  - Backend: `Dockerfile` `ARG GIT_SHA` → `-ldflags -X`.
-  - Frontend: `process.env.GIT_SHA` or `git rev-parse` at build time.
-  - Either one falls back to empty/`unknown`. Plan Task 12 confirms whether Sevalla exposes
-    a commit variable to builds.
+> **Revised 2026-09-28 (user decision):** release-please was dropped. PR #495 landed a
+> deterministic app-wide tag first, and Phase 25 unifies on it, so there is one version
+> identifier rather than two competing schemes.
+
+- **One tag scheme: `v<YYYY.MM.DD>-<short7sha>`** (committer date in UTC). Three places
+  compute it the same way, and `testdata/version-tag-fixture.json` checks that they agree:
+  - `backend/internal/core/domain/buildinfo.go` `ComputeTag`
+  - `frontend/src/lib/utils/buildTag.ts` `computeTag`
+  - `.github/workflows/tag-main.yml`, which pushes the git tag after CI passes on `main`
+- **Frontend:** `vite.config.ts` resolves `__BUILD_INFO__` (tag, branch, commit) from the
+  local git checkout at build time. `lib/buildInfo.ts` exposes `APP_VERSION` (the tag) and
+  `GIT_SHA` (the short commit) to Faro (`app.version`) and to the `X-Client-Version` header.
+  Both are `unknown` when the build has no `.git`.
+- **Backend:** `pkg/buildinfo` is the single source for OpenTelemetry (`service.version`,
+  `vcs.ref.head.revision`, `app.build.info`) and for #495's `GET /version`.
+  - **Commit:** `-ldflags` value, else Sevalla's runtime `SVL_DEPLOYMENT_COMMIT_SHA`, else
+    `unknown`.
+  - **Version:** `-ldflags` value, else `BUILD_TAG`, else the short commit SHA, else
+    `unknown`.
+  - **Why the fallback:** Sevalla exposes no committer-date variable, so the backend can't
+    compute the full tag at runtime. The short SHA still tells deploys apart, and it matches
+    the SHA suffix of the frontend's tag, so the two can be joined.
+- **No semver or changelog for now.** Nothing needs them yet. release-please can be added
+  later if it does, but it should derive from or stay compatible with this tag rather than
+  run alongside it.
 
 ## Security & privacy
 
@@ -202,7 +216,9 @@ Browser / Capacitor app                              Grafana Cloud
 | Sevalla static site (build time) | `VITE_FARO_URL` | Faro collector URL from the Grafana Frontend Observability app |
 | | `VITE_APP_ENV` | `production` |
 | | `FARO_SOURCEMAP_API_KEY`, `FARO_APP_ID`, `FARO_STACK_ID`, `FARO_API_ENDPOINT` | source-map upload; secret key is human-entered |
-| GitHub Actions | none required | release-please uses the default `GITHUB_TOKEN` |
+| Sevalla app (backend, runtime) — provided by Sevalla | `SVL_DEPLOYMENT_COMMIT_SHA`, `SVL_DEPLOYMENT_BRANCH` | read by `pkg/buildinfo`; nothing to set |
+| Sevalla app (backend, runtime) — optional | `BUILD_TAG` | full `v<date>-<sha7>` tag; without it `service.version` falls back to the short SHA |
+| GitHub Actions | none required | `tag-main.yml` (#495) pushes tags with the default `GITHUB_TOKEN` |
 
 ## Alerts (initial set)
 
