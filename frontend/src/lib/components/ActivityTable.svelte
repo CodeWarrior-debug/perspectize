@@ -16,7 +16,14 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { graphqlRequest } from '$lib/queries/client';
-	import { LIST_CONTENT, type ContentItem, type ContentResponse } from '$lib/queries/content';
+	import {
+		GET_CONTENT_DETAILS,
+		LIST_CONTENT,
+		type ContentDetailsResponse,
+		type ContentItem,
+		type ContentResponse,
+	} from '$lib/queries/content';
+	import { OPEN_CONTENT_PARAM } from '$lib/utils/contentLinks';
 	import {
 		LIST_PERSPECTIVES_BY_USER,
 		MAX_PERSPECTIVES_PER_LIST,
@@ -328,7 +335,28 @@
 
 	// Derived values from query
 	const rowData = $derived(contentQuery.data?.content.items ?? []);
-	const detailsModalContent = $derived(rowData.find((item) => String(item.id) === detailsModalContentId) ?? null);
+	const detailsModalRow = $derived(rowData.find((item) => String(item.id) === detailsModalContentId) ?? null);
+	// A deep-linked item (`?open=<id>`, e.g. from a "Go to" toast or a verse jump) is
+	// often not on the loaded page — fetch just that row so the modal can still open.
+	const detailsFallbackQuery = createQuery(() => ({
+		queryKey: queryKeys.content.row(detailsModalContentId ?? ''),
+		queryFn: () => graphqlRequest<ContentDetailsResponse>(GET_CONTENT_DETAILS, { id: detailsModalContentId }),
+		enabled: detailsModalContentId !== null && detailsModalRow === null && !contentQuery.isPending,
+		staleTime: 60 * 1000,
+	}));
+	const detailsModalContent = $derived(detailsModalRow ?? detailsFallbackQuery.data?.contentByID ?? null);
+
+	// Consume `?open=<id>`: open that item's details, then strip the param (replaceState)
+	// so a refresh or later grid URL update doesn't reopen it.
+	$effect(() => {
+		const id = page.url.searchParams.get(OPEN_CONTENT_PARAM);
+		if (!id) return;
+		detailsModalContentId = id;
+		const params = new URLSearchParams(page.url.searchParams);
+		params.delete(OPEN_CONTENT_PARAM);
+		const search = params.toString();
+		goto(search ? `?${search}` : page.url.pathname, { replaceState: true, keepFocus: true, noScroll: true });
+	});
 	const totalCount = $derived(contentQuery.data?.content.totalCount ?? 0);
 	// Reset the filtered-row count whenever the underlying row data changes
 	// (new fetch, mode switch) so a stale filtered count from the previous
