@@ -22,10 +22,10 @@ The main design file where pages, layouts, and custom components are built.
 | Page            | Contents                                                                               | Key Node IDs               |
 | --------------- | -------------------------------------------------------------------------------------- | -------------------------- |
 | youtube initial | Main app layout — "Perspectize Youtube W/ Reviews 1" frame with table, buttons, inputs | `0:1`, main frame: `3:408` |
-| youtube initial | Code capture — Activity Page Desktop (1440px), real data, all columns | `52:2` |
-| youtube initial | Code capture — Activity Page Tablet (768px), 5 columns | `50:2` |
-| youtube initial | Code capture — Activity Page Desktop (1392px), first capture | `49:2` |
-| youtube initial | Activity Page - Mobile (Make-generated, good layer names) | `42:2` |
+| youtube initial | Code capture — Activity Page Desktop (1440px), real data, all columns                  | `52:2`                     |
+| youtube initial | Code capture — Activity Page Tablet (768px), 5 columns                                 | `50:2`                     |
+| youtube initial | Code capture — Activity Page Desktop (1392px), first capture                           | `49:2`                     |
+| youtube initial | Activity Page - Mobile (Make-generated, good layer names)                              | `42:2`                     |
 
 ### Perspectize - Radix 3.0 Implementation (Design System)
 

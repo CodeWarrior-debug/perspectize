@@ -59,7 +59,7 @@ describe('ComparePickerRow', () => {
 		expect(onSwap).toHaveBeenCalled();
 	});
 
-	it("colors the avatar by viewer identity, not by side, and follows the viewer across a swap", () => {
+	it('colors the avatar by viewer identity, not by side, and follows the viewer across a swap', () => {
 		// Viewer (id '1') on the left: left avatar is primary, right is purple.
 		const { rerender } = render(ComparePickerRow, {
 			props: {
@@ -96,5 +96,16 @@ describe('ComparePickerRow', () => {
 		});
 		expect(screen.getByRole('combobox', { name: 'Left perspective' })).toBeInTheDocument();
 		expect(screen.getByRole('combobox', { name: 'Right perspective' })).toBeInTheDocument();
+	});
+
+	// Regression guard for compare-page-enhancements #10: stacks to a single
+	// column below the `sm` breakpoint instead of squeezing both selects onto
+	// one row on a phone-width screen.
+	it('stacks to a single column below the sm breakpoint', () => {
+		render(ComparePickerRow, {
+			props: { options, leftId: '1', rightId: '2', onLeftChange: vi.fn(), onRightChange: vi.fn(), onSwap: vi.fn() },
+		});
+		const grid = screen.getByTestId('picker-left').closest('.grid');
+		expect(grid).toHaveClass('grid-cols-1', 'sm:grid-cols-[1fr_auto_1fr]');
 	});
 });

@@ -31,7 +31,7 @@
 			<DialogTitle>Settings</DialogTitle>
 		</DialogHeader>
 
-		<div class="flex flex-col gap-4 sm:flex-row sm:gap-6 min-h-[320px] max-h-[75vh] overflow-y-auto">
+		<div class="flex flex-col gap-4 sm:flex-row sm:gap-6 min-h-[320px] max-h-[75vh]">
 			<nav
 				class="flex gap-1 overflow-x-auto sm:w-40 sm:shrink-0 sm:flex-col sm:overflow-visible"
 				aria-label="Settings sections"
@@ -49,7 +49,8 @@
 				{/each}
 			</nav>
 
-			<div class="flex-1 min-w-0">
+			<!-- Only this pane scrolls, so the section nav and each panel's sticky header stay put. -->
+			<div class="flex-1 min-h-0 min-w-0 overflow-y-auto">
 				{#if activeSection === 'general'}
 					<div class="flex flex-col gap-4">
 						<div class="flex items-center justify-between gap-4 rounded-md border border-border p-3">
