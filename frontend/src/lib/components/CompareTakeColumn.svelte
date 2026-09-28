@@ -44,9 +44,7 @@
 
 	{#if uniqueFeelings.length > 0}
 		<div class="flex flex-col gap-1.5 border-t border-border pt-2.5">
-			<span class="text-[10.5px] font-semibold tracking-wide text-muted-foreground uppercase">
-				Unique feelings
-			</span>
+			<span class="text-[10.5px] font-semibold tracking-wide text-muted-foreground uppercase"> Unique feelings </span>
 			<div class="flex flex-wrap gap-1.5">
 				{#each uniqueFeelings as f, i (`${f.emoji}:${f.label ?? ''}:${i}`)}
 					<span class="rounded-full border border-border px-2 py-0.5 text-[12px]">{f.emoji} {f.label ?? ''}</span>
