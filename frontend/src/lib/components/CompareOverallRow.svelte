@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { OverallComparison } from '$lib/utils/comparePerspectives';
 
-	let { overall }: { overall: OverallComparison } = $props();
+	let { overall, agreementPercent = null }: { overall: OverallComparison; agreementPercent?: number | null } = $props();
 
 	const THUMB_UP_PATHS = [
 		'M7 10v12',
@@ -52,7 +52,14 @@
 {/snippet}
 
 <div class="flex items-center justify-between rounded-lg border border-border px-3.5 py-2.5">
-	<span class="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Overall</span>
+	<div class="flex items-center gap-2">
+		<span class="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Overall</span>
+		{#if agreementPercent !== null}
+			<span class="text-[12.5px] font-medium text-foreground" data-testid="agreement-percent">
+				{agreementPercent}% aligned
+			</span>
+		{/if}
+	</div>
 	<div class="flex items-center gap-2.5">
 		{@render thumbIcon(overall.left, 'overall-left')}
 		<span

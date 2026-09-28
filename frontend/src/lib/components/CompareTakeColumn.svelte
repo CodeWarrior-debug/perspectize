@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SafeHtml from './SafeHtml.svelte';
+	import { nameInitials } from '$lib/utils/compareIdentity';
 
 	let {
 		name,
@@ -12,15 +13,6 @@
 		review: string | null;
 		uniqueFeelings: { emoji: string; label: string | null }[];
 	} = $props();
-
-	function initials(value: string): string {
-		return value
-			.split(' ')
-			.map((part) => part[0])
-			.join('')
-			.slice(0, 2)
-			.toUpperCase();
-	}
 </script>
 
 <div class="flex flex-col gap-3 rounded-lg border border-border p-3.5">
@@ -30,7 +22,7 @@
 			class="flex size-6 flex-none items-center justify-center rounded-full text-[10px] font-semibold text-white"
 			style="background-color: {avatarColor};"
 		>
-			{initials(name)}
+			{nameInitials(name)}
 		</span>
 		<span class="text-[13px] font-semibold text-foreground">{name}</span>
 	</div>

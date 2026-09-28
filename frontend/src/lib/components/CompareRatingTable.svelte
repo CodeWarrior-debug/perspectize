@@ -8,12 +8,20 @@
 		feelings,
 		sortDesc,
 		onToggleSort,
+		leftName,
+		rightName,
 	}: {
 		rows: RatingRow[];
 		filledInDifferently: FilledInDifferentlyRow[];
 		feelings: FeelingComparison;
 		sortDesc: boolean;
 		onToggleSort: () => void;
+		// Whose take filled in a dimension, for the "Filled in differently" rows
+		// below — named ("Alice"/"You") instead of raw "left"/"right", which
+		// only means anything relative to a picker column no longer visible in
+		// that sublist (compare-page-enhancements #4).
+		leftName: string;
+		rightName: string;
 	} = $props();
 
 	const STATUS_LABEL: Record<RatingRow['status'], string> = {
@@ -29,6 +37,19 @@
 
 	function fmt(n: number): string {
 		return n.toFixed(1);
+	}
+
+	// Visual 0-10 scale per row (compare-page-enhancements #2) — a filled dot
+	// for the left value, a hollow ring for the right, joined by a bar
+	// spanning the gap between them, all colored by the row's status.
+	function pct(value: number): number {
+		return Math.min(100, Math.max(0, (value / 10) * 100));
+	}
+	function trackStart(row: RatingRow): number {
+		return Math.min(pct(row.leftDisplay), pct(row.rightDisplay));
+	}
+	function trackWidth(row: RatingRow): number {
+		return Math.abs(pct(row.leftDisplay) - pct(row.rightDisplay));
 	}
 </script>
 
@@ -64,10 +85,30 @@
 						{STATUS_LABEL[row.status]}
 					</span>
 				</div>
-				<div class="flex items-center justify-between text-[12.5px] text-foreground">
-					<span>{fmt(row.leftDisplay)}</span>
-					<span style="color: var(--color-muted-foreground);">{fmt(row.pctDiff)}% different</span>
-					<span>{fmt(row.rightDisplay)}</span>
+				<div class="flex items-center gap-2 text-[12.5px] text-foreground">
+					<span class="w-6 flex-none text-right">{fmt(row.leftDisplay)}</span>
+					<div
+						class="relative h-1.5 flex-1 rounded-full bg-border"
+						data-testid={`rating-scale-${row.key}`}
+						role="img"
+						aria-label={`${fmt(row.leftDisplay)} vs ${fmt(row.rightDisplay)}, ${fmt(row.pctDiff)}% different`}
+					>
+						<div
+							class="absolute top-1/2 h-0.5 -translate-y-1/2 rounded-full"
+							style="left: {trackStart(row)}%; width: {trackWidth(row)}%; background-color: {STATUS_COLOR[row.status]};"
+						></div>
+						<span
+							class="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+							style="left: {pct(row.leftDisplay)}%; background-color: {STATUS_COLOR[row.status]};"
+						></span>
+						<span
+							class="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
+							style="left: {pct(row.rightDisplay)}%; border-color: {STATUS_COLOR[
+								row.status
+							]}; background-color: var(--color-background);"
+						></span>
+					</div>
+					<span class="w-6 flex-none">{fmt(row.rightDisplay)}</span>
 				</div>
 			</div>
 		{/each}
@@ -80,7 +121,7 @@
 			</span>
 			{#each filledInDifferently as row (row.key)}
 				<div class="text-[12.5px] text-foreground">
-					{row.label} &mdash; {row.side === 'left' ? 'left' : 'right'} filled in {fmt(row.display)}
+					{row.label} &mdash; {row.side === 'left' ? leftName : rightName} filled in {fmt(row.display)}
 				</div>
 			{/each}
 		</div>
