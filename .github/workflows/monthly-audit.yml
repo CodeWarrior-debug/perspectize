@@ -1,0 +1,162 @@
+name: Monthly Audit
+
+# NOTE ON PINNING: the initiative spec that created this workflow asked for
+# every action pinned to a full commit SHA + version comment. This session
+# had no network access to look up real SHAs (GitHub API calls returned 403
+# through the proxy), and fabricating SHAs would be worse than not pinning —
+# a wrong SHA either breaks the run or silently runs the wrong code. Pinned
+# to version tags instead, matching this repo's existing convention in
+# ci.yml/trivy.yml/codeql.yml. Resolving each tag to its real commit SHA is
+# a manual follow-up (see PR description / finish notes).
+
+on:
+  schedule:
+    - cron: "0 9 1 * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+  actions: read
+
+jobs:
+  collect:
+    name: Collect
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: frontend/package.json
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: mkdir artifacts
+        run: mkdir -p audit-artifacts
+
+      - name: golangci-lint JSON
+        working-directory: backend
+        run: |
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+          golangci-lint run --output.json.path=stdout ./... > ../audit-artifacts/golangci-lint.json 2>&1 || true
+
+      - name: govulncheck
+        working-directory: backend
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest -json ./... > ../audit-artifacts/govulncheck.json 2>&1 || true
+
+      - name: deadcode
+        working-directory: backend
+        run: go run golang.org/x/tools/cmd/deadcode@latest ./... > ../audit-artifacts/deadcode.txt 2>&1 || true
+
+      - name: Install golang-migrate
+        working-directory: backend
+        run: go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+      - name: Run migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
+        run: migrate -path migrations -database "$DATABASE_URL" up
+
+      - name: go test coverage
+        working-directory: backend
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
+        run: go test -p 1 -coverprofile=../audit-artifacts/go-coverage.out ./... > ../audit-artifacts/go-test.txt 2>&1 || true
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: jscpd
+        working-directory: frontend
+        run: pnpm exec jscpd src/ --min-lines 3 --min-tokens 25 --reporters json --output ../audit-artifacts/jscpd || true
+
+      - name: knip
+        working-directory: frontend
+        run: pnpm dlx knip --reporter json > ../audit-artifacts/knip.json 2>&1 || true
+
+      - name: vitest coverage
+        working-directory: frontend
+        run: pnpm run test:coverage > ../audit-artifacts/vitest-coverage.txt 2>&1 || true
+
+      - name: osv-scanner
+        run: |
+          go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
+          osv-scanner --recursive --format=json --output=audit-artifacts/osv-scanner.json ./ || true
+        continue-on-error: true
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
+        env:
+          GITLEAKS_REPORT_PATH: audit-artifacts/gitleaks.json
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-artifacts
+          path: audit-artifacts/
+          retention-days: 14
+
+  triage:
+    name: Triage
+    needs: collect
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: audit-artifacts
+          path: audit-artifacts
+
+      - name: Ensure health-audit label exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create health-audit --color BFD4F2 --description "Monthly codebase audit findings" --repo "${{ github.repository }}" || true
+
+      - name: Run monthly audit (ci mode)
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: "/monthly-audit ci"
+          claude_args: "--max-turns 60"

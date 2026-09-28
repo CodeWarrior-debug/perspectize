@@ -12,8 +12,23 @@ linters:
     - prealloc
     - unconvert
     - nilerr
+    - depguard
 
   settings:
+    depguard:
+      rules:
+        core-purity:
+          files:
+            - "**/internal/core/**"
+            - "!**/internal/core/**/*_test.go"
+          deny:
+            - pkg: "gorm.io/gorm"
+              desc: "internal/core must stay persistence-agnostic; put GORM usage in internal/adapters"
+            - pkg: "github.com/99designs/gqlgen"
+              desc: "internal/core must stay transport-agnostic; put gqlgen usage in internal/adapters"
+            - pkg: "github.com/CodeWarrior-debug/perspectize/backend/internal/adapters"
+              desc: "internal/core must not depend on internal/adapters (hexagonal boundary)"
+
     gocritic:
       enabled-checks:
         - nilValReturn
