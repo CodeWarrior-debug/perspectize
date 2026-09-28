@@ -183,6 +183,40 @@ describe('AddContentPopover invalid range', () => {
 	});
 });
 
+describe('AddContentPopover clear buttons', () => {
+	it('Clear all wipes text, type override, and picker edits', async () => {
+		await openWith('John 3:16-18');
+		await pick('End verse', 20);
+		await fireEvent.click(screen.getByRole('button', { name: /clear all/i }));
+		await tick();
+		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toHaveValue('');
+		expect(chip()).toHaveTextContent('Select a type');
+		expect(screen.queryByTestId('passage-picker')).toBeNull();
+	});
+
+	it('Clear all is disabled on a freshly opened, untouched form', async () => {
+		await openWith();
+		expect(screen.getByRole('button', { name: /clear all/i })).toBeDisabled();
+	});
+
+	it('Clear type resets only the passage fields, keeping the type selected', async () => {
+		await openWith('John 3:16-18');
+		await pick('End verse', 20);
+		await fireEvent.click(screen.getByRole('button', { name: /clear type/i }));
+		await tick();
+		expect(chip()).toHaveTextContent('Type: Bible passage');
+		expect(screen.getByLabelText('Start chapter')).toHaveValue('1');
+		expect(screen.getByLabelText('Start verse')).toHaveValue('1');
+		expect(screen.getByLabelText('End verse')).toHaveValue('1');
+		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toHaveValue('');
+	});
+
+	it('Clear type is disabled when no type is selected', async () => {
+		await openWith();
+		expect(screen.getByRole('button', { name: /clear type/i })).toBeDisabled();
+	});
+});
+
 describe('AddContentPopover mutation states', () => {
 	it('submitting: shows the pending label and disables the form', async () => {
 		mocks.passage.isPending = true;

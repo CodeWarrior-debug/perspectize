@@ -105,7 +105,7 @@ Every hand-kept list is a layer that can go missing. These changes remove whole 
    - `SORTABLE_COLUMNS` ⇄ `SORT_VALUE_GETTERS` ⇄ `COL_TO_SORT` (all or nothing, or explicitly marked client-only),
    - `ContentSortBy` enum ⇄ `COL_TO_SORT` values (read `backend/schema.graphql` as text),
    - `STANDARD_DIMENSIONS` ⇄ `AddFieldSearch` ⇄ `DEFAULT_FIELDS` (#19).
-3. **A lint check for hex colours** in `frontend/src/lib/components/**` and `formatting.ts`. For example, a grep in CI: `grep -rnE "#[0-9a-fA-F]{3,8}\b|rgba?\(" src/lib/components src/lib/utils/formatting.ts`, with an allowlist for brand colours such as YouTube red.
+3. **A pre-commit hook blocking hex colours** in `frontend/src/lib/components/**` and `formatting.ts` — implemented in `.hooks/pre-commit` (activated via `make install-hooks`), not CI: it diffs staged changes to files in scope and blocks the commit if an *added* line matches `#[0-9a-fA-F]{3,8}\b|rgba?\(`. Only new lines are checked, so it doesn't retroactively block the handful of pre-existing raw colours already in the codebase. An intentional exception (e.g. a brand colour like YouTube red) is allowlisted inline with a same-line `hex-ok: <reason>` comment. Self-test: `sh .hooks/test-pre-commit-hex-check.sh`.
 4. **Query-key shape rule:** each differently shaped list gets its own key branch, so a prefix filter can never cover two row shapes.
 
 ---
@@ -137,5 +137,6 @@ Paste this under **Test Plan** in `.github/PULL_REQUEST_TEMPLATE/feature.md` and
 | **PR template** | Add the §4 block to `feature.md` and `bugfix.md`. |
 | **Claude review** (`/code-review`, `code-reviewer` agent, Claude Code Review) | Add a `REVIEW.md` rule (or a `frontend/CLAUDE.md` section) saying "For UI changes, verify each §1 layer against the diff; any list entry added in one registry but not its siblings is a blocking finding." |
 | **Self-verification** (`.docs/VERIFICATION.md`) | Add to the local browser pass: resize to 375px, switch to Midnight, and toggle Loaded/All on every changed surface. |
-| **CI** | Parity tests (§3.2) and the hex-colour check (§3.3). |
+| **CI** | Parity tests (§3.2). |
+| **Pre-commit hook** | The hex-colour check (§3.3) — `.hooks/pre-commit`, activated per checkout via `make install-hooks`. |
 | **Monthly maintenance** | Re-run this audit, feeding the new PRs since the last audit to the lead reviewer, and add the results to `UI_GAP_AUDIT.md`. |

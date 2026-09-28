@@ -1,15 +1,28 @@
 <script lang="ts">
-	import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/shadcn';
+	import { Dialog, DialogContent, DialogHeader, DialogTitle, Switch } from '$lib/components/shadcn';
 	import ThemeCustomizePanel from '$lib/components/theme/ThemeCustomizePanel.svelte';
 	import type { ThemeStore } from '$lib/theme/store.svelte';
+	import { useMe } from '$lib/queries/users/useMe.svelte';
+	import { useSetOnboardingDisplayNextSession } from '$lib/queries/users/useSetOnboardingDisplayNextSession';
 
 	let { open = $bindable(false), store }: { open?: boolean; store: ThemeStore } = $props();
 
-	type SectionId = 'theme';
+	type SectionId = 'general' | 'theme';
 
-	const sections: { id: SectionId; label: string }[] = [{ id: 'theme', label: 'Customize Theme' }];
+	const sections: { id: SectionId; label: string }[] = [
+		{ id: 'general', label: 'General' },
+		{ id: 'theme', label: 'Customize Theme' },
+	];
 
-	let activeSection = $state<SectionId>('theme');
+	let activeSection = $state<SectionId>('general');
+
+	const meCtx = useMe();
+	const setDisplayNextSession = useSetOnboardingDisplayNextSession();
+	const onboardingEnabled = $derived(meCtx.me?.onboarding.displayNextSession ?? false);
+
+	function toggleOnboarding(checked: boolean) {
+		setDisplayNextSession.mutate(checked);
+	}
 </script>
 
 <Dialog bind:open>
@@ -19,7 +32,10 @@
 		</DialogHeader>
 
 		<div class="flex flex-col gap-4 sm:flex-row sm:gap-6 min-h-[320px] max-h-[75vh] overflow-y-auto">
-			<nav class="flex gap-1 overflow-x-auto sm:w-40 sm:shrink-0 sm:flex-col sm:overflow-visible" aria-label="Settings sections">
+			<nav
+				class="flex gap-1 overflow-x-auto sm:w-40 sm:shrink-0 sm:flex-col sm:overflow-visible"
+				aria-label="Settings sections"
+			>
 				{#each sections as section (section.id)}
 					<button
 						type="button"
@@ -34,7 +50,24 @@
 			</nav>
 
 			<div class="flex-1 min-w-0">
-				{#if activeSection === 'theme'}
+				{#if activeSection === 'general'}
+					<div class="flex flex-col gap-4">
+						<div class="flex items-center justify-between gap-4 rounded-md border border-border p-3">
+							<div class="flex flex-col gap-0.5">
+								<span id="onboarding-toggle-label" class="text-sm font-medium">Show onboarding next session</span>
+								<span class="text-xs text-muted-foreground">
+									Bring back the intro walkthrough the next time you sign in.
+								</span>
+							</div>
+							<Switch
+								checked={onboardingEnabled}
+								onCheckedChange={toggleOnboarding}
+								disabled={!meCtx.me || setDisplayNextSession.isPending}
+								aria-labelledby="onboarding-toggle-label"
+							/>
+						</div>
+					</div>
+				{:else if activeSection === 'theme'}
 					<ThemeCustomizePanel {store} />
 				{/if}
 			</div>

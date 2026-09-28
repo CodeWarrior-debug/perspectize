@@ -296,7 +296,7 @@ describe('ActivityTable', () => {
 				([q]) => typeof q === 'string' && q.includes('ListPerspectivesByUser'),
 			);
 			expect(perspectiveCall).toBeTruthy();
-			expect(perspectiveCall?.[1]).toEqual({ userID: 7 });
+			expect(perspectiveCall?.[1]).toEqual({ userID: 7, first: 100 });
 		});
 	});
 

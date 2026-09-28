@@ -49,8 +49,13 @@ column declares a **gap policy** (`em-dash`, `blank`, `substitute`,
 Given a selection of types, the preview flags:
 
 - **Sparse columns** — a default column populated for under half the selection.
-- **Mixed units** — e.g. Length across video seconds, book pages and article
-  read-time, which must never be sorted as one numeric axis unnormalised.
+- **Mixed units** — e.g. Length across video seconds, book pages and Bible
+  passage words (BSB), which must never be sorted as one numeric axis. The
+  sample table enforces the policy. Sorting such a column as the primary key
+  raises an alert and leaves the order unchanged until you pick one of two
+  fixes. **Filter to one type** keeps a single unit. **Sort by Type, then the
+  column** is a multi-column sort that puts the unit-consistent Type column
+  first. The spec emits that policy and the backend/frontend steps it needs.
 - **Mixed provenance** — a column that is fetched for some types and
   user-entered for others (Rating is the standing example).
 - **Lost required fields** — a type declaring a field required and
@@ -61,16 +66,29 @@ Given a selection of types, the preview flags:
 
 ## Seeded types
 
-Twelve deliberately dissimilar types ship as seed data, so the catalog is not
+Thirteen deliberately dissimilar types ship as seed data, so the catalog is not
 quietly YouTube-shaped:
 
 YouTube video · Movie · Book · Blog article · Podcast episode · Music track ·
 Propositional truth claim · Joke · Purchase · Another person's perspective ·
-Place visit · Research paper
+Place visit · Research paper · Bible passage
 
 They differ on every axis that matters: API-enriched vs scraped vs manual vs
 internal-reference; URL-identified vs ISBN/DOI/GUID-identified vs text-hash
 identified; with and without duration, audience counts, money, and stance.
+
+A fresh open (or **Reset form**) lands on the Bible passage seed, the type
+currently being designed. Its bindings mirror `feature/bible-outbound-links`,
+where every passage field is a real `content` column (`name`,
+`display_title`, `verse_start_id`/`verse_end_id`) or a `bible_book` join. Fields
+not written by `CreateFromPassage` yet are tagged `PLANNED (Qn)` in their
+tooltip, citing the question in the bible-passage ANSWERS doc.
+
+Types with sample rows (Bible passage ships ten, one per canonical division)
+render them under the header strip in section 4. That way a column choice is
+judged on real-looking cells, not just its header. Hover a header or cell for
+its tooltip. Each binding can also carry a free-text **cell appearance** (font,
+icon, subtitle, sort comparator), which goes into the spec next to its tooltip.
 
 Pick any of them in section 1 to seed the form, then edit — the seeds are a
 starting point, not a constraint. Loading YouTube alone reproduces the column
@@ -92,7 +110,7 @@ Two deterministic documents, copyable or downloadable:
 
 | File | Purpose |
 |---|---|
-| `src/catalog.ts` | The 12 seeded type profiles and the generic column catalog with per-type bindings |
+| `src/catalog.ts` | The 13 seeded type profiles, the generic column catalog with per-type bindings, and sample rows |
 | `src/model.ts` | State shape, visibility resolution, gap analysis |
 | `src/emit.ts` | Deterministic markdown generation |
 | `src/main.ts` | Form rendering and localStorage persistence |

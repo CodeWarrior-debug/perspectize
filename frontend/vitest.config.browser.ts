@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { defineConfig } from 'vitest/config';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { playwright } from '@vitest/browser-playwright';
@@ -26,11 +27,13 @@ const VIDEO_SIZE = { width: 1280, height: 720 };
 const recordVideo = process.env.VITEST_BROWSER_VIDEO ? { dir: SCREENSHOT_DIR, size: VIDEO_SIZE } : undefined;
 
 /**
- * Escape hatch for environments whose pre-installed Chromium revision doesn't
- * match the one Playwright expects (cloud containers ship their own browsers).
- * Unset on a normal machine, where Playwright resolves its own download.
+ * Which browser to drive. PW_CHROMIUM_EXECUTABLE wins (cloud containers ship
+ * their own Chromium). Otherwise use the installed Google Chrome on macOS, so
+ * no separate `playwright install` download is needed. Elsewhere, fall back to
+ * Playwright's own Chromium.
  */
-const executablePath = process.env.PW_CHROMIUM_EXECUTABLE;
+const MAC_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const executablePath = process.env.PW_CHROMIUM_EXECUTABLE ?? (existsSync(MAC_CHROME) ? MAC_CHROME : undefined);
 
 export default defineConfig({
 	plugins: [svelte()],

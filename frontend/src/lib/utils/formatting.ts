@@ -19,6 +19,42 @@ export function formatDuration(length: number | null, lengthUnits: string | null
 }
 
 /**
+ * Parse a YouTube ISO 8601 duration string (e.g. "PT4M13S", "PT1H2M10S",
+ * "PT45S") into total seconds. Returns null if the string doesn't match the
+ * expected `PT[nH][nM][nS]` shape (including an empty match, e.g. "PT").
+ */
+export function parseIsoDuration(iso: string | null | undefined): number | null {
+	if (!iso) return null;
+	const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso);
+	if (!match) return null;
+	const [, hoursStr, minutesStr, secondsStr] = match;
+	if (!hoursStr && !minutesStr && !secondsStr) return null;
+	const hours = parseInt(hoursStr ?? '0', 10);
+	const minutes = parseInt(minutesStr ?? '0', 10);
+	const seconds = parseInt(secondsStr ?? '0', 10);
+	return hours * 3600 + minutes * 60 + seconds;
+}
+
+/**
+ * Format a YouTube ISO 8601 duration (from `contentDetails.duration` on a
+ * trending/videos.list result) as "M:SS" or "H:MM:SS", for the Discover
+ * page's duration badge. Returns null when unparseable so callers can skip
+ * rendering the badge entirely — unlike `formatDuration` below, which is for
+ * AG Grid cells where an EMPTY_VALUE dash placeholder is expected instead.
+ */
+export function formatIsoDuration(iso: string | null | undefined): string | null {
+	const totalSeconds = parseIsoDuration(iso);
+	if (totalSeconds === null) return null;
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+	if (hours > 0) {
+		return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+	}
+	return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+/**
  * Format ISO date string to locale string.
  */
 export function formatDate(isoString: string): string {
@@ -321,6 +357,14 @@ export function itemCellRenderer(params: { data?: { name: string; url: string | 
 /**
  * AG Grid cell renderer for type column with YouTube icon.
  */
+/** YouTube play-button icon path (the circle-with-triangle glyph), for typeCellRenderer. */
+const YOUTUBE_ICON_PATH =
+	'M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z';
+
+/** A plain speech-bubble glyph for CLAIM rows, distinct from the YouTube play button. */
+const CLAIM_ICON_PATH =
+	'M4 4h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-4.29 3.71A1 1 0 0 1 3 19V5a1 1 0 0 1 1-1zm2 4h12M6 10.5h8';
+
 export function typeCellRenderer(params: { data?: { contentType: string } }): HTMLElement | string {
 	if (!params.data) return '';
 
@@ -343,18 +387,25 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 	hidden.textContent = params.data.contentType ?? '';
 	container.appendChild(hidden);
 
-	// YouTube play button icon (red)
+	const isClaim = params.data.contentType === 'CLAIM';
+
 	const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 	svg.setAttribute('width', '20');
 	svg.setAttribute('height', '20');
 	svg.setAttribute('viewBox', '0 0 24 24');
-	svg.setAttribute('fill', '#FF0000');
+	if (isClaim) {
+		// Not a brand colour (unlike YouTube red below) — use the theme token.
+		svg.setAttribute('fill', 'none');
+		svg.setAttribute('stroke', 'var(--color-muted-foreground)');
+		svg.setAttribute('stroke-width', '2');
+		svg.setAttribute('stroke-linecap', 'round');
+		svg.setAttribute('stroke-linejoin', 'round');
+	} else {
+		svg.setAttribute('fill', '#FF0000'); // YouTube brand red (hex-ok: fixed brand colour, not themeable)
+	}
 
 	const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-	path.setAttribute(
-		'd',
-		'M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z',
-	);
+	path.setAttribute('d', isClaim ? CLAIM_ICON_PATH : YOUTUBE_ICON_PATH);
 
 	svg.appendChild(path);
 	container.appendChild(svg);
@@ -435,7 +486,14 @@ export function perspectiveCellRenderer(params: {
  * Shows category label if assigned, or '+' icon for empty cells.
  */
 export function categoryCellRenderer(params: {
-	data?: { primaryCategory: { label: string; description: string | null; wikidataQid: string } | null };
+	data?: {
+		primaryCategory: {
+			label: string;
+			description: string | null;
+			wikidataQid: string;
+			wikipediaUrl?: string | null;
+		} | null;
+	};
 }): HTMLElement {
 	const container = document.createElement('div');
 	// h-full w-full required for flexbox centering to fill entire cell (Decision 6 gotcha)
@@ -443,10 +501,20 @@ export function categoryCellRenderer(params: {
 
 	const category = params.data?.primaryCategory;
 	if (category) {
-		const label = document.createElement('span');
+		// Label links out to Wikipedia when available; clicking elsewhere in the
+		// cell still opens the category-edit popover (see ActivityTable's grid
+		// cell click handler).
+		const label: HTMLElement = category.wikipediaUrl ? document.createElement('a') : document.createElement('span');
 		label.textContent = category.label;
 		label.title = category.description ?? category.wikidataQid;
 		label.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+		if (category.wikipediaUrl && label instanceof HTMLAnchorElement) {
+			label.href = category.wikipediaUrl;
+			label.target = '_blank';
+			label.rel = 'noopener noreferrer';
+			label.style.textDecoration = 'underline';
+			label.addEventListener('click', (e) => e.stopPropagation());
+		}
 		container.appendChild(label);
 	} else {
 		const plus = document.createElement('span');

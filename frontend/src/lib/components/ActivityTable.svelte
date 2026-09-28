@@ -18,6 +18,7 @@
 	import { LIST_CONTENT, type ContentItem, type ContentResponse } from '$lib/queries/content';
 	import {
 		LIST_PERSPECTIVES_BY_USER,
+		MAX_PERSPECTIVES_PER_LIST,
 		type ListPerspectivesByUserResponse,
 		type PerspectiveItem,
 	} from '$lib/queries/perspectives';
@@ -52,14 +53,10 @@
 		headerMinWidth,
 	} from '$lib/utils/formatting';
 	import {
-		SORT_FIELD_MAP,
-		resolveSortField,
-		resolveSortOrder,
 		capitalizeContentType,
 		durationComparator,
 		compareContentBySorts,
-		computeNextPage,
-		computePrevPage,
+		filterContentRows,
 		togglableColIds,
 	} from '$lib/utils/grid-config';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
@@ -75,7 +72,6 @@
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
-	import PerspectivePopover from '$lib/components/PerspectivePopover.svelte';
 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
 	import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
@@ -92,7 +88,11 @@
 	// Popover state for Category column
 	let categoryPopoverOpen = $state(false);
 	let categoryPopoverContentId = $state<number | null>(null);
-	let categoryPopoverCurrentCategory = $state<{ label: string; wikidataQid: string } | null>(null);
+	let categoryPopoverCurrentCategory = $state<{
+		label: string;
+		wikidataQid: string;
+		wikipediaUrl?: string | null;
+	} | null>(null);
 	let categoryPopoverPosition = $state({ x: 0, y: 0 });
 
 	// Category mutation hook
@@ -248,6 +248,7 @@
 		queryFn: () =>
 			graphqlRequest<ListPerspectivesByUserResponse>(LIST_PERSPECTIVES_BY_USER, {
 				userID: currentUserId,
+				first: MAX_PERSPECTIVES_PER_LIST,
 			}),
 		enabled: currentUserId !== null,
 		staleTime: 60 * 1000,
@@ -360,12 +361,20 @@
 	// the grid-mirroring state in "Loaded" mode (works with or without a live grid).
 	const activeSorts = $derived(mode === 'loaded' ? clientSorts : sorts);
 
-	// The mobile card list has no AG Grid instance to sort for it. In "All Items" mode
-	// the server already returned rows in the requested order; in "Loaded" mode, apply
-	// clientSorts by hand. On desktop, AG Grid does this itself, so this is a no-op.
+	// The mobile card list has no AG Grid instance to sort or filter for it. In "All
+	// Items" mode the server already returned rows in the requested (and filtered)
+	// order; in "Loaded" mode, apply clientSorts and the URL filters by hand — this
+	// used to only sort, so a mobile "Loaded"-mode card view silently ignored every
+	// column filter (see the UI gap audit, gap #5). On desktop, AG Grid does both
+	// itself, so this is a no-op there.
 	const sortedRowData = $derived(
-		mode === 'loaded' && cardMode && clientSorts.length > 0
-			? [...rowData].sort((a, b) => compareContentBySorts(a, b, clientSorts))
+		mode === 'loaded' && cardMode
+			? (() => {
+					const filtered = filterContentRows(rowData, urlParamsToFilter(filters));
+					return clientSorts.length > 0
+						? [...filtered].sort((a, b) => compareContentBySorts(a, b, clientSorts))
+						: filtered;
+				})()
 			: rowData,
 	);
 
@@ -490,11 +499,7 @@
 				maxWidth: 100,
 
 				filter: 'agTextColumnFilter',
-				valueGetter: (params) => {
-					const t = params.data?.contentType;
-					if (!t) return '';
-					return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
-				},
+				valueGetter: (params) => capitalizeContentType(params.data?.contentType),
 				filterValueGetter: (params) => {
 					return params.data?.contentType?.toLowerCase() ?? '';
 				},
@@ -526,11 +531,7 @@
 				},
 				valueGetter: durationValueGetter,
 				filterValueGetter: durationFilterValueGetter,
-				comparator: (_valueA, _valueB, nodeA, nodeB) => {
-					const a = nodeA?.data?.length ?? 0;
-					const b = nodeB?.data?.length ?? 0;
-					return a - b;
-				},
+				comparator: durationComparator,
 				headerTooltip: 'Video duration from YouTube API',
 			},
 			{
@@ -750,6 +751,7 @@
 			if (event.colDef.colId === 'perspectize') {
 				openPerspective(String(event.data.id), event.data.name);
 			} else if (event.colDef.colId === 'category') {
+				hover.close(); // don't leave the hover copy-popover open under the typeahead
 				const rect =
 					event.event?.target instanceof HTMLElement
 						? event.event.target.getBoundingClientRect()
@@ -759,6 +761,7 @@
 					? {
 							label: event.data.primaryCategory.label,
 							wikidataQid: event.data.primaryCategory.wikidataQid,
+							wikipediaUrl: event.data.primaryCategory.wikipediaUrl,
 						}
 					: null;
 				categoryPopoverPosition = { x: rect.left ?? rect.x, y: (rect.bottom ?? rect.y) + 4 };
@@ -1150,18 +1153,23 @@
 	</div>
 </div>
 
-<!-- Perspective create/edit modal — rendered outside the grid for correct portal behavior -->
+<!-- Perspective create/edit modal — rendered outside the grid for correct portal behavior.
+     Dynamically imported: it's the only path into the Tiptap-based PerspectiveEditor
+     (~170KB gzipped), which would otherwise load eagerly on every visit to this page
+     even for users who never open the editor. -->
 {#if popoverOpen && popoverContentId !== null}
-	<PerspectivePopover
-		contentId={popoverContentId}
-		contentName={popoverContentName}
-		existingPerspective={popoverExistingPerspective}
-		userId={currentUserId ?? 0}
-		bind:open={popoverOpen}
-		onClose={() => {
-			popoverOpen = false;
-		}}
-	/>
+	{#await import('$lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
+		<PerspectivePopover
+			contentId={popoverContentId}
+			contentName={popoverContentName}
+			existingPerspective={popoverExistingPerspective}
+			userId={currentUserId ?? 0}
+			bind:open={popoverOpen}
+			onClose={() => {
+				popoverOpen = false;
+			}}
+		/>
+	{/await}
 {/if}
 
 <!-- Activity item details modal — rendered outside the grid for correct portal behavior -->

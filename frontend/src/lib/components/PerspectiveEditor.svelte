@@ -26,9 +26,8 @@
 
 	/**
 	 * PerspectiveEditor — Tiptap editor for writing a perspective's review.
-	 * Extends CommentEditor's bold/italic/underline/list toolbar with headings
-	 * (H2/H3), links, image-by-URL, and tables (structural editing desktop-only).
-	 * `CommentEditor.svelte` stays unmodified for non-perspective comment UIs.
+	 * bold/italic/underline/list toolbar, plus headings (H2/H3), links,
+	 * image-by-URL, and tables (structural editing desktop-only).
 	 */
 	let {
 		value = '',

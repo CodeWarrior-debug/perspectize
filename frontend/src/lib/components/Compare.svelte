@@ -5,6 +5,7 @@
 	import { LIST_USERS, type UsersResponse } from '$lib/queries/users';
 	import {
 		LIST_PERSPECTIVES_BY_CONTENT,
+		MAX_PERSPECTIVES_PER_LIST,
 		type ListPerspectivesByContentResponse,
 	} from '$lib/queries/perspectives';
 	import { GET_CONTENT } from '$lib/queries/content';
@@ -17,18 +18,27 @@
 		compareOverall,
 		summarize,
 		sortRatingRows,
+		agreementPercent,
 	} from '$lib/utils/comparePerspectives';
+	import { identityColor } from '$lib/utils/compareIdentity';
 	import ComparePickerRow from '$lib/components/ComparePickerRow.svelte';
 	import CompareOverallRow from '$lib/components/CompareOverallRow.svelte';
 	import CompareRatingTable from '$lib/components/CompareRatingTable.svelte';
 	import CompareTakeColumn from '$lib/components/CompareTakeColumn.svelte';
+	import { Button } from '$lib/components/shadcn';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
 	import { formatDuration, extractVideoIdFromUrl } from '$lib/utils/formatting';
+	import { passageIconLabels } from '$lib/utils/bible';
+	import BiblePassageIcon from '$lib/components/BiblePassageIcon.svelte';
 
 	interface CompareContentBanner {
 		id: string;
 		name: string;
 		url: string | null;
+		contentType?: string;
+		verseStartID?: number | null;
+		verseEndID?: number | null;
+		displayTitle?: string | null;
 		length: number | null;
 		lengthUnits: string | null;
 	}
@@ -59,6 +69,7 @@
 		queryFn: () =>
 			graphqlRequest<ListPerspectivesByContentResponse>(LIST_PERSPECTIVES_BY_CONTENT, {
 				contentID: Number(contentId),
+				first: MAX_PERSPECTIVES_PER_LIST,
 			}),
 	}));
 
@@ -148,11 +159,20 @@
 			: { left: null, right: null, agree: false },
 	);
 	const summary = $derived(summarize(ratingRows));
+	const overallAgreementPercent = $derived(agreementPercent(ratingRows));
 
 	const loading = $derived(usersQuery.isLoading || perspectivesQuery.isLoading);
 	const hasComparison = $derived(perspectives.length >= 2 && !!leftPerspective && !!rightPerspective);
 	const hasNoPerspectives = $derived(!loading && perspectives.length === 0);
 
+	// The page otherwise silently defaults to comparing OTHER people's takes
+	// even when the signed-in viewer has never weighed in themselves —
+	// nudge them to add one instead of leaving it unsaid (compare-page
+	// enhancements #8). Not shown when signed out; there's nowhere for them
+	// to add a perspective from.
+	const viewerHasPerspective = $derived(meCtx.me ? perspectives.some((p) => p.userID === meCtx.me!.id) : true);
+
+	const isPassage = $derived(content?.contentType === 'BIBLE_PASSAGE');
 	const contentVideoId = $derived(extractVideoIdFromUrl(content?.url ?? null));
 </script>
 
@@ -167,28 +187,64 @@
 		Where ratings align, conflict, or were filled in differently.
 	</p>
 
-	{#if content}
-		<div class="flex items-center justify-between rounded-lg border border-border px-3.5 py-2.5">
-			<div class="flex items-center gap-2.5">
-				{#if contentVideoId}
-					<img
-						src={`https://i.ytimg.com/vi/${contentVideoId}/default.jpg`}
-						alt=""
-						class="h-8 w-10 flex-none rounded object-cover"
-					/>
-				{/if}
-				<span class="text-[13px] font-medium text-foreground">{content.name}</span>
-			</div>
-			{#if content.length != null && content.lengthUnits != null}
-				<span class="text-[12px] text-muted-foreground">{formatDuration(content.length, content.lengthUnits)}</span>
+	{#snippet contentBannerInner()}
+		<div class="flex items-center gap-2.5">
+			{#if isPassage}
+				<div class="h-8 w-10 flex-none overflow-hidden rounded bg-muted">
+					<BiblePassageIcon {...passageIconLabels(content ?? {})} />
+				</div>
+			{:else if contentVideoId}
+				<img
+					src={`https://i.ytimg.com/vi/${contentVideoId}/default.jpg`}
+					alt=""
+					class="h-8 w-10 flex-none rounded object-cover"
+				/>
 			{/if}
+			<span class="text-[13px] font-medium text-foreground">{content!.name}</span>
+		</div>
+		{#if content!.length != null && content!.lengthUnits != null}
+			<span class="text-[12px] text-muted-foreground">{formatDuration(content!.length, content!.lengthUnits)}</span>
+		{/if}
+	{/snippet}
+
+	{#if content}
+		{#if content.url}
+			<a
+				href={content.url}
+				target="_blank"
+				rel="noopener noreferrer"
+				class="flex items-center justify-between rounded-lg border border-border px-3.5 py-2.5 hover:bg-primary/[0.06]"
+			>
+				{@render contentBannerInner()}
+			</a>
+		{:else}
+			<div class="flex items-center justify-between rounded-lg border border-border px-3.5 py-2.5">
+				{@render contentBannerInner()}
+			</div>
+		{/if}
+	{:else if contentQuery.isError}
+		<div class="flex items-center justify-between gap-3 rounded-lg border border-border px-3.5 py-2.5">
+			<span class="text-[12.5px] text-muted-foreground">Couldn't load this content's details.</span>
+			<Button size="sm" variant="outline" onclick={() => contentQuery.refetch()}>Retry</Button>
 		</div>
 	{/if}
 
 	{#if loading}
 		<div class="py-12 text-center text-muted-foreground">Loading comparison…</div>
 	{:else if usersQuery.isError || perspectivesQuery.isError}
-		<div class="py-12 text-center text-muted-foreground">Failed to load this comparison. Please try again.</div>
+		<div class="flex flex-col items-center gap-3 py-12 text-center text-muted-foreground">
+			<p>Failed to load this comparison.</p>
+			<Button
+				size="sm"
+				variant="outline"
+				onclick={() => {
+					usersQuery.refetch();
+					perspectivesQuery.refetch();
+				}}
+			>
+				Retry
+			</Button>
+		</div>
 	{:else if hasNoPerspectives}
 		<div class="rounded-lg border border-border bg-accent p-6 text-center text-[13.5px] text-muted-foreground">
 			No one has shared a perspective on this content yet.
@@ -198,6 +254,18 @@
 			No other perspectives on this content yet to compare against.
 		</div>
 	{:else}
+		{#if meCtx.me && !viewerHasPerspective}
+			<div
+				class="flex items-center justify-between gap-3 rounded-lg border border-border bg-accent px-3.5 py-2.5"
+				data-testid="add-perspective-cta"
+			>
+				<p class="text-[12.5px] text-muted-foreground">
+					You haven't shared a perspective on this yet — these are all other people's takes.
+				</p>
+				<Button href="/" size="sm" variant="outline">Add yours</Button>
+			</div>
+		{/if}
+
 		<ComparePickerRow
 			{options}
 			leftId={leftId!}
@@ -223,12 +291,12 @@
 			</span>
 		</div>
 
-		<CompareOverallRow {overall} />
+		<CompareOverallRow {overall} agreementPercent={overallAgreementPercent} />
 
 		<div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
 			<CompareTakeColumn
 				name={displayName(leftId!)}
-				avatarColor={leftId === meCtx.me?.id ? 'var(--color-primary)' : 'var(--color-logo-purple)'}
+				avatarColor={identityColor(leftId!, meCtx.me?.id ?? null)}
 				review={leftPerspective!.review}
 				uniqueFeelings={feelingsComparison.leftOnly}
 			/>
@@ -238,10 +306,12 @@
 				feelings={feelingsComparison}
 				{sortDesc}
 				onToggleSort={() => (sortDesc = !sortDesc)}
+				leftName={displayName(leftId!)}
+				rightName={displayName(rightId!)}
 			/>
 			<CompareTakeColumn
 				name={displayName(rightId!)}
-				avatarColor={rightId === meCtx.me?.id ? 'var(--color-primary)' : 'var(--color-logo-purple)'}
+				avatarColor={identityColor(rightId!, meCtx.me?.id ?? null)}
 				review={rightPerspective!.review}
 				uniqueFeelings={feelingsComparison.rightOnly}
 			/>

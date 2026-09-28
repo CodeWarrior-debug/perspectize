@@ -69,6 +69,52 @@ describe('ActivityCardList', () => {
 		expect(onOpenDetails).not.toHaveBeenCalled();
 	});
 
+	// Gap #13 in the UI gap audit: the card used to show only name/channel/
+	// duration — 2 of the grid's DATA_COLUMNS. These cover the three added.
+	it('shows category, views, and likes when present', () => {
+		render(ActivityCardList, {
+			props: {
+				rowData: [
+					{
+						...rowData[0],
+						primaryCategory: { label: 'Philosophy' },
+						viewCount: 1300000,
+						likeCount: 26500,
+					},
+				],
+				onOpenDetails: vi.fn(),
+			},
+		});
+
+		expect(screen.getByText('Philosophy')).toBeInTheDocument();
+		expect(screen.getByText('1.3 M views')).toBeInTheDocument();
+		expect(screen.getByText('26.5 K likes')).toBeInTheDocument();
+	});
+
+	it('omits category, views, and likes when absent, without leaving stray separators', () => {
+		render(ActivityCardList, { props: { rowData, onOpenDetails: vi.fn() } });
+		expect(screen.queryByText(/views/)).not.toBeInTheDocument();
+		expect(screen.queryByText(/likes/)).not.toBeInTheDocument();
+	});
+
+	// Gap #13's duration inconsistency: the card used to always print a
+	// duration segment, showing a bare "—" for missing length; UserActivityView
+	// hides the whole segment instead. The card now matches that.
+	it('hides the duration segment entirely (no "—") when length is missing, matching UserActivityView', () => {
+		render(ActivityCardList, {
+			props: {
+				rowData: [{ ...rowData[0], length: null, lengthUnits: null }],
+				onOpenDetails: vi.fn(),
+			},
+		});
+		expect(screen.queryByText('—')).not.toBeInTheDocument();
+	});
+
+	it('shows the duration segment when length is present', () => {
+		render(ActivityCardList, { props: { rowData, onOpenDetails: vi.fn() } });
+		expect(screen.getByText('49:15')).toBeInTheDocument();
+	});
+
 	it('shows the "Edit your perspective" affordance for rows the user already has a perspective on', () => {
 		render(ActivityCardList, {
 			props: {

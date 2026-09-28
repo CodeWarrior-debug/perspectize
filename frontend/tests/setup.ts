@@ -33,6 +33,7 @@ const mockPageState = {
 
 vi.mock('$app/state', () => ({
 	page: mockPageState,
+	updated: { current: false, check: vi.fn(async () => false) },
 }));
 
 // Export for tests that need to change the URL

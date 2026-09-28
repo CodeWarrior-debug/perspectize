@@ -25,13 +25,14 @@ func (UserModel) TableName() string {
 
 // CategoryModel is the GORM persistence model for categories table
 type CategoryModel struct {
-	ID          int       `gorm:"primaryKey;autoIncrement"`
-	WikidataQID string    `gorm:"column:wikidata_qid;uniqueIndex;not null"`
-	Label       string    `gorm:"not null"`
-	Description string    `gorm:"column:description;default:''"`
-	EntityType  string    `gorm:"column:entity_type;default:''"`
-	CreatedAt   time.Time `gorm:"autoCreateTime"`
-	UpdatedAt   time.Time `gorm:"autoUpdateTime"`
+	ID           int       `gorm:"primaryKey;autoIncrement"`
+	WikidataQID  string    `gorm:"column:wikidata_qid;uniqueIndex;not null"`
+	Label        string    `gorm:"not null"`
+	Description  string    `gorm:"column:description;default:''"`
+	EntityType   string    `gorm:"column:entity_type;default:''"`
+	WikipediaURL string    `gorm:"column:wikipedia_url;default:''"`
+	CreatedAt    time.Time `gorm:"autoCreateTime"`
+	UpdatedAt    time.Time `gorm:"autoUpdateTime"`
 }
 
 // TableName returns the table name for CategoryModel
@@ -57,10 +58,11 @@ type ContentModel struct {
 	// Dummy fields for gorm-cursor-paginator sort key validation.
 	// These are NOT database columns — SQLRepr provides the actual SQL.
 	// The gorm:"-" tag tells GORM to ignore them for queries/migrations.
-	ViewCount    int64  `gorm:"-"`
-	LikeCount    int64  `gorm:"-"`
-	PublishedAt  string `gorm:"-"`
-	ChannelTitle string `gorm:"-"` // Dummy field for gorm-cursor-paginator sort key validation
+	ViewCount    int64   `gorm:"-"`
+	LikeCount    int64   `gorm:"-"`
+	PercentLiked float64 `gorm:"-"`
+	PublishedAt  string  `gorm:"-"`
+	ChannelTitle string  `gorm:"-"` // Dummy field for gorm-cursor-paginator sort key validation
 
 	CreatedAt time.Time `gorm:"autoCreateTime"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime"`

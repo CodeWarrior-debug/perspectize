@@ -26,15 +26,17 @@
 		name: string;
 		url: string | null;
 		channelTitle: string | null;
+		contentType?: string;
+		primaryCategory?: { label: string; wikipediaUrl?: string | null } | null;
 		viewCount: number | null;
 		likeCount: number | null;
 		length: number | null;
 		lengthUnits: string | null;
 		publishedAt: string | null;
+		createdAt?: string;
 		updatedAt: string;
 		description: string | null;
 		tags: string[] | null;
-		contentType?: string;
 		displayTitle?: string | null;
 		verseStartID?: number | null;
 		verseEndID?: number | null;
@@ -113,7 +115,7 @@
 		<DialogContent showCloseButton={false} class="max-w-[560px] gap-0 overflow-hidden rounded-xl p-0">
 			<div class="flex items-start justify-between gap-3 header-surface px-[22px] py-[18px]">
 				<DialogTitle class="text-xs font-semibold tracking-wide text-header-foreground/70 uppercase">
-					{isPassage ? 'Bible Passage' : 'YouTube Video'}
+					{content.contentType === 'CLAIM' ? 'Claim' : isPassage ? 'Bible Passage' : 'YouTube Video'}
 				</DialogTitle>
 				<DialogClose class="text-header-foreground/80 hover:text-header-foreground">
 					<XIcon class="size-[18px]" />
@@ -232,15 +234,38 @@
 							</div>
 						</div>
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
-							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Duration</div>
+							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Length</div>
 							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
 								{formatDuration(content.length, content.lengthUnits)}
 							</div>
 						</div>
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
-							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Published</div>
+							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Date</div>
 							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
 								{content.publishedAt ? formatDate(content.publishedAt) : '—'}
+							</div>
+						</div>
+						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
+							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Category</div>
+							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
+								{#if content.primaryCategory?.wikipediaUrl}
+									<a
+										href={content.primaryCategory.wikipediaUrl}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="underline"
+									>
+										{content.primaryCategory.label}
+									</a>
+								{:else}
+									{content.primaryCategory?.label ?? '—'}
+								{/if}
+							</div>
+						</div>
+						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
+							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Date Added</div>
+							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
+								{content.createdAt ? formatDate(content.createdAt) : '—'}
 							</div>
 						</div>
 					{/if}

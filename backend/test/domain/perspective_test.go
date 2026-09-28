@@ -6,6 +6,7 @@ import (
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPerspectiveStruct(t *testing.T) {
@@ -97,4 +98,30 @@ func TestPerspectiveWithCategorizedRatings(t *testing.T) {
 	assert.Equal(t, 8000, perspective.CategorizedRatings[0].Rating)
 	assert.Equal(t, "clarity", perspective.CategorizedRatings[1].Category)
 	assert.Equal(t, 9000, perspective.CategorizedRatings[1].Rating)
+}
+
+func TestFeelingStats_PercentOfPerspectives(t *testing.T) {
+	t.Run("nil when there are no perspectives at all", func(t *testing.T) {
+		stats := domain.FeelingStats{Count: 0, TotalPerspectives: 0}
+		assert.Nil(t, stats.PercentOfPerspectives())
+	})
+
+	t.Run("computes count over total as a percentage", func(t *testing.T) {
+		stats := domain.FeelingStats{Count: 3, TotalPerspectives: 12}
+		require.NotNil(t, stats.PercentOfPerspectives())
+		assert.Equal(t, 25.0, *stats.PercentOfPerspectives())
+	})
+}
+
+func TestCustomFieldStats_PercentOfPerspectives(t *testing.T) {
+	t.Run("nil when there are no perspectives at all", func(t *testing.T) {
+		stats := domain.CustomFieldStats{Count: 0, TotalPerspectives: 0}
+		assert.Nil(t, stats.PercentOfPerspectives())
+	})
+
+	t.Run("computes count over total as a percentage", func(t *testing.T) {
+		stats := domain.CustomFieldStats{Count: 5, TotalPerspectives: 20}
+		require.NotNil(t, stats.PercentOfPerspectives())
+		assert.Equal(t, 25.0, *stats.PercentOfPerspectives())
+	})
 }

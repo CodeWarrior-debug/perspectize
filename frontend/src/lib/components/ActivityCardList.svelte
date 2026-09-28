@@ -2,8 +2,9 @@
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
-	import { extractVideoIdFromUrl, formatDuration } from '$lib/utils/formatting';
-	import { BIBLE_PASSAGE_ICON_SVG } from '$lib/utils/icons';
+	import { extractVideoIdFromUrl, formatDuration, formatCount } from '$lib/utils/formatting';
+	import { passageIconLabels } from '$lib/utils/bible';
+	import BiblePassageIcon from '$lib/components/BiblePassageIcon.svelte';
 
 	interface CardRow {
 		id: string | number;
@@ -12,8 +13,18 @@
 		channelTitle: string | null;
 		length: number | null;
 		lengthUnits: string | null;
+		// Gap #13 in the UI gap audit: the mobile card used to show only name/
+		// channel/duration — 2 of the grid's 9 DATA_COLUMNS. Category, views and
+		// likes are the three most-used of the rest; the remaining columns
+		// (% liked, publish date, tags, description) are still grid/details-modal
+		// only on mobile.
+		primaryCategory?: { label: string } | null;
+		viewCount?: number | null;
+		likeCount?: number | null;
 		contentType?: string;
 		displayTitle?: string | null;
+		verseStartID?: number | null;
+		verseEndID?: number | null;
 	}
 
 	let {
@@ -59,9 +70,7 @@
 				onclick={(e) => handleThumbClick(row, e)}
 			>
 				{#if isPassage(row)}
-					<span class="flex h-full w-full items-center justify-center text-primary">
-						{@html BIBLE_PASSAGE_ICON_SVG}
-					</span>
+					<BiblePassageIcon {...passageIconLabels(row)} />
 				{:else}
 					{#if thumbSrc(row)}
 						<img
@@ -95,13 +104,32 @@
 						</div>
 					{/if}
 				{:else}
-					<div class="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+					<div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
 						{#if row.channelTitle}
 							<span>{row.channelTitle}</span>
-							<span>&middot;</span>
 						{/if}
-						<span>{formatDuration(row.length, row.lengthUnits)}</span>
+						{#if row.length}
+							{#if row.channelTitle}<span>&middot;</span>{/if}
+							<span>{formatDuration(row.length, row.lengthUnits)}</span>
+						{/if}
+						{#if row.primaryCategory}
+							{#if row.channelTitle || row.length}<span>&middot;</span>{/if}
+							<span class="rounded bg-muted px-1.5 py-0.5 text-foreground">{row.primaryCategory.label}</span>
+						{/if}
 					</div>
+					{#if row.viewCount != null || row.likeCount != null}
+						<div class="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+							{#if row.viewCount != null}
+								<span>{formatCount(row.viewCount)} views</span>
+							{/if}
+							{#if row.viewCount != null && row.likeCount != null}
+								<span>&middot;</span>
+							{/if}
+							{#if row.likeCount != null}
+								<span>{formatCount(row.likeCount)} likes</span>
+							{/if}
+						</div>
+					{/if}
 				{/if}
 			</button>
 

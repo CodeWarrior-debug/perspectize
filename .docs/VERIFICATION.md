@@ -153,8 +153,11 @@ Save screenshots to `/Users/jamesjordan/Downloads/screenshots/` with naming conv
 - Use `filePath` parameter on `take_screenshot` to save directly
 - Take full-page screenshots (`fullPage: true`) at mobile (375px), tablet (768px), desktop (1280px)
 
+**Screenshots vs video:** screenshots are for static layout. **For interactive behavior — hover states, multi-step flows, popovers that open and close, animations — record a video instead**, because a still can't show the interaction itself. Recording, encoding and the GitHub embed recipe (GIF preview linked to the mp4; `<video>` is stripped) are in [tools/video-capture](../tools/video-capture/README.md) and [PR Screenshots](PR_SCREENSHOTS.md#videos). Videos use the same `sv-` prefix, e.g. `sv-bible-video-01-add-psalm-139-1-10-1280px.mp4`.
+
 Before creating PR:
 - Screenshots at mobile (375px), tablet (768px), desktop (1280px)
+- For any interactive change: a video of the interaction (see above)
 - Console output showing no errors
 - Verification commands output
 - Upload the `sv-*` screenshots and link them in the PR — see [PR Screenshots](PR_SCREENSHOTS.md)

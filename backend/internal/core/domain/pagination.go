@@ -9,6 +9,7 @@ const (
 	ContentSortByName         ContentSortBy = "NAME"
 	ContentSortByViewCount    ContentSortBy = "VIEW_COUNT"
 	ContentSortByLikeCount    ContentSortBy = "LIKE_COUNT"
+	ContentSortByPercentLiked ContentSortBy = "PERCENT_LIKED"
 	ContentSortByPublishedAt  ContentSortBy = "PUBLISHED_AT"
 	ContentSortByChannelTitle ContentSortBy = "CHANNEL_TITLE"
 	ContentSortByLength       ContentSortBy = "LENGTH"
