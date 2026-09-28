@@ -76,3 +76,6 @@ logs/
 data/bible/interlinear/
 __pycache__/
 *.pyc
+
+# Monthly audit scratch output (regenerated per run, reports are committed)
+.docs/audits/raw/
