@@ -2,6 +2,8 @@
 
 **Status:** Not started — pre-planning spike doc only. This is **not** a superpowers plan (no `executing-plans` sub-skill header, no checkbox task list meant for autonomous execution). It exists to be linked from `.planning/ROADMAP.md` so the idea and its context aren't lost, and to give whoever picks this up (human or a future planning session) enough to write a real plan without re-deriving it.
 
+**⚠️ Written without superpowers loaded** — no `superpowers:*` skill was available in this session (plugin not connected/loaded in this Claude Code cloud environment). A superpowers-enabled session should review this via `writing-plans` (or its brainstorming/spec-writing counterparts) before treating it as vetted, and before turning it into an actual execution plan.
+
 **Roadmap link:** `.planning/ROADMAP.md` → Phase 14.1 (inserted after Phase 14: AG Grid Power Features).
 
 **Origin:** Conversation on 2026-09-27 (Claude Code cloud session) that started as a licensing/cost question about AG Grid Enterprise and AdapTable, and turned into "where would Enterprise actually help this codebase, and what would a spike to find out look like." Full transcript of that conversation is reproduced verbatim in the Appendix below, per request.
