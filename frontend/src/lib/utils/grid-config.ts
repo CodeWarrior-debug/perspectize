@@ -2,7 +2,7 @@
  * Extracted AG Grid configuration logic from ActivityTable.svelte.
  * Pure functions and constants that can be unit-tested without a browser.
  */
-import type { ContentItem } from '$lib/queries/content';
+import type { ContentItem, ContentType } from '$lib/queries/content';
 import { percentLikedValueGetter, formatTags } from './formatting';
 
 /**
@@ -11,6 +11,27 @@ import { percentLikedValueGetter, formatTags } from './formatting';
 export function capitalizeContentType(contentType: string | undefined): string {
 	if (!contentType) return '';
 	return contentType.charAt(0).toUpperCase() + contentType.slice(1).toLowerCase();
+}
+
+/**
+ * Every content type, in the order the Type column's checkbox filter lists them.
+ * Hardcoded on purpose (mirrors the backend ContentType enum) — the Record forces
+ * a new ContentType to be given a label here (Partial while CLAIM is commented out).
+ */
+const CONTENT_TYPE_LABELS: Partial<Record<ContentType, string>> = {
+	YOUTUBE: 'YouTube',
+	// CLAIM: 'Claim', // not ready in the UI yet; uncomment to offer it in the filter
+	BIBLE_PASSAGE: 'Bible Passage',
+};
+
+/** Type-filter options. `value` is the lowercased form used in the filter model and `f.type=` URL param. */
+export const CONTENT_TYPE_OPTIONS: readonly { value: string; label: string }[] = Object.entries(
+	CONTENT_TYPE_LABELS,
+).map(([type, label]) => ({ value: type.toLowerCase(), label }));
+
+/** Display label for a lowercased content type value (falls back to the raw value). */
+export function contentTypeLabel(value: string): string {
+	return CONTENT_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
 
 /**
@@ -82,6 +103,8 @@ export interface ColumnMeta {
 	filterValue?: (row: ContentItem) => string | number | null;
 	/** How a filter value string is parsed: a `min..max` range, or plain text `contains`. */
 	filterRange?: 'number' | 'date';
+	/** Filter is a checkbox list: URL value is comma-separated, model is `{ filterType: 'set', values }`. */
+	filterSet?: boolean;
 }
 
 /**
@@ -109,6 +132,7 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		serverSort: 'NAME',
 		filterKey: 'type',
 		filterValue: (row) => row.contentType?.toLowerCase() ?? null,
+		filterSet: true,
 	},
 	{ colId: 'category', label: 'Category', picker: 'data', sortable: false },
 	{
@@ -310,6 +334,9 @@ export const DATE_RANGE_COLS: ReadonlySet<string> = new Set(
 	COLUMNS.filter((c) => c.filterRange === 'date').map((c) => c.colId),
 );
 
+/** Columns whose filter is a checkbox list (`f.type=youtube,claim`). */
+export const SET_FILTER_COLS: ReadonlySet<string> = new Set(COLUMNS.filter((c) => c.filterSet).map((c) => c.colId));
+
 /** colId → canonical label, for every column with a non-empty label (used by FilterChips' chip text). */
 export const COLUMN_LABELS: Record<string, string> = Object.fromEntries(
 	COLUMNS.filter((c) => c.label.length > 0).map((c) => [c.colId, c.label]),
@@ -349,8 +376,10 @@ export function compareContentBySorts(
 
 /** The shape urlParamsToFilter (gridUrlState.ts) produces per colId. Mirrors AG Grid's own filter model. */
 interface AGFilterEntry {
-	filterType: 'text' | 'number' | 'date';
-	type: string;
+	filterType: 'text' | 'number' | 'date' | 'set';
+	type?: string;
+	/** Set filters only: matches when the row value is any of these. */
+	values?: string[];
 	filter?: number | string;
 	filterTo?: number;
 	dateFrom?: string;
@@ -443,6 +472,7 @@ export function filterContentRows(rows: ContentItem[], filterModel: Record<strin
 			const getValue = FILTER_VALUE_GETTERS[colId];
 			if (!getValue) return true;
 			const value = getValue(row);
+			if (entry.filterType === 'set') return value != null && (entry.values ?? []).includes(String(value));
 			if (entry.filterType === 'number') return matchesNumberFilter(value as number | null, entry);
 			if (entry.filterType === 'date') return matchesDateFilter(value as string | null, entry);
 			return matchesTextFilter(typeof value === 'string' ? value : value == null ? null : String(value), entry);

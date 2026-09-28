@@ -43,6 +43,8 @@ export default defineConfig({
 	// escapes tests/browser/ and lands flat in SCREENSHOT_DIR.
 	define: {
 		__SV_SCREENSHOT_DIR__: JSON.stringify(SCREENSHOT_DIR),
+		// Demo mode bypasses Clerk, so components that use the auth facade
+		// (AuthShow, useAuthState) can be mounted without a ClerkProvider.
 	},
 	server: {
 		fs: {
@@ -56,6 +58,7 @@ export default defineConfig({
 		conditions: ['browser'],
 		alias: {
 			$lib: new URL('./src/lib', import.meta.url).pathname,
+			'svelte-clerk': new URL('./tests/browser/mocks/svelte-clerk.ts', import.meta.url).pathname,
 			'$app/environment': new URL('./tests/browser/mocks/app-environment.ts', import.meta.url).pathname,
 			'$app/navigation': new URL('./tests/browser/mocks/app-navigation.ts', import.meta.url).pathname,
 			'$app/stores': new URL('./tests/browser/mocks/app-stores.ts', import.meta.url).pathname,

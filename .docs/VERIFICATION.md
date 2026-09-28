@@ -93,7 +93,7 @@ viewport heights.
 
 ## 1. Start Services
 
-The database is hosted on Sevalla (cloud PostgreSQL) — no Docker or local database setup needed.
+The everyday dev database is hosted on Sevalla (cloud PostgreSQL) — no local database setup needed. Docker Desktop is installed and is used only for the isolated demo stack (`make demo-up` / `demo-test` / `demo-record`, own Postgres on port 5434); start it with `open -a Docker` if the daemon isn't running.
 
 **Check if already running:**
 ```bash
