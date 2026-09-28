@@ -1,10 +1,11 @@
+import { execFileSync, execSync } from 'node:child_process';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { readFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
 import { faroSourcemapConfig } from './scripts/faro-sourcemaps';
+import { computeTag } from './src/lib/utils/buildTag';
 
 // Build info (src/lib/buildInfo.ts): package.json version + short git SHA. Separate from
 // SvelteKit's kit.version (stale-tab reload hash, see src/lib/utils/versionWatch.ts).
@@ -23,12 +24,42 @@ function gitSha(): string {
 // Opt-in Faro source-map upload: empty (no sourcemaps, no plugin) unless
 // FARO_SOURCEMAP_API_KEY is set; throws if the key is set without its companion vars.
 const faro = faroSourcemapConfig(process.env);
+// Resolves frontend build facts for the zzzv console hotkey (see
+// lib/utils/versionHotkey.ts) from the local git checkout, at build time.
+// Falls back to "unknown" for everything if there's no .git available —
+// e.g. the Sevalla static-site build environment isn't confirmed to have
+// one (their env vars are Application-only per docs.sevalla.com), so this
+// must never throw and break the build.
+function resolveGitBuildInfo() {
+	const unknown = { tag: 'unknown', branch: 'unknown', commit: 'unknown', commitShort: 'unknown' };
+	const git = (...args: string[]) =>
+		execFileSync('git', args, { stdio: ['ignore', 'pipe', 'ignore'] })
+			.toString()
+			.trim();
+
+	try {
+		const commit = git('rev-parse', 'HEAD');
+		const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
+		const committerDate = git('log', '-1', '--format=%cI', 'HEAD');
+		return {
+			tag: computeTag(committerDate, commit),
+			branch,
+			commit,
+			commitShort: commit.slice(0, 7),
+		};
+	} catch {
+		return unknown;
+	}
+}
+
+const buildInfo = { ...resolveGitBuildInfo(), buildTime: new Date().toISOString() };
 
 export default defineConfig({
 	// The vitest 'unit' project below `extends` this file, so it inherits these too.
 	define: {
 		__APP_VERSION__: JSON.stringify(pkg.version),
 		__GIT_SHA__: JSON.stringify(gitSha()),
+		__BUILD_INFO__: JSON.stringify(buildInfo),
 	},
 	plugins: [
 		sveltekit(),

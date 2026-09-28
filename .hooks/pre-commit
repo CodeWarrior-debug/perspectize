@@ -41,21 +41,23 @@ if [ -n "$STAGED_COLOR_FILES" ]; then
     HEX_HITS=""
     for file in $STAGED_COLOR_FILES; do
         [ -f "$file" ] || continue
+        # Leading "(" on each case pattern: macOS /bin/sh (bash 3.2) otherwise reads
+        # a pattern's ")" as the end of this $(...) and fails with a syntax error.
         FILE_HITS=$(git diff --cached --unified=0 -- "$file" | {
             cur=0
             while IFS= read -r dline; do
                 case "$dline" in
-                    @@*)
+                    (@@*)
                         newstart=$(printf '%s' "$dline" | sed -n 's/^@@ -[0-9,]* +\([0-9]*\).*/\1/p')
                         cur=$((newstart - 1))
                         ;;
-                    +++*) ;;
-                    +*)
+                    (+++*) ;;
+                    (+*)
                         cur=$((cur + 1))
                         content=$(printf '%s' "$dline" | cut -c2-)
                         case "$content" in
-                            *hex-ok:*) ;;
-                            *)
+                            (*hex-ok:*) ;;
+                            (*)
                                 if printf '%s' "$content" | grep -qE "#[0-9a-fA-F]{3,8}\b|rgba?\("; then
                                     echo "$file:$cur: $content"
                                 fi

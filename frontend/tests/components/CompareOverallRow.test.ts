@@ -31,4 +31,23 @@ describe('CompareOverallRow', () => {
 		expect(up).toHaveAttribute('fill', 'var(--color-rating-positive)');
 		expect(down).toHaveAttribute('fill', 'var(--color-rating-negative)');
 	});
+
+	it('shows the headline agreement percent when provided', () => {
+		render(CompareOverallRow, {
+			props: { overall: { left: 'THUMBS_UP', right: 'THUMBS_UP', agree: true }, agreementPercent: 82 },
+		});
+		expect(screen.getByTestId('agreement-percent')).toHaveTextContent('82% aligned');
+	});
+
+	it('omits the agreement percent when null (no shared rating dimensions)', () => {
+		render(CompareOverallRow, {
+			props: { overall: { left: 'THUMBS_UP', right: 'THUMBS_UP', agree: true }, agreementPercent: null },
+		});
+		expect(screen.queryByTestId('agreement-percent')).not.toBeInTheDocument();
+	});
+
+	it('omits the agreement percent by default when the prop is not passed', () => {
+		render(CompareOverallRow, { props: { overall: { left: 'THUMBS_UP', right: 'THUMBS_UP', agree: true } } });
+		expect(screen.queryByTestId('agreement-percent')).not.toBeInTheDocument();
+	});
 });

@@ -19,9 +19,7 @@ export interface CoachEligibilityInput {
  */
 export function isCoachEligible({ meLoaded, onboarding }: CoachEligibilityInput): boolean {
 	if (!meLoaded || !onboarding) return false;
-	return (
-		onboarding.displayNextSession === true || onboarding.version < CURRENT_INTRO_VERSION
-	);
+	return onboarding.displayNextSession === true || onboarding.version < CURRENT_INTRO_VERSION;
 }
 
 export interface QuietGraduateInput {
