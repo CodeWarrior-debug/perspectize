@@ -28,6 +28,10 @@ export const queryKeys = {
 		// Full ContentItem row (GET_CONTENT_DETAILS) for a details modal opened on an
 		// item that isn't in the loaded Activity rows (e.g. via `?open=<id>`).
 		row: (id: string) => [...queryKeys.content.details(), 'row', id] as const,
+		// ListComparableContent (ComparePicker.svelte) — a distinct shape/query
+		// from `list` above (adds perspectiveCount, no pagination), keyed by
+		// the debounced search term.
+		comparePicker: (search: string) => [...queryKeys.content.lists(), 'compare-picker', search] as const,
 	},
 
 	bible: {

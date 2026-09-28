@@ -1,11 +1,7 @@
 import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { toast } from 'svelte-sonner';
 import { graphqlRequest } from '../client';
-import {
-	UPDATE_CONTENT_SOURCE_DATA,
-	type UpdateContentSourceDataResponse,
-	type ContentResponse,
-} from './index';
+import { UPDATE_CONTENT_SOURCE_DATA, type UpdateContentSourceDataResponse, type ContentResponse } from './index';
 import { queryKeys } from '../keys';
 
 export function useUpdateSourceData() {
