@@ -27,7 +27,7 @@ function renderPassageCell(opts: {
 	const { id, name, url, displayTitle, verseStartID, verseEndID, onOpenDetails } = opts;
 
 	const cell = document.createElement('div');
-	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-1 cursor-pointer';
+	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-[3px] cursor-pointer';
 	cell.addEventListener('click', () => onOpenDetails?.(String(id)));
 
 	const iconBox = document.createElement('div');
@@ -122,7 +122,7 @@ export function activityItemCellRenderer(params: ActivityItemCellRendererParams)
 	// context.tooltipSpec popover already shows details on cell hover, and a
 	// native title attribute on top of that shows two overlapping tooltip boxes.
 	const cell = document.createElement('div');
-	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-1 cursor-pointer';
+	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-[3px] cursor-pointer';
 	cell.addEventListener('click', () => {
 		onOpenDetails?.(String(id));
 	});

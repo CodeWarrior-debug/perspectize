@@ -1077,7 +1077,7 @@
 			bind:this={gridContainer}
 			data-testid="ag-grid-container"
 			class="{isMobile ? 'overflow-y-auto' : 'flex-1'} min-h-0"
-			style="--ag-row-height: 52px; --ag-header-height: 36px;"
+			style="--ag-row-height: 49px; --ag-header-height: 36px;"
 		>
 			<AgGridSvelte5Component {gridOptions} {rowData} {theme} {modules} />
 		</div>
@@ -1091,7 +1091,7 @@
 
 	<!-- Manual Pagination Controls -->
 	<div
-		class="shrink-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-0 px-2 md:pl-4 md:pr-20 py-1.5 border-t border-border text-xs md:text-sm"
+		class="shrink-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-0 px-2 md:pl-4 md:pr-20 py-1 border-t border-border text-xs md:text-sm"
 	>
 		<div class="flex items-center gap-2 md:gap-4">
 			<div class="text-muted-foreground">

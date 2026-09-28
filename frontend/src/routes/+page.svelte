@@ -67,12 +67,14 @@
 
 <div class="flex flex-col h-[calc(100vh-4rem)]">
 	<!-- Page Header: Title + Search -->
-	<div class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-3 md:py-4">
-		<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+	<div class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4">
+		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 			<div>
-				<h1 class="text-2xl md:text-3xl font-semibold text-foreground">Activity</h1>
+				<h1 class="text-2xl font-semibold text-foreground">Activity</h1>
 				<p class="text-sm text-muted-foreground mt-1">Recently updated content</p>
 			</div>
+			<!-- FilterChips (inside the grid card) moves itself here on desktop to save a row of height. -->
+			<div id="activity-chips-slot" class="hidden md:flex flex-1 min-w-0 items-center"></div>
 			<div class="flex items-center gap-2">
 				<div class="flex items-center gap-1 rounded-md border border-input bg-background p-0.5">
 					<button
