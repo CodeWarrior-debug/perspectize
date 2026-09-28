@@ -1,31 +1,19 @@
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
-import { readFileSync } from 'node:fs';
 import { faroSourcemapConfig } from './scripts/faro-sourcemaps';
 import { computeTag } from './src/lib/utils/buildTag';
-
-// Build info (src/lib/buildInfo.ts): package.json version + short git SHA. Separate from
-// SvelteKit's kit.version (stale-tab reload hash, see src/lib/utils/versionWatch.ts).
-const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
-function gitSha(): string {
-	if (process.env.GIT_SHA) return process.env.GIT_SHA;
-	try {
-		return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
-			.toString()
-			.trim();
-	} catch {
-		return 'unknown'; // Sevalla build without .git
-	}
-}
 
 // Opt-in Faro source-map upload: empty (no sourcemaps, no plugin) unless
 // FARO_SOURCEMAP_API_KEY is set; throws if the key is set without its companion vars.
 const faro = faroSourcemapConfig(process.env);
 // Resolves frontend build facts for the zzzv console hotkey (see
 // lib/utils/versionHotkey.ts) from the local git checkout, at build time.
+// Its `tag` is also the app version sent as X-Client-Version / to Faro
+// (lib/buildInfo.ts). Separate from SvelteKit's kit.version (stale-tab
+// reload hash, see lib/utils/versionWatch.ts).
 // Falls back to "unknown" for everything if there's no .git available —
 // e.g. the Sevalla static-site build environment isn't confirmed to have
 // one (their env vars are Application-only per docs.sevalla.com), so this
@@ -57,8 +45,6 @@ const buildInfo = { ...resolveGitBuildInfo(), buildTime: new Date().toISOString(
 export default defineConfig({
 	// The vitest 'unit' project below `extends` this file, so it inherits these too.
 	define: {
-		__APP_VERSION__: JSON.stringify(pkg.version),
-		__GIT_SHA__: JSON.stringify(gitSha()),
 		__BUILD_INFO__: JSON.stringify(buildInfo),
 	},
 	plugins: [

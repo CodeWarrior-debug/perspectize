@@ -1,16 +1,23 @@
 import { Capacitor } from '@capacitor/core';
+import type { FrontendBuildInfo } from '$lib/utils/versionInfo';
+
+// typeof guard keeps this importable from configs that lack the `define` (e.g. the
+// standalone vitest browser project) instead of throwing a ReferenceError.
+const info: Partial<FrontendBuildInfo> = typeof __BUILD_INFO__ === 'object' ? __BUILD_INFO__ : {};
 
 /**
- * Frontend release version (package.json `version`), injected at build time via
- * vite.config.ts `define`. Distinct from SvelteKit's `version` (see utils/versionWatch.ts),
- * which is a per-build hash used only for stale-tab reloads.
+ * Frontend version identity: the deterministic build tag `v<YYYY.MM.DD>-<short7sha>`
+ * (committer date + short commit SHA, see utils/buildTag.ts `computeTag`), read from the
+ * `__BUILD_INFO__` define that vite.config.ts computes at build time — the same value the
+ * zzzv hotkey prints (utils/versionInfo.ts). 'unknown' when built without .git.
+ * Sent as `X-Client-Version` and reported to Faro as the app version. Distinct from
+ * SvelteKit's `kit.version` (see utils/versionWatch.ts), a per-build hash used only for
+ * stale-tab reloads.
  */
-// typeof guards keep this importable from configs that lack the `define` (e.g. the
-// standalone vitest browser project) instead of throwing a ReferenceError.
-export const APP_VERSION: string = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'unknown';
+export const APP_VERSION: string = info.tag || 'unknown';
 
-/** Short git commit SHA of the build, or 'unknown' when built without .git. */
-export const GIT_SHA: string = typeof __GIT_SHA__ === 'string' ? __GIT_SHA__ : 'unknown';
+/** Short (7-char) git commit SHA of the build, or 'unknown' when built without .git. */
+export const GIT_SHA: string = info.commitShort || 'unknown';
 
 export type ClientPlatform = 'web' | 'ios' | 'android';
 

@@ -1,11 +1,6 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 declare global {
-	/** package.json version, injected by vite.config.ts `define`. */
-	const __APP_VERSION__: string;
-	/** Short git SHA of the build ('unknown' without .git), injected by vite.config.ts `define`. */
-	const __GIT_SHA__: string;
-
 	namespace App {
 		// interface Error {}
 		// interface Locals {}
