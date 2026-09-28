@@ -126,6 +126,24 @@ const SCENARIOS = {
 		out.scroll = { openBefore: before, openAfter: (await h.popover()) !== null };
 		return out;
 	},
+
+	// Messaging panel vs the app header at several viewport heights: the panel's top edge must
+	// stay at/below the header's bottom edge (gap >= 0), or its own header row is clipped.
+	async 'chat-panel'(page) {
+		const out = {};
+		await page.locator('[data-testid="messaging-fab"]').click({ timeout: 8000 });
+		for (const height of [500, 600, 700, 800, 900, 1200]) {
+			await page.setViewportSize({ width: 1280, height });
+			await sleep(400);
+			out[height] = await page.evaluate(() => {
+				const panel = document.querySelector('[data-testid="messaging-panel"]')?.getBoundingClientRect();
+				const header = document.querySelector('header')?.getBoundingClientRect();
+				return panel && header && { panelTop: panel.top, panelHeight: panel.height, headerBottom: header.bottom, gap: panel.top - header.bottom };
+			});
+			await page.screenshot({ path: path.join(OUT_DIR, `sv-chat-panel-h${height}.png`) });
+		}
+		return out;
+	},
 };
 
 (async () => {

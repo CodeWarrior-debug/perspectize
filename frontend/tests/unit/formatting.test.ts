@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
 	formatDuration,
 	formatDurationSeconds,
+	formatIsoDuration,
+	parseIsoDuration,
 	parseDurationInput,
 	formatDate,
 	formatDateCompact,
@@ -64,6 +66,59 @@ describe('formatDuration', () => {
 
 	it('formats with null units', () => {
 		expect(formatDuration(10, null)).toBe('10 null');
+	});
+});
+
+describe('parseIsoDuration', () => {
+	it('parses minutes and seconds', () => {
+		expect(parseIsoDuration('PT4M13S')).toBe(253);
+	});
+
+	it('parses hours, minutes, and seconds', () => {
+		expect(parseIsoDuration('PT1H2M10S')).toBe(3730);
+	});
+
+	it('parses seconds only', () => {
+		expect(parseIsoDuration('PT45S')).toBe(45);
+	});
+
+	it('parses hours only', () => {
+		expect(parseIsoDuration('PT2H')).toBe(7200);
+	});
+
+	it('returns null for null/undefined/empty input', () => {
+		expect(parseIsoDuration(null)).toBeNull();
+		expect(parseIsoDuration(undefined)).toBeNull();
+		expect(parseIsoDuration('')).toBeNull();
+	});
+
+	it('returns null for an unparseable string', () => {
+		expect(parseIsoDuration('not-a-duration')).toBeNull();
+		expect(parseIsoDuration('PT')).toBeNull();
+	});
+});
+
+describe('formatIsoDuration', () => {
+	it('formats minutes and seconds as M:SS', () => {
+		expect(formatIsoDuration('PT4M13S')).toBe('4:13');
+	});
+
+	it('formats sub-minute durations as M:SS with a leading 0', () => {
+		expect(formatIsoDuration('PT45S')).toBe('0:45');
+	});
+
+	it('formats hour-plus durations as H:MM:SS', () => {
+		expect(formatIsoDuration('PT1H2M10S')).toBe('1:02:10');
+	});
+
+	it('pads minutes and seconds under an hour-plus duration', () => {
+		expect(formatIsoDuration('PT2H5S')).toBe('2:00:05');
+	});
+
+	it('returns null for null/undefined/unparseable input', () => {
+		expect(formatIsoDuration(null)).toBeNull();
+		expect(formatIsoDuration(undefined)).toBeNull();
+		expect(formatIsoDuration('garbage')).toBeNull();
 	});
 });
 
@@ -265,8 +320,8 @@ describe('nameCellRenderer', () => {
 });
 
 describe('formatCount', () => {
-	it('returns -- for null', () => {
-		expect(formatCount(null)).toBe('--');
+	it('returns — for null', () => {
+		expect(formatCount(null)).toBe('—');
 	});
 
 	it('returns number as string for counts under 1000', () => {
@@ -295,8 +350,8 @@ describe('formatCount', () => {
 });
 
 describe('formatCountExact', () => {
-	it('returns -- for null', () => {
-		expect(formatCountExact(null)).toBe('--');
+	it('returns an empty string (so no tooltip opens) for null', () => {
+		expect(formatCountExact(null)).toBe('');
 	});
 
 	it('formats small numbers without commas', () => {
@@ -400,8 +455,8 @@ describe('formatDateCompact', () => {
 });
 
 describe('formatPublishDate', () => {
-	it('returns -- for null', () => {
-		expect(formatPublishDate(null)).toBe('--');
+	it('returns — for null', () => {
+		expect(formatPublishDate(null)).toBe('—');
 	});
 
 	it('formats valid ISO date string', () => {
@@ -410,12 +465,12 @@ describe('formatPublishDate', () => {
 });
 
 describe('formatTags', () => {
-	it('returns -- for null', () => {
-		expect(formatTags(null)).toBe('--');
+	it('returns — for null', () => {
+		expect(formatTags(null)).toBe('—');
 	});
 
-	it('returns -- for empty array', () => {
-		expect(formatTags([])).toBe('--');
+	it('returns — for empty array', () => {
+		expect(formatTags([])).toBe('—');
 	});
 
 	it('formats single tag', () => {
@@ -428,12 +483,12 @@ describe('formatTags', () => {
 });
 
 describe('truncateDescription', () => {
-	it('returns -- for null', () => {
-		expect(truncateDescription(null)).toBe('--');
+	it('returns — for null', () => {
+		expect(truncateDescription(null)).toBe('—');
 	});
 
-	it('returns -- for empty string', () => {
-		expect(truncateDescription('')).toBe('--');
+	it('returns — for empty string', () => {
+		expect(truncateDescription('')).toBe('—');
 	});
 
 	it('returns full description if under max length', () => {
@@ -564,6 +619,32 @@ describe('typeCellRenderer', () => {
 		const hidden = result.querySelector('.sr-only');
 		expect(hidden).toBeTruthy();
 		expect(hidden?.textContent).toBe('YOUTUBE_VIDEO');
+	});
+
+	// Gap #12 in the UI gap audit: a CLAIM row rendered with the YouTube play
+	// icon, same as a YOUTUBE row — nothing distinguished them in the grid.
+	it('renders a different, theme-token-coloured icon for a CLAIM row (not the YouTube icon)', () => {
+		const claim = typeCellRenderer({ data: { contentType: 'CLAIM' } }) as HTMLElement;
+		const youtube = typeCellRenderer({ data: { contentType: 'YOUTUBE_VIDEO' } }) as HTMLElement;
+
+		const claimSvg = claim.querySelector('svg');
+		const claimPath = claimSvg?.querySelector('path')?.getAttribute('d');
+		const youtubePath = youtube.querySelector('svg')?.querySelector('path')?.getAttribute('d');
+
+		expect(claimSvg?.getAttribute('fill')).toBe('none');
+		expect(claimSvg?.getAttribute('stroke')).toBe('var(--color-muted-foreground)');
+		expect(claimPath).toBeTruthy();
+		expect(claimPath).not.toBe(youtubePath);
+	});
+
+	it('shows the Bible passage icon (not the YouTube icon) for BIBLE_PASSAGE', () => {
+		const result = typeCellRenderer({
+			data: { contentType: 'BIBLE_PASSAGE' },
+		}) as HTMLElement;
+
+		expect(result.querySelector('svg[data-icon="bible-passage"]')).toBeTruthy();
+		expect(result.querySelector('svg[fill="#FF0000"]')).toBeNull();
+		expect(result.querySelector('.sr-only')?.textContent).toBe('Bible Passage');
 	});
 });
 
@@ -773,5 +854,41 @@ describe('categoryCellRenderer', () => {
 
 		expect(result.style.height).toBe('100%');
 		expect(result.style.width).toBe('100%');
+	});
+
+	it('renders label as a link to wikipediaUrl when present', () => {
+		const result = categoryCellRenderer({
+			data: {
+				primaryCategory: {
+					label: 'Science',
+					description: 'Natural science',
+					wikidataQid: 'Q336',
+					wikipediaUrl: 'https://en.wikipedia.org/wiki/Science',
+				},
+			},
+		});
+
+		const link = result.querySelector('a');
+		expect(link).toBeTruthy();
+		expect(link?.textContent).toBe('Science');
+		expect(link?.href).toBe('https://en.wikipedia.org/wiki/Science');
+		expect(link?.target).toBe('_blank');
+		expect(link?.rel).toBe('noopener noreferrer');
+	});
+
+	it('renders plain span (no link) when wikipediaUrl is absent', () => {
+		const result = categoryCellRenderer({
+			data: {
+				primaryCategory: {
+					label: 'Science',
+					description: 'Natural science',
+					wikidataQid: 'Q336',
+					wikipediaUrl: null,
+				},
+			},
+		});
+
+		expect(result.querySelector('a')).toBeNull();
+		expect(result.querySelector('span')?.textContent).toBe('Science');
 	});
 });

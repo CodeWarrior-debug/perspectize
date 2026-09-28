@@ -53,7 +53,14 @@ jobs:
       - name: Run tests
         env:
           DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
-        run: go test -v -race -coverprofile=coverage.out ./...
+        # -p 1 serializes package test binaries: several integration tests
+        # (test/repositories, test/services) share one Postgres service
+        # container with no per-package isolation, and RetentionSweeper.
+        # SweepOnce prunes messages across *all* threads — running packages
+        # concurrently lets one package's in-flight message inserts get
+        # swept mid-test by another package's retention test, producing
+        # flaky counts (see PR #384 CI failure: "deleted = 624, want 20").
+        run: go test -p 1 -v -race -coverprofile=coverage.out ./...
 
       - name: Upload coverage
         uses: codecov/codecov-action@v7

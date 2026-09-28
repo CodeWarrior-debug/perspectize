@@ -22,3 +22,12 @@ https://github.com/user-attachments/assets/<!-- video-id -->
 
 - [ ] <!-- How to verify the bug is fixed -->
 - [ ] <!-- How to verify no regression introduced -->
+
+## Follow-up Steps
+
+<!-- Manual actions needed after merge, in order if sequence matters. Delete section if none. -->
+
+- [ ] DB migration: `migrate up` against `<!-- environment(s) -->` (manual per .docs — never automated)
+- [ ] Task/script: <!-- e.g. backfill script, one-off command -->
+- [ ] <!-- Additional step -->
+

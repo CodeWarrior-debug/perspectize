@@ -50,6 +50,22 @@ type UpdatePerspectiveInput struct {
 	RelatedPerspectiveIDs []int
 	CustomFields          json.RawMessage
 	Review                *string
+
+	// Clear* requests that the matching field be reset to "no value". Set only
+	// by the GraphQL adapter (modelToUpdatePerspectiveInput in helpers.go) when
+	// the client sent an explicit null (or, for Feelings/CustomFields, an empty
+	// list/object) -- distinct from omitting the field, which leaves it
+	// unchanged. When true, the paired value field above is ignored. See the UI
+	// gap audit, gap #2: without this, there was no way to clear a rating,
+	// review, feelings, or customFields once set.
+	ClearQuality      bool
+	ClearAgreement    bool
+	ClearImportance   bool
+	ClearConfidence   bool
+	ClearLike         bool
+	ClearReview       bool
+	ClearCustomFields bool
+	ClearFeelings     bool
 }
 
 // PerspectiveService defines the contract for perspective business logic
@@ -72,4 +88,14 @@ type PerspectiveService interface {
 	// AggregateByContentIDs computes the public-perspective count and average
 	// Quality rating for each given content ID, batched into a single query.
 	AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
+
+	// FeelingStats computes count/average/stddev for perspectives carrying the
+	// given feeling (see domain.FeelingStats), scoped to one content ID or,
+	// when contentID is nil, every perspective.
+	FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error)
+
+	// CustomFieldStats computes how many perspectives set the given
+	// CustomFields top-level key (see domain.CustomFieldStats), scoped to one
+	// content ID or, when contentID is nil, every perspective.
+	CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error)
 }

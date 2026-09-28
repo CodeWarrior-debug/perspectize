@@ -2,6 +2,7 @@
  * URL ↔ grid state synchronization utilities.
  * Serializes/deserializes AG Grid filter models to/from URL search params.
  */
+import { COL_TO_SORT, SORT_TO_COL, COL_TO_FILTER_KEY, NUMBER_RANGE_COLS, DATE_RANGE_COLS } from './grid-config';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,8 +42,18 @@ export const GRID_DEFAULTS: GridParams = {
 	pageSize: 10,
 	q: '',
 	qFields: ALL_SEARCH_SCOPES,
-	filters: {},
+	// First load shows YouTube content only. Clearing it is persisted as `f=none`.
+	filters: { type: 'youtube' },
 };
+
+/** Sentinel URL value for "filters explicitly cleared" (distinct from no `f.*` params, which means defaults). */
+const NO_FILTERS = 'none';
+
+/** Shallow equality for URL filter maps (key order ignored). */
+export function filtersEqual(a: Record<string, string>, b: Record<string, string>): boolean {
+	const aKeys = Object.keys(a);
+	return aKeys.length === Object.keys(b).length && aKeys.every((k) => a[k] === b[k]);
+}
 
 /** Max columns considered for a multi-column sort — matches AG Grid's practical limit for this table. */
 const MAX_SORT_COLUMNS = 5;
@@ -88,31 +99,13 @@ function serializeSortsForUrl(sorts: SortSpec[]): string {
 // ---------------------------------------------------------------------------
 // AG Grid colId ↔ GraphQL ContentSortBy bidirectional maps
 // ---------------------------------------------------------------------------
+//
+// COL_TO_SORT/SORT_TO_COL are re-exported from grid-config.ts, which is the
+// single source of truth for per-column metadata (see COLUMNS/ColumnMeta
+// there) — kept as named exports here since this is the URL/GraphQL codec
+// module callers of sortsToGraphQL etc. already import from.
 
-/** AG Grid colId → GraphQL ContentSortBy */
-export const COL_TO_SORT: Record<string, string> = {
-	item: 'NAME',
-	type: 'NAME', // Type column not independently sortable
-	duration: 'LENGTH', // New! Was NAME fallback
-	views: 'VIEW_COUNT',
-	likes: 'LIKE_COUNT',
-	publishDate: 'PUBLISHED_AT',
-	channel: 'CHANNEL_TITLE', // New! Was NAME fallback
-	createdAt: 'CREATED_AT',
-	updatedAt: 'UPDATED_AT',
-};
-
-/** GraphQL ContentSortBy → AG Grid colId (for URL → grid state) */
-export const SORT_TO_COL: Record<string, string> = {
-	NAME: 'item',
-	LENGTH: 'duration',
-	VIEW_COUNT: 'views',
-	LIKE_COUNT: 'likes',
-	PUBLISHED_AT: 'publishDate',
-	CHANNEL_TITLE: 'channel',
-	CREATED_AT: 'createdAt',
-	UPDATED_AT: 'updatedAt',
-};
+export { COL_TO_SORT, SORT_TO_COL };
 
 /**
  * Convert a SortSpec[] (URL/AG Grid shape) to the GraphQL `sorts` input list.
@@ -139,13 +132,19 @@ export function parseGridParams(params: URLSearchParams): GridParams {
 	const q = params.get('q');
 	const qf = params.get('qf');
 
-	const filters: Record<string, string> = {};
+	const parsedFilters: Record<string, string> = {};
 	for (const [key, value] of params.entries()) {
 		if (key.startsWith('f.')) {
 			const filterKey = key.slice(2); // strip 'f.' prefix
-			filters[filterKey] = value;
+			parsedFilters[filterKey] = value;
 		}
 	}
+	const filters =
+		Object.keys(parsedFilters).length > 0
+			? parsedFilters
+			: params.get('f') === NO_FILTERS
+				? {}
+				: { ...GRID_DEFAULTS.filters };
 
 	return {
 		mode: mode === 'all' ? 'all' : GRID_DEFAULTS.mode,
@@ -183,8 +182,12 @@ export function serializeGridParams(state: GridParams): string {
 	if (state.q !== GRID_DEFAULTS.q) params.set('q', state.q);
 	if (!sameScopes(state.qFields, GRID_DEFAULTS.qFields)) params.set('qf', state.qFields.join(','));
 
-	for (const [key, value] of Object.entries(state.filters)) {
-		params.set(`f.${key}`, value);
+	if (!filtersEqual(state.filters, GRID_DEFAULTS.filters)) {
+		const entries = Object.entries(state.filters);
+		if (entries.length === 0) params.set('f', NO_FILTERS);
+		for (const [key, value] of entries) {
+			params.set(`f.${key}`, value);
+		}
 	}
 
 	return params.toString();
@@ -205,32 +208,16 @@ type AGDateFilter = { filterType: 'date'; type: string; dateFrom?: string; dateT
 // ---------------------------------------------------------------------------
 // Column mappings: AG Grid colId ↔ URL f.* param key
 // ---------------------------------------------------------------------------
+//
+// COL_TO_FILTER_KEY/NUMBER_RANGE_COLS/DATE_RANGE_COLS are re-exported from
+// grid-config.ts (see COLUMNS there) — see the note above COL_TO_SORT.
 
-/** AG Grid colId → URL f.* param key */
-const COL_TO_FILTER_KEY: Record<string, string> = {
-	item: 'item',
-	type: 'type',
-	duration: 'duration',
-	views: 'views',
-	likes: 'likes',
-	publishDate: 'date',
-	channel: 'channel',
-	tags: 'tags',
-	description: 'desc',
-	createdAt: 'added',
-	updatedAt: 'updated',
-};
+export { COL_TO_FILTER_KEY, NUMBER_RANGE_COLS, DATE_RANGE_COLS };
 
 /** URL f.* param key → AG Grid colId */
 const FILTER_KEY_TO_COL: Record<string, string> = Object.fromEntries(
 	Object.entries(COL_TO_FILTER_KEY).map(([col, key]) => [key, col]),
 );
-
-/** Columns whose f.* params are number ranges (vs date ranges or text) */
-const NUMBER_RANGE_COLS = new Set(['duration', 'views', 'likes']);
-
-/** Columns whose f.* params are date ranges */
-const DATE_RANGE_COLS = new Set(['publishDate', 'createdAt', 'updatedAt']);
 
 // ---------------------------------------------------------------------------
 // filterToUrlParams — AG Grid FilterModel → URL f.* params
@@ -483,11 +470,6 @@ export function urlParamsToGraphQLFilter(
 		if (!value) continue;
 
 		switch (filterKey) {
-			case 'item':
-				result.search = value;
-				hasAny = true;
-				break;
-
 			case 'type':
 				// Bookmarked URLs from before the youtube → youtube_video rename still say "youtube"
 				result.contentType = value.toLowerCase() === 'youtube' ? 'YOUTUBE_VIDEO' : value.toUpperCase();

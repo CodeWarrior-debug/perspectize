@@ -20,23 +20,60 @@ describe('queryKeys.perspectives namespace', () => {
 	});
 
 	describe('listByUser(userId)', () => {
-		it('returns key with userId object when passed a user ID', () => {
+		it('returns key with a byUser branch tag and userId object', () => {
 			const result = queryKeys.perspectives.listByUser(42);
-			expect(result).toEqual(['app', 'perspectives', 'list', { userId: 42 }]);
+			expect(result).toEqual(['app', 'perspectives', 'list', 'byUser', { userId: 42 }]);
 		});
 
-		it('builds on perspectives.lists()', () => {
-			const listsKey = queryKeys.perspectives.lists();
+		it('builds on perspectives.byUserLists()', () => {
+			const branchKey = queryKeys.perspectives.byUserLists();
 			const result = queryKeys.perspectives.listByUser(123);
-			expect(result).toEqual([...listsKey, { userId: 123 }]);
+			expect(result).toEqual([...branchKey, { userId: 123 }]);
 		});
 
 		it('handles different user IDs independently', () => {
 			const user1 = queryKeys.perspectives.listByUser(1);
 			const user2 = queryKeys.perspectives.listByUser(2);
-			expect(user1).toEqual(['app', 'perspectives', 'list', { userId: 1 }]);
-			expect(user2).toEqual(['app', 'perspectives', 'list', { userId: 2 }]);
+			expect(user1).toEqual(['app', 'perspectives', 'list', 'byUser', { userId: 1 }]);
+			expect(user2).toEqual(['app', 'perspectives', 'list', 'byUser', { userId: 2 }]);
 			expect(user1).not.toEqual(user2);
+		});
+	});
+
+	describe('listByContent(contentId)', () => {
+		it('returns key with a byContent branch tag and contentId object', () => {
+			const result = queryKeys.perspectives.listByContent(10);
+			expect(result).toEqual(['app', 'perspectives', 'list', 'byContent', { contentId: 10 }]);
+		});
+
+		it('builds on perspectives.byContentLists()', () => {
+			const branchKey = queryKeys.perspectives.byContentLists();
+			const result = queryKeys.perspectives.listByContent(11);
+			expect(result).toEqual([...branchKey, { contentId: 11 }]);
+		});
+	});
+
+	describe('activityFeed(includePrivate)', () => {
+		it('keeps its existing key shape (unchanged by the byUser/byContent split)', () => {
+			expect(queryKeys.perspectives.activityFeed(false)).toEqual([
+				'app',
+				'perspectives',
+				'list',
+				'activityFeed',
+				{ includePrivate: false },
+			]);
+			expect(queryKeys.perspectives.activityFeed(true)).toEqual([
+				'app',
+				'perspectives',
+				'list',
+				'activityFeed',
+				{ includePrivate: true },
+			]);
+		});
+
+		it('builds on perspectives.activityFeeds()', () => {
+			const branchKey = queryKeys.perspectives.activityFeeds();
+			expect(queryKeys.perspectives.activityFeed(true)).toEqual([...branchKey, { includePrivate: true }]);
 		});
 	});
 
@@ -92,16 +129,67 @@ describe('queryKeys.perspectives namespace', () => {
 		});
 	});
 
+	describe('branch non-overlap (regression guard for gap #3 — the prefix-match cache-corruption bug)', () => {
+		// Two keys "overlap" if one is a prefix of the other — that's exactly what
+		// TanStack Query's default (non-exact) queryKey matching treats as "the same
+		// cache entry (or a match under this filter)". Before the fix, listByUser,
+		// listByContent and activityFeed all sat directly under lists() with nothing
+		// distinguishing their branches, so a filter scoped to one matched all three.
+		function isPrefixOf(prefix: readonly unknown[], key: readonly unknown[]): boolean {
+			if (prefix.length > key.length) return false;
+			return prefix.every((part, i) => JSON.stringify(part) === JSON.stringify(key[i]));
+		}
+
+		it('byUserLists(), byContentLists() and activityFeeds() are mutually non-overlapping branches', () => {
+			const branches = [
+				queryKeys.perspectives.byUserLists(),
+				queryKeys.perspectives.byContentLists(),
+				queryKeys.perspectives.activityFeeds(),
+			];
+			for (let i = 0; i < branches.length; i++) {
+				for (let j = 0; j < branches.length; j++) {
+					if (i === j) continue;
+					expect(isPrefixOf(branches[i], branches[j])).toBe(false);
+				}
+			}
+		});
+
+		it('a listByUser key does not fall under byContentLists() or activityFeeds()', () => {
+			const userKey = queryKeys.perspectives.listByUser(1);
+			expect(isPrefixOf(queryKeys.perspectives.byContentLists(), userKey)).toBe(false);
+			expect(isPrefixOf(queryKeys.perspectives.activityFeeds(), userKey)).toBe(false);
+		});
+
+		it('a listByContent key does not fall under byUserLists() or activityFeeds()', () => {
+			const contentKey = queryKeys.perspectives.listByContent(1);
+			expect(isPrefixOf(queryKeys.perspectives.byUserLists(), contentKey)).toBe(false);
+			expect(isPrefixOf(queryKeys.perspectives.activityFeeds(), contentKey)).toBe(false);
+		});
+
+		it('an activityFeed key does not fall under byUserLists() or byContentLists()', () => {
+			const feedKey = queryKeys.perspectives.activityFeed(true);
+			expect(isPrefixOf(queryKeys.perspectives.byUserLists(), feedKey)).toBe(false);
+			expect(isPrefixOf(queryKeys.perspectives.byContentLists(), feedKey)).toBe(false);
+		});
+
+		it('every branch still starts with the lists() umbrella (kept for shape-agnostic invalidation)', () => {
+			const listsPrefix = queryKeys.perspectives.lists();
+			expect(isPrefixOf(listsPrefix, queryKeys.perspectives.listByUser(1))).toBe(true);
+			expect(isPrefixOf(listsPrefix, queryKeys.perspectives.listByContent(1))).toBe(true);
+			expect(isPrefixOf(listsPrefix, queryKeys.perspectives.activityFeed(true))).toBe(true);
+		});
+	});
+
 	describe('type safety (as const)', () => {
 		it('returns readonly arrays', () => {
 			const key = queryKeys.perspectives.all();
 			expect(Array.isArray(key)).toBe(true);
 		});
 
-		it('listByUser returns readonly array with object', () => {
+		it('listByUser returns readonly array with object as its last element', () => {
 			const key = queryKeys.perspectives.listByUser(1);
 			expect(Array.isArray(key)).toBe(true);
-			expect(typeof key[3]).toBe('object');
+			expect(typeof key[4]).toBe('object');
 		});
 	});
 });

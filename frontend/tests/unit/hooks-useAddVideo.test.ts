@@ -120,9 +120,7 @@ describe('useAddVideo hook', () => {
 				createContentFromYouTube: { content: null, alreadyExisted: false },
 			});
 			expect(mockSetQueriesData).not.toHaveBeenCalled();
-			expect(mockInvalidateQueries).toHaveBeenCalledWith(
-				expect.not.objectContaining({ refetchType: 'none' }),
-			);
+			expect(mockInvalidateQueries).toHaveBeenCalledWith(expect.not.objectContaining({ refetchType: 'none' }));
 		});
 
 		it('does not insert duplicate into cache', () => {

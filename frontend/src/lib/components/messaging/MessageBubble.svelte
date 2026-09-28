@@ -83,8 +83,7 @@
 					rows={2}
 					bind:value={editBody}
 					onkeydown={handleEditKeydown}
-					aria-label="Edit message body"
-				></textarea>
+					aria-label="Edit message body"></textarea>
 				<div class="flex gap-1">
 					<button onclick={confirmEdit} aria-label="Confirm edit" class="text-primary hover:opacity-80">
 						<CheckIcon size={14} />

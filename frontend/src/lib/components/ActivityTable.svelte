@@ -18,6 +18,7 @@
 	import { LIST_CONTENT, type ContentItem, type ContentResponse } from '$lib/queries/content';
 	import {
 		LIST_PERSPECTIVES_BY_USER,
+		MAX_PERSPECTIVES_PER_LIST,
 		type ListPerspectivesByUserResponse,
 		type PerspectiveItem,
 	} from '$lib/queries/perspectives';
@@ -29,6 +30,7 @@
 		urlParamsToGraphQLFilter,
 		urlParamsToFilter,
 		filterToUrlParams,
+		filtersEqual,
 	} from '$lib/utils/gridUrlState';
 	import type { DataMode, GridParams, SortSpec } from '$lib/utils/gridUrlState';
 	import {
@@ -51,16 +53,13 @@
 		headerMinWidth,
 	} from '$lib/utils/formatting';
 	import {
-		SORT_FIELD_MAP,
-		resolveSortField,
-		resolveSortOrder,
 		capitalizeContentType,
 		durationComparator,
 		compareContentBySorts,
-		computeNextPage,
-		computePrevPage,
+		filterContentRows,
 		togglableColIds,
 	} from '$lib/utils/grid-config';
+	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
 	import SortPickerDialog from '$lib/components/SortPickerDialog.svelte';
@@ -73,7 +72,6 @@
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
-	import PerspectivePopover from '$lib/components/PerspectivePopover.svelte';
 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
 	import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
@@ -90,7 +88,11 @@
 	// Popover state for Category column
 	let categoryPopoverOpen = $state(false);
 	let categoryPopoverContentId = $state<number | null>(null);
-	let categoryPopoverCurrentCategory = $state<{ label: string; wikidataQid: string } | null>(null);
+	let categoryPopoverCurrentCategory = $state<{
+		label: string;
+		wikidataQid: string;
+		wikipediaUrl?: string | null;
+	} | null>(null);
 	let categoryPopoverPosition = $state({ x: 0, y: 0 });
 
 	// Category mutation hook
@@ -241,6 +243,7 @@
 		queryFn: () =>
 			graphqlRequest<ListPerspectivesByUserResponse>(LIST_PERSPECTIVES_BY_USER, {
 				userID: currentUserId,
+				first: MAX_PERSPECTIVES_PER_LIST,
 			}),
 		enabled: currentUserId !== null,
 		staleTime: 60 * 1000,
@@ -353,12 +356,20 @@
 	// the grid-mirroring state in "Loaded" mode (works with or without a live grid).
 	const activeSorts = $derived(mode === 'loaded' ? clientSorts : sorts);
 
-	// The mobile card list has no AG Grid instance to sort for it. In "All Items" mode
-	// the server already returned rows in the requested order; in "Loaded" mode, apply
-	// clientSorts by hand. On desktop, AG Grid does this itself, so this is a no-op.
+	// The mobile card list has no AG Grid instance to sort or filter for it. In "All
+	// Items" mode the server already returned rows in the requested (and filtered)
+	// order; in "Loaded" mode, apply clientSorts and the URL filters by hand — this
+	// used to only sort, so a mobile "Loaded"-mode card view silently ignored every
+	// column filter (see the UI gap audit, gap #5). On desktop, AG Grid does both
+	// itself, so this is a no-op there.
 	const sortedRowData = $derived(
-		mode === 'loaded' && cardMode && clientSorts.length > 0
-			? [...rowData].sort((a, b) => compareContentBySorts(a, b, clientSorts))
+		mode === 'loaded' && cardMode
+			? (() => {
+					const filtered = filterContentRows(rowData, urlParamsToFilter(filters));
+					return clientSorts.length > 0
+						? [...filtered].sort((a, b) => compareContentBySorts(a, b, clientSorts))
+						: filtered;
+				})()
 			: rowData,
 	);
 
@@ -441,29 +452,7 @@
 
 	const modules = [ClientSideRowModelModule];
 
-	const theme = themeQuartz.withParams({
-		fontFamily: "'Geist', system-ui, sans-serif",
-		fontSize: 14,
-		headerBackgroundColor: '#1a365d',
-		headerTextColor: '#ffffff',
-		headerFontWeight: 600,
-		oddRowBackgroundColor: '#f7fafc',
-		rowHoverColor: 'rgba(26, 54, 93, 0.06)',
-		borderColor: '#d4d4d4',
-		accentColor: '#1a365d',
-		foregroundColor: '#171717',
-		backgroundColor: '#ffffff',
-		selectedRowBackgroundColor: 'rgba(26, 54, 93, 0.08)',
-		columnHoverColor: 'rgba(26, 54, 93, 0.04)',
-		headerColumnResizeHandleColor: 'rgba(255, 255, 255, 0.5)',
-		// 64px comfortably fits a 32px thumbnail alongside a 2-line, 13px/1.5-leading title
-		// with margin to spare — a tighter value clips descenders (g/y/p/q/j) on the second
-		// line via the row's own overflow:hidden, even though line-clamp itself only ever
-		// cuts whole lines. See CLAUDE.md's AG Grid gotcha.
-		rowHeight: 64,
-		headerHeight: 40,
-		listItemHeight: 24,
-	});
+	const theme = themeQuartz.withParams(GRID_THEME_PARAMS);
 
 	// flex = clamp-like: proportional sizing with min/max constraints
 	// minWidth is auto-derived from headerName unless explicitly set (e.g. Item = 200)
@@ -537,11 +526,7 @@
 				},
 				valueGetter: durationValueGetter,
 				filterValueGetter: durationFilterValueGetter,
-				comparator: (_valueA, _valueB, nodeA, nodeB) => {
-					const a = nodeA?.data?.length ?? 0;
-					const b = nodeB?.data?.length ?? 0;
-					return a - b;
-				},
+				comparator: durationComparator,
 				headerTooltip: 'Video duration from YouTube API',
 			},
 			{
@@ -761,6 +746,7 @@
 			if (event.colDef.colId === 'perspectize') {
 				openPerspective(String(event.data.id), event.data.name);
 			} else if (event.colDef.colId === 'category') {
+				hover.close(); // don't leave the hover copy-popover open under the typeahead
 				const rect =
 					event.event?.target instanceof HTMLElement
 						? event.event.target.getBoundingClientRect()
@@ -770,6 +756,7 @@
 					? {
 							label: event.data.primaryCategory.label,
 							wikidataQid: event.data.primaryCategory.wikidataQid,
+							wikipediaUrl: event.data.primaryCategory.wikipediaUrl,
 						}
 					: null;
 				categoryPopoverPosition = { x: rect.left ?? rect.x, y: (rect.bottom ?? rect.y) + 4 };
@@ -824,14 +811,18 @@
 			activeFilterModel = event.api.getFilterModel();
 			displayedRowCount = event.api.getDisplayedRowCount();
 
-			// In "Loaded" mode, AG Grid handles client-side filter — skip URL update
-			if (mode === 'loaded') return;
-
-			// Server-side: debounce → convert filter model → update URL
+			// Debounce → convert filter model → update URL. In "Loaded" mode AG Grid already
+			// filtered client-side; the URL write just keeps the URL authoritative, so a
+			// cleared default filter (f=none) isn't re-applied by the restore effect below.
 			clearTimeout(debounceTimer);
 			debounceTimer = setTimeout(() => {
 				const filterModel = event.api.getFilterModel();
 				const urlFilters = filterToUrlParams(filterModel as Record<string, unknown>);
+				if (filtersEqual(urlFilters, gridParams.filters)) return;
+				if (mode === 'loaded') {
+					updateUrl({ filters: urlFilters });
+					return;
+				}
 				cursors = [null];
 				updateUrl({ filters: urlFilters, page: 1 });
 			}, 500);
@@ -976,8 +967,8 @@
 			const smCols = ['category', 'channel'];
 			const mdCols = ['duration', 'publishDate'];
 			const lgCols = ['views', 'likes', 'percentLiked', 'tags'];
-			// createdAt/updatedAt/id/addedByUserID/url stay hidden via their colDef
-			// `hide: true` until an admin enables them in the column picker.
+			// createdAt/updatedAt stay hidden via their colDef `hide: true` until the
+			// user enables them in the column picker; id/addedByUserID/url likewise, admins only.
 			const alwaysHidden = ['description'];
 
 			api.setColumnsVisible(alwaysVisible, true);
@@ -1011,7 +1002,20 @@
 
 <div class="flex flex-col h-full gap-4">
 	<!-- Active Filter Chips — always visible so users can clear filters even during errors -->
-	<FilterChips {gridApi} filterModel={activeFilterModel} />
+	<FilterChips
+		{gridApi}
+		filterModel={gridApi ? activeFilterModel : urlParamsToFilter(filters)}
+		onRemove={(colId) => {
+			const next = { ...gridParams.filters };
+			delete next[colId];
+			cursors = [null];
+			updateUrl({ filters: next, page: 1 });
+		}}
+		onClearAll={() => {
+			cursors = [null];
+			updateUrl({ filters: {}, page: 1 });
+		}}
+	/>
 
 	<!-- Error State -->
 	{#if contentQuery.isError}
@@ -1144,18 +1148,23 @@
 	</div>
 </div>
 
-<!-- Perspective create/edit modal — rendered outside the grid for correct portal behavior -->
+<!-- Perspective create/edit modal — rendered outside the grid for correct portal behavior.
+     Dynamically imported: it's the only path into the Tiptap-based PerspectiveEditor
+     (~170KB gzipped), which would otherwise load eagerly on every visit to this page
+     even for users who never open the editor. -->
 {#if popoverOpen && popoverContentId !== null}
-	<PerspectivePopover
-		contentId={popoverContentId}
-		contentName={popoverContentName}
-		existingPerspective={popoverExistingPerspective}
-		userId={currentUserId ?? 0}
-		bind:open={popoverOpen}
-		onClose={() => {
-			popoverOpen = false;
-		}}
-	/>
+	{#await import('$lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
+		<PerspectivePopover
+			contentId={popoverContentId}
+			contentName={popoverContentName}
+			existingPerspective={popoverExistingPerspective}
+			userId={currentUserId ?? 0}
+			bind:open={popoverOpen}
+			onClose={() => {
+				popoverOpen = false;
+			}}
+		/>
+	{/await}
 {/if}
 
 <!-- Activity item details modal — rendered outside the grid for correct portal behavior -->

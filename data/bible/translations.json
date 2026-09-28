@@ -1,0 +1,12 @@
+[
+  { "code": "NIV", "label": "New International Version", "catholic": false },
+  { "code": "ESV", "label": "English Standard Version", "catholic": false },
+  { "code": "KJV", "label": "King James Version", "catholic": false },
+  { "code": "NKJV", "label": "New King James Version", "catholic": false },
+  { "code": "NLT", "label": "New Living Translation", "catholic": false },
+  { "code": "NASB", "label": "New American Standard Bible", "catholic": false },
+  { "code": "CSB", "label": "Christian Standard Bible", "catholic": false },
+  { "code": "AMP", "label": "Amplified Bible", "catholic": false },
+  { "code": "MSG", "label": "The Message", "catholic": false },
+  { "code": "NABRE", "label": "New American Bible, Revised Edition", "catholic": true }
+]

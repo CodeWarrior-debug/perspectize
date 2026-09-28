@@ -50,20 +50,33 @@ gh release create screenshots \
 
 ## Videos
 
-The same bucket release hosts `.mp4`/`.webm` captures (e.g. from Vitest Browser Mode's opt-in `recordVideo` — see `frontend/CLAUDE.md`). The upload and URL-lookup steps are identical to screenshots, just with a different glob:
+**For interactive behavior — hover states, multi-step flows, popovers that open and close, animations — a video is better than screenshots.** A still can't show that a hover draws a connector, a popover closes on success, or a form syncs as you type. Use screenshots for static layout, video for interaction (often both on the same PR).
+
+Record the running app with [`tools/video-capture`](../tools/video-capture/README.md) (CDP screencast + a venv-bundled ffmpeg; the DevTools MCP itself can't record), or Vitest Browser Mode's opt-in `recordVideo` (see `frontend/CLAUDE.md`). Name videos `sv-<plan>-video-NN-<what>-<width>px.mp4`. The same bucket release hosts them, and upload and URL lookup are identical to screenshots with a different glob:
 
 ```bash
 gh release upload screenshots /Users/jamesjordan/Downloads/screenshots/sv-<plan>-*.mp4 --clobber
 gh release view screenshots --json assets --jq '.assets[] | select(.name | startswith("sv-<plan>-")) | .browser_download_url'
 ```
 
-Embed with an HTML `<video>` tag rather than markdown image syntax — `![]()` doesn't add player controls even when GitHub renders it as a link:
+### Embedding — GIF preview linked to the mp4
 
-```markdown
-<video src="https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-01-sort-animation.mp4" controls></video>
+**A `<video>` tag does not work for release assets.** Tested with `gh api markdown` (mode `gfm`): the sanitizer strips `<video src="…releases/download/…mp4" controls>` down to an empty paragraph, and a bare `.mp4` URL renders as a plain link with no player. GitHub only produces an inline player for files dragged into the PR description box in the web UI, which can't be scripted.
+
+What renders inline from a release asset is an **animated GIF**. Make a small preview GIF from the mp4 and embed it as an image that links to the full-quality mp4:
+
+```bash
+ffmpeg -i sv-<plan>-video-01-<what>-1280px.mp4 \
+  -vf "fps=8,scale=880:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" \
+  sv-<plan>-video-01-<what>-preview.gif
+gh release upload screenshots sv-<plan>-video-01-<what>-preview.gif sv-<plan>-video-01-<what>-1280px.mp4 --clobber
 ```
 
-GitHub's markdown renderer strips `<video>` tags from most sources, but a release-asset URL resolves through `objects.githubusercontent.com`, which is on the allowed host list — so this should render an inline player. If it doesn't, fall back to dragging the file directly into the PR description box in the browser (Web UI uploads always produce a player, uploading to `user-images.githubusercontent.com` instead) and replace the tag with the URL it generates.
+```markdown
+[![What the clip shows](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-<plan>-video-01-<what>-preview.gif)](https://github.com/CodeWarrior-debug/perspectize/releases/download/screenshots/sv-<plan>-video-01-<what>-1280px.mp4)
+```
+
+(`ffmpeg` is the binary bundled with the `imageio-ffmpeg` venv described in the video-capture README; screencast clips of mostly-static UI stay under ~1 MB as GIFs.) A short sentence above the embed saying what to look at helps, since a GIF has no controls and loops.
 
 ## Required permission
 

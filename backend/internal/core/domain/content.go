@@ -11,6 +11,7 @@ type ContentType string
 const (
 	ContentTypeYouTubeVideo ContentType = "YOUTUBE_VIDEO"
 	ContentTypeClaim        ContentType = "CLAIM"
+	ContentTypeBiblePassage ContentType = "BIBLE_PASSAGE"
 )
 
 // ContentSearchField identifies a text column that a ContentFilter.search term
@@ -36,6 +37,9 @@ type Content struct {
 	LengthUnits       *string
 	Response          json.RawMessage
 	PrimaryCategoryID *int
+	VerseStartID      *int    // BIBLE_PASSAGE only — computed ordinal (see BibleVerseOrdinal), not a table FK
+	VerseEndID        *int    // BIBLE_PASSAGE only
+	DisplayTitle      *string // BIBLE_PASSAGE only — optional, first-write-wins
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }

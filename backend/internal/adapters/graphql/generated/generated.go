@@ -52,13 +52,14 @@ type ComplexityRoot struct {
 	}
 
 	Category struct {
-		CreatedAt   func(childComplexity int) int
-		Description func(childComplexity int) int
-		EntityType  func(childComplexity int) int
-		ID          func(childComplexity int) int
-		Label       func(childComplexity int) int
-		UpdatedAt   func(childComplexity int) int
-		WikidataQid func(childComplexity int) int
+		CreatedAt    func(childComplexity int) int
+		Description  func(childComplexity int) int
+		EntityType   func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Label        func(childComplexity int) int
+		UpdatedAt    func(childComplexity int) int
+		WikidataQid  func(childComplexity int) int
+		WikipediaURL func(childComplexity int) int
 	}
 
 	Content struct {
@@ -70,6 +71,7 @@ type ComplexityRoot struct {
 		ContentType        func(childComplexity int) int
 		CreatedAt          func(childComplexity int) int
 		Description        func(childComplexity int) int
+		DisplayTitle       func(childComplexity int) int
 		ID                 func(childComplexity int) int
 		Length             func(childComplexity int) int
 		LengthUnits        func(childComplexity int) int
@@ -83,12 +85,21 @@ type ComplexityRoot struct {
 		Tags               func(childComplexity int) int
 		URL                func(childComplexity int) int
 		UpdatedAt          func(childComplexity int) int
+		VerseEndID         func(childComplexity int) int
+		VerseStartID       func(childComplexity int) int
 		ViewCount          func(childComplexity int) int
 	}
 
 	CreateContentResult struct {
 		AlreadyExisted func(childComplexity int) int
 		Content        func(childComplexity int) int
+	}
+
+	CustomFieldStats struct {
+		Count                 func(childComplexity int) int
+		Key                   func(childComplexity int) int
+		PercentOfPerspectives func(childComplexity int) int
+		TotalPerspectives     func(childComplexity int) int
 	}
 
 	FeelingEntry struct {
@@ -98,11 +109,47 @@ type ComplexityRoot struct {
 		Note      func(childComplexity int) int
 	}
 
+	FeelingStats struct {
+		AverageIntensity      func(childComplexity int) int
+		Count                 func(childComplexity int) int
+		Emoji                 func(childComplexity int) int
+		Label                 func(childComplexity int) int
+		PercentOfPerspectives func(childComplexity int) int
+		StdDevIntensity       func(childComplexity int) int
+		TotalPerspectives     func(childComplexity int) int
+	}
+
 	InboxEvent struct {
 		LastMessageAt func(childComplexity int) int
 		LatestSeq     func(childComplexity int) int
 		ThreadID      func(childComplexity int) int
 		UnreadCount   func(childComplexity int) int
+	}
+
+	InterlinearSegment struct {
+		SpaceBefore func(childComplexity int) int
+		Text        func(childComplexity int) int
+	}
+
+	InterlinearVerse struct {
+		Chapter  func(childComplexity int) int
+		Segments func(childComplexity int) int
+		Verse    func(childComplexity int) int
+		VerseID  func(childComplexity int) int
+		Words    func(childComplexity int) int
+	}
+
+	InterlinearWord struct {
+		Gloss       func(childComplexity int) int
+		ID          func(childComplexity int) int
+		Language    func(childComplexity int) int
+		Parsing     func(childComplexity int) int
+		Segment     func(childComplexity int) int
+		Source      func(childComplexity int) int
+		SourceOrder func(childComplexity int) int
+		Strongs     func(childComplexity int) int
+		TagSource   func(childComplexity int) int
+		Translit    func(childComplexity int) int
 	}
 
 	Message struct {
@@ -149,7 +196,9 @@ type ComplexityRoot struct {
 
 	Mutation struct {
 		AddThreadParticipants           func(childComplexity int, threadID string, userIds []string) int
+		ClearPassageDisplayTitle        func(childComplexity int, contentID int) int
 		CreateClaim                     func(childComplexity int, input model.CreateClaimInput) int
+		CreateContentFromPassage        func(childComplexity int, input model.CreateContentFromPassageInput) int
 		CreateContentFromYouTube        func(childComplexity int, input model.CreateContentFromYouTubeInput) int
 		CreateMessageThread             func(childComplexity int, input model.CreateMessageThreadInput) int
 		CreatePerspective               func(childComplexity int, input model.CreatePerspectiveInput) int
@@ -164,6 +213,7 @@ type ComplexityRoot struct {
 		MuteThread                      func(childComplexity int, threadID string, muted bool) int
 		SendMessage                     func(childComplexity int, input model.SendMessageInput) int
 		SetOnboardingDisplayNextSession func(childComplexity int, displayNextSession bool) int
+		SetPassageDisplayTitle          func(childComplexity int, input model.SetPassageDisplayTitleInput) int
 		SetPrimaryCategory              func(childComplexity int, input model.SetPrimaryCategoryInput) int
 		SetTyping                       func(childComplexity int, threadID string, typing bool) int
 		UpdateContentSourceData         func(childComplexity int, contentID int) int
@@ -194,6 +244,23 @@ type ComplexityRoot struct {
 		Change   func(childComplexity int) int
 		ThreadID func(childComplexity int) int
 		UserID   func(childComplexity int) int
+	}
+
+	PassageInterlinear struct {
+		Verses func(childComplexity int) int
+	}
+
+	PassageText struct {
+		Copyright   func(childComplexity int) int
+		Translation func(childComplexity int) int
+		Verses      func(childComplexity int) int
+	}
+
+	PassageVerse struct {
+		Chapter func(childComplexity int) int
+		Text    func(childComplexity int) int
+		Verse   func(childComplexity int) int
+		VerseID func(childComplexity int) int
 	}
 
 	Perspective struct {
@@ -230,18 +297,22 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Content         func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, sorts []*model.ContentSortInput, includeTotalCount *bool, filter *model.ContentFilter) int
-		ContentByID     func(childComplexity int, id string) int
-		Me              func(childComplexity int) int
-		MessageThread   func(childComplexity int, id string) int
-		MessageThreads  func(childComplexity int, first *int, before *string) int
-		PerspectiveByID func(childComplexity int, id string) int
-		Perspectives    func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) int
-		ThreadMessages  func(childComplexity int, threadID string, first *int, before *int) int
-		UserByID        func(childComplexity int, id string) int
-		UserByUsername  func(childComplexity int, username string) int
-		Users           func(childComplexity int) int
-		WikidataSearch  func(childComplexity int, query string, language *string, limit *int) int
+		Content            func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, sorts []*model.ContentSortInput, includeTotalCount *bool, filter *model.ContentFilter) int
+		ContentByID        func(childComplexity int, id string) int
+		CustomFieldStats   func(childComplexity int, contentID *int, key string) int
+		FeelingStats       func(childComplexity int, contentID *int, emoji string, label *string) int
+		Me                 func(childComplexity int) int
+		MessageThread      func(childComplexity int, id string) int
+		MessageThreads     func(childComplexity int, first *int, before *string) int
+		PassageInterlinear func(childComplexity int, startVerseID int, endVerseID int) int
+		PassageText        func(childComplexity int, startVerseID int, endVerseID int) int
+		PerspectiveByID    func(childComplexity int, id string) int
+		Perspectives       func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) int
+		ThreadMessages     func(childComplexity int, threadID string, first *int, before *int) int
+		UserByID           func(childComplexity int, id string) int
+		UserByUsername     func(childComplexity int, username string) int
+		Users              func(childComplexity int) int
+		WikidataSearch     func(childComplexity int, query string, language *string, limit *int) int
 	}
 
 	ReadReceiptChanged struct {
@@ -303,6 +374,7 @@ type ComplexityRoot struct {
 
 type ContentResolver interface {
 	PrimaryCategory(ctx context.Context, obj *model.Content) (*model.Category, error)
+
 	PerspectiveCount(ctx context.Context, obj *model.Content) (*int, error)
 	AverageRating(ctx context.Context, obj *model.Content) (*float64, error)
 	QualityRatingCount(ctx context.Context, obj *model.Content) (*int, error)
@@ -324,6 +396,9 @@ type MessageThreadResolver interface {
 type MutationResolver interface {
 	CreateContentFromYouTube(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error)
 	UpdateContentSourceData(ctx context.Context, contentID int) (*model.Content, error)
+	CreateContentFromPassage(ctx context.Context, input model.CreateContentFromPassageInput) (*model.Content, error)
+	SetPassageDisplayTitle(ctx context.Context, input model.SetPassageDisplayTitleInput) (*model.Content, error)
+	ClearPassageDisplayTitle(ctx context.Context, contentID int) (*model.Content, error)
 	CreateUser(ctx context.Context, input model.CreateUserInput) (*model.User, error)
 	UpdateUser(ctx context.Context, input model.UpdateUserInput) (*model.User, error)
 	DeleteUser(ctx context.Context, id string) (bool, error)
@@ -348,12 +423,16 @@ type QueryResolver interface {
 	Me(ctx context.Context) (*model.User, error)
 	ContentByID(ctx context.Context, id string) (*model.Content, error)
 	Content(ctx context.Context, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, sorts []*model.ContentSortInput, includeTotalCount *bool, filter *model.ContentFilter) (*model.PaginatedContent, error)
+	PassageText(ctx context.Context, startVerseID int, endVerseID int) (*model.PassageText, error)
+	PassageInterlinear(ctx context.Context, startVerseID int, endVerseID int) (*model.PassageInterlinear, error)
 	UserByID(ctx context.Context, id string) (*model.User, error)
 	UserByUsername(ctx context.Context, username string) (*model.User, error)
 	Users(ctx context.Context) ([]*model.User, error)
 	WikidataSearch(ctx context.Context, query string, language *string, limit *int) ([]*model.WikidataSearchResult, error)
 	PerspectiveByID(ctx context.Context, id string) (*model.Perspective, error)
 	Perspectives(ctx context.Context, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) (*model.PaginatedPerspectives, error)
+	FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*model.FeelingStats, error)
+	CustomFieldStats(ctx context.Context, contentID *int, key string) (*model.CustomFieldStats, error)
 	MessageThreads(ctx context.Context, first *int, before *string) ([]*model.MessageThread, error)
 	MessageThread(ctx context.Context, id string) (*model.MessageThread, error)
 	ThreadMessages(ctx context.Context, threadID string, first *int, before *int) (*model.MessageConnection, error)
@@ -442,6 +521,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Category.WikidataQid(childComplexity), true
+	case "Category.wikipediaUrl":
+		if e.ComplexityRoot.Category.WikipediaURL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Category.WikipediaURL(childComplexity), true
 
 	case "Content.addedBy":
 		if e.ComplexityRoot.Content.AddedBy == nil {
@@ -491,6 +576,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.Description(childComplexity), true
+	case "Content.displayTitle":
+		if e.ComplexityRoot.Content.DisplayTitle == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.DisplayTitle(childComplexity), true
 	case "Content.id":
 		if e.ComplexityRoot.Content.ID == nil {
 			break
@@ -569,6 +660,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.UpdatedAt(childComplexity), true
+	case "Content.verseEndID":
+		if e.ComplexityRoot.Content.VerseEndID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.VerseEndID(childComplexity), true
+	case "Content.verseStartID":
+		if e.ComplexityRoot.Content.VerseStartID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.VerseStartID(childComplexity), true
 	case "Content.viewCount":
 		if e.ComplexityRoot.Content.ViewCount == nil {
 			break
@@ -588,6 +691,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.CreateContentResult.Content(childComplexity), true
+
+	case "CustomFieldStats.count":
+		if e.ComplexityRoot.CustomFieldStats.Count == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomFieldStats.Count(childComplexity), true
+	case "CustomFieldStats.key":
+		if e.ComplexityRoot.CustomFieldStats.Key == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomFieldStats.Key(childComplexity), true
+	case "CustomFieldStats.percentOfPerspectives":
+		if e.ComplexityRoot.CustomFieldStats.PercentOfPerspectives == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomFieldStats.PercentOfPerspectives(childComplexity), true
+	case "CustomFieldStats.totalPerspectives":
+		if e.ComplexityRoot.CustomFieldStats.TotalPerspectives == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomFieldStats.TotalPerspectives(childComplexity), true
 
 	case "FeelingEntry.emoji":
 		if e.ComplexityRoot.FeelingEntry.Emoji == nil {
@@ -614,6 +742,49 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.FeelingEntry.Note(childComplexity), true
 
+	case "FeelingStats.averageIntensity":
+		if e.ComplexityRoot.FeelingStats.AverageIntensity == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingStats.AverageIntensity(childComplexity), true
+	case "FeelingStats.count":
+		if e.ComplexityRoot.FeelingStats.Count == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingStats.Count(childComplexity), true
+	case "FeelingStats.emoji":
+		if e.ComplexityRoot.FeelingStats.Emoji == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingStats.Emoji(childComplexity), true
+	case "FeelingStats.label":
+		if e.ComplexityRoot.FeelingStats.Label == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingStats.Label(childComplexity), true
+	case "FeelingStats.percentOfPerspectives":
+		if e.ComplexityRoot.FeelingStats.PercentOfPerspectives == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingStats.PercentOfPerspectives(childComplexity), true
+	case "FeelingStats.stdDevIntensity":
+		if e.ComplexityRoot.FeelingStats.StdDevIntensity == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingStats.StdDevIntensity(childComplexity), true
+	case "FeelingStats.totalPerspectives":
+		if e.ComplexityRoot.FeelingStats.TotalPerspectives == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeelingStats.TotalPerspectives(childComplexity), true
+
 	case "InboxEvent.lastMessageAt":
 		if e.ComplexityRoot.InboxEvent.LastMessageAt == nil {
 			break
@@ -638,6 +809,111 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.InboxEvent.UnreadCount(childComplexity), true
+
+	case "InterlinearSegment.spaceBefore":
+		if e.ComplexityRoot.InterlinearSegment.SpaceBefore == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearSegment.SpaceBefore(childComplexity), true
+	case "InterlinearSegment.text":
+		if e.ComplexityRoot.InterlinearSegment.Text == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearSegment.Text(childComplexity), true
+
+	case "InterlinearVerse.chapter":
+		if e.ComplexityRoot.InterlinearVerse.Chapter == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearVerse.Chapter(childComplexity), true
+	case "InterlinearVerse.segments":
+		if e.ComplexityRoot.InterlinearVerse.Segments == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearVerse.Segments(childComplexity), true
+	case "InterlinearVerse.verse":
+		if e.ComplexityRoot.InterlinearVerse.Verse == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearVerse.Verse(childComplexity), true
+	case "InterlinearVerse.verseId":
+		if e.ComplexityRoot.InterlinearVerse.VerseID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearVerse.VerseID(childComplexity), true
+	case "InterlinearVerse.words":
+		if e.ComplexityRoot.InterlinearVerse.Words == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearVerse.Words(childComplexity), true
+
+	case "InterlinearWord.gloss":
+		if e.ComplexityRoot.InterlinearWord.Gloss == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.Gloss(childComplexity), true
+	case "InterlinearWord.id":
+		if e.ComplexityRoot.InterlinearWord.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.ID(childComplexity), true
+	case "InterlinearWord.language":
+		if e.ComplexityRoot.InterlinearWord.Language == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.Language(childComplexity), true
+	case "InterlinearWord.parsing":
+		if e.ComplexityRoot.InterlinearWord.Parsing == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.Parsing(childComplexity), true
+	case "InterlinearWord.segment":
+		if e.ComplexityRoot.InterlinearWord.Segment == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.Segment(childComplexity), true
+	case "InterlinearWord.source":
+		if e.ComplexityRoot.InterlinearWord.Source == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.Source(childComplexity), true
+	case "InterlinearWord.sourceOrder":
+		if e.ComplexityRoot.InterlinearWord.SourceOrder == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.SourceOrder(childComplexity), true
+	case "InterlinearWord.strongs":
+		if e.ComplexityRoot.InterlinearWord.Strongs == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.Strongs(childComplexity), true
+	case "InterlinearWord.tagSource":
+		if e.ComplexityRoot.InterlinearWord.TagSource == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.TagSource(childComplexity), true
+	case "InterlinearWord.translit":
+		if e.ComplexityRoot.InterlinearWord.Translit == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InterlinearWord.Translit(childComplexity), true
 
 	case "Message.body":
 		if e.ComplexityRoot.Message.Body == nil {
@@ -800,6 +1076,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.AddThreadParticipants(childComplexity, args["threadId"].(string), args["userIds"].([]string)), true
+	case "Mutation.clearPassageDisplayTitle":
+		if e.ComplexityRoot.Mutation.ClearPassageDisplayTitle == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_clearPassageDisplayTitle_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ClearPassageDisplayTitle(childComplexity, args["contentId"].(int)), true
 	case "Mutation.createClaim":
 		if e.ComplexityRoot.Mutation.CreateClaim == nil {
 			break
@@ -811,6 +1098,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateClaim(childComplexity, args["input"].(model.CreateClaimInput)), true
+	case "Mutation.createContentFromPassage":
+		if e.ComplexityRoot.Mutation.CreateContentFromPassage == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createContentFromPassage_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateContentFromPassage(childComplexity, args["input"].(model.CreateContentFromPassageInput)), true
 	case "Mutation.createContentFromYouTube":
 		if e.ComplexityRoot.Mutation.CreateContentFromYouTube == nil {
 			break
@@ -965,6 +1263,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.SetOnboardingDisplayNextSession(childComplexity, args["displayNextSession"].(bool)), true
+	case "Mutation.setPassageDisplayTitle":
+		if e.ComplexityRoot.Mutation.SetPassageDisplayTitle == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setPassageDisplayTitle_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.SetPassageDisplayTitle(childComplexity, args["input"].(model.SetPassageDisplayTitleInput)), true
 	case "Mutation.setPrimaryCategory":
 		if e.ComplexityRoot.Mutation.SetPrimaryCategory == nil {
 			break
@@ -1102,6 +1411,57 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ParticipantChanged.UserID(childComplexity), true
+
+	case "PassageInterlinear.verses":
+		if e.ComplexityRoot.PassageInterlinear.Verses == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PassageInterlinear.Verses(childComplexity), true
+
+	case "PassageText.copyright":
+		if e.ComplexityRoot.PassageText.Copyright == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PassageText.Copyright(childComplexity), true
+	case "PassageText.translation":
+		if e.ComplexityRoot.PassageText.Translation == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PassageText.Translation(childComplexity), true
+	case "PassageText.verses":
+		if e.ComplexityRoot.PassageText.Verses == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PassageText.Verses(childComplexity), true
+
+	case "PassageVerse.chapter":
+		if e.ComplexityRoot.PassageVerse.Chapter == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PassageVerse.Chapter(childComplexity), true
+	case "PassageVerse.text":
+		if e.ComplexityRoot.PassageVerse.Text == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PassageVerse.Text(childComplexity), true
+	case "PassageVerse.verse":
+		if e.ComplexityRoot.PassageVerse.Verse == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PassageVerse.Verse(childComplexity), true
+	case "PassageVerse.verseId":
+		if e.ComplexityRoot.PassageVerse.VerseID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PassageVerse.VerseID(childComplexity), true
 
 	case "Perspective.agreement":
 		if e.ComplexityRoot.Perspective.Agreement == nil {
@@ -1289,6 +1649,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.ContentByID(childComplexity, args["id"].(string)), true
+	case "Query.customFieldStats":
+		if e.ComplexityRoot.Query.CustomFieldStats == nil {
+			break
+		}
+
+		args, err := ec.field_Query_customFieldStats_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.CustomFieldStats(childComplexity, args["contentID"].(*int), args["key"].(string)), true
+	case "Query.feelingStats":
+		if e.ComplexityRoot.Query.FeelingStats == nil {
+			break
+		}
+
+		args, err := ec.field_Query_feelingStats_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.FeelingStats(childComplexity, args["contentID"].(*int), args["emoji"].(string), args["label"].(*string)), true
 
 	case "Query.me":
 		if e.ComplexityRoot.Query.Me == nil {
@@ -1318,6 +1700,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.MessageThreads(childComplexity, args["first"].(*int), args["before"].(*string)), true
+	case "Query.passageInterlinear":
+		if e.ComplexityRoot.Query.PassageInterlinear == nil {
+			break
+		}
+
+		args, err := ec.field_Query_passageInterlinear_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.PassageInterlinear(childComplexity, args["startVerseId"].(int), args["endVerseId"].(int)), true
+	case "Query.passageText":
+		if e.ComplexityRoot.Query.PassageText == nil {
+			break
+		}
+
+		args, err := ec.field_Query_passageText_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.PassageText(childComplexity, args["startVerseId"].(int), args["endVerseId"].(int)), true
 	case "Query.perspectiveByID":
 		if e.ComplexityRoot.Query.PerspectiveByID == nil {
 			break
@@ -1584,6 +1988,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputContentFilter,
 		ec.unmarshalInputContentSortInput,
 		ec.unmarshalInputCreateClaimInput,
+		ec.unmarshalInputCreateContentFromPassageInput,
 		ec.unmarshalInputCreateContentFromYouTubeInput,
 		ec.unmarshalInputCreateMessageThreadInput,
 		ec.unmarshalInputCreatePerspectiveInput,
@@ -1591,6 +1996,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputFeelingInput,
 		ec.unmarshalInputPerspectiveFilter,
 		ec.unmarshalInputSendMessageInput,
+		ec.unmarshalInputSetPassageDisplayTitleInput,
 		ec.unmarshalInputSetPrimaryCategoryInput,
 		ec.unmarshalInputUpdatePerspectiveInput,
 		ec.unmarshalInputUpdateUserInput,
@@ -1793,6 +2199,7 @@ type Category {
   label: String!
   description: String
   entityType: String
+  wikipediaUrl: String
   createdAt: String!
   updatedAt: String!
 }
@@ -1822,6 +2229,11 @@ type Content {
   description: String
   response: JSON
   primaryCategory: Category
+  # BIBLE_PASSAGE only: computed verse ordinals (see bible_book.verses_per_chapter)
+  # and the optional, first-write-wins display title. Null for other content types.
+  verseStartID: Int
+  verseEndID: Int
+  displayTitle: String
   # Aggregates computed from ALL perspectives on this content — public and
   # private alike (privacy controls readability, not whether a perspective
   # counts here). Resolved on demand (batched per-request via dataloader)
@@ -1860,6 +2272,7 @@ enum ContentSortBy {
   NAME
   VIEW_COUNT
   LIKE_COUNT
+  PERCENT_LIKED
   PUBLISHED_AT
   CHANNEL_TITLE
   LENGTH
@@ -1879,6 +2292,7 @@ input ContentSortInput {
 enum ContentType {
   YOUTUBE_VIDEO
   CLAIM
+  BIBLE_PASSAGE
 }
 
 # Text columns that ContentFilter.search can be scoped to.
@@ -1893,6 +2307,74 @@ enum ContentSearchField {
 input CreateContentFromYouTubeInput {
   url: String!
   userId: IntID!
+}
+
+# Find-or-create a Bible passage. endChapter/endVerse equal startChapter/startVerse
+# for a single verse. userID is accepted only if it matches the session (or 0).
+input CreateContentFromPassageInput {
+  bookID: Int!
+  startChapter: Int!
+  startVerse: Int!
+  endChapter: Int!
+  endVerse: Int!
+  userID: IntID!
+}
+
+input SetPassageDisplayTitleInput {
+  contentID: IntID!
+  title: String!
+}
+
+# BSB (public domain) text for a verse-ordinal range.
+type PassageVerse {
+  verseId: Int!
+  chapter: Int!
+  verse: Int!
+  # Empty for verses the BSB omits (e.g. Matthew 17:21).
+  text: String!
+}
+
+type PassageText {
+  translation: String!
+  copyright: String!
+  verses: [PassageVerse!]!
+}
+
+# One run of a verse's English text; concatenating segments (a space before each with
+# spaceBefore) reproduces the plain BSB verse.
+type InterlinearSegment {
+  text: String!
+  spaceBefore: Boolean!
+}
+
+# One Hebrew/Greek source word. Words are in original-language order; id is the index in that order.
+type InterlinearWord {
+  id: Int!
+  language: String!
+  source: String!
+  translit: String!
+  parsing: String!
+  # Disambiguated STEPBible tag (e.g. H1254B); Berean's own plain number is kept server-side.
+  strongs: String!
+  # Short meaning (STEPBible Gloss, CC BY 4.0).
+  gloss: String!
+  # "tagged" (exact match) or "fallback" (most common sense for the plain number).
+  tagSource: String!
+  sourceOrder: Int!
+  # Index into the verse's segments of the English phrase this word belongs to; null = no phrase.
+  segment: Int
+}
+
+type InterlinearVerse {
+  verseId: Int!
+  chapter: Int!
+  verse: Int!
+  segments: [InterlinearSegment!]!
+  words: [InterlinearWord!]!
+}
+
+type PassageInterlinear {
+  verses: [InterlinearVerse!]!
 }
 
 # Filters for content queries
@@ -1968,13 +2450,25 @@ input CreatePerspectiveInput {
   review: String
 }
 
+"""
+Partial update: omit a field to leave it unchanged. For quality, agreement,
+importance, confidence, like, review, customFields and feelings, sending an
+explicit null clears the field (an empty feelings list or empty customFields
+object also clears). Every other field is a plain optional -- omit to leave
+unchanged, no way to clear it yet.
+"""
 input UpdatePerspectiveInput {
   id: IntID!
   contentID: IntID
+  "Omit = unchanged; null = clear."
   quality: Int
+  "Omit = unchanged; null = clear."
   agreement: Int
+  "Omit = unchanged; null = clear."
   importance: Int
+  "Omit = unchanged; null = clear."
   confidence: Int
+  "Omit = unchanged; null = clear."
   like: String
   privacy: Privacy
   description: String
@@ -1983,10 +2477,13 @@ input UpdatePerspectiveInput {
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRatingInput!]
+  "Omit = unchanged; null or [] = clear."
   feelings: [FeelingInput!]
   primaryPerspectiveID: IntID
   relatedPerspectiveIDs: [Int!]
+  "Omit = unchanged; null or {} = clear."
   customFields: JSON
+  "Omit = unchanged; null = clear."
   review: String
 }
 
@@ -2013,6 +2510,13 @@ input CreateClaimInput {
 type Mutation {
   createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   updateContentSourceData(contentId: IntID!): Content! @auth
+
+  # Bible passage mutations
+  createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth
+  # First-write-wins: if a title already exists, returns the content with the existing title.
+  setPassageDisplayTitle(input: SetPassageDisplayTitleInput!): Content! @auth
+  # Admin only: resets the title so it can be set again.
+  clearPassageDisplayTitle(contentId: IntID!): Content! @auth
 
   # User mutations
   createUser(input: CreateUserInput!): User! @auth
@@ -2057,6 +2561,13 @@ type Query {
     filter: ContentFilter
   ): PaginatedContent!
 
+  # Bible passage text for verse ordinals startVerseId..endVerseId (inclusive, capped server-side)
+  passageText(startVerseId: Int!, endVerseId: Int!): PassageText!
+
+  # Original-language word alignment for verse ordinals startVerseId..endVerseId (inclusive, capped server-side).
+  # Verses without alignment data are absent from the result.
+  passageInterlinear(startVerseId: Int!, endVerseId: Int!): PassageInterlinear!
+
   # User queries
   userByID(id: ID!): User
   userByUsername(username: String!): User
@@ -2077,6 +2588,48 @@ type Query {
     includeTotalCount: Boolean = false
     filter: PerspectiveFilter
   ): PaginatedPerspectives!
+
+  # How many perspectives carry a given feeling (matched by exact emoji
+  # grapheme, e.g. "🥰" for Love; label narrows further, case-insensitively,
+  # for the rare case the same emoji is reused for two curated feelings --
+  # see FeelingEntry: label is prefilled for curated wheel/search entries),
+  # the average and population standard deviation of that feeling's
+  # intensity, and what percent of ALL perspectives in scope carry it
+  # (percentOfPerspectives = count / totalPerspectives -- "of those with any
+  # perspective", not just of those with any feelings at all). Scoped to one
+  # content item's perspectives when contentID is given, or platform-wide
+  # across every perspective when omitted. Counts public and private
+  # perspectives alike, matching PerspectiveAggregate's privacy stance.
+  feelingStats(contentID: IntID, emoji: String!, label: String): FeelingStats!
+
+  # How many perspectives set the given CustomFields top-level key (any
+  # value), and what percent of ALL perspectives in scope that is. Same
+  # scoping/privacy rules as feelingStats.
+  customFieldStats(contentID: IntID, key: String!): CustomFieldStats!
+}
+
+# See Query.feelingStats. averageIntensity/stdDevIntensity are null when
+# count is 0 (nothing to average); stdDevIntensity is also null when count
+# is 1 (standard deviation of a single value is undefined here, not 0).
+# percentOfPerspectives is null only when totalPerspectives is 0 (no
+# perspectives at all in scope to take a percentage of).
+type FeelingStats {
+  emoji: String!
+  label: String
+  count: Int!
+  totalPerspectives: Int!
+  averageIntensity: Float
+  stdDevIntensity: Float
+  percentOfPerspectives: Float
+}
+
+# See Query.customFieldStats. percentOfPerspectives is null only when
+# totalPerspectives is 0.
+type CustomFieldStats {
+  key: String!
+  count: Int!
+  totalPerspectives: Int!
+  percentOfPerspectives: Float
 }
 `, BuiltIn: false},
 	{Name: "../../../../messaging.graphql", Input: `# ---- Messaging ----
@@ -2208,6 +2761,8 @@ func (ec *executionContext) childFields_Category(ctx context.Context, field grap
 		return ec.fieldContext_Category_description(ctx, field)
 	case "entityType":
 		return ec.fieldContext_Category_entityType(ctx, field)
+	case "wikipediaUrl":
+		return ec.fieldContext_Category_wikipediaUrl(ctx, field)
 	case "createdAt":
 		return ec.fieldContext_Category_createdAt(ctx, field)
 	case "updatedAt":
@@ -2252,6 +2807,12 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_response(ctx, field)
 	case "primaryCategory":
 		return ec.fieldContext_Content_primaryCategory(ctx, field)
+	case "verseStartID":
+		return ec.fieldContext_Content_verseStartID(ctx, field)
+	case "verseEndID":
+		return ec.fieldContext_Content_verseEndID(ctx, field)
+	case "displayTitle":
+		return ec.fieldContext_Content_displayTitle(ctx, field)
 	case "perspectiveCount":
 		return ec.fieldContext_Content_perspectiveCount(ctx, field)
 	case "averageRating":
@@ -2276,6 +2837,20 @@ func (ec *executionContext) childFields_CreateContentResult(ctx context.Context,
 	return nil, fmt.Errorf("no field named %q was found under type CreateContentResult", field.Name)
 }
 
+func (ec *executionContext) childFields_CustomFieldStats(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "key":
+		return ec.fieldContext_CustomFieldStats_key(ctx, field)
+	case "count":
+		return ec.fieldContext_CustomFieldStats_count(ctx, field)
+	case "totalPerspectives":
+		return ec.fieldContext_CustomFieldStats_totalPerspectives(ctx, field)
+	case "percentOfPerspectives":
+		return ec.fieldContext_CustomFieldStats_percentOfPerspectives(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type CustomFieldStats", field.Name)
+}
+
 func (ec *executionContext) childFields_FeelingEntry(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "emoji":
@@ -2290,6 +2865,26 @@ func (ec *executionContext) childFields_FeelingEntry(ctx context.Context, field 
 	return nil, fmt.Errorf("no field named %q was found under type FeelingEntry", field.Name)
 }
 
+func (ec *executionContext) childFields_FeelingStats(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "emoji":
+		return ec.fieldContext_FeelingStats_emoji(ctx, field)
+	case "label":
+		return ec.fieldContext_FeelingStats_label(ctx, field)
+	case "count":
+		return ec.fieldContext_FeelingStats_count(ctx, field)
+	case "totalPerspectives":
+		return ec.fieldContext_FeelingStats_totalPerspectives(ctx, field)
+	case "averageIntensity":
+		return ec.fieldContext_FeelingStats_averageIntensity(ctx, field)
+	case "stdDevIntensity":
+		return ec.fieldContext_FeelingStats_stdDevIntensity(ctx, field)
+	case "percentOfPerspectives":
+		return ec.fieldContext_FeelingStats_percentOfPerspectives(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type FeelingStats", field.Name)
+}
+
 func (ec *executionContext) childFields_InboxEvent(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "threadId":
@@ -2302,6 +2897,58 @@ func (ec *executionContext) childFields_InboxEvent(ctx context.Context, field gr
 		return ec.fieldContext_InboxEvent_unreadCount(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type InboxEvent", field.Name)
+}
+
+func (ec *executionContext) childFields_InterlinearSegment(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "text":
+		return ec.fieldContext_InterlinearSegment_text(ctx, field)
+	case "spaceBefore":
+		return ec.fieldContext_InterlinearSegment_spaceBefore(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type InterlinearSegment", field.Name)
+}
+
+func (ec *executionContext) childFields_InterlinearVerse(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "verseId":
+		return ec.fieldContext_InterlinearVerse_verseId(ctx, field)
+	case "chapter":
+		return ec.fieldContext_InterlinearVerse_chapter(ctx, field)
+	case "verse":
+		return ec.fieldContext_InterlinearVerse_verse(ctx, field)
+	case "segments":
+		return ec.fieldContext_InterlinearVerse_segments(ctx, field)
+	case "words":
+		return ec.fieldContext_InterlinearVerse_words(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type InterlinearVerse", field.Name)
+}
+
+func (ec *executionContext) childFields_InterlinearWord(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_InterlinearWord_id(ctx, field)
+	case "language":
+		return ec.fieldContext_InterlinearWord_language(ctx, field)
+	case "source":
+		return ec.fieldContext_InterlinearWord_source(ctx, field)
+	case "translit":
+		return ec.fieldContext_InterlinearWord_translit(ctx, field)
+	case "parsing":
+		return ec.fieldContext_InterlinearWord_parsing(ctx, field)
+	case "strongs":
+		return ec.fieldContext_InterlinearWord_strongs(ctx, field)
+	case "gloss":
+		return ec.fieldContext_InterlinearWord_gloss(ctx, field)
+	case "tagSource":
+		return ec.fieldContext_InterlinearWord_tagSource(ctx, field)
+	case "sourceOrder":
+		return ec.fieldContext_InterlinearWord_sourceOrder(ctx, field)
+	case "segment":
+		return ec.fieldContext_InterlinearWord_segment(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type InterlinearWord", field.Name)
 }
 
 func (ec *executionContext) childFields_Message(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -2396,6 +3043,40 @@ func (ec *executionContext) childFields_PaginatedPerspectives(ctx context.Contex
 		return ec.fieldContext_PaginatedPerspectives_totalCount(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type PaginatedPerspectives", field.Name)
+}
+
+func (ec *executionContext) childFields_PassageInterlinear(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "verses":
+		return ec.fieldContext_PassageInterlinear_verses(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type PassageInterlinear", field.Name)
+}
+
+func (ec *executionContext) childFields_PassageText(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "translation":
+		return ec.fieldContext_PassageText_translation(ctx, field)
+	case "copyright":
+		return ec.fieldContext_PassageText_copyright(ctx, field)
+	case "verses":
+		return ec.fieldContext_PassageText_verses(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type PassageText", field.Name)
+}
+
+func (ec *executionContext) childFields_PassageVerse(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "verseId":
+		return ec.fieldContext_PassageVerse_verseId(ctx, field)
+	case "chapter":
+		return ec.fieldContext_PassageVerse_chapter(ctx, field)
+	case "verse":
+		return ec.fieldContext_PassageVerse_verse(ctx, field)
+	case "text":
+		return ec.fieldContext_PassageVerse_text(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type PassageVerse", field.Name)
 }
 
 func (ec *executionContext) childFields_Perspective(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -2666,12 +3347,40 @@ func (ec *executionContext) field_Mutation_addThreadParticipants_args(ctx contex
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_clearPassageDisplayTitle_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "contentId",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNIntID2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["contentId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createClaim_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.CreateClaimInput, error) {
 			return ec.unmarshalNCreateClaimInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateClaimInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_createContentFromPassage_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.CreateContentFromPassageInput, error) {
+			return ec.unmarshalNCreateContentFromPassageInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromPassageInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -2900,6 +3609,20 @@ func (ec *executionContext) field_Mutation_setOnboardingDisplayNextSession_args(
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_setPassageDisplayTitle_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.SetPassageDisplayTitleInput, error) {
+			return ec.unmarshalNSetPassageDisplayTitleInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSetPassageDisplayTitleInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_setPrimaryCategory_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -3084,6 +3807,58 @@ func (ec *executionContext) field_Query_content_args(ctx context.Context, rawArg
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_customFieldStats_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "contentID",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOIntID2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["contentID"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "key",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["key"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_feelingStats_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "contentID",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOIntID2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["contentID"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "emoji",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["emoji"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "label",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["label"] = arg2
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_messageThread_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -3117,6 +3892,50 @@ func (ec *executionContext) field_Query_messageThreads_args(ctx context.Context,
 		return nil, err
 	}
 	args["before"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_passageInterlinear_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "startVerseId",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["startVerseId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "endVerseId",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["endVerseId"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_passageText_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "startVerseId",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["startVerseId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "endVerseId",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["endVerseId"] = arg1
 	return args, nil
 }
 
@@ -3532,6 +4351,29 @@ func (ec *executionContext) _Category_entityType(ctx context.Context, field grap
 	)
 }
 func (ec *executionContext) fieldContext_Category_entityType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Category", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Category_wikipediaUrl(ctx context.Context, field graphql.CollectedField, obj *model.Category) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Category_wikipediaUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.WikipediaURL, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Category_wikipediaUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Category", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
@@ -3990,6 +4832,75 @@ func (ec *executionContext) fieldContext_Content_primaryCategory(_ context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Content_verseStartID(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_verseStartID(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.VerseStartID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_verseStartID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _Content_verseEndID(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_verseEndID(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.VerseEndID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_verseEndID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _Content_displayTitle(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_displayTitle(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DisplayTitle, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_displayTitle(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _Content_perspectiveCount(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4160,6 +5071,98 @@ func (ec *executionContext) fieldContext_CreateContentResult_alreadyExisted(_ co
 	return graphql.NewScalarFieldContext("CreateContentResult", field, false, false, errors.New("field of type Boolean does not have child fields"))
 }
 
+func (ec *executionContext) _CustomFieldStats_key(ctx context.Context, field graphql.CollectedField, obj *model.CustomFieldStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CustomFieldStats_key(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Key, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CustomFieldStats_key(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CustomFieldStats", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CustomFieldStats_count(ctx context.Context, field graphql.CollectedField, obj *model.CustomFieldStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CustomFieldStats_count(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Count, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CustomFieldStats_count(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CustomFieldStats", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _CustomFieldStats_totalPerspectives(ctx context.Context, field graphql.CollectedField, obj *model.CustomFieldStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CustomFieldStats_totalPerspectives(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TotalPerspectives, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CustomFieldStats_totalPerspectives(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CustomFieldStats", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _CustomFieldStats_percentOfPerspectives(ctx context.Context, field graphql.CollectedField, obj *model.CustomFieldStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CustomFieldStats_percentOfPerspectives(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PercentOfPerspectives, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_CustomFieldStats_percentOfPerspectives(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CustomFieldStats", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
 func (ec *executionContext) _FeelingEntry_emoji(ctx context.Context, field graphql.CollectedField, obj *model.FeelingEntry) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4252,6 +5255,167 @@ func (ec *executionContext) fieldContext_FeelingEntry_note(_ context.Context, fi
 	return graphql.NewScalarFieldContext("FeelingEntry", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _FeelingStats_emoji(ctx context.Context, field graphql.CollectedField, obj *model.FeelingStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingStats_emoji(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Emoji, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingStats_emoji(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingStats", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingStats_label(ctx context.Context, field graphql.CollectedField, obj *model.FeelingStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingStats_label(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Label, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingStats_label(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingStats", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingStats_count(ctx context.Context, field graphql.CollectedField, obj *model.FeelingStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingStats_count(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Count, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingStats_count(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingStats", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingStats_totalPerspectives(ctx context.Context, field graphql.CollectedField, obj *model.FeelingStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingStats_totalPerspectives(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TotalPerspectives, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingStats_totalPerspectives(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingStats", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingStats_averageIntensity(ctx context.Context, field graphql.CollectedField, obj *model.FeelingStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingStats_averageIntensity(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.AverageIntensity, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingStats_averageIntensity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingStats", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingStats_stdDevIntensity(ctx context.Context, field graphql.CollectedField, obj *model.FeelingStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingStats_stdDevIntensity(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.StdDevIntensity, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingStats_stdDevIntensity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingStats", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _FeelingStats_percentOfPerspectives(ctx context.Context, field graphql.CollectedField, obj *model.FeelingStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeelingStats_percentOfPerspectives(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PercentOfPerspectives, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FeelingStats_percentOfPerspectives(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeelingStats", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
 func (ec *executionContext) _InboxEvent_threadId(ctx context.Context, field graphql.CollectedField, obj *model.InboxEvent) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4342,6 +5506,415 @@ func (ec *executionContext) _InboxEvent_unreadCount(ctx context.Context, field g
 }
 func (ec *executionContext) fieldContext_InboxEvent_unreadCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("InboxEvent", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearSegment_text(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearSegment) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearSegment_text(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Text, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearSegment_text(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearSegment", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearSegment_spaceBefore(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearSegment) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearSegment_spaceBefore(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SpaceBefore, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearSegment_spaceBefore(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearSegment", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearVerse_verseId(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearVerse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearVerse_verseId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.VerseID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearVerse_verseId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearVerse", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearVerse_chapter(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearVerse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearVerse_chapter(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Chapter, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearVerse_chapter(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearVerse", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearVerse_verse(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearVerse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearVerse_verse(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Verse, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearVerse_verse(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearVerse", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearVerse_segments(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearVerse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearVerse_segments(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Segments, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.InterlinearSegment) graphql.Marshaler {
+			return ec.marshalNInterlinearSegment2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearSegmentᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearVerse_segments(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InterlinearVerse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_InterlinearSegment(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _InterlinearVerse_words(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearVerse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearVerse_words(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Words, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.InterlinearWord) graphql.Marshaler {
+			return ec.marshalNInterlinearWord2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearWordᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearVerse_words(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InterlinearVerse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_InterlinearWord(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _InterlinearWord_id(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_language(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_language(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Language, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_language(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_source(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_source(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Source, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_source(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_translit(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_translit(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Translit, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_translit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_parsing(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_parsing(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Parsing, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_parsing(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_strongs(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_strongs(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Strongs, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_strongs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_gloss(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_gloss(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Gloss, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_gloss(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_tagSource(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_tagSource(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TagSource, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_tagSource(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_sourceOrder(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_sourceOrder(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SourceOrder, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_sourceOrder(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _InterlinearWord_segment(ctx context.Context, field graphql.CollectedField, obj *model.InterlinearWord) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InterlinearWord_segment(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Segment, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_InterlinearWord_segment(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type Int does not have child fields"))
 }
 
 func (ec *executionContext) _Message_id(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
@@ -5058,6 +6631,177 @@ func (ec *executionContext) fieldContext_Mutation_updateContentSourceData(ctx co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateContentSourceData_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createContentFromPassage(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_createContentFromPassage(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CreateContentFromPassage(ctx, fc.Args["input"].(model.CreateContentFromPassageInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.Content
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Content) graphql.Marshaler {
+			return ec.marshalNContent2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_createContentFromPassage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Content(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createContentFromPassage_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_setPassageDisplayTitle(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_setPassageDisplayTitle(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().SetPassageDisplayTitle(ctx, fc.Args["input"].(model.SetPassageDisplayTitleInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.Content
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Content) graphql.Marshaler {
+			return ec.marshalNContent2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_setPassageDisplayTitle(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Content(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_setPassageDisplayTitle_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_clearPassageDisplayTitle(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_clearPassageDisplayTitle(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ClearPassageDisplayTitle(ctx, fc.Args["contentId"].(int))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.Content
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Content) graphql.Marshaler {
+			return ec.marshalNContent2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_clearPassageDisplayTitle(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Content(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_clearPassageDisplayTitle_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -6506,6 +8250,208 @@ func (ec *executionContext) fieldContext_ParticipantChanged_change(_ context.Con
 	return graphql.NewScalarFieldContext("ParticipantChanged", field, false, false, errors.New("field of type ParticipantChangeKind does not have child fields"))
 }
 
+func (ec *executionContext) _PassageInterlinear_verses(ctx context.Context, field graphql.CollectedField, obj *model.PassageInterlinear) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PassageInterlinear_verses(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Verses, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.InterlinearVerse) graphql.Marshaler {
+			return ec.marshalNInterlinearVerse2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearVerseᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PassageInterlinear_verses(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PassageInterlinear",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_InterlinearVerse(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PassageText_translation(ctx context.Context, field graphql.CollectedField, obj *model.PassageText) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PassageText_translation(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Translation, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PassageText_translation(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PassageText", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _PassageText_copyright(ctx context.Context, field graphql.CollectedField, obj *model.PassageText) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PassageText_copyright(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Copyright, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PassageText_copyright(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PassageText", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _PassageText_verses(ctx context.Context, field graphql.CollectedField, obj *model.PassageText) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PassageText_verses(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Verses, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.PassageVerse) graphql.Marshaler {
+			return ec.marshalNPassageVerse2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPassageVerseᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PassageText_verses(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PassageText",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PassageVerse(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PassageVerse_verseId(ctx context.Context, field graphql.CollectedField, obj *model.PassageVerse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PassageVerse_verseId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.VerseID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PassageVerse_verseId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PassageVerse", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _PassageVerse_chapter(ctx context.Context, field graphql.CollectedField, obj *model.PassageVerse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PassageVerse_chapter(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Chapter, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PassageVerse_chapter(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PassageVerse", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _PassageVerse_verse(ctx context.Context, field graphql.CollectedField, obj *model.PassageVerse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PassageVerse_verse(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Verse, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PassageVerse_verse(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PassageVerse", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _PassageVerse_text(ctx context.Context, field graphql.CollectedField, obj *model.PassageVerse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PassageVerse_text(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Text, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PassageVerse_text(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PassageVerse", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _Perspective_id(ctx context.Context, field graphql.CollectedField, obj *model.Perspective) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -7296,6 +9242,94 @@ func (ec *executionContext) fieldContext_Query_content(ctx context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_passageText(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_passageText(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().PassageText(ctx, fc.Args["startVerseId"].(int), fc.Args["endVerseId"].(int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.PassageText) graphql.Marshaler {
+			return ec.marshalNPassageText2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPassageText(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_passageText(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PassageText(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_passageText_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_passageInterlinear(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_passageInterlinear(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().PassageInterlinear(ctx, fc.Args["startVerseId"].(int), fc.Args["endVerseId"].(int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.PassageInterlinear) graphql.Marshaler {
+			return ec.marshalNPassageInterlinear2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPassageInterlinear(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_passageInterlinear(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PassageInterlinear(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_passageInterlinear_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_userByID(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -7542,6 +9576,94 @@ func (ec *executionContext) fieldContext_Query_perspectives(ctx context.Context,
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_perspectives_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_feelingStats(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_feelingStats(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().FeelingStats(ctx, fc.Args["contentID"].(*int), fc.Args["emoji"].(string), fc.Args["label"].(*string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.FeelingStats) graphql.Marshaler {
+			return ec.marshalNFeelingStats2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingStats(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_feelingStats(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_FeelingStats(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_feelingStats_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_customFieldStats(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_customFieldStats(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().CustomFieldStats(ctx, fc.Args["contentID"].(*int), fc.Args["key"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.CustomFieldStats) graphql.Marshaler {
+			return ec.marshalNCustomFieldStats2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCustomFieldStats(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_customFieldStats(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CustomFieldStats(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_customFieldStats_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -9839,6 +11961,71 @@ func (ec *executionContext) unmarshalInputCreateClaimInput(ctx context.Context, 
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCreateContentFromPassageInput(ctx context.Context, obj any) (model.CreateContentFromPassageInput, error) {
+	var it model.CreateContentFromPassageInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"bookID", "startChapter", "startVerse", "endChapter", "endVerse", "userID"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "bookID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("bookID"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.BookID = data
+		case "startChapter":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("startChapter"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.StartChapter = data
+		case "startVerse":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("startVerse"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.StartVerse = data
+		case "endChapter":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("endChapter"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EndChapter = data
+		case "endVerse":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("endVerse"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EndVerse = data
+		case "userID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userID"))
+			data, err := ec.unmarshalNIntID2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.UserID = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateContentFromYouTubeInput(ctx context.Context, obj any) (model.CreateContentFromYouTubeInput, error) {
 	var it model.CreateContentFromYouTubeInput
 	if obj == nil {
@@ -10238,6 +12425,43 @@ func (ec *executionContext) unmarshalInputSendMessageInput(ctx context.Context, 
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputSetPassageDisplayTitleInput(ctx context.Context, obj any) (model.SetPassageDisplayTitleInput, error) {
+	var it model.SetPassageDisplayTitleInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"contentID", "title"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "contentID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("contentID"))
+			data, err := ec.unmarshalNIntID2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ContentID = data
+		case "title":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("title"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Title = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputSetPrimaryCategoryInput(ctx context.Context, obj any) (model.SetPrimaryCategoryInput, error) {
 	var it model.SetPrimaryCategoryInput
 	if obj == nil {
@@ -10334,35 +12558,35 @@ func (ec *executionContext) unmarshalInputUpdatePerspectiveInput(ctx context.Con
 			if err != nil {
 				return it, err
 			}
-			it.Quality = data
+			it.Quality = graphql.OmittableOf(data)
 		case "agreement":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("agreement"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Agreement = data
+			it.Agreement = graphql.OmittableOf(data)
 		case "importance":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("importance"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Importance = data
+			it.Importance = graphql.OmittableOf(data)
 		case "confidence":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("confidence"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Confidence = data
+			it.Confidence = graphql.OmittableOf(data)
 		case "like":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("like"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Like = data
+			it.Like = graphql.OmittableOf(data)
 		case "privacy":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("privacy"))
 			data, err := ec.unmarshalOPrivacy2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPrivacy(ctx, v)
@@ -10418,7 +12642,7 @@ func (ec *executionContext) unmarshalInputUpdatePerspectiveInput(ctx context.Con
 			if err != nil {
 				return it, err
 			}
-			it.Feelings = data
+			it.Feelings = graphql.OmittableOf(data)
 		case "primaryPerspectiveID":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("primaryPerspectiveID"))
 			data, err := ec.unmarshalOIntID2ᚖint(ctx, v)
@@ -10439,14 +12663,14 @@ func (ec *executionContext) unmarshalInputUpdatePerspectiveInput(ctx context.Con
 			if err != nil {
 				return it, err
 			}
-			it.CustomFields = data
+			it.CustomFields = graphql.OmittableOf(data)
 		case "review":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("review"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Review = data
+			it.Review = graphql.OmittableOf(data)
 		}
 	}
 	return it, nil
@@ -10653,6 +12877,11 @@ func (ec *executionContext) _Category(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
+		case "wikipediaUrl":
+			out.Values[i] = ec._Category_wikipediaUrl(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		case "createdAt":
 			out.Values[i] = ec._Category_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -10814,6 +13043,21 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "verseStartID":
+			out.Values[i] = ec._Content_verseStartID(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "verseEndID":
+			out.Values[i] = ec._Content_verseEndID(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "displayTitle":
+			out.Values[i] = ec._Content_displayTitle(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "perspectiveCount":
 			field := field
 
@@ -11002,6 +13246,59 @@ func (ec *executionContext) _CreateContentResult(ctx context.Context, sel ast.Se
 	return out
 }
 
+var customFieldStatsImplementors = []string{"CustomFieldStats"}
+
+func (ec *executionContext) _CustomFieldStats(ctx context.Context, sel ast.SelectionSet, obj *model.CustomFieldStats) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, customFieldStatsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CustomFieldStats")
+		case "key":
+			out.Values[i] = ec._CustomFieldStats_key(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "count":
+			out.Values[i] = ec._CustomFieldStats_count(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalPerspectives":
+			out.Values[i] = ec._CustomFieldStats_totalPerspectives(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "percentOfPerspectives":
+			out.Values[i] = ec._CustomFieldStats_percentOfPerspectives(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var feelingEntryImplementors = []string{"FeelingEntry"}
 
 func (ec *executionContext) _FeelingEntry(ctx context.Context, sel ast.SelectionSet, obj *model.FeelingEntry) graphql.Marshaler {
@@ -11031,6 +13328,74 @@ func (ec *executionContext) _FeelingEntry(ctx context.Context, sel ast.Selection
 			}
 		case "note":
 			out.Values[i] = ec._FeelingEntry_note(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var feelingStatsImplementors = []string{"FeelingStats"}
+
+func (ec *executionContext) _FeelingStats(ctx context.Context, sel ast.SelectionSet, obj *model.FeelingStats) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, feelingStatsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FeelingStats")
+		case "emoji":
+			out.Values[i] = ec._FeelingStats_emoji(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "label":
+			out.Values[i] = ec._FeelingStats_label(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "count":
+			out.Values[i] = ec._FeelingStats_count(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalPerspectives":
+			out.Values[i] = ec._FeelingStats_totalPerspectives(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "averageIntensity":
+			out.Values[i] = ec._FeelingStats_averageIntensity(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "stdDevIntensity":
+			out.Values[i] = ec._FeelingStats_stdDevIntensity(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "percentOfPerspectives":
+			out.Values[i] = ec._FeelingStats_percentOfPerspectives(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -11085,6 +13450,190 @@ func (ec *executionContext) _InboxEvent(ctx context.Context, sel ast.SelectionSe
 		case "unreadCount":
 			out.Values[i] = ec._InboxEvent_unreadCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var interlinearSegmentImplementors = []string{"InterlinearSegment"}
+
+func (ec *executionContext) _InterlinearSegment(ctx context.Context, sel ast.SelectionSet, obj *model.InterlinearSegment) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, interlinearSegmentImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("InterlinearSegment")
+		case "text":
+			out.Values[i] = ec._InterlinearSegment_text(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "spaceBefore":
+			out.Values[i] = ec._InterlinearSegment_spaceBefore(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var interlinearVerseImplementors = []string{"InterlinearVerse"}
+
+func (ec *executionContext) _InterlinearVerse(ctx context.Context, sel ast.SelectionSet, obj *model.InterlinearVerse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, interlinearVerseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("InterlinearVerse")
+		case "verseId":
+			out.Values[i] = ec._InterlinearVerse_verseId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "chapter":
+			out.Values[i] = ec._InterlinearVerse_chapter(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "verse":
+			out.Values[i] = ec._InterlinearVerse_verse(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "segments":
+			out.Values[i] = ec._InterlinearVerse_segments(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "words":
+			out.Values[i] = ec._InterlinearVerse_words(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var interlinearWordImplementors = []string{"InterlinearWord"}
+
+func (ec *executionContext) _InterlinearWord(ctx context.Context, sel ast.SelectionSet, obj *model.InterlinearWord) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, interlinearWordImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("InterlinearWord")
+		case "id":
+			out.Values[i] = ec._InterlinearWord_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "language":
+			out.Values[i] = ec._InterlinearWord_language(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "source":
+			out.Values[i] = ec._InterlinearWord_source(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "translit":
+			out.Values[i] = ec._InterlinearWord_translit(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "parsing":
+			out.Values[i] = ec._InterlinearWord_parsing(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "strongs":
+			out.Values[i] = ec._InterlinearWord_strongs(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "gloss":
+			out.Values[i] = ec._InterlinearWord_gloss(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "tagSource":
+			out.Values[i] = ec._InterlinearWord_tagSource(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sourceOrder":
+			out.Values[i] = ec._InterlinearWord_sourceOrder(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "segment":
+			out.Values[i] = ec._InterlinearWord_segment(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
 		default:
@@ -11724,6 +14273,27 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "createContentFromPassage":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createContentFromPassage(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "setPassageDisplayTitle":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_setPassageDisplayTitle(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "clearPassageDisplayTitle":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_clearPassageDisplayTitle(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createUser":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createUser(ctx, field)
@@ -12075,6 +14645,145 @@ func (ec *executionContext) _ParticipantChanged(ctx context.Context, sel ast.Sel
 	return out
 }
 
+var passageInterlinearImplementors = []string{"PassageInterlinear"}
+
+func (ec *executionContext) _PassageInterlinear(ctx context.Context, sel ast.SelectionSet, obj *model.PassageInterlinear) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, passageInterlinearImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PassageInterlinear")
+		case "verses":
+			out.Values[i] = ec._PassageInterlinear_verses(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var passageTextImplementors = []string{"PassageText"}
+
+func (ec *executionContext) _PassageText(ctx context.Context, sel ast.SelectionSet, obj *model.PassageText) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, passageTextImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PassageText")
+		case "translation":
+			out.Values[i] = ec._PassageText_translation(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "copyright":
+			out.Values[i] = ec._PassageText_copyright(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "verses":
+			out.Values[i] = ec._PassageText_verses(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var passageVerseImplementors = []string{"PassageVerse"}
+
+func (ec *executionContext) _PassageVerse(ctx context.Context, sel ast.SelectionSet, obj *model.PassageVerse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, passageVerseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PassageVerse")
+		case "verseId":
+			out.Values[i] = ec._PassageVerse_verseId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "chapter":
+			out.Values[i] = ec._PassageVerse_chapter(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "verse":
+			out.Values[i] = ec._PassageVerse_verse(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "text":
+			out.Values[i] = ec._PassageVerse_text(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var perspectiveImplementors = []string{"Perspective"}
 
 func (ec *executionContext) _Perspective(ctx context.Context, sel ast.SelectionSet, obj *model.Perspective) graphql.Marshaler {
@@ -12362,6 +15071,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "passageText":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_passageText(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "passageInterlinear":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_passageInterlinear(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "userByID":
 			field := field
 
@@ -12482,6 +15235,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_perspectives(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "feelingStats":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_feelingStats(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "customFieldStats":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_customFieldStats(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -13537,6 +16334,11 @@ func (ec *executionContext) unmarshalNCreateClaimInput2githubᚗcomᚋCodeWarrio
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCreateContentFromPassageInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromPassageInput(ctx context.Context, v any) (model.CreateContentFromPassageInput, error) {
+	res, err := ec.unmarshalInputCreateContentFromPassageInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCreateContentFromYouTubeInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromYouTubeInput(ctx context.Context, v any) (model.CreateContentFromYouTubeInput, error) {
 	res, err := ec.unmarshalInputCreateContentFromYouTubeInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -13567,6 +16369,16 @@ func (ec *executionContext) unmarshalNCreateUserInput2githubᚗcomᚋCodeWarrior
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNCustomFieldStats2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCustomFieldStats(ctx context.Context, sel ast.SelectionSet, v *model.CustomFieldStats) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CustomFieldStats(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNFeelingEntry2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingEntry(ctx context.Context, sel ast.SelectionSet, v *model.FeelingEntry) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -13580,6 +16392,16 @@ func (ec *executionContext) marshalNFeelingEntry2ᚖgithubᚗcomᚋCodeWarrior�
 func (ec *executionContext) unmarshalNFeelingInput2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingInput(ctx context.Context, v any) (*model.FeelingInput, error) {
 	res, err := ec.unmarshalInputFeelingInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFeelingStats2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐFeelingStats(ctx context.Context, sel ast.SelectionSet, v *model.FeelingStats) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._FeelingStats(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v any) (string, error) {
@@ -13667,6 +16489,84 @@ func (ec *executionContext) marshalNIntID2int(ctx context.Context, sel ast.Selec
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNInterlinearSegment2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearSegmentᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.InterlinearSegment) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNInterlinearSegment2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearSegment(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNInterlinearSegment2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearSegment(ctx context.Context, sel ast.SelectionSet, v *model.InterlinearSegment) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._InterlinearSegment(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNInterlinearVerse2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearVerseᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.InterlinearVerse) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNInterlinearVerse2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearVerse(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNInterlinearVerse2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearVerse(ctx context.Context, sel ast.SelectionSet, v *model.InterlinearVerse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._InterlinearVerse(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNInterlinearWord2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearWordᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.InterlinearWord) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNInterlinearWord2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearWord(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNInterlinearWord2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐInterlinearWord(ctx context.Context, sel ast.SelectionSet, v *model.InterlinearWord) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._InterlinearWord(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNMessage2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Message) graphql.Marshaler {
@@ -13771,6 +16671,52 @@ func (ec *executionContext) marshalNParticipantChangeKind2githubᚗcomᚋCodeWar
 	return v
 }
 
+func (ec *executionContext) marshalNPassageInterlinear2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPassageInterlinear(ctx context.Context, sel ast.SelectionSet, v *model.PassageInterlinear) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PassageInterlinear(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNPassageText2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPassageText(ctx context.Context, sel ast.SelectionSet, v *model.PassageText) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PassageText(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNPassageVerse2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPassageVerseᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.PassageVerse) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNPassageVerse2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPassageVerse(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNPassageVerse2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPassageVerse(ctx context.Context, sel ast.SelectionSet, v *model.PassageVerse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PassageVerse(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNPerspective2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐPerspectiveᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Perspective) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -13833,6 +16779,11 @@ func (ec *executionContext) marshalNPrivacy2githubᚗcomᚋCodeWarriorᚑdebug�
 
 func (ec *executionContext) unmarshalNSendMessageInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSendMessageInput(ctx context.Context, v any) (model.SendMessageInput, error) {
 	res, err := ec.unmarshalInputSendMessageInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNSetPassageDisplayTitleInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSetPassageDisplayTitleInput(ctx context.Context, v any) (model.SetPassageDisplayTitleInput, error) {
+	res, err := ec.unmarshalInputSetPassageDisplayTitleInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 

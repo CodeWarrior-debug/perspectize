@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
@@ -24,6 +25,20 @@ const (
 // searchResponse matches the Wikidata wbsearchentities JSON response shape
 type searchResponse struct {
 	Search []searchResult `json:"search"`
+}
+
+// getEntitiesResponse matches the Wikidata wbgetentities JSON response shape
+// when requested with props=sitelinks&sitefilter=enwiki.
+type getEntitiesResponse struct {
+	Entities map[string]entitySitelinks `json:"entities"`
+}
+
+type entitySitelinks struct {
+	Sitelinks map[string]sitelink `json:"sitelinks"`
+}
+
+type sitelink struct {
+	Title string `json:"title"`
 }
 
 // searchResult represents a single entity from the wbsearchentities response.
@@ -99,6 +114,96 @@ func (c *Client) Search(ctx context.Context, query, language string, limit int) 
 	}
 
 	return nil, fmt.Errorf("wikidata search failed after %d retries: %w", maxRetries, lastErr)
+}
+
+// GetWikipediaURL resolves a Wikidata QID to its English Wikipedia article URL
+// via the wbgetentities API (props=sitelinks, sitefilter=enwiki). Returns ""
+// with no error when the entity has no enwiki sitelink — a missing Wikipedia
+// page must never fail the caller.
+func (c *Client) GetWikipediaURL(ctx context.Context, qid string) (string, error) {
+	if qid == "" {
+		return "", fmt.Errorf("qid must not be empty")
+	}
+
+	params := url.Values{}
+	params.Set("action", "wbgetentities")
+	params.Set("ids", qid)
+	params.Set("props", "sitelinks")
+	params.Set("sitefilter", "enwiki")
+	params.Set("format", "json")
+
+	reqURL := c.baseURL + "?" + params.Encode()
+
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(attempt) * time.Second
+			select {
+			case <-ctx.Done():
+				return "", ctx.Err()
+			case <-time.After(backoff):
+			}
+		}
+
+		title, err := c.doGetEntities(ctx, reqURL, qid)
+		if err == nil {
+			if title == "" {
+				return "", nil
+			}
+			return "https://en.wikipedia.org/wiki/" + url.PathEscape(strings.ReplaceAll(title, " ", "_")), nil
+		}
+
+		lastErr = err
+
+		if !isRetryable(err) {
+			return "", err
+		}
+	}
+
+	return "", fmt.Errorf("wikidata getentities failed after %d retries: %w", maxRetries, lastErr)
+}
+
+// doGetEntities performs a single HTTP request to the Wikidata wbgetentities API
+// and returns the enwiki sitelink title, or "" if absent.
+func (c *Client) doGetEntities(ctx context.Context, reqURL, qid string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", c.userAgent)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", &APIError{
+			StatusCode: resp.StatusCode,
+			Body:       string(body),
+		}
+	}
+
+	var entitiesResp getEntitiesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&entitiesResp); err != nil {
+		return "", fmt.Errorf("decoding response: %w", err)
+	}
+
+	entity, ok := entitiesResp.Entities[qid]
+	if !ok {
+		return "", nil
+	}
+
+	link, ok := entity.Sitelinks["enwiki"]
+	if !ok {
+		return "", nil
+	}
+
+	return link.Title, nil
 }
 
 // doSearch performs a single HTTP request to the Wikidata API

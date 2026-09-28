@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
@@ -60,6 +61,9 @@ func domainToModel(c *domain.Content) *model.Content {
 		// Non-schema field — lets contentResolver.PrimaryCategory batch-load the
 		// category by FK via dataloader instead of re-fetching the content row.
 		PrimaryCategoryID: c.PrimaryCategoryID,
+		VerseStartID:      c.VerseStartID,
+		VerseEndID:        c.VerseEndID,
+		DisplayTitle:      c.DisplayTitle,
 	}
 
 	// Parse the raw response JSON into a map for GraphQL
@@ -137,14 +141,20 @@ func categoryDomainToModel(c *domain.Category) *model.Category {
 	if c == nil {
 		return nil
 	}
+	var wikipediaURL *string
+	if c.WikipediaURL != "" {
+		wikipediaURL = &c.WikipediaURL
+	}
+
 	return &model.Category{
-		ID:          strconv.Itoa(c.ID),
-		WikidataQid: c.WikidataQID,
-		Label:       c.Label,
-		Description: &c.Description,
-		EntityType:  &c.EntityType,
-		CreatedAt:   c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:   c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:           strconv.Itoa(c.ID),
+		WikidataQid:  c.WikidataQID,
+		Label:        c.Label,
+		Description:  &c.Description,
+		EntityType:   &c.EntityType,
+		WikipediaURL: wikipediaURL,
+		CreatedAt:    c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:    c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
 
@@ -447,6 +457,17 @@ func modelToCreatePerspectiveInput(userID int, input model.CreatePerspectiveInpu
 	return serviceInput
 }
 
+// omittablePtr splits a tri-state graphql.Omittable[*T] update field into a
+// (value, clear) pair: unset -> (nil, false) — leave unchanged; explicit
+// null -> (nil, true) — clear; a value -> (v, false) — apply it.
+func omittablePtr[T any](o graphql.Omittable[*T]) (*T, bool) {
+	v, set := o.ValueOK()
+	if !set {
+		return nil, false
+	}
+	return v, v == nil
+}
+
 // modelToUpdatePerspectiveInput converts a GraphQL UpdatePerspectiveInput into the
 // service-layer input. See modelToCreatePerspectiveInput for why this mapping lives
 // here instead of inline in the resolver.
@@ -454,11 +475,6 @@ func modelToUpdatePerspectiveInput(input model.UpdatePerspectiveInput) portservi
 	serviceInput := portservices.UpdatePerspectiveInput{
 		ID:                    input.ID,
 		ContentID:             input.ContentID,
-		Quality:               input.Quality,
-		Agreement:             input.Agreement,
-		Importance:            input.Importance,
-		Confidence:            input.Confidence,
-		Like:                  input.Like,
 		Privacy:               input.Privacy,
 		Description:           input.Description,
 		Category:              input.Category,
@@ -466,14 +482,29 @@ func modelToUpdatePerspectiveInput(input model.UpdatePerspectiveInput) portservi
 		Parts:                 input.Parts,
 		Labels:                input.Labels,
 		CategorizedRatings:    categorizedRatingInputsToDomain(input.CategorizedRatings),
-		Feelings:              feelingInputsToDomain(input.Feelings),
 		PrimaryPerspectiveID:  input.PrimaryPerspectiveID,
 		RelatedPerspectiveIDs: input.RelatedPerspectiveIDs,
-		Review:                input.Review,
 	}
 
-	if input.CustomFields != nil {
-		if data, err := json.Marshal(input.CustomFields); err == nil {
+	serviceInput.Quality, serviceInput.ClearQuality = omittablePtr(input.Quality)
+	serviceInput.Agreement, serviceInput.ClearAgreement = omittablePtr(input.Agreement)
+	serviceInput.Importance, serviceInput.ClearImportance = omittablePtr(input.Importance)
+	serviceInput.Confidence, serviceInput.ClearConfidence = omittablePtr(input.Confidence)
+	serviceInput.Like, serviceInput.ClearLike = omittablePtr(input.Like)
+	serviceInput.Review, serviceInput.ClearReview = omittablePtr(input.Review)
+
+	if feelings, set := input.Feelings.ValueOK(); set {
+		if len(feelings) == 0 {
+			serviceInput.ClearFeelings = true
+		} else {
+			serviceInput.Feelings = feelingInputsToDomain(feelings)
+		}
+	}
+
+	if customFields, set := input.CustomFields.ValueOK(); set {
+		if len(customFields) == 0 {
+			serviceInput.ClearCustomFields = true
+		} else if data, err := json.Marshal(customFields); err == nil {
 			serviceInput.CustomFields = data
 		}
 	}

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
@@ -45,12 +46,22 @@ func (s *CategoryServiceImpl) SetPrimaryCategory(ctx context.Context, input port
 		return nil, fmt.Errorf("%w: label must not be empty", domain.ErrInvalidInput)
 	}
 
+	// Resolve the Wikidata QID to its English Wikipedia URL. A missing
+	// sitelink or a transient API error must never block category setting —
+	// log and proceed with an empty URL.
+	wikipediaURL, err := s.wikidataClient.GetWikipediaURL(ctx, input.QID)
+	if err != nil {
+		slog.WarnContext(ctx, "failed to resolve wikipedia url for category", "qid", input.QID, "error", err)
+		wikipediaURL = ""
+	}
+
 	// Build domain category from input
 	category := &domain.Category{
-		WikidataQID: input.QID,
-		Label:       input.Label,
-		Description: input.Description,
-		EntityType:  input.EntityType,
+		WikidataQID:  input.QID,
+		Label:        input.Label,
+		Description:  input.Description,
+		EntityType:   input.EntityType,
+		WikipediaURL: wikipediaURL,
 	}
 
 	// Upsert category (insert or update by wikidata_qid)

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
@@ -17,14 +19,27 @@ import (
 type ContentService struct {
 	repo          repositories.ContentRepository
 	youtubeClient portservices.YouTubeClient
+	bibleRepo     repositories.BibleReferenceRepository
+}
+
+// ContentServiceOption configures optional ContentService dependencies.
+type ContentServiceOption func(*ContentService)
+
+// WithBibleReference enables BIBLE_PASSAGE creation by supplying the reference-data repository.
+func WithBibleReference(repo repositories.BibleReferenceRepository) ContentServiceOption {
+	return func(s *ContentService) { s.bibleRepo = repo }
 }
 
 // NewContentService creates a new content service
-func NewContentService(repo repositories.ContentRepository, yt portservices.YouTubeClient) *ContentService {
-	return &ContentService{
+func NewContentService(repo repositories.ContentRepository, yt portservices.YouTubeClient, opts ...ContentServiceOption) *ContentService {
+	s := &ContentService{
 		repo:          repo,
 		youtubeClient: yt,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // CreateFromYouTube creates content from a YouTube URL, attributed to the given user.
@@ -210,4 +225,187 @@ func (s *ContentService) ListContent(ctx context.Context, params domain.ContentL
 	}
 
 	return result, nil
+}
+
+// CreateFromPassage finds or creates the BIBLE_PASSAGE content row for a verse
+// range. Verse ordinals are computed from bible_book.verses_per_chapter, which
+// also validates that the chapter/verse exist. The canonical URL (the dedupe
+// key) and name are always regenerated from the resolved book — never taken
+// from user input — and dedupe reuses the atomic ON CONFLICT(url) upsert.
+func (s *ContentService) CreateFromPassage(ctx context.Context, input portservices.CreatePassageInput) (*domain.Content, error) {
+	if s.bibleRepo == nil {
+		return nil, errors.New("bible passage support is not configured")
+	}
+	if input.EndChapter < input.StartChapter ||
+		(input.EndChapter == input.StartChapter && input.EndVerse < input.StartVerse) {
+		return nil, fmt.Errorf("%w: passage end is before its start", domain.ErrInvalidPassage)
+	}
+
+	books, err := s.bibleRepo.ListBooks(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load bible reference data: %w", err)
+	}
+	startID, err := domain.BibleVerseOrdinal(books, input.BookID, input.StartChapter, input.StartVerse)
+	if err != nil {
+		return nil, err
+	}
+	endID, err := domain.BibleVerseOrdinal(books, input.BookID, input.EndChapter, input.EndVerse)
+	if err != nil {
+		return nil, err
+	}
+	var bookName string
+	for _, b := range books {
+		if b.ID == input.BookID {
+			bookName = b.Name
+			break
+		}
+	}
+
+	canonicalURL := domain.CanonicalPassageURL(bookName, input.StartChapter, input.StartVerse, input.EndChapter, input.EndVerse)
+	content := &domain.Content{
+		Name:          domain.CanonicalPassageName(bookName, input.StartChapter, input.StartVerse, input.EndChapter, input.EndVerse),
+		URL:           &canonicalURL,
+		ContentType:   domain.ContentTypeBiblePassage,
+		AddedByUserID: input.UserID,
+		VerseStartID:  &startID,
+		VerseEndID:    &endID,
+	}
+
+	result, existed, err := s.repo.GetOrCreateByURL(ctx, content, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create passage content: %w", err)
+	}
+	if existed {
+		return result, domain.ErrAlreadyExists
+	}
+	return result, nil
+}
+
+// MaxPassageDisplayTitleLength caps a passage's optional display title (in characters).
+const MaxPassageDisplayTitleLength = 200
+
+// SetPassageDisplayTitle sets a passage's optional title, first-write-wins: a
+// losing writer gets the winning title back on the returned content rather than
+// an error, since their intent (this passage should have a title) was met.
+func (s *ContentService) SetPassageDisplayTitle(ctx context.Context, contentID int, title string) (*domain.Content, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return nil, fmt.Errorf("%w: title must not be empty", domain.ErrInvalidInput)
+	}
+	if utf8.RuneCountInString(title) > MaxPassageDisplayTitleLength {
+		return nil, fmt.Errorf("%w: title must be at most %d characters", domain.ErrInvalidInput, MaxPassageDisplayTitleLength)
+	}
+
+	content, err := s.getPassage(ctx, contentID)
+	if err != nil {
+		return nil, err
+	}
+	winning, err := s.repo.SetDisplayTitleIfEmpty(ctx, contentID, title)
+	if err != nil {
+		return nil, err
+	}
+	content.DisplayTitle = &winning
+	return content, nil
+}
+
+// ClearPassageDisplayTitle resets a passage's title to NULL. Authorization
+// (admin-only) is the caller's responsibility.
+func (s *ContentService) ClearPassageDisplayTitle(ctx context.Context, contentID int) (*domain.Content, error) {
+	content, err := s.getPassage(ctx, contentID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.ClearDisplayTitle(ctx, contentID); err != nil {
+		return nil, err
+	}
+	content.DisplayTitle = nil
+	return content, nil
+}
+
+// getPassage loads a content row and requires it to be a BIBLE_PASSAGE.
+func (s *ContentService) getPassage(ctx context.Context, contentID int) (*domain.Content, error) {
+	content, err := s.repo.GetByID(ctx, contentID)
+	if err != nil {
+		return nil, err
+	}
+	if content.ContentType != domain.ContentTypeBiblePassage {
+		return nil, fmt.Errorf("%w: content %d is not a Bible passage", domain.ErrInvalidInput, contentID)
+	}
+	return content, nil
+}
+
+// MaxPassageTextVerses bounds a single passageText read so a client can't pull
+// the whole Bible in one query. Sized above the largest single book (Psalms,
+// 2,461 verses); the frontend links out instead of rendering long passages.
+const MaxPassageTextVerses = 2500
+
+// PassageText returns the stored BSB text for verse ordinals startVerseID..endVerseID.
+func (s *ContentService) PassageText(ctx context.Context, startVerseID, endVerseID int) (*domain.PassageText, error) {
+	if s.bibleRepo == nil {
+		return nil, errors.New("bible passage support is not configured")
+	}
+	if startVerseID < 1 || endVerseID < startVerseID {
+		return nil, fmt.Errorf("%w: invalid verse range %d-%d", domain.ErrInvalidPassage, startVerseID, endVerseID)
+	}
+	count := endVerseID - startVerseID + 1
+	if count > MaxPassageTextVerses {
+		return nil, fmt.Errorf("%w: passage exceeds %d verses", domain.ErrInvalidPassage, MaxPassageTextVerses)
+	}
+
+	books, err := s.bibleRepo.ListBooks(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load bible reference data: %w", err)
+	}
+	texts, err := s.bibleRepo.GetVerseTexts(ctx, domain.BibleTranslationBSB, startVerseID, endVerseID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load passage text: %w", err)
+	}
+	if len(texts) != count {
+		// Out-of-range ordinal, or the seeder hasn't loaded bsb.tsv into this environment.
+		return nil, fmt.Errorf("%w: verses %d-%d not found (%d of %d present)", domain.ErrNotFound, startVerseID, endVerseID, len(texts), count)
+	}
+
+	verses := make([]domain.PassageVerse, len(texts))
+	for i, t := range texts {
+		_, chapter, verse, err := domain.BibleVerseFromOrdinal(books, t.VerseID)
+		if err != nil {
+			return nil, err
+		}
+		verses[i] = domain.PassageVerse{VerseID: t.VerseID, Chapter: chapter, Verse: verse, Text: t.Text}
+	}
+	return &domain.PassageText{
+		Translation: domain.BibleTranslationBSB,
+		Copyright:   domain.BibleTranslationBSBCopyright,
+		Verses:      verses,
+	}, nil
+}
+
+// PassageInterlinear returns the interlinear (original-language) data for a verse range.
+// It applies the same range and size limits as PassageText. A range with no alignment
+// rows (unseeded environment, omitted verses) yields an empty result, not an error, so
+// the client can show plain text.
+func (s *ContentService) PassageInterlinear(ctx context.Context, startVerseID, endVerseID int) (*domain.PassageInterlinear, error) {
+	if s.bibleRepo == nil {
+		return nil, errors.New("bible passage support is not configured")
+	}
+	if startVerseID < 1 || endVerseID < startVerseID {
+		return nil, fmt.Errorf("%w: invalid verse range %d-%d", domain.ErrInvalidPassage, startVerseID, endVerseID)
+	}
+	if endVerseID-startVerseID+1 > MaxPassageTextVerses {
+		return nil, fmt.Errorf("%w: passage exceeds %d verses", domain.ErrInvalidPassage, MaxPassageTextVerses)
+	}
+
+	books, err := s.bibleRepo.ListBooks(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load bible reference data: %w", err)
+	}
+	rows, err := s.bibleRepo.GetInterlinearWords(ctx, startVerseID, endVerseID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load interlinear words: %w", err)
+	}
+	verses, err := domain.BuildInterlinearVerses(books, rows)
+	if err != nil {
+		return nil, err
+	}
+	return &domain.PassageInterlinear{Verses: verses}, nil
 }

@@ -105,6 +105,7 @@ type Category {
   label: String!
   description: String
   entityType: String
+  wikipediaUrl: String
   createdAt: String!
   updatedAt: String!
 }
@@ -134,6 +135,11 @@ type Content {
   description: String
   response: JSON
   primaryCategory: Category
+  # BIBLE_PASSAGE only: computed verse ordinals (see bible_book.verses_per_chapter)
+  # and the optional, first-write-wins display title. Null for other content types.
+  verseStartID: Int
+  verseEndID: Int
+  displayTitle: String
   # Aggregates computed from ALL perspectives on this content — public and
   # private alike (privacy controls readability, not whether a perspective
   # counts here). Resolved on demand (batched per-request via dataloader)
@@ -172,6 +178,7 @@ enum ContentSortBy {
   NAME
   VIEW_COUNT
   LIKE_COUNT
+  PERCENT_LIKED
   PUBLISHED_AT
   CHANNEL_TITLE
   LENGTH
@@ -191,6 +198,7 @@ input ContentSortInput {
 enum ContentType {
   YOUTUBE_VIDEO
   CLAIM
+  BIBLE_PASSAGE
 }
 
 # Text columns that ContentFilter.search can be scoped to.
@@ -205,6 +213,74 @@ enum ContentSearchField {
 input CreateContentFromYouTubeInput {
   url: String!
   userId: IntID!
+}
+
+# Find-or-create a Bible passage. endChapter/endVerse equal startChapter/startVerse
+# for a single verse. userID is accepted only if it matches the session (or 0).
+input CreateContentFromPassageInput {
+  bookID: Int!
+  startChapter: Int!
+  startVerse: Int!
+  endChapter: Int!
+  endVerse: Int!
+  userID: IntID!
+}
+
+input SetPassageDisplayTitleInput {
+  contentID: IntID!
+  title: String!
+}
+
+# BSB (public domain) text for a verse-ordinal range.
+type PassageVerse {
+  verseId: Int!
+  chapter: Int!
+  verse: Int!
+  # Empty for verses the BSB omits (e.g. Matthew 17:21).
+  text: String!
+}
+
+type PassageText {
+  translation: String!
+  copyright: String!
+  verses: [PassageVerse!]!
+}
+
+# One run of a verse's English text; concatenating segments (a space before each with
+# spaceBefore) reproduces the plain BSB verse.
+type InterlinearSegment {
+  text: String!
+  spaceBefore: Boolean!
+}
+
+# One Hebrew/Greek source word. Words are in original-language order; id is the index in that order.
+type InterlinearWord {
+  id: Int!
+  language: String!
+  source: String!
+  translit: String!
+  parsing: String!
+  # Disambiguated STEPBible tag (e.g. H1254B); Berean's own plain number is kept server-side.
+  strongs: String!
+  # Short meaning (STEPBible Gloss, CC BY 4.0).
+  gloss: String!
+  # "tagged" (exact match) or "fallback" (most common sense for the plain number).
+  tagSource: String!
+  sourceOrder: Int!
+  # Index into the verse's segments of the English phrase this word belongs to; null = no phrase.
+  segment: Int
+}
+
+type InterlinearVerse {
+  verseId: Int!
+  chapter: Int!
+  verse: Int!
+  segments: [InterlinearSegment!]!
+  words: [InterlinearWord!]!
+}
+
+type PassageInterlinear {
+  verses: [InterlinearVerse!]!
 }
 
 # Filters for content queries
@@ -280,13 +356,25 @@ input CreatePerspectiveInput {
   review: String
 }
 
+"""
+Partial update: omit a field to leave it unchanged. For quality, agreement,
+importance, confidence, like, review, customFields and feelings, sending an
+explicit null clears the field (an empty feelings list or empty customFields
+object also clears). Every other field is a plain optional -- omit to leave
+unchanged, no way to clear it yet.
+"""
 input UpdatePerspectiveInput {
   id: IntID!
   contentID: IntID
+  "Omit = unchanged; null = clear."
   quality: Int
+  "Omit = unchanged; null = clear."
   agreement: Int
+  "Omit = unchanged; null = clear."
   importance: Int
+  "Omit = unchanged; null = clear."
   confidence: Int
+  "Omit = unchanged; null = clear."
   like: String
   privacy: Privacy
   description: String
@@ -295,10 +383,13 @@ input UpdatePerspectiveInput {
   parts: [Int!]
   labels: [String!]
   categorizedRatings: [CategorizedRatingInput!]
+  "Omit = unchanged; null or [] = clear."
   feelings: [FeelingInput!]
   primaryPerspectiveID: IntID
   relatedPerspectiveIDs: [Int!]
+  "Omit = unchanged; null or {} = clear."
   customFields: JSON
+  "Omit = unchanged; null = clear."
   review: String
 }
 
@@ -325,6 +416,13 @@ input CreateClaimInput {
 type Mutation {
   createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   updateContentSourceData(contentId: IntID!): Content! @auth
+
+  # Bible passage mutations
+  createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth
+  # First-write-wins: if a title already exists, returns the content with the existing title.
+  setPassageDisplayTitle(input: SetPassageDisplayTitleInput!): Content! @auth
+  # Admin only: resets the title so it can be set again.
+  clearPassageDisplayTitle(contentId: IntID!): Content! @auth
 
   # User mutations
   createUser(input: CreateUserInput!): User! @auth
@@ -369,6 +467,13 @@ type Query {
     filter: ContentFilter
   ): PaginatedContent!
 
+  # Bible passage text for verse ordinals startVerseId..endVerseId (inclusive, capped server-side)
+  passageText(startVerseId: Int!, endVerseId: Int!): PassageText!
+
+  # Original-language word alignment for verse ordinals startVerseId..endVerseId (inclusive, capped server-side).
+  # Verses without alignment data are absent from the result.
+  passageInterlinear(startVerseId: Int!, endVerseId: Int!): PassageInterlinear!
+
   # User queries
   userByID(id: ID!): User
   userByUsername(username: String!): User
@@ -389,4 +494,46 @@ type Query {
     includeTotalCount: Boolean = false
     filter: PerspectiveFilter
   ): PaginatedPerspectives!
+
+  # How many perspectives carry a given feeling (matched by exact emoji
+  # grapheme, e.g. "🥰" for Love; label narrows further, case-insensitively,
+  # for the rare case the same emoji is reused for two curated feelings --
+  # see FeelingEntry: label is prefilled for curated wheel/search entries),
+  # the average and population standard deviation of that feeling's
+  # intensity, and what percent of ALL perspectives in scope carry it
+  # (percentOfPerspectives = count / totalPerspectives -- "of those with any
+  # perspective", not just of those with any feelings at all). Scoped to one
+  # content item's perspectives when contentID is given, or platform-wide
+  # across every perspective when omitted. Counts public and private
+  # perspectives alike, matching PerspectiveAggregate's privacy stance.
+  feelingStats(contentID: IntID, emoji: String!, label: String): FeelingStats!
+
+  # How many perspectives set the given CustomFields top-level key (any
+  # value), and what percent of ALL perspectives in scope that is. Same
+  # scoping/privacy rules as feelingStats.
+  customFieldStats(contentID: IntID, key: String!): CustomFieldStats!
+}
+
+# See Query.feelingStats. averageIntensity/stdDevIntensity are null when
+# count is 0 (nothing to average); stdDevIntensity is also null when count
+# is 1 (standard deviation of a single value is undefined here, not 0).
+# percentOfPerspectives is null only when totalPerspectives is 0 (no
+# perspectives at all in scope to take a percentage of).
+type FeelingStats {
+  emoji: String!
+  label: String
+  count: Int!
+  totalPerspectives: Int!
+  averageIntensity: Float
+  stdDevIntensity: Float
+  percentOfPerspectives: Float
+}
+
+# See Query.customFieldStats. percentOfPerspectives is null only when
+# totalPerspectives is 0.
+type CustomFieldStats {
+  key: String!
+  count: Int!
+  totalPerspectives: Int!
+  percentOfPerspectives: Float
 }

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
+	import { beforeNavigate } from '$app/navigation';
+	import { updated } from '$app/state';
 	import { onMount } from 'svelte';
 	import { ClerkProvider, ClerkLoaded, ClerkLoading, Show } from 'svelte-clerk';
 	import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
@@ -12,6 +14,9 @@
 	import GuestLanding from '$lib/components/onboarding/GuestLanding.svelte';
 	import OnboardingShell from '$lib/components/onboarding/OnboardingShell.svelte';
 	import { reportWebVitals } from '$lib/vitals';
+	import { watchForNewVersion } from '$lib/utils/versionWatch';
+	import { attachVersionHotkey } from '$lib/utils/versionHotkey';
+	import { printVersionInfo } from '$lib/utils/versionInfo';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import '../app.css';
 
@@ -31,8 +36,32 @@
 
 	let webManifestLink = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
 
+	// Once a newer deploy is detected (version.json polling or a resume check),
+	// turn the next client-side navigation into a full page load — the old
+	// build's route chunks may already be gone from the server.
+	beforeNavigate(({ willUnload, to }) => {
+		if (updated.current && !willUnload && to?.url) {
+			location.href = to.url.href;
+		}
+	});
+
 	onMount(() => {
 		reportWebVitals();
+		const stopVersionWatch = watchForNewVersion({
+			check: () => updated.check(),
+			reload: () => location.reload(),
+		});
+		// Hidden zzzv console hotkey — see lib/utils/versionHotkey.ts.
+		const detachVersionHotkey = attachVersionHotkey({
+			onMatch: () => {
+				const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8080/graphql';
+				void printVersionInfo({ graphqlUrl });
+			},
+		});
+		return () => {
+			stopVersionWatch();
+			detachVersionHotkey();
+		};
 	});
 </script>
 
