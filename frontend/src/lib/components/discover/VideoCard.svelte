@@ -6,6 +6,7 @@
 	import { formatDate, formatDuration, formatIsoDuration, formatCount } from '$lib/utils/formatting';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
+	import PlayIcon from '@lucide/svelte/icons/play';
 
 	let {
 		video,
@@ -14,6 +15,7 @@
 		onAdd,
 		addedContent = null,
 		userId = null,
+		index = null,
 	}: {
 		video: VideoItem;
 		isInLibrary?: boolean;
@@ -32,50 +34,53 @@
 		addedContent?: ContentItem | null;
 		/** Numeric Clerk-derived user id, needed to open PerspectivePopover. */
 		userId?: number | null;
+		/** Position within the results list — the first couple of cards get fetchpriority="high"/eager loading on their thumbnail, since they're likely above the fold. */
+		index?: number | null;
 	} = $props();
 
 	const durationLabel = $derived(video.duration ? formatIsoDuration(video.duration) : null);
 
 	let mediaContainer: HTMLDivElement | null = $state(null);
 	let iframeEl: HTMLIFrameElement | null = $state(null);
-	let isVisible = $state(false);
-	// True once the player has been mounted via an explicit "watch inline"
-	// activation (card-body click/Enter/Space) rather than just scrolling near
-	// the viewport — only then do we ask the embed to autoplay.
-	let autoplayRequested = $state(false);
+	// True once the player has been activated via an explicit "watch inline"
+	// click/Enter/Space on the card — the iframe (a full YouTube document with
+	// its own player JS/CSS/fonts) is never mounted just because the card
+	// scrolled into view. Until then we show a static thumbnail <img> facade.
+	let activated = $state(false);
 
-	const iframeSrc = $derived(`https://www.youtube.com/embed/${video.id}${autoplayRequested ? '?autoplay=1' : ''}`);
+	const iframeSrc = $derived(`https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1`);
 
-	// Lazy-mount the embedded player: only mount the iframe once the card
-	// scrolls near the viewport, so a long results/trending list doesn't fire
-	// dozens of YouTube embed requests up front. (Same IntersectionObserver
-	// gating this card previously used for a lazy-loaded thumbnail <img>.)
-	$effect(() => {
-		if (!mediaContainer || isVisible) return;
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries[0]?.isIntersecting) {
-					isVisible = true;
-				}
-			},
-			{ rootMargin: '200px' },
+	const thumbnail = $derived(video.thumbnails.medium ?? video.thumbnails.high ?? video.thumbnails.default ?? null);
+	const thumbnailSrcset = $derived.by(() => {
+		const candidates = [video.thumbnails.medium, video.thumbnails.high].filter((t): t is NonNullable<typeof t> =>
+			Boolean(t?.url && t.width),
 		);
-		observer.observe(mediaContainer);
-		return () => observer.disconnect();
+		return candidates.map((t) => `${t.url} ${t.width}w`).join(', ');
 	});
+	const isPriorityThumbnail = $derived(index !== null && index < 2);
+
+	/** Preconnects the document to `origin` once, so the actual DNS/TLS/TCP handshake for the embed/thumbnail host isn't on the critical path when it's needed. */
+	function preconnect(origin: string) {
+		if (document.head.querySelector(`link[rel="preconnect"][href="${origin}"]`)) return;
+		const link = document.createElement('link');
+		link.rel = 'preconnect';
+		link.href = origin;
+		document.head.appendChild(link);
+	}
+
+	/** Warms the embed host connection on hover/focus, ahead of an activation click. */
+	function preconnectEmbed() {
+		if (!activated) preconnect('https://www.youtube-nocookie.com');
+	}
 
 	/**
 	 * Card-body click/keyboard activation: "watch this now inline", not a
-	 * link-out to YouTube. If the player hasn't mounted yet (still below the
-	 * IntersectionObserver threshold, showing the pulse placeholder), force it
-	 * to mount and autoplay. If it's already mounted, just focus it — no
-	 * navigation, no new tab, no restart.
+	 * link-out to YouTube. Mounts the iframe (with autoplay) on first
+	 * activation; if it's already mounted, just focus it — no navigation, no
+	 * new tab, no restart.
 	 */
 	async function activatePlayer() {
-		if (!isVisible) {
-			autoplayRequested = true;
-			isVisible = true;
-		}
+		activated = true;
 		await tick();
 		iframeEl?.focus();
 		mediaContainer?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -106,10 +111,12 @@
 	aria-label={`Watch ${video.title} inline`}
 	onclick={activatePlayer}
 	onkeydown={handleCardKeydown}
-	class="flex flex-col sm:flex-row gap-4 p-3 border border-border rounded-lg bg-card text-card-foreground shadow-sm cursor-pointer outline-none transition-colors hover:bg-accent/40 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+	onpointerenter={preconnectEmbed}
+	onfocusin={preconnectEmbed}
+	class="group flex flex-col sm:flex-row gap-4 p-3 border border-border rounded-lg bg-card text-card-foreground shadow-sm cursor-pointer outline-none transition-colors hover:bg-accent/40 focus-visible:ring-[3px] focus-visible:ring-ring/50"
 >
 	<div bind:this={mediaContainer} class="w-full sm:w-80 h-45 sm:h-[180px] shrink-0 relative">
-		{#if isVisible}
+		{#if activated}
 			<iframe
 				bind:this={iframeEl}
 				src={iframeSrc}
@@ -119,8 +126,33 @@
 				allowfullscreen
 				loading="lazy"
 			></iframe>
+		{:else if thumbnail}
+			<img
+				src={thumbnail.url}
+				srcset={thumbnailSrcset || undefined}
+				sizes="(min-width: 640px) 320px, 100vw"
+				width={thumbnail.width ?? 320}
+				height={thumbnail.height ?? 180}
+				alt={video.title}
+				loading={isPriorityThumbnail ? 'eager' : 'lazy'}
+				decoding="async"
+				fetchpriority={isPriorityThumbnail ? 'high' : 'auto'}
+				class="w-full h-full object-cover rounded"
+			/>
+			<span
+				aria-hidden="true"
+				class="absolute inset-0 flex items-center justify-center rounded bg-black/10 transition-colors group-hover:bg-black/20"
+			>
+				<span class="flex items-center justify-center size-12 rounded-full bg-black/60 text-white">
+					<PlayIcon class="size-6 translate-x-0.5" fill="currentColor" />
+				</span>
+			</span>
 		{:else}
-			<div class="w-full h-full bg-muted rounded"></div>
+			<div class="w-full h-full bg-muted rounded flex items-center justify-center">
+				<span aria-hidden="true" class="flex items-center justify-center size-12 rounded-full bg-black/60 text-white">
+					<PlayIcon class="size-6 translate-x-0.5" fill="currentColor" />
+				</span>
+			</div>
 		{/if}
 		{#if durationLabel}
 			<span class="absolute bottom-1 right-1 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded pointer-events-none">
