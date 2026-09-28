@@ -231,6 +231,14 @@ func (m *mockPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 	return map[int]*domain.PerspectiveAggregate{}, nil
 }
 
+func (m *mockPerspectiveRepository) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+	return &domain.FeelingStats{Emoji: emoji, Label: label}, nil
+}
+
+func (m *mockPerspectiveRepository) CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+	return &domain.CustomFieldStats{Key: key}, nil
+}
+
 // mockCategoryRepository implements repositories.CategoryRepository for testing
 type mockCategoryRepository struct{}
 
@@ -252,6 +260,10 @@ type mockWikidataClient struct{}
 
 func (m *mockWikidataClient) Search(ctx context.Context, query string, language string, limit int) ([]domain.WikidataSearchResult, error) {
 	return []domain.WikidataSearchResult{}, nil
+}
+
+func (m *mockWikidataClient) GetWikipediaURL(ctx context.Context, qid string) (string, error) {
+	return "", nil
 }
 
 // graphqlResponse represents a generic GraphQL JSON response

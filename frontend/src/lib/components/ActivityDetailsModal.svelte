@@ -27,7 +27,7 @@
 		url: string | null;
 		channelTitle: string | null;
 		contentType?: string;
-		primaryCategory?: { label: string } | null;
+		primaryCategory?: { label: string; wikipediaUrl?: string | null } | null;
 		viewCount: number | null;
 		likeCount: number | null;
 		length: number | null;
@@ -248,7 +248,18 @@
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Category</div>
 							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
-								{content.primaryCategory?.label ?? '—'}
+								{#if content.primaryCategory?.wikipediaUrl}
+									<a
+										href={content.primaryCategory.wikipediaUrl}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="underline"
+									>
+										{content.primaryCategory.label}
+									</a>
+								{:else}
+									{content.primaryCategory?.label ?? '—'}
+								{/if}
 							</div>
 						</div>
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">

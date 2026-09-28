@@ -89,7 +89,11 @@
 	// Popover state for Category column
 	let categoryPopoverOpen = $state(false);
 	let categoryPopoverContentId = $state<number | null>(null);
-	let categoryPopoverCurrentCategory = $state<{ label: string; wikidataQid: string } | null>(null);
+	let categoryPopoverCurrentCategory = $state<{
+		label: string;
+		wikidataQid: string;
+		wikipediaUrl?: string | null;
+	} | null>(null);
 	let categoryPopoverPosition = $state({ x: 0, y: 0 });
 
 	// Category mutation hook
@@ -754,6 +758,7 @@
 					? {
 							label: event.data.primaryCategory.label,
 							wikidataQid: event.data.primaryCategory.wikidataQid,
+							wikipediaUrl: event.data.primaryCategory.wikipediaUrl,
 						}
 					: null;
 				categoryPopoverPosition = { x: rect.left ?? rect.x, y: (rect.bottom ?? rect.y) + 4 };

@@ -214,6 +214,117 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 	return out, nil
 }
 
+// feelingStatsRow is the scan target for FeelingStats' grouped query below.
+type feelingStatsRow struct {
+	Count           int
+	AvgIntensity    *float64
+	StddevIntensity *float64
+}
+
+// FeelingStats computes count/average/population-stddev of Intensity for
+// perspectives carrying the given feeling. Matching is on the exact Emoji
+// grapheme (feelings.emoji, unnested from the jsonb[] column); when label is
+// non-nil it further narrows to a case-insensitive label match (defends
+// against the same emoji being reused for two curated feelings -- see
+// FeelingEntry's doc comment). CROSS JOIN LATERAL unnest fans each
+// perspective's feelings array out into one row per feeling so the jsonb
+// object's ->>'emoji'/->>'intensity' text extraction can filter/aggregate
+// directly; COUNT(DISTINCT p.id) guards against double-counting a
+// perspective that (unusually) lists the same feeling twice.
+func (r *GormPerspectiveRepository) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+	query := `
+		SELECT
+			COUNT(DISTINCT p.id) AS count,
+			AVG((f->>'intensity')::float8) AS avg_intensity,
+			STDDEV_POP((f->>'intensity')::float8) AS stddev_intensity
+		FROM perspectives p
+		CROSS JOIN LATERAL unnest(p.feelings) AS f
+		WHERE f->>'emoji' = ?`
+	args := []interface{}{emoji}
+
+	if label != nil {
+		query += ` AND lower(f->>'label') = lower(?)`
+		args = append(args, *label)
+	}
+	if contentID != nil {
+		query += ` AND p.content_id = ?`
+		args = append(args, *contentID)
+	}
+
+	var row feelingStatsRow
+	if err := r.db.WithContext(ctx).Raw(query, args...).Scan(&row).Error; err != nil {
+		return nil, fmt.Errorf("failed to compute feeling stats: %w", err)
+	}
+
+	// STDDEV_POP of a single value comes back 0 from Postgres, but a spread
+	// computed over one data point isn't a meaningful "0" -- force nil to
+	// match FeelingStats' doc comment.
+	if row.Count < 2 {
+		row.StddevIntensity = nil
+	}
+
+	total, err := r.countPerspectives(ctx, contentID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.FeelingStats{
+		Emoji:             emoji,
+		Label:             label,
+		Count:             row.Count,
+		TotalPerspectives: total,
+		AverageIntensity:  row.AvgIntensity,
+		StdDevIntensity:   row.StddevIntensity,
+	}, nil
+}
+
+// CustomFieldStats computes how many perspectives set the given top-level
+// CustomFields key, for any value. jsonb_exists (rather than the `?`
+// containment operator) sidesteps GORM Raw()'s own `?` placeholder parsing,
+// which would otherwise misread a literal `?` operator as an extra bind arg.
+func (r *GormPerspectiveRepository) CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+	query := `
+		SELECT COUNT(*) AS count
+		FROM perspectives p
+		WHERE jsonb_exists(p.custom_fields, ?)`
+	args := []interface{}{key}
+
+	if contentID != nil {
+		query += ` AND p.content_id = ?`
+		args = append(args, *contentID)
+	}
+
+	var count int
+	if err := r.db.WithContext(ctx).Raw(query, args...).Scan(&count).Error; err != nil {
+		return nil, fmt.Errorf("failed to compute custom field stats: %w", err)
+	}
+
+	total, err := r.countPerspectives(ctx, contentID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.CustomFieldStats{
+		Key:               key,
+		Count:             count,
+		TotalPerspectives: total,
+	}, nil
+}
+
+// countPerspectives is the shared "total perspectives in scope" denominator
+// behind FeelingStats and CustomFieldStats' PercentOfPerspectives.
+func (r *GormPerspectiveRepository) countPerspectives(ctx context.Context, contentID *int) (int, error) {
+	q := r.db.WithContext(ctx).Model(&PerspectiveModel{})
+	if contentID != nil {
+		q = q.Where("content_id = ?", *contentID)
+	}
+	var count int64
+	if err := q.Count(&count).Error; err != nil {
+		return 0, fmt.Errorf("failed to count perspectives: %w", err)
+	}
+	return int(count), nil
+}
+
 // ReassignByUser updates all perspectives owned by fromUserID to toUserID
 func (r *GormPerspectiveRepository) ReassignByUser(ctx context.Context, fromUserID, toUserID int) error {
 	return r.db.WithContext(ctx).

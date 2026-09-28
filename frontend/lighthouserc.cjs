@@ -16,11 +16,7 @@ module.exports = {
 			startServerCommand: 'pnpm run preview',
 			startServerReadyPattern: 'Local:',
 			startServerReadyTimeout: 30000,
-			url: [
-				'http://localhost:4173/',
-				'http://localhost:4173/discover',
-				'http://localhost:4173/messages',
-			],
+			url: ['http://localhost:4173/', 'http://localhost:4173/discover', 'http://localhost:4173/messages'],
 			numberOfRuns: 3,
 		},
 		assert: {

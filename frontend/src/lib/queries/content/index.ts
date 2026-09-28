@@ -30,6 +30,7 @@ export interface ContentItem {
 		label: string;
 		description: string | null;
 		entityType: string | null;
+		wikipediaUrl: string | null;
 	} | null;
 	createdAt: string;
 	updatedAt: string;
@@ -106,6 +107,7 @@ export const LIST_CONTENT = gql`
 					label
 					description
 					entityType
+					wikipediaUrl
 				}
 				createdAt
 				updatedAt
@@ -121,6 +123,42 @@ export const LIST_CONTENT = gql`
 	}
 `;
 
+// Compare page's "choose something to compare" picker: needs perspectiveCount
+// per row to filter down to content that actually has 2+ perspectives to
+// compare, which is why this is a separate query from LIST_CONTENT (see the
+// cost comment on GET_CONTENT_AGGREGATES below) — capped at a modest `first`
+// so the added per-row dataloader cost stays bounded to this one picker
+// fetch, not every Activity grid page load.
+export interface ComparePickerContentItem {
+	id: string;
+	name: string;
+	contentType: string;
+	channelTitle: string | null;
+	url: string | null;
+	perspectiveCount: number | null;
+}
+
+export interface ListComparableContentResponse {
+	content: {
+		items: ComparePickerContentItem[];
+	};
+}
+
+export const LIST_COMPARABLE_CONTENT = gql`
+	query ListComparableContent($first: Int = 40, $filter: ContentFilter) {
+		content(first: $first, sortBy: UPDATED_AT, sortOrder: DESC, filter: $filter, includeTotalCount: false) {
+			items {
+				id
+				name
+				contentType
+				channelTitle
+				url
+				perspectiveCount
+			}
+		}
+	}
+`;
+
 export const GET_CONTENT = gql`
 	query GetContent($id: ID!) {
 		contentByID(id: $id) {
@@ -128,6 +166,9 @@ export const GET_CONTENT = gql`
 			name
 			url
 			contentType
+			verseStartID
+			verseEndID
+			displayTitle
 			length
 			lengthUnits
 			viewCount
@@ -191,6 +232,7 @@ export const CREATE_CONTENT_FROM_YOUTUBE = gql`
 					label
 					description
 					entityType
+					wikipediaUrl
 				}
 				createdAt
 				updatedAt

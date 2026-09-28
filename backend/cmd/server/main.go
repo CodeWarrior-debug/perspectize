@@ -24,6 +24,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/resolvers"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/realtime"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/handlers"
 	apimw "github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/middleware"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/wikidata"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
@@ -156,6 +157,7 @@ func main() {
 	messageRepo := postgres.NewGormMessageRepository(db)
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
 	hermeneuticApproachRepo := postgres.NewGormHermeneuticApproachRepository(db)
+	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
 
 	// Initialize services
 	contentService := services.NewContentService(contentRepo, youtubeClient, services.WithBibleReference(bibleReferenceRepo))
@@ -163,6 +165,7 @@ func main() {
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo, hermeneuticApproachRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
 	hermeneuticApproachService := services.NewHermeneuticApproachService(hermeneuticApproachRepo)
+	buildInfoService := services.NewBuildInfoService(buildInfoRepo)
 
 	// Messaging realtime plumbing: the hub fans events out in-process, the
 	// listener feeds it from Postgres NOTIFY, the presence tracker records who
@@ -323,6 +326,10 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ready"))
 	})
+
+	// Build/deploy info — unauthenticated, like /health and /ready. Backs the
+	// frontend's zzzv console hotkey.
+	r.Get("/version", handlers.Version(buildInfoService))
 
 	// GraphQL. The wrapper clears the per-request I/O deadlines for WebSocket
 	// upgrades so long-lived subscriptions are not killed by the server's

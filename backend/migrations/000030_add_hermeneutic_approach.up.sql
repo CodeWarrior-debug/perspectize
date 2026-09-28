@@ -1,3 +1,7 @@
+-- Numbering: originally 000027; renumbered to 000030 because 000027 (category
+-- wikipedia_url) landed on main first and 000028 (content privacy) / 000029
+-- (youtube music isrc index) are claimed by in-flight branches.
+--
 -- Hermeneutic approach lookup table, plus the perspective columns that
 -- reference it.
 --

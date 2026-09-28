@@ -25,6 +25,10 @@ export const queryKeys = {
 		// share a cache key, or whichever query populates the cache first wins
 		// for the shared staleTime window and the other reads wrong fields.
 		banner: (id: string) => [...queryKeys.content.details(), 'banner', id] as const,
+		// ListComparableContent (ComparePicker.svelte) — a distinct shape/query
+		// from `list` above (adds perspectiveCount, no pagination), keyed by
+		// the debounced search term.
+		comparePicker: (search: string) => [...queryKeys.content.lists(), 'compare-picker', search] as const,
 	},
 
 	bible: {

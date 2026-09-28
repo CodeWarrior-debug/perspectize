@@ -202,3 +202,44 @@ func (r *queryResolver) Perspectives(ctx context.Context, first *int, after *str
 
 	return conn, nil
 }
+
+// FeelingStats is the resolver for the feelingStats field.
+func (r *queryResolver) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*model.FeelingStats, error) {
+	stats, err := r.PerspectiveService.FeelingStats(ctx, contentID, emoji, label)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("invalid feelingStats arguments: %w", err)
+		}
+		slog.Error("computing feeling stats failed", "contentID", contentID, "emoji", emoji, "error", err)
+		return nil, fmt.Errorf("failed to compute feeling stats")
+	}
+
+	return &model.FeelingStats{
+		Emoji:                 stats.Emoji,
+		Label:                 stats.Label,
+		Count:                 stats.Count,
+		TotalPerspectives:     stats.TotalPerspectives,
+		AverageIntensity:      stats.AverageIntensity,
+		StdDevIntensity:       stats.StdDevIntensity,
+		PercentOfPerspectives: stats.PercentOfPerspectives(),
+	}, nil
+}
+
+// CustomFieldStats is the resolver for the customFieldStats field.
+func (r *queryResolver) CustomFieldStats(ctx context.Context, contentID *int, key string) (*model.CustomFieldStats, error) {
+	stats, err := r.PerspectiveService.CustomFieldStats(ctx, contentID, key)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("invalid customFieldStats arguments: %w", err)
+		}
+		slog.Error("computing custom field stats failed", "contentID", contentID, "key", key, "error", err)
+		return nil, fmt.Errorf("failed to compute custom field stats")
+	}
+
+	return &model.CustomFieldStats{
+		Key:                   stats.Key,
+		Count:                 stats.Count,
+		TotalPerspectives:     stats.TotalPerspectives,
+		PercentOfPerspectives: stats.PercentOfPerspectives(),
+	}, nil
+}
