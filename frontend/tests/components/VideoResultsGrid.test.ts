@@ -44,6 +44,21 @@ describe('VideoResultsGrid', () => {
 		expect(screen.getByText('Video 2')).toBeInTheDocument();
 	});
 
+	it('gives only the first two cards a high-priority, eager-loaded thumbnail', () => {
+		render(VideoResultsGrid, {
+			props: {
+				items: [makeVideo('1'), makeVideo('2'), makeVideo('3')],
+				onLoadMore: vi.fn(),
+				libraryUrls: new Set<string>(),
+				onAdd: vi.fn(),
+			},
+		});
+
+		const images = screen.getAllByRole('img') as HTMLImageElement[];
+		expect(images.map((img) => img.getAttribute('fetchpriority'))).toEqual(['high', 'high', 'auto']);
+		expect(images.map((img) => img.getAttribute('loading'))).toEqual(['eager', 'eager', 'lazy']);
+	});
+
 	it('shows the trending empty state when there are no items and no query', () => {
 		render(VideoResultsGrid, {
 			props: { items: [], onLoadMore: vi.fn(), libraryUrls: new Set<string>(), onAdd: vi.fn() },

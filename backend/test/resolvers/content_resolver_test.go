@@ -1019,6 +1019,24 @@ func TestPaginatedContentQuery_WithContentTypeFilter(t *testing.T) {
 	assert.Equal(t, "YOUTUBE_VIDEO", data.Content.Items[0].ContentType)
 }
 
+func TestPaginatedContentQuery_WithContentTypesFilter(t *testing.T) {
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			require.NotNil(t, params.Filter)
+			assert.Nil(t, params.Filter.ContentType)
+			assert.Equal(t, []domain.ContentType{domain.ContentTypeYouTubeVideo, domain.ContentTypeClaim}, params.Filter.ContentTypes)
+			return &domain.PaginatedContent{Items: []*domain.Content{}}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: { contentTypes: [YOUTUBE_VIDEO, CLAIM] }) { items { id } } }`)
+
+	assert.Empty(t, result.Errors)
+}
+
 func TestPaginatedContentQuery_WithFilterAndTotalCount(t *testing.T) {
 	repo := &mockContentRepository{
 		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {

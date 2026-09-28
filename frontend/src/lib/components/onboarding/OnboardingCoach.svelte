@@ -7,6 +7,7 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Button, Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '$lib/components/shadcn';
+	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
 	import OnboardingVideo from '$lib/components/onboarding/OnboardingVideo.svelte';
 	import AddVideoDialog from '$lib/components/AddVideoDialog.svelte';
 	import { ONBOARDING_VIDEOS, CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
@@ -274,5 +275,7 @@
 			}}
 			onSuccess={handleActionSuccess}
 		/>
+	{:catch}
+		<LazyLoadError what="the perspective editor" floating />
 	{/await}
 {/if}
