@@ -4,3 +4,7 @@ dist/
 node_modules/
 coverage/
 pnpm-lock.yaml
+# Xcode-managed native project files
+ios/
+# Hand-laid-out data (one record per line); Prettier would expand it thousands of lines
+src/lib/data/*.json

@@ -15,6 +15,8 @@
 	import OnboardingShell from '$lib/components/onboarding/OnboardingShell.svelte';
 	import { reportWebVitals } from '$lib/vitals';
 	import { watchForNewVersion } from '$lib/utils/versionWatch';
+	import { attachVersionHotkey } from '$lib/utils/versionHotkey';
+	import { printVersionInfo } from '$lib/utils/versionInfo';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import '../app.css';
 
@@ -45,10 +47,21 @@
 
 	onMount(() => {
 		reportWebVitals();
-		return watchForNewVersion({
+		const stopVersionWatch = watchForNewVersion({
 			check: () => updated.check(),
 			reload: () => location.reload(),
 		});
+		// Hidden zzzv console hotkey — see lib/utils/versionHotkey.ts.
+		const detachVersionHotkey = attachVersionHotkey({
+			onMatch: () => {
+				const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8080/graphql';
+				void printVersionInfo({ graphqlUrl });
+			},
+		});
+		return () => {
+			stopVersionWatch();
+			detachVersionHotkey();
+		};
 	});
 </script>
 
