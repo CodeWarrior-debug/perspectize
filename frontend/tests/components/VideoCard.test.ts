@@ -44,6 +44,7 @@ const addedContent: ContentItem = {
 		label: 'Music',
 		description: null,
 		entityType: null,
+		wikipediaUrl: null,
 	},
 	createdAt: '2024-06-16T00:00:00Z',
 	updatedAt: '2024-06-16T00:00:00Z',
