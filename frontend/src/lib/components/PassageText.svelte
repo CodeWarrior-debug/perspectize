@@ -4,6 +4,9 @@
 	import { PASSAGE_TEXT_QUERY, type PassageTextResponse } from '$lib/queries/bible';
 	import { queryKeys } from '$lib/queries/keys';
 	import OriginalLanguage from '$lib/components/interlinear/OriginalLanguage.svelte';
+	import VerseNumber from '$lib/components/VerseNumber.svelte';
+	import VerseJumpPrompt from '$lib/components/VerseJumpPrompt.svelte';
+	import { setVerseJump } from '$lib/utils/verseJump';
 
 	let { startVerseId, endVerseId }: { startVerseId: number; endVerseId: number } = $props();
 
@@ -30,6 +33,49 @@
 		staleTime: Infinity, // verse text never changes
 	}));
 
+	// "See <ref> only": clicking a verse number (plain or interlinear view) opens a small
+	// prompt under it that jumps to — or first adds — that single verse as its own passage.
+	const PROMPT_WIDTH = 220;
+	let container = $state<HTMLDivElement | undefined>();
+	let jump = $state<{ verseId: number; left: number; top: number; anchor: HTMLElement } | null>(null);
+
+	function closeJump(opts?: { restoreFocus?: boolean }) {
+		if (opts?.restoreFocus) jump?.anchor.focus();
+		jump = null;
+	}
+
+	setVerseJump({
+		get enabled() {
+			return verseCount > 1;
+		},
+		get activeVerseId() {
+			return jump?.verseId ?? null;
+		},
+		toggle(verseId, anchor) {
+			if (jump?.verseId === verseId || !container) {
+				jump = null;
+				return;
+			}
+			const c = container.getBoundingClientRect();
+			const a = anchor.getBoundingClientRect();
+			const left = Math.max(0, Math.min(a.left - c.left - 8, c.width - PROMPT_WIDTH));
+			jump = { verseId, left, top: a.bottom - c.top + 6, anchor };
+		},
+	});
+
+	// A different passage (e.g. after jumping to a single verse) drops any open prompt.
+	$effect(() => {
+		void startVerseId;
+		void endVerseId;
+		jump = null;
+	});
+
+	function onDocumentPointerDown(e: Event) {
+		const target = e.target as HTMLElement | null;
+		if (!jump || target?.closest('[data-verse-jump-prompt],[data-verse-number]')) return;
+		jump = null;
+	}
+
 	const verses = $derived(query.data?.passageText.verses ?? []);
 	const visibleVerses = $derived(
 		verseCount <= COLLAPSE_THRESHOLD || expanded ? verses : verses.slice(0, COLLAPSED_PREVIEW_COUNT),
@@ -41,14 +87,19 @@
 		{#each visibleVerses as v (v.verseId)}
 			<!-- The explicit trailing space keeps a verse number from running into the previous verse's last word. -->
 			<span
-				>{#if v.text}<sup class="mr-0.5 ml-0.5 text-[10px] text-muted-foreground">{v.verse}</sup
-					>{v.text}{' '}{/if}</span
+				>{#if v.text}<VerseNumber verseId={v.verseId} verse={v.verse} />{v.text}{' '}{/if}</span
 			>
 		{/each}
 	</div>
 {/snippet}
 
-<div class="passage-text font-[family-name:var(--font-family-serif)] text-[15px] leading-relaxed text-foreground">
+<svelte:document onpointerdown={onDocumentPointerDown} />
+<svelte:window onresize={() => closeJump()} />
+
+<div
+	bind:this={container}
+	class="passage-text relative font-[family-name:var(--font-family-serif)] text-[15px] leading-relaxed text-foreground"
+>
 	{#if overCap}
 		<p class="text-muted-foreground">{verseCount} verses — too long to display here.</p>
 	{:else if query.isLoading}
@@ -80,5 +131,8 @@
 			</button>
 		{/if}
 		<p class="mt-2 text-[11px] text-muted-foreground">{translation} · {copyright}</p>
+	{/if}
+	{#if jump}
+		<VerseJumpPrompt verseId={jump.verseId} left={jump.left} top={jump.top} onClose={closeJump} />
 	{/if}
 </div>

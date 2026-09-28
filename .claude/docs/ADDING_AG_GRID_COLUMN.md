@@ -208,6 +208,11 @@ If yes:
 
 1. Choose the AG Grid filter type: `agTextColumnFilter` (text/string) or
    `agNumberColumnFilter`/`agDateColumnFilter` (numeric/date).
+   For a small fixed set of values (like Type), use a checkbox list instead —
+   AG Grid Community has no Set Filter, so see `ContentTypeFilter`
+   (`frontend/src/lib/utils/contentTypeFilter.ts`): it emits
+   `{ filterType: 'set', values }`, and `filterSet: true` on the `ColumnMeta`
+   makes the URL value comma-separated (`f.type=youtube,claim`).
 2. Set it in the column def (`filter: 'agTextColumnFilter'`); the grid
    provides its own filter menu, no `floatingFilter` needed for this table.
 3. In `grid-config.ts`'s `COLUMNS` array, set `filterKey: 'urlKey'` on the

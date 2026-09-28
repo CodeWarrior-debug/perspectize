@@ -480,6 +480,7 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		if filter.ContentType != nil {
 			params.Filter.ContentType = filter.ContentType
 		}
+		params.Filter.ContentTypes = filter.ContentTypes
 		params.Filter.MinLengthSeconds = filter.MinLengthSeconds
 		params.Filter.MaxLengthSeconds = filter.MaxLengthSeconds
 		params.Filter.Search = filter.Search

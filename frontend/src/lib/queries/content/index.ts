@@ -215,6 +215,45 @@ export const GET_CONTENT = gql`
 	}
 `;
 
+// Same fields as a LIST_CONTENT row, so the details modal can render an item
+// that isn't in the currently loaded Activity page (deep link via `?open=<id>`).
+export const GET_CONTENT_DETAILS = gql`
+	query GetContentDetails($id: ID!) {
+		contentByID(id: $id) {
+			id
+			name
+			addedByUserID
+			url
+			contentType
+			verseStartID
+			verseEndID
+			displayTitle
+			length
+			lengthUnits
+			viewCount
+			likeCount
+			channelTitle
+			publishedAt
+			tags
+			description
+			primaryCategory {
+				id
+				wikidataQid
+				label
+				description
+				entityType
+				wikipediaUrl
+			}
+			createdAt
+			updatedAt
+		}
+	}
+`;
+
+export interface ContentDetailsResponse {
+	contentByID: ContentItem | null;
+}
+
 // perspectiveCount/averageRating are computed aggregates over a content's
 // perspectives (see backend Content.perspectiveCount/averageRating resolvers)
 // — too expensive to include on every row of LIST_CONTENT, so they're

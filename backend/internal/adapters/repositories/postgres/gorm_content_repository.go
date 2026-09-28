@@ -234,6 +234,13 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		if params.Filter.ContentType != nil {
 			query = query.Where("content_type = ?", strings.ToLower(string(*params.Filter.ContentType)))
 		}
+		if len(params.Filter.ContentTypes) > 0 {
+			dbTypes := make([]string, len(params.Filter.ContentTypes))
+			for i, ct := range params.Filter.ContentTypes {
+				dbTypes[i] = contentTypeToDBValue(ct)
+			}
+			query = query.Where("content_type IN ?", dbTypes)
+		}
 		if params.Filter.MinLengthSeconds != nil {
 			query = query.Where("length >= ?", *params.Filter.MinLengthSeconds)
 		}
