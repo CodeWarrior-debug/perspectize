@@ -362,6 +362,39 @@ LIMIT 10;
 {"level":"info","request_id":"abc123","method":"POST","path":"/graphql"}
 ```
 
+### Version Info: the zzzv Hotkey and GET /version
+
+For a quick "what am I actually running" check without touching the UI:
+
+- **Frontend:** anywhere in the app, type `z`, `z`, `z`, `v` in a row (case-insensitive,
+  each keystroke under 1s after the previous one; typing in a text field doesn't trigger
+  it). This prints a grouped console table (frontend build facts, then the backend's
+  `/version`) — see `frontend/src/lib/utils/versionHotkey.ts` (the pure key-sequence
+  matcher) and `frontend/src/lib/utils/versionInfo.ts` (the console output + fetch),
+  wired once in `routes/+layout.svelte`.
+- **Backend:** `GET /version` (unauthenticated, like `/health`/`/ready`) returns JSON:
+  `commit`, `branch`, `tag`, `startedAt`, and `db: { migrationVersion, dirty,
+  migrationFile, bibleData? }`. `bibleData` is only present once `cmd/seed-bible` has
+  run in that environment. See `internal/core/services/build_info_service.go` and
+  `internal/adapters/repositories/postgres/build_info_repository.go`.
+- **Version tag format:** `v<YYYY.MM.DD>-<short7sha>`, using the commit's committer
+  date in UTC (`domain.ComputeTag` in `internal/core/domain/buildinfo.go`, mirrored in
+  `frontend/src/lib/utils/buildTag.ts`'s `computeTag()` — both are tested against the
+  same fixture, `testdata/version-tag-fixture.json`). `.github/workflows/tag-main.yml`
+  pushes this tag to the exact commit once CI passes on `main` (idempotent — a rerun
+  skips a tag that already exists). This is "tag once CI passes", not "tag on deploy":
+  Sevalla does the actual deploys and there's no deploy webhook wired up yet, so the
+  frontend and backend can end up running different tagged commits at any given moment.
+- **Frontend tag/commit/branch** come from a local `git` checkout at build time
+  (`vite.config.ts`'s `resolveGitBuildInfo`, and `svelte.config.js`'s
+  `currentCommitOrUnknown` for `kit.version.name`) — "unknown" if `git` isn't
+  available in that build environment.
+- **Backend commit/branch** come from Sevalla's injected `SVL_DEPLOYMENT_COMMIT_SHA` /
+  `SVL_DEPLOYMENT_BRANCH` env vars (confirmed via Sevalla's docs to be available at both
+  build and runtime for Applications). Sevalla does **not** expose a committer-date
+  variable, so unlike the frontend the backend can't derive its own tag from the SHA
+  alone — it reports whatever `BUILD_TAG` is set to, or `"unknown"` if that's unset.
+
 ## Troubleshooting
 
 ### Database Connection Issues
