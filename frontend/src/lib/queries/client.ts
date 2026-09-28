@@ -30,10 +30,7 @@ export async function getAuthToken(): Promise<string | null> {
  * Make a GraphQL request with optional auth.
  * Automatically includes Bearer token if user is signed in.
  */
-export async function graphqlRequest<T>(
-	document: string,
-	variables?: Record<string, unknown>,
-): Promise<T> {
+export async function graphqlRequest<T>(document: string, variables?: Record<string, unknown>): Promise<T> {
 	const token = await getAuthToken();
 	const headers: Record<string, string> = {};
 	if (token) {
