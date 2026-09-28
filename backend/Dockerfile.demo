@@ -1,0 +1,20 @@
+# Demo-mode seeder image (used by docker-compose.demo.yml at the repo root).
+# The demo *server* is the normal production image (backend/Dockerfile) with
+# DEMO_MODE=true — only the seeder needs its own image.
+FROM golang:1.27-alpine AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOFLAGS="-trimpath" go build -ldflags="-s -w" -o seed-demo ./cmd/seed-demo
+
+FROM gcr.io/distroless/static-debian12:nonroot
+
+COPY --from=builder /app/seed-demo /seed-demo
+
+USER nonroot:nonroot
+
+ENTRYPOINT ["/seed-demo"]
