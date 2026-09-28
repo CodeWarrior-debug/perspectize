@@ -46,6 +46,10 @@ func TestSetup_WithEndpoint_SetsResourceAttrs(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	defer srv.Close()
 
+	origVersion := buildinfo.Version
+	t.Cleanup(func() { buildinfo.Version = origVersion })
+	buildinfo.Version = "9.9.9"
+
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", srv.URL)
 	t.Setenv("OTEL_RESOURCE_ATTRIBUTES", "")
 
@@ -62,7 +66,7 @@ func TestSetup_WithEndpoint_SetsResourceAttrs(t *testing.T) {
 	res := telemetry.Resource()
 	assertAttr(t, res, "service.name", "perspectize-backend")
 	assertAttr(t, res, "deployment.environment.name", "test")
-	assertAttr(t, res, "service.version", buildinfo.Version)
+	assertAttr(t, res, "service.version", "9.9.9")
 }
 
 func TestSetup_ResourceFromEnvOverrides(t *testing.T) {

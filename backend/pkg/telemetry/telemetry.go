@@ -162,14 +162,16 @@ func buildResource(ctx context.Context, cfg Config) (*resource.Resource, error) 
 		serviceName = defaultServiceName
 	}
 
+	version, commit := buildinfo.Info()
+
 	attrs := []attribute.KeyValue{
 		semconv.ServiceNameKey.String(serviceName),
-		semconv.ServiceVersionKey.String(buildinfo.Version),
+		semconv.ServiceVersionKey.String(version),
 	}
 	if cfg.Environment != "" {
 		attrs = append(attrs, semconv.DeploymentEnvironmentNameKey.String(cfg.Environment))
 	}
-	if _, commit := buildinfo.Info(); commit != "unknown" && commit != "" {
+	if commit != "unknown" && commit != "" {
 		attrs = append(attrs, semconv.VCSRefHeadRevisionKey.String(commit))
 	}
 

@@ -3,11 +3,11 @@ package services
 import (
 	"context"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
+	"github.com/CodeWarrior-debug/perspectize/backend/pkg/buildinfo"
 )
 
 // BuildInfoService assembles the facts served at GET /version: deploy
@@ -22,23 +22,28 @@ type BuildInfoService struct {
 	startedAt time.Time
 }
 
-// NewBuildInfoService reads deploy metadata from the environment once, at
-// wiring time.
+// NewBuildInfoService reads deploy metadata from pkg/buildinfo once, at
+// wiring time, so this service and the OpenTelemetry resource/app.build.info
+// gauge (pkg/telemetry) always report the same commit and version for a
+// given process — see pkg/buildinfo's package doc for the full fallback
+// chain (ldflags vars, then Sevalla's SVL_DEPLOYMENT_* env vars / BUILD_TAG,
+// then "unknown").
 //
-// Sevalla injects SVL_DEPLOYMENT_COMMIT_SHA and SVL_DEPLOYMENT_BRANCH into
-// the backend Application (confirmed in https://docs.sevalla.com/applications/environment-variables),
-// but no committer-date variable — so unlike the frontend static build,
-// which has a local .git checkout and can derive its tag with
-// domain.ComputeTag directly, the backend has no way to compute the
-// deterministic v<date>-<sha> tag from the SHA alone. BUILD_TAG lets a
-// deploy pipeline supply the tag explicitly (e.g. once Sevalla deploy
-// webhooks exist to look it up); until then it reports "unknown".
+// Tag is the resolved version: BUILD_TAG (or an ldflags-injected version)
+// when set, otherwise a short7sha fallback derived from the resolved commit,
+// otherwise "unknown". Sevalla has no committer-date variable, so unlike the
+// frontend static build — which has a local .git checkout and can derive
+// its tag with domain.ComputeTag directly — the backend can't compute the
+// full deterministic v<date>-<sha> tag from the SHA alone; the short-SHA
+// fallback at least correlates with the tag .github/workflows/tag-main.yml
+// pushed for the same commit.
 func NewBuildInfoService(repo repositories.BuildInfoRepository) *BuildInfoService {
+	version, commit := buildinfo.Info()
 	return &BuildInfoService{
 		repo:      repo,
-		commit:    envOrUnknown("SVL_DEPLOYMENT_COMMIT_SHA"),
-		branch:    envOrUnknown("SVL_DEPLOYMENT_BRANCH"),
-		tag:       envOrUnknown("BUILD_TAG"),
+		commit:    commit,
+		branch:    buildinfo.Branch(),
+		tag:       version,
 		startedAt: time.Now().UTC(),
 	}
 }
@@ -61,11 +66,4 @@ func (s *BuildInfoService) Get(ctx context.Context) domain.BuildInfo {
 	}
 	info.DB = facts
 	return info
-}
-
-func envOrUnknown(key string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return "unknown"
 }
