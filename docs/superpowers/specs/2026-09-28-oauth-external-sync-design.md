@@ -1,5 +1,7 @@
 # OAuth External Account Sync (YouTube first) — Design
 
+> ⚠️ Written without superpowers loaded — a superpowers-enabled session should review via writing-plans before this is executed.
+
 **Date:** 2026-09-28
 **Status:** **optional roadmap item — unscheduled.** Brainstormed with the product owner; not committed to any milestone and no plan written yet. Pick up only when there is demand for importing existing activity from other platforms.
 **Type:** feature
