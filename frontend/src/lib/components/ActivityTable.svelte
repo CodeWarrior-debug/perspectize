@@ -1027,7 +1027,7 @@
 	});
 </script>
 
-<div class="flex flex-col h-full gap-4">
+<div class="flex flex-col h-full gap-2">
 	<!-- Active Filter Chips — always visible so users can clear filters even during errors -->
 	<FilterChips
 		{gridApi}
@@ -1077,7 +1077,7 @@
 			bind:this={gridContainer}
 			data-testid="ag-grid-container"
 			class="{isMobile ? 'overflow-y-auto' : 'flex-1'} min-h-0"
-			style="--ag-row-height: 64px; --ag-header-height: 40px;"
+			style="--ag-row-height: 60px; --ag-header-height: 36px;"
 		>
 			<AgGridSvelte5Component {gridOptions} {rowData} {theme} {modules} />
 		</div>
@@ -1091,7 +1091,7 @@
 
 	<!-- Manual Pagination Controls -->
 	<div
-		class="shrink-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-0 px-2 md:px-4 py-2 border-t border-border text-xs md:text-sm"
+		class="shrink-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-0 px-2 md:px-4 py-1.5 border-t border-border text-xs md:text-sm"
 	>
 		<div class="flex items-center gap-2 md:gap-4">
 			<div class="text-muted-foreground">

@@ -11,8 +11,8 @@ describe('GRID_THEME_PARAMS', () => {
 		}
 	});
 
-	it('keeps the 64px row height that avoids clipped descenders', () => {
-		expect(GRID_THEME_PARAMS.rowHeight).toBe(64);
+	it('keeps the 60px row height that avoids clipped descenders while fitting more rows above the fold', () => {
+		expect(GRID_THEME_PARAMS.rowHeight).toBe(60);
 	});
 });
 
