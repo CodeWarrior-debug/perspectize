@@ -278,6 +278,7 @@ Recent decisions affecting current work:
 - Phase 18.1 inserted after Phase 18: Mobile Activity Page Redesign (URGENT) — Redesign mobile activity page with 3-column layout (Item, Summary info-grid, Perspective glasses icon). Rethink mobile data display away from hidden AG Grid columns toward summary-based approach.
 - Phase 19 added: Content Familiarity Tracking — Backend system for users to record familiarity level (1-16 scale) with content and set target levels. Migrations, models, repository, service, and API endpoints. Open design questions on level count, table structure, and API style to resolve during planning.
 - Phase 03.5.1 inserted after Phase 3.5: Wikidata Integration and Universal Content Types (URGENT) — Build Go client for Wikidata APIs (Entity Search, REST, SPARQL), expand domain model beyond YouTube with Q-ID entity resolution, create enrichment layer. Extends Phase 3.5 research spike into production code.
+- Phase 9.1 inserted after Phase 9: PR Review Risk Triage Spike — Research spike to classify PR diffs by review-worthiness (business logic vs wiring vs gray-area) and evaluate enforcement mechanisms (Claude Code sub-agent, PR-Agent config, OpenRouter model routing) before committing to an implementation. Not blocking other phases; process tooling, run opportunistically.
 
 ### Project-Level Plan Requirements
 

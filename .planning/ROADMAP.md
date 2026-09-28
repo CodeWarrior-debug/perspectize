@@ -313,6 +313,7 @@ Phases 6-10 address issues from the bug backlog (`.planning/phases/bugs/BACKLOG.
 - [x] **Phase 8: User Integration Flow** - Frontend create user flow, shared FormPopover, optional email in schema (INSERTED)
 - [ ] **Phase 8.1: API & Schema Quality** - Fix GraphQL types, race conditions, nested resolvers
 - [x] **Phase 9: Security Hardening** - Authentication, rate limiting, query complexity, headers, HTTPS (completed 2026-03-03)
+- [ ] **Phase 9.1: PR Review Risk Triage Spike** - Research spike: classify diffs into careful/gray/skip-if-CI-passes tiers; evaluate Claude Code sub-agent vs PR-Agent+OpenRouter for enforcement (INSERTED)
 - [ ] **Phase 10: Frontend Quality & Test Coverage** - XSS fix, codegen, error boundaries, cleanup, test gaps
 
 ### Phase 8: User Integration Flow (INSERTED)
