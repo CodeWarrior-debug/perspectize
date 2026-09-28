@@ -134,6 +134,8 @@ CORS middleware is configured in `cmd/server/main.go` for local development. Cur
 
 ## Gotchas
 
+**Owner-only mutations need a guard at every layer, not just `@owner`.** The directive is one check; also re-derive the actor in the resolver via `auth.RequireAuth(ctx)` (never trust a client-supplied user ID), pass it into the service method (e.g. `Delete(ctx, id, actorUserID)`) and return `domain.ErrForbidden` there, and scope the SQL itself (`WHERE user_id = ? AND id = ?`). See `deletePerspective`. When a non-owner hits someone else's **non-PUBLIC** perspective, `@owner` answers "resource not found", not "access denied", so the ID isn't confirmed to exist (matches `perspectiveByID` returning null).
+
 **GraphQL defaults:** gqlgen passes `first: Int = 10` as non-nil pointer (value `10`), not `nil`. Tests must expect the default value.
 
 **Adding repository interface methods:** When adding a new method to a port interface (e.g., `ListAll` on `UserRepository`), all test mocks that implement that interface must also be updated or compilation fails. Check `test/` for mock implementations.

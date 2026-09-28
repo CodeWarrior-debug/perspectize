@@ -63,6 +63,8 @@ pnpm run test:run     # Tests once (CI/verification)
 pnpm run test         # Tests in watch mode
 ```
 
+**`pnpm run check` may already fail on `main`.** Before chasing type errors, compare against the baseline: `git stash`, run the check, then `git stash pop`. Only errors in files you touched are yours.
+
 **`pnpm exec` must run from `frontend/`** — running from repo root fails with `ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE`. Use `cd frontend && pnpm exec ...` or `pnpm --dir frontend exec ...`.
 
 **Cloud/CI sandbox sessions start with no `frontend/node_modules`** (a fresh container/checkout, unlike a local dev machine). `pnpm run check`, `test:run`, etc. fail with confusing module-resolution errors — not an "install first" message — until `pnpm install` is run once in `frontend/`.
@@ -121,6 +123,8 @@ Queries use `graphql-request` with TanStack Svelte Query.
 ```
 
 **Do NOT:** Use `$query.data` (stores syntax) · Pass options object directly to `createQuery({...})` (must be function wrapper)
+
+**Adding a `useX` hook to a component means mocking it in that component's tests.** Component tests (e.g. `tests/components/PerspectivePopover.test.ts`) `vi.mock` each mutation hook individually and render without a QueryClient provider. A newly imported hook left unmocked calls the real `useQueryClient()` and throws.
 
 **`queryKey` must mirror every variable `queryFn` actually sends.** If `queryFn` conditionally builds request variables (e.g. `mode === 'all' ? filter : undefined`), the `queryKey` object needs the *same* conditional — not a shortcut that hardcodes a fixed value for one branch. A `queryKey` field that doesn't change when the real request variable does means TanStack Query never sees a reason to refetch: the UI silently keeps serving stale cached data for that branch, no matter how the input changes (including back to empty/cleared). Caught in `ActivityTable.svelte`'s search box, which hardcoded `search: ''`/`filter: undefined` in the key for "Loaded" mode while `queryFn` unconditionally sent the real filter — so typing or clearing the search input never refetched.
 
