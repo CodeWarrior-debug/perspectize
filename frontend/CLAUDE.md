@@ -227,7 +227,9 @@ Symptom in the browser: `Failed to load module script: Expected a JavaScript-or-
 
 **AG Grid testing strategy:** AG Grid doesn't render in jsdom — no lifecycle hooks, no Grid API, no cell rendering. Test AG Grid logic by extracting pure functions into `$lib/utils/grid-config.ts` (sort mapping, pagination bounds, responsive tiers, comparators, column metadata). Test renderers/formatters via `$lib/utils/formatting.ts`. For grid integration (filter UI, sort clicks, responsive `$effect` blocks), use Playwright E2E or Vitest Browser Mode (`tests/browser/`, see below). See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) testing section.
 
-**Vitest Browser Mode (`tests/browser/`, config in `vitest.config.browser.ts`) is not run in CI** — `frontend-test.yml` only runs `test:coverage` on the unit project. A browser-test assertion can be wrong from the day it's written and nothing catches it (`ag-grid-integration.test.ts` had stale `formatCount` expectations that never once passed). Run `pnpm run test:browser` locally before trusting a browser test file.
+**Vitest Browser Mode (`tests/browser/`, config in `vitest.config.browser.ts`) is not run in CI** — `frontend-test.yml` only runs `test:coverage` on the unit project. A browser-test assertion can be wrong from the day it's written and nothing catches it (`ag-grid-integration.test.ts` had stale `formatCount` expectations that never once passed). Run `pnpm run test:browser --browser.headless=true` locally before trusting a browser test file. No Playwright download is needed on macOS: the config drives the installed Google Chrome (override with `PW_CHROMIUM_EXECUTABLE`).
+
+**Browser tests: wait for cells, not rows.** AG Grid creates `.ag-row` elements before their cell renderers draw, so a count taken right after `waitForGridReady()` can see 0 cells. Poll the assertion instead: `await expect.poll(() => document.querySelectorAll(sel).length).toBe(n)`. (The thumbnail test flaked about 1 in 5 runs until it did this.)
 
 **Vitest Browser Mode capture gotchas:**
 
