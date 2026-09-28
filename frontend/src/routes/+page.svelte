@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Input, Popover, PopoverContent, PopoverTrigger, buttonVariants } from '$lib/components/shadcn';
+	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import { page } from '$app/state';
@@ -142,12 +143,16 @@
 			<div class="border border-border rounded-lg shadow-sm overflow-hidden h-full flex flex-col">
 				{#await import('$lib/components/ActivityTable.svelte') then { default: ActivityTable }}
 					<ActivityTable />
+				{:catch}
+					<LazyLoadError what="the activity table" />
 				{/await}
 			</div>
 		{:else}
 			<div class="border rounded-lg shadow-sm overflow-y-auto h-full">
 				{#await import('$lib/components/UserActivityView.svelte') then { default: UserActivityView }}
 					<UserActivityView />
+				{:catch}
+					<LazyLoadError what="user activity" />
 				{/await}
 			</div>
 		{/if}

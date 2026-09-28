@@ -1,5 +1,6 @@
 <script lang="ts">
 	import AgGridSvelte5Component from 'ag-grid-svelte5';
+	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
 	import { themeQuartz } from '@ag-grid-community/theming';
 	import type {
@@ -1162,6 +1163,8 @@
 				popoverOpen = false;
 			}}
 		/>
+	{:catch}
+		<LazyLoadError what="the perspective editor" floating />
 	{/await}
 {/if}
 
