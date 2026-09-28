@@ -1,0 +1,18 @@
+# Normalize line endings repo-wide to LF; Git converts on checkin,
+# working-tree files stay whatever the OS/editor uses.
+* text=auto eol=lf
+
+# Windows-only scripts must keep CRLF.
+*.bat text eol=crlf
+
+# Explicit binary types (also auto-detected, but pin them to be safe).
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
