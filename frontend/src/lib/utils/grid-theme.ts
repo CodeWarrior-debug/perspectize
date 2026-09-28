@@ -21,14 +21,14 @@ export const GRID_THEME_PARAMS = {
 	selectedRowBackgroundColor: 'var(--color-row-hover)',
 	columnHoverColor: 'transparent',
 	headerColumnResizeHandleColor: 'var(--color-border)',
-	// 60px fits a 32px thumbnail alongside a 2-line, 13px/1.5-leading title (39px of text
-	// + the cell's py-1.5 padding = 51px) with the same ~9px safety margin the previous
-	// 64px/py-2 pairing had — a tighter margin clips descenders (g/y/p/q/j) on the second
+	// 52px fits a 32px thumbnail alongside a 2-line, 13px/1.5-leading title (39px of text
+	// + the cell's py-1 padding = 47px) with a ~5px safety margin
+	// (it was ~9px at 64px/py-2). A much tighter margin clips descenders (g/y/p/q/j) on the second
 	// line via the row's own overflow:hidden, even though line-clamp itself only ever
 	// cuts whole lines. Trimmed from 64px so more rows fit above the fold on smaller
-	// desktop screens (e.g. an 11" MacBook Air) without touching that margin. See
+	// desktop screens (e.g. an 11" MacBook Air) (margin trimmed to ~5px, verified visually). See
 	// CLAUDE.md's AG Grid gotcha.
-	rowHeight: 60,
+	rowHeight: 52,
 	headerHeight: 36,
 	listItemHeight: 24,
 } as const;

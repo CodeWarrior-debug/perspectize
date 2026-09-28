@@ -1077,7 +1077,7 @@
 			bind:this={gridContainer}
 			data-testid="ag-grid-container"
 			class="{isMobile ? 'overflow-y-auto' : 'flex-1'} min-h-0"
-			style="--ag-row-height: 60px; --ag-header-height: 36px;"
+			style="--ag-row-height: 52px; --ag-header-height: 36px;"
 		>
 			<AgGridSvelte5Component {gridOptions} {rowData} {theme} {modules} />
 		</div>
