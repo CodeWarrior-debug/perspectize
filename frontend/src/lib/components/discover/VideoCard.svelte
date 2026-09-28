@@ -3,6 +3,7 @@
 	import type { VideoItem } from '$lib/services/youtubeApi';
 	import type { ContentItem } from '$lib/queries/content';
 	import { Button } from '$lib/components/shadcn';
+	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
 	import { formatDate, formatDuration, formatIsoDuration, formatCount } from '$lib/utils/formatting';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
@@ -211,5 +212,7 @@
 				popoverOpen = false;
 			}}
 		/>
+	{:catch}
+		<LazyLoadError what="the perspective editor" floating />
 	{/await}
 {/if}
