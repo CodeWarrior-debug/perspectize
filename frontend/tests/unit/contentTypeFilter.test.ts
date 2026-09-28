@@ -17,16 +17,15 @@ const pass = (filter: ContentTypeFilter, contentType: string) =>
 	filter.doesFilterPass({ data: { contentType }, node: {} } as never);
 
 describe('CONTENT_TYPE_OPTIONS', () => {
-	it('lists every content type with a display label', () => {
+	it('lists every enabled content type with a display label (Claim is hidden until the UI is ready)', () => {
 		expect(CONTENT_TYPE_OPTIONS).toEqual([
 			{ value: 'youtube', label: 'YouTube' },
-			{ value: 'claim', label: 'Claim' },
 			{ value: 'bible_passage', label: 'Bible Passage' },
 		]);
 	});
 
 	it('contentTypeLabel falls back to the raw value for an unknown type', () => {
-		expect(contentTypeLabel('claim')).toBe('Claim');
+		expect(contentTypeLabel('bible_passage')).toBe('Bible Passage');
 		expect(contentTypeLabel('podcast')).toBe('podcast');
 	});
 });
@@ -35,7 +34,7 @@ describe('ContentTypeFilter', () => {
 	it('renders one labelled checkbox per content type', () => {
 		const { filter } = setup();
 		const labels = [...filter.getGui().querySelectorAll('label')].map((l) => l.textContent);
-		expect(labels).toEqual(['YouTube', 'Claim', 'Bible Passage']);
+		expect(labels).toEqual(['YouTube', 'Bible Passage']);
 	});
 
 	it('is inactive with nothing ticked', () => {
@@ -46,15 +45,15 @@ describe('ContentTypeFilter', () => {
 
 	it('ticking boxes activates the filter, notifies the grid, and ORs the selected types', () => {
 		const { filter, filterChangedCallback, checkbox } = setup();
-		checkbox('claim').click();
+		checkbox('bible_passage').click();
 		checkbox('youtube').click();
 
 		expect(filterChangedCallback).toHaveBeenCalledTimes(2);
 		// Model values follow option order, not click order, so the URL stays stable.
-		expect(filter.getModel()).toEqual({ filterType: 'set', values: ['youtube', 'claim'] });
+		expect(filter.getModel()).toEqual({ filterType: 'set', values: ['youtube', 'bible_passage'] });
 		expect(pass(filter, 'YOUTUBE')).toBe(true);
-		expect(pass(filter, 'CLAIM')).toBe(true);
-		expect(pass(filter, 'BIBLE_PASSAGE')).toBe(false);
+		expect(pass(filter, 'BIBLE_PASSAGE')).toBe(true);
+		expect(pass(filter, 'CLAIM')).toBe(false);
 	});
 
 	it('setModel syncs the checkboxes; setModel(null) clears them', () => {
@@ -70,7 +69,7 @@ describe('ContentTypeFilter', () => {
 
 	it('the Clear button unticks everything and notifies the grid', () => {
 		const { filter, filterChangedCallback, checkbox } = setup();
-		filter.setModel({ filterType: 'set', values: ['youtube', 'claim'] });
+		filter.setModel({ filterType: 'set', values: ['youtube', 'bible_passage'] });
 		filter.getGui().querySelector('button')!.click();
 
 		expect(checkbox('youtube').checked).toBe(false);

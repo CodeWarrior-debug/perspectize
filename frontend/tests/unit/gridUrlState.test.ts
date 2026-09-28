@@ -529,7 +529,7 @@ describe('urlParamsToGraphQLFilter', () => {
 	});
 
 	it('drops unknown content types instead of sending an invalid enum value', () => {
-		expect(urlParamsToGraphQLFilter({ type: 'you,claim' }, '')).toEqual({ contentTypes: ['CLAIM'] });
+		expect(urlParamsToGraphQLFilter({ type: 'you,bible_passage' }, '')).toEqual({ contentTypes: ['BIBLE_PASSAGE'] });
 		expect(urlParamsToGraphQLFilter({ type: 'you' }, '')).toBeUndefined();
 	});
 
