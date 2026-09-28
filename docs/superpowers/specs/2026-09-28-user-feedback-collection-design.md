@@ -36,7 +36,8 @@ Enable users to report bugs and request features via a simple dialog that links 
 
 ### 2.1 Component: `FeedbackDialog.svelte`
 
-**Trigger:** Header menu → "Send feedback" (or Help → "Send feedback")
+**Trigger:** Settings gear (⚙️) → "Send feedback"  
+**Location:** Bottom of SettingsDialog, below theme picker
 
 **Dialog content:**
 ```

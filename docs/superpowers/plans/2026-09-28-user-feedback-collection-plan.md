@@ -22,8 +22,9 @@ Enable users to report bugs and request features via a simple in-app dialog that
   - Each button opens GitHub in a new tab
   - Dialog closes after button click
   - Optional: Use bug 🐛 and lightbulb 💡 icons
-- [ ] Add menu entry in `frontend/src/lib/components/Header.svelte` → Help menu (or side menu) → "Send feedback"
+- [ ] Add menu entry in `frontend/src/lib/components/SettingsDialog.svelte` → "Send feedback"
   - Trigger opens FeedbackDialog
+  - Place near the bottom of the settings menu (after theme picker, before other options)
 - [ ] Dialog styling: Match existing SettingsDialog patterns, centered modal with clear button layout
 - [ ] Accessibility: ARIA labels, focus trap, keyboard navigation
 - [ ] Tests: `FeedbackDialog.test.ts` — verify dialog opens/closes, links are correct, buttons work
