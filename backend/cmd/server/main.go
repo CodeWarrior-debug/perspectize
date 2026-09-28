@@ -24,11 +24,13 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/resolvers"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/realtime"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/handlers"
 	apimw "github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/middleware"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/wikidata"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/config"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/database"
 	gqltiming "github.com/CodeWarrior-debug/perspectize/backend/pkg/graphql"
@@ -142,11 +144,24 @@ func main() {
 	// Wrap the raw YouTube client with an in-memory TTL cache to avoid
 	// re-spending API quota on repeat lookups of the same video. TTL is
 	// configurable via YOUTUBE_API_CACHE_TTL_SECONDS (default 6 hours).
-	youtubeClient := youtube.NewCachingClient(
-		youtube.NewClient(cfg.YouTube.APIKey),
-		time.Duration(cfg.YouTube.CacheTTLSeconds)*time.Second,
-	)
-	slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds)
+	// Demo mode (DEMO_MODE=true, refused in production): seeded personas sign
+	// in with "Bearer demo.<persona>" and YouTube metadata comes from offline
+	// fixtures, so tours, recordings and E2E runs need no external accounts.
+	demoCfg, err := config.LoadDemo()
+	if err != nil {
+		log.Fatal(err)
+	}
+	var youtubeClient portservices.YouTubeClient
+	if demoCfg.Enabled {
+		slog.Warn("DEMO MODE ENABLED — unsigned demo.<persona> tokens are accepted; never expose this instance publicly with real data")
+		youtubeClient = youtube.NewFixtureClient()
+	} else {
+		youtubeClient = youtube.NewCachingClient(
+			youtube.NewClient(cfg.YouTube.APIKey),
+			time.Duration(cfg.YouTube.CacheTTLSeconds)*time.Second,
+		)
+		slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds)
+	}
 	wikidataClient := wikidata.NewClient()
 	contentRepo := postgres.NewGormContentRepository(db)
 	userRepo := postgres.NewGormUserRepository(db)
@@ -154,12 +169,15 @@ func main() {
 	categoryRepo := postgres.NewGormCategoryRepository(db)
 	threadRepo := postgres.NewGormThreadRepository(db)
 	messageRepo := postgres.NewGormMessageRepository(db)
+	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
+	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
 
 	// Initialize services
-	contentService := services.NewContentService(contentRepo, youtubeClient)
+	contentService := services.NewContentService(contentRepo, youtubeClient, services.WithBibleReference(bibleReferenceRepo))
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
+	buildInfoService := services.NewBuildInfoService(buildInfoRepo)
 
 	// Messaging realtime plumbing: the hub fans events out in-process, the
 	// listener feeds it from Postgres NOTIFY, the presence tracker records who
@@ -199,7 +217,10 @@ func main() {
 
 	// Shared Clerk token verifier — reused by HTTP middleware and the
 	// WebSocket InitFunc so both transports resolve identities identically.
-	tokenVerifier := auth.NewClerkTokenVerifier()
+	var tokenVerifier portservices.TokenVerifier = auth.NewClerkTokenVerifier()
+	if demoCfg.Enabled {
+		tokenVerifier = auth.NewDemoTokenVerifier(tokenVerifier)
+	}
 
 	// Initialize GraphQL with directive wiring
 	resolver := resolvers.NewResolver(
@@ -320,6 +341,10 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ready"))
 	})
+
+	// Build/deploy info — unauthenticated, like /health and /ready. Backs the
+	// frontend's zzzv console hotkey.
+	r.Get("/version", handlers.Version(buildInfoService))
 
 	// GraphQL. The wrapper clears the per-request I/O deadlines for WebSocket
 	// upgrades so long-lived subscriptions are not killed by the server's

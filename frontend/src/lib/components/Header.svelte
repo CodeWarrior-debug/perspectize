@@ -1,6 +1,8 @@
 <script lang="ts">
-	import { Show, SignInButton, UserButton } from 'svelte-clerk';
-	import AddVideoPopover from '$lib/components/AddVideoPopover.svelte';
+	import AuthShow from '$lib/components/auth/AuthShow.svelte';
+	import SignInTrigger from '$lib/components/auth/SignInTrigger.svelte';
+	import UserMenu from '$lib/components/auth/UserMenu.svelte';
+	import AddContentPopover from '$lib/components/AddContentPopover.svelte';
 	import SettingsDialog from '$lib/components/SettingsDialog.svelte';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { page } from '$app/state';
@@ -8,6 +10,11 @@
 
 	const themeStore = createThemeStore();
 	let settingsOpen = $state(false);
+
+	// The header sits on --color-primary, so the ring uses --color-primary-foreground (always
+	// contrasts with it) rather than --color-ring, which is near-invisible on the dark presets.
+	const focusRing =
+		'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 focus-visible:ring-offset-2 focus-visible:ring-offset-primary';
 
 	const navLinks = [
 		{ href: '/', label: 'Activity' },
@@ -25,7 +32,7 @@
 		<div class="flex items-center gap-4 md:gap-6 min-w-0">
 			<a
 				href="/"
-				class="font-bold text-base sm:text-lg md:text-xl text-primary-foreground hover:text-primary-foreground/80 active:opacity-75 transition-colors min-w-0 truncate"
+				class="font-bold text-base sm:text-lg md:text-xl text-primary-foreground hover:text-primary-foreground/80 active:opacity-75 transition-colors min-w-0 truncate rounded-sm {focusRing}"
 			>
 				Perspectize
 			</a>
@@ -34,7 +41,7 @@
 					<a
 						href={link.href}
 						aria-current={isActive(link.href) ? 'page' : undefined}
-						class="px-1.5 sm:px-2 py-1 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap transition-colors {isActive(
+						class="px-1.5 sm:px-2 py-1 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap transition-colors {focusRing} {isActive(
 							link.href,
 						)
 							? 'text-primary-foreground bg-primary-foreground/15'
@@ -46,36 +53,30 @@
 			</nav>
 		</div>
 		<div class="flex items-center gap-2 md:gap-4 shrink-0">
-			<Show when="signed-in">
-				<AddVideoPopover triggerVariant="outline" />
+			<AuthShow when="signed-in">
+				<AddContentPopover triggerVariant="outline" />
 				<button
 					type="button"
 					aria-label="Settings"
-					class="inline-flex items-center justify-center rounded-md size-9 text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+					class="inline-flex items-center justify-center rounded-md size-9 text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors {focusRing}"
 					onclick={() => (settingsOpen = true)}
 				>
 					<SettingsIcon class="size-4" />
 				</button>
-				<UserButton
-					appearance={{
-						elements: {
-							avatarBox: 'w-8 h-8',
-						},
-					}}
-				/>
-			</Show>
+				<UserMenu />
+			</AuthShow>
 
 			<SettingsDialog bind:open={settingsOpen} store={themeStore} />
 
-			<Show when="signed-out">
-				<SignInButton mode="modal">
+			<AuthShow when="signed-out">
+				<SignInTrigger>
 					<button
 						class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 border border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
 					>
 						Sign In
 					</button>
-				</SignInButton>
-			</Show>
+				</SignInTrigger>
+			</AuthShow>
 		</div>
 	</div>
 </header>

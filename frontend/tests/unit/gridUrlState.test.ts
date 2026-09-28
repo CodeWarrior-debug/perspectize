@@ -93,8 +93,20 @@ describe('parseGridParams', () => {
 	it('ignores unknown params', () => {
 		const params = new URLSearchParams('unknown=value&another=thing');
 		const result = parseGridParams(params);
-		expect(result.filters).toEqual({});
+		expect(result.filters).toEqual(GRID_DEFAULTS.filters);
 		expect(result.sorts).toEqual(GRID_DEFAULTS.sorts);
+	});
+
+	it('defaults to the YouTube type filter when no f.* params are present', () => {
+		expect(parseGridParams(new URLSearchParams('')).filters).toEqual({ type: 'youtube' });
+	});
+
+	it('parses f=none as explicitly cleared filters', () => {
+		expect(parseGridParams(new URLSearchParams('f=none')).filters).toEqual({});
+	});
+
+	it('explicit f.* params replace the default filter', () => {
+		expect(parseGridParams(new URLSearchParams('f.views=1000..')).filters).toEqual({ views: '1000..' });
 	});
 
 	it('collects multiple f.* params', () => {
@@ -188,6 +200,17 @@ describe('serializeGridParams', () => {
 		expect(result).toContain('f.views=1000..');
 	});
 
+	it('omits the default filter from the URL', () => {
+		expect(serializeGridParams(GRID_DEFAULTS)).not.toContain('f.');
+	});
+
+	it('serializes cleared filters as f=none and round-trips', () => {
+		const state = { ...GRID_DEFAULTS, filters: {} };
+		const serialized = serializeGridParams(state);
+		expect(serialized).toBe('f=none');
+		expect(parseGridParams(new URLSearchParams(serialized)).filters).toEqual({});
+	});
+
 	it('round-trips with parseGridParams (defaults)', () => {
 		const serialized = serializeGridParams(GRID_DEFAULTS);
 		const parsed = parseGridParams(new URLSearchParams(serialized));
@@ -228,6 +251,15 @@ describe('filterToUrlParams', () => {
 		};
 		const result = filterToUrlParams(filterModel);
 		expect(result).toEqual({ type: 'youtube' });
+	});
+
+	it('converts a set filter to a comma-separated param', () => {
+		const filterModel = { type: { filterType: 'set', values: ['youtube', 'claim'] } };
+		expect(filterToUrlParams(filterModel)).toEqual({ type: 'youtube,claim' });
+	});
+
+	it('skips a set filter with no values', () => {
+		expect(filterToUrlParams({ type: { filterType: 'set', values: [] } })).toEqual({});
 	});
 
 	it('converts channel text filter', () => {
@@ -337,7 +369,7 @@ describe('filterToUrlParams', () => {
 
 	it('converts multiple filters', () => {
 		const filterModel = {
-			type: { filterType: 'text', type: 'contains', filter: 'youtube' },
+			type: { filterType: 'set', values: ['youtube'] },
 			views: { filterType: 'number', type: 'greaterThan', filter: 1000 },
 		};
 		expect(filterToUrlParams(filterModel)).toEqual({ type: 'youtube', views: '1000..' });
@@ -353,11 +385,21 @@ describe('urlParamsToFilter', () => {
 		expect(urlParamsToFilter({})).toEqual({});
 	});
 
-	it('converts text param to AG Grid text filter', () => {
-		const result = urlParamsToFilter({ type: 'youtube' });
-		expect(result).toEqual({
-			type: { filterType: 'text', type: 'contains', filter: 'youtube' },
+	it('converts a single type param to a set filter', () => {
+		expect(urlParamsToFilter({ type: 'youtube' })).toEqual({
+			type: { filterType: 'set', values: ['youtube'] },
 		});
+	});
+
+	it('converts a comma-separated type param to a set filter, normalizing case/blanks/duplicates', () => {
+		expect(urlParamsToFilter({ type: 'youtube, CLAIM,,claim' })).toEqual({
+			type: { filterType: 'set', values: ['youtube', 'claim'] },
+		});
+	});
+
+	it('round-trips a multi-value type filter', () => {
+		const model = urlParamsToFilter({ type: 'youtube,bible_passage' });
+		expect(filterToUrlParams(model)).toEqual({ type: 'youtube,bible_passage' });
 	});
 
 	it('converts channel text param', () => {
@@ -476,9 +518,19 @@ describe('urlParamsToGraphQLFilter', () => {
 		expect(result).toEqual({ search: 'cooking', searchFields: ['TITLE', 'DESCRIPTION'] });
 	});
 
-	it('maps f.type to contentType (uppercased)', () => {
+	it('maps f.type to contentTypes (uppercased)', () => {
 		const result = urlParamsToGraphQLFilter({ type: 'youtube' }, '');
-		expect(result).toEqual({ contentType: 'YOUTUBE' });
+		expect(result).toEqual({ contentTypes: ['YOUTUBE'] });
+	});
+
+	it('maps a multi-value f.type to contentTypes', () => {
+		const result = urlParamsToGraphQLFilter({ type: 'youtube,bible_passage' }, '');
+		expect(result).toEqual({ contentTypes: ['YOUTUBE', 'BIBLE_PASSAGE'] });
+	});
+
+	it('drops unknown content types instead of sending an invalid enum value', () => {
+		expect(urlParamsToGraphQLFilter({ type: 'you,bible_passage' }, '')).toEqual({ contentTypes: ['BIBLE_PASSAGE'] });
+		expect(urlParamsToGraphQLFilter({ type: 'you' }, '')).toBeUndefined();
 	});
 
 	it('maps f.views range to minViewCount/maxViewCount', () => {
@@ -546,20 +598,18 @@ describe('urlParamsToGraphQLFilter', () => {
 		expect(result).toEqual({
 			search: 'cooking',
 			searchFields: ['TITLE', 'DESCRIPTION', 'CHANNEL_TITLE', 'TAGS'],
-			contentType: 'YOUTUBE',
+			contentTypes: ['YOUTUBE'],
 			minViewCount: 1000,
 		});
 	});
 
-	it('maps item filter to search field', () => {
-		const result = urlParamsToGraphQLFilter({ item: 'baby shark' }, '');
-		expect(result).toEqual({ search: 'baby shark' });
-	});
-
-	it('item filter overrides search bar value', () => {
-		const result = urlParamsToGraphQLFilter({ item: 'specific title' }, 'broad search');
+	it('ignores an unknown "item" filter key instead of overwriting the search bar value', () => {
+		// The item column has no filter menu (filter: false — search handled by the page-level
+		// input), so this key can only reach here via a hand-crafted URL. It must not silently
+		// clobber `search`/`searchFields` the way it used to.
+		const result = urlParamsToGraphQLFilter({ item: 'baby shark' }, 'broad search');
 		expect(result).toEqual({
-			search: 'specific title',
+			search: 'broad search',
 			searchFields: ['TITLE', 'DESCRIPTION', 'CHANNEL_TITLE', 'TAGS'],
 		});
 	});
@@ -580,6 +630,7 @@ describe('COL_TO_SORT / SORT_TO_COL', () => {
 		expect(COL_TO_SORT.duration).toBe('LENGTH');
 		expect(COL_TO_SORT.views).toBe('VIEW_COUNT');
 		expect(COL_TO_SORT.likes).toBe('LIKE_COUNT');
+		expect(COL_TO_SORT.percentLiked).toBe('PERCENT_LIKED');
 		expect(COL_TO_SORT.publishDate).toBe('PUBLISHED_AT');
 		expect(COL_TO_SORT.channel).toBe('CHANNEL_TITLE');
 		expect(COL_TO_SORT.createdAt).toBe('CREATED_AT');
@@ -591,6 +642,7 @@ describe('COL_TO_SORT / SORT_TO_COL', () => {
 		expect(SORT_TO_COL.LENGTH).toBe('duration');
 		expect(SORT_TO_COL.VIEW_COUNT).toBe('views');
 		expect(SORT_TO_COL.LIKE_COUNT).toBe('likes');
+		expect(SORT_TO_COL.PERCENT_LIKED).toBe('percentLiked');
 		expect(SORT_TO_COL.PUBLISHED_AT).toBe('publishDate');
 		expect(SORT_TO_COL.CHANNEL_TITLE).toBe('channel');
 		expect(SORT_TO_COL.CREATED_AT).toBe('createdAt');
@@ -625,6 +677,10 @@ describe('sortsToGraphQL', () => {
 
 	it('maps a single sort to the GraphQL shape', () => {
 		expect(sortsToGraphQL([{ col: 'views', dir: 'desc' }])).toEqual([{ field: 'VIEW_COUNT', order: 'DESC' }]);
+	});
+
+	it('round-trips percentLiked now that a backend ContentSortBy enum exists for it', () => {
+		expect(sortsToGraphQL([{ col: 'percentLiked', dir: 'desc' }])).toEqual([{ field: 'PERCENT_LIKED', order: 'DESC' }]);
 	});
 
 	it('preserves priority order across multiple columns', () => {

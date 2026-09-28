@@ -71,3 +71,11 @@ graphify-out/
 # Root `make start` bookkeeping
 logs/
 .dev/
+
+# Interlinear release files are fetched by hand, not committed (data/bible/README.md)
+data/bible/interlinear/
+__pycache__/
+*.pyc
+
+# Demo tour/E2E output (videos, reports, traces)
+frontend/demo/out/

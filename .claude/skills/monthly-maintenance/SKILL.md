@@ -1,6 +1,6 @@
 ---
 name: monthly-maintenance
-description: Run the monthly repo maintenance routine (merged-branch cleanup, dependabot/security PR merges, graphify update, gsd map-codebase refresh). Use when prompted by the SessionStart monthly-routine check, or when the user asks to "run the monthly routine" / "run monthly maintenance".
+description: Run the monthly repo maintenance routine (merged-branch cleanup, dependabot/security PR merges, graphify update, gsd map-codebase refresh, video-capture demo tool compaction). Use when prompted by the SessionStart monthly-routine check, or when the user asks to "run the monthly routine" / "run monthly maintenance".
 ---
 
 # Monthly Maintenance Routine
@@ -36,7 +36,15 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
    - Backend: `go list -m -u -versions` against the direct (non-indirect) requires in `backend/go.mod`, refresh [BACKEND_DEPENDENCY_ANALYSIS.md](BACKEND_DEPENDENCY_ANALYSIS.md).
    - Patch/minor bumps with no known breaking changes can be applied directly (verify with `go build`/`go test` or `pnpm run test:run` per `CLAUDE.md`'s self-verification checklist). Majors — especially interdependent ones (e.g. Vite + its Svelte plugin + Vitest) — get flagged in the doc for a follow-up PR rather than bundled into this routine's commit.
 
-7. **Record the run in ROUTINES.md.**
+7. **Compact the video-capture demo tools.**
+   - This tool lives outside the repo at `~/.claude/tools/video-capture/` (global, not git-tracked) — see its `README.md` for the recorder-etiquette lifecycle (reuse → copy-and-adapt into `demos/<name>/` → promote).
+   - List `demos/*` and skim each directory. For each one, check whether its one-off scenario has proven reusable (recorded more than once, or the PR/feature it was built for has shipped and the flow is generic): if so, **promote** it — merge the scenario branch into the shared `record-clip.mjs` (following its existing `if (SCENARIO === '...')` pattern) and delete the demo copy.
+   - Flag (don't silently delete) any demo directory with multiple near-duplicate scripts recording the same flow (e.g. a `.snapshot.mjs` variant alongside the original) — ask the user which to keep before consolidating.
+   - Delete demo directories/scripts that were genuinely throwaway (one-off clip for a since-merged PR, never reused) — but never delete a shared file (`record-clip.mjs`, `checks/*`) without the user's explicit go-ahead.
+   - Keep the "Recorders index" table in `README.md` in sync with whatever remains after promotion/deletion.
+   - Prune stale clips in `~/Downloads/screenshots/sv-*.mp4|png` — cross-check against currently open PRs (`gh pr list`) and delete clips for PRs that have since merged or closed.
+
+8. **Record the run in ROUTINES.md.**
    - Append a row: `| <Month-Year> | Y | <one-line summary — branches deleted, PRs merged, anything skipped> |`
    - If the routine was only partially completed (e.g. user deferred a step), mark `Completed` as `N` and explain why in Comments — a future session can pick it up, and the 10-merges gate won't re-trigger prematurely since the row already exists for that month.
 

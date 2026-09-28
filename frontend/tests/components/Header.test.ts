@@ -4,6 +4,9 @@ import Header from '$lib/components/Header.svelte';
 
 // Mock svelte-clerk components
 vi.mock('svelte-clerk', () => ({
+	// SettingsDialog (rendered by Header) calls useMe(), which reads this context.
+	// Signed-out keeps the underlying `me` query disabled.
+	useClerkContext: () => ({ isLoaded: false, auth: { userId: null } }),
 	Show: vi.fn(() => ({
 		$$: {},
 		$set: vi.fn(),
@@ -24,8 +27,24 @@ vi.mock('svelte-clerk', () => ({
 	})),
 }));
 
-// Mock AddVideoPopover component
-vi.mock('$lib/components/AddVideoPopover.svelte', () => ({
+// SettingsDialog (rendered by Header, closed by default) uses useMe()/
+// useSetOnboardingDisplayNextSession(), both of which need a QueryClientContext
+// that this test file doesn't otherwise provide — mock the primitives instead of
+// wrapping every render() call site in a QueryClientProvider.
+vi.mock('@tanstack/svelte-query', () => ({
+	createQuery: vi.fn(() => ({ data: undefined, isSuccess: false, isError: false })),
+	createMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+	useQueryClient: vi.fn(() => ({
+		setQueriesData: vi.fn(),
+		invalidateQueries: vi.fn(),
+		cancelQueries: vi.fn(),
+		getQueriesData: vi.fn(() => []),
+		setQueryData: vi.fn(),
+	})),
+}));
+
+// Mock AddContentPopover component
+vi.mock('$lib/components/AddContentPopover.svelte', () => ({
 	default: vi.fn(() => ({
 		$$: {},
 		$set: vi.fn(),
@@ -87,9 +106,9 @@ describe('Header component', () => {
 		expect(inner?.className).toContain('max-w-screen-xl');
 	});
 
-	it('renders AddVideoPopover component', () => {
+	it('renders AddContentPopover component', () => {
 		const { container } = render(Header);
-		// AddVideoPopover is mocked, so we just verify component renders
+		// AddContentPopover is mocked, so we just verify component renders
 		expect(container).toBeTruthy();
 	});
 

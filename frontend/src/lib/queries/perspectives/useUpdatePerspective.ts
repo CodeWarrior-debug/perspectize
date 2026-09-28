@@ -13,14 +13,15 @@ import type { FeelingInput } from './useCreatePerspective';
 
 export interface UpdatePerspectiveInput {
 	id: number;
-	quality?: number;
-	agreement?: number;
-	importance?: number;
-	confidence?: number;
-	like?: string;
-	review?: string;
-	customFields?: Record<string, number>;
-	feelings?: FeelingInput[];
+	/** undefined = leave unchanged (the key is omitted from the request); null = clear. */
+	quality?: number | null;
+	agreement?: number | null;
+	importance?: number | null;
+	confidence?: number | null;
+	like?: string | null;
+	review?: string | null;
+	customFields?: Record<string, number> | null;
+	feelings?: FeelingInput[] | null;
 	privacy?: 'PUBLIC' | 'PRIVATE';
 }
 
@@ -36,18 +37,30 @@ function patchLists(
 	return (old) => (old ? { perspectives: { ...old.perspectives, items: items(old.perspectives.items) } } : old);
 }
 
-/** Apply the submitted fields onto the cached row (omitted fields keep their value). */
+/** undefined (the key was omitted) keeps the cached value; anything else — including
+ *  explicit null — overwrites it. This mirrors the server's tri-state Update(): a
+ *  field the caller didn't mention stays put, one they set to null gets cleared. */
+function pick<T>(next: T | undefined, prev: T): T {
+	return next === undefined ? prev : next;
+}
+
+/** Apply the submitted fields onto the cached row. See pick() above for the
+ *  undefined-vs-null-vs-value semantics — this optimistic patch mirrors what the
+ *  server does in perspective_service.go's Update(), so a cleared field shows
+ *  cleared immediately instead of only after the response replaces the row. */
 function applyEdit(p: PerspectiveItem, input: UpdatePerspectiveInput): PerspectiveItem {
 	return {
 		...p,
-		quality: input.quality ?? p.quality,
-		agreement: input.agreement ?? p.agreement,
-		importance: input.importance ?? p.importance,
-		confidence: input.confidence ?? p.confidence,
-		like: input.like ?? p.like,
-		review: input.review ?? p.review,
-		customFields: input.customFields ?? p.customFields,
-		feelings: (input.feelings as FeelingEntry[] | undefined) ?? p.feelings,
+		quality: pick(input.quality, p.quality),
+		agreement: pick(input.agreement, p.agreement),
+		importance: pick(input.importance, p.importance),
+		confidence: pick(input.confidence, p.confidence),
+		like: pick(input.like, p.like),
+		review: pick(input.review, p.review),
+		// The server stores a cleared customFields as an absent/null column, same as
+		// a perspective that never had one — no need for a separate "{}" convention.
+		customFields: pick(input.customFields, p.customFields),
+		feelings: pick(input.feelings as FeelingEntry[] | null | undefined, p.feelings),
 		privacy: input.privacy ?? p.privacy,
 		updatedAt: new Date().toISOString(),
 	};
@@ -55,20 +68,31 @@ function applyEdit(p: PerspectiveItem, input: UpdatePerspectiveInput): Perspecti
 
 export function useUpdatePerspective() {
 	const queryClient = useQueryClient();
-	const listFilter = { queryKey: queryKeys.perspectives.lists() };
+	// PerspectiveItem-shaped branches only — patching by id never inserts a row, so a
+	// list that doesn't contain this perspective is untouched by the loop below.
+	// activityFeeds() is deliberately excluded: it caches a different row shape
+	// (ActivityPerspectiveItem, nested `content`, no rating fields) and is
+	// privacy-filtered server-side, so a PUBLIC<->PRIVATE toggle needs a real refetch
+	// to be re-filtered correctly, not a same-shape patch.
+	const rowListFilters: { queryKey: readonly unknown[] }[] = [
+		{ queryKey: queryKeys.perspectives.byUserLists() },
+		{ queryKey: queryKeys.perspectives.byContentLists() },
+	];
 
 	return createMutation(() => ({
 		mutationFn: async (input: UpdatePerspectiveInput) => {
 			return graphqlRequest<UpdatePerspectiveResponse>(UPDATE_PERSPECTIVE, { input });
 		},
 		onMutate: async (input: UpdatePerspectiveInput): Promise<UpdateContext> => {
-			await queryClient.cancelQueries(listFilter);
-			const previous = queryClient.getQueriesData<ListPerspectivesByUserResponse>(listFilter) as ListSnapshot;
-			const targetId = String(input.id);
-			queryClient.setQueriesData<ListPerspectivesByUserResponse>(
-				listFilter,
-				patchLists((list) => list.map((p) => (p.id === targetId ? applyEdit(p, input) : p))),
+			await Promise.all(rowListFilters.map((f) => queryClient.cancelQueries(f)));
+			const previous = rowListFilters.flatMap(
+				(f) => queryClient.getQueriesData<ListPerspectivesByUserResponse>(f) as ListSnapshot,
 			);
+			const targetId = String(input.id);
+			const edit = patchLists((list) => list.map((p) => (p.id === targetId ? applyEdit(p, input) : p)));
+			for (const f of rowListFilters) {
+				queryClient.setQueriesData<ListPerspectivesByUserResponse>(f, edit);
+			}
 			return { previous };
 		},
 		onError: (err: Error, _input: UpdatePerspectiveInput, context?: UpdateContext) => {
@@ -90,15 +114,21 @@ export function useUpdatePerspective() {
 
 			const updated = data?.updatePerspective;
 			if (!updated) {
-				queryClient.invalidateQueries(listFilter);
+				// Unexpected response shape — fall back to a full, shape-agnostic refetch.
+				queryClient.invalidateQueries({ queryKey: queryKeys.perspectives.lists() });
 				return;
 			}
 
-			queryClient.setQueriesData<ListPerspectivesByUserResponse>(
-				listFilter,
-				patchLists((list) => list.map((p) => (p.id === updated.id ? updated : p))),
-			);
-			queryClient.invalidateQueries({ ...listFilter, refetchType: 'none' });
+			const swap = patchLists((list) => list.map((p) => (p.id === updated.id ? updated : p)));
+			for (const f of rowListFilters) {
+				queryClient.setQueriesData<ListPerspectivesByUserResponse>(f, swap);
+				queryClient.invalidateQueries({ ...f, refetchType: 'none' });
+			}
+			// Activity rows carry nested `content` and are privacy-filtered — refetch
+			// rather than patch, so e.g. a PUBLIC->PRIVATE toggle drops the row out of
+			// activityFeed(false) instead of leaving it there until something else
+			// happens to refetch it.
+			queryClient.invalidateQueries({ queryKey: queryKeys.perspectives.activityFeeds() });
 
 			// Editing a perspective — including toggling its Privacy — changes this
 			// content's perspectiveCount/averageRating (see useContentAggregates,

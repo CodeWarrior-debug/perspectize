@@ -6,17 +6,10 @@
 	import { MediaQuery } from 'svelte/reactivity';
 	import { createQuery } from '@tanstack/svelte-query';
 	import XIcon from '@lucide/svelte/icons/x';
-	import {
-		Button,
-		Drawer,
-		DrawerContent,
-		DrawerHeader,
-		DrawerTitle,
-		DrawerDescription,
-	} from '$lib/components/shadcn';
+	import { Button, Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '$lib/components/shadcn';
+	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
 	import OnboardingVideo from '$lib/components/onboarding/OnboardingVideo.svelte';
 	import AddVideoDialog from '$lib/components/AddVideoDialog.svelte';
-	import PerspectivePopover from '$lib/components/PerspectivePopover.svelte';
 	import { ONBOARDING_VIDEOS, CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
 	import {
 		advanceCoachStep,
@@ -30,6 +23,7 @@
 	import { LIST_CONTENT, type ContentItem, type ContentResponse } from '$lib/queries/content';
 	import {
 		LIST_PERSPECTIVES_BY_USER,
+		MAX_PERSPECTIVES_PER_LIST,
 		type ListPerspectivesByUserResponse,
 		type PerspectiveItem,
 	} from '$lib/queries/perspectives';
@@ -74,6 +68,7 @@
 		queryFn: () =>
 			graphqlRequest<ListPerspectivesByUserResponse>(LIST_PERSPECTIVES_BY_USER, {
 				userID: userId,
+				first: MAX_PERSPECTIVES_PER_LIST,
 			}),
 		enabled: open && userId > 0,
 		staleTime: 30_000,
@@ -193,14 +188,9 @@
 			</div>
 		{:else}
 			{#if libraryEmpty}
-				<p class="text-sm text-muted-foreground">
-					Your library is empty. Add a video first, or skip this step.
-				</p>
+				<p class="text-sm text-muted-foreground">Your library is empty. Add a video first, or skip this step.</p>
 				{#if ONBOARDING_VIDEOS.howPerspective}
-					<OnboardingVideo
-						src={ONBOARDING_VIDEOS.howPerspective}
-						label="Watch how perspectives work"
-					/>
+					<OnboardingVideo src={ONBOARDING_VIDEOS.howPerspective} label="Watch how perspectives work" />
 				{/if}
 				<div class="flex flex-wrap gap-2">
 					<Button type="button" variant="outline" onclick={goToStep1}>Back to add video</Button>
@@ -208,10 +198,7 @@
 				</div>
 			{:else}
 				{#if ONBOARDING_VIDEOS.howPerspective}
-					<OnboardingVideo
-						src={ONBOARDING_VIDEOS.howPerspective}
-						label="Watch how perspectives work"
-					/>
+					<OnboardingVideo src={ONBOARDING_VIDEOS.howPerspective} label="Watch how perspectives work" />
 				{/if}
 				{#if perspectiveTarget}
 					<p class="text-sm text-muted-foreground line-clamp-2">
@@ -219,9 +206,7 @@
 					</p>
 				{/if}
 				<div class="flex flex-wrap gap-2">
-					<Button type="button" onclick={openPerspective} disabled={!perspectiveTarget}>
-						Leave a perspective
-					</Button>
+					<Button type="button" onclick={openPerspective} disabled={!perspectiveTarget}>Leave a perspective</Button>
 					<Button type="button" variant="ghost" onclick={handleSkipStep}>Skip step</Button>
 				</div>
 			{/if}
@@ -278,15 +263,19 @@
 <AddVideoDialog bind:open={addVideoOpen} onSuccess={handleActionSuccess} />
 
 {#if perspectiveOpen && perspectiveTarget}
-	<PerspectivePopover
-		contentId={parseInt(perspectiveTarget.id, 10)}
-		contentName={perspectiveTarget.name}
-		existingPerspective={perspectivesByContentId.get(perspectiveTarget.id) ?? null}
-		{userId}
-		bind:open={perspectiveOpen}
-		onClose={() => {
-			perspectiveOpen = false;
-		}}
-		onSuccess={handleActionSuccess}
-	/>
+	{#await import('$lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
+		<PerspectivePopover
+			contentId={parseInt(perspectiveTarget.id, 10)}
+			contentName={perspectiveTarget.name}
+			existingPerspective={perspectivesByContentId.get(perspectiveTarget.id) ?? null}
+			{userId}
+			bind:open={perspectiveOpen}
+			onClose={() => {
+				perspectiveOpen = false;
+			}}
+			onSuccess={handleActionSuccess}
+		/>
+	{:catch}
+		<LazyLoadError what="the perspective editor" floating />
+	{/await}
 {/if}

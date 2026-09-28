@@ -17,6 +17,7 @@
 	import { LIST_CONTENT, type ContentResponse } from '$lib/queries/content';
 	import {
 		LIST_PERSPECTIVES_BY_USER,
+		MAX_PERSPECTIVES_PER_LIST,
 		type ListPerspectivesByUserResponse,
 	} from '$lib/queries/perspectives';
 	import { queryKeys } from '$lib/queries/keys';
@@ -61,19 +62,17 @@
 		queryFn: () =>
 			graphqlRequest<ListPerspectivesByUserResponse>(LIST_PERSPECTIVES_BY_USER, {
 				userID: userId,
+				first: MAX_PERSPECTIVES_PER_LIST,
 			}),
 		enabled: needQuietCheck,
 		staleTime: 60_000,
 	}));
 
 	const ownedContentCount = $derived(
-		(contentQuery.data?.content?.items ?? []).filter((c) => c.addedByUserID === userIdStr)
-			.length,
+		(contentQuery.data?.content?.items ?? []).filter((c) => c.addedByUserID === userIdStr).length,
 	);
 	const perspectiveCount = $derived(perspectivesQuery.data?.perspectives?.items?.length ?? 0);
-	const countsReady = $derived(
-		!needQuietCheck || (contentQuery.isSuccess && perspectivesQuery.isSuccess),
-	);
+	const countsReady = $derived(!needQuietCheck || (contentQuery.isSuccess && perspectivesQuery.isSuccess));
 
 	const quietMatch = $derived(
 		needQuietCheck &&

@@ -8,6 +8,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
 
@@ -26,13 +27,14 @@ type CategorizedRatingInput struct {
 }
 
 type Category struct {
-	ID          string  `json:"id"`
-	WikidataQid string  `json:"wikidataQid"`
-	Label       string  `json:"label"`
-	Description *string `json:"description,omitempty"`
-	EntityType  *string `json:"entityType,omitempty"`
-	CreatedAt   string  `json:"createdAt"`
-	UpdatedAt   string  `json:"updatedAt"`
+	ID           string  `json:"id"`
+	WikidataQid  string  `json:"wikidataQid"`
+	Label        string  `json:"label"`
+	Description  *string `json:"description,omitempty"`
+	EntityType   *string `json:"entityType,omitempty"`
+	WikipediaURL *string `json:"wikipediaUrl,omitempty"`
+	CreatedAt    string  `json:"createdAt"`
+	UpdatedAt    string  `json:"updatedAt"`
 }
 
 type Content struct {
@@ -53,6 +55,9 @@ type Content struct {
 	Description        *string        `json:"description,omitempty"`
 	Response           map[string]any `json:"response,omitempty"`
 	PrimaryCategory    *Category      `json:"primaryCategory,omitempty"`
+	VerseStartID       *int           `json:"verseStartID,omitempty"`
+	VerseEndID         *int           `json:"verseEndID,omitempty"`
+	DisplayTitle       *string        `json:"displayTitle,omitempty"`
 	PerspectiveCount   *int           `json:"perspectiveCount,omitempty"`
 	AverageRating      *float64       `json:"averageRating,omitempty"`
 	QualityRatingCount *int           `json:"qualityRatingCount,omitempty"`
@@ -63,6 +68,7 @@ type Content struct {
 
 type ContentFilter struct {
 	ContentType       *domain.ContentType         `json:"contentType,omitempty"`
+	ContentTypes      []domain.ContentType        `json:"contentTypes,omitempty"`
 	MinLengthSeconds  *int                        `json:"minLengthSeconds,omitempty"`
 	MaxLengthSeconds  *int                        `json:"maxLengthSeconds,omitempty"`
 	Search            *string                     `json:"search,omitempty"`
@@ -91,6 +97,15 @@ type CreateClaimInput struct {
 	Text            string `json:"text"`
 	UserID          int    `json:"userID"`
 	ParentContentID int    `json:"parentContentID"`
+}
+
+type CreateContentFromPassageInput struct {
+	BookID       int `json:"bookID"`
+	StartChapter int `json:"startChapter"`
+	StartVerse   int `json:"startVerse"`
+	EndChapter   int `json:"endChapter"`
+	EndVerse     int `json:"endVerse"`
+	UserID       int `json:"userID"`
 }
 
 type CreateContentFromYouTubeInput struct {
@@ -134,6 +149,13 @@ type CreateUserInput struct {
 	Email    *string `json:"email,omitempty"`
 }
 
+type CustomFieldStats struct {
+	Key                   string   `json:"key"`
+	Count                 int      `json:"count"`
+	TotalPerspectives     int      `json:"totalPerspectives"`
+	PercentOfPerspectives *float64 `json:"percentOfPerspectives,omitempty"`
+}
+
 type FeelingEntry struct {
 	Emoji     string  `json:"emoji"`
 	Label     *string `json:"label,omitempty"`
@@ -148,11 +170,47 @@ type FeelingInput struct {
 	Note      *string `json:"note,omitempty"`
 }
 
+type FeelingStats struct {
+	Emoji                 string   `json:"emoji"`
+	Label                 *string  `json:"label,omitempty"`
+	Count                 int      `json:"count"`
+	TotalPerspectives     int      `json:"totalPerspectives"`
+	AverageIntensity      *float64 `json:"averageIntensity,omitempty"`
+	StdDevIntensity       *float64 `json:"stdDevIntensity,omitempty"`
+	PercentOfPerspectives *float64 `json:"percentOfPerspectives,omitempty"`
+}
+
 type InboxEvent struct {
 	ThreadID      string `json:"threadId"`
 	LastMessageAt string `json:"lastMessageAt"`
 	LatestSeq     int    `json:"latestSeq"`
 	UnreadCount   int    `json:"unreadCount"`
+}
+
+type InterlinearSegment struct {
+	Text        string `json:"text"`
+	SpaceBefore bool   `json:"spaceBefore"`
+}
+
+type InterlinearVerse struct {
+	VerseID  int                   `json:"verseId"`
+	Chapter  int                   `json:"chapter"`
+	Verse    int                   `json:"verse"`
+	Segments []*InterlinearSegment `json:"segments"`
+	Words    []*InterlinearWord    `json:"words"`
+}
+
+type InterlinearWord struct {
+	ID          int    `json:"id"`
+	Language    string `json:"language"`
+	Source      string `json:"source"`
+	Translit    string `json:"translit"`
+	Parsing     string `json:"parsing"`
+	Strongs     string `json:"strongs"`
+	Gloss       string `json:"gloss"`
+	TagSource   string `json:"tagSource"`
+	SourceOrder int    `json:"sourceOrder"`
+	Segment     *int   `json:"segment,omitempty"`
 }
 
 type MessageConnection struct {
@@ -209,6 +267,23 @@ type ParticipantChanged struct {
 }
 
 func (ParticipantChanged) IsThreadEvent() {}
+
+type PassageInterlinear struct {
+	Verses []*InterlinearVerse `json:"verses"`
+}
+
+type PassageText struct {
+	Translation string          `json:"translation"`
+	Copyright   string          `json:"copyright"`
+	Verses      []*PassageVerse `json:"verses"`
+}
+
+type PassageVerse struct {
+	VerseID int    `json:"verseId"`
+	Chapter int    `json:"chapter"`
+	Verse   int    `json:"verse"`
+	Text    string `json:"text"`
+}
 
 type Perspective struct {
 	ID                    string               `json:"id"`
@@ -268,6 +343,11 @@ type SendMessageInput struct {
 	ClientNonce string `json:"clientNonce"`
 }
 
+type SetPassageDisplayTitleInput struct {
+	ContentID int    `json:"contentID"`
+	Title     string `json:"title"`
+}
+
 type SetPrimaryCategoryInput struct {
 	ContentID   int     `json:"contentId"`
 	Qid         string  `json:"qid"`
@@ -293,26 +373,39 @@ type TypingChanged struct {
 
 func (TypingChanged) IsThreadEvent() {}
 
+// Partial update: omit a field to leave it unchanged. For quality, agreement,
+// importance, confidence, like, review, customFields and feelings, sending an
+// explicit null clears the field (an empty feelings list or empty customFields
+// object also clears). Every other field is a plain optional -- omit to leave
+// unchanged, no way to clear it yet.
 type UpdatePerspectiveInput struct {
-	ID                    int                       `json:"id"`
-	ContentID             *int                      `json:"contentID,omitempty"`
-	Quality               *int                      `json:"quality,omitempty"`
-	Agreement             *int                      `json:"agreement,omitempty"`
-	Importance            *int                      `json:"importance,omitempty"`
-	Confidence            *int                      `json:"confidence,omitempty"`
-	Like                  *string                   `json:"like,omitempty"`
-	Privacy               *domain.Privacy           `json:"privacy,omitempty"`
-	Description           *string                   `json:"description,omitempty"`
-	Category              *string                   `json:"category,omitempty"`
-	ReviewStatus          *domain.ReviewStatus      `json:"reviewStatus,omitempty"`
-	Parts                 []int                     `json:"parts,omitempty"`
-	Labels                []string                  `json:"labels,omitempty"`
-	CategorizedRatings    []*CategorizedRatingInput `json:"categorizedRatings,omitempty"`
-	Feelings              []*FeelingInput           `json:"feelings,omitempty"`
-	PrimaryPerspectiveID  *int                      `json:"primaryPerspectiveID,omitempty"`
-	RelatedPerspectiveIDs []int                     `json:"relatedPerspectiveIDs,omitempty"`
-	CustomFields          map[string]any            `json:"customFields,omitempty"`
-	Review                *string                   `json:"review,omitempty"`
+	ID        int  `json:"id"`
+	ContentID *int `json:"contentID,omitempty"`
+	// Omit = unchanged; null = clear.
+	Quality graphql.Omittable[*int] `json:"quality,omitempty"`
+	// Omit = unchanged; null = clear.
+	Agreement graphql.Omittable[*int] `json:"agreement,omitempty"`
+	// Omit = unchanged; null = clear.
+	Importance graphql.Omittable[*int] `json:"importance,omitempty"`
+	// Omit = unchanged; null = clear.
+	Confidence graphql.Omittable[*int] `json:"confidence,omitempty"`
+	// Omit = unchanged; null = clear.
+	Like               graphql.Omittable[*string] `json:"like,omitempty"`
+	Privacy            *domain.Privacy            `json:"privacy,omitempty"`
+	Description        *string                    `json:"description,omitempty"`
+	Category           *string                    `json:"category,omitempty"`
+	ReviewStatus       *domain.ReviewStatus       `json:"reviewStatus,omitempty"`
+	Parts              []int                      `json:"parts,omitempty"`
+	Labels             []string                   `json:"labels,omitempty"`
+	CategorizedRatings []*CategorizedRatingInput  `json:"categorizedRatings,omitempty"`
+	// Omit = unchanged; null or [] = clear.
+	Feelings              graphql.Omittable[[]*FeelingInput] `json:"feelings,omitempty"`
+	PrimaryPerspectiveID  *int                               `json:"primaryPerspectiveID,omitempty"`
+	RelatedPerspectiveIDs []int                              `json:"relatedPerspectiveIDs,omitempty"`
+	// Omit = unchanged; null or {} = clear.
+	CustomFields graphql.Omittable[map[string]any] `json:"customFields,omitempty"`
+	// Omit = unchanged; null = clear.
+	Review graphql.Omittable[*string] `json:"review,omitempty"`
 }
 
 type UpdateUserInput struct {

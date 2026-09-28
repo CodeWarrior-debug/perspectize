@@ -1,9 +1,44 @@
+import { execFileSync } from 'node:child_process';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
+import { computeTag } from './src/lib/utils/buildTag';
+
+// Resolves frontend build facts for the zzzv console hotkey (see
+// lib/utils/versionHotkey.ts) from the local git checkout, at build time.
+// Falls back to "unknown" for everything if there's no .git available —
+// e.g. the Sevalla static-site build environment isn't confirmed to have
+// one (their env vars are Application-only per docs.sevalla.com), so this
+// must never throw and break the build.
+function resolveGitBuildInfo() {
+	const unknown = { tag: 'unknown', branch: 'unknown', commit: 'unknown', commitShort: 'unknown' };
+	const git = (...args: string[]) =>
+		execFileSync('git', args, { stdio: ['ignore', 'pipe', 'ignore'] })
+			.toString()
+			.trim();
+
+	try {
+		const commit = git('rev-parse', 'HEAD');
+		const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
+		const committerDate = git('log', '-1', '--format=%cI', 'HEAD');
+		return {
+			tag: computeTag(committerDate, commit),
+			branch,
+			commit,
+			commitShort: commit.slice(0, 7),
+		};
+	} catch {
+		return unknown;
+	}
+}
+
+const buildInfo = { ...resolveGitBuildInfo(), buildTime: new Date().toISOString() };
 
 export default defineConfig({
+	define: {
+		__BUILD_INFO__: JSON.stringify(buildInfo),
+	},
 	plugins: [
 		sveltekit(),
 		tailwindcss(),
@@ -43,6 +78,24 @@ export default defineConfig({
 	],
 	resolve: {
 		conditions: ['browser'],
+	},
+	build: {
+		rollupOptions: {
+			output: {
+				// Tiptap/ProseMirror (the perspective editor's rich-text engine, ~170KB
+				// gzipped) is only reachable through a dynamic import (PerspectivePopover),
+				// but Rollup's default chunking co-located a few of its small shared
+				// helper exports with code the always-loaded root layout imports
+				// statically — which pulled the whole editor bundle into every page's
+				// critical path. Force it into its own chunk so it stays isolated behind
+				// the dynamic import.
+				manualChunks(id) {
+					if (id.includes('node_modules/@tiptap') || id.includes('node_modules/prosemirror')) {
+						return 'tiptap-vendor';
+					}
+				},
+			},
+		},
 	},
 	test: {
 		// Coverage is a root-level (workspace) option, not a per-project one — it

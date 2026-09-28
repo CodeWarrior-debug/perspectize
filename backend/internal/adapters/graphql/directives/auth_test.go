@@ -40,6 +40,26 @@ func (m *mockContentService) CreateClaim(ctx context.Context, input portservices
 	return nil, nil
 }
 
+func (m *mockContentService) CreateFromPassage(ctx context.Context, input portservices.CreatePassageInput) (*domain.Content, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) SetPassageDisplayTitle(ctx context.Context, contentID int, title string) (*domain.Content, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) ClearPassageDisplayTitle(ctx context.Context, contentID int) (*domain.Content, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) PassageText(ctx context.Context, startVerseID, endVerseID int) (*domain.PassageText, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) PassageInterlinear(ctx context.Context, startVerseID, endVerseID int) (*domain.PassageInterlinear, error) {
+	return nil, nil
+}
+
 func (m *mockContentService) UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error) {
 	return nil, nil
 }
@@ -74,6 +94,14 @@ func (m *mockPerspectiveService) ListPerspectives(ctx context.Context, params do
 
 func (m *mockPerspectiveService) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 	return map[int]*domain.PerspectiveAggregate{}, nil
+}
+
+func (m *mockPerspectiveService) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+	return &domain.FeelingStats{Emoji: emoji, Label: label}, nil
+}
+
+func (m *mockPerspectiveService) CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+	return &domain.CustomFieldStats{Key: key}, nil
 }
 
 // withFieldContext creates a context with a gqlgen FieldContext

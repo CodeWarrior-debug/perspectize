@@ -6,9 +6,11 @@ import {
 	compareOverall,
 	summarize,
 	sortRatingRows,
+	agreementPercent,
 	SIMILAR_THRESHOLD,
 	DIVERGES_THRESHOLD,
 } from '$lib/utils/comparePerspectives';
+import type { RatingRow } from '$lib/utils/comparePerspectives';
 import type { PerspectiveItem } from '$lib/queries/perspectives';
 
 function makePerspective(overrides: Partial<PerspectiveItem>): PerspectiveItem {
@@ -67,9 +69,11 @@ describe('compareRatings', () => {
 	it('compares every shared standard dimension', () => {
 		const left = makePerspective({ quality: 8000, agreement: 8000, importance: 8000, confidence: 8000 });
 		const right = makePerspective({ quality: 8000, agreement: 8000, importance: 8000, confidence: 8000 });
-		expect(compareRatings(left, right).map((r) => r.key).sort()).toEqual(
-			['agreement', 'confidence', 'importance', 'quality'].sort(),
-		);
+		expect(
+			compareRatings(left, right)
+				.map((r) => r.key)
+				.sort(),
+		).toEqual(['agreement', 'confidence', 'importance', 'quality'].sort());
 	});
 
 	it('compares shared numeric customFields keys', () => {
@@ -110,6 +114,26 @@ describe('filledInDifferently', () => {
 	it('excludes a dimension neither side filled in', () => {
 		const left = makePerspective({});
 		const right = makePerspective({});
+		expect(filledInDifferently(left, right)).toEqual([]);
+	});
+
+	it('lists a customFields key only the left side filled in, with a title-cased label', () => {
+		const left = makePerspective({ customFields: { 'story-pacing': 6000 } });
+		const right = makePerspective({ customFields: {} });
+		const rows = filledInDifferently(left, right);
+		expect(rows).toEqual([{ key: 'story-pacing', label: 'Story Pacing', side: 'left', display: 6.0 }]);
+	});
+
+	it('lists a customFields key only the right side filled in', () => {
+		const left = makePerspective({ customFields: null });
+		const right = makePerspective({ customFields: { pacing: 4000 } });
+		const rows = filledInDifferently(left, right);
+		expect(rows).toEqual([{ key: 'pacing', label: 'Pacing', side: 'right', display: 4.0 }]);
+	});
+
+	it('excludes a customFields key both sides filled in', () => {
+		const left = makePerspective({ customFields: { pacing: 6000 } });
+		const right = makePerspective({ customFields: { pacing: 4000 } });
 		expect(filledInDifferently(left, right)).toEqual([]);
 	});
 });
@@ -203,5 +227,28 @@ describe('thresholds', () => {
 	it('exposes the exact handoff-specified cutoffs', () => {
 		expect(SIMILAR_THRESHOLD).toBe(1.0);
 		expect(DIVERGES_THRESHOLD).toBe(3.0);
+	});
+});
+
+describe('agreementPercent', () => {
+	function makeRow(pctDiff: number): RatingRow {
+		return { key: 'k', label: 'K', leftDisplay: 0, rightDisplay: 0, delta: 0, pctDiff, status: 'similar' };
+	}
+
+	it('returns null when there are no shared rating dimensions', () => {
+		expect(agreementPercent([])).toBeNull();
+	});
+
+	it('is 100 when every shared dimension matches exactly', () => {
+		expect(agreementPercent([makeRow(0), makeRow(0)])).toBe(100);
+	});
+
+	it('is 0 when every shared dimension is maximally different', () => {
+		expect(agreementPercent([makeRow(100)])).toBe(0);
+	});
+
+	it('averages pctDiff across rows and inverts it', () => {
+		// avg pctDiff = (20 + 40) / 2 = 30 -> 70% aligned
+		expect(agreementPercent([makeRow(20), makeRow(40)])).toBe(70);
 	});
 });

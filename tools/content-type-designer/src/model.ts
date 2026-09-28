@@ -1,9 +1,11 @@
 import {
   COLUMNS,
+  SAMPLES,
   TYPES,
   type Binding,
   type ColumnDef,
   type ContentTypeProfile,
+  type SampleCell,
   type TypeId
 } from './catalog.js';
 
@@ -24,6 +26,15 @@ export interface DraftState {
   /** Codebase conventions to deliberately deviate from, free text. */
   deviations: string;
   testingNotes: string;
+  /** Seeded type the draft was loaded from, so the preview can borrow its sample rows. */
+  seed?: string;
+  /** Preview sort, highest priority first. Empty/undefined = unsorted. */
+  sort?: SortKey[];
+}
+
+export interface SortKey {
+  colId: string;
+  dir: 'asc' | 'desc';
 }
 
 export const ALL_TYPE_IDS: string[] = TYPES.map((t) => t.id);
@@ -156,7 +167,7 @@ function analyse(state: DraftState, columns: ResolvedColumn[]): Warning[] {
       warnings.push({
         severity: 'info',
         columnId: rc.col.id,
-        message: `"${rc.header}" mixes units across types (${[...units].join(' | ')}). Format per row from length_units and never sort it as one numeric axis without normalising.`
+        message: `"${rc.header}" mixes units across types (${[...units].join(' | ')}). Format per row from length_units. Sorting it alone raises the mixed-unit alert: filter to one type, or sort by Type first and "${rc.header}" second.`
       });
     }
 
@@ -228,4 +239,42 @@ export function sharedWithOthers(state: DraftState): { col: ColumnDef; others: s
       others: TYPES.filter((t) => col.bindings[t.id]).map((t) => t.id)
     }))
     .filter((entry) => entry.others.length > 0);
+}
+
+/** Sample rows for a type; the draft borrows the rows of the type it was seeded from. */
+export function samplesFor(id: string, state: DraftState): Record<string, SampleCell>[] {
+  const source = id === state.draft.id ? state.seed : id;
+  return (source && SAMPLES[source as TypeId]) || [];
+}
+
+/** Text a preview cell shows for a column the row's type does not bind. */
+export function gapText(col: ColumnDef): string {
+  return col.gapFallback === 'blank' ? '' : '—';
+}
+
+/** Distinct units a column carries across the current selection; >1 means sorting it alone is meaningless. */
+export function unitsFor(rc: ResolvedColumn): string[] {
+  return [...new Set(rc.aliases.map((a) => a.unit).filter(Boolean) as string[])];
+}
+
+/**
+ * A sort is conflicted when its first key is a column whose units differ across
+ * the selection — the rows would be ordered by numbers that mean different things.
+ * Putting a unit-consistent column (Type) first resolves it: each type's rows
+ * are then ordered within their own unit.
+ */
+export function sortConflict(keys: SortKey[] | undefined, grid: GridPreview): ResolvedColumn | null {
+  const first = keys?.[0];
+  if (!first) return null;
+  const rc = grid.columns.find((c) => c.col.id === first.colId);
+  return rc && unitsFor(rc).length > 1 ? rc : null;
+}
+
+/** Parse a preview cell into something orderable: h:mm:ss → seconds, "1,204" / "4.1%" → number. */
+export function sortValue(text: string | undefined): number | string | null {
+  if (text === undefined || text === '' || text === '—') return null;
+  if (/^\d+(:\d{2}){1,2}$/.test(text)) return text.split(':').reduce((acc, part) => acc * 60 + Number(part), 0);
+  const num = text.replace(/[,%]/g, '');
+  if (/^-?\d+(\.\d+)?$/.test(num)) return Number(num);
+  return text.toLowerCase();
 }

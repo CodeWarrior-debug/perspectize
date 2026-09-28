@@ -46,6 +46,24 @@ describe('ThemeCustomizePanel', () => {
 		expect(screen.getByRole('button', { name: 'Export CSS' })).toBeInTheDocument();
 	});
 
+	it('reopening the panel resumes the unsaved preview instead of reseeding from the preset', async () => {
+		const store = createThemeStore();
+		const first = render(ThemeCustomizePanel, { props: { store } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Customize' }));
+		// Switch the unit toggle to hex so the value is easy to assert.
+		await fireEvent.click(screen.getByRole('button', { name: 'HEX' }));
+		const hexInput = screen.getByLabelText('Primary value (hex)') as HTMLInputElement;
+		await fireEvent.focus(hexInput);
+		await fireEvent.input(hexInput, { target: { value: '#123456' } });
+		first.unmount();
+
+		render(ThemeCustomizePanel, { props: { store } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Customize' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'HEX' }));
+
+		expect((screen.getByLabelText('Primary value (hex)') as HTMLInputElement).value).toBe('#123456');
+	});
+
 	it('typing a valid hex into a token field previews it on the store (not yet saved)', async () => {
 		const store = createThemeStore();
 		render(ThemeCustomizePanel, { props: { store } });
@@ -106,5 +124,55 @@ describe('ThemeCustomizePanel', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Delete Delete Me' }));
 
 		expect(store.state.customThemes).toHaveLength(0);
+	});
+
+	describe('scrolling the active theme into view on open', () => {
+		let scrollIntoView: ReturnType<typeof vi.fn>;
+
+		beforeEach(() => {
+			scrollIntoView = vi.fn();
+			Element.prototype.scrollIntoView = scrollIntoView as unknown as typeof Element.prototype.scrollIntoView;
+		});
+
+		it('centres the active preset card', () => {
+			const store = createThemeStore();
+			const active = THEME_PRESETS.find((p) => p.id !== THEME_PRESETS[0].id)!;
+			store.selectPreset(active.id);
+			render(ThemeCustomizePanel, { props: { store } });
+
+			expect(scrollIntoView).toHaveBeenCalledTimes(1);
+			expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+			const target = scrollIntoView.mock.contexts[0] as HTMLElement;
+			expect(target).toHaveAttribute('data-active', 'true');
+			expect(target).toHaveTextContent(active.name);
+		});
+
+		it('centres the active custom theme card', () => {
+			const store = createThemeStore();
+			store.saveCustomTheme('Mine', THEME_PRESETS[0].base);
+			store.selectCustom(store.state.customThemes[0].id);
+			render(ThemeCustomizePanel, { props: { store } });
+
+			const target = scrollIntoView.mock.contexts[0] as HTMLElement;
+			expect(target).toHaveAttribute('data-active', 'true');
+			expect(target).toHaveTextContent('Mine');
+		});
+
+		it('marks exactly one card active', () => {
+			const store = createThemeStore();
+			render(ThemeCustomizePanel, { props: { store } });
+			expect(document.querySelectorAll('[data-active="true"]')).toHaveLength(1);
+		});
+
+		it('does not re-scroll when the user picks a different theme', async () => {
+			const store = createThemeStore();
+			const other = THEME_PRESETS.find((p) => p.id !== store.state.activeThemeId)!;
+			render(ThemeCustomizePanel, { props: { store } });
+			scrollIntoView.mockClear();
+
+			await fireEvent.click(screen.getByText(other.name));
+
+			expect(scrollIntoView).not.toHaveBeenCalled();
+		});
 	});
 });

@@ -18,12 +18,26 @@ frontend/src/
 │   │   └── AGGridTest.svelte
 │   ├── queries/         # TanStack Query + graphql-request
 │   │   ├── client.ts    # GraphQLClient (VITE_GRAPHQL_URL)
-│   │   └── content.ts   # Content query definitions (gql)
+│   │   ├── keys.ts      # Cross-domain query keys
+│   │   └── content/     # One folder per domain: index.ts (gql defs) + its hooks
 │   ├── assets/          # Static assets (favicon)
 │   └── utils/           # Utility functions
 ├── app.css              # Global styles (Tailwind v4)
 └── app.html             # HTML shell
 ```
+
+### Deep Modules
+
+Small interface, lots of work hidden behind it (Ousterhout). Test: _how little must a caller know vs. how much does it handle?_
+
+**Independent of hexagonal.** The frontend isn't hexagonal (no ports/adapters — components call hooks directly), and doesn't need to be to have deep modules. Hexagonal is about dependency direction (backend); deep modules is about boundary quality (both stacks).
+
+- **One folder per domain** — `lib/queries/{content,perspectives,users,categories,…}/` holds the `gql` defs (`index.ts`) _and_ that domain's hooks (`useCreatePerspective.ts`). Only `client.ts`/`keys.ts` are top-level.
+- **Import the domain, not its guts** — `import { LIST_CONTENT } from '$lib/queries/content'`; components call a hook, never `graphqlClient.request` + cache invalidation inline.
+- **Hide cache wiring in the hook** — query keys, `invalidateQueries`, optimistic updates live inside `useX`, so callers get `{ mutate, isPending }` and nothing else.
+- **No pass-through components** — a wrapper that only forwards props/snippets to one child adds surface without hiding anything; inline it or give it state/logic.
+
+Refs: Ousterhout, _A Philosophy of Software Design_; Matt Pocock, [How To Make Codebases AI Agents Love](https://www.aihero.dev/how-to-make-codebases-ai-agents-love) (why deep modules help agents navigate). Origin: PR #339.
 
 ## shadcn-svelte Components
 
@@ -76,6 +90,12 @@ This project uses **Svelte 5 runes** exclusively. Do not use Svelte 4 syntax.
 
 **An `$effect` that writes a `$state` var and then reads that same var back (even just-assigned) loops.** Svelte 5 flags this as `effect_update_depth_exceeded` — assigning `foo = x` then reading `foo.length` later in the same effect re-triggers the effect indefinitely, even though the value is unchanged. Fix: read from a local `const` derived off the source (prop) instead of reading the `$state` var back. See `PerspectivePopover.svelte`'s `existingPerspective` reset effect.
 
+**An Escape handler inside a bits-ui dialog must run in the capture phase, or the dialog closes on the same keypress.** bits-ui's escape layer listens for `keydown` on `document` in the bubble phase and the dialog registered first, so a bubble-phase listener (including `<svelte:document onkeydown>`) runs too late for `stopPropagation` to help, and its `onEscapeKeydown` gets a cloned event so `defaultPrevented` is lost. Register `document.addEventListener('keydown', h, { capture: true })` in an `$effect` (with cleanup) and call `stopPropagation()` only while your inner element (popover, pin) is actually showing, so a second Escape still closes the dialog. See `interlinear/InterlinearPassage.svelte`; its test uses a bubble-phase `document` spy to prove the dialog never sees the first Escape.
+
+## Auth (Clerk + demo mode)
+
+**Don't import `svelte-clerk` in new components.** Use the facade: `useAuthState()` (`$lib/auth/useAuthState`), `getAuthToken()` (`$lib/auth`), and `components/auth/{AuthShow,SignInTrigger,UserMenu}.svelte`. With `VITE_DEMO_MODE=true` there is no `ClerkProvider` in the tree, so a direct `useClerkContext()`/`<Show>` crashes demo mode (and the `demo-e2e` CI job). `$lib/auth` itself must stay free of `svelte-clerk` imports — importing the real package into a plain module breaks unit tests that load it (`$env/dynamic/public` is undefined under Vitest). See [../.docs/DEMO_MODE.md](../.docs/DEMO_MODE.md).
+
 ## TanStack Query + GraphQL
 
 Queries use `graphql-request` with TanStack Svelte Query.
@@ -106,7 +126,9 @@ Queries use `graphql-request` with TanStack Svelte Query.
 
 **Do NOT:** Use `$query.data` (stores syntax) · Pass options object directly to `createQuery({...})` (must be function wrapper)
 
-**`queryKey` must mirror every variable `queryFn` actually sends.** If `queryFn` conditionally builds request variables (e.g. `mode === 'all' ? filter : undefined`), the `queryKey` object needs the *same* conditional — not a shortcut that hardcodes a fixed value for one branch. A `queryKey` field that doesn't change when the real request variable does means TanStack Query never sees a reason to refetch: the UI silently keeps serving stale cached data for that branch, no matter how the input changes (including back to empty/cleared). Caught in `ActivityTable.svelte`'s search box, which hardcoded `search: ''`/`filter: undefined` in the key for "Loaded" mode while `queryFn` unconditionally sent the real filter — so typing or clearing the search input never refetched.
+**`queryKey` must mirror every variable `queryFn` actually sends.** If `queryFn` conditionally builds request variables (e.g. `mode === 'all' ? filter : undefined`), the `queryKey` object needs the _same_ conditional — not a shortcut that hardcodes a fixed value for one branch. A `queryKey` field that doesn't change when the real request variable does means TanStack Query never sees a reason to refetch: the UI silently keeps serving stale cached data for that branch, no matter how the input changes (including back to empty/cleared). Caught in `ActivityTable.svelte`'s search box, which hardcoded `search: ''`/`filter: undefined` in the key for "Loaded" mode while `queryFn` unconditionally sent the real filter — so typing or clearing the search input never refetched.
+
+**`isLoading` is `false` for a paused (offline) query — branch on `isPending` for the loading state.** TanStack v5 defines `isLoading = isPending && isFetching`; while the network is offline a first fetch is paused (`isPending: true`, `isFetching: false`, no data, no error). A `{#if isLoading}…{:else if isError}…{:else if data}` chain then renders nothing at all. `interlinear/OriginalLanguage.svelte` uses `isPending`; its test covers `{ isPending: true, isLoading: false, isError: false, data: undefined }`.
 
 ## Icons (Lucide)
 
@@ -140,7 +162,19 @@ Full setup and examples: [docs/AG_GRID.md](docs/AG_GRID.md)
 
 **Column visibility gotcha:** `ActivityTable.svelte` controls visibility in TWO places that must stay in sync: `hide: true` in colDef (initial default) and `$effect` with `setColumnsVisible()` (responsive override — runs on gridReady, always wins). When adding/changing columns, update BOTH. The responsive system uses 4 tiers: xs (<445px), sm (445-639px), md (640-899px), lg (900px+) — decide which tier(s) should show the new column. See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) Decision 7.
 
+**Column metadata lives in one place:** `src/lib/utils/grid-config.ts`'s `COLUMNS: readonly ColumnMeta[]` is the single source of truth for the column picker, sort picker, server/client sort maps, URL filter keys, and filter-chip labels — all derived from one `ColumnMeta` entry per column via `.filter()`/`.map()`/`Object.fromEntries()`, not five separately hand-maintained lists. Adding a column means adding one `COLUMNS` entry, not editing `DATA_COLUMNS`/`SORTABLE_COLUMNS`/`COL_TO_SORT`/`COL_TO_FILTER_KEY`/`COLUMN_LABELS` individually. See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md).
+
 **Grid remount gotcha:** the `cardMode` breakpoint (<860px) and the error state unmount `AgGridSvelte5Component` entirely — a new Grid API is created on the way back, so any imperative column state (`setColumnsVisible`, `applyColumnState`, the session column-picker override) MUST be re-applied from an `$effect` that reruns on `gridReady`, not just at the moment the user changes it.
+
+**Grid colours come from theme tokens, not hex.** `src/lib/utils/grid-theme.ts` (`GRID_THEME_PARAMS`, unit-tested to contain no raw colours) feeds `themeQuartz.withParams`, so the grid follows the theme picker. Zebra/hover come from `--color-row-alt` / `--color-row-hover` / `--color-row-accent`, derived in `src/lib/theme/derive.ts` (so custom themes get them too). Adding a derived token means: `DerivedTokens` + `toCssVarMap` + `clearInlineThemeVars` in `store.svelte.ts`, the default `@theme` block in `app.css`, and the four `[data-theme]` blocks (regenerate with `npx tsx gen-preset-css.mjs`; for a new token `git diff` must show only additions). Changing how an existing token is _derived_ changes every preset's generated block and the default block's matching values; `tests/unit/theme/css-agreement.test.ts` fails until `app.css` is regenerated. Row hover is a foreground wash (not primary-driven) so dimming the primary never erodes hover-vs-zebra; an authored neutral with chroma >= 0.004 keeps its own hue.
+
+**Theme preset names must be unique across all of `THEME_PRESETS`, not just ids.** `tests/components/theme-customize-panel.test.ts` renders every preset name with `getByText`, so two presets sharing a display `name` (even with distinct `id`s, e.g. from merging palettes proposed by different design-system branches) fails with a "multiple elements found" error. Always regenerate `app.css`'s `[data-theme]` blocks with `npx tsx gen-preset-css.mjs` after editing `presets.ts` — splice its output in place of the existing preset blocks (between the `Reading Room (default) needs no block` comment and the next unrelated CSS section), not by hand-editing hex values.
+
+**A bare `border` class is `currentColor` under Tailwind v4, not the theme's border token.** Pair it with `border-border` (or `border-b border-border` etc.) or the frame renders in the text colour: near-black on light themes, near-white on dark. Caught on the Activity grid card.
+
+**AG Grid paints row hover on `.ag-row-hover::before`, above the row background and below the cell content.** An opaque hover colour is therefore safe (text stays visible) and is what makes hover identical on odd and even rows — an alpha hover composites differently over the zebra. The left hover bar is an `inset` box-shadow on that same `::before` (`app.css`).
+
+**Column minimum widths must fit the page container.** The Activity page is capped at `max-w-screen-xl` (1280px), leaving a 1212px grid; `headerMinWidth` (`formatting.ts`) sums to just under that. Reserving extra header room (an icon slot, a divider) silently overflows the grid and clips the last column on every wide screen. The `?f.type=youtube` URL filter is applied through the grid's filter model, so the mobile card list (grid unmounted) ignores it.
 
 ## Figma Design Workflow
 
@@ -149,6 +183,7 @@ Full setup and examples: [docs/AG_GRID.md](docs/AG_GRID.md)
 - **[Code to Figma Canvas](../.claude/docs/CODE_TO_FIGMA_CANVAS.md)** — Capture running app into Figma to keep designs in sync
 
 **Code-to-Figma capture gotchas:**
+
 - CSP in `app.html` blocks `mcp.figma.com` — temporarily add to `script-src` and `connect-src`, revert after capture
 - AG Grid canvas-rendered cells (thumbnails) don't serialize into Figma captures
 - SPA hash navigation may not re-trigger auto-capture — reload or click "Send to Figma" manually
@@ -157,12 +192,20 @@ Full setup and examples: [docs/AG_GRID.md](docs/AG_GRID.md)
 
 **`static/_headers` and `static/_redirects` are load-bearing, not cosmetic.** adapter-static builds a pure static site with content-hashed `_app/immutable/*` chunks; Sevalla serves it behind Cloudflare. Two gotchas compound if either file is missing or edited carelessly:
 
-- **`_redirects`** (`/* /index.html 200`) makes client-side routing survive a hard refresh — but it also means *any* missing path, including a previous deploy's now-deleted hashed chunk, resolves to a 200 `text/html` response instead of a 404.
-- **`_headers`** caps `index.html`/the SPA fallback at `Cache-Control: ... s-maxage=0` (always revalidate), while `_app/immutable/*` keeps a long, immutable cache. Without the `s-maxage=0` override, Cloudflare's edge can keep serving a deploy-old `index.html` for up to 30 days — that stale HTML references the *previous* deploy's chunk filenames, which the new deploy no longer has, and the missing-chunk request then hits the `_redirects` catch-all and comes back as `text/html` instead of JS.
+- **`_redirects`** (`/* /index.html 200`) makes client-side routing survive a hard refresh — but it also means _any_ missing path, including a previous deploy's now-deleted hashed chunk, resolves to a 200 `text/html` response instead of a 404.
+- **`_headers`** caps `index.html`/the SPA fallback at `Cache-Control: ... s-maxage=0` (always revalidate), while `_app/immutable/*` keeps a long, immutable cache. Without the `s-maxage=0` override, Cloudflare's edge can keep serving a deploy-old `index.html` for up to 30 days — that stale HTML references the _previous_ deploy's chunk filenames, which the new deploy no longer has, and the missing-chunk request then hits the `_redirects` catch-all and comes back as `text/html` instead of JS.
 
 Symptom in the browser: `Failed to load module script: Expected a JavaScript-or-Wasm module script but the server responded with a MIME type of "text/html"` on the deployed site (not reproducible locally, since there's no CDN layer). **This is a caching/hosting-config issue, not a service worker issue** — check for it (`curl -I` the failing chunk URL, or a live `fetch()` from the deployed page) before assuming a PWA/SW root cause; a registered SW isn't even required to hit it. Verify after touching either file: `pnpm run build` then confirm both `build/_headers` and `build/_redirects` exist.
 
 **`_headers` block overlap MERGES `Cache-Control`, it doesn't override.** Cloudflare Pages/Sevalla applies every `_headers` block whose path pattern matches a request — if two blocks both match (e.g. `/_app/immutable/*` and a `/*` catch-all, for any chunk that currently exists), their `Cache-Control` values are concatenated with a comma into one nonsensical header, not resolved by specificity. Confirmed live against the deployed site. Only one splat (`*`) is allowed per rule and there's no exclusion/negation syntax, so a broad catch-all can never be scoped to exclude a narrower pattern underneath it. Design around this by making the catch-all's value safe to merge: include a bare `no-cache` token (forces revalidation unconditionally, regardless of what other directives — like a long `max-age` — end up concatenated alongside it) rather than relying on directive order or assuming the more specific rule wins.
+
+**Fresh cache headers don't cover a page that is already running.** Any tab that outlives a deploy is still on the old build when the user comes back to it. This isn't mobile-specific: it covers a phone tab or home-screen app resumed from memory, a pinned or session-restored desktop tab, and back-forward-cache restores. Its next lazy import asks for a chunk the new deploy deleted, gets the `_redirects` HTML, and the page goes blank until a manual refresh. `_headers` can't fix this, and `_redirects` can't answer 404 for `/_app/*` (Cloudflare-style `_redirects` only supports 200/3xx). Recovery happens on the client in three layers. Keep all three:
+
+- `app.html` `#stale-chunk-recovery` (inline, above SvelteKit's bootstrap): on `vite:preloadError`, a chunk-load `unhandledrejection`, or a failed `/_app/` `<script>`/`<link>`, it reloads once. A 30s `sessionStorage` guard stops reload loops by showing a "Reload" banner instead. It never auto-reloads when offline or when storage is unavailable.
+- `lib/utils/versionWatch.ts` (mounted in `+layout.svelte`): checks `_app/version.json` when the tab becomes visible, is restored from bfcache, or the window regains focus (at most once a minute; a desktop window left on screen never fires `visibilitychange`), and reloads if a newer build exists. It skips the reload while an input or contenteditable has focus.
+- `kit.version.pollInterval` (`svelte.config.js`) plus the layout's `beforeNavigate`: once `updated.current` is true, the next in-app navigation becomes a full page load.
+
+**The PWA service worker is built but never registered.** Nothing injects `registerSW.js`, so production has no SW, and #312's `skipWaiting`/`clientsClaim` never took effect. Before wiring registration up, note that `sw.js` routes navigations to a non-precached `/`, which fails install. A precaching SW that activates mid-session also deletes the old build's chunks, which brings back the version-skew problem above.
 
 ## Self-Verification (Chrome DevTools MCP)
 
@@ -190,9 +233,16 @@ Symptom in the browser: `Failed to load module script: Expected a JavaScript-or-
 
 **AG Grid testing strategy:** AG Grid doesn't render in jsdom — no lifecycle hooks, no Grid API, no cell rendering. Test AG Grid logic by extracting pure functions into `$lib/utils/grid-config.ts` (sort mapping, pagination bounds, responsive tiers, comparators, column metadata). Test renderers/formatters via `$lib/utils/formatting.ts`. For grid integration (filter UI, sort clicks, responsive `$effect` blocks), use Playwright E2E or Vitest Browser Mode (`tests/browser/`, see below). See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) testing section.
 
-**Vitest Browser Mode (`tests/browser/`, config in `vitest.config.browser.ts`) is not run in CI** — `frontend-test.yml` only runs `test:coverage` on the unit project. A browser-test assertion can be wrong from the day it's written and nothing catches it (`ag-grid-integration.test.ts` had stale `formatCount` expectations that never once passed). Run `pnpm run test:browser` locally before trusting a browser test file.
+**Custom AG Grid filter/cell components (vanilla `IFilterComp` classes) *are* jsdom-testable** — instantiate, call `init()` with a stub `filterChangedCallback`, and assert on `getGui()`. Mount the GUI first (`document.body.replaceChildren(filter.getGui())`): `.click()` on a detached checkbox fires no `change` event (see `tests/unit/contentTypeFilter.test.ts`).
+
+**No Set Filter in AG Grid Community.** For a column with a small fixed set of values, use a custom checkbox filter like `ContentTypeFilter` (`$lib/utils/contentTypeFilter.ts`, `{ filterType: 'set', values }` model) plus `filterSet: true` on its `ColumnMeta` — see ADDING_AG_GRID_COLUMN.md Decision 6.
+
+**Vitest Browser Mode (`tests/browser/`, config in `vitest.config.browser.ts`) runs in CI** (`frontend-test.yml`, after the unit coverage step, on Playwright's Chromium). It used to be local-only, which let assertions be wrong from day one (`ag-grid-integration.test.ts` had stale `formatCount` expectations that never once passed) — a red browser step is now a real failure. Run `pnpm run test:browser --browser.headless=true` locally first. Browser tests that need demo mode (no Clerk) must call `vi.hoisted(() => vi.stubEnv('VITE_DEMO_MODE', 'true'))` at the top of the file; a config-level `define` leaks into the unit project and breaks every Clerk-auth unit test. `svelte-clerk` is aliased to a stub in the browser config because the real package needs SvelteKit virtual modules. No Playwright download is needed on macOS: the config drives the installed Google Chrome (override with `PW_CHROMIUM_EXECUTABLE`).
+
+**Browser tests: wait for cells, not rows.** AG Grid creates `.ag-row` elements before their cell renderers draw, so a count taken right after `waitForGridReady()` can see 0 cells. Poll the assertion instead: `await expect.poll(() => document.querySelectorAll(sel).length).toBe(n)`. (The thumbnail test flaked about 1 in 5 runs until it did this.)
 
 **Vitest Browser Mode capture gotchas:**
+
 - `page.screenshot({ path })` resolves the path **relative to the test file**, not against `browser.instances[].screenshotDirectory` — only an absolute path escapes `tests/browser/`.
 - `screenshotDirectory` and `attachmentsDir` (failure screenshots, `context.annotate`) are two separate config options — set both or `attachmentsDir` defaults to a stray `frontend/.vitest-attachments/`.
 - Writing outside the project root (e.g. into a shared screenshots folder) needs `server.fs.allow` widened — Vite's default `server.fs.strict` refuses it.

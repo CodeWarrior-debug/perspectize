@@ -1,5 +1,16 @@
 import { gql } from 'graphql-request';
 
+/**
+ * Backend cap on `perspectives(first: Int)` (see backend/schema.graphql /
+ * perspective_service.go). The default is 10 -- every consumer of
+ * LIST_PERSPECTIVES_BY_USER/LIST_PERSPECTIVES_BY_CONTENT must pass an explicit
+ * `first` (this constant), or content/users with more than 10 perspectives
+ * silently lose data: the +/glasses "already rated" affordance, the Compare
+ * user picker, and onboarding's perspective counts all read past the cutoff
+ * as "no perspective" (see the UI gap audit, gap #4).
+ */
+export const MAX_PERSPECTIVES_PER_LIST = 100;
+
 export interface FeelingEntry {
 	emoji: string;
 	label: string | null;
@@ -91,8 +102,8 @@ export const UPDATE_PERSPECTIVE = gql`
 
 export const LIST_PERSPECTIVES_BY_USER = gql`
 	${PERSPECTIVE_FIELDS}
-	query ListPerspectivesByUser($userID: IntID) {
-		perspectives(filter: { userID: $userID }) {
+	query ListPerspectivesByUser($userID: IntID, $first: Int) {
+		perspectives(filter: { userID: $userID }, first: $first) {
 			items {
 				...PerspectiveFields
 			}
@@ -112,8 +123,8 @@ export interface ListPerspectivesByContentResponse {
 // point, no client-side filtering needed on top of it).
 export const LIST_PERSPECTIVES_BY_CONTENT = gql`
 	${PERSPECTIVE_FIELDS}
-	query ListPerspectivesByContent($contentID: IntID) {
-		perspectives(filter: { contentID: $contentID }) {
+	query ListPerspectivesByContent($contentID: IntID, $first: Int) {
+		perspectives(filter: { contentID: $contentID }, first: $first) {
 			items {
 				...PerspectiveFields
 			}

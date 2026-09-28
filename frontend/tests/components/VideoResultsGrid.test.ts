@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import VideoResultsGrid from '$lib/components/discover/VideoResultsGrid.svelte';
 import { toWatchUrl, type VideoItem } from '$lib/services/youtubeApi';
+import type { ContentItem } from '$lib/queries/content';
 
 function makeVideo(id: string): VideoItem {
 	return {
@@ -41,6 +42,21 @@ describe('VideoResultsGrid', () => {
 
 		expect(screen.getByText('Video 1')).toBeInTheDocument();
 		expect(screen.getByText('Video 2')).toBeInTheDocument();
+	});
+
+	it('gives only the first two cards a high-priority, eager-loaded thumbnail', () => {
+		render(VideoResultsGrid, {
+			props: {
+				items: [makeVideo('1'), makeVideo('2'), makeVideo('3')],
+				onLoadMore: vi.fn(),
+				libraryUrls: new Set<string>(),
+				onAdd: vi.fn(),
+			},
+		});
+
+		const images = screen.getAllByRole('img') as HTMLImageElement[];
+		expect(images.map((img) => img.getAttribute('fetchpriority'))).toEqual(['high', 'high', 'auto']);
+		expect(images.map((img) => img.getAttribute('loading'))).toEqual(['eager', 'eager', 'lazy']);
 	});
 
 	it('shows the trending empty state when there are no items and no query', () => {
@@ -142,5 +158,39 @@ describe('VideoResultsGrid', () => {
 		});
 
 		expect(screen.queryByRole('button', { name: 'Load More' })).not.toBeInTheDocument();
+	});
+
+	it('passes each item its matching entry from addedContentByVideoId, rendering the details card for a freshly-added video', () => {
+		const addedContent: ContentItem = {
+			id: '99',
+			name: 'Video 1',
+			addedByUserID: '1',
+			url: toWatchUrl('1'),
+			contentType: 'YOUTUBE',
+			length: 90,
+			lengthUnits: 'seconds',
+			viewCount: 10,
+			likeCount: 2,
+			channelTitle: 'Channel',
+			publishedAt: '2024-01-01T12:00:00Z',
+			tags: null,
+			description: null,
+			primaryCategory: null,
+			createdAt: '2024-01-01T12:00:00Z',
+			updatedAt: '2024-01-01T12:00:00Z',
+		};
+
+		render(VideoResultsGrid, {
+			props: {
+				items: [makeVideo('1'), makeVideo('2')],
+				onLoadMore: vi.fn(),
+				libraryUrls: new Set<string>(),
+				onAdd: vi.fn(),
+				addedContentByVideoId: new Map([['1', addedContent]]),
+			},
+		});
+
+		expect(screen.getByText('Added to Perspectize')).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Compare' })).toHaveAttribute('href', '/compare?contentId=99');
 	});
 });

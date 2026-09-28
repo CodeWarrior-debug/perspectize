@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { Button, Input, Label } from '$lib/components/shadcn';
 	import ColorWheel from './ColorWheel.svelte';
 	import { THEME_PRESETS, THEME_PRESET_TOKENS } from '$lib/theme/presets';
@@ -27,6 +28,13 @@
 	let openRow = $state<keyof BaseThemeTokens | null>(null);
 	let saveName = $state('');
 	let showSaveInput = $state(false);
+
+	let cardGrid = $state<HTMLDivElement>();
+
+	// Long list: land on the active theme so it's visible without hunting. Runs once on open.
+	onMount(() => {
+		cardGrid?.querySelector('[data-active="true"]')?.scrollIntoView?.({ block: 'center' });
+	});
 
 	// Draft text for each row's direct-input field, keyed by token. While a
 	// row is focused, its displayed value comes ONLY from this draft, never
@@ -66,6 +74,12 @@
 	}
 
 	function startCustomizing() {
+		const pending = store.pendingPreview();
+		if (pending) {
+			editTokens = pending;
+			customizing = true;
+			return;
+		}
 		const active = store.activeFullTokens();
 		editTokens = {
 			primary: active.primary,
@@ -104,15 +118,16 @@
 </script>
 
 <div class="flex flex-col gap-6">
-	<div>
+	<div class="sticky top-0 z-10 -mb-3 bg-background pb-3">
 		<h3 class="font-semibold text-base mb-1">Customize Theme</h3>
 		<p class="text-sm text-muted-foreground">Pick a preset, or fully customize your own colors.</p>
 	</div>
 
-	<div class="grid grid-cols-2 sm:grid-cols-3 gap-3" aria-label="Theme presets">
+	<div bind:this={cardGrid} class="grid grid-cols-2 sm:grid-cols-3 gap-3" aria-label="Theme presets">
 		{#each THEME_PRESETS as preset (preset.id)}
 			<button
 				type="button"
+				data-active={store.state.activeThemeId === preset.id}
 				onclick={() => store.selectPreset(preset.id)}
 				class="text-left rounded-md border p-3 transition-colors {store.state.activeThemeId === preset.id
 					? 'border-primary ring-1 ring-primary'
@@ -130,6 +145,7 @@
 
 		{#each store.state.customThemes as custom (custom.id)}
 			<div
+				data-active={store.state.activeThemeId === custom.id}
 				class="relative text-left rounded-md border p-3 {store.state.activeThemeId === custom.id
 					? 'border-primary ring-1 ring-primary'
 					: 'border-border'}"

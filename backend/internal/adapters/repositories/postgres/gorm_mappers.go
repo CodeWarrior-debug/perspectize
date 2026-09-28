@@ -83,13 +83,14 @@ func categoryModelToDomain(m *CategoryModel) *domain.Category {
 		return nil
 	}
 	return &domain.Category{
-		ID:          m.ID,
-		WikidataQID: m.WikidataQID,
-		Label:       m.Label,
-		Description: m.Description,
-		EntityType:  m.EntityType,
-		CreatedAt:   m.CreatedAt,
-		UpdatedAt:   m.UpdatedAt,
+		ID:           m.ID,
+		WikidataQID:  m.WikidataQID,
+		Label:        m.Label,
+		Description:  m.Description,
+		EntityType:   m.EntityType,
+		WikipediaURL: m.WikipediaURL,
+		CreatedAt:    m.CreatedAt,
+		UpdatedAt:    m.UpdatedAt,
 	}
 }
 
@@ -99,11 +100,12 @@ func categoryDomainToModel(c *domain.Category) *CategoryModel {
 		return nil
 	}
 	return &CategoryModel{
-		ID:          c.ID,
-		WikidataQID: c.WikidataQID,
-		Label:       c.Label,
-		Description: c.Description,
-		EntityType:  c.EntityType,
+		ID:           c.ID,
+		WikidataQID:  c.WikidataQID,
+		Label:        c.Label,
+		Description:  c.Description,
+		EntityType:   c.EntityType,
+		WikipediaURL: c.WikipediaURL,
 		// CreatedAt and UpdatedAt are managed by GORM
 	}
 }
@@ -123,6 +125,9 @@ func contentModelToDomain(m *ContentModel) *domain.Content {
 		LengthUnits:       m.LengthUnits,
 		Response:          m.Response,
 		PrimaryCategoryID: m.PrimaryCategoryID,
+		VerseStartID:      m.VerseStartID,
+		VerseEndID:        m.VerseEndID,
+		DisplayTitle:      m.DisplayTitle,
 		CreatedAt:         m.CreatedAt,
 		UpdatedAt:         m.UpdatedAt,
 	}
@@ -143,6 +148,9 @@ func contentDomainToModel(c *domain.Content) *ContentModel {
 		LengthUnits:       c.LengthUnits,
 		Response:          c.Response,
 		PrimaryCategoryID: c.PrimaryCategoryID,
+		VerseStartID:      c.VerseStartID,
+		VerseEndID:        c.VerseEndID,
+		DisplayTitle:      c.DisplayTitle,
 		// CreatedAt and UpdatedAt are managed by GORM
 	}
 }

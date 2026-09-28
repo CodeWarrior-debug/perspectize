@@ -6,9 +6,15 @@
 	import VideoResultsGrid from '$lib/components/discover/VideoResultsGrid.svelte';
 	import { Button } from '$lib/components/shadcn';
 	import { graphqlRequest } from '$lib/queries/client';
-	import { LIST_CONTENT, type ContentResponse } from '$lib/queries/content';
+	import {
+		LIST_CONTENT,
+		type ContentResponse,
+		type ContentItem,
+		type CreateContentResponse,
+	} from '$lib/queries/content';
 	import { queryKeys } from '$lib/queries/keys';
 	import { useAddVideo } from '$lib/queries/content/useAddVideo';
+	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import {
 		fetchYouTubeSearch,
 		fetchYouTubeTrending,
@@ -37,6 +43,13 @@
 		queryFn: () => fetchYouTubeSearch({ query: debouncedQuery, ...filters }),
 		enabled: view === 'search',
 		staleTime: 5 * 60 * 1000,
+		// At least staleTime, so a query that's still fresh isn't also evicted from
+		// the cache by the QueryClient's default 5-minute gcTime — otherwise
+		// navigating away from /discover for a few minutes (or just switching
+		// between search/trending) throws the cached page away and re-hits the
+		// YouTube API (quota cost + a round trip) even though staleTime said the
+		// data was still good.
+		gcTime: 30 * 60 * 1000,
 	}));
 
 	const trendingResult = createQuery(() => ({
@@ -44,6 +57,7 @@
 		queryFn: () => fetchYouTubeTrending(),
 		enabled: view === 'trending',
 		staleTime: 60 * 60 * 1000,
+		gcTime: 24 * 60 * 60 * 1000,
 	}));
 
 	// Accumulated results (first page from the active query + any Load More pages).
@@ -135,9 +149,27 @@
 	const addVideo = useAddVideo();
 	let pendingId = $state<string | null>(null);
 
+	// Full content metadata for videos added THIS session, keyed by video id —
+	// populated from CreateContentFromYouTube's response so VideoCard can
+	// render the inline details card (duration/views/likes/channel/category)
+	// plus working Add-perspective/Compare links right after a successful add.
+	// Pre-existing already-tracked videos (found via libraryUrls below) don't
+	// get an entry here and fall back to VideoCard's disabled "In Library"
+	// state — see VideoCard.svelte's isInLibrary branch for why.
+	let addedContentByVideoId = $state<Map<string, ContentItem>>(new Map());
+
+	const meCtx = useMe();
+	const currentUserId = $derived(meCtx.me ? parseInt(meCtx.me.id, 10) : null);
+
 	function handleAdd(videoId: string) {
 		pendingId = videoId;
 		addVideo.mutate(toWatchUrl(videoId), {
+			onSuccess: (data: CreateContentResponse) => {
+				const content = data?.createContentFromYouTube?.content;
+				if (content) {
+					addedContentByVideoId = new Map(addedContentByVideoId).set(videoId, content);
+				}
+			},
 			onSettled: () => {
 				pendingId = null;
 			},
@@ -213,7 +245,7 @@
 	<div class="flex flex-col gap-6">
 		<div>
 			<h1 class="text-2xl md:text-3xl font-semibold text-foreground">Discover</h1>
-			<p class="text-sm text-muted-foreground mt-1">Search YouTube and add videos to your library</p>
+			<p class="text-sm text-muted-foreground mt-1">Search YouTube and add videos to Perspectize</p>
 		</div>
 
 		<SearchBar bind:value={searchQuery} bind:debouncedQuery bind:inputRef={searchInputRef} />
@@ -242,6 +274,8 @@
 				isLoading={activeQuery.isLoading}
 				{isLoadingMore}
 				query={debouncedQuery}
+				{addedContentByVideoId}
+				userId={currentUserId}
 			/>
 			{#if loadMoreError}
 				<p class="text-sm text-destructive">{loadMoreError}</p>

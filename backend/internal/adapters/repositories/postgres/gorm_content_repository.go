@@ -234,6 +234,13 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		if params.Filter.ContentType != nil {
 			query = query.Where("content_type = ?", strings.ToLower(string(*params.Filter.ContentType)))
 		}
+		if len(params.Filter.ContentTypes) > 0 {
+			dbTypes := make([]string, len(params.Filter.ContentTypes))
+			for i, ct := range params.Filter.ContentTypes {
+				dbTypes[i] = contentTypeToDBValue(ct)
+			}
+			query = query.Where("content_type IN ?", dbTypes)
+		}
 		if params.Filter.MinLengthSeconds != nil {
 			query = query.Where("length >= ?", *params.Filter.MinLengthSeconds)
 		}
@@ -350,6 +357,49 @@ func (r *GormContentRepository) UpdatePrimaryCategoryID(ctx context.Context, con
 		Update("primary_category_id", categoryID)
 	if result.Error != nil {
 		return fmt.Errorf("failed to update primary category: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+// SetDisplayTitleIfEmpty implements first-write-wins for a passage's optional
+// title: the write only takes effect if no title exists yet. A losing writer is
+// told the title that won rather than given an error — their intent (this
+// passage should have a title) was satisfied, just not with their words.
+func (r *GormContentRepository) SetDisplayTitleIfEmpty(ctx context.Context, contentID int, title string) (string, error) {
+	result := r.db.WithContext(ctx).Exec(
+		`UPDATE content SET display_title = ? WHERE id = ? AND display_title IS NULL`,
+		title, contentID)
+	if result.Error != nil {
+		return "", fmt.Errorf("failed to set display title: %w", result.Error)
+	}
+	if result.RowsAffected > 0 {
+		return title, nil
+	}
+
+	// Lost the race (or the row doesn't exist) — read the current value.
+	var current ContentModel
+	if err := r.db.WithContext(ctx).Select("display_title").Where("id = ?", contentID).First(&current).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", domain.ErrNotFound
+		}
+		return "", fmt.Errorf("failed to read existing display title: %w", err)
+	}
+	if current.DisplayTitle == nil {
+		return "", domain.ErrNotFound
+	}
+	return *current.DisplayTitle, nil
+}
+
+// ClearDisplayTitle resets a passage's title to NULL so it becomes settable
+// again by anyone, rather than granting direct edit rights that would bypass
+// first-write-wins.
+func (r *GormContentRepository) ClearDisplayTitle(ctx context.Context, contentID int) error {
+	result := r.db.WithContext(ctx).Exec(`UPDATE content SET display_title = NULL WHERE id = ?`, contentID)
+	if result.Error != nil {
+		return fmt.Errorf("failed to clear display title: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
 		return domain.ErrNotFound

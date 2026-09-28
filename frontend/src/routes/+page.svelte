@@ -1,7 +1,6 @@
 <script lang="ts">
-	import ActivityTable from '$lib/components/ActivityTable.svelte';
-	import UserActivityView from '$lib/components/UserActivityView.svelte';
 	import { Input, Popover, PopoverContent, PopoverTrigger, buttonVariants } from '$lib/components/shadcn';
+	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import { page } from '$app/state';
@@ -12,6 +11,7 @@
 		ALL_SEARCH_SCOPES,
 		type SearchScopeKey,
 	} from '$lib/utils/gridUrlState';
+	import { OPEN_CONTENT_PARAM } from '$lib/utils/contentLinks';
 
 	// Derive current grid params from URL
 	const gridParams = $derived(parseGridParams(page.url.searchParams));
@@ -19,6 +19,10 @@
 	// "All Content" (existing grid) vs "By User" (new grouped activity view).
 	// Session-only, not persisted to the URL — mirrors the column picker's scope.
 	let view = $state<'content' | 'byUser'>('content');
+	// A `?open=<id>` deep link is handled by the All Content grid's details modal.
+	$effect(() => {
+		if (page.url.searchParams.has(OPEN_CONTENT_PARAM)) view = 'content';
+	});
 
 	// Local search input state (tracks what user has typed)
 	// Initialized from URL on mount; user typing updates this independently of URL
@@ -63,12 +67,14 @@
 
 <div class="flex flex-col h-[calc(100vh-4rem)]">
 	<!-- Page Header: Title + Search -->
-	<div class="px-4 md:px-6 lg:px-8 py-4 md:py-6">
-		<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+	<div class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4">
+		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 			<div>
-				<h1 class="text-2xl md:text-3xl font-semibold text-foreground">Activity</h1>
+				<h1 class="text-2xl font-semibold text-foreground">Activity</h1>
 				<p class="text-sm text-muted-foreground mt-1">Recently updated content</p>
 			</div>
+			<!-- FilterChips (inside the grid card) moves itself here on desktop to save a row of height. -->
+			<div id="activity-chips-slot" class="hidden md:flex flex-1 min-w-0 items-center"></div>
 			<div class="flex items-center gap-2">
 				<div class="flex items-center gap-1 rounded-md border border-input bg-background p-0.5">
 					<button
@@ -114,9 +120,7 @@
 						<PopoverContent align="end" class="w-56 p-2">
 							<p class="text-xs font-medium text-muted-foreground px-2 pb-1">Search in</p>
 							{#each ALL_SEARCH_SCOPES as scope (scope)}
-								<label
-									class="flex items-center gap-2 px-2 py-1.5 rounded-sm text-sm cursor-pointer hover:bg-accent"
-								>
+								<label class="flex items-center gap-2 px-2 py-1.5 rounded-sm text-sm cursor-pointer hover:bg-accent">
 									<input
 										type="checkbox"
 										checked={gridParams.qFields.includes(scope)}
@@ -134,14 +138,30 @@
 	</div>
 
 	<!-- Content Card -->
-	<div class="flex-1 min-h-0 px-4 md:px-6 lg:px-8 pb-4">
+	<!-- pb-4 (not pb-20: that reserved an ~80px dead strip that cost a grid row). The fixed Messages
+	     button is cleared by the pagination bar's own right padding instead (ActivityTable).
+	     ActivityTable/UserActivityView are dynamically imported: this route's own
+	     module is what SvelteKit's client router loads up front to resolve `/`,
+	     before the root layout's ClerkLoading/ClerkLoaded gate even decides whether
+	     to render this page at all — so a static import here forces every visitor
+	     (including signed-out ones, who never see this content) to pay for AG Grid
+	     (~800KB) before anything paints. -->
+	<div class="flex-1 min-h-0 w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 pb-4">
 		{#if view === 'content'}
-			<div class="border rounded-lg shadow-sm overflow-hidden h-full flex flex-col">
-				<ActivityTable />
+			<div class="border border-border rounded-lg shadow-sm overflow-hidden h-full flex flex-col">
+				{#await import('$lib/components/ActivityTable.svelte') then { default: ActivityTable }}
+					<ActivityTable />
+				{:catch}
+					<LazyLoadError what="the activity table" />
+				{/await}
 			</div>
 		{:else}
 			<div class="border rounded-lg shadow-sm overflow-y-auto h-full">
-				<UserActivityView />
+				{#await import('$lib/components/UserActivityView.svelte') then { default: UserActivityView }}
+					<UserActivityView />
+				{:catch}
+					<LazyLoadError what="user activity" />
+				{/await}
 			</div>
 		{/if}
 	</div>

@@ -3,6 +3,7 @@
 	import ListXIcon from '@lucide/svelte/icons/list-x';
 	import type { GridApi } from '@ag-grid-community/core';
 	import { formatDurationSeconds } from '$lib/utils/formatting';
+	import { COLUMN_LABELS, contentTypeLabel } from '$lib/utils/grid-config';
 
 	interface FilterChip {
 		colId: string;
@@ -10,21 +11,18 @@
 		value: string;
 	}
 
-	let { gridApi, filterModel }: { gridApi: GridApi | null; filterModel: Record<string, any> } =
-		$props();
-
-	const COLUMN_LABELS: Record<string, string> = {
-		type: 'Type',
-		duration: 'Length',
-		views: 'Views',
-		likes: 'Likes',
-		publishDate: 'Date',
-		channel: 'Channel',
-		tags: 'Tags',
-		description: 'Description',
-		updatedAt: 'Updated',
-		createdAt: 'Date Added',
-	};
+	let {
+		gridApi,
+		filterModel,
+		onRemove,
+		onClearAll,
+	}: {
+		gridApi: GridApi | null;
+		filterModel: Record<string, any>;
+		/** Used when no grid is mounted (mobile card mode): the caller edits URL filters directly. */
+		onRemove?: (colId: string) => void;
+		onClearAll?: () => void;
+	} = $props();
 
 	const TEXT_OPERATORS: Record<string, string> = {
 		contains: 'contains',
@@ -91,8 +89,7 @@
 			if (filter.type === 'equals') return formatShortDate(filter.dateFrom);
 			if (filter.type === 'greaterThan') return `after ${formatShortDate(filter.dateFrom)}`;
 			if (filter.type === 'lessThan') return `before ${formatShortDate(filter.dateFrom)}`;
-			if (filter.type === 'notEqual')
-				return `\u2260 ${formatShortDate(filter.dateFrom)}`;
+			if (filter.type === 'notEqual') return `\u2260 ${formatShortDate(filter.dateFrom)}`;
 			if (filter.type === 'inRange')
 				return `${formatShortDate(filter.dateFrom)} \u2013 ${formatShortDate(filter.dateTo)}`;
 			return formatShortDate(filter.dateFrom);
@@ -102,6 +99,9 @@
 	}
 
 	function formatFilterValue(filter: any, colId?: string): string {
+		if (filter.filterType === 'set') {
+			return (filter.values ?? []).map(contentTypeLabel).join(' or ');
+		}
 		if (filter.operator && filter.conditions) {
 			const parts = filter.conditions.map((c: any) => formatSingleCondition(c, colId));
 			return parts.join(` ${filter.operator.toLowerCase()} `);
@@ -124,20 +124,33 @@
 	);
 
 	function removeFilter(colId: string) {
-		if (!gridApi) return;
+		if (!gridApi) return onRemove?.(colId);
 		const model = { ...gridApi.getFilterModel() };
 		delete model[colId];
 		gridApi.setFilterModel(model);
 	}
 
 	function removeAllFilters() {
-		if (!gridApi) return;
+		if (!gridApi) return onClearAll?.();
 		gridApi.setFilterModel(null);
+	}
+
+	/** On desktop, relocate the chip row into the page header's empty middle (#activity-chips-slot)
+	 * so it costs no vertical space above the grid. Mobile keeps it inside the card. */
+	function moveToHeaderSlot(node: HTMLElement) {
+		const slot = document.getElementById('activity-chips-slot');
+		if (!slot || !window.matchMedia('(min-width: 768px)').matches) return;
+		slot.appendChild(node);
+		node.classList.remove('px-3', 'border-b', 'bg-muted/30');
+		node.classList.add('px-2');
 	}
 </script>
 
 {#if chips.length > 0}
-	<div class="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border bg-muted/30">
+	<div
+		use:moveToHeaderSlot
+		class="chips-root flex flex-wrap items-center gap-2 px-3 py-1 border-b border-border bg-muted/30"
+	>
 		{#each chips as chip (chip.colId)}
 			<span
 				class="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 text-xs rounded-full bg-primary/10 text-primary border border-primary/20"

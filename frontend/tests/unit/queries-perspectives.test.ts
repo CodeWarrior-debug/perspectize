@@ -3,6 +3,8 @@ import {
 	CREATE_PERSPECTIVE,
 	UPDATE_PERSPECTIVE,
 	LIST_PERSPECTIVES_BY_USER,
+	LIST_PERSPECTIVES_BY_CONTENT,
+	MAX_PERSPECTIVES_PER_LIST,
 	type PerspectiveItem,
 	type CreatePerspectiveResponse,
 	type UpdatePerspectiveResponse,
@@ -198,6 +200,42 @@ describe('Perspective GraphQL query definitions', () => {
 
 		it('requests items array', () => {
 			expect(LIST_PERSPECTIVES_BY_USER).toContain('items');
+		});
+
+		// Gap #4 in the UI gap audit: the backend defaults perspectives(first: Int)
+		// to 10, so a query with no explicit `first` silently truncates a user with
+		// more than 10 perspectives -- the +/glasses "already rated" affordance goes
+		// wrong for their older rows. Every consumer must pass first: MAX_PERSPECTIVES_PER_LIST.
+		it('declares and forwards a $first variable, so callers can raise the 10-row backend default', () => {
+			expect(LIST_PERSPECTIVES_BY_USER).toContain('$first: Int');
+			expect(LIST_PERSPECTIVES_BY_USER).toContain('first: $first');
+		});
+	});
+
+	describe('LIST_PERSPECTIVES_BY_CONTENT', () => {
+		it('is defined and is a non-empty string', () => {
+			expect(LIST_PERSPECTIVES_BY_CONTENT).toBeDefined();
+			expect(typeof LIST_PERSPECTIVES_BY_CONTENT).toBe('string');
+			expect(LIST_PERSPECTIVES_BY_CONTENT.length).toBeGreaterThan(0);
+		});
+
+		it('contains the ListPerspectivesByContent operation name', () => {
+			expect(LIST_PERSPECTIVES_BY_CONTENT).toContain('ListPerspectivesByContent');
+		});
+
+		it('filters by contentID', () => {
+			expect(LIST_PERSPECTIVES_BY_CONTENT).toContain('contentID');
+		});
+
+		it('declares and forwards a $first variable, so callers can raise the 10-row backend default', () => {
+			expect(LIST_PERSPECTIVES_BY_CONTENT).toContain('$first: Int');
+			expect(LIST_PERSPECTIVES_BY_CONTENT).toContain('first: $first');
+		});
+	});
+
+	describe('MAX_PERSPECTIVES_PER_LIST', () => {
+		it('matches the backend cap on perspectives(first: Int) (see perspective_service.go)', () => {
+			expect(MAX_PERSPECTIVES_PER_LIST).toBe(100);
 		});
 	});
 });

@@ -9,6 +9,7 @@ const (
 	ContentSortByName         ContentSortBy = "NAME"
 	ContentSortByViewCount    ContentSortBy = "VIEW_COUNT"
 	ContentSortByLikeCount    ContentSortBy = "LIKE_COUNT"
+	ContentSortByPercentLiked ContentSortBy = "PERCENT_LIKED"
 	ContentSortByPublishedAt  ContentSortBy = "PUBLISHED_AT"
 	ContentSortByChannelTitle ContentSortBy = "CHANNEL_TITLE"
 	ContentSortByLength       ContentSortBy = "LENGTH"
@@ -31,7 +32,9 @@ type ContentSortRule struct {
 
 // ContentFilter contains filter criteria for content queries
 type ContentFilter struct {
-	ContentType      *ContentType
+	ContentType *ContentType
+	// ContentTypes matches any of these types (OR'd). Empty = no type filter.
+	ContentTypes     []ContentType
 	MinLengthSeconds *int
 	MaxLengthSeconds *int
 	Search           *string

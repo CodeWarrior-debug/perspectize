@@ -153,6 +153,44 @@ func TestBuildContentSortRules(t *testing.T) {
 			wantTieOrder: paginator.DESC,
 		},
 		{
+			name:   "percent liked ascending uses a JSONB CASE expression with float64 null replacement",
+			sortBy: domain.ContentSortByPercentLiked,
+			order:  domain.SortOrderAsc,
+			wantPrimary: paginator.Rule{
+				Key:   "PercentLiked",
+				Order: paginator.ASC,
+				SQLRepr: "CASE " +
+					"WHEN (response->'items'->0->'statistics'->>'viewCount') IS NULL " +
+					"  OR (response->'items'->0->'statistics'->>'likeCount') IS NULL " +
+					"  OR (response->'items'->0->'statistics'->>'viewCount')::BIGINT = 0 " +
+					"THEN NULL " +
+					"ELSE (response->'items'->0->'statistics'->>'likeCount')::FLOAT8 " +
+					"     / NULLIF((response->'items'->0->'statistics'->>'viewCount')::BIGINT, 0) " +
+					"END",
+				NULLReplacement: float64(-1),
+			},
+			wantTieOrder: paginator.ASC,
+		},
+		{
+			name:   "percent liked descending",
+			sortBy: domain.ContentSortByPercentLiked,
+			order:  domain.SortOrderDesc,
+			wantPrimary: paginator.Rule{
+				Key:   "PercentLiked",
+				Order: paginator.DESC,
+				SQLRepr: "CASE " +
+					"WHEN (response->'items'->0->'statistics'->>'viewCount') IS NULL " +
+					"  OR (response->'items'->0->'statistics'->>'likeCount') IS NULL " +
+					"  OR (response->'items'->0->'statistics'->>'viewCount')::BIGINT = 0 " +
+					"THEN NULL " +
+					"ELSE (response->'items'->0->'statistics'->>'likeCount')::FLOAT8 " +
+					"     / NULLIF((response->'items'->0->'statistics'->>'viewCount')::BIGINT, 0) " +
+					"END",
+				NULLReplacement: float64(-1),
+			},
+			wantTieOrder: paginator.DESC,
+		},
+		{
 			name:   "published at uses string null replacement",
 			sortBy: domain.ContentSortByPublishedAt,
 			order:  domain.SortOrderAsc,
@@ -243,6 +281,18 @@ func TestBuildContentSortRulesMulti(t *testing.T) {
 		assert.Equal(t, paginator.ASC, rules[1].Order)
 		// ID tie-breaker follows the last column's direction
 		assert.Equal(t, paginator.Rule{Key: "ID", Order: paginator.ASC}, rules[2])
+	})
+
+	t.Run("percent liked composes with another column", func(t *testing.T) {
+		rules := buildContentSortRulesMulti([]domain.ContentSortRule{
+			{Field: domain.ContentSortByPercentLiked, Order: domain.SortOrderDesc},
+			{Field: domain.ContentSortByName, Order: domain.SortOrderAsc},
+		})
+		require.Len(t, rules, 3)
+		assert.Equal(t, "PercentLiked", rules[0].Key)
+		assert.Equal(t, paginator.DESC, rules[0].Order)
+		assert.Equal(t, "Name", rules[1].Key)
+		assert.Equal(t, paginator.ASC, rules[1].Order)
 	})
 
 	t.Run("duplicate fields collapse to their first occurrence", func(t *testing.T) {
