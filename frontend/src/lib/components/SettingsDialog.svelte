@@ -1,13 +1,17 @@
 <script lang="ts">
 	import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/shadcn';
 	import ThemeCustomizePanel from '$lib/components/theme/ThemeCustomizePanel.svelte';
+	import FeedbackDialog from '$lib/components/FeedbackDialog.svelte';
 	import type { ThemeStore } from '$lib/theme/store.svelte';
 
 	let { open = $bindable(false), store }: { open?: boolean; store: ThemeStore } = $props();
 
-	type SectionId = 'theme';
+	type SectionId = 'theme' | 'feedback';
 
-	const sections: { id: SectionId; label: string }[] = [{ id: 'theme', label: 'Customize Theme' }];
+	const sections: { id: SectionId; label: string }[] = [
+		{ id: 'theme', label: 'Customize Theme' },
+		{ id: 'feedback', label: 'Send Feedback' }
+	];
 
 	let activeSection = $state<SectionId>('theme');
 </script>
@@ -36,6 +40,8 @@
 			<div class="flex-1 min-w-0">
 				{#if activeSection === 'theme'}
 					<ThemeCustomizePanel {store} />
+				{:else if activeSection === 'feedback'}
+					<FeedbackDialog onClose={() => { open = false; }} />
 				{/if}
 			</div>
 		</div>
