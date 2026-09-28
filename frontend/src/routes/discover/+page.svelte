@@ -43,6 +43,13 @@
 		queryFn: () => fetchYouTubeSearch({ query: debouncedQuery, ...filters }),
 		enabled: view === 'search',
 		staleTime: 5 * 60 * 1000,
+		// At least staleTime, so a query that's still fresh isn't also evicted from
+		// the cache by the QueryClient's default 5-minute gcTime — otherwise
+		// navigating away from /discover for a few minutes (or just switching
+		// between search/trending) throws the cached page away and re-hits the
+		// YouTube API (quota cost + a round trip) even though staleTime said the
+		// data was still good.
+		gcTime: 30 * 60 * 1000,
 	}));
 
 	const trendingResult = createQuery(() => ({
@@ -50,6 +57,7 @@
 		queryFn: () => fetchYouTubeTrending(),
 		enabled: view === 'trending',
 		staleTime: 60 * 60 * 1000,
+		gcTime: 24 * 60 * 60 * 1000,
 	}));
 
 	// Accumulated results (first page from the active query + any Load More pages).
