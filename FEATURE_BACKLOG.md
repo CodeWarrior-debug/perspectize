@@ -46,6 +46,16 @@ Discover shipped (Browse still pending); PR #449 landed the duration badge, inli
 
 ---
 
+## OAuth External Account Sync (Optional)
+
+Brainstormed 2026-09-27: let users connect external accounts via OAuth (YouTube first) to **import** existing activity (liked videos → `Content` + draft, private perspectives) and **publish** a perspective back out (as a YouTube comment / like) as an explicit per-item action. Manual "Sync now" with a dry-run preview by default; scheduled sync only as an opt-in, import-only setting. Conflicts use a three-way diff against the last-synced snapshot with per-field ownership, and true conflicts are queued for the user. YouTube has no "list my comments" API and no like/comment webhooks, so comments are publish-only and all sync is polling.
+
+Full design: [docs/superpowers/specs/2026-09-28-oauth-external-sync-design.md](docs/superpowers/specs/2026-09-28-oauth-external-sync-design.md)
+
+**Priority:** Optional / unscheduled. Prerequisites: Google OAuth app verification, and the shared-quota fix ("YouTube Search Proxy" above) or a quota increase.
+
+---
+
 ## Unpopulated Nested GraphQL Fields — N+1 Guardrail Needed Before Implementing
 
 Discovered 2026-09-02 while investigating whether the Activity page has N+1 issues fetching user perspectives. It doesn't — `content` and `perspectives` are each single batched queries today. But three schema fields are declared and never populated, always resolving to `null`:
