@@ -165,3 +165,97 @@ jobs:
 
       - name: Build final image
         run: docker build -f backend/Dockerfile -t perspectize-backend .
+
+  demo-e2e:
+    # Runs the demo tours + flows (frontend/demo/) as Playwright E2E against a
+    # freshly seeded DEMO_MODE stack — multi-user auth, privacy and the add-video
+    # flow with no Clerk or YouTube credentials.
+    name: Demo E2E
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: demo
+          POSTGRES_PASSWORD: demo
+          POSTGRES_DB: perspectize_demo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://demo:demo@localhost:5432/perspectize_demo?sslmode=disable
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Migrate and seed demo data
+        working-directory: backend
+        run: |
+          go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+          migrate -path migrations -database "$DATABASE_URL" up
+          go run ./cmd/seed-demo
+
+      - name: Start backend (DEMO_MODE)
+        working-directory: backend
+        run: |
+          go build -o "$RUNNER_TEMP/server" ./cmd/server
+          DEMO_MODE=true nohup "$RUNNER_TEMP/server" > "$RUNNER_TEMP/server.log" 2>&1 &
+
+      - name: Build and serve demo frontend
+        working-directory: frontend
+        env:
+          VITE_DEMO_MODE: 'true'
+          VITE_GRAPHQL_URL: http://localhost:8080/graphql
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+          nohup pnpm exec vite preview --port 4173 --strictPort > "$RUNNER_TEMP/preview.log" 2>&1 &
+
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Wait for stack
+        run: |
+          for url in http://localhost:8080/ready http://localhost:4173/; do
+            timeout 60 bash -c "until curl -sf $url > /dev/null; do sleep 1; done"
+          done
+
+      - name: Run demo tours and flows
+        working-directory: frontend
+        env:
+          DEMO_BASE_URL: http://localhost:4173
+          DEMO_GRAPHQL_URL: http://localhost:8080/graphql
+        run: pnpm run demo:test
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: demo-e2e-report
+          path: |
+            frontend/demo/out/
+            ${{ runner.temp }}/*.log

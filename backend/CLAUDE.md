@@ -148,6 +148,8 @@ CORS middleware is configured in `cmd/server/main.go` for local development. Cur
 
 **Directive arg introspection:** `graphql.GetFieldContext(ctx).Args["input"]` is the *typed* input struct (e.g. `model.UpdatePerspectiveInput`), not `map[string]interface{}`. Directive/middleware code that digs a value out of an input object must read the struct (by `json` tag via reflection), not just type-assert to a map — a map-only assertion silently fails for every real request. See `directives/auth.go` `extractResourceID`/`fieldByJSONTag`.
 
+**`Perspective.ReviewStatus`** is moderation state (`PENDING`/`APPROVED`/`REJECTED`) — don't reuse it for draft/imported markers; use `labels` or `customFields`.
+
 **Cursor pagination:** Opaque base64 (`cursor:<id>`), keyset (not OFFSET), fetch `limit+1` for `hasNextPage`, whitelist sort columns (SQL injection prevention). Helpers in `helpers.go`.
 
 ### Enum & ID Handling (REQUIRED)
