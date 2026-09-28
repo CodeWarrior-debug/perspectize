@@ -30,6 +30,7 @@ export interface ContentItem {
 		label: string;
 		description: string | null;
 		entityType: string | null;
+		wikipediaUrl: string | null;
 	} | null;
 	createdAt: string;
 	updatedAt: string;
@@ -106,6 +107,7 @@ export const LIST_CONTENT = gql`
 					label
 					description
 					entityType
+					wikipediaUrl
 				}
 				createdAt
 				updatedAt
@@ -164,6 +166,9 @@ export const GET_CONTENT = gql`
 			name
 			url
 			contentType
+			verseStartID
+			verseEndID
+			displayTitle
 			length
 			lengthUnits
 			viewCount
@@ -227,6 +232,7 @@ export const CREATE_CONTENT_FROM_YOUTUBE = gql`
 					label
 					description
 					entityType
+					wikipediaUrl
 				}
 				createdAt
 				updatedAt

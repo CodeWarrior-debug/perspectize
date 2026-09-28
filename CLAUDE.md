@@ -22,9 +22,20 @@ qmd is fully retired — see the `## graphify` section near the bottom of this f
 
 **Always use `gh` CLI** for GitHub operations. Do not use MCP plugins.
 
+**Claude Code cloud sessions:** `gh` CLI is unavailable there — use the GitHub MCP tools (`mcp__github__*`) instead; the `gh api ... /pulls` examples below don't apply. Note `require-session-reflection-before-pr.sh` only pattern-matches a Bash `gh pr create` command, so it doesn't block PR creation via the MCP tool — but still run `/revise-claude-md` first, by convention, and include a Session Learnings section in the PR body.
+
 **Note:** In Claude Code web sessions, `gh` CLI may not be authenticated. If `gh` auth fails:
 - **Creating a PR:** Push the branch with `git push -u origin <branch>` and let the user create the PR via the GitHub UI button. Prepare the PR title and body as copyable text for the user.
 - **Updating a PR:** Output the updated title/body as copyable text so the user can paste it into the GitHub UI.
+
+### PR Creation: Cloud vs. Local Execution
+
+PR-creation autonomy depends on where the session is running:
+
+- **Cloud execution environment** (Claude Code on the web / managed remote container): Claude may create the PR itself, without waiting for explicit user request, whenever it judges the work complete and ready for review (push the branch, then `gh api ... /pulls` per the commands above, following the template rules below). Still never skip the pre-PR checklist (Self-Verification, `/revise-claude-md`, etc.).
+- **Local execution environment** (Claude Code running on the user's own machine): follow the rest of this file's rules as written — do NOT create a PR unless the user explicitly asks for one. Push the branch and hand the user the "Create a pull request" link, or prepare title/body as copyable text if `gh` isn't authenticated.
+
+If it's ambiguous which environment a session is running in, default to the local (ask-first) behavior.
 
 ```bash
 # Pull requests
@@ -58,7 +69,7 @@ gh api repos/CodeWarrior-debug/perspectize/pulls/123/comments
 | `chore`/`build`/`ci` | `chore.md` | Summary, Changes, Verification |
 | `docs` | `docs.md` | Summary, Files Changed, Verification |
 
-Because PRs are created via `gh api` (not `gh pr create`), GitHub's template picker never runs — read the matching template file yourself and shape the `-F body=@<file>` content to its sections before creating the PR. Any UI-visible change should fill in the Demo screenshot table (see [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md) for the `sv-` upload workflow) rather than leaving it blank.
+Because PRs are created via `gh api` (not `gh pr create`), GitHub's template picker never runs — read the matching template file yourself and shape the `-F body=@<file>` content to its sections before creating the PR. Any UI-visible change should fill in the Demo screenshot table (see [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md) for the `sv-` upload workflow) rather than leaving it blank — see the `needs-demo-video` / `ready for review` labeling rule under Self-Verification below; a cloud session can't produce this evidence itself, so it labels instead.
 
 **Issues** — use templates from `.github/ISSUE_TEMPLATE/` (feature_request.md or bug_report.md).
 
@@ -125,6 +136,10 @@ defer db.Close()
 
 **Primary workflow: obra/superpowers** (plugin enabled in `.claude/settings.json`). Use `superpowers:writing-plans` (or its brainstorming/spec-writing counterparts) for planning, and `superpowers:executing-plans` / `superpowers:subagent-driven-development` for execution. Plans and specs live in `docs/superpowers/plans/` and `docs/superpowers/specs/` — see `docs/superpowers/plans/2026-08-15-clerk-derived-user-identity-plan.md` for the established format (plan header names the required execution sub-skill, links its spec, checkbox-tracked (`- [ ]`) tasks).
 
+**Lightweight spike/research docs** (pre-planning, not meant for autonomous execution — e.g. a cost/feasibility writeup before committing to a real plan) also live in `docs/superpowers/specs/`, dated like plans/specs, but state "Status: spike, not a superpowers plan" up top instead of a sub-skill header. Link them from `.planning/ROADMAP.md` at the relevant phase so they aren't orphaned.
+
+**Superpowers unavailable this session?** Check the session's available-skills listing for `superpowers:*` entries before claiming to follow this workflow. If no `superpowers:*` skill is listed (plugin not loaded/connecting in this environment), any plan/spec/spike doc written anyway must say so at the top — `⚠️ Written without superpowers loaded — a superpowers-enabled session should review via writing-plans before this is executed` — so a later session with superpowers actually available knows to validate/regenerate it rather than trusting it as already vetted.
+
 **GSD is legacy — do NOT start new work with it.** Some milestones still have unfinished work tracked under the old workflow in `.planning/phases/` (`PROJECT.md`, `ROADMAP.md`, `STATE.md`, phase `PLAN.md`/`must_haves.truths` files). Finish those specific in-flight phases using their existing GSD plan files/commands rather than replanning them from scratch under superpowers — don't discard partially-done GSD work. All new planning and execution goes through superpowers. Branching for legacy GSD phases: see [.docs/GSD_BRANCHING.md](.docs/GSD_BRANCHING.md).
 
 **Superpowers is the preferred planning + execution orchestrator.** Select GSD commands are kept only for codebase mapping (`gsd:map-codebase`) and roadmap/milestone management (`gsd:new-milestone`, `gsd:add-phase`/`gsd:remove-phase`/`gsd:insert-phase`, `gsd:analyze-dependencies`, `gsd:milestone-summary`, `gsd:complete-milestone`, `gsd:docs-update`).
@@ -147,6 +162,15 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 
 **Browser verification is local-only.** Driving the running app via the Chrome DevTools MCP (`.docs/VERIFICATION.md` §3) needs `.claude/.env` and `.claude/sv-profile/` — both gitignored and hand-provisioned per machine. Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in; run only the headless checklist (build, backend tests, frontend tests) and hand UI-behavior checks back to a local session.
 
+**"ready for review" requires a demo, unless the user says otherwise.** This applies to any PR whose change a user can **see or interact with** — new or changed UI, a fixed user-facing bug, changed app behaviour. Judge by the actual diff, not the commit type or title.
+
+- **No demo needed** (a one-line reason in the Demo section is enough, e.g. "no visible UI change: formatting and test-type fixes"): docs/plan/research records, formatting/lint passes, test-only changes, type-only fixes, tooling/hooks/CI config, and refactors with no behaviour change.
+- A qualifying PR is `ready for review` only once it has either: (a) `sv-` screenshots/video actually captured and linked in the Demo section (see [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md)), or (b) an explicit, specific justification for why none applies — "dark by default, no UI surface", "no visible UI change", not a generic "N/A". A Demo section that just says screenshots are still needed does not qualify, no matter how green CI is.
+- **A cloud session cannot produce that evidence** (no Clerk sign-in, per above). So a cloud session finishing a qualifying (user-visible) PR must apply the `needs-demo-video` label at creation time (`gh api repos/CodeWarrior-debug/perspectize/issues/<n>/labels -f "labels[]=needs-demo-video"` — `gh pr edit` fails here, see below) rather than leaving the PR unlabeled or self-declaring it ready. This is what flags the PR for a local session to pick up and finish.
+- A local session that adds the missing evidence swaps the label: remove `needs-demo-video`, add `ready for review`, and paste the linked evidence into the PR's Demo section (don't just upload assets and leave the placeholder text).
+- `needs-demo-video` and `ready for review` are **mutually exclusive** — never both on the same PR. If a PR is blocked by something else (merge conflict, a real failing/un-run CI check, an unresolved bug), it's fine for it to carry neither label rather than force-fitting one.
+- An owner-only follow-up that needs a credential no agent has (`ANTHROPIC_API_KEY`, a Chrome origin-trial flag, a live Sevalla checkpoint) does **not** by itself block `ready for review` — that's normal handoff, not a missing demo. What blocks it is *this PR's own visible surface* going unverified.
+
 See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow, and [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md) for uploading `sv-` screenshots to a release and linking them in the PR.
 
 **Authenticated self-verify:** `.env*` files (except `.env.example`) are unreadable by design — that's expected, not a broken setup. Logged-in browser verification uses the persistent Chrome profile from `.claude/scripts/sv-chrome.sh`; see [.docs/VERIFICATION.md](.docs/VERIFICATION.md) §0. Never attempt to log in or enter credentials — ask the human to re-run the one-time login if signed out.
@@ -154,7 +178,7 @@ See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow
 ## Resources
 
 **Monorepo docs:**
-- [Architecture](.docs/ARCHITECTURE.md) — System design and hexagonal architecture
+- [Architecture](.docs/ARCHITECTURE.md) — System design and hexagonal architecture (deep-modules rules live in each package CLAUDE.md)
 - [Local Development](.docs/LOCAL_DEVELOPMENT.md) — Setup guide
 - [Agent Routing](.docs/AGENTS.md) — AI agent navigation guide
 - [Domain Guide](.docs/DOMAIN_GUIDE.md) — Domain layer rules and patterns
@@ -189,6 +213,8 @@ See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow
 - **Matching is anchored on command position** (start of string or after a shell separator), not a raw substring search — a trigger phrase (e.g. `gh pr create`) appearing inside a quoted commit message or PR body elsewhere on the line does not fire the hook.
 
 **Shared git pre-commit hook (`.hooks/pre-commit`, real `core.hooksPath` hook — not a Claude Code hook):** Auto-formats staged `backend/*.go` (gofmt) and `frontend/src/*.{svelte,ts,js}` (prettier) files and re-stages them on every `git commit`, regardless of what tool/human is committing. Also **blocks** (does not auto-fix) new raw hex/rgb colour literals added to `frontend/src/lib/components/**` or `formatting.ts` — see `.docs/UI_THOROUGHNESS_CHECKLIST.md` §3.3; allowlist an intentional one inline with a `hex-ok: <reason>` comment. Not active by default — activate once per checkout with `make install-hooks` (from `backend/`, sets `core.hooksPath` to `.hooks`). This is what actually prevents the CI `Build` job's `gofmt -l .` check from failing (as it did on PR #366); the `.claude/hooks/gofmt-precommit.sh` PreToolUse reminder above is only a fallback for a checkout where this hasn't been activated yet.
+
+**Cloud/CI sessions start with `core.hooksPath` unset** — a fresh container checkout has never run `make install-hooks`, so commits made there get no gofmt/prettier auto-fix at all (the PreToolUse reminders above only fire on a matching Bash command, and there's no frontend-side reminder). Either run `make install-hooks` once per session, or manually run `gofmt -l .` (backend) / `pnpm exec prettier --check <files>` (frontend) before every commit and fix flagged files with `--write` before pushing.
 
 **Cowork session cleanup:** Claude cowork (claude.ai web) sessions leave `_tmp_*` files and conversation transcript `.txt` files in the repo root and `frontend/`. Delete these before committing.
 

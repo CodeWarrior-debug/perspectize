@@ -90,6 +90,13 @@ export interface VideoItem {
 	publishedAt: string;
 	description: string;
 	thumbnails: YouTubeThumbnails;
+	/**
+	 * ISO 8601 duration (e.g. "PT4M13S"), only present for videos.list
+	 * (trending) results — search.list has no contentDetails, so this is
+	 * undefined for search results (see the plan's "out of scope" note: search
+	 * duration would need a separate videos.list enrichment call).
+	 */
+	duration?: string;
 }
 
 /** Normalize a search.list result item into the common VideoItem shape. */
@@ -98,6 +105,11 @@ export function toVideoItem(item: SearchResultItem): VideoItem;
 export function toVideoItem(item: TrendingItem): VideoItem;
 export function toVideoItem(item: SearchResultItem | TrendingItem): VideoItem {
 	const id = typeof item.id === 'string' ? item.id : item.id.videoId;
+	// contentDetails only exists on TrendingItem — a SearchResultItem simply
+	// doesn't have the property at runtime, so this cast is safe (accessing a
+	// missing property yields undefined, same as the `duration?: string`
+	// contract on VideoItem below).
+	const duration = (item as TrendingItem).contentDetails?.duration;
 	return {
 		id,
 		title: item.snippet.title,
@@ -105,6 +117,7 @@ export function toVideoItem(item: SearchResultItem | TrendingItem): VideoItem {
 		publishedAt: item.snippet.publishedAt,
 		description: item.snippet.description,
 		thumbnails: item.snippet.thumbnails,
+		duration,
 	};
 }
 

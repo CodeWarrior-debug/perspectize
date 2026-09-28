@@ -141,14 +141,20 @@ func categoryDomainToModel(c *domain.Category) *model.Category {
 	if c == nil {
 		return nil
 	}
+	var wikipediaURL *string
+	if c.WikipediaURL != "" {
+		wikipediaURL = &c.WikipediaURL
+	}
+
 	return &model.Category{
-		ID:          strconv.Itoa(c.ID),
-		WikidataQid: c.WikidataQID,
-		Label:       c.Label,
-		Description: &c.Description,
-		EntityType:  &c.EntityType,
-		CreatedAt:   c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:   c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:           strconv.Itoa(c.ID),
+		WikidataQid:  c.WikidataQID,
+		Label:        c.Label,
+		Description:  &c.Description,
+		EntityType:   &c.EntityType,
+		WikipediaURL: wikipediaURL,
+		CreatedAt:    c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:    c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
 

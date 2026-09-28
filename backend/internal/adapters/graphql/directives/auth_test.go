@@ -96,6 +96,14 @@ func (m *mockPerspectiveService) AggregateByContentIDs(ctx context.Context, cont
 	return map[int]*domain.PerspectiveAggregate{}, nil
 }
 
+func (m *mockPerspectiveService) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
+	return &domain.FeelingStats{Emoji: emoji, Label: label}, nil
+}
+
+func (m *mockPerspectiveService) CustomFieldStats(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error) {
+	return &domain.CustomFieldStats{Key: key}, nil
+}
+
 // withFieldContext creates a context with a gqlgen FieldContext
 func withFieldContext(ctx context.Context, fieldName string, args map[string]interface{}) context.Context {
 	fc := &graphql.FieldContext{

@@ -28,11 +28,17 @@
 	import { Button } from '$lib/components/shadcn';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
 	import { formatDuration, extractVideoIdFromUrl } from '$lib/utils/formatting';
+	import { passageIconLabels } from '$lib/utils/bible';
+	import BiblePassageIcon from '$lib/components/BiblePassageIcon.svelte';
 
 	interface CompareContentBanner {
 		id: string;
 		name: string;
 		url: string | null;
+		contentType?: string;
+		verseStartID?: number | null;
+		verseEndID?: number | null;
+		displayTitle?: string | null;
 		length: number | null;
 		lengthUnits: string | null;
 	}
@@ -166,6 +172,7 @@
 	// to add a perspective from.
 	const viewerHasPerspective = $derived(meCtx.me ? perspectives.some((p) => p.userID === meCtx.me!.id) : true);
 
+	const isPassage = $derived(content?.contentType === 'BIBLE_PASSAGE');
 	const contentVideoId = $derived(extractVideoIdFromUrl(content?.url ?? null));
 </script>
 
@@ -182,7 +189,11 @@
 
 	{#snippet contentBannerInner()}
 		<div class="flex items-center gap-2.5">
-			{#if contentVideoId}
+			{#if isPassage}
+				<div class="h-8 w-10 flex-none overflow-hidden rounded bg-muted">
+					<BiblePassageIcon {...passageIconLabels(content ?? {})} />
+				</div>
+			{:else if contentVideoId}
 				<img
 					src={`https://i.ytimg.com/vi/${contentVideoId}/default.jpg`}
 					alt=""

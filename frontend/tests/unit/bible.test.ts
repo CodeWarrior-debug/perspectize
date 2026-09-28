@@ -7,6 +7,10 @@ import {
 	rangeToVerseIds,
 	verseIdsToRange,
 	TOTAL_VERSES,
+	abbreviateBookName,
+	formatChapterVerse,
+	abbreviateReferenceFromVerseIds,
+	passageIconLabels,
 	type PassageRange,
 } from '$lib/utils/bible';
 import { BIBLE_BOOKS } from '$lib/utils/bibleStructure';
@@ -117,5 +121,51 @@ describe('verse ordinals', () => {
 	it('returns null for cross-book or reversed id pairs', () => {
 		expect(verseIdsToRange(1, 31102)).toBeNull();
 		expect(verseIdsToRange(10, 5)).toBeNull();
+	});
+});
+
+describe('abbreviateBookName', () => {
+	it('picks the shortest known alias', () => {
+		expect(abbreviateBookName(43)).toBe('Jn'); // John
+		expect(abbreviateBookName(1)).toBe('Gn'); // Genesis
+	});
+
+	it('returns empty string for an unknown book id', () => {
+		expect(abbreviateBookName(9999)).toBe('');
+	});
+});
+
+describe('formatChapterVerse', () => {
+	it('formats a single verse, a same-chapter range, and a cross-chapter range', () => {
+		expect(formatChapterVerse({ bookId: 43, startChapter: 3, startVerse: 16, endChapter: 3, endVerse: 16 })).toBe(
+			'3:16',
+		);
+		expect(formatChapterVerse({ bookId: 43, startChapter: 3, startVerse: 16, endChapter: 3, endVerse: 18 })).toBe(
+			'3:16-18',
+		);
+		expect(formatChapterVerse({ bookId: 43, startChapter: 3, startVerse: 16, endChapter: 4, endVerse: 2 })).toBe(
+			'3:16-4:2',
+		);
+	});
+});
+
+describe('abbreviateReferenceFromVerseIds', () => {
+	it('splits a valid same-book range into book abbreviation + chapter:verse', () => {
+		expect(abbreviateReferenceFromVerseIds(26137, 26137)).toEqual({ book: 'Jn', chapterVerse: '3:16' });
+	});
+
+	it('returns null for a cross-book or reversed pair', () => {
+		expect(abbreviateReferenceFromVerseIds(1, 31102)).toBeNull();
+		expect(abbreviateReferenceFromVerseIds(10, 5)).toBeNull();
+	});
+});
+
+describe('passageIconLabels', () => {
+	it('puts the book abbreviation on the left page and chapter:verse on the right', () => {
+		expect(passageIconLabels({ verseStartID: 26137, verseEndID: 26137 })).toEqual({ left: 'Jn', right: '3:16' });
+	});
+
+	it('returns empty labels when verse ids are missing (icon renders with no text)', () => {
+		expect(passageIconLabels({})).toEqual({ left: '', right: '' });
 	});
 });
