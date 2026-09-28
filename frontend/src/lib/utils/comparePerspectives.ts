@@ -37,16 +37,27 @@ export interface FeelingComparison {
 	rightOnly: FeelingRef[];
 }
 
+/**
+ * 'oneSided' covers exactly one side giving a thumbs verdict — distinct from
+ * 'differ' (both gave opposite verdicts) so the UI never renders a missing
+ * verdict with the same "disagreement" styling as an actual conflict.
+ */
+export type OverallStatus = 'agree' | 'differ' | 'oneSided' | 'none';
+
 export interface OverallComparison {
 	left: string | null;
 	right: string | null;
-	agree: boolean;
+	status: OverallStatus;
 }
 
 export interface ComparisonSummary {
 	similar: number;
 	diverges: number;
 	conflict: number;
+	/** Dimensions only the left side filled in — see `filledInDifferently`. */
+	leftOnly: number;
+	/** Dimensions only the right side filled in — see `filledInDifferently`. */
+	rightOnly: number;
 }
 
 /** Handoff-specified thresholds, in display units (0.0-10.0 scale). */
@@ -207,8 +218,15 @@ export function compareFeelings(left: PerspectiveItem, right: PerspectiveItem): 
 }
 
 export function compareOverall(left: PerspectiveItem, right: PerspectiveItem): OverallComparison {
-	const agree = left.like !== null && right.like !== null && left.like === right.like;
-	return { left: left.like, right: right.like, agree };
+	let status: OverallStatus;
+	if (left.like === null && right.like === null) {
+		status = 'none';
+	} else if (left.like === null || right.like === null) {
+		status = 'oneSided';
+	} else {
+		status = left.like === right.like ? 'agree' : 'differ';
+	}
+	return { left: left.like, right: right.like, status };
 }
 
 /**
@@ -225,9 +243,13 @@ export function agreementPercent(rows: RatingRow[]): number | null {
 	return Math.round(100 - avgPctDiff);
 }
 
-export function summarize(rows: RatingRow[]): ComparisonSummary {
-	const summary: ComparisonSummary = { similar: 0, diverges: 0, conflict: 0 };
+export function summarize(rows: RatingRow[], oneSidedRows: FilledInDifferentlyRow[] = []): ComparisonSummary {
+	const summary: ComparisonSummary = { similar: 0, diverges: 0, conflict: 0, leftOnly: 0, rightOnly: 0 };
 	for (const row of rows) summary[row.status]++;
+	for (const row of oneSidedRows) {
+		if (row.side === 'left') summary.leftOnly++;
+		else summary.rightOnly++;
+	}
 	return summary;
 }
 
