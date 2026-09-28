@@ -1027,7 +1027,7 @@
 	});
 </script>
 
-<div class="flex flex-col h-full gap-2">
+<div class="flex flex-col h-full gap-0">
 	<!-- Active Filter Chips — always visible so users can clear filters even during errors -->
 	<FilterChips
 		{gridApi}
@@ -1091,7 +1091,7 @@
 
 	<!-- Manual Pagination Controls -->
 	<div
-		class="shrink-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-0 px-2 md:px-4 py-1.5 border-t border-border text-xs md:text-sm"
+		class="shrink-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-0 px-2 md:pl-4 md:pr-20 py-1.5 border-t border-border text-xs md:text-sm"
 	>
 		<div class="flex items-center gap-2 md:gap-4">
 			<div class="text-muted-foreground">

@@ -137,7 +137,7 @@
 </script>
 
 {#if chips.length > 0}
-	<div class="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border bg-muted/30">
+	<div class="flex flex-wrap items-center gap-2 px-3 py-1 border-b border-border bg-muted/30">
 		{#each chips as chip (chip.colId)}
 			<span
 				class="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 text-xs rounded-full bg-primary/10 text-primary border border-primary/20"
