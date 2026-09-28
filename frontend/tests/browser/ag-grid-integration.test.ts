@@ -117,7 +117,7 @@ describe('AG Grid Lifecycle', () => {
 	});
 
 	it('renders AG Grid DOM structure', async () => {
-		const screen = render(AGGridTestHarness, {
+		const screen = await render(AGGridTestHarness, {
 			testRowData: SAMPLE_ROWS,
 		});
 
@@ -405,7 +405,7 @@ describe('AG Grid API Operations', () => {
 
 	it('can update row data reactively', async () => {
 		let api: GridApi | null = null;
-		const screen = render(AGGridTestHarness, {
+		render(AGGridTestHarness, {
 			testRowData: SAMPLE_ROWS,
 			onGridReady: (a) => {
 				api = a;
