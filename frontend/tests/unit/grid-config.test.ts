@@ -266,6 +266,16 @@ describe('filterContentRows', () => {
 		expect(result.map((r) => r.id)).toEqual(['1']);
 	});
 
+	it('filters by a set filter, matching any of the selected types', () => {
+		const rows = [
+			row({ id: '1', contentType: 'YOUTUBE' }),
+			row({ id: '2', contentType: 'CLAIM' }),
+			row({ id: '3', contentType: 'BIBLE_PASSAGE' }),
+		];
+		const result = filterContentRows(rows, { type: { filterType: 'set', values: ['youtube', 'bible_passage'] } });
+		expect(result.map((r) => r.id)).toEqual(['1', '3']);
+	});
+
 	it('filters by a number range (views)', () => {
 		const rows = [
 			row({ id: '1', viewCount: 500 }),

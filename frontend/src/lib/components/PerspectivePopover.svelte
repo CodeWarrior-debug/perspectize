@@ -28,8 +28,7 @@
 	import { useCreatePerspective } from '$lib/queries/perspectives/useCreatePerspective';
 	import { useUpdatePerspective } from '$lib/queries/perspectives/useUpdatePerspective';
 	import type { PerspectiveItem } from '$lib/queries/perspectives';
-	import type { Feeling } from '$lib/components/FeelWheel.svelte';
-	import type { Component } from 'svelte';
+	import FeelWheel, { type Feeling } from '$lib/components/FeelWheel.svelte';
 
 	/**
 	 * PerspectivePopover — centered modal for creating or editing a perspective.
@@ -74,19 +73,10 @@
 	// Privacy toggle — off (PUBLIC) by default
 	let isPrivate = $state(false);
 
-	// Feel-wheel — lazy-loaded only once the picker is opened, so read-only
-	// perspective views never pull the wheel/search-set code into their bundle.
+	// Feel-wheel — bundled with the popover rather than lazy-loaded: a separate
+	// chunk could fail to fetch after a deploy and leave the picker stuck loading.
 	let feelings = $state<Feeling[]>([]);
 	let feelWheelOpen = $state(false);
-	let FeelWheelComponent = $state<Component<{ value: Feeling[] }> | null>(null);
-
-	async function openFeelWheel() {
-		feelWheelOpen = true;
-		if (!FeelWheelComponent) {
-			const mod = await import('$lib/components/FeelWheel.svelte');
-			FeelWheelComponent = mod.default;
-		}
-	}
 
 	// Comment (rich text HTML)
 	let comment = $state('');
@@ -207,11 +197,7 @@
 		isPrivate = String(existingPerspective?.privacy ?? '').toUpperCase() === 'PRIVATE';
 		const nextFeelings = existingPerspective?.feelings ?? [];
 		feelings = nextFeelings;
-		if (nextFeelings.length > 0) {
-			void openFeelWheel();
-		} else {
-			feelWheelOpen = false;
-		}
+		feelWheelOpen = nextFeelings.length > 0;
 		// Restore dynamic fields from customFields if editing
 		const cf = existingPerspective?.customFields as Record<string, number> | null;
 		if (cf && Object.keys(cf).length > 0) {
@@ -519,18 +505,16 @@
 			{#if !feelWheelOpen}
 				<button
 					type="button"
-					onclick={openFeelWheel}
+					onclick={() => (feelWheelOpen = true)}
 					class="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-2 text-sm text-muted-foreground hover:opacity-70"
 				>
 					<span class="text-base leading-none">🙂</span>
 					Add a feeling
 				</button>
-			{:else if FeelWheelComponent}
-				<div class="rounded-md border border-border p-3">
-					<FeelWheelComponent bind:value={feelings} />
-				</div>
 			{:else}
-				<div class="text-center text-sm text-muted-foreground py-4">Loading feel-wheel…</div>
+				<div class="rounded-md border border-border p-3">
+					<FeelWheel bind:value={feelings} />
+				</div>
 			{/if}
 
 			<div class="flex items-center justify-between rounded-md border border-border px-3 py-2">

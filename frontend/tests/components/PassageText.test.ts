@@ -5,6 +5,7 @@ import PassageText from '$lib/components/PassageText.svelte';
 const mocks = vi.hoisted(() => ({
 	mockQueryState: { data: null as unknown, isLoading: false, isError: false },
 	lastOptions: null as any,
+	mutate: vi.fn(),
 }));
 
 vi.mock('@tanstack/svelte-query', () => ({
@@ -12,6 +13,9 @@ vi.mock('@tanstack/svelte-query', () => ({
 		mocks.lastOptions = opts();
 		return mocks.mockQueryState;
 	},
+	// Only the "See <ref> only" prompt (VerseJumpPrompt → useOpenPassage) mutates.
+	createMutation: () => ({ mutate: mocks.mutate, isPending: false }),
+	useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
 vi.mock('$lib/components/interlinear/OriginalLanguage.svelte', async () => {
@@ -138,5 +142,61 @@ describe('PassageText', () => {
 		mocks.mockQueryState.isError = false;
 		render(PassageText, { props: { startVerseId: 1, endVerseId: 200 } });
 		expect(screen.queryByRole('button', { name: /original language/i })).not.toBeInTheDocument();
+	});
+
+	describe('verse number → "See <ref> only"', () => {
+		beforeEach(() => {
+			mocks.mutate.mockReset();
+			mocks.mockQueryState.data = {
+				passageText: { translation: 'BSB', copyright: COPYRIGHT, verses: makeVerses(3) },
+			};
+		});
+
+		it('clicking a verse number opens a prompt for that verse alone', async () => {
+			render(PassageText, { props: { startVerseId: 1, endVerseId: 3 } });
+			const verse2 = screen.getByRole('button', { name: 'Verse 2' });
+			expect(verse2).toHaveAttribute('aria-expanded', 'false');
+			await fireEvent.click(verse2);
+			expect(verse2).toHaveAttribute('aria-expanded', 'true');
+			expect(screen.getByRole('dialog', { name: /Genesis 1:2 on its own/ })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: /See Genesis 1:2 only/ })).toHaveFocus();
+		});
+
+		it("the prompt's button find-or-creates that single verse", async () => {
+			render(PassageText, { props: { startVerseId: 1, endVerseId: 3 } });
+			await fireEvent.click(screen.getByRole('button', { name: 'Verse 2' }));
+			await fireEvent.click(screen.getByRole('button', { name: /See Genesis 1:2 only/ }));
+			expect(mocks.mutate).toHaveBeenCalledWith(
+				{ bookId: 1, startChapter: 1, startVerse: 2, endChapter: 1, endVerse: 2 },
+				expect.anything(),
+			);
+		});
+
+		it('clicking the same verse number again, pressing Escape, or tapping away closes it', async () => {
+			render(PassageText, { props: { startVerseId: 1, endVerseId: 3 } });
+			const verse1 = screen.getByRole('button', { name: 'Verse 1' });
+
+			await fireEvent.click(verse1);
+			await fireEvent.click(verse1);
+			expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+			await fireEvent.click(verse1);
+			await fireEvent.keyDown(document, { key: 'Escape' });
+			expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+			expect(verse1).toHaveFocus();
+
+			await fireEvent.click(verse1);
+			await fireEvent.pointerDown(document.body);
+			expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+		});
+
+		it('a single-verse passage keeps plain (non-clickable) verse numbers', () => {
+			mocks.mockQueryState.data = {
+				passageText: { translation: 'BSB', copyright: COPYRIGHT, verses: makeVerses(1) },
+			};
+			const { container } = render(PassageText, { props: { startVerseId: 1, endVerseId: 1 } });
+			expect(screen.queryByRole('button', { name: /^Verse/ })).not.toBeInTheDocument();
+			expect(container.querySelector('sup')?.textContent).toBe('1');
+		});
 	});
 });

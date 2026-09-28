@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
 
 	interface Props {
 		value: string; // hex
@@ -12,9 +13,16 @@
 	let container: HTMLDivElement;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let picker: any;
+	let loadFailed = $state(false);
 
 	onMount(async () => {
-		const { default: iro } = await import('@jaames/iro');
+		let iro;
+		try {
+			({ default: iro } = await import('@jaames/iro'));
+		} catch {
+			loadFailed = true;
+			return;
+		}
 		picker = new iro.ColorPicker(container, {
 			width: size,
 			color: value,
@@ -37,4 +45,7 @@
 	});
 </script>
 
+{#if loadFailed}
+	<LazyLoadError what="the colour picker" />
+{/if}
 <div bind:this={container} data-testid="color-wheel"></div>

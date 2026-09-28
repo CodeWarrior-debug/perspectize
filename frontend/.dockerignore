@@ -1,0 +1,12 @@
+# Keeps local installs, build output and secrets out of the demo image's
+# build context (see Dockerfile.demo).
+node_modules/
+.svelte-kit/
+build/
+coverage/
+demo/out/
+android/
+ios/
+.env
+.env.*
+!.env.example
