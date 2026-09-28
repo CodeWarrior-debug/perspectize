@@ -14,7 +14,7 @@
 	} = $props();
 
 	let draft = $state('');
-	const controller = createTypingController({ emit: onTypingChange });
+	const controller = createTypingController({ emit: (typing) => onTypingChange(typing) });
 
 	$effect(() => () => controller.stop());
 

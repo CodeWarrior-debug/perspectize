@@ -1,9 +1,44 @@
+import { execFileSync } from 'node:child_process';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
+import { computeTag } from './src/lib/utils/buildTag';
+
+// Resolves frontend build facts for the zzzv console hotkey (see
+// lib/utils/versionHotkey.ts) from the local git checkout, at build time.
+// Falls back to "unknown" for everything if there's no .git available —
+// e.g. the Sevalla static-site build environment isn't confirmed to have
+// one (their env vars are Application-only per docs.sevalla.com), so this
+// must never throw and break the build.
+function resolveGitBuildInfo() {
+	const unknown = { tag: 'unknown', branch: 'unknown', commit: 'unknown', commitShort: 'unknown' };
+	const git = (...args: string[]) =>
+		execFileSync('git', args, { stdio: ['ignore', 'pipe', 'ignore'] })
+			.toString()
+			.trim();
+
+	try {
+		const commit = git('rev-parse', 'HEAD');
+		const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
+		const committerDate = git('log', '-1', '--format=%cI', 'HEAD');
+		return {
+			tag: computeTag(committerDate, commit),
+			branch,
+			commit,
+			commitShort: commit.slice(0, 7),
+		};
+	} catch {
+		return unknown;
+	}
+}
+
+const buildInfo = { ...resolveGitBuildInfo(), buildTime: new Date().toISOString() };
 
 export default defineConfig({
+	define: {
+		__BUILD_INFO__: JSON.stringify(buildInfo),
+	},
 	plugins: [
 		sveltekit(),
 		tailwindcss(),
