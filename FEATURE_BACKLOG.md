@@ -568,3 +568,21 @@ At current traffic this is fine. At real scale (many requests per second from th
 **Priority:** Low — not worth the complexity at current (Sevalla-hosted, low-traffic) scale. Revisit if/when request volume from authenticated users grows meaningfully.
 
 **Source:** Dev discussion (2026-09-10), during PR #356 (issue #246 userID-spoofing fix) — question about whether `auth.RequireAuth`'s context lookup or the upstream middleware's DB call would ever become a cost concern.
+
+---
+
+## Backend Proxy/Cache for the YouTube Data API (Discover Page)
+
+**Type:** Dev × Performance / Security
+
+`frontend/src/lib/services/youtubeApi.ts` calls the YouTube Data API v3 straight from the browser using `VITE_YOUTUBE_API_KEY`, a build-time env var that ends up embedded in the shipped JS bundle. There's no backend caching layer — every uncached Discover page trending/search request spends real YouTube API quota, and the key itself is visible to anyone who opens devtools.
+
+**What to do:**
+
+- Add a thin backend endpoint (or GraphQL resolver) that proxies `search.list` / `videos.list?chart=mostPopular` requests, holding `YOUTUBE_API_KEY` server-side only.
+- Cache trending/search responses server-side (in-memory or Redis, keyed by query/region) with a TTL matching or exceeding the frontend's current `staleTime` (5 min search / 1 hr trending), so concurrent users share one YouTube quota hit instead of each paying their own.
+- This also removes the API key from the client bundle entirely.
+
+**Priority:** Low-Medium — current MVP quota levels are fine (see `.planning/phases/15-discover-page/15-CONTEXT.md`), and the client-side gcTime/staleTime tuning done in the discover-thumbnail-facade fix already reduces redundant refetches. Worth doing once Discover traffic or quota usage grows.
+
+**Source:** Dev request (2026-09-28), Discover page slow-media-loading investigation (bugfix/discover-thumbnail-facade) — explicitly out of scope for that PR per its own instructions.

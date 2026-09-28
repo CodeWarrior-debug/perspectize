@@ -35,6 +35,16 @@ jobs:
         working-directory: frontend
         run: pnpm run test:coverage
 
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run browser-mode tests
+        working-directory: frontend
+        env:
+          SV_SCREENSHOTS_DIR: ${{ runner.temp }}/screenshots
+        run: pnpm run test:browser --browser.headless=true
+
       - name: Upload coverage reports
         uses: actions/upload-artifact@v6
         if: always()
