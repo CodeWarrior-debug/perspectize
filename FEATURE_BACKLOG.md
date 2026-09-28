@@ -568,3 +568,21 @@ At current traffic this is fine. At real scale (many requests per second from th
 **Priority:** Low — not worth the complexity at current (Sevalla-hosted, low-traffic) scale. Revisit if/when request volume from authenticated users grows meaningfully.
 
 **Source:** Dev discussion (2026-09-10), during PR #356 (issue #246 userID-spoofing fix) — question about whether `auth.RequireAuth`'s context lookup or the upstream middleware's DB call would ever become a cost concern.
+
+---
+
+## Research Spike: Jev (TypeSafe AI "System One" model) for the future AI bot
+
+**Type:** Research Spike — not scoped, no code/config changes made.
+
+**Status:** Confirmed as a real product (TypeSafe AI, founder Diogo Almeida ex-OpenAI, $40M seed led by DCVC, early access 2026-09-15). It is a fast decision/classification model ("System One" — returns typed Choice/Score/Noul answers with calibrated probabilities in ~70-500ms), **not** a code-generation or reasoning model. It does not compete with Claude Code; it's a candidate cheap-and-fast "yes/no/classify" layer that could sit *alongside* an AI agent.
+
+**Why this is logged now instead of piloted:** research turned up ~15 third-party/community repos and Claude Code plugin/MCP integrations (`jev-kit`, `jev-code`, `limpet`, `fast-jev-compaction`, `jev-ci-triage`, two unrelated `jev-harness` projects, `jevtriage`, `jev-test-triage`, `jev-logtriage`, `graphql-classifier`, `jevcal`, plus four "awesome-jev" list repos) that appeared almost immediately after launch — a pattern worth treating with real suspicion (typosquatting / unvetted supply-chain risk), especially since several are pitched as plugging directly into CI merge gates, Claude Code's tool-call approval flow, or agent Stop hooks (i.e., things that could approve destructive commands or silently fail open). None of these should be installed without independently reading their source and confirming maintainer legitimacy first — a vendor README claim is not verification.
+
+**Where Jev could be worth real evaluation later:** when Perspectize implements its own AI bot feature (not yet built), Jev's fast/cheap classification could plausibly be useful as a pre-filter/guard layer in that bot's pipeline (e.g., cheap moderation/routing/confidence checks before an expensive model call) — that's the point at which a proper spend of time vetting official SDKs (Python/JS have official ones; Go only has unofficial community clients so far — `jev-go`, `go-jev`, `typesafe-go`) and re-running this research against the actual bot design would be worthwhile.
+
+**Do not pilot any of the community CI/agent-guard repos listed above until:** (1) the AI bot feature has a concrete design that identifies a real use case, and (2) each candidate repo is independently source-reviewed for what it actually does with any credentials/permissions it's given.
+
+**Priority:** Deferred — revisit specifically when AI bot implementation work is scoped, not before.
+
+**Source:** Dev research spike (2026-09-27/28), requested as "where can Jev enhance my workflow" — full findings captured in session, official links: https://typesafe.ai/blog/introducing-system-one-models-and-jev, https://docs.typesafe.ai/introduction/coding-agents.
