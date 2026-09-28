@@ -27,11 +27,15 @@
 		const currentId = clerkUserId ?? null;
 		if (currentId === lastSyncedClerkUserId) return;
 
+		const isInitialResolution = lastSyncedClerkUserId === undefined;
 		lastSyncedClerkUserId = currentId;
 		// content.lists(), perspectives.listByUser(), etc. are all user-scoped —
 		// clear everything, not just the me query, so nothing leaks across
-		// accounts on a shared device.
-		queryClient.clear();
+		// accounts on a shared device. The first resolution isn't an account
+		// change and nothing user-scoped is cached yet; clearing then would
+		// detach queries siblings already started (demo mode has auth loaded at
+		// mount, so they'd never recover).
+		if (!isInitialResolution) queryClient.clear();
 
 		if (currentId === null) {
 			clearUserSelection();

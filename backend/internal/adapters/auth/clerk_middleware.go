@@ -52,7 +52,7 @@ func newAuthHandler(userRepo repositories.UserRepository, verifier portservices.
 			if errors.Is(err, domain.ErrNotFound) && demo.IsDemoClerkID(clerkUserID) {
 				// Demo personas exist only once seeded (cmd/seed-demo); they
 				// have no Clerk profile to fetch, so never create them on demand.
-				slog.Warn("demo persona not seeded", "clerk_user_id", clerkUserID)
+				slog.Warn("demo persona not seeded")
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -61,7 +61,6 @@ func newAuthHandler(userRepo repositories.UserRepository, verifier portservices.
 				clerkUsr, fetchErr := clerkuser.Get(r.Context(), clerkUserID)
 				if fetchErr != nil {
 					slog.Warn("clerk user not found via API",
-						"clerk_user_id", clerkUserID,
 						"error", fetchErr,
 					)
 					next.ServeHTTP(w, r)
@@ -109,13 +108,11 @@ func newAuthHandler(userRepo repositories.UserRepository, verifier portservices.
 							linked, updErr := userRepo.Update(r.Context(), existing)
 							if updErr == nil {
 								slog.Info("linked clerk ID to existing user by email",
-									"clerk_user_id", clerkUserID,
 									"local_user_id", existing.ID,
 								)
 								user = linked
 							} else {
 								slog.Error("failed to link clerk ID to existing user",
-									"clerk_user_id", clerkUserID,
 									"error", updErr,
 								)
 								next.ServeHTTP(w, r)
@@ -123,7 +120,6 @@ func newAuthHandler(userRepo repositories.UserRepository, verifier portservices.
 							}
 						} else {
 							slog.Error("failed to find existing user by email for linking",
-								"clerk_user_id", clerkUserID,
 								"email", email,
 								"error", linkErr,
 							)
@@ -132,7 +128,6 @@ func newAuthHandler(userRepo repositories.UserRepository, verifier portservices.
 						}
 					} else {
 						slog.Error("failed to create user on-demand",
-							"clerk_user_id", clerkUserID,
 							"error", createErr,
 						)
 						next.ServeHTTP(w, r)
@@ -140,14 +135,12 @@ func newAuthHandler(userRepo repositories.UserRepository, verifier portservices.
 					}
 				} else {
 					slog.Info("on-demand user creation",
-						"clerk_user_id", clerkUserID,
 						"local_user_id", localUser.ID,
 					)
 					user = localUser
 				}
 			} else {
 				slog.Error("failed to lookup user by clerk ID",
-					"clerk_user_id", clerkUserID,
 					"error", err,
 				)
 				next.ServeHTTP(w, r)
