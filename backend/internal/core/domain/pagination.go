@@ -32,7 +32,9 @@ type ContentSortRule struct {
 
 // ContentFilter contains filter criteria for content queries
 type ContentFilter struct {
-	ContentType      *ContentType
+	ContentType *ContentType
+	// ContentTypes matches any of these types (OR'd). Empty = no type filter.
+	ContentTypes     []ContentType
 	MinLengthSeconds *int
 	MaxLengthSeconds *int
 	Search           *string

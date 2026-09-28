@@ -53,45 +53,17 @@ const addedContent: ContentItem = {
 // jsdom doesn't implement scrollIntoView.
 Element.prototype.scrollIntoView = vi.fn();
 
-// Mirrors tests/setup.ts's default IntersectionObserver mock (fires
-// isIntersecting: true synchronously) — re-installed after every test so a
-// test that swaps in a PendingObserver doesn't leave later tests without any
-// IntersectionObserver at all (vi.unstubAllGlobals would unwind all the way
-// back to jsdom's real — nonexistent — implementation, not just this file's
-// override).
-class AutoIntersectObserverMock implements IntersectionObserver {
-	readonly root = null;
-	readonly rootMargin = '';
-	readonly scrollMargin = '';
-	readonly thresholds: ReadonlyArray<number> = [];
-	private callback: IntersectionObserverCallback;
-	constructor(callback: IntersectionObserverCallback) {
-		this.callback = callback;
-	}
-	observe(target: Element) {
-		this.callback([{ isIntersecting: true, target } as IntersectionObserverEntry], this);
-	}
-	unobserve() {}
-	disconnect() {}
-	takeRecords(): IntersectionObserverEntry[] {
-		return [];
-	}
-}
-
 afterEach(() => {
-	vi.stubGlobal('IntersectionObserver', AutoIntersectObserverMock);
 	vi.mocked(Element.prototype.scrollIntoView).mockClear();
 });
 
 describe('VideoCard', () => {
-	it('renders title, channel, description, and the embedded player', () => {
+	it('renders title, channel, and description', () => {
 		render(VideoCard, { props: { video, onAdd: vi.fn() } });
 
 		expect(screen.getByText('A great video')).toBeInTheDocument();
 		expect(screen.getByText('Great Channel')).toBeInTheDocument();
 		expect(screen.getByText('A description of the great video')).toBeInTheDocument();
-		const iframe = screen.getByTitle('A great video') as HTMLIFrameElement;
-		expect(iframe.src).toBe('https://www.youtube.com/embed/abc123');
 	});
 
 	describe('duration badge', () => {
@@ -106,31 +78,38 @@ describe('VideoCard', () => {
 		});
 	});
 
-	describe('inline player lazy-mount', () => {
-		it('does not mount the iframe until intersection fires', () => {
-			class PendingObserver implements IntersectionObserver {
-				readonly root = null;
-				readonly rootMargin = '';
-				readonly scrollMargin = '';
-				readonly thresholds: ReadonlyArray<number> = [];
-				observe() {}
-				unobserve() {}
-				disconnect() {}
-				takeRecords(): IntersectionObserverEntry[] {
-					return [];
-				}
-			}
-			vi.stubGlobal('IntersectionObserver', PendingObserver);
-
+	describe('thumbnail facade', () => {
+		it('renders the thumbnail img (with src/srcset/alt) and no iframe when not activated, even after an IntersectionObserver entry fires', () => {
+			// Default setup.ts mock fires isIntersecting: true synchronously for
+			// anything that still observes — VideoCard shouldn't be one of them
+			// any more (the iframe only ever mounts on explicit activation).
 			render(VideoCard, { props: { video, onAdd: vi.fn() } });
 
+			const img = screen.getByAltText(video.title) as HTMLImageElement;
+			expect(img.src).toBe('https://img.example/medium.jpg');
+			expect(img.srcset).toBe('https://img.example/medium.jpg 320w');
+			expect(img.getAttribute('loading')).toBe('lazy');
 			expect(screen.queryByTitle(video.title)).not.toBeInTheDocument();
 		});
 
-		it('mounts and focuses the iframe once intersection fires', () => {
-			// Default setup.ts mock fires isIntersecting: true synchronously.
-			render(VideoCard, { props: { video, onAdd: vi.fn() } });
-			expect(screen.getByTitle(video.title)).toBeInTheDocument();
+		it('gives the first two cards eager/high-priority loading via the index prop', () => {
+			render(VideoCard, { props: { video, onAdd: vi.fn(), index: 0 } });
+			const img = screen.getByAltText(video.title) as HTMLImageElement;
+			expect(img.getAttribute('loading')).toBe('eager');
+			expect(img.getAttribute('fetchpriority')).toBe('high');
+		});
+
+		it('lazy-loads thumbnails for cards after the first two', () => {
+			render(VideoCard, { props: { video, onAdd: vi.fn(), index: 2 } });
+			const img = screen.getByAltText(video.title) as HTMLImageElement;
+			expect(img.getAttribute('loading')).toBe('lazy');
+			expect(img.getAttribute('fetchpriority')).toBe('auto');
+		});
+
+		it('falls back to a placeholder (no broken img) when the video has no thumbnails', () => {
+			render(VideoCard, { props: { video: { ...video, thumbnails: {} }, onAdd: vi.fn() } });
+			expect(screen.queryByRole('img')).not.toBeInTheDocument();
+			expect(screen.queryByTitle(video.title)).not.toBeInTheDocument();
 		});
 	});
 
@@ -141,21 +120,7 @@ describe('VideoCard', () => {
 			expect(card).toHaveAttribute('tabindex', '0');
 		});
 
-		it('mounts and focuses the iframe immediately on click, even before intersection fires', async () => {
-			class PendingObserver implements IntersectionObserver {
-				readonly root = null;
-				readonly rootMargin = '';
-				readonly scrollMargin = '';
-				readonly thresholds: ReadonlyArray<number> = [];
-				observe() {}
-				unobserve() {}
-				disconnect() {}
-				takeRecords(): IntersectionObserverEntry[] {
-					return [];
-				}
-			}
-			vi.stubGlobal('IntersectionObserver', PendingObserver);
-
+		it('mounts the iframe (nocookie embed, autoplay) and focuses it on click, replacing the thumbnail img', async () => {
 			render(VideoCard, { props: { video, onAdd: vi.fn() } });
 			expect(screen.queryByTitle(video.title)).not.toBeInTheDocument();
 
@@ -163,19 +128,25 @@ describe('VideoCard', () => {
 			await fireEvent.click(card);
 
 			await waitFor(() => {
-				expect(screen.getByTitle(video.title)).toBeInTheDocument();
+				const iframe = screen.getByTitle(video.title) as HTMLIFrameElement;
+				expect(iframe.src).toBe('https://www.youtube-nocookie.com/embed/abc123?autoplay=1');
 			});
 			await waitFor(() => {
 				expect(document.activeElement?.tagName).toBe('IFRAME');
 			});
+			expect(screen.queryByAltText(video.title)).not.toBeInTheDocument();
 			expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
 		});
 
 		it('focuses (without remounting or navigating) when the player is already mounted', async () => {
 			render(VideoCard, { props: { video, onAdd: vi.fn() } });
-			const iframeBefore = screen.getByTitle(video.title);
-
 			const card = screen.getByRole('button', { name: `Watch ${video.title} inline` });
+
+			// First click activates and mounts the iframe.
+			await fireEvent.click(card);
+			const iframeBefore = await waitFor(() => screen.getByTitle(video.title));
+
+			// Second click should just refocus the same iframe, not remount it.
 			await fireEvent.click(card);
 
 			await waitFor(() => {
@@ -208,9 +179,9 @@ describe('VideoCard', () => {
 			await fireEvent.click(screen.getByRole('button', { name: 'Add to Perspectize' }));
 
 			expect(onAdd).toHaveBeenCalledWith('abc123');
-			// The card is already "watching" (intersection fired on mount), so a
-			// leaked click-to-watch handler would still call scrollIntoView again —
-			// asserting it was NOT called proves the button stopped propagation.
+			// A leaked click-to-watch handler would call activatePlayer, which calls
+			// scrollIntoView — asserting it was NOT called proves the button stopped
+			// propagation to the card's own click handler.
 			expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
 		});
 

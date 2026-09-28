@@ -150,6 +150,8 @@ Error handling & DB query patterns: [.docs/GO_PATTERNS.md](../.docs/GO_PATTERNS.
 
 **GORM tracing is in-house** (`pkg/database/tracing.go`). Don't add `gorm.io/plugin/opentelemetry` — it pulls ClickHouse + MySQL drivers into the binary. SQL spans are named `"<VERB> <table>"` (e.g. `SELECT content`), not `gorm.Query`.
 
+**`Perspective.ReviewStatus`** is moderation state (`PENDING`/`APPROVED`/`REJECTED`) — don't reuse it for draft/imported markers; use `labels` or `customFields`.
+
 **Cursor pagination:** Opaque base64 (`cursor:<id>`), keyset (not OFFSET), fetch `limit+1` for `hasNextPage`, whitelist sort columns (SQL injection prevention). Helpers in `helpers.go`.
 
 ### Enum & ID Handling (REQUIRED)

@@ -1,5 +1,6 @@
 import { GraphQLClient } from 'graphql-request';
 import { clientInfoHeaders } from '$lib/buildInfo';
+import { getAuthToken } from '$lib/auth';
 
 /** GraphQL HTTP endpoint (VITE_GRAPHQL_URL build var, localhost fallback). */
 export const GRAPHQL_ENDPOINT = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8080/graphql';
@@ -15,18 +16,9 @@ console.debug('[GraphQL] endpoint:', GRAPHQL_ENDPOINT);
 
 export const graphqlClient = new GraphQLClient(GRAPHQL_ENDPOINT);
 
-/**
- * Get current Clerk session token for API requests.
- * Returns null if not authenticated.
- */
-export async function getAuthToken(): Promise<string | null> {
-	try {
-		const token = await window.Clerk?.session?.getToken();
-		return token ?? null;
-	} catch {
-		return null;
-	}
-}
+// Token source (Clerk session, or the demo persona in demo mode) lives in
+// $lib/auth; re-exported so existing importers keep working.
+export { getAuthToken };
 
 /**
  * Make a GraphQL request with optional auth.

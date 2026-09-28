@@ -4,7 +4,7 @@
 #
 # The database is remote (Sevalla) — nothing to start locally for it.
 
-.PHONY: start stop restart status logs help
+.PHONY: start stop restart status logs help demo-up demo-down demo-reset demo-wipe demo-logs demo-test demo-record
 .DEFAULT_GOAL := help
 
 BACKEND_PORT  := 8080
@@ -19,6 +19,13 @@ help:
 	@echo "  make restart  - stop then start"
 	@echo "  make status   - show what's listening on :$(BACKEND_PORT) / :$(FRONTEND_PORT)"
 	@echo "  make logs     - tail -f $(LOG_DIR)/*.log"
+	@echo ""
+	@echo "Demo stack (Docker; see docker-compose.demo.yml):"
+	@echo "  make demo-up      - build + start at http://localhost:4173 (persistent, seeded)"
+	@echo "  make demo-reset   - restore demo-persona data to the pristine seed"
+	@echo "  make demo-test    - reset, then run tours + flows as Playwright E2E"
+	@echo "  make demo-record  - reset, then record tours to frontend/demo/out/videos/"
+	@echo "  make demo-down    - stop (keeps data)  |  make demo-wipe - stop + delete data"
 
 start:
 	@mkdir -p $(PID_DIR) $(LOG_DIR)
@@ -65,3 +72,33 @@ status:
 
 logs:
 	@tail -f $(LOG_DIR)/backend.log $(LOG_DIR)/frontend.log
+
+# --- Demo stack -------------------------------------------------------------
+# Persistent Postgres + seeded personas + DEMO_MODE backend + demo frontend.
+# Playwright runs on the host against it: needs `pnpm install` in frontend/
+# and a Chromium (`pnpm --dir frontend exec playwright install chromium`).
+DEMO_COMPOSE := docker compose -f docker-compose.demo.yml
+DEMO_ENV := DEMO_BASE_URL=http://localhost:4173 DEMO_GRAPHQL_URL=http://localhost:8081/graphql
+
+demo-up:
+	$(DEMO_COMPOSE) up -d --build --wait backend frontend
+	@echo "Demo: http://localhost:4173  (API http://localhost:8081/graphql, Postgres localhost:5434 demo/demo)"
+
+demo-down:
+	$(DEMO_COMPOSE) down
+
+demo-wipe:
+	$(DEMO_COMPOSE) down -v
+
+demo-logs:
+	$(DEMO_COMPOSE) logs -f backend
+
+demo-reset:
+	$(DEMO_COMPOSE) run --rm seed -reset
+
+demo-test: demo-reset
+	$(DEMO_ENV) pnpm --dir frontend run demo:test
+
+demo-record: demo-reset
+	$(DEMO_ENV) pnpm --dir frontend run demo:record
+	@echo "Videos: frontend/demo/out/videos/*.webm"
