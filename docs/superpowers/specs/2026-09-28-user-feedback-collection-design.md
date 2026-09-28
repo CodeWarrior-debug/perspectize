@@ -2,242 +2,116 @@
 
 **Date:** 2026-09-28  
 **Author:** Claude Haiku 4.5  
-**Status:** Spike / Design spec for review before plan creation  
+**Status:** Initial QA Version
 
 ---
 
 ## Executive Summary
 
-Enable users to report bugs and request features directly from the app. Feedback flows into a secured admin review page where reports are triaged, categorized, and optionally converted to GitHub issues.
+Enable users to report bugs and request features via a simple dialog that links directly to GitHub issue creation. No custom backend storage—feedback goes straight to GitHub as the single source of truth.
 
-**User value:** Direct signal from the community on what's broken and what's wanted — replaces external feedback channels (email, Discord).
+**User value:** One-click feedback submission that lands in the team's issue tracker immediately.
 
-**Scope:** Two-phase delivery. Phase 1 (this plan) is a feedback dialog + basic admin triage. Phase 2 (future) adds GitHub issue automation.
+**Scope:** MVP dialog with two buttons linking to GitHub issue creation (bug_report.md and feature_request.md templates).
 
 ---
 
 ## 1. Problem & Motivation
 
 **Current state:**  
-- Users find bugs or want features
-- No in-app channel to report them
-- Feedback goes nowhere (email, word-of-mouth, lost)
-- Maintainers miss signal
+- Users find bugs or want features but have no in-app way to report them
+- External feedback channels (email, Discord) are scattered and hard to track
+- Single source of truth for bugs/features is GitHub issues
 
 **Target user journey:**  
-1. User clicks "Send feedback" in the header menu
-2. Dialog appears: type feedback, select "Bug" or "Feature idea", optionally upload a screenshot
-3. Feedback saves with user ID, app version, page context, timestamp
-4. Admin reviews a simple page listing all feedback, filters by type/user, decides next steps
+1. User clicks "Send feedback" in header menu
+2. Dialog appears with two options: "Report a bug" / "Request a feature"
+3. User clicks one → GitHub issue creation page opens in new tab (pre-filled with template)
+4. User files the issue directly in GitHub
+5. Done—issue is live in the team's tracker
 
 ---
 
-## 2. Phase 1: Feedback Collection + Admin Review (This Plan)
+## 2. Design: Feedback Dialog
 
-### 2.1 Data Model
+### 2.1 Component: `FeedbackDialog.svelte`
 
-#### New Table: `feedback`
+**Trigger:** Header menu → "Send feedback" (or Help → "Send feedback")
 
-```sql
-CREATE TABLE feedback (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  type TEXT NOT NULL CHECK (type IN ('bug', 'feature')),
-  title TEXT NOT NULL, -- short summary, max 200 chars
-  description TEXT NOT NULL, -- detailed report
-  page_url TEXT, -- current page when submitted
-  screenshot_url TEXT NULL, -- optional uploaded image
-  app_version TEXT NOT NULL, -- tag or commit SHA from frontend
-  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'acknowledged', 'in_progress', 'resolved', 'wontfix')),
-  admin_notes TEXT NULL, -- private notes from reviewer
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX feedback_user_id_idx ON feedback(user_id);
-CREATE INDEX feedback_type_idx ON feedback(type);
-CREATE INDEX feedback_status_idx ON feedback(status);
-CREATE INDEX feedback_created_at_idx ON feedback(created_at DESC);
+**Dialog content:**
+```
+┌─ Send Feedback ──────────────────┐
+│                                  │
+│ Help us improve Perspectize      │
+│                                  │
+│ ┌──────────────────────────────┐ │
+│ │ Report a bug                 │ │
+│ │ Something isn't working?     │ │
+│ │ [Opens GitHub Bug Template]  │ │
+│ └──────────────────────────────┘ │
+│                                  │
+│ ┌──────────────────────────────┐ │
+│ │ Request a feature            │ │
+│ │ Have an idea for improvement?│ │
+│ │ [Opens GitHub Feature Form]  │ │
+│ └──────────────────────────────┘ │
+│                                  │
+└──────────────────────────────────┘
 ```
 
-### 2.2 Backend: GraphQL API
+**Behavior:**
+- Each button links to `https://github.com/CodeWarrior-debug/perspectize/issues/new?template=bug_report.md` (or `feature_request.md`)
+- Opens in new tab
+- Dialog closes after user clicks a button
+- No confirmation needed
 
-#### Mutation: `submitFeedback`
+### 2.2 Links
 
-```graphql
-type Mutation {
-  submitFeedback(input: SubmitFeedbackInput!): Feedback!
-}
-
-input SubmitFeedbackInput {
-  type: FeedbackType! # "BUG" | "FEATURE"
-  title: String! # max 200 chars
-  description: String! # max 5000 chars
-  pageURL: String
-  screenshotURL: String # optional, pre-signed upload URL
-  appVersion: String! # from frontend build info
-}
-
-enum FeedbackType {
-  BUG
-  FEATURE
-}
-
-type Feedback {
-  id: ID!
-  type: FeedbackType!
-  title: String!
-  description: String!
-  pageURL: String
-  screenshotURL: String
-  appVersion: String!
-  status: FeedbackStatus!
-  user: User!
-  createdAt: DateTime!
-  updatedAt: DateTime!
-}
-
-enum FeedbackStatus {
-  OPEN
-  ACKNOWLEDGED
-  IN_PROGRESS
-  RESOLVED
-  WONTFIX
-}
+**Bug report:**
+```
+https://github.com/CodeWarrior-debug/perspectize/issues/new?template=bug_report.md
 ```
 
-#### Query: `feedbackList` (admin-only)
-
-```graphql
-type Query {
-  feedbackList(
-    first: Int = 20
-    after: String
-    type: FeedbackType
-    status: FeedbackStatus
-    sortBy: FeedbackSortBy = CREATED_AT_DESC
-  ): FeedbackConnection! @requireAuth(admin: true)
-}
-
-enum FeedbackSortBy {
-  CREATED_AT_DESC
-  CREATED_AT_ASC
-  UPDATED_AT_DESC
-}
-
-type FeedbackConnection {
-  edges: [FeedbackEdge!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-type FeedbackEdge {
-  cursor: String!
-  node: Feedback!
-}
+**Feature request:**
+```
+https://github.com/CodeWarrior-debug/perspectize/issues/new?template=feature_request.md
 ```
 
-#### Mutation: `updateFeedbackStatus` (admin-only)
+(Uses GitHub's issue template auto-selection feature — `.github/ISSUE_TEMPLATE/bug_report.md` and `feature_request.md` must exist)
 
-```graphql
-type Mutation {
-  updateFeedbackStatus(
-    feedbackID: ID!
-    status: FeedbackStatus!
-    adminNotes: String
-  ): Feedback! @requireAuth(admin: true)
-}
-```
+### 2.3 No Backend Required
 
-### 2.3 Frontend: UI Components
-
-#### `FeedbackDialog.svelte`
-
-- Triggered from header "Help" menu → "Send feedback"
-- Form fields:
-  - **Type:** Radio buttons (Bug / Feature idea)
-  - **Title:** Text input, ~200 char limit, counter
-  - **Description:** Textarea, ~5000 char limit, counter
-  - **Page context:** Auto-captured (current URL, breadcrumb)
-  - **Screenshot:** Optional file upload (or paste from clipboard)
-- Submit button: disabled until title + description are filled
-- Success state: "Thanks! We've received your feedback."
-- Error handling: Show submission errors, retry button
-
-**Location:** Accessible from header menu (next to user menu or under Help)
-
-#### Admin Review Page: `AdminFeedbackPage.svelte`
-
-**Route:** `/admin/feedback`  
-**Protected:** `@requireAuth(admin: true)`
-
-- **Filters:**
-  - Type: All / Bug / Feature
-  - Status: All / Open / Acknowledged / In Progress / Resolved / Won't Fix
-  - Date range: (optional, not MVP)
-- **Table columns:**
-  - Type (icon badge)
-  - Title
-  - User (email)
-  - Status (dropdown to change)
-  - Created at
-  - Action: expand to see full details
-- **Detail view (expandable row or modal):**
-  - Full description
-  - Screenshot preview (if exists)
-  - Page URL (clickable link)
-  - App version
-  - Admin notes textarea
-  - Status dropdown (with save button)
-  - Delete button (soft delete: set status to archived)
-
-### 2.4 Screenshot Upload
-
-**MVP approach:** Use browser File API, POST to a signed S3 URL (or similar CDN storage).
-
-- Frontend: `generatePresignedURL` GraphQL mutation (optional Phase 1.5 if storage budget tight; initially accept data URLs or external links)
-- Store URL in `feedback.screenshot_url`
-- No backend processing (no virus scanning yet)
-
-### 2.5 App Version Tagging
-
-**Frontend:** Expose `APP_VERSION` build variable (e.g., commit SHA, semver, or CI build ID).
-
-```ts
-// frontend/src/lib/config.ts
-export const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'dev';
-```
-
-**Backend:** Accept it as string in `SubmitFeedbackInput`. No validation yet (log mismatches).
+- No database table needed
+- No GraphQL mutations or queries
+- No admin panel
+- Pure frontend component
 
 ---
 
-## 3. Phase 1.5: GitHub Issue Linking (Optional)
+## 3. Implementation Notes
 
-Not in MVP Phase 1, but designed for it:
+**Dependencies:**
+- Requires GitHub issue templates already in repo: `.github/ISSUE_TEMPLATE/bug_report.md` and `.github/ISSUE_TEMPLATE/feature_request.md`
+- If templates don't exist, create them first using GitHub's template picker UI, or manually add files
 
-- **Admin field:** `github_issue_url` (optional TEXT column, indexed)
-- **Admin action:** Manually paste or enter a GitHub issue URL on a feedback detail
-- **Flow:**
-  1. Admin reviews feedback
-  2. Admin decides it matches an existing GitHub issue or creates one manually
-  3. Admin pastes the GitHub issue URL into `github_issue_url` field
-  4. Feedback detail shows "Linked issue: #123" with a clickable link
-- **Benefit:** Closes the loop — feedback author can see their report was tracked; admins have a canonical source of truth (GitHub issues remain the single source of truth for bug/feature tracking)
+**Styling:**
+- Dialog matches existing SettingsDialog or modal patterns
+- Two equal-width buttons, clear copy
+- Icon: bug 🐛 for bug, lightbulb 💡 for feature (or use icon library)
 
-## 4. Phase 2: GitHub Issue Automation (Future)
+**Accessibility:**
+- Dialog has proper ARIA labels and focus trap
+- Links are keyboard accessible
+- Screen readers announce button purposes clearly
 
-Future enhancement (post-Phase-1):
+---
 
-- **Admin button:** "Create issue" on a feedback detail
-- **Requires:** GitHub token stored in server env (`GITHUB_TOKEN`)
-- **Flow:**
-  1. Admin reviews feedback
-  2. Admin clicks "Create issue" button
-  3. Backend creates GitHub issue using bug_report.md or feature_request.md template
-  4. Issue link auto-populated in `feedback.github_issue_url`
-  5. Feedback author is notified (optional: Slack ping to admins)
-- **Caveat:** Only create issues for well-formed feedback. Admin reviews before creating. Sensitive details (internal paths, security findings) stay in private `admin_notes` field, never in public GitHub issue.
+## 4. Future Enhancements (Not MVP)
+
+- **Browser prefill:** Capture current page URL and pre-fill GitHub form with `body=Currently on: <url>`
+- **Auth check:** Only show dialog to signed-in users (or show different CTA for logged-out users)
+- **Analytics:** Track which users click "Report a bug" vs "Request a feature" (optional telemetry)
+- **Feedback counter:** Show "Help improve Perspectize—X bugs reported, Y features requested" (requires GitHub API call to count open issues)
 
 ---
 
