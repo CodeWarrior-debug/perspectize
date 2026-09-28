@@ -67,9 +67,11 @@ describe('compareRatings', () => {
 	it('compares every shared standard dimension', () => {
 		const left = makePerspective({ quality: 8000, agreement: 8000, importance: 8000, confidence: 8000 });
 		const right = makePerspective({ quality: 8000, agreement: 8000, importance: 8000, confidence: 8000 });
-		expect(compareRatings(left, right).map((r) => r.key).sort()).toEqual(
-			['agreement', 'confidence', 'importance', 'quality'].sort(),
-		);
+		expect(
+			compareRatings(left, right)
+				.map((r) => r.key)
+				.sort(),
+		).toEqual(['agreement', 'confidence', 'importance', 'quality'].sort());
 	});
 
 	it('compares shared numeric customFields keys', () => {

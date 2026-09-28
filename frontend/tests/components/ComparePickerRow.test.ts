@@ -59,7 +59,7 @@ describe('ComparePickerRow', () => {
 		expect(onSwap).toHaveBeenCalled();
 	});
 
-	it("colors the avatar by viewer identity, not by side, and follows the viewer across a swap", () => {
+	it('colors the avatar by viewer identity, not by side, and follows the viewer across a swap', () => {
 		// Viewer (id '1') on the left: left avatar is primary, right is purple.
 		const { rerender } = render(ComparePickerRow, {
 			props: {
