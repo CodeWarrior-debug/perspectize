@@ -23,6 +23,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/generated"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/resolvers"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/realtime"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/cached"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/handlers"
 	apimw "github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/middleware"
@@ -164,7 +165,10 @@ func main() {
 	}
 	wikidataClient := wikidata.NewClient()
 	contentRepo := postgres.NewGormContentRepository(db)
-	userRepo := postgres.NewGormUserRepository(db)
+	// Cached: the auth middleware resolves the Clerk ID -> user on every
+	// authenticated request. All user writes go through this same instance so
+	// they invalidate it (see cached.UserRepository).
+	userRepo := cached.NewUserRepository(postgres.NewGormUserRepository(db), cached.DefaultUserTTL)
 	perspectiveRepo := postgres.NewGormPerspectiveRepository(db)
 	categoryRepo := postgres.NewGormCategoryRepository(db)
 	threadRepo := postgres.NewGormThreadRepository(db)

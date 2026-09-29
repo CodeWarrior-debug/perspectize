@@ -2531,7 +2531,9 @@ type Mutation {
 
   # Perspective mutations
   createPerspective(input: CreatePerspectiveInput!): Perspective! @auth
-  updatePerspective(input: UpdatePerspectiveInput!): Perspective! @auth @owner(idField: "id")
+  # Ownership is enforced in PerspectiveService.Update + an owner-scoped UPDATE
+  # (see the resolver), not @owner: that saved a duplicate row read per save.
+  updatePerspective(input: UpdatePerspectiveInput!): Perspective! @auth
   deletePerspective(id: ID!): Boolean! @auth @owner(idField: "id")
 
   # Claim mutations
@@ -7174,20 +7176,8 @@ func (ec *executionContext) _Mutation_updatePerspective(ctx context.Context, fie
 				}
 				return ec.Directives.Auth(ctx, nil, directive0)
 			}
-			directive2 := func(ctx context.Context) (any, error) {
-				idField, err := ec.unmarshalNString2string(ctx, "id")
-				if err != nil {
-					var zeroVal *model.Perspective
-					return zeroVal, err
-				}
-				if ec.Directives.Owner == nil {
-					var zeroVal *model.Perspective
-					return zeroVal, errors.New("directive owner is not implemented")
-				}
-				return ec.Directives.Owner(ctx, nil, directive1, idField)
-			}
 
-			next = directive2
+			next = directive1
 			return next
 		},
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Perspective) graphql.Marshaler {

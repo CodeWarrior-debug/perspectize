@@ -54,9 +54,21 @@ func (r *mutationResolver) CreatePerspective(ctx context.Context, input model.Cr
 }
 
 // UpdatePerspective is the resolver for the updatePerspective field.
+// Ownership is enforced by PerspectiveService.Update (against the row it
+// already reads) and by the owner-scoped UPDATE beneath it, not by an @owner
+// directive -- the directive's own GetByID was a duplicate database round trip
+// on every save. The actor comes from the session, never from client input.
 func (r *mutationResolver) UpdatePerspective(ctx context.Context, input model.UpdatePerspectiveInput) (*model.Perspective, error) {
-	perspective, err := r.PerspectiveService.Update(ctx, modelToUpdatePerspectiveInput(input))
+	authUser, err := auth.RequireAuth(ctx)
 	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+
+	perspective, err := r.PerspectiveService.Update(ctx, modelToUpdatePerspectiveInput(input), authUser.ID)
+	if err != nil {
+		if errors.Is(err, domain.ErrForbidden) {
+			return nil, fmt.Errorf("access denied: you can only modify your own perspectives")
+		}
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, fmt.Errorf("perspective not found")
 		}

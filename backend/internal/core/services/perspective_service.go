@@ -26,16 +26,11 @@ func NewPerspectiveService(repo repositories.PerspectiveRepository, userRepo rep
 
 // Create creates a new perspective with validation
 func (s *PerspectiveService) Create(ctx context.Context, input portservices.CreatePerspectiveInput) (*domain.Perspective, error) {
-	// Validate user exists
+	// User existence is enforced by the perspectives -> users FK: the
+	// repository maps that violation to domain.ErrNotFound, which saves a
+	// separate user lookup (one database round trip) on every create.
 	if input.UserID <= 0 {
 		return nil, fmt.Errorf("%w: user_id must be a positive integer", domain.ErrInvalidInput)
-	}
-	_, err := s.userRepo.GetByID(ctx, input.UserID)
-	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
-			return nil, fmt.Errorf("%w: user with id %d not found", domain.ErrNotFound, input.UserID)
-		}
-		return nil, fmt.Errorf("failed to validate user: %w", err)
 	}
 
 	// Validate ratings are in range
@@ -122,6 +117,9 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 
 	created, err := s.repo.Create(ctx, perspective)
 	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("failed to create perspective: %w", err)
 	}
 
@@ -158,15 +156,33 @@ func applyRating(name string, clear bool, v *int, dst **int) error {
 	return nil
 }
 
-func (s *PerspectiveService) Update(ctx context.Context, input portservices.UpdatePerspectiveInput) (*domain.Perspective, error) {
+// Update applies input on behalf of actorUserID, who must own the
+// perspective. Ownership is checked here against the row we already have to
+// read for the tri-state merge, and again by the owner-scoped UPDATE in the
+// repository -- so neither guard depends on the other, and the save costs two
+// database round trips (read + UPDATE ... RETURNING) instead of a separate
+// ownership lookup on top.
+func (s *PerspectiveService) Update(ctx context.Context, input portservices.UpdatePerspectiveInput, actorUserID int) (*domain.Perspective, error) {
 	if input.ID <= 0 {
 		return nil, fmt.Errorf("%w: perspective id must be a positive integer", domain.ErrInvalidInput)
+	}
+	if actorUserID <= 0 {
+		return nil, fmt.Errorf("%w: authentication required to update a perspective", domain.ErrForbidden)
 	}
 
 	// Get existing perspective
 	existing, err := s.repo.GetByID(ctx, input.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get perspective: %w", err)
+	}
+	if existing.UserID != actorUserID {
+		// Only a PUBLIC perspective is known to be visible to this user.
+		// Anything else answers as if it didn't exist rather than confirming
+		// the id -- matching perspectiveByID's null for non-owners.
+		if existing.Privacy == domain.PrivacyPublic {
+			return nil, fmt.Errorf("%w: you can only modify your own perspectives", domain.ErrForbidden)
+		}
+		return nil, fmt.Errorf("failed to get perspective: %w", domain.ErrNotFound)
 	}
 
 	// Validate and update ratings. Explicit clear wins over a provided value (the
@@ -261,7 +277,7 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 		existing.Review = &s
 	}
 
-	updated, err := s.repo.Update(ctx, existing)
+	updated, err := s.repo.Update(ctx, existing, actorUserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update perspective: %w", err)
 	}

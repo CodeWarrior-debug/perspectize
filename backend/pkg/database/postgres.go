@@ -23,9 +23,12 @@ type PoolConfig struct {
 // DefaultPoolConfig returns sensible default pool settings
 func DefaultPoolConfig() PoolConfig {
 	return PoolConfig{
-		MaxOpenConns:    25,
-		MaxIdleConns:    5,
-		ConnMaxLifetime: 5 * time.Minute,
+		MaxOpenConns: 25,
+		MaxIdleConns: 5,
+		// Long enough that a warm connection (TLS session + pgx's prepared
+		// statement cache) survives between requests on a quiet app; every
+		// recycle costs a fresh handshake to the database on the next query.
+		ConnMaxLifetime: 30 * time.Minute,
 	}
 }
 
