@@ -823,3 +823,4 @@ Phases execute in numeric order: 1 -> 2 -> 2.1 -> 3 -> 3.1 -> 3.2 -> 3.3 -> 3.4 
 | 22. TanStack DB Pilot (Perspectives) | 0/0 | Not started | - |
 | 23. Sync Engine Evaluation | 0/0 | Gated | - |
 | 24. Local Database / Desktop | 0/0 | Gated | - |
+| 25. Jev (TypeSafe AI) Research Spike | 1/1 | Research complete, deferred | 2026-09-28 |
