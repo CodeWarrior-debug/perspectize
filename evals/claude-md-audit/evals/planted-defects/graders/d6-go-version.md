@@ -1,7 +1,7 @@
 ---
-type: regex
-pattern: 1\.21
-match: contains
-target: last_message
+type: llm
+focus: last_message
 ---
-D6: flags "Go 1.21" in backend/CLAUDE.md vs `go 1.25` in go.mod.
+D6: backend/CLAUDE.md says "Go 1.21", but backend/go.mod declares `go 1.25`.
+
+PASS only if the response explicitly identifies this as wrong/stale/nonexistent (a fix suggestion counts). Merely mentioning or quoting it, or treating it as if it were valid (e.g. asking how it is organised), is a FAIL.

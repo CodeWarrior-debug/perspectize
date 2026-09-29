@@ -10,12 +10,12 @@ Scored eval for the `claude-md-improver` skill (from `claude-md-management@claud
 
 | Grader | Defect | Type |
 |---|---|---|
-| d1-stale-path | `internal/handlers/` doesn't exist | regex |
-| d2-missing-make-target | `make seed` not in Makefile | regex |
-| d3-wrong-script | `pnpm run test:unit` (real: `test:run`) | regex |
+| d1-stale-path | `internal/handlers/` doesn't exist | llm |
+| d2-missing-make-target | `make seed` not in Makefile | llm |
+| d3-wrong-script | `pnpm run test:unit` (real: `test:run`) | llm |
 | d4-contradiction | root forbids `make migrate-up`, backend setup runs it | llm |
-| d5-dead-link | `.docs/DEPLOYMENT.md` missing | regex |
-| d6-go-version | says Go 1.21, go.mod says 1.25 | regex |
+| d5-dead-link | `.docs/DEPLOYMENT.md` missing | llm |
+| d6-go-version | says Go 1.21, go.mod says 1.25 | llm |
 
 Other graders:
 - **scores-reported**: at least three `/100` scores (regex).
@@ -23,7 +23,7 @@ Other graders:
 - **no-false-positives**: weight 2; the llm judge fails a report that calls something correct broken, such as the `make test` control.
 - **skill-fired**: whether the skill ran. It is only an indicator and doesn't count toward the score.
 
-Regex graders only check that the defect is *mentioned* in the report. The fixture puts each of those strings only in its defect's location, so a mention almost always means it was flagged.
+Defect graders are LLM judges (Opus) that require each defect to be *flagged as wrong*. An earlier version used regex graders, which passed a report that merely mentioned `internal/handlers/` or "Go 1.21" without flagging them.
 
 ## Run
 
