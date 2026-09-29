@@ -25,7 +25,8 @@ const subBufferSize = 64
 // thread_events channel. PgNotifier is the production implementation; a nil
 // Notifier makes the Hub fall back to purely in-process delivery.
 type Notifier interface {
-	Notify(ctx context.Context, payload string) error
+	// Notify emits every payload, in order, in one round trip.
+	Notify(ctx context.Context, payloads ...string) error
 }
 
 // threadSub is one registered thread subscriber: its delivery channel plus the
@@ -364,16 +365,25 @@ func (h *Hub) PublishEnvelope(ctx context.Context, env domain.EventEnvelope) {
 //
 // Without a Notifier (unit tests, or any process with no Listener) it falls
 // back to in-process fan-out.
-func (h *Hub) PublishEphemeral(ctx context.Context, env domain.EventEnvelope) error {
-	if h.notifier == nil {
-		h.PublishEnvelope(ctx, env)
+func (h *Hub) PublishEphemeral(ctx context.Context, envs ...domain.EventEnvelope) error {
+	if len(envs) == 0 {
 		return nil
 	}
-	payload, err := json.Marshal(env)
-	if err != nil {
-		return fmt.Errorf("marshal %s envelope: %w", env.Type, err)
+	if h.notifier == nil {
+		for _, env := range envs {
+			h.PublishEnvelope(ctx, env)
+		}
+		return nil
 	}
-	return h.notifier.Notify(ctx, string(payload))
+	payloads := make([]string, len(envs))
+	for i, env := range envs {
+		payload, err := json.Marshal(env)
+		if err != nil {
+			return fmt.Errorf("marshal %s envelope: %w", env.Type, err)
+		}
+		payloads[i] = string(payload)
+	}
+	return h.notifier.Notify(ctx, payloads...)
 }
 
 // ResetAll sends a StreamResetEvent to every subscriber of every thread. Used

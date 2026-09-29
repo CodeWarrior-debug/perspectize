@@ -205,16 +205,22 @@ func (r *GormThreadRepository) ListThreadsForUser(ctx context.Context, userID in
 	return groupThreadRows(rows), nil
 }
 
-// AddParticipants inserts participant rows (ignoring rows that already exist)
-// and clears left_at for any of the given users who had previously left, so a
-// rejoining user becomes active again.
-func (r *GormThreadRepository) AddParticipants(ctx context.Context, threadID int, userIDs []int) error {
+// AddParticipants upserts participant rows in one statement: new users are
+// inserted as MEMBERs, and a user who had left becomes active again (left_at
+// cleared; role and joined_at kept). RETURNING * hands back every given
+// user's row as stored.
+func (r *GormThreadRepository) AddParticipants(ctx context.Context, threadID int, userIDs []int) ([]domain.ThreadParticipant, error) {
 	if len(userIDs) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	rows := make([]ThreadParticipantModel, 0, len(userIDs))
+	seen := make(map[int]bool, len(userIDs))
 	for _, uid := range userIDs {
+		if seen[uid] {
+			continue // a duplicate would make ON CONFLICT DO UPDATE touch a row twice
+		}
+		seen[uid] = true
 		rows = append(rows, ThreadParticipantModel{
 			ThreadID: int64(threadID),
 			UserID:   int64(uid),
@@ -223,18 +229,19 @@ func (r *GormThreadRepository) AddParticipants(ctx context.Context, threadID int
 	}
 
 	if err := r.db.WithContext(ctx).
-		Clauses(clause.OnConflict{DoNothing: true}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "thread_id"}, {Name: "user_id"}},
+			DoUpdates: clause.Assignments(map[string]any{"left_at": nil}),
+		}, clause.Returning{}).
 		Create(&rows).Error; err != nil {
-		return fmt.Errorf("failed to add thread participants: %w", err)
+		return nil, fmt.Errorf("failed to add thread participants: %w", err)
 	}
 
-	if err := r.db.WithContext(ctx).
-		Model(&ThreadParticipantModel{}).
-		Where("thread_id = ? AND user_id IN ?", threadID, userIDs).
-		Update("left_at", gorm.Expr("NULL")).Error; err != nil {
-		return fmt.Errorf("failed to clear left_at for rejoining participants: %w", err)
+	out := make([]domain.ThreadParticipant, len(rows))
+	for i := range rows {
+		out[i] = threadParticipantModelToDomain(&rows[i])
 	}
-	return nil
+	return out, nil
 }
 
 // SetLeft marks a participant as having left the thread at the given time.

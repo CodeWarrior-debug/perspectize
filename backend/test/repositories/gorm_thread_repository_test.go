@@ -173,7 +173,11 @@ func TestGormThreadRepository_AddParticipants_ClearsLeftAt(t *testing.T) {
 	threadID := mustCreateThread(t, repo, a, []int{a, b})
 
 	require.NoError(t, repo.SetLeft(ctx, threadID, b, time.Now()))
-	require.NoError(t, repo.AddParticipants(ctx, threadID, []int{b}))
+	rows, err := repo.AddParticipants(ctx, threadID, []int{b})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Nil(t, rows[0].LeftAt, "returned row reflects the rejoin")
+	assert.Equal(t, domain.ThreadRoleMember, rows[0].Role)
 
 	got, err := repo.GetThread(ctx, threadID)
 	require.NoError(t, err)

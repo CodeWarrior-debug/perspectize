@@ -64,8 +64,8 @@ func (stubThreadRepo) FindDirectThread(ctx context.Context, userA, userB int) (*
 func (stubThreadRepo) ListThreadsForUser(ctx context.Context, userID int, limit int, beforeLastMessageAt *time.Time) ([]domain.MessageThread, error) {
 	return nil, nil
 }
-func (stubThreadRepo) AddParticipants(ctx context.Context, threadID int, userIDs []int) error {
-	return nil
+func (stubThreadRepo) AddParticipants(ctx context.Context, threadID int, userIDs []int) ([]domain.ThreadParticipant, error) {
+	return nil, nil
 }
 func (stubThreadRepo) SetLeft(ctx context.Context, threadID, userID int, at time.Time) error {
 	return nil

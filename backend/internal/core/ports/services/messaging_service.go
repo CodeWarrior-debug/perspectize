@@ -12,7 +12,9 @@ import (
 // Hub (Task 9) implements it. MESSAGE_POSTED is NOT published here — it
 // originates from the database trigger.
 type EventPublisher interface {
-	PublishEphemeral(ctx context.Context, env domain.EventEnvelope) error
+	// PublishEphemeral publishes one or more envelopes; several go out in a
+	// single round trip.
+	PublishEphemeral(ctx context.Context, envs ...domain.EventEnvelope) error
 }
 
 // SendMessageInput is the payload for MessagingService.SendMessage.

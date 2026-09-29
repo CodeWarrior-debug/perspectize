@@ -39,10 +39,22 @@ func NewPgNotifier(ctx context.Context, dsn string, tracer ...pgx.QueryTracer) (
 	return &PgNotifier{pool: pool}, nil
 }
 
-// Notify emits payload on the thread_events channel.
-func (n *PgNotifier) Notify(ctx context.Context, payload string) error {
-	if _, err := n.pool.Exec(ctx, "SELECT pg_notify($1, $2)", listenChannel, payload); err != nil {
-		return fmt.Errorf("pg_notify %s: %w", listenChannel, err)
+// Notify emits every payload on the thread_events channel, in order, in one
+// round trip (pg_notify over unnest ... WITH ORDINALITY).
+func (n *PgNotifier) Notify(ctx context.Context, payloads ...string) error {
+	switch len(payloads) {
+	case 0:
+		return nil
+	case 1:
+		if _, err := n.pool.Exec(ctx, "SELECT pg_notify($1, $2)", listenChannel, payloads[0]); err != nil {
+			return fmt.Errorf("pg_notify %s: %w", listenChannel, err)
+		}
+		return nil
+	}
+	if _, err := n.pool.Exec(ctx,
+		"SELECT pg_notify($1, p) FROM unnest($2::text[]) WITH ORDINALITY AS t(p, n) ORDER BY n",
+		listenChannel, payloads); err != nil {
+		return fmt.Errorf("pg_notify %s (%d payloads): %w", listenChannel, len(payloads), err)
 	}
 	return nil
 }

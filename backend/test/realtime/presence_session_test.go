@@ -26,10 +26,12 @@ type stubNotifier struct {
 	events []presenceEvent
 }
 
-func (s *stubNotifier) PublishEphemeral(_ context.Context, env domain.EventEnvelope) error {
+func (s *stubNotifier) PublishEphemeral(_ context.Context, envs ...domain.EventEnvelope) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.events = append(s.events, presenceEvent{userID: env.UserID, state: env.State, threadID: env.ThreadID})
+	for _, env := range envs {
+		s.events = append(s.events, presenceEvent{userID: env.UserID, state: env.State, threadID: env.ThreadID})
+	}
 	return nil
 }
 
@@ -77,8 +79,10 @@ func (s presenceStubThreadRepo) ListThreadsForUser(_ context.Context, _ int, _ i
 	}
 	return out, nil
 }
-func (presenceStubThreadRepo) AddParticipants(_ context.Context, _ int, _ []int) error { return nil }
-func (presenceStubThreadRepo) SetLeft(_ context.Context, _, _ int, _ time.Time) error  { return nil }
+func (presenceStubThreadRepo) AddParticipants(_ context.Context, _ int, _ []int) ([]domain.ThreadParticipant, error) {
+	return nil, nil
+}
+func (presenceStubThreadRepo) SetLeft(_ context.Context, _, _ int, _ time.Time) error { return nil }
 func (presenceStubThreadRepo) SetLastRead(_ context.Context, _, _ int, _ int64) (int64, error) {
 	return 0, nil
 }

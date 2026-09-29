@@ -24,7 +24,7 @@ func DefaultPresenceConfig() PresenceConfig {
 // presenceNotifier is the subset of *Hub this needs. *Hub satisfies it via
 // PublishEphemeral.
 type presenceNotifier interface {
-	PublishEphemeral(ctx context.Context, env domain.EventEnvelope) error
+	PublishEphemeral(ctx context.Context, envs ...domain.EventEnvelope) error
 }
 
 // RunPresenceSession models one WebSocket connection's contribution to a user's
@@ -92,12 +92,15 @@ func publishPresence(
 		slog.Warn("presence: could not list user threads", "user_id", userID, "error", err)
 		return
 	}
-	for _, t := range threads {
-		_ = notifier.PublishEphemeral(ctx, domain.EventEnvelope{
+	// One round trip for every thread, not one per thread.
+	envs := make([]domain.EventEnvelope, len(threads))
+	for i, t := range threads {
+		envs[i] = domain.EventEnvelope{
 			Type:     "PRESENCE_CHANGED",
 			ThreadID: t.ID,
 			UserID:   userID,
 			State:    string(state),
-		})
+		}
 	}
+	_ = notifier.PublishEphemeral(ctx, envs...)
 }

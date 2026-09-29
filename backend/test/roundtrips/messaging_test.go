@@ -169,7 +169,25 @@ func TestMuteThread(t *testing.T) {
 
 func TestAddThreadParticipants(t *testing.T) {
 	f := newMessagingFixture(t, 1, 0)
-	f.h.roundTrips(7, f.alice, addParticipantsMut, map[string]any{"threadId": f.threadIDs[0], "userIds": []string{fmt.Sprint(f.carolID)}})
+	// participation check, upsert ... RETURNING, one pg_notify, stats, users
+	f.h.roundTrips(5, f.alice, addParticipantsMut, map[string]any{"threadId": f.threadIDs[0], "userIds": []string{fmt.Sprint(f.carolID)}})
+}
+
+// Adding several users costs the same: one upsert, one batched pg_notify.
+func TestAddThreadParticipantsBatch(t *testing.T) {
+	f := newMessagingFixture(t, 1, 0)
+	d, _ := f.h.user("dave")
+	e, _ := f.h.user("erin")
+	data := f.h.roundTrips(5, f.alice, addParticipantsMut, map[string]any{"threadId": f.threadIDs[0],
+		"userIds": []string{fmt.Sprint(f.carolID), fmt.Sprint(d), fmt.Sprint(e)}})
+	got := decode[struct {
+		Participants []struct {
+			User struct {
+				ID string `json:"id"`
+			} `json:"user"`
+		} `json:"participants"`
+	}](t, data, "addThreadParticipants")
+	require.Len(t, got.Participants, 5)
 }
 
 func TestLeaveThread(t *testing.T) {

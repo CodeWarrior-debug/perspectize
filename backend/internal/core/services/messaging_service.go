@@ -235,23 +235,41 @@ func (s *MessagingServiceImpl) CreateThread(ctx context.Context, actorUserID int
 	return s.threadRepo.CreateThread(ctx, actorUserID, title, ids)
 }
 
-// AddParticipants adds new users to an existing thread.
+// AddParticipants adds new users to an existing thread and returns it with
+// them: the upserted rows are merged into the thread loaded for the
+// participation check (no reload), and the ADDED events go out in one batch.
 func (s *MessagingServiceImpl) AddParticipants(ctx context.Context, actorUserID, threadID int, userIDs []int) (*domain.MessageThread, error) {
-	if err := s.AssertParticipant(ctx, actorUserID, threadID); err != nil {
+	thread, err := s.participantThread(ctx, actorUserID, threadID)
+	if err != nil {
 		return nil, err
 	}
-	if err := s.threadRepo.AddParticipants(ctx, threadID, userIDs); err != nil {
+	added, err := s.threadRepo.AddParticipants(ctx, threadID, userIDs)
+	if err != nil {
 		return nil, err
 	}
-	for _, uid := range userIDs {
-		_ = s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
+	envs := make([]domain.EventEnvelope, len(userIDs))
+	for i, uid := range userIDs {
+		envs[i] = domain.EventEnvelope{
 			Type:     "PARTICIPANT_CHANGED",
 			ThreadID: threadID,
 			UserID:   uid,
 			Change:   "ADDED",
-		})
+		}
 	}
-	return s.threadRepo.GetThread(ctx, threadID)
+	_ = s.publisher.PublishEphemeral(ctx, envs...)
+
+	byUser := make(map[int]int, len(thread.Participants))
+	for i, p := range thread.Participants {
+		byUser[p.UserID] = i
+	}
+	for _, p := range added {
+		if i, ok := byUser[p.UserID]; ok {
+			thread.Participants[i] = p
+		} else {
+			thread.Participants = append(thread.Participants, p)
+		}
+	}
+	return thread, nil
 }
 
 // LeaveThread marks the actor as having left the thread.

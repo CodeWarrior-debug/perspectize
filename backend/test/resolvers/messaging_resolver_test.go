@@ -174,8 +174,8 @@ func (inboxStubThreadRepo) FindDirectThread(ctx context.Context, a, b int) (*dom
 func (inboxStubThreadRepo) ListThreadsForUser(ctx context.Context, userID, limit int, before *time.Time) ([]domain.MessageThread, error) {
 	return nil, nil
 }
-func (inboxStubThreadRepo) AddParticipants(ctx context.Context, threadID int, userIDs []int) error {
-	return nil
+func (inboxStubThreadRepo) AddParticipants(ctx context.Context, threadID int, userIDs []int) ([]domain.ThreadParticipant, error) {
+	return nil, nil
 }
 func (inboxStubThreadRepo) SetLeft(ctx context.Context, threadID, userID int, at time.Time) error {
 	return nil

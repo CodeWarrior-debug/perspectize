@@ -21,7 +21,7 @@ type mockThreadRepo struct {
 	getThreadFn          func(ctx context.Context, threadID int) (*domain.MessageThread, error)
 	findDirectThreadFn   func(ctx context.Context, userA, userB int) (*domain.MessageThread, error)
 	listThreadsForUserFn func(ctx context.Context, userID int, limit int, beforeLastMessageAt *time.Time) ([]domain.MessageThread, error)
-	addParticipantsFn    func(ctx context.Context, threadID int, userIDs []int) error
+	addParticipantsFn    func(ctx context.Context, threadID int, userIDs []int) ([]domain.ThreadParticipant, error)
 	setLeftFn            func(ctx context.Context, threadID, userID int, at time.Time) error
 	setLastReadFn        func(ctx context.Context, threadID, userID int, seq int64) (int64, error)
 	setMutedFn           func(ctx context.Context, threadID, userID int, muted bool) error
@@ -55,11 +55,15 @@ func (m *mockThreadRepo) ListThreadsForUser(ctx context.Context, userID int, lim
 	return nil, nil
 }
 
-func (m *mockThreadRepo) AddParticipants(ctx context.Context, threadID int, userIDs []int) error {
+func (m *mockThreadRepo) AddParticipants(ctx context.Context, threadID int, userIDs []int) ([]domain.ThreadParticipant, error) {
 	if m.addParticipantsFn != nil {
 		return m.addParticipantsFn(ctx, threadID, userIDs)
 	}
-	return nil
+	out := make([]domain.ThreadParticipant, len(userIDs))
+	for i, uid := range userIDs {
+		out[i] = domain.ThreadParticipant{ThreadID: threadID, UserID: uid, Role: domain.ThreadRoleMember}
+	}
+	return out, nil
 }
 
 func (m *mockThreadRepo) SetLeft(ctx context.Context, threadID, userID int, at time.Time) error {
@@ -185,12 +189,18 @@ func (m *mockMessageRepo) ownLiveMessage(ctx context.Context, messageID int64, s
 type mockPublisher struct {
 	publishEphemeralFn func(ctx context.Context, env domain.EventEnvelope) error
 	calls              []domain.EventEnvelope
+	batches            int // PublishEphemeral invocations (each is one round trip)
 }
 
-func (m *mockPublisher) PublishEphemeral(ctx context.Context, env domain.EventEnvelope) error {
-	m.calls = append(m.calls, env)
-	if m.publishEphemeralFn != nil {
-		return m.publishEphemeralFn(ctx, env)
+func (m *mockPublisher) PublishEphemeral(ctx context.Context, envs ...domain.EventEnvelope) error {
+	m.batches++
+	for _, env := range envs {
+		m.calls = append(m.calls, env)
+		if m.publishEphemeralFn != nil {
+			if err := m.publishEphemeralFn(ctx, env); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -698,4 +708,39 @@ func TestMuteThread_SetsAndReturnsThread(t *testing.T) {
 	assert.Equal(t, 7, gotThreadID)
 	assert.Equal(t, 1, gotUserID)
 	assert.True(t, gotMuted)
+}
+
+// --- AddParticipants ---
+
+func TestAddParticipants_MergesRowsAndPublishesOneBatch(t *testing.T) {
+	now := time.Now()
+	thread := threadWithParticipants(7, 1, 2)
+	thread.Participants[1].LeftAt = &now // user 2 had left and is rejoining
+	threadRepo := &mockThreadRepo{
+		getThreadFn: func(ctx context.Context, threadID int) (*domain.MessageThread, error) { return thread, nil },
+		addParticipantsFn: func(ctx context.Context, threadID int, userIDs []int) ([]domain.ThreadParticipant, error) {
+			assert.Equal(t, []int{2, 3, 4}, userIDs)
+			return []domain.ThreadParticipant{
+				{ThreadID: 7, UserID: 2, Role: domain.ThreadRoleMember},
+				{ThreadID: 7, UserID: 3, Role: domain.ThreadRoleMember},
+				{ThreadID: 7, UserID: 4, Role: domain.ThreadRoleMember},
+			}, nil
+		},
+	}
+	pub := &mockPublisher{}
+	svc := services.NewMessagingService(threadRepo, &mockMessageRepo{}, pub, newLimiter(100))
+
+	got, err := svc.AddParticipants(context.Background(), 1, 7, []int{2, 3, 4})
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, pub.batches, "every ADDED event in one publish (one round trip)")
+	require.Len(t, pub.calls, 3)
+	for _, c := range pub.calls {
+		assert.Equal(t, "PARTICIPANT_CHANGED", c.Type)
+		assert.Equal(t, "ADDED", c.Change)
+	}
+	require.Len(t, got.Participants, 4, "rejoined user replaced in place, new users appended")
+	for _, uid := range []int{2, 3, 4} {
+		assert.True(t, got.IsActiveParticipant(uid), "user %d active", uid)
+	}
 }
