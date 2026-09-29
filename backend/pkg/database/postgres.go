@@ -18,13 +18,20 @@ type PoolConfig struct {
 	MaxOpenConns    int
 	MaxIdleConns    int
 	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
 }
 
 // DefaultPoolConfig returns sensible default pool settings
 func DefaultPoolConfig() PoolConfig {
 	return PoolConfig{
 		MaxOpenConns: 25,
-		MaxIdleConns: 5,
+		// GraphQL resolvers run concurrently, so one request can hold several
+		// connections at once. With only 5 kept idle, the rest were closed
+		// after every burst and the next burst paid new TCP + TLS handshakes
+		// to the (remote) database. Keep a working set warm instead, and let
+		// ConnMaxIdleTime trim it when traffic actually stops.
+		MaxIdleConns:    15,
+		ConnMaxIdleTime: 10 * time.Minute,
 		// Long enough that a warm connection (TLS session + pgx's prepared
 		// statement cache) survives between requests on a quiet app; every
 		// recycle costs a fresh handshake to the database on the next query.
@@ -51,6 +58,12 @@ func PoolConfigFromEnv() PoolConfig {
 	if lifetime := os.Getenv("DB_CONN_MAX_LIFETIME"); lifetime != "" {
 		if val, err := time.ParseDuration(lifetime); err == nil && val > 0 {
 			cfg.ConnMaxLifetime = val
+		}
+	}
+
+	if idle := os.Getenv("DB_CONN_MAX_IDLE_TIME"); idle != "" {
+		if val, err := time.ParseDuration(idle); err == nil && val > 0 {
+			cfg.ConnMaxIdleTime = val
 		}
 	}
 
@@ -90,6 +103,7 @@ func ConnectGORM(dsn string, pool PoolConfig, opts ...Option) (*gorm.DB, error) 
 	sqlDB.SetMaxOpenConns(pool.MaxOpenConns)
 	sqlDB.SetMaxIdleConns(pool.MaxIdleConns)
 	sqlDB.SetConnMaxLifetime(pool.ConnMaxLifetime)
+	sqlDB.SetConnMaxIdleTime(pool.ConnMaxIdleTime)
 
 	// Wrap with GORM
 	gormDB, err := gorm.Open(gormPostgres.New(gormPostgres.Config{
