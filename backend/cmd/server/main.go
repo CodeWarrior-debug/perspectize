@@ -155,7 +155,8 @@ func main() {
 	// they invalidate it (see cached.UserRepository).
 	userRepo := cached.NewUserRepository(postgres.NewGormUserRepository(db), cached.DefaultUserTTL)
 	perspectiveRepo := postgres.NewGormPerspectiveRepository(db)
-	categoryRepo := postgres.NewGormCategoryRepository(db)
+	// Cached: the content grid resolves every row's primaryCategory through it.
+	categoryRepo := cached.NewCategoryRepository(postgres.NewGormCategoryRepository(db), cached.DefaultCategoryTTL)
 	threadRepo := postgres.NewGormThreadRepository(db)
 	messageRepo := postgres.NewGormMessageRepository(db)
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)

@@ -355,12 +355,14 @@ func TestGormContentRepository_List(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("IncludeTotalCount issues a separate COUNT query", func(t *testing.T) {
+	t.Run("IncludeTotalCount rides in the page query as a scalar subquery", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`SELECT count\(\*\) FROM "content"`).
-			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(37))
-		mock.ExpectQuery(`SELECT \* FROM "content"`).
-			WillReturnRows(contentRows().AddRow(11, "A", "https://a", "youtube", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime))
+		mock.ExpectQuery(`SELECT content\.\*, \(SELECT COUNT\(\*\) FROM "content"\) AS total_count FROM "content"`).
+			WillReturnRows(sqlmock.NewRows([]string{
+				"id", "name", "url", "content_type", "added_by_user_id",
+				"length", "length_units", "response", "primary_category_id",
+				"created_at", "updated_at", "total_count",
+			}).AddRow(11, "A", "https://a", "youtube", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime, 37))
 
 		got, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{
 			SortBy:            domain.ContentSortByCreatedAt,
@@ -373,14 +375,25 @@ func TestGormContentRepository_List(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("count query failure is wrapped and short-circuits", func(t *testing.T) {
+	t.Run("an empty first page means a total of 0 without another query", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`SELECT count\(\*\) FROM "content"`).WillReturnError(errors.New("count boom"))
+		mock.ExpectQuery(`AS total_count FROM "content"`).WillReturnRows(contentRows())
+
+		got, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{IncludeTotalCount: true})
+		require.NoError(t, err)
+		require.NotNil(t, got.TotalCount)
+		assert.Equal(t, 0, *got.TotalCount)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("page query failure with a count is wrapped", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`AS total_count FROM "content"`).WillReturnError(errors.New("page boom"))
 
 		got, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{IncludeTotalCount: true})
 		assert.Nil(t, got)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to count content")
+		assert.Contains(t, err.Error(), "failed to list content")
 		assertAllExpectationsMet(t, mock)
 	})
 

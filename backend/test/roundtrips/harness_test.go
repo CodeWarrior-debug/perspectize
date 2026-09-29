@@ -107,7 +107,8 @@ func newHarness(t *testing.T) *harness {
 	// Same wiring as cmd/server/main.go.
 	userRepo := cached.NewUserRepository(h.userRepo, cached.DefaultUserTTL)
 	perspectiveRepo := postgres.NewGormPerspectiveRepository(db)
-	categoryRepo := postgres.NewGormCategoryRepository(db)
+	// Cached: the content grid resolves every row's primaryCategory through it.
+	categoryRepo := cached.NewCategoryRepository(postgres.NewGormCategoryRepository(db), cached.DefaultCategoryTTL)
 	threadRepo := postgres.NewGormThreadRepository(db)
 	messageRepo := postgres.NewGormMessageRepository(db)
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)

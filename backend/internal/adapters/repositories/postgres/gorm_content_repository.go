@@ -301,17 +301,12 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		}
 	}
 
-	// Total count (before cursor/limit — respects filters only)
-	var totalCountInt *int
+	// Total count (before cursor/limit — respects filters only). It rides
+	// along in the page query as an uncorrelated scalar subquery, which
+	// Postgres evaluates once: one round trip for page + count, not two.
+	countQuery := query.Session(&gorm.Session{})
 	if params.IncludeTotalCount {
-		// Clone query to avoid Paginate() modifying count query
-		countQuery := query.Session(&gorm.Session{})
-		var count int64
-		if err := countQuery.Count(&count).Error; err != nil {
-			return nil, fmt.Errorf("failed to count content: %w", err)
-		}
-		countInt := int(count)
-		totalCountInt = &countInt
+		query = query.Select("content.*, (?) AS total_count", countQuery.Session(&gorm.Session{}).Select("COUNT(*)"))
 	}
 
 	// Execute pagination
@@ -322,6 +317,22 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 	}
 	if pageResult.Error != nil {
 		return nil, fmt.Errorf("failed to list content: %w", pageResult.Error)
+	}
+
+	var totalCountInt *int
+	if params.IncludeTotalCount {
+		var count int64
+		switch {
+		case len(models) > 0 && models[0].TotalCount != nil:
+			count = *models[0].TotalCount
+		case params.After != nil:
+			// An empty page past the end carries no row to read the total from.
+			if err := countQuery.Count(&count).Error; err != nil {
+				return nil, fmt.Errorf("failed to count content: %w", err)
+			}
+		}
+		countInt := int(count)
+		totalCountInt = &countInt
 	}
 
 	// Map results to domain
