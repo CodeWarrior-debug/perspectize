@@ -1,5 +1,5 @@
 import { createQuery } from '@tanstack/svelte-query';
-import { useClerkContext } from 'svelte-clerk';
+import { useAuthState } from '$lib/auth/useAuthState';
 import { graphqlRequest } from '$lib/queries/client';
 import { ME, type MeResponse, type Me } from '$lib/queries/users';
 
@@ -11,13 +11,13 @@ import { ME, type MeResponse, type Me } from '$lib/queries/users';
  * never trigger a second network request.
  */
 export function useMe() {
-	const clerk = useClerkContext();
-	const clerkUserId = $derived(clerk.auth.userId);
+	const auth = useAuthState();
+	const clerkUserId = $derived(auth.userId);
 
 	const meQuery = createQuery(() => ({
 		queryKey: ['me', clerkUserId],
 		queryFn: () => graphqlRequest<MeResponse>(ME),
-		enabled: clerk.isLoaded && !!clerkUserId,
+		enabled: auth.isLoaded && !!clerkUserId,
 		staleTime: 5 * 60 * 1000,
 	}));
 

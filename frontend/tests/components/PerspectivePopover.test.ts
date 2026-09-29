@@ -626,6 +626,44 @@ describe('PerspectivePopover component', () => {
 		});
 	});
 
+	describe('feel-wheel', () => {
+		const wheelSearch = () => screen.queryByPlaceholderText(/Search more feelings/);
+
+		it('starts closed in create mode, showing only the "Add a feeling" button', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			expect(screen.getByRole('button', { name: /Add a feeling/ })).toBeInTheDocument();
+			expect(wheelSearch()).not.toBeInTheDocument();
+		});
+
+		it('opens the wheel on the same tick as the click, with no loading state', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			await fireEvent.click(screen.getByRole('button', { name: /Add a feeling/ }));
+			expect(wheelSearch()).toBeInTheDocument();
+			expect(screen.queryByText(/Loading feel-wheel/)).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /Add a feeling/ })).not.toBeInTheDocument();
+		});
+
+		it('opens already expanded when editing a perspective that has feelings', async () => {
+			renderPopover({
+				existingPerspective: {
+					id: '4',
+					quality: null,
+					agreement: null,
+					importance: null,
+					confidence: null,
+					like: null,
+					feelings: [{ emoji: '😊', label: 'Happy', intensity: 7000, note: null }],
+				},
+			});
+			await tick();
+			expect(wheelSearch()).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Remove Happy' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /Add a feeling/ })).not.toBeInTheDocument();
+		});
+	});
+
 	describe('accessibility', () => {
 		it('dialog is accessible with proper roles', async () => {
 			renderPopover();

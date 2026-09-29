@@ -41,7 +41,9 @@ describe('useAddPassage', () => {
 		mocks.options.onSuccess({
 			createContentFromPassage: { id: '1', name: 'John 3:16-18', contentType: 'BIBLE_PASSAGE', displayTitle: null },
 		});
-		expect(mocks.success).toHaveBeenCalledWith('Added: John 3:16-18');
+		expect(mocks.success).toHaveBeenCalledWith('Added: John 3:16-18', {
+			action: { label: 'Go to passage', onClick: expect.any(Function) },
+		});
 		expect(mocks.invalidate).toHaveBeenCalled();
 		expect(mocks.setQueriesData).not.toHaveBeenCalled();
 	});
@@ -55,7 +57,16 @@ describe('useAddPassage', () => {
 				displayTitle: 'God so loved',
 			},
 		});
-		expect(mocks.success).toHaveBeenCalledWith('Added: God so loved');
+		expect(mocks.success).toHaveBeenCalledWith('Added: God so loved', expect.anything());
+	});
+
+	it('the "Go to passage" action opens the passage on the Activity page', async () => {
+		const { goto } = await import('$app/navigation');
+		mocks.options.onSuccess({
+			createContentFromPassage: { id: '7', name: 'John 3:16-18', contentType: 'BIBLE_PASSAGE', displayTitle: null },
+		});
+		mocks.success.mock.calls[0][1].action.onClick();
+		expect(goto).toHaveBeenCalledWith('/?open=7');
 	});
 
 	it.each([

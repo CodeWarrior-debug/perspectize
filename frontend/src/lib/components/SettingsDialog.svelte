@@ -1,17 +1,19 @@
 <script lang="ts">
 	import { Dialog, DialogContent, DialogHeader, DialogTitle, Switch } from '$lib/components/shadcn';
 	import ThemeCustomizePanel from '$lib/components/theme/ThemeCustomizePanel.svelte';
+	import FeedbackDialog from '$lib/components/FeedbackDialog.svelte';
 	import type { ThemeStore } from '$lib/theme/store.svelte';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import { useSetOnboardingDisplayNextSession } from '$lib/queries/users/useSetOnboardingDisplayNextSession';
 
 	let { open = $bindable(false), store }: { open?: boolean; store: ThemeStore } = $props();
 
-	type SectionId = 'general' | 'theme';
+	type SectionId = 'general' | 'theme' | 'feedback';
 
 	const sections: { id: SectionId; label: string }[] = [
 		{ id: 'general', label: 'General' },
 		{ id: 'theme', label: 'Customize Theme' },
+		{ id: 'feedback', label: 'Send Feedback' }
 	];
 
 	let activeSection = $state<SectionId>('general');
@@ -31,7 +33,7 @@
 			<DialogTitle>Settings</DialogTitle>
 		</DialogHeader>
 
-		<div class="flex flex-col gap-4 sm:flex-row sm:gap-6 min-h-[320px] max-h-[75vh] overflow-y-auto">
+		<div class="flex flex-col gap-4 sm:flex-row sm:gap-6 min-h-[320px] max-h-[75vh]">
 			<nav
 				class="flex gap-1 overflow-x-auto sm:w-40 sm:shrink-0 sm:flex-col sm:overflow-visible"
 				aria-label="Settings sections"
@@ -49,7 +51,8 @@
 				{/each}
 			</nav>
 
-			<div class="flex-1 min-w-0">
+			<!-- Only this pane scrolls, so the section nav and each panel's sticky header stay put. -->
+			<div class="flex-1 min-h-0 min-w-0 overflow-y-auto">
 				{#if activeSection === 'general'}
 					<div class="flex flex-col gap-4">
 						<div class="flex items-center justify-between gap-4 rounded-md border border-border p-3">
@@ -69,6 +72,8 @@
 					</div>
 				{:else if activeSection === 'theme'}
 					<ThemeCustomizePanel {store} />
+				{:else if activeSection === 'feedback'}
+					<FeedbackDialog onClose={() => { open = false; }} />
 				{/if}
 			</div>
 		</div>

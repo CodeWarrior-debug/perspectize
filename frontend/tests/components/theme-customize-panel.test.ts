@@ -125,4 +125,54 @@ describe('ThemeCustomizePanel', () => {
 
 		expect(store.state.customThemes).toHaveLength(0);
 	});
+
+	describe('scrolling the active theme into view on open', () => {
+		let scrollIntoView: ReturnType<typeof vi.fn>;
+
+		beforeEach(() => {
+			scrollIntoView = vi.fn();
+			Element.prototype.scrollIntoView = scrollIntoView as unknown as typeof Element.prototype.scrollIntoView;
+		});
+
+		it('centres the active preset card', () => {
+			const store = createThemeStore();
+			const active = THEME_PRESETS.find((p) => p.id !== THEME_PRESETS[0].id)!;
+			store.selectPreset(active.id);
+			render(ThemeCustomizePanel, { props: { store } });
+
+			expect(scrollIntoView).toHaveBeenCalledTimes(1);
+			expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+			const target = scrollIntoView.mock.contexts[0] as HTMLElement;
+			expect(target).toHaveAttribute('data-active', 'true');
+			expect(target).toHaveTextContent(active.name);
+		});
+
+		it('centres the active custom theme card', () => {
+			const store = createThemeStore();
+			store.saveCustomTheme('Mine', THEME_PRESETS[0].base);
+			store.selectCustom(store.state.customThemes[0].id);
+			render(ThemeCustomizePanel, { props: { store } });
+
+			const target = scrollIntoView.mock.contexts[0] as HTMLElement;
+			expect(target).toHaveAttribute('data-active', 'true');
+			expect(target).toHaveTextContent('Mine');
+		});
+
+		it('marks exactly one card active', () => {
+			const store = createThemeStore();
+			render(ThemeCustomizePanel, { props: { store } });
+			expect(document.querySelectorAll('[data-active="true"]')).toHaveLength(1);
+		});
+
+		it('does not re-scroll when the user picks a different theme', async () => {
+			const store = createThemeStore();
+			const other = THEME_PRESETS.find((p) => p.id !== store.state.activeThemeId)!;
+			render(ThemeCustomizePanel, { props: { store } });
+			scrollIntoView.mockClear();
+
+			await fireEvent.click(screen.getByText(other.name));
+
+			expect(scrollIntoView).not.toHaveBeenCalled();
+		});
+	});
 });

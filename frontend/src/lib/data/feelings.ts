@@ -191,7 +191,5 @@ export const FAMILY_ORDER: { family: string; header: string }[] = [
 export function searchExtendedFeelings(query: string): ExtendedFeeling[] {
 	const q = query.trim().toLowerCase();
 	if (!q) return [];
-	return EXTENDED_FEELINGS.filter(
-		(f) => f.label.toLowerCase().includes(q) || f.keywords.some((k) => k.includes(q)),
-	);
+	return EXTENDED_FEELINGS.filter((f) => f.label.toLowerCase().includes(q) || f.keywords.some((k) => k.includes(q)));
 }
