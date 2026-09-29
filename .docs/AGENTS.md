@@ -9,7 +9,7 @@ This document helps AI agents (Claude Code, subagents, skills) navigate the Pers
 | Go backend work | `backend/internal/` | `go-backend` | Sonnet | `backend-development` |
 | GraphQL changes | `schema.graphql` | `graphql-designer` | Sonnet | `api-scaffolding:graphql-architect` |
 | Database migrations | `migrations/` | `db-migration` | Sonnet | `devops-tools:databases` |
-| Code review | `.golangci.yml` | `code-reviewer` | Haiku | - |
+| Code review | `.golangci.yml` | `code-reviewer` | Sonnet | - |
 | Test writing | `*_test.go` files | `test-writer` | Haiku | - |
 | Architecture decisions | `docs/ARCHITECTURE.md` | - | Opus | - |
 
@@ -251,7 +251,7 @@ Grep: "TODO|FIXME"
 - Indexing strategies
 - Data type selection
 
-**`code-reviewer` (Haiku):**
+**`code-reviewer` (Sonnet):**
 - Go style guidelines
 - golangci-lint rules
 - Common code smells

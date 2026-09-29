@@ -207,7 +207,7 @@ models:
 | Go implementation | Sonnet | `go-backend` | Balanced quality/cost |
 | GraphQL schema design | Sonnet | `graphql-designer` | Schema patterns |
 | Database migrations | Sonnet | `db-migration` | SQL generation |
-| Code review | Haiku | `code-reviewer` | Fast pattern matching |
+| Code review | Sonnet | `code-reviewer` | Reviews must check claims against the code, not just pattern-match |
 | Test generation | Haiku | `test-writer` | Boilerplate generation |
 
 ## References

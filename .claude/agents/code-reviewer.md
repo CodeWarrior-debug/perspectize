@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
 description: Fast code reviewer for Go code. Use for reviewing PRs, checking code quality, identifying bugs, and suggesting improvements. Optimized for quick feedback cycles.
-model: haiku
+model: sonnet
 tools:
   - Read
   - Grep
