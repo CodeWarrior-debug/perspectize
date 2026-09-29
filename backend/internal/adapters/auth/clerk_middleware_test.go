@@ -103,6 +103,10 @@ func (s *stubUserRepo) UpdateOnboarding(ctx context.Context, userID int, onboard
 	return nil, errors.New("UpdateOnboarding not stubbed")
 }
 
+func (s *stubUserRepo) SetOnboardingDisplayNextSession(ctx context.Context, userID int, display bool) (*domain.User, error) {
+	return nil, errors.New("SetOnboardingDisplayNextSession not stubbed")
+}
+
 // setClerkAPIResponse points the package-level Clerk backend at a canned HTTP
 // response so clerkuser.Get can be driven without network access. The previous
 // backend is restored on test cleanup. Tests using this must not run in

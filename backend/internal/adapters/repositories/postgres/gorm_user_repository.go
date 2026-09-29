@@ -7,6 +7,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	repositories "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // GormUserRepository implements the UserRepository interface using GORM
@@ -205,22 +206,36 @@ func (r *GormUserRepository) DeactivateByClerkID(ctx context.Context, clerkID st
 	return nil
 }
 
-// UpdateOnboarding replaces the onboarding JSONB for a user.
+// sentinelRole is how UserRoleSentinel is stored (roles are lowercased; see
+// userDomainToModel). The system user's onboarding is never writable.
+const sentinelRole = "sentinel"
+
+// UpdateOnboarding replaces the onboarding JSONB for a non-sentinel user in
+// one round trip (UPDATE ... RETURNING *). Returns domain.ErrNotFound when no
+// such user exists -- or it is the sentinel; the caller disambiguates.
 func (r *GormUserRepository) UpdateOnboarding(ctx context.Context, userID int, onboarding domain.UserOnboarding) (*domain.User, error) {
-	raw := onboardingToJSON(onboarding)
-	result := r.db.WithContext(ctx).Model(&UserModel{}).
-		Where("id = ?", userID).
-		Update("onboarding", raw)
+	return r.updateOnboarding(ctx, userID, onboardingToJSON(onboarding))
+}
+
+// SetOnboardingDisplayNextSession flips only onboarding.displayNextSession,
+// in SQL, so the caller doesn't need to read the current onboarding first.
+// Same not-found/sentinel contract as UpdateOnboarding.
+func (r *GormUserRepository) SetOnboardingDisplayNextSession(ctx context.Context, userID int, display bool) (*domain.User, error) {
+	return r.updateOnboarding(ctx, userID,
+		gorm.Expr(`jsonb_set(onboarding, '{displayNextSession}', to_jsonb(?::boolean))`, display))
+}
+
+func (r *GormUserRepository) updateOnboarding(ctx context.Context, userID int, value interface{}) (*domain.User, error) {
+	var updated UserModel
+	result := r.db.WithContext(ctx).Model(&updated).
+		Clauses(clause.Returning{}).
+		Where("id = ? AND role <> ?", userID, sentinelRole).
+		Update("onboarding", value)
 	if result.Error != nil {
 		return nil, result.Error
 	}
 	if result.RowsAffected == 0 {
 		return nil, domain.ErrNotFound
-	}
-
-	var updated UserModel
-	if err := r.db.WithContext(ctx).First(&updated, userID).Error; err != nil {
-		return nil, err
 	}
 	return userModelToDomain(&updated), nil
 }

@@ -20,5 +20,10 @@ type UserRepository interface {
 	UpdateByClerkID(ctx context.Context, clerkID string, username string, email string) error
 	DeactivateByClerkID(ctx context.Context, clerkID string) error
 	// UpdateOnboarding replaces the onboarding JSON for the given user ID.
+	// Returns domain.ErrNotFound when the user doesn't exist or is the sentinel
+	// (whose onboarding is never writable).
 	UpdateOnboarding(ctx context.Context, userID int, onboarding domain.UserOnboarding) (*domain.User, error)
+	// SetOnboardingDisplayNextSession changes only onboarding.displayNextSession,
+	// without a read. Same not-found/sentinel contract as UpdateOnboarding.
+	SetOnboardingDisplayNextSession(ctx context.Context, userID int, display bool) (*domain.User, error)
 }

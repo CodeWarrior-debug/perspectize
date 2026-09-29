@@ -96,7 +96,33 @@ func (m *mockUserRepository) UpdateOnboarding(ctx context.Context, userID int, o
 	if m.updateOnboardingFn != nil {
 		return m.updateOnboardingFn(ctx, userID, onboarding)
 	}
+	if _, err := m.writableUser(ctx, userID); err != nil {
+		return nil, err
+	}
 	return &domain.User{ID: userID, Onboarding: onboarding}, nil
+}
+
+func (m *mockUserRepository) SetOnboardingDisplayNextSession(ctx context.Context, userID int, display bool) (*domain.User, error) {
+	u, err := m.writableUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	u.Onboarding.DisplayNextSession = display
+	return u, nil
+}
+
+// writableUser emulates the real repository's onboarding UPDATE predicate
+// (WHERE id = ? AND role <> 'sentinel'): a missing user or the sentinel is a
+// zero-row update, i.e. domain.ErrNotFound.
+func (m *mockUserRepository) writableUser(ctx context.Context, userID int) (*domain.User, error) {
+	if m.getByIDFn == nil {
+		return &domain.User{ID: userID}, nil
+	}
+	u, err := m.getByIDFn(ctx, userID)
+	if err != nil || u == nil || u.IsSentinel() {
+		return nil, domain.ErrNotFound
+	}
+	return u, nil
 }
 
 // mockContentRepoForUser implements repositories.ContentRepository for user tests

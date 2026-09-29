@@ -128,7 +128,30 @@ func (r *UserRepository) DeactivateByClerkID(ctx context.Context, clerkID string
 	return r.UserRepository.DeactivateByClerkID(ctx, clerkID)
 }
 
+// The onboarding writes return the full, fresh row (UPDATE ... RETURNING), so
+// they refresh that user's entry in place instead of clearing everyone's:
+// the next request from this user doesn't pay the lookup again.
+
 func (r *UserRepository) UpdateOnboarding(ctx context.Context, userID int, onboarding domain.UserOnboarding) (*domain.User, error) {
-	defer r.invalidate()
-	return r.UserRepository.UpdateOnboarding(ctx, userID, onboarding)
+	return r.writeThrough(r.UserRepository.UpdateOnboarding(ctx, userID, onboarding))
+}
+
+func (r *UserRepository) SetOnboardingDisplayNextSession(ctx context.Context, userID int, display bool) (*domain.User, error) {
+	return r.writeThrough(r.UserRepository.SetOnboardingDisplayNextSession(ctx, userID, display))
+}
+
+// writeThrough stores a just-written user under its Clerk ID. Any other
+// outcome (an error, a user without a Clerk ID) falls back to invalidating.
+func (r *UserRepository) writeThrough(user *domain.User, err error) (*domain.User, error) {
+	if err != nil || user == nil || user.ClerkUserID == "" {
+		r.invalidate()
+		return user, err
+	}
+	u := *user
+	r.mu.Lock()
+	// Bump gen so a lookup that read the pre-write row can't store it over this.
+	r.gen++
+	r.entries[user.ClerkUserID] = userEntry{user: &u, expires: r.now().Add(r.ttl)}
+	r.mu.Unlock()
+	return user, nil
 }

@@ -143,6 +143,10 @@ func (m *mockUserRepoForPerspective) UpdateOnboarding(ctx context.Context, userI
 	return &domain.User{ID: userID, Onboarding: onboarding}, nil
 }
 
+func (m *mockUserRepoForPerspective) SetOnboardingDisplayNextSession(ctx context.Context, userID int, display bool) (*domain.User, error) {
+	return &domain.User{ID: userID, Onboarding: domain.UserOnboarding{DisplayNextSession: display}}, nil
+}
+
 // --- Create Tests ---
 
 func TestPerspectiveCreate_Success(t *testing.T) {

@@ -178,6 +178,15 @@ func (m *mockUserRepository) UpdateOnboarding(ctx context.Context, userID int, o
 	return &domain.User{ID: userID, Onboarding: onboarding}, nil
 }
 
+func (m *mockUserRepository) SetOnboardingDisplayNextSession(ctx context.Context, userID int, display bool) (*domain.User, error) {
+	u, err := m.GetByID(ctx, userID)
+	if err != nil || u.IsSentinel() {
+		return nil, domain.ErrNotFound // mirrors WHERE id = ? AND role <> 'sentinel'
+	}
+	u.Onboarding.DisplayNextSession = display
+	return u, nil
+}
+
 // mockPerspectiveRepository implements repositories.PerspectiveRepository for testing
 type mockPerspectiveRepository struct {
 	createFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)

@@ -251,14 +251,6 @@ func (s *UserService) MarkOnboardingSeen(ctx context.Context, userID int, versio
 		return nil, fmt.Errorf("%w: version must be non-negative", domain.ErrInvalidInput)
 	}
 
-	user, err := s.repo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-	if user.IsSentinel() {
-		return nil, fmt.Errorf("%w", domain.ErrSentinelUser)
-	}
-
 	now := time.Now().UTC().Format(time.RFC3339)
 	onboarding := domain.UserOnboarding{
 		Version:            version,
@@ -266,11 +258,29 @@ func (s *UserService) MarkOnboardingSeen(ctx context.Context, userID int, versio
 		CompletedAt:        &now,
 	}
 
+	// One round trip: the repository refuses the sentinel in the UPDATE itself.
 	updated, err := s.repo.UpdateOnboarding(ctx, userID, onboarding)
 	if err != nil {
-		return nil, fmt.Errorf("failed to mark onboarding seen: %w", err)
+		return nil, s.onboardingWriteError(ctx, userID, err, "failed to mark onboarding seen")
 	}
 	return &updated.Onboarding, nil
+}
+
+// onboardingWriteError explains a failed onboarding write. A miss from the
+// repository means the user is missing or is the sentinel; only then is the
+// user read, to report which.
+func (s *UserService) onboardingWriteError(ctx context.Context, userID int, err error, action string) error {
+	if !errors.Is(err, domain.ErrNotFound) {
+		return fmt.Errorf("%s: %w", action, err)
+	}
+	user, getErr := s.repo.GetByID(ctx, userID)
+	if getErr != nil {
+		return fmt.Errorf("failed to get user: %w", getErr)
+	}
+	if user.IsSentinel() {
+		return fmt.Errorf("%w", domain.ErrSentinelUser)
+	}
+	return fmt.Errorf("%s: %w", action, err)
 }
 
 // SetOnboardingDisplayNextSession toggles soft coach display (Help replay).
@@ -279,20 +289,9 @@ func (s *UserService) SetOnboardingDisplayNextSession(ctx context.Context, userI
 		return nil, fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
 	}
 
-	user, err := s.repo.GetByID(ctx, userID)
+	updated, err := s.repo.SetOnboardingDisplayNextSession(ctx, userID, displayNextSession)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-	if user.IsSentinel() {
-		return nil, fmt.Errorf("%w", domain.ErrSentinelUser)
-	}
-
-	onboarding := user.Onboarding
-	onboarding.DisplayNextSession = displayNextSession
-
-	updated, err := s.repo.UpdateOnboarding(ctx, userID, onboarding)
-	if err != nil {
-		return nil, fmt.Errorf("failed to set onboarding display flag: %w", err)
+		return nil, s.onboardingWriteError(ctx, userID, err, "failed to set onboarding display flag")
 	}
 	return &updated.Onboarding, nil
 }

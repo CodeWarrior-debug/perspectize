@@ -27,6 +27,10 @@ type fakeUserRepo struct {
 	beforeReturn func()
 
 	writeErr error
+
+	// onboardingResult, when set, is what the onboarding writes return (a
+	// full row with a Clerk ID, like the real UPDATE ... RETURNING).
+	onboardingResult *domain.User
 }
 
 func newFake(users ...*domain.User) *fakeUserRepo {
@@ -99,6 +103,16 @@ func (f *fakeUserRepo) DeactivateByClerkID(ctx context.Context, clerkID string) 
 	return f.writeErr
 }
 func (f *fakeUserRepo) UpdateOnboarding(ctx context.Context, userID int, onboarding domain.UserOnboarding) (*domain.User, error) {
+	return f.onboardingWrite(userID)
+}
+func (f *fakeUserRepo) SetOnboardingDisplayNextSession(ctx context.Context, userID int, display bool) (*domain.User, error) {
+	return f.onboardingWrite(userID)
+}
+func (f *fakeUserRepo) onboardingWrite(userID int) (*domain.User, error) {
+	if f.onboardingResult != nil && f.writeErr == nil {
+		cp := *f.onboardingResult
+		return &cp, nil
+	}
 	return &domain.User{ID: userID}, f.writeErr
 }
 
@@ -222,6 +236,10 @@ func TestUserRepository_EveryWriteInvalidates(t *testing.T) {
 		{"CreateFromClerk", func(r *UserRepository) error { _, err := r.CreateFromClerk(ctx, "c", "u", "e"); return err }},
 		{"UpdateByClerkID", func(r *UserRepository) error { return r.UpdateByClerkID(ctx, "clerk_a", "u", "e") }},
 		{"DeactivateByClerkID", func(r *UserRepository) error { return r.DeactivateByClerkID(ctx, "clerk_a") }},
+		{"SetOnboardingDisplayNextSession", func(r *UserRepository) error {
+			_, err := r.SetOnboardingDisplayNextSession(ctx, 1, true)
+			return err
+		}},
 		{"UpdateOnboarding", func(r *UserRepository) error {
 			_, err := r.UpdateOnboarding(ctx, 1, domain.UserOnboarding{})
 			return err
@@ -395,4 +413,43 @@ func TestUserRepository_ConcurrentAccessIsRaceFree(t *testing.T) {
 		}(g)
 	}
 	wg.Wait()
+}
+
+func TestUserRepository_OnboardingWritesRefreshInPlace(t *testing.T) {
+	bob := &domain.User{ID: 2, ClerkUserID: "clerk_b", Username: "bob"}
+	for _, write := range []struct {
+		name string
+		do   func(r *UserRepository) error
+	}{
+		{"UpdateOnboarding", func(r *UserRepository) error {
+			_, err := r.UpdateOnboarding(context.Background(), 1, domain.UserOnboarding{Version: 7})
+			return err
+		}},
+		{"SetOnboardingDisplayNextSession", func(r *UserRepository) error {
+			_, err := r.SetOnboardingDisplayNextSession(context.Background(), 1, true)
+			return err
+		}},
+	} {
+		t.Run(write.name, func(t *testing.T) {
+			inner := newFake(alice(), bob)
+			r, _ := newRepo(inner)
+			ctx := context.Background()
+			_, err := r.GetByClerkID(ctx, "clerk_a")
+			require.NoError(t, err)
+			_, err = r.GetByClerkID(ctx, "clerk_b")
+			require.NoError(t, err)
+
+			written := alice()
+			written.Onboarding = domain.UserOnboarding{Version: 7, DisplayNextSession: true}
+			inner.onboardingResult = written
+			require.NoError(t, write.do(r))
+
+			got, err := r.GetByClerkID(ctx, "clerk_a")
+			require.NoError(t, err)
+			assert.Equal(t, 7, got.Onboarding.Version, "entry holds the written row")
+			_, err = r.GetByClerkID(ctx, "clerk_b")
+			require.NoError(t, err)
+			assert.Equal(t, 2, inner.getCalls(), "neither user is re-read after the write")
+		})
+	}
 }
