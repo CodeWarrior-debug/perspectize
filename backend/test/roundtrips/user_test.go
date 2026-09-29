@@ -61,3 +61,27 @@ func TestUpdateUserUsernameTaken(t *testing.T) {
 		t.Fatalf("unexpected error: %q", msg)
 	}
 }
+
+const meQuery = `query { me { id username role onboarding { version displayNextSession completedAt } } }`
+
+// me reuses the row the auth middleware resolved, and an onboarding write on
+// this instance is reflected immediately (the cache entry is refreshed from
+// the write's RETURNING row).
+func TestMe(t *testing.T) {
+	h := newHarness(t)
+	_, token := h.user("me")
+	h.warm(token)
+
+	h.roundTrips(0, token, meQuery, nil)
+
+	h.gql(token, `mutation { markOnboardingSeen(version: 4) { version } }`, nil)
+	data := h.roundTrips(0, token, meQuery, nil)
+	me := decode[struct {
+		Onboarding struct {
+			Version int `json:"version"`
+		} `json:"onboarding"`
+	}](t, data, "me")
+	if me.Onboarding.Version != 4 {
+		t.Fatalf("me must reflect the onboarding write, got version %d", me.Onboarding.Version)
+	}
+}
