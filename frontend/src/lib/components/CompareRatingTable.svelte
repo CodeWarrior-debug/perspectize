@@ -65,15 +65,17 @@
 		</div>
 	{/if}
 
-	<button
-		type="button"
-		data-testid="sort-toggle"
-		onclick={onToggleSort}
-		class="flex items-center justify-center gap-1 self-center text-[12.5px] font-medium text-muted-foreground"
-	>
-		{sortDesc ? 'Most similar last' : 'Most similar first'}
-		<ChevronDownIcon class="size-3.5 transition-transform" style="transform: rotate({sortDesc ? 180 : 0}deg);" />
-	</button>
+	{#if rows.length > 0}
+		<button
+			type="button"
+			data-testid="sort-toggle"
+			onclick={onToggleSort}
+			class="flex items-center justify-center gap-1 self-center text-[12.5px] font-medium text-muted-foreground"
+		>
+			{sortDesc ? 'Most similar last' : 'Most similar first'}
+			<ChevronDownIcon class="size-3.5 transition-transform" style="transform: rotate({sortDesc ? 180 : 0}deg);" />
+		</button>
+	{/if}
 
 	<div class="flex flex-col gap-3">
 		{#each rows as row (row.key)}
