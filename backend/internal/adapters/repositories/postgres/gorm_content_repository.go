@@ -71,6 +71,10 @@ func (r *GormContentRepository) GetByURL(ctx context.Context, url string) (*doma
 // When refreshOnConflict is true, updates response and updated_at on conflict (refreshes metadata).
 // When refreshOnConflict is false, does nothing on conflict (preserves original data).
 // Returns (content, alreadyExisted, error).
+//
+// One round trip in the common cases: RETURNING * hands back the inserted (or
+// refreshed) row. Only a DO NOTHING conflict returns no row, and costs a
+// second query to fetch the existing one.
 func (r *GormContentRepository) GetOrCreateByURL(ctx context.Context, content *domain.Content, refreshOnConflict bool) (*domain.Content, bool, error) {
 	model := contentDomainToModel(content)
 
@@ -83,13 +87,13 @@ func (r *GormContentRepository) GetOrCreateByURL(ctx context.Context, content *d
 		conflictClause.DoNothing = true
 	}
 
-	result := r.db.WithContext(ctx).Clauses(conflictClause).Create(model)
+	result := r.db.WithContext(ctx).Clauses(conflictClause, clause.Returning{}).Create(model)
 
 	if result.Error != nil {
 		return nil, false, fmt.Errorf("failed to upsert content: %w", result.Error)
 	}
 
-	// If RowsAffected == 0, the row already existed — fetch it by URL
+	// DO NOTHING on conflict: no row came back — fetch the existing one by URL
 	if result.RowsAffected == 0 {
 		existing, err := r.GetByURL(ctx, *content.URL)
 		if err != nil {
@@ -98,20 +102,23 @@ func (r *GormContentRepository) GetOrCreateByURL(ctx context.Context, content *d
 		return existing, true, nil
 	}
 
-	// Freshly created — re-fetch to get DB-generated timestamps
-	fresh, err := r.GetByID(ctx, model.ID)
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to fetch created content: %w", err)
-	}
-	return fresh, false, nil
+	// RETURNING filled model with the stored row. A fresh insert writes the
+	// same timestamp to created_at and updated_at (GORM stamps both from one
+	// clock read); a DO UPDATE refresh keeps the original created_at and
+	// moves only updated_at, so they differ.
+	alreadyExisted := !model.CreatedAt.Equal(model.UpdatedAt)
+	return contentModelToDomain(model), alreadyExisted, nil
 }
 
 // UpdateMetadata performs a direct UPDATE of an existing content row's refreshable
 // fields (name, response, length) plus updated_at. It never touches created_at or
 // added_by_user_id, and it does not insert — the row must already exist.
 func (r *GormContentRepository) UpdateMetadata(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
+	// RETURNING * gives back the updated row: one round trip, no re-read.
+	var updated ContentModel
 	result := r.db.WithContext(ctx).
-		Model(&ContentModel{}).
+		Model(&updated).
+		Clauses(clause.Returning{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"name":       name,
@@ -127,11 +134,7 @@ func (r *GormContentRepository) UpdateMetadata(ctx context.Context, id int, name
 		return nil, domain.ErrNotFound
 	}
 
-	fresh, err := r.GetByID(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch updated content: %w", err)
-	}
-	return fresh, nil
+	return contentModelToDomain(&updated), nil
 }
 
 // List retrieves a paginated list of content using cursor-based pagination

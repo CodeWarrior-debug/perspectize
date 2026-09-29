@@ -154,11 +154,9 @@ func TestGormContentRepository_GetOrCreateByURL(t *testing.T) {
 		return &domain.Content{Name: "New", URL: cStr("https://x"), ContentType: domain.ContentTypeYouTube, AddedByUserID: 4}
 	}
 
-	t.Run("fresh insert re-reads by id and reports alreadyExisted=false", func(t *testing.T) {
+	t.Run("fresh insert returns the RETURNING row and reports alreadyExisted=false", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`INSERT INTO "content" .* ON CONFLICT`).
-			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21))
-		mock.ExpectQuery(`SELECT \* FROM "content"`).
+		mock.ExpectQuery(`INSERT INTO "content" .* ON CONFLICT .* RETURNING \*`).
 			WillReturnRows(contentRows().AddRow(21, "New", "https://x", "youtube", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime))
 
 		got, existed, err := NewGormContentRepository(db).GetOrCreateByURL(ctx, newContent(), true)
@@ -166,6 +164,20 @@ func TestGormContentRepository_GetOrCreateByURL(t *testing.T) {
 		assert.False(t, existed)
 		require.NotNil(t, got)
 		assert.Equal(t, 21, got.ID)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("DO UPDATE refresh of an existing row reports alreadyExisted=true", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		// The refresh moves updated_at but keeps the original created_at.
+		mock.ExpectQuery(`INSERT INTO "content" .* ON CONFLICT .* DO UPDATE .* RETURNING \*`).
+			WillReturnRows(contentRows().AddRow(19, "Existing", "https://x", "youtube", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime.Add(time.Hour)))
+
+		got, existed, err := NewGormContentRepository(db).GetOrCreateByURL(ctx, newContent(), true)
+		require.NoError(t, err)
+		assert.True(t, existed)
+		require.NotNil(t, got)
+		assert.Equal(t, 19, got.ID)
 		assertAllExpectationsMet(t, mock)
 	})
 
@@ -210,27 +222,14 @@ func TestGormContentRepository_GetOrCreateByURL(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("wraps post-create re-read errors", func(t *testing.T) {
-		db, mock := newMockDB(t)
-		mock.ExpectQuery(`INSERT INTO "content"`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21))
-		mock.ExpectQuery(`SELECT \* FROM "content"`).WillReturnError(errors.New("post-create boom"))
-
-		got, existed, err := NewGormContentRepository(db).GetOrCreateByURL(ctx, newContent(), true)
-		assert.Nil(t, got)
-		assert.False(t, existed)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to fetch created content")
-		assertAllExpectationsMet(t, mock)
-	})
 }
 
 func TestGormContentRepository_UpdateMetadata(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("updates then re-reads", func(t *testing.T) {
+	t.Run("returns the updated row from RETURNING", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectQuery(`SELECT \* FROM "content"`).
+		mock.ExpectQuery(`UPDATE "content" SET .* RETURNING \*`).
 			WillReturnRows(contentRows().AddRow(11, "Refreshed", "https://x", "youtube", 4, 420, "seconds", []byte(`{"a":1}`), nil, contentRepoTime, contentRepoTime))
 
 		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 11, "Refreshed", json.RawMessage(`{"a":1}`), cInt(420))
@@ -242,9 +241,9 @@ func TestGormContentRepository_UpdateMetadata(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("zero rows affected means domain.ErrNotFound and no re-read", func(t *testing.T) {
+	t.Run("zero rows affected means domain.ErrNotFound", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(`UPDATE "content" SET`).WillReturnRows(contentRows())
 
 		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 404, "Refreshed", json.RawMessage(`{}`), nil)
 		assert.Nil(t, got)
@@ -254,7 +253,7 @@ func TestGormContentRepository_UpdateMetadata(t *testing.T) {
 
 	t.Run("wraps update errors", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnError(errors.New("meta boom"))
+		mock.ExpectQuery(`UPDATE "content" SET`).WillReturnError(errors.New("meta boom"))
 
 		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 11, "x", json.RawMessage(`{}`), nil)
 		assert.Nil(t, got)
@@ -263,17 +262,6 @@ func TestGormContentRepository_UpdateMetadata(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("wraps re-read errors", func(t *testing.T) {
-		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectQuery(`SELECT \* FROM "content"`).WillReturnError(errors.New("reread boom"))
-
-		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 11, "x", json.RawMessage(`{}`), nil)
-		assert.Nil(t, got)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to fetch updated content")
-		assertAllExpectationsMet(t, mock)
-	})
 }
 
 func TestGormContentRepository_ReassignByUser(t *testing.T) {
