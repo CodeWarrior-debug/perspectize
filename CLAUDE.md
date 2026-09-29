@@ -64,12 +64,14 @@ gh api repos/CodeWarrior-debug/perspectize/pulls/123/comments
 
 | Commit type | Template | Sections |
 |---|---|---|
-| `feat` | `feature.md` | Feature Description, Technical Changes, Demo (before/after screenshots), Test Plan |
-| `fix` | `bugfix.md` | Root Cause, Fix, Demo (before/after screenshots), Regression Test |
+| `feat` | `feature.md` | Feature Description, Technical Changes, Demo (before/after screenshots), Test Plan, QA Acceptance Criteria |
+| `fix` | `bugfix.md` | Root Cause, Fix, Demo (before/after screenshots), Regression Test, QA Acceptance Criteria |
 | `chore`/`build`/`ci` | `chore.md` | Summary, Changes, Verification |
 | `docs` | `docs.md` | Summary, Files Changed, Verification |
 
 Because PRs are created via `gh api` (not `gh pr create`), GitHub's template picker never runs — read the matching template file yourself and shape the `-F body=@<file>` content to its sections before creating the PR. Any UI-visible change should fill in the Demo screenshot table (see [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md) for the `sv-` upload workflow) rather than leaving it blank.
+
+**QA Acceptance Criteria (feat/fix PRs):** a human QA tester works from this table. Write numbered, user-observable When / Then rows (what to do in the app → what they should see), including the negative cases (e.g. "another user's perspective shows no delete option"). Not unit-test names or internals. Leave **Result** and **Notes** blank: QA marks ✅ pass / ❌ fail. Never pre-fill a Result yourself, even when automated tests cover the row.
 
 **Issues** — use templates from `.github/ISSUE_TEMPLATE/` (feature_request.md or bug_report.md).
 
