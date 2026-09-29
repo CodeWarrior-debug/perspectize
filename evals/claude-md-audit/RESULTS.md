@@ -30,3 +30,10 @@ Use Sonnet + skill for routine audits (matches Opus except one path check, ~25% 
 - `subtle-defects` trap `make db-reset` pointed at a missing `scripts/reset.sql`; Sonnet correctly reported it broken → fixture fixed.
 - `r5-cors` ground truth was wrong (`CORS_ORIGINS` defaults to `*`) → grader removed, turned into a false-positive trap.
 - `r7-middleware-path` was not in the original ground truth; a Sonnet run found it.
+
+## Follow-ups
+
+- **Rerun with exact model IDs.** The 2026-09-29 sweep passed the aliases `haiku` / `sonnet` / `opus`, and the result JSON doesn't record which model versions they resolved to (only one Haiku trace showed `claude-haiku-4-5-20251001`). Rerun with full IDs (e.g. `--model claude-sonnet-5-5`, `--model claude-opus-5-5`) and record them here so each row names a version. `--keep-temp` preserves `out/trace.jsonl`, whose `init` message carries the model.
+- **A/B the skill.** Edit the vendored `skills/claude-md-improver/SKILL.md` to add an explicit step ("verify every path, command, script and version against the code before scoring") and compare against v1.0.0 with the same suite. The skill lost `r3-helpers-path` for Sonnet (0/3 vs 2/3 without it) and lowered Haiku's recall; this tests whether the checklist is what steers models away from path-by-path checking.
+- **Check the Haiku agents.** `.claude/agents/code-reviewer.md` runs on Haiku. Haiku missed most real defects and made false claims here, though on docs rather than Go code, so build a code-review case before relying on it.
+- **More runs.** 3 runs per cell only shows large gaps; use 5+ if the Sonnet-vs-Opus difference matters.
