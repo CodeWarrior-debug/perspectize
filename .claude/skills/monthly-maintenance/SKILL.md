@@ -47,6 +47,7 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
 
 8. **Count files, lines of code and tokens.**
    - Run `python3 .claude/skills/monthly-maintenance/codebase-metrics.py --md` (drop `--md` for plain text). It reports files, lines, bytes and estimated tokens (bytes/4) for the repo total, `backend/`, `frontend/`, `.claude/` and every other top-level folder, using `git ls-files` and excluding lockfiles, generated code, binaries and bulk data (`*.tsv`). Add folders to `FOLDERS` in the script when they become worth tracking.
+   - The script is hand-rolled (no `cloc`/`tokei`/`scc` installed in cloud containers). Keep it until a standard tool is judged better; if switching, keep the exclusion list and the bytes/4 token estimate so history stays comparable.
    - Note that `.claude/` includes the vendored GSD subset, so its size is mostly not hand-written.
    - Record total files / LOC / tokens in ROUTINES.md and paste the full table into the routine's PR body, with notable deltas versus last month.
 
@@ -58,8 +59,12 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
    - Keep the "Recorders index" table in `README.md` in sync with whatever remains after promotion/deletion.
    - Prune stale clips in `~/Downloads/screenshots/sv-*.mp4|png` — cross-check against currently open PRs (`gh pr list`) and delete clips for PRs that have since merged or closed.
 
-10. **Record the run in ROUTINES.md.**
-   - Append a row: `| <Month-Year> | Y | <bundle size + speed> | <LOC: total / backend / frontend / .claude> | <one-line summary — branches deleted, PRs merged, anything skipped> |`
+10. **Record the routine's own cost.**
+   - Run `python3 .claude/skills/monthly-maintenance/session-cost.py --md` last, in the session that ran the routine. It reads the session transcript and reports model turns, wall-clock and active time, and exact input/output/cache token usage (from the transcript's `usage` blocks, not an estimate). Paste the table in the PR body.
+   - Wall-clock includes time idle waiting on the user; active time drops gaps over 10 minutes. Subagent usage is only counted if it appears in the same transcript.
+
+11. **Record the run in ROUTINES.md.**
+   - Append a row: `| <Month-Year> | Y | <bundle size + speed> | <files / LOC / est. tokens> | <routine duration + tokens used> | <one-line summary — branches deleted, PRs merged, anything skipped> |`
    - If the routine was only partially completed (e.g. user deferred a step), mark `Completed` as `N` and explain why in Comments — a future session can pick it up, and the 10-merges gate won't re-trigger prematurely since the row already exists for that month.
 
 ## Notes
