@@ -29,7 +29,7 @@ Defect graders require each defect to be *flagged as wrong*. A plain mention doe
 
 It also has traps that look wrong but are correct: `make db-reset` lives in an `include`d `mk/db.mk`, `test:e2e` exists, and the :8080 proxy is right.
 
-**`real-repo-snapshot`**: this repo at pinned commit `276bf24` (`git archive`; project `.claude` hooks, settings and skills are stripped so only the plugin loads). Seven defects in the real CLAUDE.md files, each verified against the code:
+**`real-repo-snapshot`**: this repo at pinned commit `276bf24` (`git archive`; project `.claude` hooks, settings and skills are stripped so only the plugin loads). Six defects in the real CLAUDE.md files, each verified against the code (R5, a CORS claim, was dropped: `CORS_ORIGINS` defaults to `*`, so the doc was right — it is now a false-positive trap):
 
 | Grader | Defect |
 |---|---|
@@ -37,7 +37,6 @@ It also has traps that look wrong but are correct: `make db-reset` lives in an `
 | r2-prerender | `+layout.ts` "prerender = true"; it's `false` |
 | r3-helpers-path | `adapters/graphql/helpers.go`; real path is under `resolvers/` |
 | r4-migrate-contradiction | root forbids `make migrate-up`; backend Setup runs it |
-| r5-cors | CORS "allows all origins (`*`)"; restricted to config origins |
 | r6-go-versions | `go 1.25` / `golang:1.26-alpine`; really `go 1.26` / `golang:1.27-alpine` |
 | r7-middleware-path | `internal/middleware/`; really `pkg/middleware/` (found by a Sonnet run) |
 

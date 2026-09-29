@@ -1,5 +1,5 @@
 ---
-description: perspectize itself at a pinned commit (see fixture.sh); graders hold seven verified real defects (R1-R7) and correct controls.
+description: perspectize itself at a pinned commit (see fixture.sh); graders hold six verified real defects (R1-R4, R6, R7) and correct controls.
 tags: [claude-md-improver, real-repo]
 runs: 3
 max_turns: 80
