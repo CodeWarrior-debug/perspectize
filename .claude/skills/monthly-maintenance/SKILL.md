@@ -1,6 +1,6 @@
 ---
 name: monthly-maintenance
-description: Run the monthly repo maintenance routine (merged-branch cleanup, dependabot/security PR merges, graphify update, gsd map-codebase refresh, video-capture demo tool compaction). Use when prompted by the SessionStart monthly-routine check, or when the user asks to "run the monthly routine" / "run monthly maintenance".
+description: Run the monthly repo maintenance routine (merged-branch cleanup, dependabot/security PR merges, graphify update, gsd map-codebase refresh, bundle size + lines-of-code measurement, video-capture demo tool compaction). Use when prompted by the SessionStart monthly-routine check, or when the user asks to "run the monthly routine" / "run monthly maintenance".
 ---
 
 # Monthly Maintenance Routine
@@ -36,7 +36,20 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
    - Backend: `go list -m -u -versions` against the direct (non-indirect) requires in `backend/go.mod`, refresh [BACKEND_DEPENDENCY_ANALYSIS.md](BACKEND_DEPENDENCY_ANALYSIS.md).
    - Patch/minor bumps with no known breaking changes can be applied directly (verify with `go build`/`go test` or `pnpm run test:run` per `CLAUDE.md`'s self-verification checklist). Majors — especially interdependent ones (e.g. Vite + its Svelte plugin + Vitest) — get flagged in the doc for a follow-up PR rather than bundled into this routine's commit.
 
-7. **Compact the video-capture demo tools.**
+7. **Measure app bundle size.**
+   - `pnpm run build` in `frontend/` (static adapter → output in `frontend/build/`).
+   - Record total size of `frontend/build/` (`du -sk frontend/build`) and of the client JS/CSS in `frontend/build/_app/immutable/` (raw and gzipped: e.g. `find frontend/build/_app/immutable -name '*.js' -exec cat {} + | wc -c` and the same piped through `gzip -c | wc -c`; repeat for `*.css`).
+   - List the 5 largest chunks (`find frontend/build/_app/immutable -type f -exec du -k {} + | sort -rn | head -5`) and name what's in them (AG Grid, TanStack, Clerk, etc.) so growth is attributable.
+   - Compare against the previous month's row in [ROUTINES.md](../../../ROUTINES.md) (Bundle column); flag any >10% growth in total or gzipped JS for the user.
+   - Optional backend: size of the compiled server binary (`go build -o /tmp/server ./cmd/server` in `backend/`, then `ls -l`), recorded but not compared unless it jumps notably.
+
+8. **Count lines of code.**
+   - Measure the whole repo plus key subfolders: `backend/`, `frontend/`, `.claude/` (add more here when they become worth tracking).
+   - Use `git ls-files` so gitignored/generated/vendored files are excluded, e.g. `git ls-files backend | xargs wc -l | tail -1` (per-path); use `cloc --vcs=git <path>` or `tokei` if installed for a per-language breakdown.
+   - Exclude lockfiles and generated code from the headline number (`pnpm-lock.yaml`, `go.sum`, gqlgen output such as `generated.go`, `*.tsv` data) — note what was excluded so month-over-month numbers stay comparable.
+   - Record one number per folder (plus total) in ROUTINES.md and note significant deltas versus last month.
+
+9. **Compact the video-capture demo tools.**
    - This tool lives outside the repo at `~/.claude/tools/video-capture/` (global, not git-tracked) — see its `README.md` for the recorder-etiquette lifecycle (reuse → copy-and-adapt into `demos/<name>/` → promote).
    - List `demos/*` and skim each directory. For each one, check whether its one-off scenario has proven reusable (recorded more than once, or the PR/feature it was built for has shipped and the flow is generic): if so, **promote** it — merge the scenario branch into the shared `record-clip.mjs` (following its existing `if (SCENARIO === '...')` pattern) and delete the demo copy.
    - Flag (don't silently delete) any demo directory with multiple near-duplicate scripts recording the same flow (e.g. a `.snapshot.mjs` variant alongside the original) — ask the user which to keep before consolidating.
@@ -44,8 +57,8 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
    - Keep the "Recorders index" table in `README.md` in sync with whatever remains after promotion/deletion.
    - Prune stale clips in `~/Downloads/screenshots/sv-*.mp4|png` — cross-check against currently open PRs (`gh pr list`) and delete clips for PRs that have since merged or closed.
 
-8. **Record the run in ROUTINES.md.**
-   - Append a row: `| <Month-Year> | Y | <one-line summary — branches deleted, PRs merged, anything skipped> |`
+10. **Record the run in ROUTINES.md.**
+   - Append a row: `| <Month-Year> | Y | <bundle size> | <LOC: total / backend / frontend / .claude> | <one-line summary — branches deleted, PRs merged, anything skipped> |`
    - If the routine was only partially completed (e.g. user deferred a step), mark `Completed` as `N` and explain why in Comments — a future session can pick it up, and the 10-merges gate won't re-trigger prematurely since the row already exists for that month.
 
 ## Notes
