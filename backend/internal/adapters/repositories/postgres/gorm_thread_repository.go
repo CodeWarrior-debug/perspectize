@@ -24,55 +24,48 @@ func NewGormThreadRepository(db *gorm.DB) *GormThreadRepository {
 	return &GormThreadRepository{db: db}
 }
 
-// CreateThread inserts a thread row plus its participant rows in a single
-// transaction. The creator is given the OWNER role, every other participant
-// MEMBER. The trg_init_thread_sequence trigger creates the thread_sequences row
-// automatically on thread insert. The thread is reloaded with participants
-// before being returned.
+// CreateThread inserts a thread row plus its participant rows and returns the
+// thread, all in one statement: data-modifying CTEs insert the thread and
+// then its participants (a single statement is atomic, so no transaction is
+// needed), and the outer SELECT hands both back. The creator is given the
+// OWNER role, every other participant MEMBER. The trg_init_thread_sequence
+// trigger creates the thread_sequences row on the thread insert.
 func (r *GormThreadRepository) CreateThread(ctx context.Context, createdBy int, title *string, participantUserIDs []int) (*domain.MessageThread, error) {
-	var threadID int64
-
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		thread := &MessageThreadModel{
-			Title:         title,
-			CreatedBy:     int64(createdBy),
-			LastMessageAt: time.Now(),
-		}
-		if err := tx.Create(thread).Error; err != nil {
-			return fmt.Errorf("failed to create thread: %w", err)
-		}
-		threadID = thread.ID
-
-		seen := make(map[int]bool, len(participantUserIDs))
-		parts := make([]ThreadParticipantModel, 0, len(participantUserIDs))
-		for _, uid := range participantUserIDs {
-			if seen[uid] {
-				continue
-			}
+	seen := make(map[int]bool, len(participantUserIDs))
+	ids := make([]int64, 0, len(participantUserIDs))
+	for _, uid := range participantUserIDs {
+		if !seen[uid] {
 			seen[uid] = true
-
-			role := string(domain.ThreadRoleMember)
-			if uid == createdBy {
-				role = string(domain.ThreadRoleOwner)
-			}
-			parts = append(parts, ThreadParticipantModel{
-				ThreadID: thread.ID,
-				UserID:   int64(uid),
-				Role:     role,
-			})
+			ids = append(ids, int64(uid))
 		}
-		if len(parts) > 0 {
-			if err := tx.Create(&parts).Error; err != nil {
-				return fmt.Errorf("failed to create thread participants: %w", err)
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
 
-	return r.GetThread(ctx, int(threadID))
+	var rows []threadParticipantRow
+	if err := r.db.WithContext(ctx).Raw(`WITH mt AS (
+			INSERT INTO message_threads (title, created_by) VALUES (@title, @createdBy)
+			RETURNING *
+		), tp AS (
+			INSERT INTO thread_participants (thread_id, user_id, role)
+			SELECT mt.id, u.id, CASE WHEN u.id = @createdBy THEN @owner ELSE @member END
+			FROM mt, unnest(CAST(@ids AS bigint[])) AS u(id)
+			RETURNING *
+		)
+		SELECT `+threadWithParticipantsColumns+`
+		FROM mt LEFT JOIN tp ON tp.thread_id = mt.id
+		ORDER BY tp.joined_at, tp.user_id`, map[string]any{
+		"title":     title,
+		"createdBy": createdBy,
+		"owner":     string(domain.ThreadRoleOwner),
+		"member":    string(domain.ThreadRoleMember),
+		"ids":       Int64Array(ids),
+	}).Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("failed to create thread: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("failed to create thread: no row returned")
+	}
+	thread := groupThreadRows(rows)[0]
+	return &thread, nil
 }
 
 // threadWithParticipantsColumns selects a thread's columns plus one

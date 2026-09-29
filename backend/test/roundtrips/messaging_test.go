@@ -130,9 +130,23 @@ func TestThreadMessagesListIsConstant(t *testing.T) {
 
 func TestCreateMessageThread(t *testing.T) {
 	f := newMessagingFixture(t, 0, 0)
-	f.h.roundTrips(8, f.alice, createThreadMut, map[string]any{"input": map[string]any{
+	// direct-thread lookup, one INSERT ... INSERT ... SELECT statement, stats, users
+	data := f.h.roundTrips(4, f.alice, createThreadMut, map[string]any{"input": map[string]any{
 		"participantUserIds": []string{fmt.Sprint(f.bobID)},
 	}})
+	got := decode[struct {
+		Participants []struct {
+			User struct {
+				ID string `json:"id"`
+			} `json:"user"`
+			Role string `json:"role"`
+		} `json:"participants"`
+	}](t, data, "createMessageThread")
+	roles := map[string]string{}
+	for _, p := range got.Participants {
+		roles[p.User.ID] = p.Role
+	}
+	require.Equal(t, map[string]string{fmt.Sprint(f.aliceID): "OWNER", fmt.Sprint(f.bobID): "MEMBER"}, roles)
 }
 
 func TestSendMessage(t *testing.T) {
