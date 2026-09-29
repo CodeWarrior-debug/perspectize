@@ -70,8 +70,8 @@ func (stubThreadRepo) AddParticipants(ctx context.Context, threadID int, userIDs
 func (stubThreadRepo) SetLeft(ctx context.Context, threadID, userID int, at time.Time) error {
 	return nil
 }
-func (stubThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) error {
-	return nil
+func (stubThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
+	return seq, nil
 }
 func (stubThreadRepo) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
 	return nil

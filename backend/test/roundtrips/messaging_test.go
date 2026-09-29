@@ -145,7 +145,14 @@ func TestSendMessage(t *testing.T) {
 
 func TestMarkThreadRead(t *testing.T) {
 	f := newMessagingFixture(t, 1, 2)
-	f.h.roundTrips(7, f.alice, markReadMut, map[string]any{"threadId": f.threadIDs[0], "seq": f.lastMessage.Seq})
+	// participation check, clamped UPDATE (one CTE), pg_notify, stats, users
+	data := f.h.roundTrips(5, f.alice, markReadMut, map[string]any{"threadId": f.threadIDs[0], "seq": f.lastMessage.Seq})
+	got := decode[struct {
+		MyLastReadSeq string `json:"myLastReadSeq"`
+		UnreadCount   int    `json:"unreadCount"`
+	}](t, data, "markThreadRead")
+	require.Equal(t, f.lastMessage.Seq, got.MyLastReadSeq, "returned thread carries the new pointer")
+	require.Equal(t, 0, got.UnreadCount)
 }
 
 func TestSetTyping(t *testing.T) {

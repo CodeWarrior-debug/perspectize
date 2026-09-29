@@ -180,8 +180,8 @@ func (inboxStubThreadRepo) AddParticipants(ctx context.Context, threadID int, us
 func (inboxStubThreadRepo) SetLeft(ctx context.Context, threadID, userID int, at time.Time) error {
 	return nil
 }
-func (inboxStubThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) error {
-	return nil
+func (inboxStubThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
+	return seq, nil
 }
 func (inboxStubThreadRepo) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
 	return nil

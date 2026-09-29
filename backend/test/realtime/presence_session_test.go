@@ -79,8 +79,10 @@ func (s presenceStubThreadRepo) ListThreadsForUser(_ context.Context, _ int, _ i
 }
 func (presenceStubThreadRepo) AddParticipants(_ context.Context, _ int, _ []int) error { return nil }
 func (presenceStubThreadRepo) SetLeft(_ context.Context, _, _ int, _ time.Time) error  { return nil }
-func (presenceStubThreadRepo) SetLastRead(_ context.Context, _, _ int, _ int64) error  { return nil }
-func (presenceStubThreadRepo) SetMuted(_ context.Context, _, _ int, _ bool) error      { return nil }
+func (presenceStubThreadRepo) SetLastRead(_ context.Context, _, _ int, _ int64) (int64, error) {
+	return 0, nil
+}
+func (presenceStubThreadRepo) SetMuted(_ context.Context, _, _ int, _ bool) error { return nil }
 
 var _ repositories.ThreadRepository = presenceStubThreadRepo{}
 

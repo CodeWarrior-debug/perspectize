@@ -164,22 +164,17 @@ func (s *MessagingServiceImpl) MuteThread(ctx context.Context, actorUserID, thre
 	return thread, nil
 }
 
-// MarkRead updates the actor's read receipt position in the thread.
+// MarkRead updates the actor's read receipt position in the thread. The seq
+// is clamped to the thread's highest message by the repository, in the same
+// statement as the update, and the thread loaded for the participation check
+// is returned with the new pointer applied (no re-read).
 func (s *MessagingServiceImpl) MarkRead(ctx context.Context, actorUserID, threadID int, seq int64) (*domain.MessageThread, error) {
-	if err := s.AssertParticipant(ctx, actorUserID, threadID); err != nil {
-		return nil, err
-	}
-	// Clamp to the thread's highest seq: an arbitrary client-supplied value
-	// would otherwise pin last_read_seq past the end of the thread and poison
-	// every derived read receipt and unread count.
-	maxSeq, err := s.msgRepo.MaxSeq(ctx, threadID)
+	thread, err := s.participantThread(ctx, actorUserID, threadID)
 	if err != nil {
 		return nil, err
 	}
-	if seq > maxSeq {
-		seq = maxSeq
-	}
-	if err := s.threadRepo.SetLastRead(ctx, threadID, actorUserID, seq); err != nil {
+	seq, err = s.threadRepo.SetLastRead(ctx, threadID, actorUserID, seq)
+	if err != nil {
 		return nil, err
 	}
 	_ = s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
@@ -188,7 +183,13 @@ func (s *MessagingServiceImpl) MarkRead(ctx context.Context, actorUserID, thread
 		UserID:      actorUserID,
 		LastReadSeq: seq,
 	})
-	return s.threadRepo.GetThread(ctx, threadID)
+	for i := range thread.Participants {
+		p := &thread.Participants[i]
+		if p.UserID == actorUserID && seq > p.LastReadSeq {
+			p.LastReadSeq = seq // forward-only, like the UPDATE
+		}
+	}
+	return thread, nil
 }
 
 // SetTyping broadcasts the actor's typing status to the thread.

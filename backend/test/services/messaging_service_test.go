@@ -23,7 +23,7 @@ type mockThreadRepo struct {
 	listThreadsForUserFn func(ctx context.Context, userID int, limit int, beforeLastMessageAt *time.Time) ([]domain.MessageThread, error)
 	addParticipantsFn    func(ctx context.Context, threadID int, userIDs []int) error
 	setLeftFn            func(ctx context.Context, threadID, userID int, at time.Time) error
-	setLastReadFn        func(ctx context.Context, threadID, userID int, seq int64) error
+	setLastReadFn        func(ctx context.Context, threadID, userID int, seq int64) (int64, error)
 	setMutedFn           func(ctx context.Context, threadID, userID int, muted bool) error
 }
 
@@ -69,11 +69,11 @@ func (m *mockThreadRepo) SetLeft(ctx context.Context, threadID, userID int, at t
 	return nil
 }
 
-func (m *mockThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) error {
+func (m *mockThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
 	if m.setLastReadFn != nil {
 		return m.setLastReadFn(ctx, threadID, userID, seq)
 	}
-	return nil
+	return seq, nil
 }
 
 func (m *mockThreadRepo) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
@@ -304,14 +304,14 @@ func TestMarkRead_MovesPointerAndPublishes(t *testing.T) {
 		getThreadFn: func(ctx context.Context, threadID int) (*domain.MessageThread, error) {
 			return threadWithParticipants(7, 1, 2), nil
 		},
-		setLastReadFn: func(ctx context.Context, threadID, userID int, seq int64) error {
+		setLastReadFn: func(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
 			setLastReadCalled = true
 			setLastReadSeq = seq
-			return nil
+			return seq, nil // below the thread max: unchanged by the clamp
 		},
 	}
 	pub := &mockPublisher{}
-	msgRepo := &mockMessageRepo{maxSeqFn: func(context.Context, int) (int64, error) { return 100, nil }}
+	msgRepo := &mockMessageRepo{}
 	svc := services.NewMessagingService(threadRepo, msgRepo, pub, newLimiter(100))
 
 	_, err := svc.MarkRead(context.Background(), 1, 7, 42)
@@ -325,27 +325,32 @@ func TestMarkRead_MovesPointerAndPublishes(t *testing.T) {
 	assert.Equal(t, int64(42), pub.calls[0].LastReadSeq)
 }
 
-func TestMarkRead_ClampsSeqToThreadMax(t *testing.T) {
-	var setLastReadSeq int64
+// The clamp lives in the repository (same statement as the UPDATE); the
+// service must publish, and apply to the returned thread, the clamped value
+// the repository hands back — not the client's.
+func TestMarkRead_UsesClampedSeq(t *testing.T) {
 	threadRepo := &mockThreadRepo{
 		getThreadFn: func(ctx context.Context, threadID int) (*domain.MessageThread, error) {
 			return threadWithParticipants(7, 1, 2), nil
 		},
-		setLastReadFn: func(ctx context.Context, threadID, userID int, seq int64) error {
-			setLastReadSeq = seq
-			return nil
+		setLastReadFn: func(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
+			assert.Equal(t, int64(999_999), seq, "the client's seq goes to the repository as-is")
+			return 9, nil // the thread's max
 		},
 	}
 	pub := &mockPublisher{}
-	msgRepo := &mockMessageRepo{maxSeqFn: func(context.Context, int) (int64, error) { return 9, nil }}
-	svc := services.NewMessagingService(threadRepo, msgRepo, pub, newLimiter(100))
+	svc := services.NewMessagingService(threadRepo, &mockMessageRepo{}, pub, newLimiter(100))
 
-	_, err := svc.MarkRead(context.Background(), 1, 7, 999_999)
+	got, err := svc.MarkRead(context.Background(), 1, 7, 999_999)
 
 	require.NoError(t, err)
-	assert.Equal(t, int64(9), setLastReadSeq, "seq clamped to the thread's max")
 	require.Len(t, pub.calls, 1)
 	assert.Equal(t, int64(9), pub.calls[0].LastReadSeq, "published receipt uses the clamped seq")
+	for _, p := range got.Participants {
+		if p.UserID == 1 {
+			assert.Equal(t, int64(9), p.LastReadSeq, "returned thread carries the clamped pointer")
+		}
+	}
 }
 
 // --- SetTyping ---
@@ -356,9 +361,9 @@ func TestSetTyping_PublishesEphemeralOnly(t *testing.T) {
 		getThreadFn: func(ctx context.Context, threadID int) (*domain.MessageThread, error) {
 			return threadWithParticipants(7, 1, 2), nil
 		},
-		setLastReadFn: func(ctx context.Context, threadID, userID int, seq int64) error {
+		setLastReadFn: func(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
 			setLastReadCalled = true
-			return nil
+			return seq, nil
 		},
 	}
 	pub := &mockPublisher{}

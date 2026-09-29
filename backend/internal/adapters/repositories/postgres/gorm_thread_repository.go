@@ -264,14 +264,25 @@ func (r *GormThreadRepository) SetMuted(ctx context.Context, threadID, userID in
 	return nil
 }
 
-// SetLastRead advances a participant's read pointer. It is forward-only: the
-// last_read_seq < ? predicate makes a lower or equal seq a no-op.
-func (r *GormThreadRepository) SetLastRead(ctx context.Context, threadID, userID int, seq int64) error {
-	if err := r.db.WithContext(ctx).
-		Model(&ThreadParticipantModel{}).
-		Where("thread_id = ? AND user_id = ? AND last_read_seq < ?", threadID, userID, seq).
-		Update("last_read_seq", seq).Error; err != nil {
-		return fmt.Errorf("failed to set last read seq: %w", err)
+// SetLastRead clamps seq to the thread's highest message seq and advances the
+// participant's read pointer to it, forward-only, in one round trip: the
+// clamp, the conditional UPDATE and the returned value are one statement (a
+// data-modifying CTE runs whether or not the outer query reads it). Clamping
+// matters because an arbitrary client-supplied seq would otherwise pin
+// last_read_seq past the end of the thread and poison every read receipt.
+func (r *GormThreadRepository) SetLastRead(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
+	var clamped int64
+	if err := r.db.WithContext(ctx).Raw(`
+		WITH c AS (
+			SELECT LEAST(?::bigint, COALESCE(MAX(seq), 0)) AS s FROM messages WHERE thread_id = ?
+		), u AS (
+			UPDATE thread_participants tp SET last_read_seq = c.s
+			FROM c
+			WHERE tp.thread_id = ? AND tp.user_id = ? AND tp.last_read_seq < c.s
+			RETURNING 1
+		)
+		SELECT s FROM c`, seq, threadID, threadID, userID).Scan(&clamped).Error; err != nil {
+		return 0, fmt.Errorf("failed to set last read seq: %w", err)
 	}
-	return nil
+	return clamped, nil
 }
