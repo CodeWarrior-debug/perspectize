@@ -31,22 +31,22 @@ func (r *GormCategoryRepository) Upsert(ctx context.Context, category *domain.Ca
 	model := categoryDomainToModel(category)
 	model.UpdatedAt = time.Now()
 
+	// RETURNING * gives back the stored row (inserted or updated): no re-read.
+	// wikipedia_url is refreshed too, but a blank one (the Wikidata lookup
+	// failed or found no sitelink) never overwrites a URL already stored.
 	err := r.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "wikidata_qid"}},
-		DoUpdates: clause.AssignmentColumns([]string{"label", "description", "entity_type", "updated_at"}),
-	}).Create(model).Error
+		Columns: []clause.Column{{Name: "wikidata_qid"}},
+		DoUpdates: append(clause.AssignmentColumns([]string{"label", "description", "entity_type", "updated_at"}),
+			clause.Assignment{
+				Column: clause.Column{Name: "wikipedia_url"},
+				Value:  gorm.Expr("COALESCE(NULLIF(EXCLUDED.wikipedia_url, ''), categories.wikipedia_url)"),
+			}),
+	}, clause.Returning{}).Create(model).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to upsert category: %w", err)
 	}
 
-	// Fetch fresh record by wikidata_qid for DB-generated timestamps
-	var fresh CategoryModel
-	err = r.db.WithContext(ctx).Where("wikidata_qid = ?", category.WikidataQID).First(&fresh).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch upserted category: %w", err)
-	}
-
-	return categoryModelToDomain(&fresh), nil
+	return categoryModelToDomain(model), nil
 }
 
 // GetByID fetches a category by its primary key

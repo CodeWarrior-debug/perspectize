@@ -289,36 +289,43 @@ func TestGormContentRepository_ReassignByUser(t *testing.T) {
 func TestGormContentRepository_UpdatePrimaryCategoryID(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("succeeds when one row is updated", func(t *testing.T) {
+	t.Run("returns the updated row from RETURNING", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectQuery(`UPDATE "content" SET .* RETURNING \*`).
+			WillReturnRows(contentRows().AddRow(11, "c", "https://x", "youtube", 4, nil, nil, nil, 9, contentRepoTime, contentRepoTime))
 
-		assert.NoError(t, NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9)))
+		got, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9))
+		require.NoError(t, err)
+		require.NotNil(t, got.PrimaryCategoryID)
+		assert.Equal(t, 9, *got.PrimaryCategoryID)
 		assertAllExpectationsMet(t, mock)
 	})
 
 	t.Run("nil category id clears the FK", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectQuery(`UPDATE "content" SET`).
+			WillReturnRows(contentRows().AddRow(11, "c", "https://x", "youtube", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime))
 
-		assert.NoError(t, NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, nil))
+		got, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, nil)
+		require.NoError(t, err)
+		assert.Nil(t, got.PrimaryCategoryID)
 		assertAllExpectationsMet(t, mock)
 	})
 
 	t.Run("zero rows affected means domain.ErrNotFound", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(`UPDATE "content" SET`).WillReturnRows(contentRows())
 
-		err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 404, cInt(9))
+		_, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 404, cInt(9))
 		assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
 		assertAllExpectationsMet(t, mock)
 	})
 
 	t.Run("wraps update errors", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnError(errors.New("cat fk boom"))
+		mock.ExpectQuery(`UPDATE "content" SET`).WillReturnError(errors.New("cat fk boom"))
 
-		err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9))
+		_, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to update primary category")
 		assertAllExpectationsMet(t, mock)

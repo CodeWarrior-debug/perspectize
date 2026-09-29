@@ -71,8 +71,8 @@ func (m *mockContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 	return nil
 }
 
-func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) error {
-	return nil
+func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+	return &domain.Content{ID: contentID, PrimaryCategoryID: categoryID}, nil
 }
 
 // mockYouTubeClient implements services.YouTubeClient for testing

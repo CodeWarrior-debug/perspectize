@@ -80,8 +80,16 @@ func (m *mockContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 	return nil
 }
 
-func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) error {
-	return nil
+// UpdatePrimaryCategoryID emulates UPDATE ... RETURNING against getByIDFn's
+// row: missing content is ErrNotFound, otherwise the row with the new FK.
+func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+	got, err := m.GetByID(ctx, contentID)
+	if err != nil {
+		return nil, err
+	}
+	cp := *got
+	cp.PrimaryCategoryID = categoryID
+	return &cp, nil
 }
 
 // mockYouTubeClient implements services.YouTubeClient for testing

@@ -66,7 +66,7 @@ func (m *mockWikidataClient) GetWikipediaURL(ctx context.Context, qid string) (s
 // mockContentRepoForCategory implements repositories.ContentRepository for category tests
 type mockContentRepoForCategory struct {
 	getByIDFn               func(ctx context.Context, id int) (*domain.Content, error)
-	updatePrimaryCategoryFn func(ctx context.Context, contentID int, categoryID *int) error
+	updatePrimaryCategoryFn func(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error)
 }
 
 func (m *mockContentRepoForCategory) Create(ctx context.Context, content *domain.Content) (*domain.Content, error) {
@@ -93,11 +93,24 @@ func (m *mockContentRepoForCategory) List(ctx context.Context, params domain.Con
 func (m *mockContentRepoForCategory) ReassignByUser(ctx context.Context, fromUserID, toUserID int) error {
 	return nil
 }
-func (m *mockContentRepoForCategory) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) error {
+
+// UpdatePrimaryCategoryID emulates UPDATE ... RETURNING: the content row
+// (from getByIDFn when set) with the new FK, or ErrNotFound when it's missing.
+func (m *mockContentRepoForCategory) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
 	if m.updatePrimaryCategoryFn != nil {
 		return m.updatePrimaryCategoryFn(ctx, contentID, categoryID)
 	}
-	return nil
+	c := &domain.Content{ID: contentID}
+	if m.getByIDFn != nil {
+		got, err := m.getByIDFn(ctx, contentID)
+		if err != nil {
+			return nil, err
+		}
+		cp := *got
+		c = &cp
+	}
+	c.PrimaryCategoryID = categoryID
+	return c, nil
 }
 
 // --- SetPrimaryCategory Tests ---
@@ -299,8 +312,8 @@ func TestSetPrimaryCategory_ContentNotFound(t *testing.T) {
 func TestSetPrimaryCategory_UpdateFKFails(t *testing.T) {
 	categoryRepo := &mockCategoryRepository{}
 	contentRepo := &mockContentRepoForCategory{
-		updatePrimaryCategoryFn: func(ctx context.Context, contentID int, categoryID *int) error {
-			return fmt.Errorf("fk constraint violation")
+		updatePrimaryCategoryFn: func(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+			return nil, fmt.Errorf("fk constraint violation")
 		},
 	}
 	svc := services.NewCategoryService(categoryRepo, contentRepo, &mockWikidataClient{})

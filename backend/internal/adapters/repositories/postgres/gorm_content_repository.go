@@ -353,18 +353,22 @@ func (r *GormContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 }
 
 // UpdatePrimaryCategoryID sets the primary_category_id FK on a content record
-func (r *GormContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) error {
+// and returns the updated row (RETURNING *). Zero rows means the content
+// doesn't exist, so callers need no separate existence check.
+func (r *GormContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+	var updated ContentModel
 	result := r.db.WithContext(ctx).
-		Model(&ContentModel{}).
+		Model(&updated).
+		Clauses(clause.Returning{}).
 		Where("id = ?", contentID).
 		Update("primary_category_id", categoryID)
 	if result.Error != nil {
-		return fmt.Errorf("failed to update primary category: %w", result.Error)
+		return nil, fmt.Errorf("failed to update primary category: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return domain.ErrNotFound
+		return nil, domain.ErrNotFound
 	}
-	return nil
+	return contentModelToDomain(&updated), nil
 }
 
 // SetDisplayTitleIfEmpty implements first-write-wins for a passage's optional

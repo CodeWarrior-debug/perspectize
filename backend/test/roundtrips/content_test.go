@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
 
@@ -86,4 +87,52 @@ func TestGetOrCreateByURLReportsRefreshAsExisting(t *testing.T) {
 	require.True(t, existed)
 	require.Equal(t, first.ID, second.ID)
 	require.Len(t, h.counter.Statements(), 1)
+}
+
+const setPrimaryCategoryMut = `mutation($input: SetPrimaryCategoryInput!) {
+  setPrimaryCategory(input: $input) { id primaryCategory { id wikidataQid label } }
+}`
+
+func TestSetPrimaryCategory(t *testing.T) {
+	h := newHarness(t)
+	userID, token := h.user("cat")
+	contentID := h.content(userID, "cat")
+	h.warm(token)
+	qid := fmt.Sprintf("Q%d", time.Now().UnixNano()%1_000_000_000)
+	t.Cleanup(func() { _ = h.db.Exec("DELETE FROM categories WHERE wikidata_qid = ?", qid).Error })
+
+	// category upsert RETURNING, content UPDATE RETURNING, primaryCategory loader
+	data := h.roundTrips(3, token, setPrimaryCategoryMut, map[string]any{"input": map[string]any{
+		"contentId": contentID, "qid": qid, "label": "Physics",
+	}})
+	got := decode[struct {
+		PrimaryCategory struct {
+			WikidataQid string `json:"wikidataQid"`
+			Label       string `json:"label"`
+		} `json:"primaryCategory"`
+	}](t, data, "setPrimaryCategory")
+	require.Equal(t, qid, got.PrimaryCategory.WikidataQid)
+	require.Equal(t, "Physics", got.PrimaryCategory.Label)
+}
+
+// Upsert refreshes wikipedia_url (it used to be left out of DO UPDATE, so a
+// URL was never updated), but a blank one — a failed or empty Wikidata
+// lookup — keeps what's stored.
+func TestCategoryUpsertWikipediaURL(t *testing.T) {
+	h := newHarness(t)
+	repo := postgres.NewGormCategoryRepository(h.db)
+	ctx := context.Background()
+	qid := fmt.Sprintf("Q%d", time.Now().UnixNano()%1_000_000_000)
+	t.Cleanup(func() { _ = h.db.Exec("DELETE FROM categories WHERE wikidata_qid = ?", qid).Error })
+
+	upsert := func(url string) string {
+		t.Helper()
+		c, err := repo.Upsert(ctx, &domain.Category{WikidataQID: qid, Label: "X", WikipediaURL: url})
+		require.NoError(t, err)
+		return c.WikipediaURL
+	}
+	require.Equal(t, "", upsert(""))
+	require.Equal(t, "https://en.wikipedia.org/wiki/A", upsert("https://en.wikipedia.org/wiki/A"))
+	require.Equal(t, "https://en.wikipedia.org/wiki/A", upsert(""), "blank lookup keeps the stored URL")
+	require.Equal(t, "https://en.wikipedia.org/wiki/B", upsert("https://en.wikipedia.org/wiki/B"), "a new URL replaces it")
 }
