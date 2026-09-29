@@ -11,6 +11,15 @@ import { gql } from 'graphql-request';
  */
 export const MAX_PERSPECTIVES_PER_LIST = 100;
 
+/** Prefix of the placeholder id useCreatePerspective gives its optimistic row
+ *  until the server returns the real one. */
+export const OPTIMISTIC_PREFIX = 'optimistic-';
+
+/** True for an optimistic row's placeholder id — not yet addressable by id on the server. */
+export function isOptimisticId(id: string | null | undefined): boolean {
+	return typeof id === 'string' && id.startsWith(OPTIMISTIC_PREFIX);
+}
+
 export interface FeelingEntry {
 	emoji: string;
 	label: string | null;
