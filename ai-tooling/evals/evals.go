@@ -10,7 +10,6 @@ package evals
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -64,20 +63,8 @@ type Report struct {
 	Seeds       []SeedReport  `json:"seeds"`
 }
 
-var citeRe = regexp.MustCompile(`\[([a-z0-9-]+\.[a-z0-9-]+)\]`)
-
 // Citations returns the unique [area.task] IDs in text, in first-seen order.
-func Citations(text string) []string {
-	var ids []string
-	seen := map[string]bool{}
-	for _, m := range citeRe.FindAllStringSubmatch(text, -1) {
-		if !seen[m[1]] {
-			seen[m[1]] = true
-			ids = append(ids, m[1])
-		}
-	}
-	return ids
-}
+func Citations(text string) []string { return jeeves.Citations(text) }
 
 // Check grades one answer. A seed with must_not_claim entries is a trap: it
 // passes only with the exact unsupported phrase. Any other seed passes when

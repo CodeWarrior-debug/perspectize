@@ -2,7 +2,7 @@
 
 Go module (sibling to `backend/`) for Perspectize's AI assistant tooling: provider-neutral LLM layer, agent loop, tool registry, Jeeves tools, evals, and the `botler` dev CLI.
 
-**Status:** Milestone v1.2 (Phases 25–28, `.planning/ROADMAP.md`; requirements `.planning/v1.2-REQUIREMENTS.md`; research `.planning/v1.2-research/`). Phase 25 first plan ready: `docs/superpowers/plans/2026-09-26-app-guide-plan.md` (spec alongside in `docs/superpowers/specs/`). Phase 25 in progress: `appguide` package (parser + lint) built; guide content being written.
+**Status:** Milestone v1.2 (Phases 25–28, `.planning/ROADMAP.md`; requirements `.planning/v1.2-REQUIREMENTS.md`; research `.planning/v1.2-research/`). Phase 25 first plan ready: `docs/superpowers/plans/2026-09-26-app-guide-plan.md` (spec alongside in `docs/superpowers/specs/`). Phase 25 in progress: app guide written and verified (9 areas); tracer 1 (terminal) and tracer 2 (in-app dev sidebar) code-complete, live runs pending an API key.
 
 ## Teaching mode (always on in this folder)
 
@@ -37,6 +37,9 @@ Every ai-tooling spec and plan builds teaching in; it isn't bolted on afterwards
 - **Guide fan-out (all 9 areas verified):** 54 entries, 46 seeds, ~34 KB as tool results (~8.6k tokens). Rounds to close: activity, perspectives, messaging 1; adding-content, bible, settings 2; compare, discover, getting-started 3. No area needed escalation.
 - **Failure modes seen, now in the writers' brief:** position words (above/below/under); sign-in values (the root layout gates every route); "not supported" claims that another area actually provides (the coach toggle in Settings); quoting third-party (Clerk) labels the repo doesn't render; timing claims copied from UI copy that the code contradicts. Verifiers used frontend unit tests as ground truth, a strong signal worth keeping.
 - **Tracer 1 code-complete** (llm, fake, agent, jeeves, anthropic adapter, botler tools/chat/eval, evals). Live `botler chat` and the Claude eval baseline are pending an `ANTHROPIC_API_KEY` in the environment.
+- **Tracer 2 code-complete** (backend `internal/adapters/assistant`, `assistantReply` subscription in `backend/assistant.graphql`, dev sidebar behind `VITE_JEEVES_DEV`). The backend imports this module via `replace ../ai-tooling`, so its Docker context is the repo root (PR #458). The live checkpoint is pending the API key plus `JEEVES_ENABLED=true` and `VITE_JEEVES_DEV=true`.
+- **Keep shared logic in this module, not in its callers:** citation parsing moved from `evals` into `jeeves.Citations` the moment the backend needed it too. Anything both `botler` and the backend need belongs here.
+- **Assistant output needs its own sanitizer:** `SafeHtml`'s DOMPurify config allows `img`, and the CSP allows `img-src https:`, so an injected image would exfiltrate data with zero clicks. `assistantMarkdown.ts` uses a separate DOMPurify instance that forbids images, media, frames, forms, styles and SVG.
 - **Deferred:** server-side refusal fallbacks (they need the beta Messages API throughout the adapter); refusals surface as `llm.StopRefusal` for now.
 
 ## Locked decisions (from design discussion, 2026-09-26)

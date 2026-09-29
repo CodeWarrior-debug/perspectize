@@ -561,3 +561,22 @@ func nilIfEmpty(s string) *string {
 	}
 	return &s
 }
+
+// assistantEventToModel maps a domain assistant event onto the GraphQL
+// AssistantEvent union.
+func assistantEventToModel(e domain.AssistantEvent) model.AssistantEvent {
+	switch e.Kind {
+	case domain.AssistantEventText:
+		return &model.AssistantTextDelta{Text: e.Text}
+	case domain.AssistantEventTool:
+		return &model.AssistantToolActivity{Name: e.ToolName}
+	case domain.AssistantEventDone:
+		citations := e.Citations
+		if citations == nil {
+			citations = []string{} // non-null list in the schema
+		}
+		return &model.AssistantDone{Stop: e.Stop, Citations: citations, InputTokens: e.InputTokens, OutputTokens: e.OutputTokens}
+	default:
+		return &model.AssistantError{Message: e.Message}
+	}
+}
