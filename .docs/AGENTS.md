@@ -17,6 +17,13 @@ the code.
 | `db-migration` | Sonnet | Writing and reviewing golang-migrate SQL. **Never applies migrations** (shared Sevalla DB) | — |
 | `test-writer` | Sonnet | Table-driven testify tests, regression tests, coverage gaps (hand-written mocks, sqlmock GORM harness) | — |
 
+### Implementation (frontend)
+
+| Agent | Model | Use for | Hand off to |
+|---|---|---|---|
+| `svelte-frontend` | Sonnet | Svelte 5 components, routes, `lib/queries/<domain>` hooks, frontend follow-ups to schema changes | `vitest-writer` for tests; `figma-designer` for Figma input |
+| `vitest-writer` | Sonnet | Vitest unit, component (`@testing-library/svelte`) and Browser Mode tests; UI regression tests | — |
+
 ### Review
 
 | Agent | Model | Use for |
@@ -42,9 +49,10 @@ spawning a new one.
 
 ### Gaps
 
-There are no frontend (SvelteKit / Vitest / Playwright) agents yet. Frontend
-tasks go to a general-purpose subagent with `frontend/CLAUDE.md` as required
-reading.
+- There is no frontend reviewer: `code-reviewer` covers Go only. Use the
+  `/code-review` skill for Svelte diffs.
+- There is no agent for Playwright demo tours (`frontend/demo/`); see
+  [DEMO_MODE.md](DEMO_MODE.md).
 
 ## Using agents in superpowers plans
 
