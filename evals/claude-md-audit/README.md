@@ -31,7 +31,7 @@ Prerequisites: in a Linux container, Bash needs the sandbox backend (`apt instal
 
 ```bash
 # from repo root; one model, 3 runs, with the no-plugin baseline arm (default)
-claude plugin eval evals/claude-md-audit --model sonnet --judge-model sonnet \
+claude plugin eval evals/claude-md-audit --model sonnet --judge-model opus \
   --scaffold --trust-plugin --allow-tools Bash Edit Write --max-cost-usd 5
 ```
 
