@@ -146,7 +146,7 @@ func (m *mockPerspectiveRepoForUser) GetByID(ctx context.Context, id int) (*doma
 func (m *mockPerspectiveRepoForUser) Update(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
 	return p, nil
 }
-func (m *mockPerspectiveRepoForUser) Delete(ctx context.Context, id int) error {
+func (m *mockPerspectiveRepoForUser) Delete(ctx context.Context, id int, ownerUserID int) error {
 	return nil
 }
 func (m *mockPerspectiveRepoForUser) List(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error) {

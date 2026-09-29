@@ -46,6 +46,10 @@ export interface UpdatePerspectiveResponse {
 	updatePerspective: PerspectiveItem;
 }
 
+export interface DeletePerspectiveResponse {
+	deletePerspective: boolean;
+}
+
 export interface ListPerspectivesByUserResponse {
 	perspectives: {
 		items: PerspectiveItem[];
@@ -97,6 +101,15 @@ export const UPDATE_PERSPECTIVE = gql`
 		updatePerspective(input: $input) {
 			...PerspectiveFields
 		}
+	}
+`;
+
+// Owner-only on the server (@auth @owner directive, an actor check in
+// PerspectiveService.Delete, and a user_id-scoped DELETE in the repository), so
+// the UI hiding the button for non-owners is a courtesy, not the enforcement.
+export const DELETE_PERSPECTIVE = gql`
+	mutation DeletePerspective($id: ID!) {
+		deletePerspective(id: $id)
 	}
 `;
 
