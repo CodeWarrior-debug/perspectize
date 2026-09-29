@@ -80,7 +80,7 @@ func (m *mockPerspectiveService) GetByID(ctx context.Context, id int) (*domain.P
 	return nil, domain.ErrNotFound
 }
 
-func (m *mockPerspectiveService) Update(ctx context.Context, input portservices.UpdatePerspectiveInput) (*domain.Perspective, error) {
+func (m *mockPerspectiveService) Update(ctx context.Context, input portservices.UpdatePerspectiveInput, actorUserID int) (*domain.Perspective, error) {
 	return nil, nil
 }
 

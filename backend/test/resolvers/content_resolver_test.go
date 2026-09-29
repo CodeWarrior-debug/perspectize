@@ -182,7 +182,7 @@ func (m *mockUserRepository) UpdateOnboarding(ctx context.Context, userID int, o
 type mockPerspectiveRepository struct {
 	createFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
 	getByIDFn func(ctx context.Context, id int) (*domain.Perspective, error)
-	updateFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
+	updateFn  func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
 	deleteFn  func(ctx context.Context, id int, ownerUserID int) error
 	listFn    func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
 }
@@ -202,9 +202,9 @@ func (m *mockPerspectiveRepository) GetByID(ctx context.Context, id int) (*domai
 	return nil, domain.ErrNotFound
 }
 
-func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
+func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
 	if m.updateFn != nil {
-		return m.updateFn(ctx, p)
+		return m.updateFn(ctx, p, ownerUserID)
 	}
 	return p, nil
 }

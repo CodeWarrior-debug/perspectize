@@ -17,7 +17,7 @@ import (
 type mockPerspectiveRepository struct {
 	createFn    func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
 	getByIDFn   func(ctx context.Context, id int) (*domain.Perspective, error)
-	updateFn    func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
+	updateFn    func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
 	deleteFn    func(ctx context.Context, id int, ownerUserID int) error
 	listFn      func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
 	aggregateFn func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
@@ -41,9 +41,9 @@ func (m *mockPerspectiveRepository) GetByID(ctx context.Context, id int) (*domai
 	return nil, domain.ErrNotFound
 }
 
-func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
+func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
 	if m.updateFn != nil {
-		return m.updateFn(ctx, p)
+		return m.updateFn(ctx, p, ownerUserID)
 	}
 	return p, nil
 }
@@ -194,20 +194,33 @@ func TestPerspectiveCreate_WithRatings(t *testing.T) {
 	assert.Equal(t, &agreement, result.Agreement)
 }
 
-func TestPerspectiveCreate_UserNotFound(t *testing.T) {
-	perspectiveRepo := &mockPerspectiveRepository{}
+func TestPerspectiveCreate_DoesNotLookUpUser(t *testing.T) {
+	// User existence is enforced by the FK, not a separate GetByID round trip.
+	userLookups := 0
 	userRepo := &mockUserRepoForPerspective{
 		getByIDFn: func(ctx context.Context, id int) (*domain.User, error) {
-			return nil, domain.ErrNotFound
+			userLookups++
+			return &domain.User{ID: id}, nil
 		},
 	}
+	svc := services.NewPerspectiveService(&mockPerspectiveRepository{}, userRepo)
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
-	input := portservices.CreatePerspectiveInput{
-		UserID: 999,
+	_, err := svc.Create(context.Background(), portservices.CreatePerspectiveInput{UserID: 1, Like: strPtr("up")})
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, userLookups)
+}
+
+func TestPerspectiveCreate_RepoNotFoundPassesThrough(t *testing.T) {
+	// The repository maps the users FK violation to ErrNotFound.
+	perspectiveRepo := &mockPerspectiveRepository{
+		createFn: func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
+			return nil, fmt.Errorf("%w: user with id %d not found", domain.ErrNotFound, p.UserID)
+		},
 	}
+	svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{})
 
-	result, err := svc.Create(context.Background(), input)
+	result, err := svc.Create(context.Background(), portservices.CreatePerspectiveInput{UserID: 999, Like: strPtr("up")})
 
 	assert.Nil(t, result)
 	require.Error(t, err)

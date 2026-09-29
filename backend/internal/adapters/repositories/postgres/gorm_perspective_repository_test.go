@@ -2,12 +2,14 @@ package postgres
 
 import (
 	"context"
+	"database/sql/driver"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -109,14 +111,20 @@ func TestGormPerspectiveRepository_GetByID(t *testing.T) {
 	})
 }
 
+// recordArg records one bound argument and accepts any value, so a test can
+// assert on specific positions without listing every column value.
+type recordArg struct{ got driver.Value }
+
+func (r *recordArg) Match(v driver.Value) bool { r.got = v; return true }
+
 func TestGormPerspectiveRepository_Create(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("inserts then re-reads the created row via GetByID", func(t *testing.T) {
+	t.Run("single INSERT ... RETURNING, no follow-up SELECT", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`INSERT INTO "perspectives"`).
-			WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).AddRow(5, perspRepoTime, perspRepoTime))
-		mock.ExpectQuery(`SELECT \* FROM "perspectives"`).
+		// Only the INSERT is expected: a trailing SELECT (or BEGIN/COMMIT) would
+		// fail with an unexpected-call error.
+		mock.ExpectQuery(`INSERT INTO "perspectives" .* RETURNING `).
 			WillReturnRows(fullPerspectiveRow(perspectiveRows(), 5))
 
 		got, err := NewGormPerspectiveRepository(db).Create(ctx, &domain.Perspective{
@@ -128,7 +136,49 @@ func TestGormPerspectiveRepository_Create(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, 5, got.ID)
 		assert.Equal(t, perspRepoTime, got.CreatedAt)
+		assert.Equal(t, perspRepoTime, got.UpdatedAt)
+		assert.Equal(t, []int{1, 2, 3}, got.Parts)
+		assert.Equal(t, []string{"a", "b"}, got.Labels)
 		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("FK violation on perspectives_users_fk maps to domain.ErrNotFound", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`INSERT INTO "perspectives"`).
+			WillReturnError(&pgconn.PgError{Code: "23503", ConstraintName: "perspectives_users_fk"})
+
+		got, err := NewGormPerspectiveRepository(db).Create(ctx, &domain.Perspective{UserID: 999})
+		assert.Nil(t, got)
+		assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "999")
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("other constraint errors stay generic", func(t *testing.T) {
+		tests := []struct {
+			name string
+			err  *pgconn.PgError
+		}{
+			{"other FK (content)", &pgconn.PgError{Code: "23503", ConstraintName: "perspectives_content_fk"}},
+			{"user FK name but different code", &pgconn.PgError{Code: "23505", ConstraintName: "perspectives_users_fk"}},
+			{"check violation", &pgconn.PgError{Code: "23514", ConstraintName: "perspectives_quality_check"}},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				db, mock := newMockDB(t)
+				mock.ExpectQuery(`INSERT INTO "perspectives"`).WillReturnError(tt.err)
+
+				got, err := NewGormPerspectiveRepository(db).Create(ctx, &domain.Perspective{UserID: 2})
+				assert.Nil(t, got)
+				require.Error(t, err)
+				assert.False(t, errors.Is(err, domain.ErrNotFound), "must not be mapped to ErrNotFound: %v", err)
+				assert.Contains(t, err.Error(), "failed to insert perspective")
+				var pgErr *pgconn.PgError
+				assert.True(t, errors.As(err, &pgErr), "original PgError must stay in the chain")
+				assertAllExpectationsMet(t, mock)
+			})
+		}
 	})
 
 	t.Run("wraps insert errors", func(t *testing.T) {
@@ -139,6 +189,7 @@ func TestGormPerspectiveRepository_Create(t *testing.T) {
 		assert.Nil(t, got)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to insert perspective")
+		assert.Contains(t, err.Error(), "p ins boom")
 		assertAllExpectationsMet(t, mock)
 	})
 }
@@ -146,30 +197,72 @@ func TestGormPerspectiveRepository_Create(t *testing.T) {
 func TestGormPerspectiveRepository_Update(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("saves then re-reads the row", func(t *testing.T) {
+	t.Run("single owner-scoped UPDATE ... RETURNING, no follow-up SELECT", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "perspectives" SET`).WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectQuery(`SELECT \* FROM "perspectives"`).
+		// 18 SET values (id, user_id and created_at are omitted from SET, and the
+		// nil custom_fields is inlined as NULL), then the owner and id predicates.
+		recs := make([]*recordArg, 20)
+		matchers := make([]driver.Value, 20)
+		for i := range recs {
+			recs[i] = &recordArg{}
+			matchers[i] = recs[i]
+		}
+		mock.ExpectQuery(`UPDATE "perspectives" SET "content_id"=\$1,.*"review"=\$17,"updated_at"=\$18 WHERE user_id = \$19 AND "id" = \$20 RETURNING `).
+			WithArgs(matchers...).
 			WillReturnRows(fullPerspectiveRow(perspectiveRows(), 5))
 
 		got, err := NewGormPerspectiveRepository(db).Update(ctx, &domain.Perspective{
 			ID: 5, UserID: 2, Privacy: domain.PrivacyPublic, Description: pStr("desc"),
-		})
+		}, 42)
 		require.NoError(t, err)
 		require.NotNil(t, got)
 		assert.Equal(t, 5, got.ID)
 		assert.Equal(t, perspRepoTime, got.UpdatedAt)
+		assert.Equal(t, []int{1, 2, 3}, got.Parts)
+		assertAllExpectationsMet(t, mock)
+
+		// The owner predicate binds ownerUserID (42), never the perspective's own
+		// UserID (2); the id predicate binds 5.
+		assert.EqualValues(t, 42, recs[18].got, "user_id predicate must use ownerUserID")
+		assert.EqualValues(t, 5, recs[19].got, "id predicate")
+		for i := 0; i < 18; i++ {
+			assert.NotEqualValues(t, 42, recs[i].got, "owner id must not be written into SET (arg %d)", i+1)
+		}
+		// Select("*") writes nil fields too, so an unset rating is a real clear.
+		assert.Nil(t, recs[2].got, "quality (nil) must be written as NULL")
+	})
+
+	t.Run("zero rows (missing or not owned) means domain.ErrNotFound", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`UPDATE "perspectives" SET`).WillReturnRows(perspectiveRows())
+
+		got, err := NewGormPerspectiveRepository(db).Update(ctx, &domain.Perspective{ID: 404, UserID: 2}, 2)
+		assert.Nil(t, got)
+		assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("wraps save errors", func(t *testing.T) {
-		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "perspectives" SET`).WillReturnError(errors.New("p upd boom"))
+	t.Run("non-positive owner never reaches the database", func(t *testing.T) {
+		for _, owner := range []int{0, -1} {
+			db, mock := newMockDB(t)
 
-		got, err := NewGormPerspectiveRepository(db).Update(ctx, &domain.Perspective{ID: 5, UserID: 2})
+			got, err := NewGormPerspectiveRepository(db).Update(ctx, &domain.Perspective{ID: 5, UserID: 2}, owner)
+			assert.Nil(t, got)
+			assert.True(t, errors.Is(err, domain.ErrNotFound), "owner %d: expected domain.ErrNotFound, got %v", owner, err)
+			assertAllExpectationsMet(t, mock)
+		}
+	})
+
+	t.Run("wraps update errors", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`UPDATE "perspectives" SET`).WillReturnError(errors.New("p upd boom"))
+
+		got, err := NewGormPerspectiveRepository(db).Update(ctx, &domain.Perspective{ID: 5, UserID: 2}, 2)
 		assert.Nil(t, got)
 		require.Error(t, err)
+		assert.False(t, errors.Is(err, domain.ErrNotFound))
 		assert.Contains(t, err.Error(), "failed to update perspective")
+		assert.Contains(t, err.Error(), "p upd boom")
 		assertAllExpectationsMet(t, mock)
 	})
 }
