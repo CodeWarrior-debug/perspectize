@@ -314,3 +314,19 @@ func TestOwner_ResourceNotFound(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "resource not found")
 }
+
+func (m *mockContentService) CreateFromYouTubeMusic(ctx context.Context, url string, userID int) (*domain.Content, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) PromoteRelatedMedia(ctx context.Context, contentID int, videoID string, userID int) (*domain.Content, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) MarkRelatedMediaUnavailable(ctx context.Context, contentID int, videoID string) error {
+	return nil
+}
+
+func (m *mockContentService) CheckLyrics(ctx context.Context, contentID int, force bool) (*domain.LyricsAvailability, error) {
+	return nil, nil
+}

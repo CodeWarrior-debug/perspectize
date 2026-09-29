@@ -30,3 +30,6 @@ export const BIBLE_PASSAGE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" w
 
 // Same glyph filling a square wrapper, for icon tiles that put text on the pages.
 export const BIBLE_PASSAGE_ICON_SVG_SCALABLE = `<svg xmlns="http://www.w3.org/2000/svg" class="absolute inset-0 h-full w-full" viewBox="1.5 2 21 20" fill="none" stroke="currentColor" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-icon="bible-passage"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>`;
+
+// Music note — the YouTube Music track content-type icon (Lucide "music").
+export const MUSIC_TRACK_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-icon="music-track"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;

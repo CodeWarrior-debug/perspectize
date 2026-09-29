@@ -20,6 +20,10 @@ type ContentService struct {
 	repo          repositories.ContentRepository
 	youtubeClient portservices.YouTubeClient
 	bibleRepo     repositories.BibleReferenceRepository
+	ytMusic       portservices.YTMusicClient
+	musicBrainz   portservices.MusicBrainzClient
+	lyrics        portservices.LyricsClient
+	async         func(func())
 }
 
 // ContentServiceOption configures optional ContentService dependencies.

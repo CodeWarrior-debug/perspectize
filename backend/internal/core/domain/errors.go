@@ -13,4 +13,5 @@ var (
 	ErrDeleteSentinel = errors.New("cannot delete the system sentinel user")
 	ErrForbidden      = errors.New("access denied")
 	ErrRateLimited    = errors.New("rate limit exceeded")
+	ErrNotATrack      = errors.New("link is an album, playlist, or artist, not a single track")
 )

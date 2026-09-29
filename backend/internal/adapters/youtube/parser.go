@@ -78,3 +78,38 @@ func ParseISO8601Duration(duration string) (int, error) {
 
 	return hours*3600 + minutes*60 + seconds, nil
 }
+
+// URLKind is what a YouTube-family URL points at.
+type URLKind string
+
+const (
+	URLKindVideo           URLKind = "video"
+	URLKindMusicTrack      URLKind = "musicTrack"
+	URLKindMusicCollection URLKind = "musicCollection"
+)
+
+// NormalizeYouTubeMusicURL returns the canonical YouTube Music URL for a video ID.
+// It differs from NormalizeYouTubeURL on purpose, so a track and the same video
+// saved as a YOUTUBE row never collide on UNIQUE(url).
+func NormalizeYouTubeMusicURL(videoID string) string {
+	return "https://music.youtube.com/watch?v=" + videoID
+}
+
+var musicWatchRe = regexp.MustCompile(`^https?://music\.youtube\.com/watch\?(?:.*&)?v=([a-zA-Z0-9_-]{11})(?:[&#]|$)`)
+var musicCollectionRe = regexp.MustCompile(`^https?://music\.youtube\.com/(?:playlist|browse|channel)(?:[/?]|$)`)
+
+// ClassifyURL decides which create flow a URL belongs to. It must run before
+// normalization, because NormalizeYouTubeURL discards the music. host.
+func ClassifyURL(url string) (URLKind, string, error) {
+	if m := musicWatchRe.FindStringSubmatch(url); m != nil {
+		return URLKindMusicTrack, m[1], nil
+	}
+	if musicCollectionRe.MatchString(url) {
+		return URLKindMusicCollection, "", nil
+	}
+	id, err := ExtractVideoID(url)
+	if err != nil {
+		return "", "", err
+	}
+	return URLKindVideo, id, nil
+}

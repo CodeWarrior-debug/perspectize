@@ -309,6 +309,87 @@ func (r *mutationResolver) UpdateContentSourceData(ctx context.Context, contentI
 	return domainToModel(content), nil
 }
 
+// CreateContentFromYouTubeMusic is the resolver for the createContentFromYouTubeMusic field.
+func (r *mutationResolver) CreateContentFromYouTubeMusic(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	if input.UserID != 0 && input.UserID != authUser.ID {
+		return nil, fmt.Errorf("access denied: cannot create content for another user")
+	}
+
+	content, err := r.ContentService.CreateFromYouTubeMusic(ctx, input.URL, authUser.ID)
+	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
+		return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: true}, nil
+	}
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrNotATrack):
+			return nil, fmt.Errorf("paste a song link, not an album, playlist, or artist")
+		case errors.Is(err, domain.ErrInvalidURL):
+			return nil, fmt.Errorf("invalid YouTube Music URL")
+		}
+		return nil, fmt.Errorf("failed to create content from YouTube Music")
+	}
+	return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: false}, nil
+}
+
+// PromoteRelatedMedia is the resolver for the promoteRelatedMedia field.
+func (r *mutationResolver) PromoteRelatedMedia(ctx context.Context, contentID int, videoID string) (*model.Content, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	video, err := r.ContentService.PromoteRelatedMedia(ctx, contentID, videoID, authUser.ID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("related video not found")
+		}
+		slog.Error("promoting related media failed", "contentID", contentID, "videoID", videoID, "error", err)
+		return nil, fmt.Errorf("failed to add related video")
+	}
+	return domainToModel(video), nil
+}
+
+// MarkRelatedMediaUnavailable is the resolver for the markRelatedMediaUnavailable field.
+func (r *mutationResolver) MarkRelatedMediaUnavailable(ctx context.Context, contentID int, videoID string) (*model.Content, error) {
+	if err := r.ContentService.MarkRelatedMediaUnavailable(ctx, contentID, videoID); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("related video not found")
+		}
+		slog.Error("marking related media unavailable failed", "contentID", contentID, "videoID", videoID, "error", err)
+		return nil, fmt.Errorf("failed to update related video")
+	}
+	return r.contentModelByID(ctx, contentID)
+}
+
+// RefreshLyricsAvailability is the resolver for the refreshLyricsAvailability field.
+func (r *mutationResolver) RefreshLyricsAvailability(ctx context.Context, contentID int) (*model.Content, error) {
+	if _, err := r.ContentService.CheckLyrics(ctx, contentID, false); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("content not found")
+		}
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("lyrics are only available for music tracks")
+		}
+		// LRCLIB being down should not break the modal; return the stored state.
+		slog.Warn("lyrics availability refresh failed", "contentID", contentID, "error", err)
+	}
+	return r.contentModelByID(ctx, contentID)
+}
+
+func (r *mutationResolver) contentModelByID(ctx context.Context, contentID int) (*model.Content, error) {
+	c, err := r.ContentService.GetByID(ctx, contentID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("content not found")
+		}
+		return nil, fmt.Errorf("failed to load content")
+	}
+	return domainToModel(c), nil
+}
+
 // CreateClaim is the resolver for the createClaim field.
 func (r *mutationResolver) CreateClaim(ctx context.Context, input model.CreateClaimInput) (*model.Content, error) {
 	content, err := r.ContentService.CreateClaim(ctx, portservices.CreateClaimInput{

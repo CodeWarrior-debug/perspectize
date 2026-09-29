@@ -4,7 +4,7 @@
 	import PassagePicker from '$lib/components/PassagePicker.svelte';
 	import { useAddVideo } from '$lib/queries/content/useAddVideo';
 	import { useAddPassage } from '$lib/queries/content/useAddPassage';
-	import { validateYouTubeUrl } from '$lib/utils/youtube';
+	import { validateYouTubeUrl, classifyYouTubeUrl } from '$lib/utils/youtube';
 	import { detectContentType } from '$lib/utils/detectContentType';
 	import type { PassageRange } from '$lib/utils/bible';
 	import { defaultRange, isRangeInBounds, isRangeOrdered } from '$lib/utils/passageRange';
@@ -68,9 +68,17 @@
 	const chipLabel = $derived.by(() => {
 		if (!effectiveType) return 'Select a type';
 		const name =
-			effectiveType === 'YOUTUBE' ? 'YouTube' : effectiveType === 'BIBLE_PASSAGE' ? 'Bible passage' : 'Claim';
+			effectiveType === 'YOUTUBE'
+				? classifyYouTubeUrl(input) === 'musicTrack'
+					? 'YouTube Music'
+					: 'YouTube'
+				: effectiveType === 'BIBLE_PASSAGE'
+					? 'Bible passage'
+					: 'Claim';
 		return manualType ? `Type: ${name}` : `Detected: ${name}`;
 	});
+
+	const isMusicCollection = $derived(classifyYouTubeUrl(input) === 'musicCollection');
 
 	const isSubmitDisabled = $derived.by(() => {
 		if (effectiveType === 'YOUTUBE') return !input.trim();
@@ -147,7 +155,7 @@
 	{triggerVariant}
 	triggerLabel="Add Content"
 	title="Add Content"
-	description="Paste a YouTube link, or type a Bible reference like John 3:16-18."
+	description="Paste a YouTube or YouTube Music link, or type a Bible reference like John 3:16-18."
 	submitLabel="Add"
 	pendingLabel="Adding..."
 	{isPending}
@@ -184,6 +192,10 @@
 			</div>
 			{#if error}
 				<p class="text-sm text-red-600">{error}</p>
+			{:else if isMusicCollection}
+				<p data-testid="music-collection-notice" class="text-sm text-red-600">
+					This is an album, playlist, or artist page. Paste a link to a single song.
+				</p>
 			{/if}
 
 			<div class="flex items-center gap-2 text-sm">

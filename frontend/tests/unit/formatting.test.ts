@@ -646,6 +646,17 @@ describe('typeCellRenderer', () => {
 		expect(result.querySelector('svg[fill="#FF0000"]')).toBeNull();
 		expect(result.querySelector('.sr-only')?.textContent).toBe('Bible Passage');
 	});
+
+	it('shows the music icon (not the YouTube icon) for YOUTUBE_MUSIC', () => {
+		const result = typeCellRenderer({
+			data: { contentType: 'YOUTUBE_MUSIC' },
+		}) as HTMLElement;
+
+		expect(result.querySelector('svg[data-icon="music-track"]')).toBeTruthy();
+		expect(result.querySelector('svg[fill="#FF0000"]')).toBeNull();
+		expect(result.classList.contains('text-primary')).toBe(true);
+		expect(result.querySelector('.sr-only')?.textContent).toBe('YouTube Music Track');
+	});
 });
 
 describe('headerMinWidth', () => {

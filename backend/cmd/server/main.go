@@ -22,12 +22,15 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/directives"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/generated"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/resolvers"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/lrclib"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/musicbrainz"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/realtime"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/handlers"
 	apimw "github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/middleware"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/wikidata"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/ytmusic"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/config"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
@@ -173,7 +176,10 @@ func main() {
 	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
 
 	// Initialize services
-	contentService := services.NewContentService(contentRepo, youtubeClient, services.WithBibleReference(bibleReferenceRepo))
+	contentService := services.NewContentService(contentRepo, youtubeClient,
+		services.WithBibleReference(bibleReferenceRepo),
+		services.WithMusicEnrichment(ytmusic.NewClient(), musicbrainz.NewClient(), lrclib.NewClient()),
+	)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)

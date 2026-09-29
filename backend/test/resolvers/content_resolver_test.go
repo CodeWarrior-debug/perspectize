@@ -1358,3 +1358,11 @@ func (m *mockContentRepository) ClearDisplayTitle(ctx context.Context, contentID
 	}
 	return nil
 }
+
+func (m *mockContentRepository) GetByISRC(ctx context.Context, isrc string) (*domain.Content, error) {
+	return nil, domain.ErrNotFound
+}
+
+func (m *mockContentRepository) SetResponseKey(ctx context.Context, contentID int, key string, value json.RawMessage) error {
+	return nil
+}

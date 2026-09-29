@@ -12,6 +12,7 @@ const (
 	ContentTypeYouTube      ContentType = "YOUTUBE"
 	ContentTypeClaim        ContentType = "CLAIM"
 	ContentTypeBiblePassage ContentType = "BIBLE_PASSAGE"
+	ContentTypeYouTubeMusic ContentType = "YOUTUBE_MUSIC"
 )
 
 // ContentSearchField identifies a text column that a ContentFilter.search term
