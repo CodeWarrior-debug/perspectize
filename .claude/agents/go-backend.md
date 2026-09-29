@@ -70,7 +70,9 @@ this prompt disagree, the docs and the existing code win.
 4. Verify, from `backend/`:
    - `go build ./...`
    - `gofmt -l .` (must print nothing)
-   - `go test ./...`
+   - `go test ./... 2>&1 | grep -vE '^(ok|\?)\s'` (quiet: prints only failures; empty output = all passed)
+     Never use `-v` on a full run (about 2,300 lines). On a failure, rerun only
+     that test: `go test ./<pkg>/ -run '^TestName$' -v 2>&1 | tail -80`.
    - `make lint` if `golangci-lint` is installed.
 
 ## Output

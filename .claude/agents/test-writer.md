@@ -66,11 +66,15 @@ must fail for the stated reason).
    `RowsAffected == 0`, wrapped repo errors), validation boundaries, and auth
    or ownership denial.
 3. Write the tests, reusing existing mocks and helpers.
-4. Run from `backend/`: `go test ./<pkg>/... -run <TestName> -v`, then
-   `go test ./...` and `gofmt -l .`.
+4. Run from `backend/`, keeping output small:
+   - `go test ./<pkg>/ -run '^TestName$'` for the new tests.
+   - `go test ./... 2>&1 | grep -vE '^(ok|\?)\s'` (quiet: prints only failures; empty output = all passed).
+     Never use `-v` on a full run (about 2,300 lines). On a failure, rerun only
+     that test: `go test ./<pkg>/ -run '^TestName$' -v 2>&1 | tail -80`.
+   - `gofmt -l .`
 
 ## Output
 
 Return the test files written, the cases covered (one line each), and the
-`go test` summary output. If a test exposes a real bug, stop and report it
-with the failing output rather than bending the test to pass.
+`go test` result (failures verbatim, or "all passed"). If a test exposes a
+real bug, stop and report it with the failing output rather than bending the test to pass.

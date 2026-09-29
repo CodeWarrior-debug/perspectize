@@ -59,7 +59,12 @@ services (`go-backend` territory) and keep resolvers thin.
    call the service → map to the model. No business logic in the resolver.
 4. Add resolver tests in `backend/test/resolvers/`. With the gqlgen test
    client, spell out every selected field in the decode target.
-5. Verify from `backend/`: `go build ./...`, `gofmt -l .`, `go test ./...`.
+5. Verify from `backend/`:
+   - `go build ./...`
+   - `gofmt -l .`
+   - `go test ./... 2>&1 | grep -vE '^(ok|\?)\s'` (quiet: prints only failures; empty output = all passed).
+     Never use `-v` on a full run (about 2,300 lines). On a failure, rerun only
+     that test: `go test ./<pkg>/ -run '^TestName$' -v 2>&1 | tail -80`.
 
 ## Quality standards
 

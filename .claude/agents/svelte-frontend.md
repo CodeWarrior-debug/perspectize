@@ -76,6 +76,9 @@ wins.
 4. Verify from `frontend/`:
    - `pnpm run check`
    - `pnpm run test:run`
+     Vitest's default reporter is already quiet in this non-interactive shell
+     (about 14 lines: failures plus a summary). Don't add `--reporter=dot` or
+     `verbose`; they replay every test's stderr (1,300+ lines).
    - `pnpm exec prettier --check <changed files>`
 5. You cannot do browser verification in a cloud session. Say so, and note that
    a user-visible change needs the `needs-demo-video` label (see

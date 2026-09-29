@@ -73,5 +73,11 @@ whether to dispatch it directly or use it as a reference for its own prompt.
   entry) go near the top of the body, even though CLAUDE.md also has them.
 - Least-privilege tools: reviewers stay read-only, and implementers get
   `Edit` + `Bash` so they can verify their own work.
+- Quiet verification: every line a subagent's command prints costs tokens.
+  - Go: `go test ./... 2>&1 | grep -vE '^(ok|\?)\s'` prints only failures.
+    Never use `-v` on a full run (about 2,300 lines); use it only on one
+    failing test, piped through `tail`.
+  - Vitest: the default reporter is already quiet in non-interactive shells.
+    `--reporter=dot` or `verbose` replays all test stderr (1,300+ lines).
 - Only list `skills:` entries that actually exist in the project.
 - Update this roster whenever an agent is added, renamed or retired.
