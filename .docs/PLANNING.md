@@ -39,13 +39,13 @@ of how each task is dispatched. For each tagged task it picks one of:
    that apply: the "read first" files, the hard rules (for example,
    `db-migration`'s never-apply rule), the process steps and the verification
    commands.
-3. **Ignore it** when the task turned out not to fit (for example, it crossed
-   into frontend code). Note that in the task's completion notes.
+3. **Ignore it** when the task turned out not to fit (for example, a
+   `go-backend` task that grew into frontend code). Note that in the task's completion notes.
 
 Guidelines for plan writers:
 
-- Tag only where an agent clearly fits. Leave the line off frontend, docs and
-  mixed tasks rather than forcing a backend agent onto them.
+- Tag only where an agent clearly fits. Leave the line off docs-only and
+  cross-stack tasks rather than forcing one stack's agent onto them.
 - Never tag a task with an agent that lacks the tools it needs. `code-reviewer`
   is read-only, so it is a review suggestion, not an implementer.
 - Any task that touches `backend/migrations/` should carry `db-migration` as at
