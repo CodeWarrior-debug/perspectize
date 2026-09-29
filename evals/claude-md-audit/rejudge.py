@@ -53,8 +53,9 @@ def ask(prompt, model):
     return verdict == "PASS", reasoning, out.get("total_cost_usd") or 0.0, sorted((out.get("modelUsage") or {}).keys())
 
 
-def collect(paths, skip, only_case, only_arm, only_failed):
+def collect(paths, skip, only_case, only_arm, only_failed, only_passed=False, mixed=False):
     jobs, reports = [], {}
+    seen = {}  # (case, grader) -> [passes, fails] across all inputs, for --mixed
     for path in paths:
         label = os.path.splitext(os.path.basename(path))[0]
         d = json.load(open(path))
@@ -69,7 +70,10 @@ def collect(paths, skip, only_case, only_arm, only_failed):
                     for g in run["graders"]:
                         if g["name"] in skip or g["name"] not in spec or "judgeVotes" not in g:
                             continue
+                        seen.setdefault((case["name"], g["name"]), [0, 0])[0 if g["passed"] else 1] += 1
                         if only_failed and g["passed"]:
+                            continue
+                        if only_passed and not g["passed"]:
                             continue
                         cfg = spec[g["name"]]["config"]
                         rid = f"{label}-{case['name']}-{arm}-{i + 1}"
@@ -80,6 +84,9 @@ def collect(paths, skip, only_case, only_arm, only_failed):
                             "criteria": cfg["criteria"], "focus": cfg.get("focus", "last_message"),
                             "harness_votes": g["judgeVotes"], "harness_verdict": sum(g["judgeVotes"]) > len(g["judgeVotes"]) / 2,
                         })
+    if mixed:
+        keep = {k for k, (p, f) in seen.items() if p and f}
+        jobs = [j for j in jobs if (j["case"], j["grader"]) in keep]
     return jobs, reports
 
 
@@ -122,10 +129,13 @@ def main():
     ap.add_argument("--case")
     ap.add_argument("--arm", choices=["with", "without"])
     ap.add_argument("--only-failed", action="store_true", help="only graders the harness failed (cheapest useful subset)")
+    ap.add_argument("--only-passed", action="store_true", help="only graders the harness passed (to look for false passes)")
+    ap.add_argument("--mixed", action="store_true", help="only graders that both passed and failed somewhere in the inputs")
+    ap.add_argument("--max-cost-usd", type=float, help="stop starting new judgements once this much has been spent")
     ap.add_argument("--limit", type=int, help="only the first N jobs (pilot)")
     a = ap.parse_args()
 
-    jobs, reports = collect(a.results, set(a.skip), a.case, a.arm, a.only_failed)
+    jobs, reports = collect(a.results, set(a.skip), a.case, a.arm, a.only_failed, a.only_passed, a.mixed)
     if a.limit:
         jobs = jobs[:a.limit]
     os.makedirs(os.path.join(a.out, "reports"), exist_ok=True)
@@ -146,6 +156,10 @@ def main():
                   open(jpath, "w"), indent=1)
 
     def work(job):
+        with lock:
+            spent = sum(x.get("cost_usd", 0) for x in results.values())
+        if a.max_cost_usd is not None and spent >= a.max_cost_usd:
+            return  # over budget: left undone, so a rerun with a higher cap resumes here
         try:
             v, reasoning, cost, used = ask(PROMPT.format(criteria=job["criteria"], focus=job["focus"],
                                                           evidence=reports[job["report"]]), a.model)
