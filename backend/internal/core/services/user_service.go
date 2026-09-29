@@ -159,16 +159,8 @@ func (s *UserService) Update(ctx context.Context, input portservices.UpdateUserI
 		if username == domain.DeletedUserUsername || username == domain.SystemUserUsername {
 			return nil, fmt.Errorf("%w: username is reserved", domain.ErrInvalidInput)
 		}
-		// Check uniqueness (only if actually changing)
-		if username != user.Username {
-			existing, err := s.repo.GetByUsername(ctx, username)
-			if err == nil && existing != nil {
-				return nil, fmt.Errorf("%w: username already taken", domain.ErrAlreadyExists)
-			}
-			if err != nil && !errors.Is(err, domain.ErrNotFound) {
-				return nil, fmt.Errorf("failed to check username: %w", err)
-			}
-		}
+		// Uniqueness is enforced by the users_unique_username constraint; the
+		// repository reports a clash as domain.ErrAlreadyExists.
 		user.Username = username
 	}
 
@@ -181,21 +173,15 @@ func (s *UserService) Update(ctx context.Context, input portservices.UpdateUserI
 		if !emailRegex.MatchString(email) {
 			return nil, fmt.Errorf("%w: invalid email format", domain.ErrInvalidInput)
 		}
-		// Check uniqueness (only if actually changing)
-		if email != user.Email {
-			existing, err := s.repo.GetByEmail(ctx, email)
-			if err == nil && existing != nil {
-				return nil, fmt.Errorf("%w: email already registered", domain.ErrAlreadyExists)
-			}
-			if err != nil && !errors.Is(err, domain.ErrNotFound) {
-				return nil, fmt.Errorf("failed to check email: %w", err)
-			}
-		}
+		// Uniqueness: users_unique_email constraint, as for username.
 		user.Email = email
 	}
 
 	updated, err := s.repo.Update(ctx, user)
 	if err != nil {
+		if errors.Is(err, domain.ErrAlreadyExists) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
 

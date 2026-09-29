@@ -70,6 +70,18 @@ func (m *mockUserRepository) Update(ctx context.Context, user *domain.User) (*do
 	if m.updateFn != nil {
 		return m.updateFn(ctx, user)
 	}
+	// Emulate the users_unique_username / users_unique_email constraints the
+	// real UPDATE relies on: another user already holding the value is a clash.
+	if m.getByUsernameFn != nil {
+		if other, err := m.getByUsernameFn(ctx, user.Username); err == nil && other != nil && other.ID != user.ID {
+			return nil, fmt.Errorf("%w: username already taken", domain.ErrAlreadyExists)
+		}
+	}
+	if m.getByEmailFn != nil && user.Email != "" {
+		if other, err := m.getByEmailFn(ctx, user.Email); err == nil && other != nil && other.ID != user.ID {
+			return nil, fmt.Errorf("%w: email already registered", domain.ErrAlreadyExists)
+		}
+	}
 	return user, nil
 }
 

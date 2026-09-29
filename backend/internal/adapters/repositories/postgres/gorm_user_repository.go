@@ -3,12 +3,17 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	repositories "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+// pgUniqueViolation is Postgres' SQLSTATE for a unique violation (23505).
+const pgUniqueViolation = "23505"
 
 // GormUserRepository implements the UserRepository interface using GORM
 type GormUserRepository struct {
@@ -118,22 +123,31 @@ func (r *GormUserRepository) Update(ctx context.Context, user *domain.User) (*do
 	model := userDomainToModel(user)
 	model.ID = user.ID
 
-	result := r.db.WithContext(ctx).Model(model).Updates(map[string]interface{}{
-		"username":      model.Username,
-		"email":         model.Email,
-		"clerk_user_id": model.ClerkUserID,
-	})
+	// RETURNING * hands back the row with its new updated_at: no re-read.
+	var updated UserModel
+	result := r.db.WithContext(ctx).Model(&updated).
+		Clauses(clause.Returning{}).
+		Where("id = ?", user.ID).
+		Updates(map[string]interface{}{
+			"username":      model.Username,
+			"email":         model.Email,
+			"clerk_user_id": model.ClerkUserID,
+		})
 	if result.Error != nil {
+		// The unique constraints are the uniqueness check (no pre-query).
+		var pgErr *pgconn.PgError
+		if errors.As(result.Error, &pgErr) && pgErr.Code == pgUniqueViolation {
+			switch pgErr.ConstraintName {
+			case "users_unique_username":
+				return nil, fmt.Errorf("%w: username already taken", domain.ErrAlreadyExists)
+			case "users_unique_email":
+				return nil, fmt.Errorf("%w: email already registered", domain.ErrAlreadyExists)
+			}
+		}
 		return nil, result.Error
 	}
 	if result.RowsAffected == 0 {
 		return nil, domain.ErrNotFound
-	}
-
-	// Re-read to get updated timestamps
-	var updated UserModel
-	if err := r.db.WithContext(ctx).First(&updated, user.ID).Error; err != nil {
-		return nil, err
 	}
 
 	return userModelToDomain(&updated), nil
