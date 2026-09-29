@@ -57,3 +57,19 @@ claude plugin eval evals/claude-md-audit --model sonnet --judge-model opus \
 - To compare models, run once each with `--model haiku|sonnet|opus`, adding `--output-dir` per model.
 - `--case` takes one glob; repeating it keeps only the last.
 - Results go to `evals/claude-md-audit/evals/results/` (gitignored).
+
+## Judge reasoning
+
+The harness judge is told to answer with one word (3 votes, majority), so results only contain votes. `rejudge.py` re-judges the stored llm verdicts with a reasoning-first prompt and saves the reasoning:
+
+```bash
+python3 evals/claude-md-audit/rejudge.py haiku.json sonnet.json opus.json \
+  --out evals/claude-md-audit/judgements/<date> --only-failed --model sonnet --skip r5-cors
+```
+
+- It's a **reproduction**, not the harness judge's own thinking: same criterion and agent output, one vote, reasoning first. It reports agreement with the harness verdict.
+- Cost is dominated by the reports (~$0.05 per judgement with Opus). `--only-failed` re-judges just the failed checks, the ones worth reading; all 378 sweep verdicts would be ~$20.
+- Needs the `--json <file>` output of an eval run. Writes `judgements.json`, `JUDGEMENTS.md` and `reports/` (the agent outputs the reasoning quotes). It resumes if rerun on the same `--out`.
+- `--only-failed` can't reveal false passes; a check the harness passed wrongly is never re-judged.
+
+`judgements/2026-09-29-sweep-failed/`: the 56 failed checks from the first sweep, re-judged with Sonnet: 56/56 agree with the harness. All four failures by Sonnet are `r3-helpers-path`: it flagged the neighbouring `feature_resolver.go` error but treated the Deep Modules paths as correct.
