@@ -134,10 +134,23 @@
 		if (!gridApi) return onClearAll?.();
 		gridApi.setFilterModel(null);
 	}
+
+	/** On desktop, relocate the chip row into the page header's empty middle (#activity-chips-slot)
+	 * so it costs no vertical space above the grid. Mobile keeps it inside the card. */
+	function moveToHeaderSlot(node: HTMLElement) {
+		const slot = document.getElementById('activity-chips-slot');
+		if (!slot || !window.matchMedia('(min-width: 768px)').matches) return;
+		slot.appendChild(node);
+		node.classList.remove('px-3', 'border-b', 'bg-muted/30');
+		node.classList.add('px-2');
+	}
 </script>
 
 {#if chips.length > 0}
-	<div class="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border bg-muted/30">
+	<div
+		use:moveToHeaderSlot
+		class="chips-root flex flex-wrap items-center gap-2 px-3 py-1 border-b border-border bg-muted/30"
+	>
 		{#each chips as chip (chip.colId)}
 			<span
 				class="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 text-xs rounded-full bg-primary/10 text-primary border border-primary/20"

@@ -42,6 +42,18 @@ function resolveGitBuildInfo() {
 
 const buildInfo = { ...resolveGitBuildInfo(), buildTime: new Date().toISOString() };
 
+/**
+ * @vite-pwa/sveltekit `push()`es `prerendered/**\/*.{html,json}` onto globPatterns.
+ * This is an SPA (prerender = false), so nothing exists there when workbox runs and
+ * it emits "One of the glob patterns doesn't match any files" — surfaced as a Sevalla
+ * deploy error. Drop just that pattern; the `client/` ones the plugin adds still apply.
+ */
+function withoutPrerenderedGlob(patterns: string[]): string[] {
+	const push = patterns.push.bind(patterns);
+	patterns.push = (...items: string[]) => push(...items.filter((p) => !p.startsWith('prerendered/')));
+	return patterns;
+}
+
 export default defineConfig({
 	// The vitest 'unit' project below `extends` this file, so it inherits these too.
 	define: {
@@ -53,7 +65,7 @@ export default defineConfig({
 		SvelteKitPWA({
 			registerType: 'autoUpdate',
 			workbox: {
-				globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+				globPatterns: withoutPrerenderedGlob(['**/*.{js,css,html,ico,png,svg,woff2}']),
 				// registerType: 'autoUpdate' alone doesn't make a new service worker take
 				// over immediately — without these, a newly-deployed SW installs but sits
 				// in the "waiting" state until every old tab closes, so a page loaded
