@@ -35,19 +35,27 @@ func NewMessagingService(
 
 // AssertParticipant verifies that the actor is an active participant in the thread.
 func (s *MessagingServiceImpl) AssertParticipant(ctx context.Context, actorUserID, threadID int) error {
+	_, err := s.participantThread(ctx, actorUserID, threadID)
+	return err
+}
+
+// participantThread loads the thread (one query, participants included) and
+// verifies the actor is an active participant, returning the loaded thread so
+// callers don't read it again.
+func (s *MessagingServiceImpl) participantThread(ctx context.Context, actorUserID, threadID int) (*domain.MessageThread, error) {
 	thread, err := s.threadRepo.GetThread(ctx, threadID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if thread == nil {
 		// A repository that reports "missing" as (nil, nil) must not reach
 		// IsActiveParticipant — that is a value receiver and would panic.
-		return fmt.Errorf("%w: thread %d", domain.ErrNotFound, threadID)
+		return nil, fmt.Errorf("%w: thread %d", domain.ErrNotFound, threadID)
 	}
 	if !thread.IsActiveParticipant(actorUserID) {
-		return fmt.Errorf("%w: not a participant of thread %d", domain.ErrForbidden, threadID)
+		return nil, fmt.Errorf("%w: not a participant of thread %d", domain.ErrForbidden, threadID)
 	}
-	return nil
+	return thread, nil
 }
 
 // SendMessage persists a new message to a thread from the actor.
@@ -126,15 +134,23 @@ func (s *MessagingServiceImpl) DeleteMessage(ctx context.Context, actorUserID in
 	return tombstoned, nil
 }
 
-// MuteThread sets the actor's muted flag for a thread they participate in.
+// MuteThread sets the actor's muted flag for a thread they participate in and
+// returns the thread with that flag applied (no re-read: the write changes
+// nothing else).
 func (s *MessagingServiceImpl) MuteThread(ctx context.Context, actorUserID, threadID int, muted bool) (*domain.MessageThread, error) {
-	if err := s.AssertParticipant(ctx, actorUserID, threadID); err != nil {
+	thread, err := s.participantThread(ctx, actorUserID, threadID)
+	if err != nil {
 		return nil, err
 	}
 	if err := s.threadRepo.SetMuted(ctx, threadID, actorUserID, muted); err != nil {
 		return nil, err
 	}
-	return s.threadRepo.GetThread(ctx, threadID)
+	for i := range thread.Participants {
+		if thread.Participants[i].UserID == actorUserID {
+			thread.Participants[i].Muted = muted
+		}
+	}
+	return thread, nil
 }
 
 // MarkRead updates the actor's read receipt position in the thread.
@@ -263,12 +279,10 @@ func (s *MessagingServiceImpl) ListSince(ctx context.Context, actorUserID, threa
 	return s.msgRepo.ListSince(ctx, threadID, sinceSeq)
 }
 
-// GetThread returns the thread, including its participants.
+// GetThread returns the thread, including its participants. The load that
+// checks participation is the result.
 func (s *MessagingServiceImpl) GetThread(ctx context.Context, actorUserID, threadID int) (*domain.MessageThread, error) {
-	if err := s.AssertParticipant(ctx, actorUserID, threadID); err != nil {
-		return nil, err
-	}
-	return s.threadRepo.GetThread(ctx, threadID)
+	return s.participantThread(ctx, actorUserID, threadID)
 }
 
 // MaxSeq returns the highest message sequence number in the thread.

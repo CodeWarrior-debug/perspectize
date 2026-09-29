@@ -99,71 +99,75 @@ func newMessagingFixture(t *testing.T, threads, messages int) *messagingFixture 
 
 func TestMessageThreadsList(t *testing.T) {
 	f := newMessagingFixture(t, 5, 0)
-	// threads, participants, thread stats (all threads), users (all participants)
-	f.h.roundTrips(4, f.alice, listThreadsQuery, map[string]any{"first": 50})
+	// threads JOIN participants, thread stats (all threads), users (all participants)
+	f.h.roundTrips(3, f.alice, listThreadsQuery, map[string]any{"first": 50})
 }
 
 // The thread list must not grow with the number of threads (no N+1): 12
-// threads cost the same 4 statements as 5.
+// threads cost the same 3 statements as 5.
 func TestMessageThreadsListIsConstant(t *testing.T) {
 	f := newMessagingFixture(t, 12, 0)
-	f.h.roundTrips(4, f.alice, listThreadsQuery, map[string]any{"first": 50})
+	f.h.roundTrips(3, f.alice, listThreadsQuery, map[string]any{"first": 50})
 }
 
 func TestMessageThreadGet(t *testing.T) {
 	f := newMessagingFixture(t, 1, 0)
-	f.h.roundTrips(6, f.alice, getThreadQuery, map[string]any{"id": f.threadIDs[0]})
+	// thread JOIN participants (also the participation check), stats, users
+	f.h.roundTrips(3, f.alice, getThreadQuery, map[string]any{"id": f.threadIDs[0]})
 }
 
 func TestThreadMessagesList(t *testing.T) {
 	f := newMessagingFixture(t, 1, 10)
-	// thread + participants (participation check), messages, users (all senders)
-	f.h.roundTrips(4, f.alice, listMessagesQuery, map[string]any{"threadId": f.threadIDs[0], "first": 50})
+	// thread JOIN participants (participation check), messages, users (all senders)
+	f.h.roundTrips(3, f.alice, listMessagesQuery, map[string]any{"threadId": f.threadIDs[0], "first": 50})
 }
 
 // Nor the message list with the number of messages: 30 cost the same as 10.
 func TestThreadMessagesListIsConstant(t *testing.T) {
 	f := newMessagingFixture(t, 1, 30)
-	f.h.roundTrips(4, f.alice, listMessagesQuery, map[string]any{"threadId": f.threadIDs[0], "first": 50})
+	f.h.roundTrips(3, f.alice, listMessagesQuery, map[string]any{"threadId": f.threadIDs[0], "first": 50})
 }
 
 func TestCreateMessageThread(t *testing.T) {
 	f := newMessagingFixture(t, 0, 0)
-	f.h.roundTrips(9, f.alice, createThreadMut, map[string]any{"input": map[string]any{
+	f.h.roundTrips(8, f.alice, createThreadMut, map[string]any{"input": map[string]any{
 		"participantUserIds": []string{fmt.Sprint(f.bobID)},
 	}})
 }
 
 func TestSendMessage(t *testing.T) {
 	f := newMessagingFixture(t, 1, 0)
-	f.h.roundTrips(5, f.alice, sendMessageMut, map[string]any{"input": map[string]any{
+	f.h.roundTrips(4, f.alice, sendMessageMut, map[string]any{"input": map[string]any{
 		"threadId": f.threadIDs[0], "body": "hi", "clientNonce": "rt-send",
 	}})
 }
 
 func TestMarkThreadRead(t *testing.T) {
 	f := newMessagingFixture(t, 1, 2)
-	f.h.roundTrips(9, f.alice, markReadMut, map[string]any{"threadId": f.threadIDs[0], "seq": f.lastMessage.Seq})
+	f.h.roundTrips(7, f.alice, markReadMut, map[string]any{"threadId": f.threadIDs[0], "seq": f.lastMessage.Seq})
 }
 
 func TestSetTyping(t *testing.T) {
 	f := newMessagingFixture(t, 1, 0)
-	f.h.roundTrips(3, f.alice, setTypingMut, map[string]any{"threadId": f.threadIDs[0], "typing": true})
+	// participation check, pg_notify
+	f.h.roundTrips(2, f.alice, setTypingMut, map[string]any{"threadId": f.threadIDs[0], "typing": true})
 }
 
 func TestMuteThread(t *testing.T) {
 	f := newMessagingFixture(t, 1, 0)
-	f.h.roundTrips(7, f.alice, muteThreadMut, map[string]any{"threadId": f.threadIDs[0], "muted": true})
+	// participation check (the thread returned), UPDATE, stats, users
+	f.h.roundTrips(4, f.alice, muteThreadMut, map[string]any{"threadId": f.threadIDs[0], "muted": true})
 }
 
 func TestAddThreadParticipants(t *testing.T) {
 	f := newMessagingFixture(t, 1, 0)
-	f.h.roundTrips(9, f.alice, addParticipantsMut, map[string]any{"threadId": f.threadIDs[0], "userIds": []string{fmt.Sprint(f.carolID)}})
+	f.h.roundTrips(7, f.alice, addParticipantsMut, map[string]any{"threadId": f.threadIDs[0], "userIds": []string{fmt.Sprint(f.carolID)}})
 }
 
 func TestLeaveThread(t *testing.T) {
 	f := newMessagingFixture(t, 1, 0)
-	f.h.roundTrips(4, f.bob, leaveThreadMut, map[string]any{"threadId": f.threadIDs[0]})
+	// participation check, UPDATE, pg_notify
+	f.h.roundTrips(3, f.bob, leaveThreadMut, map[string]any{"threadId": f.threadIDs[0]})
 }
 
 func TestEditMessage(t *testing.T) {

@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -76,23 +75,78 @@ func (r *GormThreadRepository) CreateThread(ctx context.Context, createdBy int, 
 	return r.GetThread(ctx, int(threadID))
 }
 
-// GetThread loads a thread and its participants. A missing thread is reported as
-// domain.ErrNotFound.
-func (r *GormThreadRepository) GetThread(ctx context.Context, threadID int) (*domain.MessageThread, error) {
-	var model MessageThreadModel
-	if err := r.db.WithContext(ctx).First(&model, threadID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, domain.ErrNotFound
+// threadWithParticipantsColumns selects a thread's columns plus one
+// participant's (p_-prefixed, NULL when the thread has none) per row, so a
+// thread and its participants load in one round trip.
+const threadWithParticipantsColumns = `mt.id, mt.title, mt.created_by, mt.last_message_at, mt.created_at,
+	tp.user_id AS p_user_id, tp.role AS p_role, tp.last_read_seq AS p_last_read_seq,
+	tp.muted AS p_muted, tp.joined_at AS p_joined_at, tp.left_at AS p_left_at`
+
+// threadParticipantRow is one row of a thread LEFT JOIN thread_participants.
+type threadParticipantRow struct {
+	MessageThreadModel
+	PUserID      *int64
+	PRole        *string
+	PLastReadSeq *int64
+	PMuted       *bool
+	PJoinedAt    *time.Time
+	PLeftAt      *time.Time
+}
+
+// groupThreadRows folds joined rows back into threads, keeping row order.
+func groupThreadRows(rows []threadParticipantRow) []domain.MessageThread {
+	order := []int64{}
+	models := map[int64]MessageThreadModel{}
+	parts := map[int64][]ThreadParticipantModel{}
+	for _, row := range rows {
+		if _, seen := models[row.ID]; !seen {
+			order = append(order, row.ID)
+			models[row.ID] = row.MessageThreadModel
 		}
+		if row.PUserID == nil {
+			continue
+		}
+		parts[row.ID] = append(parts[row.ID], ThreadParticipantModel{
+			ThreadID:    row.ID,
+			UserID:      *row.PUserID,
+			Role:        deref(row.PRole),
+			LastReadSeq: deref(row.PLastReadSeq),
+			Muted:       deref(row.PMuted),
+			JoinedAt:    deref(row.PJoinedAt),
+			LeftAt:      row.PLeftAt,
+		})
+	}
+	threads := make([]domain.MessageThread, len(order))
+	for i, id := range order {
+		m := models[id]
+		threads[i] = messageThreadModelToDomain(&m, parts[id])
+	}
+	return threads
+}
+
+func deref[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+	return *p
+}
+
+// GetThread loads a thread and its participants in one query. A missing
+// thread is reported as domain.ErrNotFound.
+func (r *GormThreadRepository) GetThread(ctx context.Context, threadID int) (*domain.MessageThread, error) {
+	var rows []threadParticipantRow
+	if err := r.db.WithContext(ctx).Raw(`SELECT `+threadWithParticipantsColumns+`
+		FROM message_threads mt
+		LEFT JOIN thread_participants tp ON tp.thread_id = mt.id
+		WHERE mt.id = ?
+		ORDER BY tp.joined_at, tp.user_id`, threadID).Scan(&rows).Error; err != nil {
 		return nil, fmt.Errorf("failed to get thread: %w", err)
 	}
-
-	var parts []ThreadParticipantModel
-	if err := r.db.WithContext(ctx).Where("thread_id = ?", threadID).Find(&parts).Error; err != nil {
-		return nil, fmt.Errorf("failed to load thread participants: %w", err)
+	if len(rows) == 0 {
+		return nil, domain.ErrNotFound
 	}
-
-	thread := messageThreadModelToDomain(&model, parts)
+	thread := groupThreadRows(rows)[0]
 	return &thread, nil
 }
 
@@ -119,48 +173,36 @@ func (r *GormThreadRepository) FindDirectThread(ctx context.Context, userA, user
 }
 
 // ListThreadsForUser returns the user's active threads ordered by most recent
-// activity. When beforeLastMessageAt is set, only threads strictly older than it
-// are returned (keyset pagination).
+// activity, with their participants, in one query. When beforeLastMessageAt is
+// set, only threads strictly older than it are returned (keyset pagination).
 func (r *GormThreadRepository) ListThreadsForUser(ctx context.Context, userID int, limit int, beforeLastMessageAt *time.Time) ([]domain.MessageThread, error) {
-	q := r.db.WithContext(ctx).
-		Table("message_threads mt").
-		Joins("JOIN thread_participants tp ON tp.thread_id = mt.id").
-		Where("tp.user_id = ? AND tp.left_at IS NULL", userID)
+	where := "me.user_id = @user AND me.left_at IS NULL"
+	args := map[string]any{"user": userID}
 	if beforeLastMessageAt != nil {
-		q = q.Where("mt.last_message_at < ?", *beforeLastMessageAt)
+		where += " AND mt.last_message_at < @before"
+		args["before"] = *beforeLastMessageAt
 	}
-	q = q.Order("mt.last_message_at DESC")
+	limitSQL := ""
 	if limit > 0 {
-		q = q.Limit(limit)
+		limitSQL = " LIMIT @limit"
+		args["limit"] = limit
 	}
 
-	var models []MessageThreadModel
-	if err := q.Select("mt.*").Scan(&models).Error; err != nil {
+	var rows []threadParticipantRow
+	if err := r.db.WithContext(ctx).Raw(`WITH mine AS (
+			SELECT mt.* FROM message_threads mt
+			JOIN thread_participants me ON me.thread_id = mt.id
+			WHERE `+where+`
+			ORDER BY mt.last_message_at DESC, mt.id DESC`+limitSQL+`
+		)
+		SELECT `+threadWithParticipantsColumns+`
+		FROM mine mt
+		LEFT JOIN thread_participants tp ON tp.thread_id = mt.id
+		ORDER BY mt.last_message_at DESC, mt.id DESC, tp.joined_at, tp.user_id`, args).
+		Scan(&rows).Error; err != nil {
 		return nil, fmt.Errorf("failed to list threads for user: %w", err)
 	}
-	if len(models) == 0 {
-		return []domain.MessageThread{}, nil
-	}
-
-	ids := make([]int64, len(models))
-	for i := range models {
-		ids[i] = models[i].ID
-	}
-
-	var parts []ThreadParticipantModel
-	if err := r.db.WithContext(ctx).Where("thread_id IN ?", ids).Find(&parts).Error; err != nil {
-		return nil, fmt.Errorf("failed to load thread participants: %w", err)
-	}
-	partsByThread := make(map[int64][]ThreadParticipantModel, len(models))
-	for _, p := range parts {
-		partsByThread[p.ThreadID] = append(partsByThread[p.ThreadID], p)
-	}
-
-	threads := make([]domain.MessageThread, len(models))
-	for i := range models {
-		threads[i] = messageThreadModelToDomain(&models[i], partsByThread[models[i].ID])
-	}
-	return threads, nil
+	return groupThreadRows(rows), nil
 }
 
 // AddParticipants inserts participant rows (ignoring rows that already exist)
