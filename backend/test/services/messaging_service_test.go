@@ -140,6 +140,10 @@ func (m *mockMessageRepo) CountSince(ctx context.Context, threadID int, sinceSeq
 	return 0, nil
 }
 
+func (m *mockMessageRepo) ThreadStats(ctx context.Context, viewerID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
+	return map[int]domain.ThreadStats{}, nil
+}
+
 func (m *mockMessageRepo) UpdateBody(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error) {
 	if m.updateBodyFn != nil {
 		return m.updateBodyFn(ctx, messageID, body, editedAt)

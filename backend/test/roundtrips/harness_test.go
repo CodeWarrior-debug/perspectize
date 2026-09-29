@@ -112,7 +112,7 @@ func newHarness(t *testing.T) *harness {
 	messageRepo := postgres.NewGormMessageRepository(db)
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
 
-	notifier, err := realtime.NewPgNotifier(context.Background(), dsn)
+	notifier, err := realtime.NewPgNotifier(context.Background(), dsn, counter)
 	require.NoError(t, err)
 	hub := realtime.NewHub(messageRepo, threadRepo, notifier)
 

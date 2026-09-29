@@ -34,6 +34,9 @@ func (s stubMsgRepo) MaxSeq(ctx context.Context, t int) (int64, error) { return 
 func (s stubMsgRepo) CountSince(ctx context.Context, t int, since int64) (int, error) {
 	return 0, nil
 }
+func (s stubMsgRepo) ThreadStats(ctx context.Context, viewerID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
+	return map[int]domain.ThreadStats{}, nil
+}
 func (s stubMsgRepo) UpdateBody(ctx context.Context, id int64, body string, editedAt time.Time) (*domain.Message, error) {
 	return nil, nil
 }

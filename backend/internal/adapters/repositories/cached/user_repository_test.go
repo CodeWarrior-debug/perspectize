@@ -79,6 +79,16 @@ func (f *fakeUserRepo) GetByClerkID(ctx context.Context, clerkID string) (*domai
 func (f *fakeUserRepo) GetByID(ctx context.Context, id int) (*domain.User, error) {
 	return &domain.User{ID: id}, nil
 }
+
+func (f *fakeUserRepo) GetByIDs(ctx context.Context, ids []int) ([]*domain.User, error) {
+	out := []*domain.User{}
+	for _, id := range ids {
+		if u, err := f.GetByID(ctx, id); err == nil && u != nil {
+			out = append(out, u)
+		}
+	}
+	return out, nil
+}
 func (f *fakeUserRepo) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
 	return &domain.User{Username: username}, nil
 }

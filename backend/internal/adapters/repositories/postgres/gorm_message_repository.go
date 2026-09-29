@@ -137,6 +137,34 @@ func (r *GormMessageRepository) CountSince(ctx context.Context, threadID int, si
 	return int(n), nil
 }
 
+// ThreadStats computes latestSeq and the viewer's unread count for many
+// threads in one round trip. Each correlated subquery is an index range scan on
+// (thread_id, seq), same as the per-thread MaxSeq / CountSince it replaces.
+func (r *GormMessageRepository) ThreadStats(ctx context.Context, viewerUserID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
+	out := make(map[int]domain.ThreadStats, len(threadIDs))
+	if len(threadIDs) == 0 {
+		return out, nil
+	}
+	var rows []struct {
+		ThreadID  int
+		LatestSeq int64
+		Unread    int
+	}
+	if err := r.db.WithContext(ctx).Raw(`
+		SELECT tp.thread_id,
+		       (SELECT COALESCE(MAX(m.seq), 0) FROM messages m WHERE m.thread_id = tp.thread_id) AS latest_seq,
+		       (SELECT COUNT(*) FROM messages m WHERE m.thread_id = tp.thread_id AND m.seq > tp.last_read_seq) AS unread
+		FROM thread_participants tp
+		WHERE tp.user_id = ? AND tp.thread_id IN ?`, viewerUserID, threadIDs).
+		Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("failed to load thread stats: %w", err)
+	}
+	for _, row := range rows {
+		out[row.ThreadID] = domain.ThreadStats{LatestSeq: row.LatestSeq, Unread: row.Unread}
+	}
+	return out, nil
+}
+
 // UpdateBody rewrites a message body and stamps edited_at. The row is reloaded
 // via GetByID so the returned message carries the trigger-assigned seq and the
 // DB created_at unchanged. A missing id is reported as domain.ErrNotFound.

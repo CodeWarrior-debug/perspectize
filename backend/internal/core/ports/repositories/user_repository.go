@@ -10,6 +10,8 @@ import (
 type UserRepository interface {
 	Create(ctx context.Context, user *domain.User) (*domain.User, error)
 	GetByID(ctx context.Context, id int) (*domain.User, error)
+	// GetByIDs loads many users in one query; missing ids are simply absent.
+	GetByIDs(ctx context.Context, ids []int) ([]*domain.User, error)
 	GetByClerkID(ctx context.Context, clerkID string) (*domain.User, error)
 	GetByUsername(ctx context.Context, username string) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)

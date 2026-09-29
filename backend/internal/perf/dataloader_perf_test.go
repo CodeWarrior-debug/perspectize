@@ -151,7 +151,7 @@ func TestContentListDataloaderPerf(t *testing.T) {
 	// does, so this harness is byte-identical for the before/after runs. In
 	// the baseline (pre-fix) state the resolver never touches the loader, so
 	// it is simply unused context.
-	httpHandler := dlmw.Middleware(categoryService)(srv)
+	httpHandler := dlmw.Middleware(dlmw.Services{Category: categoryService})(srv)
 
 	c := client.New(httpHandler)
 

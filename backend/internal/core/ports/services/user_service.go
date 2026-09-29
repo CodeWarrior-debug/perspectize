@@ -20,6 +20,8 @@ type UserService interface {
 
 	// GetByID retrieves a user by ID
 	GetByID(ctx context.Context, id int) (*domain.User, error)
+	// GetByIDs retrieves many users in one query; missing ids are absent.
+	GetByIDs(ctx context.Context, ids []int) ([]*domain.User, error)
 
 	// GetByUsername retrieves a user by username
 	GetByUsername(ctx context.Context, username string) (*domain.User, error)

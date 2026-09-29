@@ -55,6 +55,22 @@ func (r *GormUserRepository) GetByID(ctx context.Context, id int) (*domain.User,
 	return userModelToDomain(&model), nil
 }
 
+// GetByIDs loads many users in one query (the per-request user dataloader).
+func (r *GormUserRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.User, error) {
+	if len(ids) == 0 {
+		return []*domain.User{}, nil
+	}
+	var models []UserModel
+	if err := r.db.WithContext(ctx).Where("id IN ?", ids).Find(&models).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*domain.User, len(models))
+	for i := range models {
+		out[i] = userModelToDomain(&models[i])
+	}
+	return out, nil
+}
+
 // GetByClerkID retrieves a user by their Clerk user ID
 func (r *GormUserRepository) GetByClerkID(ctx context.Context, clerkID string) (*domain.User, error) {
 	var model UserModel

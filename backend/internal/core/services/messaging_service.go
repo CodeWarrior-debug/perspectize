@@ -279,18 +279,9 @@ func (s *MessagingServiceImpl) MaxSeq(ctx context.Context, actorUserID, threadID
 	return s.msgRepo.MaxSeq(ctx, threadID)
 }
 
-// ThreadMaxSeq returns the highest message sequence number in the thread
-// WITHOUT re-checking participation. It is the trusted variant used by GraphQL
-// field resolvers on a thread the query has already authorized; callers that
-// have not authorized the thread must use MaxSeq.
-func (s *MessagingServiceImpl) ThreadMaxSeq(ctx context.Context, threadID int) (int64, error) {
-	return s.msgRepo.MaxSeq(ctx, threadID)
-}
-
-// UnreadCount returns the number of messages in the thread newer than sinceSeq,
-// WITHOUT re-checking participation — same trusted-caller contract as
-// ThreadMaxSeq. Counting rows keeps the number right even when pruning has left
-// gaps in the sequence.
-func (s *MessagingServiceImpl) UnreadCount(ctx context.Context, threadID int, sinceSeq int64) (int, error) {
-	return s.msgRepo.CountSince(ctx, threadID, sinceSeq)
+// ThreadStats returns latestSeq and the viewer's unread count per thread
+// WITHOUT re-checking participation — only for already-authorized threads (see
+// the port). Counting rows keeps unread right even when pruning left gaps.
+func (s *MessagingServiceImpl) ThreadStats(ctx context.Context, viewerUserID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
+	return s.msgRepo.ThreadStats(ctx, viewerUserID, threadIDs)
 }

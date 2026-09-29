@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -22,8 +23,16 @@ var _ Notifier = (*PgNotifier)(nil)
 
 // NewPgNotifier dials dsn and returns a notifier backed by the resulting pool.
 // The caller owns the pool and must call Close when done.
-func NewPgNotifier(ctx context.Context, dsn string) (*PgNotifier, error) {
-	pool, err := pgxpool.New(ctx, dsn)
+func NewPgNotifier(ctx context.Context, dsn string, tracer ...pgx.QueryTracer) (*PgNotifier, error) {
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("parse notifier dsn: %w", err)
+	}
+	// Optional tracer: the round-trip tests count pg_notify calls too.
+	if len(tracer) > 0 && tracer[0] != nil {
+		cfg.ConnConfig.Tracer = tracer[0]
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("create notifier pool: %w", err)
 	}

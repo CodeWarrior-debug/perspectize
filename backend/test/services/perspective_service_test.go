@@ -103,6 +103,16 @@ func (m *mockUserRepoForPerspective) GetByID(ctx context.Context, id int) (*doma
 	return &domain.User{ID: id, Username: "testuser", Email: "test@example.com"}, nil
 }
 
+func (m *mockUserRepoForPerspective) GetByIDs(ctx context.Context, ids []int) ([]*domain.User, error) {
+	out := []*domain.User{}
+	for _, id := range ids {
+		if u, err := m.GetByID(ctx, id); err == nil && u != nil {
+			out = append(out, u)
+		}
+	}
+	return out, nil
+}
+
 func (m *mockUserRepoForPerspective) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
 	return nil, domain.ErrNotFound
 }

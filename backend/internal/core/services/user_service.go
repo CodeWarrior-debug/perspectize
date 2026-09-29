@@ -107,6 +107,22 @@ func (s *UserService) GetByID(ctx context.Context, id int) (*domain.User, error)
 	return user, nil
 }
 
+// GetByIDs retrieves many users in one query (backs the per-request user
+// dataloader). Non-positive ids are dropped rather than queried.
+func (s *UserService) GetByIDs(ctx context.Context, ids []int) ([]*domain.User, error) {
+	valid := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if id > 0 {
+			valid = append(valid, id)
+		}
+	}
+	users, err := s.repo.GetByIDs(ctx, valid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users: %w", err)
+	}
+	return users, nil
+}
+
 // GetByUsername retrieves a user by username
 func (s *UserService) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
 	username = strings.TrimSpace(username)

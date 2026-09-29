@@ -148,9 +148,16 @@ func Middleware(d Deps) []func(http.Handler) http.Handler {
 		apimw.SecureHeaders(),       // M-14: security headers (HSTS, X-Content-Type-Options, X-Frame-Options)
 		apimw.ContentTypeValidation, // M-15: CSRF protection via Content-Type
 		auth.Middleware(d.UserRepo, d.TokenVerifier),
-		graphqldl.Middleware(d.CategoryService, d.PerspectiveService), // per-request GraphQL dataloaders (batches Content.primaryCategory, Content.perspectiveCount/averageRating)
-		perfmw.RequestTimer,                                           // structured request timing (replaces chi Logger)
-		perfmw.Recoverer,                                              // structured panic recovery (JSON via slog)
+		// per-request GraphQL dataloaders (batches Content.primaryCategory,
+		// Content.perspectiveCount/averageRating, users, thread stats)
+		graphqldl.Middleware(graphqldl.Services{
+			Category:    d.CategoryService,
+			Perspective: d.PerspectiveService,
+			User:        d.UserService,
+			Messaging:   d.MessagingService,
+		}),
+		perfmw.RequestTimer, // structured request timing (replaces chi Logger)
+		perfmw.Recoverer,    // structured panic recovery (JSON via slog)
 	}
 }
 
