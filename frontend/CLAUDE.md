@@ -8,14 +8,14 @@ SvelteKit web app with Svelte 5, TanStack Query, AG Grid, shadcn-svelte, and Tai
 frontend/src/
 ├── routes/              # SvelteKit file-based routing
 │   ├── +layout.svelte   # Root layout (QueryClientProvider, Header, Toaster)
-│   ├── +layout.ts       # Layout config (prerender = true)
+│   ├── +layout.ts       # Layout config (SPA: prerender = false, ssr = false)
 │   └── +page.svelte     # Home page
 ├── lib/
 │   ├── components/      # Svelte 5 components
 │   │   ├── shadcn/      # shadcn-svelte primitives (button/)
 │   │   ├── Header.svelte
 │   │   ├── PageWrapper.svelte
-│   │   └── AGGridTest.svelte
+│   │   └── …                # ActivityTable, feature folders (auth/, discover/, interlinear/, …)
 │   ├── queries/         # TanStack Query + graphql-request
 │   │   ├── client.ts    # GraphQLClient (VITE_GRAPHQL_URL)
 │   │   ├── keys.ts      # Cross-domain query keys
@@ -38,6 +38,12 @@ Small interface, lots of work hidden behind it (Ousterhout). Test: _how little m
 - **No pass-through components** — a wrapper that only forwards props/snippets to one child adds surface without hiding anything; inline it or give it state/logic.
 
 Refs: Ousterhout, _A Philosophy of Software Design_; Matt Pocock, [How To Make Codebases AI Agents Love](https://www.aihero.dev/how-to-make-codebases-ai-agents-love) (why deep modules help agents navigate). Origin: PR #339.
+
+## Docs
+
+- [Design Spec](docs/DESIGN_SPEC.md) — Figma design system, color tokens, typography, component specs
+- [Adding an AG Grid Column](../.claude/docs/ADDING_AG_GRID_COLUMN.md) — decision checklist for ActivityTable columns
+- Figma: see [Figma Design Workflow](#figma-design-workflow) below
 
 ## shadcn-svelte Components
 
@@ -66,6 +72,8 @@ pnpm run test         # Tests in watch mode
 **`pnpm exec` must run from `frontend/`** — running from repo root fails with `ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE`. Use `cd frontend && pnpm exec ...` or `pnpm --dir frontend exec ...`.
 
 **Cloud/CI sandbox sessions start with no `frontend/node_modules`** (a fresh container/checkout, unlike a local dev machine). `pnpm run check`, `test:run`, etc. fail with confusing module-resolution errors — not an "install first" message — until `pnpm install` is run once in `frontend/`.
+
+**`pnpm-lock.yaml` merge conflicts:** accept either side (`git checkout --theirs frontend/pnpm-lock.yaml`), then regenerate with `pnpm install --dir frontend`. Use `--dir` instead of `cd` to avoid hook/shell side effects that can switch branches mid-operation.
 
 **Env vars:** `.env.example` lists every `VITE_*` variable by name (values blank on purpose). Copy it to `frontend/.env` and fill in real values by hand — the agent cannot read `.env` (see [../.docs/SECURITY.md](../.docs/SECURITY.md)).
 
@@ -147,6 +155,10 @@ Per-icon imports from `@lucide/svelte` for tree-shaking:
 
 - Import path: `@lucide/svelte/icons/{kebab-case-name}`
 - Default size in buttons: `size-4` (applied via button base). Override with explicit `size-*` class.
+
+## Pre-commit colour guard
+
+The shared git pre-commit hook (`make install-hooks`; see [.docs/HOOKS.md](../.docs/HOOKS.md)) **blocks** new raw hex/rgb colour literals added to `src/lib/components/**` or `formatting.ts` — use theme tokens (see `.docs/UI_THOROUGHNESS_CHECKLIST.md` §3.3). Allowlist an intentional literal inline with a `hex-ok: <reason>` comment.
 
 ## Design Tokens
 
