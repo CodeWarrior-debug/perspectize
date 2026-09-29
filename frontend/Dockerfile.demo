@@ -1,0 +1,30 @@
+# Demo-mode frontend (used by docker-compose.demo.yml at the repo root).
+# VITE_* values are baked in at build time: demo mode swaps Clerk for the
+# seeded persona picker, so no Clerk key is needed.
+FROM node:22-alpine AS builder
+
+ARG VITE_GRAPHQL_URL=http://localhost:8081/graphql
+ENV VITE_DEMO_MODE=true \
+    VITE_GRAPHQL_URL=$VITE_GRAPHQL_URL
+
+WORKDIR /app
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+# src/app.html's CSP only allows the API at http://localhost:8080 (plus the
+# hosted origins). The demo stack serves it on another port (8081 by default),
+# so the browser would block every request. Add the demo API origin to the
+# demo image only; the shipped app.html is untouched.
+RUN API_ORIGIN=$(echo "$VITE_GRAPHQL_URL" | sed -E 's#^(https?://[^/]+).*#\1#') \
+    && WS_ORIGIN=$(echo "$API_ORIGIN" | sed 's#^http#ws#') \
+    && sed -i "s#connect-src 'self'#connect-src 'self' $API_ORIGIN $WS_ORIGIN#" src/app.html \
+    && grep -q "$API_ORIGIN" src/app.html
+RUN pnpm exec svelte-kit sync && pnpm run build
+
+FROM nginx:1.29-alpine
+COPY demo/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/build /usr/share/nginx/html
+EXPOSE 80

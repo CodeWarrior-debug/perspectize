@@ -48,7 +48,8 @@
 </script>
 
 <div class="category-typeahead w-64 p-2">
-	<!-- Search input -->
+	<!-- Search input: focused on open, since the user just opened this picker to search -->
+	<!-- svelte-ignore a11y_autofocus -->
 	<input
 		type="text"
 		bind:value={searchTerm}

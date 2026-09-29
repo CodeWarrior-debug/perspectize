@@ -1,98 +1,98 @@
 [
-  {
-    "refName": "wayfarer",
-    "displayName": "Wayfarer",
-    "category": "classic",
-    "description": "Timeless angular, goes with everything",
-    "svg": "wayfarer.svg",
-    "viewBox": "0 0 70 28"
-  },
-  {
-    "refName": "aviator",
-    "displayName": "Aviator",
-    "category": "classic",
-    "description": "Teardrop lenses, double bridge",
-    "svg": "aviator.svg",
-    "viewBox": "0 0 70 30"
-  },
-  {
-    "refName": "clubmaster",
-    "displayName": "Clubmaster",
-    "category": "classic",
-    "description": "Bold browline, intellectual cool",
-    "svg": "clubmaster.svg",
-    "viewBox": "0 0 70 26"
-  },
-  {
-    "refName": "round",
-    "displayName": "Round",
-    "category": "scholarly",
-    "description": "Pince-nez, no arms, bookish",
-    "svg": "round.svg",
-    "viewBox": "0 0 56 28"
-  },
-  {
-    "refName": "oval",
-    "displayName": "Oval",
-    "category": "scholarly",
-    "description": "Refined pince-nez ellipses",
-    "svg": "oval.svg",
-    "viewBox": "0 0 62 28"
-  },
-  {
-    "refName": "catEye",
-    "displayName": "Cat-Eye",
-    "category": "fashion",
-    "description": "Upswept corners, retro glam",
-    "svg": "cat-eye.svg",
-    "viewBox": "0 0 72 26"
-  },
-  {
-    "refName": "butterfly",
-    "displayName": "Butterfly",
-    "category": "fashion",
-    "description": "Oversized, swooping, Audrey Hepburn",
-    "svg": "butterfly.svg",
-    "viewBox": "0 0 76 30"
-  },
-  {
-    "refName": "oversizedRound",
-    "displayName": "Oversized Round",
-    "category": "fashion",
-    "description": "70s boho, big and bold",
-    "svg": "oversized-round.svg",
-    "viewBox": "0 0 70 32"
-  },
-  {
-    "refName": "heart",
-    "displayName": "Heart",
-    "category": "fashion",
-    "description": "Playful, festival-ready, main character",
-    "svg": "heart.svg",
-    "viewBox": "0 0 68 28"
-  },
-  {
-    "refName": "sportWrap",
-    "displayName": "Sport Wrap",
-    "category": "athletic",
-    "description": "Curved, aerodynamic, performance",
-    "svg": "sport-wrap.svg",
-    "viewBox": "0 0 74 22"
-  },
-  {
-    "refName": "shield",
-    "displayName": "Shield",
-    "category": "athletic",
-    "description": "Single lens wraparound, futuristic",
-    "svg": "shield.svg",
-    "viewBox": "0 0 70 24"
-  },
-  {
-    "refName": "hexagonal",
-    "displayName": "Hexagonal",
-    "category": "modern",
-    "description": "Geometric, editorial, sharp",
-    "svg": "hexagonal.svg",
-    "viewBox": "0 0 68 28"
-  }
+	{
+		"refName": "wayfarer",
+		"displayName": "Wayfarer",
+		"category": "classic",
+		"description": "Timeless angular, goes with everything",
+		"svg": "wayfarer.svg",
+		"viewBox": "0 0 70 28"
+	},
+	{
+		"refName": "aviator",
+		"displayName": "Aviator",
+		"category": "classic",
+		"description": "Teardrop lenses, double bridge",
+		"svg": "aviator.svg",
+		"viewBox": "0 0 70 30"
+	},
+	{
+		"refName": "clubmaster",
+		"displayName": "Clubmaster",
+		"category": "classic",
+		"description": "Bold browline, intellectual cool",
+		"svg": "clubmaster.svg",
+		"viewBox": "0 0 70 26"
+	},
+	{
+		"refName": "round",
+		"displayName": "Round",
+		"category": "scholarly",
+		"description": "Pince-nez, no arms, bookish",
+		"svg": "round.svg",
+		"viewBox": "0 0 56 28"
+	},
+	{
+		"refName": "oval",
+		"displayName": "Oval",
+		"category": "scholarly",
+		"description": "Refined pince-nez ellipses",
+		"svg": "oval.svg",
+		"viewBox": "0 0 62 28"
+	},
+	{
+		"refName": "catEye",
+		"displayName": "Cat-Eye",
+		"category": "fashion",
+		"description": "Upswept corners, retro glam",
+		"svg": "cat-eye.svg",
+		"viewBox": "0 0 72 26"
+	},
+	{
+		"refName": "butterfly",
+		"displayName": "Butterfly",
+		"category": "fashion",
+		"description": "Oversized, swooping, Audrey Hepburn",
+		"svg": "butterfly.svg",
+		"viewBox": "0 0 76 30"
+	},
+	{
+		"refName": "oversizedRound",
+		"displayName": "Oversized Round",
+		"category": "fashion",
+		"description": "70s boho, big and bold",
+		"svg": "oversized-round.svg",
+		"viewBox": "0 0 70 32"
+	},
+	{
+		"refName": "heart",
+		"displayName": "Heart",
+		"category": "fashion",
+		"description": "Playful, festival-ready, main character",
+		"svg": "heart.svg",
+		"viewBox": "0 0 68 28"
+	},
+	{
+		"refName": "sportWrap",
+		"displayName": "Sport Wrap",
+		"category": "athletic",
+		"description": "Curved, aerodynamic, performance",
+		"svg": "sport-wrap.svg",
+		"viewBox": "0 0 74 22"
+	},
+	{
+		"refName": "shield",
+		"displayName": "Shield",
+		"category": "athletic",
+		"description": "Single lens wraparound, futuristic",
+		"svg": "shield.svg",
+		"viewBox": "0 0 70 24"
+	},
+	{
+		"refName": "hexagonal",
+		"displayName": "Hexagonal",
+		"category": "modern",
+		"description": "Geometric, editorial, sharp",
+		"svg": "hexagonal.svg",
+		"viewBox": "0 0 68 28"
+	}
 ]

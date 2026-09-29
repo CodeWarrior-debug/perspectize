@@ -2,7 +2,15 @@
  * URL ↔ grid state synchronization utilities.
  * Serializes/deserializes AG Grid filter models to/from URL search params.
  */
-import { COL_TO_SORT, SORT_TO_COL, COL_TO_FILTER_KEY, NUMBER_RANGE_COLS, DATE_RANGE_COLS } from './grid-config';
+import {
+	COL_TO_SORT,
+	SORT_TO_COL,
+	COL_TO_FILTER_KEY,
+	NUMBER_RANGE_COLS,
+	DATE_RANGE_COLS,
+	SET_FILTER_COLS,
+	CONTENT_TYPE_OPTIONS,
+} from './grid-config';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -204,6 +212,19 @@ function sameScopes(a: SearchScopeKey[], b: SearchScopeKey[]): boolean {
 type AGTextFilter = { filterType: 'text'; type: string; filter: string };
 type AGNumberFilter = { filterType: 'number'; type: string; filter?: number; filterTo?: number };
 type AGDateFilter = { filterType: 'date'; type: string; dateFrom?: string; dateTo?: string };
+type AGSetFilter = { filterType: 'set'; values: string[] };
+
+/** Split a comma-separated set-filter URL value, dropping blanks and duplicates. */
+export function parseSetValue(value: string): string[] {
+	return [
+		...new Set(
+			value
+				.split(',')
+				.map((v) => v.trim().toLowerCase())
+				.filter(Boolean),
+		),
+	];
+}
 
 // ---------------------------------------------------------------------------
 // Column mappings: AG Grid colId ↔ URL f.* param key
@@ -234,9 +255,13 @@ export function filterToUrlParams(filterModel: Record<string, unknown>): Record<
 		const filterKey = COL_TO_FILTER_KEY[colId];
 		if (!filterKey) continue; // unknown column — skip
 
-		const f = raw as AGTextFilter | AGNumberFilter | AGDateFilter;
+		const f = raw as AGTextFilter | AGNumberFilter | AGDateFilter | AGSetFilter;
 
-		if (f.filterType === 'text') {
+		if (f.filterType === 'set') {
+			if (f.values?.length) {
+				result[filterKey] = f.values.join(',');
+			}
+		} else if (f.filterType === 'text') {
 			const textFilter = f as AGTextFilter;
 			if (textFilter.filter) {
 				result[filterKey] = textFilter.filter;
@@ -286,7 +311,13 @@ export function urlParamsToFilter(filters: Record<string, string>): Record<strin
 		const colId = FILTER_KEY_TO_COL[filterKey];
 		if (!colId) continue;
 
-		if (DATE_RANGE_COLS.has(colId)) {
+		if (SET_FILTER_COLS.has(colId)) {
+			// Checkbox list filter (type): "youtube,claim"
+			const values = parseSetValue(value);
+			if (values.length > 0) {
+				result[colId] = { filterType: 'set', values } satisfies AGSetFilter;
+			}
+		} else if (DATE_RANGE_COLS.has(colId)) {
 			// Date range filter
 			const sep = value.indexOf('..');
 			if (sep === -1) {
@@ -362,7 +393,7 @@ export function urlParamsToFilter(filters: Record<string, string>): Record<strin
 				}
 			}
 		} else {
-			// Text filter (type, channel, tags, description)
+			// Text filter (channel, tags, description)
 			result[colId] = {
 				filterType: 'text',
 				type: 'contains',
@@ -392,6 +423,7 @@ const SCOPE_TO_GQL_FIELD: Record<SearchScopeKey, ContentSearchFieldGQL> = {
 /** GraphQL ContentFilter input — defined here so Plan 02 (Wave 1) doesn't depend on Plan 03 */
 export interface ContentFilterInput {
 	contentType?: string;
+	contentTypes?: string[];
 	minLengthSeconds?: number;
 	maxLengthSeconds?: number;
 	search?: string;
@@ -470,10 +502,19 @@ export function urlParamsToGraphQLFilter(
 		if (!value) continue;
 
 		switch (filterKey) {
-			case 'type':
-				result.contentType = value.toUpperCase();
-				hasAny = true;
+			case 'type': {
+				// Unknown values (a stale or hand-edited URL) are dropped rather than sent,
+				// since the server rejects anything outside its ContentType enum.
+				const known = new Set(CONTENT_TYPE_OPTIONS.map((o) => o.value));
+				const types = parseSetValue(value)
+					.filter((v) => known.has(v))
+					.map((v) => v.toUpperCase());
+				if (types.length > 0) {
+					result.contentTypes = types;
+					hasAny = true;
+				}
 				break;
+			}
 
 			case 'views': {
 				const { min, max } = parseNumberRange(value);

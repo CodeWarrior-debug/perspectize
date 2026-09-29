@@ -21,7 +21,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/svix/svix-webhooks v1.99.1
 	github.com/unrolled/secure v1.17.0
-	github.com/vektah/gqlparser/v2 v2.5.37
+	github.com/vektah/gqlparser/v2 v2.5.58
 	github.com/vikstrous/dataloadgen v0.0.10
 	go.opentelemetry.io/otel v1.46.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.46.0

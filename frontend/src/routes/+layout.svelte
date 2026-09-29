@@ -3,10 +3,14 @@
 	import { beforeNavigate } from '$app/navigation';
 	import { updated } from '$app/state';
 	import { onMount } from 'svelte';
-	import { ClerkProvider, ClerkLoaded, ClerkLoading, Show } from 'svelte-clerk';
+	import { ClerkProvider, ClerkLoaded, ClerkLoading } from 'svelte-clerk';
 	import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
 	import { Toaster } from 'svelte-sonner';
 	import favicon from '$lib/assets/favicon.svg';
+	import { DEMO_MODE } from '$lib/auth';
+	import AuthShow from '$lib/components/auth/AuthShow.svelte';
+	import DemoBanner from '$lib/components/auth/DemoBanner.svelte';
+	import DemoPersonaDialog from '$lib/components/auth/DemoPersonaDialog.svelte';
 	import AuthUserSync from '$lib/components/AuthUserSync.svelte';
 	import Header from '$lib/components/Header.svelte';
 	import InboxStreamMount from '$lib/components/messaging/InboxStreamMount.svelte';
@@ -17,6 +21,8 @@
 	import { JEEVES_DEV } from '$lib/assistant/config';
 	import { reportWebVitals } from '$lib/vitals';
 	import { watchForNewVersion } from '$lib/utils/versionWatch';
+	import { attachVersionHotkey } from '$lib/utils/versionHotkey';
+	import { printVersionInfo } from '$lib/utils/versionInfo';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import '../app.css';
 
@@ -47,10 +53,21 @@
 
 	onMount(() => {
 		reportWebVitals();
-		return watchForNewVersion({
+		const stopVersionWatch = watchForNewVersion({
 			check: () => updated.check(),
 			reload: () => location.reload(),
 		});
+		// Hidden zzzv console hotkey — see lib/utils/versionHotkey.ts.
+		const detachVersionHotkey = attachVersionHotkey({
+			onMatch: () => {
+				const graphqlUrl = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8080/graphql';
+				void printVersionInfo({ graphqlUrl });
+			},
+		});
+		return () => {
+			stopVersionWatch();
+			detachVersionHotkey();
+		};
 	});
 </script>
 
@@ -59,33 +76,49 @@
 	{@html webManifestLink}
 </svelte:head>
 
-<ClerkProvider {publishableKey}>
+{#snippet app()}
+	<AuthUserSync />
+	<div class="min-h-screen bg-background text-foreground">
+		{#if DEMO_MODE}
+			<DemoBanner />
+			<DemoPersonaDialog />
+		{/if}
+		<Header />
+		<AuthShow when="signed-out">
+			<GuestLanding />
+		</AuthShow>
+		<AuthShow when="signed-in">
+			<InboxStreamMount />
+			<MessagingWidget />
+			<OnboardingShell />
+			{#if JEEVES_DEV}
+				<AssistantPanel />
+			{/if}
+			{@render children()}
+		</AuthShow>
+	</div>
+{/snippet}
+
+{#if DEMO_MODE}
+	<!-- Demo mode: no Clerk at all — seeded personas sign in via DemoPersonaDialog. -->
 	<QueryClientProvider client={queryClient}>
 		<Toaster position="top-right" duration={2000} richColors />
-
-		<ClerkLoading>
-			<div class="flex h-screen items-center justify-center">
-				<p class="text-muted-foreground">Loading...</p>
-			</div>
-		</ClerkLoading>
-
-		<ClerkLoaded>
-			<AuthUserSync />
-			<div class="min-h-screen bg-background text-foreground">
-				<Header />
-				<Show when="signed-out">
-					<GuestLanding />
-				</Show>
-				<Show when="signed-in">
-					<InboxStreamMount />
-					<MessagingWidget />
-					<OnboardingShell />
-					{#if JEEVES_DEV}
-						<AssistantPanel />
-					{/if}
-					{@render children()}
-				</Show>
-			</div>
-		</ClerkLoaded>
+		{@render app()}
 	</QueryClientProvider>
-</ClerkProvider>
+{:else}
+	<ClerkProvider {publishableKey}>
+		<QueryClientProvider client={queryClient}>
+			<Toaster position="top-right" duration={2000} richColors />
+
+			<ClerkLoading>
+				<div class="flex h-screen items-center justify-center">
+					<p class="text-muted-foreground">Loading...</p>
+				</div>
+			</ClerkLoading>
+
+			<ClerkLoaded>
+				{@render app()}
+			</ClerkLoaded>
+		</QueryClientProvider>
+	</ClerkProvider>
+{/if}

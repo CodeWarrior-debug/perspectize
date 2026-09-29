@@ -70,13 +70,21 @@ gh api repos/CodeWarrior-debug/perspectize/pulls/123/comments
 | `chore`/`build`/`ci` | `chore.md` | Summary, Changes, Verification |
 | `docs` | `docs.md` | Summary, Files Changed, Verification |
 
-Because PRs are created via `gh api` (not `gh pr create`), GitHub's template picker never runs — read the matching template file yourself and shape the `-F body=@<file>` content to its sections before creating the PR. Any UI-visible change should fill in the Demo screenshot table (see [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md) for the `sv-` upload workflow) rather than leaving it blank.
+Because PRs are created via `gh api` (not `gh pr create`), GitHub's template picker never runs — read the matching template file yourself and shape the `-F body=@<file>` content to its sections before creating the PR. Any UI-visible change should fill in the Demo screenshot table (see [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md) for the `sv-` upload workflow) rather than leaving it blank — see the `needs-demo-video` / `ready for review` labeling rule under Self-Verification below; a cloud session can't produce this evidence itself, so it labels instead.
 
 **Issues** — use templates from `.github/ISSUE_TEMPLATE/` (feature_request.md or bug_report.md).
 
 **Never create a GitHub issue just to have something for a PR to close.** Only put `Closes #N`/link an issue in a PR when that issue already existed before the PR work started (the user filed it, or it was already tracked). If no issue exists, don't manufacture one — just omit the issue reference and drop the `issueNumber` segment from the branch name (see Branch Naming below).
 
 GitHub Projects v2: See [.docs/GITHUB_PROJECTS.md](.docs/GITHUB_PROJECTS.md).
+
+### `needs-local-session-takeover` label
+
+Marks a PR opened from a **cloud** session whose remaining work needs the user's machine (Docker, local-only MCP servers such as Sevalla, Clerk sign-in / browser verification). The PR body lists that work as a checklist and links the originating session.
+
+- **Taking it over:** from a local checkout, `git pull` the PR branch, then run `claude --teleport` and pick the session linked in the PR body — this resumes that cloud session locally with its full history. (Alternatively start a local session and work from the PR checklist.)
+- **Cloud sessions:** apply the label (and list the local-only steps) instead of claiming unverified work is done.
+- **Local sessions:** remove the label once every checklist item under "Local session takeover" is done.
 
 ### PR Merge Preferences
 
@@ -129,13 +137,17 @@ defer db.Close()
 
 **Migration numbering:** Always check existing migration files before creating new ones. Plan-specified numbers may be stale — use `ls backend/migrations/ | tail -5` to find the next available number. Also check open PRs/branches for an in-flight migration claiming the same number (e.g. `git log --all --oneline -- 'backend/migrations/*'`); if one exists, take the next free number and note the collision in the file header. Prefer idempotent DDL (`DROP CONSTRAINT IF EXISTS` before `ADD`, `UPDATE ... WHERE col IS NULL` before `SET NOT NULL`) so a migration is safe on a fresh DB or one already patched out of band.
 
-**Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`) during dev or verification.** There is no local Docker Postgres — `DATABASE_URL` / the Makefile default points at the **shared Sevalla dev database**, so `make migrate-up` mutates shared state. Migrations are applied **manually per environment** at rollout time (verified: nothing on Sevalla runs them — no runner in `cmd/server`, no CI step, no release/pre-deploy hook; the `/migrations` dir baked into the image is never executed). Migration work = write + review the SQL only; a PR that adds a migration must state it needs a manual `migrate up` against each environment.
+**Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`) during dev or verification.** Docker itself is installed (Docker Desktop; start it with `open -a Docker`), but the normal dev setup has no local Postgres — `DATABASE_URL` / the Makefile default points at the **shared Sevalla dev database**, so `make migrate-up` mutates shared state. The only local Postgres is the isolated demo stack's (`make demo-up`, port 5434, its own volume) — that one is safe to reset and never touches Sevalla. Migrations are applied **manually per environment** at rollout time (verified: nothing on Sevalla runs them — no runner in `cmd/server`, no CI step, no release/pre-deploy hook; the `/migrations` dir baked into the image is never executed). Migration work = write + review the SQL only; a PR that adds a migration must state it needs a manual `migrate up` against each environment.
 
 **Commit messages:** Conventional commit format (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`). One logical change per commit. GSD planning work (PLAN.md, CONTEXT.md, RESEARCH.md, ROADMAP.md) uses the `docs` tag — e.g., `docs(11,13): create execution plans`.
 
 ## Planning & Execution Workflow
 
 **Primary workflow: obra/superpowers** (plugin enabled in `.claude/settings.json`). Use `superpowers:writing-plans` (or its brainstorming/spec-writing counterparts) for planning, and `superpowers:executing-plans` / `superpowers:subagent-driven-development` for execution. Plans and specs live in `docs/superpowers/plans/` and `docs/superpowers/specs/` — see `docs/superpowers/plans/2026-08-15-clerk-derived-user-identity-plan.md` for the established format (plan header names the required execution sub-skill, links its spec, checkbox-tracked (`- [ ]`) tasks).
+
+**Lightweight spike/research docs** (pre-planning, not meant for autonomous execution — e.g. a cost/feasibility writeup before committing to a real plan) also live in `docs/superpowers/specs/`, dated like plans/specs, but state "Status: spike, not a superpowers plan" up top instead of a sub-skill header. Link them from `.planning/ROADMAP.md` at the relevant phase so they aren't orphaned.
+
+**Superpowers unavailable this session?** Check the session's available-skills listing for `superpowers:*` entries before claiming to follow this workflow. If no `superpowers:*` skill is listed (plugin not loaded/connecting in this environment), any plan/spec/spike doc written anyway must say so at the top — `⚠️ Written without superpowers loaded — a superpowers-enabled session should review via writing-plans before this is executed` — so a later session with superpowers actually available knows to validate/regenerate it rather than trusting it as already vetted.
 
 **GSD is legacy — do NOT start new work with it.** Some milestones still have unfinished work tracked under the old workflow in `.planning/phases/` (`PROJECT.md`, `ROADMAP.md`, `STATE.md`, phase `PLAN.md`/`must_haves.truths` files). Finish those specific in-flight phases using their existing GSD plan files/commands rather than replanning them from scratch under superpowers — don't discard partially-done GSD work. All new planning and execution goes through superpowers. Branching for legacy GSD phases: see [.docs/GSD_BRANCHING.md](.docs/GSD_BRANCHING.md).
 
@@ -162,6 +174,15 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 
 **Browser verification is local-only.** Driving the running app via the Chrome DevTools MCP (`.docs/VERIFICATION.md` §3) needs `.claude/.env` and `.claude/sv-profile/` — both gitignored and hand-provisioned per machine. Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in; run only the headless checklist (build, backend tests, frontend tests) and hand UI-behavior checks back to a local session.
 
+**"ready for review" requires a demo, unless the user says otherwise.** This applies to any PR whose change a user can **see or interact with** — new or changed UI, a fixed user-facing bug, changed app behaviour. Judge by the actual diff, not the commit type or title.
+
+- **No demo needed** (a one-line reason in the Demo section is enough, e.g. "no visible UI change: formatting and test-type fixes"): docs/plan/research records, formatting/lint passes, test-only changes, type-only fixes, tooling/hooks/CI config, and refactors with no behaviour change.
+- A qualifying PR is `ready for review` only once it has either: (a) `sv-` screenshots/video actually captured and linked in the Demo section (see [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md)), or (b) an explicit, specific justification for why none applies — "dark by default, no UI surface", "no visible UI change", not a generic "N/A". A Demo section that just says screenshots are still needed does not qualify, no matter how green CI is.
+- **A cloud session cannot produce that evidence** (no Clerk sign-in, per above). So a cloud session finishing a qualifying (user-visible) PR must apply the `needs-demo-video` label at creation time (`gh api repos/CodeWarrior-debug/perspectize/issues/<n>/labels -f "labels[]=needs-demo-video"` — `gh pr edit` fails here, see below) rather than leaving the PR unlabeled or self-declaring it ready. This is what flags the PR for a local session to pick up and finish.
+- A local session that adds the missing evidence swaps the label: remove `needs-demo-video`, add `ready for review`, and paste the linked evidence into the PR's Demo section (don't just upload assets and leave the placeholder text).
+- `needs-demo-video` and `ready for review` are **mutually exclusive** — never both on the same PR. If a PR is blocked by something else (merge conflict, a real failing/un-run CI check, an unresolved bug), it's fine for it to carry neither label rather than force-fitting one.
+- An owner-only follow-up that needs a credential no agent has (`ANTHROPIC_API_KEY`, a Chrome origin-trial flag, a live Sevalla checkpoint) does **not** by itself block `ready for review` — that's normal handoff, not a missing demo. What blocks it is *this PR's own visible surface* going unverified.
+
 See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow, and [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md) for uploading `sv-` screenshots to a release and linking them in the PR.
 
 **Authenticated self-verify:** `.env*` files (except `.env.example`) are unreadable by design — that's expected, not a broken setup. Logged-in browser verification uses the persistent Chrome profile from `.claude/scripts/sv-chrome.sh`; see [.docs/VERIFICATION.md](.docs/VERIFICATION.md) §0. Never attempt to log in or enter credentials — ask the human to re-run the one-time login if signed out.
@@ -177,6 +198,7 @@ See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow
 - [Security](.docs/SECURITY.md) — Secret management, rotation procedures, incident response
 - [Dependency Security](.docs/DEPENDENCY_SECURITY.md) — Trivy/pnpm-audit scanning, CVE remediation workflow, CI gotchas
 - [Worktrees](.docs/WORKTREES.md) — Location convention and the 3 numbered reusable worktrees for isolated Claude Code work
+- [Demo Mode](.docs/DEMO_MODE.md) — Docker demo stack (persistent Postgres + seeded personas, no Clerk/YouTube), Playwright tours that run as E2E (`make demo-test`) or record videos (`make demo-record`)
 
 **Frontend docs:**
 - [Frontend CLAUDE.md](frontend/CLAUDE.md) — SvelteKit, Svelte 5, TanStack Query patterns
@@ -190,6 +212,7 @@ See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow
 
 **Planning & backlog:**
 - [Feature Backlog](FEATURE_BACKLOG.md) — Future ideas and enhancements not tied to any milestone. Capture ideas here during development; evaluate when planning new work.
+  - **Optional/unscheduled roadmap items:** write a superpowers spec (`docs/superpowers/specs/YYYY-MM-DD-<name>-design.md`, `Status: optional roadmap item — unscheduled`, no plan file) + a short FEATURE_BACKLOG.md entry linking it. Don't add to legacy `.planning/ROADMAP.md`.
 - [Bug Tracking](.docs/BUG_TRACKING.md) — How known bugs are tracked privately (gitignored files, persistent bugs phase)
 
 **Bug logging (MANDATORY):** When you discover a bug during development, review, or testing, log it in `.planning/phases/bugs/BACKLOG.md` with severity and location. Also create a GitHub issue using the bug report template — keep sensitive details (exact paths, line numbers, security specifics) in the backlog only. When a bug is fixed, move it to `.planning/phases/bugs/CLOSED.md` with the PR reference. These files are gitignored — never commit them.

@@ -357,8 +357,8 @@ github.com/unrolled/secure v1.17.0 h1:Io7ifFgo99Bnh0J7+Q+qcMzWM6kaDPCA5FroFZEdbW
 github.com/unrolled/secure v1.17.0/go.mod h1:BmF5hyM6tXczk3MpQkFf1hpKSRqCyhqcbiQtiAF7+40=
 github.com/urfave/cli/v3 v3.11.0 h1:P/euJp99kb9p0tlVY+iYTLYYTAQlfl0hR2gUO1Img1Q=
 github.com/urfave/cli/v3 v3.11.0/go.mod h1:ysVLtOEmg2tOy6PknnYVhDoouyC/6N42TMeoMzskhso=
-github.com/vektah/gqlparser/v2 v2.5.37 h1:jbb1Ilv+xBklV6653tKb4oVUupPNTLb5LmrnBKVI12Y=
-github.com/vektah/gqlparser/v2 v2.5.37/go.mod h1:9O4Ox6Ngd3Y12bMD3w6i3CRQXh8W1oC1q0m6olCymDM=
+github.com/vektah/gqlparser/v2 v2.5.58 h1:yHxQ3EjU2OGuDMh6noxxmZova1HkBM3CbdGtL+rvjOc=
+github.com/vektah/gqlparser/v2 v2.5.58/go.mod h1:9O4Ox6Ngd3Y12bMD3w6i3CRQXh8W1oC1q0m6olCymDM=
 github.com/vikstrous/dataloadgen v0.0.10 h1:x07XAeEjIWXohvcjRvE72KY8pV5A3sTbKEFmxcj9RNM=
 github.com/vikstrous/dataloadgen v0.0.10/go.mod h1:8vuQVpBH0ODbMKAPUdCAPcOGezoTIhgAjgex51t4vbg=
 github.com/woodsbury/decimal128 v1.3.0 h1:8pffMNWIlC0O5vbyHWFZAt5yWvWcrHA+3ovIIjVWss0=
