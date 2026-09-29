@@ -612,3 +612,13 @@ At current traffic this is fine. At real scale (many requests per second from th
 **Priority:** Low-Medium — current MVP quota levels are fine (see `.planning/phases/15-discover-page/15-CONTEXT.md`), and the client-side gcTime/staleTime tuning done in the discover-thumbnail-facade fix already reduces redundant refetches. Worth doing once Discover traffic or quota usage grows.
 
 **Source:** Dev request (2026-09-28), Discover page slow-media-loading investigation (bugfix/discover-thumbnail-facade) — explicitly out of scope for that PR per its own instructions.
+
+## Multiple Perspectives per Content (Public + Private Slots)
+
+Nothing in the backend currently limits how many perspectives a user can have on one content entry (the old `UNIQUE(claim, user_id)` went away in migration 000007). Users will want a public and a private aspect on the same content. Proposed model: one perspective per `(user_id, content_id, privacy)` via a partial unique index, plus UI to switch between the two slots.
+
+**Blocked on two gates:** (1) the sharing model must be finalised first (the slot model assumes exactly two visibility levels), and (2) the aggregate **double-counting** audit — `AggregateByContentIDs`, `FeelingStats`, `CustomFieldStats`, `Compare.svelte`, and onboarding perspective counts all assume one perspective per user per content.
+
+**Spec:** [docs/superpowers/specs/2026-09-29-multiple-perspectives-per-content-design.md](docs/superpowers/specs/2026-09-29-multiple-perspectives-per-content-design.md)
+
+**Priority:** Optional / unscheduled.
