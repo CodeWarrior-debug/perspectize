@@ -2,13 +2,13 @@ package database
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"os"
 	"strconv"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 	gormPostgres "gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -57,13 +57,34 @@ func PoolConfigFromEnv() PoolConfig {
 	return cfg
 }
 
+// Option customizes ConnectGORM.
+type Option func(*connectOptions)
+
+type connectOptions struct {
+	tracer pgx.QueryTracer
+}
+
+// WithTracer attaches a pgx tracer to every connection (see StatementCounter).
+func WithTracer(t pgx.QueryTracer) Option {
+	return func(o *connectOptions) { o.tracer = t }
+}
+
 // ConnectGORM creates a new PostgreSQL database connection using GORM
-func ConnectGORM(dsn string, pool PoolConfig) (*gorm.DB, error) {
-	// Open raw sql.DB with pgx driver (reuse existing driver)
-	sqlDB, err := sql.Open("pgx", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
+func ConnectGORM(dsn string, pool PoolConfig, opts ...Option) (*gorm.DB, error) {
+	var o connectOptions
+	for _, opt := range opts {
+		opt(&o)
 	}
+
+	// Open raw sql.DB with the pgx driver
+	connCfg, err := pgx.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse database DSN: %w", err)
+	}
+	if o.tracer != nil {
+		connCfg.Tracer = o.tracer
+	}
+	sqlDB := stdlib.OpenDB(*connCfg)
 
 	// Configure pool on the raw connection
 	sqlDB.SetMaxOpenConns(pool.MaxOpenConns)
