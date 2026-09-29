@@ -78,6 +78,9 @@ real logic. A test that passes because nothing rendered is worse than no test.
 4. Run from `frontend/`:
    - `pnpm exec vitest run --project unit <file>`
    - `pnpm run test:run`
+     Vitest's default reporter is already quiet in this non-interactive shell
+     (about 14 lines: failures plus a summary). Don't add `--reporter=dot` or
+     `verbose`; they replay every test's stderr (1,300+ lines).
    - for browser tests, `pnpm run test:browser --browser.headless=true`
      (no `--` before the flag)
    - `pnpm exec prettier --check <files>`
