@@ -43,11 +43,10 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
    - Compare against the previous month's row in [ROUTINES.md](../../../ROUTINES.md) (Bundle column); flag any >10% growth in total or gzipped JS for the user.
    - Optional backend: size of the compiled server binary (`go build -o /tmp/server ./cmd/server` in `backend/`, then `ls -l`), recorded but not compared unless it jumps notably.
 
-8. **Count lines of code.**
-   - Measure the whole repo plus key subfolders: `backend/`, `frontend/`, `.claude/` (add more here when they become worth tracking).
-   - Use `git ls-files` so gitignored/generated/vendored files are excluded, e.g. `git ls-files backend | xargs wc -l | tail -1` (per-path); use `cloc --vcs=git <path>` or `tokei` if installed for a per-language breakdown.
-   - Exclude lockfiles and generated code from the headline number (`pnpm-lock.yaml`, `go.sum`, gqlgen output such as `generated.go`, `*.tsv` data) — note what was excluded so month-over-month numbers stay comparable.
-   - Record one number per folder (plus total) in ROUTINES.md and note significant deltas versus last month.
+8. **Count files, lines of code and tokens.**
+   - Run `python3 .claude/skills/monthly-maintenance/codebase-metrics.py --md` (drop `--md` for plain text). It reports files, lines, bytes and estimated tokens (bytes/4) for the repo total, `backend/`, `frontend/`, `.claude/` and every other top-level folder, using `git ls-files` and excluding lockfiles, generated code, binaries and bulk data (`*.tsv`). Add folders to `FOLDERS` in the script when they become worth tracking.
+   - Note that `.claude/` includes the vendored GSD subset, so its size is mostly not hand-written.
+   - Record total files / LOC / tokens in ROUTINES.md and paste the full table into the routine's PR body, with notable deltas versus last month.
 
 9. **Compact the video-capture demo tools.**
    - This tool lives outside the repo at `~/.claude/tools/video-capture/` (global, not git-tracked) — see its `README.md` for the recorder-etiquette lifecycle (reuse → copy-and-adapt into `demos/<name>/` → promote).
