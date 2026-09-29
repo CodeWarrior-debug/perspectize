@@ -34,7 +34,7 @@
 		"@internationalized/date": "^3.12.4",
 		"@lhci/cli": "^0.15.1",
 		"@lucide/svelte": "^1.48.0",
-		"@playwright/test": "1.58.2",
+		"@playwright/test": "1.63.0",
 		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "~2.70.2",
