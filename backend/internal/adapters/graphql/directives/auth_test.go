@@ -32,6 +32,16 @@ func (m *mockContentService) GetByID(ctx context.Context, id int) (*domain.Conte
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockContentService) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	out := []*domain.Content{}
+	for _, id := range ids {
+		if c, err := m.GetByID(ctx, id); err == nil && c != nil {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
 func (m *mockContentService) ListContent(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
 	return nil, nil
 }

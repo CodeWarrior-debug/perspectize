@@ -154,6 +154,7 @@ func Middleware(d Deps) []func(http.Handler) http.Handler {
 			Category:    d.CategoryService,
 			Perspective: d.PerspectiveService,
 			User:        d.UserService,
+			Content:     d.ContentService,
 			Messaging:   d.MessagingService,
 		}),
 		perfmw.RequestTimer, // structured request timing (replaces chi Logger)

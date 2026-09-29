@@ -1,8 +1,11 @@
 package roundtrips
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const createPerspectiveMutation = `mutation($input: CreatePerspectiveInput!) {
@@ -101,5 +104,41 @@ func TestDeletePerspectiveNotOwner(t *testing.T) {
 	}
 	if n := len(h.counter.Statements()); n != 2 {
 		t.Fatalf("round trips: want 2, got %d: %v", n, h.counter.Statements())
+	}
+}
+
+// frontend LIST_PERSPECTIVES_BY_CONTENT-style selection plus the user and
+// content fields (which used to always be null): one statement for the list,
+// one for all users, one for all content — whatever the number of rows.
+func TestPerspectiveUserAndContentBatched(t *testing.T) {
+	h := newHarness(t)
+	ownerID, owner := h.user("pc-owner")
+	contentID := h.content(ownerID, "pc")
+	for i := 0; i < 4; i++ {
+		_, tok := h.user(fmt.Sprintf("pc%d", i))
+		h.warm(tok)
+		createPerspective(h, tok, contentID)
+	}
+	h.warm(owner)
+
+	data := h.roundTrips(3, owner, `query($c: IntID) { perspectives(filter: {contentID: $c}, first: 100) {
+		items { id userID user { id username } content { id name } } } }`, map[string]any{"c": contentID})
+	got := decode[struct {
+		Items []struct {
+			UserID string `json:"userID"`
+			User   *struct {
+				ID string `json:"id"`
+			} `json:"user"`
+			Content *struct {
+				Name string `json:"name"`
+			} `json:"content"`
+		} `json:"items"`
+	}](t, data, "perspectives")
+	require.Len(t, got.Items, 4)
+	for _, it := range got.Items {
+		require.NotNil(t, it.User, "user resolves")
+		require.Equal(t, it.UserID, it.User.ID)
+		require.NotNil(t, it.Content, "content resolves")
+		require.Equal(t, "pc", it.Content.Name)
 	}
 }

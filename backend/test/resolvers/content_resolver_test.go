@@ -48,6 +48,16 @@ func (m *mockContentRepository) GetByID(ctx context.Context, id int) (*domain.Co
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockContentRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	out := []*domain.Content{}
+	for _, id := range ids {
+		if c, err := m.GetByID(ctx, id); err == nil && c != nil {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
 func (m *mockContentRepository) GetByURL(ctx context.Context, url string) (*domain.Content, error) {
 	if m.getByURLFn != nil {
 		return m.getByURLFn(ctx, url)

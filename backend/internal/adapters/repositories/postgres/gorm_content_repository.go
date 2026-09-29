@@ -53,6 +53,22 @@ func (r *GormContentRepository) GetByID(ctx context.Context, id int) (*domain.Co
 	return contentModelToDomain(&model), nil
 }
 
+// GetByIDs loads many content rows in one query (the content dataloader).
+func (r *GormContentRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	if len(ids) == 0 {
+		return []*domain.Content{}, nil
+	}
+	var models []ContentModel
+	if err := r.db.WithContext(ctx).Where("id = ANY(CAST(? AS bigint[]))", intsToArray(ids)).Find(&models).Error; err != nil {
+		return nil, fmt.Errorf("failed to get content by ids: %w", err)
+	}
+	out := make([]*domain.Content, len(models))
+	for i := range models {
+		out[i] = contentModelToDomain(&models[i])
+	}
+	return out, nil
+}
+
 // GetByURL retrieves a content record by its URL
 func (r *GormContentRepository) GetByURL(ctx context.Context, url string) (*domain.Content, error) {
 	var model ContentModel

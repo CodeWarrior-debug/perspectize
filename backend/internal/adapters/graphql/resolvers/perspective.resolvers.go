@@ -17,6 +17,7 @@ import (
 	"strconv"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/generated"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
@@ -267,3 +268,42 @@ func (r *queryResolver) CustomFieldStats(ctx context.Context, contentID *int, ke
 		PercentOfPerspectives: stats.PercentOfPerspectives(),
 	}, nil
 }
+
+// User is the resolver for the user field: batched through the per-request
+// user loader, so a list of perspectives costs one users query in total.
+func (r *perspectiveResolver) User(ctx context.Context, obj *model.Perspective) (*model.User, error) {
+	id, err := strconv.Atoi(obj.UserID)
+	if err != nil {
+		return nil, nil
+	}
+	u, err := r.userByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return userDomainToModel(u), nil
+}
+
+// Content is the resolver for the content field: batched through the
+// per-request content loader.
+func (r *perspectiveResolver) Content(ctx context.Context, obj *model.Perspective) (*model.Content, error) {
+	if obj.ContentID == nil {
+		return nil, nil
+	}
+	id, err := strconv.Atoi(*obj.ContentID)
+	if err != nil {
+		return nil, nil
+	}
+	c, err := r.contentByID(ctx, id)
+	if err != nil || c == nil {
+		return nil, err
+	}
+	return domainToModel(c), nil
+}
+
+// Perspective returns generated.PerspectiveResolver implementation.
+func (r *Resolver) Perspective() generated.PerspectiveResolver { return &perspectiveResolver{r} }
+
+type perspectiveResolver struct{ *Resolver }

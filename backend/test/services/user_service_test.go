@@ -158,6 +158,16 @@ func (m *mockContentRepoForUser) Create(ctx context.Context, content *domain.Con
 func (m *mockContentRepoForUser) GetByID(ctx context.Context, id int) (*domain.Content, error) {
 	return nil, domain.ErrNotFound
 }
+
+func (m *mockContentRepoForUser) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	out := []*domain.Content{}
+	for _, id := range ids {
+		if c, err := m.GetByID(ctx, id); err == nil && c != nil {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
 func (m *mockContentRepoForUser) GetByURL(ctx context.Context, url string) (*domain.Content, error) {
 	return nil, domain.ErrNotFound
 }

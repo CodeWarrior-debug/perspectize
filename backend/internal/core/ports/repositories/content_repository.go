@@ -11,6 +11,8 @@ import (
 type ContentRepository interface {
 	Create(ctx context.Context, content *domain.Content) (*domain.Content, error)
 	GetByID(ctx context.Context, id int) (*domain.Content, error)
+	// GetByIDs loads many content rows in one query; missing ids are absent.
+	GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error)
 	GetByURL(ctx context.Context, url string) (*domain.Content, error)
 	// GetOrCreateByURL atomically inserts content or returns existing content matching the URL.
 	// When refreshOnConflict is true (default), updates response and updated_at on conflict.

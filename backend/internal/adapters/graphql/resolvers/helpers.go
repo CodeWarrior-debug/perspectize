@@ -3,6 +3,7 @@ package resolvers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -319,6 +320,23 @@ func (r *Resolver) threadStatsFor(ctx context.Context, viewerID int, obj *model.
 		return domain.ThreadStats{}, err
 	}
 	return stats[tid], nil
+}
+
+// contentByID resolves content through the per-request loader (one query for
+// every perspective's content in a response); nil when it doesn't exist.
+func (r *Resolver) contentByID(ctx context.Context, id int) (*domain.Content, error) {
+	if l := dataloader.For(ctx); l != nil {
+		c, err := l.ContentByID.Load(ctx, id)
+		if dataloader.IsNotFound(err) {
+			return nil, nil
+		}
+		return c, err
+	}
+	c, err := r.ContentService.GetByID(ctx, id)
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil, nil
+	}
+	return c, err
 }
 
 // userByID resolves a user through the per-request loader (one query for all

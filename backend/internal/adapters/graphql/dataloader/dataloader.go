@@ -26,7 +26,10 @@ type ctxKey struct{}
 type Loaders struct {
 	CategoryByID                    *dataloadgen.Loader[int, *domain.Category]
 	PerspectiveAggregateByContentID *dataloadgen.Loader[int, *domain.PerspectiveAggregate]
-	// UserByID batches Message.sender / ThreadParticipant.user lookups.
+	// ContentByID batches Perspective.content lookups.
+	ContentByID *dataloadgen.Loader[int, *domain.Content]
+	// UserByID batches Message.sender / ThreadParticipant.user /
+	// Perspective.user / Content.addedBy lookups.
 	UserByID *dataloadgen.Loader[int, *domain.User]
 	// ThreadStats batches MessageThread.latestSeq / unreadCount per viewer.
 	ThreadStats *dataloadgen.Loader[ThreadStatsKey, domain.ThreadStats]
@@ -43,6 +46,7 @@ type Services struct {
 	Category    portservices.CategoryService
 	Perspective portservices.PerspectiveService
 	User        portservices.UserService
+	Content     portservices.ContentService
 	Messaging   portservices.MessagingService
 }
 
@@ -52,11 +56,13 @@ func NewLoaders(s Services) *Loaders {
 	pb := &perspectiveAggregateBatcher{service: s.Perspective}
 	ub := &userBatcher{service: s.User}
 	tb := &threadStatsBatcher{service: s.Messaging}
+	cnb := &contentBatcher{service: s.Content}
 	return &Loaders{
 		CategoryByID:                    dataloadgen.NewMappedLoader(cb.byID),
 		PerspectiveAggregateByContentID: dataloadgen.NewMappedLoader(pb.byContentID),
 		UserByID:                        dataloadgen.NewMappedLoader(ub.byID),
 		ThreadStats:                     dataloadgen.NewMappedLoader(tb.byKey),
+		ContentByID:                     dataloadgen.NewMappedLoader(cnb.byID),
 	}
 }
 
@@ -93,6 +99,25 @@ func (b *userBatcher) byID(ctx context.Context, ids []int) (map[int]*domain.User
 	for _, u := range users {
 		if u != nil {
 			out[u.ID] = u
+		}
+	}
+	return out, nil
+}
+
+// contentBatcher resolves a batch of content IDs in one query.
+type contentBatcher struct {
+	service portservices.ContentService
+}
+
+func (b *contentBatcher) byID(ctx context.Context, ids []int) (map[int]*domain.Content, error) {
+	items, err := b.service.GetByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int]*domain.Content, len(items))
+	for _, c := range items {
+		if c != nil {
+			out[c.ID] = c
 		}
 	}
 	return out, nil
