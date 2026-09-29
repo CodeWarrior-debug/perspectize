@@ -20,13 +20,6 @@ const pgForeignKeyViolation = "23503"
 // (migrations 000004/000006).
 const perspectivesUserFK = "perspectives_users_fk"
 
-// singleStatement runs one write without GORM's implicit BEGIN/COMMIT. Each
-// of those is a separate round trip to the database, and a single INSERT or
-// UPDATE is already atomic on its own.
-func (r *GormPerspectiveRepository) singleStatement(ctx context.Context) *gorm.DB {
-	return r.db.WithContext(ctx).Session(&gorm.Session{SkipDefaultTransaction: true})
-}
-
 // GormPerspectiveRepository implements the PerspectiveRepository interface using GORM
 type GormPerspectiveRepository struct {
 	db *gorm.DB
@@ -48,7 +41,7 @@ func NewGormPerspectiveRepository(db *gorm.DB) *GormPerspectiveRepository {
 func (r *GormPerspectiveRepository) Create(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
 	model := perspectiveDomainToModel(p)
 
-	if err := r.singleStatement(ctx).Clauses(clause.Returning{}).Create(model).Error; err != nil {
+	if err := r.db.WithContext(ctx).Clauses(clause.Returning{}).Create(model).Error; err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolation && pgErr.ConstraintName == perspectivesUserFK {
 			return nil, fmt.Errorf("%w: user with id %d not found", domain.ErrNotFound, p.UserID)
@@ -91,7 +84,7 @@ func (r *GormPerspectiveRepository) Update(ctx context.Context, p *domain.Perspe
 
 	// Select("*") writes nil/zero fields too, so a cleared rating really is
 	// cleared; the identity and creation columns are never rewritten.
-	result := r.singleStatement(ctx).
+	result := r.db.WithContext(ctx).
 		Model(model).
 		Clauses(clause.Returning{}).
 		Where("user_id = ?", ownerUserID).

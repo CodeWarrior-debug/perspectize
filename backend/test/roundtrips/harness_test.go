@@ -8,6 +8,9 @@
 // means a change added (or removed) round trips: if it removed some, lower the
 // expected count; if it added some, justify it or fix it.
 //
+// Set RT_MEASURE=1 to log every operation's statements instead of failing
+// on a count mismatch (handy for recording a before/after when optimizing).
+//
 // Requires DATABASE_URL pointing at a migrated, disposable database (CI's
 // Postgres service). Skips otherwise. Never point it at a shared database.
 package roundtrips
@@ -20,6 +23,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -166,6 +170,14 @@ func (h *harness) content(userID int, name string) int {
 	return c.ID
 }
 
+// trackContent registers a content row created through the API for cleanup.
+func (h *harness) trackContent(id string) {
+	h.t.Helper()
+	n, err := strconv.Atoi(id)
+	require.NoError(h.t, err)
+	h.contentIDs = append(h.contentIDs, n)
+}
+
 // warm makes one authenticated request so the Clerk ID -> user cache is
 // populated, the way it is for every request after a user's first.
 func (h *harness) warm(token string) {
@@ -207,12 +219,17 @@ func (h *harness) roundTrips(want int, token, query string, vars map[string]any)
 	h.counter.Reset()
 	data := h.gql(token, query, vars)
 	got := h.counter.Statements()
-	if len(got) != want {
+	if len(got) != want || os.Getenv("RT_MEASURE") != "" {
 		var b strings.Builder
 		for i, s := range got {
 			fmt.Fprintf(&b, "  %2d. %s\n", i+1, truncate(s, 160))
 		}
-		h.t.Fatalf("round trips: want %d, got %d:\n%s", want, len(got), b.String())
+		msg := fmt.Sprintf("round trips: want %d, got %d:\n%s", want, len(got), b.String())
+		if os.Getenv("RT_MEASURE") != "" {
+			h.t.Log(msg)
+		} else {
+			h.t.Fatal(msg)
+		}
 	}
 	return data
 }

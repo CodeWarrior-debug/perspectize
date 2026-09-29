@@ -94,7 +94,14 @@ func ConnectGORM(dsn string, pool PoolConfig, opts ...Option) (*gorm.DB, error) 
 	// Wrap with GORM
 	gormDB, err := gorm.Open(gormPostgres.New(gormPostgres.Config{
 		Conn: sqlDB,
-	}), &gorm.Config{})
+	}), &gorm.Config{
+		// GORM otherwise wraps every single Create/Update/Delete in its own
+		// BEGIN ... COMMIT: two extra round trips to the database per write,
+		// for statements that are already atomic on their own. We use no
+		// associations or hooks that would need it; multi-statement work uses
+		// an explicit db.Transaction(...), which is unaffected.
+		SkipDefaultTransaction: true,
+	})
 	if err != nil {
 		sqlDB.Close()
 		return nil, fmt.Errorf("failed to initialize GORM: %w", err)

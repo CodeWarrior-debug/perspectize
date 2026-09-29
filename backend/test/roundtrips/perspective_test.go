@@ -69,3 +69,17 @@ func TestUpdatePerspective(t *testing.T) {
 		t.Fatalf("unexpected update result: %+v", got)
 	}
 }
+
+func TestDeletePerspective(t *testing.T) {
+	h := newHarness(t)
+	userID, token := h.user("delete")
+	contentID := h.content(userID, "delete")
+	h.warm(token)
+	p := createPerspective(h, token, contentID)
+
+	// @owner SELECT, service SELECT, owner-scoped DELETE
+	data := h.roundTrips(3, token, `mutation($id: ID!) { deletePerspective(id: $id) }`, map[string]any{"id": p.ID})
+	if !decode[bool](t, data, "deletePerspective") {
+		t.Fatal("deletePerspective returned false")
+	}
+}
