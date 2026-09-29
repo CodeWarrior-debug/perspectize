@@ -341,6 +341,15 @@ func (r *queryResolver) ContentByID(ctx context.Context, id string) (*model.Cont
 		return nil, fmt.Errorf("invalid content ID: %s", id)
 	}
 
+	// The details modal asks only for aggregates (GET_CONTENT_AGGREGATES).
+	// Those resolve from the id alone through the aggregate loader, so don't
+	// read the whole row (JSONB response included) just to throw it away.
+	// Trade-off: for an unknown id this answers with zero counts instead of a
+	// "not found" error.
+	if onlyIDAndAggregatesSelected(ctx) {
+		return &model.Content{ID: strconv.Itoa(intID)}, nil
+	}
+
 	content, err := r.ContentService.GetByID(ctx, intID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {

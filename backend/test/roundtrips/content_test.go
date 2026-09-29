@@ -230,3 +230,34 @@ func TestListContentGridCategoriesCached(t *testing.T) {
 	}
 	require.GreaterOrEqual(t, labels, 3, "cached category reflects this instance's own write")
 }
+
+// frontend GET_CONTENT_AGGREGATES (details modal)
+const contentAggregatesQuery = `query($id: ID!) { contentByID(id: $id) { id perspectiveCount averageRating qualityRatingCount } }`
+
+func TestContentAggregates(t *testing.T) {
+	h := newHarness(t)
+	userID, token := h.user("agg")
+	contentID := h.content(userID, "agg")
+	h.warm(token)
+	createPerspective(h, token, contentID)
+
+	// aggregate loader only (no content row fetch)
+	data := h.roundTrips(1, token, contentAggregatesQuery, map[string]any{"id": contentID})
+	got := decode[struct {
+		PerspectiveCount int `json:"perspectiveCount"`
+	}](t, data, "contentByID")
+	require.Equal(t, 1, got.PerspectiveCount)
+}
+
+// Asking for row fields as well still reads the row (and still errors for an
+// unknown id).
+func TestContentByIDWithRowFields(t *testing.T) {
+	h := newHarness(t)
+	userID, token := h.user("byid")
+	contentID := h.content(userID, "byid")
+	h.warm(token)
+
+	h.roundTrips(2, token, `query($id: ID!) { contentByID(id: $id) { id name perspectiveCount } }`, map[string]any{"id": contentID})
+	msg := h.gqlError(token, `query { contentByID(id: "999999999") { id name } }`, nil)
+	require.Contains(t, msg, "content not found")
+}

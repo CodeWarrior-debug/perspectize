@@ -584,3 +584,30 @@ func nilIfEmpty(s string) *string {
 	}
 	return &s
 }
+
+// contentFieldsFromID are the Content fields that resolve from its id alone.
+var contentFieldsFromID = map[string]bool{
+	"__typename":         true,
+	"id":                 true,
+	"perspectiveCount":   true,
+	"averageRating":      true,
+	"qualityRatingCount": true,
+}
+
+// onlyIDAndAggregatesSelected reports whether the current field's selection
+// needs nothing from the content row itself.
+func onlyIDAndAggregatesSelected(ctx context.Context) bool {
+	if graphql.GetFieldContext(ctx) == nil {
+		return false
+	}
+	fields := graphql.CollectFieldsCtx(ctx, nil)
+	if len(fields) == 0 {
+		return false
+	}
+	for _, f := range fields {
+		if !contentFieldsFromID[f.Name] {
+			return false
+		}
+	}
+	return true
+}
