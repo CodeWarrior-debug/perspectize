@@ -703,6 +703,7 @@ Phases 11-15 planned from FEATURE_BACKLOG.md. Phase 16 added for mobile app rese
 - [ ] **Phase 12: Authentication** - Clerk-based auth replacing user dropdown selector
 - [ ] **Phase 13: Content Categories** - Organize content by category/topic
 - [ ] **Phase 14: AG Grid Power Features** - Advanced table features, column grouping, export
+- [ ] **Phase 14.1: AG Grid Enterprise SSRM Spike (GATED, INSERTED)** - 1–2 day spike: does AG Grid Enterprise's Server-Side Row Model cleanly replace the hand-rolled Data Mode toggle / `gridUrlState.ts` from Phase 18, given `ag-grid-svelte5` compat at v32→v33+? Not a purchase commitment — go/no-go spike only. Depends on Phase 18. See `docs/superpowers/specs/2026-09-27-ag-grid-enterprise-ssrm-spike.md` for scope, exit criteria, and full licensing research (AG Grid Enterprise is $999/dev perpetual + separate deployment licence; AdapTable is annual/per-app, no AG Grid dependency; neither offers revenue-share/profit-participation; a contributor without a license key still gets a working app — only adopted Enterprise features watermark, nothing fails to load).
 - [ ] **Phase 15: Discover Page** - Content discovery and recommendation interface
 - [ ] **Phase 16: Mobile App Strategy** - Research native mobile approaches for SvelteKit SPA
 - [ ] **Phase 20: Bible Static Assets** - Serve immutable Bible verse text + interlinear from content-hashed per-book static chunks instead of GraphQL/Postgres; measure perf + cost before/after
@@ -710,6 +711,7 @@ Phases 11-15 planned from FEATURE_BACKLOG.md. Phase 16 added for mobile app rese
 - [ ] **Phase 22: TanStack DB Pilot (Perspectives)** - One-entity pilot of `@tanstack/svelte-db` query collections over existing GraphQL; adopt or revert on exit criteria
 - [ ] **Phase 23: Sync Engine Evaluation (GATED)** - ElectricSQL + TanStack DB Electric collection; only if real-time/collab or measured read-cost growth
 - [ ] **Phase 24: Local Database / Desktop (GATED)** - PGlite local Postgres and/or Tauri desktop shell; only on offline or distribution requirement
+- [ ] **Jev (TypeSafe AI) Research Spike (UNSCOPED, DEFERRED)** - No phase number yet: this isn't gated on an existing phase, it's pre-work for a not-yet-planned AI bot feature. Jev is a real fast decision/classification model ("System One") from TypeSafe AI — not a code-gen/reasoning model, complements rather than competes with Claude Code. Revisit specifically when the AI bot feature is scoped; do not pilot any of the unverified third-party CI/agent-guard repos surfaced alongside it without independent source review first. See `docs/superpowers/specs/2026-09-28-jev-typesafe-ai-research-spike.md` for full findings.
 
 ### Phase 18.1: Mobile Activity Page Redesign (INSERTED)
 
@@ -823,4 +825,3 @@ Phases execute in numeric order: 1 -> 2 -> 2.1 -> 3 -> 3.1 -> 3.2 -> 3.3 -> 3.4 
 | 22. TanStack DB Pilot (Perspectives) | 0/0 | Not started | - |
 | 23. Sync Engine Evaluation | 0/0 | Gated | - |
 | 24. Local Database / Desktop | 0/0 | Gated | - |
-| 25. Jev (TypeSafe AI) Research Spike | 1/1 | Research complete, deferred | 2026-09-28 |

@@ -413,6 +413,8 @@ func TestGormContentRepository_List(t *testing.T) {
 		// — contentTypeToDBValue's lowercasing is asserted directly in
 		// helpers_test.go; this case only proves the filter is wired into the query.
 		{"content type", &domain.ContentFilter{ContentType: func() *domain.ContentType { ct := domain.ContentTypeYouTube; return &ct }()}, `content_type = `},
+		{"content types", &domain.ContentFilter{ContentTypes: []domain.ContentType{domain.ContentTypeYouTube, domain.ContentTypeClaim}}, `content_type IN \(`},
+		{"empty content types is ignored", &domain.ContentFilter{ContentTypes: []domain.ContentType{}}, `SELECT \* FROM "content"`},
 		{"min length", &domain.ContentFilter{MinLengthSeconds: cInt(60)}, `length >= `},
 		{"max length", &domain.ContentFilter{MaxLengthSeconds: cInt(600)}, `length <= `},
 		{"name search", &domain.ContentFilter{Search: cStr("go")}, `name ILIKE `},

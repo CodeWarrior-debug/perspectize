@@ -1,8 +1,10 @@
 import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { toast } from 'svelte-sonner';
+import { goto } from '$app/navigation';
 import { graphqlRequest } from '../client';
 import { CREATE_CONTENT_FROM_YOUTUBE, type CreateContentResponse, type ContentResponse } from './index';
 import { queryKeys } from '../keys';
+import { activityContentHref } from '$lib/utils/contentLinks';
 
 export function useAddVideo() {
 	const queryClient = useQueryClient();
@@ -20,8 +22,13 @@ export function useAddVideo() {
 			const newItem = result?.content;
 
 			if (result?.alreadyExisted) {
-				// VIDEO-05: Warn user that video already exists
-				toast.warning('This video has already been added');
+				// VIDEO-05: Warn user that video already exists, and offer a way to it
+				const existingId = newItem?.id;
+				toast.warning('This video has already been added', {
+					action: existingId
+						? { label: 'Go to video', onClick: () => goto(activityContentHref(existingId)) }
+						: undefined,
+				});
 			} else {
 				toast.success(`Added: ${newItem?.name ?? 'video'}`);
 			}
