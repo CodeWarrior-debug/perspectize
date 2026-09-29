@@ -73,3 +73,5 @@ python3 evals/claude-md-audit/rejudge.py haiku.json sonnet.json opus.json \
 - `--only-failed` can't reveal false passes; a check the harness passed wrongly is never re-judged.
 
 `judgements/2026-09-29-sweep-failed/`: the 56 failed checks from the first sweep, re-judged with Sonnet: 56/56 agree with the harness. All four failures by Sonnet are `r3-helpers-path`: it flagged the neighbouring `feature_resolver.go` error but treated the Deep Modules paths as correct.
+
+`compare_judges.py <dirA> <dirB>` compares two `rejudge.py` outputs (no API calls). `judgements/COMPARISON-sonnet-vs-opus.md` compares Sonnet and Opus as the re-judge on the 56 failed checks: identical verdicts (56/56), Opus ~1.9x the cost and slightly longer, more heavily quoted reasoning. It says nothing about passes, which were not re-judged.
