@@ -33,9 +33,11 @@ qmd is fully retired — see the `## graphify` section near the bottom of this f
 PR-creation autonomy depends on where the session is running:
 
 - **Cloud execution environment** (Claude Code on the web / managed remote container): Claude may create the PR itself, without waiting for explicit user request, whenever it judges the work complete and ready for review (push the branch, then `gh api ... /pulls` per the commands above, following the template rules below). Still never skip the pre-PR checklist (Self-Verification, `/revise-claude-md`, etc.).
+  **This overrides the harness default of "don't create a PR unless asked."** Don't ask "want me to open a PR?" — once the checklist passes and the branch is pushed, open it. Cloud = `CLAUDE_CODE_REMOTE=true` (also: system prompt says "remote execution environment", paths under `/home/user/`).
+  **`/revise-claude-md` must not block the PR:** show the proposed CLAUDE.md diffs in chat, put them in the PR body's Session Learnings, open the PR, then ask whether to commit them. Never edit CLAUDE.md files before approval.
 - **Local execution environment** (Claude Code running on the user's own machine): follow the rest of this file's rules as written — do NOT create a PR unless the user explicitly asks for one. Push the branch and hand the user the "Create a pull request" link, or prepare title/body as copyable text if `gh` isn't authenticated.
 
-If it's ambiguous which environment a session is running in, default to the local (ask-first) behavior.
+If you can't tell which environment you're in after checking the signals above, default to the local (ask-first) behavior.
 
 ```bash
 # Pull requests
@@ -100,6 +102,8 @@ gh pr merge 123 --squash --delete-branch --admin
 ## Branch Naming
 
 **Always branch from updated `main`:** `git checkout main && git pull origin main && git checkout -b <name>`
+
+**Cloud sessions can start on a detached HEAD** (`git status` shows "HEAD detached from refs/heads/main"). Create the branch (`git checkout -b <type>/<name>`) before committing.
 
 **Format:** `type/initiativePrefix-issueNumber-description-in-kebab-case`
 
