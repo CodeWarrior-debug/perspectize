@@ -1,4 +1,4 @@
-.PHONY: build run dev test docker-up docker-down clean migrate-up migrate-up-n migrate-down migrate-down-n migrate-create graphql-gen fmt lint test-coverage test-duplication install-hooks
+.PHONY: build run dev test docker-up docker-down clean migrate-up migrate-up-n migrate-down migrate-down-n migrate-create graphql-gen fmt lint test-coverage test-duplication install-hooks mutate mutate-diff
 
 # Load .env file if it exists
 ifneq (,$(wildcard .env))
@@ -94,3 +94,14 @@ test-duplication:
 test-coverage:
 	go test -v -coverpkg=./internal/...,./pkg/... -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
+
+# Mutation testing (requires gremlins: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0).
+# Config lives in .gremlins.yaml. GOFLAGS=-count=1 bypasses the go test cache so the coverage
+# baseline Gremlins derives its per-mutant timeout from reflects a real suite run.
+# Full run (slow — every mutant runs the whole suite): make mutate
+mutate:
+	GOFLAGS=-count=1 gremlins unleash .
+
+# Only mutate lines changed vs origin/main (what CI runs on PRs): make mutate-diff
+mutate-diff:
+	GOFLAGS=-count=1 gremlins unleash --diff origin/main .
