@@ -61,7 +61,7 @@ func (r *GormUserRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain
 		return []*domain.User{}, nil
 	}
 	var models []UserModel
-	if err := r.db.WithContext(ctx).Where("id IN ?", ids).Find(&models).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("id = ANY(CAST(? AS bigint[]))", intsToArray(ids)).Find(&models).Error; err != nil {
 		return nil, err
 	}
 	out := make([]*domain.User, len(models))

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
+	"github.com/CodeWarrior-debug/perspectize/backend/pkg/database"
 )
 
 // Field selections copied from frontend/src/lib/queries/messaging/index.ts so
@@ -256,4 +257,28 @@ func TestEditMessageNotSender(t *testing.T) {
 	msg := f.h.gqlError(f.bob, editMessageMut, map[string]any{"messageId": f.lastMessage.ID, "body": "hijack"})
 	require.Contains(t, msg, "only the sender may edit")
 	require.Len(t, f.h.counter.Statements(), 2)
+}
+
+// Batch lookups keep one SQL text whatever the batch size (= ANY(bigint[])
+// instead of IN ($1..$n)), so a warm connection never re-prepares them. On a
+// single-connection pool: lists of different lengths cost no new prepares
+// once each statement has been seen.
+func TestBatchQueriesDoNotRePrepare(t *testing.T) {
+	pool := database.DefaultPoolConfig()
+	pool.MaxOpenConns, pool.MaxIdleConns = 1, 1
+	h := newHarnessWithPool(t, pool)
+
+	aliceID, alice := h.user("prep-a")
+	h.warm(alice)
+	var threads []string
+	for i := 0; i < 4; i++ {
+		peer, _ := h.user(fmt.Sprintf("prep%d", i))
+		threads = append(threads, h.createThread(alice, peer))
+		_ = aliceID
+	}
+
+	h.gql(alice, listThreadsQuery, map[string]any{"first": 2}) // warm: 2 threads, 3 users
+	h.counter.Reset()
+	h.gql(alice, listThreadsQuery, map[string]any{"first": 4}) // 4 threads, 5 users
+	require.Zero(t, h.counter.Prepares(), "a different batch size must reuse the prepared statement")
 }

@@ -479,8 +479,8 @@ func TestGormPerspectiveRepository_AggregateByContentIDs(t *testing.T) {
 		// COUNT(quality)/the Quality column at all.
 		rows := sqlmock.NewRows([]string{"content_id", "count", "quality_count", "avg_quality"}).
 			AddRow(11, 1, 0, nil)
-		mock.ExpectQuery(`SELECT content_id AS content_id, COUNT\(\*\) AS count, COUNT\(quality\) AS quality_count, AVG\(quality\) AS avg_quality FROM "perspectives" WHERE content_id IN \(\$1\) GROUP BY "content_id"`).
-			WithArgs(11).
+		mock.ExpectQuery(`SELECT content_id AS content_id, COUNT\(\*\) AS count, COUNT\(quality\) AS quality_count, AVG\(quality\) AS avg_quality FROM "perspectives" WHERE content_id = ANY\(CAST\(\$1 AS bigint\[\]\)\) GROUP BY "content_id"`).
+			WithArgs("{11}"). // one bigint[] parameter, not one placeholder per id
 			WillReturnRows(rows)
 
 		got, err := NewGormPerspectiveRepository(db).AggregateByContentIDs(ctx, []int{11})

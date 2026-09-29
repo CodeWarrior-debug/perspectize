@@ -85,6 +85,13 @@ var saltSeq atomic.Int64
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
+	return newHarnessWithPool(t, database.DefaultPoolConfig())
+}
+
+// newHarnessWithPool is newHarness with an explicit pool (e.g. one connection,
+// to make prepared-statement cache behaviour deterministic).
+func newHarnessWithPool(t *testing.T, pool database.PoolConfig) *harness {
+	t.Helper()
 
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -92,7 +99,7 @@ func newHarness(t *testing.T) *harness {
 	}
 
 	counter := &database.StatementCounter{}
-	db, err := database.ConnectGORM(dsn, database.DefaultPoolConfig(), database.WithTracer(counter))
+	db, err := database.ConnectGORM(dsn, pool, database.WithTracer(counter))
 	require.NoError(t, err)
 	require.NoError(t, database.PingGORM(context.Background(), db))
 

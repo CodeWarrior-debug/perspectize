@@ -153,7 +153,7 @@ func (r *GormMessageRepository) ThreadStats(ctx context.Context, viewerUserID in
 		       (SELECT COALESCE(MAX(m.seq), 0) FROM messages m WHERE m.thread_id = tp.thread_id) AS latest_seq,
 		       (SELECT COUNT(*) FROM messages m WHERE m.thread_id = tp.thread_id AND m.seq > tp.last_read_seq) AS unread
 		FROM thread_participants tp
-		WHERE tp.user_id = ? AND tp.thread_id IN ?`, viewerUserID, threadIDs).
+		WHERE tp.user_id = ? AND tp.thread_id = ANY(CAST(? AS bigint[]))`, viewerUserID, intsToArray(threadIDs)).
 		Scan(&rows).Error; err != nil {
 		return nil, fmt.Errorf("failed to load thread stats: %w", err)
 	}

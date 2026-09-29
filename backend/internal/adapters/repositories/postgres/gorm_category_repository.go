@@ -72,7 +72,7 @@ func (r *GormCategoryRepository) GetByIDs(ctx context.Context, ids []int) ([]*do
 	}
 
 	var models []CategoryModel
-	if err := r.db.WithContext(ctx).Where("id IN ?", ids).Find(&models).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("id = ANY(CAST(? AS bigint[]))", intsToArray(ids)).Find(&models).Error; err != nil {
 		return nil, fmt.Errorf("failed to get categories by ids: %w", err)
 	}
 

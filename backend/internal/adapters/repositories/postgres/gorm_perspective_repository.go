@@ -238,7 +238,7 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 	err := r.db.WithContext(ctx).
 		Model(&PerspectiveModel{}).
 		Select("content_id AS content_id, COUNT(*) AS count, COUNT(quality) AS quality_count, AVG(quality) AS avg_quality").
-		Where("content_id IN ?", contentIDs).
+		Where("content_id = ANY(CAST(? AS bigint[]))", intsToArray(contentIDs)).
 		Group("content_id").
 		Find(&rows).Error
 	if err != nil {
