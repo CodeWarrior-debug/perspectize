@@ -77,9 +77,29 @@ func TestDeletePerspective(t *testing.T) {
 	h.warm(token)
 	p := createPerspective(h, token, contentID)
 
-	// @owner SELECT, service SELECT, owner-scoped DELETE
-	data := h.roundTrips(3, token, `mutation($id: ID!) { deletePerspective(id: $id) }`, map[string]any{"id": p.ID})
+	// owner-scoped DELETE
+	data := h.roundTrips(1, token, `mutation($id: ID!) { deletePerspective(id: $id) }`, map[string]any{"id": p.ID})
 	if !decode[bool](t, data, "deletePerspective") {
 		t.Fatal("deletePerspective returned false")
+	}
+}
+
+func TestDeletePerspectiveNotOwner(t *testing.T) {
+	h := newHarness(t)
+	ownerID, ownerToken := h.user("delowner")
+	_, otherToken := h.user("delother")
+	contentID := h.content(ownerID, "delowner")
+	h.warm(ownerToken)
+	h.warm(otherToken)
+	p := createPerspective(h, ownerToken, contentID)
+
+	// The non-owner's DELETE matches nothing; one SELECT then picks the error.
+	h.counter.Reset()
+	msg := h.gqlError(otherToken, `mutation($id: ID!) { deletePerspective(id: $id) }`, map[string]any{"id": p.ID})
+	if msg != "access denied: you can only delete your own perspectives" {
+		t.Fatalf("unexpected error: %q", msg)
+	}
+	if n := len(h.counter.Statements()); n != 2 {
+		t.Fatalf("round trips: want 2, got %d: %v", n, h.counter.Statements())
 	}
 }

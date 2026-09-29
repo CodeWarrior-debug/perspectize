@@ -212,6 +212,24 @@ func (h *harness) gql(token, query string, vars map[string]any) map[string]json.
 	return resp.Data
 }
 
+// gqlError performs a request that must fail and returns its first error
+// message.
+func (h *harness) gqlError(token, query string, vars map[string]any) string {
+	h.t.Helper()
+	body, err := json.Marshal(map[string]any{"query": query, "variables": vars})
+	require.NoError(h.t, err)
+	req := httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	h.handler.ServeHTTP(rec, req)
+
+	var resp gqlResponse
+	require.NoError(h.t, json.Unmarshal(rec.Body.Bytes(), &resp), rec.Body.String())
+	require.NotEmpty(h.t, resp.Errors, rec.Body.String())
+	return resp.Errors[0].Message
+}
+
 // roundTrips performs the request and asserts it sent exactly want statements
 // to Postgres, printing them on mismatch.
 func (h *harness) roundTrips(want int, token, query string, vars map[string]any) map[string]json.RawMessage {

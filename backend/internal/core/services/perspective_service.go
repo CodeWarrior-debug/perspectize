@@ -286,10 +286,11 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 }
 
 // Delete removes a perspective on behalf of actorUserID. Only the owner may
-// delete — public or private alike. This is one of several independent guards
-// (the @owner directive before it, and the owner-scoped DELETE in the
-// repository after it); each must hold on its own so a regression in one layer
-// can't let a user remove someone else's perspective.
+// delete — public or private alike. Two independent guards: the actor check
+// here and the owner-scoped DELETE in the repository (WHERE id = ? AND
+// user_id = ?), which is also what makes the happy path a single round trip.
+// Only when that DELETE matches nothing do we read the row, to tell "not
+// yours" from "doesn't exist".
 func (s *PerspectiveService) Delete(ctx context.Context, id int, actorUserID int) error {
 	if id <= 0 {
 		return fmt.Errorf("%w: perspective id must be a positive integer", domain.ErrInvalidInput)
@@ -298,19 +299,25 @@ func (s *PerspectiveService) Delete(ctx context.Context, id int, actorUserID int
 		return fmt.Errorf("%w: authentication required to delete a perspective", domain.ErrForbidden)
 	}
 
-	existing, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("failed to get perspective: %w", err)
+	err := s.repo.Delete(ctx, id, actorUserID)
+	if err == nil {
+		return nil
 	}
-	if existing.UserID != actorUserID {
-		return fmt.Errorf("%w: you can only delete your own perspectives", domain.ErrForbidden)
-	}
-
-	if err := s.repo.Delete(ctx, id, actorUserID); err != nil {
+	if !errors.Is(err, domain.ErrNotFound) {
 		return fmt.Errorf("failed to delete perspective: %w", err)
 	}
 
-	return nil
+	existing, getErr := s.repo.GetByID(ctx, id)
+	if getErr != nil {
+		return fmt.Errorf("failed to get perspective: %w", getErr)
+	}
+	// Someone else's perspective. Only a PUBLIC one is known to be visible to
+	// this user; anything else answers as if it didn't exist rather than
+	// confirming the id -- matching perspectiveByID's null for non-owners.
+	if existing.UserID != actorUserID && existing.Privacy == domain.PrivacyPublic {
+		return fmt.Errorf("%w: you can only delete your own perspectives", domain.ErrForbidden)
+	}
+	return fmt.Errorf("failed to delete perspective: %w", domain.ErrNotFound)
 }
 
 // ListPerspectives retrieves a paginated list of perspectives

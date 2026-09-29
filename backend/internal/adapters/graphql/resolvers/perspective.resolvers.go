@@ -86,10 +86,10 @@ func (r *mutationResolver) UpdatePerspective(ctx context.Context, input model.Up
 }
 
 // DeletePerspective is the resolver for the deletePerspective field.
-// The @owner directive has already checked ownership by the time this runs;
-// the actor is still re-derived from the session (never from client input) and
-// handed to the service, which re-checks it, so deletion stays owner-only even
-// if the directive were ever removed from the schema.
+// The actor is derived from the session (never from client input) and handed
+// to the service, which enforces ownership with an owner-scoped DELETE -- see
+// PerspectiveService.Delete. (No @owner directive: its lookup was a separate
+// round trip in front of a DELETE that already can't touch another user's row.)
 func (r *mutationResolver) DeletePerspective(ctx context.Context, id string) (bool, error) {
 	authUser, err := auth.RequireAuth(ctx)
 	if err != nil {

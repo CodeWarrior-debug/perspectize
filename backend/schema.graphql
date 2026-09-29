@@ -440,7 +440,9 @@ type Mutation {
   # Ownership is enforced in PerspectiveService.Update + an owner-scoped UPDATE
   # (see the resolver), not @owner: that saved a duplicate row read per save.
   updatePerspective(input: UpdatePerspectiveInput!): Perspective! @auth
-  deletePerspective(id: ID!): Boolean! @auth @owner(idField: "id")
+  # Ownership: PerspectiveService.Delete + an owner-scoped DELETE, not @owner
+  # (see updatePerspective).
+  deletePerspective(id: ID!): Boolean! @auth
 
   # Claim mutations
   createClaim(input: CreateClaimInput!): Content! @auth

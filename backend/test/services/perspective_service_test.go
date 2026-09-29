@@ -423,13 +423,17 @@ func TestPerspectiveDelete_OwnerCanDeleteAnyPrivacy(t *testing.T) {
 func TestPerspectiveDelete_NonOwnerForbidden(t *testing.T) {
 	for _, privacy := range deletePrivacyCases {
 		t.Run(string(privacy), func(t *testing.T) {
-			deleteCalled := false
+			var gotOwner int
 			perspectiveRepo := &mockPerspectiveRepository{
 				getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
 					return &domain.Perspective{ID: id, UserID: 99, Privacy: privacy}, nil
 				},
+				// Emulates the owner-scoped DELETE: another user's row never matches.
 				deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
-					deleteCalled = true
+					gotOwner = ownerUserID
+					if ownerUserID != 99 {
+						return domain.ErrNotFound
+					}
 					return nil
 				},
 			}
@@ -438,8 +442,13 @@ func TestPerspectiveDelete_NonOwnerForbidden(t *testing.T) {
 			err := svc.Delete(context.Background(), 1, 42)
 
 			require.Error(t, err)
-			assert.True(t, errors.Is(err, domain.ErrForbidden))
-			assert.False(t, deleteCalled, "repository Delete must not run for a non-owner")
+			assert.Equal(t, 42, gotOwner, "the DELETE must be scoped to the actor")
+			// Only a PUBLIC perspective is confirmed to exist; others read as missing.
+			if privacy == domain.PrivacyPublic {
+				assert.True(t, errors.Is(err, domain.ErrForbidden), "got %v", err)
+			} else {
+				assert.True(t, errors.Is(err, domain.ErrNotFound), "got %v", err)
+			}
 		})
 	}
 }
@@ -466,6 +475,9 @@ func TestPerspectiveDelete_NotFound(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
 			return nil, domain.ErrNotFound
+		},
+		deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
+			return domain.ErrNotFound
 		},
 	}
 	userRepo := &mockUserRepoForPerspective{}

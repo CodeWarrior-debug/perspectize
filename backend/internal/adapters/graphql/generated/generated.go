@@ -2534,7 +2534,9 @@ type Mutation {
   # Ownership is enforced in PerspectiveService.Update + an owner-scoped UPDATE
   # (see the resolver), not @owner: that saved a duplicate row read per save.
   updatePerspective(input: UpdatePerspectiveInput!): Perspective! @auth
-  deletePerspective(id: ID!): Boolean! @auth @owner(idField: "id")
+  # Ownership: PerspectiveService.Delete + an owner-scoped DELETE, not @owner
+  # (see updatePerspective).
+  deletePerspective(id: ID!): Boolean! @auth
 
   # Claim mutations
   createClaim(input: CreateClaimInput!): Content! @auth
@@ -7233,20 +7235,8 @@ func (ec *executionContext) _Mutation_deletePerspective(ctx context.Context, fie
 				}
 				return ec.Directives.Auth(ctx, nil, directive0)
 			}
-			directive2 := func(ctx context.Context) (any, error) {
-				idField, err := ec.unmarshalNString2string(ctx, "id")
-				if err != nil {
-					var zeroVal bool
-					return zeroVal, err
-				}
-				if ec.Directives.Owner == nil {
-					var zeroVal bool
-					return zeroVal, errors.New("directive owner is not implemented")
-				}
-				return ec.Directives.Owner(ctx, nil, directive1, idField)
-			}
 
-			next = directive2
+			next = directive1
 			return next
 		},
 		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
