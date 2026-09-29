@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/ai-tooling/agent"
+	"github.com/CodeWarrior-debug/perspectize/ai-tooling/jeeves"
 	"github.com/CodeWarrior-debug/perspectize/ai-tooling/llm"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/stretchr/testify/assert"
@@ -23,11 +24,13 @@ type scripted struct {
 	block  chan struct{} // if set, Ask waits on it (or ctx) before returning
 	mu     sync.Mutex
 	asked  []string
+	viewer jeeves.Viewer
 }
 
-func (s *scripted) Ask(ctx context.Context, q string, onEvent func(llm.Event)) (agent.Result, error) {
+func (s *scripted) AskAs(ctx context.Context, v jeeves.Viewer, q string, onEvent func(llm.Event)) (agent.Result, error) {
 	s.mu.Lock()
 	s.asked = append(s.asked, q)
+	s.viewer = v
 	s.mu.Unlock()
 	for _, e := range s.events {
 		onEvent(e)
@@ -109,6 +112,7 @@ func TestAsk_StreamsTextToolAndDone(t *testing.T) {
 	assert.Equal(t, []string{"compare.pick-two"}, done.Citations)
 	assert.Equal(t, 120, done.InputTokens)
 	assert.Equal(t, 30, done.OutputTokens)
+	assert.Equal(t, jeeves.Viewer{UserID: 7}, a.viewer, "data tools are scoped to the signed-in user")
 }
 
 func TestAsk_BatchesTextDeltas(t *testing.T) {
@@ -198,7 +202,7 @@ func TestDisabled(t *testing.T) {
 }
 
 func TestNewJeeves_BuildsWithoutNetwork(t *testing.T) {
-	s, err := NewJeeves("claude-opus-5", allowAll{})
+	s, err := NewJeeves("claude-opus-5", allowAll{}, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, s)
 	assert.Equal(t, "claude-opus-5", s.model)

@@ -40,6 +40,9 @@ Every ai-tooling spec and plan builds teaching in; it isn't bolted on afterwards
 - **Tracer 2 code-complete** (backend `internal/adapters/assistant`, `assistantReply` subscription in `backend/assistant.graphql`, dev sidebar behind `VITE_JEEVES_DEV`). The backend imports this module via `replace ../ai-tooling`, so its Docker context is the repo root (PR #458). The live checkpoint is pending the API key plus `JEEVES_ENABLED=true` and `VITE_JEEVES_DEV=true`.
 - **Keep shared logic in this module, not in its callers:** citation parsing moved from `evals` into `jeeves.Citations` the moment the backend needed it too. Anything both `botler` and the backend need belongs here.
 - **Assistant output needs its own sanitizer:** `SafeHtml`'s DOMPurify config allows `img`, and the CSP allows `img-src https:`, so an injected image would exfiltrate data with zero clicks. `assistantMarkdown.ts` uses a separate DOMPurify instance that forbids images, media, frames, forms, styles and SVG.
+- **Tracer 3 code-complete:** `list_perspectives` (read-only) behind `PerspectizeData`, with an explicit `Viewer` on every call. `datacontract.Run` is the shared privacy contract; `memdata` and the backend adapter both run it. BRIDGE-02 moved the single-row check into `PerspectiveService.GetVisible`.
+- **Mutation-test a contract before trusting it:** break the implementation on purpose and confirm the contract fails. It caught 8 leaks when both privacy layers were disabled, and passed with either layer alone, which proves each layer independently.
+- **Bind identity in code, never in tool input:** tools that read user data are built per request with the viewer in a closure, and the schema forbids extra properties, so the model can't ask as someone else.
 - **Deferred:** server-side refusal fallbacks (they need the beta Messages API throughout the adapter); refusals surface as `llm.StopRefusal` for now.
 
 ## Locked decisions (from design discussion, 2026-09-26)

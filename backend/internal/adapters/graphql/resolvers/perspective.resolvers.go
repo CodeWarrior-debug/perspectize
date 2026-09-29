@@ -102,7 +102,15 @@ func (r *queryResolver) PerspectiveByID(ctx context.Context, id string) (*model.
 		return nil, fmt.Errorf("invalid perspective ID: %s", id)
 	}
 
-	perspective, err := r.PerspectiveService.GetByID(ctx, intID)
+	// GetVisible hides other users' private perspectives as not-found, so a
+	// hidden id returns null exactly like a missing one. See
+	// docs/superpowers/specs/2026-09-09-perspective-privacy-design.md.
+	var viewerID *int
+	if viewer, ok := auth.ForContext(ctx); ok {
+		id := viewer.ID
+		viewerID = &id
+	}
+	perspective, err := r.PerspectiveService.GetVisible(ctx, viewerID, intID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, nil // Return null for not found (GraphQL convention)
@@ -112,16 +120,6 @@ func (r *queryResolver) PerspectiveByID(ctx context.Context, id string) (*model.
 		}
 		slog.Error("getting perspective failed", "id", id, "error", err)
 		return nil, fmt.Errorf("failed to get perspective")
-	}
-
-	// Private perspectives are visible only to their owner; return nil (not an
-	// error) so the id's existence isn't disclosed. See
-	// docs/superpowers/specs/2026-09-09-perspective-privacy-design.md.
-	if perspective.Privacy == domain.PrivacyPrivate {
-		viewer, ok := auth.ForContext(ctx)
-		if !ok || viewer.ID != perspective.UserID {
-			return nil, nil
-		}
 	}
 
 	return perspectiveDomainToModel(perspective), nil

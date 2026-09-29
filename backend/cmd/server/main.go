@@ -234,7 +234,8 @@ func main() {
 			slog.Warn("JEEVES_ENABLED is true but ANTHROPIC_API_KEY is empty; assistant replies will fail")
 		}
 		assistantSvc, err := assistant.NewJeeves(cfg.Assistant.Model,
-			services.NewSlidingWindowLimiter(assistant.DefaultRateLimit, assistant.DefaultRateWindow))
+			services.NewSlidingWindowLimiter(assistant.DefaultRateLimit, assistant.DefaultRateWindow),
+			assistant.NewPerspectiveData(perspectiveService, contentService))
 		if err != nil {
 			log.Fatalf("Failed to initialize assistant: %v", err)
 		}
