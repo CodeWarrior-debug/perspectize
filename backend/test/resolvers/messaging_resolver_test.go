@@ -152,10 +152,10 @@ func (s inboxStubMsgRepo) CountSince(ctx context.Context, threadID int, sinceSeq
 func (s inboxStubMsgRepo) ThreadStats(ctx context.Context, viewerID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
 	return map[int]domain.ThreadStats{}, nil
 }
-func (s inboxStubMsgRepo) UpdateBody(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error) {
+func (s inboxStubMsgRepo) UpdateBody(ctx context.Context, messageID int64, senderID int, body string, editedAt time.Time) (*domain.Message, error) {
 	return nil, nil
 }
-func (s inboxStubMsgRepo) SoftDelete(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
+func (s inboxStubMsgRepo) SoftDelete(ctx context.Context, messageID int64, senderID int, deletedAt time.Time) (*domain.Message, error) {
 	return nil, nil
 }
 

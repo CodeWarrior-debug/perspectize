@@ -137,7 +137,8 @@ func TestCreateMessageThread(t *testing.T) {
 
 func TestSendMessage(t *testing.T) {
 	f := newMessagingFixture(t, 1, 0)
-	f.h.roundTrips(4, f.alice, sendMessageMut, map[string]any{"input": map[string]any{
+	// participation check, INSERT ... RETURNING, sender
+	f.h.roundTrips(3, f.alice, sendMessageMut, map[string]any{"input": map[string]any{
 		"threadId": f.threadIDs[0], "body": "hi", "clientNonce": "rt-send",
 	}})
 }
@@ -172,12 +173,14 @@ func TestLeaveThread(t *testing.T) {
 
 func TestEditMessage(t *testing.T) {
 	f := newMessagingFixture(t, 1, 1)
-	f.h.roundTrips(5, f.alice, editMessageMut, map[string]any{"messageId": f.lastMessage.ID, "body": "edited"})
+	// sender-scoped UPDATE ... RETURNING, pg_notify, sender
+	f.h.roundTrips(3, f.alice, editMessageMut, map[string]any{"messageId": f.lastMessage.ID, "body": "edited"})
 }
 
 func TestDeleteMessage(t *testing.T) {
 	f := newMessagingFixture(t, 1, 1)
-	f.h.roundTrips(5, f.alice, deleteMessageMut, map[string]any{"messageId": f.lastMessage.ID})
+	// sender-scoped UPDATE ... RETURNING, pg_notify, sender
+	f.h.roundTrips(3, f.alice, deleteMessageMut, map[string]any{"messageId": f.lastMessage.ID})
 }
 
 // The batched stats must equal what the per-thread MaxSeq / CountSince
@@ -205,4 +208,13 @@ func TestThreadStatsMatchPerThreadQueries(t *testing.T) {
 		require.Equal(t, fmt.Sprint(wantLatest), th.LatestSeq, "thread %d latestSeq", id)
 		require.Equal(t, wantUnread, th.UnreadCount, "thread %d unreadCount", id)
 	}
+}
+
+// Someone else's message: the scoped UPDATE matches nothing, one read says why.
+func TestEditMessageNotSender(t *testing.T) {
+	f := newMessagingFixture(t, 1, 1) // message 0 is alice's
+	f.h.counter.Reset()
+	msg := f.h.gqlError(f.bob, editMessageMut, map[string]any{"messageId": f.lastMessage.ID, "body": "hijack"})
+	require.Contains(t, msg, "only the sender may edit")
+	require.Len(t, f.h.counter.Statements(), 2)
 }

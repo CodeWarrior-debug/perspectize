@@ -37,10 +37,10 @@ func (s stubMsgRepo) CountSince(ctx context.Context, t int, since int64) (int, e
 func (s stubMsgRepo) ThreadStats(ctx context.Context, viewerID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
 	return map[int]domain.ThreadStats{}, nil
 }
-func (s stubMsgRepo) UpdateBody(ctx context.Context, id int64, body string, editedAt time.Time) (*domain.Message, error) {
+func (s stubMsgRepo) UpdateBody(ctx context.Context, id int64, senderID int, body string, editedAt time.Time) (*domain.Message, error) {
 	return nil, nil
 }
-func (s stubMsgRepo) SoftDelete(ctx context.Context, id int64, deletedAt time.Time) (*domain.Message, error) {
+func (s stubMsgRepo) SoftDelete(ctx context.Context, id int64, senderID int, deletedAt time.Time) (*domain.Message, error) {
 	return nil, nil
 }
 

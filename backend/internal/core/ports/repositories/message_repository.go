@@ -23,10 +23,12 @@ type MessageRepository interface {
 	// a participant row for the viewer are absent from the map.
 	ThreadStats(ctx context.Context, viewerUserID int, threadIDs []int) (map[int]domain.ThreadStats, error)
 	// UpdateBody rewrites a message body and stamps edited_at, returning the
-	// reloaded row. A missing id is reported as domain.ErrNotFound.
-	UpdateBody(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error)
+	// updated row — ONLY if senderID sent it and it isn't deleted (both are
+	// part of the UPDATE). No matching row is reported as domain.ErrNotFound.
+	UpdateBody(ctx context.Context, messageID int64, senderID int, body string, editedAt time.Time) (*domain.Message, error)
 	// SoftDelete tombstones a message: it sets deleted_at and blanks the body
-	// while keeping the row (and its seq) in place, returning the reloaded row.
-	// A missing id is reported as domain.ErrNotFound.
-	SoftDelete(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error)
+	// while keeping the row (and its seq) in place, returning the updated row —
+	// ONLY if senderID sent it and it isn't already deleted. No matching row is
+	// reported as domain.ErrNotFound.
+	SoftDelete(ctx context.Context, messageID int64, senderID int, deletedAt time.Time) (*domain.Message, error)
 }

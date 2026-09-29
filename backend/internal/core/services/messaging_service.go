@@ -80,58 +80,69 @@ func (s *MessagingServiceImpl) SendMessage(ctx context.Context, actorUserID int,
 	})
 }
 
-// EditMessage updates the body of a message the actor sent.
+// EditMessage updates the body of a message the actor sent. The sender and
+// not-deleted checks are part of the UPDATE, so the happy path is one round
+// trip; only a miss reads the message, to say why.
 func (s *MessagingServiceImpl) EditMessage(ctx context.Context, actorUserID int, messageID int64, body string) (*domain.Message, error) {
-	msg, err := s.msgRepo.GetByID(ctx, messageID)
-	if err != nil {
-		return nil, err
-	}
-	if msg.SenderID != actorUserID {
-		return nil, fmt.Errorf("%w: only the sender may edit message %d", domain.ErrForbidden, messageID)
-	}
-	if msg.DeletedAt != nil {
-		return nil, fmt.Errorf("%w: message %d is deleted", domain.ErrInvalidInput, messageID)
-	}
 	if len(body) == 0 || len([]byte(body)) > maxMessageBodyBytes {
 		return nil, fmt.Errorf("%w: message body must be 1..%d bytes", domain.ErrInvalidInput, maxMessageBodyBytes)
 	}
-	updated, err := s.msgRepo.UpdateBody(ctx, messageID, body, time.Now().UTC())
+	updated, err := s.msgRepo.UpdateBody(ctx, messageID, actorUserID, body, time.Now().UTC())
+	if errors.Is(err, domain.ErrNotFound) {
+		msg, why := s.explainOwnMessageMiss(ctx, actorUserID, messageID, "edit")
+		if why != nil {
+			return nil, why
+		}
+		return nil, fmt.Errorf("%w: message %d is deleted", domain.ErrInvalidInput, msg.ID)
+	}
 	if err != nil {
 		return nil, err
 	}
 	_ = s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
 		Type:      "MESSAGE_EDITED",
-		ThreadID:  msg.ThreadID,
-		Seq:       msg.Seq,
+		ThreadID:  updated.ThreadID,
+		Seq:       updated.Seq,
 		MessageID: messageID,
 	})
 	return updated, nil
 }
 
 // DeleteMessage soft-deletes a message the actor sent. Idempotent when the
-// message is already deleted.
+// message is already deleted (returned as is, nothing published).
 func (s *MessagingServiceImpl) DeleteMessage(ctx context.Context, actorUserID int, messageID int64) (*domain.Message, error) {
-	msg, err := s.msgRepo.GetByID(ctx, messageID)
-	if err != nil {
-		return nil, err
+	tombstoned, err := s.msgRepo.SoftDelete(ctx, messageID, actorUserID, time.Now().UTC())
+	if errors.Is(err, domain.ErrNotFound) {
+		msg, why := s.explainOwnMessageMiss(ctx, actorUserID, messageID, "delete")
+		if why != nil {
+			return nil, why
+		}
+		return msg, nil // already deleted
 	}
-	if msg.SenderID != actorUserID {
-		return nil, fmt.Errorf("%w: only the sender may delete message %d", domain.ErrForbidden, messageID)
-	}
-	if msg.DeletedAt != nil {
-		return msg, nil
-	}
-	tombstoned, err := s.msgRepo.SoftDelete(ctx, messageID, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
 	_ = s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
 		Type:      "MESSAGE_DELETED",
-		ThreadID:  msg.ThreadID,
-		Seq:       msg.Seq,
+		ThreadID:  tombstoned.ThreadID,
+		Seq:       tombstoned.Seq,
 		MessageID: messageID,
 	})
 	return tombstoned, nil
+}
+
+// explainOwnMessageMiss runs after a sender-scoped message UPDATE matched no
+// row. It returns an error when the message is missing or not the actor's;
+// otherwise the message exists, is the actor's and is already deleted, and it
+// is returned for the caller to handle.
+func (s *MessagingServiceImpl) explainOwnMessageMiss(ctx context.Context, actorUserID int, messageID int64, verb string) (*domain.Message, error) {
+	msg, err := s.msgRepo.GetByID(ctx, messageID)
+	if err != nil {
+		return nil, err
+	}
+	if msg.SenderID != actorUserID {
+		return nil, fmt.Errorf("%w: only the sender may %s message %d", domain.ErrForbidden, verb, messageID)
+	}
+	return msg, nil
 }
 
 // MuteThread sets the actor's muted flag for a thread they participate in and

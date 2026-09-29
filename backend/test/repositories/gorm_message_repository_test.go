@@ -130,7 +130,7 @@ func TestGormMessageRepository_UpdateBody(t *testing.T) {
 	m, err := repo.Insert(ctx, &domain.Message{ThreadID: threadID, SenderID: a, Body: "original", ClientNonce: "u1"})
 	require.NoError(t, err)
 
-	edited, err := repo.UpdateBody(ctx, m.ID, "edited text", time.Now().UTC())
+	edited, err := repo.UpdateBody(ctx, m.ID, a, "edited text", time.Now().UTC())
 	require.NoError(t, err)
 	assert.Equal(t, "edited text", edited.Body)
 	require.NotNil(t, edited.EditedAt)
@@ -144,7 +144,7 @@ func TestGormMessageRepository_SoftDelete(t *testing.T) {
 	m, err := repo.Insert(ctx, &domain.Message{ThreadID: threadID, SenderID: a, Body: "to be deleted", ClientNonce: "d1"})
 	require.NoError(t, err)
 
-	del, err := repo.SoftDelete(ctx, m.ID, time.Now().UTC())
+	del, err := repo.SoftDelete(ctx, m.ID, a, time.Now().UTC())
 	require.NoError(t, err)
 	require.NotNil(t, del.DeletedAt)
 	assert.Equal(t, "", del.Body, "soft delete must blank the body")
@@ -153,14 +153,40 @@ func TestGormMessageRepository_SoftDelete(t *testing.T) {
 
 func TestGormMessageRepository_UpdateBody_NotFound(t *testing.T) {
 	repo, _, _, _ := messageTestSetup(t)
-	_, err := repo.UpdateBody(context.Background(), 999999999, "x", time.Now().UTC())
+	_, err := repo.UpdateBody(context.Background(), 999999999, 1, "x", time.Now().UTC())
 	assert.True(t, errors.Is(err, domain.ErrNotFound), "want ErrNotFound, got %v", err)
 }
 
 func TestGormMessageRepository_SoftDelete_NotFound(t *testing.T) {
 	repo, _, _, _ := messageTestSetup(t)
-	_, err := repo.SoftDelete(context.Background(), 999999999, time.Now().UTC())
+	_, err := repo.SoftDelete(context.Background(), 999999999, 1, time.Now().UTC())
 	assert.True(t, errors.Is(err, domain.ErrNotFound), "want ErrNotFound, got %v", err)
+}
+
+// The sender and not-deleted predicates are part of the UPDATE itself: another
+// user's message, or an already-deleted one, matches nothing.
+func TestGormMessageRepository_UpdatesAreSenderScoped(t *testing.T) {
+	repo, threadID, a, b := messageTestSetup(t)
+	ctx := context.Background()
+
+	m, err := repo.Insert(ctx, &domain.Message{ThreadID: threadID, SenderID: a, Body: "mine", ClientNonce: "s1"})
+	require.NoError(t, err)
+
+	_, err = repo.UpdateBody(ctx, m.ID, b, "hijack", time.Now().UTC())
+	assert.True(t, errors.Is(err, domain.ErrNotFound), "other sender: want ErrNotFound, got %v", err)
+	_, err = repo.SoftDelete(ctx, m.ID, b, time.Now().UTC())
+	assert.True(t, errors.Is(err, domain.ErrNotFound), "other sender: want ErrNotFound, got %v", err)
+
+	_, err = repo.SoftDelete(ctx, m.ID, a, time.Now().UTC())
+	require.NoError(t, err)
+	_, err = repo.UpdateBody(ctx, m.ID, a, "edit a tombstone", time.Now().UTC())
+	assert.True(t, errors.Is(err, domain.ErrNotFound), "deleted: want ErrNotFound, got %v", err)
+	_, err = repo.SoftDelete(ctx, m.ID, a, time.Now().UTC())
+	assert.True(t, errors.Is(err, domain.ErrNotFound), "already deleted: want ErrNotFound, got %v", err)
+
+	got, err := repo.GetByID(ctx, m.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "", got.Body, "the other sender's edit never landed")
 }
 
 // TestGormMessageRepository_RetentionUnboundedByDefault exercises the insert
