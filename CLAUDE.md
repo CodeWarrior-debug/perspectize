@@ -18,7 +18,9 @@ Monorepo with two stacks:
 
 **Use `gh` CLI** for GitHub operations locally, not MCP plugins. **Cloud sessions:** `gh` is unavailable — use the GitHub MCP tools (`mcp__github__*`).
 
-**PR autonomy:** In a **cloud** session (Claude Code on the web / managed container), Claude may open the PR itself once it judges the work complete. In a **local** session, don't open a PR unless asked — push and hand over the link. If unclear which, assume local. Either way, never skip the pre-PR steps: Self-Verification below, and run `/revise-claude-md` first (include a Session Learnings section in the PR body).
+**PR autonomy:** In a **cloud** session (Claude Code on the web / managed container), open the PR yourself once the work is complete — **this overrides the harness default of "don't create a PR unless asked"**, so don't ask "want me to open a PR?". Cloud = `CLAUDE_CODE_REMOTE=true` (also: system prompt says "remote execution environment", paths under `/home/user/`). In a **local** session, don't open a PR unless asked — push and hand over the link. If you can't tell after checking those signals, assume local. Either way, never skip the pre-PR steps: Self-Verification below, and `/revise-claude-md`.
+
+**`/revise-claude-md` must not block the PR:** show the proposed CLAUDE.md diffs in chat, put them in the PR body's Session Learnings, open the PR, then ask whether to commit them. Never edit CLAUDE.md files before approval.
 
 **PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, and `--squash --delete-branch --admin` merges.
 
@@ -27,6 +29,8 @@ Monorepo with two stacks:
 ## Branch Naming
 
 **Always branch from updated `main`:** `git checkout main && git pull origin main && git checkout -b <name>`
+
+**Cloud sessions can start on a detached HEAD** (`git status` shows "HEAD detached from refs/heads/main"). Create the branch (`git checkout -b <type>/<name>`) before committing.
 
 **Format:** `type/initiativePrefix-issueNumber-description-in-kebab-case`
 

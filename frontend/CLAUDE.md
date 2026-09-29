@@ -221,6 +221,8 @@ Symptom in the browser: `Failed to load module script: Expected a JavaScript-or-
 
 **The PWA service worker is built but never registered.** Nothing injects `registerSW.js`, so production has no SW, and #312's `skipWaiting`/`clientsClaim` never took effect. Before wiring registration up, note that `sw.js` routes navigations to a non-precached `/`, which fails install. A precaching SW that activates mid-session also deletes the old build's chunks, which brings back the version-skew problem above.
 
+**`@vite-pwa/sveltekit` appends `prerendered/**/*.{html,json}` to `workbox.globPatterns`** (via `push()`, unless one starting `prerendered/` exists). This SPA has `prerender = false`, so the dir is empty when workbox runs and Sevalla surfaces "One of the glob patterns doesn't match any files" as a deploy error. Adding your own `prerendered/` pattern doesn't help (still empty); `vite.config.ts`'s `withoutPrerenderedGlob()` drops it. Verify: `pnpm run build`, then check the `PWA v…` block has no `warnings`.
+
 ## Self-Verification (Chrome DevTools MCP)
 
 | Step       | Tool                                          | Purpose                        |
