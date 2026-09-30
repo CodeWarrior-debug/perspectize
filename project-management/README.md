@@ -18,10 +18,12 @@ intent → spec → plan → diff → pull request → incident record ─┐
 | 2 | `spec.md` | What are the requirements, derived from the accepted intent? | Design |
 | 3 | `plan.md` | In what steps do we build it? | Build |
 | 4 | diff | What changed? | Build |
-| 5 | pull request | Does it do what the intent asked? | Verify |
+| 5 | pull request(s) | Does it do what the intent asked? | Verify |
 | 6 | incident record | What went wrong in production, and what does it teach us? | Feeds the next intent |
 
 **`intent.md`** covers one proposed change. It has five parts: the problem, the proposed outcome, the affected users and systems, the constraints, and the open questions. Claude drafts it from a conversation, the product owner corrects it, and it is committed only after a human signs off on the *why*. That sign-off is what triggers the design pass. After approval it is a historical record: git history is the evidence (author and timestamp), and it is not rewritten later. Changes after the first spec commit are a signal worth noticing.
+
+**One intent, many PRs.** An intent is sized to a problem, not to a diff. Expect one intent to fan out into several plans or plan tasks, and each of those into its own PR (for example a migration PR, a backend PR and a frontend PR, or a sequence of small slices). Every one of those PRs links back to the same intent, and the intent's **Downstream** list collects them. The intent is only done when the outcome it describes is met, not when the first PR merges. A PR that cannot name an intent is a sign the change is either too small to need one (chores, dependency bumps) or that the "why" was never written down.
 
 **Not the same as CLAUDE.md.** CLAUDE.md is standing guidance (commands, conventions, pitfalls). An intent is per-change and accumulates, so it never goes in CLAUDE.md.
 
@@ -34,7 +36,7 @@ We do not move existing docs or duplicate them. This folder **owns** the artifac
 | Intent | `project-management/intents/<feature>.md` | **Owned here** |
 | Spec | `docs/superpowers/specs/` | Hyperlink |
 | Plan | `docs/superpowers/plans/` | Hyperlink |
-| Diff / PR | GitHub | Hyperlink (PR URL) |
+| Diff / PRs | GitHub (**several per intent**) | Hyperlink each PR URL in the intent's Downstream list |
 | Incident record | GitHub issue (bug template); private detail in gitignored `.planning/phases/bugs/` | Hyperlink to the issue only |
 
 **Hyperlink vs. symlink**
@@ -60,11 +62,13 @@ Status: draft | accepted | superseded by <link>
 
 ## Downstream
 - Spec: <link>
-- Plan: <link>
-- PR(s): <link>
+- Plan(s): <link>
+- PRs (one line each, add as they open):
+  - [ ] <title> — <PR link> — open | merged
+  - [ ] <title> — <PR link> — open | merged
 ```
 
-The **Downstream** section is how this folder stays an index: fill it in as each later artifact appears.
+The **Downstream** section is how this folder stays an index: fill it in as each later artifact appears. Tick each PR when it merges; the intent moves to `Status: done` when the last one does and the outcome is verified. In the other direction, each PR description links back to its intent.
 
 ## Status
 
