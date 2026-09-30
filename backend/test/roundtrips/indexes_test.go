@@ -13,6 +13,10 @@ import (
 // seq scans for the check asks "can an index serve this at all?".
 func TestHotQueriesUseIndexes(t *testing.T) {
 	h := newHarness(t)
+	// index names the one index that must serve the query. "" means any index
+	// will do (no Seq Scan): which of several covering indexes the planner
+	// picks depends on table statistics, and differs between Postgres versions
+	// on the near-empty test tables.
 	cases := []struct {
 		name, index, sql string
 	}{
@@ -22,7 +26,7 @@ func TestHotQueriesUseIndexes(t *testing.T) {
 			`SELECT * FROM perspectives WHERE user_id = 1 ORDER BY created_at DESC, id DESC LIMIT 100`},
 		{"content grid default sort", "idx_content_updated_at_id",
 			`SELECT * FROM content ORDER BY content.updated_at DESC, content.id DESC LIMIT 100`},
-		{"message history (dropped duplicate still covered)", "messages_thread_id_seq_key",
+		{"message history (dropped duplicate still covered)", "",
 			`SELECT * FROM messages WHERE thread_id = 1 ORDER BY seq DESC LIMIT 50`},
 		{"auth lookup (dropped duplicate still covered)", "users_clerk_user_id_key",
 			`SELECT * FROM users WHERE clerk_user_id = 'x' LIMIT 1`},
@@ -37,7 +41,12 @@ func TestHotQueriesUseIndexes(t *testing.T) {
 				return tx.Raw("EXPLAIN " + tc.sql).Scan(&plan).Error
 			})
 			require.NoError(t, err)
-			require.Contains(t, strings.Join(plan, "\n"), tc.index)
+			p := strings.Join(plan, "\n")
+			if tc.index == "" {
+				require.NotContains(t, p, "Seq Scan", "some index must serve this query")
+				return
+			}
+			require.Contains(t, p, tc.index)
 		})
 	}
 }
