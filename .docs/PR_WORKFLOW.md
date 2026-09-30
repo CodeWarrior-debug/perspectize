@@ -81,8 +81,9 @@ Migrations are never applied automatically (see `backend/CLAUDE.md` → Migratio
 |-------|-----------|-------------|
 | `migrations-unapplied` | Every PR that adds or changes a file under `backend/migrations/`, at creation time. It **stays on after merge**. | When the migration has been applied to every environment; swap it for `migrations-applied`. |
 | `migrations-applied` | A merged PR whose migrations have been applied to every environment. | Never. |
-| `check-migration-number-before-apply` | A PR whose migration number might be wrong by the time it's applied: another open PR or branch claims the same number, or this PR skipped numbers that in-flight branches claim. | Automatically, once the numbering is clean (see below). If it's still on at merge time, check the number against `main` and renumber first. |
+| `check-migration-number-before-apply` | A PR whose migration number might be wrong by the time it's applied: another open PR or branch claims the same number, or this PR skipped numbers that in-flight branches claim. | Automatically, once the number is the next free one on `main` and no other open PR uses it (see below). If it's still on at merge time, renumber to the next free number first. |
 
+- **Migration numbers on open PRs are provisional.** Don't spend effort renumbering around other in-flight branches while a PR is open. Finalize the number as the **last step before merging**: rename the files to the next free number on `main`. It can't wait until after merge, because golang-migrate refuses to run at all if two files on `main` share a version. `check-migration-number-before-apply` still being on at merge time means that rename is due.
 - `migrations-unapplied` and `migrations-applied` are **mutually exclusive**.
 - To find pending rollouts: `gh pr list --state merged --label migrations-unapplied`.
 
