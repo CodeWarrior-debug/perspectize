@@ -32,7 +32,7 @@ vi.mock('@tanstack/svelte-query', async (importOriginal) => {
 		useQueryClient: () => client,
 	};
 });
-vi.mock('svelte-sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('svelte-sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
 
 beforeEach(() => {
@@ -137,5 +137,52 @@ describe('eviction: useDeletePerspective.onSuccess evicts exactly what changed',
 		const outcome = invalidationOutcome(client, [...affected, ...unrelated]);
 		expect(outcome.invalidated).toEqual(affected);
 		expect(outcome.untouched).toEqual(unrelated);
+	});
+});
+
+describe('eviction: useSetPassageDisplayTitle.onSuccess patches in place, evicts nothing', () => {
+	it('updates only that passage in cached lists/rows and invalidates no entry', async () => {
+		const listKey = queryKeys.content.list({ first: 50 });
+		const rowKey = queryKeys.content.row('3');
+		const aggregatesKey = queryKeys.content.detail('3');
+		const otherRowKey = queryKeys.content.row('4');
+		const unrelated = [
+			queryKeys.perspectives.listByContent(3),
+			queryKeys.users.list(),
+			queryKeys.bible.passageText(1, 2),
+		];
+		seed(client, listKey, {
+			content: {
+				items: [
+					{ id: '3', displayTitle: null },
+					{ id: '4', displayTitle: 'Other' },
+				],
+			},
+		});
+		seed(client, rowKey, { contentByID: { id: '3', name: 'Genesis 1:1', displayTitle: null } });
+		const aggregates = { contentByID: { id: '3', perspectiveCount: 2 } };
+		seed(client, aggregatesKey, aggregates);
+		const otherRow = { contentByID: { id: '4', displayTitle: 'Other' } };
+		seed(client, otherRowKey, otherRow);
+		for (const k of unrelated) seed(client, k);
+
+		const { useSetPassageDisplayTitle } = await import('$lib/queries/bible/useSetPassageDisplayTitle');
+		useSetPassageDisplayTitle();
+		capturedDeleteOptions.onSuccess(
+			{ setPassageDisplayTitle: { id: '3', displayTitle: 'Creation' } },
+			{ contentID: '3', title: 'Creation' },
+		);
+
+		const all = [listKey, rowKey, aggregatesKey, otherRowKey, ...unrelated];
+		expect(invalidationOutcome(client, all).invalidated).toEqual([]);
+
+		expect(client.getQueryData<any>(listKey).content.items).toEqual([
+			{ id: '3', displayTitle: 'Creation' },
+			{ id: '4', displayTitle: 'Other' },
+		]);
+		expect(client.getQueryData<any>(rowKey).contentByID.displayTitle).toBe('Creation');
+		// Entries without this passage's title come back as the same object: no re-render.
+		expect(client.getQueryData(aggregatesKey)).toBe(aggregates);
+		expect(client.getQueryData(otherRowKey)).toBe(otherRow);
 	});
 });
