@@ -1,0 +1,24 @@
+# Docker build context = repo root (see backend/Dockerfile).
+# Deny by default, then allow only what the image build needs. This file
+# replaces backend/.dockerignore, which stops applying once the context is
+# the repo root.
+
+*
+!backend/
+!ai-tooling/
+
+# Secrets: never in the build context, even inside allowed directories.
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+
+# Noise and local artifacts (carried over from the old backend/.dockerignore).
+**/.git
+**/node_modules
+**/tmp/
+**/*.log
+**/coverage.html
+**/coverage.out
+backend/perf/
+ai-tooling/evals/results/
