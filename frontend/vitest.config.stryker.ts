@@ -32,5 +32,9 @@ export default defineConfig({
 		environment: 'jsdom',
 		globals: true,
 		setupFiles: ['./tests/setup.ts'],
+		// Mutation runs execute instrumented code, several runners at once — the Bible
+		// verse-ordinal round-trip test blows the 5s default there while passing in ~1s
+		// normally. A dry-run timeout aborts Stryker, so give it headroom.
+		testTimeout: 30_000,
 	},
 });
