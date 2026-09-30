@@ -140,6 +140,19 @@ Queries use `graphql-request` with TanStack Svelte Query.
 
 **`isLoading` is `false` for a paused (offline) query — branch on `isPending` for the loading state.** TanStack v5 defines `isLoading = isPending && isFetching`; while the network is offline a first fetch is paused (`isPending: true`, `isFetching: false`, no data, no error). A `{#if isLoading}…{:else if isError}…{:else if data}` chain then renders nothing at all. `interlinear/OriginalLanguage.svelte` uses `isPending`; its test covers `{ isPending: true, isLoading: false, isError: false, data: undefined }`.
 
+## Query caching & call budget (REQUIRED for data-fetching changes)
+
+The aim is one network call per distinct piece of data, deliberate freshness, and exact cache eviction. Test with a **real** `QueryClient` via `tests/helpers/queryBudget.ts` (worked examples: `tests/unit/query-cache-contract.test.ts`).
+
+- **One hook, one key per piece of data.** Two components needing the same data call the same `useX` (same `queryKey`); never a second hand-rolled `createQuery`. Test: `mountConsumers(client, opts, 3)` → `fetches() === 1`.
+- **Choose `staleTime` on purpose.** Default `0` refetches on every mount. Immutable data → `Infinity`; user-scoped → minutes; lists → ~30–60s. Test: a second mount inside `staleTime` costs 0 calls.
+- **Keys come from `queryKeys` (`lib/queries/keys.ts`)** and mirror every variable `queryFn` sends (see the `queryKey` rule above). Test: `hashKey` changes when each variable changes.
+- **Mutations evict exactly what changed** — affected lists/details/aggregates, never a root key (`queryKeys.all`, `content.all()`) "to be safe". Patch optimistically only caches of the *same row shape*, and roll back in `onError`. Test: `seed` affected + unrelated keys, run `onSuccess`, then assert both `invalidationOutcome(...).invalidated` and `.untouched`.
+- **Mocked `invalidateQueries` assertions are not enough** — they pass even when the key matches no cache entry. Keep them for branch coverage, add a real-client eviction test.
+- No fetch from an `$effect` that can loop, or per keystroke without a debounce.
+
+Full table: [../.docs/QUERY_BUDGET.md](../.docs/QUERY_BUDGET.md).
+
 ## Icons (Lucide)
 
 Per-icon imports from `@lucide/svelte` for tree-shaking:

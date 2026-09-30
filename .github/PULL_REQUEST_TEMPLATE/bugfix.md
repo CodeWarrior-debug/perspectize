@@ -23,6 +23,15 @@ https://github.com/user-attachments/assets/<!-- video-id -->
 - [ ] <!-- How to verify the bug is fixed -->
 - [ ] <!-- How to verify no regression introduced -->
 
+## Query Budget
+
+<!-- Delete this section only if the PR touches no DB access and no data fetching. See .docs/QUERY_BUDGET.md -->
+
+- [ ] Backend: new/changed queries have a `querycount` test (batch = 1 query for any N; empty input = 0); per-row GraphQL fields use a dataloader
+- [ ] Frontend: new `createQuery` has a deliberate `staleTime`, reuses the existing hook/key (no duplicate fetch), and its `queryKey` includes every variable `queryFn` sends
+- [ ] Frontend: mutations evict exactly the affected keys — real-`QueryClient` test asserts what is invalidated **and** what is not
+- [ ] Migration adds an index for any new filtered/sorted column (or says why not)
+
 ## QA Acceptance Criteria
 
 <!-- For QA: one numbered row per actionable check, in the order to run them.
@@ -42,4 +51,3 @@ https://github.com/user-attachments/assets/<!-- video-id -->
 - [ ] DB migration: `migrate up` against `<!-- environment(s) -->` (manual per .docs — never automated)
 - [ ] Task/script: <!-- e.g. backfill script, one-off command -->
 - [ ] <!-- Additional step -->
-

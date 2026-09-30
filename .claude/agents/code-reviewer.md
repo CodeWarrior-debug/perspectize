@@ -54,7 +54,13 @@ Never edit files, commit, or run migrations.
    gqlgen binding.
 4. **Migrations:** missing or non-reversing down; non-idempotent DDL; a
    numbering collision; anything that runs `migrate up/down`.
-5. **Tests:** new behaviour without a test; port methods added without
+5. **Query budget** ([.docs/QUERY_BUDGET.md](../../.docs/QUERY_BUDGET.md)): a repo or
+   service call inside a loop over results (N+1); a per-row GraphQL field that
+   bypasses the dataloader; `Preload`/joins the caller never reads; the same
+   lookup repeated in middleware and resolver; `COUNT(*)` issued when
+   `includeTotalCount` is false; a new filtered/sorted column with no index; a
+   DB-touching change with no `querycount` assertion. Flag these as Blocking.
+6. **Tests:** new behaviour without a test; port methods added without
    updating the mocks in `backend/test/`; assertion-free tests.
 
 Skip pure style nits that `gofmt` or `golangci-lint` already enforce.

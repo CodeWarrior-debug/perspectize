@@ -73,6 +73,21 @@ Marks a PR opened from a **cloud** session whose remaining work needs the user's
 - **Cloud sessions:** apply the label (and list the local-only steps) instead of claiming unverified work is done.
 - **Local sessions:** remove the label once every checklist item under "Local session takeover" is done.
 
+## Migration labels
+
+Migrations are never applied automatically (see `backend/CLAUDE.md` → Migrations): someone runs `migrate up` by hand against each environment after the PR merges. These labels track that, so a merged PR with a pending migration can't be forgotten.
+
+| Label | Put it on | Take it off |
+|-------|-----------|-------------|
+| `migrations-unapplied` | Every PR that adds or changes a file under `backend/migrations/`, at creation time. It **stays on after merge**. | When the migration has been applied to every environment; swap it for `migrations-applied`. |
+| `migrations-applied` | A merged PR whose migrations have been applied to every environment. | Never. |
+| `check-migration-number-before-apply` | A PR whose migration number might be wrong by the time it's applied: another open PR or branch claims the same number, or this PR skipped numbers that in-flight branches claim. | Once the number has been checked against `main` right before applying. If a gap is still open or a number collides, renumber first. |
+
+- `migrations-unapplied` and `migrations-applied` are **mutually exclusive**.
+- To find pending rollouts: `gh pr list --state merged --label migrations-unapplied`.
+- To check for a collision: `ls backend/migrations | tail -5` on `main`, plus `git log --all --oneline -- 'backend/migrations/*'` for numbers claimed on other branches.
+- Add labels with `gh api repos/CodeWarrior-debug/perspectize/issues/<n>/labels -f "labels[]=migrations-unapplied"`, as for `needs-demo-video`. In a cloud session, use the GitHub MCP `issue_write` tool; its `labels` field replaces the whole set, so pass the existing labels too.
+
 ## Merge preferences
 
 ```bash
