@@ -37,7 +37,10 @@ func NewUserService(
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 
 // Create creates a new user with validation
-func (s *UserService) Create(ctx context.Context, username, email string) (*domain.User, error) {
+func (s *UserService) Create(ctx context.Context, actor *domain.AuthenticatedUser, username, email string) (*domain.User, error) {
+	if !isAdmin(actor) {
+		return nil, fmt.Errorf("%w: only an admin may create users", domain.ErrForbidden)
+	}
 	// Validate username
 	username = strings.TrimSpace(username)
 	if username == "" {
@@ -147,9 +150,12 @@ func (s *UserService) ListAll(ctx context.Context) ([]*domain.User, error) {
 }
 
 // Update updates an existing user's username and/or email
-func (s *UserService) Update(ctx context.Context, input portservices.UpdateUserInput) (*domain.User, error) {
+func (s *UserService) Update(ctx context.Context, actor *domain.AuthenticatedUser, input portservices.UpdateUserInput) (*domain.User, error) {
 	if input.ID <= 0 {
 		return nil, fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
+	}
+	if !isSelfOrAdmin(actor, input.ID) {
+		return nil, fmt.Errorf("%w: you can only modify your own account", domain.ErrForbidden)
 	}
 
 	// Fetch existing user
@@ -206,9 +212,12 @@ func (s *UserService) Update(ctx context.Context, input portservices.UpdateUserI
 
 // Delete reassigns the user's content and perspectives to the sentinel
 // "[deleted]" user, then removes the user row.
-func (s *UserService) Delete(ctx context.Context, id int) error {
+func (s *UserService) Delete(ctx context.Context, actor *domain.AuthenticatedUser, id int) error {
 	if id <= 0 {
 		return fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
+	}
+	if !isSelfOrAdmin(actor, id) {
+		return fmt.Errorf("%w: you can only delete your own account", domain.ErrForbidden)
 	}
 
 	// Fetch the user to verify it exists
@@ -296,4 +305,15 @@ func (s *UserService) SetOnboardingDisplayNextSession(ctx context.Context, userI
 		return nil, s.onboardingWriteError(ctx, userID, err, "failed to set onboarding display flag")
 	}
 	return &updated.Onboarding, nil
+}
+
+// isAdmin reports whether the actor is an authenticated admin.
+func isAdmin(actor *domain.AuthenticatedUser) bool {
+	return actor != nil && actor.Role == domain.UserRoleAdmin
+}
+
+// isSelfOrAdmin reports whether the actor may act on the account userID:
+// their own, or any account if they are an admin.
+func isSelfOrAdmin(actor *domain.AuthenticatedUser, userID int) bool {
+	return actor != nil && (actor.ID == userID || actor.Role == domain.UserRoleAdmin)
 }

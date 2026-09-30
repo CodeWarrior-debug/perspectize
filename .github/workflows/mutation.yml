@@ -1,0 +1,180 @@
+name: Mutation Testing
+
+# Report-only for now: no score thresholds, so this never fails a PR. It surfaces
+# LIVED mutants (code changes no test noticed) on the lines a PR touches. Once a
+# baseline is settled, gate with Gremlins `--threshold-efficacy` and Stryker
+# `thresholds.break` (see docs/superpowers/specs/*-test-hardening-spike.md).
+#
+# Full runs are local only: `make mutate` (backend/) and `pnpm run mutate` (frontend/).
+# CI does the incremental version — PRs mutate only changed lines/files. A full Stryker
+# pass takes ~3h+ on a 4-core machine, so it is NOT run on every push to main; trigger it
+# by hand (workflow_dispatch, on main) to seed Stryker's incremental cache, which later PR
+# runs restore so they don't re-run mutants whose source and tests are unchanged.
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/mutation.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Gremlins (changed lines)
+    # A diff-scoped run is meaningless on a push to main or a manual dispatch.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          # --diff needs origin/main's history to compute changed lines.
+          fetch-depth: 0
+
+      - name: Detect backend Go changes
+        id: changes
+        working-directory: .
+        run: |
+          if git diff --quiet "origin/${{ github.base_ref }}...HEAD" -- 'backend/**/*.go'; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Go
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Install Gremlins
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      # No Postgres service on purpose. Gremlins runs several `go test ./...` at once
+      # and the DB-backed tests are not safe to run concurrently against one database
+      # (see the -p 1 note in ci.yml) — a flaky failure would be counted as a KILLED
+      # mutant and inflate the score. The DB tests skip cleanly without DATABASE_URL,
+      # so repositories are measured through their sqlmock tests only.
+      # Goes through the Make target on purpose: it first runs the unmutated suite in an
+      # isolated copy of backend/ (`mutate-preflight`) and applies the skip list for tests
+      # that read files outside backend/. Without those, every mutant "dies" of the same
+      # unrelated failure and Gremlins reports a bogus 100% score.
+      - name: Run Gremlins on changed lines
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          set -o pipefail
+          make mutate-diff \
+            MUTATE_BASE="origin/${{ github.base_ref }}" \
+            GREMLINS_ARGS="--workers 2 -o $RUNNER_TEMP/gremlins.json" 2>&1 | tee "$RUNNER_TEMP/gremlins.log"
+
+      - name: Summarize
+        if: always() && steps.changes.outputs.changed == 'true'
+        run: |
+          {
+            echo '### Gremlins — mutants on changed lines'
+            echo
+            echo '```'
+            grep -E 'LIVED|TIMED OUT' "$RUNNER_TEMP/gremlins.log" || echo 'No LIVED or TIMED OUT mutants.'
+            echo
+            tail -7 "$RUNNER_TEMP/gremlins.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Gremlins report
+        if: always() && steps.changes.outputs.changed == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: gremlins-report
+          path: |
+            ${{ runner.temp }}/gremlins.json
+            ${{ runner.temp }}/gremlins.log
+
+  frontend:
+    name: Stryker (incremental)
+    runs-on: ubuntu-latest
+    # PR runs are small; a manual full run (cache seeding) needs ~3h+.
+    timeout-minutes: 360
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Stryker's incremental file maps each mutant to a result keyed on the source and
+      # test content it was run against; unchanged mutants aren't re-run. A manual full run
+      # on main saves a fresh copy; PRs restore the newest one available to them.
+      - name: Restore Stryker incremental cache
+        uses: actions/cache@v4
+        with:
+          path: frontend/reports/stryker-incremental.json
+          key: stryker-incremental-${{ github.sha }}
+          restore-keys: stryker-incremental-
+
+      - name: Find changed source files
+        id: files
+        if: github.event_name == 'pull_request'
+        run: |
+          # Passing --mutate on the CLI replaces stryker.config.json's list, so the
+          # same exclusions (declaration files, vendored shadcn, assets) are applied here.
+          files=$(git diff --name-only --diff-filter=AM "origin/${{ github.base_ref }}...HEAD" -- 'frontend/src/lib/**/*.ts' \
+            | sed 's#^frontend/##' \
+            | grep -v -E '\.d\.ts$|^src/lib/components/shadcn/|^src/lib/assets/' \
+            | paste -sd, - || true)
+          echo "mutate=$files" >> "$GITHUB_OUTPUT"
+
+      - name: Run Stryker
+        if: github.event_name != 'pull_request' || steps.files.outputs.mutate != ''
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm exec stryker run --incremental --mutate "${{ steps.files.outputs.mutate }}" 2>&1 | tee "$RUNNER_TEMP/stryker.log"
+          else
+            pnpm run mutate:incremental 2>&1 | tee "$RUNNER_TEMP/stryker.log"
+          fi
+
+      - name: Summarize
+        if: always() && (github.event_name != 'pull_request' || steps.files.outputs.mutate != '')
+        run: |
+          {
+            echo '### Stryker — mutation score'
+            echo
+            echo '```'
+            tail -40 "$RUNNER_TEMP/stryker.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Stryker report
+        if: always() && (github.event_name != 'pull_request' || steps.files.outputs.mutate != '')
+        uses: actions/upload-artifact@v6
+        with:
+          name: stryker-report
+          path: frontend/reports/mutation/

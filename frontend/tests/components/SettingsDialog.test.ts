@@ -94,9 +94,16 @@ describe('SettingsDialog', () => {
 		expect(screen.getByRole('switch')).toBeDisabled();
 	});
 
-	it('switches to the theme section and shows no onboarding toggle there', async () => {
-		render(SettingsDialog, { props: { open: true, store: fakeStore } });
-		await fireEvent.click(screen.getByRole('button', { name: 'Customize Theme' }));
-		expect(screen.queryByText('Show onboarding next session')).toBeNull();
-	});
+	it(
+		'switches to the theme section and shows no onboarding toggle there',
+		async () => {
+			render(SettingsDialog, { props: { open: true, store: fakeStore } });
+			await fireEvent.click(screen.getByRole('button', { name: 'Customize Theme' }));
+			expect(screen.queryByText('Show onboarding next session')).toBeNull();
+		},
+		// ThemeCustomizePanel mounts all 28 presets on click; under the full
+		// suite's CPU contention that render can miss the default 5s budget
+		// even though it's not actually stuck. See frontend/CLAUDE.md.
+		15000
+	);
 });
