@@ -85,6 +85,7 @@
 
 	function onPointerDown(e: PointerEvent) {
 		if (e.pointerType === 'mouse' && e.button !== 0) return;
+		suppressClick = false; // a drag may end with no click (touch), so never carry the flag into a new press
 		const el = e.currentTarget as HTMLElement;
 		startX = e.clientX;
 		startY = e.clientY;
