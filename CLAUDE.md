@@ -72,6 +72,8 @@ defer db.Close()
 
 Run the relevant subset (e.g., backend-only changes skip step 4). Report results explicitly — don't just say "tests pass", show the output summary.
 
+**Mutation testing** (`make mutate` in `backend/`, `pnpm run mutate` in `frontend/`; slow, run deliberately): a run where nothing survives is a harness bug, not a pass — hand-apply one mutant and confirm the suite fails before trusting a score. **Report results as what they say about the tests, not the tool:** "your tests caught X of Y planted bugs (killed)", "missed Z (lived/survived)", "N places no test runs (not covered)"; "efficacy" is the efficacy of the tests. Give the all-in figure (caught ÷ every planted bug) beside the efficacy figure. Language table, baselines and pitfalls: `docs/superpowers/specs/2026-09-29-test-hardening-spike.md`.
+
 **Browser verification is local-only** (needs the gitignored `.claude/.env` + `.claude/sv-profile/`). Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in: run only the checklist above, and label a user-visible PR `needs-demo-video` instead of claiming it's ready (see [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md#demo-requirement-ready-for-review)).
 
 **`.env*` files (except `.env.example`) are unreadable by design** — expected, not a broken setup. Never attempt to log in or enter credentials; ask the human to re-run the one-time login if signed out. Evidence capture: [.docs/VERIFICATION.md](.docs/VERIFICATION.md).

@@ -19,19 +19,38 @@ Mutation testing is the direct check: change the code in a small way (flip `>` t
 
 ## Baseline results
 
+### How to report mutation results (use this language)
+
+Report what the mutation tool says **about the tests**, not about the tool. "Efficacy" here is the efficacy of *your tests*, not of Gremlins or Stryker. Lead with "your tests caught X of Y", keep the tool's term in parentheses so output still maps back.
+
+| Tool says | Say this |
+|---|---|
+| Killed | Your tests **caught** the planted bug |
+| Lived / Survived | Your tests **missed** it: the code changed and every test still passed |
+| Timed out | The bug made a test hang — counts as caught |
+| Test efficacy (Gremlins) / mutation score (Stryker) | **How many of the planted bugs your tests caught**, in code they run |
+| Not covered / No coverage | Code **no test runs at all**, so no test could catch a bug there |
+| Mutator coverage | How much of the place-a-bug-here surface your tests run |
+
+Also give the all-in figure (caught ÷ every planted bug, including untested code) next to the efficacy figure, since efficacy alone ignores untested code.
+
 ### Backend (Gremlins v0.6.0, full run, 2026-09-30) — valid
+
+**Your backend tests caught 749 of the 849 bugs planted in code they run (88.2%).** Counting code no test runs, they caught about 69% (749 of ~1,080 places a bug could go).
 
 | | |
 |---|---|
-| Runnable mutants | 858 (+231 not covered by any test) |
-| Killed | 749 |
-| **Lived** | **100** |
-| Timed out | 7 |
-| Test efficacy (killed / killed+lived) | **88.2%** |
-| Mutator coverage (mutants any test reaches) | 78.6% |
+| Caught (killed) | 749 |
+| **Missed (lived)** | **100** |
+| Caught by hang (timed out) | 7 |
+| Code no test runs (not covered) | 231 |
+| Tests caught this share of bugs in code they run (efficacy) | **88.2%** |
+| Share of the bug-surface your tests run (mutator coverage) | 78.6% |
 | Wall time | 1h 33m (3 workers, 4 cores) |
 
-Where the 100 survivors are: `graphql/resolvers` 25 (18 in `helpers.go`), `core/services` 21 (`content_service.go` 9, `perspective_service.go` 8), `repositories/postgres` 19 (14 in `gorm_mappers.go`), `wikidata` 11, `realtime` 9, `youtube` 5, `core/domain` 3, `auth` 3, `config` 2, `directives` 2. By kind: 53 boundary (`>` vs `>=`), 38 negation, 4 arithmetic, 4 increment/decrement, 1 negative-inversion. Boundary and mapper survivors are the classic signature of tests that check the happy path but not edges or every mapped field. Six of the seven timeouts are in `realtime/hub.go` (a mutated condition turning a loop into a hang — expected, not a test gap by itself).
+The suite has 579 top-level Go tests (~268 `t.Run` subtests inside them). Mutants and tests are not paired: each mutant was checked against the whole suite.
+
+Where your tests missed (the 100): `graphql/resolvers` 25 (18 in `helpers.go`), `core/services` 21 (`content_service.go` 9, `perspective_service.go` 8), `repositories/postgres` 19 (14 in `gorm_mappers.go`), `wikidata` 11, `realtime` 9, `youtube` 5, `core/domain` 3, `auth` 3, `config` 2, `directives` 2. By kind: 53 boundary (`>` vs `>=`), 38 negation, 4 arithmetic, 4 increment/decrement, 1 negative-inversion. Boundary and mapper survivors are the classic signature of tests that check the happy path but not edges or every mapped field. Six of the seven timeouts are in `realtime/hub.go` (a mutated condition turning a loop into a hang — expected, not a test gap by itself).
 
 Two caveats: (1) `ComputeTag` and the Bible verse-ordinal logic read as under-tested only because their tests are on the `MUTATE_SKIP` list (finding 3b); (2) DB-backed tests were not run, so repository numbers reflect sqlmock tests only.
 
