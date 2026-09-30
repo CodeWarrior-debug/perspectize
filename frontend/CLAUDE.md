@@ -251,7 +251,7 @@ Symptom in the browser: `Failed to load module script: Expected a JavaScript-or-
 
 **Custom AG Grid filter/cell components (vanilla `IFilterComp` classes) *are* jsdom-testable** — instantiate, call `init()` with a stub `filterChangedCallback`, and assert on `getGui()`. Mount the GUI first (`document.body.replaceChildren(filter.getGui())`): `.click()` on a detached checkbox fires no `change` event (see `tests/unit/contentTypeFilter.test.ts`).
 
-**`SettingsDialog.test.ts`'s theme-section test is flaky under the full suite.** It can time out at 5s (`fireEvent.click` on "Customize theme") when run with the whole suite, but passes in isolation every time. Rerun the single file before assuming a change broke it.
+**A test with more render work than usual needs its own timeout, not just a rerun.** `SettingsDialog.test.ts`'s theme-section test mounts `ThemeCustomizePanel` (28 presets) on click; under full-suite CPU contention that legitimately exceeds Vitest's default 5s per-test budget even though nothing is stuck — it flaked intermittently until given an explicit longer timeout (`it(name, fn, 15000)`).
 
 **No Set Filter in AG Grid Community.** For a column with a small fixed set of values, use a custom checkbox filter like `ContentTypeFilter` (`$lib/utils/contentTypeFilter.ts`, `{ filterType: 'set', values }` model) plus `filterSet: true` on its `ColumnMeta` — see ADDING_AG_GRID_COLUMN.md Decision 6.
 
