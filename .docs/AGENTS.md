@@ -1,286 +1,83 @@
-# Agent Routing Guide
+# Agent Roster & Routing
 
-This document helps AI agents (Claude Code, subagents, skills) navigate the Perspectize codebase efficiently.
+The project subagents in `.claude/agents/`, what each is for, and how to use
+them. Coding patterns are **not** repeated here. They live in the package
+CLAUDE.md files (`backend/CLAUDE.md`, `frontend/CLAUDE.md`), which every agent
+is told to read first. Keeping one copy is what stops the agents drifting from
+the code.
 
-## Quick Navigation Matrix
+## Roster
 
-| Task | Read First | Subagent | Model | Skills to Load |
-|------|------------|----------|-------|----------------|
-| Go backend work | `backend/internal/` | `go-backend` | Sonnet | `backend-development` |
-| GraphQL changes | `schema.graphql` | `graphql-designer` | Sonnet | `api-scaffolding:graphql-architect` |
-| Database migrations | `migrations/` | `db-migration` | Sonnet | `devops-tools:databases` |
-| Code review | `.golangci.yml` | `code-reviewer` | Haiku | - |
-| Test writing | `*_test.go` files | `test-writer` | Haiku | - |
-| Architecture decisions | `docs/ARCHITECTURE.md` | - | Opus | - |
+### Implementation (backend)
 
-## Domain-Specific Instructions
+| Agent | Model | Use for | Hand off to |
+|---|---|---|---|
+| `go-backend` | Sonnet | Domain models, ports, services, GORM repositories, resolver wiring, middleware | `graphql-designer` for SDL; `db-migration` for SQL |
+| `graphql-designer` | Sonnet | `schema.graphql` / `messaging.graphql` changes, `make graphql-gen` (and its `schema.resolvers.go` collision), resolvers, dataloaders | `go-backend` for service logic |
+| `db-migration` | Sonnet | Writing and reviewing golang-migrate SQL. **Never applies migrations** (shared Sevalla DB) | — |
+| `test-writer` | Sonnet | Table-driven testify tests, regression tests, coverage gaps (hand-written mocks, sqlmock GORM harness) | — |
 
-### Go Backend (`backend/`)
+### Implementation (frontend)
 
-**Entry Points:**
-- `cmd/server/main.go` - Application bootstrap, DI wiring
-- `internal/core/domain/` - Domain models (start here for new entities)
-- `internal/core/services/` - Business logic (start here for feature logic)
-- `internal/adapters/repositories/` - Database access (start here for queries)
+| Agent | Model | Use for | Hand off to |
+|---|---|---|---|
+| `svelte-frontend` | Sonnet | Svelte 5 components, routes, `lib/queries/<domain>` hooks, frontend follow-ups to schema changes | `vitest-writer` for tests; `figma-designer` for Figma input |
+| `vitest-writer` | Sonnet | Vitest unit, component (`@testing-library/svelte`) and Browser Mode tests; UI regression tests | — |
 
-**Key Patterns:**
-```go
-// Resolver pattern - delegates to service layer
-func (r *queryResolver) Content(ctx context.Context, id string) (*model.Content, error) {
-    return r.contentService.GetByID(ctx, id)
-}
+### Review
 
-// Service pattern - interface-first
-type ContentService interface {
-    GetByID(ctx context.Context, id string) (*domain.Content, error)
-    Create(ctx context.Context, input dto.CreateContentInput) (*domain.Content, error)
-}
+| Agent | Model | Use for |
+|---|---|---|
+| `code-reviewer` | inherit | Read-only review of Go backend diffs against the repo's rules (hexagonal, GORM separation, owner guards, pagination error checks, migration safety) |
 
-// Repository pattern - sqlx named queries
-func (r *ContentRepository) GetByID(ctx context.Context, id int) (*domain.Content, error) {
-    var content domain.Content
-    err := r.db.GetContext(ctx, &content,
-        `SELECT * FROM content WHERE id = $1`, id)
-    return &content, err
-}
-```
+### Research & external systems
 
-**Do:**
-- Use `context.Context` as first parameter everywhere
-- Return `error` as last return value
-- Use sqlx named queries for complex SQL
-- Write table-driven tests
-- Follow hexagonal architecture (domain never imports adapters)
+Each of these holds its own scoped MCP connection, so the main session never
+loads that tool set. Continue a running one with `SendMessage` instead of
+spawning a new one.
 
-**Don't:**
-- Put business logic in resolvers
-- Use raw SQL string concatenation
-- Ignore errors
-- Use `panic` in library code
-- Add database tags to domain models
+| Agent | Model | Use for |
+|---|---|---|
+| `context7-docs` | Sonnet | Current library/framework docs (gqlgen, SvelteKit, TanStack Query, GORM, …) as a distilled, cited answer |
+| `figma-designer` | Sonnet | Figma links, design-to-code, tokens, Code Connect |
+| `sevalla-mcp-ops` | Haiku | Sevalla deployments, SHAs, logs, env vars, domains, metrics |
 
-### GraphQL (`schema.graphql`)
+### Legacy (GSD)
 
-**Workflow:**
-1. Edit schema: `schema.graphql`
-2. Regenerate: `make graphql-gen`
-3. Implement resolver: `internal/adapters/graphql/resolvers/`
-4. Test at `/graphql`
+`gsd-*` agents serve only the kept GSD commands (`gsd:map-codebase`,
+`gsd:docs-update`, roadmap management). See [PLANNING.md](PLANNING.md).
 
-**Resolver Pattern:**
-```go
-func (r *queryResolver) Content(ctx context.Context, id string) (*model.Content, error) {
-    // Delegate to service layer - don't put logic here
-    return r.contentService.GetByID(ctx, id)
-}
+### Gaps
 
-// Use DataLoader for N+1 prevention
-func (r *contentResolver) Perspectives(ctx context.Context, obj *model.Content) ([]*model.Perspective, error) {
-    return r.loaders.PerspectivesByContentID.Load(ctx, obj.ID)
-}
-```
+- There is no frontend reviewer: `code-reviewer` covers Go only. Use the
+  `/code-review` skill for Svelte diffs.
+- There is no agent for Playwright demo tours (`frontend/demo/`); see
+  [DEMO_MODE.md](DEMO_MODE.md).
 
-### Database (`migrations/`)
+## Using agents in superpowers plans
 
-**Migration Naming:**
-```
-{sequence}_{description}.up.sql
-{sequence}_{description}.down.sql
-```
+See [PLANNING.md → Suggested subagent types](PLANNING.md#suggested-subagent-types).
+In short: plans *suggest* an agent per task. The executing skill decides
+whether to dispatch it directly or use it as a reference for its own prompt.
 
-**Examples:**
-- `000001_initial_schema.up.sql`
-- `000002_add_perspectives_table.up.sql`
-- `000003_add_user_preferences.up.sql`
+## Designing or editing an agent
 
-**Rules:**
-1. Always provide both `.up.sql` AND `.down.sql`
-2. Make down migrations reversible when possible
-3. Use `IF EXISTS` / `IF NOT EXISTS` for safety
-4. Add indexes for foreign keys and frequently queried columns
-5. Use `TIMESTAMPTZ` not `TIMESTAMP` for times
-
-**PostgreSQL-Specific:**
-```sql
--- Use custom domains for constraints
-CREATE DOMAIN valid_integer_range AS INTEGER
-CHECK (VALUE BETWEEN 0 AND 10000);
-
--- Use JSONB for flexible data
-response JSONB,
-
--- Index JSONB paths you query
-CREATE INDEX idx_content_response_title
-ON content ((response->>'title'));
-```
-
-### Testing (`*_test.go`, `test/`)
-
-**Unit Test Location:** Same package as code being tested
-```
-internal/core/services/
-├── perspective_service.go
-└── perspective_service_test.go  # Tests for perspective_service.go
-```
-
-**Integration Tests:** `test/integration/`
-```
-test/
-├── integration/
-│   ├── content_test.go
-│   └── perspective_test.go
-└── fixtures/
-    └── test_data.sql
-```
-
-**Test Pattern:**
-```go
-func TestPerspectiveService_Create(t *testing.T) {
-    tests := []struct {
-        name    string
-        input   dto.CreatePerspectiveInput
-        want    *domain.Perspective
-        wantErr bool
-    }{
-        {
-            name: "valid perspective",
-            input: dto.CreatePerspectiveInput{
-                ContentID: 1,
-                Quality:   7500,
-            },
-            want: &domain.Perspective{Quality: 7500},
-        },
-        {
-            name:    "quality out of range",
-            input:   dto.CreatePerspectiveInput{Quality: 15000},
-            wantErr: true,
-        },
-    }
-
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            // Setup mocks...
-            got, err := service.Create(ctx, tt.input)
-            if tt.wantErr {
-                assert.Error(t, err)
-                return
-            }
-            assert.NoError(t, err)
-            assert.Equal(t, tt.want.Quality, got.Quality)
-        })
-    }
-}
-```
-
-## Build & Test Commands
-
-```bash
-# Development
-make run              # Start server on :8080
-make dev              # Start with hot reload (air)
-
-# Testing
-make test             # Run unit tests
-make test-coverage    # Generate coverage report
-
-# Database
-make migrate-up       # Apply migrations
-make migrate-down     # Rollback one migration
-make migrate-version  # Show migration status
-make migrate-create   # Create new migration
-
-# Code Quality
-make lint             # Run golangci-lint
-make fmt              # Format code
-
-# GraphQL
-make graphql-gen      # Regenerate gqlgen code
-```
-
-## File Discovery Patterns
-
-When searching the codebase, use these patterns:
-
-```bash
-# Find all domain models
-Glob: internal/core/domain/*.go
-
-# Find all services
-Glob: internal/core/services/*.go
-
-# Find all tests
-Glob: **/*_test.go
-
-# Find repository implementations
-Glob: internal/adapters/repositories/**/*.go
-
-# Find migrations
-Glob: migrations/*.sql
-
-# Find GraphQL schema
-Glob: schema.graphql
-
-# Search for error handling
-Grep: "if err != nil"
-
-# Search for TODO/FIXME
-Grep: "TODO|FIXME"
-```
-
-## Context Boundaries
-
-### What Each Subagent Should Know
-
-**`go-backend` (Sonnet):**
-- Go idioms and best practices
-- Hexagonal architecture patterns
-- sqlx query patterns
-- Error handling conventions
-- Project structure
-
-**`graphql-designer` (Sonnet):**
-- GraphQL schema design
-- gqlgen configuration
-- Resolver patterns
-- DataLoader for N+1
-- Input validation
-
-**`db-migration` (Sonnet):**
-- PostgreSQL DDL syntax
-- Migration best practices
-- Indexing strategies
-- Data type selection
-
-**`code-reviewer` (Haiku):**
-- Go style guidelines
-- golangci-lint rules
-- Common code smells
-- Security considerations
-
-**`test-writer` (Haiku):**
-- Table-driven test patterns
-- testify assertions
-- sqlmock for DB mocking
-- Test file organization
-
-## Prompt Caching Optimization
-
-For agents working on this project, structure prompts with:
-
-1. **First (cacheable):** Project context from CLAUDE.md
-2. **Second (cacheable):** Relevant skill content
-3. **Third (cacheable):** Architecture patterns from this file
-4. **Last (dynamic):** Specific task instructions
-
-This ordering maximizes cache hits across sessions.
-
-## Escalation Rules
-
-| Situation | Escalate To |
-|-----------|-------------|
-| Architecture change affecting multiple packages | Opus |
-| Security-related code review | Opus |
-| Performance optimization decisions | Opus |
-| Simple bug fix | Stay with current model |
-| New endpoint following existing pattern | Sonnet |
-| Documentation updates | Haiku |
+- Keep the frontmatter `description` specific. Say when to use the agent, name
+  2–4 trigger scenarios, and say what it is **not** for. That is what the
+  dispatcher matches on.
+- The body should give the agent a *process* and *pointers* ("read
+  `backend/CLAUDE.md` first", "copy the nearest sibling file"), not a second
+  copy of the patterns. Copied examples go stale; this roster was rewritten
+  because the old agents described sqlx after the move to GORM.
+- Hard safety rules (no `migrate up/down`, no `.env` reads, no credential
+  entry) go near the top of the body, even though CLAUDE.md also has them.
+- Least-privilege tools: reviewers stay read-only, and implementers get
+  `Edit` + `Bash` so they can verify their own work.
+- Quiet verification: every line a subagent's command prints costs tokens.
+  - Go: `go test ./... 2>&1 | grep -vE '^(ok|\?)\s'` prints only failures.
+    Never use `-v` on a full run (about 2,300 lines); use it only on one
+    failing test, piped through `tail`.
+  - Vitest: the default reporter is already quiet in non-interactive shells.
+    `--reporter=dot` or `verbose` replays all test stderr (1,300+ lines).
+- Only list `skills:` entries that actually exist in the project.
+- Update this roster whenever an agent is added, renamed or retired.

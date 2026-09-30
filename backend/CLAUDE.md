@@ -11,8 +11,9 @@ backend/
 │   ├── core/         # domain/ (models), ports/ (interfaces), services/ (logic)
 │   ├── adapters/     # graphql/ (primary), repositories/ (DB), youtube/ (API)
 │   ├── config/       # Configuration loading
-│   └── middleware/    # HTTP middleware
-├── pkg/              # database/ (connection), graphql/ (IntID scalar)
+│   ├── demo/         # Demo-mode seeding
+│   └── perf/         # Performance helpers
+├── pkg/              # database/ (connection), graphql/ (IntID scalar), logger/, middleware/ (HTTP)
 └── migrations/       # SQL migration files
 ```
 
@@ -36,16 +37,16 @@ Small interface, lots of work hidden behind it (Ousterhout). Test: *how little m
 
 **Not the same as hexagonal — they stack.** Hexagonal decides *which way dependencies point* (core never imports adapters). Deep modules decides *whether each boundary is worth having*. Code can be perfectly hexagonal yet shallow: a port that mirrors every SQL query 1:1, or a service method that only calls the repo. Hexagonal draws the walls; deep modules makes each door earn its place.
 
-- **One file per domain** — `adapters/graphql/{content,perspective,user,category,messaging}.resolvers.go`. When `make graphql-gen` drops new stubs into `schema.resolvers.go`, move them to the matching domain file.
+- **One file per domain** — `adapters/graphql/resolvers/{content,perspective,user,category,messaging}.resolvers.go`. When `make graphql-gen` drops new stubs into `schema.resolvers.go`, move them to the matching domain file.
 - **Callers see ports, not structs** — services depend on `core/ports` interfaces; never reach into a repository's SQL helpers.
-- **Pull mapping down** — GraphQL model ↔ domain conversion lives once in `adapters/graphql/helpers.go` (e.g. `modelToCreatePerspectiveInput`), not inline in each resolver.
+- **Pull mapping down** — GraphQL model ↔ domain conversion lives once in `adapters/graphql/resolvers/helpers.go` (e.g. `modelToCreatePerspectiveInput`), not inline in each resolver.
 - **No pass-through methods** — a service method that only forwards to the repo with no rule/validation is a smell; give it responsibility or call the port directly.
 
 Refs: Ousterhout, *A Philosophy of Software Design*; Matt Pocock, [How To Make Codebases AI Agents Love](https://www.aihero.dev/how-to-make-codebases-ai-agents-love) (why deep modules help agents navigate). Origin: PR #339.
 
 ## Stack
 
-Go 1.25+ (pinned via `toolchain` in go.mod + Dockerfile) · gqlgen (schema-first) · PostgreSQL 17 (GORM + pgx/v5) · golang-migrate · go-playground/validator · testify · log/slog · godotenv
+Go 1.26+ (pinned via `toolchain` in go.mod + Dockerfile) · gqlgen (schema-first) · PostgreSQL 17 (GORM + pgx/v5) · golang-migrate · go-playground/validator · testify · log/slog · godotenv
 
 ### ORM: GORM (Hex-Clean Separate Model Pattern)
 
@@ -60,7 +61,7 @@ Go 1.25+ (pinned via `toolchain` in go.mod + Dockerfile) · gqlgen (schema-first
 
 ```bash
 # Setup
-go mod download && make docker-up && make migrate-up && cp .env.example .env
+go mod download && cp .env.example .env   # then fill .env by hand; no local DB setup (see Configuration)
 make install-hooks    # Activate pre-commit (gofmt + prettier)
 
 # Daily
@@ -71,11 +72,11 @@ make test-coverage    # Coverage → coverage.html
 make fmt && make lint # Format + lint
 make graphql-gen      # Regen after schema changes
 
-# Migrations
-make migrate-up       # Apply pending
-make migrate-down     # Rollback last
+# Migrations — create/inspect only during dev; see Migrations below before any up/down
 make migrate-create   # New migration (prompts for name)
 make migrate-version  # Current version
+make migrate-up       # Rollout only, per environment — never in dev
+make migrate-down     # Rollout only — never in dev
 make migrate-force    # Force version (recovery)
 
 # Docker (PostgreSQL)
@@ -93,7 +94,7 @@ may require `?sslmode=disable`.
 
 **Sevalla build strategy:** Dockerfile builder. Dockerfile path = `backend/Dockerfile` (relative to repo root, not context). Docker context = `backend`. Sevalla requires the redundant `backend/` prefix on the Dockerfile path even though context is already `backend`.
 
-**Database is remote (Sevalla)** — `DATABASE_URL` in `.env` points to `us-east1-001.proxy.sevalla.app`. No `make docker-up` needed for development. Migrations run against the remote DB.
+**Database is remote (Sevalla)** — `DATABASE_URL` in `.env` points to `us-east1-001.proxy.sevalla.app`. No `make docker-up` needed for development. Because it is shared, never run migrations against it from dev — see Migrations.
 
 ## GraphQL
 
@@ -124,15 +125,17 @@ Error handling & DB query patterns: [.docs/GO_PATTERNS.md](../.docs/GO_PATTERNS.
 3. Service: `internal/core/services/feature_service.go`
 4. Repository impl: `internal/adapters/repositories/postgres/feature_repository.go`
 5. Schema: `schema.graphql` → `make graphql-gen`
-6. Resolver: `internal/adapters/graphql/resolvers/feature_resolver.go`
+6. Resolver: `internal/adapters/graphql/resolvers/<domain>.resolvers.go` (move stubs out of `schema.resolvers.go`, see GraphQL)
 7. Wire: `cmd/server/main.go`
 8. Tests: `test/services/`, `test/repositories/`
 
 ## CORS
 
-CORS middleware is configured in `cmd/server/main.go` for local development. Currently allows all origins (`*`). Restrict to frontend's production origin before deploying.
+CORS middleware is configured in `cmd/server/main.go` from `CORS_ORIGINS` (`internal/config/security.go`, comma-separated). It defaults to `*` when unset (and the example env file sets `*`), so set it to the frontend's origin in every deployed environment.
 
 ## Gotchas
+
+**Owner-only mutations need a guard at every layer, not just `@owner`.** The directive is one check; also re-derive the actor in the resolver via `auth.RequireAuth(ctx)` (never trust a client-supplied user ID), pass it into the service method (e.g. `Delete(ctx, id, actorUserID)`) and return `domain.ErrForbidden` there, and scope the SQL itself (`WHERE user_id = ? AND id = ?`). See `deletePerspective`. When a non-owner hits someone else's **non-PUBLIC** perspective, `@owner` answers "resource not found", not "access denied", so the ID isn't confirmed to exist (matches `perspectiveByID` returning null).
 
 **GraphQL defaults:** gqlgen passes `first: Int = 10` as non-nil pointer (value `10`), not `nil`. Tests must expect the default value.
 
@@ -145,6 +148,8 @@ CORS middleware is configured in `cmd/server/main.go` for local development. Cur
 **Non-schema model fields:** use `extraFields` under a type in `gqlgen.yml` (e.g. `Content.PrimaryCategoryID`) to carry data (like an FK) onto a generated model for a resolver to use, then `go run github.com/99designs/gqlgen generate`. Populate it in `domainToModel`.
 
 **Directive arg introspection:** `graphql.GetFieldContext(ctx).Args["input"]` is the *typed* input struct (e.g. `model.UpdatePerspectiveInput`), not `map[string]interface{}`. Directive/middleware code that digs a value out of an input object must read the struct (by `json` tag via reflection), not just type-assert to a map — a map-only assertion silently fails for every real request. See `directives/auth.go` `extractResourceID`/`fieldByJSONTag`.
+
+**`Perspective.ReviewStatus`** is moderation state (`PENDING`/`APPROVED`/`REJECTED`) — don't reuse it for draft/imported markers; use `labels` or `customFields`.
 
 **Cursor pagination:** Opaque base64 (`cursor:<id>`), keyset (not OFFSET), fetch `limit+1` for `hasNextPage`, whitelist sort columns (SQL injection prevention). Helpers in `helpers.go`.
 
@@ -177,16 +182,37 @@ models:
 ## Go Version Management
 
 **`go.mod` uses `toolchain` directive** to decouple minimum version from local dev version:
-- `go 1.25` — minimum required (set by dependencies like gqlgen)
+- `go 1.26` — minimum required (set by dependencies like gqlgen)
 - `toolchain go1.26.0` — version used for local development
 
-**Dockerfile pins the base image** (`golang:1.26-alpine`) so Sevalla builds always use a known-good version.
+**Dockerfile pins the base image** (`golang:1.27-alpine`) so Sevalla builds always use a known-good version.
 
 **CI uses `go-version-file`** (`backend/go.mod`) so GitHub Actions auto-detects the version.
 
 **When Go updates locally** (e.g., Homebrew): only the `toolchain` line changes. The `go` minimum stays stable unless a dependency forces it up. Update the Dockerfile base image to match.
 
 **Never hardcode Go versions** in CI or deployment configs. Always reference `go.mod`.
+
+## Migrations
+
+**Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`) during dev or verification.** Docker itself is installed (Docker Desktop; start it with `open -a Docker`), but the normal dev setup has no local Postgres — `DATABASE_URL` / the Makefile default points at the **shared Sevalla dev database**, so `make migrate-up` mutates shared state. The only local Postgres is the isolated demo stack's (`make demo-up` from the repo root, port 5434, its own volume) — that one is safe to reset and never touches Sevalla. Migrations are applied **manually per environment** at rollout time (verified: nothing on Sevalla runs them — no runner in `cmd/server`, no CI step, no release/pre-deploy hook; the `/migrations` dir baked into the image is never executed). Migration work = write + review the SQL only; a PR that adds a migration must state it needs a manual `migrate up` against each environment.
+
+**Migration numbering:** Always check existing migration files before creating new ones. Plan-specified numbers may be stale — use `ls migrations/ | tail -5` to find the next available number. Also check open PRs/branches for an in-flight migration claiming the same number (e.g. `git log --all --oneline -- 'backend/migrations/*'`); if one exists, take the next free number and note the collision in the file header. Prefer idempotent DDL (`DROP CONSTRAINT IF EXISTS` before `ADD`, `UPDATE ... WHERE col IS NULL` before `SET NOT NULL`) so a migration is safe on a fresh DB or one already patched out of band.
+
+## Agent Delegation
+
+| Task Type | Model | Subagent | Rationale |
+|-----------|-------|----------|-----------|
+| Architecture decisions | Opus | - | Complex multi-file reasoning |
+| Go implementation | Sonnet | `go-backend` | Balanced quality/cost |
+| GraphQL schema design | Sonnet | `graphql-designer` | Schema patterns |
+| Database migrations | Sonnet | `db-migration` | SQL generation |
+| Code review | Haiku | `code-reviewer` | Fast pattern matching |
+| Test generation | Haiku | `test-writer` | Boilerplate generation |
+
+## References
+
+[gqlgen](https://gqlgen.com/) | [Hexagonal Architecture](https://alistair.cockburn.us/hexagonal-architecture/) | [Effective Go](https://go.dev/doc/effective_go) | [PostgreSQL 17](https://www.postgresql.org/docs/17/)
 
 ## Self-Verification
 

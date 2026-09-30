@@ -25,6 +25,9 @@ export const queryKeys = {
 		// share a cache key, or whichever query populates the cache first wins
 		// for the shared staleTime window and the other reads wrong fields.
 		banner: (id: string) => [...queryKeys.content.details(), 'banner', id] as const,
+		// Full ContentItem row (GET_CONTENT_DETAILS) for a details modal opened on an
+		// item that isn't in the loaded Activity rows (e.g. via `?open=<id>`).
+		row: (id: string) => [...queryKeys.content.details(), 'row', id] as const,
 		// ListComparableContent (ComparePicker.svelte) — a distinct shape/query
 		// from `list` above (adds perspectiveCount, no pagination), keyed by
 		// the debounced search term.

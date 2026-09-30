@@ -111,8 +111,19 @@ describe('useAddVideo hook', () => {
 			capturedMutationOptions.onSuccess({
 				createContentFromYouTube: { content: { name: 'Existing Video', id: '1' }, alreadyExisted: true },
 			});
-			expect(mockToastWarning).toHaveBeenCalledWith('This video has already been added');
+			expect(mockToastWarning).toHaveBeenCalledWith('This video has already been added', {
+				action: { label: 'Go to video', onClick: expect.any(Function) },
+			});
 			expect(mockToastSuccess).not.toHaveBeenCalled();
+		});
+
+		it('the duplicate toast\'s "Go to video" action opens the existing item on the Activity page', async () => {
+			const { goto } = await import('$app/navigation');
+			capturedMutationOptions.onSuccess({
+				createContentFromYouTube: { content: { name: 'Existing Video', id: '42' }, alreadyExisted: true },
+			});
+			mockToastWarning.mock.calls[0][1].action.onClick();
+			expect(goto).toHaveBeenCalledWith('/?open=42');
 		});
 
 		it('falls back to a full refetch when the response has no content item', () => {

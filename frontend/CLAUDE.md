@@ -8,14 +8,14 @@ SvelteKit web app with Svelte 5, TanStack Query, AG Grid, shadcn-svelte, and Tai
 frontend/src/
 ├── routes/              # SvelteKit file-based routing
 │   ├── +layout.svelte   # Root layout (QueryClientProvider, Header, Toaster)
-│   ├── +layout.ts       # Layout config (prerender = true)
+│   ├── +layout.ts       # Layout config (SPA: prerender = false, ssr = false)
 │   └── +page.svelte     # Home page
 ├── lib/
 │   ├── components/      # Svelte 5 components
 │   │   ├── shadcn/      # shadcn-svelte primitives (button/)
 │   │   ├── Header.svelte
 │   │   ├── PageWrapper.svelte
-│   │   └── AGGridTest.svelte
+│   │   └── …                # ActivityTable, feature folders (auth/, discover/, interlinear/, …)
 │   ├── queries/         # TanStack Query + graphql-request
 │   │   ├── client.ts    # GraphQLClient (VITE_GRAPHQL_URL)
 │   │   ├── keys.ts      # Cross-domain query keys
@@ -38,6 +38,12 @@ Small interface, lots of work hidden behind it (Ousterhout). Test: _how little m
 - **No pass-through components** — a wrapper that only forwards props/snippets to one child adds surface without hiding anything; inline it or give it state/logic.
 
 Refs: Ousterhout, _A Philosophy of Software Design_; Matt Pocock, [How To Make Codebases AI Agents Love](https://www.aihero.dev/how-to-make-codebases-ai-agents-love) (why deep modules help agents navigate). Origin: PR #339.
+
+## Docs
+
+- [Design Spec](docs/DESIGN_SPEC.md) — Figma design system, color tokens, typography, component specs
+- [Adding an AG Grid Column](../.claude/docs/ADDING_AG_GRID_COLUMN.md) — decision checklist for ActivityTable columns
+- Figma: see [Figma Design Workflow](#figma-design-workflow) below
 
 ## shadcn-svelte Components
 
@@ -67,6 +73,8 @@ pnpm run test         # Tests in watch mode
 
 **Cloud/CI sandbox sessions start with no `frontend/node_modules`** (a fresh container/checkout, unlike a local dev machine). `pnpm run check`, `test:run`, etc. fail with confusing module-resolution errors — not an "install first" message — until `pnpm install` is run once in `frontend/`.
 
+**`pnpm-lock.yaml` merge conflicts:** accept either side (`git checkout --theirs frontend/pnpm-lock.yaml`), then regenerate with `pnpm install --dir frontend`. Use `--dir` instead of `cd` to avoid hook/shell side effects that can switch branches mid-operation.
+
 **Env vars:** `.env.example` lists every `VITE_*` variable by name (values blank on purpose). Copy it to `frontend/.env` and fill in real values by hand — the agent cannot read `.env` (see [../.docs/SECURITY.md](../.docs/SECURITY.md)).
 
 ## Svelte 5 Patterns
@@ -91,6 +99,10 @@ This project uses **Svelte 5 runes** exclusively. Do not use Svelte 4 syntax.
 **An `$effect` that writes a `$state` var and then reads that same var back (even just-assigned) loops.** Svelte 5 flags this as `effect_update_depth_exceeded` — assigning `foo = x` then reading `foo.length` later in the same effect re-triggers the effect indefinitely, even though the value is unchanged. Fix: read from a local `const` derived off the source (prop) instead of reading the `$state` var back. See `PerspectivePopover.svelte`'s `existingPerspective` reset effect.
 
 **An Escape handler inside a bits-ui dialog must run in the capture phase, or the dialog closes on the same keypress.** bits-ui's escape layer listens for `keydown` on `document` in the bubble phase and the dialog registered first, so a bubble-phase listener (including `<svelte:document onkeydown>`) runs too late for `stopPropagation` to help, and its `onEscapeKeydown` gets a cloned event so `defaultPrevented` is lost. Register `document.addEventListener('keydown', h, { capture: true })` in an `$effect` (with cleanup) and call `stopPropagation()` only while your inner element (popover, pin) is actually showing, so a second Escape still closes the dialog. See `interlinear/InterlinearPassage.svelte`; its test uses a bubble-phase `document` spy to prove the dialog never sees the first Escape.
+
+## Auth (Clerk + demo mode)
+
+**Don't import `svelte-clerk` in new components.** Use the facade: `useAuthState()` (`$lib/auth/useAuthState`), `getAuthToken()` (`$lib/auth`), and `components/auth/{AuthShow,SignInTrigger,UserMenu}.svelte`. With `VITE_DEMO_MODE=true` there is no `ClerkProvider` in the tree, so a direct `useClerkContext()`/`<Show>` crashes demo mode (and the `demo-e2e` CI job). `$lib/auth` itself must stay free of `svelte-clerk` imports — importing the real package into a plain module breaks unit tests that load it (`$env/dynamic/public` is undefined under Vitest). See [../.docs/DEMO_MODE.md](../.docs/DEMO_MODE.md).
 
 ## TanStack Query + GraphQL
 
@@ -122,6 +134,8 @@ Queries use `graphql-request` with TanStack Svelte Query.
 
 **Do NOT:** Use `$query.data` (stores syntax) · Pass options object directly to `createQuery({...})` (must be function wrapper)
 
+**Adding a `useX` hook to a component means mocking it in that component's tests.** Component tests (e.g. `tests/components/PerspectivePopover.test.ts`) `vi.mock` each mutation hook individually and render without a QueryClient provider. A newly imported hook left unmocked calls the real `useQueryClient()` and throws.
+
 **`queryKey` must mirror every variable `queryFn` actually sends.** If `queryFn` conditionally builds request variables (e.g. `mode === 'all' ? filter : undefined`), the `queryKey` object needs the _same_ conditional — not a shortcut that hardcodes a fixed value for one branch. A `queryKey` field that doesn't change when the real request variable does means TanStack Query never sees a reason to refetch: the UI silently keeps serving stale cached data for that branch, no matter how the input changes (including back to empty/cleared). Caught in `ActivityTable.svelte`'s search box, which hardcoded `search: ''`/`filter: undefined` in the key for "Loaded" mode while `queryFn` unconditionally sent the real filter — so typing or clearing the search input never refetched.
 
 **`isLoading` is `false` for a paused (offline) query — branch on `isPending` for the loading state.** TanStack v5 defines `isLoading = isPending && isFetching`; while the network is offline a first fetch is paused (`isPending: true`, `isFetching: false`, no data, no error). A `{#if isLoading}…{:else if isError}…{:else if data}` chain then renders nothing at all. `interlinear/OriginalLanguage.svelte` uses `isPending`; its test covers `{ isPending: true, isLoading: false, isError: false, data: undefined }`.
@@ -141,6 +155,10 @@ Per-icon imports from `@lucide/svelte` for tree-shaking:
 
 - Import path: `@lucide/svelte/icons/{kebab-case-name}`
 - Default size in buttons: `size-4` (applied via button base). Override with explicit `size-*` class.
+
+## Pre-commit colour guard
+
+The shared git pre-commit hook (`make install-hooks`; see [.docs/HOOKS.md](../.docs/HOOKS.md)) **blocks** new raw hex/rgb colour literals added to `src/lib/components/**` or `formatting.ts` — use theme tokens (see `.docs/UI_THOROUGHNESS_CHECKLIST.md` §3.3). Allowlist an intentional literal inline with a `hex-ok: <reason>` comment.
 
 ## Design Tokens
 
@@ -203,6 +221,8 @@ Symptom in the browser: `Failed to load module script: Expected a JavaScript-or-
 
 **The PWA service worker is built but never registered.** Nothing injects `registerSW.js`, so production has no SW, and #312's `skipWaiting`/`clientsClaim` never took effect. Before wiring registration up, note that `sw.js` routes navigations to a non-precached `/`, which fails install. A precaching SW that activates mid-session also deletes the old build's chunks, which brings back the version-skew problem above.
 
+**`@vite-pwa/sveltekit` appends `prerendered/**/*.{html,json}` to `workbox.globPatterns`** (via `push()`, unless one starting `prerendered/` exists). This SPA has `prerender = false`, so the dir is empty when workbox runs and Sevalla surfaces "One of the glob patterns doesn't match any files" as a deploy error. Adding your own `prerendered/` pattern doesn't help (still empty); `vite.config.ts`'s `withoutPrerenderedGlob()` drops it. Verify: `pnpm run build`, then check the `PWA v…` block has no `warnings`.
+
 ## Self-Verification (Chrome DevTools MCP)
 
 | Step       | Tool                                          | Purpose                        |
@@ -229,7 +249,11 @@ Symptom in the browser: `Failed to load module script: Expected a JavaScript-or-
 
 **AG Grid testing strategy:** AG Grid doesn't render in jsdom — no lifecycle hooks, no Grid API, no cell rendering. Test AG Grid logic by extracting pure functions into `$lib/utils/grid-config.ts` (sort mapping, pagination bounds, responsive tiers, comparators, column metadata). Test renderers/formatters via `$lib/utils/formatting.ts`. For grid integration (filter UI, sort clicks, responsive `$effect` blocks), use Playwright E2E or Vitest Browser Mode (`tests/browser/`, see below). See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) testing section.
 
-**Vitest Browser Mode (`tests/browser/`, config in `vitest.config.browser.ts`) is not run in CI** — `frontend-test.yml` only runs `test:coverage` on the unit project. A browser-test assertion can be wrong from the day it's written and nothing catches it (`ag-grid-integration.test.ts` had stale `formatCount` expectations that never once passed). Run `pnpm run test:browser --browser.headless=true` locally before trusting a browser test file. No Playwright download is needed on macOS: the config drives the installed Google Chrome (override with `PW_CHROMIUM_EXECUTABLE`).
+**Custom AG Grid filter/cell components (vanilla `IFilterComp` classes) *are* jsdom-testable** — instantiate, call `init()` with a stub `filterChangedCallback`, and assert on `getGui()`. Mount the GUI first (`document.body.replaceChildren(filter.getGui())`): `.click()` on a detached checkbox fires no `change` event (see `tests/unit/contentTypeFilter.test.ts`).
+
+**No Set Filter in AG Grid Community.** For a column with a small fixed set of values, use a custom checkbox filter like `ContentTypeFilter` (`$lib/utils/contentTypeFilter.ts`, `{ filterType: 'set', values }` model) plus `filterSet: true` on its `ColumnMeta` — see ADDING_AG_GRID_COLUMN.md Decision 6.
+
+**Vitest Browser Mode (`tests/browser/`, config in `vitest.config.browser.ts`) runs in CI** (`frontend-test.yml`, after the unit coverage step, on Playwright's Chromium). It used to be local-only, which let assertions be wrong from day one (`ag-grid-integration.test.ts` had stale `formatCount` expectations that never once passed) — a red browser step is now a real failure. Run `pnpm run test:browser --browser.headless=true` locally first. Browser tests that need demo mode (no Clerk) must call `vi.hoisted(() => vi.stubEnv('VITE_DEMO_MODE', 'true'))` at the top of the file; a config-level `define` leaks into the unit project and breaks every Clerk-auth unit test. `svelte-clerk` is aliased to a stub in the browser config because the real package needs SvelteKit virtual modules. No Playwright download is needed on macOS: the config drives the installed Google Chrome (override with `PW_CHROMIUM_EXECUTABLE`).
 
 **Browser tests: wait for cells, not rows.** AG Grid creates `.ag-row` elements before their cell renderers draw, so a count taken right after `waitForGridReady()` can see 0 cells. Poll the assertion instead: `await expect.poll(() => document.querySelectorAll(sel).length).toBe(n)`. (The thumbnail test flaked about 1 in 5 runs until it did this.)
 

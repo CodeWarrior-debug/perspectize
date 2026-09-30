@@ -68,6 +68,7 @@ type Content struct {
 
 type ContentFilter struct {
 	ContentType       *domain.ContentType         `json:"contentType,omitempty"`
+	ContentTypes      []domain.ContentType        `json:"contentTypes,omitempty"`
 	MinLengthSeconds  *int                        `json:"minLengthSeconds,omitempty"`
 	MaxLengthSeconds  *int                        `json:"maxLengthSeconds,omitempty"`
 	Search            *string                     `json:"search,omitempty"`

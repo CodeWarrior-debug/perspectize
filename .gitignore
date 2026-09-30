@@ -76,3 +76,9 @@ logs/
 data/bible/interlinear/
 __pycache__/
 *.pyc
+
+# Demo tour/E2E output (videos, reports, traces)
+frontend/demo/out/
+
+# claude plugin eval output
+evals/**/results/

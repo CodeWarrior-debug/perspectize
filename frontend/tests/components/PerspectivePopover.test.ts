@@ -2,10 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import PerspectivePopover from '$lib/components/PerspectivePopover.svelte';
 import { tick } from 'svelte';
+import type { PerspectiveItem } from '$lib/queries/perspectives';
 
 const mocks = vi.hoisted(() => ({
 	mockCreateMutate: vi.fn(),
 	mockUpdateMutate: vi.fn(),
+	mockDeleteMutate: vi.fn(),
 	mockOnClose: vi.fn(),
 	mockSaveDraft: vi.fn(),
 	mockLoadDraft: vi.fn(() => null as string | null),
@@ -41,6 +43,13 @@ vi.mock('$lib/queries/perspectives/useUpdatePerspective', () => ({
 vi.mock('$lib/queries/perspectives/useHermeneuticApproaches', () => ({
 	useHermeneuticApproaches: vi.fn(() => ({
 		data: { hermeneuticApproaches: [] },
+	})),
+}));
+
+vi.mock('$lib/queries/perspectives/useDeletePerspective', () => ({
+	useDeletePerspective: vi.fn(() => ({
+		mutate: mocks.mockDeleteMutate,
+		isPending: false,
 	})),
 }));
 
@@ -623,6 +632,44 @@ describe('PerspectivePopover component', () => {
 		});
 	});
 
+	describe('feel-wheel', () => {
+		const wheelSearch = () => screen.queryByPlaceholderText(/Search more feelings/);
+
+		it('starts closed in create mode, showing only the "Add a feeling" button', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			expect(screen.getByRole('button', { name: /Add a feeling/ })).toBeInTheDocument();
+			expect(wheelSearch()).not.toBeInTheDocument();
+		});
+
+		it('opens the wheel on the same tick as the click, with no loading state', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			await fireEvent.click(screen.getByRole('button', { name: /Add a feeling/ }));
+			expect(wheelSearch()).toBeInTheDocument();
+			expect(screen.queryByText(/Loading feel-wheel/)).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /Add a feeling/ })).not.toBeInTheDocument();
+		});
+
+		it('opens already expanded when editing a perspective that has feelings', async () => {
+			renderPopover({
+				existingPerspective: {
+					id: '4',
+					quality: null,
+					agreement: null,
+					importance: null,
+					confidence: null,
+					like: null,
+					feelings: [{ emoji: '😊', label: 'Happy', intensity: 7000, note: null }],
+				},
+			});
+			await tick();
+			expect(wheelSearch()).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Remove Happy' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /Add a feeling/ })).not.toBeInTheDocument();
+		});
+	});
+
 	describe('accessibility', () => {
 		it('dialog is accessible with proper roles', async () => {
 			renderPopover();
@@ -860,6 +907,105 @@ describe('PerspectivePopover component', () => {
 			expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
 			expect(screen.getByLabelText('Comment')).toHaveValue('<p>saved copy</p>');
 			expect(screen.queryByText('Restored unsaved draft')).not.toBeInTheDocument();
+		});
+	});
+	describe('deleting a perspective', () => {
+		const own: PerspectiveItem = {
+			id: '7',
+			userID: '42',
+			contentID: '1',
+			quality: 5000,
+			agreement: null,
+			importance: null,
+			confidence: null,
+			like: null,
+			review: null,
+			privacy: 'PUBLIC',
+			description: null,
+			primaryPerspectiveID: null,
+			relatedPerspectiveIDs: null,
+			customFields: null,
+			feelings: null,
+			createdAt: '2026-01-01T00:00:00Z',
+			updatedAt: '2026-01-01T00:00:00Z',
+		};
+
+		// Ownership alone decides — privacy never grants or removes the option.
+		// 'SHARED' isn't a real privacy value yet; it stands in for any future one.
+		it.each(['PUBLIC', 'PRIVATE', 'SHARED'])("offers delete on the user's own %s perspective", async (privacy) => {
+			renderPopover({ existingPerspective: { ...own, privacy }, userId: 42 });
+			await tick();
+			expect(screen.getByRole('button', { name: 'Delete perspective' })).toBeInTheDocument();
+		});
+
+		it.each(['PUBLIC', 'PRIVATE', 'SHARED'])(
+			"never shows delete for another user's %s perspective",
+			async (privacy) => {
+				renderPopover({ existingPerspective: { ...own, userID: '99', privacy }, userId: 42 });
+				await tick();
+				expect(screen.queryByRole('button', { name: 'Delete perspective' })).not.toBeInTheDocument();
+				expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+			},
+		);
+
+		it('never shows delete when the owner is unknown or the viewer is signed out', async () => {
+			const { unmount } = renderPopover({ existingPerspective: { ...own, userID: undefined }, userId: 42 });
+			await tick();
+			expect(screen.queryByRole('button', { name: 'Delete perspective' })).not.toBeInTheDocument();
+			unmount();
+
+			renderPopover({ existingPerspective: { ...own, userID: '0' }, userId: 0 });
+			await tick();
+			expect(screen.queryByRole('button', { name: 'Delete perspective' })).not.toBeInTheDocument();
+		});
+
+		it('never shows delete when creating a new perspective', async () => {
+			renderPopover({ existingPerspective: null, userId: 42 });
+			await tick();
+			expect(screen.queryByRole('button', { name: 'Delete perspective' })).not.toBeInTheDocument();
+		});
+
+		it('asks for confirmation before deleting, and "Keep it" backs out', async () => {
+			renderPopover({ existingPerspective: own, userId: 42 });
+			await tick();
+
+			await fireEvent.click(screen.getByRole('button', { name: 'Delete perspective' }));
+			expect(screen.getByText("Delete this perspective? This can't be undone.")).toBeInTheDocument();
+			expect(mocks.mockDeleteMutate).not.toHaveBeenCalled();
+
+			await fireEvent.click(screen.getByRole('button', { name: 'Keep it' }));
+			expect(screen.queryByText("Delete this perspective? This can't be undone.")).not.toBeInTheDocument();
+			expect(mocks.mockDeleteMutate).not.toHaveBeenCalled();
+			expect(mocks.mockOnClose).not.toHaveBeenCalled();
+		});
+
+		it('confirming deletes by id, clears the draft and closes', async () => {
+			const onSuccess = vi.fn();
+			render(PerspectivePopover, {
+				props: {
+					contentId: 1,
+					contentName: 'Test Content',
+					userId: 42,
+					open: true,
+					onClose: mocks.mockOnClose,
+					onSuccess,
+					existingPerspective: own,
+				},
+			});
+			await tick();
+
+			await fireEvent.click(screen.getByRole('button', { name: 'Delete perspective' }));
+			await fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+			expect(mocks.mockDeleteMutate).toHaveBeenCalledTimes(1);
+			const [input, opts] = mocks.mockDeleteMutate.mock.calls[0];
+			expect(input).toEqual({ id: '7', contentID: '1' });
+
+			opts.onSuccess();
+			expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
+			expect(mocks.mockOnClose).toHaveBeenCalled();
+			// onSuccess means "created/updated" to callers (e.g. onboarding progress).
+			expect(onSuccess).not.toHaveBeenCalled();
 		});
 	});
 	describe('expanding the comment editor in place', () => {

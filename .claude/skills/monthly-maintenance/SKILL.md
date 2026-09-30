@@ -1,6 +1,6 @@
 ---
 name: monthly-maintenance
-description: Run the monthly repo maintenance routine (merged-branch cleanup, dependabot/security PR merges, graphify update, gsd map-codebase refresh, video-capture demo tool compaction). Use when prompted by the SessionStart monthly-routine check, or when the user asks to "run the monthly routine" / "run monthly maintenance".
+description: Run the monthly repo maintenance routine (merged-branch cleanup, dependabot/security PR merges, graphify update, gsd map-codebase refresh, bundle size + lines-of-code measurement, video-capture demo tool compaction). Use when prompted by the SessionStart monthly-routine check, or when the user asks to "run the monthly routine" / "run monthly maintenance".
 ---
 
 # Monthly Maintenance Routine
@@ -36,7 +36,22 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
    - Backend: `go list -m -u -versions` against the direct (non-indirect) requires in `backend/go.mod`, refresh [BACKEND_DEPENDENCY_ANALYSIS.md](BACKEND_DEPENDENCY_ANALYSIS.md).
    - Patch/minor bumps with no known breaking changes can be applied directly (verify with `go build`/`go test` or `pnpm run test:run` per `CLAUDE.md`'s self-verification checklist). Majors — especially interdependent ones (e.g. Vite + its Svelte plugin + Vitest) — get flagged in the doc for a follow-up PR rather than bundled into this routine's commit.
 
-7. **Compact the video-capture demo tools.**
+7. **Measure app bundle size and speed.**
+   - `pnpm run build` in `frontend/` (static adapter → output in `frontend/build/`).
+   - Record total size of `frontend/build/` (`du -sk frontend/build`) and of the client JS/CSS in `frontend/build/_app/immutable/` (raw and gzipped: e.g. `find frontend/build/_app/immutable -name '*.js' -exec cat {} + | wc -c` and the same piped through `gzip -c | wc -c`; repeat for `*.css`).
+   - List the 5 largest chunks (`find frontend/build/_app/immutable -type f -exec du -k {} + | sort -rn | head -5`) and name what's in them (AG Grid, TanStack, Clerk, etc.) so growth is attributable.
+   - Compare against the previous month's row in [ROUTINES.md](../../../ROUTINES.md) (Bundle column); flag any >10% growth in total or gzipped JS for the user.
+   - Optional backend: size of the compiled server binary (`go build -o /tmp/server ./cmd/server` in `backend/`, then `ls -l`), recorded but not compared unless it jumps notably.
+   - **Speed (Lighthouse):** with the build in place, run `pnpm run perf:lighthouse` in `frontend/` (3 runs per route, config in `lighthouserc.cjs`). Report the median performance score, FCP, LCP, TBT, and CLS for `/` and `/discover`, pulled from `frontend/perf/lighthouse/results/*-report.json`. Flag a performance score drop of 5+ points or LCP growth of 15%+ against last month. `/messages` is auth-gated, so it only measures the logged-out view. In a cloud/root container Chrome refuses to start without `--no-sandbox`: run `CHROME_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome pnpm exec lhci autorun --collect.settings.chromeFlags="--no-sandbox --headless=new" --collect.url=http://localhost:4173/ --collect.url=http://localhost:4173/discover` instead. Numbers from a cloud container are only comparable to other cloud-container runs.
+   - Backend latency (k6, `backend/perf/k6/`) needs a running server plus database, so it is local-only; note it as skipped in a cloud run.
+
+8. **Count files, lines of code and tokens.**
+   - Run `python3 .claude/skills/monthly-maintenance/codebase-metrics.py --md` (drop `--md` for plain text). It reports files, lines, bytes and estimated tokens (bytes/4) for the repo total, `backend/`, `frontend/`, `.claude/` and every other top-level folder, using `git ls-files` and excluding lockfiles, generated code, binaries and bulk data (`*.tsv`). Add folders to `FOLDERS` in the script when they become worth tracking.
+   - The script is hand-rolled (no `cloc`/`tokei`/`scc` installed in cloud containers). Keep it until a standard tool is judged better; if switching, keep the exclusion list and the bytes/4 token estimate so history stays comparable.
+   - Note that `.claude/` includes the vendored GSD subset, so its size is mostly not hand-written.
+   - Record total files / LOC / tokens in ROUTINES.md and paste the full table into the routine's PR body, with notable deltas versus last month.
+
+9. **Compact the video-capture demo tools.**
    - This tool lives outside the repo at `~/.claude/tools/video-capture/` (global, not git-tracked) — see its `README.md` for the recorder-etiquette lifecycle (reuse → copy-and-adapt into `demos/<name>/` → promote).
    - List `demos/*` and skim each directory. For each one, check whether its one-off scenario has proven reusable (recorded more than once, or the PR/feature it was built for has shipped and the flow is generic): if so, **promote** it — merge the scenario branch into the shared `record-clip.mjs` (following its existing `if (SCENARIO === '...')` pattern) and delete the demo copy.
    - Flag (don't silently delete) any demo directory with multiple near-duplicate scripts recording the same flow (e.g. a `.snapshot.mjs` variant alongside the original) — ask the user which to keep before consolidating.
@@ -44,8 +59,12 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
    - Keep the "Recorders index" table in `README.md` in sync with whatever remains after promotion/deletion.
    - Prune stale clips in `~/Downloads/screenshots/sv-*.mp4|png` — cross-check against currently open PRs (`gh pr list`) and delete clips for PRs that have since merged or closed.
 
-8. **Record the run in ROUTINES.md.**
-   - Append a row: `| <Month-Year> | Y | <one-line summary — branches deleted, PRs merged, anything skipped> |`
+10. **Record the routine's own cost.**
+   - Run `python3 .claude/skills/monthly-maintenance/session-cost.py --md` last, in the session that ran the routine. It reads the session transcript and reports model turns, wall-clock and active time, and exact input/output/cache token usage (from the transcript's `usage` blocks, not an estimate). Paste the table in the PR body.
+   - Wall-clock includes time idle waiting on the user; active time drops gaps over 10 minutes. Subagent usage is only counted if it appears in the same transcript.
+
+11. **Record the run in ROUTINES.md.**
+   - Append a row: `| <Month-Year> | Y | <bundle size + speed> | <files / LOC / est. tokens> | <routine duration + tokens used> | <one-line summary — branches deleted, PRs merged, anything skipped> |`
    - If the routine was only partially completed (e.g. user deferred a step), mark `Completed` as `N` and explain why in Comments — a future session can pick it up, and the 10-merges gate won't re-trigger prematurely since the row already exists for that month.
 
 ## Notes

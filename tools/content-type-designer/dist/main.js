@@ -1,9 +1,13 @@
-import { COLUMNS, GROUP_LABELS, TYPES } from './catalog.js';
-import { buildMatrix, buildSpec } from './emit.js';
-import { bindingFor, gapText, resolveGrid, samplesFor, sortConflict, sortValue, typeLabel, unitsFor } from './model.js';
+import { COLUMNS, GROUP_LABELS, TMDB_TYPES, TYPES } from './catalog.js';
+import { detailsFor } from './details.js';
+import { el } from './dom.js';
+import { buildMatrix, buildSoloViews, buildSpec } from './emit.js';
+import { openDetails } from './modal.js';
+import { bindingFor, cellSortValue, cellText, gapText, profileFor, resolveGrid, samplesFor, sortConflict, typeLabel, unitsFor } from './model.js';
+import { attachTip, cellTipContent } from './tip.js';
 const STORAGE_KEY = 'perspectize.content-type-designer.v1';
 /** Seed the type currently being designed, so a fresh open / reset lands on a filled-in form. */
-const DEFAULT_SEED = 'bible';
+const DEFAULT_SEED = 'movie';
 function seededState(typeId) {
     const state = blankState();
     const t = TYPES.find((x) => x.id === typeId);
@@ -67,18 +71,6 @@ function save() {
     catch {
         /* private browsing — the form still works, it just will not persist */
     }
-}
-function el(tag, props = {}, children = []) {
-    const node = document.createElement(tag);
-    for (const [k, v] of Object.entries(props)) {
-        if (k === 'class')
-            node.className = String(v);
-        else
-            node[k] = v;
-    }
-    for (const c of children)
-        node.append(c);
-    return node;
 }
 function field(label, control, hint) {
     return el('label', { class: 'field' }, [
@@ -229,6 +221,263 @@ function renderColumnRow(col) {
     ]);
     return el('div', { class: 'col-row' }, [head, detail, flags]);
 }
+/* ------------------------------------------------------- shared grid bits */
+/** The details layout for a type; the draft borrows its seed's layout. */
+function layoutFor(typeId) {
+    const lookup = typeId === state.draft.id ? state.seed ?? typeId : typeId;
+    return detailsFor(lookup, typeLabel(typeId, state.draft), (col) => bindingFor(col, typeId, state)?.defaultVisible === true);
+}
+function accentFor(typeId) {
+    return profileFor(typeId, state.draft)?.accent || '#3B6FD4';
+}
+function showDetails(typeId, row) {
+    openDetails({
+        layout: layoutFor(typeId),
+        row,
+        typeLabel: typeLabel(typeId, state.draft),
+        accent: accentFor(typeId),
+        binding: (colId) => {
+            const col = COLUMNS.find((c) => c.id === colId);
+            return col ? bindingFor(col, typeId, state) : undefined;
+        }
+    });
+}
+/** Sample rows, or one placeholder row so a type with no samples still has cells to hover. */
+function rowsForSolo(typeId) {
+    const rows = samplesFor(typeId, state);
+    if (rows.length)
+        return { rows, synthetic: false };
+    const row = { item: `Example ${typeLabel(typeId, state.draft).toLowerCase()}` };
+    for (const col of COLUMNS) {
+        const b = bindingFor(col, typeId, state);
+        if (b && col.id !== 'item')
+            row[col.id] = `‹${b.label || col.generic}›`;
+    }
+    return { rows: [row], synthetic: true };
+}
+function headerTip(rc, current) {
+    const meta = [];
+    if (rc.aliases.length === 1) {
+        const b = bindingFor(rc.col, rc.bound[0], current);
+        if (b) {
+            meta.push(`${b.source} · ${b.path}${b.unit ? ` · ${b.unit}` : ''}`);
+            meta.push(`${b.applicability} · ${b.defaultVisible ? 'on' : 'off'} by default`);
+            if (b.appearance)
+                meta.push(`Cell: ${b.appearance}`);
+        }
+    }
+    else if (rc.aliases.length > 1) {
+        for (const a of rc.aliases)
+            meta.push(`${typeLabel(a.typeId, current.draft)} → ${a.label}${a.unit ? ` (${a.unit})` : ''}`);
+        const units = unitsFor(rc);
+        if (units.length > 1)
+            meta.push(`Mixed units: ${units.join(' · ')} — sorting it alone raises the alert`);
+    }
+    if (rc.unbound.length)
+        meta.push(`Gap (${rc.col.gapFallback}) for ${rc.unbound.map((t) => typeLabel(t, current.draft)).join(', ')}`);
+    return { title: rc.header || 'Perspectize', body: [rc.tooltip], meta };
+}
+/** Tiny media tile in the Item cell: poster (2:3), still/thumb (16:9) or nothing. */
+function miniMedia(typeId, row) {
+    const kind = layoutFor(typeId).media;
+    if (kind === 'none' || kind === 'icon')
+        return null;
+    const tile = el('span', { class: `media mini media-${kind}` });
+    tile.style.setProperty('--type-accent', accentFor(typeId));
+    const url = cellText(row.tmdbUrl ?? row.url);
+    attachTip(tile, () => ({
+        body: [url ? `Opens ${url} in a new tab` : 'Opens the source in a new tab'],
+        meta: [kind === 'poster' ? '2:3 poster tile (24×36)' : '16:9 tile (48×27)']
+    }));
+    return tile;
+}
+function bodyCell(rc, typeId, row, current) {
+    if (rc.col.id === 'perspectize') {
+        const td = el('td', { class: 'center perspectize' }, ['◎']);
+        attachTip(td, () => ({ body: ['Perspectize — add or edit your perspective'] }));
+        return td;
+    }
+    if (rc.col.id === 'type')
+        return el('td', { class: 'muted' }, [typeLabel(typeId, current.draft)]);
+    const binding = bindingFor(rc.col, typeId, current);
+    if (!binding) {
+        const td = el('td', { class: 'gap' }, [gapText(rc.col)]);
+        attachTip(td, () => ({
+            body: [`${typeLabel(typeId, current.draft)} has no ${rc.col.generic || rc.col.id}.`],
+            meta: [`Gap policy: ${rc.col.gapFallback}`]
+        }));
+        return td;
+    }
+    const value = row[rc.col.id];
+    const td = el('td');
+    if (rc.col.align)
+        td.classList.add(rc.col.align);
+    if (value === undefined) {
+        td.classList.add('unset');
+        td.append('·');
+    }
+    else if (rc.col.id === 'item') {
+        const title = el('span', { class: 'title-link' }, [cellText(value)]);
+        title.addEventListener('click', () => showDetails(typeId, row));
+        const sub = typeof value === 'string' ? undefined : value.sub;
+        const media = miniMedia(typeId, row);
+        td.append(el('div', { class: 'item-cell' }, [
+            ...(media ? [media] : []),
+            el('div', {}, [title, ...(sub ? [el('span', { class: 'cell-sub' }, [sub])] : [])])
+        ]));
+    }
+    else {
+        td.append(el('span', { class: 'cell-title' }, [cellText(value)]));
+        if (typeof value !== 'string' && value.sub)
+            td.append(el('span', { class: 'cell-sub' }, [value.sub]));
+    }
+    attachTip(td, () => ({
+        ...cellTipContent(value, binding.label || rc.col.generic, [
+            binding.cellTip ? `Spec: ${binding.cellTip}` : 'Spec: default — displayed text; copy copies the raw value',
+            ...(binding.appearance ? [`Cell: ${binding.appearance}`] : [])
+        ]),
+        spoiler: /^Blurred/.test(binding.appearance ?? '')
+    }), { pinOnClick: true });
+    return td;
+}
+function sortRows(rows, keys, valueOf) {
+    rows.sort((a, b) => {
+        for (const k of keys) {
+            const va = cellSortValue(valueOf(a, k.colId));
+            const vb = cellSortValue(valueOf(b, k.colId));
+            if (va === vb)
+                continue;
+            if (va === null)
+                return 1; // blanks last in either direction
+            if (vb === null)
+                return -1;
+            const cmp = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb));
+            if (cmp !== 0)
+                return k.dir === 'asc' ? cmp : -cmp;
+        }
+        return 0;
+    });
+}
+/* ------------------------------------------------------- single-type view */
+function soloTypeId() {
+    const ids = [state.draft.id, ...TYPES.map((t) => t.id)];
+    return state.soloType && ids.includes(state.soloType) ? state.soloType : 'movie';
+}
+function renderSolo() {
+    const typeId = soloTypeId();
+    const label = typeLabel(typeId, state.draft);
+    const tabs = el('div', { class: 'solo-tabs' });
+    const groups = [
+        ['TMDB', TMDB_TYPES],
+        ['Draft', [state.draft.id]],
+        ['Other types', TYPES.map((t) => t.id).filter((id) => !TMDB_TYPES.includes(id))]
+    ];
+    for (const [name, ids] of groups) {
+        const group = el('div', { class: 'tab-group' }, [el('span', { class: 'tab-group-label' }, [name])]);
+        for (const id of ids) {
+            const tab = el('button', { type: 'button', class: `chip${id === typeId ? ' on' : ''}` }, [
+                id === state.draft.id ? `${typeLabel(id, state.draft)} (draft)` : typeLabel(id, state.draft)
+            ]);
+            tab.addEventListener('click', () => {
+                state.soloType = id;
+                state.soloSort = undefined;
+                save();
+                render();
+            });
+            group.append(tab);
+        }
+        tabs.append(group);
+    }
+    const soloState = { ...state, selected: [typeId] };
+    const overrides = state.soloOverrides?.[typeId] ?? {};
+    const suggested = resolveGrid(soloState);
+    const grid = resolveGrid(soloState, overrides);
+    const picker = el('div', { class: 'col-chips' });
+    for (const rc of grid.columns) {
+        if (rc.bound.length === 0 || rc.col.id === 'perspectize')
+            continue;
+        const locked = rc.col.pinned === true;
+        const forced = overrides[rc.col.id] !== undefined;
+        const chip = el('button', {
+            type: 'button',
+            class: `colchip${rc.visible ? ' on' : ''}${forced ? ' forced' : ''}${locked ? ' locked' : ''}`,
+            disabled: locked
+        }, [rc.header || rc.col.generic, ...(forced ? [el('sup', {}, ['what-if'])] : [])]);
+        attachTip(chip, () => ({ ...headerTip(rc, soloState), meta: [...headerTip(rc, soloState).meta, rc.reason] }));
+        chip.addEventListener('click', () => {
+            const next = !rc.visible;
+            const sugg = suggested.columns.find((c) => c.col.id === rc.col.id)?.visible;
+            const all = (state.soloOverrides ??= {});
+            const mine = (all[typeId] ??= {});
+            if (next === sugg)
+                delete mine[rc.col.id];
+            else
+                mine[rc.col.id] = next;
+            save();
+            render();
+        });
+        picker.append(chip);
+    }
+    const forcedCount = Object.keys(overrides).length;
+    const resetBtn = el('button', { type: 'button' }, ['Reset to suggested']);
+    resetBtn.disabled = forcedCount === 0;
+    resetBtn.addEventListener('click', () => {
+        if (state.soloOverrides)
+            delete state.soloOverrides[typeId];
+        save();
+        render();
+    });
+    const { rows, synthetic } = rowsForSolo(typeId);
+    const visible = grid.visible;
+    const sort = state.soloSort && visible.some((rc) => rc.col.id === state.soloSort.colId) ? state.soloSort : undefined;
+    const ordered = [...rows];
+    if (sort)
+        sortRows(ordered, [sort], (row, colId) => row[colId]);
+    const head = el('tr', {}, visible.map((rc) => {
+        const th = el('th', {}, [rc.header || '◎', ...(sort?.colId === rc.col.id ? [sort.dir === 'asc' ? ' ▲' : ' ▼'] : [])]);
+        attachTip(th, () => headerTip(rc, soloState));
+        if (rc.col.sortable) {
+            th.classList.add('sortable');
+            th.addEventListener('click', () => {
+                const cur = state.soloSort;
+                state.soloSort =
+                    cur?.colId !== rc.col.id ? { colId: rc.col.id, dir: 'asc' } : cur.dir === 'asc' ? { colId: rc.col.id, dir: 'desc' } : undefined;
+                save();
+                render();
+            });
+        }
+        return th;
+    }));
+    const body = ordered.map((row) => el('tr', {}, visible.map((rc) => bodyCell(rc, typeId, row, soloState))));
+    const table = el('div', { class: 'app-grid' }, [el('table', {}, [el('thead', {}, [head]), el('tbody', {}, body)])]);
+    const openFirst = el('button', { type: 'button', class: 'primary' }, [`Open ${label} details view`]);
+    openFirst.addEventListener('click', () => showDetails(typeId, ordered[0]));
+    const warn = el('ul', { class: 'warnings' });
+    for (const w of grid.warnings)
+        warn.append(el('li', { class: `w-${w.severity}` }, [w.message]));
+    if (!grid.warnings.length)
+        warn.append(el('li', { class: 'w-ok' }, ['No gaps flagged with this type alone.']));
+    const offCount = grid.columns.filter((rc) => !rc.visible && rc.bound.length > 0 && !rc.col.hideWhenSolo).length;
+    return section('Single-type view — suggested columns, tooltips, details', 'What the Activity table shows when this is the only type filtered in. Headers use the type’s own labels; Type is dropped because every row would repeat it.', [
+        tabs,
+        el('p', { class: 'solo-summary' }, [
+            el('strong', {}, [`${visible.length} columns`]),
+            ` on by default for ${label} alone · ${offCount} more in the column picker`,
+            ...(forcedCount ? [` · ${forcedCount} what-if change${forcedCount > 1 ? 's' : ''}`] : [])
+        ]),
+        picker,
+        el('div', { class: 'row' }, [openFirst, resetBtn]),
+        el('p', { class: 'muted small' }, [
+            synthetic
+                ? 'No sample rows for this type — the placeholder row still carries every tooltip. '
+                : '',
+            'Hover a header or cell for its tooltip. Click a cell to pin its popover and try Copy. Click a title to open the details view. Click a chip above to try a column on or off.'
+        ]),
+        table,
+        warn
+    ], 'solo');
+}
+/* ------------------------------------------------------ cross-type preview */
 function renderPreview() {
     const picks = el('div', { class: 'chips' });
     const ids = [state.draft.id, ...TYPES.map((t) => t.id)];
@@ -243,17 +492,31 @@ function renderPreview() {
         });
         picks.append(chip);
     }
+    const family = el('button', { type: 'button' }, ['Select the TMDB family']);
+    family.addEventListener('click', () => {
+        state.selected = [...TMDB_TYPES];
+        state.sort = [];
+        save();
+        render();
+    });
+    const mixed = el('button', { type: 'button' }, ['TMDB + YouTube + Bible']);
+    mixed.addEventListener('click', () => {
+        state.selected = [...TMDB_TYPES, 'youtube', 'bible'];
+        state.sort = [];
+        save();
+        render();
+    });
     const grid = resolveGrid(state);
     const headerStrip = el('div', { class: 'grid-preview' });
     for (const rc of grid.visible) {
-        headerStrip.append(el('div', { class: `gcell${rc.unbound.length ? ' sparse' : ''}`, title: rc.tooltip }, [
+        const cell = el('div', { class: `gcell${rc.unbound.length ? ' sparse' : ''}` }, [
             el('span', { class: 'gh' }, [rc.header || '◎']),
             el('span', { class: 'gm' }, [
-                rc.unbound.length
-                    ? `${Math.round(rc.coverage * 100)}% filled · ${rc.col.gapFallback}`
-                    : 'all selected types'
+                rc.unbound.length ? `${Math.round(rc.coverage * 100)}% filled · ${rc.col.gapFallback}` : 'all selected types'
             ])
-        ]));
+        ]);
+        attachTip(cell, () => headerTip(rc, state));
+        headerStrip.append(cell);
     }
     const samples = renderSamples(state, grid);
     const warn = el('ul', { class: 'warnings' });
@@ -268,6 +531,7 @@ function renderPreview() {
     ]);
     return section('4 · Cross-type grid preview', 'Select the types a user might have in view at once and check the header row still reads as one table.', [
         picks,
+        el('div', { class: 'row' }, [family, mixed]),
         field('Default-visibility rule', select(state.rule, ['any', 'majority', 'all'], (v) => (state.rule = v), {
             any: 'any selected type wants it',
             majority: 'a majority want it',
@@ -277,20 +541,7 @@ function renderPreview() {
         ...(samples ? [samples] : []),
         hiddenList,
         warn
-    ]);
-}
-function sampleCell(value, tooltip) {
-    if (value === undefined)
-        return el('td', { class: 'unset', title: 'No sample value' }, ['·']);
-    if (typeof value === 'string')
-        return el('td', { title: tooltip }, [value]);
-    return el('td', { title: tooltip }, [
-        el('span', { class: 'cell-title' }, [value.text]),
-        ...(value.sub ? [el('span', { class: 'cell-sub' }, [value.sub])] : [])
-    ]);
-}
-function cellText(value) {
-    return value === undefined ? undefined : typeof value === 'string' ? value : value.text;
+    ], 'cross');
 }
 /** Cycle one column through asc → desc → off, keeping any other keys as lower priorities. */
 function toggleSort(colId) {
@@ -367,28 +618,12 @@ function renderSamples(current, grid) {
         const col = visible.find((rc) => rc.col.id === colId)?.col;
         if (!col || !bindingFor(col, row.typeId, current))
             return undefined;
-        return cellText(row.cells[colId]);
+        return row.cells[colId];
     };
     const keys = (current.sort ?? []).filter((k) => visible.some((rc) => rc.col.id === k.colId && rc.col.sortable));
     const alert = renderSortAlert(current, grid);
-    if (keys.length && !alert) {
-        rows.sort((a, b) => {
-            for (const k of keys) {
-                const va = sortValue(valueOf(a, k.colId));
-                const vb = sortValue(valueOf(b, k.colId));
-                if (va === vb)
-                    continue;
-                if (va === null)
-                    return 1; // blanks last in either direction
-                if (vb === null)
-                    return -1;
-                const cmp = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb));
-                if (cmp !== 0)
-                    return k.dir === 'asc' ? cmp : -cmp;
-            }
-            return 0;
-        });
-    }
+    if (keys.length && !alert)
+        sortRows(rows, keys, valueOf);
     const head = el('tr', {}, visible.map((rc) => {
         const idx = keys.findIndex((k) => k.colId === rc.col.id);
         const key = keys[idx];
@@ -398,7 +633,8 @@ function renderSamples(current, grid) {
             ...(key ? [` ${key.dir === 'asc' ? '▲' : '▼'}`] : []),
             ...(key && keys.length > 1 ? [el('sup', {}, [String(idx + 1)])] : [])
         ];
-        const th = el('th', { title: units.length > 1 ? `${rc.tooltip} — mixed units: ${units.join(' · ')}` : rc.tooltip }, label);
+        const th = el('th', {}, label);
+        attachTip(th, () => headerTip(rc, current));
         if (rc.col.sortable) {
             th.classList.add('sortable');
             if (units.length > 1)
@@ -407,25 +643,13 @@ function renderSamples(current, grid) {
         }
         return th;
     }));
-    const body = rows.map(({ typeId, cells }) => el('tr', {}, visible.map((rc) => {
-        if (rc.col.id === 'perspectize')
-            return el('td', { class: 'center' }, ['◎']);
-        if (rc.col.id === 'type')
-            return el('td', { class: 'muted' }, [typeLabel(typeId, current.draft)]);
-        const binding = bindingFor(rc.col, typeId, current);
-        if (!binding)
-            return el('td', { class: 'gap', title: `Not bound — ${rc.col.gapFallback}` }, [gapText(rc.col)]);
-        const td = sampleCell(cells[rc.col.id], binding.tooltip ?? rc.col.tooltip);
-        if (rc.col.align)
-            td.classList.add(rc.col.align);
-        return td;
-    })));
+    const body = rows.map(({ typeId, cells }) => el('tr', {}, visible.map((rc) => bodyCell(rc, typeId, cells, current))));
     return el('div', { class: 'samples' }, [
         el('p', { class: 'muted small' }, [
-            'Sample rows — click a header to sort (again to reverse, a third time to clear); hover for its tooltip. "·" means the sample has no value for a bound column; a dashed header mixes units.'
+            'Sample rows — click a header to sort (again to reverse, a third time to clear); hover for its tooltip; click a title for the details view. "·" means the sample has no value for a bound column; a dashed header mixes units.'
         ]),
         ...(alert ? [alert] : []),
-        el('div', { class: 'sample-scroll' }, [el('table', {}, [el('thead', {}, [head]), el('tbody', {}, body)])])
+        el('div', { class: 'sample-scroll app-grid' }, [el('table', {}, [el('thead', {}, [head]), el('tbody', {}, body)])])
     ]);
 }
 function renderNotes() {
@@ -453,9 +677,13 @@ function renderOutput() {
     const tabs = el('div', { class: 'tabs' });
     let mode = 'spec';
     const paint = () => {
-        pre.textContent = mode === 'spec' ? buildSpec(state) : buildMatrix(state);
+        pre.textContent = mode === 'spec' ? buildSpec(state) : mode === 'matrix' ? buildMatrix(state) : buildSoloViews(state);
     };
-    for (const [key, label] of [['spec', 'Spec + checklist'], ['matrix', 'Column × type matrix']]) {
+    for (const [key, label] of [
+        ['spec', 'Spec + checklist'],
+        ['matrix', 'Column × type matrix'],
+        ['solo', 'Single-type views (section 4 selection)']
+    ]) {
         const tab = el('button', { type: 'button', class: `tab${mode === key ? ' on' : ''}` }, [label]);
         tab.addEventListener('click', () => {
             mode = key;
@@ -491,22 +719,21 @@ function renderOutput() {
 function grid2(children) {
     return el('div', { class: 'grid2' }, children);
 }
-function section(title, blurb, children) {
-    return el('section', {}, [el('h2', {}, [title]), el('p', { class: 'blurb' }, [blurb]), ...children]);
+function section(title, blurb, children, id) {
+    return el('section', id ? { id } : {}, [el('h2', {}, [title]), el('p', { class: 'blurb' }, [blurb]), ...children]);
 }
 function render() {
     const root = document.getElementById('app');
     if (!root)
         return;
-    root.replaceChildren(renderIdentity(), renderIngestion(), renderColumns(), renderPreview(), renderNotes(), renderOutput());
+    root.replaceChildren(renderSolo(), renderIdentity(), renderIngestion(), renderColumns(), renderPreview(), renderNotes(), renderOutput());
 }
 /** Text-only inputs do not change layout, so they just repaint the output. */
 function renderDerived() {
     const repaint = renderOutput.repaint;
     repaint?.();
-    const preview = document.querySelector('.grid-preview')?.parentElement;
-    if (preview)
-        preview.replaceWith(renderPreview());
+    document.getElementById('cross')?.replaceWith(renderPreview());
+    document.getElementById('solo')?.replaceWith(renderSolo());
 }
 const reset = document.getElementById('reset');
 reset?.addEventListener('click', () => {

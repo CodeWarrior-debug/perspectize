@@ -183,7 +183,7 @@ type mockPerspectiveRepository struct {
 	createFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
 	getByIDFn func(ctx context.Context, id int) (*domain.Perspective, error)
 	updateFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
-	deleteFn  func(ctx context.Context, id int) error
+	deleteFn  func(ctx context.Context, id int, ownerUserID int) error
 	listFn    func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
 }
 
@@ -209,9 +209,9 @@ func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspe
 	return p, nil
 }
 
-func (m *mockPerspectiveRepository) Delete(ctx context.Context, id int) error {
+func (m *mockPerspectiveRepository) Delete(ctx context.Context, id int, ownerUserID int) error {
 	if m.deleteFn != nil {
-		return m.deleteFn(ctx, id)
+		return m.deleteFn(ctx, id, ownerUserID)
 	}
 	return nil
 }
@@ -1017,6 +1017,24 @@ func TestPaginatedContentQuery_WithContentTypeFilter(t *testing.T) {
 	assert.Len(t, data.Content.Items, 1)
 	assert.Equal(t, "YouTube Video", data.Content.Items[0].Name)
 	assert.Equal(t, "YOUTUBE", data.Content.Items[0].ContentType)
+}
+
+func TestPaginatedContentQuery_WithContentTypesFilter(t *testing.T) {
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			require.NotNil(t, params.Filter)
+			assert.Nil(t, params.Filter.ContentType)
+			assert.Equal(t, []domain.ContentType{domain.ContentTypeYouTube, domain.ContentTypeClaim}, params.Filter.ContentTypes)
+			return &domain.PaginatedContent{Items: []*domain.Content{}}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: { contentTypes: [YOUTUBE, CLAIM] }) { items { id } } }`)
+
+	assert.Empty(t, result.Errors)
 }
 
 func TestPaginatedContentQuery_WithFilterAndTotalCount(t *testing.T) {
