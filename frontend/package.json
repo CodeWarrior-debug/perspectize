@@ -38,7 +38,6 @@
 		"@lucide/svelte": "^1.48.0",
 		"@playwright/test": "1.63.0",
 		"@stryker-mutator/core": "^10.0.0",
-		"@stryker-mutator/typescript-checker": "^10.0.0",
 		"@stryker-mutator/vitest-runner": "^10.0.0",
 		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/adapter-static": "^3.0.10",

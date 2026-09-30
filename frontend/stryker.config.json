@@ -1,12 +1,10 @@
 {
 	"$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-	"plugins": ["@stryker-mutator/vitest-runner", "@stryker-mutator/typescript-checker"],
+	"plugins": ["@stryker-mutator/vitest-runner"],
 	"testRunner": "vitest",
 	"vitest": {
 		"configFile": "vitest.config.stryker.ts"
 	},
-	"checkers": ["typescript"],
-	"tsconfigFile": "tsconfig.json",
 	"mutate": ["src/lib/**/*.ts", "!src/lib/components/shadcn/**", "!src/lib/assets/**"],
 	"coverageAnalysis": "perTest",
 	"reporters": ["clear-text", "progress", "html", "json"],
