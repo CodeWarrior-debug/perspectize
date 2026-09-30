@@ -1,0 +1,7 @@
+[
+  { "question": "How do I open Settings?", "expect_ids": ["settings.open"], "must_not_claim": [] },
+  { "question": "I dismissed the onboarding walkthrough, how do I get it back?", "expect_ids": ["settings.onboarding-toggle"], "must_not_claim": [] },
+  { "question": "How do I sign out of Perspectize?", "expect_ids": ["settings.sign-out"], "must_not_claim": [] },
+  { "question": "Where do I edit my account profile details?", "expect_ids": ["settings.manage-account"], "must_not_claim": [] },
+  { "question": "Can I delete my account from the Settings dialog?", "expect_ids": [], "must_not_claim": ["delete your account", "delete account"] }
+]

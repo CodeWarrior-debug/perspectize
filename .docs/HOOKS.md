@@ -16,7 +16,7 @@ Two independent hook systems. The root [CLAUDE.md](../CLAUDE.md) keeps only what
 
 ## Shared git pre-commit hook
 
-`.hooks/pre-commit`, a real `core.hooksPath` hook — not a Claude Code hook. It auto-formats staged `backend/*.go` (gofmt) and `frontend/src/*.{svelte,ts,js}` (prettier) files and re-stages them on every `git commit`, regardless of what tool/human is committing. It also **blocks** (does not auto-fix) new raw hex/rgb colour literals in frontend components — see [frontend/CLAUDE.md](../frontend/CLAUDE.md).
+`.hooks/pre-commit`, a real `core.hooksPath` hook — not a Claude Code hook. It auto-formats staged `backend/*.go` and `ai-tooling/*.go` (gofmt) and `frontend/src/*.{svelte,ts,js}` (prettier) files and re-stages them on every `git commit`, regardless of what tool/human is committing. It also **blocks** (does not auto-fix) new raw hex/rgb colour literals in frontend components — see [frontend/CLAUDE.md](../frontend/CLAUDE.md).
 
 Not active by default — activate once per checkout with `make install-hooks` (from `backend/`, sets `core.hooksPath` to `.hooks`). This is what actually prevents the CI `Build` job's `gofmt -l .` check from failing (as it did on PR #366); the `gofmt-precommit.sh` PreToolUse reminder above is only a fallback for a checkout where this hasn't been activated yet.
 

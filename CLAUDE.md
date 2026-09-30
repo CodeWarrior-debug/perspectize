@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Monorepo with two stacks:
 - **Backend:** `backend/` — Go GraphQL API (see `backend/CLAUDE.md`)
 - **Frontend:** `frontend/` — SvelteKit web app (see `frontend/CLAUDE.md`)
+- **AI tooling:** `ai-tooling/` — Go module for the Jeeves assistant, evals, and `botler` CLI; design stage (see `ai-tooling/CLAUDE.md` — **teaching mode is on there**)
 
 **CLAUDE.md structure:** This root file is loaded in every session, so it holds only repo-wide rules. Stack-specific rules live in `backend/CLAUDE.md` / `frontend/CLAUDE.md` (loaded once you touch files there); long procedures live in `.docs/` and are linked below. A safety rule that must hold before any stack file is read keeps a one-line stub here.
 
@@ -60,6 +61,8 @@ defer db.Close()
 
 **New work uses obra/superpowers** (`superpowers:writing-plans` → `superpowers:executing-plans` / `superpowers:subagent-driven-development`; plans/specs in `docs/superpowers/`). **GSD is legacy** — only finish in-flight `.planning/phases/` work with its existing plan files; never start new work with it. If no `superpowers:*` skill is listed this session, any plan/spec you write must carry the "written without superpowers" banner. Details, spike-doc format, and which GSD commands remain: [.docs/PLANNING.md](.docs/PLANNING.md).
 
+**`gsd:new-milestone` is destructive here:** its `phases clear --confirm` step deletes every `.planning/phases/` dir and it resets `STATE.md`, and `gsd-roadmapper` rewrites `STATE.md`. While v1.1 is in flight, run it non-destructively: skip the clear, keep STATE, write `.planning/vX.Y-REQUIREMENTS.md` + `.planning/vX.Y-research/` (never `.planning/research/`, which holds v1.0 research), and append phases to `ROADMAP.md` by hand.
+
 ## Self-Verification (MANDATORY)
 
 **Before claiming work is complete, pushing, or creating a PR**, you MUST run verification. No exceptions.
@@ -68,7 +71,8 @@ defer db.Close()
 2. **Format**: `gofmt -l .` in `backend/` — must return empty (CI's `Build` job fails otherwise). `make install-hooks` (once per checkout) auto-fixes this on every commit.
 3. **Backend tests**: `go test ./...` in `backend/` — all must pass
 4. **Frontend tests**: `pnpm run test:run` in `frontend/` — all must pass
-5. **Stale references**: If renaming/moving files or paths, grep the entire repo for old names
+5. **AI tooling**: `go build ./...`, `gofmt -l .`, `go test ./...` in `ai-tooling/` (includes app-guide lint, which checks guide `Source` paths against `frontend/` — so frontend renames/moves can fail it)
+6. **Stale references**: If renaming/moving files or paths, grep the entire repo for old names
 
 Run the relevant subset (e.g., backend-only changes skip step 4). Report results explicitly — don't just say "tests pass", show the output summary.
 

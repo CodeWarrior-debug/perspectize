@@ -1,0 +1,27 @@
+[
+  {
+    "question": "How do I search for a video by title on the Activity page?",
+    "expect_ids": ["activity.search-content"],
+    "must_not_claim": []
+  },
+  {
+    "question": "Can I sort the Activity table by more than one column at once?",
+    "expect_ids": ["activity.sort-content"],
+    "must_not_claim": []
+  },
+  {
+    "question": "How do I permanently save my chosen columns so they're still there after I refresh?",
+    "expect_ids": ["activity.choose-columns"],
+    "must_not_claim": ["saved permanently", "persists after refresh", "saved to your account"]
+  },
+  {
+    "question": "Can I filter the Activity table on my phone the same way the column filter menus work on desktop?",
+    "expect_ids": ["activity.filter-columns"],
+    "must_not_claim": ["column filter menus on mobile", "same filter menu on the card list"]
+  },
+  {
+    "question": "In the By User view, can I see other people's private perspectives if I turn on 'Include my private perspectives'?",
+    "expect_ids": ["activity.by-user-privacy"],
+    "must_not_claim": ["shows other users' private perspectives", "reveals everyone's private perspectives"]
+  }
+]

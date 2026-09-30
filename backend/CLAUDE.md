@@ -135,6 +135,8 @@ CORS middleware is configured in `cmd/server/main.go` from `CORS_ORIGINS` (`inte
 
 ## Gotchas
 
+**Perspective privacy is enforced in the resolver, not the service:** `PerspectiveByID` checks `PrivacyPrivate`; `PerspectiveService.GetByID` doesn't, and `ListPerspectives` is only safe with `ViewerID` set. Code calling services directly (e.g. in-process Jeeves tools) must apply the check (planned fix: BRIDGE-02).
+
 **Owner-only mutations need a guard at every layer, not just `@owner`.** The directive is one check; also re-derive the actor in the resolver via `auth.RequireAuth(ctx)` (never trust a client-supplied user ID), pass it into the service method (e.g. `Delete(ctx, id, actorUserID)`) and return `domain.ErrForbidden` there, and scope the SQL itself (`WHERE user_id = ? AND id = ?`). See `deletePerspective`. When a non-owner hits someone else's **non-PUBLIC** perspective, `@owner` answers "resource not found", not "access denied", so the ID isn't confirmed to exist (matches `perspectiveByID` returning null).
 
 **GraphQL defaults:** gqlgen passes `first: Int = 10` as non-nil pointer (value `10`), not `nil`. Tests must expect the default value.

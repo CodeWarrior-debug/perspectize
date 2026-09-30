@@ -127,6 +127,27 @@ Users can easily submit their perspective on a YouTube video and browse others' 
 - Phase 10: Frontend quality & test coverage
 - Phase 11–16: Database optimization, Clerk auth, content categories, AG Grid power features, discover page, mobile app strategy
 
+---
+
+## Current Milestone: v1.2 Jeeves AI Assistant (runs in parallel with v1.1)
+
+**Goal:** Give users an in-app AI assistant ("Jeevesbot" by default, renamable) that answers how-to questions from an app guide and helps them refine their perspectives — built on a provider-neutral `ai-tooling/` Go module that starts on Claude and pivots to OpenRouter once evals show it's ready.
+
+**Target features:**
+- Provider-neutral AI foundation (`ai-tooling/`): own message/event types, Anthropic adapter, agent loop, tool registry
+- App guide (task-oriented, verified against the frontend code) as Jeeves's how-to knowledge
+- Read-only Jeeves tools over a `PerspectizeData` interface (GraphQL, fixture, and in-process implementations)
+- `botler` dev CLI (`tools list`, `tools call`, `chat`, `eval`) over GraphQL
+- Eval harness: deterministic checks on fixtures, model × prompt-version matrix, token/latency capture
+- In-app Jeeves: GraphQL subscription streaming, sidebar UI, per-page tool sets, assistant rename, confirm-to-apply actions, usage logging, rate limits
+- OpenRouter (OpenAI-compatible) adapter + model registry, gated by cross-model evals
+
+**Key context:**
+- Locked decisions and teaching-mode rules: `ai-tooling/CLAUDE.md`. Detailed specs/plans go through superpowers; GSD tracks the milestone only.
+- Progressive: only the next phase is planned in detail; later phases are re-planned from what the previous phase learned.
+- Capability ladder: tell (guide) → look (read-only tools) → do with confirmation → (maybe) do autonomously.
+- Deferred to a later milestone: usage ledger/credits, BYOK, remote MCP server + OAuth (which will serve a future Chrome extension).
+
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
@@ -142,5 +163,22 @@ Users can easily submit their perspective on a YouTube video and browse others' 
 | Mobile-first responsive | Figma design system TBD on mobile, need breakpoint strategy | — Pending |
 | Monorepo (frontend in same repo) | Frontend and backend co-located for easier development | — Pending |
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-02-04 after milestone v1.0 scope confirmed*
+*Last updated: 2026-09-26 — milestone v1.2 (Jeeves AI Assistant) started alongside v1.1*

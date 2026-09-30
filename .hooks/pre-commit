@@ -3,7 +3,7 @@
 # Activated by: git config core.hooksPath .hooks (see Makefile setup target)
 
 # --- Go: gofmt ---
-STAGED_GO=$(git diff --cached --name-only --diff-filter=ACM -- 'backend/*.go')
+STAGED_GO=$(git diff --cached --name-only --diff-filter=ACM -- 'backend/*.go' 'ai-tooling/*.go')
 if [ -n "$STAGED_GO" ]; then
     echo "$STAGED_GO" | while read -r file; do
         if [ -f "$file" ]; then

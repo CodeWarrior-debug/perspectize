@@ -1,0 +1,27 @@
+[
+  {
+    "question": "How do I rate a video's quality and give it a thumbs up?",
+    "expect_ids": ["perspectives.rate", "perspectives.thumbs"],
+    "must_not_claim": []
+  },
+  {
+    "question": "Can I add my own custom rating category, like 'humor'?",
+    "expect_ids": ["perspectives.add-field"],
+    "must_not_claim": []
+  },
+  {
+    "question": "How do I make my perspective private so only I can see it?",
+    "expect_ids": ["perspectives.privacy"],
+    "must_not_claim": []
+  },
+  {
+    "question": "Can I delete a perspective I already saved?",
+    "expect_ids": [],
+    "must_not_claim": ["delete a perspective", "remove a saved perspective"]
+  },
+  {
+    "question": "Can I attach an image file from my computer to my review?",
+    "expect_ids": ["perspectives.review"],
+    "must_not_claim": ["upload an image file", "attach a file"]
+  }
+]
