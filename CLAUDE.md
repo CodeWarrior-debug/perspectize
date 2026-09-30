@@ -65,7 +65,7 @@ defer db.Close()
 **Before claiming work is complete, pushing, or creating a PR**, you MUST run verification. No exceptions.
 
 1. **Build**: `go build ./...` in `backend/` — must compile with zero errors
-2. **Format**: `gofmt -l .` in `backend/` — must return empty (CI's `Build` job fails otherwise). `make install-hooks` (once per checkout) auto-fixes this on every commit.
+2. **Format**: `gofmt -l .` in `backend/` — must return empty (CI's `Build` job fails otherwise). `make install-hooks` (once per checkout, run in `backend/`; there is no root target) auto-fixes this on every commit.
 3. **Backend tests**: `go test ./...` in `backend/` — all must pass
 4. **Frontend tests**: `pnpm run test:run` in `frontend/` — all must pass
 5. **Query budget**: if the change touches DB access or data fetching, it carries a query-count test (backend) / cache-contract test (frontend) — [.docs/QUERY_BUDGET.md](.docs/QUERY_BUDGET.md).
@@ -105,7 +105,7 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 
 **Bug logging (MANDATORY):** When you discover a bug during development, review, or testing, log it in `.planning/phases/bugs/BACKLOG.md` with severity and location. Also create a GitHub issue using the bug report template — keep sensitive details (exact paths, line numbers, security specifics) in the backlog only. When a bug is fixed, move it to `.planning/phases/bugs/CLOSED.md` with the PR reference. These files are gitignored — never commit them.
 
-**Hooks:** Claude Code PreToolUse hooks guard `.env` reads and block `gh pr create` until `/revise-claude-md` has run (then create the PR with `gh api`). The real git pre-commit hook (gofmt + prettier auto-fix) is off until `make install-hooks` — **cloud/CI checkouts start without it**, so run `make install-hooks` once per session or check `gofmt -l .` / `pnpm exec prettier --check` before each commit. Full list: [.docs/HOOKS.md](.docs/HOOKS.md).
+**Hooks:** Claude Code PreToolUse hooks guard `.env` reads and block `gh pr create` until `/revise-claude-md` has run (then create the PR with `gh api`). The real git pre-commit hook (gofmt + prettier auto-fix) is off until `make install-hooks` — **cloud/CI checkouts start without it**, so run `make install-hooks` in `backend/` once per session or check `gofmt -l .` / `pnpm exec prettier --check` before each commit. Full list: [.docs/HOOKS.md](.docs/HOOKS.md).
 
 **Cowork session cleanup:** Claude cowork (claude.ai web) sessions leave `_tmp_*` files and conversation transcript `.txt` files in the repo root and `frontend/`. Delete these before committing.
 

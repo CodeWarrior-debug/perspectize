@@ -109,7 +109,7 @@ The failure is confined to that last step: `generated.go` and `models_gen.go` ar
 ## Testing
 
 - **Unit:** Mock deps, no DB. `make test`.
-- **Integration:** Auto-skip when DB unavailable (`t.Skip()`).
+- **Integration:** Auto-skip when DB unavailable (`t.Skip()`), so a green run without `DATABASE_URL` may have tested nothing. In a cloud session, run `pg_ctlcluster 16 main start`, migrate a **local** `testdb` (never the shared Sevalla DB), then run `DATABASE_URL=postgres://…/testdb go test -p 1 ./...`.
 - **Query counts:** assert statement counts with `internal/perf/querycount` — see Query budget below.
 - **Build-tagged harnesses rot.** Code behind the `perf` tag isn't compiled by `go build/test ./...`; CI vets it (`go vet -tags perf ./internal/perf/...`). Run that vet after changing `NewResolver` / `dataloader.Middleware` signatures.
 - **Env isolation:** Tests loading config must clear env vars via `t.Setenv("KEY", "")`. See `clearConfigEnvVars` in `test/config/config_test.go`.
@@ -128,7 +128,10 @@ c.AssertExactly(t, 1) // batch: 1 query for 50 ids, never 50
 - A GraphQL field that loads per-parent data goes through a dataloader (`adapters/graphql/dataloader`), with a loader test proving N loads → 1 service call.
 - Set the budget to what the path costs **today**, not a generous ceiling.
 - Reject in review: a repo/service call inside a loop over results, a `Preload` the caller never reads, the same lookup in both middleware and resolver.
-- Whole-request counts against real Postgres: opt-in `go test -tags perf ./internal/perf/` (CI compiles it via `go vet -tags perf`).
+- **Whole-request round trips are pinned in `test/roundtrips`**, which runs the real middleware, gqlgen, services and GORM stack against Postgres. A new or changed GraphQL operation gets a count there. `RT_MEASURE=1` prints each statement instead of failing.
+- Batch lookups use `= ANY(CAST(? AS bigint[]))` with `intsToArray`, so pgx's statement cache hits for any batch size. `querycount` SQL matchers should expect that form, not `IN (`.
+- **Writes:** GORM runs with `SkipDefaultTransaction` (no BEGIN/COMMIT around a single statement). Use `clause.Returning{}` instead of re-reading the row. Enforce ownership in the `UPDATE`/`DELETE` WHERE clause, and read the row only on a zero-row miss to tell not-found from forbidden. Never `Save()` behind a scoped WHERE: its zero-row fallback is an upsert.
+- Opt-in whole-request harness: `go test -tags perf ./internal/perf/` (CI compiles it via `go vet -tags perf`).
 
 Full table and examples: [.docs/QUERY_BUDGET.md](../.docs/QUERY_BUDGET.md).
 
@@ -151,11 +154,13 @@ Error handling & DB query patterns: [.docs/GO_PATTERNS.md](../.docs/GO_PATTERNS.
 
 ## CORS
 
-CORS middleware is configured in `cmd/server/main.go` from `CORS_ORIGINS` (`internal/config/security.go`, comma-separated). It defaults to `*` when unset (and the example env file sets `*`), so set it to the frontend's origin in every deployed environment.
+CORS middleware is part of the API middleware chain in `internal/server/api.go` (`server.Middleware`, built from `server.Deps`, which `cmd/server/main.go` fills in). The allowed origins come from `CORS_ORIGINS` (`internal/config/security.go`, comma-separated). It defaults to `*` when unset (and the example env file sets `*`), so set it to the frontend's origin in every deployed environment.
 
 ## Gotchas
 
-**Owner-only mutations need a guard at every layer, not just `@owner`.** The directive is one check; also re-derive the actor in the resolver via `auth.RequireAuth(ctx)` (never trust a client-supplied user ID), pass it into the service method (e.g. `Delete(ctx, id, actorUserID)`) and return `domain.ErrForbidden` there, and scope the SQL itself (`WHERE user_id = ? AND id = ?`). See `deletePerspective`. When a non-owner hits someone else's **non-PUBLIC** perspective, `@owner` answers "resource not found", not "access denied", so the ID isn't confirmed to exist (matches `perspectiveByID` returning null).
+**Owner-only mutations need a guard at every layer, not just `@owner`.** The directive is one check; also re-derive the actor in the resolver via `auth.RequireAuth(ctx)` (never trust a client-supplied user ID), pass it into the service method (e.g. `Delete(ctx, id, actorUserID)`) and return `domain.ErrForbidden` there, and scope the SQL itself (`WHERE user_id = ? AND id = ?`). See `deletePerspective`. `updatePerspective` and `deletePerspective` deliberately skip `@owner`, because its lookup was a duplicate round trip. The service check plus owner-scoped SQL are the two guards there, and the service returns the same not-found / access-denied split. When a non-owner hits someone else's **non-PUBLIC** perspective, `@owner` answers "resource not found", not "access denied", so the ID isn't confirmed to exist (matches `perspectiveByID` returning null).
+
+**A model-bound schema field with no resolver is always null.** When `gqlgen.yml` binds a type to a Go model that lacks the field (e.g. `Perspective.user`), gqlgen resolves it silently to null. Add `resolver: true` for that field in `gqlgen.yml` and resolve it through a dataloader.
 
 **GraphQL defaults:** gqlgen passes `first: Int = 10` as non-nil pointer (value `10`), not `nil`. Tests must expect the default value.
 
