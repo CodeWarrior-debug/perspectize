@@ -14,6 +14,7 @@ Two independent hook systems. The root [CLAUDE.md](../CLAUDE.md) keeps only what
 - **Pre-commit prettier:** `prettier-precommit.sh` injects a non-blocking reminder on `git commit` to run `pnpm exec prettier --write` on staged frontend files.
 - **Pre-commit gofmt (fallback):** `gofmt-precommit.sh` only fires when `core.hooksPath` isn't set to `.hooks` in the current checkout — see below for the real fix — and then reminds to run `make install-hooks` rather than to gofmt by hand.
 - **Matching is anchored on command position** (start of string or after a shell separator), not a raw substring search — a trigger phrase (e.g. `gh pr create`) appearing inside a quoted commit message or PR body elsewhere on the line does not fire the hook.
+  - **Backtick counts as a command position.** A Bash command that merely mentions a guarded command inside a markdown code span (e.g. a heredoc writing docs) trips the hook with a false "session reflection required" denial. Nothing runs; rephrase the text or write the file with the Write tool.
 
 ## Shared git pre-commit hook
 

@@ -111,6 +111,7 @@ The failure is confined to that last step: `generated.go` and `models_gen.go` ar
 - **Unit:** Mock deps, no DB. `make test`.
 - **Integration:** Auto-skip when DB unavailable (`t.Skip()`).
 - **Query counts:** assert statement counts with `internal/perf/querycount` — see Query budget below.
+- **Build-tagged harnesses rot.** Code behind the `perf` tag isn't compiled by `go build/test ./...`; CI vets it (`go vet -tags perf ./internal/perf/...`). Run that vet after changing `NewResolver` / `dataloader.Middleware` signatures.
 - **Env isolation:** Tests loading config must clear env vars via `t.Setenv("KEY", "")`. See `clearConfigEnvVars` in `test/config/config_test.go`.
 
 ## Query budget (REQUIRED for DB-touching changes)
