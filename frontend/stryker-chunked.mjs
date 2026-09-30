@@ -19,7 +19,7 @@
  * "missed" = Survived, "no test runs it" = NoCoverage. See
  * docs/superpowers/specs/2026-09-29-test-hardening-spike.md.
  */
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, openSync, closeSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, openSync, closeSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
@@ -67,8 +67,21 @@ function partition(files, n) {
 	return bins.map((b) => b.files.sort());
 }
 
-function writeConfigs() {
+// Stale output would be silently mixed into the summary: a chunk report from an earlier, different
+// layout, or from a run that is about to be redone. Clear it before (re)running.
+function clearStale() {
 	mkdirSync(REPORTS, { recursive: true });
+	for (const name of readdirSync(REPORTS)) {
+		const match = name.match(/^chunk-(\d+)(\.conf\.json|\.log)?$/);
+		if (!match) continue;
+		const index = Number(match[1]);
+		// Chunks beyond the current layout are always stale; in a full run (no --only) all are.
+		if (index > chunkCount || !only.length) rmSync(`${REPORTS}/${name}`, { recursive: true, force: true });
+	}
+}
+
+function writeConfigs() {
+	clearStale();
 	const base = JSON.parse(readFileSync('stryker.config.json', 'utf8'));
 	const chunks = partition(sourceFiles(), chunkCount);
 	chunks.forEach((files, idx) => {
