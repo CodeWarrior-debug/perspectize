@@ -1,4 +1,4 @@
-.PHONY: build run dev test docker-up docker-down clean migrate-up migrate-up-n migrate-down migrate-down-n migrate-create graphql-gen fmt lint test-coverage test-duplication install-hooks mutate mutate-diff
+.PHONY: build run dev test docker-up docker-down clean migrate-up migrate-up-n migrate-down migrate-down-n migrate-create graphql-gen fmt lint test-coverage test-duplication install-hooks mutate mutate-diff mutate-preflight
 
 # Load .env file if it exists
 ifneq (,$(wildcard .env))
@@ -96,12 +96,26 @@ test-coverage:
 	go tool cover -html=coverage.out -o coverage.html
 
 # Mutation testing (requires gremlins: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0).
-# Config lives in .gremlins.yaml. GOFLAGS=-count=1 bypasses the go test cache so the coverage
-# baseline Gremlins derives its per-mutant timeout from reflects a real suite run.
-# Full run (slow — every mutant runs the whole suite): make mutate
-mutate:
-	GOFLAGS=-count=1 gremlins unleash .
+# Config lives in .gremlins.yaml. Gremlins runs the suite in a copy of backend/ only, so:
+#  - -count=1 bypasses the go test cache (the coverage baseline the per-mutant timeout derives
+#    from must be a real run), and
+#  - these tests are skipped because they read files outside backend/ (repo-root data/bible,
+#    shared frontend fixtures) that the copy doesn't have. Left in, they fail on EVERY mutant and
+#    Gremlins reports a bogus 100% kill rate. `make mutate-preflight` catches any new offender.
+MUTATE_SKIP = ^(TestManifestMatchesReleaseFilesWhenPresent|TestParseBSB_RealFile_SequentialAndMatchesVerseTotal|TestBibleBooksJSON_Has66Books|TestSeederEmbeddedBooksJSON_MatchesRepoRoot|TestFrontendBooksJSON_MatchesRepoRoot|TestBibleVerseOrdinal_RealBooks|TestBibleVerseOrdinal_RoundTripsForAllRealVerses|TestComputeTag_MatchesSharedFixture)$$
+MUTATE_GOFLAGS = -count=1 -skip=$(MUTATE_SKIP)
+MUTATE_BASE ?= origin/main
+GREMLINS_ARGS ?=
 
-# Only mutate lines changed vs origin/main (what CI runs on PRs): make mutate-diff
-mutate-diff:
-	GOFLAGS=-count=1 gremlins unleash --diff origin/main .
+# Runs the UNMUTATED suite in an isolated copy of backend/, the way Gremlins does. Must be green,
+# otherwise every mutant would be counted as killed by the same unrelated failure.
+mutate-preflight:
+	@tmp=$$(mktemp -d); cp -r . "$$tmp/backend"; (cd "$$tmp/backend" && GOFLAGS='$(MUTATE_GOFLAGS)' go test ./...); status=$$?; rm -rf "$$tmp"; exit $$status
+
+# Full run (slow — every mutant runs the whole suite, ~1h): make mutate
+mutate: mutate-preflight
+	GOFLAGS='$(MUTATE_GOFLAGS)' gremlins unleash $(GREMLINS_ARGS) .
+
+# Only mutate lines changed vs $(MUTATE_BASE) (what CI runs on PRs): make mutate-diff
+mutate-diff: mutate-preflight
+	GOFLAGS='$(MUTATE_GOFLAGS)' gremlins unleash --diff $(MUTATE_BASE) $(GREMLINS_ARGS) .

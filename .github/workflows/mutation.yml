@@ -62,20 +62,26 @@ jobs:
 
       - name: Install Gremlins
         if: steps.changes.outputs.changed == 'true'
-        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+        run: |
+          go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       # No Postgres service on purpose. Gremlins runs several `go test ./...` at once
       # and the DB-backed tests are not safe to run concurrently against one database
       # (see the -p 1 note in ci.yml) — a flaky failure would be counted as a KILLED
       # mutant and inflate the score. The DB tests skip cleanly without DATABASE_URL,
       # so repositories are measured through their sqlmock tests only.
+      # Goes through the Make target on purpose: it first runs the unmutated suite in an
+      # isolated copy of backend/ (`mutate-preflight`) and applies the skip list for tests
+      # that read files outside backend/. Without those, every mutant "dies" of the same
+      # unrelated failure and Gremlins reports a bogus 100% score.
       - name: Run Gremlins on changed lines
         if: steps.changes.outputs.changed == 'true'
         run: |
-          GOFLAGS=-count=1 gremlins unleash \
-            --diff "origin/${{ github.base_ref }}" \
-            --workers 2 \
-            -o "$RUNNER_TEMP/gremlins.json" . 2>&1 | tee "$RUNNER_TEMP/gremlins.log"
+          set -o pipefail
+          make mutate-diff \
+            MUTATE_BASE="origin/${{ github.base_ref }}" \
+            GREMLINS_ARGS="--workers 2 -o $RUNNER_TEMP/gremlins.json" 2>&1 | tee "$RUNNER_TEMP/gremlins.log"
 
       - name: Summarize
         if: always() && steps.changes.outputs.changed == 'true'
