@@ -89,6 +89,12 @@ jobs:
       - name: Build
         run: go build -v ./...
 
+      # The opt-in perf harness sits behind the `perf` build tag, so nothing else
+      # compiles it and it silently rots (it had drifted out of sync with
+      # NewResolver/Middleware). Vet builds it without needing a database.
+      - name: Compile perf-tagged harness
+        run: go vet -tags perf ./internal/perf/...
+
       - name: Verify formatting
         run: |
           gofmt -l .
