@@ -28,7 +28,14 @@ export default defineConfig({
 	test: {
 		name: 'unit',
 		include: ['tests/**/*.{test,spec}.{js,ts}'],
-		exclude: ['tests/browser/**'],
+		exclude: [
+			'tests/browser/**',
+			// Stryker runs in a sandbox copy of frontend/ only. These two read files that live
+			// outside it (repo-root data/bible/ and testdata/), fail unmutated there, and would
+			// abort the dry run. Their mutants (buildTag.ts, bibleVersion) read as LIVED.
+			'tests/unit/bibleVersion.test.ts',
+			'tests/unit/buildTag.test.ts',
+		],
 		environment: 'jsdom',
 		globals: true,
 		setupFiles: ['./tests/setup.ts'],
