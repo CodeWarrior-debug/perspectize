@@ -6,18 +6,15 @@ name: Mutation Testing
 # `thresholds.break` (see docs/superpowers/specs/*-test-hardening-spike.md).
 #
 # Full runs are local only: `make mutate` (backend/) and `pnpm run mutate` (frontend/).
-# CI does the incremental version — PRs mutate only changed lines/files, and pushes
-# to main refresh Stryker's incremental cache so PR runs reuse prior results.
+# CI does the incremental version — PRs mutate only changed lines/files. A full Stryker
+# pass takes ~3h+ on a 4-core machine, so it is NOT run on every push to main; trigger it
+# by hand (workflow_dispatch, on main) to seed Stryker's incremental cache, which later PR
+# runs restore so they don't re-run mutants whose source and tests are unchanged.
 
 on:
   pull_request:
     paths:
       - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/mutation.yml'
-  push:
-    branches: [main]
-    paths:
       - 'frontend/**'
       - '.github/workflows/mutation.yml'
   workflow_dispatch:
@@ -108,6 +105,8 @@ jobs:
   frontend:
     name: Stryker (incremental)
     runs-on: ubuntu-latest
+    # PR runs are small; a manual full run (cache seeding) needs ~3h+.
+    timeout-minutes: 360
     defaults:
       run:
         working-directory: frontend
@@ -132,8 +131,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # Stryker's incremental file maps each mutant to a result keyed on the source and
-      # test content it was run against; unchanged mutants aren't re-run. Pushes to main
-      # save a fresh copy, PRs restore the newest one available to them.
+      # test content it was run against; unchanged mutants aren't re-run. A manual full run
+      # on main saves a fresh copy; PRs restore the newest one available to them.
       - name: Restore Stryker incremental cache
         uses: actions/cache@v4
         with:

@@ -15,11 +15,35 @@ Mutation testing is the direct check: change the code in a small way (flip `>` t
 
 - **Backend — Gremlins:** `backend/.gremlins.yaml`, `make mutate` (full, local) and `make mutate-diff` (changed lines vs `origin/main`).
 - **Frontend — StrykerJS:** `frontend/stryker.config.json`, `frontend/vitest.config.stryker.ts`, `pnpm run mutate` (full, local) and `pnpm run mutate:incremental`.
-- **CI:** `.github/workflows/mutation.yml` — report-only. PRs mutate only changed Go lines (Gremlins `--diff`) and changed `src/lib/**/*.ts` files (Stryker `--mutate` + incremental cache); pushes to `main` refresh Stryker's incremental cache. No thresholds, so it cannot fail a PR yet.
+- **CI:** `.github/workflows/mutation.yml` — report-only. PRs mutate only changed Go lines (Gremlins `--diff`, via `make mutate-diff`) and changed `src/lib/**/*.ts` files (Stryker `--mutate` + incremental cache). A full Stryker pass is ~3h+, so it is manual-only (`workflow_dispatch` on `main`, to seed the incremental cache) rather than on every push. No thresholds, so it cannot fail a PR yet. **Not yet exercised on GitHub** — the first PR run is the real test of the workflow.
 
 ## Baseline results
 
-_Pending — the first valid full local runs (Gremlins, then Stryker) were still in progress when this draft was committed. This section is filled in once they finish._
+### Backend (Gremlins v0.6.0, full run, 2026-09-30) — valid
+
+| | |
+|---|---|
+| Runnable mutants | 858 (+231 not covered by any test) |
+| Killed | 749 |
+| **Lived** | **100** |
+| Timed out | 7 |
+| Test efficacy (killed / killed+lived) | **88.2%** |
+| Mutator coverage (mutants any test reaches) | 78.6% |
+| Wall time | 1h 33m (3 workers, 4 cores) |
+
+Where the 100 survivors are: `graphql/resolvers` 25 (18 in `helpers.go`), `core/services` 21 (`content_service.go` 9, `perspective_service.go` 8), `repositories/postgres` 19 (14 in `gorm_mappers.go`), `wikidata` 11, `realtime` 9, `youtube` 5, `core/domain` 3, `auth` 3, `config` 2, `directives` 2. By kind: 53 boundary (`>` vs `>=`), 38 negation, 4 arithmetic, 4 increment/decrement, 1 negative-inversion. Boundary and mapper survivors are the classic signature of tests that check the happy path but not edges or every mapped field. Six of the seven timeouts are in `realtime/hub.go` (a mutated condition turning a loop into a hang — expected, not a test gap by itself).
+
+Two caveats: (1) `ComputeTag` and the Bible verse-ordinal logic read as under-tested only because their tests are on the `MUTATE_SKIP` list (finding 3b); (2) DB-backed tests were not run, so repository numbers reflect sqlmock tests only.
+
+Spot-check of the verdicts: mutating `resolvers/helpers.go:70` (`len(c.Response) > 0` → `>= 0`) by hand left the full suite green, confirming that survivor is real.
+
+Not covered (231 mutants) is a separate signal: code no test executes at all, e.g. most of `pkg/database` and `pkg/middleware/recovery.go`.
+
+### Frontend (StrykerJS 10) — **no valid score yet**
+
+The full pass (5,987 mutants across 100 files in `src/lib/**/*.ts`) did not finish: at the 2-hour cap of the environment it was running in, Stryker's own progress read ~56% with ~1h 28m remaining, i.e. roughly 3.3 hours on a 4-core machine. Stryker writes its report only at the end, so nothing was saved, and the mid-run counters (1,370 "survived" of 5,301 "tested", 1 timeout) include mutants Stryker resolves without running tests, so they are **not** a score and should not be quoted as one.
+
+To get the baseline: run `pnpm run mutate` in `frontend/` on a dev machine (or a workflow_dispatch run in CI, timeout is 6h) and paste the numbers here. Splitting by directory with `--mutate 'src/lib/utils/**'` etc. is a way to fit shorter windows. What was verified: the setup works end to end (plugins load, the unmutated dry run passes, mutants execute).
 
 ## Findings that shape the rest of the work
 
@@ -34,6 +58,10 @@ These were found the hard way while getting the first full runs to produce trust
 6. **The frontend has no ESLint at all** (`golangci-lint` exists for Go; the frontend relies on `svelte-check` + Prettier). Any lint-based test-quality rule on the frontend means adopting ESLint first — that raises its cost from "enable a rule" to "introduce a linter".
 7. **`golangci-lint` currently excludes `gocritic` on `_test.go` files and does not enable `testifylint`.**
 8. **Adding Stryker churned `pnpm-lock.yaml`** (peer-dependency suffixes such as `(supports-color@7.2.0)` on `@babel/*` snapshot keys). No existing top-level version changed.
+9. **Stryker under pnpm needs `plugins` declared explicitly.** It auto-discovers `@stryker-mutator/*` next to its own install, which pnpm's strict layout hides — symptoms are "Unknown stryker config option vitest" and "Cannot find Checker plugin".
+10. **No TypeScript checker.** `@stryker-mutator/typescript-checker` runs plain `tsc`, which cannot resolve type exports from `.svelte` files (TS2614) and trips on existing `tests/browser` type errors; this repo type-checks with `svelte-check`. Without a checker, mutants that are type-invalid but run fine (Vitest strips types) can survive, so survivors are slightly overstated. Revisit if a `svelte-check`-based checker appears.
+11. **Vitest's 5s default timeout aborts the Stryker dry run.** One heavy test (Bible verse-ordinal round-trip) passes in ~1s normally but exceeds 5s instrumented and alongside other runners; `vitest.config.stryker.ts` sets `testTimeout: 30_000`.
+12. **Stryker's sandbox is a copy of `frontend/`, so tests that read repo-root files fail the dry run** — same class as finding 3b. `bibleVersion.test.ts` and `buildTag.test.ts` are excluded in `vitest.config.stryker.ts`; their mutants read as LIVED. Stryker's dry run is the preflight here (it aborts on any unmutated failure); the hermetic-tests option below removes both exclusion lists.
 
 ## Options not yet done
 
@@ -47,7 +75,7 @@ Open questions: runtime budget per agent invocation (Gremlins ~seconds per mutan
 
 ### 1b. Make the repo-root-reading tests hermetic
 
-The eight tests skipped by `MUTATE_SKIP` (finding 3b) depend on files outside `backend/`. Give them a copy under `backend/…/testdata` (or `go:embed` the JSON) with a test asserting the copy matches the repo-root original, so they run — and count — in mutation runs and in any build that only has `backend/` (the Docker build context is already `backend/`). Removes the skip list.
+The eight Go tests skipped by `MUTATE_SKIP` (finding 3b) and the two frontend tests excluded from Stryker (finding 12) depend on files outside their module. Give them a copy under `backend/…/testdata` (or `go:embed` the JSON) with a test asserting the copy matches the repo-root original, so they run — and count — in mutation runs and in any build that only has `backend/` (the Docker build context is already `backend/`). Removes the skip list.
 
 ### 2. Lint rules for test smells
 
