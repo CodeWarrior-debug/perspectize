@@ -60,6 +60,10 @@ this prompt disagree, the docs and the existing code win.
 - **Never** run `make migrate-up` / `migrate-down`. Hand schema changes to
   `db-migration`.
 
+## Query budget
+
+Read [.docs/QUERY_BUDGET.md](../../.docs/QUERY_BUDGET.md). Any DB-touching change needs a `backend/internal/perf/querycount` assertion: batch methods cost the same for 1 and 50 inputs, empty input costs 0, per-row GraphQL fields go through a dataloader. Never write a repo/service call inside a loop over results.
+
 ## Process
 
 1. Read the files above and the code you will touch.

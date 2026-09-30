@@ -110,7 +110,26 @@ The failure is confined to that last step: `generated.go` and `models_gen.go` ar
 
 - **Unit:** Mock deps, no DB. `make test`.
 - **Integration:** Auto-skip when DB unavailable (`t.Skip()`).
+- **Query counts:** assert statement counts with `internal/perf/querycount` — see Query budget below.
 - **Env isolation:** Tests loading config must clear env vars via `t.Setenv("KEY", "")`. See `clearConfigEnvVars` in `test/config/config_test.go`.
+
+## Query budget (REQUIRED for DB-touching changes)
+
+Every repository method, service method or resolver that touches the database has a **query budget**: the number of SQL statements it issues, asserted in a test so a regression fails CI. Use `internal/perf/querycount` (GORM-callback counter; works with go-sqlmock and real Postgres):
+
+```go
+c := querycount.Attach(t, db)
+_, _ = repo.GetByIDs(ctx, seqIDs(50))
+c.AssertExactly(t, 1) // batch: 1 query for 50 ids, never 50
+```
+
+- Batch methods (`...ByIDs`, `Aggregate...`): same count for 1 and 50 inputs; empty input issues 0. List queries: assert the page (+ count only when `includeTotalCount`).
+- A GraphQL field that loads per-parent data goes through a dataloader (`adapters/graphql/dataloader`), with a loader test proving N loads → 1 service call.
+- Set the budget to what the path costs **today**, not a generous ceiling.
+- Reject in review: a repo/service call inside a loop over results, a `Preload` the caller never reads, the same lookup in both middleware and resolver.
+- Whole-request counts against real Postgres: opt-in `go test -tags perf ./internal/perf/` (CI compiles it via `go vet -tags perf`).
+
+Full table and examples: [.docs/QUERY_BUDGET.md](../.docs/QUERY_BUDGET.md).
 
 ## Code Style
 
