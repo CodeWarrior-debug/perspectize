@@ -135,7 +135,9 @@ export const LIST_PERSPECTIVES_BY_USER = gql`
 
 export interface ListPerspectivesByContentResponse {
 	perspectives: {
-		items: PerspectiveItem[];
+		// `user` comes from the server on fetch; rows patched in by the
+		// create/update hooks (own rows only) don't carry it.
+		items: (PerspectiveItem & { user?: { id: string; username: string } | null })[];
 	};
 }
 
@@ -149,6 +151,12 @@ export const LIST_PERSPECTIVES_BY_CONTENT = gql`
 		perspectives(filter: { contentID: $contentID }, first: $first) {
 			items {
 				...PerspectiveFields
+				# Batched server-side; replaces downloading the whole users table
+				# just to label the Compare picker.
+				user {
+					id
+					username
+				}
 			}
 		}
 	}
