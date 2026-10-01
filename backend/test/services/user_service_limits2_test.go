@@ -24,7 +24,7 @@ func TestUserCreate_UsernameLengthBoundary(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := newTestUserService(&mockUserRepository{})
-			result, err := svc.Create(context.Background(), strings.Repeat("a", tt.length), "")
+			result, err := svc.Create(context.Background(), testAdmin, strings.Repeat("a", tt.length), "")
 			if tt.wantErr {
 				assert.Nil(t, result)
 				require.Error(t, err)
@@ -55,7 +55,7 @@ func TestUserUpdate_UsernameLengthBoundary(t *testing.T) {
 			}
 			svc := newTestUserService(repo)
 			name := strings.Repeat("b", tt.length)
-			result, err := svc.Update(context.Background(), portservices.UpdateUserInput{ID: 2, Username: &name})
+			result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{ID: 2, Username: &name})
 			if tt.wantErr {
 				assert.Nil(t, result)
 				require.Error(t, err)
@@ -85,7 +85,7 @@ func TestUserUpdate_UsernameLookupUnexpectedError(t *testing.T) {
 	svc := newTestUserService(repo)
 	name := "newname"
 
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{ID: 2, Username: &name})
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{ID: 2, Username: &name})
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -105,7 +105,7 @@ func TestUserUpdate_UsernameLookupNotFoundProceeds(t *testing.T) {
 	svc := newTestUserService(repo)
 	name := "newname"
 
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{ID: 2, Username: &name})
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{ID: 2, Username: &name})
 
 	require.NoError(t, err)
 	assert.Equal(t, "newname", result.Username)
