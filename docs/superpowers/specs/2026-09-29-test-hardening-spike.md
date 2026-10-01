@@ -14,7 +14,7 @@ Mutation testing is the direct check: change the code in a small way (flip `>` t
 ## Done in this change (not spike scope)
 
 - **Backend — Gremlins:** `backend/.gremlins.yaml`, `make mutate` (full, local) and `make mutate-diff` (changed lines vs `origin/main`).
-- **Frontend — StrykerJS:** `frontend/stryker.config.json`, `frontend/vitest.config.stryker.ts`, `pnpm run mutate` (full, local) and `pnpm run mutate:incremental`.
+- **Frontend — StrykerJS:** `frontend/stryker.config.json`, `frontend/vitest.config.stryker.ts`, `pnpm run mutate` (full, single report at the end), `pnpm run mutate:chunked` (full, in chunks with one report each — use this when the time is capped) and `pnpm run mutate:incremental`.
 - **CI:** `.github/workflows/mutation.yml` — report-only. PRs mutate only changed Go lines (Gremlins `--diff`, via `make mutate-diff`) and changed `src/lib/**/*.ts` files (Stryker `--mutate` + incremental cache). A full Stryker pass is ~3h+, so it is manual-only (`workflow_dispatch` on `main`, to seed the incremental cache) rather than on every push. No thresholds, so it cannot fail a PR yet. **Not yet exercised on GitHub** — the first PR run is the real test of the workflow.
 
 ## Baseline results
@@ -76,11 +76,30 @@ Eight test-writing agents (one per area, each in its own worktree) added 20 test
 - **17 more misses had been hidden by the first run** (finding 13). They are fixed too, and the targeted re-run confirms all 17 are now caught.
 - **8 new misses appeared** (`retention.go` 5, `pkg/database/postgres.go` 3). They were "no test runs it" before; the new tests now execute those lines without asserting on them. Coverage went up, not down — these are the next targets.
 
-### Frontend (StrykerJS 10) — **no valid score yet**
+### Frontend (StrykerJS 10, full run in 6 chunks, 2026-09-30) — valid
 
-The full pass (5,987 mutants across 100 files in `src/lib/**/*.ts`) did not finish: at the 2-hour cap of the environment it was running in, Stryker's own progress read ~56% with ~1h 28m remaining, i.e. roughly 3.3 hours on a 4-core machine. Stryker writes its report only at the end, so nothing was saved, and the mid-run counters (1,370 "survived" of 5,301 "tested", 1 timeout) include mutants Stryker resolves without running tests, so they are **not** a score and should not be quoted as one.
+**Your frontend tests caught 3,997 of the 5,986 bugs planted in `src/lib/**/*.ts` (66.8%), and 70.4% of those in code they run.** 1,678 were missed and 311 sit in code no test runs.
 
-To get the baseline: run `pnpm run mutate` in `frontend/` on a dev machine (or a workflow_dispatch run in CI, timeout is 6h) and paste the numbers here. Splitting by directory with `--mutate 'src/lib/utils/**'` etc. is a way to fit shorter windows. What was verified: the setup works end to end (plugins load, the unmutated dry run passes, mutants execute).
+| | |
+|---|---|
+| Caught (killed 3,994 + timed out 3) | 3,997 |
+| **Missed (survived)** | **1,678** |
+| Code no test runs (no coverage) | 311 |
+| Caught, of all planted bugs | **66.8%** |
+| Caught, of bugs in code the tests run (efficacy) | 70.4% |
+| Excluded (1 runtime-error mutant) | 1 |
+
+**Two data tables account for over half the misses.** `data/feelings.ts` (622 missed, 0% caught) and `theme/presets.ts` (246 missed, 33% caught) are lists of labels and colour strings; no test asserts on each entry, so string-literal changes there pass silently. That is 868 of the 1,678 misses. Without those two files your tests caught **3,876 of 4,982 = 77.8%**, which is the fairer number for logic code.
+
+**Real logic gaps** (lowest catch rate where it matters): `utils/grid-config.ts` 50% (45 missed, 145 in code no test runs); `theme/store.svelte.ts` 48% and `theme/derive.ts` 52%; `utils/icons.ts` 6.5% (25 no test runs it); `vitals.ts` 11 planted, none run by any test; `queries/messaging/useEditMessage.ts` 57%. Healthy areas: `queries/perspectives` 88%, `queries/users` 90%, `stores` 89%, `onboarding` 88%; `utils` overall is 79% across 2,902 planted bugs.
+
+**By kind of change:** string literals 54% not caught (879 of 1,625), optional chaining 67% (58 of 86), arrays 54%, objects 42%; conditionals 27% (353 of 1,294) and equality operators 20% (92 of 462). The conditional and equality misses (445) are the higher-value targets; the string/object/array misses are mostly labels, colours and data.
+
+**Spot-check of the verdicts:** removing the `ms <= 0` guard in `utils/formatting.ts` (`formatRemainingTime`; a negative duration then yields e.g. `-2m` instead of `0m`) left the 23 related test files (526 tests) green, confirming that survivor is real.
+
+**Caveats:** there is no TypeScript checker (finding 10), so a few type-invalid mutants may count as missed; `bibleVersion.test.ts` and `buildTag.test.ts` are excluded (finding 12), so those files look weaker than they are; 5 of the 100 files had no mutants.
+
+**How it ran:** `pnpm run mutate:chunked` splits the files into 6 size-balanced chunks, runs them one after another (17, 29, 14, 38, 10 and 97 minutes, about 3.4 hours in total) and writes one report per chunk, so a cut-off run keeps the finished chunks. `--only 3,4` resumes, `--aggregate-only` re-summarises reports on disk. The single-shot `pnpm run mutate` still works, but writes its report only at the end.
 
 ## Findings that shape the rest of the work
 

@@ -18,6 +18,7 @@
 		"test:coverage": "vitest run --project unit --coverage",
 		"mutate": "stryker run --force",
 		"mutate:incremental": "stryker run --incremental",
+		"mutate:chunked": "node stryker-chunked.mjs",
 		"test:duplication": "jscpd src/ tests/ --min-lines 3 --min-tokens 25 --reporters html --output coverage/duplication",
 		"demo:test": "playwright test -c demo/playwright.config.ts --project e2e",
 		"demo:record": "playwright test -c demo/playwright.config.ts --project record",
