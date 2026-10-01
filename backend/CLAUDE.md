@@ -110,9 +110,29 @@ The failure is confined to that last step: `generated.go` and `models_gen.go` ar
 
 - **Unit:** Mock deps, no DB. `make test`.
 - **Integration:** Auto-skip when DB unavailable (`t.Skip()`).
+- **Query counts:** assert statement counts with `internal/perf/querycount` — see Query budget below.
+- **Build-tagged harnesses rot.** Code behind the `perf` tag isn't compiled by `go build/test ./...`; CI vets it (`go vet -tags perf ./internal/perf/...`). Run that vet after changing `NewResolver` / `dataloader.Middleware` signatures.
 - **Env isolation:** Tests loading config must clear env vars via `t.Setenv("KEY", "")`. See `clearConfigEnvVars` in `test/config/config_test.go`.
 - **Mutation testing:** always `make mutate` / `make mutate-diff`, never bare `gremlins`. They run `mutate-preflight` (unmutated suite in an isolated copy of `backend/`, must be green) and skip the tests in `MUTATE_SKIP`. A new test that reads outside `backend/` (`../../../data/…`) must be added to `MUTATE_SKIP` or, better, made hermetic. Run on an idle machine: a flaky test failing mid-run counts as a catch (#518), and the first baseline overstated catches by at least 17.
 - **Cloud sandbox:** `go: no such tool "covdata"` (auto-downloaded toolchain) → `go build -o "$(go env GOROOT)/pkg/tool/linux_amd64/covdata" cmd/covdata`. Gremlins fills the Go build cache fast; `go clean -cache` before a long run if disk is tight.
+
+## Query budget (REQUIRED for DB-touching changes)
+
+Every repository method, service method or resolver that touches the database has a **query budget**: the number of SQL statements it issues, asserted in a test so a regression fails CI. Use `internal/perf/querycount` (GORM-callback counter; works with go-sqlmock and real Postgres):
+
+```go
+c := querycount.Attach(t, db)
+_, _ = repo.GetByIDs(ctx, seqIDs(50))
+c.AssertExactly(t, 1) // batch: 1 query for 50 ids, never 50
+```
+
+- Batch methods (`...ByIDs`, `Aggregate...`): same count for 1 and 50 inputs; empty input issues 0. List queries: assert the page (+ count only when `includeTotalCount`).
+- A GraphQL field that loads per-parent data goes through a dataloader (`adapters/graphql/dataloader`), with a loader test proving N loads → 1 service call.
+- Set the budget to what the path costs **today**, not a generous ceiling.
+- Reject in review: a repo/service call inside a loop over results, a `Preload` the caller never reads, the same lookup in both middleware and resolver.
+- Whole-request counts against real Postgres: opt-in `go test -tags perf ./internal/perf/` (CI compiles it via `go vet -tags perf`).
+
+Full table and examples: [.docs/QUERY_BUDGET.md](../.docs/QUERY_BUDGET.md).
 
 ## Code Style
 
