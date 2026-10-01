@@ -65,6 +65,10 @@ wins.
   - Import Lucide icons per icon (`@lucide/svelte/icons/<name>`).
 - **Secrets:** never read `.env` files and never attempt a Clerk sign-in.
 
+## Query caching & call budget
+
+Read [.docs/QUERY_BUDGET.md](../../.docs/QUERY_BUDGET.md) and the "Query caching & call budget" section of `frontend/CLAUDE.md`. One hook + one key per piece of data, a deliberate `staleTime`, a `queryKey` covering every `queryFn` variable, and mutations that invalidate exactly the affected keys.
+
 ## Process
 
 1. Run `pnpm install` in `frontend/` first if `node_modules` is missing or

@@ -68,7 +68,8 @@ defer db.Close()
 2. **Format**: `gofmt -l .` in `backend/` — must return empty (CI's `Build` job fails otherwise). `make install-hooks` (once per checkout) auto-fixes this on every commit.
 3. **Backend tests**: `go test ./...` in `backend/` — all must pass
 4. **Frontend tests**: `pnpm run test:run` in `frontend/` — all must pass
-5. **Stale references**: If renaming/moving files or paths, grep the entire repo for old names
+5. **Query budget**: if the change touches DB access or data fetching, it carries a query-count test (backend) / cache-contract test (frontend) — [.docs/QUERY_BUDGET.md](.docs/QUERY_BUDGET.md).
+6. **Stale references**: If renaming/moving files or paths, grep the entire repo for old names
 
 Run the relevant subset (e.g., backend-only changes skip step 4). Report results explicitly — don't just say "tests pass", show the output summary.
 
@@ -90,6 +91,7 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 - [Dependency Security](.docs/DEPENDENCY_SECURITY.md) — Trivy/pnpm-audit scanning, CVE remediation workflow, CI gotchas
 - [Worktrees](.docs/WORKTREES.md) — Location convention and the 3 numbered reusable worktrees for isolated Claude Code work
 - [Demo Mode](.docs/DEMO_MODE.md) — Docker demo stack (persistent Postgres + seeded personas, no Clerk/YouTube), Playwright tours that run as E2E (`make demo-test`) or record videos (`make demo-record`)
+- [Query Budget](.docs/QUERY_BUDGET.md) — query-count tests, dataloaders, TanStack caching/eviction rules
 - [PR Workflow](.docs/PR_WORKFLOW.md) · [Planning](.docs/PLANNING.md) · [Hooks](.docs/HOOKS.md)
 - [claude-md-audit eval](evals/claude-md-audit/README.md) — `claude plugin eval` suite scoring the `claude-md-improver` skill; rerun after changing CLAUDE.md tooling or before trusting a cheaper model with audits
 

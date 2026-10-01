@@ -58,6 +58,24 @@ Spot-check of the verdicts: mutating `resolvers/helpers.go:70` (`len(c.Response)
 
 Not covered (231 mutants) is a separate signal: code no test executes at all, e.g. most of `pkg/database` and `pkg/middleware/recovery.go`.
 
+### Backend after the fixes (2026-09-30)
+
+Eight test-writing agents (one per area, each in its own worktree) added 20 test files, +2,264 lines, tests only — no production code changed. Each item was hand-verified by its agent (apply the planted bug, the new test must fail; revert, it must pass), then re-measured by Gremlins.
+
+| | First full run | After the fixes* |
+|---|---|---|
+| Your tests caught (killed + hang) | 756 | 859 |
+| **Missed** | **100** (really ≥117, see below) | **20** (12 equivalent + 8 newly exposed) |
+| Code no test runs | 231 | 208 |
+| Caught, of code they run (efficacy) | 88.2% (at most 86.2% once the false kills below are removed) | ~97.7% |
+| Caught, of all 1,087 planted | 69.5% | 79.0% |
+
+\*Combined from two runs, not one continuous run: a full run on the branch after the first round of fixes (836 caught, 29 missed), then a targeted re-run of `core/services` and `pkg/database` after the second round.
+
+- **88 of the original 100 are caught.** The other 12 were judged *equivalent* (the planted change does not alter observable behaviour, so no test can catch it) and still show as missed: `clerk_middleware.go:168`, `helpers.go:70/218/247` (resolvers; `:70` differs only by an extra log line), `hub.go:76/143/230`, `repositories/postgres/helpers.go:210`, `youtube/client.go:79`, `youtube/parser.go:33`, `bible_reference.go:40`, `messaging_service.go:152`. Seven of those were checked against the code by hand; the rest are the agents' judgement.
+- **17 more misses had been hidden by the first run** (finding 13). They are fixed too, and the targeted re-run confirms all 17 are now caught.
+- **8 new misses appeared** (`retention.go` 5, `pkg/database/postgres.go` 3). They were "no test runs it" before; the new tests now execute those lines without asserting on them. Coverage went up, not down — these are the next targets.
+
 ### Frontend (StrykerJS 10, full run in 6 chunks, 2026-09-30) — valid
 
 **Your frontend tests caught 3,997 of the 5,986 bugs planted in `src/lib/**/*.ts` (66.8%), and 70.4% of those in code they run.** 1,678 were missed and 311 sit in code no test runs.
@@ -100,12 +118,15 @@ These were found the hard way while getting the first full runs to produce trust
 10. **No TypeScript checker.** `@stryker-mutator/typescript-checker` runs plain `tsc`, which cannot resolve type exports from `.svelte` files (TS2614) and trips on existing `tests/browser` type errors; this repo type-checks with `svelte-check`. Without a checker, mutants that are type-invalid but run fine (Vitest strips types) can survive, so survivors are slightly overstated. Revisit if a `svelte-check`-based checker appears.
 11. **Vitest's 5s default timeout aborts the Stryker dry run.** One heavy test (Bible verse-ordinal round-trip) passes in ~1s normally but exceeds 5s instrumented and alongside other runners; `vitest.config.stryker.ts` sets `testTimeout: 30_000`.
 12. **Stryker's sandbox is a copy of `frontend/`, so tests that read repo-root files fail the dry run** — same class as finding 3b. `bibleVersion.test.ts` and `buildTag.test.ts` are excluded in `vitest.config.stryker.ts`; their mutants read as LIVED. Stryker's dry run is the preflight here (it aborts on any unmutated failure); the hermetic-tests option below removes both exclusion lists.
+13. **A "caught" verdict is not always a real catch.** The first valid full run counted 17 planted bugs as caught that the suite actually misses: they were KILLED in that run, then LIVED once the same code was re-run with only *more* tests added, which is impossible for a real kill. Hand-applying two of them on the original suite left it fully green. The cause is not proven; the likeliest is a flaky test failing while that mutant was running (any failing test counts as a kill — see #518), and the 17 are clustered in a few files, consistent with a short burst of machine load. So treat a first baseline as an upper bound, run mutation testing on an idle machine, and re-verify a sample of "caught" mutants by hand. The targeted re-run skipped the `TestPresenceSession_*` tests for this reason.
 
 ## Options not yet done
 
 Ordered roughly by value for effort. Each is independent.
 
 ### 1. Close the loop with the test-writing agents (highest value)
+
+**Tried this round:** eight `test-writer` agents in parallel worktrees fixed 100+17 items (see "Backend after the fixes"). What worked: a per-item procedure (reproduce, write test, prove it fails under the planted bug, confirm production untouched) and new test files only. What to change next time: give each agent its own script path (they overwrote each other in a shared scratchpad), tell them not to delete caches, note that worktrees branch from `main` not the current branch, and independently re-check their "equivalent" verdicts.
 
 `.claude/agents/test-writer.md` and `vitest-writer.md` say tests must "assert something meaningful", but nothing checks it. Add a step: after writing tests, run mutation testing scoped to the code under test (`gremlins unleash --diff`/a single path; `stryker run --mutate <file>`) and iterate until surviving mutants are killed or explicitly justified as equivalent. This turns the tool from a report into a repair loop, which is the "fixing" half of the original question.
 

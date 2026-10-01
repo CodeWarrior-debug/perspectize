@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -30,13 +29,13 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
-	"gorm.io/gorm"
 
 	dlmw "github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/dataloader"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/generated"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/resolvers"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/perf/querycount"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/database"
 )
 
@@ -72,20 +71,6 @@ query ListContent($first: Int, $sortBy: ContentSortBy = UPDATED_AT, $sortOrder: 
   }
 }`
 
-// queryCounter counts SQL statements issued on a *gorm.DB via callbacks.
-type queryCounter struct{ n int64 }
-
-func (qc *queryCounter) reset()        { atomic.StoreInt64(&qc.n, 0) }
-func (qc *queryCounter) count() int64  { return atomic.LoadInt64(&qc.n) }
-func (qc *queryCounter) hook(*gorm.DB) { atomic.AddInt64(&qc.n, 1) }
-
-func (qc *queryCounter) register(db *gorm.DB) {
-	// Every read path in this project is a SELECT (GORM "query") or a
-	// Raw().Scan ("row"). Register on both so nothing is missed.
-	_ = db.Callback().Query().After("*").Register("perf:count_query", qc.hook)
-	_ = db.Callback().Row().After("*").Register("perf:count_row", qc.hook)
-}
-
 func stats(samples []time.Duration) (min, max, mean, median time.Duration) {
 	sorted := append([]time.Duration(nil), samples...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
@@ -120,8 +105,7 @@ func TestContentListDataloaderPerf(t *testing.T) {
 	sqlDB, _ := db.DB()
 	defer sqlDB.Close()
 
-	qc := &queryCounter{}
-	qc.register(db)
+	qc := querycount.Attach(t, db)
 
 	contentRepo := postgres.NewGormContentRepository(db)
 	userRepo := postgres.NewGormUserRepository(db)
@@ -133,7 +117,7 @@ func TestContentListDataloaderPerf(t *testing.T) {
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, nil)
 
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService)
+	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)
 	execSchema := generated.NewExecutableSchema(generated.Config{
 		Resolvers: resolver,
 		Directives: generated.DirectiveRoot{
@@ -151,7 +135,7 @@ func TestContentListDataloaderPerf(t *testing.T) {
 	// does, so this harness is byte-identical for the before/after runs. In
 	// the baseline (pre-fix) state the resolver never touches the loader, so
 	// it is simply unused context.
-	httpHandler := dlmw.Middleware(categoryService)(srv)
+	httpHandler := dlmw.Middleware(categoryService, perspectiveService)(srv)
 
 	c := client.New(httpHandler)
 
@@ -162,7 +146,7 @@ func TestContentListDataloaderPerf(t *testing.T) {
 	queryCounts := make([]int64, 0, iterations)
 
 	for i := 0; i < iterations; i++ {
-		qc.reset()
+		qc.Reset()
 		start := time.Now()
 		// The gqlgen test client rejects response keys that have no matching
 		// struct field, so every selected field must be present here.
@@ -211,9 +195,9 @@ func TestContentListDataloaderPerf(t *testing.T) {
 			t.Fatalf("iteration %d: %v", i, err)
 		}
 		latencies = append(latencies, elapsed)
-		queryCounts = append(queryCounts, qc.count())
+		queryCounts = append(queryCounts, int64(qc.Count()))
 		t.Logf("iter %2d: %6.1fms  rows=%d  queries=%d",
-			i, float64(elapsed.Microseconds())/1000, len(resp.Content.Items), qc.count())
+			i, float64(elapsed.Microseconds())/1000, len(resp.Content.Items), qc.Count())
 	}
 
 	min, max, mean, median := stats(latencies)

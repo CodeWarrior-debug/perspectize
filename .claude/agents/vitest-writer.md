@@ -67,6 +67,10 @@ real logic. A test that passes because nothing rendered is worse than no test.
   offline query), not only `isLoading`.
 - **Never** read `.env` files or hit a real backend.
 
+## Cache and call-count tests
+
+For any `createQuery` or mutation hook, write a **real-`QueryClient`** test with `tests/helpers/queryBudget.ts` (example: `tests/unit/query-cache-contract.test.ts`): N consumers → 1 fetch; a second mount inside `staleTime` → 0 fetches; `hashKey` differs when each `queryFn` variable changes; mutation `onSuccess` → assert both what was invalidated and what was left untouched. A mocked `invalidateQueries` call-check alone is not enough. Details: [.docs/QUERY_BUDGET.md](../../.docs/QUERY_BUDGET.md).
+
 ## Process
 
 1. Run `pnpm install` in `frontend/` if `node_modules` is missing or stale.
