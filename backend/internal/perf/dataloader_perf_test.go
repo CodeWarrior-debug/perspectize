@@ -114,7 +114,7 @@ func TestContentListDataloaderPerf(t *testing.T) {
 
 	contentService := services.NewContentService(contentRepo, nil)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
-	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, nil)
 
 	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)

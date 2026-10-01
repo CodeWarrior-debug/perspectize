@@ -12,16 +12,35 @@ import (
 
 // PerspectiveService implements business logic for perspective operations
 type PerspectiveService struct {
-	repo     repositories.PerspectiveRepository
-	userRepo repositories.UserRepository
+	repo                    repositories.PerspectiveRepository
+	userRepo                repositories.UserRepository
+	hermeneuticApproachRepo repositories.HermeneuticApproachRepository
 }
 
 // NewPerspectiveService creates a new perspective service
-func NewPerspectiveService(repo repositories.PerspectiveRepository, userRepo repositories.UserRepository) *PerspectiveService {
+func NewPerspectiveService(repo repositories.PerspectiveRepository, userRepo repositories.UserRepository, hermeneuticApproachRepo repositories.HermeneuticApproachRepository) *PerspectiveService {
 	return &PerspectiveService{
-		repo:     repo,
-		userRepo: userRepo,
+		repo:                    repo,
+		userRepo:                userRepo,
+		hermeneuticApproachRepo: hermeneuticApproachRepo,
 	}
+}
+
+// validateHermeneutic enforces that at most one of hermeneuticApproachID /
+// hermeneuticCustomText is set, and that a given approach ID exists.
+func (s *PerspectiveService) validateHermeneutic(ctx context.Context, approachID *int, customText *string) error {
+	if approachID != nil && customText != nil {
+		return fmt.Errorf("%w: hermeneuticApproachID and hermeneuticCustomText are mutually exclusive", domain.ErrInvalidInput)
+	}
+	if approachID != nil {
+		if _, err := s.hermeneuticApproachRepo.GetByID(ctx, *approachID); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				return fmt.Errorf("%w: hermeneutic approach %d not found", domain.ErrNotFound, *approachID)
+			}
+			return fmt.Errorf("failed to validate hermeneutic approach: %w", err)
+		}
+	}
+	return nil
 }
 
 // Create creates a new perspective with validation
@@ -99,6 +118,10 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 		sanitizedReview = &s
 	}
 
+	if err := s.validateHermeneutic(ctx, input.HermeneuticApproachID, input.HermeneuticCustomText); err != nil {
+		return nil, err
+	}
+
 	perspective := &domain.Perspective{
 		UserID:                input.UserID,
 		ContentID:             input.ContentID,
@@ -118,6 +141,8 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 		RelatedPerspectiveIDs: input.RelatedPerspectiveIDs,
 		CustomFields:          input.CustomFields,
 		Review:                sanitizedReview,
+		HermeneuticApproachID: input.HermeneuticApproachID,
+		HermeneuticCustomText: input.HermeneuticCustomText,
 	}
 
 	created, err := s.repo.Create(ctx, perspective)
@@ -259,6 +284,19 @@ func (s *PerspectiveService) Update(ctx context.Context, input portservices.Upda
 	} else if input.Review != nil {
 		s := sanitizeReview(*input.Review)
 		existing.Review = &s
+	}
+
+	if input.HermeneuticApproachID != nil || input.HermeneuticCustomText != nil {
+		if err := s.validateHermeneutic(ctx, input.HermeneuticApproachID, input.HermeneuticCustomText); err != nil {
+			return nil, err
+		}
+		if input.HermeneuticApproachID != nil {
+			existing.HermeneuticApproachID = input.HermeneuticApproachID
+			existing.HermeneuticCustomText = nil
+		} else {
+			existing.HermeneuticCustomText = input.HermeneuticCustomText
+			existing.HermeneuticApproachID = nil
+		}
 	}
 
 	updated, err := s.repo.Update(ctx, existing)

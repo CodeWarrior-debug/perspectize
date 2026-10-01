@@ -23,6 +23,9 @@ export interface UpdatePerspectiveInput {
 	customFields?: Record<string, number> | null;
 	feelings?: FeelingInput[] | null;
 	privacy?: 'PUBLIC' | 'PRIVATE';
+	/** Mutually exclusive with hermeneuticCustomText; setting one clears the other server-side. */
+	hermeneuticApproachID?: number;
+	hermeneuticCustomText?: string;
 }
 
 type ListSnapshot = [readonly unknown[], ListPerspectivesByUserResponse | undefined][];
@@ -62,6 +65,18 @@ function applyEdit(p: PerspectiveItem, input: UpdatePerspectiveInput): Perspecti
 		customFields: pick(input.customFields, p.customFields),
 		feelings: pick(input.feelings as FeelingEntry[] | null | undefined, p.feelings),
 		privacy: input.privacy ?? p.privacy,
+		hermeneuticApproachID:
+			input.hermeneuticApproachID !== undefined
+				? String(input.hermeneuticApproachID)
+				: input.hermeneuticCustomText !== undefined
+					? null
+					: p.hermeneuticApproachID,
+		hermeneuticCustomText:
+			input.hermeneuticCustomText !== undefined
+				? input.hermeneuticCustomText
+				: input.hermeneuticApproachID !== undefined
+					? null
+					: p.hermeneuticCustomText,
 		updatedAt: new Date().toISOString(),
 	};
 }

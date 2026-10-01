@@ -154,7 +154,7 @@ func TestPerspectiveCreate_Success(t *testing.T) {
 	}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	like := "up"
 	input := portservices.CreatePerspectiveInput{
 		UserID: 1,
@@ -178,7 +178,7 @@ func TestPerspectiveCreate_WithRatings(t *testing.T) {
 	}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	quality := 8000
 	agreement := 5000
 	input := portservices.CreatePerspectiveInput{
@@ -202,7 +202,7 @@ func TestPerspectiveCreate_UserNotFound(t *testing.T) {
 		},
 	}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	input := portservices.CreatePerspectiveInput{
 		UserID: 999,
 	}
@@ -218,7 +218,7 @@ func TestPerspectiveCreate_InvalidUserID(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepository{}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	input := portservices.CreatePerspectiveInput{
 		UserID: 0,
 	}
@@ -234,7 +234,7 @@ func TestPerspectiveCreate_RatingTooHigh(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepository{}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	quality := 10001
 	input := portservices.CreatePerspectiveInput{
 		UserID:  1,
@@ -252,7 +252,7 @@ func TestPerspectiveCreate_RatingNegative(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepository{}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	agreement := -1
 	input := portservices.CreatePerspectiveInput{
 		UserID:    1,
@@ -274,7 +274,7 @@ func TestPerspectiveCreate_RepositoryError(t *testing.T) {
 	}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	like := "up"
 	input := portservices.CreatePerspectiveInput{
 		UserID: 1,
@@ -292,7 +292,7 @@ func TestPerspectiveCreate_NoFieldsProvided(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepository{}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	input := portservices.CreatePerspectiveInput{
 		UserID: 1,
 		// No quality, agreement, importance, confidence, like, review, or description
@@ -322,7 +322,7 @@ func TestPerspectiveGetByID_Success(t *testing.T) {
 	}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	result, err := svc.GetByID(context.Background(), 1)
 
 	require.NoError(t, err)
@@ -337,7 +337,7 @@ func TestPerspectiveGetByID_NotFound(t *testing.T) {
 	}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	result, err := svc.GetByID(context.Background(), 999)
 
 	assert.Nil(t, result)
@@ -349,7 +349,7 @@ func TestPerspectiveGetByID_InvalidID(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepository{}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	result, err := svc.GetByID(context.Background(), 0)
 
 	assert.Nil(t, result)
@@ -372,7 +372,7 @@ func TestPerspectiveDelete_OwnerSucceeds(t *testing.T) {
 	}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	err := svc.Delete(context.Background(), 1, 42)
 
 	require.NoError(t, err)
@@ -400,7 +400,7 @@ func TestPerspectiveDelete_OwnerCanDeleteAnyPrivacy(t *testing.T) {
 				},
 			}
 
-			svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{})
+			svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{}, nil)
 			require.NoError(t, svc.Delete(context.Background(), 1, 42))
 			assert.True(t, deleted)
 		})
@@ -421,7 +421,7 @@ func TestPerspectiveDelete_NonOwnerForbidden(t *testing.T) {
 				},
 			}
 
-			svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{})
+			svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{}, nil)
 			err := svc.Delete(context.Background(), 1, 42)
 
 			require.Error(t, err)
@@ -440,7 +440,7 @@ func TestPerspectiveDelete_NoActorForbidden(t *testing.T) {
 		},
 	}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{})
+	svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{}, nil)
 	err := svc.Delete(context.Background(), 1, 0)
 
 	require.Error(t, err)
@@ -457,7 +457,7 @@ func TestPerspectiveDelete_NotFound(t *testing.T) {
 	}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	err := svc.Delete(context.Background(), 999, 42)
 
 	require.Error(t, err)
@@ -476,7 +476,7 @@ func TestPerspectiveDelete_RepoScopedDeleteMissPropagatesNotFound(t *testing.T) 
 		},
 	}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{})
+	svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{}, nil)
 	err := svc.Delete(context.Background(), 1, 42)
 
 	require.Error(t, err)
@@ -487,7 +487,7 @@ func TestPerspectiveDelete_InvalidID(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepository{}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	err := svc.Delete(context.Background(), 0, 42)
 
 	require.Error(t, err)
@@ -513,7 +513,7 @@ func TestPerspectiveList_Success(t *testing.T) {
 	}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	result, err := svc.ListPerspectives(context.Background(), domain.PerspectiveListParams{})
 
 	require.NoError(t, err)
@@ -524,7 +524,7 @@ func TestPerspectiveList_InvalidFirst(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepository{}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	first := 0
 	result, err := svc.ListPerspectives(context.Background(), domain.PerspectiveListParams{First: &first})
 
@@ -537,7 +537,7 @@ func TestPerspectiveList_FirstTooLarge(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepository{}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	first := 101
 	result, err := svc.ListPerspectives(context.Background(), domain.PerspectiveListParams{First: &first})
 
@@ -552,7 +552,7 @@ func TestNewPerspectiveService(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepository{}
 	userRepo := &mockUserRepoForPerspective{}
 
-	svc := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	svc := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 
 	assert.NotNil(t, svc)
 }
@@ -594,7 +594,7 @@ func TestPerspectiveService_ListPerspectives_PrivacyEnforcement(t *testing.T) {
 				return &domain.PaginatedPerspectives{Items: []*domain.Perspective{}}, nil
 			},
 		}
-		return services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+		return services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 	}
 
 	t.Run("owner viewing their own list is not restricted", func(t *testing.T) {
@@ -658,7 +658,7 @@ func TestPerspectiveService_AggregateByContentIDs(t *testing.T) {
 				}, nil
 			},
 		}
-		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 		got, err := svc.AggregateByContentIDs(ctx, []int{1, 2})
 		require.NoError(t, err)
@@ -675,7 +675,7 @@ func TestPerspectiveService_AggregateByContentIDs(t *testing.T) {
 				return nil, fmt.Errorf("db exploded")
 			},
 		}
-		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 		_, err := svc.AggregateByContentIDs(ctx, []int{1})
 		require.Error(t, err)
@@ -703,7 +703,7 @@ func TestPerspectiveService_FeelingStats(t *testing.T) {
 				}, nil
 			},
 		}
-		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 		label := "Love"
 		got, err := svc.FeelingStats(ctx, &contentID, "🥰", &label)
@@ -717,7 +717,7 @@ func TestPerspectiveService_FeelingStats(t *testing.T) {
 	})
 
 	t.Run("rejects an empty emoji", func(t *testing.T) {
-		svc := services.NewPerspectiveService(&mockPerspectiveRepository{}, &mockUserRepoForPerspective{})
+		svc := services.NewPerspectiveService(&mockPerspectiveRepository{}, &mockUserRepoForPerspective{}, nil)
 		_, err := svc.FeelingStats(ctx, nil, "", nil)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)
@@ -729,7 +729,7 @@ func TestPerspectiveService_FeelingStats(t *testing.T) {
 				return nil, fmt.Errorf("db exploded")
 			},
 		}
-		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 		_, err := svc.FeelingStats(ctx, nil, "🥰", nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "db exploded")
@@ -747,7 +747,7 @@ func TestPerspectiveService_CustomFieldStats(t *testing.T) {
 				return &domain.CustomFieldStats{Key: "mood", Count: 5, TotalPerspectives: 20}, nil
 			},
 		}
-		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 		got, err := svc.CustomFieldStats(ctx, nil, "mood")
 		require.NoError(t, err)
@@ -757,7 +757,7 @@ func TestPerspectiveService_CustomFieldStats(t *testing.T) {
 	})
 
 	t.Run("rejects an empty key", func(t *testing.T) {
-		svc := services.NewPerspectiveService(&mockPerspectiveRepository{}, &mockUserRepoForPerspective{})
+		svc := services.NewPerspectiveService(&mockPerspectiveRepository{}, &mockUserRepoForPerspective{}, nil)
 		_, err := svc.CustomFieldStats(ctx, nil, "")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)

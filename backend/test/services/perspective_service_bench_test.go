@@ -21,7 +21,7 @@ func BenchmarkPerspectiveService_GetByID(b *testing.B) {
 		},
 	}
 	userRepo := &mockUserRepoForPerspective{}
-	svc := services.NewPerspectiveService(repo, userRepo)
+	svc := services.NewPerspectiveService(repo, userRepo, nil)
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -51,7 +51,7 @@ func BenchmarkPerspectiveService_ListPerspectives(b *testing.B) {
 		},
 	}
 	userRepo := &mockUserRepoForPerspective{}
-	svc := services.NewPerspectiveService(repo, userRepo)
+	svc := services.NewPerspectiveService(repo, userRepo, nil)
 	ctx := context.Background()
 	first := 10
 

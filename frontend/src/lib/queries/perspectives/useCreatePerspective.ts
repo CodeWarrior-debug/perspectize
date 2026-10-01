@@ -29,6 +29,9 @@ export interface CreatePerspectiveInput {
 	customFields?: Record<string, number>;
 	feelings?: FeelingInput[];
 	privacy?: 'PUBLIC' | 'PRIVATE';
+	/** Mutually exclusive with hermeneuticCustomText. */
+	hermeneuticApproachID?: number;
+	hermeneuticCustomText?: string;
 }
 
 type ListSnapshot = [readonly unknown[], ListPerspectivesByUserResponse | undefined][];
@@ -57,6 +60,8 @@ function optimisticPerspective(input: CreatePerspectiveInput, id: string): Persp
 		relatedPerspectiveIDs: null,
 		customFields: input.customFields ?? null,
 		feelings: (input.feelings as FeelingEntry[] | undefined) ?? null,
+		hermeneuticApproachID: input.hermeneuticApproachID != null ? String(input.hermeneuticApproachID) : null,
+		hermeneuticCustomText: input.hermeneuticCustomText ?? null,
 		createdAt: now,
 		updatedAt: now,
 	};

@@ -57,9 +57,9 @@ func (stubBibleRepo) ListBooks(ctx context.Context) ([]domain.BibleBook, error) 
 func setupPassageTestServer(repo *mockContentRepository, role domain.UserRole) *httptest.Server {
 	contentService := services.NewContentService(repo, &mockYouTubeClient{}, services.WithBibleReference(stubBibleRepo{}))
 	userService := services.NewUserService(&mockUserRepository{}, repo, &mockPerspectiveRepository{})
-	perspectiveService := services.NewPerspectiveService(&mockPerspectiveRepository{}, &mockUserRepository{})
+	perspectiveService := services.NewPerspectiveService(&mockPerspectiveRepository{}, &mockUserRepository{}, nil)
 	categoryService := services.NewCategoryService(&mockCategoryRepository{}, repo, &mockWikidataClient{})
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)
+	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil, nil)
 	directiveRoot := directives.NewDirectiveRoot(contentService, perspectiveService)
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{
 		Resolvers:  resolver,

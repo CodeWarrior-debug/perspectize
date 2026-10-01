@@ -170,13 +170,15 @@ func main() {
 	threadRepo := postgres.NewGormThreadRepository(db)
 	messageRepo := postgres.NewGormMessageRepository(db)
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
+	hermeneuticApproachRepo := postgres.NewGormHermeneuticApproachRepository(db)
 	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
 
 	// Initialize services
 	contentService := services.NewContentService(contentRepo, youtubeClient, services.WithBibleReference(bibleReferenceRepo))
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
-	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo, hermeneuticApproachRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
+	hermeneuticApproachService := services.NewHermeneuticApproachService(hermeneuticApproachRepo)
 	buildInfoService := services.NewBuildInfoService(buildInfoRepo)
 
 	// Messaging realtime plumbing: the hub fans events out in-process, the
@@ -225,7 +227,7 @@ func main() {
 	// Initialize GraphQL with directive wiring
 	resolver := resolvers.NewResolver(
 		contentService, userService, perspectiveService, categoryService,
-		messagingService, hub, presence,
+		hermeneuticApproachService, messagingService, hub, presence,
 	)
 	directiveRoot := directives.NewDirectiveRoot(contentService, perspectiveService)
 	gqlConfig := generated.Config{

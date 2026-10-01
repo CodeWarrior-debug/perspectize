@@ -24,9 +24,9 @@ func setupTestServerWithUserRepo(userRepo *mockUserRepository) *httptest.Server 
 	perspectiveRepo := &mockPerspectiveRepository{}
 	contentService := services.NewContentService(contentRepo, &mockYouTubeClient{})
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
-	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	categoryService := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)
+	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil, nil)
 	directiveRoot := directives.NewDirectiveRoot(contentService, perspectiveService)
 	gqlConfig := generated.Config{
 		Resolvers: resolver,
@@ -47,9 +47,9 @@ func setupTestServerNoAuth(userRepo *mockUserRepository) *httptest.Server {
 	perspectiveRepo := &mockPerspectiveRepository{}
 	contentService := services.NewContentService(contentRepo, &mockYouTubeClient{})
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
-	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo, nil)
 	categoryService := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)
+	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil, nil)
 	directiveRoot := directives.NewDirectiveRoot(contentService, perspectiveService)
 	gqlConfig := generated.Config{
 		Resolvers: resolver,

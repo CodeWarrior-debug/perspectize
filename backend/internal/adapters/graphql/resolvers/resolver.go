@@ -19,10 +19,11 @@ import (
 // the matching domain file above.
 
 type Resolver struct {
-	ContentService     portservices.ContentService
-	UserService        portservices.UserService
-	PerspectiveService portservices.PerspectiveService
-	CategoryService    portservices.CategoryService
+	ContentService             portservices.ContentService
+	UserService                portservices.UserService
+	PerspectiveService         portservices.PerspectiveService
+	CategoryService            portservices.CategoryService
+	HermeneuticApproachService portservices.HermeneuticApproachService
 
 	// Messaging feature dependencies.
 	Messaging portservices.MessagingService
@@ -36,18 +37,20 @@ func NewResolver(
 	userService portservices.UserService,
 	perspectiveService portservices.PerspectiveService,
 	categoryService portservices.CategoryService,
+	hermeneuticApproachService portservices.HermeneuticApproachService,
 	messagingService portservices.MessagingService,
 	hub *realtime.Hub,
 	presence *realtime.PresenceTracker,
 ) *Resolver {
 	return &Resolver{
-		ContentService:     contentService,
-		UserService:        userService,
-		PerspectiveService: perspectiveService,
-		CategoryService:    categoryService,
-		Messaging:          messagingService,
-		Hub:                hub,
-		Presence:           presence,
+		ContentService:             contentService,
+		UserService:                userService,
+		PerspectiveService:         perspectiveService,
+		CategoryService:            categoryService,
+		HermeneuticApproachService: hermeneuticApproachService,
+		Messaging:                  messagingService,
+		Hub:                        hub,
+		Presence:                   presence,
 	}
 }
 

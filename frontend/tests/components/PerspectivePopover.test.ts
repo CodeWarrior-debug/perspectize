@@ -40,6 +40,12 @@ vi.mock('$lib/queries/perspectives/useUpdatePerspective', () => ({
 	})),
 }));
 
+vi.mock('$lib/queries/perspectives/useHermeneuticApproaches', () => ({
+	useHermeneuticApproaches: vi.fn(() => ({
+		data: { hermeneuticApproaches: [] },
+	})),
+}));
+
 vi.mock('$lib/queries/perspectives/useDeletePerspective', () => ({
 	useDeletePerspective: vi.fn(() => ({
 		mutate: mocks.mockDeleteMutate,

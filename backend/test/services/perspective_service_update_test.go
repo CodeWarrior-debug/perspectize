@@ -46,7 +46,7 @@ func TestPerspectiveUpdate_OmittedFieldsLeaveExistingValuesUnchanged(t *testing.
 	repo := &mockPerspectiveRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) { return existing, nil },
 	}
-	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1})
 
@@ -66,7 +66,7 @@ func TestPerspectiveUpdate_SetsRatings(t *testing.T) {
 	repo := &mockPerspectiveRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) { return existing, nil },
 	}
-	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Quality: intPtr(3000)})
 
@@ -81,7 +81,7 @@ func TestPerspectiveUpdate_InvalidRating(t *testing.T) {
 	repo := &mockPerspectiveRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) { return existing, nil },
 	}
-	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Quality: intPtr(99999)})
 
@@ -106,7 +106,7 @@ func TestPerspectiveUpdate_ClearRatings(t *testing.T) {
 			repo := &mockPerspectiveRepository{
 				getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) { return existing, nil },
 			}
-			svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+			svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 			result, err := svc.Update(context.Background(), tt.input)
 
@@ -121,7 +121,7 @@ func TestPerspectiveUpdate_ClearWinsOverAnInvalidValue(t *testing.T) {
 	repo := &mockPerspectiveRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) { return existing, nil },
 	}
-	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 	// The mapper never sends both Clear and an out-of-range Quality together in
 	// practice, but Update() itself should still resolve this sanely: clear
@@ -139,7 +139,7 @@ func TestPerspectiveUpdate_ClearLike(t *testing.T) {
 	repo := &mockPerspectiveRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) { return existing, nil },
 	}
-	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, ClearLike: true})
 
@@ -152,7 +152,7 @@ func TestPerspectiveUpdate_SetsLikeWhenProvided(t *testing.T) {
 	repo := &mockPerspectiveRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) { return existing, nil },
 	}
-	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Like: strPtr("down")})
 
@@ -166,7 +166,7 @@ func TestPerspectiveUpdate_ClearReview(t *testing.T) {
 	repo := &mockPerspectiveRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) { return existing, nil },
 	}
-	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, ClearReview: true})
 
@@ -179,7 +179,7 @@ func TestPerspectiveUpdate_ClearFeelings(t *testing.T) {
 	repo := &mockPerspectiveRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) { return existing, nil },
 	}
-	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, ClearFeelings: true})
 
@@ -192,7 +192,7 @@ func TestPerspectiveUpdate_FeelingsOverMaxStillRejected(t *testing.T) {
 	repo := &mockPerspectiveRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) { return existing, nil },
 	}
-	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 	tooMany := make([]domain.FeelingEntry, domain.MaxFeelings+1)
 	for i := range tooMany {
@@ -210,7 +210,7 @@ func TestPerspectiveUpdate_ClearCustomFields(t *testing.T) {
 	repo := &mockPerspectiveRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) { return existing, nil },
 	}
-	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, ClearCustomFields: true})
 
@@ -223,7 +223,7 @@ func TestPerspectiveUpdate_SetsCustomFieldsWhenProvided(t *testing.T) {
 	repo := &mockPerspectiveRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) { return existing, nil },
 	}
-	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{}, nil)
 
 	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{
 		ID: 1, CustomFields: json.RawMessage(`{"clarity":9000}`),
