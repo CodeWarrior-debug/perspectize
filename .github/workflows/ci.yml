@@ -103,6 +103,11 @@ jobs:
             exit 1
           fi
 
+      # Rules behind the migration-labels workflow (runner's built-in Node).
+      - name: Test migration label rules
+        working-directory: .
+        run: node --test .github/scripts/migration-labels.test.js
+
   demo-e2e:
     # Runs the demo tours + flows (frontend/demo/) as Playwright E2E against a
     # freshly seeded DEMO_MODE stack — multi-user auth, privacy and the add-video
