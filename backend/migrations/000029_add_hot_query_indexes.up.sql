@@ -1,8 +1,7 @@
 -- Indexes for the hottest read paths, and removal of three indexes that
 -- exactly duplicate a unique constraint's own index (pure write cost).
 --
--- Numbering: 000028 (content privacy) and 000029 (youtube music isrc) are
--- claimed by in-flight branches, so this takes 000030.
+-- Numbering: 000029 is the next free number on main (000028 is the youtube_video rename).
 --
 -- Plain CREATE INDEX (not CONCURRENTLY): golang-migrate sends the file as one
 -- multi-statement query, which runs in an implicit transaction where

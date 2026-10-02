@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// The hot read paths must be servable from an index (migration 000030). Test
+// The hot read paths must be servable from an index (migration 000029). Test
 // tables are tiny, so the planner would pick a seq scan anyway; disabling
 // seq scans for the check asks "can an index serve this at all?".
 func TestHotQueriesUseIndexes(t *testing.T) {
