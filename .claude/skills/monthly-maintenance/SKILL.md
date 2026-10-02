@@ -35,6 +35,7 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
    - Frontend: `npx npm-check-updates` in `frontend/`, refresh [FRONTEND_DEPENDENCY_ANALYSIS.md](FRONTEND_DEPENDENCY_ANALYSIS.md) with current findings.
    - Backend: `go list -m -u -f '{{if not .Indirect}}{{if .Update}}{{.Path}} {{.Version}} -> {{.Update.Version}}{{end}}{{end}}' all` in `backend/` (empty output = all direct deps current; an `and .Indirect .Update` template silently prints nothing), refresh [BACKEND_DEPENDENCY_ANALYSIS.md](BACKEND_DEPENDENCY_ANALYSIS.md).
    - Frontend CVE overrides live only in `frontend/pnpm-workspace.yaml` (never `package.json` `pnpm.overrides`); run `pnpm audit` (full tree) to find them.
+   - Root `README.md`: check its Tech Stack and Prerequisites version claims (Go, Node, pnpm, PostgreSQL) against `backend/go.mod`, `.github/workflows/ci.yml` (Node, Postgres, pnpm) and the Dockerfiles, and fix any that drifted.
    - Patch/minor bumps with no known breaking changes can be applied directly (verify with `go build`/`go test` or `pnpm run test:run` per `CLAUDE.md`'s self-verification checklist). Majors — especially interdependent ones (e.g. Vite + its Svelte plugin + Vitest) — get flagged in the doc for a follow-up PR rather than bundled into this routine's commit.
 
 7. **Measure app bundle size and speed.**
