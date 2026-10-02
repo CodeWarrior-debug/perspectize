@@ -51,7 +51,7 @@ export const GRID_DEFAULTS: GridParams = {
 	q: '',
 	qFields: ALL_SEARCH_SCOPES,
 	// First load shows YouTube content only. Clearing it is persisted as `f=none`.
-	filters: { type: 'youtube' },
+	filters: { type: 'youtube_video' },
 };
 
 /** Sentinel URL value for "filters explicitly cleared" (distinct from no `f.*` params, which means defaults). */
@@ -214,13 +214,15 @@ type AGNumberFilter = { filterType: 'number'; type: string; filter?: number; fil
 type AGDateFilter = { filterType: 'date'; type: string; dateFrom?: string; dateTo?: string };
 type AGSetFilter = { filterType: 'set'; values: string[] };
 
-/** Split a comma-separated set-filter URL value, dropping blanks and duplicates. */
+/** Split a comma-separated set-filter URL value, dropping blanks and duplicates.
+ * Bookmarked URLs from before the youtube → youtube_video rename still say "youtube". */
 export function parseSetValue(value: string): string[] {
 	return [
 		...new Set(
 			value
 				.split(',')
 				.map((v) => v.trim().toLowerCase())
+				.map((v) => (v === 'youtube' ? 'youtube_video' : v))
 				.filter(Boolean),
 		),
 	];

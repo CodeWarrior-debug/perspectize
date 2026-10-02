@@ -2,11 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import PerspectivePopover from '$lib/components/PerspectivePopover.svelte';
 import { tick } from 'svelte';
+import { toast } from 'svelte-sonner';
 import type { PerspectiveItem } from '$lib/queries/perspectives';
 
 const mocks = vi.hoisted(() => ({
-	mockCreateMutate: vi.fn(),
-	mockUpdateMutate: vi.fn(),
+	mockCreateMutateAsync: vi.fn(),
+	mockUpdateMutateAsync: vi.fn(),
 	mockDeleteMutate: vi.fn(),
 	mockOnClose: vi.fn(),
 	mockSaveDraft: vi.fn(),
@@ -28,14 +29,14 @@ vi.mock('$lib/components/PerspectiveEditor.svelte', async () => {
 
 vi.mock('$lib/queries/perspectives/useCreatePerspective', () => ({
 	useCreatePerspective: vi.fn(() => ({
-		mutate: mocks.mockCreateMutate,
+		mutateAsync: mocks.mockCreateMutateAsync,
 		isPending: false,
 	})),
 }));
 
 vi.mock('$lib/queries/perspectives/useUpdatePerspective', () => ({
 	useUpdatePerspective: vi.fn(() => ({
-		mutate: mocks.mockUpdateMutate,
+		mutateAsync: mocks.mockUpdateMutateAsync,
 		isPending: false,
 	})),
 }));
@@ -51,8 +52,11 @@ vi.mock('svelte-sonner', () => ({
 	toast: {
 		success: vi.fn(),
 		error: vi.fn(),
+		info: vi.fn(),
 	},
 }));
+
+const flushPromises = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 function renderPopover(props?: {
 	contentId?: number;
@@ -77,6 +81,10 @@ describe('PerspectivePopover component', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mocks.mockLoadDraft.mockReturnValue(null);
+		mocks.mockCreateMutateAsync.mockReset();
+		mocks.mockUpdateMutateAsync.mockReset();
+		mocks.mockCreateMutateAsync.mockResolvedValue({});
+		mocks.mockUpdateMutateAsync.mockResolvedValue({});
 	});
 
 	describe('rendering', () => {
@@ -404,7 +412,7 @@ describe('PerspectivePopover component', () => {
 	});
 
 	describe('form submission', () => {
-		it('calls createMutation.mutate when submitting in create mode with a rating', async () => {
+		it('calls createMutation.mutateAsync when submitting in create mode with a rating', async () => {
 			renderPopover();
 			await tick();
 			// Click thumbs up to set at least one field
@@ -412,10 +420,10 @@ describe('PerspectivePopover component', () => {
 			// Submit
 			const submitBtn = screen.getByRole('button', { name: 'Save perspective' });
 			await fireEvent.click(submitBtn);
-			expect(mocks.mockCreateMutate).toHaveBeenCalled();
+			expect(mocks.mockCreateMutateAsync).toHaveBeenCalled();
 		});
 
-		it('calls updateMutation.mutate when submitting in edit mode', async () => {
+		it('calls updateMutation.mutateAsync when submitting in edit mode', async () => {
 			renderPopover({
 				existingPerspective: {
 					id: '5',
@@ -429,7 +437,7 @@ describe('PerspectivePopover component', () => {
 			await tick();
 			const submitBtn = screen.getByRole('button', { name: 'Save perspective' });
 			await fireEvent.click(submitBtn);
-			expect(mocks.mockUpdateMutate).toHaveBeenCalled();
+			expect(mocks.mockUpdateMutateAsync).toHaveBeenCalled();
 		});
 	});
 
@@ -454,7 +462,7 @@ describe('PerspectivePopover component', () => {
 			await fireEvent.click(screen.getByLabelText('Remove Quality'));
 			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
 
-			const payload = mocks.mockUpdateMutate.mock.calls.at(-1)![0];
+			const payload = mocks.mockUpdateMutateAsync.mock.calls.at(-1)![0];
 			expect(payload.quality).toBeNull();
 			// The field the user didn't touch is still sent as its real value, not
 			// dropped -- edit mode sends the whole form state every time.
@@ -477,7 +485,7 @@ describe('PerspectivePopover component', () => {
 			await fireEvent.click(screen.getByLabelText('Thumbs up')); // was pressed; this toggles it off
 			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
 
-			const payload = mocks.mockUpdateMutate.mock.calls.at(-1)![0];
+			const payload = mocks.mockUpdateMutateAsync.mock.calls.at(-1)![0];
 			expect(payload.like).toBeNull();
 			expect(payload.quality).toBe(7500);
 		});
@@ -499,7 +507,7 @@ describe('PerspectivePopover component', () => {
 			await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '' } });
 			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
 
-			const payload = mocks.mockUpdateMutate.mock.calls.at(-1)![0];
+			const payload = mocks.mockUpdateMutateAsync.mock.calls.at(-1)![0];
 			expect(payload.review).toBeNull();
 		});
 
@@ -520,7 +528,7 @@ describe('PerspectivePopover component', () => {
 			await fireEvent.click(screen.getByLabelText('Remove Clarity'));
 			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
 
-			const payload = mocks.mockUpdateMutate.mock.calls.at(-1)![0];
+			const payload = mocks.mockUpdateMutateAsync.mock.calls.at(-1)![0];
 			expect(payload.customFields).toBeNull();
 		});
 
@@ -530,7 +538,7 @@ describe('PerspectivePopover component', () => {
 			await fireEvent.click(screen.getByLabelText('Thumbs up'));
 			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
 
-			const payload = mocks.mockCreateMutate.mock.calls.at(-1)![0];
+			const payload = mocks.mockCreateMutateAsync.mock.calls.at(-1)![0];
 			expect(payload.review).toBeUndefined();
 			expect(payload.customFields).toBeUndefined();
 			expect('review' in payload ? payload.review === undefined : true).toBe(true);
@@ -558,8 +566,8 @@ describe('PerspectivePopover component', () => {
 
 			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
 
-			expect(mocks.mockCreateMutate).toHaveBeenCalled();
-			const payload = mocks.mockCreateMutate.mock.calls.at(-1)![0];
+			expect(mocks.mockCreateMutateAsync).toHaveBeenCalled();
+			const payload = mocks.mockCreateMutateAsync.mock.calls.at(-1)![0];
 			expect(payload.customFields).toBeDefined();
 			expect(typeof payload.customFields.humor).toBe('number');
 			expect(payload.customFields.humor).toBeGreaterThan(0);
@@ -600,8 +608,8 @@ describe('PerspectivePopover component', () => {
 
 			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
 
-			expect(mocks.mockCreateMutate).toHaveBeenCalled();
-			const payload = mocks.mockCreateMutate.mock.calls.at(-1)![0];
+			expect(mocks.mockCreateMutateAsync).toHaveBeenCalled();
+			const payload = mocks.mockCreateMutateAsync.mock.calls.at(-1)![0];
 			expect(Object.keys(payload.customFields ?? {}).sort()).toEqual(['depthx', 'humor', 'wit']);
 			// distinct values, in tap order
 			expect(payload.customFields.humor).toBeLessThan(payload.customFields.wit);
@@ -693,8 +701,8 @@ describe('PerspectivePopover component', () => {
 			await tick();
 			await fireEvent.click(screen.getByLabelText('Thumbs up'));
 			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
-			expect(mocks.mockCreateMutate).toHaveBeenCalled();
-			const payload = mocks.mockCreateMutate.mock.calls.at(-1)![0];
+			expect(mocks.mockCreateMutateAsync).toHaveBeenCalled();
+			const payload = mocks.mockCreateMutateAsync.mock.calls.at(-1)![0];
 			expect(payload.privacy).toBe('PUBLIC');
 		});
 
@@ -704,8 +712,8 @@ describe('PerspectivePopover component', () => {
 			await fireEvent.click(screen.getByLabelText('Thumbs up'));
 			await fireEvent.click(screen.getByRole('switch', { name: /private/i }));
 			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
-			expect(mocks.mockCreateMutate).toHaveBeenCalled();
-			const payload = mocks.mockCreateMutate.mock.calls.at(-1)![0];
+			expect(mocks.mockCreateMutateAsync).toHaveBeenCalled();
+			const payload = mocks.mockCreateMutateAsync.mock.calls.at(-1)![0];
 			expect(payload.privacy).toBe('PRIVATE');
 		});
 
@@ -767,9 +775,8 @@ describe('PerspectivePopover component', () => {
 			await fireEvent.click(screen.getByLabelText('Thumbs up'));
 			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
 
-			expect(mocks.mockCreateMutate).toHaveBeenCalled();
-			const options = mocks.mockCreateMutate.mock.calls.at(-1)![1];
-			options.onSuccess();
+			expect(mocks.mockCreateMutateAsync).toHaveBeenCalled();
+			await flushPromises();
 			expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
 		});
 
@@ -787,9 +794,8 @@ describe('PerspectivePopover component', () => {
 			await tick();
 			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
 
-			expect(mocks.mockUpdateMutate).toHaveBeenCalled();
-			const options = mocks.mockUpdateMutate.mock.calls.at(-1)![1];
-			options.onSuccess();
+			expect(mocks.mockUpdateMutateAsync).toHaveBeenCalled();
+			await flushPromises();
 			expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
 		});
 	});
@@ -804,8 +810,8 @@ describe('PerspectivePopover component', () => {
 			await fireEvent.click(screen.getByLabelText('Thumbs up'));
 			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
 
-			expect(mocks.mockCreateMutate).toHaveBeenCalled();
-			const payload = mocks.mockCreateMutate.mock.calls.at(-1)![0];
+			expect(mocks.mockCreateMutateAsync).toHaveBeenCalled();
+			const payload = mocks.mockCreateMutateAsync.mock.calls.at(-1)![0];
 			expect(payload.review).toContain('<img');
 		});
 
@@ -815,7 +821,7 @@ describe('PerspectivePopover component', () => {
 			await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: imageOnly } });
 			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
 
-			expect(mocks.mockCreateMutate).toHaveBeenCalled();
+			expect(mocks.mockCreateMutateAsync).toHaveBeenCalled();
 		});
 	});
 
@@ -828,11 +834,14 @@ describe('PerspectivePopover component', () => {
 				await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>typed</p>' } });
 				await fireEvent.click(screen.getByLabelText('Thumbs up'));
 				await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
-				mocks.mockCreateMutate.mock.calls.at(-1)![1].onSuccess();
+				await vi.advanceTimersByTimeAsync(0);
 				expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
+				// Submit flushed the pending draft once; the cancelled debounce timer
+				// must not write a second time after the clear.
+				expect(mocks.mockSaveDraft).toHaveBeenCalledTimes(1);
 
 				await vi.advanceTimersByTimeAsync(1500);
-				expect(mocks.mockSaveDraft).not.toHaveBeenCalled();
+				expect(mocks.mockSaveDraft).toHaveBeenCalledTimes(1);
 			} finally {
 				vi.useRealTimers();
 			}
@@ -1002,6 +1011,158 @@ describe('PerspectivePopover component', () => {
 			expect(onSuccess).not.toHaveBeenCalled();
 		});
 	});
+
+	describe('optimistic close and async save', () => {
+		const existing = {
+			id: '5',
+			quality: 7500,
+			agreement: null,
+			importance: null,
+			confidence: null,
+			like: null,
+		};
+
+		function deferred() {
+			let resolve!: (v?: unknown) => void;
+			let reject!: (e?: unknown) => void;
+			const promise = new Promise((res, rej) => {
+				resolve = res;
+				reject = rej;
+			});
+			return { promise, resolve, reject };
+		}
+
+		function renderWithSuccess(existingPerspective: any) {
+			const onSuccess = vi.fn();
+			render(PerspectivePopover, {
+				props: {
+					contentId: 1,
+					contentName: 'Test Content',
+					userId: 42,
+					open: true,
+					onClose: mocks.mockOnClose,
+					onSuccess,
+					existingPerspective,
+				},
+			});
+			return onSuccess;
+		}
+
+		it('create: closes before the server replies, then clears the draft and calls onSuccess on resolve', async () => {
+			const d = deferred();
+			mocks.mockCreateMutateAsync.mockReturnValue(d.promise);
+			const onSuccess = renderWithSuccess(null);
+			await tick();
+			await fireEvent.click(screen.getByLabelText('Thumbs up'));
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			expect(mocks.mockOnClose).toHaveBeenCalledTimes(1);
+			expect(mocks.mockClearDraft).not.toHaveBeenCalled();
+			expect(onSuccess).not.toHaveBeenCalled();
+
+			d.resolve({});
+			await flushPromises();
+			expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
+			expect(onSuccess).toHaveBeenCalledTimes(1);
+		});
+
+		it('update: closes before the server replies, then clears the draft and calls onSuccess on resolve', async () => {
+			const d = deferred();
+			mocks.mockUpdateMutateAsync.mockReturnValue(d.promise);
+			const onSuccess = renderWithSuccess(existing);
+			await tick();
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+			expect(mocks.mockOnClose).toHaveBeenCalledTimes(1);
+			expect(mocks.mockClearDraft).not.toHaveBeenCalled();
+			expect(onSuccess).not.toHaveBeenCalled();
+
+			d.resolve({});
+			await flushPromises();
+			expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
+			expect(onSuccess).toHaveBeenCalledTimes(1);
+		});
+
+		it('create rejection keeps the draft and skips onSuccess (rejection is swallowed)', async () => {
+			mocks.mockCreateMutateAsync.mockRejectedValue(new Error('boom'));
+			const onSuccess = renderWithSuccess(null);
+			await tick();
+			await fireEvent.click(screen.getByLabelText('Thumbs up'));
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+			await flushPromises();
+
+			expect(mocks.mockOnClose).toHaveBeenCalledTimes(1);
+			expect(mocks.mockClearDraft).not.toHaveBeenCalled();
+			expect(onSuccess).not.toHaveBeenCalled();
+		});
+
+		it('update rejection keeps the draft and skips onSuccess', async () => {
+			mocks.mockUpdateMutateAsync.mockRejectedValue(new Error('boom'));
+			const onSuccess = renderWithSuccess(existing);
+			await tick();
+			await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+			await flushPromises();
+
+			expect(mocks.mockOnClose).toHaveBeenCalledTimes(1);
+			expect(mocks.mockClearDraft).not.toHaveBeenCalled();
+			expect(onSuccess).not.toHaveBeenCalled();
+		});
+
+		it('flushes the latest typed review to the draft on submit, inside the debounce window', async () => {
+			vi.useFakeTimers();
+			try {
+				mocks.mockCreateMutateAsync.mockReturnValue(new Promise(() => {})); // never settles
+				renderPopover({ existingPerspective: null });
+				await tick();
+				await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>latest</p>' } });
+				await fireEvent.click(screen.getByLabelText('Thumbs up'));
+				expect(mocks.mockSaveDraft).not.toHaveBeenCalled();
+
+				await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+				expect(mocks.mockSaveDraft).toHaveBeenCalledWith('draft:1:42', '<p>latest</p>', '');
+				expect(mocks.mockOnClose).toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		describe('placeholder (optimistic) id', () => {
+			const optimistic = { ...existing, id: 'optimistic-1700000000000', userID: '42', contentID: '1' };
+			const info = 'Still saving your perspective — try again in a moment';
+
+			it('submit shows an info toast and neither mutates nor closes', async () => {
+				renderPopover({ existingPerspective: optimistic });
+				await tick();
+				await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+
+				expect(toast.info).toHaveBeenCalledWith(info);
+				expect(mocks.mockUpdateMutateAsync).not.toHaveBeenCalled();
+				expect(mocks.mockCreateMutateAsync).not.toHaveBeenCalled();
+				expect(mocks.mockOnClose).not.toHaveBeenCalled();
+			});
+
+			it('delete shows an info toast and does not call the delete mutation', async () => {
+				renderPopover({ existingPerspective: optimistic, userId: 42 });
+				await tick();
+				await fireEvent.click(screen.getByRole('button', { name: 'Delete perspective' }));
+				await fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+				expect(toast.info).toHaveBeenCalledWith(info);
+				expect(mocks.mockDeleteMutate).not.toHaveBeenCalled();
+				expect(mocks.mockOnClose).not.toHaveBeenCalled();
+			});
+
+			it('a real numeric id is not blocked', async () => {
+				renderPopover({ existingPerspective: existing });
+				await tick();
+				await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+				expect(toast.info).not.toHaveBeenCalled();
+				expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
+			});
+		});
+	});
+
 	describe('expanding the comment editor in place', () => {
 		it('starts collapsed', async () => {
 			renderPopover();

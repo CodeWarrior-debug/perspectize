@@ -25,8 +25,7 @@ type fakeMessaging struct {
 	sendFn              func(ctx context.Context, actor int, in portservices.SendMessageInput) (*domain.Message, error)
 	getThreadFn         func(ctx context.Context, actor, threadID int) (*domain.MessageThread, error)
 	maxSeqFn            func(ctx context.Context, actor, threadID int) (int64, error)
-	threadMaxSeqFn      func(ctx context.Context, threadID int) (int64, error)
-	unreadCountFn       func(ctx context.Context, threadID int, sinceSeq int64) (int, error)
+	threadStatsFn       func(ctx context.Context, viewerID int, threadIDs []int) (map[int]domain.ThreadStats, error)
 	listSinceFn         func(ctx context.Context, actor, threadID int, sinceSeq int64) ([]domain.Message, error)
 	getHistoryFn        func(ctx context.Context, actor, threadID, limit int, beforeSeq *int64) ([]domain.Message, error)
 	assertParticipantFn func(ctx context.Context, actor, threadID int) error
@@ -101,18 +100,11 @@ func (f *fakeMessaging) MaxSeq(ctx context.Context, actor, threadID int) (int64,
 	return f.maxSeqFn(ctx, actor, threadID)
 }
 
-func (f *fakeMessaging) ThreadMaxSeq(ctx context.Context, threadID int) (int64, error) {
-	if f.threadMaxSeqFn == nil {
-		return 0, nil
+func (f *fakeMessaging) ThreadStats(ctx context.Context, viewerID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
+	if f.threadStatsFn == nil {
+		return map[int]domain.ThreadStats{}, nil
 	}
-	return f.threadMaxSeqFn(ctx, threadID)
-}
-
-func (f *fakeMessaging) UnreadCount(ctx context.Context, threadID int, sinceSeq int64) (int, error) {
-	if f.unreadCountFn == nil {
-		return 0, nil
-	}
-	return f.unreadCountFn(ctx, threadID, sinceSeq)
+	return f.threadStatsFn(ctx, viewerID, threadIDs)
 }
 
 func (f *fakeMessaging) EditMessage(ctx context.Context, actor int, messageID int64, body string) (*domain.Message, error) {
@@ -157,10 +149,13 @@ func (s inboxStubMsgRepo) MaxSeq(ctx context.Context, threadID int) (int64, erro
 func (s inboxStubMsgRepo) CountSince(ctx context.Context, threadID int, sinceSeq int64) (int, error) {
 	return 0, nil
 }
-func (s inboxStubMsgRepo) UpdateBody(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error) {
+func (s inboxStubMsgRepo) ThreadStats(ctx context.Context, viewerID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
+	return map[int]domain.ThreadStats{}, nil
+}
+func (s inboxStubMsgRepo) UpdateBody(ctx context.Context, messageID int64, senderID int, body string, editedAt time.Time) (*domain.Message, error) {
 	return nil, nil
 }
-func (s inboxStubMsgRepo) SoftDelete(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
+func (s inboxStubMsgRepo) SoftDelete(ctx context.Context, messageID int64, senderID int, deletedAt time.Time) (*domain.Message, error) {
 	return nil, nil
 }
 
@@ -179,14 +174,14 @@ func (inboxStubThreadRepo) FindDirectThread(ctx context.Context, a, b int) (*dom
 func (inboxStubThreadRepo) ListThreadsForUser(ctx context.Context, userID, limit int, before *time.Time) ([]domain.MessageThread, error) {
 	return nil, nil
 }
-func (inboxStubThreadRepo) AddParticipants(ctx context.Context, threadID int, userIDs []int) error {
-	return nil
+func (inboxStubThreadRepo) AddParticipants(ctx context.Context, threadID int, userIDs []int) ([]domain.ThreadParticipant, error) {
+	return nil, nil
 }
 func (inboxStubThreadRepo) SetLeft(ctx context.Context, threadID, userID int, at time.Time) error {
 	return nil
 }
-func (inboxStubThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) error {
-	return nil
+func (inboxStubThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
+	return seq, nil
 }
 func (inboxStubThreadRepo) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
 	return nil
@@ -257,23 +252,18 @@ func TestMessageThreadResolver_ReadPointers(t *testing.T) {
 			{ThreadID: 5, UserID: 2, LastReadSeq: 1, Role: domain.ThreadRoleMember},
 		},
 	}
-	// latestSeq/unreadCount resolve through the trusted, no-re-auth variants:
+	// latestSeq/unreadCount resolve through the trusted, no-re-auth ThreadStats:
 	// the parent messageThread query already authorized the actor.
-	maxSeqCalls := 0
 	fake := &fakeMessaging{
 		getThreadFn: func(context.Context, int, int) (*domain.MessageThread, error) { return thread, nil },
 		maxSeqFn: func(context.Context, int, int) (int64, error) {
 			t.Fatal("field resolvers must not re-authorize via MaxSeq")
 			return 0, nil
 		},
-		threadMaxSeqFn: func(context.Context, int) (int64, error) {
-			maxSeqCalls++
-			return 10, nil
-		},
-		unreadCountFn: func(_ context.Context, threadID int, sinceSeq int64) (int, error) {
-			assert.Equal(t, 5, threadID)
-			assert.Equal(t, int64(7), sinceSeq, "counts from the actor's read pointer")
-			return 3, nil
+		threadStatsFn: func(_ context.Context, viewerID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
+			assert.Equal(t, 1, viewerID, "stats are the actor's")
+			assert.Equal(t, []int{5}, threadIDs)
+			return map[int]domain.ThreadStats{5: {LatestSeq: 10, Unread: 3}}, nil
 		},
 	}
 	r := &resolvers.Resolver{Messaging: fake}
@@ -295,12 +285,6 @@ func TestMessageThreadResolver_ReadPointers(t *testing.T) {
 	unread, err := r.MessageThread().UnreadCount(ctx, got)
 	require.NoError(t, err)
 	assert.Equal(t, 3, unread)
-
-	// latestSeq is memoized on the thread object: a second read does not re-query.
-	again, err := r.MessageThread().LatestSeq(ctx, got)
-	require.NoError(t, err)
-	assert.Equal(t, 10, again)
-	assert.Equal(t, 1, maxSeqCalls, "latestSeq queried once per thread")
 
 	parts, err := r.MessageThread().Participants(ctx, got)
 	require.NoError(t, err)

@@ -196,7 +196,7 @@ input ContentSortInput {
 }
 
 enum ContentType {
-  YOUTUBE
+  YOUTUBE_VIDEO
   CLAIM
   BIBLE_PASSAGE
 }
@@ -437,8 +437,12 @@ type Mutation {
 
   # Perspective mutations
   createPerspective(input: CreatePerspectiveInput!): Perspective! @auth
-  updatePerspective(input: UpdatePerspectiveInput!): Perspective! @auth @owner(idField: "id")
-  deletePerspective(id: ID!): Boolean! @auth @owner(idField: "id")
+  # Ownership is enforced in PerspectiveService.Update + an owner-scoped UPDATE
+  # (see the resolver), not @owner: that saved a duplicate row read per save.
+  updatePerspective(input: UpdatePerspectiveInput!): Perspective! @auth
+  # Ownership: PerspectiveService.Delete + an owner-scoped DELETE, not @owner
+  # (see updatePerspective).
+  deletePerspective(id: ID!): Boolean! @auth
 
   # Claim mutations
   createClaim(input: CreateClaimInput!): Content! @auth

@@ -7,6 +7,7 @@ import {
 	type ListPerspectivesByUserResponse,
 	type PerspectiveItem,
 	type FeelingEntry,
+	OPTIMISTIC_PREFIX,
 } from './index';
 import { queryKeys } from '../keys';
 
@@ -83,7 +84,7 @@ export function useCreatePerspective() {
 		exact: true,
 	});
 
-	return createMutation(() => ({
+	const mutation = createMutation(() => ({
 		mutationFn: async (input: CreatePerspectiveInput) => {
 			return graphqlRequest<CreatePerspectiveResponse>(CREATE_PERSPECTIVE, { input });
 		},
@@ -92,14 +93,14 @@ export function useCreatePerspective() {
 			const filter = ownListFilter(input.userID);
 			await queryClient.cancelQueries(filter);
 			const previous = queryClient.getQueriesData<ListPerspectivesByUserResponse>(filter) as ListSnapshot;
-			const tempId = `optimistic-${Date.now()}`;
+			const tempId = `${OPTIMISTIC_PREFIX}${Date.now()}`;
 			queryClient.setQueriesData<ListPerspectivesByUserResponse>(
 				filter,
 				patchLists((list) => [optimisticPerspective(input, tempId), ...list]),
 			);
 			return { previous, tempId };
 		},
-		onError: (err: Error, _input: CreatePerspectiveInput, context?: CreateContext) => {
+		onError: (err: Error, input: CreatePerspectiveInput, context?: CreateContext) => {
 			// Roll the optimistic insert back.
 			context?.previous?.forEach(([key, data]) => queryClient.setQueryData(key, data));
 
@@ -111,7 +112,11 @@ export function useCreatePerspective() {
 			} else if (message.includes('at least one field')) {
 				toast.error('Please fill in at least one field');
 			} else {
-				toast.error('Failed to add perspective. Please try again.');
+				// The popover has already closed (it doesn't wait for the server), so
+				// offer the retry here rather than making the user re-enter everything.
+				toast.error('Failed to add perspective.', {
+					action: { label: 'Retry', onClick: () => mutation.mutate(input) },
+				});
 			}
 		},
 		onSuccess: (data: CreatePerspectiveResponse, input: CreatePerspectiveInput, context?: CreateContext) => {
@@ -155,4 +160,5 @@ export function useCreatePerspective() {
 			}
 		},
 	}));
+	return mutation;
 }

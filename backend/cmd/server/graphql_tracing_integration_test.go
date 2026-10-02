@@ -29,6 +29,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/server"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/database"
 )
 
@@ -46,7 +47,7 @@ const contentSearchQuery = `query ContentSearch($q: String) {
 
 // tracingHarness is a minimal, fully-wired GraphQL + GORM stack (real
 // Postgres, real otelgqlgen + in-house GORM tracing (pkg/database) wiring
-// via instrumentGraphQL/instrumentDB) fronted by the same withTracing(router)
+// via server.InstrumentGraphQL/instrumentDB) fronted by the same withTracing(router)
 // wrapper main() uses.
 type tracingHarness struct {
 	router     http.Handler
@@ -102,7 +103,7 @@ func newTracingHarness(t *testing.T) *tracingHarness {
 		name := fmt.Sprintf("%s content %d %06d", distinctSearchTerm, i, rand.Intn(1_000_000))
 		c, err := contentRepo.Create(context.Background(), &domain.Content{
 			Name:          name,
-			ContentType:   domain.ContentTypeYouTube,
+			ContentType:   domain.ContentTypeYouTubeVideo,
 			AddedByUserID: h.userID,
 		})
 		require.NoError(t, err, "create seed content")
@@ -122,8 +123,8 @@ func newTracingHarness(t *testing.T) *tracingHarness {
 	srv := handler.New(generated.NewExecutableSchema(gqlConfig))
 	srv.AddTransport(transport.POST{})
 	srv.SetQueryCache(lru.New[*ast.QueryDocument](100))
-	instrumentGraphQL(srv)
-	srv.AroundOperations(operationMetrics())
+	server.InstrumentGraphQL(srv)
+	srv.AroundOperations(server.OperationMetrics())
 
 	r := chi.NewRouter()
 	r.Handle("/graphql", srv)
@@ -160,7 +161,7 @@ func (h *tracingHarness) post(t *testing.T, query string, variables map[string]a
 // TestGraphQLTracing_OneTraceSpansHTTPGraphQLAndGORM_NoSensitiveValues drives
 // a real GraphQL request (POST /graphql -> chi -> gqlgen(otelgqlgen) ->
 // content resolver -> GORM(otel plugin) -> Postgres) through the exact
-// wiring main() uses (instrumentGraphQL, instrumentDB, withTracing) and
+// wiring main() uses (server.InstrumentGraphQL, instrumentDB, withTracing) and
 // asserts:
 //   - every span produced by the request shares one trace ID
 //   - there is a root HTTP server span named "POST /graphql"

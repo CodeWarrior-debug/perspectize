@@ -67,7 +67,7 @@ const mockDataResponse = {
 				id: '1',
 				name: 'Test Video',
 				url: 'https://youtube.com/watch?v=abc',
-				contentType: 'YOUTUBE',
+				contentType: 'YOUTUBE_VIDEO',
 				length: 300,
 				lengthUnits: 'seconds',
 				viewCount: 1500,

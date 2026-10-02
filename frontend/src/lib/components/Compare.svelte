@@ -2,7 +2,6 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import { goto } from '$app/navigation';
 	import { graphqlRequest } from '$lib/queries/client';
-	import { LIST_USERS, type UsersResponse } from '$lib/queries/users';
 	import {
 		LIST_PERSPECTIVES_BY_CONTENT,
 		MAX_PERSPECTIVES_PER_LIST,
@@ -58,12 +57,6 @@
 
 	const meCtx = useMe();
 
-	const usersQuery = createQuery(() => ({
-		queryKey: queryKeys.users.list(),
-		queryFn: () => graphqlRequest<UsersResponse>(LIST_USERS),
-		staleTime: 5 * 60 * 1000,
-	}));
-
 	const perspectivesQuery = createQuery(() => ({
 		queryKey: queryKeys.perspectives.listByContent(Number(contentId)),
 		queryFn: () =>
@@ -82,12 +75,15 @@
 	}));
 
 	const perspectives = $derived(perspectivesQuery.data?.perspectives.items ?? []);
-	const users = $derived(usersQuery.data?.users ?? []);
+	// Usernames arrive on the perspective rows themselves (Perspective.user).
+	const usernames = $derived(
+		new Map(perspectives.filter((p) => p.user).map((p) => [p.userID, p.user!.username] as const)),
+	);
 	const content = $derived(contentQuery.data?.contentByID ?? null);
 
 	function displayName(userID: string): string {
 		if (meCtx.me && userID === meCtx.me.id) return 'You';
-		return users.find((u) => u.id === userID)?.username ?? `User ${userID}`;
+		return usernames.get(userID) ?? `User ${userID}`;
 	}
 
 	// Picker candidates: every user with a fetched perspective row (privacy
@@ -156,12 +152,27 @@
 	const overall = $derived.by(() =>
 		leftPerspective && rightPerspective
 			? compareOverall(leftPerspective, rightPerspective)
-			: { left: null, right: null, agree: false },
+			: { left: null, right: null, status: 'none' as const },
 	);
-	const summary = $derived(summarize(ratingRows));
+	const summary = $derived(summarize(ratingRows, filledInDifferentlyRows));
 	const overallAgreementPercent = $derived(agreementPercent(ratingRows));
+	const hasOverlap = $derived(ratingRows.length > 0);
 
-	const loading = $derived(usersQuery.isLoading || perspectivesQuery.isLoading);
+	// Zero overlap means every rated dimension landed in "filled in
+	// differently" — showing "0 similar · 0 diverge · 0 conflict" reads as
+	// either perfect agreement or a broken page, so swap in a plain
+	// empty-state message instead (compare-no-overlap-summary #1).
+	const noOverlapMessage = $derived.by(() => {
+		if (!leftId || !rightId) return '';
+		const leftLabel = displayName(leftId);
+		const rightLabel = displayName(rightId);
+		if (summary.leftOnly === 0 && summary.rightOnly === 0) return `Neither of you rated any shared dimensions.`;
+		if (summary.rightOnly === 0) return `${rightLabel} didn't rate this.`;
+		if (summary.leftOnly === 0) return `${leftLabel} didn't rate this.`;
+		return `${leftLabel} and ${rightLabel} rated different dimensions — nothing to compare directly.`;
+	});
+
+	const loading = $derived(perspectivesQuery.isLoading);
 	const hasComparison = $derived(perspectives.length >= 2 && !!leftPerspective && !!rightPerspective);
 	const hasNoPerspectives = $derived(!loading && perspectives.length === 0);
 
@@ -231,14 +242,13 @@
 
 	{#if loading}
 		<div class="py-12 text-center text-muted-foreground">Loading comparison…</div>
-	{:else if usersQuery.isError || perspectivesQuery.isError}
+	{:else if perspectivesQuery.isError}
 		<div class="flex flex-col items-center gap-3 py-12 text-center text-muted-foreground">
 			<p>Failed to load this comparison.</p>
 			<Button
 				size="sm"
 				variant="outline"
 				onclick={() => {
-					usersQuery.refetch();
 					perspectivesQuery.refetch();
 				}}
 			>
@@ -276,22 +286,37 @@
 			onSwap={handleSwap}
 		/>
 
-		<div class="flex items-center gap-4 text-[12.5px]">
-			<span class="flex items-center gap-1.5">
-				<span class="size-1.5 rounded-full" style="background-color: var(--color-rating-positive);"></span>
-				{summary.similar} similar
-			</span>
-			<span class="flex items-center gap-1.5">
-				<span class="size-1.5 rounded-full" style="background-color: var(--color-rating-neutral);"></span>
-				{summary.diverges} diverge
-			</span>
-			<span class="flex items-center gap-1.5">
-				<span class="size-1.5 rounded-full" style="background-color: var(--color-rating-negative);"></span>
-				{summary.conflict} conflict
-			</span>
-		</div>
+		{#if hasOverlap}
+			<div class="flex flex-wrap items-center gap-4 text-[12.5px]">
+				<span class="flex items-center gap-1.5">
+					<span class="size-1.5 rounded-full" style="background-color: var(--color-rating-positive);"></span>
+					{summary.similar} similar
+				</span>
+				<span class="flex items-center gap-1.5">
+					<span class="size-1.5 rounded-full" style="background-color: var(--color-rating-neutral);"></span>
+					{summary.diverges} diverge
+				</span>
+				<span class="flex items-center gap-1.5">
+					<span class="size-1.5 rounded-full" style="background-color: var(--color-rating-negative);"></span>
+					{summary.conflict} conflict
+				</span>
+				{#if summary.leftOnly > 0}
+					<span class="text-muted-foreground">{summary.leftOnly} only {displayName(leftId!)} rated</span>
+				{/if}
+				{#if summary.rightOnly > 0}
+					<span class="text-muted-foreground">{summary.rightOnly} only {displayName(rightId!)} rated</span>
+				{/if}
+			</div>
+		{:else}
+			<p class="text-[12.5px] text-muted-foreground">{noOverlapMessage}</p>
+		{/if}
 
-		<CompareOverallRow {overall} agreementPercent={overallAgreementPercent} />
+		<CompareOverallRow
+			{overall}
+			leftName={displayName(leftId!)}
+			rightName={displayName(rightId!)}
+			agreementPercent={overallAgreementPercent}
+		/>
 
 		<div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
 			<CompareTakeColumn

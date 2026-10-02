@@ -15,3 +15,41 @@ Details behind the two-line summary in the root [CLAUDE.md](../CLAUDE.md).
 **Select GSD commands are kept** only for codebase mapping (`gsd:map-codebase`) and roadmap/milestone management (`gsd:new-milestone`, `gsd:add-phase`/`gsd:remove-phase`/`gsd:insert-phase`, `gsd:analyze-dependencies`, `gsd:milestone-summary`, `gsd:complete-milestone`, `gsd:docs-update`).
 
 **Vendored GSD is a frozen legacy subset** (`.claude/get-shit-done/`, curated `.claude/commands/gsd/`). Do not run `npx get-shit-done-cc` against this repo — a full install dumps ~200 unused command/agent/workflow files and bakes absolute paths into the command files. The `VERSION` marker tracks the toolchain maintainers run locally so the update-check hook stays quiet; it is not a claim that every vendored file is on that release. For phase CRUD / dependency analysis on newer GSD, use a personal global install.
+
+## Suggested subagent types
+
+When a plan has tasks that fit a project agent (roster: [AGENTS.md](AGENTS.md)),
+tag the task with a **suggestion** line under its heading:
+
+```markdown
+### Task 3: Add visibility filter to GormPerspectiveRepository.List
+
+**Suggested subagent:** `go-backend` (review: `code-reviewer`)
+```
+
+It is a suggestion, not a requirement. The executing skill
+(`superpowers:subagent-driven-development` / `executing-plans`) keeps control
+of how each task is dispatched. For each tagged task it picks one of:
+
+1. **Dispatch the agent directly** (`subagent_type: go-backend`). This is the
+   default when the task fits the agent's description and needs no special
+   framing.
+2. **Use the agent as a reference.** Dispatch its own implementer or reviewer
+   prompt, but read `.claude/agents/<name>.md` first and carry over the parts
+   that apply: the "read first" files, the hard rules (for example,
+   `db-migration`'s never-apply rule), the process steps and the verification
+   commands.
+3. **Ignore it** when the task turned out not to fit (for example, a
+   `go-backend` task that grew into frontend code). Note that in the task's completion notes.
+
+Guidelines for plan writers:
+
+- Tag only where an agent clearly fits. Leave the line off docs-only and
+  cross-stack tasks rather than forcing one stack's agent onto them.
+- Never tag a task with an agent that lacks the tools it needs. `code-reviewer`
+  is read-only, so it is a review suggestion, not an implementer.
+- Any task that touches `backend/migrations/` should carry `db-migration` as at
+  least a reference, so its never-apply rule reaches whoever executes it.
+- The older `**Subagent type:**` label (see
+  `2026-09-05-postgres-auth-test-coverage-plan.md`) means the same thing; new
+  plans use `**Suggested subagent:**`.

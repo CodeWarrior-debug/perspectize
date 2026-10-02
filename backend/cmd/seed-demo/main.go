@@ -202,7 +202,7 @@ func (s *seeder) seedContent(ctx context.Context) error {
 			c, err = s.content.Create(ctx, &domain.Content{
 				Name:          meta.Title,
 				URL:           &watchURL,
-				ContentType:   domain.ContentTypeYouTube,
+				ContentType:   domain.ContentTypeYouTubeVideo,
 				AddedByUserID: s.userIDs[v.AddedBy],
 				Length:        &meta.Duration,
 				LengthUnits:   &units,

@@ -89,6 +89,12 @@ jobs:
       - name: Build
         run: go build -v ./...
 
+      # The opt-in perf harness sits behind the `perf` build tag, so nothing else
+      # compiles it and it silently rots (it had drifted out of sync with
+      # NewResolver/Middleware). Vet builds it without needing a database.
+      - name: Compile perf-tagged harness
+        run: go vet -tags perf ./internal/perf/...
+
       - name: Verify formatting
         run: |
           gofmt -l .
@@ -96,6 +102,11 @@ jobs:
             echo "Code is not formatted. Run 'make fmt'"
             exit 1
           fi
+
+      # Rules behind the migration-labels workflow (runner's built-in Node).
+      - name: Test migration label rules
+        working-directory: .
+        run: node --test .github/scripts/migration-labels.test.js
 
   demo-e2e:
     # Runs the demo tours + flows (frontend/demo/) as Playwright E2E against a

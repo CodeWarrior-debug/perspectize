@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import { QueryClient } from '@tanstack/svelte-query';
 import TestWrapper from '../helpers/TestWrapper.svelte';
@@ -70,6 +70,13 @@ describe('Compare', () => {
 		clerkState.auth.userId = '1';
 	});
 
+	// Usernames come from Perspective.user on the perspectives query; the page
+	// must not download the whole users table (it used to, via ListUsers).
+	afterEach(() => {
+		const queries = mockRequest.mock.calls.map((c: unknown[]) => String(c[0]));
+		expect(queries.some((q: string) => q.includes('ListUsers'))).toBe(false);
+	});
+
 	it('shows an empty state when only one perspective exists on the content', async () => {
 		mockRequest.mockImplementation((query: string) => {
 			if (query.includes('ListUsers')) return Promise.resolve({ users: [{ id: '1', username: 'me' }] });
@@ -80,6 +87,7 @@ describe('Compare', () => {
 							{
 								id: 'p1',
 								userID: '1',
+								user: { id: '1', username: 'me' },
 								contentID: '10',
 								quality: 8000,
 								agreement: null,
@@ -128,6 +136,7 @@ describe('Compare', () => {
 							{
 								id: 'p1',
 								userID: '1',
+								user: { id: '1', username: 'me' },
 								contentID: '10',
 								quality: 8000,
 								agreement: null,
@@ -147,6 +156,7 @@ describe('Compare', () => {
 							{
 								id: 'p2',
 								userID: '2',
+								user: { id: '2', username: 'Jamie Lee' },
 								contentID: '10',
 								quality: 7000,
 								agreement: null,
@@ -199,6 +209,7 @@ describe('Compare', () => {
 							{
 								id: 'p1',
 								userID: '1',
+								user: { id: '1', username: 'me' },
 								contentID: '10',
 								quality: 8000,
 								agreement: null,
@@ -218,6 +229,7 @@ describe('Compare', () => {
 							{
 								id: 'p2',
 								userID: '2',
+								user: { id: '2', username: 'Jamie Lee' },
 								contentID: '10',
 								quality: 7000,
 								agreement: null,
@@ -237,6 +249,7 @@ describe('Compare', () => {
 							{
 								id: 'p3',
 								userID: '3',
+								user: { id: '3', username: 'Sam Rivera' },
 								contentID: '10',
 								quality: 6000,
 								agreement: null,
@@ -324,6 +337,7 @@ describe('Compare', () => {
 							{
 								id: 'p1',
 								userID: '1',
+								user: { id: '1', username: 'me' },
 								contentID: '10',
 								quality: 8000,
 								agreement: null,
@@ -343,6 +357,7 @@ describe('Compare', () => {
 							{
 								id: 'p2',
 								userID: '2',
+								user: { id: '2', username: 'Jamie Lee' },
 								contentID: '10',
 								quality: 7000,
 								agreement: null,
@@ -423,6 +438,7 @@ describe('Compare', () => {
 							{
 								id: 'p2',
 								userID: '2',
+								user: { id: '2', username: 'Jamie Lee' },
 								contentID: '10',
 								quality: 8000,
 								agreement: null,
@@ -442,6 +458,7 @@ describe('Compare', () => {
 							{
 								id: 'p3',
 								userID: '3',
+								user: { id: '3', username: 'Sam Rivera' },
 								contentID: '10',
 								quality: 6000,
 								agreement: null,
@@ -496,6 +513,7 @@ describe('Compare', () => {
 							{
 								id: 'p1',
 								userID: '1',
+								user: { id: '1', username: 'me' },
 								contentID: '10',
 								quality: 8000,
 								agreement: null,
@@ -530,6 +548,83 @@ describe('Compare', () => {
 		expect(screen.getByRole('link', { name: /Video/ })).toHaveAttribute('href', 'https://youtu.be/abc123');
 	});
 
+	// Regression test for the reported repro: a second perspective that rated
+	// nothing at all (every dimension one-sided, no thumbs verdict) must read
+	// as an empty state, not "0 similar · 0 diverge · 0 conflict" (which looks
+	// like either perfect agreement or a broken page).
+	it('shows a plain empty-state message and no sort toggle when the two perspectives share no rated dimensions', async () => {
+		mockRequest.mockImplementation((query: string) => {
+			if (query.includes('ListUsers'))
+				return Promise.resolve({
+					users: [
+						{ id: '1', username: 'me' },
+						{ id: '2', username: 'jjagent' },
+					],
+				});
+			if (query.includes('ListPerspectivesByContent')) {
+				return Promise.resolve({
+					perspectives: {
+						items: [
+							{
+								id: 'p1',
+								userID: '1',
+								user: { id: '1', username: 'me' },
+								contentID: '10',
+								quality: 8000,
+								agreement: 7000,
+								importance: 6000,
+								confidence: 9000,
+								like: 'THUMBS_UP',
+								review: 'Great',
+								privacy: 'PUBLIC',
+								description: null,
+								primaryPerspectiveID: null,
+								relatedPerspectiveIDs: null,
+								customFields: null,
+								feelings: null,
+								createdAt: '2026-01-01T00:00:00Z',
+								updatedAt: '2026-01-01T00:00:00Z',
+							},
+							{
+								id: 'p2',
+								userID: '2',
+								user: { id: '2', username: 'jjagent' },
+								contentID: '10',
+								quality: null,
+								agreement: null,
+								importance: null,
+								confidence: null,
+								like: null,
+								review: null,
+								privacy: 'PUBLIC',
+								description: null,
+								primaryPerspectiveID: null,
+								relatedPerspectiveIDs: null,
+								customFields: null,
+								feelings: null,
+								createdAt: '2026-01-01T00:00:00Z',
+								updatedAt: '2026-01-02T00:00:00Z',
+							},
+						],
+					},
+				});
+			}
+			if (query.includes('GetContent')) return Promise.resolve(contentResponse);
+			if (query.includes('query Me')) return Promise.resolve(meResponse);
+			return Promise.resolve({});
+		});
+
+		renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+		await waitFor(() => {
+			expect(screen.getByText("jjagent didn't rate this.")).toBeInTheDocument();
+		});
+		expect(screen.queryByText(/similar/)).not.toBeInTheDocument();
+		expect(screen.queryByText(/diverge/)).not.toBeInTheDocument();
+		expect(screen.queryByTestId('sort-toggle')).not.toBeInTheDocument();
+		expect(screen.getByText('Only You gave a verdict')).toBeInTheDocument();
+	});
+
 	it('shows a retry action when the comparison fails to load', async () => {
 		mockRequest.mockImplementation((query: string) => {
 			if (query.includes('ListUsers')) return Promise.reject(new Error('network error'));
@@ -557,6 +652,7 @@ describe('Compare', () => {
 							{
 								id: 'p1',
 								userID: '1',
+								user: { id: '1', username: 'me' },
 								contentID: '10',
 								quality: 8000,
 								agreement: null,

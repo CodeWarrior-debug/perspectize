@@ -35,9 +35,9 @@ describe('FilterChips', () => {
 	});
 
 	it('renders a chip for a set (content type) filter with display labels', () => {
-		renderChips({ type: { filterType: 'set', values: ['youtube', 'bible_passage'] } });
+		renderChips({ type: { filterType: 'set', values: ['youtube_video', 'bible_passage'] } });
 		expect(screen.getByText('Type:')).toBeInTheDocument();
-		expect(screen.getByText('YouTube or Bible Passage')).toBeInTheDocument();
+		expect(screen.getByText('YouTube Video or Bible Passage')).toBeInTheDocument();
 	});
 
 	it('renders a chip for a number filter', () => {

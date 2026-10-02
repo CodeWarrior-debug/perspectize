@@ -1,8 +1,6 @@
 package model
 
 import (
-	"sync"
-
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
 
@@ -21,41 +19,6 @@ type MessageThread struct {
 	CreatedAt     string  `json:"createdAt"`
 
 	Src *domain.MessageThread `json:"-"`
-
-	// memo caches per-thread lookups (currently latestSeq) so the several field
-	// resolvers that need them issue one query between them instead of one each
-	// — the difference between ~2 and ~6 queries per row on a thread-list page.
-	// It is a pointer because generated gqlgen code copies MessageThread by
-	// value and a struct holding a sync.Once must not be copied.
-	memo *threadMemo `json:"-"`
-}
-
-// threadMemo holds the once-per-thread resolved values shared by the copies
-// gqlgen makes of a MessageThread.
-type threadMemo struct {
-	latestSeqOnce sync.Once
-	latestSeq     int64
-	latestSeqErr  error
-}
-
-// EnableMemo attaches a fresh memo, and is called once at projection time. A
-// thread without one still resolves correctly; it just re-queries per field.
-func (t *MessageThread) EnableMemo() {
-	t.memo = &threadMemo{}
-}
-
-// ResolveLatestSeq returns the thread's highest message seq, calling load at
-// most once per memo and reusing the result (including the error) on every
-// later call. Safe for the concurrent field resolution gqlgen may perform. With
-// no memo attached it simply calls load.
-func (t *MessageThread) ResolveLatestSeq(load func() (int64, error)) (int64, error) {
-	if t.memo == nil {
-		return load()
-	}
-	t.memo.latestSeqOnce.Do(func() {
-		t.memo.latestSeq, t.memo.latestSeqErr = load()
-	})
-	return t.memo.latestSeq, t.memo.latestSeqErr
 }
 
 // ThreadParticipant is the GraphQL projection of domain.ThreadParticipant.

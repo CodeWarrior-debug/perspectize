@@ -34,10 +34,13 @@ func (s stubMsgRepo) MaxSeq(ctx context.Context, t int) (int64, error) { return 
 func (s stubMsgRepo) CountSince(ctx context.Context, t int, since int64) (int, error) {
 	return 0, nil
 }
-func (s stubMsgRepo) UpdateBody(ctx context.Context, id int64, body string, editedAt time.Time) (*domain.Message, error) {
+func (s stubMsgRepo) ThreadStats(ctx context.Context, viewerID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
+	return map[int]domain.ThreadStats{}, nil
+}
+func (s stubMsgRepo) UpdateBody(ctx context.Context, id int64, senderID int, body string, editedAt time.Time) (*domain.Message, error) {
 	return nil, nil
 }
-func (s stubMsgRepo) SoftDelete(ctx context.Context, id int64, deletedAt time.Time) (*domain.Message, error) {
+func (s stubMsgRepo) SoftDelete(ctx context.Context, id int64, senderID int, deletedAt time.Time) (*domain.Message, error) {
 	return nil, nil
 }
 
@@ -61,14 +64,14 @@ func (stubThreadRepo) FindDirectThread(ctx context.Context, userA, userB int) (*
 func (stubThreadRepo) ListThreadsForUser(ctx context.Context, userID int, limit int, beforeLastMessageAt *time.Time) ([]domain.MessageThread, error) {
 	return nil, nil
 }
-func (stubThreadRepo) AddParticipants(ctx context.Context, threadID int, userIDs []int) error {
-	return nil
+func (stubThreadRepo) AddParticipants(ctx context.Context, threadID int, userIDs []int) ([]domain.ThreadParticipant, error) {
+	return nil, nil
 }
 func (stubThreadRepo) SetLeft(ctx context.Context, threadID, userID int, at time.Time) error {
 	return nil
 }
-func (stubThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) error {
-	return nil
+func (stubThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
+	return seq, nil
 }
 func (stubThreadRepo) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
 	return nil

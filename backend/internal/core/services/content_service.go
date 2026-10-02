@@ -82,7 +82,7 @@ func (s *ContentService) CreateFromYouTube(ctx context.Context, url string, user
 	content := &domain.Content{
 		Name:          metadata.Title,
 		URL:           &canonicalURL,
-		ContentType:   domain.ContentTypeYouTube,
+		ContentType:   domain.ContentTypeYouTubeVideo,
 		AddedByUserID: userID,
 		Length:        &metadata.Duration,
 		LengthUnits:   &lengthUnits,
@@ -114,6 +114,22 @@ func (s *ContentService) GetByID(ctx context.Context, id int) (*domain.Content, 
 		return nil, fmt.Errorf("failed to get content: %w", err)
 	}
 	return content, nil
+}
+
+// GetByIDs loads many content rows in one query (backs the content dataloader).
+// Non-positive ids are dropped rather than queried.
+func (s *ContentService) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	valid := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if id > 0 {
+			valid = append(valid, id)
+		}
+	}
+	items, err := s.repo.GetByIDs(ctx, valid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get content: %w", err)
+	}
+	return items, nil
 }
 
 // UpdateSourceData refreshes an existing content item's metadata by re-fetching it from

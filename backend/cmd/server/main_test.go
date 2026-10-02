@@ -12,10 +12,12 @@ import (
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/server"
 )
 
-func TestCorsOptions_PreflightAllowsTraceAndClientHeaders(t *testing.T) {
-	handler := cors.Handler(corsOptions([]string{"https://app.example.com"}))(
+func TestCORSOptions_PreflightAllowsTraceAndClientHeaders(t *testing.T) {
+	handler := cors.Handler(server.CORSOptions([]string{"https://app.example.com"}))(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}),

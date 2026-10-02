@@ -21,7 +21,7 @@ overrides:
   js-cookie: ^3.0.8
   cookie: ^0.7.2
   serialize-javascript: ^7.1.0
-  brace-expansion: ^5.0.9
+  brace-expansion: ^5.0.12
   picomatch: ^4.0.4
   'vitest>picomatch': ^4.0.5
   '@xmldom/xmldom': ^0.9.12
@@ -29,9 +29,11 @@ overrides:
   esbuild: ^0.28.2
   tar: ^7.5.22
   prosemirror-transform: 1.12.0
-  fast-uri: ^3.1.6
+  fast-uri: ^3.1.8
   undici: ^7.24.0
-  devalue: ^5.8.1
+  devalue: ^5.9.2
+  qs: ^6.16.0
+  tmp: ^0.2.6
   '@lucide/svelte': 1.43.0
 # Dropped when the two override sources were reconciled: `rollup: ^4.59.0`,
 # `minimatch: ^10.2.3` and `tinyglobby>picomatch: ^4.0.4`. The first two were

@@ -9,7 +9,7 @@ import (
 type ContentType string
 
 const (
-	ContentTypeYouTube      ContentType = "YOUTUBE"
+	ContentTypeYouTubeVideo ContentType = "YOUTUBE_VIDEO"
 	ContentTypeClaim        ContentType = "CLAIM"
 	ContentTypeBiblePassage ContentType = "BIBLE_PASSAGE"
 )

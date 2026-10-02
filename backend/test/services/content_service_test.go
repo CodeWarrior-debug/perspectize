@@ -39,6 +39,16 @@ func (m *mockContentRepository) GetByID(ctx context.Context, id int) (*domain.Co
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockContentRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	out := []*domain.Content{}
+	for _, id := range ids {
+		if c, err := m.GetByID(ctx, id); err == nil && c != nil {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
 func (m *mockContentRepository) GetByURL(ctx context.Context, url string) (*domain.Content, error) {
 	if m.getByURLFn != nil {
 		return m.getByURLFn(ctx, url)
@@ -71,8 +81,8 @@ func (m *mockContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 	return nil
 }
 
-func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) error {
-	return nil
+func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+	return &domain.Content{ID: contentID, PrimaryCategoryID: categoryID}, nil
 }
 
 // mockYouTubeClient implements services.YouTubeClient for testing
@@ -103,7 +113,7 @@ func TestGetByID_Success(t *testing.T) {
 		ID:          1,
 		Name:        "Test Video",
 		URL:         &url,
-		ContentType: domain.ContentTypeYouTube,
+		ContentType: domain.ContentTypeYouTubeVideo,
 	}
 
 	repo := &mockContentRepository{
@@ -214,7 +224,7 @@ func TestCreateFromYouTube_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.ID)
 	assert.Equal(t, "Test Video Title", result.Name)
-	assert.Equal(t, domain.ContentTypeYouTube, result.ContentType)
+	assert.Equal(t, domain.ContentTypeYouTubeVideo, result.ContentType)
 	// URL stored is the canonical form, not the input URL
 	assert.Equal(t, &canonicalURL, result.URL)
 	assert.Equal(t, 42, result.AddedByUserID)
@@ -413,7 +423,7 @@ func TestUpdateSourceData_Success(t *testing.T) {
 		ID:            1,
 		Name:          "Old Title",
 		URL:           &url,
-		ContentType:   domain.ContentTypeYouTube,
+		ContentType:   domain.ContentTypeYouTubeVideo,
 		AddedByUserID: 7,
 		CreatedAt:     createdAt,
 	}
@@ -422,7 +432,7 @@ func TestUpdateSourceData_Success(t *testing.T) {
 		ID:            1,
 		Name:          "New Title",
 		URL:           &url,
-		ContentType:   domain.ContentTypeYouTube,
+		ContentType:   domain.ContentTypeYouTubeVideo,
 		AddedByUserID: 7,
 		CreatedAt:     createdAt, // unchanged
 	}
