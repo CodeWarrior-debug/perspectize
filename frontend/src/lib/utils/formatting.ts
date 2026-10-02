@@ -441,7 +441,8 @@ export class PerspectiveHeaderRenderer {
 		this.eGui = document.createElement('div');
 		this.eGui.className = 'flex items-center justify-center w-full h-full';
 		this.eGui.innerHTML = GLASSES_SVG;
-		this.eGui.title = 'Perspectize — add or edit your perspective';
+		// No native `title` — the column's `headerTooltip` already shows this text,
+		// and a title on top of it renders two stacked tooltips.
 	}
 
 	getGui(): HTMLElement {
@@ -504,7 +505,8 @@ export function categoryCellRenderer(params: {
 		// cell click handler).
 		const label: HTMLElement = category.wikipediaUrl ? document.createElement('a') : document.createElement('span');
 		label.textContent = category.label;
-		label.title = category.description ?? category.wikidataQid;
+		// No native `title` — the column's context.tooltipSpec hover popover already
+		// covers this cell, and a title on top of it renders two stacked tooltips.
 		label.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
 		if (category.wikipediaUrl && label instanceof HTMLAnchorElement) {
 			label.href = category.wikipediaUrl;
