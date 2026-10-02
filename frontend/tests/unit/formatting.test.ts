@@ -802,7 +802,7 @@ describe('categoryCellRenderer', () => {
 		expect(span?.style.color).toBe('rgb(163, 163, 163)');
 	});
 
-	it('sets title attribute to description when present', () => {
+	it('sets no native title (the hover popover is the only tooltip)', () => {
 		const result = categoryCellRenderer({
 			data: {
 				primaryCategory: {
@@ -814,22 +814,7 @@ describe('categoryCellRenderer', () => {
 		});
 
 		const span = result.querySelector('span');
-		expect(span?.title).toBe('Study of matter and energy');
-	});
-
-	it('sets title attribute to wikidataQid when description is null', () => {
-		const result = categoryCellRenderer({
-			data: {
-				primaryCategory: {
-					label: 'Chemistry',
-					description: null,
-					wikidataQid: 'Q2329',
-				},
-			},
-		});
-
-		const span = result.querySelector('span');
-		expect(span?.title).toBe('Q2329');
+		expect(span?.hasAttribute('title')).toBe(false);
 	});
 
 	it('renders "+" when data is undefined', () => {
