@@ -401,7 +401,7 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 		svg.setAttribute('stroke-linecap', 'round');
 		svg.setAttribute('stroke-linejoin', 'round');
 	} else {
-		svg.setAttribute('fill', '#FF0000'); // YouTube brand red
+		svg.setAttribute('fill', '#FF0000'); // YouTube brand red (hex-ok: fixed brand colour, not themeable)
 	}
 
 	const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');

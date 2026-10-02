@@ -168,7 +168,7 @@ func TestSetPassageDisplayTitle_FirstWriterWins(t *testing.T) {
 func TestSetPassageDisplayTitle_RejectsNonPassageAndBlank(t *testing.T) {
 	repo := &mockContentRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
-			return &domain.Content{ID: id, ContentType: domain.ContentTypeYouTube}, nil
+			return &domain.Content{ID: id, ContentType: domain.ContentTypeYouTubeVideo}, nil
 		},
 	}
 	server := setupPassageTestServer(repo, domain.UserRoleDefault)
