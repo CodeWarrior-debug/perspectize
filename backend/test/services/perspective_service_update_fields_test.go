@@ -138,7 +138,7 @@ func TestPerspectiveUpdate_RelatedPerspectiveIDsCapIsFifty(t *testing.T) {
 			getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
 				return existingPerspectiveWithOptionalsSet(), nil
 			},
-			updateFn: func(ctx context.Context, p *domain.Perspective, actorUserID int) (*domain.Perspective, error) {
+			updateFn: func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
 				updated = true
 				return p, nil
 			},

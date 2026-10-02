@@ -24,8 +24,8 @@ func TestUpdatePerspective_OwnerUpdatesWithSessionUserAsOwner(t *testing.T) {
 			getCalls++
 			return &domain.Perspective{ID: 100, UserID: 1, Privacy: domain.PrivacyPrivate}, nil
 		},
-		updateFn: func(ctx context.Context, p *domain.Perspective, actorUserID int) (*domain.Perspective, error) {
-			gotOwner = actorUserID
+		updateFn: func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
+			gotOwner = ownerUserID
 			return p, nil
 		},
 	}
@@ -55,7 +55,7 @@ func TestUpdatePerspective_NonOwnerDenied(t *testing.T) {
 				getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
 					return &domain.Perspective{ID: 100, UserID: 2, Privacy: tc.privacy}, nil
 				},
-				updateFn: func(ctx context.Context, p *domain.Perspective, actorUserID int) (*domain.Perspective, error) {
+				updateFn: func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
 					updateCalled = true
 					return p, nil
 				},
@@ -78,7 +78,7 @@ func TestUpdatePerspective_UnauthenticatedRejected(t *testing.T) {
 			getCalled = true
 			return &domain.Perspective{ID: 100, UserID: 1}, nil
 		},
-		updateFn: func(ctx context.Context, p *domain.Perspective, actorUserID int) (*domain.Perspective, error) {
+		updateFn: func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
 			updateCalled = true
 			return p, nil
 		},

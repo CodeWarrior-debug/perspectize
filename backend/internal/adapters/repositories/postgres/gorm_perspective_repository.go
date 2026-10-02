@@ -76,8 +76,8 @@ func (r *GormPerspectiveRepository) GetByID(ctx context.Context, id int) (*domai
 // Deliberately not gorm's Save(): when an UPDATE matches zero rows Save falls
 // back to an INSERT ... ON CONFLICT DO UPDATE, which would bypass the owner
 // predicate entirely.
-func (r *GormPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective, actorUserID int) (*domain.Perspective, error) {
-	if actorUserID <= 0 {
+func (r *GormPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
+	if ownerUserID <= 0 {
 		return nil, domain.ErrNotFound
 	}
 	model := perspectiveDomainToModel(p)
@@ -87,7 +87,7 @@ func (r *GormPerspectiveRepository) Update(ctx context.Context, p *domain.Perspe
 	result := r.db.WithContext(ctx).
 		Model(model).
 		Clauses(clause.Returning{}).
-		Where("user_id = ?", actorUserID).
+		Where("user_id = ?", ownerUserID).
 		Select("*").
 		Omit("id", "user_id", "created_at").
 		Updates(model)
@@ -103,11 +103,11 @@ func (r *GormPerspectiveRepository) Update(ctx context.Context, p *domain.Perspe
 
 // Delete removes a perspective by ID, scoped to its owner (see the port's doc
 // comment): DELETE ... WHERE id = ? AND user_id = ?.
-func (r *GormPerspectiveRepository) Delete(ctx context.Context, id int, actorUserID int) error {
-	if actorUserID <= 0 {
+func (r *GormPerspectiveRepository) Delete(ctx context.Context, id int, ownerUserID int) error {
+	if ownerUserID <= 0 {
 		return domain.ErrNotFound
 	}
-	result := r.db.WithContext(ctx).Where("user_id = ?", actorUserID).Delete(&PerspectiveModel{}, id)
+	result := r.db.WithContext(ctx).Where("user_id = ?", ownerUserID).Delete(&PerspectiveModel{}, id)
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete perspective: %w", result.Error)
 	}
