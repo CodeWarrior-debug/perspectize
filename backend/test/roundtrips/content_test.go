@@ -75,7 +75,7 @@ func TestGetOrCreateByURLReportsRefreshAsExisting(t *testing.T) {
 	h := newHarness(t)
 	userID, _ := h.user("upsert")
 	url := fmt.Sprintf("https://example.test/upsert/%d", time.Now().UnixNano())
-	c := &domain.Content{Name: "u", URL: &url, ContentType: domain.ContentTypeYouTube, AddedByUserID: userID}
+	c := &domain.Content{Name: "u", URL: &url, ContentType: domain.ContentTypeYouTubeVideo, AddedByUserID: userID}
 
 	first, existed, err := h.contentRepo.GetOrCreateByURL(context.Background(), c, true)
 	require.NoError(t, err)

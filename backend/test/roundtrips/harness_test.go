@@ -171,7 +171,7 @@ func (h *harness) content(userID int, name string) int {
 	h.t.Helper()
 	url := fmt.Sprintf("https://example.test/%s/%d", name, time.Now().UnixNano())
 	c, err := h.contentRepo.Create(context.Background(), &domain.Content{
-		Name: name, URL: &url, ContentType: domain.ContentTypeYouTube, AddedByUserID: userID,
+		Name: name, URL: &url, ContentType: domain.ContentTypeYouTubeVideo, AddedByUserID: userID,
 	})
 	require.NoError(h.t, err)
 	h.contentIDs = append(h.contentIDs, c.ID)
