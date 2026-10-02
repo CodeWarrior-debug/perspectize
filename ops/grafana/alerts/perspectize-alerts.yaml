@@ -1,0 +1,82 @@
+# Grafana-managed alert rules, in Grafana's file-provisioning format
+# (apiVersion 1 / groups / rules). Locally, docker-compose.observability.yml
+# mounts this file at /otel-lgtm/grafana/conf/provisioning/alerting/.
+#
+# Tracer set: ONE rule, the "Operation latency" row of the spec's alert table
+# (docs/superpowers/specs/2026-09-26-observability-design.md). The rest of
+# that table is added once this one has been proven end to end.
+#
+# datasourceUid "prometheus" is the uid otel-lgtm provisions
+# (docker/grafana-datasources.yaml). Provisioned alert rules can't use a
+# dashboard template variable, so for Grafana Cloud swap it for the Cloud
+# stack's Prometheus datasource uid — see ops/grafana/README.md.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: perspectize-api
+    folder: Perspectize
+    interval: 1m
+    rules:
+      - uid: perspectize-graphql-p95
+        title: GraphQL operation p95 latency above 1s
+        condition: C
+        data:
+          # A: p95 per operation over the last 5m. Subscriptions are
+          # excluded (their duration is time to first response only).
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              editorMode: code
+              expr: >-
+                histogram_quantile(0.95, sum by (le, graphql_operation_name)
+                (rate(graphql_server_operation_duration_seconds_bucket{job="perspectize-backend",
+                graphql_operation_type!="subscription"}[5m])))
+              instant: true
+              range: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+          # B: one value per operation. dropNN drops the NaN that
+          # histogram_quantile returns for an operation with no recent traffic.
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          # C: fire when p95 > 1 second.
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 1
+        # ...sustained for 10 minutes (spec window).
+        for: 10m
+        # Low traffic produces no data; that's not an incident.
+        noDataState: OK
+        execErrState: Error
+        isPaused: false
+        labels:
+          service: perspectize-backend
+          severity: warning
+        annotations:
+          summary: "GraphQL {{ $labels.graphql_operation_name }} p95 is {{ humanizeDuration $values.B.Value }} (> 1s for 10m)"
+          description: >-
+            p95 of graphql.server.operation.duration for operation
+            {{ $labels.graphql_operation_name }} has been above 1s for 10 minutes.
+            Open the "Perspectize API" dashboard, then Explore -> Tempo with
+            {resource.service.name="perspectize-backend" && duration > 1s}
+            to find the slow traces.

@@ -25,4 +25,8 @@ describe('app.html Content-Security-Policy', () => {
 		expect(directive('frame-src')).toContain('https://www.youtube.com');
 		expect(directive('frame-src')).toContain('https://www.youtube-nocookie.com');
 	});
+
+	it('allows the Grafana Faro collector so RUM/errors/traces can be sent', () => {
+		expect(directive('connect-src')).toContain('https://*.grafana.net');
+	});
 });

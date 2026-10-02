@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
@@ -17,6 +18,7 @@ import (
 	coderws "github.com/coder/websocket"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/ravilushqa/otelgqlgen"
 	"github.com/vektah/gqlparser/v2/ast"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
@@ -31,6 +33,7 @@ import (
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	gqltiming "github.com/CodeWarrior-debug/perspectize/backend/pkg/graphql"
 	perfmw "github.com/CodeWarrior-debug/perspectize/backend/pkg/middleware"
+	"github.com/CodeWarrior-debug/perspectize/backend/pkg/telemetry"
 )
 
 // Deps is everything the API handler needs. Construction of the services and
@@ -85,6 +88,18 @@ func NewGraphQLServer(d Deps) *handler.Server {
 		Implementation:        coderWebsocketImplementationFor(d.CORSOrigins),
 		KeepAlivePingInterval: 10 * time.Second,
 		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
+			// Browsers can't set custom headers on a WebSocket upgrade, so the
+			// frontend sends its version/platform in connection_init instead.
+			// Normalize through the same bounded sets as the HTTP ClientInfo
+			// middleware and store them so subscription operations see them.
+			// (No span attrs here: the HTTP tracing wrapper skips WS handshakes,
+			// so there is no active span on this context.)
+			clientVersion, clientPlatform := perfmw.NormalizeClientInfo(
+				initPayload.GetString("clientVersion"),
+				initPayload.GetString("clientPlatform"),
+			)
+			ctx = perfmw.WithClientInfo(ctx, clientVersion, clientPlatform)
+
 			token := initPayload.Authorization()
 			if token == "" {
 				if v, ok := initPayload["authToken"].(string); ok {
@@ -127,7 +142,8 @@ func NewGraphQLServer(d Deps) *handler.Server {
 	if d.EnableIntrospection {
 		srv.Use(extension.Introspection{})
 	}
-	srv.AroundOperations(gqltiming.OperationTimer())
+	InstrumentGraphQL(srv)
+	srv.AroundOperations(OperationMetrics())
 	return srv
 }
 
@@ -137,16 +153,11 @@ func Middleware(d Deps) []func(http.Handler) http.Handler {
 	return []func(http.Handler) http.Handler{
 		middleware.RequestID,
 		middleware.RealIP,
+		perfmw.ClientInfo,                        // tags every request (even unauthenticated/rate-limited) with client.version/platform
 		apimw.GlobalRateLimit(d.RateLimitPerMin), // H-11: rate limiting before auth
-		cors.Handler(cors.Options{ // C-05: CORS restricted to config origins
-			AllowedOrigins:   d.CORSOrigins,
-			AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
-			AllowedHeaders:   []string{"Content-Type", "Authorization"},
-			AllowCredentials: true,
-			MaxAge:           300,
-		}),
-		apimw.SecureHeaders(),       // M-14: security headers (HSTS, X-Content-Type-Options, X-Frame-Options)
-		apimw.ContentTypeValidation, // M-15: CSRF protection via Content-Type
+		cors.Handler(CORSOptions(d.CORSOrigins)), // C-05: CORS restricted to config origins
+		apimw.SecureHeaders(),                    // M-14: security headers (HSTS, X-Content-Type-Options, X-Frame-Options)
+		apimw.ContentTypeValidation,              // M-15: CSRF protection via Content-Type
 		auth.Middleware(d.UserRepo, d.TokenVerifier),
 		// per-request GraphQL dataloaders (batches Content.primaryCategory,
 		// Content.perspectiveCount/averageRating, users, thread stats)
@@ -160,6 +171,58 @@ func Middleware(d Deps) []func(http.Handler) http.Handler {
 		perfmw.RequestTimer, // structured request timing (replaces chi Logger)
 		perfmw.Recoverer,    // structured panic recovery (JSON via slog)
 	}
+}
+
+// CORSOptions builds the CORS configuration for the given allowlist of
+// origins. AllowedHeaders includes the W3C trace context headers
+// (traceparent/tracestate) and the client identity headers
+// (X-Client-Version/X-Client-Platform) so browser preflight doesn't reject
+// requests carrying them.
+func CORSOptions(origins []string) cors.Options {
+	return cors.Options{
+		AllowedOrigins: origins,
+		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders: []string{
+			"Content-Type",
+			"Authorization",
+			"traceparent",
+			"tracestate",
+			"X-Client-Version",
+			"X-Client-Platform",
+		},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}
+}
+
+// InstrumentGraphQL registers otelgqlgen on srv so every operation gets a
+// span, and every field with a real resolver gets a child span
+// (fc.IsResolver — trivial struct-field reads on batched/dataloaded types
+// like Content.primaryCategory don't get their own span, which keeps list
+// queries from ballooning into hundreds of spans). Variables are never
+// recorded (WithoutVariables). Must run before srv.AroundOperations(...) so
+// the operation span is already in context for OperationMetrics.
+func InstrumentGraphQL(srv *handler.Server) {
+	srv.Use(otelgqlgen.Middleware(
+		otelgqlgen.WithoutVariables(),
+		otelgqlgen.WithCreateSpanFromFields(func(fc *graphql.FieldContext) bool {
+			return fc.IsResolver
+		}),
+	))
+}
+
+// maxOperationNames caps distinct graphql.operation.name values on the
+// operation histogram (spec cardinality budget); extras report as "other".
+const maxOperationNames = 200
+
+// OperationMetrics builds the per-operation latency/error histogram
+// middleware against the global Meter (delegates once telemetry.Setup
+// installs a real MeterProvider).
+func OperationMetrics() graphql.OperationMiddleware {
+	return gqltiming.OperationMetrics(
+		telemetry.Meter(),
+		telemetry.NewBoundedSet(maxOperationNames, telemetry.OperationNamePattern),
+	)
 }
 
 // coderWebsocketImplementationFor builds the coder/websocket-backed
