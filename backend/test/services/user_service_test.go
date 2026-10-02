@@ -146,7 +146,7 @@ func (m *mockPerspectiveRepoForUser) GetByID(ctx context.Context, id int) (*doma
 func (m *mockPerspectiveRepoForUser) Update(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
 	return p, nil
 }
-func (m *mockPerspectiveRepoForUser) Delete(ctx context.Context, id int) error {
+func (m *mockPerspectiveRepoForUser) Delete(ctx context.Context, id int, ownerUserID int) error {
 	return nil
 }
 func (m *mockPerspectiveRepoForUser) List(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error) {
@@ -178,6 +178,9 @@ func newTestUserServiceFull(repo *mockUserRepository, contentRepo *mockContentRe
 	return services.NewUserService(repo, contentRepo, perspectiveRepo)
 }
 
+// testAdmin is the actor for tests of behaviour other than authorization.
+var testAdmin = &domain.AuthenticatedUser{ID: 999, Role: domain.UserRoleAdmin}
+
 // --- Create Tests ---
 
 func TestCreate_Success(t *testing.T) {
@@ -189,7 +192,7 @@ func TestCreate_Success(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Create(context.Background(), "testuser", "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "testuser", "test@example.com")
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.ID)
@@ -202,7 +205,7 @@ func TestCreate_UsernameEmpty(t *testing.T) {
 	repo := &mockUserRepository{}
 	svc := newTestUserService(repo)
 
-	result, err := svc.Create(context.Background(), "", "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "", "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -214,7 +217,7 @@ func TestCreate_UsernameWhitespace(t *testing.T) {
 	repo := &mockUserRepository{}
 	svc := newTestUserService(repo)
 
-	result, err := svc.Create(context.Background(), "   ", "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "   ", "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -227,7 +230,7 @@ func TestCreate_UsernameTooLong(t *testing.T) {
 	svc := newTestUserService(repo)
 
 	// Username with 25 characters (limit is 24)
-	result, err := svc.Create(context.Background(), "abcdefghijklmnopqrstuvwxy", "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "abcdefghijklmnopqrstuvwxy", "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -244,7 +247,7 @@ func TestCreate_EmailEmpty_Succeeds(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Create(context.Background(), "testuser", "")
+	result, err := svc.Create(context.Background(), testAdmin, "testuser", "")
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.ID)
@@ -267,7 +270,7 @@ func TestCreate_EmailInvalid(t *testing.T) {
 
 	for _, email := range testCases {
 		t.Run(email, func(t *testing.T) {
-			result, err := svc.Create(context.Background(), "testuser", email)
+			result, err := svc.Create(context.Background(), testAdmin, "testuser", email)
 
 			assert.Nil(t, result)
 			require.Error(t, err)
@@ -285,7 +288,7 @@ func TestCreate_UsernameAlreadyExists(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Create(context.Background(), "existinguser", "new@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "existinguser", "new@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -301,7 +304,7 @@ func TestCreate_EmailAlreadyExists(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Create(context.Background(), "newuser", "existing@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "newuser", "existing@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -317,7 +320,7 @@ func TestCreate_RepositoryCreateError(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Create(context.Background(), "testuser", "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "testuser", "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -332,7 +335,7 @@ func TestCreate_GetByUsernameUnexpectedError(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Create(context.Background(), "testuser", "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "testuser", "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -347,7 +350,7 @@ func TestCreate_GetByEmailUnexpectedError(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Create(context.Background(), "testuser", "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "testuser", "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -522,7 +525,7 @@ func TestUpdate_Success(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{
 		ID:       2,
 		Username: &newUsername,
 	})
@@ -541,7 +544,7 @@ func TestUpdate_SentinelUserBlocked(t *testing.T) {
 
 	newUsername := "hacker"
 	svc := newTestUserService(repo)
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{
 		ID:       1,
 		Username: &newUsername,
 	})
@@ -555,7 +558,7 @@ func TestUpdate_InvalidID(t *testing.T) {
 	repo := &mockUserRepository{}
 	svc := newTestUserService(repo)
 
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{ID: 0})
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{ID: 0})
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -577,7 +580,7 @@ func TestUpdate_UsernameAlreadyTaken(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{
 		ID:       2,
 		Username: &takenName,
 	})
@@ -611,7 +614,7 @@ func TestDelete_Success(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepoForUser{}
 	svc := newTestUserServiceFull(repo, contentRepo, perspectiveRepo)
 
-	err := svc.Delete(context.Background(), 2)
+	err := svc.Delete(context.Background(), testAdmin, 2)
 	require.NoError(t, err)
 }
 
@@ -623,7 +626,7 @@ func TestDelete_SentinelUserBlocked(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	err := svc.Delete(context.Background(), 1)
+	err := svc.Delete(context.Background(), testAdmin, 1)
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrDeleteSentinel))
@@ -633,7 +636,7 @@ func TestDelete_InvalidID(t *testing.T) {
 	repo := &mockUserRepository{}
 	svc := newTestUserService(repo)
 
-	err := svc.Delete(context.Background(), 0)
+	err := svc.Delete(context.Background(), testAdmin, 0)
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrInvalidInput))
@@ -647,7 +650,7 @@ func TestDelete_UserNotFound(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	err := svc.Delete(context.Background(), 999)
+	err := svc.Delete(context.Background(), testAdmin, 999)
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrNotFound))
@@ -675,7 +678,7 @@ func TestDelete_ReassignContentFails(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepoForUser{}
 	svc := newTestUserServiceFull(repo, contentRepo, perspectiveRepo)
 
-	err := svc.Delete(context.Background(), 2)
+	err := svc.Delete(context.Background(), testAdmin, 2)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to reassign content")
@@ -703,7 +706,7 @@ func TestDelete_ReassignPerspectivesFails(t *testing.T) {
 	}
 	svc := newTestUserServiceFull(repo, contentRepo, perspectiveRepo)
 
-	err := svc.Delete(context.Background(), 2)
+	err := svc.Delete(context.Background(), testAdmin, 2)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to reassign perspectives")
@@ -715,7 +718,7 @@ func TestCreate_ReservedDeletedUsername(t *testing.T) {
 	repo := &mockUserRepository{}
 	svc := newTestUserService(repo)
 
-	result, err := svc.Create(context.Background(), domain.DeletedUserUsername, "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, domain.DeletedUserUsername, "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -727,7 +730,7 @@ func TestCreate_ReservedSystemUsername(t *testing.T) {
 	repo := &mockUserRepository{}
 	svc := newTestUserService(repo)
 
-	result, err := svc.Create(context.Background(), domain.SystemUserUsername, "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, domain.SystemUserUsername, "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -744,7 +747,7 @@ func TestUpdate_ReservedDeletedUsername(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{
 		ID:       2,
 		Username: &reserved,
 	})
@@ -764,7 +767,7 @@ func TestUpdate_ReservedSystemUsername(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{
 		ID:       2,
 		Username: &reserved,
 	})
@@ -784,7 +787,7 @@ func TestUpdate_SystemSentinelBlocked(t *testing.T) {
 
 	newUsername := "hacker"
 	svc := newTestUserService(repo)
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{
 		ID:       1,
 		Username: &newUsername,
 	})
@@ -802,7 +805,7 @@ func TestDelete_SystemSentinelBlocked(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	err := svc.Delete(context.Background(), 1)
+	err := svc.Delete(context.Background(), testAdmin, 1)
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrDeleteSentinel))
@@ -829,7 +832,7 @@ func TestCreate_SetsDefaultOnboarding(t *testing.T) {
 	}
 	svc := newTestUserService(repo)
 
-	result, err := svc.Create(context.Background(), "newbie", "n@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "newbie", "n@example.com")
 	require.NoError(t, err)
 	require.NotNil(t, captured)
 	assert.Equal(t, domain.DefaultUserOnboarding(), captured.Onboarding)
@@ -968,4 +971,80 @@ func (m *mockContentRepoForUser) SetDisplayTitleIfEmpty(ctx context.Context, con
 
 func (m *mockContentRepoForUser) ClearDisplayTitle(ctx context.Context, contentID int) error {
 	return nil
+}
+
+// --- Authorization ---
+
+func TestUserMutations_Authorization(t *testing.T) {
+	target := &domain.User{ID: 5, Username: "target", Email: "t@example.com", Role: domain.UserRoleDefault}
+	newRepo := func(wrote *bool) *mockUserRepository {
+		return &mockUserRepository{
+			getByIDFn: func(ctx context.Context, id int) (*domain.User, error) { cp := *target; return &cp, nil },
+			getByUsernameFn: func(ctx context.Context, username string) (*domain.User, error) {
+				if username == domain.DeletedUserUsername {
+					return &domain.User{ID: 1, Username: username, Role: domain.UserRoleSentinel}, nil
+				}
+				return nil, domain.ErrNotFound
+			},
+			updateFn: func(ctx context.Context, u *domain.User) (*domain.User, error) {
+				*wrote = true
+				return u, nil
+			},
+			deleteFn: func(ctx context.Context, id int) error {
+				*wrote = true
+				return nil
+			},
+		}
+	}
+	name := "renamed"
+	other := &domain.AuthenticatedUser{ID: 6, Role: domain.UserRoleDefault}
+	self := &domain.AuthenticatedUser{ID: 5, Role: domain.UserRoleDefault}
+
+	tests := []struct {
+		name    string
+		actor   *domain.AuthenticatedUser
+		allowed bool
+	}{
+		{"another user", other, false},
+		{"no actor", nil, false},
+		{"the user themself", self, true},
+		{"an admin", testAdmin, true},
+	}
+	for _, tc := range tests {
+		t.Run("update/"+tc.name, func(t *testing.T) {
+			wrote := false
+			svc := newTestUserService(newRepo(&wrote))
+			_, err := svc.Update(context.Background(), tc.actor, portservices.UpdateUserInput{ID: 5, Username: &name})
+			if tc.allowed {
+				require.NoError(t, err)
+				assert.True(t, wrote)
+			} else {
+				assert.True(t, errors.Is(err, domain.ErrForbidden), "got %v", err)
+				assert.False(t, wrote, "nothing may be written for an unauthorized actor")
+			}
+		})
+		t.Run("delete/"+tc.name, func(t *testing.T) {
+			wrote := false
+			svc := newTestUserService(newRepo(&wrote))
+			err := svc.Delete(context.Background(), tc.actor, 5)
+			if tc.allowed {
+				require.NoError(t, err)
+				assert.True(t, wrote)
+			} else {
+				assert.True(t, errors.Is(err, domain.ErrForbidden), "got %v", err)
+				assert.False(t, wrote, "nothing may be written for an unauthorized actor")
+			}
+		})
+	}
+
+	for _, actor := range []*domain.AuthenticatedUser{nil, self, other} {
+		created := false
+		repo := &mockUserRepository{createFn: func(ctx context.Context, u *domain.User) (*domain.User, error) {
+			created = true
+			return u, nil
+		}}
+		_, err := newTestUserService(repo).Create(context.Background(), actor, "newbie", "n@example.com")
+		assert.True(t, errors.Is(err, domain.ErrForbidden), "non-admin create: got %v", err)
+		assert.False(t, created)
+	}
 }

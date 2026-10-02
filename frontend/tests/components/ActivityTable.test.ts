@@ -9,7 +9,7 @@
  * browser environment (manual verification or Playwright E2E tests).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/svelte';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import { QueryClient } from '@tanstack/svelte-query';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { mockPageState } from '../setup';
@@ -172,6 +172,22 @@ describe('ActivityTable', () => {
 		await waitFor(() => {
 			expect(mockRequest).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ filter: undefined }));
 		});
+	});
+
+	it("?open=<id> opens that item's details (fetched by ID when not loaded) and strips the param", async () => {
+		const { goto } = await import('$app/navigation');
+		const deepLinked = { ...mockDataResponse.content.items[0], id: '99', name: 'Deep Linked Video' };
+		mockRequest.mockImplementation(async (query: string) =>
+			String(query).includes('GetContentDetails') ? { contentByID: deepLinked } : mockEmptyResponse,
+		);
+		mockPageState.url = new URL('http://localhost/?q=sowell&open=99');
+		renderWithQuery();
+
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalledWith(expect.stringContaining('GetContentDetails'), { id: '99' });
+		});
+		expect(goto).toHaveBeenCalledWith('?q=sowell', expect.objectContaining({ replaceState: true }));
+		expect(await screen.findByText('Deep Linked Video')).toBeInTheDocument();
 	});
 
 	it('hides pagination controls in loaded mode (default)', async () => {

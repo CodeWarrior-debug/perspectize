@@ -131,6 +131,36 @@ describe('CompareRatingTable', () => {
 		expect(screen.queryByText(/left filled in/)).not.toBeInTheDocument();
 	});
 
+	it('hides the sort toggle when there are no shared rows to sort', () => {
+		render(CompareRatingTable, {
+			props: {
+				rows: [],
+				filledInDifferently,
+				feelings: noFeelings,
+				sortDesc: false,
+				onToggleSort: vi.fn(),
+				leftName: 'Alice',
+				rightName: 'Bob',
+			},
+		});
+		expect(screen.queryByTestId('sort-toggle')).not.toBeInTheDocument();
+	});
+
+	it('shows the sort toggle when there is at least one shared row', () => {
+		render(CompareRatingTable, {
+			props: {
+				rows,
+				filledInDifferently,
+				feelings: noFeelings,
+				sortDesc: false,
+				onToggleSort: vi.fn(),
+				leftName: 'Alice',
+				rightName: 'Bob',
+			},
+		});
+		expect(screen.getByTestId('sort-toggle')).toBeInTheDocument();
+	});
+
 	it('shows the matching-feelings row only when there are shared feelings', () => {
 		const { rerender } = render(CompareRatingTable, {
 			props: {

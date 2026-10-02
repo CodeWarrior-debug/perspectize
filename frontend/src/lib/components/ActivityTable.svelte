@@ -16,7 +16,14 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { graphqlRequest } from '$lib/queries/client';
-	import { LIST_CONTENT, type ContentItem, type ContentResponse } from '$lib/queries/content';
+	import {
+		GET_CONTENT_DETAILS,
+		LIST_CONTENT,
+		type ContentDetailsResponse,
+		type ContentItem,
+		type ContentResponse,
+	} from '$lib/queries/content';
+	import { OPEN_CONTENT_PARAM } from '$lib/utils/contentLinks';
 	import {
 		LIST_PERSPECTIVES_BY_USER,
 		MAX_PERSPECTIVES_PER_LIST,
@@ -328,7 +335,28 @@
 
 	// Derived values from query
 	const rowData = $derived(contentQuery.data?.content.items ?? []);
-	const detailsModalContent = $derived(rowData.find((item) => String(item.id) === detailsModalContentId) ?? null);
+	const detailsModalRow = $derived(rowData.find((item) => String(item.id) === detailsModalContentId) ?? null);
+	// A deep-linked item (`?open=<id>`, e.g. from a "Go to" toast or a verse jump) is
+	// often not on the loaded page — fetch just that row so the modal can still open.
+	const detailsFallbackQuery = createQuery(() => ({
+		queryKey: queryKeys.content.row(detailsModalContentId ?? ''),
+		queryFn: () => graphqlRequest<ContentDetailsResponse>(GET_CONTENT_DETAILS, { id: detailsModalContentId }),
+		enabled: detailsModalContentId !== null && detailsModalRow === null && !contentQuery.isPending,
+		staleTime: 60 * 1000,
+	}));
+	const detailsModalContent = $derived(detailsModalRow ?? detailsFallbackQuery.data?.contentByID ?? null);
+
+	// Consume `?open=<id>`: open that item's details, then strip the param (replaceState)
+	// so a refresh or later grid URL update doesn't reopen it.
+	$effect(() => {
+		const id = page.url.searchParams.get(OPEN_CONTENT_PARAM);
+		if (!id) return;
+		detailsModalContentId = id;
+		const params = new URLSearchParams(page.url.searchParams);
+		params.delete(OPEN_CONTENT_PARAM);
+		const search = params.toString();
+		goto(search ? `?${search}` : page.url.pathname, { replaceState: true, keepFocus: true, noScroll: true });
+	});
 	const totalCount = $derived(contentQuery.data?.content.totalCount ?? 0);
 	// Reset the filtered-row count whenever the underlying row data changes
 	// (new fetch, mode switch) so a stale filtered count from the previous
@@ -999,7 +1027,7 @@
 	});
 </script>
 
-<div class="flex flex-col h-full gap-4">
+<div class="flex flex-col h-full gap-0">
 	<!-- Active Filter Chips — always visible so users can clear filters even during errors -->
 	<FilterChips
 		{gridApi}
@@ -1049,7 +1077,7 @@
 			bind:this={gridContainer}
 			data-testid="ag-grid-container"
 			class="{isMobile ? 'overflow-y-auto' : 'flex-1'} min-h-0"
-			style="--ag-row-height: 64px; --ag-header-height: 40px;"
+			style="--ag-row-height: 49px; --ag-header-height: 36px;"
 		>
 			<AgGridSvelte5Component {gridOptions} {rowData} {theme} {modules} />
 		</div>
@@ -1063,7 +1091,7 @@
 
 	<!-- Manual Pagination Controls -->
 	<div
-		class="shrink-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-0 px-2 md:px-4 py-2 border-t border-border text-xs md:text-sm"
+		class="shrink-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-0 px-2 md:pl-4 md:pr-20 py-1 border-t border-border text-xs md:text-sm"
 	>
 		<div class="flex items-center gap-2 md:gap-4">
 			<div class="text-muted-foreground">

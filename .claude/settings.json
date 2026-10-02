@@ -127,6 +127,10 @@
           },
           {
             "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/query-budget-precommit.sh\""
+          },
+          {
+            "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-session-reflection-before-pr.sh\""
           }
         ]
@@ -138,6 +142,7 @@
     "claude-md-management@claude-plugins-official": true,
     "context7@claude-plugins-official": false,
     "frontend-design@claude-plugins-official": true,
+    "plugin-dev@claude-plugins-official": true,
     "superpowers@superpowers-dev": true
   },
   "extraKnownMarketplaces": {
