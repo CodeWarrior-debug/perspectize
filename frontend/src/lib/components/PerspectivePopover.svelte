@@ -29,7 +29,7 @@
 	import { useCreatePerspective } from '$lib/queries/perspectives/useCreatePerspective';
 	import { useUpdatePerspective } from '$lib/queries/perspectives/useUpdatePerspective';
 	import { useDeletePerspective } from '$lib/queries/perspectives/useDeletePerspective';
-	import type { PerspectiveItem } from '$lib/queries/perspectives';
+	import { isOptimisticId, type PerspectiveItem } from '$lib/queries/perspectives';
 	import FeelWheel, { type Feeling } from '$lib/components/FeelWheel.svelte';
 
 	/**
@@ -281,6 +281,10 @@
 	function handleDelete() {
 		// Re-check at the moment of action, not just when the button rendered.
 		if (!canDelete || !existingPerspective) return;
+		if (isStillSaving) {
+			toast.info('Still saving your perspective — try again in a moment');
+			return;
+		}
 		deleteMutation.mutate(
 			{ id: existingPerspective.id, contentID: existingPerspective.contentID },
 			{
@@ -295,8 +299,18 @@
 		);
 	}
 
+	// A perspective created a moment ago carries a temporary id until the
+	// server replies (see useCreatePerspective); it can't be edited or
+	// deleted by id yet.
+	const isStillSaving = $derived(isOptimisticId(existingPerspective?.id));
+
 	function handleSubmit(e: Event) {
 		e.preventDefault();
+
+		if (isStillSaving) {
+			toast.info('Still saving your perspective — try again in a moment');
+			return;
+		}
 
 		const hasAnyRating = quality !== null || agreement !== null || importance !== null || confidence !== null;
 		const hasLike = likeValue !== null;
@@ -317,9 +331,23 @@
 				}))
 			: undefined;
 
+		// Close immediately instead of waiting for the server: the mutation hooks
+		// patch the cached lists optimistically, so the change is already on
+		// screen, and a slow network (mobile) no longer holds the sheet open for
+		// the full round trip. mutateAsync settles even after this component
+		// unmounts. On failure the hook rolls the optimistic patch back and
+		// offers Retry, and the review text survives as a draft (flushed below,
+		// cleared only once the save succeeds).
+		flushPendingDraft();
+		const key = draftKey(contentId, userId);
+		const afterSave = () => {
+			clearDraft(key);
+			onSuccess?.();
+		};
+
 		if (isEditMode && existingPerspective) {
-			updateMutation.mutate(
-				{
+			updateMutation
+				.mutateAsync({
 					id: parseInt(existingPerspective.id, 10),
 					// Edit mode sends the full form state, not just what changed: a field
 					// the user emptied is sent as null so the server clears it -- unlike
@@ -334,21 +362,13 @@
 					customFields: buildCustomFields() ?? null,
 					feelings: feelingsPayload ?? null,
 					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
-				},
-				{
-					onSuccess: () => {
-						// Cancel first: a debounced save still in flight would re-create the
-						// draft we are about to delete.
-						cancelPendingDraft();
-						clearDraft(draftKey(contentId, userId));
-						onSuccess?.();
-						onClose();
-					},
-				},
-			);
+				})
+				.then(afterSave, () => {
+					// Error toast + Retry come from useUpdatePerspective's onError.
+				});
 		} else {
-			createMutation.mutate(
-				{
+			createMutation
+				.mutateAsync({
 					userID: userId,
 					contentID: contentId,
 					quality: quality ?? undefined,
@@ -360,19 +380,12 @@
 					customFields: buildCustomFields(),
 					feelings: feelingsPayload,
 					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
-				},
-				{
-					onSuccess: () => {
-						// Cancel first: a debounced save still in flight would re-create the
-						// draft we are about to delete.
-						cancelPendingDraft();
-						clearDraft(draftKey(contentId, userId));
-						onSuccess?.();
-						onClose();
-					},
-				},
-			);
+				})
+				.then(afterSave, () => {
+					// Error toast + Retry come from useCreatePerspective's onError.
+				});
 		}
+		onClose();
 	}
 </script>
 

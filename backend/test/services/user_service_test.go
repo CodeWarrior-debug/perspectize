@@ -41,6 +41,16 @@ func (m *mockUserRepository) GetByID(ctx context.Context, id int) (*domain.User,
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockUserRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.User, error) {
+	out := []*domain.User{}
+	for _, id := range ids {
+		if u, err := m.GetByID(ctx, id); err == nil && u != nil {
+			out = append(out, u)
+		}
+	}
+	return out, nil
+}
+
 func (m *mockUserRepository) GetByClerkID(ctx context.Context, clerkID string) (*domain.User, error) {
 	return nil, domain.ErrNotFound
 }
@@ -70,6 +80,18 @@ func (m *mockUserRepository) Update(ctx context.Context, user *domain.User) (*do
 	if m.updateFn != nil {
 		return m.updateFn(ctx, user)
 	}
+	// Emulate the users_unique_username / users_unique_email constraints the
+	// real UPDATE relies on: another user already holding the value is a clash.
+	if m.getByUsernameFn != nil {
+		if other, err := m.getByUsernameFn(ctx, user.Username); err == nil && other != nil && other.ID != user.ID {
+			return nil, fmt.Errorf("%w: username already taken", domain.ErrAlreadyExists)
+		}
+	}
+	if m.getByEmailFn != nil && user.Email != "" {
+		if other, err := m.getByEmailFn(ctx, user.Email); err == nil && other != nil && other.ID != user.ID {
+			return nil, fmt.Errorf("%w: email already registered", domain.ErrAlreadyExists)
+		}
+	}
 	return user, nil
 }
 
@@ -96,7 +118,33 @@ func (m *mockUserRepository) UpdateOnboarding(ctx context.Context, userID int, o
 	if m.updateOnboardingFn != nil {
 		return m.updateOnboardingFn(ctx, userID, onboarding)
 	}
+	if _, err := m.writableUser(ctx, userID); err != nil {
+		return nil, err
+	}
 	return &domain.User{ID: userID, Onboarding: onboarding}, nil
+}
+
+func (m *mockUserRepository) SetOnboardingDisplayNextSession(ctx context.Context, userID int, display bool) (*domain.User, error) {
+	u, err := m.writableUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	u.Onboarding.DisplayNextSession = display
+	return u, nil
+}
+
+// writableUser emulates the real repository's onboarding UPDATE predicate
+// (WHERE id = ? AND role <> 'sentinel'): a missing user or the sentinel is a
+// zero-row update, i.e. domain.ErrNotFound.
+func (m *mockUserRepository) writableUser(ctx context.Context, userID int) (*domain.User, error) {
+	if m.getByIDFn == nil {
+		return &domain.User{ID: userID}, nil
+	}
+	u, err := m.getByIDFn(ctx, userID)
+	if err != nil || u == nil || u.IsSentinel() {
+		return nil, domain.ErrNotFound
+	}
+	return u, nil
 }
 
 // mockContentRepoForUser implements repositories.ContentRepository for user tests
@@ -109,6 +157,16 @@ func (m *mockContentRepoForUser) Create(ctx context.Context, content *domain.Con
 }
 func (m *mockContentRepoForUser) GetByID(ctx context.Context, id int) (*domain.Content, error) {
 	return nil, domain.ErrNotFound
+}
+
+func (m *mockContentRepoForUser) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	out := []*domain.Content{}
+	for _, id := range ids {
+		if c, err := m.GetByID(ctx, id); err == nil && c != nil {
+			out = append(out, c)
+		}
+	}
+	return out, nil
 }
 func (m *mockContentRepoForUser) GetByURL(ctx context.Context, url string) (*domain.Content, error) {
 	return nil, domain.ErrNotFound
@@ -128,8 +186,8 @@ func (m *mockContentRepoForUser) ReassignByUser(ctx context.Context, fromUserID,
 	}
 	return nil
 }
-func (m *mockContentRepoForUser) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) error {
-	return nil
+func (m *mockContentRepoForUser) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+	return &domain.Content{ID: contentID, PrimaryCategoryID: categoryID}, nil
 }
 
 // mockPerspectiveRepoForUser implements repositories.PerspectiveRepository for user tests
@@ -143,7 +201,7 @@ func (m *mockPerspectiveRepoForUser) Create(ctx context.Context, p *domain.Persp
 func (m *mockPerspectiveRepoForUser) GetByID(ctx context.Context, id int) (*domain.Perspective, error) {
 	return nil, domain.ErrNotFound
 }
-func (m *mockPerspectiveRepoForUser) Update(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
+func (m *mockPerspectiveRepoForUser) Update(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
 	return p, nil
 }
 func (m *mockPerspectiveRepoForUser) Delete(ctx context.Context, id int, ownerUserID int) error {

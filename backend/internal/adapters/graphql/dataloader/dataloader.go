@@ -26,25 +26,53 @@ type ctxKey struct{}
 type Loaders struct {
 	CategoryByID                    *dataloadgen.Loader[int, *domain.Category]
 	PerspectiveAggregateByContentID *dataloadgen.Loader[int, *domain.PerspectiveAggregate]
+	// ContentByID batches Perspective.content lookups.
+	ContentByID *dataloadgen.Loader[int, *domain.Content]
+	// UserByID batches Message.sender / ThreadParticipant.user /
+	// Perspective.user / Content.addedBy lookups.
+	UserByID *dataloadgen.Loader[int, *domain.User]
+	// ThreadStats batches MessageThread.latestSeq / unreadCount per viewer.
+	ThreadStats *dataloadgen.Loader[ThreadStatsKey, domain.ThreadStats]
+}
+
+// ThreadStatsKey identifies one viewer's stats for one thread.
+type ThreadStatsKey struct {
+	ViewerID int
+	ThreadID int
+}
+
+// Services are the ports the loaders batch through.
+type Services struct {
+	Category    portservices.CategoryService
+	Perspective portservices.PerspectiveService
+	User        portservices.UserService
+	Content     portservices.ContentService
+	Messaging   portservices.MessagingService
 }
 
 // NewLoaders builds a fresh set of loaders backed by the given services.
-func NewLoaders(categoryService portservices.CategoryService, perspectiveService portservices.PerspectiveService) *Loaders {
-	cb := &categoryBatcher{service: categoryService}
-	pb := &perspectiveAggregateBatcher{service: perspectiveService}
+func NewLoaders(s Services) *Loaders {
+	cb := &categoryBatcher{service: s.Category}
+	pb := &perspectiveAggregateBatcher{service: s.Perspective}
+	ub := &userBatcher{service: s.User}
+	tb := &threadStatsBatcher{service: s.Messaging}
+	cnb := &contentBatcher{service: s.Content}
 	return &Loaders{
 		CategoryByID:                    dataloadgen.NewMappedLoader(cb.byID),
 		PerspectiveAggregateByContentID: dataloadgen.NewMappedLoader(pb.byContentID),
+		UserByID:                        dataloadgen.NewMappedLoader(ub.byID),
+		ThreadStats:                     dataloadgen.NewMappedLoader(tb.byKey),
+		ContentByID:                     dataloadgen.NewMappedLoader(cnb.byID),
 	}
 }
 
 // Middleware injects a fresh *Loaders into the context of every request. It
-// mirrors the chi middleware conventions in cmd/server/main.go (a
+// mirrors the chi middleware conventions in internal/server (a
 // func(http.Handler) http.Handler).
-func Middleware(categoryService portservices.CategoryService, perspectiveService portservices.PerspectiveService) func(http.Handler) http.Handler {
+func Middleware(s Services) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), ctxKey{}, NewLoaders(categoryService, perspectiveService))
+			ctx := context.WithValue(r.Context(), ctxKey{}, NewLoaders(s))
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -55,6 +83,68 @@ func Middleware(categoryService portservices.CategoryService, perspectiveService
 func For(ctx context.Context) *Loaders {
 	l, _ := ctx.Value(ctxKey{}).(*Loaders)
 	return l
+}
+
+// userBatcher resolves a batch of user IDs in one query.
+type userBatcher struct {
+	service portservices.UserService
+}
+
+func (b *userBatcher) byID(ctx context.Context, ids []int) (map[int]*domain.User, error) {
+	users, err := b.service.GetByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int]*domain.User, len(users))
+	for _, u := range users {
+		if u != nil {
+			out[u.ID] = u
+		}
+	}
+	return out, nil
+}
+
+// contentBatcher resolves a batch of content IDs in one query.
+type contentBatcher struct {
+	service portservices.ContentService
+}
+
+func (b *contentBatcher) byID(ctx context.Context, ids []int) (map[int]*domain.Content, error) {
+	items, err := b.service.GetByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int]*domain.Content, len(items))
+	for _, c := range items {
+		if c != nil {
+			out[c.ID] = c
+		}
+	}
+	return out, nil
+}
+
+// threadStatsBatcher resolves many (viewer, thread) stats in one query per
+// viewer — in practice one query, since a request has a single viewer.
+type threadStatsBatcher struct {
+	service portservices.MessagingService
+}
+
+func (b *threadStatsBatcher) byKey(ctx context.Context, keys []ThreadStatsKey) (map[ThreadStatsKey]domain.ThreadStats, error) {
+	byViewer := make(map[int][]int)
+	for _, k := range keys {
+		byViewer[k.ViewerID] = append(byViewer[k.ViewerID], k.ThreadID)
+	}
+	out := make(map[ThreadStatsKey]domain.ThreadStats, len(keys))
+	for viewer, threadIDs := range byViewer {
+		stats, err := b.service.ThreadStats(ctx, viewer, threadIDs)
+		if err != nil {
+			return nil, err
+		}
+		for tid, st := range stats {
+			out[ThreadStatsKey{ViewerID: viewer, ThreadID: tid}] = st
+		}
+	}
+	return out, nil
 }
 
 // categoryBatcher adapts CategoryService to a dataloadgen mapped-fetch func.

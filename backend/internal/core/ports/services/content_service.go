@@ -50,6 +50,9 @@ type ContentService interface {
 
 	// GetByID retrieves content by ID
 	GetByID(ctx context.Context, id int) (*domain.Content, error)
+	// GetByIDs loads many content rows in one query (the content dataloader);
+	// missing ids are absent.
+	GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error)
 
 	// ListContent retrieves a paginated list of content
 	ListContent(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)

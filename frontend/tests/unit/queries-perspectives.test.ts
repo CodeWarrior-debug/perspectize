@@ -5,6 +5,8 @@ import {
 	LIST_PERSPECTIVES_BY_USER,
 	LIST_PERSPECTIVES_BY_CONTENT,
 	MAX_PERSPECTIVES_PER_LIST,
+	OPTIMISTIC_PREFIX,
+	isOptimisticId,
 	type PerspectiveItem,
 	type CreatePerspectiveResponse,
 	type UpdatePerspectiveResponse,
@@ -237,5 +239,24 @@ describe('Perspective GraphQL query definitions', () => {
 		it('matches the backend cap on perspectives(first: Int) (see perspective_service.go)', () => {
 			expect(MAX_PERSPECTIVES_PER_LIST).toBe(100);
 		});
+	});
+});
+
+describe('isOptimisticId', () => {
+	it('is true for ids carrying the optimistic prefix', () => {
+		expect(OPTIMISTIC_PREFIX).toBe('optimistic-');
+		expect(isOptimisticId('optimistic-1700000000000')).toBe(true);
+	});
+
+	it('is false for real server ids', () => {
+		expect(isOptimisticId('7')).toBe(false);
+		expect(isOptimisticId('12345')).toBe(false);
+	});
+
+	it('is false for a prefix that is not at the start, and for empty/nullish ids', () => {
+		expect(isOptimisticId('x-optimistic-1')).toBe(false);
+		expect(isOptimisticId('')).toBe(false);
+		expect(isOptimisticId(null)).toBe(false);
+		expect(isOptimisticId(undefined)).toBe(false);
 	});
 });

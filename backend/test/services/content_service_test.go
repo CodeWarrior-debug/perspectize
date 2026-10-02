@@ -39,6 +39,16 @@ func (m *mockContentRepository) GetByID(ctx context.Context, id int) (*domain.Co
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockContentRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	out := []*domain.Content{}
+	for _, id := range ids {
+		if c, err := m.GetByID(ctx, id); err == nil && c != nil {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
 func (m *mockContentRepository) GetByURL(ctx context.Context, url string) (*domain.Content, error) {
 	if m.getByURLFn != nil {
 		return m.getByURLFn(ctx, url)
@@ -71,8 +81,8 @@ func (m *mockContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 	return nil
 }
 
-func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) error {
-	return nil
+func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+	return &domain.Content{ID: contentID, PrimaryCategoryID: categoryID}, nil
 }
 
 // mockYouTubeClient implements services.YouTubeClient for testing

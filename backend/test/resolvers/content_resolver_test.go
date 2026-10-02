@@ -48,6 +48,16 @@ func (m *mockContentRepository) GetByID(ctx context.Context, id int) (*domain.Co
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockContentRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	out := []*domain.Content{}
+	for _, id := range ids {
+		if c, err := m.GetByID(ctx, id); err == nil && c != nil {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
 func (m *mockContentRepository) GetByURL(ctx context.Context, url string) (*domain.Content, error) {
 	if m.getByURLFn != nil {
 		return m.getByURLFn(ctx, url)
@@ -80,8 +90,16 @@ func (m *mockContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 	return nil
 }
 
-func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) error {
-	return nil
+// UpdatePrimaryCategoryID emulates UPDATE ... RETURNING against getByIDFn's
+// row: missing content is ErrNotFound, otherwise the row with the new FK.
+func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+	got, err := m.GetByID(ctx, contentID)
+	if err != nil {
+		return nil, err
+	}
+	cp := *got
+	cp.PrimaryCategoryID = categoryID
+	return &cp, nil
 }
 
 // mockYouTubeClient implements services.YouTubeClient for testing
@@ -127,6 +145,16 @@ func (m *mockUserRepository) GetByID(ctx context.Context, id int) (*domain.User,
 		return m.getByIDFn(ctx, id)
 	}
 	return nil, domain.ErrNotFound
+}
+
+func (m *mockUserRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.User, error) {
+	out := []*domain.User{}
+	for _, id := range ids {
+		if u, err := m.GetByID(ctx, id); err == nil && u != nil {
+			out = append(out, u)
+		}
+	}
+	return out, nil
 }
 
 func (m *mockUserRepository) GetByClerkID(ctx context.Context, clerkID string) (*domain.User, error) {
@@ -178,11 +206,20 @@ func (m *mockUserRepository) UpdateOnboarding(ctx context.Context, userID int, o
 	return &domain.User{ID: userID, Onboarding: onboarding}, nil
 }
 
+func (m *mockUserRepository) SetOnboardingDisplayNextSession(ctx context.Context, userID int, display bool) (*domain.User, error) {
+	u, err := m.GetByID(ctx, userID)
+	if err != nil || u.IsSentinel() {
+		return nil, domain.ErrNotFound // mirrors WHERE id = ? AND role <> 'sentinel'
+	}
+	u.Onboarding.DisplayNextSession = display
+	return u, nil
+}
+
 // mockPerspectiveRepository implements repositories.PerspectiveRepository for testing
 type mockPerspectiveRepository struct {
 	createFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
 	getByIDFn func(ctx context.Context, id int) (*domain.Perspective, error)
-	updateFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
+	updateFn  func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
 	deleteFn  func(ctx context.Context, id int, ownerUserID int) error
 	listFn    func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
 }
@@ -202,9 +239,9 @@ func (m *mockPerspectiveRepository) GetByID(ctx context.Context, id int) (*domai
 	return nil, domain.ErrNotFound
 }
 
-func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
+func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
 	if m.updateFn != nil {
-		return m.updateFn(ctx, p)
+		return m.updateFn(ctx, p, ownerUserID)
 	}
 	return p, nil
 }

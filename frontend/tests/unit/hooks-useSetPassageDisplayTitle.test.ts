@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
 	mockInvalidateQueries: vi.fn(),
+	mockSetQueriesData: vi.fn(),
 	mockToastSuccess: vi.fn(),
 	mockToastInfo: vi.fn(),
 	mockToastError: vi.fn(),
@@ -14,7 +15,10 @@ vi.mock('@tanstack/svelte-query', () => ({
 		capturedMutationOptions = optionsFn();
 		return { mutate: vi.fn(), isPending: false };
 	}),
-	useQueryClient: vi.fn(() => ({ invalidateQueries: mocks.mockInvalidateQueries })),
+	useQueryClient: vi.fn(() => ({
+		invalidateQueries: mocks.mockInvalidateQueries,
+		setQueriesData: mocks.mockSetQueriesData,
+	})),
 }));
 
 vi.mock('svelte-sonner', () => ({
@@ -40,7 +44,7 @@ describe('useSetPassageDisplayTitle', () => {
 		expect(graphqlRequest).toHaveBeenCalledWith(expect.stringContaining('setPassageDisplayTitle'), { input });
 	});
 
-	it('toasts success and refreshes content when our title was stored', () => {
+	it('toasts success and patches the title in place (no refetch) when our title was stored', () => {
 		capturedMutationOptions.onSuccess(
 			{ setPassageDisplayTitle: { id: '7', displayTitle: 'Creation' } },
 			{ contentID: '7', title: ' Creation ' },
@@ -48,10 +52,11 @@ describe('useSetPassageDisplayTitle', () => {
 
 		expect(mocks.mockToastSuccess).toHaveBeenCalledWith('Title saved');
 		expect(mocks.mockToastInfo).not.toHaveBeenCalled();
-		expect(mocks.mockInvalidateQueries).toHaveBeenCalled();
+		expect(mocks.mockSetQueriesData).toHaveBeenCalledWith({ queryKey: ['app', 'content'] }, expect.any(Function));
+		expect(mocks.mockInvalidateQueries).not.toHaveBeenCalled();
 	});
 
-	it('tells the user when another title won (first-write-wins) and still refreshes', () => {
+	it('tells the user when another title won (first-write-wins) and patches in the winner', () => {
 		capturedMutationOptions.onSuccess(
 			{ setPassageDisplayTitle: { id: '7', displayTitle: 'Genesis Creation' } },
 			{ contentID: '7', title: 'Creation' },
@@ -59,7 +64,34 @@ describe('useSetPassageDisplayTitle', () => {
 
 		expect(mocks.mockToastInfo).toHaveBeenCalled();
 		expect(mocks.mockToastSuccess).not.toHaveBeenCalled();
-		expect(mocks.mockInvalidateQueries).toHaveBeenCalled();
+		const updater = mocks.mockSetQueriesData.mock.calls[0][1];
+		const patched = updater({ content: { items: [{ id: '7', displayTitle: null }] } });
+		expect(patched.content.items[0].displayTitle).toBe('Genesis Creation');
+	});
+
+	it('withDisplayTitle patches lists and rows, and leaves other shapes untouched', async () => {
+		const { withDisplayTitle } = await import('$lib/queries/bible/useSetPassageDisplayTitle');
+		const list = {
+			content: {
+				items: [
+					{ id: '7', displayTitle: null },
+					{ id: '8', displayTitle: 'x' },
+				],
+			},
+		};
+		const patchedList = withDisplayTitle(list, '7', 'T') as typeof list;
+		expect(patchedList.content.items[0].displayTitle).toBe('T');
+		expect(patchedList.content.items[1]).toBe(list.content.items[1]);
+
+		const other = { content: { items: [{ id: '9' }] } };
+		expect(withDisplayTitle(other, '7', 'T')).toBe(other);
+
+		const row = { contentByID: { id: '7', displayTitle: null, name: 'Gen 1' } };
+		expect((withDisplayTitle(row, '7', 'T') as typeof row).contentByID.displayTitle).toBe('T');
+
+		const aggregates = { contentByID: { id: '7', perspectiveCount: 2 } };
+		expect(withDisplayTitle(aggregates, '7', 'T')).toBe(aggregates);
+		expect(withDisplayTitle(undefined, '7', 'T')).toBeUndefined();
 	});
 
 	it('toasts an error on failure', () => {

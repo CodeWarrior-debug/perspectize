@@ -44,8 +44,8 @@ func TestEditMessage_BodySizeBoundary(t *testing.T) {
 		getByIDFn: func(ctx context.Context, id int64) (*domain.Message, error) {
 			return &domain.Message{ID: id, ThreadID: 7, SenderID: 1, Seq: 3, Body: "old"}, nil
 		},
-		updateBodyFn: func(ctx context.Context, id int64, body string, editedAt time.Time) (*domain.Message, error) {
-			return &domain.Message{ID: id, Body: body}, nil
+		updateBodyFn: func(ctx context.Context, messageID int64, senderID int, body string, editedAt time.Time) (*domain.Message, error) {
+			return &domain.Message{ID: messageID, SenderID: senderID, Body: body}, nil
 		},
 	}
 	svc := services.NewMessagingService(&mockThreadRepo{}, msgRepo, &mockPublisher{}, newLimiter(100))

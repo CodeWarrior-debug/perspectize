@@ -34,6 +34,7 @@ type ResolverRoot interface {
 	Message() MessageResolver
 	MessageThread() MessageThreadResolver
 	Mutation() MutationResolver
+	Perspective() PerspectiveResolver
 	Query() QueryResolver
 	Subscription() SubscriptionResolver
 	ThreadParticipant() ThreadParticipantResolver
@@ -373,6 +374,8 @@ type ComplexityRoot struct {
 // region    ************************** generated!.gotpl **************************
 
 type ContentResolver interface {
+	AddedBy(ctx context.Context, obj *model.Content) (*model.User, error)
+
 	PrimaryCategory(ctx context.Context, obj *model.Content) (*model.Category, error)
 
 	PerspectiveCount(ctx context.Context, obj *model.Content) (*int, error)
@@ -418,6 +421,11 @@ type MutationResolver interface {
 	EditMessage(ctx context.Context, messageID string, body string) (*model.Message, error)
 	DeleteMessage(ctx context.Context, messageID string) (*model.Message, error)
 	MuteThread(ctx context.Context, threadID string, muted bool) (*model.MessageThread, error)
+}
+type PerspectiveResolver interface {
+	User(ctx context.Context, obj *model.Perspective) (*model.User, error)
+
+	Content(ctx context.Context, obj *model.Perspective) (*model.Content, error)
 }
 type QueryResolver interface {
 	Me(ctx context.Context) (*model.User, error)
@@ -2531,8 +2539,12 @@ type Mutation {
 
   # Perspective mutations
   createPerspective(input: CreatePerspectiveInput!): Perspective! @auth
-  updatePerspective(input: UpdatePerspectiveInput!): Perspective! @auth @owner(idField: "id")
-  deletePerspective(id: ID!): Boolean! @auth @owner(idField: "id")
+  # Ownership is enforced in PerspectiveService.Update + an owner-scoped UPDATE
+  # (see the resolver), not @owner: that saved a duplicate row read per save.
+  updatePerspective(input: UpdatePerspectiveInput!): Perspective! @auth
+  # Ownership: PerspectiveService.Delete + an owner-scoped DELETE, not @owner
+  # (see updatePerspective).
+  deletePerspective(id: ID!): Boolean! @auth
 
   # Claim mutations
   createClaim(input: CreateClaimInput!): Content! @auth
@@ -4549,7 +4561,7 @@ func (ec *executionContext) _Content_addedBy(ctx context.Context, field graphql.
 			return ec.fieldContext_Content_addedBy(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.AddedBy, nil
+			return ec.Resolvers.Content().AddedBy(ctx, obj)
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model.User) graphql.Marshaler {
@@ -4563,8 +4575,8 @@ func (ec *executionContext) fieldContext_Content_addedBy(_ context.Context, fiel
 	fc = &graphql.FieldContext{
 		Object:     "Content",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_User(ctx, field)
 		},
@@ -7174,20 +7186,8 @@ func (ec *executionContext) _Mutation_updatePerspective(ctx context.Context, fie
 				}
 				return ec.Directives.Auth(ctx, nil, directive0)
 			}
-			directive2 := func(ctx context.Context) (any, error) {
-				idField, err := ec.unmarshalNString2string(ctx, "id")
-				if err != nil {
-					var zeroVal *model.Perspective
-					return zeroVal, err
-				}
-				if ec.Directives.Owner == nil {
-					var zeroVal *model.Perspective
-					return zeroVal, errors.New("directive owner is not implemented")
-				}
-				return ec.Directives.Owner(ctx, nil, directive1, idField)
-			}
 
-			next = directive2
+			next = directive1
 			return next
 		},
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Perspective) graphql.Marshaler {
@@ -7243,20 +7243,8 @@ func (ec *executionContext) _Mutation_deletePerspective(ctx context.Context, fie
 				}
 				return ec.Directives.Auth(ctx, nil, directive0)
 			}
-			directive2 := func(ctx context.Context) (any, error) {
-				idField, err := ec.unmarshalNString2string(ctx, "id")
-				if err != nil {
-					var zeroVal bool
-					return zeroVal, err
-				}
-				if ec.Directives.Owner == nil {
-					var zeroVal bool
-					return zeroVal, errors.New("directive owner is not implemented")
-				}
-				return ec.Directives.Owner(ctx, nil, directive1, idField)
-			}
 
-			next = directive2
+			next = directive1
 			return next
 		},
 		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
@@ -8509,7 +8497,7 @@ func (ec *executionContext) _Perspective_user(ctx context.Context, field graphql
 			return ec.fieldContext_Perspective_user(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.User, nil
+			return ec.Resolvers.Perspective().User(ctx, obj)
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model.User) graphql.Marshaler {
@@ -8523,8 +8511,8 @@ func (ec *executionContext) fieldContext_Perspective_user(_ context.Context, fie
 	fc = &graphql.FieldContext{
 		Object:     "Perspective",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_User(ctx, field)
 		},
@@ -8564,7 +8552,7 @@ func (ec *executionContext) _Perspective_content(ctx context.Context, field grap
 			return ec.fieldContext_Perspective_content(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.Content, nil
+			return ec.Resolvers.Perspective().Content(ctx, obj)
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Content) graphql.Marshaler {
@@ -8578,8 +8566,8 @@ func (ec *executionContext) fieldContext_Perspective_content(_ context.Context, 
 	fc = &graphql.FieldContext{
 		Object:     "Perspective",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_Content(ctx, field)
 		},
@@ -12960,10 +12948,43 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "addedBy":
-			out.Values[i] = ec._Content_addedBy(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				atomic.AddUint32(&out.Invalids, 1)
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Content_addedBy(ctx, field, obj)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "length":
 			out.Values[i] = ec._Content_length(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
@@ -14808,122 +14829,188 @@ func (ec *executionContext) _Perspective(ctx context.Context, sel ast.SelectionS
 		case "id":
 			out.Values[i] = ec._Perspective_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "userID":
 			out.Values[i] = ec._Perspective_userID(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "user":
-			out.Values[i] = ec._Perspective_user(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Perspective_user(ctx, field, obj)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "contentID":
 			out.Values[i] = ec._Perspective_contentID(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "content":
-			out.Values[i] = ec._Perspective_content(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Perspective_content(ctx, field, obj)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "quality":
 			out.Values[i] = ec._Perspective_quality(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "agreement":
 			out.Values[i] = ec._Perspective_agreement(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "importance":
 			out.Values[i] = ec._Perspective_importance(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "confidence":
 			out.Values[i] = ec._Perspective_confidence(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "like":
 			out.Values[i] = ec._Perspective_like(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "privacy":
 			out.Values[i] = ec._Perspective_privacy(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "description":
 			out.Values[i] = ec._Perspective_description(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "category":
 			out.Values[i] = ec._Perspective_category(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "reviewStatus":
 			out.Values[i] = ec._Perspective_reviewStatus(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "parts":
 			out.Values[i] = ec._Perspective_parts(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "labels":
 			out.Values[i] = ec._Perspective_labels(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "categorizedRatings":
 			out.Values[i] = ec._Perspective_categorizedRatings(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "feelings":
 			out.Values[i] = ec._Perspective_feelings(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "primaryPerspectiveID":
 			out.Values[i] = ec._Perspective_primaryPerspectiveID(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "relatedPerspectiveIDs":
 			out.Values[i] = ec._Perspective_relatedPerspectiveIDs(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "customFields":
 			out.Values[i] = ec._Perspective_customFields(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "review":
 			out.Values[i] = ec._Perspective_review(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "createdAt":
 			out.Values[i] = ec._Perspective_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Perspective_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))

@@ -21,9 +21,9 @@ type mockThreadRepo struct {
 	getThreadFn          func(ctx context.Context, threadID int) (*domain.MessageThread, error)
 	findDirectThreadFn   func(ctx context.Context, userA, userB int) (*domain.MessageThread, error)
 	listThreadsForUserFn func(ctx context.Context, userID int, limit int, beforeLastMessageAt *time.Time) ([]domain.MessageThread, error)
-	addParticipantsFn    func(ctx context.Context, threadID int, userIDs []int) error
+	addParticipantsFn    func(ctx context.Context, threadID int, userIDs []int) ([]domain.ThreadParticipant, error)
 	setLeftFn            func(ctx context.Context, threadID, userID int, at time.Time) error
-	setLastReadFn        func(ctx context.Context, threadID, userID int, seq int64) error
+	setLastReadFn        func(ctx context.Context, threadID, userID int, seq int64) (int64, error)
 	setMutedFn           func(ctx context.Context, threadID, userID int, muted bool) error
 }
 
@@ -55,11 +55,15 @@ func (m *mockThreadRepo) ListThreadsForUser(ctx context.Context, userID int, lim
 	return nil, nil
 }
 
-func (m *mockThreadRepo) AddParticipants(ctx context.Context, threadID int, userIDs []int) error {
+func (m *mockThreadRepo) AddParticipants(ctx context.Context, threadID int, userIDs []int) ([]domain.ThreadParticipant, error) {
 	if m.addParticipantsFn != nil {
 		return m.addParticipantsFn(ctx, threadID, userIDs)
 	}
-	return nil
+	out := make([]domain.ThreadParticipant, len(userIDs))
+	for i, uid := range userIDs {
+		out[i] = domain.ThreadParticipant{ThreadID: threadID, UserID: uid, Role: domain.ThreadRoleMember}
+	}
+	return out, nil
 }
 
 func (m *mockThreadRepo) SetLeft(ctx context.Context, threadID, userID int, at time.Time) error {
@@ -69,11 +73,11 @@ func (m *mockThreadRepo) SetLeft(ctx context.Context, threadID, userID int, at t
 	return nil
 }
 
-func (m *mockThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) error {
+func (m *mockThreadRepo) SetLastRead(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
 	if m.setLastReadFn != nil {
 		return m.setLastReadFn(ctx, threadID, userID, seq)
 	}
-	return nil
+	return seq, nil
 }
 
 func (m *mockThreadRepo) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
@@ -92,8 +96,8 @@ type mockMessageRepo struct {
 	listSinceFn   func(ctx context.Context, threadID int, sinceSeq int64) ([]domain.Message, error)
 	maxSeqFn      func(ctx context.Context, threadID int) (int64, error)
 	countSinceFn  func(ctx context.Context, threadID int, sinceSeq int64) (int, error)
-	updateBodyFn  func(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error)
-	softDeleteFn  func(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error)
+	updateBodyFn  func(ctx context.Context, messageID int64, senderID int, body string, editedAt time.Time) (*domain.Message, error)
+	softDeleteFn  func(ctx context.Context, messageID int64, senderID int, deletedAt time.Time) (*domain.Message, error)
 }
 
 func (m *mockMessageRepo) Insert(ctx context.Context, msg *domain.Message) (*domain.Message, error) {
@@ -140,18 +144,44 @@ func (m *mockMessageRepo) CountSince(ctx context.Context, threadID int, sinceSeq
 	return 0, nil
 }
 
-func (m *mockMessageRepo) UpdateBody(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error) {
-	if m.updateBodyFn != nil {
-		return m.updateBodyFn(ctx, messageID, body, editedAt)
-	}
-	return nil, domain.ErrNotFound
+func (m *mockMessageRepo) ThreadStats(ctx context.Context, viewerID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
+	return map[int]domain.ThreadStats{}, nil
 }
 
-func (m *mockMessageRepo) SoftDelete(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
-	if m.softDeleteFn != nil {
-		return m.softDeleteFn(ctx, messageID, deletedAt)
+func (m *mockMessageRepo) UpdateBody(ctx context.Context, messageID int64, senderID int, body string, editedAt time.Time) (*domain.Message, error) {
+	if m.updateBodyFn != nil {
+		return m.updateBodyFn(ctx, messageID, senderID, body, editedAt)
 	}
-	return nil, domain.ErrNotFound
+	msg, err := m.ownLiveMessage(ctx, messageID, senderID)
+	if err != nil {
+		return nil, err
+	}
+	msg.Body, msg.EditedAt = body, &editedAt
+	return msg, nil
+}
+
+func (m *mockMessageRepo) SoftDelete(ctx context.Context, messageID int64, senderID int, deletedAt time.Time) (*domain.Message, error) {
+	if m.softDeleteFn != nil {
+		return m.softDeleteFn(ctx, messageID, senderID, deletedAt)
+	}
+	msg, err := m.ownLiveMessage(ctx, messageID, senderID)
+	if err != nil {
+		return nil, err
+	}
+	msg.Body, msg.DeletedAt = "", &deletedAt
+	return msg, nil
+}
+
+// ownLiveMessage emulates the real repository's scoped UPDATE predicate
+// (WHERE id = ? AND sender_id = ? AND deleted_at IS NULL): anything else is a
+// zero-row update, i.e. domain.ErrNotFound.
+func (m *mockMessageRepo) ownLiveMessage(ctx context.Context, messageID int64, senderID int) (*domain.Message, error) {
+	msg, err := m.GetByID(ctx, messageID)
+	if err != nil || msg == nil || msg.SenderID != senderID || msg.DeletedAt != nil {
+		return nil, domain.ErrNotFound
+	}
+	cp := *msg
+	return &cp, nil
 }
 
 // --- mock EventPublisher ---
@@ -159,12 +189,18 @@ func (m *mockMessageRepo) SoftDelete(ctx context.Context, messageID int64, delet
 type mockPublisher struct {
 	publishEphemeralFn func(ctx context.Context, env domain.EventEnvelope) error
 	calls              []domain.EventEnvelope
+	batches            int // PublishEphemeral invocations (each is one round trip)
 }
 
-func (m *mockPublisher) PublishEphemeral(ctx context.Context, env domain.EventEnvelope) error {
-	m.calls = append(m.calls, env)
-	if m.publishEphemeralFn != nil {
-		return m.publishEphemeralFn(ctx, env)
+func (m *mockPublisher) PublishEphemeral(ctx context.Context, envs ...domain.EventEnvelope) error {
+	m.batches++
+	for _, env := range envs {
+		m.calls = append(m.calls, env)
+		if m.publishEphemeralFn != nil {
+			if err := m.publishEphemeralFn(ctx, env); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -278,14 +314,14 @@ func TestMarkRead_MovesPointerAndPublishes(t *testing.T) {
 		getThreadFn: func(ctx context.Context, threadID int) (*domain.MessageThread, error) {
 			return threadWithParticipants(7, 1, 2), nil
 		},
-		setLastReadFn: func(ctx context.Context, threadID, userID int, seq int64) error {
+		setLastReadFn: func(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
 			setLastReadCalled = true
 			setLastReadSeq = seq
-			return nil
+			return seq, nil // below the thread max: unchanged by the clamp
 		},
 	}
 	pub := &mockPublisher{}
-	msgRepo := &mockMessageRepo{maxSeqFn: func(context.Context, int) (int64, error) { return 100, nil }}
+	msgRepo := &mockMessageRepo{}
 	svc := services.NewMessagingService(threadRepo, msgRepo, pub, newLimiter(100))
 
 	_, err := svc.MarkRead(context.Background(), 1, 7, 42)
@@ -299,27 +335,32 @@ func TestMarkRead_MovesPointerAndPublishes(t *testing.T) {
 	assert.Equal(t, int64(42), pub.calls[0].LastReadSeq)
 }
 
-func TestMarkRead_ClampsSeqToThreadMax(t *testing.T) {
-	var setLastReadSeq int64
+// The clamp lives in the repository (same statement as the UPDATE); the
+// service must publish, and apply to the returned thread, the clamped value
+// the repository hands back — not the client's.
+func TestMarkRead_UsesClampedSeq(t *testing.T) {
 	threadRepo := &mockThreadRepo{
 		getThreadFn: func(ctx context.Context, threadID int) (*domain.MessageThread, error) {
 			return threadWithParticipants(7, 1, 2), nil
 		},
-		setLastReadFn: func(ctx context.Context, threadID, userID int, seq int64) error {
-			setLastReadSeq = seq
-			return nil
+		setLastReadFn: func(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
+			assert.Equal(t, int64(999_999), seq, "the client's seq goes to the repository as-is")
+			return 9, nil // the thread's max
 		},
 	}
 	pub := &mockPublisher{}
-	msgRepo := &mockMessageRepo{maxSeqFn: func(context.Context, int) (int64, error) { return 9, nil }}
-	svc := services.NewMessagingService(threadRepo, msgRepo, pub, newLimiter(100))
+	svc := services.NewMessagingService(threadRepo, &mockMessageRepo{}, pub, newLimiter(100))
 
-	_, err := svc.MarkRead(context.Background(), 1, 7, 999_999)
+	got, err := svc.MarkRead(context.Background(), 1, 7, 999_999)
 
 	require.NoError(t, err)
-	assert.Equal(t, int64(9), setLastReadSeq, "seq clamped to the thread's max")
 	require.Len(t, pub.calls, 1)
 	assert.Equal(t, int64(9), pub.calls[0].LastReadSeq, "published receipt uses the clamped seq")
+	for _, p := range got.Participants {
+		if p.UserID == 1 {
+			assert.Equal(t, int64(9), p.LastReadSeq, "returned thread carries the clamped pointer")
+		}
+	}
 }
 
 // --- SetTyping ---
@@ -330,9 +371,9 @@ func TestSetTyping_PublishesEphemeralOnly(t *testing.T) {
 		getThreadFn: func(ctx context.Context, threadID int) (*domain.MessageThread, error) {
 			return threadWithParticipants(7, 1, 2), nil
 		},
-		setLastReadFn: func(ctx context.Context, threadID, userID int, seq int64) error {
+		setLastReadFn: func(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
 			setLastReadCalled = true
-			return nil
+			return seq, nil
 		},
 	}
 	pub := &mockPublisher{}
@@ -473,22 +514,24 @@ var _ portservices.MessagingService = (*services.MessagingServiceImpl)(nil)
 // --- EditMessage ---
 
 func TestEditMessage_OnlySenderMayEdit(t *testing.T) {
-	updateCalled := false
+	var gotSender int
 	msgRepo := &mockMessageRepo{
 		getByIDFn: func(ctx context.Context, id int64) (*domain.Message, error) {
 			return &domain.Message{ID: id, ThreadID: 7, SenderID: 7, Seq: 3}, nil
 		},
-		updateBodyFn: func(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error) {
-			updateCalled = true
-			return nil, nil
-		},
 	}
-	svc := services.NewMessagingService(&mockThreadRepo{}, msgRepo, &mockPublisher{}, newLimiter(100))
+	msgRepo.updateBodyFn = func(ctx context.Context, messageID int64, senderID int, body string, editedAt time.Time) (*domain.Message, error) {
+		gotSender = senderID
+		return nil, domain.ErrNotFound // scoped to sender 9: matches nothing
+	}
+	pub := &mockPublisher{}
+	svc := services.NewMessagingService(&mockThreadRepo{}, msgRepo, pub, newLimiter(100))
 
 	_, err := svc.EditMessage(context.Background(), 9, 100, "new body")
 
 	assert.True(t, errors.Is(err, domain.ErrForbidden), "expected ErrForbidden, got %v", err)
-	assert.False(t, updateCalled, "UpdateBody must not be called")
+	assert.Equal(t, 9, gotSender, "the UPDATE must be scoped to the actor")
+	assert.Empty(t, pub.calls)
 }
 
 func TestEditMessage_NotFound(t *testing.T) {
@@ -539,7 +582,7 @@ func TestEditMessage_PublishesMessageEditedEnvelope(t *testing.T) {
 		getByIDFn: func(ctx context.Context, id int64) (*domain.Message, error) {
 			return &domain.Message{ID: id, ThreadID: 7, SenderID: 1, Seq: 3}, nil
 		},
-		updateBodyFn: func(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error) {
+		updateBodyFn: func(ctx context.Context, messageID int64, senderID int, body string, editedAt time.Time) (*domain.Message, error) {
 			gotBody = body
 			return &domain.Message{ID: messageID, ThreadID: 7, SenderID: 1, Seq: 3, Body: body, EditedAt: &editedAt}, nil
 		},
@@ -563,22 +606,18 @@ func TestEditMessage_PublishesMessageEditedEnvelope(t *testing.T) {
 // --- DeleteMessage ---
 
 func TestDeleteMessage_OnlySenderMayDelete(t *testing.T) {
-	softDeleteCalled := false
 	msgRepo := &mockMessageRepo{
 		getByIDFn: func(ctx context.Context, id int64) (*domain.Message, error) {
 			return &domain.Message{ID: id, ThreadID: 7, SenderID: 7, Seq: 3}, nil
 		},
-		softDeleteFn: func(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
-			softDeleteCalled = true
-			return nil, nil
-		},
 	}
-	svc := services.NewMessagingService(&mockThreadRepo{}, msgRepo, &mockPublisher{}, newLimiter(100))
+	pub := &mockPublisher{}
+	svc := services.NewMessagingService(&mockThreadRepo{}, msgRepo, pub, newLimiter(100))
 
 	_, err := svc.DeleteMessage(context.Background(), 9, 100)
 
 	assert.True(t, errors.Is(err, domain.ErrForbidden), "expected ErrForbidden, got %v", err)
-	assert.False(t, softDeleteCalled, "SoftDelete must not be called")
+	assert.Empty(t, pub.calls, "nothing deleted, nothing published")
 }
 
 func TestDeleteMessage_PublishesMessageDeletedEnvelope(t *testing.T) {
@@ -587,7 +626,7 @@ func TestDeleteMessage_PublishesMessageDeletedEnvelope(t *testing.T) {
 		getByIDFn: func(ctx context.Context, id int64) (*domain.Message, error) {
 			return &domain.Message{ID: id, ThreadID: 7, SenderID: 1, Seq: 5}, nil
 		},
-		softDeleteFn: func(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
+		softDeleteFn: func(ctx context.Context, messageID int64, senderID int, deletedAt time.Time) (*domain.Message, error) {
 			softDeleteCalled = true
 			return &domain.Message{ID: messageID, ThreadID: 7, SenderID: 1, Seq: 5, Body: "", DeletedAt: &deletedAt}, nil
 		},
@@ -610,14 +649,9 @@ func TestDeleteMessage_PublishesMessageDeletedEnvelope(t *testing.T) {
 
 func TestDeleteMessage_IdempotentWhenAlreadyDeleted(t *testing.T) {
 	now := time.Now().UTC()
-	softDeleteCalled := false
 	msgRepo := &mockMessageRepo{
 		getByIDFn: func(ctx context.Context, id int64) (*domain.Message, error) {
 			return &domain.Message{ID: id, ThreadID: 7, SenderID: 1, Seq: 5, DeletedAt: &now}, nil
-		},
-		softDeleteFn: func(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
-			softDeleteCalled = true
-			return nil, nil
 		},
 	}
 	pub := &mockPublisher{}
@@ -628,7 +662,6 @@ func TestDeleteMessage_IdempotentWhenAlreadyDeleted(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.NotNil(t, got.DeletedAt)
-	assert.False(t, softDeleteCalled, "SoftDelete must not be called for an already-deleted message")
 	assert.Empty(t, pub.calls, "no publish on idempotent delete")
 }
 
@@ -675,4 +708,39 @@ func TestMuteThread_SetsAndReturnsThread(t *testing.T) {
 	assert.Equal(t, 7, gotThreadID)
 	assert.Equal(t, 1, gotUserID)
 	assert.True(t, gotMuted)
+}
+
+// --- AddParticipants ---
+
+func TestAddParticipants_MergesRowsAndPublishesOneBatch(t *testing.T) {
+	now := time.Now()
+	thread := threadWithParticipants(7, 1, 2)
+	thread.Participants[1].LeftAt = &now // user 2 had left and is rejoining
+	threadRepo := &mockThreadRepo{
+		getThreadFn: func(ctx context.Context, threadID int) (*domain.MessageThread, error) { return thread, nil },
+		addParticipantsFn: func(ctx context.Context, threadID int, userIDs []int) ([]domain.ThreadParticipant, error) {
+			assert.Equal(t, []int{2, 3, 4}, userIDs)
+			return []domain.ThreadParticipant{
+				{ThreadID: 7, UserID: 2, Role: domain.ThreadRoleMember},
+				{ThreadID: 7, UserID: 3, Role: domain.ThreadRoleMember},
+				{ThreadID: 7, UserID: 4, Role: domain.ThreadRoleMember},
+			}, nil
+		},
+	}
+	pub := &mockPublisher{}
+	svc := services.NewMessagingService(threadRepo, &mockMessageRepo{}, pub, newLimiter(100))
+
+	got, err := svc.AddParticipants(context.Background(), 1, 7, []int{2, 3, 4})
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, pub.batches, "every ADDED event in one publish (one round trip)")
+	require.Len(t, pub.calls, 3)
+	for _, c := range pub.calls {
+		assert.Equal(t, "PARTICIPANT_CHANGED", c.Type)
+		assert.Equal(t, "ADDED", c.Change)
+	}
+	require.Len(t, got.Participants, 4, "rejoined user replaced in place, new users appended")
+	for _, uid := range []int{2, 3, 4} {
+		assert.True(t, got.IsActiveParticipant(uid), "user %d active", uid)
+	}
 }

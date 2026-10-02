@@ -26,6 +26,23 @@ import (
 // a per-request dataloader that batches every row's lookup on a page into one
 // `WHERE id IN (...)` query. If the dataloader middleware is not installed
 // (e.g. a direct resolver unit test), it falls back to a single-row service call.
+// AddedBy is the resolver for the addedBy field, batched through the
+// per-request user loader.
+func (r *contentResolver) AddedBy(ctx context.Context, obj *model.Content) (*model.User, error) {
+	id, err := strconv.Atoi(obj.AddedByUserID)
+	if err != nil {
+		return nil, nil
+	}
+	u, err := r.userByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return userDomainToModel(u), nil
+}
+
 func (r *contentResolver) PrimaryCategory(ctx context.Context, obj *model.Content) (*model.Category, error) {
 	if obj.PrimaryCategoryID == nil {
 		return nil, nil
@@ -339,6 +356,15 @@ func (r *queryResolver) ContentByID(ctx context.Context, id string) (*model.Cont
 	intID, err := strconv.Atoi(id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid content ID: %s", id)
+	}
+
+	// The details modal asks only for aggregates (GET_CONTENT_AGGREGATES).
+	// Those resolve from the id alone through the aggregate loader, so don't
+	// read the whole row (JSONB response included) just to throw it away.
+	// Trade-off: for an unknown id this answers with zero counts instead of a
+	// "not found" error.
+	if onlyIDAndAggregatesSelected(ctx) {
+		return &model.Content{ID: strconv.Itoa(intID)}, nil
 	}
 
 	content, err := r.ContentService.GetByID(ctx, intID)

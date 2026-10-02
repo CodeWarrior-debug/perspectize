@@ -79,7 +79,7 @@ export function useUpdatePerspective() {
 		{ queryKey: queryKeys.perspectives.byContentLists() },
 	];
 
-	return createMutation(() => ({
+	const mutation = createMutation(() => ({
 		mutationFn: async (input: UpdatePerspectiveInput) => {
 			return graphqlRequest<UpdatePerspectiveResponse>(UPDATE_PERSPECTIVE, { input });
 		},
@@ -95,7 +95,7 @@ export function useUpdatePerspective() {
 			}
 			return { previous };
 		},
-		onError: (err: Error, _input: UpdatePerspectiveInput, context?: UpdateContext) => {
+		onError: (err: Error, input: UpdatePerspectiveInput, context?: UpdateContext) => {
 			context?.previous?.forEach(([key, data]) => queryClient.setQueryData(key, data));
 
 			const message = err.message.toLowerCase();
@@ -106,7 +106,11 @@ export function useUpdatePerspective() {
 			} else if (message.includes('at least one field')) {
 				toast.error('Please fill in at least one field');
 			} else {
-				toast.error('Failed to update perspective. Please try again.');
+				// The popover has already closed (it doesn't wait for the server), so
+				// offer the retry here rather than making the user re-enter everything.
+				toast.error('Failed to update perspective.', {
+					action: { label: 'Retry', onClick: () => mutation.mutate(input) },
+				});
 			}
 		},
 		onSuccess: (data: UpdatePerspectiveResponse) => {
@@ -141,4 +145,5 @@ export function useUpdatePerspective() {
 			}
 		},
 	}));
+	return mutation;
 }

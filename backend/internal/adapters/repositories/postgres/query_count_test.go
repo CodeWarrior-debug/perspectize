@@ -46,7 +46,7 @@ func TestQueryCount_CounterDetectsNPlusOne(t *testing.T) {
 func TestQueryCount_CategoryGetByIDs_IsOneQueryForAnyBatchSize(t *testing.T) {
 	ctx := context.Background()
 	db, mock := newMockDB(t)
-	mock.ExpectQuery(`SELECT \* FROM "categories" WHERE id IN`).
+	mock.ExpectQuery(`SELECT \* FROM "categories" WHERE id = ANY\(CAST\(\$1 AS bigint\[\]\)\)`).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "wikidata_qid", "label"}).AddRow(1, "Q1", "x"))
 
 	c := querycount.Attach(t, db)
@@ -72,7 +72,7 @@ func TestQueryCount_CategoryGetByIDs_EmptyInputIssuesNoQuery(t *testing.T) {
 func TestQueryCount_PerspectiveAggregateByContentIDs_IsOneQueryForAnyBatchSize(t *testing.T) {
 	ctx := context.Background()
 	db, mock := newMockDB(t)
-	mock.ExpectQuery(`FROM "perspectives" WHERE content_id IN`).
+	mock.ExpectQuery(`FROM "perspectives" WHERE content_id = ANY\(CAST\(\$1 AS bigint\[\]\)\)`).
 		WillReturnRows(sqlmock.NewRows([]string{"content_id", "count", "quality_count", "avg_quality"}).
 			AddRow(1, 2, 2, 5000.0))
 

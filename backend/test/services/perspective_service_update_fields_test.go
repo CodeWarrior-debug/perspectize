@@ -37,7 +37,7 @@ func updateWith(t *testing.T, input portservices.UpdatePerspectiveInput) *domain
 	}
 	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
 	input.ID = 1
-	result, err := svc.Update(context.Background(), input)
+	result, err := svc.Update(context.Background(), input, 1)
 	require.NoError(t, err)
 	return result
 }
@@ -138,14 +138,14 @@ func TestPerspectiveUpdate_RelatedPerspectiveIDsCapIsFifty(t *testing.T) {
 			getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
 				return existingPerspectiveWithOptionalsSet(), nil
 			},
-			updateFn: func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
+			updateFn: func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
 				updated = true
 				return p, nil
 			},
 		}
 		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
 
-		_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, RelatedPerspectiveIDs: ids(51)})
+		_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, RelatedPerspectiveIDs: ids(51)}, 1)
 
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)
