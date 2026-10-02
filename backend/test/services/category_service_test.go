@@ -139,7 +139,7 @@ func TestSetPrimaryCategory_Success(t *testing.T) {
 			return &domain.Content{
 				ID:                id,
 				Name:              "Test Video",
-				ContentType:       domain.ContentTypeYouTube,
+				ContentType:       domain.ContentTypeYouTubeVideo,
 				PrimaryCategoryID: &catID,
 			}, nil
 		},

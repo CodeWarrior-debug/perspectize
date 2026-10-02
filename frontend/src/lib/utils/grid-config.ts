@@ -6,10 +6,13 @@ import type { ContentItem, ContentType } from '$lib/queries/content';
 import { percentLikedValueGetter, formatTags } from './formatting';
 
 /**
- * Capitalize first letter, lowercase rest — used by the type column valueGetter.
+ * Display label for a content type — used by the type column valueGetter.
+ * Known types use CONTENT_TYPE_LABELS; others get first letter capitalized, rest lowercased.
  */
 export function capitalizeContentType(contentType: string | undefined): string {
 	if (!contentType) return '';
+	const label = CONTENT_TYPE_LABELS[contentType.toUpperCase() as ContentType];
+	if (label) return label;
 	return contentType.charAt(0).toUpperCase() + contentType.slice(1).toLowerCase();
 }
 
@@ -19,7 +22,7 @@ export function capitalizeContentType(contentType: string | undefined): string {
  * a new ContentType to be given a label here (Partial while CLAIM is commented out).
  */
 const CONTENT_TYPE_LABELS: Partial<Record<ContentType, string>> = {
-	YOUTUBE: 'YouTube',
+	YOUTUBE_VIDEO: 'YouTube Video',
 	// CLAIM: 'Claim', // not ready in the UI yet; uncomment to offer it in the filter
 	BIBLE_PASSAGE: 'Bible Passage',
 };

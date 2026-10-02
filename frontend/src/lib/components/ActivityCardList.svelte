@@ -80,7 +80,7 @@
 							onerror={(e) => e.currentTarget.remove()}
 						/>
 					{/if}
-					<span class="absolute right-1 bottom-1 flex items-center justify-center rounded bg-[rgba(23,23,23,0.65)] p-1">
+					<span class="absolute right-1 bottom-1 flex items-center justify-center rounded bg-black/65 p-1">
 						<PlayIcon class="size-2.5 fill-white text-white" />
 					</span>
 				{/if}

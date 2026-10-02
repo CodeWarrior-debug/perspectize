@@ -108,7 +108,7 @@ describe('AddContentPopover detection states', () => {
 describe('AddContentPopover manual override', () => {
 	it('a wrong autodetect can be overridden to another type', async () => {
 		await openWith('John 3:16-18');
-		await pick('Change type', 'YOUTUBE');
+		await pick('Change type', 'YOUTUBE_VIDEO');
 		expect(chip()).toHaveTextContent('Type: YouTube');
 		expect(screen.queryByTestId('passage-picker')).toBeNull();
 	});
@@ -123,7 +123,7 @@ describe('AddContentPopover manual override', () => {
 
 	it('a manual YouTube type with a non-YouTube string shows an inline error and does not submit', async () => {
 		await openWith('John 3:16-18');
-		await pick('Change type', 'YOUTUBE');
+		await pick('Change type', 'YOUTUBE_VIDEO');
 		await fireEvent.click(submit());
 		expect(screen.getByText(/valid youtube url/i)).toBeInTheDocument();
 		expect(mocks.video.mutate).not.toHaveBeenCalled();
@@ -131,7 +131,7 @@ describe('AddContentPopover manual override', () => {
 
 	it('retyping after an override goes back to autodetect', async () => {
 		await openWith('John 3:16-18');
-		await pick('Change type', 'YOUTUBE');
+		await pick('Change type', 'YOUTUBE_VIDEO');
 		await type(YT + '&t=1');
 		expect(chip()).toHaveTextContent('Detected: YouTube');
 		await type('Genesis 1:1-3');

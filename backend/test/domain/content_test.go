@@ -10,21 +10,21 @@ import (
 )
 
 func TestContentType_YouTube(t *testing.T) {
-	assert.Equal(t, domain.ContentType("YOUTUBE"), domain.ContentTypeYouTube)
+	assert.Equal(t, domain.ContentType("YOUTUBE_VIDEO"), domain.ContentTypeYouTubeVideo)
 }
 
 func TestContent_RequiredFields(t *testing.T) {
 	content := domain.Content{
 		ID:          1,
 		Name:        "Test Video",
-		ContentType: domain.ContentTypeYouTube,
+		ContentType: domain.ContentTypeYouTubeVideo,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
 
 	assert.Equal(t, 1, content.ID)
 	assert.Equal(t, "Test Video", content.Name)
-	assert.Equal(t, domain.ContentTypeYouTube, content.ContentType)
+	assert.Equal(t, domain.ContentTypeYouTubeVideo, content.ContentType)
 	assert.Nil(t, content.URL)
 	assert.Nil(t, content.Length)
 	assert.Nil(t, content.LengthUnits)
@@ -41,7 +41,7 @@ func TestContent_OptionalFields(t *testing.T) {
 		ID:          1,
 		Name:        "Full Video",
 		URL:         &url,
-		ContentType: domain.ContentTypeYouTube,
+		ContentType: domain.ContentTypeYouTubeVideo,
 		Length:      &length,
 		LengthUnits: &lengthUnits,
 		Response:    response,
@@ -62,7 +62,7 @@ func TestContent_NilOptionalFields(t *testing.T) {
 	content := domain.Content{
 		ID:          1,
 		Name:        "Minimal Content",
-		ContentType: domain.ContentTypeYouTube,
+		ContentType: domain.ContentTypeYouTubeVideo,
 	}
 
 	assert.Nil(t, content.URL)

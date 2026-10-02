@@ -3,7 +3,7 @@ import { gql } from 'graphql-request';
 export type { ContentFilterInput } from '$lib/utils/gridUrlState';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
-export type ContentType = 'YOUTUBE' | 'CLAIM' | 'BIBLE_PASSAGE';
+export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE';
 
 export interface ContentItem {
 	id: string;

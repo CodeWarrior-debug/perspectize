@@ -113,7 +113,7 @@ func TestGetByID_Success(t *testing.T) {
 		ID:          1,
 		Name:        "Test Video",
 		URL:         &url,
-		ContentType: domain.ContentTypeYouTube,
+		ContentType: domain.ContentTypeYouTubeVideo,
 	}
 
 	repo := &mockContentRepository{
@@ -224,7 +224,7 @@ func TestCreateFromYouTube_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.ID)
 	assert.Equal(t, "Test Video Title", result.Name)
-	assert.Equal(t, domain.ContentTypeYouTube, result.ContentType)
+	assert.Equal(t, domain.ContentTypeYouTubeVideo, result.ContentType)
 	// URL stored is the canonical form, not the input URL
 	assert.Equal(t, &canonicalURL, result.URL)
 	assert.Equal(t, 42, result.AddedByUserID)
@@ -423,7 +423,7 @@ func TestUpdateSourceData_Success(t *testing.T) {
 		ID:            1,
 		Name:          "Old Title",
 		URL:           &url,
-		ContentType:   domain.ContentTypeYouTube,
+		ContentType:   domain.ContentTypeYouTubeVideo,
 		AddedByUserID: 7,
 		CreatedAt:     createdAt,
 	}
@@ -432,7 +432,7 @@ func TestUpdateSourceData_Success(t *testing.T) {
 		ID:            1,
 		Name:          "New Title",
 		URL:           &url,
-		ContentType:   domain.ContentTypeYouTube,
+		ContentType:   domain.ContentTypeYouTubeVideo,
 		AddedByUserID: 7,
 		CreatedAt:     createdAt, // unchanged
 	}

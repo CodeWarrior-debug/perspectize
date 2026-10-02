@@ -81,12 +81,20 @@ Migrations are never applied automatically (see `backend/CLAUDE.md` → Migratio
 |-------|-----------|-------------|
 | `migrations-unapplied` | Every PR that adds or changes a file under `backend/migrations/`, at creation time. It **stays on after merge**. | When the migration has been applied to every environment; swap it for `migrations-applied`. |
 | `migrations-applied` | A merged PR whose migrations have been applied to every environment. | Never. |
-| `check-migration-number-before-apply` | A PR whose migration number might be wrong by the time it's applied: another open PR or branch claims the same number, or this PR skipped numbers that in-flight branches claim. | Once the number has been checked against `main` right before applying. If a gap is still open or a number collides, renumber first. |
+| `check-migration-number-before-apply` | A PR whose migration number might be wrong by the time it's applied: another open PR or branch claims the same number, or this PR skipped numbers that in-flight branches claim. | Automatically, once the number is the next free one on `main` and no other open PR uses it (see below). If it's still on at merge time, renumber to the next free number first. |
 
+- **Migration numbers on open PRs are provisional.** Don't spend effort renumbering around other in-flight branches while a PR is open. Finalize the number as the **last step before merging**: rename the files to the next free number on `main`. It can't wait until after merge, because golang-migrate refuses to run at all if two files on `main` share a version. `check-migration-number-before-apply` still being on at merge time means that rename is due.
 - `migrations-unapplied` and `migrations-applied` are **mutually exclusive**.
 - To find pending rollouts: `gh pr list --state merged --label migrations-unapplied`.
-- To check for a collision: `ls backend/migrations | tail -5` on `main`, plus `git log --all --oneline -- 'backend/migrations/*'` for numbers claimed on other branches.
-- Add labels with `gh api repos/CodeWarrior-debug/perspectize/issues/<n>/labels -f "labels[]=migrations-unapplied"`, as for `needs-demo-video`. In a cloud session, use the GitHub MCP `issue_write` tool; its `labels` field replaces the whole set, so pass the existing labels too.
+
+**Automated on open PRs.** The `Migration labels` workflow (`.github/workflows/migration-labels.yml`, rules in `.github/scripts/migration-labels.js`) keeps `migrations-unapplied` and `check-migration-number-before-apply` in sync on every open PR. Don't set those two by hand on an open PR; the next run overwrites them.
+
+- **When it runs:** a PR is opened, reopened or pushed to; a migration lands on `main` (every other open PR is re-checked, because the next free number moved); or on demand from the Actions tab (**Run workflow**).
+- **Numbering check:** a PR gets `check-migration-number-before-apply` when one of its new migration numbers matches one on `main` or in another open PR, skips past `main`'s latest, or leaves a gap within the PR. The label comes off automatically once none of that holds. The run's summary lists the reason for each PR.
+- **Blind spot:** it can't see branches with no open PR, so check those with `git log --all --oneline -- 'backend/migrations/*'`.
+- **Still manual:** swapping `migrations-unapplied` for `migrations-applied` after `migrate up` has run everywhere. The workflow has no database access, and it never touches a PR that already carries `migrations-applied`.
+- **Cost:** no AI tokens and no secrets. It's plain JavaScript on the run's built-in `GITHUB_TOKEN`, about 10 seconds of Actions time per run.
+- **Adding a label by hand** (e.g. `migrations-applied`): `gh api repos/CodeWarrior-debug/perspectize/issues/<n>/labels -f "labels[]=migrations-applied"`. In a cloud session, use the GitHub MCP `issue_write` tool; its `labels` field replaces the whole set, so pass the existing labels too.
 
 ## Merge preferences
 

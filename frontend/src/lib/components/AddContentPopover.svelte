@@ -14,7 +14,7 @@
 	import EraserIcon from '@lucide/svelte/icons/eraser';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 
-	type ChosenType = 'YOUTUBE' | 'BIBLE_PASSAGE';
+	type ChosenType = 'YOUTUBE_VIDEO' | 'BIBLE_PASSAGE';
 
 	let {
 		triggerVariant = 'default',
@@ -68,12 +68,12 @@
 	const chipLabel = $derived.by(() => {
 		if (!effectiveType) return 'Select a type';
 		const name =
-			effectiveType === 'YOUTUBE' ? 'YouTube' : effectiveType === 'BIBLE_PASSAGE' ? 'Bible passage' : 'Claim';
+			effectiveType === 'YOUTUBE_VIDEO' ? 'YouTube' : effectiveType === 'BIBLE_PASSAGE' ? 'Bible passage' : 'Claim';
 		return manualType ? `Type: ${name}` : `Detected: ${name}`;
 	});
 
 	const isSubmitDisabled = $derived.by(() => {
-		if (effectiveType === 'YOUTUBE') return !input.trim();
+		if (effectiveType === 'YOUTUBE_VIDEO') return !input.trim();
 		if (effectiveType === 'BIBLE_PASSAGE') return !rangeValid;
 		return true;
 	});
@@ -95,7 +95,7 @@
 	// chosen type itself so the user doesn't lose their place (e.g. re-typing a
 	// passage reference after a typo shouldn't require re-selecting the type).
 	function clearType() {
-		if (effectiveType === 'YOUTUBE' || effectiveType === 'BIBLE_PASSAGE') {
+		if (effectiveType === 'YOUTUBE_VIDEO' || effectiveType === 'BIBLE_PASSAGE') {
 			// Clearing the text would otherwise make autodetection fall back to "no
 			// type" — pin the type explicitly so the user stays on the same type.
 			manualType = effectiveType;
@@ -110,12 +110,12 @@
 
 	function handleTypeChange(e: Event) {
 		const value = (e.currentTarget as HTMLSelectElement).value;
-		manualType = value === 'YOUTUBE' || value === 'BIBLE_PASSAGE' ? value : null;
+		manualType = value === 'YOUTUBE_VIDEO' || value === 'BIBLE_PASSAGE' ? value : null;
 		error = '';
 	}
 
 	function handleSubmit() {
-		if (effectiveType === 'YOUTUBE') {
+		if (effectiveType === 'YOUTUBE_VIDEO') {
 			const url = input.trim();
 			if (!validateYouTubeUrl(url)) {
 				error = 'Please enter a valid YouTube URL';
@@ -191,19 +191,19 @@
 				<select
 					aria-label="Change type"
 					class="border-input bg-background h-8 rounded-md border px-2 text-sm"
-					value={effectiveType === 'YOUTUBE' || effectiveType === 'BIBLE_PASSAGE' ? effectiveType : ''}
+					value={effectiveType === 'YOUTUBE_VIDEO' || effectiveType === 'BIBLE_PASSAGE' ? effectiveType : ''}
 					onchange={handleTypeChange}
 					disabled={isPending}
 				>
 					<option value="" disabled>Select a type</option>
-					<option value="YOUTUBE">YouTube</option>
+					<option value="YOUTUBE_VIDEO">YouTube</option>
 					<option value="BIBLE_PASSAGE">Bible passage</option>
 				</select>
 				<div class="ml-auto flex items-center gap-1">
 					<button
 						type="button"
 						onclick={clearType}
-						disabled={isPending || (effectiveType !== 'YOUTUBE' && effectiveType !== 'BIBLE_PASSAGE')}
+						disabled={isPending || (effectiveType !== 'YOUTUBE_VIDEO' && effectiveType !== 'BIBLE_PASSAGE')}
 						aria-label="Clear type"
 						title="Clear this type's fields"
 						class="text-muted-foreground hover:text-foreground flex items-center gap-1 rounded-md px-1.5 py-1 transition-colors disabled:pointer-events-none disabled:opacity-40"

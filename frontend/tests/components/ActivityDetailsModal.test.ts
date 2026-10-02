@@ -47,7 +47,7 @@ const content = {
 	name: 'Stephen Paea breaking bench',
 	url: 'https://youtube.com/watch?v=abc123',
 	channelTitle: 'TBD tribute',
-	contentType: 'YOUTUBE',
+	contentType: 'YOUTUBE_VIDEO',
 	primaryCategory: { label: 'Powerlifting' },
 	viewCount: 1300000,
 	likeCount: 26500,

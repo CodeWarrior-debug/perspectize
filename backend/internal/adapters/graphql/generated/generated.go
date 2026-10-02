@@ -2298,7 +2298,7 @@ input ContentSortInput {
 }
 
 enum ContentType {
-  YOUTUBE
+  YOUTUBE_VIDEO
   CLAIM
   BIBLE_PASSAGE
 }

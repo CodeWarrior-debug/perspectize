@@ -7,6 +7,8 @@ import {
 	markQuietGraduateAttempted,
 	resetQuietGraduateAttempt,
 	getQuietGraduateAttempted,
+	replayCoach,
+	getCoachReplayNonce,
 } from '$lib/onboarding/coachGate.svelte';
 import { CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
 
@@ -50,6 +52,13 @@ describe('coachGate', () => {
 				},
 			}),
 		).toBe(true);
+	});
+
+	it('replayCoach force-opens and bumps the nonce so the coach remounts', () => {
+		const before = getCoachReplayNonce();
+		replayCoach();
+		expect(getCoachForceOpen()).toBe(true);
+		expect(getCoachReplayNonce()).toBe(before + 1);
 	});
 
 	it('quiet graduate only once per attempt flag', () => {
