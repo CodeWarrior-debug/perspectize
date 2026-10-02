@@ -261,9 +261,9 @@ func TestPerspectiveUpdate_Ownership(t *testing.T) {
 					gotRead = true
 					return &domain.Perspective{ID: id, UserID: tt.ownerID, Privacy: tt.privacy}, nil
 				},
-				updateFn: func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
+				updateFn: func(ctx context.Context, p *domain.Perspective, actorUserID int) (*domain.Perspective, error) {
 					gotUpdate = true
-					gotOwner = ownerUserID
+					gotOwner = actorUserID
 					return p, nil
 				},
 			}
@@ -291,7 +291,7 @@ func TestPerspectiveUpdate_RepoUpdateNotFoundIsPropagated(t *testing.T) {
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
 			return &domain.Perspective{ID: id, UserID: 7}, nil
 		},
-		updateFn: func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
+		updateFn: func(ctx context.Context, p *domain.Perspective, actorUserID int) (*domain.Perspective, error) {
 			return nil, domain.ErrNotFound
 		},
 	}

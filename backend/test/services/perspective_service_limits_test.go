@@ -55,7 +55,7 @@ func newUpdateSvc(existing *domain.Perspective) (*services.PerspectiveService, *
 			cp := *existing
 			return &cp, nil
 		},
-		updateFn: func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
+		updateFn: func(ctx context.Context, p *domain.Perspective, actorUserID int) (*domain.Perspective, error) {
 			saved = *p
 			return p, nil
 		},

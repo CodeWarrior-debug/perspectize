@@ -25,8 +25,8 @@ func TestDeletePerspective_OwnerDeletes(t *testing.T) {
 				getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
 					return &domain.Perspective{ID: 100, UserID: 1, Privacy: privacy}, nil
 				},
-				deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
-					gotID, gotOwner = id, ownerUserID
+				deleteFn: func(ctx context.Context, id int, actorUserID int) error {
+					gotID, gotOwner = id, actorUserID
 					return nil
 				},
 			}
@@ -60,9 +60,9 @@ func TestDeletePerspective_NonOwnerCannotDelete(t *testing.T) {
 					return &domain.Perspective{ID: 100, UserID: 2, Privacy: tc.privacy}, nil
 				},
 				// Emulates the owner-scoped DELETE: another user's row never matches.
-				deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
-					gotOwner = ownerUserID
-					if ownerUserID != 2 {
+				deleteFn: func(ctx context.Context, id int, actorUserID int) error {
+					gotOwner = actorUserID
+					if actorUserID != 2 {
 						return domain.ErrNotFound
 					}
 					return nil
@@ -86,7 +86,7 @@ func TestDeletePerspective_UnauthenticatedRejected(t *testing.T) {
 			getCalled = true
 			return &domain.Perspective{ID: 100, UserID: 1}, nil
 		},
-		deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
+		deleteFn: func(ctx context.Context, id int, actorUserID int) error {
 			deleteCalled = true
 			return nil
 		},
@@ -103,7 +103,7 @@ func TestDeletePerspective_UnauthenticatedRejected(t *testing.T) {
 
 func TestDeletePerspective_NotFound(t *testing.T) {
 	repo := &mockPerspectiveRepository{ // getByIDFn nil => ErrNotFound
-		deleteFn: func(ctx context.Context, id int, ownerUserID int) error { return domain.ErrNotFound },
+		deleteFn: func(ctx context.Context, id int, actorUserID int) error { return domain.ErrNotFound },
 	}
 	server := setupPerspectiveVisibilityServer(repo, true)
 	defer server.Close()

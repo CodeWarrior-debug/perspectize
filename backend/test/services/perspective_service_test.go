@@ -17,8 +17,8 @@ import (
 type mockPerspectiveRepository struct {
 	createFn    func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
 	getByIDFn   func(ctx context.Context, id int) (*domain.Perspective, error)
-	updateFn    func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
-	deleteFn    func(ctx context.Context, id int, ownerUserID int) error
+	updateFn    func(ctx context.Context, p *domain.Perspective, actorUserID int) (*domain.Perspective, error)
+	deleteFn    func(ctx context.Context, id int, actorUserID int) error
 	listFn      func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
 	aggregateFn func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
 
@@ -41,16 +41,16 @@ func (m *mockPerspectiveRepository) GetByID(ctx context.Context, id int) (*domai
 	return nil, domain.ErrNotFound
 }
 
-func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
+func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective, actorUserID int) (*domain.Perspective, error) {
 	if m.updateFn != nil {
-		return m.updateFn(ctx, p, ownerUserID)
+		return m.updateFn(ctx, p, actorUserID)
 	}
 	return p, nil
 }
 
-func (m *mockPerspectiveRepository) Delete(ctx context.Context, id int, ownerUserID int) error {
+func (m *mockPerspectiveRepository) Delete(ctx context.Context, id int, actorUserID int) error {
 	if m.deleteFn != nil {
-		return m.deleteFn(ctx, id, ownerUserID)
+		return m.deleteFn(ctx, id, actorUserID)
 	}
 	return nil
 }
@@ -392,8 +392,8 @@ func TestPerspectiveDelete_OwnerSucceeds(t *testing.T) {
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
 			return &domain.Perspective{ID: id, UserID: 42}, nil
 		},
-		deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
-			gotID, gotOwner = id, ownerUserID
+		deleteFn: func(ctx context.Context, id int, actorUserID int) error {
+			gotID, gotOwner = id, actorUserID
 			return nil
 		},
 	}
@@ -421,7 +421,7 @@ func TestPerspectiveDelete_OwnerCanDeleteAnyPrivacy(t *testing.T) {
 				getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
 					return &domain.Perspective{ID: id, UserID: 42, Privacy: privacy}, nil
 				},
-				deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
+				deleteFn: func(ctx context.Context, id int, actorUserID int) error {
 					deleted = true
 					return nil
 				},
@@ -443,9 +443,9 @@ func TestPerspectiveDelete_NonOwnerForbidden(t *testing.T) {
 					return &domain.Perspective{ID: id, UserID: 99, Privacy: privacy}, nil
 				},
 				// Emulates the owner-scoped DELETE: another user's row never matches.
-				deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
-					gotOwner = ownerUserID
-					if ownerUserID != 99 {
+				deleteFn: func(ctx context.Context, id int, actorUserID int) error {
+					gotOwner = actorUserID
+					if actorUserID != 99 {
 						return domain.ErrNotFound
 					}
 					return nil
@@ -490,7 +490,7 @@ func TestPerspectiveDelete_NotFound(t *testing.T) {
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
 			return nil, domain.ErrNotFound
 		},
-		deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
+		deleteFn: func(ctx context.Context, id int, actorUserID int) error {
 			return domain.ErrNotFound
 		},
 	}
@@ -510,7 +510,7 @@ func TestPerspectiveDelete_RepoScopedDeleteMissPropagatesNotFound(t *testing.T) 
 		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
 			return &domain.Perspective{ID: id, UserID: 42}, nil
 		},
-		deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
+		deleteFn: func(ctx context.Context, id int, actorUserID int) error {
 			return domain.ErrNotFound
 		},
 	}

@@ -219,8 +219,8 @@ func (m *mockUserRepository) SetOnboardingDisplayNextSession(ctx context.Context
 type mockPerspectiveRepository struct {
 	createFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
 	getByIDFn func(ctx context.Context, id int) (*domain.Perspective, error)
-	updateFn  func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
-	deleteFn  func(ctx context.Context, id int, ownerUserID int) error
+	updateFn  func(ctx context.Context, p *domain.Perspective, actorUserID int) (*domain.Perspective, error)
+	deleteFn  func(ctx context.Context, id int, actorUserID int) error
 	listFn    func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
 }
 
@@ -239,16 +239,16 @@ func (m *mockPerspectiveRepository) GetByID(ctx context.Context, id int) (*domai
 	return nil, domain.ErrNotFound
 }
 
-func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
+func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective, actorUserID int) (*domain.Perspective, error) {
 	if m.updateFn != nil {
-		return m.updateFn(ctx, p, ownerUserID)
+		return m.updateFn(ctx, p, actorUserID)
 	}
 	return p, nil
 }
 
-func (m *mockPerspectiveRepository) Delete(ctx context.Context, id int, ownerUserID int) error {
+func (m *mockPerspectiveRepository) Delete(ctx context.Context, id int, actorUserID int) error {
 	if m.deleteFn != nil {
-		return m.deleteFn(ctx, id, ownerUserID)
+		return m.deleteFn(ctx, id, actorUserID)
 	}
 	return nil
 }

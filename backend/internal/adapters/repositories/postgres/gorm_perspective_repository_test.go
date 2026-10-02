@@ -221,9 +221,9 @@ func TestGormPerspectiveRepository_Update(t *testing.T) {
 		assert.Equal(t, []int{1, 2, 3}, got.Parts)
 		assertAllExpectationsMet(t, mock)
 
-		// The owner predicate binds ownerUserID (42), never the perspective's own
+		// The owner predicate binds actorUserID (42), never the perspective's own
 		// UserID (2); the id predicate binds 5.
-		assert.EqualValues(t, 42, recs[18].got, "user_id predicate must use ownerUserID")
+		assert.EqualValues(t, 42, recs[18].got, "user_id predicate must use actorUserID")
 		assert.EqualValues(t, 5, recs[19].got, "id predicate")
 		for i := 0; i < 18; i++ {
 			assert.NotEqualValues(t, 42, recs[i].got, "owner id must not be written into SET (arg %d)", i+1)

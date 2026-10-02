@@ -201,10 +201,10 @@ func (m *mockPerspectiveRepoForUser) Create(ctx context.Context, p *domain.Persp
 func (m *mockPerspectiveRepoForUser) GetByID(ctx context.Context, id int) (*domain.Perspective, error) {
 	return nil, domain.ErrNotFound
 }
-func (m *mockPerspectiveRepoForUser) Update(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
+func (m *mockPerspectiveRepoForUser) Update(ctx context.Context, p *domain.Perspective, actorUserID int) (*domain.Perspective, error) {
 	return p, nil
 }
-func (m *mockPerspectiveRepoForUser) Delete(ctx context.Context, id int, ownerUserID int) error {
+func (m *mockPerspectiveRepoForUser) Delete(ctx context.Context, id int, actorUserID int) error {
 	return nil
 }
 func (m *mockPerspectiveRepoForUser) List(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error) {
