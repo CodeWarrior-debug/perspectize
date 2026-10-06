@@ -14,7 +14,7 @@ the code.
 |---|---|---|---|
 | `go-backend` | Sonnet | Domain models, ports, services, GORM repositories, resolver wiring, middleware | `graphql-designer` for SDL; `db-migration` for SQL |
 | `graphql-designer` | Sonnet | `schema.graphql` / `messaging.graphql` changes, `make graphql-gen` (and its `schema.resolvers.go` collision), resolvers, dataloaders | `go-backend` for service logic |
-| `db-migration` | Sonnet | Writing and reviewing golang-migrate SQL. **Never applies migrations** (shared Sevalla DB) | — |
+| `db-migration` | Sonnet | Writing and reviewing golang-migrate SQL. **Never applies migrations** (shared Neon DB) | — |
 | `test-writer` | Sonnet | Table-driven testify tests, regression tests, coverage gaps (hand-written mocks, sqlmock GORM harness) | — |
 
 ### Implementation (frontend)

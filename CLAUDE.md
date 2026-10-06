@@ -52,7 +52,7 @@ defer db.Close()
 
 **No chained bash commands:** Do not use `&&` to chain shell commands. Run each command as a separate Bash tool call. Chained commands don't match permission allow-list patterns and block on approval prompts. This applies to all agents and subagents.
 
-**Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`) during dev or verification** — `DATABASE_URL` points at the **shared Sevalla dev database**. Migrations are written and reviewed only, then applied manually per environment at rollout. Details and migration numbering: `backend/CLAUDE.md` → Migrations.
+**Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`) during dev or verification** — `DATABASE_URL` points at the **shared Neon database**. Migrations are written and reviewed only, then applied manually per environment at rollout. Details and migration numbering: `backend/CLAUDE.md` → Migrations.
 
 **Commit messages:** Conventional commit format (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`). One logical change per commit. GSD planning work (PLAN.md, CONTEXT.md, RESEARCH.md, ROADMAP.md) uses the `docs` tag — e.g., `docs(11,13): create execution plans`.
 
