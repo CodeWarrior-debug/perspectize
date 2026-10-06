@@ -89,12 +89,15 @@ Two sources (precedence order): **env vars** > `config/config.json`.
 Required: `DATABASE_URL`. Optional: `YOUTUBE_API_KEY`, `DATABASE_PASSWORD`.
 See `.env.example` — it lists every variable by name (values blank on purpose).
 Copy it to `backend/.env` and fill in real values by hand; the agent cannot read
-`.env` (see [../.docs/SECURITY.md](../.docs/SECURITY.md)). Production note: Sevalla
-may require `?sslmode=disable`.
+`.env` (see [../.docs/SECURITY.md](../.docs/SECURITY.md)). `DATABASE_URL` is a Neon
+**direct** string (no `-pooler`) with `sslmode=require` — the realtime listener uses
+LISTEN/NOTIFY, which Neon's pooler doesn't support. Pool size is tuned with the
+`DB_MAX_OPEN_CONNS` / `DB_MAX_IDLE_CONNS` / `DB_CONN_MAX_IDLE_TIME` /
+`DB_CONN_MAX_LIFETIME` env vars (documented in `.env.example`).
 
 **Sevalla build strategy:** Dockerfile builder. Dockerfile path = `backend/Dockerfile` (relative to repo root, not context). Docker context = `backend`. Sevalla requires the redundant `backend/` prefix on the Dockerfile path even though context is already `backend`.
 
-**Database is remote (Sevalla)** — `DATABASE_URL` in `.env` points to `us-east1-001.proxy.sevalla.app`. No `make docker-up` needed for development. Because it is shared, never run migrations against it from dev — see Migrations.
+**Database is remote (Neon)** — `DATABASE_URL` in `.env` points to a Neon Postgres endpoint (us-east-1); the app itself still deploys on Sevalla. No `make docker-up` needed for development. Because it is shared, never run migrations against it from dev — see Migrations.
 
 ## GraphQL
 
@@ -109,7 +112,7 @@ The failure is confined to that last step: `generated.go` and `models_gen.go` ar
 ## Testing
 
 - **Unit:** Mock deps, no DB. `make test`.
-- **Integration:** Auto-skip when DB unavailable (`t.Skip()`), so a green run without `DATABASE_URL` may have tested nothing. In a cloud session, run `pg_ctlcluster 16 main start`, migrate a **local** `testdb` (never the shared Sevalla DB), then run `DATABASE_URL=postgres://…/testdb go test -p 1 ./...`.
+- **Integration:** Auto-skip when DB unavailable (`t.Skip()`), so a green run without `DATABASE_URL` may have tested nothing. In a cloud session, run `pg_ctlcluster 16 main start`, migrate a **local** `testdb` (never the shared Neon DB), then run `DATABASE_URL=postgres://…/testdb go test -p 1 ./...`.
 - **Query counts:** assert statement counts with `internal/perf/querycount` — see Query budget below.
 - **Build-tagged harnesses rot.** Code behind the `perf` tag isn't compiled by `go build/test ./...`; CI vets it (`go vet -tags perf ./internal/perf/...`). Run that vet after changing `NewResolver` / `dataloader.Middleware` signatures.
 - **Env isolation:** Tests loading config must clear env vars via `t.Setenv("KEY", "")`. See `clearConfigEnvVars` in `test/config/config_test.go`.
@@ -222,7 +225,7 @@ models:
 
 ## Migrations
 
-**Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`) during dev or verification.** Docker itself is installed (Docker Desktop; start it with `open -a Docker`), but the normal dev setup has no local Postgres — `DATABASE_URL` / the Makefile default points at the **shared Sevalla dev database**, so `make migrate-up` mutates shared state. The only local Postgres is the isolated demo stack's (`make demo-up` from the repo root, port 5434, its own volume) — that one is safe to reset and never touches Sevalla. Migrations are applied **manually per environment** at rollout time (verified: nothing on Sevalla runs them — no runner in `cmd/server`, no CI step, no release/pre-deploy hook; the `/migrations` dir baked into the image is never executed). Migration work = write + review the SQL only; a PR that adds a migration must state it needs a manual `migrate up` against each environment. The `Migration labels` workflow tags it `migrations-unapplied`. Swap that for `migrations-applied` by hand once it's applied everywhere (`.docs/PR_WORKFLOW.md` → Migration labels).
+**Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`) during dev or verification.** Docker itself is installed (Docker Desktop; start it with `open -a Docker`), but the normal dev setup has no local Postgres — `DATABASE_URL` / the Makefile default points at the **shared Neon database**, so `make migrate-up` mutates shared state. The only local Postgres is the isolated demo stack's (`make demo-up` from the repo root, port 5434, its own volume) — that one is safe to reset and never touches Neon. Migrations are applied **manually per environment** at rollout time (verified: nothing on Sevalla runs them — no runner in `cmd/server`, no CI step, no release/pre-deploy hook; the `/migrations` dir baked into the image is never executed). Migration work = write + review the SQL only; a PR that adds a migration must state it needs a manual `migrate up` against each environment. The `Migration labels` workflow tags it `migrations-unapplied`. Swap that for `migrations-applied` by hand once it's applied everywhere (`.docs/PR_WORKFLOW.md` → Migration labels).
 
 **Migration numbering:** Always check existing migration files before creating new ones. Plan-specified numbers may be stale — use `ls migrations/ | tail -5` to find the next available number. Numbers on open PRs are **provisional**: don't renumber around other in-flight branches. Finalize the number as the last step before merging (rename to the next free number on `main`). It can't wait until after merge, because golang-migrate won't run with two files sharing a version on `main`. `check-migration-number-before-apply` still on a PR means that rename is due. Prefer idempotent DDL (`DROP CONSTRAINT IF EXISTS` before `ADD`, `UPDATE ... WHERE col IS NULL` before `SET NOT NULL`) so a migration is safe on a fresh DB or one already patched out of band.
 
