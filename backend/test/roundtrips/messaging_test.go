@@ -223,8 +223,8 @@ func TestDeleteMessage(t *testing.T) {
 	f.h.roundTrips(3, f.alice, deleteMessageMut, map[string]any{"messageId": f.lastMessage.ID})
 }
 
-// The batched stats must equal what the per-thread MaxSeq / CountSince
-// queries they replaced would have returned.
+// The batched stats must equal what the per-thread MaxSeq query and an
+// others-only count past the read pointer would have returned.
 func TestThreadStatsMatchPerThreadQueries(t *testing.T) {
 	f := newMessagingFixture(t, 3, 5)
 	h := f.h
@@ -243,11 +243,30 @@ func TestThreadStatsMatchPerThreadQueries(t *testing.T) {
 		lastRead, _ := strconv.ParseInt(th.MyLastReadSeq, 10, 64)
 		wantLatest, err := msgRepo.MaxSeq(context.Background(), id)
 		require.NoError(t, err)
-		wantUnread, err := msgRepo.CountSince(context.Background(), id, lastRead)
-		require.NoError(t, err)
+		// Unread is what others sent past the pointer, never the viewer's own.
+		var wantUnread int
+		require.NoError(t, h.db.Raw(
+			`SELECT COUNT(*) FROM messages WHERE thread_id = ? AND seq > ? AND sender_id <> ?`,
+			id, lastRead, f.aliceID).Scan(&wantUnread).Error)
 		require.Equal(t, fmt.Sprint(wantLatest), th.LatestSeq, "thread %d latestSeq", id)
 		require.Equal(t, wantUnread, th.UnreadCount, "thread %d unreadCount", id)
 	}
+}
+
+// The fixture alternates senders (alice, bob, alice, bob, alice) with nothing
+// read yet: each viewer's unread count is only what the other party sent.
+func TestThreadUnreadExcludesOwnMessages(t *testing.T) {
+	f := newMessagingFixture(t, 1, 5)
+	unreadFor := func(token string) int {
+		data := f.h.gql(token, listThreadsQuery, map[string]any{"first": 50})
+		threads := decode[[]struct {
+			UnreadCount int `json:"unreadCount"`
+		}](t, data, "messageThreads")
+		require.Len(t, threads, 1)
+		return threads[0].UnreadCount
+	}
+	require.Equal(t, 2, unreadFor(f.alice), "alice sent 3 of 5; only bob's 2 are unread to her")
+	require.Equal(t, 3, unreadFor(f.bob), "bob sent 2 of 5; only alice's 3 are unread to him")
 }
 
 // Someone else's message: the scoped UPDATE matches nothing, one read says why.

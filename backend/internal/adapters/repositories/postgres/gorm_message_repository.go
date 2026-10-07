@@ -136,8 +136,10 @@ func (r *GormMessageRepository) CountSince(ctx context.Context, threadID int, si
 }
 
 // ThreadStats computes latestSeq and the viewer's unread count for many
-// threads in one round trip. Each correlated subquery is an index range scan on
-// (thread_id, seq), same as the per-thread MaxSeq / CountSince it replaces.
+// threads in one round trip. Unread counts only messages sent by someone else:
+// the viewer's own messages are never unread to them. Each correlated subquery
+// is an index range scan on (thread_id, seq), same as the per-thread MaxSeq /
+// CountSince it replaces.
 func (r *GormMessageRepository) ThreadStats(ctx context.Context, viewerUserID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
 	out := make(map[int]domain.ThreadStats, len(threadIDs))
 	if len(threadIDs) == 0 {
@@ -151,7 +153,7 @@ func (r *GormMessageRepository) ThreadStats(ctx context.Context, viewerUserID in
 	if err := r.db.WithContext(ctx).Raw(`
 		SELECT tp.thread_id,
 		       (SELECT COALESCE(MAX(m.seq), 0) FROM messages m WHERE m.thread_id = tp.thread_id) AS latest_seq,
-		       (SELECT COUNT(*) FROM messages m WHERE m.thread_id = tp.thread_id AND m.seq > tp.last_read_seq) AS unread
+		       (SELECT COUNT(*) FROM messages m WHERE m.thread_id = tp.thread_id AND m.seq > tp.last_read_seq AND m.sender_id <> tp.user_id) AS unread
 		FROM thread_participants tp
 		WHERE tp.user_id = ? AND tp.thread_id = ANY(CAST(? AS bigint[]))`, viewerUserID, intsToArray(threadIDs)).
 		Scan(&rows).Error; err != nil {
