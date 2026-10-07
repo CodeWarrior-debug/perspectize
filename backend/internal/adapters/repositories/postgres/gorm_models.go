@@ -67,6 +67,9 @@ type ContentModel struct {
 	LikeCount    int64   `gorm:"-"`
 	PercentLiked float64 `gorm:"-"`
 	PublishedAt  string  `gorm:"-"`
+	BoxOffice    int64   `gorm:"-"`
+	VsBudget     float64 `gorm:"-"`
+	AgeRating    int64   `gorm:"-"`
 	ChannelTitle string  `gorm:"-"` // Dummy field for gorm-cursor-paginator sort key validation
 
 	CreatedAt time.Time `gorm:"autoCreateTime"`

@@ -130,6 +130,31 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 				"END",
 			NULLReplacement: float64(-1),
 		}
+	case domain.ContentSortByBoxOffice:
+		return paginator.Rule{
+			Key:             "BoxOffice",
+			Order:           paginatorOrder,
+			SQLRepr:         "(response->>'revenue')::BIGINT",
+			NULLReplacement: int64(0),
+		}
+	case domain.ContentSortByVsBudget:
+		// Revenue as a multiple of budget; NULL when either is unknown or budget is 0.
+		return paginator.Rule{
+			Key:   "VsBudget",
+			Order: paginatorOrder,
+			SQLRepr: "CASE WHEN response->>'budget' IS NULL OR response->>'revenue' IS NULL " +
+				"OR (response->>'budget')::BIGINT = 0 THEN NULL " +
+				"ELSE (response->>'revenue')::FLOAT8 / NULLIF((response->>'budget')::BIGINT,0) END",
+			NULLReplacement: float64(-1),
+		}
+	case domain.ContentSortByAgeRating:
+		return paginator.Rule{
+			Key:   "AgeRating",
+			Order: paginatorOrder,
+			SQLRepr: "CASE response->>'certification' WHEN 'G' THEN 1 WHEN 'PG' THEN 2 " +
+				"WHEN 'PG-13' THEN 3 WHEN 'R' THEN 4 WHEN 'NC-17' THEN 5 ELSE NULL END",
+			NULLReplacement: int64(0),
+		}
 	case domain.ContentSortByPublishedAt:
 		return paginator.Rule{
 			Key:             "PublishedAt",

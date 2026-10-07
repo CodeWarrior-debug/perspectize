@@ -162,6 +162,32 @@ var contentSearchColumns = map[domain.ContentSearchField]string{
 	domain.ContentSearchFieldDescription:  "response->'items'->0->'snippet'->>'description' ILIKE ?",
 	domain.ContentSearchFieldChannelTitle: "response->'items'->0->'snippet'->>'channelTitle' ILIKE ?",
 	domain.ContentSearchFieldTags:         "(response->'items'->0->'snippet'->'tags')::text ILIKE ?",
+	// Movie people live in the response JSONB as arrays of {id,name,...}; one bound ? each.
+	domain.ContentSearchFieldCast: "EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(response->'cast','[]'::jsonb)) p " +
+		"WHERE p->>'name' ILIKE ?)",
+	domain.ContentSearchFieldDirector: "EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(response->'directors','[]'::jsonb)) p " +
+		"WHERE p->>'name' ILIKE ?)",
+}
+
+// applyPersonFilter matches movies by a TMDB person id in cast and/or directors using
+// JSONB containment (served by the partial GIN indexes). The id is marshalled in Go
+// and bound as a parameter; role nil means either role.
+func applyPersonFilter(query *gorm.DB, personID *int, role *domain.PersonRole) *gorm.DB {
+	if personID == nil {
+		return query
+	}
+	needle, err := json.Marshal([]map[string]int{{"id": *personID}})
+	if err != nil {
+		return query // unreachable: marshalling a map of ints cannot fail
+	}
+	switch {
+	case role != nil && *role == domain.PersonRoleCast:
+		return query.Where("response->'cast' @> ?::jsonb", string(needle))
+	case role != nil && *role == domain.PersonRoleDirector:
+		return query.Where("response->'directors' @> ?::jsonb", string(needle))
+	default:
+		return query.Where("(response->'cast' @> ?::jsonb OR response->'directors' @> ?::jsonb)", string(needle), string(needle))
+	}
 }
 
 // maxSearchPhrases caps comma-separated phrases per search to bound query size.
@@ -269,6 +295,7 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		if params.Filter.Search != nil && *params.Filter.Search != "" {
 			query = applyContentSearch(query, *params.Filter.Search, params.Filter.SearchFields)
 		}
+		query = applyPersonFilter(query, params.Filter.PersonID, params.Filter.PersonRole)
 		// View count filters (JSONB extraction)
 		if params.Filter.MinViewCount != nil {
 			query = query.Where("(response->'items'->0->'statistics'->>'viewCount')::BIGINT >= ?", *params.Filter.MinViewCount)

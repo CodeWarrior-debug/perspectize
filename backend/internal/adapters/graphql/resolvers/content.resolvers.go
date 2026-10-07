@@ -456,6 +456,8 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		params.Filter.MaxLengthSeconds = filter.MaxLengthSeconds
 		params.Filter.Search = filter.Search
 		params.Filter.SearchFields = filter.SearchFields
+		params.Filter.PersonID = filter.PersonID
+		params.Filter.PersonRole = filter.PersonRole
 		params.Filter.MinViewCount = filter.MinViewCount
 		params.Filter.MaxViewCount = filter.MaxViewCount
 		params.Filter.MinLikeCount = filter.MinLikeCount

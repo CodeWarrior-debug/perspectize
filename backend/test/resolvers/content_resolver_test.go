@@ -1395,3 +1395,25 @@ func (m *mockContentRepository) ClearDisplayTitle(ctx context.Context, contentID
 	}
 	return nil
 }
+
+func TestPaginatedContentQuery_WithPersonFilter(t *testing.T) {
+	var got domain.ContentListParams
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			got = params
+			return &domain.PaginatedContent{}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: { personId: 525, personRole: DIRECTOR }) { items { id } } }`)
+	assert.Empty(t, result.Errors)
+
+	require.NotNil(t, got.Filter)
+	require.NotNil(t, got.Filter.PersonID)
+	assert.Equal(t, 525, *got.Filter.PersonID)
+	require.NotNil(t, got.Filter.PersonRole)
+	assert.Equal(t, domain.PersonRoleDirector, *got.Filter.PersonRole)
+}
