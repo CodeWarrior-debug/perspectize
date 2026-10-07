@@ -113,6 +113,21 @@ export function ratedComparator(
 	return unknownLastComparator(ageRatingRank(valueA), ageRatingRank(valueB), nodeA, nodeB, isDescending);
 }
 
+/** Comparator for the Released column (ISO dates): chronological, unknown last in both directions. */
+export function releasedComparator(
+	valueA: string | null | undefined,
+	valueB: string | null | undefined,
+	nodeA?: unknown,
+	nodeB?: unknown,
+	isDescending?: boolean,
+): number {
+	const time = (v: string | null | undefined) => {
+		const t = v ? Date.parse(v) : NaN;
+		return Number.isNaN(t) ? null : t;
+	};
+	return unknownLastComparator(time(valueA), time(valueB), nodeA, nodeB, isDescending);
+}
+
 // ---------------------------------------------------------------------------
 // Column metadata — the single source of truth
 // ---------------------------------------------------------------------------
@@ -161,6 +176,12 @@ export interface ColumnMeta {
 	 * trigger a sort for them.
 	 */
 	serverSort?: string;
+	/**
+	 * Sortable only client-side ("Loaded" mode and the mobile card list): the backend's
+	 * ContentSortBy has no matching key. Disabled in "All Items" mode, where a header
+	 * click or picker entry would otherwise silently do nothing.
+	 */
+	clientOnlySort?: boolean;
 	/** URL `f.<filterKey>=` param key, if this column has a filter. */
 	filterKey?: string;
 	/** Row-value extractor for client-side filtering (mobile card list). */
@@ -271,12 +292,14 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		sortValue: (row) => percentLikedValueGetter({ data: row }),
 		serverSort: 'PERCENT_LIKED',
 	},
-	// Released has no server sort (PUBLISHED_AT reads the YouTube path), so it is not sortable at all.
+	// Released has no server sort key (PUBLISHED_AT reads the YouTube path), so it sorts client-side only.
 	{
 		colId: 'released',
 		label: 'Released',
 		picker: 'data',
-		sortable: false,
+		sortable: true,
+		sortValue: (row) => releasedValueGetter({ data: row }),
+		clientOnlySort: true,
 		filterKey: 'released',
 		filterValue: (row) => releasedValueGetter({ data: row }),
 		filterRange: 'date',
@@ -307,7 +330,10 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		colId: 'tmdbScore',
 		label: 'TMDB Score',
 		picker: 'data',
-		sortable: false,
+		sortable: true,
+		// No ContentSortBy key for the TMDB vote average, so client-side only.
+		sortValue: (row) => tmdbScoreValueGetter({ data: row }),
+		clientOnlySort: true,
 		filterKey: 'tmdb',
 		filterValue: (row) => tmdbScoreValueGetter({ data: row }),
 		filterRange: 'number',
@@ -476,6 +502,16 @@ export const SORTABLE_COLUMNS: readonly TogglableColumn[] = COLUMNS.filter((c) =
 	colId: c.colId,
 	label: c.label,
 }));
+
+/** Columns with no server sort key: sortable in "Loaded" mode only. */
+export const CLIENT_ONLY_SORT_COLS: readonly string[] = COLUMNS.filter((c) => c.clientOnlySort).map((c) => c.colId);
+
+/** The sort picker's columns for a data mode; client-only columns are offered in "Loaded" mode alone. */
+export function sortableColumnsFor(mode: 'all' | 'loaded'): readonly TogglableColumn[] {
+	return mode === 'loaded'
+		? SORTABLE_COLUMNS
+		: SORTABLE_COLUMNS.filter((c) => !CLIENT_ONLY_SORT_COLS.includes(c.colId));
+}
 
 /** colId → row-value extractor, for client-side (non-grid) multi-column sorting. */
 const SORT_VALUE_GETTERS: Record<string, (row: ContentItem) => string | number | null> = Object.fromEntries(

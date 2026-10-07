@@ -8,6 +8,10 @@ import {
 	SORTABLE_COLUMNS,
 	compareContentBySorts,
 	filterContentRows,
+	CLIENT_ONLY_SORT_COLS,
+	COL_TO_SORT,
+	sortableColumnsFor,
+	releasedComparator,
 } from '$lib/utils/grid-config';
 import type { ContentItem } from '$lib/queries/content';
 
@@ -186,6 +190,12 @@ describe('SORTABLE_COLUMNS', () => {
 		}
 	});
 
+	it('includes the client-only Movie columns Released and TMDB Score', () => {
+		const ids = SORTABLE_COLUMNS.map((c) => c.colId);
+		expect(ids).toContain('released');
+		expect(ids).toContain('tmdbScore');
+	});
+
 	it('includes percentLiked — sortable in the grid, must stay sortable in the mobile/Loaded-mode picker too', () => {
 		expect(SORTABLE_COLUMNS.map((c) => c.colId)).toContain('percentLiked');
 	});
@@ -340,5 +350,57 @@ describe('filterContentRows', () => {
 		const rows = [row({ id: '1' })];
 		const result = filterContentRows(rows, { notARealColumn: { filterType: 'text', type: 'contains', filter: 'x' } });
 		expect(result.map((r) => r.id)).toEqual(['1']);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Client-only sort columns (Released, TMDB Score)
+// ---------------------------------------------------------------------------
+describe('client-only sort columns', () => {
+	const movieRow = (id: string, releaseDate: string | null, voteAverage: number | null) =>
+		row({
+			id,
+			contentType: 'MOVIE',
+			response: { releaseDate, voteAverage, voteCount: voteAverage == null ? 0 : 1000 },
+		} as Partial<ContentItem>);
+	const rows = [movieRow('a', '2010-07-15', 8.4), movieRow('b', '1999-03-31', 7.1), movieRow('c', null, null)];
+	const ids = (sorts: { col: string; dir: 'asc' | 'desc' }[]) =>
+		[...rows].sort((x, y) => compareContentBySorts(x, y, sorts)).map((r) => r.id);
+
+	it('have no server sort key, so sortsToGraphQL drops them', () => {
+		expect(COL_TO_SORT).not.toHaveProperty('released');
+		expect(COL_TO_SORT).not.toHaveProperty('tmdbScore');
+		expect([...CLIENT_ONLY_SORT_COLS].sort()).toEqual(['released', 'tmdbScore']);
+	});
+
+	it('Loaded mode offers them in the sort picker', () => {
+		const loaded = sortableColumnsFor('loaded').map((c) => c.colId);
+		expect(loaded).toContain('released');
+		expect(loaded).toContain('tmdbScore');
+	});
+
+	it('All Items mode hides them from the sort picker but keeps server-sortable columns', () => {
+		const all = sortableColumnsFor('all').map((c) => c.colId);
+		expect(all).not.toContain('released');
+		expect(all).not.toContain('tmdbScore');
+		expect(all).toContain('boxOffice');
+		expect(all).toContain('item');
+	});
+
+	it('sorts Released chronologically with unknown last in both directions', () => {
+		expect(ids([{ col: 'released', dir: 'asc' }])).toEqual(['b', 'a', 'c']);
+		expect(ids([{ col: 'released', dir: 'desc' }])).toEqual(['a', 'b', 'c']);
+	});
+
+	it('sorts TMDB Score numerically with unrated last in both directions', () => {
+		expect(ids([{ col: 'tmdbScore', dir: 'asc' }])).toEqual(['b', 'a', 'c']);
+		expect(ids([{ col: 'tmdbScore', dir: 'desc' }])).toEqual(['a', 'b', 'c']);
+	});
+
+	it('releasedComparator orders dates and keeps unknown last when descending', () => {
+		expect(releasedComparator('1999-01-01', '2010-01-01')).toBeLessThan(0);
+		expect(releasedComparator(null, '2010-01-01', null, null, false)).toBeGreaterThan(0);
+		expect(releasedComparator(null, '2010-01-01', null, null, true)).toBeLessThan(0); // AG negates for desc
+		expect(releasedComparator('garbage', null)).toBe(0);
 	});
 });

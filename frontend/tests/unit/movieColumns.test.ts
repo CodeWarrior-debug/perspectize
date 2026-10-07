@@ -376,9 +376,17 @@ describe('Movie COLUMNS entries', () => {
 		expect(sortsToGraphQL([{ col: 'boxOffice', dir: 'desc' }])).toEqual([{ field: 'BOX_OFFICE', order: 'DESC' }]);
 	});
 
-	it('Cast, Genre, Released and TMDB Score are not sortable', () => {
-		for (const id of ['cast', 'genre', 'released', 'tmdbScore']) {
+	it('Cast and Genre are not sortable', () => {
+		for (const id of ['cast', 'genre']) {
 			expect(byId(id)?.sortable, id).toBe(false);
+			expect(byId(id)?.serverSort, id).toBeUndefined();
+		}
+	});
+
+	it('Released and TMDB Score sort client-side only (no ContentSortBy key)', () => {
+		for (const id of ['released', 'tmdbScore']) {
+			expect(byId(id)?.sortable, id).toBe(true);
+			expect(byId(id)?.clientOnlySort, id).toBe(true);
 			expect(byId(id)?.serverSort, id).toBeUndefined();
 		}
 	});

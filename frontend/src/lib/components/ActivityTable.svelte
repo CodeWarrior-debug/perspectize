@@ -87,7 +87,10 @@
 		capitalizeContentType,
 		durationComparator,
 		unknownLastComparator,
+		releasedComparator,
 		ratedComparator,
+		CLIENT_ONLY_SORT_COLS,
+		sortableColumnsFor,
 		compareContentBySorts,
 		filterContentRows,
 		togglableColIds,
@@ -709,7 +712,7 @@
 				flex: 1,
 				minWidth: 105,
 				maxWidth: 140,
-				sortable: false,
+				comparator: releasedComparator,
 				filter: 'agDateColumnFilter',
 				// AG's date filter compares local dates; the ISO release date would read as the day before west of UTC.
 				filterValueGetter: (params) => releasedFilterDate(releasedValueGetter({ data: params.data })),
@@ -752,9 +755,9 @@
 				flex: 0.7,
 				minWidth: 121,
 				maxWidth: 130,
-				sortable: false,
 				filter: 'agNumberColumnFilter',
 				valueGetter: tmdbScoreValueGetter,
+				comparator: unknownLastComparator,
 				valueFormatter: (params) => formatTmdbScore(params.value),
 				// Muted when the score rests on fewer than 50 votes.
 				cellClass: (params) => (hasLowVoteCount({ data: params.data }) ? 'text-muted-foreground' : ''),
@@ -1113,9 +1116,26 @@
 		if (!gridApi || !gridReady || mode !== 'all') return;
 		skipNextSortEvent = true;
 		gridApi.applyColumnState({
-			state: gridParams.sorts.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
+			// Drop client-only columns (a stale URL sort): the server cannot honour them.
+			state: gridParams.sorts
+				.filter((s) => !CLIENT_ONLY_SORT_COLS.includes(s.col))
+				.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
 			defaultState: { sort: null },
 		});
+	});
+
+	// Client-only sort columns (no ContentSortBy key) can sort in "Loaded" mode but would
+	// silently do nothing in "All Items" mode, so switch their header sorting off there.
+	// AG Grid reads colDef.sortable live; refreshHeader redraws the header without touching
+	// the column visibility state the responsive effect owns.
+	$effect(() => {
+		const sortableHere = mode === 'loaded';
+		if (!gridApi || !gridReady) return;
+		for (const colId of CLIENT_ONLY_SORT_COLS) {
+			const colDef = gridApi.getColumn(colId)?.getColDef();
+			if (colDef) colDef.sortable = sortableHere;
+		}
+		gridApi.refreshHeader();
 	});
 
 	// Restore AG Grid filter state from URL on mount and mode changes
@@ -1462,7 +1482,12 @@
 <!-- Sort picker — works identically on mobile and desktop, and in both data modes;
      see handleSortsApply for how each mode is wired underneath. -->
 {#if sortPickerOpen}
-	<SortPickerDialog bind:open={sortPickerOpen} sorts={activeSorts} onApply={handleSortsApply} />
+	<SortPickerDialog
+		bind:open={sortPickerOpen}
+		sorts={activeSorts}
+		onApply={handleSortsApply}
+		columns={sortableColumnsFor(mode)}
+	/>
 {/if}
 
 <!-- Category typeahead popover — rendered outside the grid for correct portal positioning -->
