@@ -9,6 +9,7 @@
 	import { useSetTyping } from '$lib/queries/messaging/useSetTyping';
 	import { useMarkThreadRead } from '$lib/queries/messaging/useMarkThreadRead';
 	import { createThreadStream } from '$lib/messaging/useThreadStream.svelte';
+	import { streamIdle } from '$lib/messaging/streamIdle.svelte';
 	import { otherParticipants } from '$lib/messaging/format';
 	import { showSenderForIndex, lastKnownSeq, typingUsernames, shouldMarkRead } from './threadView.helpers';
 	import MessageBubble from './MessageBubble.svelte';
@@ -65,7 +66,7 @@
 
 	$effect(() => {
 		const id = threadId;
-		if (!myUserId) return;
+		if (!myUserId || streamIdle.paused) return;
 		currentStream?.stop();
 		const nextStream = createThreadStream({ queryClient, getThreadId: () => id, myUserId });
 		nextStream.start();
