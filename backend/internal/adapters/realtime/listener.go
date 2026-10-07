@@ -21,6 +21,10 @@ const (
 	// DefaultGracePeriod is how long the Listener keeps its connection after the
 	// last Hub subscriber leaves, so a quick reconnect does not re-dial.
 	DefaultGracePeriod = 30 * time.Second
+
+	// connCloseTimeout bounds conn.Close so a half-dead socket can't stall
+	// idle close or shutdown.
+	connCloseTimeout = 5 * time.Second
 )
 
 // Conn is the slice of *pgx.Conn the Listener needs. It is the dial seam's
@@ -96,8 +100,8 @@ func NewListener(dsn string, hub *Hub, opts ...ListenerOption) *Listener {
 // and LISTENing) -> GRACE (connected, zero subscribers, close timer running) ->
 // IDLE. A subscriber arriving during GRACE cancels the close and stays ACTIVE
 // on the same connection. On any connection-level error while subscribers are
-// present it logs, resets Hub subscribers, sleeps for the current backoff, and
-// retries. Backoff starts at 250ms, doubles, and is capped at 10s; it resets
+// present it logs, sleeps for the current backoff, and retries (subscribers are
+// reset once the new connection is LISTENing). Backoff starts at 250ms, doubles, and is capped at 10s; it resets
 // once a connection is established and LISTEN succeeds.
 func (l *Listener) Run(ctx context.Context) {
 	backoff := l.initialBackoff
@@ -128,7 +132,8 @@ func (l *Listener) Run(ctx context.Context) {
 		if err != nil {
 			slog.Warn("thread_events listener error; will reconnect",
 				"error", err, "backoff", backoff)
-			l.hub.ResetAll()
+			// No ResetAll here: onReady resets subscribers once the next
+			// connection is LISTENing, which is when they can actually resync.
 			select {
 			case <-ctx.Done():
 				return
@@ -211,7 +216,12 @@ func (l *Listener) listenOnce(ctx context.Context, onReady func()) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = conn.Close(context.Background()) }()
+	defer func() {
+		// Bounded so closing a half-dead socket can't stall idle close or shutdown.
+		closeCtx, cancel := context.WithTimeout(context.Background(), connCloseTimeout)
+		defer cancel()
+		_ = conn.Close(closeCtx)
+	}()
 
 	if _, err := conn.Exec(ctx, "LISTEN "+listenChannel); err != nil {
 		return err
