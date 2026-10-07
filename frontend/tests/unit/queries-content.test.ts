@@ -3,6 +3,7 @@ import {
 	LIST_CONTENT,
 	GET_CONTENT,
 	CREATE_CONTENT_FROM_YOUTUBE,
+	CREATE_CONTENT_FROM_MOVIE,
 	type ContentItem,
 	type ContentResponse,
 	type CreateContentResponse,
@@ -150,6 +151,21 @@ describe('GraphQL query definitions', () => {
 			expect(GET_CONTENT).toContain('likeCount');
 			expect(GET_CONTENT).toContain('commentCount');
 			expect(GET_CONTENT).toContain('response');
+		});
+	});
+
+	describe('CREATE_CONTENT_FROM_MOVIE', () => {
+		it('is a CreateContentFromMovie mutation taking CreateContentFromMovieInput', () => {
+			expect(CREATE_CONTENT_FROM_MOVIE).toContain(
+				'mutation CreateContentFromMovie($input: CreateContentFromMovieInput!)',
+			);
+			expect(CREATE_CONTENT_FROM_MOVIE).toContain('createContentFromMovie(input: $input)');
+		});
+
+		it('requests the fields the success toast and its Go-to action need', () => {
+			for (const field of ['id', 'name', 'contentType', 'url']) {
+				expect(CREATE_CONTENT_FROM_MOVIE).toContain(field);
+			}
 		});
 	});
 

@@ -3,7 +3,7 @@ import { gql } from 'graphql-request';
 export type { ContentFilterInput } from '$lib/utils/gridUrlState';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
-export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE';
+export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE';
 
 export interface ContentItem {
 	id: string;
@@ -280,6 +280,28 @@ export const CREATE_CONTENT_FROM_YOUTUBE = gql`
 		}
 	}
 `;
+
+// Idempotent: the server find-or-creates the movie row, so an existing movie
+// comes back as a normal Content (no "alreadyExisted" flag).
+export const CREATE_CONTENT_FROM_MOVIE = gql`
+	mutation CreateContentFromMovie($input: CreateContentFromMovieInput!) {
+		createContentFromMovie(input: $input) {
+			id
+			name
+			url
+			contentType
+		}
+	}
+`;
+
+export interface CreateContentFromMovieResponse {
+	createContentFromMovie: {
+		id: string;
+		name: string;
+		url: string | null;
+		contentType: string;
+	};
+}
 
 export const UPDATE_CONTENT_SOURCE_DATA = gql`
 	mutation UpdateContentSourceData($contentId: IntID!) {
