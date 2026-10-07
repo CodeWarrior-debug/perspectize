@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { Input, Label } from '$lib/components/shadcn';
 	import FormPopover from '$lib/components/FormPopover.svelte';
 	import { useAddMovie } from '$lib/queries/content/useAddMovie';
@@ -16,11 +17,13 @@
 
 	const movieMutation = useAddMovie();
 
-	// Reading `open` synchronously; mutation reset is a call, not a tracked read.
+	// Only `open` may be a dependency here. `movieMutation.reset` reads the reactive mutation
+	// object, so without untrack a success re-runs this effect (open is still true), resets the
+	// mutation before the close-on-success effect below sees `isSuccess`, and the popover never closes.
 	$effect(() => {
 		if (open) {
 			input = '';
-			movieMutation.reset();
+			untrack(() => movieMutation.reset());
 		}
 	});
 
