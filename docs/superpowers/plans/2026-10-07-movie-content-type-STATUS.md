@@ -78,3 +78,10 @@ Note: verify with migrate-free steps only (no `make migrate-*` against the share
 - Ruling: `@auth` on `createContentFromMovie` accepted, since it matches sibling mutations. Cost if wrong: none (unauthenticated callers are refused).
 - Ruling: no worktree; work stays on `feature/movie-content-type` in the main checkout (owner's explicit branch plan; no other session editing it). Cost if wrong: a dirty tree collides with a concurrent session.
 - Ruling (this task): Tags left out of the preview grid because the preview validator caps columns at 10. Cost if wrong: the preview under-represents the default set; the app itself has the column.
+
+
+## Update (later on 2026-10-07)
+
+Done since the notes above: movie-aware details modal; Neon-branch verification of migration 000030 with live TMDB adds; server-side and client-side Movie column filters (Genre, Rated, Released, Box office, TMDB Score) and a click-a-cast-name person filter; cursor pagination fix for computed sort keys (C-02); Loaded mode sends the Type filter to the server; Released / TMDB Score client-side sort; "Film" header; Movie facts on mobile cards; `$1T` and `<1%` formatting.
+
+Still open: Vs. budget filter (no backend field), Studio column, TMDB person link in the cast tooltip, TMDB logo, Cast sort, Collection tile, adult-title guard (product decision), duplicate-add toast (backend returns no already-existed flag), `core/services` importing `adapters/tmdb`, #559 and #560, GIN indexes for the new filters, and the merge-time items (renumber migration 000030, spec "Decisions to confirm", preview-file overlap).
