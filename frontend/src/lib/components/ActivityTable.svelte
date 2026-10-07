@@ -322,14 +322,14 @@
 	// Data fetching (mode-conditional)
 	// ---------------------------------------------------------------------------
 
-	// In server-side mode, build GraphQL filter from URL params + search
-	// In client-side mode, pass search as simple filter (no column filters)
+	// In server-side mode, build GraphQL filter from URL params + search.
+	// In client-side mode, pass search plus the Type filter only (other column filters stay
+	// client-side). Type must go to the server too: "Loaded" fetches just the 100 most recent
+	// rows, so filtering by type only in the grid hides every older row of that type.
 	const graphqlFilter = $derived(
 		mode === 'all'
 			? urlParamsToGraphQLFilter(filters, searchText, searchFields)
-			: searchText
-				? urlParamsToGraphQLFilter({}, searchText, searchFields)
-				: undefined,
+			: urlParamsToGraphQLFilter(filters.type ? { type: filters.type } : {}, searchText, searchFields),
 	);
 
 	const contentQuery = createQuery(() => ({
