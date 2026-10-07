@@ -13,6 +13,7 @@ const (
 	ContentSortByPublishedAt  ContentSortBy = "PUBLISHED_AT"
 	ContentSortByChannelTitle ContentSortBy = "CHANNEL_TITLE"
 	ContentSortByLength       ContentSortBy = "LENGTH"
+	ContentSortByAddedBy      ContentSortBy = "ADDED_BY"
 )
 
 // SortOrder represents ascending or descending sort direction
@@ -52,6 +53,8 @@ type ContentFilter struct {
 	ChannelTitle      *string
 	TagContains       *string
 	DescriptionSearch *string
+	// AddedByUsername matches the adder's username (ILIKE, via the users table)
+	AddedByUsername *string
 	// Record date filters (direct columns)
 	CreatedAfter  *string
 	CreatedBefore *string

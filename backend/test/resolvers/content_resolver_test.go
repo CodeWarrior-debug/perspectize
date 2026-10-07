@@ -1120,6 +1120,41 @@ func TestPaginatedContentQuery_WithContentTypesFilter(t *testing.T) {
 	assert.Empty(t, result.Errors)
 }
 
+func TestPaginatedContentQuery_WithAddedByUsernameFilter(t *testing.T) {
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			require.NotNil(t, params.Filter)
+			require.NotNil(t, params.Filter.AddedByUsername)
+			assert.Equal(t, "ann", *params.Filter.AddedByUsername)
+			return &domain.PaginatedContent{Items: []*domain.Content{}}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: { addedByUsername: "ann" }) { items { id } } }`)
+
+	assert.Empty(t, result.Errors)
+}
+
+func TestPaginatedContentQuery_SortByAddedBy(t *testing.T) {
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			assert.Equal(t, domain.ContentSortByAddedBy, params.SortBy)
+			assert.Equal(t, domain.SortOrderAsc, params.SortOrder)
+			return &domain.PaginatedContent{Items: []*domain.Content{}}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(sortBy: ADDED_BY, sortOrder: ASC) { items { id } } }`)
+
+	assert.Empty(t, result.Errors)
+}
+
 func TestPaginatedContentQuery_WithFilterAndTotalCount(t *testing.T) {
 	repo := &mockContentRepository{
 		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {

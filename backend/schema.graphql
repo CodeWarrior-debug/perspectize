@@ -182,6 +182,8 @@ enum ContentSortBy {
   PUBLISHED_AT
   CHANNEL_TITLE
   LENGTH
+  # Username of the user who added the content (case-insensitive)
+  ADDED_BY
 }
 
 enum SortOrder {
@@ -305,6 +307,8 @@ input ContentFilter {
   channelTitle: String       # ILIKE search
   tagContains: String        # Tag text contains
   descriptionSearch: String  # ILIKE search on description
+  # ILIKE search on the username of the user who added the content
+  addedByUsername: String
   # Record date filters
   createdAfter: String
   createdBefore: String

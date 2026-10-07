@@ -69,6 +69,12 @@ type ContentModel struct {
 	PublishedAt  string  `gorm:"-"`
 	ChannelTitle string  `gorm:"-"` // Dummy field for gorm-cursor-paginator sort key validation
 
+	// AddedBy is the lowercased adder username, read-only and populated only when List
+	// selects it for the ADDED_BY sort. Unlike the dummies above it must carry a real
+	// value: the paginator builds the next cursor from this field, so an always-empty one
+	// would make every "next page" a repeat of the first.
+	AddedBy string `gorm:"column:added_by;->;-:migration"`
+
 	CreatedAt time.Time `gorm:"autoCreateTime"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime"`
 }

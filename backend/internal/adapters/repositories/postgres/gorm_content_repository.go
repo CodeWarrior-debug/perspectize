@@ -302,6 +302,10 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		if params.Filter.DescriptionSearch != nil && *params.Filter.DescriptionSearch != "" {
 			query = query.Where("response->'items'->0->'snippet'->>'description' ILIKE ?", "%"+*params.Filter.DescriptionSearch+"%")
 		}
+		// Adder username filter (subquery on users, no JOIN — see ADDED_BY sort rule)
+		if params.Filter.AddedByUsername != nil && *params.Filter.AddedByUsername != "" {
+			query = query.Where("added_by_user_id IN (SELECT id FROM users WHERE username ILIKE ?)", "%"+*params.Filter.AddedByUsername+"%")
+		}
 		// Created/Updated date filters (direct columns)
 		if params.Filter.CreatedAfter != nil {
 			query = query.Where("created_at >= ?", *params.Filter.CreatedAfter)
@@ -321,8 +325,21 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 	// along in the page query as an uncorrelated scalar subquery, which
 	// Postgres evaluates once: one round trip for page + count, not two.
 	countQuery := query.Session(&gorm.Session{})
+	selectCols := "content.*"
+	var selectArgs []interface{}
 	if params.IncludeTotalCount {
-		query = query.Select("content.*, (?) AS total_count", countQuery.Session(&gorm.Session{}).Select("COUNT(*)"))
+		selectCols += ", (?) AS total_count"
+		selectArgs = append(selectArgs, countQuery.Session(&gorm.Session{}).Select("COUNT(*)"))
+	}
+	// The ADDED_BY cursor is built from the row's added_by value, so it must be selected.
+	for _, rule := range rules {
+		if rule.Key == "AddedBy" {
+			selectCols += ", " + addedBySortExpr + " AS added_by"
+			break
+		}
+	}
+	if selectCols != "content.*" {
+		query = query.Select(selectCols, selectArgs...)
 	}
 
 	// Execute pagination

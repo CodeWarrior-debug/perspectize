@@ -87,6 +87,12 @@ func intSliceToInt64Array(ints []int) Int64Array {
 	return result
 }
 
+// addedBySortExpr is the ADDED_BY sort key: the adder's lowercased username, as a
+// correlated scalar subquery rather than a JOIN (the paginator splices it into ORDER BY
+// and the cursor WHERE, and the list query stays single-table). List also selects it
+// AS added_by so the paginator can read the value back off the row to build the cursor.
+const addedBySortExpr = "LOWER((SELECT u.username FROM users u WHERE u.id = content.added_by_user_id))"
+
 // contentSortRule builds a single paginator.Rule for one content sort column.
 func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) paginator.Rule {
 	// Map domain.SortOrder to paginator.Order
@@ -142,6 +148,13 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 			Key:             "ChannelTitle",
 			Order:           paginatorOrder,
 			SQLRepr:         "response->'items'->0->'snippet'->>'channelTitle'",
+			NULLReplacement: "",
+		}
+	case domain.ContentSortByAddedBy:
+		return paginator.Rule{
+			Key:             "AddedBy",
+			Order:           paginatorOrder,
+			SQLRepr:         addedBySortExpr,
 			NULLReplacement: "",
 		}
 	case domain.ContentSortByLength:

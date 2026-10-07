@@ -436,6 +436,8 @@ func TestGormContentRepository_List(t *testing.T) {
 		{"channel title", &domain.ContentFilter{ChannelTitle: cStr("chan")}, `'snippet'->>'channelTitle' ILIKE `},
 		{"tag contains", &domain.ContentFilter{TagContains: cStr("tag")}, `'snippet'->'tags'.*ILIKE `},
 		{"description search", &domain.ContentFilter{DescriptionSearch: cStr("desc")}, `'snippet'->>'description' ILIKE `},
+		{"added by username", &domain.ContentFilter{AddedByUsername: cStr("ann")}, `added_by_user_id IN \(SELECT id FROM users WHERE username ILIKE `},
+		{"empty added by username is ignored", &domain.ContentFilter{AddedByUsername: cStr("")}, `SELECT \* FROM "content"`},
 		{"created after", &domain.ContentFilter{CreatedAfter: cStr("2026-01-01")}, `created_at >= `},
 		{"created before", &domain.ContentFilter{CreatedBefore: cStr("2026-12-31")}, `created_at <= `},
 		{"updated after", &domain.ContentFilter{UpdatedAfter: cStr("2026-01-01")}, `updated_at >= `},
