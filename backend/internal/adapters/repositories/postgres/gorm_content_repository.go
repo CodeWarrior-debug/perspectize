@@ -163,15 +163,19 @@ var contentSearchColumns = map[domain.ContentSearchField]string{
 	domain.ContentSearchFieldChannelTitle: "response->'items'->0->'snippet'->>'channelTitle' ILIKE ?",
 	domain.ContentSearchFieldTags:         "(response->'items'->0->'snippet'->'tags')::text ILIKE ?",
 	// Movie people live in the response JSONB as arrays of {id,name,...}; one bound ? each.
-	domain.ContentSearchFieldCast: "EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(response->'cast','[]'::jsonb)) p " +
+	// jsonb_typeof guards against a stored JSON null/scalar (COALESCE only covers SQL NULL).
+	domain.ContentSearchFieldCast: "EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(response->'cast') = 'array' THEN response->'cast' ELSE '[]'::jsonb END) p " +
 		"WHERE p->>'name' ILIKE ?)",
-	domain.ContentSearchFieldDirector: "EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(response->'directors','[]'::jsonb)) p " +
+	domain.ContentSearchFieldDirector: "EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(response->'directors') = 'array' THEN response->'directors' ELSE '[]'::jsonb END) p " +
 		"WHERE p->>'name' ILIKE ?)",
 }
 
 // applyPersonFilter matches movies by a TMDB person id in cast and/or directors using
 // JSONB containment (served by the partial GIN indexes). The id is marshalled in Go
 // and bound as a parameter; role nil means either role.
+//
+// The partial GIN indexes (migration 000030) only apply when the query also filters
+// content_type = 'movie', so callers must pair personId with the MOVIE type filter.
 func applyPersonFilter(query *gorm.DB, personID *int, role *domain.PersonRole) *gorm.DB {
 	if personID == nil {
 		return query

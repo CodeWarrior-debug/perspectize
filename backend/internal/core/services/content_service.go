@@ -429,6 +429,10 @@ func (s *ContentService) PassageInterlinear(ctx context.Context, startVerseID, e
 	return &domain.PassageInterlinear{Verses: verses}, nil
 }
 
+// ErrMovieClientUnavailable is returned by CreateFromMovie when the service was
+// built without a movie client. Resolvers show clients a generic message.
+var ErrMovieClientUnavailable = errors.New("movie lookup is unavailable: no movie client configured")
+
 // CreateFromMovie creates MOVIE content from a TMDB or IMDb movie URL (or bare IMDb id),
 // attributed to the given user. If the movie already exists, returns the existing content
 // along with ErrAlreadyExists. Duplicates are detected by canonical TMDB URL before any
@@ -440,7 +444,8 @@ func (s *ContentService) CreateFromMovie(ctx context.Context, rawURL string, use
 	}
 
 	if s.movieClient == nil {
-		return nil, fmt.Errorf("failed to fetch movie metadata")
+		slog.Error("movie lookup requested but no movie client is configured", "userID", userID)
+		return nil, ErrMovieClientUnavailable
 	}
 
 	// IMDb ids must be resolved to a TMDB id so both URL forms dedupe to one row.

@@ -12,12 +12,11 @@ type Config struct {
 	Server   ServerConfig   `json:"server"`
 	Database DatabaseConfig `json:"database"`
 	YouTube  YouTubeConfig  `json:"youtube"`
+	Logging  LoggingConfig  `json:"logging"`
 
 	// TMDBReadAccessToken is the TMDB v4 read access token (TMDB_API_READ_ACCESS_TOKEN).
 	// Blank disables movie lookups without stopping the server.
 	TMDBReadAccessToken string `json:"tmdb_read_access_token,omitempty"`
-
-	Logging LoggingConfig `json:"logging"`
 
 	// MessageRetentionMax caps how many of the newest messages each thread
 	// keeps. 0 (the default) disables the application-side retention sweep

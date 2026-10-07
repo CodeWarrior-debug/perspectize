@@ -56,9 +56,9 @@ func TestApplyContentSearch_CastAndDirector(t *testing.T) {
 		wantRe string
 	}{
 		{"cast", []domain.ContentSearchField{domain.ContentSearchFieldCast},
-			`WHERE EXISTS \(SELECT 1 FROM jsonb_array_elements\(COALESCE\(response->'cast','\[\]'::jsonb\)\) p WHERE p->>'name' ILIKE \$1\)`},
+			`WHERE EXISTS \(SELECT 1 FROM jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'cast'\) = 'array' THEN response->'cast' ELSE '\[\]'::jsonb END\) p WHERE p->>'name' ILIKE \$1\)`},
 		{"director", []domain.ContentSearchField{domain.ContentSearchFieldDirector},
-			`WHERE EXISTS \(SELECT 1 FROM jsonb_array_elements\(COALESCE\(response->'directors','\[\]'::jsonb\)\) p WHERE p->>'name' ILIKE \$1\)`},
+			`WHERE EXISTS \(SELECT 1 FROM jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'directors'\) = 'array' THEN response->'directors' ELSE '\[\]'::jsonb END\) p WHERE p->>'name' ILIKE \$1\)`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -76,7 +76,7 @@ func TestApplyContentSearch_CastAndDirector(t *testing.T) {
 
 	t.Run("cast and director are OR'd with one arg each", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`jsonb_array_elements\(COALESCE\(response->'cast'.*ILIKE \$1\) OR EXISTS .*response->'directors'.*ILIKE \$2`).
+		mock.ExpectQuery(`jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'cast'\).*ILIKE \$1\) OR EXISTS .*response->'directors'.*ILIKE \$2`).
 			WithArgs("%Nolan%", "%Nolan%", int64(11)).WillReturnRows(contentRows())
 		_, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{
 			SortBy:    domain.ContentSortByCreatedAt,

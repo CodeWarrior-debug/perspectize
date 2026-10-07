@@ -3,6 +3,7 @@ package resolvers_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http/httptest"
 	"testing"
 
@@ -91,4 +92,37 @@ func TestCreateContentFromMovie_InvalidURL(t *testing.T) {
 	result := executeGraphQL(t, server, `mutation { createContentFromMovie(input: { url: "https://example.com/x" }) { id } }`)
 	require.NotEmpty(t, result.Errors)
 	assert.Contains(t, result.Errors[0].Message, "invalid movie URL")
+}
+
+func TestCreateContentFromMovie_Unauthenticated(t *testing.T) {
+	server := setupTestServerNoAuth(&mockUserRepository{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, movieMutation)
+	require.NotEmpty(t, result.Errors)
+	assert.Contains(t, result.Errors[0].Message, "access denied: authentication required")
+}
+
+func TestCreateContentFromMovie_NotFoundMapsToMovieNotFound(t *testing.T) {
+	mc := stubMovieClient{get: func(ctx context.Context, id int) (*portservices.MovieMetadata, error) {
+		return nil, domain.ErrNotFound
+	}}
+	server := setupMovieServer(&mockContentRepository{}, mc)
+	defer server.Close()
+
+	result := executeGraphQL(t, server, movieMutation)
+	require.NotEmpty(t, result.Errors)
+	assert.Equal(t, "movie not found", result.Errors[0].Message)
+}
+
+func TestCreateContentFromMovie_GenericErrorMessage(t *testing.T) {
+	mc := stubMovieClient{get: func(ctx context.Context, id int) (*portservices.MovieMetadata, error) {
+		return nil, errors.New("upstream blew up Bearer secret")
+	}}
+	server := setupMovieServer(&mockContentRepository{}, mc)
+	defer server.Close()
+
+	result := executeGraphQL(t, server, movieMutation)
+	require.NotEmpty(t, result.Errors)
+	assert.Equal(t, "failed to create content from movie", result.Errors[0].Message)
 }

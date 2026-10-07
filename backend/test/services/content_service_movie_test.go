@@ -173,3 +173,11 @@ func TestCreateFromMovie_RepoErrorsWrapped(t *testing.T) {
 	_, err = svc2.CreateFromMovie(context.Background(), "https://www.themoviedb.org/movie/603", 1)
 	assert.ErrorIs(t, err, boom)
 }
+
+func TestCreateFromMovie_NilMovieClient(t *testing.T) {
+	svc := services.NewContentService(&mockContentRepository{}, nil, nil)
+	_, err := svc.CreateFromMovie(context.Background(), "https://www.themoviedb.org/movie/603", 1)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, services.ErrMovieClientUnavailable)
+	assert.NotEqual(t, "failed to fetch movie metadata", err.Error())
+}

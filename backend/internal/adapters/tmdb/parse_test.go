@@ -2,7 +2,9 @@ package tmdb
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -151,5 +153,81 @@ func TestShapeMovie_NoBudget(t *testing.T) {
 func TestShapeMovie_InvalidJSON(t *testing.T) {
 	if _, err := ShapeMovie([]byte("{")); err == nil {
 		t.Error("expected error")
+	}
+}
+
+func shapedCertification(t *testing.T, raw string) (string, json.RawMessage) {
+	t.Helper()
+	meta, err := ShapeMovie([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out struct {
+		Certification string          `json:"certification"`
+		Directors     json.RawMessage `json:"directors"`
+	}
+	if err := json.Unmarshal(meta.Response, &out); err != nil {
+		t.Fatal(err)
+	}
+	return out.Certification, out.Directors
+}
+
+func TestShapeMovie_CertificationPrefersTheatrical(t *testing.T) {
+	raw := `{"id":1,"release_dates":{"results":[
+		{"iso_3166_1":"GB","release_dates":[{"certification":"15","type":3}]},
+		{"iso_3166_1":"US","release_dates":[
+			{"certification":"NC-17","type":1},
+			{"certification":"","type":2},
+			{"certification":"R","type":3},
+			{"certification":"PG","type":4}]}]}}`
+	if got, _ := shapedCertification(t, raw); got != "R" {
+		t.Errorf("certification = %q, want R (theatrical)", got)
+	}
+}
+
+func TestShapeMovie_CertificationFallsBackToFirstNonEmpty(t *testing.T) {
+	raw := `{"id":1,"release_dates":{"results":[
+		{"iso_3166_1":"US","release_dates":[
+			{"certification":"","type":1},
+			{"certification":"PG-13","type":2},
+			{"certification":"R","type":1}]}]}}`
+	if got, _ := shapedCertification(t, raw); got != "PG-13" {
+		t.Errorf("certification = %q, want PG-13", got)
+	}
+}
+
+func TestShapeMovie_NoUSCertification(t *testing.T) {
+	raw := `{"id":1,"release_dates":{"results":[
+		{"iso_3166_1":"GB","release_dates":[{"certification":"15","type":3}]}]}}`
+	if got, _ := shapedCertification(t, raw); got != "" {
+		t.Errorf("certification = %q, want empty", got)
+	}
+}
+
+func TestShapeMovie_CastWithoutDirectorGivesEmptyArray(t *testing.T) {
+	raw := `{"id":1,"credits":{"cast":[{"id":1,"name":"A","character":"B","order":0}],
+		"crew":[{"id":2,"name":"C","job":"Producer"}]}}`
+	_, directors := shapedCertification(t, raw)
+	if string(directors) != "[]" {
+		t.Errorf("directors = %s, want []", directors)
+	}
+}
+
+func TestShapeMovie_InvalidJSONIsTMDBAPIError(t *testing.T) {
+	_, err := ShapeMovie([]byte(`{"title":"SECRET-BODY"`))
+	if !errors.Is(err, ErrTMDBAPI) {
+		t.Fatalf("want ErrTMDBAPI, got %v", err)
+	}
+	if strings.Contains(err.Error(), "SECRET-BODY") {
+		t.Errorf("error leaks body: %v", err)
+	}
+}
+
+func TestParseMovieInput_RejectsShortIMDbID(t *testing.T) {
+	if _, _, err := ParseMovieInput("tt123"); err == nil {
+		t.Error("expected error for 3-digit id")
+	}
+	if _, _, err := ParseMovieInput("https://www.imdb.com/title/tt123/"); err == nil {
+		t.Error("expected error for 3-digit id in URL")
 	}
 }

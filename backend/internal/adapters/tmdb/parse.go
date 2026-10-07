@@ -17,8 +17,9 @@ const maxCast = 15
 
 var (
 	tmdbMovieRe = regexp.MustCompile(`(?i)themoviedb\.org/movie/(\d+)(?:[-/?#]|$)`)
-	imdbURLRe   = regexp.MustCompile(`(?i)imdb\.com/title/(tt\d+)(?:[/?#]|$)`)
-	imdbIDRe    = regexp.MustCompile(`^tt\d{5,}$`)
+	imdbURLRe   = regexp.MustCompile(`(?i)imdb\.com/title/(tt\d{5,})(?:[/?#]|$)`)
+	// imdbIDRe is the single definition of a valid IMDb title id, shared with client.go.
+	imdbIDRe = regexp.MustCompile(`^tt\d{5,}$`)
 )
 
 // ErrInvalidMovieInput is returned when a string is not a recognised TMDB movie or IMDb title reference.
@@ -84,6 +85,7 @@ type tmdbMovie struct {
 			Country  string `json:"iso_3166_1"`
 			Releases []struct {
 				Certification string `json:"certification"`
+				Type          int    `json:"type"`
 			} `json:"release_dates"`
 		} `json:"results"`
 	} `json:"release_dates"`
@@ -137,7 +139,8 @@ type shapedMovie struct {
 func ShapeMovie(raw []byte) (*services.MovieMetadata, error) {
 	var m tmdbMovie
 	if err := json.Unmarshal(raw, &m); err != nil {
-		return nil, fmt.Errorf("failed to parse TMDB response: %w", err)
+		// Deliberately not wrapping err: decoder errors can echo upstream content.
+		return nil, fmt.Errorf("%w: failed to parse response", ErrTMDBAPI)
 	}
 
 	imdbID := m.IMDbID
@@ -226,17 +229,28 @@ func nonZero(v int64) *int64 {
 	return &v
 }
 
-// usCertification returns the first non-empty US certification, or "".
+// releaseTypeTheatrical is TMDB's release type 3 (theatrical).
+const releaseTypeTheatrical = 3
+
+// usCertification returns the US certification of the theatrical release, or
+// the first non-empty US certification when no theatrical one exists, or "".
 func usCertification(m tmdbMovie) string {
+	first := ""
 	for _, r := range m.ReleaseDates.Results {
 		if r.Country != "US" {
 			continue
 		}
 		for _, rel := range r.Releases {
-			if rel.Certification != "" {
+			if rel.Certification == "" {
+				continue
+			}
+			if rel.Type == releaseTypeTheatrical {
 				return rel.Certification
+			}
+			if first == "" {
+				first = rel.Certification
 			}
 		}
 	}
-	return ""
+	return first
 }

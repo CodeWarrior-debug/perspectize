@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"regexp"
 	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
@@ -20,7 +19,8 @@ import (
 // token or the upstream body.
 var ErrTMDBAPI = errors.New("tmdb API error")
 
-var imdbPathRe = regexp.MustCompile(`^tt\d+$`)
+// maxResponseBytes caps how much of an upstream body is read.
+const maxResponseBytes = 5 << 20
 
 // Client implements services.MovieClient against the TMDB v3 API.
 type Client struct {
@@ -56,6 +56,10 @@ func (c *Client) get(ctx context.Context, path string, query url.Values) ([]byte
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			// Preserve cancellation/deadline for callers; never include err (embeds the URL).
+			return nil, fmt.Errorf("%w: request aborted: %w", ErrTMDBAPI, ctxErr)
+		}
 		// *url.Error embeds the full URL; log/return only the cause class, never err itself.
 		slog.Error("TMDB request failed", "path", path, "timeout", isTimeout(err))
 		return nil, fmt.Errorf("%w: request failed", ErrTMDBAPI)
@@ -70,9 +74,16 @@ func (c *Client) get(ctx context.Context, path string, query url.Values) ([]byte
 		return nil, fmt.Errorf("%w: status %d", ErrTMDBAPI, resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("%w: request aborted: %w", ErrTMDBAPI, ctxErr)
+		}
 		return nil, fmt.Errorf("%w: failed to read response body", ErrTMDBAPI)
+	}
+	if len(body) > maxResponseBytes {
+		slog.Error("TMDB response too large", "path", path)
+		return nil, fmt.Errorf("%w: response too large", ErrTMDBAPI)
 	}
 	return body, nil
 }
@@ -102,7 +113,7 @@ func (c *Client) GetMovie(ctx context.Context, tmdbID int) (*services.MovieMetad
 
 // FindMovieByIMDbID resolves an IMDb id to a TMDB movie id.
 func (c *Client) FindMovieByIMDbID(ctx context.Context, imdbID string) (int, error) {
-	if !imdbPathRe.MatchString(imdbID) {
+	if !imdbIDRe.MatchString(imdbID) {
 		return 0, fmt.Errorf("%w: invalid IMDb id", ErrInvalidMovieInput)
 	}
 	q := url.Values{}

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
@@ -128,5 +129,59 @@ func TestFindMovieByIMDbID_RejectsBadID(t *testing.T) {
 	c := NewClient(testToken)
 	if _, err := c.FindMovieByIMDbID(context.Background(), "../x"); err == nil {
 		t.Error("expected error for malformed imdb id")
+	}
+}
+
+func TestGetMovie_OversizedBodyIsSanitizedAPIError(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		chunk := []byte(strings.Repeat("x", 1<<20))
+		for i := 0; i < 7; i++ {
+			if _, err := w.Write(chunk); err != nil {
+				return
+			}
+		}
+	})
+	_, err := c.GetMovie(context.Background(), 1)
+	if !errors.Is(err, ErrTMDBAPI) {
+		t.Fatalf("want ErrTMDBAPI, got %v", err)
+	}
+}
+
+func TestGetMovie_CancelledContextPreserved(t *testing.T) {
+	release := make(chan struct{})
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	})
+	t.Cleanup(func() { close(release) })
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { time.Sleep(50 * time.Millisecond); cancel() }()
+	_, err := c.GetMovie(ctx, 1)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("want context.Canceled, got %v", err)
+	}
+	if strings.Contains(err.Error(), testToken) || strings.Contains(err.Error(), "http://") {
+		t.Errorf("error leaks URL/token: %v", err)
+	}
+}
+
+func TestGetMovie_DeadlinePreserved(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_, err := c.GetMovie(ctx, 1)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("want DeadlineExceeded, got %v", err)
+	}
+}
+
+func TestFindMovieByIMDbID_RejectsShortID(t *testing.T) {
+	c := NewClient(testToken)
+	if _, err := c.FindMovieByIMDbID(context.Background(), "tt123"); !errors.Is(err, ErrInvalidMovieInput) {
+		t.Errorf("want ErrInvalidMovieInput, got %v", err)
 	}
 }
