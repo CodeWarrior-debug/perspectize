@@ -80,6 +80,7 @@ type ComplexityRoot struct {
 		Name               func(childComplexity int) int
 		PerspectiveCount   func(childComplexity int) int
 		PrimaryCategory    func(childComplexity int) int
+		Privacy            func(childComplexity int) int
 		PublishedAt        func(childComplexity int) int
 		QualityRatingCount func(childComplexity int) int
 		Response           func(childComplexity int) int
@@ -632,6 +633,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.PrimaryCategory(childComplexity), true
+	case "Content.privacy":
+		if e.ComplexityRoot.Content.Privacy == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.Privacy(childComplexity), true
 	case "Content.publishedAt":
 		if e.ComplexityRoot.Content.PublishedAt == nil {
 			break
@@ -2242,6 +2249,10 @@ type Content {
   verseStartID: Int
   verseEndID: Int
   displayTitle: String
+  # Who can read this row. CLAIM content starts PRIVATE (owner-only); everything
+  # else is PUBLIC. Private rows are omitted from lists and contentByID for
+  # anyone but their owner.
+  privacy: Privacy!
   # Aggregates computed from ALL perspectives on this content — public and
   # private alike (privacy controls readability, not whether a perspective
   # counts here). Resolved on demand (batched per-request via dataloader)
@@ -2513,8 +2524,8 @@ input SetPrimaryCategoryInput {
 
 input CreateClaimInput {
   text: String!            # The claim text (may contain @this/@here tokens)
-  userID: IntID!           # Who created the claim
-  parentContentID: IntID!  # The content item this claim is about
+  userID: IntID!           # 0 = derive from session; non-zero must match the session user
+  parentContentID: IntID   # Optional: the content item this claim is about
 }
 
 type Mutation {
@@ -2827,6 +2838,8 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_verseEndID(ctx, field)
 	case "displayTitle":
 		return ec.fieldContext_Content_displayTitle(ctx, field)
+	case "privacy":
+		return ec.fieldContext_Content_privacy(ctx, field)
 	case "perspectiveCount":
 		return ec.fieldContext_Content_perspectiveCount(ctx, field)
 	case "averageRating":
@@ -4913,6 +4926,29 @@ func (ec *executionContext) _Content_displayTitle(ctx context.Context, field gra
 }
 func (ec *executionContext) fieldContext_Content_displayTitle(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Content", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Content_privacy(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_privacy(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Privacy, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v domain.Privacy) graphql.Marshaler {
+			return ec.marshalNPrivacy2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPrivacy(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Content_privacy(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, false, false, errors.New("field of type Privacy does not have child fields"))
 }
 
 func (ec *executionContext) _Content_perspectiveCount(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
@@ -11948,7 +11984,7 @@ func (ec *executionContext) unmarshalInputCreateClaimInput(ctx context.Context, 
 			it.UserID = data
 		case "parentContentID":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("parentContentID"))
-			data, err := ec.unmarshalNIntID2int(ctx, v)
+			data, err := ec.unmarshalOIntID2ᚖint(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -13086,6 +13122,11 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 		case "displayTitle":
 			out.Values[i] = ec._Content_displayTitle(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "privacy":
+			out.Values[i] = ec._Content_privacy(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "perspectiveCount":

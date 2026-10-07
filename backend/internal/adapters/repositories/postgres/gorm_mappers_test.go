@@ -353,3 +353,24 @@ func TestContentMapper_BiblePassageFields_RoundTrip(t *testing.T) {
 	assert.Equal(t, intPtr(3), back.VerseEndID)
 	assert.Equal(t, strPtr("Creation"), back.DisplayTitle)
 }
+
+func TestContentMapper_Privacy(t *testing.T) {
+	tests := []struct {
+		name   string
+		in     domain.Privacy
+		wantDB string
+		want   domain.Privacy
+	}{
+		{"unset defaults to public", "", "public", domain.PrivacyPublic},
+		{"public", domain.PrivacyPublic, "public", domain.PrivacyPublic},
+		{"private", domain.PrivacyPrivate, "private", domain.PrivacyPrivate},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := contentDomainToModel(&domain.Content{Name: "x", Privacy: tt.in})
+			assert.Equal(t, tt.wantDB, m.Privacy)
+			assert.Equal(t, tt.want, contentModelToDomain(m).Privacy)
+		})
+	}
+	assert.Equal(t, domain.PrivacyPublic, contentModelToDomain(&ContentModel{}).Privacy)
+}

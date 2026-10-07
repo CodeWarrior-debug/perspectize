@@ -217,6 +217,8 @@ type aggregateRow struct {
 	Count        int
 	QualityCount int
 	AvgQuality   *float64
+	Privacy      string
+	OwnerID      int
 }
 
 // AggregateByContentIDs computes, per content ID, the count of ALL
@@ -242,7 +244,7 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 	var rows []aggregateRow
 	err := r.db.WithContext(ctx).
 		Table("content AS c").
-		Select("c.id AS content_id, COUNT(p.id) AS count, COUNT(p.quality) AS quality_count, AVG(p.quality) AS avg_quality").
+		Select("c.id AS content_id, COUNT(p.id) AS count, COUNT(p.quality) AS quality_count, AVG(p.quality) AS avg_quality, c.privacy AS privacy, c.added_by_user_id AS owner_id").
 		Joins("LEFT JOIN perspectives p ON p.content_id = c.id").
 		Where("c.id = ANY(CAST(? AS bigint[]))", intsToArray(contentIDs)).
 		Group("c.id").
@@ -258,6 +260,8 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 			Count:          row.Count,
 			QualityCount:   row.QualityCount,
 			AverageQuality: row.AvgQuality,
+			ContentPrivacy: contentPrivacyFromDB(row.Privacy),
+			ContentOwnerID: row.OwnerID,
 		}
 	}
 	return out, nil

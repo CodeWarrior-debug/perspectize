@@ -6,11 +6,12 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
 
-// CreateClaimInput holds the input for creating a claim content entry
+// CreateClaimInput holds the input for creating a claim content entry.
+// ParentContentID is optional: a claim may stand alone.
 type CreateClaimInput struct {
 	Text            string
 	UserID          int
-	ParentContentID int
+	ParentContentID *int
 }
 
 // CreatePassageInput holds the input for creating (or finding) a Bible passage

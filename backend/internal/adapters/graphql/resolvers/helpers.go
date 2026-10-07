@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
 	"log/slog"
 	"strconv"
 	"time"
@@ -66,6 +67,7 @@ func domainToModel(c *domain.Content) *model.Content {
 		VerseStartID:      c.VerseStartID,
 		VerseEndID:        c.VerseEndID,
 		DisplayTitle:      c.DisplayTitle,
+		Privacy:           contentPrivacy(c.Privacy),
 	}
 
 	// Parse the raw response JSON into a map for GraphQL
@@ -603,6 +605,15 @@ func nilIfEmpty(s string) *string {
 	return &s
 }
 
+// contentPrivacy maps an unset domain privacy to PUBLIC for the non-null
+// GraphQL field.
+func contentPrivacy(p domain.Privacy) domain.Privacy {
+	if p == "" {
+		return domain.PrivacyPublic
+	}
+	return p
+}
+
 // contentFieldsFromID are the Content fields that resolve from its id alone.
 var contentFieldsFromID = map[string]bool{
 	"__typename":         true,
@@ -628,4 +639,14 @@ func onlyIDAndAggregatesSelected(ctx context.Context) bool {
 		}
 	}
 	return true
+}
+
+// canViewContent reports whether the caller may read a content row: public
+// rows are readable by anyone, private rows only by their owner.
+func canViewContent(ctx context.Context, privacy domain.Privacy, ownerID int) bool {
+	if privacy != domain.PrivacyPrivate {
+		return true
+	}
+	viewer, ok := auth.ForContext(ctx)
+	return ok && viewer.ID == ownerID
 }

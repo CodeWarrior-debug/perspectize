@@ -40,6 +40,9 @@ type Content struct {
 	VerseStartID      *int    // BIBLE_PASSAGE only — computed ordinal (see BibleVerseOrdinal), not a table FK
 	VerseEndID        *int    // BIBLE_PASSAGE only
 	DisplayTitle      *string // BIBLE_PASSAGE only — optional, first-write-wins
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	// Privacy controls who can read the row. Empty is treated as PrivacyPublic on
+	// write. CLAIM content is created PrivacyPrivate (owner-only).
+	Privacy   Privacy
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }

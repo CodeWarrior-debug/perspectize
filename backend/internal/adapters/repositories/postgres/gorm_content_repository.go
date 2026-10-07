@@ -219,6 +219,15 @@ func applyContentSearch(query *gorm.DB, term string, fields []domain.ContentSear
 	return query
 }
 
+// applyContentVisibility restricts a content query to rows the viewer may read.
+func applyContentVisibility(query *gorm.DB, viewerID *int) *gorm.DB {
+	public := privacyToDBValue(domain.PrivacyPublic)
+	if viewerID == nil {
+		return query.Where("content.privacy = ?", public)
+	}
+	return query.Where("(content.privacy = ? OR content.added_by_user_id = ?)", public, *viewerID)
+}
+
 func (r *GormContentRepository) List(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
 	limit := 10
 	if params.First != nil {
@@ -316,6 +325,11 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 			query = query.Where("updated_at <= ?", *params.Filter.UpdatedBefore)
 		}
 	}
+
+	// Visibility: public rows, plus the viewer's own private rows. Applied after
+	// the filters (so their placeholders keep their positions) and before the
+	// count, so the page and total agree.
+	query = applyContentVisibility(query, params.ViewerID)
 
 	// Total count (before cursor/limit — respects filters only). It rides
 	// along in the page query as an uncorrelated scalar subquery, which

@@ -78,9 +78,9 @@ describe('useCreateClaim hook', () => {
 			useCreateClaim();
 		});
 
-		it('shows success toast "Claim created"', () => {
+		it('shows a success toast that says the claim is private', () => {
 			capturedMutationOptions.onSuccess();
-			expect(mockToastSuccess).toHaveBeenCalledWith('Claim created');
+			expect(mockToastSuccess).toHaveBeenCalledWith('Claim saved — private to you for now');
 		});
 
 		it('invalidates content lists cache', () => {

@@ -479,7 +479,7 @@ func TestGormPerspectiveRepository_AggregateByContentIDs(t *testing.T) {
 		// COUNT(quality)/the Quality column at all.
 		rows := sqlmock.NewRows([]string{"content_id", "count", "quality_count", "avg_quality"}).
 			AddRow(11, 1, 0, nil)
-		mock.ExpectQuery(`SELECT c.id AS content_id, COUNT\(p.id\) AS count, COUNT\(p.quality\) AS quality_count, AVG\(p.quality\) AS avg_quality FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id WHERE c.id = ANY\(CAST\(\$1 AS bigint\[\]\)\) GROUP BY "c"."id"`).
+		mock.ExpectQuery(`SELECT c.id AS content_id, COUNT\(p.id\) AS count, COUNT\(p.quality\) AS quality_count, AVG\(p.quality\) AS avg_quality, c.privacy AS privacy, c.added_by_user_id AS owner_id FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id WHERE c.id = ANY\(CAST\(\$1 AS bigint\[\]\)\) GROUP BY "c"."id"`).
 			WithArgs("{11}"). // one bigint[] parameter, not one placeholder per id
 			WillReturnRows(rows)
 

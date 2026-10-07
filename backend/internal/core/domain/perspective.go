@@ -166,6 +166,12 @@ type PerspectiveAggregate struct {
 	Count          int
 	QualityCount   int
 	AverageQuality *float64
+
+	// The content row's own visibility, carried so a caller that resolves
+	// content from aggregates alone (contentByID's id-only fast path) can still
+	// hide another user's private content without a second query.
+	ContentPrivacy Privacy
+	ContentOwnerID int
 }
 
 // FeelingStats summarizes how many perspectives in scope (one content item,

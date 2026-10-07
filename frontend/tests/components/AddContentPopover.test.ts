@@ -94,7 +94,7 @@ describe('AddContentPopover paste button', () => {
 		await tick();
 
 		expect(readText).toHaveBeenCalled();
-		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toHaveValue(
+		expect(screen.getByPlaceholderText(/paste a link, type a reference, or write a claim/i)).toHaveValue(
 			'https://youtube.com/watch?v=abc123',
 		);
 	});

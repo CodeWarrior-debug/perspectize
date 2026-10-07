@@ -4,6 +4,7 @@
 	import PassagePicker from '$lib/components/PassagePicker.svelte';
 	import { useAddVideo } from '$lib/queries/content/useAddVideo';
 	import { useAddPassage } from '$lib/queries/content/useAddPassage';
+	import { useCreateClaim } from '$lib/queries/content/useCreateClaim';
 	import { validateYouTubeUrl } from '$lib/utils/youtube';
 	import { detectContentType } from '$lib/utils/detectContentType';
 	import type { PassageRange } from '$lib/utils/bible';
@@ -14,7 +15,8 @@
 	import EraserIcon from '@lucide/svelte/icons/eraser';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 
-	type ChosenType = 'YOUTUBE_VIDEO' | 'BIBLE_PASSAGE';
+	type ChosenType = 'YOUTUBE_VIDEO' | 'BIBLE_PASSAGE' | 'CLAIM';
+	const CHOSEN_TYPES: ChosenType[] = ['YOUTUBE_VIDEO', 'BIBLE_PASSAGE', 'CLAIM'];
 
 	let {
 		triggerVariant = 'default',
@@ -47,20 +49,24 @@
 	});
 
 	const detected = $derived(detectContentType(input));
-	const effectiveType = $derived<ChosenType | 'CLAIM' | null>(manualType ?? detected.type);
+	const effectiveType = $derived<ChosenType | null>(manualType ?? detected.type);
+	// A claim is free text of at least two words (same rule autodetection uses).
+	const claimText = $derived(input.trim());
+	const claimValid = $derived(/\s/.test(claimText));
 	const range = $derived<PassageRange>(
 		rangeOverride ?? (detected.type === 'BIBLE_PASSAGE' ? detected.range : defaultRange(1)),
 	);
 	const rangeValid = $derived(isRangeOrdered(range) && isRangeInBounds(range));
 
-	// addPassage is created first so the YouTube hook stays the last createMutation
-	// call, keeping the existing YouTube-path tests' captured options unchanged.
+	// claim and passage hooks are created first so the YouTube hook stays the last
+	// createMutation call, keeping the existing YouTube-path tests' captured options unchanged.
+	const claimMutation = useCreateClaim();
 	const passageMutation = useAddPassage();
 	const videoMutation = useAddVideo();
-	const isPending = $derived(videoMutation.isPending || passageMutation.isPending);
+	const isPending = $derived(videoMutation.isPending || passageMutation.isPending || claimMutation.isPending);
 
 	$effect(() => {
-		if (videoMutation.isSuccess || passageMutation.isSuccess) {
+		if (videoMutation.isSuccess || passageMutation.isSuccess || claimMutation.isSuccess) {
 			open = false;
 		}
 	});
@@ -75,6 +81,7 @@
 	const isSubmitDisabled = $derived.by(() => {
 		if (effectiveType === 'YOUTUBE_VIDEO') return !input.trim();
 		if (effectiveType === 'BIBLE_PASSAGE') return !rangeValid;
+		if (effectiveType === 'CLAIM') return !claimValid;
 		return true;
 	});
 
@@ -95,7 +102,7 @@
 	// chosen type itself so the user doesn't lose their place (e.g. re-typing a
 	// passage reference after a typo shouldn't require re-selecting the type).
 	function clearType() {
-		if (effectiveType === 'YOUTUBE_VIDEO' || effectiveType === 'BIBLE_PASSAGE') {
+		if (effectiveType) {
 			// Clearing the text would otherwise make autodetection fall back to "no
 			// type" — pin the type explicitly so the user stays on the same type.
 			manualType = effectiveType;
@@ -110,7 +117,7 @@
 
 	function handleTypeChange(e: Event) {
 		const value = (e.currentTarget as HTMLSelectElement).value;
-		manualType = value === 'YOUTUBE_VIDEO' || value === 'BIBLE_PASSAGE' ? value : null;
+		manualType = CHOSEN_TYPES.includes(value as ChosenType) ? (value as ChosenType) : null;
 		error = '';
 	}
 
@@ -129,6 +136,11 @@
 			// Only the numeric range is sent; the server regenerates the canonical
 			// name/url, so a pasted Bible Gateway link is never stored.
 			passageMutation.mutate(range);
+		} else if (effectiveType === 'CLAIM') {
+			if (!claimValid) return;
+			error = '';
+			// userID 0 = derive from the Clerk session. No parent: claims stand alone.
+			claimMutation.mutate({ text: claimText, userID: 0 });
 		}
 	}
 
@@ -147,7 +159,7 @@
 	{triggerVariant}
 	triggerLabel="Add Content"
 	title="Add Content"
-	description="Paste a YouTube link, or type a Bible reference like John 3:16-18."
+	description="Paste a YouTube link, type a Bible reference like John 3:16-18, or write a claim."
 	submitLabel="Add"
 	pendingLabel="Adding..."
 	{isPending}
@@ -159,12 +171,12 @@
 	{/snippet}
 	{#snippet formFields()}
 		<div class="space-y-2">
-			<Label for="content-input">Link or reference</Label>
+			<Label for="content-input">Link, reference, or claim</Label>
 			<div class="relative">
 				<Input
 					id="content-input"
 					type="text"
-					placeholder="Paste a link or type a reference"
+					placeholder="Paste a link, type a reference, or write a claim"
 					bind:value={input}
 					oninput={resetOverrides}
 					disabled={isPending}
@@ -191,19 +203,20 @@
 				<select
 					aria-label="Change type"
 					class="border-input bg-background h-8 rounded-md border px-2 text-sm"
-					value={effectiveType === 'YOUTUBE_VIDEO' || effectiveType === 'BIBLE_PASSAGE' ? effectiveType : ''}
+					value={effectiveType ?? ''}
 					onchange={handleTypeChange}
 					disabled={isPending}
 				>
 					<option value="" disabled>Select a type</option>
 					<option value="YOUTUBE_VIDEO">YouTube</option>
 					<option value="BIBLE_PASSAGE">Bible passage</option>
+					<option value="CLAIM">Claim</option>
 				</select>
 				<div class="ml-auto flex items-center gap-1">
 					<button
 						type="button"
 						onclick={clearType}
-						disabled={isPending || (effectiveType !== 'YOUTUBE_VIDEO' && effectiveType !== 'BIBLE_PASSAGE')}
+						disabled={isPending || !effectiveType}
 						aria-label="Clear type"
 						title="Clear this type's fields"
 						class="text-muted-foreground hover:text-foreground flex items-center gap-1 rounded-md px-1.5 py-1 transition-colors disabled:pointer-events-none disabled:opacity-40"
@@ -226,7 +239,13 @@
 			</div>
 
 			{#if effectiveType === 'CLAIM'}
-				<p class="text-sm text-muted-foreground">Claims can't be added from here yet. Pick a type above to continue.</p>
+				<p class="text-sm text-muted-foreground">
+					{#if claimValid}
+						Claims are private — only you can see them for now.
+					{:else}
+						Write the claim as a statement of at least two words.
+					{/if}
+				</p>
 			{/if}
 
 			{#if effectiveType === 'BIBLE_PASSAGE'}
