@@ -1,6 +1,6 @@
 # Movie content type: morning handover
 
-Branch: `feature/movie-content-type`. Spec: `docs/superpowers/specs/2026-10-07-movie-content-type-design.md`. Plan: `docs/superpowers/plans/2026-10-07-movie-content-type.md` (if present alongside this file).
+Branch: `feature/movie-content-type`. Spec: `docs/superpowers/specs/2026-10-07-movie-content-type-design.md`. Plan: `docs/superpowers/plans/2026-10-07-movie-content-type-plan.md`.
 
 ## (a) What was built
 
@@ -12,7 +12,9 @@ Branch: `feature/movie-content-type`. Spec: `docs/superpowers/specs/2026-10-07-m
 - Task 5, formatters: `db26c54b` shared h:mm:ss duration formatter, money and vs-budget formatters.
 - Task 6a, Add Movie: `364821d8` Add Movie form, `createContentFromMovie` query and hook, TMDB image CSP.
 - Task 6b, columns: `e657ba76` Movie columns, cast renderer, money and duration cells, default column set; `ec52117a` unknown-last comparators for Rated, Box office and Vs. budget, Duration header kept within grid width.
-- Task 7: preview rebuild and this file (`docs(movie): rebuild Movie preview from the amended spec; add overnight status handover`).
+- Task 7: `8b4317f5` `docs(movie): rebuild Movie preview from the amended spec; add overnight status handover` (preview rebuild and this file).
+- Backend clean-up: `15c1ebf4` `fix(movie): backend review follow-ups (theatrical certification, size-capped TMDB reads, context errors, JSON-null-safe people search, resolver tests)`.
+- Frontend and docs clean-up: `fix(movie): frontend and docs review follow-ups (formatter boundary tests, Duration label, status handover)` (formatter boundary tests, the details modal now says "Duration", this file updated).
 
 The rebuilt preview is `tools/content-type-designer/previews/movie-activity.html`, built from `tools/content-type-designer/previews/movie-activity.spec.json`. The `content-type-preview` skill (engine, validator, `examples/`) is not on this branch: it lives on `chore/content-type-preview-skill` (commit `6625d888`). The spec was built with that branch's `build.mjs` from a scratch copy. The preview tool caps at 10 columns and the app has 11 (it adds Tags), so Tags is shown in the details view only. Film facts and scores in the preview are illustrative.
 
@@ -30,9 +32,11 @@ The rebuilt preview is `tools/content-type-designer/previews/movie-activity.html
 - [ ] Add one real movie via the Add Movie button and check the grid.
 - [ ] Open the grid at lg and mobile widths, with the Movie filter and with the YouTube default.
 - [ ] Try Cast search with scope Director and with scope Cast.
-- [ ] Verify using `make migrate`-free steps only (no `make migrate-*` against the shared database).
 - [ ] Review the spec's "Decisions to confirm" list.
 - [ ] Decide on the pre-PR follow-ups below.
+- [ ] Decide how to land the preview skill: this branch's rebuilt `tools/content-type-designer/previews/movie-activity.html` and branch `chore/content-type-preview-skill` (6625d888, which holds the skill and the older preview) both add that path, so whichever merges second hits an add/add conflict. Resolve by keeping this branch's rebuilt version, and move `movie-activity.spec.json` into `.claude/skills/content-type-preview/examples/movie.spec.json` once the skill is on the branch.
+
+Note: verify with migrate-free steps only (no `make migrate-*` against the shared database).
 
 ## (d) Known follow-ups
 
@@ -44,11 +48,20 @@ The rebuilt preview is `tools/content-type-designer/previews/movie-activity.html
 - Released, TMDB Score and Cast are not sortable (Genre is not sortable either).
 - Mobile card list and details modal have no Movie fields.
 - Item header still says "Item".
-- `ActivityDetailsModal` still says "Length".
 - Movie Tags filter only works in Loaded mode.
 - CAST/DIRECTOR search scopes in Loaded mode scan all rows.
 - Theatrical-release certification preference in the TMDB adapter (a deferred fix).
-- The deferred minors are tracked in the SDD ledger (`.superpowers/sdd/2026-10-07-movie-content-type-plan/progress.md`, git-ignored scratch).
+- Deferred minors (the SDD ledger is git-ignored scratch and will not survive a fresh checkout, so they are listed here):
+  - `formatMoneyCompact` for values >= 1e12 renders "$1000B" (no unit above B).
+  - A tiny positive vs-budget ratio renders "0%" after rounding.
+  - `tmdbScoreValueGetter` treats `voteAverage` 0 with votes > 0 as unknown.
+  - The `?f.type=movie` deep link briefly shows the YouTube layout until the first animation frame.
+  - `durationComparator` (pre-existing) sorts unknown durations first when ascending.
+  - A stale `qf=cast` search scope after removing the movie type filter makes the scope summary compare wrong (`+page.svelte` ~line 62).
+  - The width tests parse `ActivityTable.svelte` source text (fragile).
+  - The Duration header at 111px may ellipsize next to the sort/filter icons (not checked in a browser).
+  - The partial GIN index only helps when the query also filters `content_type = 'movie'`.
+  - `parseDurationInput('1:30:99')` returns 5499 (seconds >= 60 are accepted, not rejected); pinned in `tests/unit/formatting.test.ts`.
 
 ## (e) Rulings I made
 

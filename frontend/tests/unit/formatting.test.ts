@@ -59,6 +59,14 @@ describe('shared h:mm:ss duration', () => {
 		expect(parseDurationInput(text)).toBe(expected);
 	});
 
+	// CONCERN (pinned, not fixed): out-of-range minutes/seconds are not rejected.
+	// A 3-part value is h:mm:ss, so '1:30:99' = 1*3600 + 30*60 + 99 = 5499 (99 seconds
+	// carries over) instead of null. Today's behaviour; revisit if strict input is wanted.
+	it('parses a 3-part value as h:mm:ss and does not reject seconds >= 60', () => {
+		expect(parseDurationInput('1:30:99')).toBe(5499);
+		expect(parseDurationInput('1:30:00')).toBe(5400);
+	});
+
 	it('round-trips formatted values through parseDurationInput', () => {
 		for (const s of [0, 59, 3599, 3600, 8525]) {
 			expect(parseDurationInput(formatDurationSeconds(s))).toBe(s);
@@ -81,6 +89,21 @@ describe('formatMoneyCompact', () => {
 		[1_150_000_000, '$1.2B'],
 		[2_800_000_000, '$2.8B'],
 	])('formatMoneyCompact(%s) = %s', (v, expected) => {
+		expect(formatMoneyCompact(v)).toBe(expected);
+	});
+
+	// Rule: round to one decimal in the unit's own scale (half up); a rounded 1000
+	// promotes to the next unit. Boundary values around each unit edge.
+	it.each([
+		[999, '$999'],
+		[999_499, '$999.5K'], // 999.499K rounds to 999.5K (one decimal), no promotion yet
+		[999_500, '$999.5K'],
+		[999_950, '$1M'], // 999.95K rounds to 1000.0K, promoted
+		[999_999, '$1M'],
+		[1_000_000, '$1M'],
+		[316_400_000, '$316.4M'],
+		[1_000_000_000, '$1B'],
+	])('boundary: formatMoneyCompact(%s) = %s', (v, expected) => {
 		expect(formatMoneyCompact(v)).toBe(expected);
 	});
 });

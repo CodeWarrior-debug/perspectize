@@ -79,6 +79,13 @@ describe('ActivityDetailsModal', () => {
 		expect(screen.getByText('0:59')).toBeInTheDocument(); // duration
 	});
 
+	it('labels the length tile "Duration" to match the grid column', () => {
+		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+
+		expect(screen.getByText('Duration')).toBeInTheDocument();
+		expect(screen.queryByText('Length')).not.toBeInTheDocument();
+	});
+
 	// Gap #11 in the UI gap audit: the modal had no Category or Date Added, and
 	// hard-coded "YouTube Video" regardless of content type -- even though all
 	// three were already on the ContentItem rows both callers pass in.

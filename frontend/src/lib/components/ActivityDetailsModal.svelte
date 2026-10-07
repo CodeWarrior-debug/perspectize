@@ -234,7 +234,7 @@
 							</div>
 						</div>
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
-							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Length</div>
+							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Duration</div>
 							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
 								{formatDuration(content.length, content.lengthUnits)}
 							</div>
