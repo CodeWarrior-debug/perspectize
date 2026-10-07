@@ -108,18 +108,30 @@ describe('durationComparator', () => {
 // Column-picker registry
 // ---------------------------------------------------------------------------
 describe('column-picker registry', () => {
-	it('DATA_COLUMNS holds the 12 user-togglable data columns', () => {
+	it('DATA_COLUMNS holds the 24 user-togglable data columns', () => {
 		expect(DATA_COLUMNS.map((c) => c.colId)).toEqual([
 			'type',
 			'category',
+			'genre',
+			'rated',
+			'cast',
 			'duration',
 			'views',
 			'likes',
 			'percentLiked',
+			'released',
+			'boxOffice',
+			'vsBudget',
+			'tmdbScore',
 			'publishDate',
 			'channel',
 			'tags',
 			'description',
+			'budget',
+			'votes',
+			'collection',
+			'synopsis',
+			'tmdbId',
 			'createdAt',
 			'updatedAt',
 		]);
@@ -145,13 +157,13 @@ describe('column-picker registry', () => {
 		}
 	});
 
-	it('togglableColIds(false) returns only the 12 data columns', () => {
+	it('togglableColIds(false) returns only the 24 data columns', () => {
 		expect(togglableColIds(false)).toEqual(DATA_COLUMNS.map((c) => c.colId));
 	});
 
-	it('togglableColIds(true) returns all 15 columns', () => {
+	it('togglableColIds(true) returns all 27 columns', () => {
 		const ids = togglableColIds(true);
-		expect(ids).toHaveLength(15);
+		expect(ids).toHaveLength(27);
 		expect(ids).toEqual([...DATA_COLUMNS.map((c) => c.colId), ...INTERNAL_COLUMNS.map((c) => c.colId)]);
 	});
 

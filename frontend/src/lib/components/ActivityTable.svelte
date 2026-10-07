@@ -56,9 +56,28 @@
 		formatPercentLiked,
 		formatPublishDate,
 		formatTags,
+		contentTags,
 		truncateDescription,
 		contentRowId,
 		headerMinWidth,
+		castCellRenderer,
+		genreValueGetter,
+		ratedValueGetter,
+		releasedValueGetter,
+		formatReleased,
+		boxOfficeValueGetter,
+		formatBoxOffice,
+		vsBudgetValueGetter,
+		formatVsBudgetCell,
+		tmdbScoreValueGetter,
+		formatTmdbScore,
+		hasLowVoteCount,
+		budgetValueGetter,
+		votesValueGetter,
+		collectionValueGetter,
+		synopsisValueGetter,
+		tmdbIdValueGetter,
+		textOrEmpty,
 	} from '$lib/utils/formatting';
 	import {
 		capitalizeContentType,
@@ -66,6 +85,8 @@
 		compareContentBySorts,
 		filterContentRows,
 		togglableColIds,
+		defaultColumnVisibility,
+		isMovieOnlyTypeFilter,
 	} from '$lib/utils/grid-config';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
@@ -539,9 +560,51 @@
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.category },
 				hide: true,
 			},
+			// Movie columns (TMDB). Hidden by default; the responsive effect shows the Movie
+			// default set when the type filter is exactly MOVIE. Minimum widths are tuned so
+			// that set fits the 1212px grid: perspectize 50 + item 200 + genre 72 + rated 82
+			// + cast 130 + duration 126 + released 100 + box office 120 + vs. budget 120
+			// + TMDB score 100 + tags 95 = 1195.
+			{
+				colId: 'genre',
+				headerName: 'Genre',
+				flex: 1,
+				minWidth: 72,
+				maxWidth: 180,
+				sortable: false,
+				filter: false,
+				valueGetter: genreValueGetter,
+				valueFormatter: (params) => textOrEmpty(params.value),
+				headerTooltip: 'TMDB genres',
+				hide: true,
+			},
+			{
+				colId: 'rated',
+				headerName: 'Rated',
+				flex: 0.5,
+				maxWidth: 100,
+				filter: false,
+				valueGetter: ratedValueGetter,
+				valueFormatter: (params) => textOrEmpty(params.value),
+				headerTooltip: 'US age rating (G, PG, PG-13, R, NC-17). Sorts by rating, not A-Z; unrated last.',
+				hide: true,
+			},
+			{
+				colId: 'cast',
+				headerName: 'Cast',
+				flex: 2,
+				minWidth: 130,
+				sortable: false,
+				filter: false,
+				cellRenderer: castCellRenderer,
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.cast },
+				headerTooltip:
+					'Directors lead (marked dir.), then billed cast. Only the top 15 cast are stored, so only they are searchable.',
+				hide: true,
+			},
 			{
 				colId: 'duration',
-				headerName: 'Length',
+				headerName: 'Duration',
 				flex: 0.7,
 				maxWidth: 120,
 
@@ -554,7 +617,8 @@
 				valueGetter: durationValueGetter,
 				filterValueGetter: durationFilterValueGetter,
 				comparator: durationComparator,
-				headerTooltip: 'Video duration from YouTube API',
+				headerTooltip:
+					'Video duration from YouTube API. For movies this is the runtime, to the minute (TMDB does not report seconds).',
 			},
 			{
 				colId: 'views',
@@ -598,6 +662,59 @@
 				headerTooltip: 'Likes as a percentage of views',
 			},
 			{
+				colId: 'released',
+				headerName: 'Released',
+				flex: 1,
+				minWidth: 100,
+				maxWidth: 140,
+				sortable: false,
+				filter: false,
+				valueGetter: releasedValueGetter,
+				valueFormatter: (params) => formatReleased(params.value),
+				headerTooltip: 'Theatrical release date from TMDB',
+				hide: true,
+			},
+			{
+				colId: 'boxOffice',
+				headerName: 'Box office',
+				flex: 0.8,
+				maxWidth: 130,
+				filter: false,
+				valueGetter: boxOfficeValueGetter,
+				valueFormatter: (params) => formatBoxOffice(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.boxOffice },
+				headerTooltip: 'Worldwide gross (USD) from TMDB. A dash means TMDB has no figure.',
+				hide: true,
+			},
+			{
+				colId: 'vsBudget',
+				headerName: 'Vs. budget',
+				flex: 0.8,
+				maxWidth: 130,
+				filter: false,
+				valueGetter: vsBudgetValueGetter,
+				valueFormatter: (params) => formatVsBudgetCell(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.vsBudget },
+				headerTooltip: 'Box office as a percentage of budget. Ignores marketing, so under 100% does not mean a loss.',
+				hide: true,
+			},
+			{
+				colId: 'tmdbScore',
+				headerName: 'TMDB Score',
+				flex: 0.7,
+				minWidth: 100,
+				maxWidth: 120,
+				sortable: false,
+				filter: false,
+				valueGetter: tmdbScoreValueGetter,
+				valueFormatter: (params) => formatTmdbScore(params.value),
+				// Muted when the score rests on fewer than 50 votes.
+				cellClass: (params) => (hasLowVoteCount({ data: params.data }) ? 'text-muted-foreground' : ''),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.tmdbScore },
+				headerTooltip: 'TMDB user score out of 10. Muted when fewer than 50 votes.',
+				hide: true,
+			},
+			{
 				colId: 'publishDate',
 				field: 'publishedAt',
 				headerName: 'Date',
@@ -625,16 +742,17 @@
 			},
 			{
 				colId: 'tags',
-				field: 'tags',
 				headerName: 'Tags',
 				flex: 1.5,
 				maxWidth: 250,
 				sortable: false,
 				filter: 'agTextColumnFilter',
-				filterValueGetter: (params) => formatTags(params.data?.tags ?? null),
+				// YouTube tags, or TMDB keywords for a Movie (see contentTags).
+				valueGetter: (params) => contentTags(params.data),
+				filterValueGetter: (params) => formatTags(contentTags(params.data)),
 				valueFormatter: (params) => formatTags(params.value),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.tags },
-				headerTooltip: 'Tags from YouTube API',
+				headerTooltip: 'Tags from YouTube API, or TMDB keywords for movies',
 			},
 			{
 				colId: 'description',
@@ -646,6 +764,68 @@
 				valueFormatter: (params) => truncateDescription(params.value, 80),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.description },
 				headerTooltip: 'Video description from YouTube API',
+				hide: true,
+			},
+			// Movie picker-only columns (never in the default set).
+			{
+				colId: 'budget',
+				headerName: 'Budget',
+				flex: 0.8,
+				maxWidth: 130,
+				sortable: false,
+				filter: false,
+				valueGetter: budgetValueGetter,
+				valueFormatter: (params) => formatBoxOffice(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.budget },
+				headerTooltip: 'Production budget (USD) from TMDB. A dash means TMDB has no figure.',
+				hide: true,
+			},
+			{
+				colId: 'votes',
+				headerName: 'Votes',
+				flex: 0.7,
+				maxWidth: 110,
+				sortable: false,
+				filter: false,
+				valueGetter: votesValueGetter,
+				valueFormatter: (params) => formatCount(params.value),
+				headerTooltip: 'Number of TMDB votes behind the score',
+				hide: true,
+			},
+			{
+				colId: 'collection',
+				headerName: 'Collection',
+				flex: 1,
+				maxWidth: 200,
+				sortable: false,
+				filter: false,
+				valueGetter: collectionValueGetter,
+				valueFormatter: (params) => textOrEmpty(params.value),
+				headerTooltip: 'TMDB collection (franchise) this film belongs to',
+				hide: true,
+			},
+			{
+				colId: 'synopsis',
+				headerName: 'Synopsis',
+				flex: 2,
+				sortable: false,
+				filter: false,
+				valueGetter: synopsisValueGetter,
+				valueFormatter: (params) => truncateDescription(params.value, 80),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.synopsis },
+				headerTooltip: 'Plot overview from TMDB',
+				hide: true,
+			},
+			{
+				colId: 'tmdbId',
+				headerName: 'TMDB ID',
+				flex: 0.6,
+				maxWidth: 110,
+				sortable: false,
+				filter: false,
+				valueGetter: tmdbIdValueGetter,
+				valueFormatter: (params) => (params.value == null ? '—' : String(params.value)),
+				headerTooltip: 'TMDB movie id',
 				hide: true,
 			},
 			{
@@ -970,6 +1150,7 @@
 	// sm (445-639): Perspectize, Item, Type, Category, Channel
 	// md (640-899): Perspectize, Item, Type, Category, Channel, Duration, Date
 	// lg (900+):    Perspectize, Item, Type, Category, Channel, Duration, Date, Views, Likes, Tags
+	// With the type filter exactly MOVIE, the Movie set applies instead (defaultColumnVisibility).
 	$effect(() => {
 		if (!gridApi || !gridReady) return;
 		const api = gridApi;
@@ -988,21 +1169,16 @@
 			return;
 		}
 		const tier = responsiveTier;
+		// Type filter exactly MOVIE -> the Movie default column set. Read synchronously,
+		// before the rAF, so this effect re-runs when the filter changes.
+		const movieOnly = isMovieOnlyTypeFilter(filters.type);
 		requestAnimationFrame(() => {
 			if (!gridApi) return; // Grid may have been destroyed before rAF fires
-			const alwaysVisible = ['item', 'type', 'perspectize'];
-			const smCols = ['category', 'channel'];
-			const mdCols = ['duration', 'publishDate'];
-			const lgCols = ['views', 'likes', 'percentLiked', 'tags'];
 			// createdAt/updatedAt stay hidden via their colDef `hide: true` until the
 			// user enables them in the column picker; id/addedByUserID/url likewise, admins only.
-			const alwaysHidden = ['description'];
-
-			api.setColumnsVisible(alwaysVisible, true);
-			api.setColumnsVisible(alwaysHidden, false);
-			api.setColumnsVisible(smCols, tier !== 'xs');
-			api.setColumnsVisible(mdCols, tier === 'md' || tier === 'lg');
-			api.setColumnsVisible(lgCols, tier === 'lg');
+			const { visible, hidden } = defaultColumnVisibility(tier, movieOnly);
+			api.setColumnsVisible(visible, true);
+			api.setColumnsVisible(hidden, false);
 		});
 	});
 

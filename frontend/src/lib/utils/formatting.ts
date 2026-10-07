@@ -412,6 +412,10 @@ const YOUTUBE_ICON_PATH =
 const CLAIM_ICON_PATH =
 	'M4 4h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-4.29 3.71A1 1 0 0 1 3 19V5a1 1 0 0 1 1-1zm2 4h12M6 10.5h8';
 
+/** Film-frame glyph for MOVIE rows (outline, themed stroke). */
+const MOVIE_ICON_PATH =
+	'M4 2h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5';
+
 export function typeCellRenderer(params: { data?: { contentType: string } }): HTMLElement | string {
 	if (!params.data) return '';
 
@@ -424,6 +428,28 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 		const label = document.createElement('span');
 		label.className = 'sr-only';
 		label.textContent = 'Bible Passage';
+		container.appendChild(label);
+		return container;
+	}
+
+	if (params.data.contentType === 'MOVIE') {
+		container.title = 'Movie';
+		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		svg.setAttribute('width', '20');
+		svg.setAttribute('height', '20');
+		svg.setAttribute('viewBox', '0 0 24 24');
+		svg.setAttribute('fill', 'none');
+		svg.setAttribute('stroke', 'var(--color-muted-foreground)');
+		svg.setAttribute('stroke-width', '2');
+		svg.setAttribute('stroke-linecap', 'round');
+		svg.setAttribute('stroke-linejoin', 'round');
+		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+		path.setAttribute('d', MOVIE_ICON_PATH);
+		svg.appendChild(path);
+		const label = document.createElement('span');
+		label.className = 'sr-only';
+		label.textContent = 'Movie';
+		container.appendChild(svg);
 		container.appendChild(label);
 		return container;
 	}
@@ -589,4 +615,283 @@ export function nameCellRenderer(params: { data?: { name: string; url: string | 
 	const span = document.createElement('span');
 	span.textContent = params.data.name;
 	return span;
+}
+
+// ---------------------------------------------------------------------------
+// Movie (TMDB) cells
+// ---------------------------------------------------------------------------
+//
+// Movie rows keep their data in the Content `response` JSON, shaped by
+// backend/internal/adapters/tmdb/parse.go (ShapeMovie). Every reader below goes
+// through movieResponse(), which returns null for non-movie rows and anything
+// that isn't an object, so a null/foreign `response` degrades to EMPTY_VALUE.
+
+export interface MovieCast {
+	id: number;
+	name: string;
+	character?: string;
+	order?: number;
+}
+
+export interface MovieResponse {
+	tmdbId?: number;
+	imdbId?: string;
+	tagline?: string;
+	overview?: string;
+	releaseDate?: string;
+	year?: number;
+	genres?: string[];
+	certification?: string;
+	runtimeMinutes?: number;
+	budget?: number | null;
+	revenue?: number | null;
+	voteAverage?: number;
+	voteCount?: number;
+	posterPath?: string | null;
+	keywords?: string[];
+	cast?: MovieCast[];
+	directors?: { id: number; name: string }[];
+	collection?: { id?: number; name?: string } | null;
+}
+
+/** Minimal row shape the Movie helpers read. */
+export interface MovieRow {
+	contentType?: string;
+	response?: unknown;
+	tags?: string[] | null;
+}
+
+/** The parsed Movie payload, or null when the row isn't a Movie or has no usable `response`. */
+export function movieResponse(row: MovieRow | null | undefined): MovieResponse | null {
+	if (!row || row.contentType !== 'MOVIE') return null;
+	let r = row.response;
+	if (typeof r === 'string') {
+		try {
+			r = JSON.parse(r);
+		} catch {
+			return null;
+		}
+	}
+	if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
+	return r as MovieResponse;
+}
+
+export interface MoviePerson {
+	id: number;
+	name: string;
+	role: 'director' | 'cast';
+	character: string | null;
+}
+
+/** Directors first, then cast in billing order. */
+export function moviePeople(row: MovieRow | null | undefined): MoviePerson[] {
+	const m = movieResponse(row);
+	if (!m) return [];
+	const directors: MoviePerson[] = (m.directors ?? []).map((d) => ({
+		id: d.id,
+		name: d.name,
+		role: 'director',
+		character: null,
+	}));
+	const cast: MoviePerson[] = [...(m.cast ?? [])]
+		.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+		.map((c) => ({ id: c.id, name: c.name, role: 'cast', character: c.character || null }));
+	return [...directors, ...cast];
+}
+
+const CAST_CELL_VISIBLE = 3;
+
+/**
+ * AG Grid cell renderer for the Cast column: directors first (marked `dir.`),
+ * then cast in billing order as chips; the first three show, the rest collapse
+ * to `+N`. No people -> EMPTY_VALUE.
+ */
+export function castCellRenderer(params: { data?: MovieRow }): HTMLElement | string {
+	if (!params.data) return '';
+	const people = moviePeople(params.data);
+
+	const container = document.createElement('div');
+	container.className = 'flex h-full w-full items-center gap-1 overflow-hidden whitespace-nowrap';
+	if (people.length === 0) {
+		container.textContent = EMPTY_VALUE;
+		return container;
+	}
+
+	for (const person of people.slice(0, CAST_CELL_VISIBLE)) {
+		const chip = document.createElement('span');
+		chip.dataset.testid = 'cast-chip';
+		chip.className = 'shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] leading-tight text-foreground';
+		if (person.role === 'director') {
+			const marker = document.createElement('span');
+			marker.className = 'text-muted-foreground';
+			marker.textContent = 'dir.';
+			chip.appendChild(marker);
+			chip.appendChild(document.createTextNode(` ${person.name}`));
+		} else {
+			chip.textContent = person.name;
+		}
+		container.appendChild(chip);
+	}
+	const extra = people.length - CAST_CELL_VISIBLE;
+	if (extra > 0) {
+		const more = document.createElement('span');
+		more.dataset.testid = 'cast-more';
+		more.className = 'shrink-0 text-[11px] text-muted-foreground';
+		more.textContent = `+${extra}`;
+		container.appendChild(more);
+	}
+	return container;
+}
+
+/** Cast tooltip checklist rows: name, role (Director / as <character>) and TMDB person id. */
+export function castTooltipItems(row: MovieRow | null | undefined): string[] {
+	return moviePeople(row).map((p) => {
+		const role = p.role === 'director' ? 'Director' : p.character ? `as ${p.character}` : null;
+		return [p.name, role, `TMDB #${p.id}`].filter(Boolean).join(' · ');
+	});
+}
+
+/** TMDB reports 0 for "unknown"; the backend stores null, and this guards a stray 0 too. */
+function knownNumber(v: number | null | undefined): number | null {
+	return v == null || v === 0 ? null : v;
+}
+
+/** Box office = revenue (USD); null when unknown. */
+export function boxOfficeValueGetter(params: { data?: MovieRow }): number | null {
+	return knownNumber(movieResponse(params.data)?.revenue);
+}
+
+export function formatBoxOffice(usd: number | null): string {
+	return formatMoneyCompact(usd);
+}
+
+export function boxOfficeTooltip(params: { data?: MovieRow }): string {
+	const revenue = boxOfficeValueGetter(params);
+	return revenue == null ? '' : formatMoneyExact(revenue);
+}
+
+/** Budget (USD); null when unknown. Picker-only column. */
+export function budgetValueGetter(params: { data?: MovieRow }): number | null {
+	return knownNumber(movieResponse(params.data)?.budget);
+}
+
+/** Revenue as a percentage of budget; null when either side is unknown. */
+export function vsBudgetValueGetter(params: { data?: MovieRow }): number | null {
+	const m = movieResponse(params.data);
+	return vsBudgetPercent(knownNumber(m?.revenue), knownNumber(m?.budget));
+}
+
+export function formatVsBudgetCell(pct: number | null): string {
+	return formatVsBudget(pct);
+}
+
+/** Multiple, net gain/loss, and the marketing caveat. Empty when revenue or budget is unknown. */
+export function vsBudgetTooltip(params: { data?: MovieRow }): string {
+	const m = movieResponse(params.data);
+	const revenue = knownNumber(m?.revenue);
+	const budget = knownNumber(m?.budget);
+	const pct = vsBudgetPercent(revenue, budget);
+	if (pct == null || revenue == null || budget == null) return '';
+	const net = revenue - budget;
+	const netText =
+		net === 0
+			? 'broke even'
+			: net > 0
+				? `net gain ${formatMoneyExact(net)}`
+				: `net loss ${formatMoneyExact(Math.abs(net))}`;
+	return (
+		`Grossed ${(revenue / budget).toFixed(1)}× its ${formatMoneyExact(budget)} budget (${formatVsBudget(pct)}), ${netText}. ` +
+		`Ignores marketing and the studio's share of gross, so under 100% does not mean a loss.`
+	);
+}
+
+const LOW_VOTE_COUNT = 50;
+
+/** TMDB vote average (0-10); null with no votes. */
+export function tmdbScoreValueGetter(params: { data?: MovieRow }): number | null {
+	const m = movieResponse(params.data);
+	if (!m || !m.voteCount || !m.voteAverage) return null;
+	return m.voteAverage;
+}
+
+/** One decimal out of 10 (`8.4`), never a percent. */
+export function formatTmdbScore(score: number | null): string {
+	return score == null ? EMPTY_VALUE : score.toFixed(1);
+}
+
+/** True when the score rests on fewer than 50 votes (rendered muted). */
+export function hasLowVoteCount(params: { data?: MovieRow }): boolean {
+	const m = movieResponse(params.data);
+	return m != null && (m.voteCount ?? 0) < LOW_VOTE_COUNT;
+}
+
+export function tmdbScoreTooltip(params: { data?: MovieRow }): string {
+	const score = tmdbScoreValueGetter(params);
+	if (score == null) return '';
+	const votes = movieResponse(params.data)?.voteCount ?? 0;
+	const base = `${score.toFixed(1)} / 10 from ${votes.toLocaleString('en-US')} votes`;
+	return hasLowVoteCount(params) ? `${base} (fewer than ${LOW_VOTE_COUNT} votes, so treat it with caution)` : base;
+}
+
+/** US certification (`PG-13`); null when TMDB has none. */
+export function ratedValueGetter(params: { data?: MovieRow }): string | null {
+	return movieResponse(params.data)?.certification || null;
+}
+
+const AGE_RATING_ORDER = ['G', 'PG', 'PG-13', 'R', 'NC-17'];
+
+/** G < PG < PG-13 < R < NC-17; anything else (NR, empty) is null so it sorts last. Mirrors the backend AGE_RATING sort. */
+export function ageRatingRank(certification: string | null | undefined): number | null {
+	const i = AGE_RATING_ORDER.indexOf((certification ?? '').toUpperCase());
+	return i === -1 ? null : i;
+}
+
+export function genreValueGetter(params: { data?: MovieRow }): string | null {
+	const genres = movieResponse(params.data)?.genres;
+	return genres && genres.length > 0 ? genres.join(', ') : null;
+}
+
+/** ISO release date (`2010-07-15`); null when unknown. */
+export function releasedValueGetter(params: { data?: MovieRow }): string | null {
+	return movieResponse(params.data)?.releaseDate || null;
+}
+
+/** `Jul 15, 2010`. Formatted in UTC: a date-only string parses as UTC midnight and would otherwise show the previous day west of UTC. */
+export function formatReleased(iso: string | null): string {
+	if (!iso) return EMPTY_VALUE;
+	const d = new Date(iso);
+	if (isNaN(d.getTime())) return EMPTY_VALUE;
+	return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+export function votesValueGetter(params: { data?: MovieRow }): number | null {
+	return knownNumber(movieResponse(params.data)?.voteCount);
+}
+
+export function collectionValueGetter(params: { data?: MovieRow }): string | null {
+	return movieResponse(params.data)?.collection?.name || null;
+}
+
+export function synopsisValueGetter(params: { data?: MovieRow }): string | null {
+	return movieResponse(params.data)?.overview || null;
+}
+
+export function tmdbIdValueGetter(params: { data?: MovieRow }): number | null {
+	return movieResponse(params.data)?.tmdbId ?? null;
+}
+
+/**
+ * Tags for a row: the real tags (YouTube) when present, else TMDB keywords for a
+ * Movie. Keywords are a source-provided set (see GitHub issue 560 for the planned
+ * source vs user tag split; deliberately not modelled here).
+ */
+export function contentTags(row: MovieRow | null | undefined): string[] | null {
+	if (row?.tags && row.tags.length > 0) return row.tags;
+	const keywords = movieResponse(row)?.keywords;
+	return keywords && keywords.length > 0 ? keywords : null;
+}
+
+/** Display text for a nullable string cell. */
+export function textOrEmpty(value: string | null | undefined): string {
+	return value ? value : EMPTY_VALUE;
 }

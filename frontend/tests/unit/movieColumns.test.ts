@@ -1,0 +1,442 @@
+import { describe, it, expect } from 'vitest';
+import {
+	castCellRenderer,
+	castTooltipItems,
+	boxOfficeValueGetter,
+	vsBudgetValueGetter,
+	formatBoxOffice,
+	formatVsBudgetCell,
+	boxOfficeTooltip,
+	vsBudgetTooltip,
+	tmdbScoreValueGetter,
+	formatTmdbScore,
+	hasLowVoteCount,
+	tmdbScoreTooltip,
+	ratedValueGetter,
+	genreValueGetter,
+	releasedValueGetter,
+	formatReleased,
+	contentTags,
+	durationValueGetter,
+	ageRatingRank,
+	typeCellRenderer,
+	EMPTY_VALUE,
+} from '$lib/utils/formatting';
+import {
+	COLUMNS,
+	COL_TO_SORT,
+	DATA_COLUMNS,
+	defaultColumnVisibility,
+	isMovieOnlyTypeFilter,
+	capitalizeContentType,
+	compareContentBySorts,
+} from '$lib/utils/grid-config';
+import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
+import {
+	sortsToGraphQL,
+	urlParamsToGraphQLFilter,
+	parseGridParams,
+	serializeGridParams,
+} from '$lib/utils/gridUrlState';
+import type { ContentItem } from '$lib/queries/content';
+
+const DIRECTORS = [{ id: 525, name: 'Christopher Nolan' }];
+const CAST = [
+	{ id: 6193, name: 'Leonardo DiCaprio', character: 'Cobb', order: 0 },
+	{ id: 24045, name: 'Joseph Gordon-Levitt', character: 'Arthur', order: 1 },
+	{ id: 27578, name: 'Elliot Page', character: 'Ariadne', order: 2 },
+	{ id: 2524, name: 'Tom Hardy', character: 'Eames', order: 3 },
+];
+
+function movie(response: Record<string, unknown> | null, extra: Partial<ContentItem> = {}) {
+	return { contentType: 'MOVIE', response, ...extra } as unknown as ContentItem;
+}
+
+function chipText(el: HTMLElement | string): string {
+	return typeof el === 'string' ? el : (el.textContent ?? '');
+}
+
+describe('castCellRenderer', () => {
+	it('shows directors only, marked dir.', () => {
+		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: [] }) });
+		expect(chipText(el)).toBe('dir. Christopher Nolan');
+	});
+
+	it('shows cast only, in billing order', () => {
+		const el = castCellRenderer({ data: movie({ directors: [], cast: CAST.slice(0, 2) }) }) as HTMLElement;
+		const chips = el.querySelectorAll('[data-testid="cast-chip"]');
+		expect([...chips].map((c) => c.textContent)).toEqual(['Leonardo DiCaprio', 'Joseph Gordon-Levitt']);
+	});
+
+	it('puts directors before cast', () => {
+		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: CAST.slice(0, 2) }) }) as HTMLElement;
+		const chips = [...el.querySelectorAll('[data-testid="cast-chip"]')].map((c) => c.textContent);
+		expect(chips).toEqual(['dir. Christopher Nolan', 'Leonardo DiCaprio', 'Joseph Gordon-Levitt']);
+	});
+
+	it('shows the first three people then +N', () => {
+		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: CAST }) }) as HTMLElement;
+		expect(el.querySelectorAll('[data-testid="cast-chip"]')).toHaveLength(3);
+		expect(el.querySelector('[data-testid="cast-more"]')?.textContent).toBe('+2');
+	});
+
+	it('shows no +N when there are exactly three', () => {
+		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: CAST.slice(0, 2) }) }) as HTMLElement;
+		expect(el.querySelector('[data-testid="cast-more"]')).toBeNull();
+	});
+
+	it('shows an empty marker when there are no people', () => {
+		expect(chipText(castCellRenderer({ data: movie({ directors: [], cast: [] }) }))).toBe(EMPTY_VALUE);
+	});
+
+	it('shows an empty marker for a null response', () => {
+		expect(chipText(castCellRenderer({ data: movie(null) }))).toBe(EMPTY_VALUE);
+	});
+
+	it('shows an empty marker for a non-movie row', () => {
+		const row = { contentType: 'YOUTUBE_VIDEO', response: { items: [] } } as unknown as ContentItem;
+		expect(chipText(castCellRenderer({ data: row }))).toBe(EMPTY_VALUE);
+	});
+
+	it('renders nothing without row data', () => {
+		expect(castCellRenderer({})).toBe('');
+	});
+});
+
+describe('castTooltipItems', () => {
+	it('lists directors first with role and TMDB person id', () => {
+		const items = castTooltipItems(movie({ directors: DIRECTORS, cast: CAST.slice(0, 1) }));
+		expect(items).toEqual(['Christopher Nolan · Director · TMDB #525', 'Leonardo DiCaprio · as Cobb · TMDB #6193']);
+	});
+
+	it('omits the role text when a cast member has no character', () => {
+		const items = castTooltipItems(movie({ directors: [], cast: [{ id: 1, name: 'A', character: '', order: 0 }] }));
+		expect(items).toEqual(['A · TMDB #1']);
+	});
+
+	it('is empty for a null response', () => {
+		expect(castTooltipItems(movie(null))).toEqual([]);
+	});
+});
+
+describe('money getters', () => {
+	it('boxOfficeValueGetter reads revenue', () => {
+		expect(boxOfficeValueGetter({ data: movie({ revenue: 836_800_000 }) })).toBe(836_800_000);
+	});
+
+	it('treats null, zero and missing revenue as unknown', () => {
+		expect(boxOfficeValueGetter({ data: movie({ revenue: null }) })).toBeNull();
+		expect(boxOfficeValueGetter({ data: movie({ revenue: 0 }) })).toBeNull();
+		expect(boxOfficeValueGetter({ data: movie(null) })).toBeNull();
+		expect(boxOfficeValueGetter({})).toBeNull();
+	});
+
+	it('formats box office compactly and shows a dash for unknown', () => {
+		expect(formatBoxOffice(836_800_000)).toBe('$836.8M');
+		expect(formatBoxOffice(null)).toBe(EMPTY_VALUE);
+		expect(formatBoxOffice(0)).toBe(EMPTY_VALUE);
+	});
+
+	it('boxOfficeTooltip gives the exact figure, empty when unknown', () => {
+		expect(boxOfficeTooltip({ data: movie({ revenue: 836_836_967 }) })).toBe('$836,836,967');
+		expect(boxOfficeTooltip({ data: movie({ revenue: 0 }) })).toBe('');
+	});
+
+	it('vsBudgetValueGetter is revenue over budget as a percentage', () => {
+		expect(vsBudgetValueGetter({ data: movie({ revenue: 300, budget: 100 }) })).toBe(300);
+	});
+
+	it('vsBudgetValueGetter is null when either side is null or zero', () => {
+		expect(vsBudgetValueGetter({ data: movie({ revenue: null, budget: 100 }) })).toBeNull();
+		expect(vsBudgetValueGetter({ data: movie({ revenue: 100, budget: null }) })).toBeNull();
+		expect(vsBudgetValueGetter({ data: movie({ revenue: 0, budget: 0 }) })).toBeNull();
+		expect(vsBudgetValueGetter({ data: movie(null) })).toBeNull();
+	});
+
+	it('formats vs budget as a percentage and a dash for unknown', () => {
+		expect(formatVsBudgetCell(3455.4)).toBe('3,455%');
+		expect(formatVsBudgetCell(null)).toBe(EMPTY_VALUE);
+	});
+
+	it('vsBudgetTooltip states the multiple, the net gain and the marketing caveat', () => {
+		const t = vsBudgetTooltip({ data: movie({ revenue: 300_000_000, budget: 100_000_000 }) });
+		expect(t).toContain('3.0×');
+		expect(t).toContain('$200,000,000');
+		expect(t).toContain('gain');
+		expect(t).toContain('marketing');
+		expect(t).toContain('does not mean a loss');
+	});
+
+	it('vsBudgetTooltip states a net loss when revenue is below budget', () => {
+		const t = vsBudgetTooltip({ data: movie({ revenue: 40_000_000, budget: 100_000_000 }) });
+		expect(t).toContain('0.4×');
+		expect(t).toContain('loss');
+		expect(t).toContain('$60,000,000');
+	});
+
+	it('vsBudgetTooltip is empty when unknown', () => {
+		expect(vsBudgetTooltip({ data: movie({ revenue: 0, budget: 100 }) })).toBe('');
+	});
+});
+
+describe('tmdb score', () => {
+	it('is the vote average out of 10 with one decimal, never a percent', () => {
+		expect(tmdbScoreValueGetter({ data: movie({ voteAverage: 8.364, voteCount: 35000 }) })).toBe(8.364);
+		expect(formatTmdbScore(8.364)).toBe('8.4');
+		expect(formatTmdbScore(8.0)).toBe('8.0');
+		expect(formatTmdbScore(8.4)).not.toContain('%');
+	});
+
+	it('is unknown with no votes or no response', () => {
+		expect(tmdbScoreValueGetter({ data: movie({ voteAverage: 0, voteCount: 0 }) })).toBeNull();
+		expect(tmdbScoreValueGetter({ data: movie(null) })).toBeNull();
+		expect(formatTmdbScore(null)).toBe(EMPTY_VALUE);
+	});
+
+	it('flags fewer than 50 votes as low confidence', () => {
+		expect(hasLowVoteCount({ data: movie({ voteAverage: 9, voteCount: 49 }) })).toBe(true);
+		expect(hasLowVoteCount({ data: movie({ voteAverage: 9, voteCount: 50 }) })).toBe(false);
+		expect(hasLowVoteCount({ data: movie(null) })).toBe(false);
+	});
+
+	it('tooltip shows the score out of 10 and the vote count, with a caution when few votes', () => {
+		expect(tmdbScoreTooltip({ data: movie({ voteAverage: 8.4, voteCount: 35000 }) })).toBe(
+			'8.4 / 10 from 35,000 votes',
+		);
+		expect(tmdbScoreTooltip({ data: movie({ voteAverage: 9, voteCount: 3 }) })).toContain('fewer than 50 votes');
+		expect(tmdbScoreTooltip({ data: movie(null) })).toBe('');
+	});
+});
+
+describe('simple movie getters', () => {
+	it('rated is the certification, null when empty', () => {
+		expect(ratedValueGetter({ data: movie({ certification: 'PG-13' }) })).toBe('PG-13');
+		expect(ratedValueGetter({ data: movie({ certification: '' }) })).toBeNull();
+		expect(ratedValueGetter({ data: movie(null) })).toBeNull();
+	});
+
+	it('genre joins the genres, null when none', () => {
+		expect(genreValueGetter({ data: movie({ genres: ['Action', 'Science Fiction'] }) })).toBe(
+			'Action, Science Fiction',
+		);
+		expect(genreValueGetter({ data: movie({ genres: [] }) })).toBeNull();
+	});
+
+	it('released formats the release date without shifting the day across timezones', () => {
+		expect(releasedValueGetter({ data: movie({ releaseDate: '2010-07-15' }) })).toBe('2010-07-15');
+		expect(formatReleased('2010-07-15')).toBe('Jul 15, 2010');
+		expect(formatReleased(null)).toBe(EMPTY_VALUE);
+		expect(releasedValueGetter({ data: movie({ releaseDate: '' }) })).toBeNull();
+	});
+
+	it('ranks certifications G < PG < PG-13 < R < NC-17, unrated last', () => {
+		const ranks = ['G', 'PG', 'PG-13', 'R', 'NC-17'].map((c) => ageRatingRank(c));
+		expect(ranks).toEqual([...ranks].sort((a, b) => (a as number) - (b as number)));
+		expect(ageRatingRank('NR')).toBeNull();
+		expect(ageRatingRank(undefined)).toBeNull();
+	});
+});
+
+describe('Tags for movies', () => {
+	it('uses TMDB keywords when the row has no tags', () => {
+		expect(contentTags(movie({ keywords: ['dream', 'heist'] }, { tags: null }))).toEqual(['dream', 'heist']);
+	});
+
+	it('prefers real tags (YouTube) over response keywords', () => {
+		const row = { contentType: 'YOUTUBE_VIDEO', tags: ['a'], response: {} } as unknown as ContentItem;
+		expect(contentTags(row)).toEqual(['a']);
+	});
+
+	it('is null when there is nothing', () => {
+		expect(contentTags(movie(null, { tags: null }))).toBeNull();
+	});
+});
+
+describe('Duration for movies', () => {
+	it('shows 8520 seconds as 2:22:00', () => {
+		expect(durationValueGetter({ data: { length: 8520, lengthUnits: 'seconds' } })).toBe('2:22:00');
+	});
+});
+
+describe('movie type cell', () => {
+	it('is not the YouTube icon', () => {
+		const el = typeCellRenderer({ data: { contentType: 'MOVIE' } }) as HTMLElement;
+		expect(el.textContent).toContain('Movie');
+		expect(el.innerHTML).not.toContain('FF0000');
+	});
+
+	it('type filter knows the Movie label', () => {
+		expect(capitalizeContentType('MOVIE')).toBe('Movie');
+	});
+});
+
+describe('movie item cell', () => {
+	it('shows poster, title and year', () => {
+		const el = activityItemCellRenderer({
+			data: {
+				id: '1',
+				name: 'Inception',
+				url: 'https://www.themoviedb.org/movie/27205',
+				contentType: 'MOVIE',
+				response: { posterPath: '/abc.jpg', year: 2010 },
+			},
+		}) as HTMLElement;
+		expect(el.querySelector('img')?.getAttribute('src')).toBe('https://image.tmdb.org/t/p/w92/abc.jpg');
+		expect(el.querySelector('[data-testid="item-title"]')?.textContent).toBe('Inception');
+		expect(el.querySelector('[data-testid="item-subtitle"]')?.textContent).toBe('2010');
+	});
+
+	it('omits the poster and year when unknown', () => {
+		const el = activityItemCellRenderer({
+			data: { id: '1', name: 'Inception', url: null, contentType: 'MOVIE', response: null },
+		}) as HTMLElement;
+		expect(el.querySelector('img')).toBeNull();
+		expect(el.querySelector('[data-testid="item-subtitle"]')).toBeNull();
+	});
+});
+
+describe('Movie COLUMNS entries', () => {
+	const byId = (id: string) => COLUMNS.find((c) => c.colId === id);
+
+	it('Box office, Vs. budget and Rated sort server-side by their backend enums', () => {
+		expect(byId('boxOffice')).toMatchObject({ sortable: true, serverSort: 'BOX_OFFICE', label: 'Box office' });
+		expect(byId('vsBudget')).toMatchObject({ sortable: true, serverSort: 'VS_BUDGET', label: 'Vs. budget' });
+		expect(byId('rated')).toMatchObject({ sortable: true, serverSort: 'AGE_RATING', label: 'Rated' });
+		expect(COL_TO_SORT.boxOffice).toBe('BOX_OFFICE');
+		expect(COL_TO_SORT.vsBudget).toBe('VS_BUDGET');
+		expect(COL_TO_SORT.rated).toBe('AGE_RATING');
+		expect(sortsToGraphQL([{ col: 'boxOffice', dir: 'desc' }])).toEqual([{ field: 'BOX_OFFICE', order: 'DESC' }]);
+	});
+
+	it('Cast, Genre, Released and TMDB Score are not sortable', () => {
+		for (const id of ['cast', 'genre', 'released', 'tmdbScore']) {
+			expect(byId(id)?.sortable, id).toBe(false);
+			expect(byId(id)?.serverSort, id).toBeUndefined();
+		}
+	});
+
+	it('Duration is the header name for the runtime column', () => {
+		expect(byId('duration')?.label).toBe('Duration');
+	});
+
+	it('client-side sort uses the movie values, unknown last', () => {
+		const a = movie({ revenue: 10 });
+		const b = movie({ revenue: 20 });
+		const none = movie({ revenue: null });
+		const sorted = [none, a, b].sort((x, y) => compareContentBySorts(x, y, [{ col: 'boxOffice', dir: 'desc' }]));
+		expect(sorted).toEqual([b, a, none]);
+		const r = [movie({ certification: 'R' }), movie({ certification: 'G' }), movie({ certification: 'NR' })];
+		r.sort((x, y) => compareContentBySorts(x, y, [{ col: 'rated', dir: 'asc' }]));
+		expect(r.map((x) => (x.response as { certification: string }).certification)).toEqual(['G', 'R', 'NR']);
+	});
+
+	it('Budget, Votes, Collection, Synopsis and TMDB ID are picker columns', () => {
+		const ids = DATA_COLUMNS.map((c) => c.colId);
+		for (const id of ['budget', 'votes', 'collection', 'synopsis', 'tmdbId']) expect(ids).toContain(id);
+	});
+});
+
+describe('Movie default column set', () => {
+	it('is detected only when the type filter is exactly MOVIE', () => {
+		expect(isMovieOnlyTypeFilter('movie')).toBe(true);
+		expect(isMovieOnlyTypeFilter(' Movie ')).toBe(true);
+		expect(isMovieOnlyTypeFilter('movie,youtube_video')).toBe(false);
+		expect(isMovieOnlyTypeFilter('youtube_video')).toBe(false);
+		expect(isMovieOnlyTypeFilter(undefined)).toBe(false);
+	});
+
+	it('shows the spec default columns at lg and omits Date Added', () => {
+		const { visible } = defaultColumnVisibility('lg', true);
+		expect(visible).toEqual(
+			expect.arrayContaining([
+				'perspectize',
+				'item',
+				'genre',
+				'rated',
+				'cast',
+				'duration',
+				'released',
+				'boxOffice',
+				'vsBudget',
+				'tmdbScore',
+				'tags',
+			]),
+		);
+		expect(visible).not.toContain('createdAt');
+		expect(visible).not.toContain('type');
+		for (const id of ['budget', 'votes', 'collection', 'synopsis', 'tmdbId', 'views', 'likes', 'channel']) {
+			expect(visible, id).not.toContain(id);
+		}
+	});
+
+	it('reveals Movie columns progressively by tier', () => {
+		expect(defaultColumnVisibility('xs', true).visible).toEqual(['perspectize', 'item']);
+		const md = defaultColumnVisibility('md', true).visible;
+		expect(md).toContain('cast');
+		expect(md).not.toContain('boxOffice');
+	});
+
+	it('keeps the YouTube set unchanged and hides every Movie column', () => {
+		const lg = defaultColumnVisibility('lg', false);
+		expect(lg.visible).toEqual(
+			expect.arrayContaining([
+				'item',
+				'type',
+				'perspectize',
+				'category',
+				'channel',
+				'duration',
+				'publishDate',
+				'views',
+				'likes',
+				'percentLiked',
+				'tags',
+			]),
+		);
+		for (const id of ['genre', 'rated', 'cast', 'released', 'boxOffice', 'vsBudget', 'tmdbScore']) {
+			expect(lg.visible, id).not.toContain(id);
+			expect(lg.hidden, id).toContain(id);
+		}
+		expect(lg.hidden).toContain('description');
+		expect(defaultColumnVisibility('xs', false).visible).toEqual(['item', 'type', 'perspectize']);
+	});
+
+	it('every column is either shown or hidden, never both', () => {
+		for (const tier of ['xs', 'sm', 'md', 'lg'] as const) {
+			for (const movieOnly of [true, false]) {
+				const { visible, hidden } = defaultColumnVisibility(tier, movieOnly);
+				expect(visible.filter((c) => hidden.includes(c))).toEqual([]);
+			}
+		}
+	});
+});
+
+describe('Movie search scopes', () => {
+	it('lists Cast and Director as search scopes when the type filter includes movies', () => {
+		const p = parseGridParams(new URLSearchParams('f.type=movie'));
+		expect(p.qFields).toEqual(['title', 'desc', 'channel', 'tags', 'cast', 'director']);
+	});
+
+	it('keeps the four base scopes for non-movie views', () => {
+		expect(parseGridParams(new URLSearchParams('f.type=youtube_video')).qFields).toEqual([
+			'title',
+			'desc',
+			'channel',
+			'tags',
+		]);
+	});
+
+	it('maps cast and director to the backend enum values', () => {
+		const f = urlParamsToGraphQLFilter({ type: 'movie' }, 'nolan', ['cast', 'director']);
+		expect(f?.searchFields).toEqual(['CAST', 'DIRECTOR']);
+		expect(f?.contentTypes).toEqual(['MOVIE']);
+	});
+
+	it('omits qf from the URL when it is the default for the filter, includes it otherwise', () => {
+		const defaults = parseGridParams(new URLSearchParams('f.type=movie'));
+		expect(serializeGridParams(defaults)).not.toContain('qf=');
+		const narrowed = { ...defaults, qFields: ['cast' as const] };
+		expect(serializeGridParams(narrowed)).toContain('qf=cast');
+		expect(parseGridParams(new URLSearchParams(serializeGridParams(narrowed))).qFields).toEqual(['cast']);
+	});
+});

@@ -20,10 +20,21 @@ import {
 export type DataMode = 'all' | 'loaded';
 
 /** Which columns the `q` search box matches against. */
-export type SearchScopeKey = 'title' | 'desc' | 'channel' | 'tags';
+export type SearchScopeKey = 'title' | 'desc' | 'channel' | 'tags' | 'cast' | 'director';
 
-/** All available search scopes — the search box matches everything by default. */
+/** The scopes every view searches by default (and the whole picker outside Movie views). */
 export const ALL_SEARCH_SCOPES: SearchScopeKey[] = ['title', 'desc', 'channel', 'tags'];
+
+/** Extra scopes offered, and on by default, only while the type filter includes MOVIE. */
+export const MOVIE_SEARCH_SCOPES: SearchScopeKey[] = ['cast', 'director'];
+
+const EVERY_SEARCH_SCOPE: SearchScopeKey[] = [...ALL_SEARCH_SCOPES, ...MOVIE_SEARCH_SCOPES];
+
+/** Scopes offered (and on by default) for a given set of URL filters: Cast/Director join in when `f.type` includes movie. */
+export function searchScopesFor(filters: Record<string, string>): SearchScopeKey[] {
+	const types = (filters.type ?? '').split(',').map((t) => t.trim().toLowerCase());
+	return types.includes('movie') ? EVERY_SEARCH_SCOPE : ALL_SEARCH_SCOPES;
+}
 
 /** One column of a multi-column sort, in priority order (first = primary). */
 export interface SortSpec {
@@ -161,22 +172,22 @@ export function parseGridParams(params: URLSearchParams): GridParams {
 		pageSize:
 			pageSize !== null && !isNaN(Number(pageSize)) && Number(pageSize) > 0 ? Number(pageSize) : GRID_DEFAULTS.pageSize,
 		q: q ?? GRID_DEFAULTS.q,
-		qFields: parseSearchScopes(qf),
+		qFields: parseSearchScopes(qf, searchScopesFor(filters)),
 		filters,
 	};
 }
 
 /** Parse the `qf` URL value into a validated, de-duped list of scope keys. Falls back to "all" when absent, empty, or entirely invalid. */
-function parseSearchScopes(qf: string | null): SearchScopeKey[] {
-	if (!qf) return ALL_SEARCH_SCOPES;
-	const valid = new Set(ALL_SEARCH_SCOPES);
+function parseSearchScopes(qf: string | null, defaults: SearchScopeKey[]): SearchScopeKey[] {
+	if (!qf) return defaults;
+	const valid = new Set(EVERY_SEARCH_SCOPE);
 	const parsed = qf
 		.split(',')
 		.map((s) => s.trim())
 		.filter((s): s is SearchScopeKey => valid.has(s as SearchScopeKey));
-	// De-dupe while preserving ALL_SEARCH_SCOPES order for a stable serialized form.
+	// De-dupe while preserving canonical order for a stable serialized form.
 	const selected = new Set(parsed);
-	return selected.size > 0 ? ALL_SEARCH_SCOPES.filter((s) => selected.has(s)) : ALL_SEARCH_SCOPES;
+	return selected.size > 0 ? EVERY_SEARCH_SCOPE.filter((s) => selected.has(s)) : defaults;
 }
 
 /** Serialize GridParams to URL search string (omitting defaults) */
@@ -188,7 +199,7 @@ export function serializeGridParams(state: GridParams): string {
 	if (state.page !== GRID_DEFAULTS.page) params.set('page', String(state.page));
 	if (state.pageSize !== GRID_DEFAULTS.pageSize) params.set('pageSize', String(state.pageSize));
 	if (state.q !== GRID_DEFAULTS.q) params.set('q', state.q);
-	if (!sameScopes(state.qFields, GRID_DEFAULTS.qFields)) params.set('qf', state.qFields.join(','));
+	if (!sameScopes(state.qFields, searchScopesFor(state.filters))) params.set('qf', state.qFields.join(','));
 
 	if (!filtersEqual(state.filters, GRID_DEFAULTS.filters)) {
 		const entries = Object.entries(state.filters);
@@ -412,7 +423,7 @@ export function urlParamsToFilter(filters: Record<string, string>): Record<strin
 // ---------------------------------------------------------------------------
 
 /** GraphQL ContentSearchField enum values (backend `schema.graphql`) */
-export type ContentSearchFieldGQL = 'TITLE' | 'DESCRIPTION' | 'CHANNEL_TITLE' | 'TAGS';
+export type ContentSearchFieldGQL = 'TITLE' | 'DESCRIPTION' | 'CHANNEL_TITLE' | 'TAGS' | 'CAST' | 'DIRECTOR';
 
 /** UI scope key → GraphQL ContentSearchField enum value */
 const SCOPE_TO_GQL_FIELD: Record<SearchScopeKey, ContentSearchFieldGQL> = {
@@ -420,6 +431,8 @@ const SCOPE_TO_GQL_FIELD: Record<SearchScopeKey, ContentSearchFieldGQL> = {
 	desc: 'DESCRIPTION',
 	channel: 'CHANNEL_TITLE',
 	tags: 'TAGS',
+	cast: 'CAST',
+	director: 'DIRECTOR',
 };
 
 /** GraphQL ContentFilter input — defined here so Plan 02 (Wave 1) doesn't depend on Plan 03 */

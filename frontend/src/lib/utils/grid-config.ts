@@ -3,7 +3,15 @@
  * Pure functions and constants that can be unit-tested without a browser.
  */
 import type { ContentItem, ContentType } from '$lib/queries/content';
-import { percentLikedValueGetter, formatTags } from './formatting';
+import {
+	percentLikedValueGetter,
+	formatTags,
+	contentTags,
+	movieResponse,
+	ageRatingRank,
+	boxOfficeValueGetter,
+	vsBudgetValueGetter,
+} from './formatting';
 
 /**
  * Display label for a content type — used by the type column valueGetter.
@@ -25,6 +33,7 @@ const CONTENT_TYPE_LABELS: Partial<Record<ContentType, string>> = {
 	YOUTUBE_VIDEO: 'YouTube Video',
 	// CLAIM: 'Claim', // not ready in the UI yet; uncomment to offer it in the filter
 	BIBLE_PASSAGE: 'Bible Passage',
+	MOVIE: 'Movie',
 };
 
 /** Type-filter options. `value` is the lowercased form used in the filter model and `f.type=` URL param. */
@@ -138,9 +147,24 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		filterSet: true,
 	},
 	{ colId: 'category', label: 'Category', picker: 'data', sortable: false },
+	// Movie columns (MOVIE rows read their `response` JSON; see formatting.ts). Shown by
+	// default only when the type filter is exactly MOVIE (defaultColumnVisibility below).
+	{ colId: 'genre', label: 'Genre', picker: 'data', sortable: false },
+	{
+		colId: 'rated',
+		label: 'Rated',
+		picker: 'data',
+		sortable: true,
+		// Orders by rating (G < PG < PG-13 < R < NC-17, unrated last), not A-Z; the server does the same.
+		sortValue: (row) => ageRatingRank(movieResponse(row)?.certification),
+		serverSort: 'AGE_RATING',
+	},
+	// One column for people: directors first, then billed cast. Not sortable (a person list has no order);
+	// searched via the Cast / Director search scopes instead.
+	{ colId: 'cast', label: 'Cast', picker: 'data', sortable: false },
 	{
 		colId: 'duration',
-		label: 'Length',
+		label: 'Duration',
 		picker: 'data',
 		sortable: true,
 		sortValue: (row) => row.length,
@@ -183,6 +207,25 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		sortValue: (row) => percentLikedValueGetter({ data: row }),
 		serverSort: 'PERCENT_LIKED',
 	},
+	// Released has no server sort (PUBLISHED_AT reads the YouTube path), so it is not sortable at all.
+	{ colId: 'released', label: 'Released', picker: 'data', sortable: false },
+	{
+		colId: 'boxOffice',
+		label: 'Box office',
+		picker: 'data',
+		sortable: true,
+		sortValue: (row) => boxOfficeValueGetter({ data: row }),
+		serverSort: 'BOX_OFFICE',
+	},
+	{
+		colId: 'vsBudget',
+		label: 'Vs. budget',
+		picker: 'data',
+		sortable: true,
+		sortValue: (row) => vsBudgetValueGetter({ data: row }),
+		serverSort: 'VS_BUDGET',
+	},
+	{ colId: 'tmdbScore', label: 'TMDB Score', picker: 'data', sortable: false },
 	{
 		colId: 'publishDate',
 		label: 'Date',
@@ -210,7 +253,7 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		picker: 'data',
 		sortable: false,
 		filterKey: 'tags',
-		filterValue: (row) => formatTags(row.tags).toLowerCase(),
+		filterValue: (row) => formatTags(contentTags(row)).toLowerCase(),
 	},
 	{
 		colId: 'description',
@@ -220,6 +263,12 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		filterKey: 'desc',
 		filterValue: (row) => row.description?.toLowerCase() ?? null,
 	},
+	// Movie picker-only columns (never in the default set).
+	{ colId: 'budget', label: 'Budget', picker: 'data', sortable: false },
+	{ colId: 'votes', label: 'Votes', picker: 'data', sortable: false },
+	{ colId: 'collection', label: 'Collection', picker: 'data', sortable: false },
+	{ colId: 'synopsis', label: 'Synopsis', picker: 'data', sortable: false },
+	{ colId: 'tmdbId', label: 'TMDB ID', picker: 'data', sortable: false },
 	{
 		colId: 'createdAt',
 		label: 'Date Added',
@@ -246,6 +295,69 @@ export const COLUMNS: readonly ColumnMeta[] = [
 	{ colId: 'addedByUserID', label: 'Submitter', picker: 'admin', sortable: false },
 	{ colId: 'url', label: 'Source URL', picker: 'admin', sortable: false },
 ] as const;
+
+// ---------------------------------------------------------------------------
+// Default column visibility (responsive tiers x Movie set)
+// ---------------------------------------------------------------------------
+
+export type ResponsiveTier = 'xs' | 'sm' | 'md' | 'lg';
+
+/** True when the `f.type` URL value names exactly one type and it is MOVIE. */
+export function isMovieOnlyTypeFilter(typeFilter: string | undefined): boolean {
+	if (!typeFilter) return false;
+	const types = typeFilter
+		.split(',')
+		.map((t) => t.trim().toLowerCase())
+		.filter(Boolean);
+	return types.length === 1 && types[0] === 'movie';
+}
+
+/** Per-tier column lists. Columns in `hidden` are forced off; createdAt/updatedAt and the admin columns are in neither list (colDef `hide: true`, picker only). */
+const MOVIE_ONLY_PICKER = ['budget', 'votes', 'collection', 'synopsis', 'tmdbId'];
+const MOVIE_DEFAULT_COLS = ['genre', 'rated', 'cast', 'released', 'boxOffice', 'vsBudget', 'tmdbScore'];
+
+/**
+ * Which grid columns the responsive system shows at a tier. With the type filter
+ * exactly MOVIE (Type is redundant when one type is in view) the Movie default
+ * set applies: ◎ Film Genre Rated Cast Duration Released Box office Vs. budget
+ * TMDB Score Tags (Date Added, Budget, Collection, Votes, Synopsis, TMDB ID stay
+ * in the picker). Any other filter keeps the YouTube layout and hides the Movie
+ * columns, which would be empty. Mirrored by the colDef `hide` flags in
+ * ActivityTable.svelte (initial default); this is the override that wins.
+ */
+export function defaultColumnVisibility(
+	tier: ResponsiveTier,
+	movieOnly: boolean,
+): { visible: string[]; hidden: string[] } {
+	const sm = tier !== 'xs';
+	const md = tier === 'md' || tier === 'lg';
+	const lg = tier === 'lg';
+	const visible: string[] = movieOnly ? ['perspectize', 'item'] : ['item', 'type', 'perspectize'];
+	if (movieOnly) {
+		if (sm) visible.push('genre', 'rated');
+		if (md) visible.push('cast', 'duration', 'released');
+		if (lg) visible.push('boxOffice', 'vsBudget', 'tmdbScore', 'tags');
+	} else {
+		if (sm) visible.push('category', 'channel');
+		if (md) visible.push('duration', 'publishDate');
+		if (lg) visible.push('views', 'likes', 'percentLiked', 'tags');
+	}
+	const managed = [
+		'type',
+		'category',
+		'channel',
+		'duration',
+		'publishDate',
+		'views',
+		'likes',
+		'percentLiked',
+		'tags',
+		'description',
+		...MOVIE_DEFAULT_COLS,
+		...MOVIE_ONLY_PICKER,
+	];
+	return { visible, hidden: managed.filter((c) => !visible.includes(c)) };
+}
 
 /** Column-picker registry entry — just the fields ColumnPickerDialog/SortPickerDialog need. */
 export interface TogglableColumn {
