@@ -5,6 +5,7 @@ import { graphqlRequest } from '../client';
 import { CREATE_CONTENT_FROM_MOVIE, type CreateContentFromMovieResponse } from './index';
 import { queryKeys } from '../keys';
 import { activityContentHref } from '$lib/utils/contentLinks';
+import { contentNotAllowedMessage } from '$lib/utils/movie';
 
 export function useAddMovie() {
 	const queryClient = useQueryClient();
@@ -27,8 +28,11 @@ export function useAddMovie() {
 		},
 		onError: (err: Error) => {
 			console.error('[AddMovie] mutation failed:', err);
+			const notAllowed = contentNotAllowedMessage(err);
 			const message = err.message.toLowerCase();
-			if (message.includes('load failed') || message.includes('failed to fetch')) {
+			if (notAllowed) {
+				toast.error(notAllowed);
+			} else if (message.includes('load failed') || message.includes('failed to fetch')) {
 				toast.error('Cannot reach the server. Check your connection and try again.');
 			} else if (message.includes('invalid movie url') || message.includes('movie not found')) {
 				toast.error('Invalid movie link or movie not found');

@@ -8,11 +8,13 @@ const mocks = vi.hoisted(() => ({
 	reset: vi.fn(),
 	// Reactive flags (filled in by the mock factory) so a test can flip them mid-render.
 	flags: null as null | Map<string, boolean>,
+	errorState: null as null | Map<string, unknown>,
 }));
 
 vi.mock('$lib/queries/content/useAddMovie', async () => {
 	const { SvelteMap } = await import('svelte/reactivity');
 	mocks.flags = new SvelteMap<string, boolean>();
+	mocks.errorState = new SvelteMap<string, unknown>();
 	const flag = (k: string) => mocks.flags!.get(k) ?? false;
 	return {
 		useAddMovie: () => ({
@@ -24,6 +26,9 @@ vi.mock('$lib/queries/content/useAddMovie', async () => {
 			get isSuccess() {
 				return flag('isSuccess');
 			},
+			get error() {
+				return mocks.errorState!.get('error') ?? null;
+			},
 			get isError() {
 				return flag('isError');
 			},
@@ -31,6 +36,8 @@ vi.mock('$lib/queries/content/useAddMovie', async () => {
 	};
 });
 
+const NOT_ALLOWED =
+	'While Perspectize does not intend to act as censor, adding NSFW content is not enabled until traffic necessitates a long-term decision about content access policies.';
 const ATTRIBUTION = 'This product uses the TMDB API but is not endorsed or certified by TMDB.';
 
 async function openForm() {
@@ -48,6 +55,7 @@ describe('AddMoviePopover', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mocks.flags!.clear();
+		mocks.errorState!.clear();
 	});
 
 	it('idle: shows an empty input, a disabled Add button, no messages, and the TMDB attribution', async () => {
@@ -99,6 +107,26 @@ describe('AddMoviePopover', () => {
 		const input = await openForm();
 		expect(screen.getByText(/could not add this movie/i)).toBeInTheDocument();
 		expect(input).toBeEnabled();
+	});
+
+	it('error with a generic server error keeps the generic message', async () => {
+		mocks.flags!.set('isError', true);
+		mocks.errorState!.set('error', { response: { errors: [{ message: 'boom', extensions: { code: 'INTERNAL' } }] } });
+		await openForm();
+		expect(screen.getByText('Could not add this movie. Check the link and try again.')).toBeInTheDocument();
+		expect(screen.queryByText('boom')).not.toBeInTheDocument();
+	});
+
+	it('error CONTENT_NOT_ALLOWED: shows the exact server text and stays open', async () => {
+		mocks.flags!.set('isError', true);
+		mocks.errorState!.set('error', {
+			response: { errors: [{ message: NOT_ALLOWED, extensions: { code: 'CONTENT_NOT_ALLOWED' } }] },
+		});
+		const input = await openForm();
+		expect(screen.getByText(NOT_ALLOWED)).toBeInTheDocument();
+		expect(screen.queryByText(/could not add this movie/i)).not.toBeInTheDocument();
+		expect(input).toBeEnabled();
+		expect(screen.getByLabelText(/tmdb or imdb link/i)).toBeInTheDocument();
 	});
 
 	it('success: closes the form', async () => {

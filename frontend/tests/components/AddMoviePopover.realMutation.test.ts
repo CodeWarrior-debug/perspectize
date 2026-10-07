@@ -71,6 +71,22 @@ describe('AddMoviePopover with the real useAddMovie mutation', () => {
 		expect(screen.getByLabelText(/tmdb or imdb link/i)).toHaveValue(URL_OK);
 	});
 
+	it('shows the exact server message and stays open for a CONTENT_NOT_ALLOWED rejection', async () => {
+		const message = 'While Perspectize does not intend to act as censor, adding NSFW content is not enabled.';
+		mocks.graphqlRequest.mockRejectedValue(
+			Object.assign(new Error(message), {
+				response: { errors: [{ message, extensions: { code: 'CONTENT_NOT_ALLOWED' } }] },
+			}),
+		);
+		renderPopover();
+		const input = await openForm();
+		await submit(input, URL_OK);
+
+		expect(await screen.findByText(message)).toBeInTheDocument();
+		expect(screen.queryByText(/could not add this movie/i)).not.toBeInTheDocument();
+		expect(screen.getByLabelText(/tmdb or imdb link/i)).toHaveValue(URL_OK);
+	});
+
 	it('reopens after a success with an empty input and no stale state', async () => {
 		mocks.graphqlRequest.mockResolvedValue({ createContentFromMovie: { id: '1', name: 'Heat' } });
 		renderPopover();

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateMovieInput } from '$lib/utils/movie';
+import { contentNotAllowedMessage, validateMovieInput } from '$lib/utils/movie';
 
 describe('validateMovieInput', () => {
 	it.each([
@@ -39,5 +39,27 @@ describe('validateMovieInput', () => {
 		['bare number', '603'],
 	])('rejects %s', (_name, input) => {
 		expect(validateMovieInput(input)).toBe(false);
+	});
+});
+
+describe('contentNotAllowedMessage', () => {
+	const err = (errors: unknown[]) => ({ response: { errors } });
+
+	it('returns the server message verbatim for CONTENT_NOT_ALLOWED', () => {
+		expect(contentNotAllowedMessage(err([{ message: 'No NC-17.', extensions: { code: 'CONTENT_NOT_ALLOWED' } }]))).toBe(
+			'No NC-17.',
+		);
+	});
+
+	it.each([
+		['another code', err([{ message: 'x', extensions: { code: 'INTERNAL' } }])],
+		['no extensions', err([{ message: 'x' }])],
+		['empty errors', err([])],
+		['no response', new Error('boom')],
+		['null', null],
+		['undefined', undefined],
+		['missing message', err([{ extensions: { code: 'CONTENT_NOT_ALLOWED' } }])],
+	])('returns null for %s', (_n, e) => {
+		expect(contentNotAllowedMessage(e)).toBeNull();
 	});
 });

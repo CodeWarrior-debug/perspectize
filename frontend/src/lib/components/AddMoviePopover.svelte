@@ -3,7 +3,7 @@
 	import { Input, Label } from '$lib/components/shadcn';
 	import FormPopover from '$lib/components/FormPopover.svelte';
 	import { useAddMovie } from '$lib/queries/content/useAddMovie';
-	import { validateMovieInput } from '$lib/utils/movie';
+	import { contentNotAllowedMessage, validateMovieInput } from '$lib/utils/movie';
 	import ClapperboardIcon from '@lucide/svelte/icons/clapperboard';
 
 	let {
@@ -33,6 +33,7 @@
 
 	const trimmed = $derived(input.trim());
 	const isValid = $derived(validateMovieInput(trimmed));
+	const notAllowedMessage = $derived(contentNotAllowedMessage(movieMutation.error));
 	const showInvalid = $derived(trimmed !== '' && !isValid);
 
 	function handleSubmit() {
@@ -72,7 +73,9 @@
 				<p class="text-sm text-destructive">Please enter a valid TMDB or IMDb movie link or IMDb id</p>
 			{/if}
 			{#if movieMutation.isError}
-				<p class="text-sm text-destructive">Could not add this movie. Check the link and try again.</p>
+				<p class="text-sm text-destructive">
+					{notAllowedMessage ?? 'Could not add this movie. Check the link and try again.'}
+				</p>
 			{/if}
 			<p class="text-xs text-muted-foreground">
 				This product uses the TMDB API but is not endorsed or certified by TMDB.

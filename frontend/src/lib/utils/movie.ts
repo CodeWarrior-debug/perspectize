@@ -22,3 +22,15 @@ export function validateMovieInput(raw: string): boolean {
 	if (IMDB_URL_RE.test(s)) return true;
 	return IMDB_ID_RE.test(s.toLowerCase());
 }
+
+/**
+ * The server's message when it rejected the movie as not allowed (extensions.code
+ * CONTENT_NOT_ALLOWED, e.g. NC-17), verbatim; null for every other error. Reads the
+ * graphql-request ClientError shape (`error.response.errors[0]`).
+ */
+export function contentNotAllowedMessage(error: unknown): string | null {
+	const first = (error as { response?: { errors?: unknown[] } } | null | undefined)?.response?.errors?.[0] as
+		{ message?: unknown; extensions?: { code?: unknown } } | undefined;
+	if (first?.extensions?.code !== 'CONTENT_NOT_ALLOWED') return null;
+	return typeof first.message === 'string' && first.message !== '' ? first.message : null;
+}

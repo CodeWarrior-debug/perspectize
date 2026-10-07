@@ -93,6 +93,14 @@ describe('useAddMovie hook', () => {
 			expect(mockToastError).toHaveBeenCalledWith('Failed to add movie. Please try again.');
 		});
 
+		it('CONTENT_NOT_ALLOWED toasts the server message verbatim', () => {
+			const err = Object.assign(new Error('While Perspectize ...: {"response":{}}'), {
+				response: { errors: [{ message: 'No NSFW yet.', extensions: { code: 'CONTENT_NOT_ALLOWED' } }] },
+			});
+			capturedMutationOptions.onError(err);
+			expect(mockToastError).toHaveBeenCalledWith('No NSFW yet.');
+		});
+
 		it('logs the raw error', () => {
 			const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 			const err = new Error('boom');
