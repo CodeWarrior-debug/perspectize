@@ -307,7 +307,8 @@ func (m *mockWikidataClient) GetWikipediaURL(ctx context.Context, qid string) (s
 type graphqlResponse struct {
 	Data   json.RawMessage `json:"data"`
 	Errors []struct {
-		Message string `json:"message"`
+		Message    string         `json:"message"`
+		Extensions map[string]any `json:"extensions"`
 	} `json:"errors"`
 }
 

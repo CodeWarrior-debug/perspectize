@@ -181,3 +181,49 @@ func TestCreateFromMovie_NilMovieClient(t *testing.T) {
 	assert.ErrorIs(t, err, services.ErrMovieClientUnavailable)
 	assert.NotEqual(t, "failed to fetch movie metadata", err.Error())
 }
+
+func TestCreateFromMovie_CertificationPolicy(t *testing.T) {
+	tests := []struct {
+		name         string
+		response     string
+		wantRejected bool
+	}{
+		{"NC-17 rejected", `{"certification":"NC-17"}`, true},
+		{"lowercase nc-17 rejected", `{"certification":"nc-17"}`, true},
+		{"padded NC-17 rejected", `{"certification":"  Nc-17 "}`, true},
+		{"PG-13 allowed", `{"certification":"PG-13"}`, false},
+		{"empty certification allowed", `{"certification":""}`, false},
+		{"missing certification allowed", `{"id":603}`, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mc := &mockMovieClient{getMovieFn: func(ctx context.Context, id int) (*portservices.MovieMetadata, error) {
+				return &portservices.MovieMetadata{TMDBID: 603, Title: "X", Response: json.RawMessage(tt.response)}, nil
+			}}
+			writes := 0
+			repo := &mockContentRepository{
+				createFn: func(ctx context.Context, c *domain.Content) (*domain.Content, error) {
+					writes++
+					return c, nil
+				},
+				getOrCreateByURLFn: func(ctx context.Context, c *domain.Content, r bool) (*domain.Content, bool, error) {
+					writes++
+					return c, false, nil
+				},
+			}
+			svc := services.NewContentService(repo, nil, mc)
+
+			got, err := svc.CreateFromMovie(context.Background(), "https://www.themoviedb.org/movie/603", 1)
+			if tt.wantRejected {
+				require.Error(t, err)
+				assert.True(t, errors.Is(err, domain.ErrContentNotAllowed))
+				assert.Equal(t, "While Perspectize does not intend to act as censor, adding NSFW content is not enabled until traffic necessitates a long-term decision about content access policies.", err.Error())
+				assert.Nil(t, got)
+				assert.Equal(t, 0, writes, "must not persist")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, 1, writes)
+		})
+	}
+}

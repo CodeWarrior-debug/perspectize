@@ -16,6 +16,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 // PrimaryCategory is the resolver for the primaryCategory field.
@@ -204,6 +205,11 @@ func (r *mutationResolver) CreateContentFromMovie(ctx context.Context, input mod
 			return nil, fmt.Errorf("invalid movie URL: use a TMDB or IMDb movie link")
 		case errors.Is(err, domain.ErrNotFound):
 			return nil, fmt.Errorf("movie not found")
+		case errors.Is(err, domain.ErrContentNotAllowed):
+			return nil, &gqlerror.Error{
+				Message:    domain.ErrContentNotAllowed.Error(),
+				Extensions: map[string]any{"code": "CONTENT_NOT_ALLOWED"},
+			}
 		}
 		// Details are already logged server-side by the service layer.
 		return nil, fmt.Errorf("failed to create content from movie")

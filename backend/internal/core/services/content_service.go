@@ -480,6 +480,11 @@ func (s *ContentService) CreateFromMovie(ctx context.Context, rawURL string, use
 		return nil, fmt.Errorf("failed to fetch movie metadata")
 	}
 
+	// Policy: NC-17 movies are not enabled. Checked before any write.
+	if isNC17(metadata.Response) {
+		return nil, domain.ErrContentNotAllowed
+	}
+
 	content := &domain.Content{
 		Name:          metadata.Title,
 		URL:           &canonicalURL,
@@ -501,4 +506,16 @@ func (s *ContentService) CreateFromMovie(ctx context.Context, rawURL string, use
 		return created, domain.ErrAlreadyExists
 	}
 	return created, nil
+}
+
+// isNC17 reports whether the shaped movie payload carries an NC-17 certification
+// (case-insensitive, whitespace-trimmed). Unparseable or empty payloads are allowed.
+func isNC17(response json.RawMessage) bool {
+	var shaped struct {
+		Certification string `json:"certification"`
+	}
+	if err := json.Unmarshal(response, &shaped); err != nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(shaped.Certification), "NC-17")
 }

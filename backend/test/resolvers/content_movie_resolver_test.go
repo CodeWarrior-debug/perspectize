@@ -126,3 +126,23 @@ func TestCreateContentFromMovie_GenericErrorMessage(t *testing.T) {
 	require.NotEmpty(t, result.Errors)
 	assert.Equal(t, "failed to create content from movie", result.Errors[0].Message)
 }
+
+func TestCreateContentFromMovie_NC17MapsToContentNotAllowed(t *testing.T) {
+	writes := 0
+	repo := &mockContentRepository{getOrCreateByURLFn: func(ctx context.Context, c *domain.Content) (*domain.Content, bool, error) {
+		writes++
+		return c, false, nil
+	}}
+	mc := stubMovieClient{get: func(ctx context.Context, id int) (*portservices.MovieMetadata, error) {
+		return &portservices.MovieMetadata{TMDBID: 603, Title: "X", Response: json.RawMessage(`{"certification":"NC-17"}`)}, nil
+	}}
+	server := setupMovieServer(repo, mc)
+	defer server.Close()
+
+	result := executeGraphQL(t, server, movieMutation)
+	require.Len(t, result.Errors, 1)
+	assert.Equal(t, domain.ErrContentNotAllowed.Error(), result.Errors[0].Message)
+	assert.Equal(t, "While Perspectize does not intend to act as censor, adding NSFW content is not enabled until traffic necessitates a long-term decision about content access policies.", result.Errors[0].Message)
+	assert.Equal(t, "CONTENT_NOT_ALLOWED", result.Errors[0].Extensions["code"])
+	assert.Equal(t, 0, writes)
+}
