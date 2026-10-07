@@ -15,8 +15,8 @@
 	import EraserIcon from '@lucide/svelte/icons/eraser';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 
-	type ChosenType = 'YOUTUBE' | 'BIBLE_PASSAGE' | 'CLAIM';
-	const CHOSEN_TYPES: ChosenType[] = ['YOUTUBE', 'BIBLE_PASSAGE', 'CLAIM'];
+	type ChosenType = 'YOUTUBE_VIDEO' | 'BIBLE_PASSAGE' | 'CLAIM';
+	const CHOSEN_TYPES: ChosenType[] = ['YOUTUBE_VIDEO', 'BIBLE_PASSAGE', 'CLAIM'];
 
 	let {
 		triggerVariant = 'default',
@@ -74,12 +74,12 @@
 	const chipLabel = $derived.by(() => {
 		if (!effectiveType) return 'Select a type';
 		const name =
-			effectiveType === 'YOUTUBE' ? 'YouTube' : effectiveType === 'BIBLE_PASSAGE' ? 'Bible passage' : 'Claim';
+			effectiveType === 'YOUTUBE_VIDEO' ? 'YouTube' : effectiveType === 'BIBLE_PASSAGE' ? 'Bible passage' : 'Claim';
 		return manualType ? `Type: ${name}` : `Detected: ${name}`;
 	});
 
 	const isSubmitDisabled = $derived.by(() => {
-		if (effectiveType === 'YOUTUBE') return !input.trim();
+		if (effectiveType === 'YOUTUBE_VIDEO') return !input.trim();
 		if (effectiveType === 'BIBLE_PASSAGE') return !rangeValid;
 		if (effectiveType === 'CLAIM') return !claimValid;
 		return true;
@@ -122,7 +122,7 @@
 	}
 
 	function handleSubmit() {
-		if (effectiveType === 'YOUTUBE') {
+		if (effectiveType === 'YOUTUBE_VIDEO') {
 			const url = input.trim();
 			if (!validateYouTubeUrl(url)) {
 				error = 'Please enter a valid YouTube URL';
@@ -208,7 +208,7 @@
 					disabled={isPending}
 				>
 					<option value="" disabled>Select a type</option>
-					<option value="YOUTUBE">YouTube</option>
+					<option value="YOUTUBE_VIDEO">YouTube</option>
 					<option value="BIBLE_PASSAGE">Bible passage</option>
 					<option value="CLAIM">Claim</option>
 				</select>

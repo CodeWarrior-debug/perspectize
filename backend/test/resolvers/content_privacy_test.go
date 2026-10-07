@@ -50,9 +50,43 @@ func TestContentByID_PrivateHiddenFromOthers(t *testing.T) {
 	server := setupTestServer(repo, &mockYouTubeClient{})
 	defer server.Close()
 
-	result := executeGraphQL(t, server, `{ contentByID(id: "5") { id } }`)
+	result := executeGraphQL(t, server, `{ contentByID(id: "5") { id name } }`)
 	require.Empty(t, result.Errors)
 	assert.JSONEq(t, `{"contentByID": null}`, string(result.Data))
+}
+
+// The id/aggregates-only fast path skips reading the content row; the
+// aggregate query carries privacy + owner so it still hides private rows.
+func TestContentByID_AggregatesOnly_PrivateHiddenFromOthers(t *testing.T) {
+	perspectiveRepo := &mockPerspectiveRepository{
+		aggregateFn: func(ctx context.Context, ids []int) (map[int]*domain.PerspectiveAggregate, error) {
+			return map[int]*domain.PerspectiveAggregate{
+				5: {ContentID: 5, Count: 3, ContentPrivacy: domain.PrivacyPrivate, ContentOwnerID: 2},
+			}, nil
+		},
+	}
+	server := setupTestServerWithRepos(&mockContentRepository{}, &mockYouTubeClient{}, perspectiveRepo, &mockUserRepository{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ contentByID(id: "5") { id perspectiveCount } }`)
+	require.Empty(t, result.Errors)
+	assert.JSONEq(t, `{"contentByID": null}`, string(result.Data))
+}
+
+func TestContentByID_AggregatesOnly_PrivateVisibleToOwner(t *testing.T) {
+	perspectiveRepo := &mockPerspectiveRepository{
+		aggregateFn: func(ctx context.Context, ids []int) (map[int]*domain.PerspectiveAggregate, error) {
+			return map[int]*domain.PerspectiveAggregate{
+				5: {ContentID: 5, Count: 3, ContentPrivacy: domain.PrivacyPrivate, ContentOwnerID: 1},
+			}, nil
+		},
+	}
+	server := setupTestServerWithRepos(&mockContentRepository{}, &mockYouTubeClient{}, perspectiveRepo, &mockUserRepository{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ contentByID(id: "5") { id perspectiveCount } }`)
+	require.Empty(t, result.Errors)
+	assert.JSONEq(t, `{"contentByID": {"id": "5", "perspectiveCount": 3}}`, string(result.Data))
 }
 
 func TestContentByID_UnsetPrivacyReadsAsPublic(t *testing.T) {

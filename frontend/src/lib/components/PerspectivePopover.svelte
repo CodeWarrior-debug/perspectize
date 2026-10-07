@@ -3,6 +3,7 @@
 	import { toast } from 'svelte-sonner';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import InfoIcon from '@lucide/svelte/icons/info';
+	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import { MediaQuery } from 'svelte/reactivity';
 	import {
 		Dialog,
@@ -27,9 +28,9 @@
 	import type { FieldDef } from '$lib/components/AddFieldSearch.svelte';
 	import { useCreatePerspective } from '$lib/queries/perspectives/useCreatePerspective';
 	import { useUpdatePerspective } from '$lib/queries/perspectives/useUpdatePerspective';
-	import type { PerspectiveItem } from '$lib/queries/perspectives';
-	import type { Feeling } from '$lib/components/FeelWheel.svelte';
-	import type { Component } from 'svelte';
+	import { useDeletePerspective } from '$lib/queries/perspectives/useDeletePerspective';
+	import { isOptimisticId, type PerspectiveItem } from '$lib/queries/perspectives';
+	import FeelWheel, { type Feeling } from '$lib/components/FeelWheel.svelte';
 
 	/**
 	 * PerspectivePopover — centered modal for creating or editing a perspective.
@@ -55,11 +56,21 @@
 		userId: number;
 		open?: boolean;
 		onClose: () => void;
-		/** Fired after create/update succeeds (before onClose). */
+		/** Fired after create/update succeeds (before onClose). Not fired on delete. */
 		onSuccess?: () => void;
 	} = $props();
 
 	const isEditMode = $derived(existingPerspective !== null);
+
+	// Delete is offered only when the perspective provably belongs to the signed-in
+	// user (userId is the session user from every caller) — whatever its privacy
+	// (public, private, or any shared state added later); privacy never factors in. A perspective with a
+	// missing/mismatched userID never shows the option, so no one is led to think
+	// they can delete someone else's. The server enforces this independently.
+	const canDelete = $derived(
+		existingPerspective !== null && userId > 0 && String(existingPerspective.userID ?? '') === String(userId),
+	);
+	let confirmingDelete = $state(false);
 
 	// --- Core rating fields (backend-mapped) ---
 	let quality = $state<number | null>(null);
@@ -74,19 +85,10 @@
 	// Privacy toggle — off (PUBLIC) by default
 	let isPrivate = $state(false);
 
-	// Feel-wheel — lazy-loaded only once the picker is opened, so read-only
-	// perspective views never pull the wheel/search-set code into their bundle.
+	// Feel-wheel — bundled with the popover rather than lazy-loaded: a separate
+	// chunk could fail to fetch after a deploy and leave the picker stuck loading.
 	let feelings = $state<Feeling[]>([]);
 	let feelWheelOpen = $state(false);
-	let FeelWheelComponent = $state<Component<{ value: Feeling[] }> | null>(null);
-
-	async function openFeelWheel() {
-		feelWheelOpen = true;
-		if (!FeelWheelComponent) {
-			const mod = await import('$lib/components/FeelWheel.svelte');
-			FeelWheelComponent = mod.default;
-		}
-	}
 
 	// Comment (rich text HTML)
 	let comment = $state('');
@@ -204,14 +206,11 @@
 			restoredFromDraft = false;
 		}
 		commentExpanded = false;
+		confirmingDelete = false;
 		isPrivate = String(existingPerspective?.privacy ?? '').toUpperCase() === 'PRIVATE';
 		const nextFeelings = existingPerspective?.feelings ?? [];
 		feelings = nextFeelings;
-		if (nextFeelings.length > 0) {
-			void openFeelWheel();
-		} else {
-			feelWheelOpen = false;
-		}
+		feelWheelOpen = nextFeelings.length > 0;
 		// Restore dynamic fields from customFields if editing
 		const cf = existingPerspective?.customFields as Record<string, number> | null;
 		if (cf && Object.keys(cf).length > 0) {
@@ -227,7 +226,8 @@
 
 	const createMutation = useCreatePerspective();
 	const updateMutation = useUpdatePerspective();
-	const isPending = $derived(createMutation.isPending || updateMutation.isPending);
+	const deleteMutation = useDeletePerspective();
+	const isPending = $derived(createMutation.isPending || updateMutation.isPending || deleteMutation.isPending);
 
 	const hasComment = $derived(hasReviewContent(comment));
 
@@ -278,8 +278,39 @@
 		return hasReviewContent(comment) ? sanitizeHtml(comment) : undefined;
 	}
 
+	function handleDelete() {
+		// Re-check at the moment of action, not just when the button rendered.
+		if (!canDelete || !existingPerspective) return;
+		if (isStillSaving) {
+			toast.info('Still saving your perspective — try again in a moment');
+			return;
+		}
+		deleteMutation.mutate(
+			{ id: existingPerspective.id, contentID: existingPerspective.contentID },
+			{
+				onSuccess: () => {
+					// The perspective is gone — an unsaved draft for it is meaningless.
+					cancelPendingDraft();
+					clearDraft(draftKey(contentId, userId));
+					confirmingDelete = false;
+					onClose();
+				},
+			},
+		);
+	}
+
+	// A perspective created a moment ago carries a temporary id until the
+	// server replies (see useCreatePerspective); it can't be edited or
+	// deleted by id yet.
+	const isStillSaving = $derived(isOptimisticId(existingPerspective?.id));
+
 	function handleSubmit(e: Event) {
 		e.preventDefault();
+
+		if (isStillSaving) {
+			toast.info('Still saving your perspective — try again in a moment');
+			return;
+		}
 
 		const hasAnyRating = quality !== null || agreement !== null || importance !== null || confidence !== null;
 		const hasLike = likeValue !== null;
@@ -300,9 +331,23 @@
 				}))
 			: undefined;
 
+		// Close immediately instead of waiting for the server: the mutation hooks
+		// patch the cached lists optimistically, so the change is already on
+		// screen, and a slow network (mobile) no longer holds the sheet open for
+		// the full round trip. mutateAsync settles even after this component
+		// unmounts. On failure the hook rolls the optimistic patch back and
+		// offers Retry, and the review text survives as a draft (flushed below,
+		// cleared only once the save succeeds).
+		flushPendingDraft();
+		const key = draftKey(contentId, userId);
+		const afterSave = () => {
+			clearDraft(key);
+			onSuccess?.();
+		};
+
 		if (isEditMode && existingPerspective) {
-			updateMutation.mutate(
-				{
+			updateMutation
+				.mutateAsync({
 					id: parseInt(existingPerspective.id, 10),
 					// Edit mode sends the full form state, not just what changed: a field
 					// the user emptied is sent as null so the server clears it -- unlike
@@ -317,21 +362,13 @@
 					customFields: buildCustomFields() ?? null,
 					feelings: feelingsPayload ?? null,
 					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
-				},
-				{
-					onSuccess: () => {
-						// Cancel first: a debounced save still in flight would re-create the
-						// draft we are about to delete.
-						cancelPendingDraft();
-						clearDraft(draftKey(contentId, userId));
-						onSuccess?.();
-						onClose();
-					},
-				},
-			);
+				})
+				.then(afterSave, () => {
+					// Error toast + Retry come from useUpdatePerspective's onError.
+				});
 		} else {
-			createMutation.mutate(
-				{
+			createMutation
+				.mutateAsync({
 					userID: userId,
 					contentID: contentId,
 					quality: quality ?? undefined,
@@ -343,19 +380,12 @@
 					customFields: buildCustomFields(),
 					feelings: feelingsPayload,
 					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
-				},
-				{
-					onSuccess: () => {
-						// Cancel first: a debounced save still in flight would re-create the
-						// draft we are about to delete.
-						cancelPendingDraft();
-						clearDraft(draftKey(contentId, userId));
-						onSuccess?.();
-						onClose();
-					},
-				},
-			);
+				})
+				.then(afterSave, () => {
+					// Error toast + Retry come from useCreatePerspective's onError.
+				});
 		}
+		onClose();
 	}
 </script>
 
@@ -519,18 +549,16 @@
 			{#if !feelWheelOpen}
 				<button
 					type="button"
-					onclick={openFeelWheel}
+					onclick={() => (feelWheelOpen = true)}
 					class="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-2 text-sm text-muted-foreground hover:opacity-70"
 				>
 					<span class="text-base leading-none">🙂</span>
 					Add a feeling
 				</button>
-			{:else if FeelWheelComponent}
-				<div class="rounded-md border border-border p-3">
-					<FeelWheelComponent bind:value={feelings} />
-				</div>
 			{:else}
-				<div class="text-center text-sm text-muted-foreground py-4">Loading feel-wheel…</div>
+				<div class="rounded-md border border-border p-3">
+					<FeelWheel bind:value={feelings} />
+				</div>
 			{/if}
 
 			<div class="flex items-center justify-between rounded-md border border-border px-3 py-2">
@@ -547,23 +575,67 @@
 			class="shrink-0 flex gap-2.5 px-5 border-t border-border bg-background"
 			style="padding-top: 14px; padding-bottom: {mobile ? 'calc(22px + env(safe-area-inset-bottom))' : '14px'};"
 		>
-			<Button
-				type="button"
-				variant="outline"
-				size="default"
-				onclick={() => onClose()}
-				disabled={isPending}
-				class="flex-1"
-			>
-				Cancel
-			</Button>
-			<Button type="submit" size="default" disabled={isPending} class="flex-1">
-				{#if isPending}
-					{isEditMode ? 'Saving...' : 'Adding...'}
-				{:else}
-					Save perspective
+			{#if canDelete && confirmingDelete}
+				<div class="flex flex-1 flex-col gap-2.5" role="alertdialog" aria-labelledby="perspective-delete-confirm">
+					<p id="perspective-delete-confirm" class="text-sm text-center">
+						Delete this perspective? This can't be undone.
+					</p>
+					<div class="flex gap-2.5">
+						<Button
+							type="button"
+							variant="outline"
+							size="default"
+							onclick={() => (confirmingDelete = false)}
+							disabled={isPending}
+							class="flex-1"
+						>
+							Keep it
+						</Button>
+						<Button
+							type="button"
+							variant="destructive"
+							size="default"
+							onclick={handleDelete}
+							disabled={isPending}
+							class="flex-1"
+						>
+							{deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+						</Button>
+					</div>
+				</div>
+			{:else}
+				{#if canDelete}
+					<Button
+						type="button"
+						variant="outline"
+						size="default"
+						onclick={() => (confirmingDelete = true)}
+						disabled={isPending}
+						aria-label="Delete perspective"
+						title="Delete perspective"
+						class="shrink-0 text-destructive hover:text-destructive"
+					>
+						<Trash2Icon class="size-4" />
+					</Button>
 				{/if}
-			</Button>
+				<Button
+					type="button"
+					variant="outline"
+					size="default"
+					onclick={() => onClose()}
+					disabled={isPending}
+					class="flex-1"
+				>
+					Cancel
+				</Button>
+				<Button type="submit" size="default" disabled={isPending} class="flex-1">
+					{#if isPending}
+						{isEditMode ? 'Saving...' : 'Adding...'}
+					{:else}
+						Save perspective
+					{/if}
+				</Button>
+			{/if}
 		</div>
 	</form>
 {/snippet}

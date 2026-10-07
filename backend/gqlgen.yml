@@ -100,8 +100,19 @@ models:
     fields:
       email:
         resolver: true
+  # Batched through the per-request user / content loaders (they were plain
+  # model fields nothing ever set, so they always resolved to null).
+  Perspective:
+    fields:
+      user:
+        resolver: true
+      content:
+        resolver: true
   Content:
     fields:
+      # Batched through the per-request user loader.
+      addedBy:
+        resolver: true
       primaryCategory:
         resolver: true
       perspectiveCount:

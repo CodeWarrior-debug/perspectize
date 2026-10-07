@@ -26,6 +26,23 @@ import (
 // a per-request dataloader that batches every row's lookup on a page into one
 // `WHERE id IN (...)` query. If the dataloader middleware is not installed
 // (e.g. a direct resolver unit test), it falls back to a single-row service call.
+// AddedBy is the resolver for the addedBy field, batched through the
+// per-request user loader.
+func (r *contentResolver) AddedBy(ctx context.Context, obj *model.Content) (*model.User, error) {
+	id, err := strconv.Atoi(obj.AddedByUserID)
+	if err != nil {
+		return nil, nil
+	}
+	u, err := r.userByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return userDomainToModel(u), nil
+}
+
 func (r *contentResolver) PrimaryCategory(ctx context.Context, obj *model.Content) (*model.Category, error) {
 	if obj.PrimaryCategoryID == nil {
 		return nil, nil
@@ -100,7 +117,7 @@ func (r *contentResolver) QualityRatingCount(ctx context.Context, obj *model.Con
 
 // loadPerspectiveAggregate is the shared fetch behind PerspectiveCount,
 // AverageRating, and QualityRatingCount. Returns (nil, nil) when the content
-// has no perspectives at all.
+// has no perspectives at all (or doesn't exist).
 func (r *contentResolver) loadPerspectiveAggregate(ctx context.Context, obj *model.Content) (*domain.PerspectiveAggregate, error) {
 	contentID, err := strconv.Atoi(obj.ID)
 	if err != nil {
@@ -108,24 +125,42 @@ func (r *contentResolver) loadPerspectiveAggregate(ctx context.Context, obj *mod
 		return nil, nil
 	}
 
-	if loaders := dataloader.For(ctx); loaders != nil {
-		agg, err := loaders.PerspectiveAggregateByContentID.Load(ctx, contentID)
-		if err != nil {
-			if dataloader.IsNotFound(err) {
-				return nil, nil
-			}
-			slog.Error("resolving perspective aggregate via dataloader failed", "contentID", contentID, "error", err)
-			return nil, nil
-		}
-		return agg, nil
-	}
-
-	aggregates, err := r.PerspectiveService.AggregateByContentIDs(ctx, []int{contentID})
+	agg, _, err := r.fetchPerspectiveAggregate(ctx, contentID)
 	if err != nil {
 		slog.Error("resolving perspective aggregate failed", "contentID", contentID, "error", err)
 		return nil, nil
 	}
-	return aggregates[contentID], nil
+	// The repository returns a zero-count entry for content that exists but has
+	// no perspectives; the fields keep resolving that to null, as before.
+	if agg == nil || agg.Count == 0 {
+		return nil, nil
+	}
+	return agg, nil
+}
+
+// fetchPerspectiveAggregate loads one content id's aggregate through the
+// per-request dataloader (falling back to a single-row service call when the
+// middleware isn't installed). found is false when no content row exists for
+// the id: the aggregate query is driven from the content table, so an existing
+// content with no perspectives comes back as a zero-count entry, not as absent.
+func (r *Resolver) fetchPerspectiveAggregate(ctx context.Context, contentID int) (agg *domain.PerspectiveAggregate, found bool, err error) {
+	if loaders := dataloader.For(ctx); loaders != nil {
+		agg, err := loaders.PerspectiveAggregateByContentID.Load(ctx, contentID)
+		if err != nil {
+			if dataloader.IsNotFound(err) {
+				return nil, false, nil
+			}
+			return nil, false, err
+		}
+		return agg, true, nil
+	}
+
+	aggregates, err := r.PerspectiveService.AggregateByContentIDs(ctx, []int{contentID})
+	if err != nil {
+		return nil, false, err
+	}
+	agg, found = aggregates[contentID]
+	return agg, found, nil
 }
 
 // CreateContentFromYouTube is the resolver for the createContentFromYouTube field.
@@ -350,6 +385,28 @@ func (r *queryResolver) ContentByID(ctx context.Context, id string) (*model.Cont
 		return nil, fmt.Errorf("invalid content ID: %s", id)
 	}
 
+	// The details modal asks only for aggregates (GET_CONTENT_AGGREGATES).
+	// Those resolve from the id alone through the aggregate loader, so don't
+	// read the whole row (JSONB response included) just to throw it away.
+	// The aggregate query is driven from the content table, so it doubles as
+	// the existence check: an unknown id is absent from it and still answers
+	// "not found", with no extra statement. The loader caches the result, so
+	// the aggregate fields reuse this same load.
+	if onlyIDAndAggregatesSelected(ctx) {
+		agg, found, err := r.fetchPerspectiveAggregate(ctx, intID)
+		if err != nil {
+			slog.Error("checking content existence via aggregate failed", "id", id, "error", err)
+			return nil, fmt.Errorf("failed to get content")
+		}
+		if !found {
+			return nil, fmt.Errorf("content not found with ID: %s", id)
+		}
+		if !canViewContent(ctx, agg.ContentPrivacy, agg.ContentOwnerID) {
+			return nil, nil
+		}
+		return &model.Content{ID: strconv.Itoa(intID)}, nil
+	}
+
 	content, err := r.ContentService.GetByID(ctx, intID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
@@ -364,11 +421,8 @@ func (r *queryResolver) ContentByID(ctx context.Context, id string) (*model.Cont
 
 	// Private content is visible only to its owner; return nil (not an error)
 	// so the id's existence isn't disclosed — same convention as PerspectiveByID.
-	if content.Privacy == domain.PrivacyPrivate {
-		viewer, ok := auth.ForContext(ctx)
-		if !ok || viewer.ID != content.AddedByUserID {
-			return nil, nil
-		}
+	if !canViewContent(ctx, content.Privacy, content.AddedByUserID) {
+		return nil, nil
 	}
 
 	return domainToModel(content), nil
@@ -417,6 +471,7 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		if filter.ContentType != nil {
 			params.Filter.ContentType = filter.ContentType
 		}
+		params.Filter.ContentTypes = filter.ContentTypes
 		params.Filter.MinLengthSeconds = filter.MinLengthSeconds
 		params.Filter.MaxLengthSeconds = filter.MaxLengthSeconds
 		params.Filter.Search = filter.Search

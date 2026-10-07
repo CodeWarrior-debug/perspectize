@@ -17,7 +17,7 @@ function row(overrides: Partial<ContentItem>): ContentItem {
 		name: '',
 		addedByUserID: '1',
 		url: null,
-		contentType: 'YOUTUBE',
+		contentType: 'YOUTUBE_VIDEO',
 		length: null,
 		lengthUnits: null,
 		viewCount: null,
@@ -38,8 +38,12 @@ function row(overrides: Partial<ContentItem>): ContentItem {
 // ---------------------------------------------------------------------------
 describe('capitalizeContentType', () => {
 	it('capitalizes first letter and lowercases rest', () => {
-		expect(capitalizeContentType('YOUTUBE')).toBe('Youtube');
-		expect(capitalizeContentType('youtube_video')).toBe('Youtube_video');
+		expect(capitalizeContentType('CLAIM')).toBe('Claim');
+	});
+
+	it('shows youtube_video as "YouTube Video" in any casing', () => {
+		expect(capitalizeContentType('YOUTUBE_VIDEO')).toBe('YouTube Video');
+		expect(capitalizeContentType('youtube_video')).toBe('YouTube Video');
 	});
 
 	it('returns empty string for undefined', () => {
@@ -261,9 +265,19 @@ describe('filterContentRows', () => {
 	});
 
 	it('filters by a text "contains" filter (e.g. the default type: youtube filter)', () => {
-		const rows = [row({ id: '1', contentType: 'YOUTUBE' }), row({ id: '2', contentType: 'CLAIM' })];
+		const rows = [row({ id: '1', contentType: 'YOUTUBE_VIDEO' }), row({ id: '2', contentType: 'CLAIM' })];
 		const result = filterContentRows(rows, { type: { filterType: 'text', type: 'contains', filter: 'youtube' } });
 		expect(result.map((r) => r.id)).toEqual(['1']);
+	});
+
+	it('filters by a set filter, matching any of the selected types', () => {
+		const rows = [
+			row({ id: '1', contentType: 'YOUTUBE' }),
+			row({ id: '2', contentType: 'CLAIM' }),
+			row({ id: '3', contentType: 'BIBLE_PASSAGE' }),
+		];
+		const result = filterContentRows(rows, { type: { filterType: 'set', values: ['youtube', 'bible_passage'] } });
+		expect(result.map((r) => r.id)).toEqual(['1', '3']);
 	});
 
 	it('filters by a number range (views)', () => {
@@ -299,8 +313,8 @@ describe('filterContentRows', () => {
 
 	it('applies multiple filters as AND', () => {
 		const rows = [
-			row({ id: '1', contentType: 'YOUTUBE', viewCount: 500 }),
-			row({ id: '2', contentType: 'YOUTUBE', viewCount: 5000 }),
+			row({ id: '1', contentType: 'YOUTUBE_VIDEO', viewCount: 500 }),
+			row({ id: '2', contentType: 'YOUTUBE_VIDEO', viewCount: 5000 }),
 			row({ id: '3', contentType: 'CLAIM', viewCount: 5000 }),
 		];
 		const result = filterContentRows(rows, {

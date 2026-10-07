@@ -56,6 +56,11 @@ type ContentModel struct {
 	DisplayTitle      *string         `gorm:"column:display_title"`
 	Privacy           string          `gorm:"column:privacy;not null;default:public"`
 
+	// TotalCount is read-only and only present when List selects it: the
+	// filtered total, computed by a scalar subquery in the same statement as
+	// the page (one round trip instead of a separate COUNT(*)).
+	TotalCount *int64 `gorm:"column:total_count;->;-:migration"`
+
 	// Dummy fields for gorm-cursor-paginator sort key validation.
 	// These are NOT database columns — SQLRepr provides the actual SQL.
 	// The gorm:"-" tag tells GORM to ignore them for queries/migrations.

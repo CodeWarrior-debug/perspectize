@@ -4,7 +4,7 @@ import { parseReference, type PassageRange } from './passageParserAdapter';
 export type { PassageRange };
 
 export type DetectionResult =
-	| { type: 'YOUTUBE'; url: string }
+	| { type: 'YOUTUBE_VIDEO'; url: string }
 	/** `range` is the ONLY thing to persist; regenerate the canonical string from it, never store pasted text. */
 	| { type: 'BIBLE_PASSAGE'; range: PassageRange; source: 'text' | 'biblegateway' }
 	| { type: 'CLAIM'; text: string }
@@ -44,7 +44,7 @@ export function detectContentCandidates(input: string): DetectionResult[] {
 	const trimmed = input.trim();
 	if (!trimmed) return [];
 
-	if (validateYouTubeUrl(trimmed)) return [{ type: 'YOUTUBE', url: trimmed }];
+	if (validateYouTubeUrl(trimmed)) return [{ type: 'YOUTUBE_VIDEO', url: trimmed }];
 
 	const url = parseUrl(trimmed);
 	if (url) {

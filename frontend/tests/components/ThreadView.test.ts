@@ -113,6 +113,61 @@ describe('ThreadView', () => {
 		expect(onEditMessage).toHaveBeenCalledWith('m2', 't1', 'edited body', 'yo');
 	});
 
+	describe('initial scroll position', () => {
+		const originalScrollIntoView = Element.prototype.scrollIntoView;
+		const originalLastRead = mocks.threadData.messageThread.myLastReadSeq;
+		const scrollIntoView = vi.fn();
+		const msg = (seq: number, senderId: string, username: string) => ({
+			id: `m${seq}`,
+			threadId: 't1',
+			seq,
+			body: `body ${seq}`,
+			createdAt: 'x',
+			sender: { id: senderId, username },
+		});
+
+		beforeEach(() => {
+			Element.prototype.scrollIntoView = scrollIntoView;
+			mocks.messagesData.items = [
+				msg(1, 'u2', 'alice'),
+				msg(2, 'u1', 'me'),
+				msg(3, 'u2', 'alice'),
+				msg(4, 'u2', 'alice'),
+			] as typeof mocks.messagesData.items;
+		});
+		afterEach(() => {
+			Element.prototype.scrollIntoView = originalScrollIntoView;
+			mocks.threadData.messageThread.myLastReadSeq = originalLastRead;
+		});
+
+		const scrolledSeq = () => (scrollIntoView.mock.contexts[0] as HTMLElement | undefined)?.getAttribute('data-seq');
+
+		it('scrolls to the first unread message from the other party', () => {
+			mocks.threadData.messageThread.myLastReadSeq = 1;
+			render(ThreadView, { props: { threadId: 't1', onEditMessage: vi.fn(), onDeleteMessage: vi.fn() } });
+			expect(scrollIntoView).toHaveBeenCalledTimes(1);
+			expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+			expect(scrolledSeq()).toBe('3');
+		});
+
+		it('does not jump anywhere when everything is read', () => {
+			mocks.threadData.messageThread.myLastReadSeq = 4;
+			render(ThreadView, { props: { threadId: 't1', onEditMessage: vi.fn(), onDeleteMessage: vi.fn() } });
+			expect(scrollIntoView).not.toHaveBeenCalled();
+		});
+
+		it('ignores my own unread messages (only the other party counts)', () => {
+			mocks.messagesData.items = [
+				msg(1, 'u2', 'alice'),
+				msg(2, 'u1', 'me'),
+				msg(3, 'u1', 'me'),
+			] as typeof mocks.messagesData.items;
+			mocks.threadData.messageThread.myLastReadSeq = 1;
+			render(ThreadView, { props: { threadId: 't1', onEditMessage: vi.fn(), onDeleteMessage: vi.fn() } });
+			expect(scrollIntoView).not.toHaveBeenCalled();
+		});
+	});
+
 	it('renders a tombstone for a deleted message through the full render path', () => {
 		mocks.messagesData.items = [
 			{

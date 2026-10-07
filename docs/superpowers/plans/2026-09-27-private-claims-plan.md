@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Branch: `claude/claim-content-type-html-form-17cx78`.
-- Migration `000028_add_content_privacy` (next free number; no open branch claims 000028). Idempotent DDL. **Never run `make migrate-up`.** The PR must say it needs a manual `migrate up` per environment.
+- Migration `000031_add_content_privacy` (renumbered from 000028 after main took 000028–000029 and an open branch claimed 000030). Idempotent DDL. **Never run `make migrate-up`.** The PR must say it needs a manual `migrate up` per environment.
 - Existing content stays public: the column defaults to `'public'`.
 - Stored lowercase, exposed as the existing `Privacy` GraphQL enum (`PUBLIC`/`PRIVATE`), converted with the existing `privacyToDBValue`/`privacyFromDBValue` helpers.
 - After `schema.graphql` edits: `make graphql-gen`, then delete the stray `resolvers/schema.resolvers.go` after diffing it (see backend/CLAUDE.md).
@@ -32,7 +32,7 @@
 
 ### Task 1: Migration — content.privacy
 
-**Files:** Create `backend/migrations/000028_add_content_privacy.up.sql` and `.down.sql`.
+**Files:** Create `backend/migrations/000031_add_content_privacy.up.sql` and `.down.sql`.
 
 - [x] Up: `ADD COLUMN IF NOT EXISTS privacy text NOT NULL DEFAULT 'public'`; `DROP CONSTRAINT IF EXISTS content_privacy_check`; `ADD CONSTRAINT content_privacy_check CHECK (privacy IN ('public','private'))`; add a partial index on `(added_by_user_id) WHERE privacy = 'private'` for the owner branch of the filter.
 - [x] Down: drop the index, constraint and column (`IF EXISTS`).

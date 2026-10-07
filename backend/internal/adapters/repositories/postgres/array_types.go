@@ -213,3 +213,16 @@ func (a Int64Array) Value() (driver.Value, error) {
 	buf.WriteByte('}')
 	return buf.String(), nil
 }
+
+// intsToArray passes ids as ONE bigint[] parameter (use with
+// "col = ANY(CAST(? AS bigint[]))") instead of GORM's "IN ?" expansion into one
+// placeholder per id. The SQL text then stays the same whatever the batch
+// size, so pgx's per-connection prepared-statement cache hits instead of
+// paying an extra Parse round trip for every new batch length.
+func intsToArray(ids []int) Int64Array {
+	out := make(Int64Array, len(ids))
+	for i, id := range ids {
+		out[i] = int64(id)
+	}
+	return out
+}

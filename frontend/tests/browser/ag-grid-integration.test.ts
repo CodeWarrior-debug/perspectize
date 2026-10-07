@@ -27,7 +27,7 @@ const SAMPLE_ROWS = [
 		id: '1',
 		name: 'Understanding TypeScript Generics',
 		url: 'https://www.youtube.com/watch?v=abc123',
-		contentType: 'YOUTUBE',
+		contentType: 'YOUTUBE_VIDEO',
 		length: 612,
 		lengthUnits: 'seconds',
 		viewCount: 45200,
@@ -43,7 +43,7 @@ const SAMPLE_ROWS = [
 		id: '2',
 		name: 'Svelte 5 Runes Explained',
 		url: 'https://www.youtube.com/watch?v=def456',
-		contentType: 'YOUTUBE',
+		contentType: 'YOUTUBE_VIDEO',
 		length: 1845,
 		lengthUnits: 'seconds',
 		viewCount: 128000,
@@ -59,7 +59,7 @@ const SAMPLE_ROWS = [
 		id: '3',
 		name: 'GraphQL Best Practices',
 		url: 'https://www.youtube.com/watch?v=ghi789',
-		contentType: 'YOUTUBE',
+		contentType: 'YOUTUBE_VIDEO',
 		length: 2400,
 		lengthUnits: 'seconds',
 		viewCount: 67500,
@@ -117,7 +117,7 @@ describe('AG Grid Lifecycle', () => {
 	});
 
 	it('renders AG Grid DOM structure', async () => {
-		const screen = render(AGGridTestHarness, {
+		const screen = await render(AGGridTestHarness, {
 			testRowData: SAMPLE_ROWS,
 		});
 
@@ -156,10 +156,11 @@ describe('AG Grid Cell Rendering', () => {
 		render(AGGridTestHarness, { testRowData: SAMPLE_ROWS });
 		await waitForGridReady();
 
-		const thumbnails = document.querySelectorAll('.ag-cell[col-id="item"] img');
-		expect(thumbnails.length).toBe(3);
+		// Rows appear before their cell renderers draw, so poll rather than count once.
+		const selector = '.ag-cell[col-id="item"] img';
+		await expect.poll(() => document.querySelectorAll(selector).length).toBe(3);
 
-		const firstImg = thumbnails[0] as HTMLImageElement;
+		const firstImg = document.querySelector(selector) as HTMLImageElement;
 		expect(firstImg.src).toContain('i.ytimg.com/vi/abc123');
 	});
 
@@ -405,7 +406,7 @@ describe('AG Grid API Operations', () => {
 
 	it('can update row data reactively', async () => {
 		let api: GridApi | null = null;
-		const screen = render(AGGridTestHarness, {
+		render(AGGridTestHarness, {
 			testRowData: SAMPLE_ROWS,
 			onGridReady: (a) => {
 				api = a;

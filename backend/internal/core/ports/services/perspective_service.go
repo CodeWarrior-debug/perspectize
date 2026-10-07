@@ -76,11 +76,15 @@ type PerspectiveService interface {
 	// GetByID retrieves a perspective by ID
 	GetByID(ctx context.Context, id int) (*domain.Perspective, error)
 
-	// Update updates an existing perspective
-	Update(ctx context.Context, input UpdatePerspectiveInput) (*domain.Perspective, error)
+	// Update updates an existing perspective on behalf of actorUserID, who
+	// must own it (domain.ErrForbidden for someone else's public perspective,
+	// domain.ErrNotFound for a missing or non-public one).
+	Update(ctx context.Context, input UpdatePerspectiveInput, actorUserID int) (*domain.Perspective, error)
 
-	// Delete removes a perspective by ID
-	Delete(ctx context.Context, id int) error
+	// Delete removes a perspective on behalf of actorUserID, who must own it.
+	// Returns domain.ErrForbidden when the actor isn't the owner, and
+	// domain.ErrNotFound when the id doesn't exist.
+	Delete(ctx context.Context, id int, actorUserID int) error
 
 	// ListPerspectives retrieves a paginated list of perspectives
 	ListPerspectives(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)

@@ -3,12 +3,15 @@ package resolvers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
 	"log/slog"
 	"strconv"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/dataloader"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
@@ -295,22 +298,61 @@ func messageThreadToModel(t *domain.MessageThread) *model.MessageThread {
 		CreatedAt:     t.CreatedAt.Format(time.RFC3339),
 		Src:           &src,
 	}
-	// Share per-thread lookups (latestSeq) across this thread's field resolvers.
-	out.EnableMemo()
 	return out
 }
 
-// latestSeqOf resolves a thread's highest message seq once per projected thread
-// object, using the trusted (no re-authorization) service call: the query that
-// produced the object already checked participation.
-func (r *Resolver) latestSeqOf(ctx context.Context, obj *model.MessageThread) (int64, error) {
-	return obj.ResolveLatestSeq(func() (int64, error) {
-		tid, err := parseIntID("id", obj.ID)
-		if err != nil {
-			return 0, err
+// threadStatsFor returns the viewer's stats for an already-authorized thread,
+// through the per-request loader so a thread list costs one query for every
+// thread's latestSeq + unreadCount together. Without the loader middleware
+// (unit tests) it falls back to a single-thread call.
+func (r *Resolver) threadStatsFor(ctx context.Context, viewerID int, obj *model.MessageThread) (domain.ThreadStats, error) {
+	tid, err := parseIntID("id", obj.ID)
+	if err != nil {
+		return domain.ThreadStats{}, err
+	}
+	if l := dataloader.For(ctx); l != nil {
+		st, err := l.ThreadStats.Load(ctx, dataloader.ThreadStatsKey{ViewerID: viewerID, ThreadID: tid})
+		if err != nil && !dataloader.IsNotFound(err) {
+			return domain.ThreadStats{}, err
 		}
-		return r.Messaging.ThreadMaxSeq(ctx, tid)
-	})
+		return st, nil
+	}
+	stats, err := r.Messaging.ThreadStats(ctx, viewerID, []int{tid})
+	if err != nil {
+		return domain.ThreadStats{}, err
+	}
+	return stats[tid], nil
+}
+
+// contentByID resolves content through the per-request loader (one query for
+// every perspective's content in a response); nil when it doesn't exist.
+func (r *Resolver) contentByID(ctx context.Context, id int) (*domain.Content, error) {
+	if l := dataloader.For(ctx); l != nil {
+		c, err := l.ContentByID.Load(ctx, id)
+		if dataloader.IsNotFound(err) {
+			return nil, nil
+		}
+		return c, err
+	}
+	c, err := r.ContentService.GetByID(ctx, id)
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil, nil
+	}
+	return c, err
+}
+
+// userByID resolves a user through the per-request loader (one query for all
+// the senders / participants in a response), falling back to a direct lookup
+// when the loader middleware isn't installed.
+func (r *Resolver) userByID(ctx context.Context, id int) (*domain.User, error) {
+	if l := dataloader.For(ctx); l != nil {
+		u, err := l.UserByID.Load(ctx, id)
+		if dataloader.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to get user: %w", domain.ErrNotFound)
+		}
+		return u, err
+	}
+	return r.UserService.GetByID(ctx, id)
 }
 
 // threadParticipantToModel projects a domain participant row onto its GraphQL
@@ -570,4 +612,41 @@ func contentPrivacy(p domain.Privacy) domain.Privacy {
 		return domain.PrivacyPublic
 	}
 	return p
+}
+
+// contentFieldsFromID are the Content fields that resolve from its id alone.
+var contentFieldsFromID = map[string]bool{
+	"__typename":         true,
+	"id":                 true,
+	"perspectiveCount":   true,
+	"averageRating":      true,
+	"qualityRatingCount": true,
+}
+
+// onlyIDAndAggregatesSelected reports whether the current field's selection
+// needs nothing from the content row itself.
+func onlyIDAndAggregatesSelected(ctx context.Context) bool {
+	if graphql.GetFieldContext(ctx) == nil {
+		return false
+	}
+	fields := graphql.CollectFieldsCtx(ctx, nil)
+	if len(fields) == 0 {
+		return false
+	}
+	for _, f := range fields {
+		if !contentFieldsFromID[f.Name] {
+			return false
+		}
+	}
+	return true
+}
+
+// canViewContent reports whether the caller may read a content row: public
+// rows are readable by anyone, private rows only by their owner.
+func canViewContent(ctx context.Context, privacy domain.Privacy, ownerID int) bool {
+	if privacy != domain.PrivacyPrivate {
+		return true
+	}
+	viewer, ok := auth.ForContext(ctx)
+	return ok && viewer.ID == ownerID
 }

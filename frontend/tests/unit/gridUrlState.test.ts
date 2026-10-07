@@ -98,7 +98,7 @@ describe('parseGridParams', () => {
 	});
 
 	it('defaults to the YouTube type filter when no f.* params are present', () => {
-		expect(parseGridParams(new URLSearchParams('')).filters).toEqual({ type: 'youtube' });
+		expect(parseGridParams(new URLSearchParams('')).filters).toEqual({ type: 'youtube_video' });
 	});
 
 	it('parses f=none as explicitly cleared filters', () => {
@@ -194,7 +194,7 @@ describe('serializeGridParams', () => {
 	});
 
 	it('serializes filters with f. prefix', () => {
-		const state = { ...GRID_DEFAULTS, filters: { type: 'youtube', views: '1000..' } };
+		const state = { ...GRID_DEFAULTS, filters: { type: 'youtube_video', views: '1000..' } };
 		const result = serializeGridParams(state);
 		expect(result).toContain('f.type=youtube');
 		expect(result).toContain('f.views=1000..');
@@ -228,7 +228,7 @@ describe('serializeGridParams', () => {
 			pageSize: 25,
 			q: 'tutorial',
 			qFields: GRID_DEFAULTS.qFields,
-			filters: { type: 'youtube', views: '1000..5000' },
+			filters: { type: 'youtube_video', views: '1000..5000' },
 		};
 		const serialized = serializeGridParams(state);
 		const parsed = parseGridParams(new URLSearchParams(serialized));
@@ -251,6 +251,15 @@ describe('filterToUrlParams', () => {
 		};
 		const result = filterToUrlParams(filterModel);
 		expect(result).toEqual({ type: 'youtube' });
+	});
+
+	it('converts a set filter to a comma-separated param', () => {
+		const filterModel = { type: { filterType: 'set', values: ['youtube_video', 'claim'] } };
+		expect(filterToUrlParams(filterModel)).toEqual({ type: 'youtube_video,claim' });
+	});
+
+	it('skips a set filter with no values', () => {
+		expect(filterToUrlParams({ type: { filterType: 'set', values: [] } })).toEqual({});
 	});
 
 	it('converts channel text filter', () => {
@@ -360,10 +369,10 @@ describe('filterToUrlParams', () => {
 
 	it('converts multiple filters', () => {
 		const filterModel = {
-			type: { filterType: 'text', type: 'contains', filter: 'youtube' },
+			type: { filterType: 'set', values: ['youtube_video'] },
 			views: { filterType: 'number', type: 'greaterThan', filter: 1000 },
 		};
-		expect(filterToUrlParams(filterModel)).toEqual({ type: 'youtube', views: '1000..' });
+		expect(filterToUrlParams(filterModel)).toEqual({ type: 'youtube_video', views: '1000..' });
 	});
 });
 
@@ -376,11 +385,21 @@ describe('urlParamsToFilter', () => {
 		expect(urlParamsToFilter({})).toEqual({});
 	});
 
-	it('converts text param to AG Grid text filter', () => {
-		const result = urlParamsToFilter({ type: 'youtube' });
-		expect(result).toEqual({
-			type: { filterType: 'text', type: 'contains', filter: 'youtube' },
+	it('converts a single type param to a set filter', () => {
+		expect(urlParamsToFilter({ type: 'youtube_video' })).toEqual({
+			type: { filterType: 'set', values: ['youtube_video'] },
 		});
+	});
+
+	it('converts a comma-separated type param to a set filter, normalizing case/blanks/duplicates', () => {
+		expect(urlParamsToFilter({ type: 'youtube, CLAIM,,claim' })).toEqual({
+			type: { filterType: 'set', values: ['youtube_video', 'claim'] },
+		});
+	});
+
+	it('round-trips a multi-value type filter', () => {
+		const model = urlParamsToFilter({ type: 'youtube_video,bible_passage' });
+		expect(filterToUrlParams(model)).toEqual({ type: 'youtube_video,bible_passage' });
 	});
 
 	it('converts channel text param', () => {
@@ -466,7 +485,7 @@ describe('urlParamsToFilter', () => {
 	});
 
 	it('converts multiple filters', () => {
-		const result = urlParamsToFilter({ type: 'youtube', views: '1000..' });
+		const result = urlParamsToFilter({ type: 'youtube_video', views: '1000..' });
 		expect(result.type).toBeDefined();
 		expect(result.views).toBeDefined();
 	});
@@ -499,9 +518,19 @@ describe('urlParamsToGraphQLFilter', () => {
 		expect(result).toEqual({ search: 'cooking', searchFields: ['TITLE', 'DESCRIPTION'] });
 	});
 
-	it('maps f.type to contentType (uppercased)', () => {
-		const result = urlParamsToGraphQLFilter({ type: 'youtube' }, '');
-		expect(result).toEqual({ contentType: 'YOUTUBE' });
+	it('maps f.type to contentTypes (uppercased)', () => {
+		const result = urlParamsToGraphQLFilter({ type: 'youtube_video' }, '');
+		expect(result).toEqual({ contentTypes: ['YOUTUBE_VIDEO'] });
+	});
+
+	it('maps a multi-value f.type to contentTypes', () => {
+		const result = urlParamsToGraphQLFilter({ type: 'youtube_video,bible_passage' }, '');
+		expect(result).toEqual({ contentTypes: ['YOUTUBE_VIDEO', 'BIBLE_PASSAGE'] });
+	});
+
+	it('drops unknown content types instead of sending an invalid enum value', () => {
+		expect(urlParamsToGraphQLFilter({ type: 'you,bible_passage' }, '')).toEqual({ contentTypes: ['BIBLE_PASSAGE'] });
+		expect(urlParamsToGraphQLFilter({ type: 'you' }, '')).toBeUndefined();
 	});
 
 	it('maps f.views range to minViewCount/maxViewCount', () => {
@@ -565,11 +594,11 @@ describe('urlParamsToGraphQLFilter', () => {
 	});
 
 	it('combines multiple filters and search', () => {
-		const result = urlParamsToGraphQLFilter({ type: 'youtube', views: '1000..' }, 'cooking');
+		const result = urlParamsToGraphQLFilter({ type: 'youtube_video', views: '1000..' }, 'cooking');
 		expect(result).toEqual({
 			search: 'cooking',
 			searchFields: ['TITLE', 'DESCRIPTION', 'CHANNEL_TITLE', 'TAGS'],
-			contentType: 'YOUTUBE',
+			contentTypes: ['YOUTUBE_VIDEO'],
 			minViewCount: 1000,
 		});
 	});

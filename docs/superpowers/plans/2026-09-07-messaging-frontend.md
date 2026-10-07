@@ -65,9 +65,9 @@ Everywhere else the spec and `backend/messaging.graphql` on the base branch are 
 - Modify: `backend/internal/core/domain/messaging.go` — `Message.EditedAt *time.Time`, `Message.DeletedAt *time.Time`.
 - Modify: `backend/internal/core/domain/realtime.go` — `MessageEditedEvent{ Message Message }`, `MessageDeletedEvent{ ThreadID int; MessageID int64; Seq int64 }` + `isThreadEvent()`; `EventEnvelope` needs no new fields (reuses `Type`/`ThreadID`/`Seq`/`MessageID`).
 - Modify: `backend/internal/core/ports/repositories/message_repository.go` — `UpdateBody`, `SoftDelete`.
-- Modify: `backend/internal/core/ports/repositories/thread_repository.go` — `SetMuted`.
+- Modify: `backend/internal/core/ports/repositories/message_thread_repository.go` — `SetMuted`.
 - Modify: `backend/internal/core/ports/services/messaging_service.go` — `EditMessage`, `DeleteMessage`, `MuteThread`.
-- Modify: `backend/internal/adapters/repositories/postgres/gorm_message_repository.go`, `gorm_thread_repository.go`, `gorm_messaging_mappers.go`, `gorm_models.go`.
+- Modify: `backend/internal/adapters/repositories/postgres/gorm_message_repository.go`, `gorm_message_thread_repository.go`, `gorm_messaging_mappers.go`, `gorm_models.go`.
 - Modify: `backend/internal/core/services/messaging_service.go` — the three methods + `maxMessageBodyBytes` reuse.
 - Modify: `backend/internal/adapters/realtime/hub.go` — `PublishEnvelope` cases `"MESSAGE_EDITED"` / `"MESSAGE_DELETED"`.
 - Modify: `backend/internal/adapters/graphql/resolvers/messaging.resolvers.go`, `model/messaging.go`, `resolver.go` — mutation resolvers, `Message.EditedAt`/`DeletedAt` field resolvers, union type-switch entries.
@@ -537,18 +537,18 @@ git commit -m "feat(messaging): schema + domain + codegen for edit/delete/mute"
 
 **Files:**
 - Modify: `backend/internal/core/ports/repositories/message_repository.go`
-- Modify: `backend/internal/core/ports/repositories/thread_repository.go`
+- Modify: `backend/internal/core/ports/repositories/message_thread_repository.go`
 - Modify: `backend/internal/adapters/repositories/postgres/gorm_message_repository.go`
-- Modify: `backend/internal/adapters/repositories/postgres/gorm_thread_repository.go`
+- Modify: `backend/internal/adapters/repositories/postgres/gorm_message_thread_repository.go`
 - Modify: `backend/internal/adapters/repositories/postgres/gorm_messaging_mappers.go`
 - Modify: `backend/internal/adapters/repositories/postgres/gorm_models.go`
-- Test: `backend/test/repositories/gorm_message_repository_test.go` (extend), `backend/test/repositories/gorm_thread_repository_test.go` (extend)
+- Test: `backend/test/repositories/gorm_message_repository_test.go` (extend), `backend/test/repositories/gorm_message_thread_repository_test.go` (extend)
 
 **Interfaces:**
 - Produces (ports):
   - `MessageRepository.UpdateBody(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error)` — updates `body` + `edited_at`, returns the reloaded row. `domain.ErrNotFound` when the id is absent.
   - `MessageRepository.SoftDelete(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error)` — sets `deleted_at`, sets `body = ''`, returns the reloaded row.
-  - `ThreadRepository.SetMuted(ctx context.Context, threadID, userID int, muted bool) error` — updates `thread_participants.muted`; `domain.ErrNotFound` when no such participant row.
+  - `MessageThreadRepository.SetMuted(ctx context.Context, threadID, userID int, muted bool) error` — updates `thread_participants.muted`; `domain.ErrNotFound` when no such participant row.
 - Produces (models/mappers): `MessageModel` gains `EditedAt *time.Time` / `DeletedAt *time.Time` (columns `edited_at` / `deleted_at`); `messageModelToDomain` / `messageDomainToModel` carry them. `messageDomainToModel` still must NOT set `Seq`/`CreatedAt` (see the existing comment in `gorm_messaging_mappers.go`).
 
 - [ ] **Step 1: Write failing repo tests** (DB-gated, mirror the existing file's helpers)
@@ -593,9 +593,9 @@ func TestGormMessageRepository_UpdateBody_NotFound(t *testing.T) {
 
 And for the thread repo:
 ```go
-func TestGormThreadRepository_SetMuted(t *testing.T) {
+func TestGormMessageThreadRepository_SetMuted(t *testing.T) {
 	db := openTestDBOrSkip(t)
-	repo := postgres.NewGormThreadRepository(db)
+	repo := postgres.NewGormMessageThreadRepository(db)
 	ctx := context.Background()
 	threadID, userID := seedThreadWithParticipant(t, db) // existing helper
 
@@ -651,9 +651,9 @@ func (r *GormMessageRepository) SoftDelete(ctx context.Context, messageID int64,
 	return r.GetByID(ctx, messageID)
 }
 ```
-`gorm_thread_repository.go`:
+`gorm_message_thread_repository.go`:
 ```go
-func (r *GormThreadRepository) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
+func (r *GormMessageThreadRepository) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
 	res := r.db.WithContext(ctx).Table("thread_participants").
 		Where("thread_id = ? AND user_id = ?", threadID, userID).
 		Update("muted", muted)
@@ -695,7 +695,7 @@ git commit -m "feat(messaging): repo UpdateBody / SoftDelete / SetMuted"
 - Test: `backend/test/services/messaging_service_test.go` (extend)
 
 **Interfaces:**
-- Consumes: `MessageRepository.GetByID` / `UpdateBody` / `SoftDelete`; `ThreadRepository.SetMuted` / `GetThread`; `publisher.PublishEphemeral`; `domain.EventEnvelope`.
+- Consumes: `MessageRepository.GetByID` / `UpdateBody` / `SoftDelete`; `MessageThreadRepository.SetMuted` / `GetThread`; `publisher.PublishEphemeral`; `domain.EventEnvelope`.
 - Produces on `MessagingService` (port + impl):
   - `EditMessage(ctx context.Context, actorUserID int, messageID int64, body string) (*domain.Message, error)` — loads the message; `ErrNotFound` if absent; `ErrForbidden` if `msg.SenderID != actorUserID`; `ErrInvalidInput` if `msg.DeletedAt != nil` or `len(body) == 0` or `len([]byte(body)) > maxMessageBodyBytes`; calls `UpdateBody(ctx, messageID, body, time.Now().UTC())`; then `publisher.PublishEphemeral(ctx, domain.EventEnvelope{Type: "MESSAGE_EDITED", ThreadID: msg.ThreadID, Seq: msg.Seq, MessageID: messageID})`; returns the updated message.
   - `DeleteMessage(ctx context.Context, actorUserID int, messageID int64) (*domain.Message, error)` — loads; `ErrNotFound` / `ErrForbidden` as above; idempotent if already deleted (return the row, no publish); calls `SoftDelete(ctx, messageID, time.Now().UTC())`; then `PublishEphemeral(ctx, domain.EventEnvelope{Type: "MESSAGE_DELETED", ThreadID: msg.ThreadID, Seq: msg.Seq, MessageID: messageID})`; returns the tombstoned message.

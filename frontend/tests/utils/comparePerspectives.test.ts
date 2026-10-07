@@ -6,9 +6,11 @@ import {
 	compareOverall,
 	summarize,
 	sortRatingRows,
+	agreementPercent,
 	SIMILAR_THRESHOLD,
 	DIVERGES_THRESHOLD,
 } from '$lib/utils/comparePerspectives';
+import type { RatingRow } from '$lib/utils/comparePerspectives';
 import type { PerspectiveItem } from '$lib/queries/perspectives';
 
 function makePerspective(overrides: Partial<PerspectiveItem>): PerspectiveItem {
@@ -67,9 +69,11 @@ describe('compareRatings', () => {
 	it('compares every shared standard dimension', () => {
 		const left = makePerspective({ quality: 8000, agreement: 8000, importance: 8000, confidence: 8000 });
 		const right = makePerspective({ quality: 8000, agreement: 8000, importance: 8000, confidence: 8000 });
-		expect(compareRatings(left, right).map((r) => r.key).sort()).toEqual(
-			['agreement', 'confidence', 'importance', 'quality'].sort(),
-		);
+		expect(
+			compareRatings(left, right)
+				.map((r) => r.key)
+				.sort(),
+		).toEqual(['agreement', 'confidence', 'importance', 'quality'].sort());
 	});
 
 	it('compares shared numeric customFields keys', () => {
@@ -112,6 +116,26 @@ describe('filledInDifferently', () => {
 		const right = makePerspective({});
 		expect(filledInDifferently(left, right)).toEqual([]);
 	});
+
+	it('lists a customFields key only the left side filled in, with a title-cased label', () => {
+		const left = makePerspective({ customFields: { 'story-pacing': 6000 } });
+		const right = makePerspective({ customFields: {} });
+		const rows = filledInDifferently(left, right);
+		expect(rows).toEqual([{ key: 'story-pacing', label: 'Story Pacing', side: 'left', display: 6.0 }]);
+	});
+
+	it('lists a customFields key only the right side filled in', () => {
+		const left = makePerspective({ customFields: null });
+		const right = makePerspective({ customFields: { pacing: 4000 } });
+		const rows = filledInDifferently(left, right);
+		expect(rows).toEqual([{ key: 'pacing', label: 'Pacing', side: 'right', display: 4.0 }]);
+	});
+
+	it('excludes a customFields key both sides filled in', () => {
+		const left = makePerspective({ customFields: { pacing: 6000 } });
+		const right = makePerspective({ customFields: { pacing: 4000 } });
+		expect(filledInDifferently(left, right)).toEqual([]);
+	});
 });
 
 describe('compareFeelings', () => {
@@ -147,34 +171,75 @@ describe('compareFeelings', () => {
 });
 
 describe('compareOverall', () => {
-	it('agrees when both thumbs match', () => {
+	it('is "agree" when both thumbs are up', () => {
 		const left = makePerspective({ like: 'THUMBS_UP' });
 		const right = makePerspective({ like: 'THUMBS_UP' });
-		expect(compareOverall(left, right)).toEqual({ left: 'THUMBS_UP', right: 'THUMBS_UP', agree: true });
+		expect(compareOverall(left, right)).toEqual({ left: 'THUMBS_UP', right: 'THUMBS_UP', status: 'agree' });
 	});
 
-	it('differs when thumbs are opposite', () => {
+	it('is "agree" when both thumbs are down', () => {
+		const left = makePerspective({ like: 'THUMBS_DOWN' });
+		const right = makePerspective({ like: 'THUMBS_DOWN' });
+		expect(compareOverall(left, right).status).toBe('agree');
+	});
+
+	it('is "differ" when thumbs are opposite', () => {
 		const left = makePerspective({ like: 'THUMBS_UP' });
 		const right = makePerspective({ like: 'THUMBS_DOWN' });
-		expect(compareOverall(left, right).agree).toBe(false);
+		expect(compareOverall(left, right)).toEqual({ left: 'THUMBS_UP', right: 'THUMBS_DOWN', status: 'differ' });
 	});
 
-	it('differs when either side has no thumb set', () => {
+	it('is "oneSided" when the left side has no thumb set', () => {
+		const left = makePerspective({ like: null });
+		const right = makePerspective({ like: 'THUMBS_UP' });
+		expect(compareOverall(left, right)).toEqual({ left: null, right: 'THUMBS_UP', status: 'oneSided' });
+	});
+
+	it('is "oneSided" when the right side has no thumb set', () => {
 		const left = makePerspective({ like: 'THUMBS_UP' });
 		const right = makePerspective({ like: null });
-		expect(compareOverall(left, right).agree).toBe(false);
+		expect(compareOverall(left, right)).toEqual({ left: 'THUMBS_UP', right: null, status: 'oneSided' });
+	});
+
+	it('is "none" when neither side has a thumb set', () => {
+		const left = makePerspective({ like: null });
+		const right = makePerspective({ like: null });
+		expect(compareOverall(left, right)).toEqual({ left: null, right: null, status: 'none' });
 	});
 });
 
 describe('summarize', () => {
-	it('counts rows by status', () => {
+	it('counts rows by status, with zero one-sided counts when not given any', () => {
 		const rows = [
 			{ key: 'a', label: 'A', leftDisplay: 0, rightDisplay: 0, delta: 0, pctDiff: 0, status: 'similar' as const },
 			{ key: 'b', label: 'B', leftDisplay: 0, rightDisplay: 0, delta: 2, pctDiff: 20, status: 'diverges' as const },
 			{ key: 'c', label: 'C', leftDisplay: 0, rightDisplay: 0, delta: 10, pctDiff: 100, status: 'conflict' as const },
 			{ key: 'd', label: 'D', leftDisplay: 0, rightDisplay: 0, delta: 0.5, pctDiff: 5, status: 'similar' as const },
 		];
-		expect(summarize(rows)).toEqual({ similar: 2, diverges: 1, conflict: 1 });
+		expect(summarize(rows)).toEqual({ similar: 2, diverges: 1, conflict: 1, leftOnly: 0, rightOnly: 0 });
+	});
+
+	it('counts one-sided rows by side, alongside the shared-dimension counts', () => {
+		const rows = [
+			{ key: 'a', label: 'A', leftDisplay: 0, rightDisplay: 0, delta: 0, pctDiff: 0, status: 'similar' as const },
+		];
+		const oneSided = [
+			{ key: 'b', label: 'B', side: 'left' as const, display: 5 },
+			{ key: 'c', label: 'C', side: 'left' as const, display: 6 },
+			{ key: 'd', label: 'D', side: 'right' as const, display: 7 },
+		];
+		expect(summarize(rows, oneSided)).toEqual({ similar: 1, diverges: 0, conflict: 0, leftOnly: 2, rightOnly: 1 });
+	});
+
+	it('is all zero-count fields when there are no rated dimensions on either side', () => {
+		expect(summarize([], [])).toEqual({ similar: 0, diverges: 0, conflict: 0, leftOnly: 0, rightOnly: 0 });
+	});
+
+	it('reflects zero overlap when every dimension is one-sided', () => {
+		const oneSided = [{ key: 'a', label: 'A', side: 'left' as const, display: 8 }];
+		const result = summarize([], oneSided);
+		expect(result.similar + result.diverges + result.conflict).toBe(0);
+		expect(result.leftOnly).toBe(1);
 	});
 });
 
@@ -203,5 +268,28 @@ describe('thresholds', () => {
 	it('exposes the exact handoff-specified cutoffs', () => {
 		expect(SIMILAR_THRESHOLD).toBe(1.0);
 		expect(DIVERGES_THRESHOLD).toBe(3.0);
+	});
+});
+
+describe('agreementPercent', () => {
+	function makeRow(pctDiff: number): RatingRow {
+		return { key: 'k', label: 'K', leftDisplay: 0, rightDisplay: 0, delta: 0, pctDiff, status: 'similar' };
+	}
+
+	it('returns null when there are no shared rating dimensions', () => {
+		expect(agreementPercent([])).toBeNull();
+	});
+
+	it('is 100 when every shared dimension matches exactly', () => {
+		expect(agreementPercent([makeRow(0), makeRow(0)])).toBe(100);
+	});
+
+	it('is 0 when every shared dimension is maximally different', () => {
+		expect(agreementPercent([makeRow(100)])).toBe(0);
+	});
+
+	it('averages pctDiff across rows and inverts it', () => {
+		// avg pctDiff = (20 + 40) / 2 = 30 -> 70% aligned
+		expect(agreementPercent([makeRow(20), makeRow(40)])).toBe(70);
 	});
 });

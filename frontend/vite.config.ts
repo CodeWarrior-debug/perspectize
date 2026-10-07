@@ -1,16 +1,63 @@
+import { execFileSync } from 'node:child_process';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
+import { computeTag } from './src/lib/utils/buildTag';
+
+// Resolves frontend build facts for the zzzv console hotkey (see
+// lib/utils/versionHotkey.ts) from the local git checkout, at build time.
+// Falls back to "unknown" for everything if there's no .git available —
+// e.g. the Sevalla static-site build environment isn't confirmed to have
+// one (their env vars are Application-only per docs.sevalla.com), so this
+// must never throw and break the build.
+function resolveGitBuildInfo() {
+	const unknown = { tag: 'unknown', branch: 'unknown', commit: 'unknown', commitShort: 'unknown' };
+	const git = (...args: string[]) =>
+		execFileSync('git', args, { stdio: ['ignore', 'pipe', 'ignore'] })
+			.toString()
+			.trim();
+
+	try {
+		const commit = git('rev-parse', 'HEAD');
+		const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
+		const committerDate = git('log', '-1', '--format=%cI', 'HEAD');
+		return {
+			tag: computeTag(committerDate, commit),
+			branch,
+			commit,
+			commitShort: commit.slice(0, 7),
+		};
+	} catch {
+		return unknown;
+	}
+}
+
+const buildInfo = { ...resolveGitBuildInfo(), buildTime: new Date().toISOString() };
+
+/**
+ * @vite-pwa/sveltekit `push()`es `prerendered/**\/*.{html,json}` onto globPatterns.
+ * This is an SPA (prerender = false), so nothing exists there when workbox runs and
+ * it emits "One of the glob patterns doesn't match any files" — surfaced as a Sevalla
+ * deploy error. Drop just that pattern; the `client/` ones the plugin adds still apply.
+ */
+function withoutPrerenderedGlob(patterns: string[]): string[] {
+	const push = patterns.push.bind(patterns);
+	patterns.push = (...items: string[]) => push(...items.filter((p) => !p.startsWith('prerendered/')));
+	return patterns;
+}
 
 export default defineConfig({
+	define: {
+		__BUILD_INFO__: JSON.stringify(buildInfo),
+	},
 	plugins: [
 		sveltekit(),
 		tailwindcss(),
 		SvelteKitPWA({
 			registerType: 'autoUpdate',
 			workbox: {
-				globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+				globPatterns: withoutPrerenderedGlob(['**/*.{js,css,html,ico,png,svg,woff2}']),
 				// registerType: 'autoUpdate' alone doesn't make a new service worker take
 				// over immediately — without these, a newly-deployed SW installs but sits
 				// in the "waiting" state until every old tab closes, so a page loaded

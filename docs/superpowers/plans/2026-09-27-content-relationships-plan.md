@@ -8,7 +8,7 @@
 
 **Tech Stack:** Go 1.25+, gqlgen, GORM, golang-migrate SQL, Svelte 5 runes, TanStack Svelte Query.
 
-**Depends on:** `2026-09-27-private-claims-plan.md` (content.privacy, migration 000028).
+**Depends on:** `2026-09-27-private-claims-plan.md` (content.privacy, migration 000031).
 
 ## Agreed Design
 

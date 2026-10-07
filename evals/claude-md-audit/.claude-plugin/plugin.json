@@ -1,0 +1,5 @@
+{
+  "name": "claude-md-management",
+  "description": "Eval harness: vendored claude-md-improver skill (claude-md-management@claude-plugins-official 1.0.0) plus its eval suite.",
+  "version": "1.0.0"
+}

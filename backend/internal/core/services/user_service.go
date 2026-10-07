@@ -37,7 +37,10 @@ func NewUserService(
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 
 // Create creates a new user with validation
-func (s *UserService) Create(ctx context.Context, username, email string) (*domain.User, error) {
+func (s *UserService) Create(ctx context.Context, actor *domain.AuthenticatedUser, username, email string) (*domain.User, error) {
+	if !isAdmin(actor) {
+		return nil, fmt.Errorf("%w: only an admin may create users", domain.ErrForbidden)
+	}
 	// Validate username
 	username = strings.TrimSpace(username)
 	if username == "" {
@@ -107,6 +110,22 @@ func (s *UserService) GetByID(ctx context.Context, id int) (*domain.User, error)
 	return user, nil
 }
 
+// GetByIDs retrieves many users in one query (backs the per-request user
+// dataloader). Non-positive ids are dropped rather than queried.
+func (s *UserService) GetByIDs(ctx context.Context, ids []int) ([]*domain.User, error) {
+	valid := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if id > 0 {
+			valid = append(valid, id)
+		}
+	}
+	users, err := s.repo.GetByIDs(ctx, valid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users: %w", err)
+	}
+	return users, nil
+}
+
 // GetByUsername retrieves a user by username
 func (s *UserService) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
 	username = strings.TrimSpace(username)
@@ -131,9 +150,12 @@ func (s *UserService) ListAll(ctx context.Context) ([]*domain.User, error) {
 }
 
 // Update updates an existing user's username and/or email
-func (s *UserService) Update(ctx context.Context, input portservices.UpdateUserInput) (*domain.User, error) {
+func (s *UserService) Update(ctx context.Context, actor *domain.AuthenticatedUser, input portservices.UpdateUserInput) (*domain.User, error) {
 	if input.ID <= 0 {
 		return nil, fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
+	}
+	if !isSelfOrAdmin(actor, input.ID) {
+		return nil, fmt.Errorf("%w: you can only modify your own account", domain.ErrForbidden)
 	}
 
 	// Fetch existing user
@@ -159,16 +181,8 @@ func (s *UserService) Update(ctx context.Context, input portservices.UpdateUserI
 		if username == domain.DeletedUserUsername || username == domain.SystemUserUsername {
 			return nil, fmt.Errorf("%w: username is reserved", domain.ErrInvalidInput)
 		}
-		// Check uniqueness (only if actually changing)
-		if username != user.Username {
-			existing, err := s.repo.GetByUsername(ctx, username)
-			if err == nil && existing != nil {
-				return nil, fmt.Errorf("%w: username already taken", domain.ErrAlreadyExists)
-			}
-			if err != nil && !errors.Is(err, domain.ErrNotFound) {
-				return nil, fmt.Errorf("failed to check username: %w", err)
-			}
-		}
+		// Uniqueness is enforced by the users_unique_username constraint; the
+		// repository reports a clash as domain.ErrAlreadyExists.
 		user.Username = username
 	}
 
@@ -181,21 +195,15 @@ func (s *UserService) Update(ctx context.Context, input portservices.UpdateUserI
 		if !emailRegex.MatchString(email) {
 			return nil, fmt.Errorf("%w: invalid email format", domain.ErrInvalidInput)
 		}
-		// Check uniqueness (only if actually changing)
-		if email != user.Email {
-			existing, err := s.repo.GetByEmail(ctx, email)
-			if err == nil && existing != nil {
-				return nil, fmt.Errorf("%w: email already registered", domain.ErrAlreadyExists)
-			}
-			if err != nil && !errors.Is(err, domain.ErrNotFound) {
-				return nil, fmt.Errorf("failed to check email: %w", err)
-			}
-		}
+		// Uniqueness: users_unique_email constraint, as for username.
 		user.Email = email
 	}
 
 	updated, err := s.repo.Update(ctx, user)
 	if err != nil {
+		if errors.Is(err, domain.ErrAlreadyExists) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
 
@@ -204,9 +212,12 @@ func (s *UserService) Update(ctx context.Context, input portservices.UpdateUserI
 
 // Delete reassigns the user's content and perspectives to the sentinel
 // "[deleted]" user, then removes the user row.
-func (s *UserService) Delete(ctx context.Context, id int) error {
+func (s *UserService) Delete(ctx context.Context, actor *domain.AuthenticatedUser, id int) error {
 	if id <= 0 {
 		return fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
+	}
+	if !isSelfOrAdmin(actor, id) {
+		return fmt.Errorf("%w: you can only delete your own account", domain.ErrForbidden)
 	}
 
 	// Fetch the user to verify it exists
@@ -251,14 +262,6 @@ func (s *UserService) MarkOnboardingSeen(ctx context.Context, userID int, versio
 		return nil, fmt.Errorf("%w: version must be non-negative", domain.ErrInvalidInput)
 	}
 
-	user, err := s.repo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-	if user.IsSentinel() {
-		return nil, fmt.Errorf("%w", domain.ErrSentinelUser)
-	}
-
 	now := time.Now().UTC().Format(time.RFC3339)
 	onboarding := domain.UserOnboarding{
 		Version:            version,
@@ -266,11 +269,29 @@ func (s *UserService) MarkOnboardingSeen(ctx context.Context, userID int, versio
 		CompletedAt:        &now,
 	}
 
+	// One round trip: the repository refuses the sentinel in the UPDATE itself.
 	updated, err := s.repo.UpdateOnboarding(ctx, userID, onboarding)
 	if err != nil {
-		return nil, fmt.Errorf("failed to mark onboarding seen: %w", err)
+		return nil, s.onboardingWriteError(ctx, userID, err, "failed to mark onboarding seen")
 	}
 	return &updated.Onboarding, nil
+}
+
+// onboardingWriteError explains a failed onboarding write. A miss from the
+// repository means the user is missing or is the sentinel; only then is the
+// user read, to report which.
+func (s *UserService) onboardingWriteError(ctx context.Context, userID int, err error, action string) error {
+	if !errors.Is(err, domain.ErrNotFound) {
+		return fmt.Errorf("%s: %w", action, err)
+	}
+	user, getErr := s.repo.GetByID(ctx, userID)
+	if getErr != nil {
+		return fmt.Errorf("failed to get user: %w", getErr)
+	}
+	if user.IsSentinel() {
+		return fmt.Errorf("%w", domain.ErrSentinelUser)
+	}
+	return fmt.Errorf("%s: %w", action, err)
 }
 
 // SetOnboardingDisplayNextSession toggles soft coach display (Help replay).
@@ -279,20 +300,20 @@ func (s *UserService) SetOnboardingDisplayNextSession(ctx context.Context, userI
 		return nil, fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
 	}
 
-	user, err := s.repo.GetByID(ctx, userID)
+	updated, err := s.repo.SetOnboardingDisplayNextSession(ctx, userID, displayNextSession)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-	if user.IsSentinel() {
-		return nil, fmt.Errorf("%w", domain.ErrSentinelUser)
-	}
-
-	onboarding := user.Onboarding
-	onboarding.DisplayNextSession = displayNextSession
-
-	updated, err := s.repo.UpdateOnboarding(ctx, userID, onboarding)
-	if err != nil {
-		return nil, fmt.Errorf("failed to set onboarding display flag: %w", err)
+		return nil, s.onboardingWriteError(ctx, userID, err, "failed to set onboarding display flag")
 	}
 	return &updated.Onboarding, nil
+}
+
+// isAdmin reports whether the actor is an authenticated admin.
+func isAdmin(actor *domain.AuthenticatedUser) bool {
+	return actor != nil && actor.Role == domain.UserRoleAdmin
+}
+
+// isSelfOrAdmin reports whether the actor may act on the account userID:
+// their own, or any account if they are an admin.
+func isSelfOrAdmin(actor *domain.AuthenticatedUser, userID int) bool {
+	return actor != nil && (actor.ID == userID || actor.Role == domain.UserRoleAdmin)
 }

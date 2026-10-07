@@ -297,9 +297,30 @@ describe('useCreatePerspective hook', () => {
 			expect(mockToastError).toHaveBeenCalledWith('Please fill in at least one field');
 		});
 
-		it('shows generic message for unknown errors', () => {
-			capturedMutationOptions.onError(new Error('connection timeout'));
-			expect(mockToastError).toHaveBeenCalledWith('Failed to add perspective. Please try again.');
+		it('shows generic message with a Retry action for unknown errors', () => {
+			capturedMutationOptions.onError(new Error('connection timeout'), { userID: 42, contentID: 10, quality: 7500 });
+			expect(mockToastError).toHaveBeenCalledWith('Failed to add perspective.', {
+				action: { label: 'Retry', onClick: expect.any(Function) },
+			});
+		});
+
+		it('Retry re-runs the same mutation with the same input', () => {
+			const input = { userID: 42, contentID: 10, quality: 7500 };
+			capturedMutationOptions.onError(new Error('connection timeout'), input);
+			const opts = mockToastError.mock.calls.at(-1)![1];
+			expect(mockMutate).not.toHaveBeenCalled();
+			opts.action.onClick();
+			expect(mockMutate).toHaveBeenCalledTimes(1);
+			expect(mockMutate).toHaveBeenCalledWith(input);
+		});
+
+		it('validation errors carry no Retry action', () => {
+			for (const m of ['user not found', 'invalid rating: quality 99999', 'at least one field must be provided']) {
+				mockToastError.mockClear();
+				capturedMutationOptions.onError(new Error(m), { userID: 42, contentID: 10, quality: 7500 });
+				expect(mockToastError).toHaveBeenCalledTimes(1);
+				expect(mockToastError.mock.calls[0]).toHaveLength(1);
+			}
 		});
 
 		it('rolls the optimistic insert back from the snapshot', () => {
