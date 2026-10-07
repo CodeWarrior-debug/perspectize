@@ -16,6 +16,7 @@ import {
 	ratedValueGetter,
 	genreValueGetter,
 	releasedValueGetter,
+	releasedFilterDate,
 	formatReleased,
 	contentTags,
 	durationValueGetter,
@@ -596,5 +597,36 @@ describe('default column sets fit the 1212px grid', () => {
 			const max = b.match(/\n\s*maxWidth:\s*(\d+)/)?.[1];
 			if (min && max) expect(Number(min), b.slice(0, 30)).toBeLessThanOrEqual(Number(max));
 		}
+	});
+});
+
+describe('cast cell person links', () => {
+	it('tags every named person with their TMDB id, directors and cast alike', () => {
+		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: CAST.slice(0, 2) }) }) as HTMLElement;
+		const tagged = [...el.querySelectorAll('[data-person-id]')].map((n) => [
+			n.getAttribute('data-person-id'),
+			n.textContent,
+		]);
+		expect(tagged).toEqual([
+			['525', 'Christopher Nolan'],
+			['6193', 'Leonardo DiCaprio'],
+			['24045', 'Joseph Gordon-Levitt'],
+		]);
+	});
+
+	it('does not tag the +N overflow marker', () => {
+		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: CAST }) }) as HTMLElement;
+		expect(el.querySelector('[data-testid="cast-more"]')?.hasAttribute('data-person-id')).toBe(false);
+	});
+});
+
+describe('releasedFilterDate', () => {
+	it('is the local calendar day of the ISO date (what AG Grid compares)', () => {
+		const d = releasedFilterDate('2010-07-15');
+		expect([d?.getFullYear(), d?.getMonth(), d?.getDate()]).toEqual([2010, 6, 15]);
+	});
+	it('is null for missing or malformed dates', () => {
+		expect(releasedFilterDate(null)).toBeNull();
+		expect(releasedFilterDate('soon')).toBeNull();
 	});
 });

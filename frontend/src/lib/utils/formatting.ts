@@ -704,7 +704,23 @@ export function moviePeople(row: MovieRow | null | undefined): MoviePerson[] {
 export const CAST_CELL_MAX_DIRECTORS = 2;
 export const CAST_CELL_MAX_CAST = 3;
 
-function castLine(names: string[], directors: boolean): HTMLElement {
+/** Attribute on a clickable cast/director name; its value is the TMDB person id (read by ActivityTable's cell click). */
+export const PERSON_ID_ATTR = 'data-person-id';
+
+/** The names, comma separated, each wrapped in a span carrying its person id so a click can filter by that person. */
+function appendPeople(parent: HTMLElement, people: MoviePerson[]): void {
+	people.forEach((p, i) => {
+		if (i > 0) parent.appendChild(document.createTextNode(', '));
+		const name = document.createElement('span');
+		name.setAttribute(PERSON_ID_ATTR, String(p.id));
+		name.className = 'cursor-pointer hover:underline';
+		name.title = `Show movies with ${p.name}`;
+		name.textContent = p.name;
+		parent.appendChild(name);
+	});
+}
+
+function castLine(people: MoviePerson[], directors: boolean): HTMLElement {
 	const line = document.createElement('div');
 	line.dataset.testid = 'cast-line';
 	line.className = 'flex w-full min-w-0 items-baseline gap-1';
@@ -715,10 +731,9 @@ function castLine(names: string[], directors: boolean): HTMLElement {
 		marker.className = 'text-muted-foreground';
 		marker.textContent = 'dir.';
 		text.appendChild(marker);
-		text.appendChild(document.createTextNode(` ${names.join(', ')}`));
-	} else {
-		text.textContent = names.join(', ');
+		text.appendChild(document.createTextNode(' '));
 	}
+	appendPeople(text, people);
 	line.appendChild(text);
 	return line;
 }
@@ -745,20 +760,8 @@ export function castCellRenderer(params: { data?: MovieRow }): HTMLElement | str
 	const directors = people.filter((p) => p.role === 'director').slice(0, CAST_CELL_MAX_DIRECTORS);
 	const cast = people.filter((p) => p.role === 'cast').slice(0, CAST_CELL_MAX_CAST);
 	const lines: HTMLElement[] = [];
-	if (directors.length > 0)
-		lines.push(
-			castLine(
-				directors.map((d) => d.name),
-				true,
-			),
-		);
-	if (cast.length > 0)
-		lines.push(
-			castLine(
-				cast.map((c) => c.name),
-				false,
-			),
-		);
+	if (directors.length > 0) lines.push(castLine(directors, true));
+	if (cast.length > 0) lines.push(castLine(cast, false));
 	for (const line of lines) container.appendChild(line);
 
 	const extra = people.length - directors.length - cast.length;
@@ -883,6 +886,12 @@ export function genreValueGetter(params: { data?: MovieRow }): string | null {
 /** ISO release date (`2010-07-15`); null when unknown. */
 export function releasedValueGetter(params: { data?: MovieRow }): string | null {
 	return movieResponse(params.data)?.releaseDate || null;
+}
+
+/** Local-midnight Date for an ISO release date, the shape AG Grid's date filter compares; null when unknown/invalid. */
+export function releasedFilterDate(iso: string | null): Date | null {
+	const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? '');
+	return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
 }
 
 /** `Jul 15, 2010`. Formatted in UTC: a date-only string parses as UTC midnight and would otherwise show the previous day west of UTC. */

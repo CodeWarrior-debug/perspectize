@@ -39,6 +39,7 @@
 		urlParamsToFilter,
 		filterToUrlParams,
 		filtersEqual,
+		nonGridFilters,
 	} from '$lib/utils/gridUrlState';
 	import type { DataMode, GridParams, SortSpec } from '$lib/utils/gridUrlState';
 	import {
@@ -64,7 +65,10 @@
 		genreValueGetter,
 		ratedValueGetter,
 		releasedValueGetter,
+		releasedFilterDate,
 		formatReleased,
+		moviePeople,
+		PERSON_ID_ATTR,
 		boxOfficeValueGetter,
 		formatBoxOffice,
 		vsBudgetValueGetter,
@@ -89,6 +93,9 @@
 		togglableColIds,
 		defaultColumnVisibility,
 		isMovieOnlyTypeFilter,
+		PERSON_FILTER_KEY,
+		parsePersonFilter,
+		rowMatchesPerson,
 	} from '$lib/utils/grid-config';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
@@ -103,7 +110,7 @@
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
-	import { ContentTypeFilter } from '$lib/utils/contentTypeFilter';
+	import { ContentTypeFilter, AgeRatingFilter } from '$lib/utils/contentTypeFilter';
 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
 	import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
@@ -229,6 +236,15 @@
 	const searchText = $derived(gridParams.q);
 	const searchFields = $derived(gridParams.qFields);
 	const filters = $derived(gridParams.filters);
+	// `f.person` (TMDB id, optional `:cast`/`:director`): has no grid column, so it is tracked apart from the grid filter model.
+	const personFilter = $derived(parsePersonFilter(filters[PERSON_FILTER_KEY]));
+
+	/** Filter to movies crediting this person (clicking a name in the Cast cell). */
+	function filterByPerson(personId: string) {
+		hover.close();
+		cursors = [null];
+		updateUrl({ filters: { ...gridParams.filters, [PERSON_FILTER_KEY]: personId }, page: 1 });
+	}
 
 	// ---------------------------------------------------------------------------
 	// URL update helper
@@ -391,6 +407,19 @@
 	});
 	const loadedItemsCount = $derived(displayedRowCount ?? rowData.length);
 	const loading = $derived(contentQuery.isLoading || contentQuery.isPlaceholderData);
+	// Chip text for the person filter: the name from any loaded row, else the bare TMDB id.
+	const personChipLabel = $derived.by(() => {
+		if (!personFilter) return '';
+		for (const r of rowData) {
+			const hit = moviePeople(r).find((p) => p.id === personFilter.id);
+			if (hit) return hit.name;
+		}
+		return `TMDB #${personFilter.id}`;
+	});
+	const chipFilterModel = $derived<Record<string, any>>({
+		...(gridApi ? activeFilterModel : urlParamsToFilter(filters)),
+		...(personFilter ? { [PERSON_FILTER_KEY]: { filterType: 'person', filter: personChipLabel } } : {}),
+	});
 	const hasActiveFilters = $derived(Object.keys(filters).length > 0 || searchText !== '');
 
 	// ---------------------------------------------------------------------------
@@ -418,7 +447,8 @@
 	const sortedRowData = $derived(
 		mode === 'loaded' && cardMode
 			? (() => {
-					const filtered = filterContentRows(rowData, urlParamsToFilter(filters));
+					const byColumns = filterContentRows(rowData, urlParamsToFilter(filters));
+					const filtered = personFilter ? byColumns.filter((r) => rowMatchesPerson(r, personFilter)) : byColumns;
 					return clientSorts.length > 0
 						? [...filtered].sort((a, b) => compareContentBySorts(a, b, clientSorts))
 						: filtered;
@@ -471,7 +501,10 @@
 		// When switching Loaded → All: sync AG Grid filter state to URL params
 		if (newMode === 'all' && gridApi) {
 			const filterModel = gridApi.getFilterModel();
-			const urlFilters = filterToUrlParams(filterModel as Record<string, unknown>);
+			const urlFilters = {
+				...filterToUrlParams(filterModel as Record<string, unknown>),
+				...nonGridFilters(gridParams.filters),
+			};
 			updateUrl({ mode: newMode, page: 1, filters: urlFilters });
 		} else {
 			updateUrl({ mode: newMode, page: 1 });
@@ -574,7 +607,7 @@
 				minWidth: 82,
 				maxWidth: 180,
 				sortable: false,
-				filter: false,
+				filter: 'agTextColumnFilter',
 				valueGetter: genreValueGetter,
 				valueFormatter: (params) => textOrEmpty(params.value),
 				headerTooltip: 'TMDB genres',
@@ -586,7 +619,7 @@
 				flex: 0.5,
 				minWidth: 82,
 				maxWidth: 100,
-				filter: false,
+				filter: AgeRatingFilter,
 				valueGetter: ratedValueGetter,
 				comparator: ratedComparator,
 				valueFormatter: (params) => textOrEmpty(params.value),
@@ -677,7 +710,9 @@
 				minWidth: 105,
 				maxWidth: 140,
 				sortable: false,
-				filter: false,
+				filter: 'agDateColumnFilter',
+				// AG's date filter compares local dates; the ISO release date would read as the day before west of UTC.
+				filterValueGetter: (params) => releasedFilterDate(releasedValueGetter({ data: params.data })),
 				valueGetter: releasedValueGetter,
 				valueFormatter: (params) => formatReleased(params.value),
 				headerTooltip: 'Theatrical release date from TMDB',
@@ -689,7 +724,7 @@
 				flex: 0.8,
 				minWidth: 138, // room for the sort arrow
 				maxWidth: 150,
-				filter: false,
+				filter: 'agNumberColumnFilter',
 				valueGetter: boxOfficeValueGetter,
 				comparator: unknownLastComparator,
 				valueFormatter: (params) => formatBoxOffice(params.value),
@@ -718,7 +753,7 @@
 				minWidth: 121,
 				maxWidth: 130,
 				sortable: false,
-				filter: false,
+				filter: 'agNumberColumnFilter',
 				valueGetter: tmdbScoreValueGetter,
 				valueFormatter: (params) => formatTmdbScore(params.value),
 				// Muted when the score rests on fewer than 50 votes.
@@ -966,6 +1001,11 @@
 
 			if (event.colDef.colId === 'perspectize') {
 				openPerspective(String(event.data.id), event.data.name);
+			} else if (event.colDef.colId === 'cast') {
+				// A name in the Cast cell filters to that person (TMDB id carried on the span).
+				const nameEl = (event.event?.target as HTMLElement | null)?.closest<HTMLElement>(`[${PERSON_ID_ATTR}]`);
+				const personId = nameEl?.getAttribute(PERSON_ID_ATTR);
+				if (personId) filterByPerson(personId);
 			} else if (event.colDef.colId === 'category') {
 				hover.close(); // don't leave the hover copy-popover open under the typeahead
 				const rect =
@@ -1026,6 +1066,9 @@
 			cursors = [null]; // Reset cursor stack
 			updateUrl({ sorts: newSorts.length > 0 ? newSorts : [], page: 1 });
 		},
+		// The person filter has no column, so "Loaded" mode applies it here, alongside the column filters.
+		isExternalFilterPresent: () => personFilter != null,
+		doesExternalFilterPass: (node) => (personFilter && node.data ? rowMatchesPerson(node.data, personFilter) : false),
 		onFilterChanged: (event: FilterChangedEvent) => {
 			hover.close();
 			// Immediate: update chip display
@@ -1038,7 +1081,10 @@
 			clearTimeout(debounceTimer);
 			debounceTimer = setTimeout(() => {
 				const filterModel = event.api.getFilterModel();
-				const urlFilters = filterToUrlParams(filterModel as Record<string, unknown>);
+				const urlFilters = {
+					...filterToUrlParams(filterModel as Record<string, unknown>),
+					...nonGridFilters(gridParams.filters),
+				};
 				if (filtersEqual(urlFilters, gridParams.filters)) return;
 				if (mode === 'loaded') {
 					updateUrl({ filters: urlFilters });
@@ -1077,6 +1123,13 @@
 		if (!gridApi || !gridReady) return;
 		const filterModel = urlParamsToFilter(gridParams.filters);
 		gridApi.setFilterModel(Object.keys(filterModel).length > 0 ? filterModel : null);
+	});
+
+	// Re-run the grid's filters when the person filter changes (external filters aren't tracked by the model).
+	$effect(() => {
+		void personFilter;
+		if (!gridApi || !gridReady) return;
+		gridApi.onFilterChanged();
 	});
 
 	// Update loading state reactively
@@ -1221,7 +1274,7 @@
 	<!-- Active Filter Chips — always visible so users can clear filters even during errors -->
 	<FilterChips
 		{gridApi}
-		filterModel={gridApi ? activeFilterModel : urlParamsToFilter(filters)}
+		filterModel={chipFilterModel}
 		onRemove={(colId) => {
 			const next = { ...gridParams.filters };
 			delete next[colId];
