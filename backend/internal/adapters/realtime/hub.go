@@ -227,15 +227,20 @@ func (h *Hub) fanOutInbox(ctx context.Context, threadID int, seq int64, at time.
 		if p.LeftAt != nil {
 			continue
 		}
-		unread := seq - p.LastReadSeq
-		if unread < 0 {
-			unread = 0
+		// Same source as the thread list's unreadCount: only messages sent by
+		// others past the participant's read pointer. Deriving it from seq
+		// arithmetic would count the sender's own messages.
+		stats, err := h.msgRepo.ThreadStats(ctx, p.UserID, []int{threadID})
+		if err != nil {
+			slog.Warn("realtime hub: inbox fan-out could not load unread count",
+				"thread_id", threadID, "user_id", p.UserID, "err", err)
+			continue
 		}
 		h.broadcastInbox(p.UserID, domain.InboxEvent{
 			ThreadID:      threadID,
 			LastMessageAt: lastMessageAt,
 			LatestSeq:     seq,
-			UnreadCount:   int(unread),
+			UnreadCount:   stats[threadID].Unread,
 		})
 	}
 }

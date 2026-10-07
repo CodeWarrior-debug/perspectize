@@ -62,7 +62,11 @@
 	}
 </script>
 
-<div data-testid="message" class="group relative flex gap-2 {mine ? 'justify-end' : 'justify-start'}">
+<div
+	data-testid="message"
+	data-seq={message.seq}
+	class="group relative flex gap-2 {mine ? 'justify-end' : 'justify-start'}"
+>
 	{#if !mine && showSender}
 		<Avatar size="sm" username={message.sender.username} />
 	{/if}
