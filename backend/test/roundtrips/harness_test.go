@@ -36,6 +36,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/realtime"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/cached"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
@@ -125,7 +126,7 @@ func newHarnessWithPool(t *testing.T, pool database.PoolConfig) *harness {
 	hub := realtime.NewHub(messageRepo, threadRepo, notifier)
 
 	deps := server.Deps{
-		ContentService:     services.NewContentService(h.contentRepo, youtube.NewFixtureClient(), nil, services.WithBibleReference(bibleReferenceRepo)),
+		ContentService:     services.NewContentService(h.contentRepo, youtube.NewFixtureClient(), tmdb.NewFixtureClient(), services.WithBibleReference(bibleReferenceRepo)),
 		UserService:        services.NewUserService(userRepo, h.contentRepo, perspectiveRepo),
 		PerspectiveService: services.NewPerspectiveService(perspectiveRepo, userRepo),
 		CategoryService:    services.NewCategoryService(categoryRepo, h.contentRepo, noWikidata{}),

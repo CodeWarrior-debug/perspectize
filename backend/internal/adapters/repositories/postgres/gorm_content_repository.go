@@ -184,13 +184,16 @@ func applyPersonFilter(query *gorm.DB, personID *int, role *domain.PersonRole) *
 	if err != nil {
 		return query // unreachable: marshalling a map of ints cannot fail
 	}
+	// Literal (not a bound arg) so the planner can prove the partial-index predicate
+	// even under generic prepared plans. Person ids only mean something for movies.
+	movie := "content_type = '" + contentTypeToDBValue(domain.ContentTypeMovie) + "' AND "
 	switch {
 	case role != nil && *role == domain.PersonRoleCast:
-		return query.Where("response->'cast' @> ?::jsonb", string(needle))
+		return query.Where(movie+"response->'cast' @> ?::jsonb", string(needle))
 	case role != nil && *role == domain.PersonRoleDirector:
-		return query.Where("response->'directors' @> ?::jsonb", string(needle))
+		return query.Where(movie+"response->'directors' @> ?::jsonb", string(needle))
 	default:
-		return query.Where("(response->'cast' @> ?::jsonb OR response->'directors' @> ?::jsonb)", string(needle), string(needle))
+		return query.Where(movie+"(response->'cast' @> ?::jsonb OR response->'directors' @> ?::jsonb)", string(needle), string(needle))
 	}
 }
 

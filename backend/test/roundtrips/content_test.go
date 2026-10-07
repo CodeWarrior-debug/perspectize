@@ -261,3 +261,41 @@ func TestContentByIDWithRowFields(t *testing.T) {
 	msg := h.gqlError(token, `query { contentByID(id: "999999999") { id name } }`, nil)
 	require.Contains(t, msg, "content not found")
 }
+
+const createFromMovieMutation = `mutation($input: CreateContentFromMovieInput!) {
+  createContentFromMovie(input: $input) { id name contentType movie }
+}`
+
+// UNVERIFIED-AGAINST-DB: counts derived from ContentService.CreateFromMovie
+// (run with RT_MEASURE=1 against a database to print the statements).
+//   - new movie: GetByURL (SELECT, not found) + GetOrCreateByURL (INSERT ... ON CONFLICT
+//     RETURNING) = 2. The TMDB call is the offline fixture client: no SQL.
+//   - duplicate: GetByURL finds the row and returns before any metadata fetch = 1.
+func TestCreateContentFromMovie(t *testing.T) {
+	h := newHarness(t)
+	_, token := h.user("movie")
+	h.warm(token)
+	url := fmt.Sprintf("https://www.themoviedb.org/movie/%d", 100_000_000+time.Now().UnixNano()%800_000_000)
+	vars := map[string]any{"input": map[string]any{"url": url}}
+
+	type movieResult struct {
+		ID          string         `json:"id"`
+		Name        string         `json:"name"`
+		ContentType string         `json:"contentType"`
+		Movie       map[string]any `json:"movie"`
+	}
+
+	data := h.roundTrips(2, token, createFromMovieMutation, vars)
+	created := decode[movieResult](t, data, "createContentFromMovie")
+	h.trackContent(created.ID)
+	if created.ContentType != "MOVIE" || created.Movie == nil {
+		t.Fatalf("created row should be a MOVIE with the movie payload: %+v", created)
+	}
+
+	// Duplicate add: a single SELECT by canonical URL, no insert, no TMDB fetch.
+	data = h.roundTrips(1, token, createFromMovieMutation, vars)
+	again := decode[movieResult](t, data, "createContentFromMovie")
+	if again.ID != created.ID {
+		t.Fatalf("duplicate add should return the existing row: %+v vs %+v", again, created)
+	}
+}

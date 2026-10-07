@@ -89,6 +89,16 @@ func intSliceToInt64Array(ints []int) Int64Array {
 
 // contentSortRule builds a single paginator.Rule for one content sort column.
 func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) paginator.Rule {
+	// Movie columns sort unknowns (NULL) LAST. The paginator wraps the expression in
+	// COALESCE(expr, NULLReplacement), so ASC needs a high sentinel and DESC a low one.
+	// Sentinels stay exactly representable as float64 (cursors round-trip through JSON
+	// numbers, so math.MaxInt64 would lose precision): 2^53 for money, 99 for the rating
+	// rank (real ranks are 1-5), 1e18 for the revenue/budget multiple.
+	asc := order == domain.SortOrderAsc
+	boxOfficeNull, vsBudgetNull, ageRatingNull := int64(0), float64(-1), int64(0)
+	if asc {
+		boxOfficeNull, vsBudgetNull, ageRatingNull = int64(1<<53), float64(1e18), int64(99)
+	}
 	// Map domain.SortOrder to paginator.Order
 	var paginatorOrder paginator.Order
 	if order == domain.SortOrderAsc {
@@ -135,7 +145,7 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 			Key:             "BoxOffice",
 			Order:           paginatorOrder,
 			SQLRepr:         "(response->>'revenue')::BIGINT",
-			NULLReplacement: int64(0),
+			NULLReplacement: boxOfficeNull,
 		}
 	case domain.ContentSortByVsBudget:
 		// Revenue as a multiple of budget; NULL when either is unknown or budget is 0.
@@ -145,7 +155,7 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 			SQLRepr: "CASE WHEN response->>'budget' IS NULL OR response->>'revenue' IS NULL " +
 				"OR (response->>'budget')::BIGINT = 0 THEN NULL " +
 				"ELSE (response->>'revenue')::FLOAT8 / NULLIF((response->>'budget')::BIGINT,0) END",
-			NULLReplacement: float64(-1),
+			NULLReplacement: vsBudgetNull,
 		}
 	case domain.ContentSortByAgeRating:
 		return paginator.Rule{
@@ -153,7 +163,7 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 			Order: paginatorOrder,
 			SQLRepr: "CASE response->>'certification' WHEN 'G' THEN 1 WHEN 'PG' THEN 2 " +
 				"WHEN 'PG-13' THEN 3 WHEN 'R' THEN 4 WHEN 'NC-17' THEN 5 ELSE NULL END",
-			NULLReplacement: int64(0),
+			NULLReplacement: ageRatingNull,
 		}
 	case domain.ContentSortByPublishedAt:
 		return paginator.Rule{

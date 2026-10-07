@@ -15,33 +15,43 @@ import (
 )
 
 func TestMovieSortRules(t *testing.T) {
+	const vsBudgetSQL = "CASE WHEN response->>'budget' IS NULL OR response->>'revenue' IS NULL " +
+		"OR (response->>'budget')::BIGINT = 0 THEN NULL " +
+		"ELSE (response->>'revenue')::FLOAT8 / NULLIF((response->>'budget')::BIGINT,0) END"
+	const ageSQL = "CASE response->>'certification' WHEN 'G' THEN 1 WHEN 'PG' THEN 2 " +
+		"WHEN 'PG-13' THEN 3 WHEN 'R' THEN 4 WHEN 'NC-17' THEN 5 ELSE NULL END"
+	// Unknowns sort LAST: the paginator COALESCEs NULLs to NULLReplacement, so ASC
+	// needs a high sentinel and DESC a low one.
 	tests := []struct {
 		name   string
 		sortBy domain.ContentSortBy
+		order  domain.SortOrder
 		want   paginator.Rule
 	}{
-		{"box office", domain.ContentSortByBoxOffice, paginator.Rule{
+		{"box office desc", domain.ContentSortByBoxOffice, domain.SortOrderDesc, paginator.Rule{
 			Key: "BoxOffice", Order: paginator.DESC,
-			SQLRepr:         "(response->>'revenue')::BIGINT",
-			NULLReplacement: int64(0),
+			SQLRepr: "(response->>'revenue')::BIGINT", NULLReplacement: int64(0),
 		}},
-		{"vs budget", domain.ContentSortByVsBudget, paginator.Rule{
-			Key: "VsBudget", Order: paginator.DESC,
-			SQLRepr: "CASE WHEN response->>'budget' IS NULL OR response->>'revenue' IS NULL " +
-				"OR (response->>'budget')::BIGINT = 0 THEN NULL " +
-				"ELSE (response->>'revenue')::FLOAT8 / NULLIF((response->>'budget')::BIGINT,0) END",
-			NULLReplacement: float64(-1),
+		{"box office asc", domain.ContentSortByBoxOffice, domain.SortOrderAsc, paginator.Rule{
+			Key: "BoxOffice", Order: paginator.ASC,
+			SQLRepr: "(response->>'revenue')::BIGINT", NULLReplacement: int64(1 << 53),
 		}},
-		{"age rating", domain.ContentSortByAgeRating, paginator.Rule{
-			Key: "AgeRating", Order: paginator.DESC,
-			SQLRepr: "CASE response->>'certification' WHEN 'G' THEN 1 WHEN 'PG' THEN 2 " +
-				"WHEN 'PG-13' THEN 3 WHEN 'R' THEN 4 WHEN 'NC-17' THEN 5 ELSE NULL END",
-			NULLReplacement: int64(0),
+		{"vs budget desc", domain.ContentSortByVsBudget, domain.SortOrderDesc, paginator.Rule{
+			Key: "VsBudget", Order: paginator.DESC, SQLRepr: vsBudgetSQL, NULLReplacement: float64(-1),
+		}},
+		{"vs budget asc", domain.ContentSortByVsBudget, domain.SortOrderAsc, paginator.Rule{
+			Key: "VsBudget", Order: paginator.ASC, SQLRepr: vsBudgetSQL, NULLReplacement: float64(1e18),
+		}},
+		{"age rating desc", domain.ContentSortByAgeRating, domain.SortOrderDesc, paginator.Rule{
+			Key: "AgeRating", Order: paginator.DESC, SQLRepr: ageSQL, NULLReplacement: int64(0),
+		}},
+		{"age rating asc", domain.ContentSortByAgeRating, domain.SortOrderAsc, paginator.Rule{
+			Key: "AgeRating", Order: paginator.ASC, SQLRepr: ageSQL, NULLReplacement: int64(99),
 		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rules := buildContentSortRules(tt.sortBy, domain.SortOrderDesc)
+			rules := buildContentSortRules(tt.sortBy, tt.order)
 			require.Len(t, rules, 2)
 			assert.Equal(t, tt.want, rules[0])
 		})
@@ -101,13 +111,13 @@ func TestList_PersonFilter(t *testing.T) {
 		wantArgs []driver.Value
 	}{
 		{"cast only", cInt(525), role(domain.PersonRoleCast),
-			`WHERE response->'cast' @> \$1::jsonb ORDER BY`,
+			`WHERE content_type = 'movie' AND response->'cast' @> \$1::jsonb ORDER BY`,
 			[]driver.Value{`[{"id":525}]`, int64(11)}},
 		{"director only", cInt(525), role(domain.PersonRoleDirector),
-			`WHERE response->'directors' @> \$1::jsonb ORDER BY`,
+			`WHERE content_type = 'movie' AND response->'directors' @> \$1::jsonb ORDER BY`,
 			[]driver.Value{`[{"id":525}]`, int64(11)}},
 		{"any role ORs both", cInt(525), nil,
-			`WHERE \(response->'cast' @> \$1::jsonb OR response->'directors' @> \$2::jsonb\) ORDER BY`,
+			`WHERE content_type = 'movie' AND \(response->'cast' @> \$1::jsonb OR response->'directors' @> \$2::jsonb\) ORDER BY`,
 			[]driver.Value{`[{"id":525}]`, `[{"id":525}]`, int64(11)}},
 	}
 	for _, tc := range cases {
