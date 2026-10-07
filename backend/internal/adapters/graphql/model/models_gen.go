@@ -77,6 +77,14 @@ type ContentFilter struct {
 	SearchFields      []domain.ContentSearchField `json:"searchFields,omitempty"`
 	PersonID          *int                        `json:"personId,omitempty"`
 	PersonRole        *domain.PersonRole          `json:"personRole,omitempty"`
+	GenreContains     *string                     `json:"genreContains,omitempty"`
+	AgeRating         []string                    `json:"ageRating,omitempty"`
+	ReleasedAfter     *string                     `json:"releasedAfter,omitempty"`
+	ReleasedBefore    *string                     `json:"releasedBefore,omitempty"`
+	MinBoxOffice      *float64                    `json:"minBoxOffice,omitempty"`
+	MaxBoxOffice      *float64                    `json:"maxBoxOffice,omitempty"`
+	MinTmdbScore      *float64                    `json:"minTmdbScore,omitempty"`
+	MaxTmdbScore      *float64                    `json:"maxTmdbScore,omitempty"`
 	MinViewCount      *int                        `json:"minViewCount,omitempty"`
 	MaxViewCount      *int                        `json:"maxViewCount,omitempty"`
 	MinLikeCount      *int                        `json:"minLikeCount,omitempty"`

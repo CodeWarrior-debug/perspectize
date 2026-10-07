@@ -71,6 +71,15 @@ type ContentFilter struct {
 	// PersonID/PersonRole match movies by a person (cast or director).
 	PersonID   *int
 	PersonRole *PersonRole
+	// Movie column filters (JSONB extraction on movie rows).
+	GenreContains  *string
+	AgeRating      []string
+	ReleasedAfter  *string // ISO date, inclusive
+	ReleasedBefore *string // ISO date, inclusive
+	MinBoxOffice   *float64
+	MaxBoxOffice   *float64
+	MinTmdbScore   *float64
+	MaxTmdbScore   *float64
 }
 
 // ContentListParams contains parameters for paginated content queries

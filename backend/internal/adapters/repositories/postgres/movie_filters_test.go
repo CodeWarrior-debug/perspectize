@@ -147,6 +147,52 @@ func TestList_PersonFilter(t *testing.T) {
 	})
 }
 
+func TestList_MovieColumnFilters(t *testing.T) {
+	ctx := context.Background()
+	f64 := func(v float64) *float64 { return &v }
+	cases := []struct {
+		name     string
+		filter   domain.ContentFilter
+		wantRe   string
+		wantArgs []driver.Value
+	}{
+		{"genre contains", domain.ContentFilter{GenreContains: cStr("sci")},
+			`WHERE \(response->'genres'\)::text ILIKE \$1 ORDER BY`, []driver.Value{"%sci%", int64(11)}},
+		{"age rating any of", domain.ContentFilter{AgeRating: []string{"PG-13", "R"}},
+			`WHERE response->>'certification' IN \(\$1,\$2\) ORDER BY`, []driver.Value{"PG-13", "R", int64(11)}},
+		{"released after", domain.ContentFilter{ReleasedAfter: cStr("2000-01-01")},
+			`WHERE response->>'releaseDate' >= \$1 ORDER BY`, []driver.Value{"2000-01-01", int64(11)}},
+		{"released before", domain.ContentFilter{ReleasedBefore: cStr("2010-12-31")},
+			`WHERE response->>'releaseDate' <= \$1 ORDER BY`, []driver.Value{"2010-12-31", int64(11)}},
+		{"min box office", domain.ContentFilter{MinBoxOffice: f64(1e6)},
+			`WHERE \(response->>'revenue'\)::FLOAT8 >= \$1 ORDER BY`, []driver.Value{1e6, int64(11)}},
+		{"max box office", domain.ContentFilter{MaxBoxOffice: f64(2e9)},
+			`WHERE \(response->>'revenue'\)::FLOAT8 <= \$1 ORDER BY`, []driver.Value{2e9, int64(11)}},
+		{"min tmdb score", domain.ContentFilter{MinTmdbScore: f64(6.5)},
+			`WHERE \(response->>'voteAverage'\)::FLOAT8 >= \$1 ORDER BY`, []driver.Value{6.5, int64(11)}},
+		{"max tmdb score", domain.ContentFilter{MaxTmdbScore: f64(9)},
+			`WHERE \(response->>'voteAverage'\)::FLOAT8 <= \$1 ORDER BY`, []driver.Value{9.0, int64(11)}},
+		{"empty genre and ratings add nothing", domain.ContentFilter{GenreContains: cStr(""), AgeRating: []string{}},
+			`SELECT \* FROM "content" ORDER BY`, []driver.Value{int64(11)}},
+		{"filters AND together", domain.ContentFilter{GenreContains: cStr("x"), MinTmdbScore: f64(7)},
+			`ILIKE \$1 AND \(response->>'voteAverage'\)::FLOAT8 >= \$2 ORDER BY`, []driver.Value{"%x%", 7.0, int64(11)}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db, mock := newMockDB(t)
+			mock.ExpectQuery(tc.wantRe).WithArgs(tc.wantArgs...).WillReturnRows(contentRows())
+			filter := tc.filter
+			_, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{
+				SortBy:    domain.ContentSortByCreatedAt,
+				SortOrder: domain.SortOrderDesc,
+				Filter:    &filter,
+			})
+			require.NoError(t, err)
+			assertAllExpectationsMet(t, mock)
+		})
+	}
+}
+
 func TestQueryCount_FilteredMovieList_IsOnePageQuery(t *testing.T) {
 	// Budget = what it costs today: the page query only. The total count rides along
 	// in the same statement (scalar subquery), so includeTotalCount adds no round trip.
@@ -161,7 +207,7 @@ func TestQueryCount_FilteredMovieList_IsOnePageQuery(t *testing.T) {
 			SortOrder:         domain.SortOrderDesc,
 			IncludeTotalCount: withTotal,
 			Filter: &domain.ContentFilter{
-				PersonID: &id, Search: cStr("x"),
+				PersonID: &id, Search: cStr("x"), GenreContains: cStr("drama"), AgeRating: []string{"R", "PG"},
 				SearchFields: []domain.ContentSearchField{domain.ContentSearchFieldCast},
 			},
 		})

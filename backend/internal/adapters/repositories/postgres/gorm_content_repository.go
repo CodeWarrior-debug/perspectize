@@ -197,6 +197,38 @@ func applyPersonFilter(query *gorm.DB, personID *int, role *domain.PersonRole) *
 	}
 }
 
+// applyMovieColumnFilters applies the movie grid's per-column filters. All read the
+// shaped TMDB payload in the response JSONB. Rows without the key (non-movies, or
+// movies missing the value) yield NULL, so a set filter excludes them. Values are
+// always bound; releaseDate is an ISO string so lexical comparison is date order.
+func applyMovieColumnFilters(query *gorm.DB, f *domain.ContentFilter) *gorm.DB {
+	if f.GenreContains != nil && *f.GenreContains != "" {
+		query = query.Where("(response->'genres')::text ILIKE ?", "%"+*f.GenreContains+"%")
+	}
+	if len(f.AgeRating) > 0 {
+		query = query.Where("response->>'certification' IN ?", f.AgeRating)
+	}
+	if f.ReleasedAfter != nil {
+		query = query.Where("response->>'releaseDate' >= ?", *f.ReleasedAfter)
+	}
+	if f.ReleasedBefore != nil {
+		query = query.Where("response->>'releaseDate' <= ?", *f.ReleasedBefore)
+	}
+	if f.MinBoxOffice != nil {
+		query = query.Where("(response->>'revenue')::FLOAT8 >= ?", *f.MinBoxOffice)
+	}
+	if f.MaxBoxOffice != nil {
+		query = query.Where("(response->>'revenue')::FLOAT8 <= ?", *f.MaxBoxOffice)
+	}
+	if f.MinTmdbScore != nil {
+		query = query.Where("(response->>'voteAverage')::FLOAT8 >= ?", *f.MinTmdbScore)
+	}
+	if f.MaxTmdbScore != nil {
+		query = query.Where("(response->>'voteAverage')::FLOAT8 <= ?", *f.MaxTmdbScore)
+	}
+	return query
+}
+
 // maxSearchPhrases caps comma-separated phrases per search to bound query size.
 const maxSearchPhrases = 10
 
@@ -303,6 +335,7 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 			query = applyContentSearch(query, *params.Filter.Search, params.Filter.SearchFields)
 		}
 		query = applyPersonFilter(query, params.Filter.PersonID, params.Filter.PersonRole)
+		query = applyMovieColumnFilters(query, params.Filter)
 		// View count filters (JSONB extraction)
 		if params.Filter.MinViewCount != nil {
 			query = query.Where("(response->'items'->0->'statistics'->>'viewCount')::BIGINT >= ?", *params.Filter.MinViewCount)
