@@ -217,11 +217,12 @@ func (m *mockUserRepository) SetOnboardingDisplayNextSession(ctx context.Context
 
 // mockPerspectiveRepository implements repositories.PerspectiveRepository for testing
 type mockPerspectiveRepository struct {
-	createFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
-	getByIDFn func(ctx context.Context, id int) (*domain.Perspective, error)
-	updateFn  func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
-	deleteFn  func(ctx context.Context, id int, ownerUserID int) error
-	listFn    func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
+	createFn    func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
+	getByIDFn   func(ctx context.Context, id int) (*domain.Perspective, error)
+	updateFn    func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
+	deleteFn    func(ctx context.Context, id int, ownerUserID int) error
+	listFn      func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
+	aggregateFn func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
 }
 
 func (m *mockPerspectiveRepository) Create(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
@@ -265,6 +266,9 @@ func (m *mockPerspectiveRepository) ReassignByUser(ctx context.Context, fromUser
 }
 
 func (m *mockPerspectiveRepository) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
+	if m.aggregateFn != nil {
+		return m.aggregateFn(ctx, contentIDs)
+	}
 	return map[int]*domain.PerspectiveAggregate{}, nil
 }
 
@@ -424,6 +428,48 @@ func TestContentQuery_Success(t *testing.T) {
 	assert.Equal(t, "Test Video", data.ContentByID.Name)
 	assert.Equal(t, "YOUTUBE_VIDEO", data.ContentByID.ContentType)
 	assert.Equal(t, url, data.ContentByID.URL)
+}
+
+// The aggregates-only shortcut skips the content row read, so existence comes
+// from the aggregate query: an id it doesn't return is "content not found".
+func TestContentByID_AggregatesOnly_UnknownIDReturnsNotFound(t *testing.T) {
+	perspectiveRepo := &mockPerspectiveRepository{
+		aggregateFn: func(ctx context.Context, ids []int) (map[int]*domain.PerspectiveAggregate, error) {
+			return map[int]*domain.PerspectiveAggregate{}, nil
+		},
+	}
+	server := setupTestServerWithRepos(&mockContentRepository{}, &mockYouTubeClient{}, perspectiveRepo, &mockUserRepository{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ contentByID(id: "999") { id perspectiveCount averageRating qualityRatingCount } }`)
+
+	require.NotEmpty(t, result.Errors, "Expected an error for an unknown id")
+	assert.Contains(t, result.Errors[0].Message, "content not found")
+}
+
+func TestContentByID_AggregatesOnly_KnownIDWithoutPerspectivesResolvesNull(t *testing.T) {
+	perspectiveRepo := &mockPerspectiveRepository{
+		aggregateFn: func(ctx context.Context, ids []int) (map[int]*domain.PerspectiveAggregate, error) {
+			return map[int]*domain.PerspectiveAggregate{1: {ContentID: 1}}, nil
+		},
+	}
+	server := setupTestServerWithRepos(&mockContentRepository{}, &mockYouTubeClient{}, perspectiveRepo, &mockUserRepository{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ contentByID(id: "1") { id perspectiveCount averageRating } }`)
+
+	assert.Empty(t, result.Errors)
+	var data struct {
+		ContentByID struct {
+			ID               string   `json:"id"`
+			PerspectiveCount *int     `json:"perspectiveCount"`
+			AverageRating    *float64 `json:"averageRating"`
+		} `json:"contentByID"`
+	}
+	require.NoError(t, json.Unmarshal(result.Data, &data))
+	assert.Equal(t, "1", data.ContentByID.ID)
+	assert.Nil(t, data.ContentByID.PerspectiveCount)
+	assert.Nil(t, data.ContentByID.AverageRating)
 }
 
 func TestContentQuery_NotFound_ReturnsError(t *testing.T) {
