@@ -38,7 +38,7 @@ const testTimeout = 3 * time.Second
 type testServer struct {
 	url         string
 	db          *gorm.DB
-	threadRepo  *postgres.GormThreadRepository
+	threadRepo  *postgres.GormMessageThreadRepository
 	messageRepo *postgres.GormMessageRepository
 	userRepo    *postgres.GormUserRepository
 	messaging   portservices.MessagingService
@@ -70,7 +70,7 @@ func newServer(t *testing.T) *testServer {
 
 	ts := &testServer{
 		db:          db,
-		threadRepo:  postgres.NewGormThreadRepository(db),
+		threadRepo:  postgres.NewGormMessageThreadRepository(db),
 		messageRepo: postgres.NewGormMessageRepository(db),
 		userRepo:    postgres.NewGormUserRepository(db),
 	}

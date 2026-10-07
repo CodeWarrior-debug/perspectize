@@ -59,7 +59,7 @@ func main() {
 		users:        postgres.NewGormUserRepository(db),
 		content:      postgres.NewGormContentRepository(db),
 		perspectives: postgres.NewGormPerspectiveRepository(db),
-		threads:      postgres.NewGormThreadRepository(db),
+		threads:      postgres.NewGormMessageThreadRepository(db),
 		messages:     postgres.NewGormMessageRepository(db),
 		userIDs:      map[string]int{},
 		contentIDs:   map[string]int{},
@@ -126,7 +126,7 @@ type seeder struct {
 	users        *postgres.GormUserRepository
 	content      *postgres.GormContentRepository
 	perspectives *postgres.GormPerspectiveRepository
-	threads      *postgres.GormThreadRepository
+	threads      *postgres.GormMessageThreadRepository
 	messages     *postgres.GormMessageRepository
 
 	userIDs    map[string]int // persona key -> users.id

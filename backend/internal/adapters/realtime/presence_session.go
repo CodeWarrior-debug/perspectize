@@ -44,7 +44,7 @@ func RunPresenceSession(
 	ctx context.Context,
 	tracker *PresenceTracker,
 	notifier presenceNotifier,
-	threadRepo repositories.ThreadRepository,
+	threadRepo repositories.MessageThreadRepository,
 	userID int,
 	cfg PresenceConfig,
 ) {
@@ -83,7 +83,7 @@ func RunPresenceSession(
 func publishPresence(
 	ctx context.Context,
 	notifier presenceNotifier,
-	threadRepo repositories.ThreadRepository,
+	threadRepo repositories.MessageThreadRepository,
 	userID int,
 	state domain.PresenceState,
 ) {

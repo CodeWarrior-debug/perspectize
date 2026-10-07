@@ -46,8 +46,8 @@ type Hub struct {
 	nextInID int
 
 	msgRepo    repositories.MessageRepository
-	threadRepo repositories.ThreadRepository // used by the inbox fan-out to resolve participants
-	notifier   Notifier                      // optional; nil means in-process-only ephemerals
+	threadRepo repositories.MessageThreadRepository // used by the inbox fan-out to resolve participants
+	notifier   Notifier                             // optional; nil means in-process-only ephemerals
 }
 
 // NewHub constructs a Hub. threadRepo is used by the MESSAGE_POSTED inbox
@@ -55,7 +55,7 @@ type Hub struct {
 // by PublishEphemeral to emit events over Postgres NOTIFY so every instance
 // (including this one, via its own Listener) receives them; pass nil for
 // in-process-only delivery.
-func NewHub(msgRepo repositories.MessageRepository, threadRepo repositories.ThreadRepository, notifier Notifier) *Hub {
+func NewHub(msgRepo repositories.MessageRepository, threadRepo repositories.MessageThreadRepository, notifier Notifier) *Hub {
 	return &Hub{
 		subs:       make(map[int]map[int]*threadSub),
 		inbox:      make(map[int]map[int]chan domain.InboxEvent),

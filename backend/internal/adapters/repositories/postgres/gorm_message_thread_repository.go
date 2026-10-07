@@ -11,17 +11,17 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// GormThreadRepository implements the ThreadRepository port using GORM.
-type GormThreadRepository struct {
+// GormMessageThreadRepository implements the MessageThreadRepository port using GORM.
+type GormMessageThreadRepository struct {
 	db *gorm.DB
 }
 
 // Compile-time interface check
-var _ repositories.ThreadRepository = (*GormThreadRepository)(nil)
+var _ repositories.MessageThreadRepository = (*GormMessageThreadRepository)(nil)
 
-// NewGormThreadRepository creates a new GORM-backed thread repository.
-func NewGormThreadRepository(db *gorm.DB) *GormThreadRepository {
-	return &GormThreadRepository{db: db}
+// NewGormMessageThreadRepository creates a new GORM-backed thread repository.
+func NewGormMessageThreadRepository(db *gorm.DB) *GormMessageThreadRepository {
+	return &GormMessageThreadRepository{db: db}
 }
 
 // CreateThread inserts a thread row plus its participant rows and returns the
@@ -30,7 +30,7 @@ func NewGormThreadRepository(db *gorm.DB) *GormThreadRepository {
 // needed), and the outer SELECT hands both back. The creator is given the
 // OWNER role, every other participant MEMBER. The trg_init_thread_sequence
 // trigger creates the thread_sequences row on the thread insert.
-func (r *GormThreadRepository) CreateThread(ctx context.Context, createdBy int, title *string, participantUserIDs []int) (*domain.MessageThread, error) {
+func (r *GormMessageThreadRepository) CreateThread(ctx context.Context, createdBy int, title *string, participantUserIDs []int) (*domain.MessageThread, error) {
 	seen := make(map[int]bool, len(participantUserIDs))
 	ids := make([]int64, 0, len(participantUserIDs))
 	for _, uid := range participantUserIDs {
@@ -127,7 +127,7 @@ func deref[T any](p *T) T {
 
 // GetThread loads a thread and its participants in one query. A missing
 // thread is reported as domain.ErrNotFound.
-func (r *GormThreadRepository) GetThread(ctx context.Context, threadID int) (*domain.MessageThread, error) {
+func (r *GormMessageThreadRepository) GetThread(ctx context.Context, threadID int) (*domain.MessageThread, error) {
 	var rows []threadParticipantRow
 	if err := r.db.WithContext(ctx).Raw(`SELECT `+threadWithParticipantsColumns+`
 		FROM message_threads mt
@@ -145,7 +145,7 @@ func (r *GormThreadRepository) GetThread(ctx context.Context, threadID int) (*do
 
 // FindDirectThread returns the 1:1 thread whose only two active participants are
 // userA and userB. No such thread yields domain.ErrNotFound.
-func (r *GormThreadRepository) FindDirectThread(ctx context.Context, userA, userB int) (*domain.MessageThread, error) {
+func (r *GormMessageThreadRepository) FindDirectThread(ctx context.Context, userA, userB int) (*domain.MessageThread, error) {
 	var threadID int64
 	err := r.db.WithContext(ctx).
 		Table("thread_participants tp").
@@ -168,7 +168,7 @@ func (r *GormThreadRepository) FindDirectThread(ctx context.Context, userA, user
 // ListThreadsForUser returns the user's active threads ordered by most recent
 // activity, with their participants, in one query. When beforeLastMessageAt is
 // set, only threads strictly older than it are returned (keyset pagination).
-func (r *GormThreadRepository) ListThreadsForUser(ctx context.Context, userID int, limit int, beforeLastMessageAt *time.Time) ([]domain.MessageThread, error) {
+func (r *GormMessageThreadRepository) ListThreadsForUser(ctx context.Context, userID int, limit int, beforeLastMessageAt *time.Time) ([]domain.MessageThread, error) {
 	where := "me.user_id = @user AND me.left_at IS NULL"
 	args := map[string]any{"user": userID}
 	if beforeLastMessageAt != nil {
@@ -202,7 +202,7 @@ func (r *GormThreadRepository) ListThreadsForUser(ctx context.Context, userID in
 // inserted as MEMBERs, and a user who had left becomes active again (left_at
 // cleared; role and joined_at kept). RETURNING * hands back every given
 // user's row as stored.
-func (r *GormThreadRepository) AddParticipants(ctx context.Context, threadID int, userIDs []int) ([]domain.ThreadParticipant, error) {
+func (r *GormMessageThreadRepository) AddParticipants(ctx context.Context, threadID int, userIDs []int) ([]domain.ThreadParticipant, error) {
 	if len(userIDs) == 0 {
 		return nil, nil
 	}
@@ -238,7 +238,7 @@ func (r *GormThreadRepository) AddParticipants(ctx context.Context, threadID int
 }
 
 // SetLeft marks a participant as having left the thread at the given time.
-func (r *GormThreadRepository) SetLeft(ctx context.Context, threadID, userID int, at time.Time) error {
+func (r *GormMessageThreadRepository) SetLeft(ctx context.Context, threadID, userID int, at time.Time) error {
 	if err := r.db.WithContext(ctx).
 		Model(&ThreadParticipantModel{}).
 		Where("thread_id = ? AND user_id = ?", threadID, userID).
@@ -250,7 +250,7 @@ func (r *GormThreadRepository) SetLeft(ctx context.Context, threadID, userID int
 
 // SetMuted toggles a participant's muted flag. No matching participant row is
 // reported as domain.ErrNotFound.
-func (r *GormThreadRepository) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
+func (r *GormMessageThreadRepository) SetMuted(ctx context.Context, threadID, userID int, muted bool) error {
 	res := r.db.WithContext(ctx).
 		Model(&ThreadParticipantModel{}).
 		Where("thread_id = ? AND user_id = ?", threadID, userID).
@@ -270,7 +270,7 @@ func (r *GormThreadRepository) SetMuted(ctx context.Context, threadID, userID in
 // data-modifying CTE runs whether or not the outer query reads it). Clamping
 // matters because an arbitrary client-supplied seq would otherwise pin
 // last_read_seq past the end of the thread and poison every read receipt.
-func (r *GormThreadRepository) SetLastRead(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
+func (r *GormMessageThreadRepository) SetLastRead(ctx context.Context, threadID, userID int, seq int64) (int64, error) {
 	var clamped int64
 	if err := r.db.WithContext(ctx).Raw(`
 		WITH c AS (

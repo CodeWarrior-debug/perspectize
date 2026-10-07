@@ -147,7 +147,7 @@ Browser (graphql-ws client)
 gqlgen HTTP handler ── transport.Websocket ── InitFunc → TokenVerifier (Clerk)
         │
         ▼
-GraphQL resolvers ──► MessagingService ──► ThreadRepository / MessageRepository (GORM)
+GraphQL resolvers ──► MessagingService ──► MessageThreadRepository / MessageRepository (GORM)
         │                    │
         │                    ├─ INSERT message (BEFORE INSERT trigger allocates per-thread seq)
         │                    │  AFTER INSERT trigger → pg_notify('thread_events', {ids})
@@ -173,7 +173,7 @@ Realtime Hub ◄──────── dedicated LISTEN connection on 'thread_
 | Component | Location | Responsibility |
 |---|---|---|
 | `MessagingService` | `internal/core/services/messaging_service.go` | Business logic: create thread, send, mark read, add/remove participants, list threads, get history, typing. Authorization (caller is an active participant). Rate limiting. |
-| `ThreadRepository` (port) | `internal/core/ports/repositories/` | Thread + participant persistence. |
+| `MessageThreadRepository` (port) | `internal/core/ports/repositories/` | Thread + participant persistence. |
 | `MessageRepository` (port) | `internal/core/ports/repositories/` | Message persistence, history paging, retention. |
 | GORM impls | `internal/adapters/repositories/postgres/` | Separate-model pattern (domain ↔ GORM mappers). Cursor pagination via existing helpers. |
 | `Hub` | `internal/adapters/realtime/hub.go` | In-memory subscriber registry; dedicated `LISTEN` connection; NOTIFY → row load → local fan-out; backpressure handling; presence tracking. |

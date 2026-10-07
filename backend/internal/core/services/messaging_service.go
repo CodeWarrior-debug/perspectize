@@ -15,7 +15,7 @@ const maxMessageBodyBytes = 8192
 
 // MessagingServiceImpl is the business-logic implementation of MessagingService.
 type MessagingServiceImpl struct {
-	threadRepo repositories.ThreadRepository
+	threadRepo repositories.MessageThreadRepository
 	msgRepo    repositories.MessageRepository
 	publisher  portservices.EventPublisher
 	limiter    *SlidingWindowLimiter
@@ -25,7 +25,7 @@ var _ portservices.MessagingService = (*MessagingServiceImpl)(nil)
 
 // NewMessagingService constructs the messaging business-logic service.
 func NewMessagingService(
-	threadRepo repositories.ThreadRepository,
+	threadRepo repositories.MessageThreadRepository,
 	msgRepo repositories.MessageRepository,
 	publisher portservices.EventPublisher,
 	limiter *SlidingWindowLimiter,

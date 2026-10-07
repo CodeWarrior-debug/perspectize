@@ -196,8 +196,8 @@ func (inboxStubThreadRepo) SetMuted(ctx context.Context, threadID, userID int, m
 }
 
 var (
-	_ repositories.MessageRepository = inboxStubMsgRepo{}
-	_ repositories.ThreadRepository  = inboxStubThreadRepo{}
+	_ repositories.MessageRepository       = inboxStubMsgRepo{}
+	_ repositories.MessageThreadRepository = inboxStubThreadRepo{}
 )
 
 func authedCtx(userID int) context.Context {
