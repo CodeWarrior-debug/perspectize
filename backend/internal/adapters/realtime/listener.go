@@ -190,7 +190,11 @@ func (l *Listener) watchIdle(ctx context.Context, closeIdle func()) {
 		case count == 0 && timer == nil:
 			timer = time.NewTimer(l.grace)
 			timerC = timer.C
+			slog.Info("thread_events listener has no subscribers; closing after grace", "grace", l.grace)
 		case count > 0:
+			if timer != nil {
+				slog.Info("thread_events listener: subscriber returned during grace; staying connected")
+			}
 			stop()
 		}
 
