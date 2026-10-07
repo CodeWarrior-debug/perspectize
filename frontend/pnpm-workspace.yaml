@@ -6,6 +6,12 @@ onlyBuiltDependencies:
   - esbuild
   - '@clerk/shared'
 
+# Refuse package versions published less than 24h (1440 minutes) ago. Sevalla's
+# build already enforces this; pnpm 10.33 (local + CI) doesn't by default, so
+# without this line a fresh transitive release passes CI and then fails the
+# Sevalla deploy. See .docs/DEPENDENCY_SECURITY.md #7.
+minimumReleaseAge: 1440
+
 # Single source of truth for dependency overrides.
 #
 # These MUST NOT be duplicated in package.json's `pnpm.overrides` block: pnpm
