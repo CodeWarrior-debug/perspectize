@@ -736,7 +736,7 @@ export function castCellRenderer(params: { data?: MovieRow }): HTMLElement | str
 
 	const container = document.createElement('div');
 	container.className =
-		'flex max-h-[34px] w-full flex-col justify-center overflow-hidden whitespace-nowrap text-[11px] leading-tight';
+		'flex h-full w-full flex-col justify-center overflow-hidden whitespace-nowrap text-[11px] leading-tight';
 	if (people.length === 0) {
 		container.textContent = EMPTY_VALUE;
 		return container;

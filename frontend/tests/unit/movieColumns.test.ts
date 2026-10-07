@@ -98,7 +98,9 @@ describe('castCellRenderer', () => {
 			expect(line.firstElementChild?.className).toContain('truncate');
 			expect(line.firstElementChild?.className).toContain('min-w-0');
 		}
-		expect(el.className).toContain('max-h-[34px]');
+		// Fills the cell and centres the two lines vertically (a fixed max-height left the block top-heavy).
+		expect(el.className).toContain('h-full');
+		expect(el.className).toContain('justify-center');
 	});
 
 	it('puts +N after the directors when there is no cast', () => {
