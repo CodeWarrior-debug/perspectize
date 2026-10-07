@@ -10,12 +10,15 @@
 		formatDuration,
 		formatRemainingTime,
 		formatTags,
+		movieResponse,
 		extractVideoIdFromUrl,
 		getSourceDataCooldown,
 	} from '$lib/utils/formatting';
 	import { useUpdateSourceData } from '$lib/queries/content/useUpdateSourceData';
 	import { useContentAggregates } from '$lib/queries/content/useContentAggregates';
 	import { ratingToDisplay } from '$lib/utils/ratings';
+	import MovieTiles from '$lib/components/MovieTiles.svelte';
+	import MovieBody from '$lib/components/MovieBody.svelte';
 	import PassageText from '$lib/components/PassageText.svelte';
 	import PassagePositionBar from '$lib/components/PassagePositionBar.svelte';
 	import PassageLinks from '$lib/components/PassageLinks.svelte';
@@ -40,6 +43,8 @@
 		displayTitle?: string | null;
 		verseStartID?: number | null;
 		verseEndID?: number | null;
+		// MOVIE rows only: the shaped TMDB payload selected by LIST_CONTENT.
+		movie?: unknown;
 	}
 
 	let {
@@ -67,6 +72,8 @@
 
 	const videoId = $derived(content ? extractVideoIdFromUrl(content.url) : null);
 	const thumbSrc = $derived(videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null);
+	const movie = $derived(content ? movieResponse(content) : null);
+	const posterSrc = $derived(movie?.posterPath ? `https://image.tmdb.org/t/p/w342${movie.posterPath}` : null);
 	const hasTags = $derived(!!content?.tags && content.tags.length > 0);
 	const hasDescription = $derived(!!content?.description && content.description.trim().length > 0);
 
@@ -116,7 +123,13 @@
 		<DialogContent showCloseButton={false} class="max-w-[560px] gap-0 overflow-hidden rounded-xl p-0">
 			<div class="flex items-start justify-between gap-3 bg-primary px-[22px] py-[18px]">
 				<DialogTitle class="text-xs font-semibold tracking-wide text-primary-foreground/70 uppercase">
-					{content.contentType === 'CLAIM' ? 'Claim' : isPassage ? 'Bible Passage' : 'YouTube Video'}
+					{content.contentType === 'CLAIM'
+						? 'Claim'
+						: isPassage
+							? 'Bible Passage'
+							: isMovie
+								? 'Movie'
+								: 'YouTube Video'}
 				</DialogTitle>
 				<DialogClose class="text-primary-foreground/80 hover:text-primary-foreground">
 					<XIcon class="size-[18px]" />
@@ -171,8 +184,21 @@
 					{/if}
 				{:else}
 					<div class="flex items-start gap-3.5">
-						<div class="h-[68px] w-[120px] flex-none overflow-hidden rounded-md bg-muted">
-							{#if thumbSrc}
+						<div
+							class={isMovie
+								? 'aspect-[2/3] w-[92px] flex-none overflow-hidden rounded-md bg-muted'
+								: 'h-[68px] w-[120px] flex-none overflow-hidden rounded-md bg-muted'}
+						>
+							{#if isMovie}
+								{#if posterSrc}
+									<img
+										src={posterSrc}
+										alt={`${content.name} poster`}
+										class="h-full w-full object-cover"
+										onerror={(e) => e.currentTarget.remove()}
+									/>
+								{/if}
+							{:else if thumbSrc}
 								<img
 									src={thumbSrc}
 									alt=""
@@ -187,7 +213,13 @@
 							>
 								{content.name}
 							</div>
-							<div class="mt-1 text-[13px] text-muted-foreground">{content.channelTitle}</div>
+							{#if isMovie}
+								{#if movie?.tagline}
+									<div class="mt-1 text-[13px] text-muted-foreground italic">{movie.tagline}</div>
+								{/if}
+							{:else}
+								<div class="mt-1 text-[13px] text-muted-foreground">{content.channelTitle}</div>
+							{/if}
 						</div>
 					</div>
 				{/if}
@@ -221,7 +253,9 @@
 							{averageRatingDisplay}
 						</div>
 					</div>
-					{#if !isPassage}
+					{#if isMovie}
+						<MovieTiles row={content} length={content.length} lengthUnits={content.lengthUnits} />
+					{:else if !isPassage}
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Views</div>
 							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
@@ -290,7 +324,7 @@
 							>
 								Compare
 							</a>
-							{#if !isPassage}
+							{#if !isPassage && !isMovie}
 								<button
 									type="button"
 									disabled={updateSourceData.isPending || cooldown.active}
@@ -304,7 +338,7 @@
 								</button>
 							{/if}
 						</div>
-						{#if !isPassage && cooldown.active}
+						{#if !isPassage && !isMovie && cooldown.active}
 							<div class="max-w-[280px] text-right text-[11px] text-muted-foreground">
 								This was updated recently. Check back in {formatRemainingTime(cooldown.remainingMs)} to refresh again.
 							</div>
@@ -312,7 +346,7 @@
 					</div>
 				</div>
 
-				{#if !isPassage && hasDescription}
+				{#if !isPassage && !isMovie && hasDescription}
 					<div class="mt-3.5 border-t border-border pt-3.5">
 						<div class="mb-1.5 text-[11px] tracking-wide text-muted-foreground uppercase">Description</div>
 						<div class="font-serif text-[13px] whitespace-pre-wrap text-foreground">
@@ -321,7 +355,7 @@
 					</div>
 				{/if}
 
-				{#if !isPassage && hasTags}
+				{#if !isPassage && !isMovie && hasTags}
 					<div class="mt-3.5">
 						<div class="mb-1.5 text-[11px] tracking-wide text-muted-foreground uppercase">Tags</div>
 						<div class="font-[family-name:var(--font-family-serif)] text-[13px] text-foreground">
@@ -331,6 +365,7 @@
 				{/if}
 
 				{#if isMovie}
+					<MovieBody row={content} />
 					<p class="mt-3.5 border-t border-border pt-3.5 text-[11px] text-muted-foreground">
 						This product uses the TMDB API but is not endorsed or certified by TMDB.
 					</p>
