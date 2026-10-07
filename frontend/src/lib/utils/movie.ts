@@ -2,7 +2,7 @@
 // must never reject something the server accepts. Patterns are deliberately
 // unanchored at the front, exactly as on the server.
 const TMDB_MOVIE_RE = /themoviedb\.org\/movie\/(\d+)(?:[-/?#]|$)/i;
-const IMDB_URL_RE = /imdb\.com\/title\/(tt\d+)(?:[/?#]|$)/i;
+const IMDB_URL_RE = /imdb\.com\/title\/(tt\d{5,})(?:[/?#]|$)/i;
 const IMDB_ID_RE = /^tt\d{5,}$/;
 
 const MAX_INT64 = 9223372036854775807n;

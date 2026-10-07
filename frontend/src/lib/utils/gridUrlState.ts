@@ -177,17 +177,21 @@ export function parseGridParams(params: URLSearchParams): GridParams {
 	};
 }
 
-/** Parse the `qf` URL value into a validated, de-duped list of scope keys. Falls back to "all" when absent, empty, or entirely invalid. */
+/**
+ * Parse the `qf` URL value into a validated, de-duped list of scope keys, limited to the scopes
+ * currently offered (`defaults`; hidden Cast/Director scopes are dropped once the Movie filter is gone).
+ * Falls back to "all" when absent, empty, or nothing valid and visible remains.
+ */
 function parseSearchScopes(qf: string | null, defaults: SearchScopeKey[]): SearchScopeKey[] {
 	if (!qf) return defaults;
-	const valid = new Set(EVERY_SEARCH_SCOPE);
+	const valid = new Set(defaults);
 	const parsed = qf
 		.split(',')
 		.map((s) => s.trim())
 		.filter((s): s is SearchScopeKey => valid.has(s as SearchScopeKey));
 	// De-dupe while preserving canonical order for a stable serialized form.
 	const selected = new Set(parsed);
-	return selected.size > 0 ? EVERY_SEARCH_SCOPE.filter((s) => selected.has(s)) : defaults;
+	return selected.size > 0 ? defaults.filter((s) => selected.has(s)) : defaults;
 }
 
 /** Serialize GridParams to URL search string (omitting defaults) */

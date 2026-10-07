@@ -4,7 +4,7 @@ Status: **written and built autonomously overnight, not reviewed.** The brainsto
 
 This **narrows and amends** `2026-09-27-tmdb-content-types-design.md` to the **Movie** type only. TV show / season / episode stay in that spec and are out of scope here. Where this doc and the TMDB doc disagree on a Movie column, this doc wins (owner pointers of 2026-10-07).
 
-Preview of the intended grid: `tools/content-type-designer/previews/movie-activity.html` (built with the `content-type-preview` skill; it predates these pointers and will be rebuilt from `.claude/skills/content-type-preview/examples/movie.spec.json`).
+Preview of the intended grid: `tools/content-type-designer/previews/movie-activity.html`, from `tools/content-type-designer/previews/movie-activity.spec.json` (built with the `content-type-preview` skill; it predates these pointers and will be rebuilt from `.claude/skills/content-type-preview/examples/movie.spec.json`).
 
 ## Scope
 

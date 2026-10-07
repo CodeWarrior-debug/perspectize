@@ -26,6 +26,9 @@ export interface ContentItem {
 	description: string | null;
 	// Source payload (JSON scalar). Movie rows read cast/revenue/etc. from it; YouTube rows carry the API items.
 	response?: Record<string, unknown> | null;
+	// MOVIE rows only: the shaped TMDB payload. List rows select this instead of `response`
+	// (so YouTube rows don't ship their snippet twice); null for every other type.
+	movie?: Record<string, unknown> | null;
 	primaryCategory: {
 		id: string;
 		wikidataQid: string;
@@ -103,7 +106,7 @@ export const LIST_CONTENT = gql`
 				publishedAt
 				tags
 				description
-				response
+				movie
 				primaryCategory {
 					id
 					wikidataQid
@@ -206,6 +209,7 @@ export const GET_CONTENT_DETAILS = gql`
 			tags
 			description
 			response
+			movie
 			primaryCategory {
 				id
 				wikidataQid

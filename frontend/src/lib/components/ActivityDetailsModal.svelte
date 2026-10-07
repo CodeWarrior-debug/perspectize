@@ -52,6 +52,7 @@
 		onClose: () => void;
 	} = $props();
 
+	const isMovie = $derived(content?.contentType === 'MOVIE');
 	const isPassage = $derived(content?.contentType === 'BIBLE_PASSAGE');
 	const hasVerseRange = $derived(isPassage && content?.verseStartID != null && content?.verseEndID != null);
 	const setPassageTitle = useSetPassageDisplayTitle();
@@ -327,6 +328,12 @@
 							{formatTags(content.tags)}
 						</div>
 					</div>
+				{/if}
+
+				{#if isMovie}
+					<p class="mt-3.5 border-t border-border pt-3.5 text-[11px] text-muted-foreground">
+						This product uses the TMDB API but is not endorsed or certified by TMDB.
+					</p>
 				{/if}
 			</div>
 		</DialogContent>

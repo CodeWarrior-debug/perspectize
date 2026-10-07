@@ -13,6 +13,8 @@ describe('validateMovieInput', () => {
 		['IMDb URL without trailing slash', 'https://www.imdb.com/title/tt0133093'],
 		['IMDb URL with query', 'https://m.imdb.com/title/tt0133093/?ref_=fn_al_tt_1'],
 		['bare IMDb id', 'tt0133093'],
+		['bare IMDb id, five digits', 'tt01234'],
+		['IMDb URL, five digits', 'https://www.imdb.com/title/tt01234/'],
 		['bare IMDb id, upper case', 'TT0133093'],
 		['surrounding whitespace', '  https://www.themoviedb.org/movie/603  \n'],
 	])('accepts %s', (_name, input) => {
@@ -29,6 +31,7 @@ describe('validateMovieInput', () => {
 		['TMDB movie id beyond int64', 'https://www.themoviedb.org/movie/99999999999999999999'],
 		['IMDb name URL', 'https://www.imdb.com/name/nm0000206/'],
 		['IMDb id too short', 'tt123'],
+		['IMDb URL id too short', 'https://www.imdb.com/title/tt123/'],
 		['IMDb id with trailing letters', 'tt0133093x'],
 		['empty string', ''],
 		['whitespace only', '   \t '],

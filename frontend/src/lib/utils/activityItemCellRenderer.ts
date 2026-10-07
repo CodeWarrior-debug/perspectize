@@ -84,17 +84,18 @@ function renderPassageCell(opts: {
 /**
  * Movie variant of the Item cell: TMDB poster (small, 2:3) beside the title with
  * the release year as a subtitle. Poster click opens the TMDB page, cell click
- * opens the details modal. No poster (or no `response`) leaves a plain tile.
+ * opens the details modal. No poster (or no `movie`/`response`) leaves a plain tile.
  */
 function renderMovieCell(opts: {
 	id: string | number;
 	name: string;
 	url: string | null;
-	response: unknown;
+	movie?: unknown;
+	response?: unknown;
 	onOpenDetails?: (contentId: string) => void;
 }): HTMLElement {
-	const { id, name, url, response, onOpenDetails } = opts;
-	const m = movieResponse({ contentType: 'MOVIE', response });
+	const { id, name, url, movie, response, onOpenDetails } = opts;
+	const m = movieResponse({ contentType: 'MOVIE', movie, response });
 
 	const cell = document.createElement('div');
 	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-[3px] cursor-pointer';
@@ -146,6 +147,7 @@ export interface ActivityItemCellRendererParams {
 		displayTitle?: string | null;
 		verseStartID?: number | null;
 		verseEndID?: number | null;
+		movie?: unknown;
 		response?: unknown;
 	};
 	context?: { onOpenDetails?: (contentId: string) => void };
@@ -168,7 +170,7 @@ const PLAY_ICON_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="non
 export function activityItemCellRenderer(params: ActivityItemCellRendererParams): HTMLElement | string {
 	if (!params.data) return '';
 
-	const { id, name, url, contentType, displayTitle, verseStartID, verseEndID, response } = params.data;
+	const { id, name, url, contentType, displayTitle, verseStartID, verseEndID, movie, response } = params.data;
 	const onOpenDetails = params.context?.onOpenDetails;
 
 	if (contentType === 'BIBLE_PASSAGE') {
@@ -176,7 +178,7 @@ export function activityItemCellRenderer(params: ActivityItemCellRendererParams)
 	}
 
 	if (contentType === 'MOVIE') {
-		return renderMovieCell({ id, name, url, response, onOpenDetails });
+		return renderMovieCell({ id, name, url, movie, response, onOpenDetails });
 	}
 
 	// No native `title` attribute here (or on the thumbnail below) — the column's

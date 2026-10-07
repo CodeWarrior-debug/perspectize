@@ -621,10 +621,10 @@ export function nameCellRenderer(params: { data?: { name: string; url: string | 
 // Movie (TMDB) cells
 // ---------------------------------------------------------------------------
 //
-// Movie rows keep their data in the Content `response` JSON, shaped by
-// backend/internal/adapters/tmdb/parse.go (ShapeMovie). Every reader below goes
-// through movieResponse(), which returns null for non-movie rows and anything
-// that isn't an object, so a null/foreign `response` degrades to EMPTY_VALUE.
+// Movie rows carry their data in the Content `movie` JSON (list rows) or `response`
+// (details query), shaped by backend/internal/adapters/tmdb/parse.go (ShapeMovie).
+// Every reader below goes through movieResponse(), which returns null for non-movie
+// rows and anything that isn't an object, so a null/foreign payload degrades to EMPTY_VALUE.
 
 export interface MovieCast {
 	id: number;
@@ -657,14 +657,15 @@ export interface MovieResponse {
 /** Minimal row shape the Movie helpers read. */
 export interface MovieRow {
 	contentType?: string;
+	movie?: unknown;
 	response?: unknown;
 	tags?: string[] | null;
 }
 
-/** The parsed Movie payload, or null when the row isn't a Movie or has no usable `response`. */
+/** The parsed Movie payload, or null when the row isn't a Movie or has no usable `movie`/`response`. */
 export function movieResponse(row: MovieRow | null | undefined): MovieResponse | null {
 	if (!row || row.contentType !== 'MOVIE') return null;
-	let r = row.response;
+	let r = row.movie ?? row.response;
 	if (typeof r === 'string') {
 		try {
 			r = JSON.parse(r);

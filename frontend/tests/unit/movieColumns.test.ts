@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	castCellRenderer,
 	castTooltipItems,
+	movieResponse,
 	boxOfficeValueGetter,
 	vsBudgetValueGetter,
 	formatBoxOffice,
@@ -53,7 +54,7 @@ const CAST = [
 ];
 
 function movie(response: Record<string, unknown> | null, extra: Partial<ContentItem> = {}) {
-	return { contentType: 'MOVIE', response, ...extra } as unknown as ContentItem;
+	return { contentType: 'MOVIE', movie: response, ...extra } as unknown as ContentItem;
 }
 
 function chipText(el: HTMLElement | string): string {
@@ -98,7 +99,7 @@ describe('castCellRenderer', () => {
 	});
 
 	it('shows an empty marker for a non-movie row', () => {
-		const row = { contentType: 'YOUTUBE_VIDEO', response: { items: [] } } as unknown as ContentItem;
+		const row = { contentType: 'YOUTUBE_VIDEO', movie: null, response: { items: [] } } as unknown as ContentItem;
 		expect(chipText(castCellRenderer({ data: row }))).toBe(EMPTY_VALUE);
 	});
 
@@ -120,6 +121,42 @@ describe('castTooltipItems', () => {
 
 	it('is empty for a null response', () => {
 		expect(castTooltipItems(movie(null))).toEqual([]);
+	});
+
+	it('keeps two people with the same name but different TMDB ids as distinct entries', () => {
+		const items = castTooltipItems(
+			movie({
+				directors: [],
+				cast: [
+					{ id: 111, name: 'Chris Evans', character: 'Steve', order: 0 },
+					{ id: 222, name: 'Chris Evans', character: 'Lance', order: 1 },
+				],
+			}),
+		);
+		expect(items).toEqual(['Chris Evans · as Steve · TMDB #111', 'Chris Evans · as Lance · TMDB #222']);
+	});
+});
+
+describe('list rows carry the Movie payload in `movie`, not `response`', () => {
+	it('a YOUTUBE_VIDEO list row with movie: null yields the empty marker and no movie payload', () => {
+		const row = { contentType: 'YOUTUBE_VIDEO', movie: null } as unknown as ContentItem;
+		expect(movieResponse(row)).toBeNull();
+		expect(chipText(castCellRenderer({ data: row }))).toBe(EMPTY_VALUE);
+	});
+
+	it('a MOVIE list row with movie populated renders the movie cells', () => {
+		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: [] }) });
+		expect(chipText(el)).toBe('dir. Christopher Nolan');
+	});
+
+	it('falls back to `response` when `movie` is absent (details query)', () => {
+		const row = { contentType: 'MOVIE', response: { year: 2010 } } as unknown as ContentItem;
+		expect(movieResponse(row)).toEqual({ year: 2010 });
+	});
+
+	it('prefers `movie` over `response` when both are present', () => {
+		const row = { contentType: 'MOVIE', movie: { year: 2011 }, response: { year: 2010 } } as unknown as ContentItem;
+		expect(movieResponse(row)).toEqual({ year: 2011 });
 	});
 });
 
@@ -247,7 +284,7 @@ describe('Tags for movies', () => {
 	});
 
 	it('prefers real tags (YouTube) over response keywords', () => {
-		const row = { contentType: 'YOUTUBE_VIDEO', tags: ['a'], response: {} } as unknown as ContentItem;
+		const row = { contentType: 'YOUTUBE_VIDEO', tags: ['a'], movie: null } as unknown as ContentItem;
 		expect(contentTags(row)).toEqual(['a']);
 	});
 
@@ -282,7 +319,7 @@ describe('movie item cell', () => {
 				name: 'Inception',
 				url: 'https://www.themoviedb.org/movie/27205',
 				contentType: 'MOVIE',
-				response: { posterPath: '/abc.jpg', year: 2010 },
+				movie: { posterPath: '/abc.jpg', year: 2010 },
 			},
 		}) as HTMLElement;
 		expect(el.querySelector('img')?.getAttribute('src')).toBe('https://image.tmdb.org/t/p/w92/abc.jpg');
@@ -292,7 +329,7 @@ describe('movie item cell', () => {
 
 	it('omits the poster and year when unknown', () => {
 		const el = activityItemCellRenderer({
-			data: { id: '1', name: 'Inception', url: null, contentType: 'MOVIE', response: null },
+			data: { id: '1', name: 'Inception', url: null, contentType: 'MOVIE', movie: null },
 		}) as HTMLElement;
 		expect(el.querySelector('img')).toBeNull();
 		expect(el.querySelector('[data-testid="item-subtitle"]')).toBeNull();
@@ -331,7 +368,7 @@ describe('Movie COLUMNS entries', () => {
 		expect(sorted).toEqual([b, a, none]);
 		const r = [movie({ certification: 'R' }), movie({ certification: 'G' }), movie({ certification: 'NR' })];
 		r.sort((x, y) => compareContentBySorts(x, y, [{ col: 'rated', dir: 'asc' }]));
-		expect(r.map((x) => (x.response as { certification: string }).certification)).toEqual(['G', 'R', 'NR']);
+		expect(r.map((x) => (x.movie as { certification: string }).certification)).toEqual(['G', 'R', 'NR']);
 	});
 
 	it('Budget, Votes, Collection, Synopsis and TMDB ID are picker columns', () => {
@@ -416,6 +453,21 @@ describe('Movie default column set', () => {
 });
 
 describe('Movie search scopes', () => {
+	it('keeps the cast scope while the movie filter is on', () => {
+		const p = parseGridParams(new URLSearchParams('f.type=movie&qf=cast'));
+		expect(p.qFields).toEqual(['cast']);
+	});
+
+	it('drops hidden movie scopes once the movie filter is removed', () => {
+		const p = parseGridParams(new URLSearchParams('f.type=youtube_video&qf=title,cast,director'));
+		expect(p.qFields).toEqual(['title']);
+	});
+
+	it('falls back to the visible defaults when every qf scope is hidden', () => {
+		const p = parseGridParams(new URLSearchParams('f.type=youtube_video&qf=cast'));
+		expect(p.qFields).toEqual(['title', 'desc', 'channel', 'tags']);
+	});
+
 	it('lists Cast and Director as search scopes when the type filter includes movies', () => {
 		const p = parseGridParams(new URLSearchParams('f.type=movie'));
 		expect(p.qFields).toEqual(['title', 'desc', 'channel', 'tags', 'cast', 'director']);

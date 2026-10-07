@@ -15,6 +15,7 @@ Branch: `feature/movie-content-type`. Spec: `docs/superpowers/specs/2026-10-07-m
 - Task 7: `8b4317f5` `docs(movie): rebuild Movie preview from the amended spec; add overnight status handover` (preview rebuild and this file).
 - Backend clean-up: `15c1ebf4` `fix(movie): backend review follow-ups (theatrical certification, size-capped TMDB reads, context errors, JSON-null-safe people search, resolver tests)`.
 - Frontend and docs clean-up: `fix(movie): frontend and docs review follow-ups (formatter boundary tests, Duration label, status handover)` (formatter boundary tests, the details modal now says "Duration", this file updated).
+- Final fix wave: `6eea0490` `fix(movie): unknown-last server sorts, movie field instead of response payload, round-trip coverage, partial-index-friendly person filter` (backend); and `fix(movie): select movie field in list, TMDB attribution in details, scope and IMDb-id consistency, status updates` (frontend and docs: list selects `movie` instead of `response`, TMDB attribution in the details modal for movie rows, hidden search scopes dropped, IMDb id pattern aligned to `tt\d{5,}`, same-name people test, this file).
 
 The rebuilt preview is `tools/content-type-designer/previews/movie-activity.html`, built from `tools/content-type-designer/previews/movie-activity.spec.json`. The `content-type-preview` skill (engine, validator, `examples/`) is not on this branch: it lives on `chore/content-type-preview-skill` (commit `6625d888`). The spec was built with that branch's `build.mjs` from a scratch copy. The preview tool caps at 10 columns and the app has 11 (it adds Tags), so Tags is shown in the details view only. Film facts and scores in the preview are illustrative.
 
@@ -40,7 +41,6 @@ Note: verify with migrate-free steps only (no `make migrate-*` against the share
 
 ## (d) Known follow-ups
 
-- Pre-PR: the `response` blob is now selected on every list row, which roughly doubles the wire size of YouTube rows; proper fix is a backend field (e.g. `movie: JSON`/typed `MovieDetails` returned only for MOVIE rows) selected instead of `response`.
 - `personId` filter exists in the backend but has no UI (pair it with the MOVIE type filter because the GIN index is partial).
 - Per-type default-column switch flow with toast/revert is issue #559 and is NOT built (the Movie default set is applied only when the type filter is exactly movie).
 - Source vs user tags is issue #560.
@@ -50,14 +50,21 @@ Note: verify with migrate-free steps only (no `make migrate-*` against the share
 - Item header still says "Item".
 - Movie Tags filter only works in Loaded mode.
 - CAST/DIRECTOR search scopes in Loaded mode scan all rows.
-- Theatrical-release certification preference in the TMDB adapter (a deferred fix).
+- Studio picker column and the TMDB person-page link in the cast tooltip: both promised by the spec, not built.
+- Deploy order: the backend must deploy before the frontend. A frontend ahead of the backend gets GraphQL validation errors for the MOVIE filter, the `movie` field and the Add Movie mutation.
+- Migration `000030` collides with branch `claude/bible-passage-hermeneutic-field-hebiut`, which also adds `000030_add_hermeneutic_approach`. Rename to the next free number on main just before merge.
+- No adult-title guard: TMDB returns `adult: true` titles by id and their posters would show to every viewer. A product decision.
+- Inherited cursor bug C-02 for computed sort keys: BoxOffice, VsBudget and AgeRating are `gorm:"-"` fields, so the paginator encodes 0 in the cursor and pages 2+ in All mode can skip rows (same as Views, Likes and % Liked).
+- `core/services` imports `adapters/tmdb` for `ParseMovieInput`/`CanonicalMovieURL`. This copies the YouTube import and is a hexagonal-rule exception to unwind later.
+- TMDB attribution is now shown in the details modal for movie rows, but the TMDB logo is not.
+- Round-trip statement counts for `createContentFromMovie` (new = 2, duplicate = 1) are unverified against a database (the tests skip without `DATABASE_URL`). Run them with `RT_MEASURE=1` against the local demo Postgres before trusting them.
+- The server-side ascending sort now puts unknown last via sentinel NULLReplacement values (2^53, 99, 1e18). Check pagination across pages with a real DB.
 - Deferred minors (the SDD ledger is git-ignored scratch and will not survive a fresh checkout, so they are listed here):
   - `formatMoneyCompact` for values >= 1e12 renders "$1000B" (no unit above B).
   - A tiny positive vs-budget ratio renders "0%" after rounding.
   - `tmdbScoreValueGetter` treats `voteAverage` 0 with votes > 0 as unknown.
   - The `?f.type=movie` deep link briefly shows the YouTube layout until the first animation frame.
   - `durationComparator` (pre-existing) sorts unknown durations first when ascending.
-  - A stale `qf=cast` search scope after removing the movie type filter makes the scope summary compare wrong (`+page.svelte` ~line 62).
   - The width tests parse `ActivityTable.svelte` source text (fragile).
   - The Duration header at 111px may ellipsize next to the sort/filter icons (not checked in a browser).
   - The partial GIN index only helps when the query also filters `content_type = 'movie'`.

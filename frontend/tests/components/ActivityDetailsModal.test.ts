@@ -116,6 +116,22 @@ describe('ActivityDetailsModal', () => {
 		expect(screen.getByText('YouTube Video')).toBeInTheDocument();
 	});
 
+	describe('TMDB attribution', () => {
+		const TMDB_NOTICE = 'This product uses the TMDB API but is not endorsed or certified by TMDB.';
+
+		it('is shown for a MOVIE row', () => {
+			render(ActivityDetailsModal, {
+				props: { content: { ...content, contentType: 'MOVIE' }, open: true, onClose: vi.fn() },
+			});
+			expect(screen.getByText(TMDB_NOTICE)).toBeInTheDocument();
+		});
+
+		it('is hidden for a YOUTUBE_VIDEO row', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			expect(screen.queryByText(TMDB_NOTICE)).not.toBeInTheDocument();
+		});
+	});
+
 	it('labels the header "Claim" for a CLAIM content item', () => {
 		render(ActivityDetailsModal, {
 			props: { content: { ...content, contentType: 'CLAIM' }, open: true, onClose: vi.fn() },
