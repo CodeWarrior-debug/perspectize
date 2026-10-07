@@ -187,7 +187,28 @@ func (r *mutationResolver) CreateContentFromYouTube(ctx context.Context, input m
 
 // CreateContentFromMovie is the resolver for the createContentFromMovie field.
 func (r *mutationResolver) CreateContentFromMovie(ctx context.Context, input model.CreateContentFromMovieInput) (*model.Content, error) {
-	return nil, errors.New("not implemented")
+	// Identity comes from the session only; the input carries just the URL.
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+
+	content, err := r.ContentService.CreateFromMovie(ctx, input.URL, authUser.ID)
+	// Idempotent duplicate: return the existing row.
+	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
+		return domainToModel(content), nil
+	}
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrInvalidInput):
+			return nil, fmt.Errorf("invalid movie URL: use a TMDB or IMDb movie link")
+		case errors.Is(err, domain.ErrNotFound):
+			return nil, fmt.Errorf("movie not found")
+		}
+		// Details are already logged server-side by the service layer.
+		return nil, fmt.Errorf("failed to create content from movie")
+	}
+	return domainToModel(content), nil
 }
 
 // CreateContentFromPassage is the resolver for the createContentFromPassage field.

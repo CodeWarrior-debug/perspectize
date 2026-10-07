@@ -112,7 +112,7 @@ func TestContentListDataloaderPerf(t *testing.T) {
 	perspectiveRepo := postgres.NewGormPerspectiveRepository(db)
 	categoryRepo := postgres.NewGormCategoryRepository(db)
 
-	contentService := services.NewContentService(contentRepo, nil)
+	contentService := services.NewContentService(contentRepo, nil, nil)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, nil)

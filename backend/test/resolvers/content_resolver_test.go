@@ -340,7 +340,7 @@ func setupTestServer(repo *mockContentRepository, ytClient *mockYouTubeClient) *
 func setupTestServerWithRepos(repo *mockContentRepository, ytClient *mockYouTubeClient, perspectiveRepo *mockPerspectiveRepository, userRepo *mockUserRepository) *httptest.Server {
 	categoryRepo := &mockCategoryRepository{}
 	wikidataClient := &mockWikidataClient{}
-	contentService := services.NewContentService(repo, ytClient)
+	contentService := services.NewContentService(repo, ytClient, nil)
 	userService := services.NewUserService(userRepo, repo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, repo, wikidataClient)
@@ -1368,7 +1368,7 @@ func TestNewResolver(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepository{}
 	categoryRepo := &mockCategoryRepository{}
 	wikidataClient := &mockWikidataClient{}
-	contentService := services.NewContentService(repo, ytClient)
+	contentService := services.NewContentService(repo, ytClient, nil)
 	userService := services.NewUserService(userRepo, repo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, repo, wikidataClient)
