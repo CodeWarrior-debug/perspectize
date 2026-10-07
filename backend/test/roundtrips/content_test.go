@@ -249,6 +249,21 @@ func TestContentAggregates(t *testing.T) {
 	require.Equal(t, 1, got.PerspectiveCount)
 }
 
+// An aggregates-only query for an unknown id still errors "content not found"
+// (the aggregate query doubles as the existence check), and content that
+// exists but has no perspectives is still one round trip with null aggregates.
+func TestContentAggregatesUnknownID(t *testing.T) {
+	h := newHarness(t)
+	userID, token := h.user("aggmiss")
+	emptyID := h.content(userID, "aggmiss")
+	h.warm(token)
+
+	msg := h.gqlError(token, contentAggregatesQuery, map[string]any{"id": "999999999"})
+	require.Contains(t, msg, "content not found")
+
+	h.roundTrips(1, token, contentAggregatesQuery, map[string]any{"id": emptyID})
+}
+
 // Asking for row fields as well still reads the row (and still errors for an
 // unknown id).
 func TestContentByIDWithRowFields(t *testing.T) {
