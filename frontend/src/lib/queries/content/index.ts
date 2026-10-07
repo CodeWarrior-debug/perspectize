@@ -9,6 +9,9 @@ export interface ContentItem {
 	id: string;
 	name: string;
 	addedByUserID: string;
+	// Client-side only (not in the GraphQL selection): ActivityTable fills it from the
+	// cached users list, so the User column can render/sort/filter without a per-row join.
+	addedByUsername?: string | null;
 	url: string | null;
 	contentType: string;
 	// BIBLE_PASSAGE only: computed verse ordinals and the optional,

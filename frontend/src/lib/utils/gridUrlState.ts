@@ -439,6 +439,7 @@ export interface ContentFilterInput {
 	channelTitle?: string;
 	tagContains?: string;
 	descriptionSearch?: string;
+	addedByUsername?: string;
 	createdAfter?: string;
 	createdBefore?: string;
 	updatedAfter?: string;
@@ -572,6 +573,11 @@ export function urlParamsToGraphQLFilter(
 
 			case 'channel':
 				result.channelTitle = value;
+				hasAny = true;
+				break;
+
+			case 'user':
+				result.addedByUsername = value;
 				hasAny = true;
 				break;
 

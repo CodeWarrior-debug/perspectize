@@ -205,6 +205,16 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		filterValue: (row) => row.channelTitle?.toLowerCase() ?? null,
 	},
 	{
+		colId: 'user',
+		label: 'User',
+		picker: 'data',
+		sortable: true,
+		sortValue: (row) => row.addedByUsername?.toLowerCase() ?? null,
+		serverSort: 'ADDED_BY',
+		filterKey: 'user',
+		filterValue: (row) => row.addedByUsername?.toLowerCase() ?? null,
+	},
+	{
 		colId: 'tags',
 		label: 'Tags',
 		picker: 'data',
