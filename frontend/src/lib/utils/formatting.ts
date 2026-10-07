@@ -18,6 +18,7 @@ const MONEY_UNITS = [
 	{ size: 1e3, suffix: 'K' },
 	{ size: 1e6, suffix: 'M' },
 	{ size: 1e9, suffix: 'B' },
+	{ size: 1e12, suffix: 'T' },
 ] as const;
 
 /**
@@ -54,9 +55,11 @@ export function vsBudgetPercent(revenue: number | null, budget: number | null): 
 	return (revenue / budget) * 100;
 }
 
-/** `3,455%` (rounded, thousands separators); null -> EMPTY_VALUE. */
+/** `3,455%` (rounded, thousands separators; `<1%` for a positive ratio under 0.5%); null -> EMPTY_VALUE. */
 export function formatVsBudget(pct: number | null): string {
 	if (pct == null) return EMPTY_VALUE;
+	// A tiny positive ratio must not read as a flat loss of everything ("0%").
+	if (pct > 0 && pct < 0.5) return '<1%';
 	return `${Math.round(pct).toLocaleString('en-US')}%`;
 }
 

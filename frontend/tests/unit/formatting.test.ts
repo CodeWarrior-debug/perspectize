@@ -103,6 +103,9 @@ describe('formatMoneyCompact', () => {
 		[1_000_000, '$1M'],
 		[316_400_000, '$316.4M'],
 		[1_000_000_000, '$1B'],
+		[999_950_000_000, '$1T'],
+		[1_000_000_000_000, '$1T'],
+		[1_200_000_000_000, '$1.2T'],
 	])('boundary: formatMoneyCompact(%s) = %s', (v, expected) => {
 		expect(formatMoneyCompact(v)).toBe(expected);
 	});
@@ -136,6 +139,10 @@ describe('vsBudgetPercent / formatVsBudget', () => {
 		[3455.2, '3,455%'],
 		[3500, '3,500%'],
 		[49.6, '50%'],
+		[0.3, '<1%'],
+		[0.49, '<1%'],
+		[0.5, '1%'],
+		[0, '0%'],
 		[null, '—'],
 	])('formatVsBudget(%s) = %s', (pct, expected) => {
 		expect(formatVsBudget(pct)).toBe(expected);
