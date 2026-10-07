@@ -21,9 +21,11 @@ export function watchStreamIdle(
 	const detector = createIdleDetector({
 		...opts,
 		onIdle: () => {
+			console.info('[realtime] idle: pausing inbox/thread streams');
 			streamIdle.paused = true;
 		},
 		onActive: () => {
+			console.info('[realtime] activity: resuming streams and refreshing inbox');
 			streamIdle.paused = false;
 			queryClient.invalidateQueries({ queryKey: queryKeys.messaging.threads.all() });
 		},
