@@ -36,7 +36,7 @@
 		"@capacitor/ios": "^8.5.2",
 		"@internationalized/date": "^3.12.4",
 		"@lhci/cli": "^0.15.1",
-		"@lucide/svelte": "^1.49.0",
+		"@lucide/svelte": "^1.51.0",
 		"@playwright/test": "1.63.0",
 		"@stryker-mutator/core": "^10.0.0",
 		"@stryker-mutator/vitest-runner": "^10.0.0",
