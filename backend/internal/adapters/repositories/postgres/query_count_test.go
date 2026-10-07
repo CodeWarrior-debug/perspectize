@@ -72,7 +72,7 @@ func TestQueryCount_CategoryGetByIDs_EmptyInputIssuesNoQuery(t *testing.T) {
 func TestQueryCount_PerspectiveAggregateByContentIDs_IsOneQueryForAnyBatchSize(t *testing.T) {
 	ctx := context.Background()
 	db, mock := newMockDB(t)
-	mock.ExpectQuery(`FROM "perspectives" WHERE content_id = ANY\(CAST\(\$1 AS bigint\[\]\)\)`).
+	mock.ExpectQuery(`FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id WHERE c.id = ANY\(CAST\(\$1 AS bigint\[\]\)\)`).
 		WillReturnRows(sqlmock.NewRows([]string{"content_id", "count", "quality_count", "avg_quality"}).
 			AddRow(1, 2, 2, 5000.0))
 

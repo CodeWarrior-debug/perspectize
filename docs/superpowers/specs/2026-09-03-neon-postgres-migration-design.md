@@ -1,7 +1,7 @@
 # Neon Postgres Migration & Performance Tuning — Design Spec
 
 **Date:** 2026-09-03
-**Status:** Approved for planning
+**Status:** Piece 1 (migration) cut over 2026-10-06; Sevalla decommission and Piece 2 (performance tuning) pending — see "Execution status" in the migration plan
 **Required execution sub-skill:** `superpowers:executing-plans`
 
 ## Overview

@@ -187,7 +187,7 @@ func main() {
 	perspectiveRepo := postgres.NewGormPerspectiveRepository(db)
 	// Cached: the content grid resolves every row's primaryCategory through it.
 	categoryRepo := cached.NewCategoryRepository(postgres.NewGormCategoryRepository(db), cached.DefaultCategoryTTL)
-	threadRepo := postgres.NewGormThreadRepository(db)
+	threadRepo := postgres.NewGormMessageThreadRepository(db)
 	messageRepo := postgres.NewGormMessageRepository(db)
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
 	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)

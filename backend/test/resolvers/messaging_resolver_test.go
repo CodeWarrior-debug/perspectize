@@ -130,7 +130,11 @@ func (f *fakeMessaging) MuteThread(ctx context.Context, actor, threadID int, mut
 
 // inboxStubMsgRepo / inboxStubThreadRepo are the minimum repository surface the
 // Hub touches when fanning a MESSAGE_POSTED envelope out to per-user inboxes.
-type inboxStubMsgRepo struct{ msg domain.Message }
+type inboxStubMsgRepo struct {
+	msg domain.Message
+	// unread is the per-viewer count ThreadStats reports.
+	unread map[int]int
+}
 
 func (s inboxStubMsgRepo) Insert(ctx context.Context, m *domain.Message) (*domain.Message, error) {
 	return m, nil
@@ -150,7 +154,11 @@ func (s inboxStubMsgRepo) CountSince(ctx context.Context, threadID int, sinceSeq
 	return 0, nil
 }
 func (s inboxStubMsgRepo) ThreadStats(ctx context.Context, viewerID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
-	return map[int]domain.ThreadStats{}, nil
+	out := map[int]domain.ThreadStats{}
+	for _, id := range threadIDs {
+		out[id] = domain.ThreadStats{Unread: s.unread[viewerID]}
+	}
+	return out, nil
 }
 func (s inboxStubMsgRepo) UpdateBody(ctx context.Context, messageID int64, senderID int, body string, editedAt time.Time) (*domain.Message, error) {
 	return nil, nil
@@ -188,8 +196,8 @@ func (inboxStubThreadRepo) SetMuted(ctx context.Context, threadID, userID int, m
 }
 
 var (
-	_ repositories.MessageRepository = inboxStubMsgRepo{}
-	_ repositories.ThreadRepository  = inboxStubThreadRepo{}
+	_ repositories.MessageRepository       = inboxStubMsgRepo{}
+	_ repositories.MessageThreadRepository = inboxStubThreadRepo{}
 )
 
 func authedCtx(userID int) context.Context {
@@ -564,7 +572,7 @@ func TestThreadEventsSubscription_NonParticipantRejected(t *testing.T) {
 func TestInboxEventsSubscription_DeliversAndClosesOnCancel(t *testing.T) {
 	at := time.Date(2026, 9, 6, 8, 30, 0, 0, time.UTC)
 	hub := realtime.NewHub(
-		inboxStubMsgRepo{msg: domain.Message{ID: 90, ThreadID: 3, SenderID: 12, Seq: 9, CreatedAt: at}},
+		inboxStubMsgRepo{msg: domain.Message{ID: 90, ThreadID: 3, SenderID: 12, Seq: 9, CreatedAt: at}, unread: map[int]int{11: 2}},
 		inboxStubThreadRepo{thread: domain.MessageThread{
 			ID:            3,
 			LastMessageAt: at,

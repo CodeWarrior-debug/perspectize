@@ -130,7 +130,7 @@ func (c *ServerConfig) GetAddr() string {
 }
 
 // GetDSN returns the PostgreSQL connection string (Data Source Name)
-// Prefers DATABASE_URL env var if set (for hosted databases like Sevalla)
+// Prefers DATABASE_URL env var if set (for hosted databases like Neon)
 func (c *DatabaseConfig) GetDSN() string {
 	if url := os.Getenv("DATABASE_URL"); url != "" {
 		return url

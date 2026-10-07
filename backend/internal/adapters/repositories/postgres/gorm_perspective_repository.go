@@ -229,6 +229,11 @@ type aggregateRow struct {
 // (COUNT(*), every perspective) since Quality is optional — that's the
 // number shown in the average-rating tooltip so "N ratings" always matches
 // what AverageQuality was actually computed over.
+//
+// Driven from the content table (LEFT JOIN), so every EXISTING content id gets
+// an entry — Count 0 when it has no perspectives — and only ids with no
+// content row are absent. Callers can therefore tell "no such content" (absent)
+// from "no perspectives yet" (Count == 0) in the same single query.
 func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 	if len(contentIDs) == 0 {
 		return map[int]*domain.PerspectiveAggregate{}, nil
@@ -236,10 +241,11 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 
 	var rows []aggregateRow
 	err := r.db.WithContext(ctx).
-		Model(&PerspectiveModel{}).
-		Select("content_id AS content_id, COUNT(*) AS count, COUNT(quality) AS quality_count, AVG(quality) AS avg_quality").
-		Where("content_id = ANY(CAST(? AS bigint[]))", intsToArray(contentIDs)).
-		Group("content_id").
+		Table("content AS c").
+		Select("c.id AS content_id, COUNT(p.id) AS count, COUNT(p.quality) AS quality_count, AVG(p.quality) AS avg_quality").
+		Joins("LEFT JOIN perspectives p ON p.content_id = c.id").
+		Where("c.id = ANY(CAST(? AS bigint[]))", intsToArray(contentIDs)).
+		Group("c.id").
 		Find(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to aggregate perspectives by content: %w", err)

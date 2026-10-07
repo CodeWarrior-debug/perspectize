@@ -35,7 +35,7 @@ Defined once in `backend/internal/demo/fixtures.go` (mirrored for the picker in 
 | `carmen` | carmen_admin | ADMIN | Admin-only UI |
 | `newbie` | newbie_demo | DEFAULT | Empty account; onboarding coach still active |
 
-Seed also includes 5 YouTube videos, 8 perspectives and an Alice↔Ben message thread (4 unread). "Me at the zoo" (`jNQXAC9IVRw`) is deliberately *not* seeded so tours can add it.
+Seed also includes 5 YouTube videos, 8 perspectives and an Alice↔Ben message thread (2 unread for each of them: only the other's messages count). "Me at the zoo" (`jNQXAC9IVRw`) is deliberately *not* seeded so tours can add it.
 
 ## How it works
 
@@ -44,7 +44,7 @@ Seed also includes 5 YouTube videos, 8 perspectives and an Alice↔Ben message t
 | Config gate | `backend/internal/config/demo.go` | `DEMO_MODE=true` enables demo mode; **fatal with `APP_ENV=production`** |
 | Demo auth | `backend/internal/adapters/auth/demo_token_verifier.go` | Wraps the Clerk verifier: `Bearer demo.<persona>` → `clerk_user_id = demo_<persona>`; anything else goes to Clerk. Unseeded personas are never created on demand |
 | Offline YouTube | `backend/internal/adapters/youtube/fixture_client.go` | Canned metadata for fixture IDs, a placeholder for any other ID — the add-video flow works with no API key |
-| Seeder | `backend/cmd/seed-demo` | Idempotent; `-reset` deletes only demo-persona rows first. Refuses non-local DB hosts without `-allow-remote` (protects the shared Sevalla DB) |
+| Seeder | `backend/cmd/seed-demo` | Idempotent; `-reset` deletes only demo-persona rows first. Refuses non-local DB hosts without `-allow-remote` (protects the shared Neon DB) |
 | Frontend auth facade | `frontend/src/lib/auth/`, `src/lib/components/auth/` | `VITE_DEMO_MODE=true` drops `ClerkProvider`; `AuthShow` / `SignInTrigger` / `UserMenu` / `useAuthState` / `getAuthToken` pick Clerk or the demo session. `?demo_as=<key>` selects a persona (`?demo_as=` signs out) |
 | Stack | `docker-compose.demo.yml` | postgres (volume `demo_pgdata`) → migrate → seed → backend (**production image**, `DEMO_MODE=true`) → frontend (`frontend/Dockerfile.demo`, nginx) |
 | Tours / flows | `frontend/demo/` | Playwright; `e2e` + `record` projects |

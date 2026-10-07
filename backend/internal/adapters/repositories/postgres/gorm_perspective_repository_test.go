@@ -479,7 +479,7 @@ func TestGormPerspectiveRepository_AggregateByContentIDs(t *testing.T) {
 		// COUNT(quality)/the Quality column at all.
 		rows := sqlmock.NewRows([]string{"content_id", "count", "quality_count", "avg_quality"}).
 			AddRow(11, 1, 0, nil)
-		mock.ExpectQuery(`SELECT content_id AS content_id, COUNT\(\*\) AS count, COUNT\(quality\) AS quality_count, AVG\(quality\) AS avg_quality FROM "perspectives" WHERE content_id = ANY\(CAST\(\$1 AS bigint\[\]\)\) GROUP BY "content_id"`).
+		mock.ExpectQuery(`SELECT c.id AS content_id, COUNT\(p.id\) AS count, COUNT\(p.quality\) AS quality_count, AVG\(p.quality\) AS avg_quality FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id WHERE c.id = ANY\(CAST\(\$1 AS bigint\[\]\)\) GROUP BY "c"."id"`).
 			WithArgs("{11}"). // one bigint[] parameter, not one placeholder per id
 			WillReturnRows(rows)
 
@@ -489,6 +489,24 @@ func TestGormPerspectiveRepository_AggregateByContentIDs(t *testing.T) {
 		assert.Equal(t, 1, got[11].Count)
 		assert.Equal(t, 0, got[11].QualityCount)
 		assert.Nil(t, got[11].AverageQuality)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("content with no perspectives gets a zero entry; unknown id is absent", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		// LEFT JOIN yields one zero-count row for content 11 (exists, no
+		// perspectives) and nothing for 99 (no content row).
+		rows := sqlmock.NewRows([]string{"content_id", "count", "quality_count", "avg_quality"}).
+			AddRow(11, 0, 0, nil)
+		mock.ExpectQuery(`FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id`).
+			WithArgs("{11,99}").
+			WillReturnRows(rows)
+
+		got, err := NewGormPerspectiveRepository(db).AggregateByContentIDs(ctx, []int{11, 99})
+		require.NoError(t, err)
+		require.Contains(t, got, 11)
+		assert.Equal(t, 0, got[11].Count)
+		assert.NotContains(t, got, 99)
 		assertAllExpectationsMet(t, mock)
 	})
 

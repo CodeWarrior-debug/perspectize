@@ -15,7 +15,12 @@ import (
 )
 
 // stubMsgRepo is a no-op MessageRepository that returns a fixed message from GetByID.
-type stubMsgRepo struct{ msg domain.Message }
+type stubMsgRepo struct {
+	msg domain.Message
+	// unread is the per-viewer unread count ThreadStats reports (the real
+	// repository excludes the viewer's own messages).
+	unread map[int]int
+}
 
 func (s stubMsgRepo) Insert(ctx context.Context, m *domain.Message) (*domain.Message, error) {
 	return m, nil
@@ -35,7 +40,11 @@ func (s stubMsgRepo) CountSince(ctx context.Context, t int, since int64) (int, e
 	return 0, nil
 }
 func (s stubMsgRepo) ThreadStats(ctx context.Context, viewerID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
-	return map[int]domain.ThreadStats{}, nil
+	out := map[int]domain.ThreadStats{}
+	for _, id := range threadIDs {
+		out[id] = domain.ThreadStats{Unread: s.unread[viewerID]}
+	}
+	return out, nil
 }
 func (s stubMsgRepo) UpdateBody(ctx context.Context, id int64, senderID int, body string, editedAt time.Time) (*domain.Message, error) {
 	return nil, nil
@@ -44,7 +53,7 @@ func (s stubMsgRepo) SoftDelete(ctx context.Context, id int64, senderID int, del
 	return nil, nil
 }
 
-// stubThreadRepo is a ThreadRepository whose GetThread returns a caller-supplied
+// stubThreadRepo is a MessageThreadRepository whose GetThread returns a caller-supplied
 // thread; the Hub's inbox fan-out uses it to resolve participants.
 type stubThreadRepo struct{ thread *domain.MessageThread }
 
@@ -78,9 +87,9 @@ func (stubThreadRepo) SetMuted(ctx context.Context, threadID, userID int, muted 
 }
 
 var (
-	_ repositories.MessageRepository = stubMsgRepo{}
-	_ repositories.ThreadRepository  = stubThreadRepo{}
-	_ portservices.EventPublisher    = (*realtime.Hub)(nil)
+	_ repositories.MessageRepository       = stubMsgRepo{}
+	_ repositories.MessageThreadRepository = stubThreadRepo{}
+	_ portservices.EventPublisher          = (*realtime.Hub)(nil)
 )
 
 // countingMsgRepo records how many times GetByID was called.
@@ -111,7 +120,13 @@ func TestHub_InboxFanout(t *testing.T) {
 		},
 	}
 	hub := realtime.NewHub(
-		stubMsgRepo{msg: domain.Message{ID: 10, ThreadID: 1, Seq: 5, Body: "hi", CreatedAt: now}},
+		// Participant 11 sent message 10, so ThreadStats (own messages excluded)
+		// says 0 even though seq 5 minus lastRead 2 would say 3; 12 has 3 unread
+		// from others even though seq 5 minus lastRead 5 would say 0.
+		stubMsgRepo{
+			msg:    domain.Message{ID: 10, ThreadID: 1, Seq: 5, Body: "hi", SenderID: 11, CreatedAt: now},
+			unread: map[int]int{11: 0, 12: 3},
+		},
 		stubThreadRepo{thread: thread},
 		nil,
 	)
@@ -143,7 +158,7 @@ func TestHub_InboxFanout(t *testing.T) {
 	case e := <-inbox11:
 		assert.Equal(t, 1, e.ThreadID)
 		assert.Equal(t, int64(5), e.LatestSeq)
-		assert.Equal(t, 3, e.UnreadCount, "seq 5 minus lastRead 2")
+		assert.Equal(t, 0, e.UnreadCount, "sender's own message is not unread")
 		assert.Equal(t, now, e.LastMessageAt)
 	case <-time.After(time.Second):
 		t.Fatal("participant 11 got no inbox event")
@@ -151,7 +166,7 @@ func TestHub_InboxFanout(t *testing.T) {
 
 	select {
 	case e := <-inbox12:
-		assert.Equal(t, 0, e.UnreadCount, "caught-up participant has no unread")
+		assert.Equal(t, 3, e.UnreadCount, "recipient counts unread from others")
 	case <-time.After(time.Second):
 		t.Fatal("participant 12 got no inbox event")
 	}

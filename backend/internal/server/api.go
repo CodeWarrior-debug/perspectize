@@ -46,7 +46,7 @@ type Deps struct {
 	MessagingService   portservices.MessagingService
 
 	UserRepo   repositories.UserRepository
-	ThreadRepo repositories.ThreadRepository
+	ThreadRepo repositories.MessageThreadRepository
 
 	Hub      *realtime.Hub
 	Presence *realtime.PresenceTracker

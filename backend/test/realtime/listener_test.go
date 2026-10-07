@@ -30,7 +30,7 @@ func TestListener_DeliversNotifyToHub(t *testing.T) {
 	require.NoError(t, database.PingGORM(context.Background(), db))
 
 	userRepo := postgres.NewGormUserRepository(db)
-	threadRepo := postgres.NewGormThreadRepository(db)
+	threadRepo := postgres.NewGormMessageThreadRepository(db)
 	msgRepo := postgres.NewGormMessageRepository(db)
 	ctx := context.Background()
 

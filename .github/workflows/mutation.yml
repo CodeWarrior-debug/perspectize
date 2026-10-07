@@ -134,7 +134,7 @@ jobs:
       # test content it was run against; unchanged mutants aren't re-run. A manual full run
       # on main saves a fresh copy; PRs restore the newest one available to them.
       - name: Restore Stryker incremental cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: frontend/reports/stryker-incremental.json
           key: stryker-incremental-${{ github.sha }}

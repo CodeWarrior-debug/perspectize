@@ -44,7 +44,7 @@ func TestHub_UnsubscribeOneKeepsOtherInboxSubscribers(t *testing.T) {
 		Participants:  []domain.ThreadParticipant{{ThreadID: 1, UserID: 11}},
 	}
 	hub := realtime.NewHub(
-		stubMsgRepo{msg: domain.Message{ID: 10, ThreadID: 1, Seq: 4, CreatedAt: now}},
+		stubMsgRepo{msg: domain.Message{ID: 10, ThreadID: 1, Seq: 4, CreatedAt: now}, unread: map[int]int{11: 4}},
 		stubThreadRepo{thread: thread},
 		nil,
 	)
