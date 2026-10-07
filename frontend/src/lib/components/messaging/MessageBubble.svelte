@@ -3,6 +3,8 @@
 	import { isOptimistic } from '$lib/messaging/optimistic';
 	import { messageClockTime } from '$lib/messaging/format';
 	import Avatar from './Avatar.svelte';
+	import MessageLink from './MessageLink.svelte';
+	import { linkify } from './linkify';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import CheckIcon from '@lucide/svelte/icons/check';
@@ -26,6 +28,7 @@
 
 	const isOwn = $derived(mine);
 	const isDeleted = $derived(message.deletedAt != null || message.body === '');
+	const segments = $derived(linkify(message.body));
 
 	let editing = $state(false);
 	let editBody = $state('');
@@ -98,7 +101,10 @@
 				</div>
 			</div>
 		{:else}
-			{message.body}
+			{#each segments as seg, i (i)}{#if seg.type === 'link'}<MessageLink
+						href={seg.href}
+						text={seg.text}
+					/>{:else}{seg.text}{/if}{/each}
 			{#if message.editedAt}
 				<span class="text-xs opacity-70">(edited)</span>
 			{/if}
