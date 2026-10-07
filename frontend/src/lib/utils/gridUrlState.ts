@@ -9,7 +9,10 @@ import {
 	NUMBER_RANGE_COLS,
 	DATE_RANGE_COLS,
 	SET_FILTER_COLS,
+	DAY_DATE_COLS,
 	CONTENT_TYPE_OPTIONS,
+	PERSON_FILTER_KEY,
+	parsePersonFilter,
 } from './grid-config';
 
 // ---------------------------------------------------------------------------
@@ -252,6 +255,14 @@ export function parseSetValue(value: string): string[] {
 
 export { COL_TO_FILTER_KEY, NUMBER_RANGE_COLS, DATE_RANGE_COLS };
 
+/**
+ * The `f.*` params that have no grid column (just the person filter), so the grid's own filter
+ * model can't carry them. Re-merge these whenever the URL filters are rebuilt from the grid.
+ */
+export function nonGridFilters(filters: Record<string, string>): Record<string, string> {
+	return PERSON_FILTER_KEY in filters ? { [PERSON_FILTER_KEY]: filters[PERSON_FILTER_KEY] } : {};
+}
+
 /** URL f.* param key → AG Grid colId */
 const FILTER_KEY_TO_COL: Record<string, string> = Object.fromEntries(
 	Object.entries(COL_TO_FILTER_KEY).map(([col, key]) => [key, col]),
@@ -297,8 +308,9 @@ export function filterToUrlParams(filterModel: Record<string, unknown>): Record<
 			}
 		} else if (f.filterType === 'date') {
 			const dateFilter = f as AGDateFilter;
-			const from = dateFilter.dateFrom ? dateFilter.dateFrom.substring(0, 7) : ''; // YYYY-MM
-			const to = dateFilter.dateTo ? dateFilter.dateTo.substring(0, 7) : '';
+			const len = DAY_DATE_COLS.has(colId) ? 10 : 7; // YYYY-MM-DD for day columns, else YYYY-MM
+			const from = dateFilter.dateFrom ? dateFilter.dateFrom.substring(0, len) : '';
+			const to = dateFilter.dateTo ? dateFilter.dateTo.substring(0, len) : '';
 
 			if (from && to) {
 				result[filterKey] = `${from}..${to}`;
@@ -398,13 +410,13 @@ export function urlParamsToFilter(filters: Record<string, string>): Record<strin
 				} else if (min !== undefined && !isNaN(min)) {
 					result[colId] = {
 						filterType: 'number',
-						type: 'greaterThan',
+						type: 'greaterThanOrEqual',
 						filter: min,
 					} satisfies AGNumberFilter;
 				} else if (max !== undefined && !isNaN(max)) {
 					result[colId] = {
 						filterType: 'number',
-						type: 'lessThan',
+						type: 'lessThanOrEqual',
 						filter: max,
 					} satisfies AGNumberFilter;
 				}
@@ -460,6 +472,17 @@ export interface ContentFilterInput {
 	createdBefore?: string;
 	updatedAfter?: string;
 	updatedBefore?: string;
+	// Movie filters (movie rows only; other rows never match)
+	personId?: string;
+	personRole?: 'CAST' | 'DIRECTOR';
+	genreContains?: string;
+	ageRating?: string[];
+	releasedAfter?: string;
+	releasedBefore?: string;
+	minBoxOffice?: number;
+	maxBoxOffice?: number;
+	minTmdbScore?: number;
+	maxTmdbScore?: number;
 }
 
 /**
@@ -610,6 +633,70 @@ export function urlParamsToGraphQLFilter(
 				}
 				if (to) {
 					result.createdBefore = to;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'genre':
+				result.genreContains = value;
+				hasAny = true;
+				break;
+
+			case 'rated': {
+				// Certifications are stored uppercase (PG-13); URL set values are lowercased.
+				const ratings = parseSetValue(value).map((v) => v.toUpperCase());
+				if (ratings.length > 0) {
+					result.ageRating = ratings;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'released': {
+				const { from, to } = parseDateRange(value);
+				if (from) {
+					result.releasedAfter = from;
+					hasAny = true;
+				}
+				if (to) {
+					result.releasedBefore = to;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'boxoffice': {
+				const { min, max } = parseNumberRange(value);
+				if (min !== undefined) {
+					result.minBoxOffice = min;
+					hasAny = true;
+				}
+				if (max !== undefined) {
+					result.maxBoxOffice = max;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'tmdb': {
+				const { min, max } = parseNumberRange(value);
+				if (min !== undefined) {
+					result.minTmdbScore = min;
+					hasAny = true;
+				}
+				if (max !== undefined) {
+					result.maxTmdbScore = max;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case PERSON_FILTER_KEY: {
+				const person = parsePersonFilter(value);
+				if (person) {
+					result.personId = String(person.id);
+					if (person.role) result.personRole = person.role.toUpperCase() as 'CAST' | 'DIRECTOR';
 					hasAny = true;
 				}
 				break;

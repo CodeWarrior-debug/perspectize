@@ -11,6 +11,11 @@ import {
 	ageRatingRank,
 	boxOfficeValueGetter,
 	vsBudgetValueGetter,
+	genreValueGetter,
+	ratedValueGetter,
+	releasedValueGetter,
+	tmdbScoreValueGetter,
+	moviePeople,
 } from './formatting';
 
 /**
@@ -40,6 +45,21 @@ const CONTENT_TYPE_LABELS: Partial<Record<ContentType, string>> = {
 export const CONTENT_TYPE_OPTIONS: readonly { value: string; label: string }[] = Object.entries(
 	CONTENT_TYPE_LABELS,
 ).map(([type, label]) => ({ value: type.toLowerCase(), label }));
+
+/** Rated-filter options: the standard US certifications. `value` is lowercased like every set-filter URL value; the server gets it uppercased. */
+export const AGE_RATING_OPTIONS: readonly { value: string; label: string }[] = [
+	'G',
+	'PG',
+	'PG-13',
+	'R',
+	'NC-17',
+	'NR',
+].map((r) => ({ value: r.toLowerCase(), label: r }));
+
+/** Display label for a set-filter value on column `colId` (content type name, or the certification in capitals). */
+export function setFilterValueLabel(colId: string, value: string): string {
+	return colId === 'rated' ? value.toUpperCase() : contentTypeLabel(value);
+}
 
 /** Display label for a lowercased content type value (falls back to the raw value). */
 export function contentTypeLabel(value: string): string {
@@ -147,6 +167,8 @@ export interface ColumnMeta {
 	filterValue?: (row: ContentItem) => string | number | null;
 	/** How a filter value string is parsed: a `min..max` range, or plain text `contains`. */
 	filterRange?: 'number' | 'date';
+	/** Date filter is whole-day (`YYYY-MM-DD`) rather than the default month (`YYYY-MM`) URL precision. */
+	filterDay?: boolean;
 	/** Filter is a checkbox list: URL value is comma-separated, model is `{ filterType: 'set', values }`. */
 	filterSet?: boolean;
 }
@@ -181,7 +203,14 @@ export const COLUMNS: readonly ColumnMeta[] = [
 	{ colId: 'category', label: 'Category', picker: 'data', sortable: false },
 	// Movie columns (MOVIE rows read their `response` JSON; see formatting.ts). Shown by
 	// default only when the type filter is exactly MOVIE (defaultColumnVisibility below).
-	{ colId: 'genre', label: 'Genre', picker: 'data', sortable: false },
+	{
+		colId: 'genre',
+		label: 'Genre',
+		picker: 'data',
+		sortable: false,
+		filterKey: 'genre',
+		filterValue: (row) => genreValueGetter({ data: row })?.toLowerCase() ?? null,
+	},
 	{
 		colId: 'rated',
 		label: 'Rated',
@@ -190,6 +219,9 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		// Orders by rating (G < PG < PG-13 < R < NC-17, unrated last), not A-Z; the server does the same.
 		sortValue: (row) => ageRatingRank(movieResponse(row)?.certification),
 		serverSort: 'AGE_RATING',
+		filterKey: 'rated',
+		filterValue: (row) => ratedValueGetter({ data: row })?.toLowerCase() ?? null,
+		filterSet: true,
 	},
 	// One column for people: directors first, then billed cast. Not sortable (a person list has no order);
 	// searched via the Cast / Director search scopes instead.
@@ -240,7 +272,16 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		serverSort: 'PERCENT_LIKED',
 	},
 	// Released has no server sort (PUBLISHED_AT reads the YouTube path), so it is not sortable at all.
-	{ colId: 'released', label: 'Released', picker: 'data', sortable: false },
+	{
+		colId: 'released',
+		label: 'Released',
+		picker: 'data',
+		sortable: false,
+		filterKey: 'released',
+		filterValue: (row) => releasedValueGetter({ data: row }),
+		filterRange: 'date',
+		filterDay: true,
+	},
 	{
 		colId: 'boxOffice',
 		label: 'Box office',
@@ -248,6 +289,9 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		sortable: true,
 		sortValue: (row) => boxOfficeValueGetter({ data: row }),
 		serverSort: 'BOX_OFFICE',
+		filterKey: 'boxoffice',
+		filterValue: (row) => boxOfficeValueGetter({ data: row }),
+		filterRange: 'number',
 	},
 	{
 		colId: 'vsBudget',
@@ -256,8 +300,18 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		sortable: true,
 		sortValue: (row) => vsBudgetValueGetter({ data: row }),
 		serverSort: 'VS_BUDGET',
+		// No filter on purpose: it is derived (revenue / budget) and the server has no field for it, so
+		// a filter would apply in "Loaded" mode only and be silently dropped in "All Items".
 	},
-	{ colId: 'tmdbScore', label: 'TMDB Score', picker: 'data', sortable: false },
+	{
+		colId: 'tmdbScore',
+		label: 'TMDB Score',
+		picker: 'data',
+		sortable: false,
+		filterKey: 'tmdb',
+		filterValue: (row) => tmdbScoreValueGetter({ data: row }),
+		filterRange: 'number',
+	},
 	{
 		colId: 'publishDate',
 		label: 'Date',
@@ -481,6 +535,9 @@ export const DATE_RANGE_COLS: ReadonlySet<string> = new Set(
 	COLUMNS.filter((c) => c.filterRange === 'date').map((c) => c.colId),
 );
 
+/** Date-range columns whose URL values keep the day (`YYYY-MM-DD`) instead of the month. */
+export const DAY_DATE_COLS: ReadonlySet<string> = new Set(COLUMNS.filter((c) => c.filterDay).map((c) => c.colId));
+
 /** Columns whose filter is a checkbox list (`f.type=youtube,claim`). */
 export const SET_FILTER_COLS: ReadonlySet<string> = new Set(COLUMNS.filter((c) => c.filterSet).map((c) => c.colId));
 
@@ -625,4 +682,31 @@ export function filterContentRows(rows: ContentItem[], filterModel: Record<strin
 			return matchesTextFilter(typeof value === 'string' ? value : value == null ? null : String(value), entry);
 		}),
 	);
+}
+
+// ---------------------------------------------------------------------------
+// Person filter (`f.person=<tmdb id>[:cast|:director]`) — not a column filter
+// ---------------------------------------------------------------------------
+
+/** URL `f.*` key for the person filter. It has no grid column, so it is never part of the AG Grid filter model. */
+export const PERSON_FILTER_KEY = 'person';
+
+export interface PersonFilter {
+	id: number;
+	/** Omitted = either role, matching the server's `personRole` default. */
+	role?: 'cast' | 'director';
+}
+
+/** Parse `123`, `123:cast` or `123:director`; null for anything else (bad ids are ignored, never sent). */
+export function parsePersonFilter(value: string | undefined): PersonFilter | null {
+	const m = /^(\d+)(?::(cast|director))?$/i.exec((value ?? '').trim());
+	if (!m) return null;
+	const id = Number(m[1]);
+	if (!Number.isSafeInteger(id) || id <= 0) return null;
+	return m[2] ? { id, role: m[2].toLowerCase() as 'cast' | 'director' } : { id };
+}
+
+/** Client-side twin of the server's person filter: the row is a Movie crediting this person (in the role, if given). */
+export function rowMatchesPerson(row: ContentItem, person: PersonFilter): boolean {
+	return moviePeople(row).some((p) => p.id === person.id && (!person.role || p.role === person.role));
 }
