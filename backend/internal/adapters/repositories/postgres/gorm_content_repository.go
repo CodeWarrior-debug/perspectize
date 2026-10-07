@@ -299,6 +299,10 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		rules = buildContentSortRules(params.SortBy, params.SortOrder)
 	}
 
+	// The cursor is built from the last row's struct fields, so every computed sort
+	// expression must come back as a scanned column (C-02).
+	computedSelects := computedSortSelects(rules)
+
 	// Configure paginator options
 	opts := []paginator.Option{
 		paginator.WithRules(rules...),
@@ -388,8 +392,11 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 	// along in the page query as an uncorrelated scalar subquery, which
 	// Postgres evaluates once: one round trip for page + count, not two.
 	countQuery := query.Session(&gorm.Session{})
-	if params.IncludeTotalCount {
-		query = query.Select("content.*, (?) AS total_count", countQuery.Session(&gorm.Session{}).Select("COUNT(*)"))
+	switch {
+	case params.IncludeTotalCount:
+		query = query.Select("content.*"+computedSelects+", (?) AS total_count", countQuery.Session(&gorm.Session{}).Select("COUNT(*)"))
+	case computedSelects != "":
+		query = query.Select("content.*" + computedSelects)
 	}
 
 	// Execute pagination
