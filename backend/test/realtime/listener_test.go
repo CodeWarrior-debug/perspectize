@@ -61,11 +61,17 @@ func TestListener_DeliversNotifyToHub(t *testing.T) {
 	t.Cleanup(cancel)
 	go listener.Run(runCtx)
 
-	// Give the dedicated LISTEN connection time to establish before we notify.
-	time.Sleep(500 * time.Millisecond)
-
+	// The Listener is lazy: subscribing triggers the dial. It resets every
+	// subscriber once LISTEN is established, so wait for that before notifying.
 	ch, unsub := hub.Subscribe(thread.ID, 1)
 	t.Cleanup(unsub)
+	select {
+	case evt := <-ch:
+		_, ok := evt.(domain.StreamResetEvent)
+		require.True(t, ok, "expected StreamResetEvent on connect, got %T", evt)
+	case <-time.After(5 * time.Second):
+		t.Fatal("listener did not connect after first subscriber")
+	}
 
 	const want = "hello over LISTEN"
 	_, err = msgRepo.Insert(ctx, &domain.Message{ThreadID: thread.ID, SenderID: b.ID, Body: want, ClientNonce: "notify-nonce"})
