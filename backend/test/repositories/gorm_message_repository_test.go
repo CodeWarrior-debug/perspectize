@@ -19,7 +19,7 @@ func messageTestSetup(t *testing.T) (*postgres.GormMessageRepository, int, int, 
 	t.Helper()
 	db := openTestDB(t)
 	userRepo := postgres.NewGormUserRepository(db)
-	threadRepo := postgres.NewGormThreadRepository(db)
+	threadRepo := postgres.NewGormMessageThreadRepository(db)
 	msgRepo := postgres.NewGormMessageRepository(db)
 	ctx := context.Background()
 

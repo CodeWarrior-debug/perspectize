@@ -88,7 +88,7 @@ func (presenceStubThreadRepo) SetLastRead(_ context.Context, _, _ int, _ int64) 
 }
 func (presenceStubThreadRepo) SetMuted(_ context.Context, _, _ int, _ bool) error { return nil }
 
-var _ repositories.ThreadRepository = presenceStubThreadRepo{}
+var _ repositories.MessageThreadRepository = presenceStubThreadRepo{}
 
 var testCfg = realtime.PresenceConfig{
 	OfflineGrace:      40 * time.Millisecond,

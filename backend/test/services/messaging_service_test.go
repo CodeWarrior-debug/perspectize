@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// --- mock ThreadRepository (function-field style) ---
+// --- mock MessageThreadRepository (function-field style) ---
 
 type mockThreadRepo struct {
 	createThreadFn       func(ctx context.Context, createdBy int, title *string, participantUserIDs []int) (*domain.MessageThread, error)

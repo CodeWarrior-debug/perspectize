@@ -53,7 +53,7 @@ func (s stubMsgRepo) SoftDelete(ctx context.Context, id int64, senderID int, del
 	return nil, nil
 }
 
-// stubThreadRepo is a ThreadRepository whose GetThread returns a caller-supplied
+// stubThreadRepo is a MessageThreadRepository whose GetThread returns a caller-supplied
 // thread; the Hub's inbox fan-out uses it to resolve participants.
 type stubThreadRepo struct{ thread *domain.MessageThread }
 
@@ -87,9 +87,9 @@ func (stubThreadRepo) SetMuted(ctx context.Context, threadID, userID int, muted 
 }
 
 var (
-	_ repositories.MessageRepository = stubMsgRepo{}
-	_ repositories.ThreadRepository  = stubThreadRepo{}
-	_ portservices.EventPublisher    = (*realtime.Hub)(nil)
+	_ repositories.MessageRepository       = stubMsgRepo{}
+	_ repositories.MessageThreadRepository = stubThreadRepo{}
+	_ portservices.EventPublisher          = (*realtime.Hub)(nil)
 )
 
 // countingMsgRepo records how many times GetByID was called.

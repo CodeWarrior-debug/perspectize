@@ -7,8 +7,8 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
 
-// ThreadRepository is the port for message thread storage operations.
-type ThreadRepository interface {
+// MessageThreadRepository is the port for message thread storage operations.
+type MessageThreadRepository interface {
 	CreateThread(ctx context.Context, createdBy int, title *string, participantUserIDs []int) (*domain.MessageThread, error)
 	GetThread(ctx context.Context, threadID int) (*domain.MessageThread, error)
 	FindDirectThread(ctx context.Context, userA, userB int) (*domain.MessageThread, error)
