@@ -88,6 +88,7 @@
 		durationComparator,
 		unknownLastComparator,
 		releasedComparator,
+		itemColumnHeader,
 		ratedComparator,
 		CLIENT_ONLY_SORT_COLS,
 		sortableColumnsFor,
@@ -1135,6 +1136,15 @@
 			const colDef = gridApi.getColumn(colId)?.getColDef();
 			if (colDef) colDef.sortable = sortableHere;
 		}
+		gridApi.refreshHeader();
+	});
+
+	// The Item column reads "Film" in the Movie view. headerName is read live; refreshHeader redraws it.
+	$effect(() => {
+		const headerName = itemColumnHeader(filters.type);
+		if (!gridApi || !gridReady) return;
+		const colDef = gridApi.getColumn('item')?.getColDef();
+		if (colDef) colDef.headerName = headerName;
 		gridApi.refreshHeader();
 	});
 

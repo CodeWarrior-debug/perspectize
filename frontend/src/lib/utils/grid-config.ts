@@ -746,3 +746,8 @@ export function parsePersonFilter(value: string | undefined): PersonFilter | nul
 export function rowMatchesPerson(row: ContentItem, person: PersonFilter): boolean {
 	return moviePeople(row).some((p) => p.id === person.id && (!person.role || p.role === person.role));
 }
+
+/** Item column header: "Film" when the type filter is exactly MOVIE, otherwise "Item". */
+export function itemColumnHeader(typeFilter: string | undefined): string {
+	return isMovieOnlyTypeFilter(typeFilter) ? 'Film' : 'Item';
+}

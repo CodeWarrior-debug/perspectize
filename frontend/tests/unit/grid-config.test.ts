@@ -12,6 +12,7 @@ import {
 	COL_TO_SORT,
 	sortableColumnsFor,
 	releasedComparator,
+	itemColumnHeader,
 } from '$lib/utils/grid-config';
 import type { ContentItem } from '$lib/queries/content';
 
@@ -402,5 +403,16 @@ describe('client-only sort columns', () => {
 		expect(releasedComparator(null, '2010-01-01', null, null, false)).toBeGreaterThan(0);
 		expect(releasedComparator(null, '2010-01-01', null, null, true)).toBeLessThan(0); // AG negates for desc
 		expect(releasedComparator('garbage', null)).toBe(0);
+	});
+});
+
+describe('itemColumnHeader', () => {
+	it('is "Film" when the type filter is exactly MOVIE', () => {
+		expect(itemColumnHeader('movie')).toBe('Film');
+	});
+	it('is "Item" for other filters, multiple types, or none', () => {
+		expect(itemColumnHeader('youtube_video')).toBe('Item');
+		expect(itemColumnHeader('movie,youtube_video')).toBe('Item');
+		expect(itemColumnHeader(undefined)).toBe('Item');
 	});
 });
