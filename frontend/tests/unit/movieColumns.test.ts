@@ -62,59 +62,56 @@ function chipText(el: HTMLElement | string): string {
 }
 
 describe('castCellRenderer', () => {
+	const lines = (el: HTMLElement) => [...el.querySelectorAll('[data-testid="cast-line"]')].map((l) => l.textContent);
+
 	it('shows directors only, marked dir.', () => {
 		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: [] }) });
 		expect(chipText(el)).toBe('dir. Christopher Nolan');
 	});
 
-	it('shows cast only, in billing order', () => {
+	it('shows cast only on line 1, joined with commas in billing order', () => {
 		const el = castCellRenderer({ data: movie({ directors: [], cast: CAST.slice(0, 2) }) }) as HTMLElement;
-		const chips = el.querySelectorAll('[data-testid="cast-chip"]');
-		expect([...chips].map((c) => c.textContent)).toEqual(['Leonardo DiCaprio', 'Joseph Gordon-Levitt']);
+		expect(lines(el)).toEqual(['Leonardo DiCaprio, Joseph Gordon-Levitt']);
 	});
 
-	it('puts directors before cast', () => {
+	it('puts directors on line 1 and cast on line 2', () => {
 		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: CAST.slice(0, 2) }) }) as HTMLElement;
-		const chips = [...el.querySelectorAll('[data-testid="cast-chip"]')].map((c) => c.textContent);
-		expect(chips).toEqual(['dir. Christopher Nolan', 'Leonardo DiCaprio', 'Joseph Gordon-Levitt']);
+		expect(lines(el)).toEqual(['dir. Christopher Nolan', 'Leonardo DiCaprio, Joseph Gordon-Levitt']);
+		expect(el.querySelector('[data-testid="cast-more"]')).toBeNull();
 	});
 
-	it('puts directors on line 1 and lead cast on line 2', () => {
-		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: CAST.slice(0, 2) }) }) as HTMLElement;
-		const lines = [...el.children].map((l) =>
-			[...l.querySelectorAll('[data-testid="cast-chip"]')].map((c) => c.textContent),
-		);
-		expect(lines).toEqual([['dir. Christopher Nolan'], ['Leonardo DiCaprio', 'Joseph Gordon-Levitt']]);
-	});
-
-	it('lists two directors and two lead cast, then +N for everyone else, on the last line', () => {
+	it('lists 2 directors and 3 cast, then +N (flex-none, on the last line) for the rest', () => {
 		const dirs = [...DIRECTORS, { id: 1, name: 'Lana Wachowski' }, { id: 2, name: 'Lilly Wachowski' }];
 		const el = castCellRenderer({ data: movie({ directors: dirs, cast: CAST }) }) as HTMLElement;
-		expect(el.querySelectorAll('[data-testid="cast-chip"]')).toHaveLength(4);
+		expect(lines(el)[0]).toBe('dir. Christopher Nolan, Lana Wachowski');
+		expect(lines(el)[1]).toBe('Leonardo DiCaprio, Joseph Gordon-Levitt, Elliot Page+2');
 		const more = el.querySelector('[data-testid="cast-more"]');
-		expect(more?.textContent).toBe('+3');
+		expect(more?.textContent).toBe('+2');
+		expect(more?.className).toContain('flex-none');
 		expect(more?.parentElement).toBe(el.lastElementChild);
 	});
 
-	it('keeps +N flex-none and lets names shrink so +N is never clipped', () => {
+	it('renders plain text, with a truncating name span and no chips', () => {
 		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: CAST }) }) as HTMLElement;
-		expect(el.querySelector('[data-testid="cast-more"]')?.className).toContain('flex-none');
-		for (const chip of el.querySelectorAll('[data-testid="cast-chip"]')) {
-			expect(chip.className).toContain('truncate');
-			expect(chip.className).toContain('min-w-0');
+		expect(el.querySelector('[data-testid="cast-chip"]')).toBeNull();
+		for (const line of el.querySelectorAll('[data-testid="cast-line"]')) {
+			expect(line.firstElementChild?.className).toContain('truncate');
+			expect(line.firstElementChild?.className).toContain('min-w-0');
 		}
+		expect(el.className).toContain('max-h-[34px]');
 	});
 
-	it('puts +N on the director line when there is no cast', () => {
+	it('puts +N after the directors when there is no cast', () => {
 		const dirs = [...DIRECTORS, { id: 1, name: 'A' }, { id: 2, name: 'B' }];
 		const el = castCellRenderer({ data: movie({ directors: dirs, cast: [] }) }) as HTMLElement;
+		expect(lines(el)).toEqual(['dir. Christopher Nolan, A+1']);
 		expect(el.children).toHaveLength(1);
-		expect(el.querySelector('[data-testid="cast-more"]')?.textContent).toBe('+1');
 	});
 
-	it('shows no +N when everyone is listed', () => {
-		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: CAST.slice(0, 2) }) }) as HTMLElement;
-		expect(el.querySelector('[data-testid="cast-more"]')).toBeNull();
+	it('puts +N at the end of line 1 when there are no directors', () => {
+		const more = Array.from({ length: 5 }, (_, i) => ({ id: i, name: `P${i}`, character: '', order: i }));
+		const el = castCellRenderer({ data: movie({ directors: [], cast: more }) }) as HTMLElement;
+		expect(lines(el)).toEqual(['P0, P1, P2+2']);
 	});
 
 	it('shows an empty marker when there are no people', () => {
