@@ -82,6 +82,8 @@
 	import {
 		capitalizeContentType,
 		durationComparator,
+		unknownLastComparator,
+		ratedComparator,
 		compareContentBySorts,
 		filterContentRows,
 		togglableColIds,
@@ -585,6 +587,7 @@
 				maxWidth: 100,
 				filter: false,
 				valueGetter: ratedValueGetter,
+				comparator: ratedComparator,
 				valueFormatter: (params) => textOrEmpty(params.value),
 				headerTooltip: 'US age rating (G, PG, PG-13, R, NC-17). Sorts by rating, not A-Z; unrated last.',
 				hide: true,
@@ -606,6 +609,9 @@
 				colId: 'duration',
 				headerName: 'Duration',
 				flex: 0.7,
+				// Explicit floor: headerMinWidth('Duration') is 126, which pushed the YouTube lg set
+				// past the 1212px grid and clipped Tags. 111 (what 'Length' used) keeps it at 1211.
+				minWidth: 111,
 				maxWidth: 120,
 
 				filter: 'agNumberColumnFilter',
@@ -681,6 +687,7 @@
 				maxWidth: 130,
 				filter: false,
 				valueGetter: boxOfficeValueGetter,
+				comparator: unknownLastComparator,
 				valueFormatter: (params) => formatBoxOffice(params.value),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.boxOffice },
 				headerTooltip: 'Worldwide gross (USD) from TMDB. A dash means TMDB has no figure.',
@@ -693,6 +700,7 @@
 				maxWidth: 130,
 				filter: false,
 				valueGetter: vsBudgetValueGetter,
+				comparator: unknownLastComparator,
 				valueFormatter: (params) => formatVsBudgetCell(params.value),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.vsBudget },
 				headerTooltip: 'Box office as a percentage of budget. Ignores marketing, so under 100% does not mean a loss.',

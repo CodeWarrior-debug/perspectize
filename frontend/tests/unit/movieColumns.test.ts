@@ -30,7 +30,11 @@ import {
 	isMovieOnlyTypeFilter,
 	capitalizeContentType,
 	compareContentBySorts,
+	unknownLastComparator,
+	ratedComparator,
 } from '$lib/utils/grid-config';
+import activityTableSource from '$lib/components/ActivityTable.svelte?raw';
+import { headerMinWidth } from '$lib/utils/formatting';
 import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
 import {
 	sortsToGraphQL,
@@ -438,5 +442,63 @@ describe('Movie search scopes', () => {
 		const narrowed = { ...defaults, qFields: ['cast' as const] };
 		expect(serializeGridParams(narrowed)).toContain('qf=cast');
 		expect(parseGridParams(new URLSearchParams(serializeGridParams(narrowed))).qFields).toEqual(['cast']);
+	});
+});
+
+// AG Grid calls comparator(a, b, nodeA, nodeB, isDescending) and negates the result for descending,
+// so "unknown last in both directions" means returning the opposite sign when descending.
+function agSort<T>(values: T[], cmp: (a: T, b: T, na: unknown, nb: unknown, desc: boolean) => number, desc: boolean) {
+	return [...values].sort((a, b) => (desc ? -1 : 1) * cmp(a, b, null, null, desc));
+}
+
+describe('grid comparators (Loaded-mode desktop grid)', () => {
+	it('unknownLastComparator orders numbers with null last ascending and descending', () => {
+		const v = [null, 20, 10, null, 30];
+		expect(agSort(v, unknownLastComparator, false)).toEqual([10, 20, 30, null, null]);
+		expect(agSort(v, unknownLastComparator, true)).toEqual([30, 20, 10, null, null]);
+	});
+
+	it('ratedComparator orders by rating, not A-Z, unrated last in both directions', () => {
+		const v = ['R', null, 'G', 'PG-13', 'NC-17', 'PG', 'NR'];
+		expect(agSort(v, ratedComparator, false).slice(0, 5)).toEqual(['G', 'PG', 'PG-13', 'R', 'NC-17']);
+		expect(agSort(v, ratedComparator, false).slice(5).sort()).toEqual([null, 'NR'].sort());
+		expect(agSort(v, ratedComparator, true).slice(0, 5)).toEqual(['NC-17', 'R', 'PG-13', 'PG', 'G']);
+		const desc = agSort(v, ratedComparator, true);
+		expect(desc.slice(5).every((x) => x === null || x === 'NR')).toBe(true);
+	});
+
+	it('the Rated, Box office and Vs. budget colDefs use these comparators', () => {
+		for (const id of ['rated', 'boxOffice', 'vsBudget']) {
+			const block = activityTableSource.split(/(?=colId:\s*')/g).find((b) => b.startsWith(`colId: '${id}'`));
+			expect(block, id).toMatch(/comparator:\s*(ratedComparator|unknownLastComparator)/);
+		}
+	});
+});
+
+describe('default column sets fit the 1212px grid', () => {
+	const blocks = activityTableSource.split(/(?=colId:\s*')/g);
+	function minWidth(colId: string): number {
+		const b = blocks.find((x) => x.startsWith(`colId: '${colId}'`));
+		if (!b) throw new Error(`no colDef for ${colId}`);
+		const explicit = b.match(/\n\s*minWidth:\s*(\d+)/)?.[1];
+		if (explicit) return Number(explicit);
+		const name = b.match(/headerName:\s*'([^']*)'/)?.[1] ?? '';
+		return headerMinWidth(name, !/\n\s*filter:\s*false/.test(b));
+	}
+	it.each([
+		['YouTube', false],
+		['Movie', true],
+	])('%s lg set sums under 1212', (_n, movieOnly) => {
+		const { visible } = defaultColumnVisibility('lg', movieOnly as boolean);
+		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
+		expect(total).toBeLessThanOrEqual(1211);
+	});
+
+	it('no colDef has minWidth above maxWidth', () => {
+		for (const b of blocks) {
+			const min = b.match(/\n\s*minWidth:\s*(\d+)/)?.[1];
+			const max = b.match(/\n\s*maxWidth:\s*(\d+)/)?.[1];
+			if (min && max) expect(Number(min), b.slice(0, 30)).toBeLessThanOrEqual(Number(max));
+		}
 	});
 });

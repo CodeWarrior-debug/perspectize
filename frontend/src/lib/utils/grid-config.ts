@@ -61,6 +61,38 @@ export function durationComparator(
 	return a - b;
 }
 
+/**
+ * AG Grid comparator that keeps unknown (null) values last in BOTH directions.
+ * AG Grid negates the comparator result for descending sorts, so when descending the
+ * sign for a null is flipped. Used for Loaded-mode (client) sort of Movie columns,
+ * matching the server (NULLs last) and compareContentBySorts.
+ */
+export function unknownLastComparator(
+	valueA: number | null | undefined,
+	valueB: number | null | undefined,
+	_nodeA?: unknown,
+	_nodeB?: unknown,
+	isDescending?: boolean,
+): number {
+	const aNull = valueA == null;
+	const bNull = valueB == null;
+	if (aNull && bNull) return 0;
+	if (aNull) return isDescending ? -1 : 1;
+	if (bNull) return isDescending ? 1 : -1;
+	return valueA - valueB;
+}
+
+/** Comparator for the Rated column (string certification values): by rating rank, unrated last in both directions. */
+export function ratedComparator(
+	valueA: string | null | undefined,
+	valueB: string | null | undefined,
+	nodeA?: unknown,
+	nodeB?: unknown,
+	isDescending?: boolean,
+): number {
+	return unknownLastComparator(ageRatingRank(valueA), ageRatingRank(valueB), nodeA, nodeB, isDescending);
+}
+
 // ---------------------------------------------------------------------------
 // Column metadata — the single source of truth
 // ---------------------------------------------------------------------------
