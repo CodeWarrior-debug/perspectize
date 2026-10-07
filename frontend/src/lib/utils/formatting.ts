@@ -9,13 +9,55 @@ export const EMPTY_VALUE = '—';
 export function formatDuration(length: number | null, lengthUnits: string | null): string {
 	if (length === null) return EMPTY_VALUE;
 
-	if (lengthUnits === 'seconds') {
-		const minutes = Math.floor(length / 60);
-		const seconds = length % 60;
-		return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-	}
+	if (lengthUnits === 'seconds') return formatDurationSeconds(length);
 
 	return `${length} ${lengthUnits}`;
+}
+
+const MONEY_UNITS = [
+	{ size: 1e3, suffix: 'K' },
+	{ size: 1e6, suffix: 'M' },
+	{ size: 1e9, suffix: 'B' },
+] as const;
+
+/**
+ * Compact USD (`$1.2B`, `$316M`, `$950K`, `$999`). One decimal only when
+ * non-zero. null or 0 is "unknown" (TMDB reports 0 for no data), never "$0".
+ */
+export function formatMoneyCompact(usd: number | null): string {
+	if (usd == null || usd === 0) return EMPTY_VALUE;
+	if (Math.abs(usd) < 1e3) return `$${Math.round(usd)}`;
+	let idx = 0;
+	for (let i = 0; i < MONEY_UNITS.length; i++) {
+		if (Math.abs(usd) >= MONEY_UNITS[i].size) idx = i;
+	}
+	// Round to one decimal in integer space (avoids 1.15.toFixed(1) === "1.1"),
+	// and promote a rounded 1000 (999_999 -> 1000K) to the next unit.
+	const scale = (i: number) => Math.round(usd / (MONEY_UNITS[i].size / 10)) / 10;
+	let value = scale(idx);
+	if (Math.abs(value) >= 1000 && idx < MONEY_UNITS.length - 1) {
+		idx += 1;
+		value = scale(idx);
+	}
+	return `$${value}${MONEY_UNITS[idx].suffix}`;
+}
+
+/** Full USD with thousands separators (`$1,234,567`); null or 0 -> EMPTY_VALUE. */
+export function formatMoneyExact(usd: number | null): string {
+	if (usd == null || usd === 0) return EMPTY_VALUE;
+	return `$${usd.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+}
+
+/** Revenue as a percentage of budget; null when either side is unknown (null or 0). */
+export function vsBudgetPercent(revenue: number | null, budget: number | null): number | null {
+	if (!revenue || !budget) return null;
+	return (revenue / budget) * 100;
+}
+
+/** `3,455%` (rounded, thousands separators); null -> EMPTY_VALUE. */
+export function formatVsBudget(pct: number | null): string {
+	if (pct == null) return EMPTY_VALUE;
+	return `${Math.round(pct).toLocaleString('en-US')}%`;
 }
 
 /**
@@ -145,27 +187,32 @@ export function durationFilterValueGetter(params: { data?: { length: number | nu
 }
 
 /**
- * Format seconds as m:ss display string (for filter chip display).
+ * Format seconds as `m:ss` below an hour and `h:mm:ss` from 3600 up. The one
+ * duration formatter, shared by YouTube (`formatDuration`), Movie runtime and
+ * filter chips.
  */
 export function formatDurationSeconds(seconds: number): string {
-	const m = Math.floor(seconds / 60);
+	const pad = (n: number) => n.toString().padStart(2, '0');
+	const h = Math.floor(seconds / 3600);
+	const m = Math.floor((seconds % 3600) / 60);
 	const s = seconds % 60;
-	return `${m}:${s.toString().padStart(2, '0')}`;
+	if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+	return `${m}:${pad(s)}`;
 }
 
 /**
- * Parse duration filter input. Accepts "m:ss" or plain seconds.
+ * Parse duration filter input. Accepts "h:mm:ss", "m:ss" or plain seconds.
  * Returns total seconds, or null if unparseable.
  */
 export function parseDurationInput(text: string | null): number | null {
 	if (text == null || text.trim() === '') return null;
 	const trimmed = text.trim();
 	if (trimmed.includes(':')) {
-		const [minStr, secStr] = trimmed.split(':');
-		const mins = parseInt(minStr, 10);
-		const secs = parseInt(secStr, 10);
-		if (isNaN(mins) || isNaN(secs)) return null;
-		return mins * 60 + secs;
+		const parts = trimmed.split(':');
+		if (parts.length > 3) return null;
+		const nums = parts.map((p) => parseInt(p, 10));
+		if (nums.some((n) => isNaN(n))) return null;
+		return nums.reduce((total, n) => total * 60 + n, 0);
 	}
 	const n = parseFloat(trimmed);
 	return isNaN(n) ? null : n;

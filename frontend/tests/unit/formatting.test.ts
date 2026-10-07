@@ -29,7 +29,95 @@ import {
 	getSourceDataCooldown,
 	formatRemainingTime,
 	SOURCE_DATA_COOLDOWN_MS,
+	formatMoneyCompact,
+	formatMoneyExact,
+	vsBudgetPercent,
+	formatVsBudget,
 } from '$lib/utils/formatting';
+
+describe('shared h:mm:ss duration', () => {
+	it.each([
+		[0, '0:00'],
+		[59, '0:59'],
+		[3599, '59:59'],
+		[3600, '1:00:00'],
+		[8520, '2:22:00'],
+		[8525, '2:22:05'],
+	])('formatDurationSeconds(%i) = %s and formatDuration agrees', (secs, expected) => {
+		expect(formatDurationSeconds(secs)).toBe(expected);
+		expect(formatDuration(secs, 'seconds')).toBe(expected);
+	});
+
+	it.each([
+		['1:02:03', 3723],
+		['2:22:00', 8520],
+		['0:01:05', 65],
+		['59:59', 3599],
+		['1:2:3:4', null],
+		['1:xx:03', null],
+	])('parseDurationInput(%s) = %s', (text, expected) => {
+		expect(parseDurationInput(text)).toBe(expected);
+	});
+
+	it('round-trips formatted values through parseDurationInput', () => {
+		for (const s of [0, 59, 3599, 3600, 8525]) {
+			expect(parseDurationInput(formatDurationSeconds(s))).toBe(s);
+		}
+	});
+});
+
+describe('formatMoneyCompact', () => {
+	it.each([
+		[null, '—'],
+		[0, '—'],
+		[12, '$12'],
+		[999, '$999'],
+		[1000, '$1K'],
+		[950_000, '$950K'],
+		[1_500, '$1.5K'],
+		[999_999, '$1M'],
+		[1_000_000, '$1M'],
+		[316_000_000, '$316M'],
+		[1_150_000_000, '$1.2B'],
+		[2_800_000_000, '$2.8B'],
+	])('formatMoneyCompact(%s) = %s', (v, expected) => {
+		expect(formatMoneyCompact(v)).toBe(expected);
+	});
+});
+
+describe('formatMoneyExact', () => {
+	it.each([
+		[null, '—'],
+		[0, '—'],
+		[999, '$999'],
+		[1_234_567, '$1,234,567'],
+	])('formatMoneyExact(%s) = %s', (v, expected) => {
+		expect(formatMoneyExact(v)).toBe(expected);
+	});
+});
+
+describe('vsBudgetPercent / formatVsBudget', () => {
+	it.each([
+		[2_800_000_000, 80_000_000, 3500],
+		[50, 100, 50],
+		[null, 100, null],
+		[100, null, null],
+		[100, 0, null],
+		[0, 100, null],
+		[null, null, null],
+	])('vsBudgetPercent(%s, %s) = %s', (rev, budget, expected) => {
+		expect(vsBudgetPercent(rev, budget)).toBe(expected);
+	});
+
+	it.each([
+		[3455.2, '3,455%'],
+		[3500, '3,500%'],
+		[49.6, '50%'],
+		[null, '—'],
+	])('formatVsBudget(%s) = %s', (pct, expected) => {
+		expect(formatVsBudget(pct)).toBe(expected);
+	});
+});
 
 describe('formatDuration', () => {
 	it('returns dash for null length', () => {
@@ -57,7 +145,7 @@ describe('formatDuration', () => {
 	});
 
 	it('formats large durations', () => {
-		expect(formatDuration(3661, 'seconds')).toBe('61:01');
+		expect(formatDuration(3661, 'seconds')).toBe('1:01:01');
 	});
 
 	it('formats non-seconds units with value and unit', () => {
@@ -194,7 +282,7 @@ describe('formatDurationSeconds', () => {
 	});
 
 	it('formats large durations', () => {
-		expect(formatDurationSeconds(3661)).toBe('61:01');
+		expect(formatDurationSeconds(3661)).toBe('1:01:01');
 	});
 
 	it('formats sub-minute durations', () => {
