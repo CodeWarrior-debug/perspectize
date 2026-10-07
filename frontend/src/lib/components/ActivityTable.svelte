@@ -531,7 +531,7 @@
 				colId: 'item',
 				headerName: 'Item',
 				flex: 2,
-				minWidth: 200,
+				minWidth: 185,
 
 				filter: 'agTextColumnFilter',
 				filterValueGetter: (params) => params.data?.name ?? '',
@@ -564,14 +564,14 @@
 			},
 			// Movie columns (TMDB). Hidden by default; the responsive effect shows the Movie
 			// default set when the type filter is exactly MOVIE. Minimum widths are tuned so
-			// that set fits the 1212px grid: perspectize 50 + item 200 + genre 72 + rated 82
-			// + cast 130 + duration 126 + released 100 + box office 120 + vs. budget 120
-			// + TMDB score 100 + tags 95 = 1195.
+			// that set fits the 1212px grid: perspectize 50 + item 185 + genre 82 + rated 82
+			// + cast 125 + duration 111 + released 105 + box office 138 + vs. budget 118
+			// + TMDB score 121 + tags 90 = 1207. Box office keeps room for its sort arrow.
 			{
 				colId: 'genre',
 				headerName: 'Genre',
 				flex: 1,
-				minWidth: 72,
+				minWidth: 82,
 				maxWidth: 180,
 				sortable: false,
 				filter: false,
@@ -584,6 +584,7 @@
 				colId: 'rated',
 				headerName: 'Rated',
 				flex: 0.5,
+				minWidth: 82,
 				maxWidth: 100,
 				filter: false,
 				valueGetter: ratedValueGetter,
@@ -596,10 +597,12 @@
 				colId: 'cast',
 				headerName: 'Cast',
 				flex: 2,
-				minWidth: 130,
+				minWidth: 125,
 				sortable: false,
 				filter: false,
 				cellRenderer: castCellRenderer,
+				// Tighter cell padding so the two-line cast cell has room for names beside +N.
+				cellStyle: { '--ag-cell-horizontal-padding': '8px' },
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.cast },
 				headerTooltip:
 					'Directors lead (marked dir.), then billed cast. Only the top 15 cast are stored, so only they are searchable.',
@@ -671,7 +674,7 @@
 				colId: 'released',
 				headerName: 'Released',
 				flex: 1,
-				minWidth: 100,
+				minWidth: 105,
 				maxWidth: 140,
 				sortable: false,
 				filter: false,
@@ -684,7 +687,8 @@
 				colId: 'boxOffice',
 				headerName: 'Box office',
 				flex: 0.8,
-				maxWidth: 130,
+				minWidth: 138, // room for the sort arrow
+				maxWidth: 150,
 				filter: false,
 				valueGetter: boxOfficeValueGetter,
 				comparator: unknownLastComparator,
@@ -697,6 +701,7 @@
 				colId: 'vsBudget',
 				headerName: 'Vs. budget',
 				flex: 0.8,
+				minWidth: 118,
 				maxWidth: 130,
 				filter: false,
 				valueGetter: vsBudgetValueGetter,
@@ -710,8 +715,8 @@
 				colId: 'tmdbScore',
 				headerName: 'TMDB Score',
 				flex: 0.7,
-				minWidth: 100,
-				maxWidth: 120,
+				minWidth: 121,
+				maxWidth: 130,
 				sortable: false,
 				filter: false,
 				valueGetter: tmdbScoreValueGetter,
@@ -752,6 +757,7 @@
 				colId: 'tags',
 				headerName: 'Tags',
 				flex: 1.5,
+				minWidth: 90,
 				maxWidth: 250,
 				sortable: false,
 				filter: 'agTextColumnFilter',

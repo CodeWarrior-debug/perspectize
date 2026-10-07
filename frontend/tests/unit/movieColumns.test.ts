@@ -79,13 +79,40 @@ describe('castCellRenderer', () => {
 		expect(chips).toEqual(['dir. Christopher Nolan', 'Leonardo DiCaprio', 'Joseph Gordon-Levitt']);
 	});
 
-	it('shows the first three people then +N', () => {
-		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: CAST }) }) as HTMLElement;
-		expect(el.querySelectorAll('[data-testid="cast-chip"]')).toHaveLength(3);
-		expect(el.querySelector('[data-testid="cast-more"]')?.textContent).toBe('+2');
+	it('puts directors on line 1 and lead cast on line 2', () => {
+		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: CAST.slice(0, 2) }) }) as HTMLElement;
+		const lines = [...el.children].map((l) =>
+			[...l.querySelectorAll('[data-testid="cast-chip"]')].map((c) => c.textContent),
+		);
+		expect(lines).toEqual([['dir. Christopher Nolan'], ['Leonardo DiCaprio', 'Joseph Gordon-Levitt']]);
 	});
 
-	it('shows no +N when there are exactly three', () => {
+	it('lists two directors and two lead cast, then +N for everyone else, on the last line', () => {
+		const dirs = [...DIRECTORS, { id: 1, name: 'Lana Wachowski' }, { id: 2, name: 'Lilly Wachowski' }];
+		const el = castCellRenderer({ data: movie({ directors: dirs, cast: CAST }) }) as HTMLElement;
+		expect(el.querySelectorAll('[data-testid="cast-chip"]')).toHaveLength(4);
+		const more = el.querySelector('[data-testid="cast-more"]');
+		expect(more?.textContent).toBe('+3');
+		expect(more?.parentElement).toBe(el.lastElementChild);
+	});
+
+	it('keeps +N flex-none and lets names shrink so +N is never clipped', () => {
+		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: CAST }) }) as HTMLElement;
+		expect(el.querySelector('[data-testid="cast-more"]')?.className).toContain('flex-none');
+		for (const chip of el.querySelectorAll('[data-testid="cast-chip"]')) {
+			expect(chip.className).toContain('truncate');
+			expect(chip.className).toContain('min-w-0');
+		}
+	});
+
+	it('puts +N on the director line when there is no cast', () => {
+		const dirs = [...DIRECTORS, { id: 1, name: 'A' }, { id: 2, name: 'B' }];
+		const el = castCellRenderer({ data: movie({ directors: dirs, cast: [] }) }) as HTMLElement;
+		expect(el.children).toHaveLength(1);
+		expect(el.querySelector('[data-testid="cast-more"]')?.textContent).toBe('+1');
+	});
+
+	it('shows no +N when everyone is listed', () => {
 		const el = castCellRenderer({ data: movie({ directors: DIRECTORS, cast: CAST.slice(0, 2) }) }) as HTMLElement;
 		expect(el.querySelector('[data-testid="cast-more"]')).toBeNull();
 	});
@@ -543,7 +570,25 @@ describe('default column sets fit the 1212px grid', () => {
 	])('%s lg set sums under 1212', (_n, movieOnly) => {
 		const { visible } = defaultColumnVisibility('lg', movieOnly as boolean);
 		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
-		expect(total).toBeLessThanOrEqual(1211);
+		expect(total).toBeLessThanOrEqual(1212);
+	});
+
+	it('Movie lg minimum widths are the tuned table (sum 1207)', () => {
+		const { visible } = defaultColumnVisibility('lg', true);
+		const widths = Object.fromEntries(visible.map((id) => [id, minWidth(id)]));
+		expect(widths).toMatchObject({
+			item: 185,
+			genre: 82,
+			rated: 82,
+			cast: 125,
+			duration: 111,
+			released: 105,
+			boxOffice: 138,
+			vsBudget: 118,
+			tmdbScore: 121,
+			tags: 90,
+		});
+		expect(Object.values(widths).reduce((a, b) => a + b, 0)).toBe(1207);
 	});
 
 	it('no colDef has minWidth above maxWidth', () => {

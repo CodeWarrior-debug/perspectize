@@ -700,46 +700,62 @@ export function moviePeople(row: MovieRow | null | undefined): MoviePerson[] {
 	return [...directors, ...cast];
 }
 
-const CAST_CELL_VISIBLE = 3;
+/** Most directors / lead cast names the Cast cell lists; everyone else collapses to `+N`. */
+export const CAST_CELL_MAX_DIRECTORS = 2;
+export const CAST_CELL_MAX_CAST = 2;
+
+function castChip(person: MoviePerson): HTMLElement {
+	const chip = document.createElement('span');
+	chip.dataset.testid = 'cast-chip';
+	chip.className = 'min-w-0 truncate rounded bg-muted px-1.5 py-0.5 text-[11px] leading-tight text-foreground';
+	if (person.role === 'director') {
+		const marker = document.createElement('span');
+		marker.className = 'text-muted-foreground';
+		marker.textContent = 'dir.';
+		chip.appendChild(marker);
+		chip.appendChild(document.createTextNode(` ${person.name}`));
+	} else {
+		chip.textContent = person.name;
+	}
+	return chip;
+}
+
+function castLine(people: MoviePerson[]): HTMLElement {
+	const line = document.createElement('div');
+	line.className = 'flex w-full min-w-0 items-center gap-1';
+	for (const person of people) line.appendChild(castChip(person));
+	return line;
+}
 
 /**
- * AG Grid cell renderer for the Cast column: directors first (marked `dir.`),
- * then cast in billing order as chips; the first three show, the rest collapse
- * to `+N`. No people -> EMPTY_VALUE.
+ * AG Grid cell renderer for the Cast column. Two lines inside the row: line 1 the
+ * director(s) (marked `dir.`), line 2 the lead cast in billing order. Names shrink and
+ * truncate with an ellipsis; the `+N` marker for everyone not listed is flex-none on the
+ * last line, so it is never the thing that gets clipped. No people -> EMPTY_VALUE.
  */
 export function castCellRenderer(params: { data?: MovieRow }): HTMLElement | string {
 	if (!params.data) return '';
 	const people = moviePeople(params.data);
 
 	const container = document.createElement('div');
-	container.className = 'flex h-full w-full items-center gap-1 overflow-hidden whitespace-nowrap';
+	container.className = 'flex h-full w-full flex-col justify-center gap-0.5 overflow-hidden whitespace-nowrap';
 	if (people.length === 0) {
 		container.textContent = EMPTY_VALUE;
 		return container;
 	}
 
-	for (const person of people.slice(0, CAST_CELL_VISIBLE)) {
-		const chip = document.createElement('span');
-		chip.dataset.testid = 'cast-chip';
-		chip.className = 'shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] leading-tight text-foreground';
-		if (person.role === 'director') {
-			const marker = document.createElement('span');
-			marker.className = 'text-muted-foreground';
-			marker.textContent = 'dir.';
-			chip.appendChild(marker);
-			chip.appendChild(document.createTextNode(` ${person.name}`));
-		} else {
-			chip.textContent = person.name;
-		}
-		container.appendChild(chip);
-	}
-	const extra = people.length - CAST_CELL_VISIBLE;
+	const directors = people.filter((p) => p.role === 'director').slice(0, CAST_CELL_MAX_DIRECTORS);
+	const cast = people.filter((p) => p.role === 'cast').slice(0, CAST_CELL_MAX_CAST);
+	const lines = [directors, cast].filter((l) => l.length > 0).map(castLine);
+	for (const line of lines) container.appendChild(line);
+
+	const extra = people.length - directors.length - cast.length;
 	if (extra > 0) {
 		const more = document.createElement('span');
 		more.dataset.testid = 'cast-more';
-		more.className = 'shrink-0 text-[11px] text-muted-foreground';
+		more.className = 'flex-none text-[11px] text-muted-foreground';
 		more.textContent = `+${extra}`;
-		container.appendChild(more);
+		lines[lines.length - 1].appendChild(more);
 	}
 	return container;
 }
