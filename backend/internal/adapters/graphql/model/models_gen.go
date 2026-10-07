@@ -73,6 +73,8 @@ type ContentFilter struct {
 	MaxLengthSeconds  *int                        `json:"maxLengthSeconds,omitempty"`
 	Search            *string                     `json:"search,omitempty"`
 	SearchFields      []domain.ContentSearchField `json:"searchFields,omitempty"`
+	PersonID          *int                        `json:"personId,omitempty"`
+	PersonRole        *domain.PersonRole          `json:"personRole,omitempty"`
 	MinViewCount      *int                        `json:"minViewCount,omitempty"`
 	MaxViewCount      *int                        `json:"maxViewCount,omitempty"`
 	MinLikeCount      *int                        `json:"minLikeCount,omitempty"`
@@ -97,6 +99,10 @@ type CreateClaimInput struct {
 	Text            string `json:"text"`
 	UserID          int    `json:"userID"`
 	ParentContentID int    `json:"parentContentID"`
+}
+
+type CreateContentFromMovieInput struct {
+	URL string `json:"url"`
 }
 
 type CreateContentFromPassageInput struct {

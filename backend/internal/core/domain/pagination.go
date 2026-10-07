@@ -13,6 +13,17 @@ const (
 	ContentSortByPublishedAt  ContentSortBy = "PUBLISHED_AT"
 	ContentSortByChannelTitle ContentSortBy = "CHANNEL_TITLE"
 	ContentSortByLength       ContentSortBy = "LENGTH"
+	ContentSortByBoxOffice    ContentSortBy = "BOX_OFFICE"
+	ContentSortByVsBudget     ContentSortBy = "VS_BUDGET"
+	ContentSortByAgeRating    ContentSortBy = "AGE_RATING"
+)
+
+// PersonRole is the role a person plays on a movie, used by ContentFilter.PersonRole.
+type PersonRole string
+
+const (
+	PersonRoleCast     PersonRole = "CAST"
+	PersonRoleDirector PersonRole = "DIRECTOR"
 )
 
 // SortOrder represents ascending or descending sort direction
@@ -57,6 +68,9 @@ type ContentFilter struct {
 	CreatedBefore *string
 	UpdatedAfter  *string
 	UpdatedBefore *string
+	// PersonID/PersonRole match movies by a person (cast or director).
+	PersonID   *int
+	PersonRole *PersonRole
 }
 
 // ContentListParams contains parameters for paginated content queries

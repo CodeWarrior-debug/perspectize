@@ -185,6 +185,11 @@ func (r *mutationResolver) CreateContentFromYouTube(ctx context.Context, input m
 	}, nil
 }
 
+// CreateContentFromMovie is the resolver for the createContentFromMovie field.
+func (r *mutationResolver) CreateContentFromMovie(ctx context.Context, input model.CreateContentFromMovieInput) (*model.Content, error) {
+	return nil, errors.New("not implemented")
+}
+
 // CreateContentFromPassage is the resolver for the createContentFromPassage field.
 func (r *mutationResolver) CreateContentFromPassage(ctx context.Context, input model.CreateContentFromPassageInput) (*model.Content, error) {
 	// Identity comes from the session; a client-supplied userID only has to match it.
