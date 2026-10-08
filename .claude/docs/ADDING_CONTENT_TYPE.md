@@ -395,3 +395,23 @@ After adding a content type:
 7. Verify every filter in both modes: All Items (server) and Loaded (client) return the same rows; the URL round-trips; the chip label reads correctly; the Type filter reaches the server in Loaded mode and the footer total reflects it
 8. Verify mobile responsiveness (card list shows the type's own facts)
 9. Re-walk the Per-type surface checklist and confirm every row has an answer and a pinning test
+
+---
+
+## Movie retrospective
+
+What went wrong on each ✱ row in PR #565 (Movie), and how it was fixed. See the PR for the code; paths are not repeated here because Movie is not merged to `main` yet.
+
+| Row | What went wrong | How PR #565 fixed it |
+|---|---|---|
+| Filters | The designer marked columns filterable but the guide had no filter step, so Movie shipped with none. | Added `ContentFilter` fields, repo conditions and resolver mapping (server), plus grid-config filter keys and `filterContentRows` parity (client). |
+| Sort: computed keys | Cursor pagination encoded a zero value for a computed sort key (C-02): page 2 repeated page 1. | Fixed so the scanned key carries the real value; pinned with a multi-page test. |
+| Data modes | In Loaded mode the Type filter stayed client-side inside the 100-row cap, so Movie rows were missing and the footer total was wrong. | The Type filter is now sent to the server in Loaded mode and the total reflects it. |
+| Grid columns | The single-type view still headed the Item column "Item". | Per-type header: "Film". |
+| Mobile card list | The cards showed YouTube facts (views / likes / channel). | Cards show movie facts (year, rating, runtime, TMDB score). |
+| Details modal | The modal carried YouTube-only controls. | Movie-specific layout without them. |
+| Add form | The popover did not close after a successful add; the effect re-ran and reopened state. | Fixed by reading the reactive state inside `untrack`. |
+| Content policy | No adult gate, so NC-17 and TMDB `adult: true` titles could be added. | Rejected with `CONTENT_NOT_ALLOWED`; the form shows the server's message. |
+| Formatting edge values | $1T rendered as "$1000B"; values under 1% rendered "0%". | Fixed units and a "<1%" form; covered in `formatting.test.ts`. |
+| Add form: duplicate | Adding an existing movie gives no feedback. | **Still open:** a duplicate-add toast using the already-existed flag. |
+
