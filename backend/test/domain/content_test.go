@@ -84,3 +84,14 @@ func TestContent_BiblePassageFields_OptionalAndNilByDefault(t *testing.T) {
 	assert.Nil(t, c.VerseEndID)
 	assert.Nil(t, c.DisplayTitle)
 }
+
+func TestMovieConstants(t *testing.T) {
+	assert.Equal(t, domain.ContentType("MOVIE"), domain.ContentTypeMovie)
+	assert.Equal(t, domain.ContentSearchField("CAST"), domain.ContentSearchFieldCast)
+	assert.Equal(t, domain.ContentSearchField("DIRECTOR"), domain.ContentSearchFieldDirector)
+	assert.Equal(t, domain.ContentSortBy("BOX_OFFICE"), domain.ContentSortByBoxOffice)
+	assert.Equal(t, domain.ContentSortBy("VS_BUDGET"), domain.ContentSortByVsBudget)
+	assert.Equal(t, domain.ContentSortBy("AGE_RATING"), domain.ContentSortByAgeRating)
+	assert.Equal(t, domain.PersonRole("CAST"), domain.PersonRoleCast)
+	assert.Equal(t, domain.PersonRole("DIRECTOR"), domain.PersonRoleDirector)
+}

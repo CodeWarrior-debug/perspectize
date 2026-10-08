@@ -17,6 +17,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/realtime"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/cached"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/handlers"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/wikidata"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
@@ -148,6 +149,12 @@ func main() {
 		)
 		slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds)
 	}
+	var movieClient portservices.MovieClient = tmdb.UnconfiguredClient{}
+	if cfg.TMDBReadAccessToken != "" {
+		movieClient = tmdb.NewClient(cfg.TMDBReadAccessToken)
+	} else {
+		slog.Warn("TMDB_API_READ_ACCESS_TOKEN is empty — movie lookups will fail")
+	}
 	wikidataClient := wikidata.NewClient()
 	contentRepo := postgres.NewGormContentRepository(db)
 	// Cached: the auth middleware resolves the Clerk ID -> user on every
@@ -163,7 +170,7 @@ func main() {
 	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
 
 	// Initialize services
-	contentService := services.NewContentService(contentRepo, youtubeClient, services.WithBibleReference(bibleReferenceRepo))
+	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, services.WithBibleReference(bibleReferenceRepo))
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)

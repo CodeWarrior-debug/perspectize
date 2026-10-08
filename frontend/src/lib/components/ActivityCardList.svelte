@@ -2,7 +2,15 @@
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
-	import { extractVideoIdFromUrl, formatDuration, formatCount } from '$lib/utils/formatting';
+	import {
+		extractVideoIdFromUrl,
+		formatDuration,
+		formatCount,
+		releasedValueGetter,
+		ratedValueGetter,
+		tmdbScoreValueGetter,
+		formatTmdbScore,
+	} from '$lib/utils/formatting';
 	import { passageIconLabels } from '$lib/utils/bible';
 	import BiblePassageIcon from '$lib/components/BiblePassageIcon.svelte';
 
@@ -22,6 +30,9 @@
 		viewCount?: number | null;
 		likeCount?: number | null;
 		contentType?: string;
+		// MOVIE rows carry TMDB data in their JSON `response` (or `movie`); see formatting.ts.
+		movie?: unknown;
+		response?: unknown;
 		displayTitle?: string | null;
 		verseStartID?: number | null;
 		verseEndID?: number | null;
@@ -47,6 +58,19 @@
 	}
 
 	const isPassage = (row: CardRow) => row.contentType === 'BIBLE_PASSAGE';
+	const isMovie = (row: CardRow) => row.contentType === 'MOVIE';
+
+	/** Year, rating, runtime and TMDB score for a movie card (unknown parts are skipped). */
+	function movieFacts(row: CardRow): string[] {
+		const released = releasedValueGetter({ data: row });
+		const score = tmdbScoreValueGetter({ data: row });
+		return [
+			released ? released.slice(0, 4) : null,
+			ratedValueGetter({ data: row }),
+			row.length ? formatDuration(row.length, row.lengthUnits) : null,
+			score != null ? `TMDB ${formatTmdbScore(score)}` : null,
+		].filter((f): f is string => !!f);
+	}
 
 	function thumbSrc(row: CardRow): string | null {
 		const videoId = extractVideoIdFromUrl(row.url);
@@ -103,6 +127,19 @@
 							{row.name}
 						</div>
 					{/if}
+				{:else if isMovie(row)}
+					<div
+						data-testid={`card-movie-facts-${row.id}`}
+						class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+					>
+						{#each movieFacts(row) as fact, i (i)}
+							{#if i > 0}<span>&middot;</span>{/if}
+							<span>{fact}</span>
+						{/each}
+						{#if row.primaryCategory}
+							<span class="rounded bg-muted px-1.5 py-0.5 text-foreground">{row.primaryCategory.label}</span>
+						{/if}
+					</div>
 				{:else}
 					<div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
 						{#if row.channelTitle}

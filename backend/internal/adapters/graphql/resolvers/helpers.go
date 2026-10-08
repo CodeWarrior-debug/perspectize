@@ -75,6 +75,9 @@ func domainToModel(c *domain.Content) *model.Content {
 			slog.Warn("failed to parse content response JSON", "contentID", c.ID, "error", err)
 		} else {
 			m.Response = responseMap
+			if c.ContentType == domain.ContentTypeMovie {
+				m.Movie = responseMap
+			}
 		}
 
 		// Extract fields from the YouTube API response

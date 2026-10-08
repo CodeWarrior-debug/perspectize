@@ -5,12 +5,7 @@
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import {
-		parseGridParams,
-		serializeGridParams,
-		ALL_SEARCH_SCOPES,
-		type SearchScopeKey,
-	} from '$lib/utils/gridUrlState';
+	import { parseGridParams, serializeGridParams, searchScopesFor, type SearchScopeKey } from '$lib/utils/gridUrlState';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 
 	// Derive current grid params from URL
@@ -41,7 +36,12 @@
 		desc: 'Description',
 		channel: 'Channel',
 		tags: 'Tags',
+		cast: 'Cast',
+		director: 'Director',
 	};
+
+	// Cast and Director are offered (and on by default) only while the type filter includes Movie.
+	const availableScopes = $derived(searchScopesFor(gridParams.filters));
 
 	// Debounced search → URL update
 	let searchTimer: ReturnType<typeof setTimeout>;
@@ -67,7 +67,7 @@
 	}
 
 	const scopeSummary = $derived(
-		gridParams.qFields.length === ALL_SEARCH_SCOPES.length
+		gridParams.qFields.length === availableScopes.length
 			? 'All fields'
 			: gridParams.qFields.map((s) => SCOPE_LABELS[s]).join(', '),
 	);
@@ -119,7 +119,7 @@
 					</PopoverTrigger>
 					<PopoverContent align="end" class="w-56 p-2">
 						<p class="text-xs font-medium text-muted-foreground px-2 pb-1">Search in</p>
-						{#each ALL_SEARCH_SCOPES as scope (scope)}
+						{#each availableScopes as scope (scope)}
 							<label class="flex items-center gap-2 px-2 py-1.5 rounded-sm text-sm cursor-pointer hover:bg-accent">
 								<input
 									type="checkbox"

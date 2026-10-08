@@ -513,7 +513,8 @@ func TestGormContentRepository_List(t *testing.T) {
 	t.Run("all filters combined produce a single query", func(t *testing.T) {
 		db, mock := newMockDB(t)
 		ct := domain.ContentTypeYouTubeVideo
-		mock.ExpectQuery(`SELECT \* FROM "content" WHERE`).WillReturnRows(contentRows())
+		// View-count sort is a computed key, so the page also selects it for the cursor.
+		mock.ExpectQuery(`SELECT content\.\*, .* AS view_count FROM "content" WHERE`).WillReturnRows(contentRows())
 
 		got, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{
 			First:     cInt(3),

@@ -162,6 +162,73 @@ var contentSearchColumns = map[domain.ContentSearchField]string{
 	domain.ContentSearchFieldDescription:  "response->'items'->0->'snippet'->>'description' ILIKE ?",
 	domain.ContentSearchFieldChannelTitle: "response->'items'->0->'snippet'->>'channelTitle' ILIKE ?",
 	domain.ContentSearchFieldTags:         "(response->'items'->0->'snippet'->'tags')::text ILIKE ?",
+	// Movie people live in the response JSONB as arrays of {id,name,...}; one bound ? each.
+	// jsonb_typeof guards against a stored JSON null/scalar (COALESCE only covers SQL NULL).
+	domain.ContentSearchFieldCast: "EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(response->'cast') = 'array' THEN response->'cast' ELSE '[]'::jsonb END) p " +
+		"WHERE p->>'name' ILIKE ?)",
+	domain.ContentSearchFieldDirector: "EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(response->'directors') = 'array' THEN response->'directors' ELSE '[]'::jsonb END) p " +
+		"WHERE p->>'name' ILIKE ?)",
+}
+
+// applyPersonFilter matches movies by a TMDB person id in cast and/or directors using
+// JSONB containment. The id is marshalled in Go and bound as a parameter; role nil
+// means either role.
+//
+// No index serves this yet: at current movie volume a scan is cheaper. If EXPLAIN on
+// real data shows otherwise, add partial GIN indexes (jsonb_path_ops) on
+// response->'cast' and response->'directors' WHERE content_type = 'movie'; those only
+// apply when the query also filters to MOVIE, so pair personId with the type filter.
+func applyPersonFilter(query *gorm.DB, personID *int, role *domain.PersonRole) *gorm.DB {
+	if personID == nil {
+		return query
+	}
+	needle, err := json.Marshal([]map[string]int{{"id": *personID}})
+	if err != nil {
+		return query // unreachable: marshalling a map of ints cannot fail
+	}
+	// Literal (not a bound arg) so the planner can prove the partial-index predicate
+	// even under generic prepared plans. Person ids only mean something for movies.
+	movie := "content_type = '" + contentTypeToDBValue(domain.ContentTypeMovie) + "' AND "
+	switch {
+	case role != nil && *role == domain.PersonRoleCast:
+		return query.Where(movie+"response->'cast' @> ?::jsonb", string(needle))
+	case role != nil && *role == domain.PersonRoleDirector:
+		return query.Where(movie+"response->'directors' @> ?::jsonb", string(needle))
+	default:
+		return query.Where(movie+"(response->'cast' @> ?::jsonb OR response->'directors' @> ?::jsonb)", string(needle), string(needle))
+	}
+}
+
+// applyMovieColumnFilters applies the movie grid's per-column filters. All read the
+// shaped TMDB payload in the response JSONB. Rows without the key (non-movies, or
+// movies missing the value) yield NULL, so a set filter excludes them. Values are
+// always bound; releaseDate is an ISO string so lexical comparison is date order.
+func applyMovieColumnFilters(query *gorm.DB, f *domain.ContentFilter) *gorm.DB {
+	if f.GenreContains != nil && *f.GenreContains != "" {
+		query = query.Where("(response->'genres')::text ILIKE ?", "%"+*f.GenreContains+"%")
+	}
+	if len(f.AgeRating) > 0 {
+		query = query.Where("response->>'certification' IN ?", f.AgeRating)
+	}
+	if f.ReleasedAfter != nil {
+		query = query.Where("response->>'releaseDate' >= ?", *f.ReleasedAfter)
+	}
+	if f.ReleasedBefore != nil {
+		query = query.Where("response->>'releaseDate' <= ?", *f.ReleasedBefore)
+	}
+	if f.MinBoxOffice != nil {
+		query = query.Where("(response->>'revenue')::FLOAT8 >= ?", *f.MinBoxOffice)
+	}
+	if f.MaxBoxOffice != nil {
+		query = query.Where("(response->>'revenue')::FLOAT8 <= ?", *f.MaxBoxOffice)
+	}
+	if f.MinTmdbScore != nil {
+		query = query.Where("(response->>'voteAverage')::FLOAT8 >= ?", *f.MinTmdbScore)
+	}
+	if f.MaxTmdbScore != nil {
+		query = query.Where("(response->>'voteAverage')::FLOAT8 <= ?", *f.MaxTmdbScore)
+	}
+	return query
 }
 
 // maxSearchPhrases caps comma-separated phrases per search to bound query size.
@@ -234,6 +301,10 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		rules = buildContentSortRules(params.SortBy, params.SortOrder)
 	}
 
+	// The cursor is built from the last row's struct fields, so every computed sort
+	// expression must come back as a scanned column (C-02).
+	computedSelects := computedSortSelects(rules)
+
 	// Configure paginator options
 	opts := []paginator.Option{
 		paginator.WithRules(rules...),
@@ -269,6 +340,8 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		if params.Filter.Search != nil && *params.Filter.Search != "" {
 			query = applyContentSearch(query, *params.Filter.Search, params.Filter.SearchFields)
 		}
+		query = applyPersonFilter(query, params.Filter.PersonID, params.Filter.PersonRole)
+		query = applyMovieColumnFilters(query, params.Filter)
 		// View count filters (JSONB extraction)
 		if params.Filter.MinViewCount != nil {
 			query = query.Where("(response->'items'->0->'statistics'->>'viewCount')::BIGINT >= ?", *params.Filter.MinViewCount)
@@ -325,21 +398,11 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 	// along in the page query as an uncorrelated scalar subquery, which
 	// Postgres evaluates once: one round trip for page + count, not two.
 	countQuery := query.Session(&gorm.Session{})
-	selectCols := "content.*"
-	var selectArgs []interface{}
-	if params.IncludeTotalCount {
-		selectCols += ", (?) AS total_count"
-		selectArgs = append(selectArgs, countQuery.Session(&gorm.Session{}).Select("COUNT(*)"))
-	}
-	// The ADDED_BY cursor is built from the row's added_by value, so it must be selected.
-	for _, rule := range rules {
-		if rule.Key == "AddedBy" {
-			selectCols += ", " + addedBySortExpr + " AS added_by"
-			break
-		}
-	}
-	if selectCols != "content.*" {
-		query = query.Select(selectCols, selectArgs...)
+	switch {
+	case params.IncludeTotalCount:
+		query = query.Select("content.*"+computedSelects+", (?) AS total_count", countQuery.Session(&gorm.Session{}).Select("COUNT(*)"))
+	case computedSelects != "":
+		query = query.Select("content.*" + computedSelects)
 	}
 
 	// Execute pagination

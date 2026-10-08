@@ -3,7 +3,7 @@ import { gql } from 'graphql-request';
 export type { ContentFilterInput } from '$lib/utils/gridUrlState';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
-export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE';
+export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE';
 
 export interface ContentItem {
 	id: string;
@@ -27,6 +27,11 @@ export interface ContentItem {
 	publishedAt: string | null;
 	tags: string[] | null;
 	description: string | null;
+	// Source payload (JSON scalar). Movie rows read cast/revenue/etc. from it; YouTube rows carry the API items.
+	response?: Record<string, unknown> | null;
+	// MOVIE rows only: the shaped TMDB payload. List rows select this instead of `response`
+	// (so YouTube rows don't ship their snippet twice); null for every other type.
+	movie?: Record<string, unknown> | null;
 	primaryCategory: {
 		id: string;
 		wikidataQid: string;
@@ -104,6 +109,7 @@ export const LIST_CONTENT = gql`
 				publishedAt
 				tags
 				description
+				movie
 				primaryCategory {
 					id
 					wikidataQid
@@ -205,6 +211,8 @@ export const GET_CONTENT_DETAILS = gql`
 			publishedAt
 			tags
 			description
+			response
+			movie
 			primaryCategory {
 				id
 				wikidataQid
@@ -283,6 +291,28 @@ export const CREATE_CONTENT_FROM_YOUTUBE = gql`
 		}
 	}
 `;
+
+// Idempotent: the server find-or-creates the movie row, so an existing movie
+// comes back as a normal Content (no "alreadyExisted" flag).
+export const CREATE_CONTENT_FROM_MOVIE = gql`
+	mutation CreateContentFromMovie($input: CreateContentFromMovieInput!) {
+		createContentFromMovie(input: $input) {
+			id
+			name
+			url
+			contentType
+		}
+	}
+`;
+
+export interface CreateContentFromMovieResponse {
+	createContentFromMovie: {
+		id: string;
+		name: string;
+		url: string | null;
+		contentType: string;
+	};
+}
 
 export const UPDATE_CONTENT_SOURCE_DATA = gql`
 	mutation UpdateContentSourceData($contentId: IntID!) {

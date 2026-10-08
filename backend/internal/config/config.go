@@ -14,6 +14,10 @@ type Config struct {
 	YouTube  YouTubeConfig  `json:"youtube"`
 	Logging  LoggingConfig  `json:"logging"`
 
+	// TMDBReadAccessToken is the TMDB v4 read access token (TMDB_API_READ_ACCESS_TOKEN).
+	// Blank disables movie lookups without stopping the server.
+	TMDBReadAccessToken string `json:"tmdb_read_access_token,omitempty"`
+
 	// MessageRetentionMax caps how many of the newest messages each thread
 	// keeps. 0 (the default) disables the application-side retention sweep
 	// entirely — threads grow unbounded. Set via MESSAGE_RETENTION_MAX.
@@ -94,6 +98,10 @@ func Load(configPath string) (*Config, error) {
 
 	if ytAPIKey := os.Getenv("YOUTUBE_API_KEY"); ytAPIKey != "" {
 		cfg.YouTube.APIKey = ytAPIKey
+	}
+
+	if tmdbToken := os.Getenv("TMDB_API_READ_ACCESS_TOKEN"); tmdbToken != "" {
+		cfg.TMDBReadAccessToken = tmdbToken
 	}
 
 	// Unlike getEnvInt (security.go), 0 is a valid value here — it disables
