@@ -32,7 +32,7 @@ One new content type, `MOVIE`, added by TMDB movie URL or IMDb `tt` id, shown in
 **Searchable, by role (answers "movies Mel Gibson directed vs. acted in"):**
 - New `ContentSearchField` values `CAST` and `DIRECTOR`. `CAST` = name `ILIKE` over `response.cast[*].name`; `DIRECTOR` = same over `response.directors[*].name`. Each is its own scope, so searching `DIRECTOR` for "Mel Gibson" returns only the films he directed. Implemented as an `EXISTS (SELECT 1 FROM jsonb_array_elements(...))` expression in the existing `contentSearchColumns` map (one `?` placeholder, like TAGS).
 - New filter `personId: IntID` (+ optional `personRole: CAST | DIRECTOR`, default any) = exact id match via JSONB containment (`response->'cast' @> '[{"id":N}]'`). This is the dedupe-correct way to ask for one person's films.
-- One migration adds a **partial GIN index** (`jsonb_path_ops`) on the movie rows' cast and directors so containment is index-assisted. Migration is **written, not applied** (see Rollout).
+- One migration adds a **partial GIN index** (`jsonb_path_ops`) on the movie rows' cast and directors so containment is index-assisted. Migration is **written, not applied** (see Rollout). **Dropped 2026-10-08 before merge:** no measured need at current volume; revisit with EXPLAIN on real data.
 - Limitation, stated in the tooltip: only the top 15 cast are searchable.
 
 **Why not a `person` table now:** it buys "all films with X" and exact identity, both of which the id filter + GIN index already give for one type. Promote to `person` + `content_person` when a second type (TV) needs shared people. Revisit then.
