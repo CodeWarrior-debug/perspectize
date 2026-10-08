@@ -3,6 +3,7 @@ package tmdb
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -229,5 +230,32 @@ func TestParseMovieInput_RejectsShortIMDbID(t *testing.T) {
 	}
 	if _, _, err := ParseMovieInput("https://www.imdb.com/title/tt123/"); err == nil {
 		t.Error("expected error for 3-digit id in URL")
+	}
+}
+
+func TestShapeMovie_AdultFlagSurvivesShaping(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{"true", `{"id":1,"adult":true}`, true},
+		{"false", `{"id":1,"adult":false}`, false},
+		{"missing", `{"id":1}`, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			meta, err := ShapeMovie([]byte(tc.raw))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var out map[string]json.RawMessage
+			if err := json.Unmarshal(meta.Response, &out); err != nil {
+				t.Fatal(err)
+			}
+			if got := string(out["adult"]); got != fmt.Sprint(tc.want) {
+				t.Errorf("adult = %s, want %v", got, tc.want)
+			}
+		})
 	}
 }

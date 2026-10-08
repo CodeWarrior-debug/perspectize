@@ -194,6 +194,9 @@ func TestCreateFromMovie_CertificationPolicy(t *testing.T) {
 		{"PG-13 allowed", `{"certification":"PG-13"}`, false},
 		{"empty certification allowed", `{"certification":""}`, false},
 		{"missing certification allowed", `{"id":603}`, false},
+		{"adult true rejected", `{"adult":true}`, true},
+		{"adult false allowed", `{"adult":false,"certification":"R"}`, false},
+		{"adult true with PG-13 rejected", `{"adult":true,"certification":"PG-13"}`, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

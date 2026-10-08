@@ -480,8 +480,8 @@ func (s *ContentService) CreateFromMovie(ctx context.Context, rawURL string, use
 		return nil, fmt.Errorf("failed to fetch movie metadata")
 	}
 
-	// Policy: NC-17 movies are not enabled. Checked before any write.
-	if isNC17(metadata.Response) {
+	// Policy: NC-17 and TMDB-adult movies are not enabled. Checked before any write.
+	if movieNotAllowed(metadata.Response) {
 		return nil, domain.ErrContentNotAllowed
 	}
 
@@ -508,14 +508,16 @@ func (s *ContentService) CreateFromMovie(ctx context.Context, rawURL string, use
 	return created, nil
 }
 
-// isNC17 reports whether the shaped movie payload carries an NC-17 certification
-// (case-insensitive, whitespace-trimmed). Unparseable or empty payloads are allowed.
-func isNC17(response json.RawMessage) bool {
+// movieNotAllowed is the single content policy for movies: it rejects a shaped
+// movie payload that is NC-17 (case-insensitive, whitespace-trimmed) or flagged
+// adult by TMDB. Unparseable or empty payloads are allowed.
+func movieNotAllowed(response json.RawMessage) bool {
 	var shaped struct {
 		Certification string `json:"certification"`
+		Adult         bool   `json:"adult"`
 	}
 	if err := json.Unmarshal(response, &shaped); err != nil {
 		return false
 	}
-	return strings.EqualFold(strings.TrimSpace(shaped.Certification), "NC-17")
+	return shaped.Adult || strings.EqualFold(strings.TrimSpace(shaped.Certification), "NC-17")
 }

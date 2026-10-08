@@ -67,6 +67,7 @@ type tmdbMovie struct {
 	Genres              []struct {
 		Name string `json:"name"`
 	} `json:"genres"`
+	Adult   bool `json:"adult"`
 	Credits struct {
 		Cast []struct {
 			ID        int    `json:"id"`
@@ -121,6 +122,7 @@ type shapedMovie struct {
 	Year                int              `json:"year"`
 	Genres              []string         `json:"genres"`
 	Certification       string           `json:"certification"`
+	Adult               bool             `json:"adult"`
 	RuntimeMinutes      int              `json:"runtimeMinutes"`
 	RuntimeSecondsKnown bool             `json:"runtimeSecondsKnown"`
 	Budget              *int64           `json:"budget"`
@@ -192,6 +194,7 @@ func ShapeMovie(raw []byte) (*services.MovieMetadata, error) {
 		Year:                year,
 		Genres:              genres,
 		Certification:       usCertification(m),
+		Adult:               m.Adult,
 		RuntimeMinutes:      m.Runtime,
 		RuntimeSecondsKnown: false,
 		Budget:              nonZero(m.Budget),
