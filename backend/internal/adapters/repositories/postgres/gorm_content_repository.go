@@ -171,11 +171,13 @@ var contentSearchColumns = map[domain.ContentSearchField]string{
 }
 
 // applyPersonFilter matches movies by a TMDB person id in cast and/or directors using
-// JSONB containment (served by the partial GIN indexes). The id is marshalled in Go
-// and bound as a parameter; role nil means either role.
+// JSONB containment. The id is marshalled in Go and bound as a parameter; role nil
+// means either role.
 //
-// The partial GIN indexes (migration 000030) only apply when the query also filters
-// content_type = 'movie', so callers must pair personId with the MOVIE type filter.
+// No index serves this yet: at current movie volume a scan is cheaper. If EXPLAIN on
+// real data shows otherwise, add partial GIN indexes (jsonb_path_ops) on
+// response->'cast' and response->'directors' WHERE content_type = 'movie'; those only
+// apply when the query also filters to MOVIE, so pair personId with the type filter.
 func applyPersonFilter(query *gorm.DB, personID *int, role *domain.PersonRole) *gorm.DB {
 	if personID == nil {
 		return query
