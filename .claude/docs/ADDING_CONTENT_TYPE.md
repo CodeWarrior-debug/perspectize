@@ -60,8 +60,6 @@ The Movie type (PR #565) shipped without column filters even though the designer
 
 ---
 
----
-
 ## Decision 1: How Is Content Ingested?
 
 | Method | Example | What You Build |
