@@ -15,6 +15,8 @@ interface ImportMetaEnv {
 	readonly VITE_ONBOARDING_VIDEO_GUEST_PRODUCT?: string;
 	readonly VITE_ONBOARDING_VIDEO_HOW_ADD_VIDEO?: string;
 	readonly VITE_ONBOARDING_VIDEO_HOW_PERSPECTIVE?: string;
+	readonly VITE_SUPPORT_URL?: string;
+	readonly VITE_FEATURE_CONTRIBUTE_TAB?: string;
 }
 
 interface ImportMeta {
