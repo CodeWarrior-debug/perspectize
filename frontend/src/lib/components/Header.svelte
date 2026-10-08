@@ -3,7 +3,6 @@
 	import SignInTrigger from '$lib/components/auth/SignInTrigger.svelte';
 	import UserMenu from '$lib/components/auth/UserMenu.svelte';
 	import AddContentPopover from '$lib/components/AddContentPopover.svelte';
-	import AddMoviePopover from '$lib/components/AddMoviePopover.svelte';
 	import SettingsDialog from '$lib/components/SettingsDialog.svelte';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { page } from '$app/state';
@@ -56,7 +55,6 @@
 		<div class="flex items-center gap-2 md:gap-4 shrink-0">
 			<AuthShow when="signed-in">
 				<AddContentPopover triggerVariant="outline" />
-				<AddMoviePopover triggerVariant="outline" />
 				<button
 					type="button"
 					aria-label="Settings"

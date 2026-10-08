@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { QueryClient } from '@tanstack/svelte-query';
-import AddMoviePopover from '$lib/components/AddMoviePopover.svelte';
+import AddContentPopover from '$lib/components/AddContentPopover.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 
 // Uses the REAL useAddMovie hook (real createMutation) so the popover's effects see a genuinely
@@ -19,16 +19,17 @@ vi.mock('svelte-sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } })
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
 const URL_OK = 'https://www.themoviedb.org/movie/949';
+const PLACEHOLDER = /paste a link or type a reference/i;
 
 function renderPopover() {
 	const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-	return render(TestWrapper, { props: { queryClient, component: AddMoviePopover } });
+	return render(TestWrapper, { props: { queryClient, component: AddContentPopover } });
 }
 
 async function openForm() {
-	await fireEvent.click(screen.getByRole('button', { name: /add movie/i }));
+	await fireEvent.click(screen.getByRole('button', { name: /add content/i }));
 	await tick();
-	return screen.getByLabelText(/tmdb or imdb link/i) as HTMLInputElement;
+	return screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;
 }
 
 async function submit(input: HTMLInputElement, value: string) {
@@ -37,7 +38,7 @@ async function submit(input: HTMLInputElement, value: string) {
 	await fireEvent.click(screen.getByRole('button', { name: /^add$/i }));
 }
 
-describe('AddMoviePopover with the real useAddMovie mutation', () => {
+describe('AddContentPopover with the real useAddMovie mutation', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -51,11 +52,11 @@ describe('AddMoviePopover with the real useAddMovie mutation', () => {
 		await submit(input, URL_OK);
 
 		// In flight: the form must keep what the user typed (the open-effect must not re-run and wipe it).
-		await waitFor(() => expect(screen.getByLabelText(/tmdb or imdb link/i)).toBeDisabled());
-		expect(screen.getByLabelText(/tmdb or imdb link/i)).toHaveValue(URL_OK);
+		await waitFor(() => expect(screen.getByPlaceholderText(PLACEHOLDER)).toBeDisabled());
+		expect(screen.getByPlaceholderText(PLACEHOLDER)).toHaveValue(URL_OK);
 
 		resolveRequest({ createContentFromMovie: { id: '1', name: 'Heat' } });
-		await waitFor(() => expect(screen.queryByLabelText(/tmdb or imdb link/i)).not.toBeInTheDocument());
+		await waitFor(() => expect(screen.queryByPlaceholderText(PLACEHOLDER)).not.toBeInTheDocument());
 		expect(mocks.graphqlRequest).toHaveBeenCalledTimes(1);
 		expect(mocks.graphqlRequest.mock.calls[0][1]).toEqual({ input: { url: URL_OK } });
 	});
@@ -67,8 +68,8 @@ describe('AddMoviePopover with the real useAddMovie mutation', () => {
 		await submit(input, URL_OK);
 
 		expect(await screen.findByText(/could not add this movie/i)).toBeInTheDocument();
-		expect(screen.getByLabelText(/tmdb or imdb link/i)).toBeEnabled();
-		expect(screen.getByLabelText(/tmdb or imdb link/i)).toHaveValue(URL_OK);
+		expect(screen.getByPlaceholderText(PLACEHOLDER)).toBeEnabled();
+		expect(screen.getByPlaceholderText(PLACEHOLDER)).toHaveValue(URL_OK);
 	});
 
 	it('shows the exact server message and stays open for a CONTENT_NOT_ALLOWED rejection', async () => {
@@ -84,7 +85,7 @@ describe('AddMoviePopover with the real useAddMovie mutation', () => {
 
 		expect(await screen.findByText(message)).toBeInTheDocument();
 		expect(screen.queryByText(/could not add this movie/i)).not.toBeInTheDocument();
-		expect(screen.getByLabelText(/tmdb or imdb link/i)).toHaveValue(URL_OK);
+		expect(screen.getByPlaceholderText(PLACEHOLDER)).toHaveValue(URL_OK);
 	});
 
 	it('reopens after a success with an empty input and no stale state', async () => {
@@ -92,16 +93,15 @@ describe('AddMoviePopover with the real useAddMovie mutation', () => {
 		renderPopover();
 		const input = await openForm();
 		await submit(input, URL_OK);
-		await waitFor(() => expect(screen.queryByLabelText(/tmdb or imdb link/i)).not.toBeInTheDocument());
+		await waitFor(() => expect(screen.queryByPlaceholderText(PLACEHOLDER)).not.toBeInTheDocument());
 
 		const reopened = await openForm();
 		expect(reopened).toHaveValue('');
 		expect(screen.queryByText(/could not add/i)).not.toBeInTheDocument();
-		expect(screen.queryByText(/valid tmdb or imdb/i)).not.toBeInTheDocument();
 		// Still open: the stale success state must not close it again.
 		await tick();
 		await tick();
-		expect(screen.getByLabelText(/tmdb or imdb link/i)).toBeInTheDocument();
+		expect(screen.getByPlaceholderText(PLACEHOLDER)).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: /^add$/i })).toBeDisabled();
 	});
 
