@@ -2,15 +2,15 @@
 
 > ⚠️ Written without superpowers loaded — a superpowers-enabled session should review via writing-plans before this is executed.
 >
-> **Status: DRAFT — awaiting answers to [Open Questions](#open-questions).** Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status: Phase 1 approved (2026-10-08) — see [Decisions](#decisions). Phase 2 designed, not scheduled.** Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a "Contribute" section to the Settings dialog. Phase 1 ships a short blurb and a "Buy me a coffee" outbound link. Phase 2 grows it into three paths: support with money, contribute as a developer, help with QA. Adding a path means adding a data entry, not new UI.
+**Goal:** Add a "Contribute" section to the Settings dialog. Phase 1 ships a short blurb and a "Support Perspectize" outbound link to a **Stripe Payment Link** (customer chooses amount; payouts go straight to the bank; 2.9% + $0.30, no platform cut). Phase 2 grows it into three paths: support with money, contribute as a developer, help with QA. Adding a path means adding a data entry, not new UI.
 
 **Architecture:** This is frontend only. Settings is a modal (`SettingsDialog.svelte`), not a route. Its sections are a local `sections` array plus an `{#if}` chain keyed on `activeSection` `$state`, with no URL routing. We add a `contribute` entry and branch, and render a new `ContributePanel.svelte`. The panel maps over a typed `CONTRIBUTE_PATHS` array built in `$lib/contribute/config.ts`. Config reads build-time `import.meta.env.VITE_*` vars, as `$lib/onboarding/config.ts` already does. A path whose URL env var is unset or invalid drops out of the list. If no paths remain, or the flag is off, the tab is hidden.
 
 **Tech Stack:** Svelte 5 runes, shadcn-svelte (`src/lib/components/shadcn/`), Tailwind v4 theme tokens, `@lucide/svelte` per-icon imports, Vitest (jsdom `unit` project) + `@testing-library/svelte` + `jest-dom`.
 
-**Backend / DB changes:** None for Phase 1 or for the Phase 2 links. The one exception is beta-tester signup. It needs a backend user flag plus a migration only if signup is done in-app. With an external form link it needs none. See Q6.
+**Backend / DB changes:** None for Phase 1 or for the Phase 2 links. The one exception is beta-tester signup. It needs a backend user flag plus a migration only if signup is done in-app. With an external form link it needs none.
 
 ---
 
@@ -30,8 +30,8 @@
 | Demo tours | No tour opens Settings, so nothing breaks | `frontend/demo/` |
 
 **Deviations from the request, with reasons:**
-- `PUBLIC_BMC_URL` becomes **`VITE_BMC_URL`**. The app never uses `$env/static/public`. `frontend/CLAUDE.md` notes that `$env/dynamic/public` is undefined under Vitest, and `.env.example` lists only `VITE_*`. The build-time behaviour is the same.
-- The plan lives at `docs/plans/contribute-tab.md` as you asked. Repo convention is `docs/superpowers/plans/YYYY-MM-DD-*.md` (see Q9).
+- `PUBLIC_BMC_URL` becomes **`VITE_SUPPORT_URL`**: provider-neutral (Stripe now, swappable without code), and `VITE_*` because the app never uses `$env/static/public`. `frontend/CLAUDE.md` notes that `$env/dynamic/public` is undefined under Vitest, and `.env.example` lists only `VITE_*`. The build-time behaviour is the same.
+- The plan lives at `docs/plans/contribute-tab.md` as you asked. Repo convention is `docs/superpowers/plans/YYYY-MM-DD-*.md` .
 
 ---
 
@@ -44,7 +44,7 @@ import type { Component } from 'svelte';
 
 export interface ContributeLink {
 	id: string;
-	label: string;          // visible link text, e.g. "Buy me a coffee"
+	label: string;          // visible link text, e.g. "Support Perspectize"
 	href: string;           // validated https URL
 }
 
@@ -57,10 +57,10 @@ export interface ContributePath {
 }
 ```
 
-You asked for a flat `{id,title,description,href,icon}`. The Phase 2 paths have **1, 3 and 2 links** (BMC; repo / CONTRIBUTING / good-first-issue; bug template / beta signup), so I propose `links[]` on each path. Phase 1 is just one path with one link. Q1 asks you to pick.
+You asked for a flat `{id,title,description,href,icon}`. The Phase 2 paths have **1, 3 and 2 links** (Stripe, later + GitHub Sponsors; repo / CONTRIBUTING / good-first-issue; bug template / beta signup), so each path has `links[]`. Phase 1 is one path with one link.
 
 `buildContributePaths(env)` is a pure function. Tests call it directly, with no module reloading.
-- Each link's href comes from a constant (GitHub URLs derived from one `GITHUB_REPO`) or from an env var (`VITE_BMC_URL`, Phase 2 `VITE_BETA_SIGNUP_URL`).
+- Each link's href comes from a constant (GitHub URLs derived from one `GITHUB_REPO`) or from an env var (`VITE_SUPPORT_URL`, Phase 2 `VITE_BETA_SIGNUP_URL`).
 - `safeExternalUrl(value)` trims the value, parses it with `new URL`, and accepts **`https:` only**. That blocks a bad or `javascript:` env value from reaching an `href`.
 - Links with no valid href are dropped, then paths with no links are dropped.
 - Exports: `CONTRIBUTE_PATHS = buildContributePaths(import.meta.env)` and `CONTRIBUTE_TAB_ENABLED = flag && CONTRIBUTE_PATHS.length > 0`.
@@ -69,7 +69,7 @@ Phase 2 moves `GITHUB_REPO` and the issue-template URLs out of `FeedbackDialog.s
 
 ### Feature flag (ship dark)
 
-Add `VITE_FEATURE_CONTRIBUTE_TAB === 'true'`. This mirrors `VITE_DEMO_MODE`. It is a build-time flag, so turning it on in Sevalla needs a **rebuild/redeploy**, not just a restart (see Q3). The tab is also hidden automatically when `VITE_BMC_URL` is unset, so an incomplete config never shows an empty tab.
+Add `VITE_FEATURE_CONTRIBUTE_TAB === 'true'`. This mirrors `VITE_DEMO_MODE`. It is a build-time flag, so turning it on in Sevalla needs a **rebuild/redeploy**, not just a restart. The tab is also hidden automatically when `VITE_SUPPORT_URL` is unset, so an incomplete config never shows an empty tab.
 
 `SettingsDialog` turns `sections` into a filtered constant:
 `const sections = ALL_SECTIONS.filter(s => s.id !== 'contribute' || CONTRIBUTE_TAB_ENABLED)`.
@@ -90,7 +90,7 @@ Add `VITE_FEATURE_CONTRIBUTE_TAB === 'true'`. This mirrors `VITE_DEMO_MODE`. It 
 
 ### Settings nav a11y (small, optional)
 
-The nav buttons give no "selected" signal to assistive tech. I propose adding `aria-current={activeSection === section.id ? 'page' : undefined}` to the existing button: one attribute that helps every section. A full WAI-ARIA tabs pattern (`role="tablist"`, arrow-key roving focus) is a larger change and out of scope here. See Q5.
+The nav buttons give no "selected" signal to assistive tech. I propose adding `aria-current={activeSection === section.id ? 'page' : undefined}` to the existing button: one attribute that helps every section. A full WAI-ARIA tabs pattern (`role="tablist"`, arrow-key roving focus) is a larger change and out of scope here.
 
 ---
 
@@ -100,33 +100,33 @@ The nav buttons give no "selected" signal to assistive tech. I propose adding `a
 - Create: `frontend/src/lib/contribute/config.ts` — types, `safeExternalUrl`, `buildContributePaths`, `CONTRIBUTE_PATHS`, `CONTRIBUTE_TAB_ENABLED`
 - Create: `frontend/src/lib/components/contribute/ContributePanel.svelte`
 - Modify: `frontend/src/lib/components/SettingsDialog.svelte` — `contribute` section id and branch, flag filter, (optional) `aria-current`
-- Modify: `frontend/src/app.d.ts` — add `VITE_BMC_URL?`, `VITE_FEATURE_CONTRIBUTE_TAB?`
+- Modify: `frontend/src/app.d.ts` — add `VITE_SUPPORT_URL?`, `VITE_FEATURE_CONTRIBUTE_TAB?`
 - Modify: `frontend/.env.example` — document both (blank values)
 - Create: `frontend/tests/unit/contribute-config.test.ts`
 - Create: `frontend/tests/components/ContributePanel.test.ts`
 - Modify: `frontend/tests/components/SettingsDialog.test.ts` — tab shown when enabled, hidden when disabled
-- Ops (not in repo): set `VITE_BMC_URL` (and later the flag) as **build-time** env vars on the Sevalla static site `perspectize-frontend`
+- Ops (not in repo): set `VITE_SUPPORT_URL` (and later the flag) as **build-time** env vars on the Sevalla static site `perspectize-frontend`
 
 **Phase 2**
 - Create: `frontend/src/lib/contribute/github.ts` — `GITHUB_REPO`, issue/label/CONTRIBUTING URLs
 - Modify: `frontend/src/lib/components/FeedbackDialog.svelte` — import the URLs from `github.ts` (no behaviour change)
 - Modify: `frontend/src/lib/contribute/config.ts` — add `develop` and `qa` paths, plus `VITE_BETA_SIGNUP_URL`
 - Modify: `frontend/src/app.d.ts`, `frontend/.env.example` — `VITE_BETA_SIGNUP_URL`
-- Create: `CONTRIBUTING.md` (repo root) — needed before linking it (Q7)
+- Create: `CONTRIBUTING.md` (repo root) — needed before linking it
 - Modify: tests above for the new paths
-- Backend / migration **only if** Q6 picks in-app beta signup
+- Backend / migration only if beta signup ever moves in-app
 
 ---
 
 ## Phased task breakdown
 
-### Phase 1 — BMC link (build now)
+### Phase 1 — Stripe support link (build now)
 
 #### Task 1: Contribute config module + unit tests
 **Suggested subagent:** `svelte-frontend` (tests: `vitest-writer`)
 
 - [ ] Write `tests/unit/contribute-config.test.ts` first, against `buildContributePaths(env)` and `safeExternalUrl`:
-  - [ ] valid `https://buymeacoffee.com/x` → one `support` path with one link
+  - [ ] valid `https://buy.stripe.com/test_abc` → one `support` path with one link
   - [ ] unset, empty or whitespace → `[]`
   - [ ] `http://…`, `javascript:alert(1)`, `not a url` → rejected
   - [ ] the flag is true only for the exact string `'true'`; `CONTRIBUTE_TAB_ENABLED` is false when the paths are empty even with the flag on
@@ -138,7 +138,7 @@ The nav buttons give no "selected" signal to assistive tech. I propose adding `a
 **Suggested subagent:** `svelte-frontend` (tests: `vitest-writer`)
 
 - [ ] Write `tests/components/ContributePanel.test.ts` against fixture `paths`:
-  - [ ] `getByRole('link', { name: /buy me a coffee/i })` has `href` equal to the fixture URL, `target="_blank"` and `rel="noopener noreferrer"`
+  - [ ] `getByRole('link', { name: /support perspectize/i })` has `href` equal to the fixture URL, `target="_blank"` and `rel="noopener noreferrer"`
   - [ ] the accessible name includes "(opens in a new tab)"
   - [ ] each path title is a `heading` (level 3), and icons are `aria-hidden`
   - [ ] every link is an `<a>` with an `href`, and none has `tabindex="-1"` (so it is keyboard-reachable); `link.focus()` makes it `document.activeElement`
@@ -150,16 +150,16 @@ The nav buttons give no "selected" signal to assistive tech. I propose adding `a
 **Suggested subagent:** `svelte-frontend` (tests: `vitest-writer`)
 
 - [ ] Extend `SettingsDialog.test.ts`. Mock `$lib/contribute/config` (`vi.mock`) so the enabled and disabled states are deterministic:
-  - [ ] enabled: a "Contribute" nav button exists; clicking it shows the BMC link and hides "Restart onboarding"
+  - [ ] enabled: a "Contribute" nav button exists; clicking it shows the Stripe support link and hides "Restart onboarding"
   - [ ] disabled: no "Contribute" button
-  - [ ] (if Q5 is yes) the active nav button has `aria-current="page"` and the others don't
-- [ ] Add `'contribute'` to `SectionId`, the section entry (placed **after** `feedback`, see Q8), the flag filter and the `{:else if}` branch
+  - [ ] the active nav button has `aria-current="page"` and the others don't
+- [ ] Add `'contribute'` to `SectionId`, the section entry (placed **after** `feedback`), the flag filter and the `{:else if}` branch
 - [ ] Full verification: `pnpm run test:run`, `pnpm run check`, `pnpm exec prettier --check` on the touched files
 - [ ] Label the PR `needs-demo-video`, since it is user-visible and cloud sessions can't do the Clerk browser check
 
 #### Task 4: Ship dark → enable
 - [ ] Merge with the flag unset (the tab is invisible in prod)
-- [ ] Set `VITE_BMC_URL` + `VITE_FEATURE_CONTRIBUTE_TAB=true` as Sevalla build env vars, rebuild, and smoke-test the link
+- [ ] Set `VITE_SUPPORT_URL` + `VITE_FEATURE_CONTRIBUTE_TAB=true` as Sevalla build env vars, rebuild, and smoke-test the link
 - [ ] **Code review** (Opus): `code-reviewer` is Go-only, so the orchestrator reviews the frontend diff directly
 
 ### Phase 2 — three paths (design now, build later)
@@ -177,20 +177,22 @@ The nav buttons give no "selected" signal to assistive tech. I propose adding `a
 - [ ] Add a `qa` path: bug-report template (shared URL), beta signup (`VITE_BETA_SIGNUP_URL`, dropped when unset)
 - [ ] Config tests: three paths when everything is set; the beta link drops cleanly when unset. Panel tests need no change beyond fixtures, which is the data-driven acceptance check
 
-#### Task 8 (conditional on Q6 = in-app): beta signup backend
+#### Task 8 (only if signup moves in-app): beta signup backend
 - [ ] Separate plan: a `db-migration` user column, a `graphql-designer` mutation, a `go-backend` service. **Not designed here.**
 
 ---
 
-## Open questions
+## Decisions
 
-1. **Data shape:** use `links[]` per path (proposed: the Developer path has 3 links, QA has 2), or keep it flat with one href per entry (then Developer becomes 3 separate cards)?
-2. **Env var name:** OK to use `VITE_BMC_URL` rather than `PUBLIC_BMC_URL` (matches the repo; `$env` isn't used anywhere)? And what is the BMC URL? I'll put it only in Sevalla and in your local `.env`, never in code.
-3. **Flag mechanics:** is a build-time env flag acceptable, given that toggling it needs a Sevalla rebuild? The alternative is a runtime flag (a server-provided config or flag service), which means backend work and is overkill here in my view.
-4. **Visibility:** the gear is shown **only to signed-in users**, so signed-out visitors (likely a big share of would-be supporters) never see Contribute. Keep it like that for Phase 1, or also expose it elsewhere later (e.g. a footer link)?
-5. **Nav a11y:** add `aria-current` to the existing section buttons (one attribute, helps all tabs)? Yes or no. A full ARIA tabs pattern with arrow keys would be a separate change.
-6. **Beta signup:** use an external form link (Tally / Google Form / GitHub Discussions; no backend) or in-app opt-in (backend + migration)? I recommend the external link for Phase 2.
-7. **CONTRIBUTING.md:** shall Phase 2 write it, or link to the README's Contributing section for now?
-8. **Tab order and label:** put "Contribute" last (after Send Feedback)? Label it "Contribute" or "Support Perspectize"? Do you have copy for the blurb, or should I draft it?
-9. **Plan location:** keep `docs/plans/contribute-tab.md`, or move it to the repo convention `docs/superpowers/plans/2026-10-08-contribute-tab-plan.md`?
-10. **a11y tooling:** stick with role- and attribute-based assertions (the current repo practice), or add `vitest-axe` as a dev dependency for an automated axe pass on the panel?
+Provider: **Stripe Payment Link** (user decision). GitHub Sponsors is deferred to the Phase 2 developer path, because supporters there need a GitHub account. Other questions use these defaults; push back on the PR if any is wrong.
+
+1. **Data shape:** `links[]` per path.
+2. **Env var:** `VITE_SUPPORT_URL`. The real URL lives only in Sevalla and the local env file.
+3. **Flag:** build-time `VITE_FEATURE_CONTRIBUTE_TAB`. Toggling it needs a Sevalla rebuild.
+4. **Visibility:** signed-in only (the gear is unchanged). Revisit with a footer link later.
+5. **Nav a11y:** add `aria-current="page"` to the active section button. A full ARIA tabs pattern is out of scope.
+6. **Beta signup:** an external form link (no backend), in Phase 2.
+7. **CONTRIBUTING.md:** Phase 2 writes it.
+8. **Placement:** last, after Send Feedback. Label "Contribute"; blurb drafted in the PR.
+9. **Plan location:** `docs/plans/contribute-tab.md`, as requested.
+10. **a11y tests:** role- and attribute-based assertions. No new `vitest-axe` dependency.
