@@ -95,6 +95,8 @@ function undecidedSurfaces(state) {
         out.push({ surface: 'Mobile card list', question: 'Which facts replace views / likes / channel on the card?' });
     if (empty(d.duplicateFeedback))
         out.push({ surface: 'Add form: duplicate feedback', question: 'What does the form show when the item already exists (already-existed flag)?' });
+    if (empty(d.addContentEntry))
+        out.push({ surface: 'Add form: Add Content entry', question: 'How does detectContentType recognise this type (link patterns / reference syntax), what is its select label, and which extra fields or notices appear only for it?' });
     if (empty(d.contentPolicy))
         out.push({ surface: 'Content policy', question: 'Is there an adult / rating gate, and what is the exact rejection message?' });
     if (!layoutOf(state, d.id).attribution)
@@ -324,6 +326,7 @@ export function buildSpec(state) {
             ? `Adapter: \`backend/internal/adapters/${d.id}/\` against ${d.enrichment}.`
             : 'Adapter: none.',
         `Schema: add \`${d.enumValue}\` to the ContentType enum and a \`createContentFrom${d.label.replace(/[^A-Za-z0-9]/g, '')}\` mutation + input in \`backend/schema.graphql\`, then \`make graphql-gen\`.`,
+        'Add form: extend AddContentPopover (detectContentType + type select); never add a header button.',
         `Service: \`CreateFrom${d.label.replace(/[^A-Za-z0-9]/g, '')}\` in \`content_service.go\` — dedupe on ${d.identity}, validate, enrich, persist.`,
         migrations.length
             ? `Migration: promote ${migrations.map((c) => c.id).join(', ')} to columns (check \`ls backend/migrations/ | tail -5\` for the next number).`

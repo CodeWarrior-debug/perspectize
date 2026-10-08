@@ -70,6 +70,8 @@ export interface ContentTypeProfile {
   thumbnail: string;
   /** Adult / rating gate and the exact rejection message. Empty = undecided. */
   contentPolicy?: string;
+  /** How the type enters the Add Content window: detection pattern, select label, extra fields/notices. Empty = undecided. */
+  addContentEntry?: string;
   /** What the add form shows when the item already exists. Empty = undecided. */
   duplicateFeedback?: string;
   /** Facts the mobile card list shows in place of views / likes / channel. Empty = undecided. */
@@ -171,7 +173,8 @@ export const TYPES: ContentTypeProfile[] = [
     contentPolicy: 'Reject NC-17 and TMDB adult:true (CONTENT_NOT_ALLOWED)',
     mobileCardFields: 'year, rating, runtime, TMDB score',
     searchFields: 'title, cast, director',
-    duplicateFeedback: 'TBD'
+    duplicateFeedback: 'TBD',
+    addContentEntry: 'Autodetect TMDB/IMDb movie links; select label Movie; TMDB attribution notice only for Movie'
   },
   {
     id: 'book',

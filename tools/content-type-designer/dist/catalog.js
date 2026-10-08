@@ -46,7 +46,8 @@ export const TYPES = [
         contentPolicy: 'Reject NC-17 and TMDB adult:true (CONTENT_NOT_ALLOWED)',
         mobileCardFields: 'year, rating, runtime, TMDB score',
         searchFields: 'title, cast, director',
-        duplicateFeedback: 'TBD'
+        duplicateFeedback: 'TBD',
+        addContentEntry: 'Autodetect TMDB/IMDb movie links; select label Movie; TMDB attribution notice only for Movie'
     },
     {
         id: 'book',

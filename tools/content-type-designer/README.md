@@ -139,7 +139,7 @@ Two deterministic documents, copyable or downloadable:
    `.claude/docs/ADDING_CONTENT_TYPE.md`.
    *Undecided surfaces* lists the rows of that guide's "Per-type surface
    checklist" the form cannot answer: the optional profile fields Content
-   policy, Duplicate-add feedback, Mobile card facts and Search fields (empty
+   policy, Duplicate-add feedback, Add Content entry, Mobile card facts and Search fields (empty
    or "TBD" means undecided), a missing details-view attribution, plus rows no
    field covers (computed sort keys, data modes, add-form errors, formatting
    edge values, rollout). Each is a blocker until answered in the spec.
