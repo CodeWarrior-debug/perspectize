@@ -52,7 +52,7 @@ The Movie type (PR #565) shipped without column filters even though the designer
 | **Search** | Which fields does the search box cover for this type? Does the scope picker need new options? | `ContentSearchField` repo test + scope-picker test |
 | **Details modal** ✱ | Type-specific layout; no YouTube-only controls (embed, channel link, etc.). | ActivityDetailsModal test per type state |
 | **Mobile card list** ✱ | Which facts replace views / likes / channel? | Card-list component test for this type |
-| **Add form** ✱ | Accepted inputs? Duplicate-add feedback (surface the `already existed` flag, not a silent success)? Specific error messages per failure? Does the popover close on success? | Form/hook tests for each state: success, duplicate, each error, closes on success |
+| **Add form** ✱ | A new type joins the existing Add Content window (`AddContentPopover`); **never a new header button or popover.** How does `detectContentType` recognise this type's input (link patterns / reference syntax)? What label does it get in the type select? Which extra fields or notices appear only for this type (e.g. attribution)? Accepted inputs, and which ones the description/placeholder names (common forms only; don't advertise niche ones such as bare ids)? Duplicate-add feedback (surface the `already existed` flag, not a silent success)? Specific error messages per failure? Does the window close on success? | `detectContentType` unit cases; `AddContentPopover` states: autodetect ("Detected: <type>"), manual select via "Change type", submit calls the type's mutation, success closes, each error, type-only notice shown only for this type |
 | **Content policy** ✱ | Adult / rating gate and the exact message (Movie: NC-17 and TMDB `adult: true` are rejected with `CONTENT_NOT_ALLOWED`). | Service tests per rejected input; frontend test showing the server message |
 | **Licensing / attribution** | Required attribution text, logo, API terms of use? | Details-modal attribution test |
 | **Formatting edge values** ✱ | null, 0, huge ($1T, not $1000B), tiny (<1%, not 0%). | `formatting.test.ts` cases for each |
@@ -118,8 +118,11 @@ Is the field unique to this content type?
 
 ## Decision 5: Frontend Form Approach
 
-| Approach | When | Example |
-|----------|------|---------|
+**Rule:** extend `AddContentPopover.svelte` (one input, `detectContentType` autodetect, "Change type" select, per-type fields and notices). Never add a new header button or popover for a type.
+
+Why: one entry point for every type; header buttons don't scale as types are added.
+
+----------|------|---------|
 | **New component** (`AddArticlePopover.svelte`) | Different form fields than YouTube | Article needs title + author fields |
 | **Extend existing** (generic `AddContentPopover`) | Same form shape (just a URL input) | Podcast URL works same as YouTube |
 | **Unified with type selector** | User picks type, form adapts | Dropdown: YouTube / Article / Podcast |
@@ -268,7 +271,14 @@ export function validateArticleUrl(url: string): boolean {
 
 ### Step J: Frontend — Add Content Form
 
-Create component and mutation hook (e.g., `AddArticlePopover.svelte` + `useAddArticle.ts`).
+Extend `AddContentPopover.svelte`; do not create a new popover or header button.
+
+- Teach `detectContentType` to recognise the type's input and give it a label in the type select.
+- Add the per-type fields, submit path and any type-only notice (e.g. attribution) inside `AddContentPopover`.
+- Add a mutation hook (e.g., `useAddArticle.ts`) using the authenticated `graphqlRequest()` wrapper.
+- Copy names only the common input forms.
+
+Tests: `detectContentType` unit cases; `AddContentPopover` states (autodetect, manual select, submit calls the type's mutation, success closes, each error, type-only notice).
 
 ### Step K: Frontend — Table Renderers
 
@@ -411,5 +421,6 @@ What went wrong on each ✱ row in PR #565 (Movie), and how it was fixed. See th
 | Add form | The popover did not close after a successful add; the effect re-ran and reopened state. | Fixed by reading the reactive state inside `untrack`. |
 | Content policy | No adult gate, so NC-17 and TMDB `adult: true` titles could be added. | Rejected with `CONTENT_NOT_ALLOWED`; the form shows the server's message. |
 | Formatting edge values | $1T rendered as "$1000B"; values under 1% rendered "0%". | Fixed units and a "<1%" form; covered in `formatting.test.ts`. |
+| Add form: entry point | Shipped a separate Add Movie header button and advertised bare IMDb ids in the copy. | Folded into Add Content (autodetects TMDB/IMDb links, Movie in the type select, TMDB notice only for Movie); copy names links only. |
 | Add form: duplicate | Adding an existing movie gives no feedback. | **Still open:** a duplicate-add toast using the already-existed flag. |
 
