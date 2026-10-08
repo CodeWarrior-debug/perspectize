@@ -94,6 +94,7 @@ type ContentFilter struct {
 	ChannelTitle      *string                     `json:"channelTitle,omitempty"`
 	TagContains       *string                     `json:"tagContains,omitempty"`
 	DescriptionSearch *string                     `json:"descriptionSearch,omitempty"`
+	AddedByUsername   *string                     `json:"addedByUsername,omitempty"`
 	CreatedAfter      *string                     `json:"createdAfter,omitempty"`
 	CreatedBefore     *string                     `json:"createdBefore,omitempty"`
 	UpdatedAfter      *string                     `json:"updatedAfter,omitempty"`

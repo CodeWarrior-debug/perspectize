@@ -103,6 +103,7 @@
 	} from '$lib/utils/grid-config';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
+	import { useUsernames } from '$lib/queries/users/useUsernames.svelte';
 	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
 	import SortPickerDialog from '$lib/components/SortPickerDialog.svelte';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
@@ -377,7 +378,14 @@
 	}));
 
 	// Derived values from query
-	const rowData = $derived(contentQuery.data?.content.items ?? []);
+	// Rows get their adder's username from the cached users list (see useUsernames).
+	const usernames = useUsernames();
+	const rowData = $derived(
+		(contentQuery.data?.content.items ?? []).map((item) => ({
+			...item,
+			addedByUsername: usernames.byId.get(item.addedByUserID) ?? null,
+		})),
+	);
 	const detailsModalRow = $derived(rowData.find((item) => String(item.id) === detailsModalContentId) ?? null);
 	// A deep-linked item (`?open=<id>`, e.g. from a "Go to" toast or a verse jump) is
 	// often not on the loaded page — fetch just that row so the modal can still open.
@@ -791,6 +799,16 @@
 
 				filter: 'agTextColumnFilter',
 				headerTooltip: 'Channel name from YouTube API',
+			},
+			{
+				colId: 'user',
+				field: 'addedByUsername',
+				headerName: 'User',
+				flex: 0.8,
+				maxWidth: 160,
+
+				filter: 'agTextColumnFilter',
+				headerTooltip: 'User who added this item',
 			},
 			{
 				colId: 'tags',

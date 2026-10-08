@@ -375,6 +375,10 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		if params.Filter.DescriptionSearch != nil && *params.Filter.DescriptionSearch != "" {
 			query = query.Where("response->'items'->0->'snippet'->>'description' ILIKE ?", "%"+*params.Filter.DescriptionSearch+"%")
 		}
+		// Adder username filter (subquery on users, no JOIN — see ADDED_BY sort rule)
+		if params.Filter.AddedByUsername != nil && *params.Filter.AddedByUsername != "" {
+			query = query.Where("added_by_user_id IN (SELECT id FROM users WHERE username ILIKE ?)", "%"+*params.Filter.AddedByUsername+"%")
+		}
 		// Created/Updated date filters (direct columns)
 		if params.Filter.CreatedAfter != nil {
 			query = query.Where("created_at >= ?", *params.Filter.CreatedAfter)

@@ -98,9 +98,9 @@ describe('ActivityCardList', () => {
 	});
 
 	// Gap #13's duration inconsistency: the card used to always print a
-	// duration segment, showing a bare "—" for missing length; UserActivityView
-	// hides the whole segment instead. The card now matches that.
-	it('hides the duration segment entirely (no "—") when length is missing, matching UserActivityView', () => {
+	// duration segment, showing a bare "—" for missing length; it now hides the
+	// whole segment instead.
+	it('hides the duration segment entirely (no "—") when length is missing', () => {
 		render(ActivityCardList, {
 			props: {
 				rowData: [{ ...rowData[0], length: null, lengthUnits: null }],

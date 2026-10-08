@@ -87,6 +87,12 @@ func intSliceToInt64Array(ints []int) Int64Array {
 	return result
 }
 
+// addedBySortExpr is the ADDED_BY sort key: the adder's lowercased username, as a
+// correlated scalar subquery rather than a JOIN (the paginator splices it into ORDER BY
+// and the cursor WHERE, and the list query stays single-table). It is listed in
+// computedSortColumns, so List selects it AS added_by for the cursor.
+const addedBySortExpr = "LOWER((SELECT u.username FROM users u WHERE u.id = content.added_by_user_id))"
+
 // computedSortColumns maps a content sort rule Key whose value is computed (no real
 // column) to the alias List selects it under. Each alias is the column tag of the
 // matching read-only ContentModel field, which is how gorm-cursor-paginator reads the
@@ -100,6 +106,7 @@ var computedSortColumns = map[string]string{
 	"BoxOffice":    "box_office",
 	"VsBudget":     "vs_budget",
 	"AgeRating":    "age_rating",
+	"AddedBy":      "added_by",
 }
 
 // computedSortSelects returns the ", (expr) AS alias" select-list suffix for every
@@ -217,6 +224,13 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 			Key:             "ChannelTitle",
 			Order:           paginatorOrder,
 			SQLRepr:         "response->'items'->0->'snippet'->>'channelTitle'",
+			NULLReplacement: "",
+		}
+	case domain.ContentSortByAddedBy:
+		return paginator.Rule{
+			Key:             "AddedBy",
+			Order:           paginatorOrder,
+			SQLRepr:         addedBySortExpr,
 			NULLReplacement: "",
 		}
 	case domain.ContentSortByLength:

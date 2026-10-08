@@ -509,6 +509,7 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		params.Filter.ChannelTitle = filter.ChannelTitle
 		params.Filter.TagContains = filter.TagContains
 		params.Filter.DescriptionSearch = filter.DescriptionSearch
+		params.Filter.AddedByUsername = filter.AddedByUsername
 		params.Filter.CreatedAfter = filter.CreatedAfter
 		params.Filter.CreatedBefore = filter.CreatedBefore
 		params.Filter.UpdatedAfter = filter.UpdatedAfter

@@ -113,7 +113,7 @@ describe('durationComparator', () => {
 // Column-picker registry
 // ---------------------------------------------------------------------------
 describe('column-picker registry', () => {
-	it('DATA_COLUMNS holds the 24 user-togglable data columns', () => {
+	it('DATA_COLUMNS holds the 25 user-togglable data columns', () => {
 		expect(DATA_COLUMNS.map((c) => c.colId)).toEqual([
 			'type',
 			'category',
@@ -130,6 +130,7 @@ describe('column-picker registry', () => {
 			'tmdbScore',
 			'publishDate',
 			'channel',
+			'user',
 			'tags',
 			'description',
 			'budget',
@@ -162,13 +163,13 @@ describe('column-picker registry', () => {
 		}
 	});
 
-	it('togglableColIds(false) returns only the 24 data columns', () => {
+	it('togglableColIds(false) returns only the 25 data columns', () => {
 		expect(togglableColIds(false)).toEqual(DATA_COLUMNS.map((c) => c.colId));
 	});
 
-	it('togglableColIds(true) returns all 27 columns', () => {
+	it('togglableColIds(true) returns all 28 columns', () => {
 		const ids = togglableColIds(true);
-		expect(ids).toHaveLength(27);
+		expect(ids).toHaveLength(28);
 		expect(ids).toEqual([...DATA_COLUMNS.map((c) => c.colId), ...INTERNAL_COLUMNS.map((c) => c.colId)]);
 	});
 
@@ -355,6 +356,44 @@ describe('filterContentRows', () => {
 });
 
 // ---------------------------------------------------------------------------
+// User column (adder's username, filled in client-side from the users list)
+// ---------------------------------------------------------------------------
+describe('user column', () => {
+	it('is offered in the sort picker', () => {
+		expect(SORTABLE_COLUMNS.map((c) => c.colId)).toContain('user');
+	});
+
+	it('sorts case-insensitively by username, ascending and descending', () => {
+		const rows = [
+			row({ id: 'a', addedByUsername: 'bob' }),
+			row({ id: 'b', addedByUsername: 'Ann' }),
+			row({ id: 'c', addedByUsername: 'cy' }),
+		];
+		const asc = [...rows].sort((x, y) => compareContentBySorts(x, y, [{ col: 'user', dir: 'asc' }]));
+		expect(asc.map((r) => r.id)).toEqual(['b', 'a', 'c']);
+		const desc = [...rows].sort((x, y) => compareContentBySorts(x, y, [{ col: 'user', dir: 'desc' }]));
+		expect(desc.map((r) => r.id)).toEqual(['c', 'a', 'b']);
+	});
+
+	it('sorts rows with no resolved username last in both directions', () => {
+		const rows = [row({ id: 'n', addedByUsername: null }), row({ id: 'a', addedByUsername: 'ann' })];
+		for (const dir of ['asc', 'desc'] as const) {
+			const sorted = [...rows].sort((x, y) => compareContentBySorts(x, y, [{ col: 'user', dir }]));
+			expect(sorted.map((r) => r.id)).toEqual(['a', 'n']);
+		}
+	});
+
+	it('filters by username substring, case-insensitively', () => {
+		const rows = [
+			row({ id: 'a', addedByUsername: 'Annabel' }),
+			row({ id: 'b', addedByUsername: 'bob' }),
+			row({ id: 'c', addedByUsername: null }),
+		];
+		const out = filterContentRows(rows, { user: { filterType: 'text', type: 'contains', filter: 'ANN' } });
+		expect(out.map((r) => r.id)).toEqual(['a']);
+	});
+});
+
 // Client-only sort columns (Released, TMDB Score)
 // ---------------------------------------------------------------------------
 describe('client-only sort columns', () => {

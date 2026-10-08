@@ -2310,6 +2310,8 @@ enum ContentSortBy {
   BOX_OFFICE
   VS_BUDGET
   AGE_RATING
+  # Username of the user who added the content (case-insensitive)
+  ADDED_BY
 }
 
 enum SortOrder {
@@ -2459,6 +2461,8 @@ input ContentFilter {
   channelTitle: String       # ILIKE search
   tagContains: String        # Tag text contains
   descriptionSearch: String  # ILIKE search on description
+  # ILIKE search on the username of the user who added the content
+  addedByUsername: String
   # Record date filters
   createdAfter: String
   createdBefore: String
@@ -11883,7 +11887,7 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
+	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12065,6 +12069,13 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.DescriptionSearch = data
+		case "addedByUsername":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addedByUsername"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AddedByUsername = data
 		case "createdAfter":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("createdAfter"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)

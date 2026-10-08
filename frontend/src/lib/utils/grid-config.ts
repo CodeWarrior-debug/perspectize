@@ -360,6 +360,16 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		filterValue: (row) => row.channelTitle?.toLowerCase() ?? null,
 	},
 	{
+		colId: 'user',
+		label: 'User',
+		picker: 'data',
+		sortable: true,
+		sortValue: (row) => row.addedByUsername?.toLowerCase() ?? null,
+		serverSort: 'ADDED_BY',
+		filterKey: 'user',
+		filterValue: (row) => row.addedByUsername?.toLowerCase() ?? null,
+	},
+	{
 		colId: 'tags',
 		label: 'Tags',
 		picker: 'data',
@@ -463,6 +473,8 @@ export function defaultColumnVisibility(
 		'views',
 		'likes',
 		'percentLiked',
+		// Picker-only: adding it to the lg set overflows the 1212px grid (movieColumns.test.ts).
+		'user',
 		'tags',
 		'description',
 		...MOVIE_DEFAULT_COLS,
