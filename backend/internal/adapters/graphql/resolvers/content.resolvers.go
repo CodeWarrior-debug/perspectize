@@ -16,6 +16,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 // PrimaryCategory is the resolver for the primaryCategory field.
@@ -201,6 +202,37 @@ func (r *mutationResolver) CreateContentFromYouTube(ctx context.Context, input m
 		Content:        domainToModel(content),
 		AlreadyExisted: false,
 	}, nil
+}
+
+// CreateContentFromMovie is the resolver for the createContentFromMovie field.
+func (r *mutationResolver) CreateContentFromMovie(ctx context.Context, input model.CreateContentFromMovieInput) (*model.Content, error) {
+	// Identity comes from the session only; the input carries just the URL.
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+
+	content, err := r.ContentService.CreateFromMovie(ctx, input.URL, authUser.ID)
+	// Idempotent duplicate: return the existing row.
+	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
+		return domainToModel(content), nil
+	}
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrInvalidInput):
+			return nil, fmt.Errorf("invalid movie URL: use a TMDB or IMDb movie link")
+		case errors.Is(err, domain.ErrNotFound):
+			return nil, fmt.Errorf("movie not found")
+		case errors.Is(err, domain.ErrContentNotAllowed):
+			return nil, &gqlerror.Error{
+				Message:    domain.ErrContentNotAllowed.Error(),
+				Extensions: map[string]any{"code": "CONTENT_NOT_ALLOWED"},
+			}
+		}
+		// Details are already logged server-side by the service layer.
+		return nil, fmt.Errorf("failed to create content from movie")
+	}
+	return domainToModel(content), nil
 }
 
 // CreateContentFromPassage is the resolver for the createContentFromPassage field.
@@ -458,6 +490,16 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		params.Filter.MaxLengthSeconds = filter.MaxLengthSeconds
 		params.Filter.Search = filter.Search
 		params.Filter.SearchFields = filter.SearchFields
+		params.Filter.PersonID = filter.PersonID
+		params.Filter.PersonRole = filter.PersonRole
+		params.Filter.GenreContains = filter.GenreContains
+		params.Filter.AgeRating = filter.AgeRating
+		params.Filter.ReleasedAfter = filter.ReleasedAfter
+		params.Filter.ReleasedBefore = filter.ReleasedBefore
+		params.Filter.MinBoxOffice = filter.MinBoxOffice
+		params.Filter.MaxBoxOffice = filter.MaxBoxOffice
+		params.Filter.MinTmdbScore = filter.MinTmdbScore
+		params.Filter.MaxTmdbScore = filter.MaxTmdbScore
 		params.Filter.MinViewCount = filter.MinViewCount
 		params.Filter.MaxViewCount = filter.MaxViewCount
 		params.Filter.MinLikeCount = filter.MinLikeCount

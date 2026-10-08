@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
@@ -20,6 +21,7 @@ type ContentService struct {
 	repo          repositories.ContentRepository
 	youtubeClient portservices.YouTubeClient
 	bibleRepo     repositories.BibleReferenceRepository
+	movieClient   portservices.MovieClient
 }
 
 // ContentServiceOption configures optional ContentService dependencies.
@@ -31,10 +33,11 @@ func WithBibleReference(repo repositories.BibleReferenceRepository) ContentServi
 }
 
 // NewContentService creates a new content service
-func NewContentService(repo repositories.ContentRepository, yt portservices.YouTubeClient, opts ...ContentServiceOption) *ContentService {
+func NewContentService(repo repositories.ContentRepository, yt portservices.YouTubeClient, movie portservices.MovieClient, opts ...ContentServiceOption) *ContentService {
 	s := &ContentService{
 		repo:          repo,
 		youtubeClient: yt,
+		movieClient:   movie,
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -424,4 +427,97 @@ func (s *ContentService) PassageInterlinear(ctx context.Context, startVerseID, e
 		return nil, err
 	}
 	return &domain.PassageInterlinear{Verses: verses}, nil
+}
+
+// ErrMovieClientUnavailable is returned by CreateFromMovie when the service was
+// built without a movie client. Resolvers show clients a generic message.
+var ErrMovieClientUnavailable = errors.New("movie lookup is unavailable: no movie client configured")
+
+// CreateFromMovie creates MOVIE content from a TMDB or IMDb movie URL (or bare IMDb id),
+// attributed to the given user. If the movie already exists, returns the existing content
+// along with ErrAlreadyExists. Duplicates are detected by canonical TMDB URL before any
+// metadata fetch, so a repeat add costs no TMDB metadata call.
+func (s *ContentService) CreateFromMovie(ctx context.Context, rawURL string, userID int) (*domain.Content, error) {
+	tmdbID, imdbID, err := tmdb.ParseMovieInput(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidInput, err)
+	}
+
+	if s.movieClient == nil {
+		slog.Error("movie lookup requested but no movie client is configured", "userID", userID)
+		return nil, ErrMovieClientUnavailable
+	}
+
+	// IMDb ids must be resolved to a TMDB id so both URL forms dedupe to one row.
+	if tmdbID == 0 {
+		tmdbID, err = s.movieClient.FindMovieByIMDbID(ctx, imdbID)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				return nil, fmt.Errorf("%w: movie not found", domain.ErrNotFound)
+			}
+			slog.Error("failed to resolve IMDb id", "imdbID", imdbID, "userID", userID, "error", err)
+			return nil, fmt.Errorf("failed to fetch movie metadata")
+		}
+	}
+
+	canonicalURL := tmdb.CanonicalMovieURL(tmdbID)
+
+	existing, err := s.repo.GetByURL(ctx, canonicalURL)
+	if err == nil && existing != nil {
+		return existing, domain.ErrAlreadyExists
+	}
+	if err != nil && !errors.Is(err, domain.ErrNotFound) {
+		return nil, fmt.Errorf("failed to check existing content: %w", err)
+	}
+
+	metadata, err := s.movieClient.GetMovie(ctx, tmdbID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("%w: movie not found", domain.ErrNotFound)
+		}
+		// Log details server-side; clients get a generic message.
+		slog.Error("failed to fetch movie metadata", "tmdbID", tmdbID, "userID", userID, "error", err)
+		return nil, fmt.Errorf("failed to fetch movie metadata")
+	}
+
+	// Policy: NC-17 and TMDB-adult movies are not enabled. Checked before any write.
+	if movieNotAllowed(metadata.Response) {
+		return nil, domain.ErrContentNotAllowed
+	}
+
+	content := &domain.Content{
+		Name:          metadata.Title,
+		URL:           &canonicalURL,
+		ContentType:   domain.ContentTypeMovie,
+		AddedByUserID: userID,
+		Length:        metadata.RuntimeSeconds,
+		Response:      metadata.Response,
+	}
+	if metadata.RuntimeSeconds != nil {
+		lengthUnits := "seconds"
+		content.LengthUnits = &lengthUnits
+	}
+
+	created, alreadyExisted, err := s.repo.GetOrCreateByURL(ctx, content, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save content: %w", err)
+	}
+	if alreadyExisted {
+		return created, domain.ErrAlreadyExists
+	}
+	return created, nil
+}
+
+// movieNotAllowed is the single content policy for movies: it rejects a shaped
+// movie payload that is NC-17 (case-insensitive, whitespace-trimmed) or flagged
+// adult by TMDB. Unparseable or empty payloads are allowed.
+func movieNotAllowed(response json.RawMessage) bool {
+	var shaped struct {
+		Certification string `json:"certification"`
+		Adult         bool   `json:"adult"`
+	}
+	if err := json.Unmarshal(response, &shaped); err != nil {
+		return false
+	}
+	return shaped.Adult || strings.EqualFold(strings.TrimSpace(shaped.Certification), "NC-17")
 }

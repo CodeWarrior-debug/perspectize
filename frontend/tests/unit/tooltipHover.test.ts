@@ -41,7 +41,22 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 	it('has an entry for every specced column id', () => {
 		// Limitation: asserts the map, not that ActivityTable columnDefs reference it (AG Grid does not render in jsdom).
 		expect(Object.keys(S).sort()).toEqual(
-			['category', 'description', 'item', 'likes', 'percentLiked', 'perspectize', 'tags', 'views'].sort(),
+			[
+				'boxOffice',
+				'budget',
+				'cast',
+				'category',
+				'description',
+				'item',
+				'likes',
+				'percentLiked',
+				'perspectize',
+				'synopsis',
+				'tags',
+				'tmdbScore',
+				'views',
+				'vsBudget',
+			].sort(),
 		);
 		expect(S.perspectize).toBe(false);
 		for (const k of Object.keys(S) as (keyof typeof S)[]) expect(S[k]).toBeDefined();

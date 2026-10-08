@@ -13,7 +13,7 @@ import (
 // run against config file values only. t.Setenv restores originals on cleanup.
 func clearConfigEnvVars(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"DATABASE_URL", "DATABASE_PASSWORD", "YOUTUBE_API_KEY", "YOUTUBE_API_CACHE_TTL_SECONDS", "MESSAGE_RETENTION_MAX", "MESSAGE_RETENTION_SWEEP_MINUTES"} {
+	for _, key := range []string{"DATABASE_URL", "DATABASE_PASSWORD", "YOUTUBE_API_KEY", "TMDB_API_READ_ACCESS_TOKEN", "YOUTUBE_API_CACHE_TTL_SECONDS", "MESSAGE_RETENTION_MAX", "MESSAGE_RETENTION_SWEEP_MINUTES"} {
 		t.Setenv(key, "")
 	}
 }
@@ -209,4 +209,21 @@ func TestDatabaseConfig_GetDSN_FromRealConfig(t *testing.T) {
 	// Verify it's a valid PostgreSQL connection string format
 	expected := "host=localhost port=5432 user=testuser password=testpass dbname=testdb sslmode=disable"
 	assert.Equal(t, expected, dsn)
+}
+
+func TestLoad_TMDBReadAccessTokenFromEnv(t *testing.T) {
+	clearConfigEnvVars(t)
+	t.Setenv("TMDB_API_READ_ACCESS_TOKEN", "tmdb_token_abc")
+
+	cfg, err := config.Load("/nonexistent/config.json")
+	assert.NoError(t, err)
+	assert.Equal(t, "tmdb_token_abc", cfg.TMDBReadAccessToken)
+}
+
+func TestLoad_TMDBReadAccessTokenBlankByDefault(t *testing.T) {
+	clearConfigEnvVars(t)
+
+	cfg, err := config.Load("/nonexistent/config.json")
+	assert.NoError(t, err)
+	assert.Equal(t, "", cfg.TMDBReadAccessToken)
 }

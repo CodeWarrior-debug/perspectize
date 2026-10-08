@@ -22,7 +22,7 @@ import (
 func setupPerspectiveVisibilityServer(perspectiveRepo *mockPerspectiveRepository, withAuth bool) *httptest.Server {
 	userRepo := &mockUserRepository{}
 	contentRepo := &mockContentRepository{}
-	contentService := services.NewContentService(contentRepo, &mockYouTubeClient{})
+	contentService := services.NewContentService(contentRepo, &mockYouTubeClient{}, nil)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})

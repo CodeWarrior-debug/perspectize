@@ -134,6 +134,8 @@ type Content {
   tags: [String!]
   description: String
   response: JSON
+  "Movie-specific metadata (the shaped TMDB payload); null for other content types."
+  movie: JSON
   primaryCategory: Category
   # BIBLE_PASSAGE only: computed verse ordinals (see bible_book.verses_per_chapter)
   # and the optional, first-write-wins display title. Null for other content types.
@@ -182,6 +184,9 @@ enum ContentSortBy {
   PUBLISHED_AT
   CHANNEL_TITLE
   LENGTH
+  BOX_OFFICE
+  VS_BUDGET
+  AGE_RATING
 }
 
 enum SortOrder {
@@ -199,6 +204,7 @@ enum ContentType {
   YOUTUBE_VIDEO
   CLAIM
   BIBLE_PASSAGE
+  MOVIE
 }
 
 # Text columns that ContentFilter.search can be scoped to.
@@ -207,9 +213,22 @@ enum ContentSearchField {
   DESCRIPTION
   CHANNEL_TITLE
   TAGS
+  CAST
+  DIRECTOR
+}
+
+# Role a person plays on a movie (ContentFilter.personRole).
+enum PersonRole {
+  CAST
+  DIRECTOR
 }
 
 # Inputs
+input CreateContentFromMovieInput {
+  # IMDb or TMDB movie URL
+  url: String!
+}
+
 input CreateContentFromYouTubeInput {
   url: String!
   userId: IntID!
@@ -293,6 +312,18 @@ input ContentFilter {
   search: String
   # Which columns `search` matches against (OR'd together). Omitted/empty = TITLE only.
   searchFields: [ContentSearchField!]
+  # Match movies by person; personRole narrows to CAST or DIRECTOR (omitted = either).
+  personId: IntID
+  personRole: PersonRole
+  # Movie column filters (movie rows only; other rows have no such data and never match)
+  genreContains: String      # Case-insensitive contains on the genre names
+  ageRating: [String!]       # Certification is any of these (e.g. PG-13, R)
+  releasedAfter: String      # ISO date (YYYY-MM-DD), inclusive
+  releasedBefore: String     # ISO date (YYYY-MM-DD), inclusive
+  minBoxOffice: Float        # Revenue in dollars, inclusive
+  maxBoxOffice: Float
+  minTmdbScore: Float        # TMDB vote average (0-10), inclusive
+  maxTmdbScore: Float
   # View/like count filters
   minViewCount: Int
   maxViewCount: Int
@@ -418,6 +449,9 @@ input CreateClaimInput {
 type Mutation {
   createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   updateContentSourceData(contentId: IntID!): Content! @auth
+
+  # Movie mutations
+  createContentFromMovie(input: CreateContentFromMovieInput!): Content! @auth
 
   # Bible passage mutations
   createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth
