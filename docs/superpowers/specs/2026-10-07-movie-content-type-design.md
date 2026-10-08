@@ -85,7 +85,7 @@ As in the TMDB doc §7 (Movie): 2:3 poster, tagline, tiles (Perspectives, Avg. r
 | Schema | enum value, input, mutation, new sort/search enums, `ContentFilter.personId/personRole` |
 | Migration | `0000NN` partial GIN index on movie cast/directors (written only) |
 | Config | `TMDB_API_READ_ACCESS_TOKEN` (name only in `.env.example`) |
-| Frontend | movie column set, Cast/Box office/Vs. budget renderers, shared duration formatter, Add Movie form, queries/types, CSP |
+| Frontend | movie column set, Cast/Box office/Vs. budget renderers, shared duration formatter, Movie in the Add Content window (autodetect + type select; was a separate Add Movie form until 2026-10-08), queries/types, CSP |
 
 ## Testing
 

@@ -30,7 +30,7 @@ The rebuilt preview is `tools/content-type-designer/previews/movie-activity.html
 
 - [ ] Set `TMDB_API_READ_ACCESS_TOKEN` in each environment by hand.
 - [ ] Re-check the migration number (`000030`) against main, then apply it manually per environment.
-- [ ] Add one real movie via the Add Movie button and check the grid.
+- [ ] Add one real movie via Add Content (paste a TMDB or IMDb link) and check the grid.
 - [ ] Open the grid at lg and mobile widths, with the Movie filter and with the YouTube default.
 - [ ] Try Cast search with scope Director and with scope Cast.
 - [ ] Review the spec's "Decisions to confirm" list.
@@ -87,3 +87,5 @@ Done since the notes above: movie-aware details modal; Neon-branch verification 
 Still open: Vs. budget filter (no backend field), Studio column, TMDB person link in the cast tooltip, TMDB logo, Cast sort, Collection tile, adult-title guard (product decision), duplicate-add toast (backend returns no already-existed flag), `core/services` importing `adapters/tmdb`, #559 and #560, GIN indexes for the new filters, and the merge-time items (renumber migration 000030, spec "Decisions to confirm", preview-file overlap).
 
 **2026-10-08: migration dropped.** `000030_add_movie_people_index` was removed before merge: it was a design-time choice, not backed by EXPLAIN or query stats, and at a dozen movie rows Postgres scans anyway. The PR now has no migration, so the renumbering and manual `migrate up` items above no longer apply. Add the cast/director (and genre/rating/box-office) indexes in their own PR once EXPLAIN ANALYZE on real data justifies them.
+
+**2026-10-08: no separate Add Movie button.** Product rule: a new content type joins the single Add Content window (autodetect + type select), never its own header button. `AddMoviePopover` was folded into `AddContentPopover`; TMDB and IMDb links autodetect as Movie, and the copy names links only (bare IMDb ids are still accepted, not advertised).
