@@ -70,7 +70,11 @@ function blankState(): DraftState {
       icon: '',
       accent: '#3B6FD4',
       sharesUrlSpace: true,
-      thumbnail: ''
+      thumbnail: '',
+      contentPolicy: '',
+      duplicateFeedback: '',
+      mobileCardFields: '',
+      searchFields: ''
     },
     decisions: {},
     selected: ['youtube'],
@@ -195,6 +199,12 @@ function renderIngestion(): HTMLElement {
       field('Enrichment source', input(d.enrichment, (v) => (d.enrichment = v), 'TMDB /movie/{id}'), 'Name the exact endpoint — it decides the adapter and the API key.'),
       field('Accepted URL shapes', input(d.urlPattern, (v) => (d.urlPattern = v), 'optional: themoviedb.org/movie/<id>')),
       field('Identity / dedup key', input(d.identity, (v) => (d.identity = v), 'tmdbId (fallback: title + year)'), 'Types without a URL still need a natural key, or duplicates pile up.')
+    ]),
+    grid2([
+      field('Content policy', input(d.contentPolicy ?? '', (v) => (d.contentPolicy = v), 'Reject NC-17 and adult titles (CONTENT_NOT_ALLOWED)'), 'Adult / rating gate and the exact rejection message. Empty = undecided.'),
+      field('Duplicate-add feedback', input(d.duplicateFeedback ?? '', (v) => (d.duplicateFeedback = v), 'toast: "Already in Perspectize"'), 'What the form shows when the item already exists. Empty = undecided.'),
+      field('Mobile card facts', input(d.mobileCardFields ?? '', (v) => (d.mobileCardFields = v), 'year, rating, runtime'), 'Replaces views / likes / channel on the card list. Empty = undecided.'),
+      field('Search fields', input(d.searchFields ?? '', (v) => (d.searchFields = v), 'title, cast, director'), 'Which fields the search box covers (scope picker). Empty = undecided.')
     ]),
     checkbox(d.urlRequired, (v) => (d.urlRequired = v), 'A URL is required to create this type'),
     checkbox(

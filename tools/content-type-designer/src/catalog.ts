@@ -68,6 +68,14 @@ export interface ContentTypeProfile {
   /** Types where the same URL may legitimately exist under another type. */
   sharesUrlSpace: boolean;
   thumbnail: string;
+  /** Adult / rating gate and the exact rejection message. Empty = undecided. */
+  contentPolicy?: string;
+  /** What the add form shows when the item already exists. Empty = undecided. */
+  duplicateFeedback?: string;
+  /** Facts the mobile card list shows in place of views / likes / channel. Empty = undecided. */
+  mobileCardFields?: string;
+  /** Fields the search box covers for this type (scope picker). Empty = undecided. */
+  searchFields?: string;
 }
 
 export interface Binding {
@@ -159,7 +167,11 @@ export const TYPES: ContentTypeProfile[] = [
     icon: 'film',
     accent: '#0F9D8C',
     sharesUrlSpace: false,
-    thumbnail: 'TMDB poster_path — 2:3 tile (w92 in the grid, w342 in details)'
+    thumbnail: 'TMDB poster_path — 2:3 tile (w92 in the grid, w342 in details)',
+    contentPolicy: 'Reject NC-17 and TMDB adult:true (CONTENT_NOT_ALLOWED)',
+    mobileCardFields: 'year, rating, runtime, TMDB score',
+    searchFields: 'title, cast, director',
+    duplicateFeedback: 'TBD'
   },
   {
     id: 'book',

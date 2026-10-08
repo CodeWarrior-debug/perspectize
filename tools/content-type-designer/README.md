@@ -129,9 +129,20 @@ set the app ships today, which is the tool's sanity check.
 Two deterministic documents, copyable or downloadable:
 
 1. **Spec + checklist** — identity, ingestion, per-field decisions with storage
-   and migration implications, the resolved default grid, per-type header
-   aliases, the consistency review, and an implementation checklist keyed to
-   the files in `.claude/docs/ADDING_CONTENT_TYPE.md`.
+   and migration implications, a **Filters** table (for every chosen
+   `filterable` column: filter kind from the value type, proposed
+   `ContentFilter` field names, URL key, chip label, index note and the
+   Loaded/All parity rule; derived columns are listed as "no filter"), the
+   resolved default grid, per-type header aliases, the consistency review, an
+   **Undecided surfaces** section, and an implementation checklist (including
+   backend and frontend filter steps) keyed to the files in
+   `.claude/docs/ADDING_CONTENT_TYPE.md`.
+   *Undecided surfaces* lists the rows of that guide's "Per-type surface
+   checklist" the form cannot answer: the optional profile fields Content
+   policy, Duplicate-add feedback, Mobile card facts and Search fields (empty
+   or "TBD" means undecided), a missing details-view attribution, plus rows no
+   field covers (computed sort keys, data modes, add-form errors, formatting
+   edge values, rollout). Each is a blocker until answered in the spec.
 2. **Column × content type matrix** — every column against every type, marking
    default-visible / available / not applicable. Useful on its own for spotting
    a column that only one type will ever fill.
