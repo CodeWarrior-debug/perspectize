@@ -49,7 +49,8 @@
 </script>
 
 <form class="flex flex-col gap-1.5" onsubmit={handleSubmit} role="search">
-	<div class="flex w-full gap-2">
+	<!-- Phones: the button stacks under the input so the input keeps the full width. -->
+	<div class="flex w-full flex-col gap-2 sm:flex-row">
 		<div class="relative flex-1 min-w-0">
 			<SearchIcon class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
 			<Input
@@ -71,7 +72,12 @@
 				</button>
 			{/if}
 		</div>
-		<Button type="submit" variant={isVideoLink ? 'default' : 'outline'} disabled={!trimmed || isAdding}>
+		<Button
+			type="submit"
+			variant={isVideoLink ? 'default' : 'outline'}
+			disabled={!trimmed || isAdding}
+			class="w-full sm:w-auto"
+		>
 			{#if isVideoLink}
 				<GlassesIcon class="size-4" />
 				{isAdding ? 'Adding...' : 'Add to Perspectize'}
