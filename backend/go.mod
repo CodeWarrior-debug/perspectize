@@ -1,6 +1,6 @@
 module github.com/CodeWarrior-debug/perspectize/backend
 
-go 1.26.0
+go 1.27.2
 
 require (
 	github.com/99designs/gqlgen v0.17.95
