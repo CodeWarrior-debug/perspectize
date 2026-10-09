@@ -715,7 +715,7 @@
 				filterValueGetter: durationFilterValueGetter,
 				comparator: durationComparator,
 				headerTooltip:
-					'Video duration from YouTube API. For movies this is the runtime, to the minute (TMDB does not report seconds).',
+					'Video duration from YouTube API. For movies this is the runtime in h:mm (TMDB reports whole minutes).',
 			},
 			{
 				colId: 'views',

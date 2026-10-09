@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { LengthDisplay } from '$lib/queries/content';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
@@ -21,6 +22,7 @@
 		channelTitle: string | null;
 		length: number | null;
 		lengthUnits: string | null;
+		lengthDisplay?: LengthDisplay | null;
 		// Gap #13 in the UI gap audit: the mobile card used to show only name/
 		// channel/duration — 2 of the grid's 9 DATA_COLUMNS. Category, views and
 		// likes are the three most-used of the rest; the remaining columns
@@ -67,7 +69,7 @@
 		return [
 			released ? released.slice(0, 4) : null,
 			ratedValueGetter({ data: row }),
-			row.length ? formatDuration(row.length, row.lengthUnits) : null,
+			row.length ? formatDuration(row.length, row.lengthUnits, row.lengthDisplay?.precision) : null,
 			score != null ? `TMDB ${formatTmdbScore(score)}` : null,
 		].filter((f): f is string => !!f);
 	}
@@ -147,7 +149,7 @@
 						{/if}
 						{#if row.length}
 							{#if row.channelTitle}<span>&middot;</span>{/if}
-							<span>{formatDuration(row.length, row.lengthUnits)}</span>
+							<span>{formatDuration(row.length, row.lengthUnits, row.lengthDisplay?.precision)}</span>
 						{/if}
 						{#if row.primaryCategory}
 							{#if row.channelTitle || row.length}<span>&middot;</span>{/if}

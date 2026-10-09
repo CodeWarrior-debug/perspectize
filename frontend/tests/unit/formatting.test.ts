@@ -162,6 +162,25 @@ describe('formatDuration', () => {
 		expect(formatDuration(300, 'seconds')).toBe('5:00');
 	});
 
+	it('MINUTES precision (TMDB runtime) formats as h:mm, no seconds', () => {
+		expect(formatDuration(142 * 60, 'seconds', 'MINUTES')).toBe('2:22');
+		expect(formatDuration(120 * 60, 'seconds', 'MINUTES')).toBe('2:00');
+		expect(formatDuration(45 * 60, 'seconds', 'MINUTES')).toBe('0:45');
+	});
+
+	it('SECONDS precision keeps h:mm:ss', () => {
+		expect(formatDuration(142 * 60, 'seconds', 'SECONDS')).toBe('2:22:00');
+	});
+
+	it('no or unknown precision falls back to seconds formatting', () => {
+		expect(formatDuration(142 * 60, 'seconds', null)).toBe('2:22:00');
+		expect(formatDuration(142 * 60, 'seconds', 'HOURS')).toBe('2:22:00');
+	});
+
+	it('MINUTES precision with no length is a dash', () => {
+		expect(formatDuration(null, 'seconds', 'MINUTES')).toBe('—');
+	});
+
 	it('formats seconds with padded seconds part', () => {
 		expect(formatDuration(65, 'seconds')).toBe('1:05');
 	});
@@ -265,6 +284,14 @@ describe('durationValueGetter', () => {
 
 	it('returns formatted duration for seconds', () => {
 		expect(durationValueGetter({ data: { length: 300, lengthUnits: 'seconds' } })).toBe('5:00');
+	});
+
+	it('formats to the row lengthDisplay precision', () => {
+		expect(
+			durationValueGetter({
+				data: { length: 142 * 60, lengthUnits: 'seconds', lengthDisplay: { source: 'tmdb', precision: 'MINUTES' } },
+			}),
+		).toBe('2:22');
 	});
 
 	it('returns dash for null length', () => {
