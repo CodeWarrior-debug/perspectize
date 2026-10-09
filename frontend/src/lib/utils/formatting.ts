@@ -1,17 +1,28 @@
 import { BIBLE_PASSAGE_ICON_SVG } from './icons';
+import type { LengthDisplay } from '$lib/queries/content';
 
 /** The one "no value" glyph for grid cells; keep new formatters on it. */
 export const EMPTY_VALUE = '—';
 
 /**
- * Convert length + lengthUnits to display format.
+ * Convert length + lengthUnits to display format, to the source's precision
+ * (`lengthDisplay.precision`): MINUTES -> h:mm (a TMDB runtime, so no ":00"),
+ * anything else (SECONDS, unknown, absent) -> h:mm:ss / m:ss.
  */
-export function formatDuration(length: number | null, lengthUnits: string | null): string {
+export function formatDuration(length: number | null, lengthUnits: string | null, precision?: string | null): string {
 	if (length === null) return EMPTY_VALUE;
 
-	if (lengthUnits === 'seconds') return formatDurationSeconds(length);
+	if (lengthUnits === 'seconds') {
+		return precision === 'MINUTES' ? formatDurationMinutes(length) : formatDurationSeconds(length);
+	}
 
 	return `${length} ${lengthUnits}`;
+}
+
+/** h:mm from seconds, for lengths a source reports to the minute (142 min -> "2:22", 45 -> "0:45"). */
+export function formatDurationMinutes(seconds: number): string {
+	const totalMinutes = Math.round(seconds / 60);
+	return `${Math.floor(totalMinutes / 60)}:${(totalMinutes % 60).toString().padStart(2, '0')}`;
 }
 
 const MONEY_UNITS = [
@@ -174,11 +185,29 @@ export function formatRemainingTime(ms: number): string {
 }
 
 /**
+ * Duration cell tooltip: the value plus the format it is in, so the unit is
+ * clear ("2:59 (h:mm)" for a movie runtime, "3:47 (m:ss)", "1:02:03 (h:mm:ss)").
+ */
+export function durationTooltip(params: {
+	data?: { length: number | null; lengthUnits: string | null; lengthDisplay?: LengthDisplay | null };
+}): string {
+	const d = params.data;
+	if (!d || d.length == null) return '';
+	const precision = d.lengthDisplay?.precision;
+	const text = formatDuration(d.length, d.lengthUnits, precision);
+	if (d.lengthUnits !== 'seconds') return text;
+	const unit = precision === 'MINUTES' ? 'h:mm' : d.length >= 3600 ? 'h:mm:ss' : 'm:ss';
+	return `${text} (${unit})`;
+}
+
+/**
  * AG Grid value getter for duration column.
  */
-export function durationValueGetter(params: { data?: { length: number | null; lengthUnits: string | null } }): string {
+export function durationValueGetter(params: {
+	data?: { length: number | null; lengthUnits: string | null; lengthDisplay?: LengthDisplay | null };
+}): string {
 	if (!params.data) return EMPTY_VALUE;
-	return formatDuration(params.data.length, params.data.lengthUnits);
+	return formatDuration(params.data.length, params.data.lengthUnits, params.data.lengthDisplay?.precision);
 }
 
 /**

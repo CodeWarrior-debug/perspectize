@@ -10,6 +10,8 @@ import {
 	vsBudgetValueGetter,
 	tmdbScoreTooltip,
 	tmdbScoreValueGetter,
+	durationTooltip,
+	durationValueGetter,
 	contentTags,
 	synopsisValueGetter,
 	formatMoneyExact,
@@ -26,6 +28,11 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 	category: {
 		text: (c: CellCtx) => c.data?.primaryCategory?.label ?? '',
 		copyValue: (c: CellCtx) => c.data?.primaryCategory?.label ?? '',
+	},
+	duration: {
+		emptyText: 'No duration',
+		text: (c: CellCtx) => durationTooltip({ data: c.data }),
+		copyValue: (c: CellCtx) => durationValueGetter({ data: c.data }),
 	},
 	views: {
 		text: (c: CellCtx) => formatCountExact(c.data?.viewCount ?? null),

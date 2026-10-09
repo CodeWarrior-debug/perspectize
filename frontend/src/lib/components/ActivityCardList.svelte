@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { LengthDisplay } from '$lib/queries/content';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
@@ -10,6 +11,7 @@
 		ratedValueGetter,
 		tmdbScoreValueGetter,
 		formatTmdbScore,
+		movieResponse,
 	} from '$lib/utils/formatting';
 	import { passageIconLabels } from '$lib/utils/bible';
 	import BiblePassageIcon from '$lib/components/BiblePassageIcon.svelte';
@@ -21,6 +23,7 @@
 		channelTitle: string | null;
 		length: number | null;
 		lengthUnits: string | null;
+		lengthDisplay?: LengthDisplay | null;
 		// Gap #13 in the UI gap audit: the mobile card used to show only name/
 		// channel/duration — 2 of the grid's 9 DATA_COLUMNS. Category, views and
 		// likes are the three most-used of the rest; the remaining columns
@@ -67,14 +70,23 @@
 		return [
 			released ? released.slice(0, 4) : null,
 			ratedValueGetter({ data: row }),
-			row.length ? formatDuration(row.length, row.lengthUnits) : null,
+			row.length ? formatDuration(row.length, row.lengthUnits, row.lengthDisplay?.precision) : null,
 			score != null ? `TMDB ${formatTmdbScore(score)}` : null,
 		].filter((f): f is string => !!f);
 	}
 
-	function thumbSrc(row: CardRow): string | null {
+	/** YouTube thumbnail, or a movie's TMDB poster (portrait, so it is fitted, not cropped). */
+	function thumbSrc(row: CardRow): { src: string; poster: boolean } | null {
 		const videoId = extractVideoIdFromUrl(row.url);
-		return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null;
+		if (videoId) return { src: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, poster: false };
+		const posterPath = movieResponse(row)?.posterPath;
+		return posterPath ? { src: `https://image.tmdb.org/t/p/w154${posterPath}`, poster: true } : null;
+	}
+
+	/** Grey tile only behind a video thumbnail or an empty slot; posters and the book sit on the card colour. */
+	function thumbBg(row: CardRow): string {
+		if (isPassage(row) || thumbSrc(row)?.poster) return '';
+		return 'bg-muted';
 	}
 
 	function handleThumbClick(row: CardRow, e: MouseEvent) {
@@ -90,23 +102,29 @@
 				type="button"
 				data-testid={`card-thumb-${row.id}`}
 				title="Open original content in new tab"
-				class="relative h-16 w-24 flex-none overflow-hidden rounded-md bg-muted"
+				class="relative h-16 w-24 flex-none overflow-hidden rounded-md {thumbBg(row)}"
 				onclick={(e) => handleThumbClick(row, e)}
 			>
 				{#if isPassage(row)}
 					<BiblePassageIcon {...passageIconLabels(row)} />
 				{:else}
-					{#if thumbSrc(row)}
+					{@const thumb = thumbSrc(row)}
+					{#if thumb}
 						<img
-							src={thumbSrc(row)}
+							src={thumb.src}
 							alt=""
-							class="h-full w-full object-cover"
+							class="h-full w-full {thumb.poster ? 'object-contain' : 'object-cover'}"
 							onerror={(e) => e.currentTarget.remove()}
 						/>
 					{/if}
-					<span class="absolute right-1 bottom-1 flex items-center justify-center rounded bg-black/65 p-1">
-						<PlayIcon class="size-2.5 fill-white text-white" />
-					</span>
+					{#if thumb && !thumb.poster}
+						<span
+							data-testid="card-play-badge"
+							class="absolute right-1 bottom-1 flex items-center justify-center rounded bg-black/65 p-1"
+						>
+							<PlayIcon class="size-2.5 fill-white text-white" />
+						</span>
+					{/if}
 				{/if}
 			</button>
 
@@ -147,7 +165,7 @@
 						{/if}
 						{#if row.length}
 							{#if row.channelTitle}<span>&middot;</span>{/if}
-							<span>{formatDuration(row.length, row.lengthUnits)}</span>
+							<span>{formatDuration(row.length, row.lengthUnits, row.lengthDisplay?.precision)}</span>
 						{/if}
 						{#if row.primaryCategory}
 							{#if row.channelTitle || row.length}<span>&middot;</span>{/if}

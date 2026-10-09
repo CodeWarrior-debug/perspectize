@@ -157,3 +157,42 @@ describe('activityItemCellRenderer', () => {
 		});
 	});
 });
+
+describe('activityItemCellRenderer: one thumbnail slot for every type (titles line up)', () => {
+	const variants = {
+		video: { id: '1', name: 'A video', url: 'https://youtube.com/watch?v=abc123' },
+		passage: {
+			id: '2',
+			name: 'John 1:1-5',
+			url: null,
+			contentType: 'BIBLE_PASSAGE',
+			verseStartID: 43001001,
+			verseEndID: 43001005,
+		},
+		movie: { id: '3', name: 'A film', url: null, contentType: 'MOVIE', movie: { posterPath: '/p.jpg', year: 2001 } },
+		'movie without poster': { id: '4', name: 'No poster', url: null, contentType: 'MOVIE', movie: {} },
+	};
+
+	for (const [label, data] of Object.entries(variants)) {
+		it(`${label}: the image sits in the shared 40px-wide, 42px-tall centered slot`, () => {
+			const cell = activityItemCellRenderer({ data }) as HTMLElement;
+			const slot = cell.querySelector('[data-testid="item-thumb"]')?.parentElement;
+			expect(slot?.parentElement).toBe(cell);
+			for (const cls of ['w-10', 'h-[42px]', 'flex-none', 'items-center', 'justify-center']) {
+				expect(slot?.className).toContain(cls);
+			}
+		});
+	}
+
+	it('the passage book sits on the row colour, with no grey tile', () => {
+		const cell = activityItemCellRenderer({ data: variants.passage }) as HTMLElement;
+		expect(cell.querySelector('[data-testid="item-thumb"]')?.className).not.toContain('bg-muted');
+	});
+
+	it('a movie poster is the 2:3 image centered in the slot', () => {
+		const cell = activityItemCellRenderer({ data: variants.movie }) as HTMLElement;
+		const thumb = cell.querySelector('[data-testid="item-thumb"]');
+		expect(thumb?.className).toContain('w-7');
+		expect(thumb?.querySelector('img')?.getAttribute('src')).toBe('https://image.tmdb.org/t/p/w92/p.jpg');
+	});
+});

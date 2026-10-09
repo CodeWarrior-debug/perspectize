@@ -246,7 +246,19 @@ export const COLUMNS: readonly ColumnMeta[] = [
 	},
 	// One column for people: directors first, then billed cast. Not sortable (a person list has no order);
 	// searched via the Cast / Director search scopes instead.
-	{ colId: 'cast', label: 'Cast', picker: 'data', sortable: false },
+	{
+		colId: 'cast',
+		label: 'Cast',
+		picker: 'data',
+		sortable: false,
+		// Matches a cast or director name, like the server's castContains.
+		filterKey: 'cast',
+		filterValue: (row) =>
+			moviePeople(row)
+				.map((p) => p.name)
+				.join(', ')
+				.toLowerCase() || null,
+	},
 	{
 		colId: 'duration',
 		label: 'Duration',
@@ -299,7 +311,7 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		picker: 'data',
 		sortable: true,
 		sortValue: (row) => releasedValueGetter({ data: row }),
-		clientOnlySort: true,
+		serverSort: 'RELEASE_DATE',
 		filterKey: 'released',
 		filterValue: (row) => releasedValueGetter({ data: row }),
 		filterRange: 'date',
@@ -307,7 +319,7 @@ export const COLUMNS: readonly ColumnMeta[] = [
 	},
 	{
 		colId: 'boxOffice',
-		label: 'Box office',
+		label: 'Take',
 		picker: 'data',
 		sortable: true,
 		sortValue: (row) => boxOfficeValueGetter({ data: row }),
@@ -318,7 +330,7 @@ export const COLUMNS: readonly ColumnMeta[] = [
 	},
 	{
 		colId: 'vsBudget',
-		label: 'Vs. budget',
+		label: 'ROI',
 		picker: 'data',
 		sortable: true,
 		sortValue: (row) => vsBudgetValueGetter({ data: row }),
@@ -328,12 +340,11 @@ export const COLUMNS: readonly ColumnMeta[] = [
 	},
 	{
 		colId: 'tmdbScore',
-		label: 'TMDB Score',
+		label: 'Rating',
 		picker: 'data',
 		sortable: true,
-		// No ContentSortBy key for the TMDB vote average, so client-side only.
 		sortValue: (row) => tmdbScoreValueGetter({ data: row }),
-		clientOnlySort: true,
+		serverSort: 'TMDB_SCORE',
 		filterKey: 'tmdb',
 		filterValue: (row) => tmdbScoreValueGetter({ data: row }),
 		filterRange: 'number',
@@ -430,9 +441,8 @@ const MOVIE_DEFAULT_COLS = ['genre', 'rated', 'cast', 'released', 'boxOffice', '
 
 /**
  * Which grid columns the responsive system shows at a tier. With the type filter
- * exactly MOVIE (Type is redundant when one type is in view) the Movie default
- * set applies: ◎ Film Genre Rated Cast Duration Released Box office Vs. budget
- * TMDB Score Tags (Date Added, Budget, Collection, Votes, Synopsis, TMDB ID stay
+ * exactly MOVIE the Movie default set applies: ◎ Film Type Genre Rated Cast
+ * Duration Released Box office Vs. budget TMDB Score Tags (Date Added, Budget, Collection, Votes, Synopsis, TMDB ID stay
  * in the picker). Any other filter keeps the YouTube layout and hides the Movie
  * columns, which would be empty. Mirrored by the colDef `hide` flags in
  * ActivityTable.svelte (initial default); this is the override that wins.
@@ -444,7 +454,7 @@ export function defaultColumnVisibility(
 	const sm = tier !== 'xs';
 	const md = tier === 'md' || tier === 'lg';
 	const lg = tier === 'lg';
-	const visible: string[] = movieOnly ? ['perspectize', 'item'] : ['item', 'type', 'perspectize'];
+	const visible: string[] = movieOnly ? ['perspectize', 'item', 'type'] : ['item', 'type', 'perspectize'];
 	if (movieOnly) {
 		if (sm) visible.push('genre', 'rated');
 		if (md) visible.push('cast', 'duration', 'released');
@@ -745,6 +755,26 @@ export function parsePersonFilter(value: string | undefined): PersonFilter | nul
 /** Client-side twin of the server's person filter: the row is a Movie crediting this person (in the role, if given). */
 export function rowMatchesPerson(row: ContentItem, person: PersonFilter): boolean {
 	return moviePeople(row).some((p) => p.id === person.id && (!person.role || p.role === person.role));
+}
+
+/** The slice of AG Grid's API that syncItemHeader needs (kept small so it is unit-testable). */
+export interface HeaderApi {
+	getColumn(colId: string): { getColDef(): { headerName?: string } } | null | undefined;
+	refreshHeader(): void;
+}
+
+/**
+ * Set the Item column's header text, redrawing the header only when it actually
+ * changes. refreshHeader closes an open column-filter popup, and the caller's
+ * effect re-runs on every filter change, so an unconditional redraw closed the
+ * filter while the user was still typing. Returns whether it redrew.
+ */
+export function syncItemHeader(api: HeaderApi, name: string): boolean {
+	const colDef = api.getColumn('item')?.getColDef();
+	if (!colDef || colDef.headerName === name) return false;
+	colDef.headerName = name;
+	api.refreshHeader();
+	return true;
 }
 
 /** Item column header: "Film" when the type filter is exactly MOVIE, otherwise "Item". */

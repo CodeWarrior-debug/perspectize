@@ -95,8 +95,7 @@
 		compareContentBySorts,
 		filterContentRows,
 		togglableColIds,
-		defaultColumnVisibility,
-		isMovieOnlyTypeFilter,
+		syncItemHeader,
 		PERSON_FILTER_KEY,
 		parsePersonFilter,
 		rowMatchesPerson,
@@ -104,6 +103,18 @@
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
+	import {
+		COLUMN_VIEW_LABEL,
+		clearLayout,
+		columnViewFor,
+		defaultLayout,
+		loadLayout,
+		planColumnSwitch,
+		saveLayout,
+		type ColumnLayout,
+		type ColumnView,
+	} from '$lib/utils/columnLayouts';
+	import { toast } from 'svelte-sonner';
 	import SortPickerDialog from '$lib/components/SortPickerDialog.svelte';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
@@ -185,13 +196,16 @@
 	// Signed-in user — drives the admin-only "Internal" group in the column picker.
 	const meCtx = useMe();
 
-	// Column picker (session-only). Once the user makes a manual choice,
-	// `userColumnOverride` is non-null and the responsive $effect below stops
-	// touching column visibility for the rest of the session. A page refresh
-	// clears it and automatic responsive layout resumes.
+	// Column picker. Each column view (Movie, or the general set; see columnLayouts.ts)
+	// keeps its own saved setup in localStorage once the user changes a column, and the
+	// visibility $effect below applies it instead of that view's responsive defaults.
+	// `layoutVersion` bumps after every save/clear so that effect and the picker re-read.
 	let columnPickerOpen = $state(false);
-	let userColumnOverride = $state<Record<string, boolean> | null>(null);
-	const overrideActive = $derived(userColumnOverride !== null);
+	let layoutVersion = $state(0);
+	const customLayout = $derived.by(() => {
+		void layoutVersion;
+		return loadLayout(columnView) !== null;
+	});
 
 	function currentVisibility(): Record<string, boolean> {
 		const out: Record<string, boolean> = {};
@@ -205,16 +219,52 @@
 
 	function handleColumnToggle(colId: string, next: boolean) {
 		if (!gridApi || !gridReady) return;
-		if (userColumnOverride === null) userColumnOverride = currentVisibility();
-		userColumnOverride = { ...userColumnOverride, [colId]: next };
+		const base = loadLayout(columnView) ?? currentVisibility();
+		saveLayout(columnView, { ...base, [colId]: next });
 		gridApi.setColumnsVisible([colId], next);
+		layoutVersion++;
+	}
+
+	function handleColumnsReset() {
+		clearLayout(columnView);
+		layoutVersion++;
+	}
+
+	function applyLayout(api: GridApi, layout: ColumnLayout) {
+		const entries = Object.entries(layout);
+		api.setColumnsVisible(
+			entries.filter(([, v]) => v).map(([c]) => c),
+			true,
+		);
+		api.setColumnsVisible(
+			entries.filter(([, v]) => !v).map(([c]) => c),
+			false,
+		);
+	}
+
+	/** After a switch of column view: offer the previous columns back, or the picker. */
+	function showColumnSwitchToast(view: ColumnView, previous: ColumnLayout) {
+		toast.warning(`Showing ${COLUMN_VIEW_LABEL[view]}`, {
+			id: 'column-view-switch',
+			action: {
+				label: 'Revert',
+				onClick: () => {
+					saveLayout(view, previous);
+					layoutVersion++;
+				},
+			},
+			cancel: {
+				label: 'Choose columns',
+				onClick: () => (columnPickerOpen = true),
+			},
+		});
 	}
 
 	// Checkbox state for the dialog — recomputed when it opens and after every
 	// toggle so the checkboxes track the live grid.
 	const pickerVisibility = $derived.by(() => {
 		void columnPickerOpen;
-		void userColumnOverride;
+		void layoutVersion;
 		return columnPickerOpen ? currentVisibility() : {};
 	});
 
@@ -240,6 +290,8 @@
 	const searchText = $derived(gridParams.q);
 	const searchFields = $derived(gridParams.qFields);
 	const filters = $derived(gridParams.filters);
+	/** Which saved/default column set applies (columnLayouts.ts): Movie, or the general set. */
+	const columnView = $derived(columnViewFor(filters.type));
 	// `f.person` (TMDB id, optional `:cast`/`:director`): has no grid column, so it is tracked apart from the grid filter model.
 	const personFilter = $derived(parsePersonFilter(filters[PERSON_FILTER_KEY]));
 
@@ -581,6 +633,8 @@
 				colId: 'type',
 				headerName: 'Type',
 				flex: 0.5,
+				// The cell is a single icon; 84 still fits the header text, sort arrow and filter button.
+				minWidth: 84,
 				maxWidth: 100,
 
 				filter: ContentTypeFilter,
@@ -636,7 +690,12 @@
 				flex: 2,
 				minWidth: 125,
 				sortable: false,
-				filter: false,
+				filter: 'agTextColumnFilter',
+				// Directors and cast names, matching the server's castContains.
+				filterValueGetter: (params) =>
+					moviePeople(params.data)
+						.map((p) => p.name)
+						.join(', '),
 				cellRenderer: castCellRenderer,
 				// Tighter cell padding so the two-line cast cell has room for names beside +N.
 				cellStyle: { '--ag-cell-horizontal-padding': '8px' },
@@ -663,8 +722,9 @@
 				valueGetter: durationValueGetter,
 				filterValueGetter: durationFilterValueGetter,
 				comparator: durationComparator,
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.duration },
 				headerTooltip:
-					'Video duration from YouTube API. For movies this is the runtime, to the minute (TMDB does not report seconds).',
+					'Video duration from YouTube API. For movies this is the runtime in h:mm (TMDB reports whole minutes).',
 			},
 			{
 				colId: 'views',
@@ -724,9 +784,9 @@
 			},
 			{
 				colId: 'boxOffice',
-				headerName: 'Box office',
+				headerName: 'Take',
 				flex: 0.8,
-				minWidth: 138, // room for the sort arrow
+				minWidth: 96, // "Take" + sort arrow + filter button
 				maxWidth: 150,
 				filter: 'agNumberColumnFilter',
 				valueGetter: boxOfficeValueGetter,
@@ -738,23 +798,23 @@
 			},
 			{
 				colId: 'vsBudget',
-				headerName: 'Vs. budget',
+				headerName: 'ROI',
 				flex: 0.8,
-				minWidth: 118,
+				minWidth: 72, // "ROI" + sort arrow (no filter button)
 				maxWidth: 130,
 				filter: false,
 				valueGetter: vsBudgetValueGetter,
 				comparator: unknownLastComparator,
 				valueFormatter: (params) => formatVsBudgetCell(params.value),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.vsBudget },
-				headerTooltip: 'Box office as a percentage of budget. Ignores marketing, so under 100% does not mean a loss.',
+				headerTooltip: 'Box Office Take / Budget',
 				hide: true,
 			},
 			{
 				colId: 'tmdbScore',
-				headerName: 'TMDB Score',
+				headerName: 'Rating',
 				flex: 0.7,
-				minWidth: 121,
+				minWidth: 111,
 				maxWidth: 130,
 				filter: 'agNumberColumnFilter',
 				valueGetter: tmdbScoreValueGetter,
@@ -1140,12 +1200,11 @@
 	});
 
 	// The Item column reads "Film" in the Movie view. headerName is read live; refreshHeader redraws it.
+	// syncItemHeader redraws only on a real rename: this effect re-runs on every filter change.
 	$effect(() => {
 		const headerName = itemColumnHeader(filters.type);
 		if (!gridApi || !gridReady) return;
-		const colDef = gridApi.getColumn('item')?.getColDef();
-		if (colDef) colDef.headerName = headerName;
-		gridApi.refreshHeader();
+		syncItemHeader(gridApi, headerName);
 	});
 
 	// Restore AG Grid filter state from URL on mount and mode changes
@@ -1248,34 +1307,35 @@
 	// md (640-899): Perspectize, Item, Type, Category, Channel, Duration, Date
 	// lg (900+):    Perspectize, Item, Type, Category, Channel, Duration, Date, Views, Likes, Tags
 	// With the type filter exactly MOVIE, the Movie set applies instead (defaultColumnVisibility).
+	// A view with a saved setup (column picker) shows that instead of its defaults, which
+	// also re-applies it after a grid remount (cardMode toggle, error recovery).
+	// Switching view (e.g. to exactly MOVIE) shows a toast offering the previous columns back.
+	let lastColumnView: ColumnView | null = null; // plain, not $state: written by the effect it guards
 	$effect(() => {
-		if (!gridApi || !gridReady) return;
-		const api = gridApi;
-		// Once the user takes manual control via the column picker, that map is the
-		// source of truth for the rest of the session — re-applied here so it also
-		// survives a grid remount (cardMode toggle, error recovery). A page refresh
-		// clears userColumnOverride and restores breakpoint-driven visibility.
-		if (userColumnOverride) {
-			const override = userColumnOverride;
-			requestAnimationFrame(() => {
-				if (!gridApi) return;
-				for (const [colId, visible] of Object.entries(override)) {
-					api.setColumnsVisible([colId], visible);
-				}
-			});
+		if (!gridApi || !gridReady) {
+			// No grid: the next mount is a fresh start, not a switch, so no toast.
+			lastColumnView = null;
 			return;
 		}
+		const api = gridApi;
+		void layoutVersion;
+		// Read synchronously, before the rAF, so this effect re-runs when they change.
 		const tier = responsiveTier;
-		// Type filter exactly MOVIE -> the Movie default column set. Read synchronously,
-		// before the rAF, so this effect re-runs when the filter changes.
-		const movieOnly = isMovieOnlyTypeFilter(filters.type);
+		const view = columnView;
+		const prevView = lastColumnView;
+		lastColumnView = view;
+		const current = prevView !== null && prevView !== view ? currentVisibility() : {};
+		const plan = planColumnSwitch({
+			prevView,
+			view,
+			current,
+			saved: loadLayout(view),
+			defaults: defaultLayout(tier, view),
+		});
 		requestAnimationFrame(() => {
 			if (!gridApi) return; // Grid may have been destroyed before rAF fires
-			// createdAt/updatedAt stay hidden via their colDef `hide: true` until the
-			// user enables them in the column picker; id/addedByUserID/url likewise, admins only.
-			const { visible, hidden } = defaultColumnVisibility(tier, movieOnly);
-			api.setColumnsVisible(visible, true);
-			api.setColumnsVisible(hidden, false);
+			applyLayout(api, plan.apply);
+			if (plan.toast) showColumnSwitchToast(view, current);
 		});
 	});
 
@@ -1484,8 +1544,9 @@
 		bind:open={columnPickerOpen}
 		isAdmin={meCtx.isAdmin}
 		visibility={pickerVisibility}
-		{overrideActive}
+		{customLayout}
 		onToggle={handleColumnToggle}
+		onReset={handleColumnsReset}
 	/>
 {/if}
 

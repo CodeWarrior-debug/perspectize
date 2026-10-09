@@ -231,14 +231,16 @@ models:
 
 ## Agent Delegation
 
-| Task Type | Model | Subagent | Rationale |
-|-----------|-------|----------|-----------|
-| Architecture decisions | Opus | - | Complex multi-file reasoning |
-| Go implementation | Sonnet | `go-backend` | Balanced quality/cost |
-| GraphQL schema design | Sonnet | `graphql-designer` | Schema patterns |
-| Database migrations | Sonnet | `db-migration` | SQL generation |
-| Code review | Haiku | `code-reviewer` | Fast pattern matching |
-| Test generation | Haiku | `test-writer` | Boilerplate generation |
+Each subagent's model is set in its `model:` frontmatter (`.claude/agents/*.md`) — don't restate it here, and don't override it with the Agent tool's `model` parameter.
+
+| Task Type | Subagent |
+|-----------|----------|
+| Architecture decisions | main session (no subagent) |
+| Go implementation | `go-backend` |
+| GraphQL schema design | `graphql-designer` |
+| Database migrations | `db-migration` |
+| Code review | `code-reviewer` |
+| Test generation | `test-writer` |
 
 ## References
 

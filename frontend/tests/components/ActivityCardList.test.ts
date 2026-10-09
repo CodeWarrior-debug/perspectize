@@ -184,6 +184,76 @@ describe('ActivityCardList', () => {
 		});
 	});
 
+	describe('thumbnail states (poster, empty slot, video, passage)', () => {
+		const film = {
+			id: '6',
+			name: 'Fellowship',
+			url: 'https://www.themoviedb.org/movie/120',
+			channelTitle: null,
+			length: 10740,
+			lengthUnits: 'seconds',
+			contentType: 'MOVIE',
+			response: { posterPath: '/poster.jpg' },
+		};
+		const thumb = (id: string) => screen.getByTestId(`card-thumb-${id}`);
+
+		it('movie with a poster: TMDB poster fitted (not cropped), no play badge, no grey tile', () => {
+			render(ActivityCardList, { props: { rowData: [film], onOpenDetails: vi.fn() } });
+			const img = thumb('6').querySelector('img');
+			expect(img?.getAttribute('src')).toBe('https://image.tmdb.org/t/p/w154/poster.jpg');
+			expect(img?.className).toContain('object-contain');
+			expect(screen.queryByTestId('card-play-badge')).not.toBeInTheDocument();
+			expect(thumb('6').className).not.toContain('bg-muted');
+		});
+
+		it('movie without a poster: grey placeholder slot, no image, no play badge', () => {
+			render(ActivityCardList, { props: { rowData: [{ ...film, response: {} }], onOpenDetails: vi.fn() } });
+			expect(thumb('6').querySelector('img')).toBeNull();
+			expect(screen.queryByTestId('card-play-badge')).not.toBeInTheDocument();
+			expect(thumb('6').className).toContain('bg-muted');
+		});
+
+		it('video: YouTube thumbnail cropped to fill, with the play badge', () => {
+			render(ActivityCardList, { props: { rowData: [rowData[0]], onOpenDetails: vi.fn() } });
+			const img = thumb('1').querySelector('img');
+			expect(img?.getAttribute('src')).toBe('https://i.ytimg.com/vi/abc123/hqdefault.jpg');
+			expect(img?.className).toContain('object-cover');
+			expect(screen.getByTestId('card-play-badge')).toBeInTheDocument();
+		});
+
+		it('passage: book icon on the card colour, no grey tile, no play badge', () => {
+			render(ActivityCardList, {
+				props: {
+					rowData: [
+						{
+							id: '7',
+							name: 'John 1:1-5',
+							url: null,
+							channelTitle: null,
+							length: null,
+							lengthUnits: null,
+							contentType: 'BIBLE_PASSAGE',
+						},
+					],
+					onOpenDetails: vi.fn(),
+				},
+			});
+			expect(thumb('7').className).not.toContain('bg-muted');
+			expect(screen.queryByTestId('card-play-badge')).not.toBeInTheDocument();
+		});
+
+		it('movie runtime shows to its reported precision (h:mm for MINUTES)', () => {
+			render(ActivityCardList, {
+				props: {
+					rowData: [{ ...film, lengthDisplay: { source: 'tmdb', precision: 'MINUTES' } }],
+					onOpenDetails: vi.fn(),
+				},
+			});
+			expect(screen.getByTestId('card-movie-facts-6')).toHaveTextContent('2:59');
+			expect(screen.getByTestId('card-movie-facts-6')).not.toHaveTextContent('2:59:00');
+		});
+	});
+
 	describe('Bible passage rows', () => {
 		const passage = {
 			id: '3',

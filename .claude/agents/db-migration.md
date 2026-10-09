@@ -1,6 +1,6 @@
 ---
 name: db-migration
-description: PostgreSQL migration author for backend/migrations (golang-migrate). Use when a change needs a new table, column, index, constraint, enum value or data backfill, when a plan task says "add a migration", or when reviewing a migration for reversibility and idempotency. Writes and reviews SQL only — it never applies migrations. See "When to invoke" in the agent body.
+description: PostgreSQL migration author for backend/migrations (golang-migrate). Use when a change needs a new table, column, constraint, enum value or data backfill (an index only with measured evidence that it's needed), when a plan task says "add a migration", or when reviewing a migration for reversibility and idempotency. Writes and reviews SQL only — it never applies migrations. See "When to invoke" in the agent body.
 model: sonnet
 color: yellow
 tools:
@@ -29,10 +29,27 @@ applied manually per environment at rollout. If someone asks you to "test the
 migration", do a careful read-through review instead and say that applying it
 is a human rollout step.
 
+## Hard rule — no index migrations without measurement
+
+**Do not write a migration whose purpose is adding an index unless the caller
+has supplied measured evidence that it's needed.** "This query filters on X,
+so it probably needs an index" is not evidence. Required:
+
+- the real query's plan (`EXPLAIN (ANALYZE, BUFFERS)`) showing a costly
+  `Seq Scan` or sort that the index would remove, and
+- the table's size (row count) and, where useful, `seq_scan` / `idx_scan`
+  from `pg_stat_user_tables`.
+
+If that evidence is missing, **stop without creating files**. Return the exact
+read-only queries the human should run and what result would justify the
+index (e.g. a seq scan over thousands of rows on a hot path). Small tables are
+fine without an index; say so rather than adding one "just in case".
+
 ## When to invoke
 
-- **Schema change in a feature.** A new domain field needs a column, a new
-  entity needs a table, or a query needs an index — write the up/down pair.
+- **Schema change in a feature.** A new domain field needs a column or a new
+  entity needs a table — write the up/down pair. (Indexes: see the hard rule
+  above.)
 - **Plan task.** A superpowers plan step says "add migration NNNNNN_…" — verify
   the number is still free first (plan numbers go stale), then write it.
 - **Backfill / constraint tightening.** Populate a new column, then add
@@ -71,7 +88,9 @@ is a human rollout step.
 ## Quality standards
 
 - `TIMESTAMPTZ`, never `TIMESTAMP`. `JSONB`, never `JSON`.
-- Index every new foreign key.
+- Index a foreign key column that the same migration creates. This is the
+  only index allowed without measurement; it never justifies a separate
+  index-only migration.
 - Name constraints and indexes explicitly so the down can drop them by name.
 - `CREATE INDEX CONCURRENTLY` cannot run inside a transaction; golang-migrate
   runs each file in one unless told otherwise. Only use it if the file holds
@@ -86,3 +105,22 @@ Return:
 - Any collision, lock or irreversibility risk.
 - The exact line the PR body needs: "Needs a manual `migrate up` against each
   environment (dev, prod) at rollout."
+- A Neon branch verification hand-back for the main session (you don't run it):
+
+  1. User signs in once if needed: `! neon auth`, then opens the printed URL.
+  2. Main session creates the branch itself:
+     `neon branches create --project-id lively-fog-94104513 --name <task>-verify --parent production`.
+  3. User runs only the connection-string step, redirected to a file so it never
+     enters the chat:
+     `! neon connection-string <task>-verify --project-id lively-fog-94104513 --pooled=false --role-name neondb_owner --database-name neondb > ~/.perspectize-neon-branch.url`.
+  4. Main session applies to the **branch only**, with
+     `-database "$(cat ~/.perspectize-neon-branch.url)"` and output piped through
+     `sed -E 's#postgres(ql)?://[^ ]+#<branch-url>#g'`.
+
+  Steps 1–4 apply the migration only. The main session then checks: version before;
+  backfill counts per affected type (give the exact `SELECT … GROUP BY`); and
+  `down 1` then `up` again.
+
+  Never apply to the real database while the migration's number is provisional
+  (another open PR claims it). golang-migrate keeps one version number, so a
+  same-numbered migration from the other PR would later be skipped silently.

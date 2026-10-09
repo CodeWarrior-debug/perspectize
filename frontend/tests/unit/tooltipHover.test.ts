@@ -47,6 +47,7 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 				'cast',
 				'category',
 				'description',
+				'duration',
 				'item',
 				'likes',
 				'percentLiked',
@@ -68,6 +69,12 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 
 	it('item shows the name despite undefined value', () => {
 		expect(mk('item', { name: 'Vid' })).toMatchObject({ text: 'Vid', copy: 'Vid' });
+	});
+
+	it('duration names its format: h:mm for a movie runtime, m:ss for a short video', () => {
+		const movie = { length: 179 * 60, lengthUnits: 'seconds', lengthDisplay: { source: 'tmdb', precision: 'MINUTES' } };
+		expect(mk('duration', movie)).toMatchObject({ text: '2:59 (h:mm)', copy: '2:59' });
+		expect(mk('duration', { length: 227, lengthUnits: 'seconds' })).toMatchObject({ text: '3:47 (m:ss)' });
 	});
 
 	it('category shows the primary category label', () => {
