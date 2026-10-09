@@ -55,7 +55,7 @@ func (stubBibleRepo) ListBooks(ctx context.Context) ([]domain.BibleBook, error) 
 // setupPassageTestServer is setupTestServer with Bible reference data wired and
 // a caller-chosen role for the injected session user.
 func setupPassageTestServer(repo *mockContentRepository, role domain.UserRole) *httptest.Server {
-	contentService := services.NewContentService(repo, &mockYouTubeClient{}, services.WithBibleReference(stubBibleRepo{}))
+	contentService := services.NewContentService(repo, &mockYouTubeClient{}, nil, services.WithBibleReference(stubBibleRepo{}))
 	userService := services.NewUserService(&mockUserRepository{}, repo, &mockPerspectiveRepository{})
 	perspectiveService := services.NewPerspectiveService(&mockPerspectiveRepository{}, &mockUserRepository{})
 	categoryService := services.NewCategoryService(&mockCategoryRepository{}, repo, &mockWikidataClient{})

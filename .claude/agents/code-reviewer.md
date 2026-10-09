@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Read-only reviewer for Go backend diffs. Use after a go-backend, graphql-designer or db-migration task completes, before pushing or opening a PR that touches backend/, or when asked to review a Go change or branch. Checks correctness and the repo's own rules (hexagonal, GORM separation, owner guards, pagination error checks, migration safety). Not for frontend diffs. See "When to invoke" in the agent body.
+description: Read-only reviewer for Go backend diffs. Use PROACTIVELY after a go-backend, graphql-designer or db-migration task completes, before pushing or opening a PR that touches backend/, or when asked to review a Go change or branch. Checks correctness and the repo's own rules (hexagonal, GORM separation, owner guards, pagination error checks, migration safety). Not for frontend diffs. See "When to invoke" in the agent body.
 model: inherit
 color: red
 tools:

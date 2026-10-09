@@ -9,7 +9,10 @@ import {
 	NUMBER_RANGE_COLS,
 	DATE_RANGE_COLS,
 	SET_FILTER_COLS,
+	DAY_DATE_COLS,
 	CONTENT_TYPE_OPTIONS,
+	PERSON_FILTER_KEY,
+	parsePersonFilter,
 } from './grid-config';
 
 // ---------------------------------------------------------------------------
@@ -20,10 +23,21 @@ import {
 export type DataMode = 'all' | 'loaded';
 
 /** Which columns the `q` search box matches against. */
-export type SearchScopeKey = 'title' | 'desc' | 'channel' | 'tags';
+export type SearchScopeKey = 'title' | 'desc' | 'channel' | 'tags' | 'cast' | 'director';
 
-/** All available search scopes — the search box matches everything by default. */
+/** The scopes every view searches by default (and the whole picker outside Movie views). */
 export const ALL_SEARCH_SCOPES: SearchScopeKey[] = ['title', 'desc', 'channel', 'tags'];
+
+/** Extra scopes offered, and on by default, only while the type filter includes MOVIE. */
+export const MOVIE_SEARCH_SCOPES: SearchScopeKey[] = ['cast', 'director'];
+
+const EVERY_SEARCH_SCOPE: SearchScopeKey[] = [...ALL_SEARCH_SCOPES, ...MOVIE_SEARCH_SCOPES];
+
+/** Scopes offered (and on by default) for a given set of URL filters: Cast/Director join in when `f.type` includes movie. */
+export function searchScopesFor(filters: Record<string, string>): SearchScopeKey[] {
+	const types = (filters.type ?? '').split(',').map((t) => t.trim().toLowerCase());
+	return types.includes('movie') ? EVERY_SEARCH_SCOPE : ALL_SEARCH_SCOPES;
+}
 
 /** One column of a multi-column sort, in priority order (first = primary). */
 export interface SortSpec {
@@ -161,22 +175,26 @@ export function parseGridParams(params: URLSearchParams): GridParams {
 		pageSize:
 			pageSize !== null && !isNaN(Number(pageSize)) && Number(pageSize) > 0 ? Number(pageSize) : GRID_DEFAULTS.pageSize,
 		q: q ?? GRID_DEFAULTS.q,
-		qFields: parseSearchScopes(qf),
+		qFields: parseSearchScopes(qf, searchScopesFor(filters)),
 		filters,
 	};
 }
 
-/** Parse the `qf` URL value into a validated, de-duped list of scope keys. Falls back to "all" when absent, empty, or entirely invalid. */
-function parseSearchScopes(qf: string | null): SearchScopeKey[] {
-	if (!qf) return ALL_SEARCH_SCOPES;
-	const valid = new Set(ALL_SEARCH_SCOPES);
+/**
+ * Parse the `qf` URL value into a validated, de-duped list of scope keys, limited to the scopes
+ * currently offered (`defaults`; hidden Cast/Director scopes are dropped once the Movie filter is gone).
+ * Falls back to "all" when absent, empty, or nothing valid and visible remains.
+ */
+function parseSearchScopes(qf: string | null, defaults: SearchScopeKey[]): SearchScopeKey[] {
+	if (!qf) return defaults;
+	const valid = new Set(defaults);
 	const parsed = qf
 		.split(',')
 		.map((s) => s.trim())
 		.filter((s): s is SearchScopeKey => valid.has(s as SearchScopeKey));
-	// De-dupe while preserving ALL_SEARCH_SCOPES order for a stable serialized form.
+	// De-dupe while preserving canonical order for a stable serialized form.
 	const selected = new Set(parsed);
-	return selected.size > 0 ? ALL_SEARCH_SCOPES.filter((s) => selected.has(s)) : ALL_SEARCH_SCOPES;
+	return selected.size > 0 ? defaults.filter((s) => selected.has(s)) : defaults;
 }
 
 /** Serialize GridParams to URL search string (omitting defaults) */
@@ -188,7 +206,7 @@ export function serializeGridParams(state: GridParams): string {
 	if (state.page !== GRID_DEFAULTS.page) params.set('page', String(state.page));
 	if (state.pageSize !== GRID_DEFAULTS.pageSize) params.set('pageSize', String(state.pageSize));
 	if (state.q !== GRID_DEFAULTS.q) params.set('q', state.q);
-	if (!sameScopes(state.qFields, GRID_DEFAULTS.qFields)) params.set('qf', state.qFields.join(','));
+	if (!sameScopes(state.qFields, searchScopesFor(state.filters))) params.set('qf', state.qFields.join(','));
 
 	if (!filtersEqual(state.filters, GRID_DEFAULTS.filters)) {
 		const entries = Object.entries(state.filters);
@@ -237,6 +255,14 @@ export function parseSetValue(value: string): string[] {
 
 export { COL_TO_FILTER_KEY, NUMBER_RANGE_COLS, DATE_RANGE_COLS };
 
+/**
+ * The `f.*` params that have no grid column (just the person filter), so the grid's own filter
+ * model can't carry them. Re-merge these whenever the URL filters are rebuilt from the grid.
+ */
+export function nonGridFilters(filters: Record<string, string>): Record<string, string> {
+	return PERSON_FILTER_KEY in filters ? { [PERSON_FILTER_KEY]: filters[PERSON_FILTER_KEY] } : {};
+}
+
 /** URL f.* param key → AG Grid colId */
 const FILTER_KEY_TO_COL: Record<string, string> = Object.fromEntries(
 	Object.entries(COL_TO_FILTER_KEY).map(([col, key]) => [key, col]),
@@ -282,8 +308,9 @@ export function filterToUrlParams(filterModel: Record<string, unknown>): Record<
 			}
 		} else if (f.filterType === 'date') {
 			const dateFilter = f as AGDateFilter;
-			const from = dateFilter.dateFrom ? dateFilter.dateFrom.substring(0, 7) : ''; // YYYY-MM
-			const to = dateFilter.dateTo ? dateFilter.dateTo.substring(0, 7) : '';
+			const len = DAY_DATE_COLS.has(colId) ? 10 : 7; // YYYY-MM-DD for day columns, else YYYY-MM
+			const from = dateFilter.dateFrom ? dateFilter.dateFrom.substring(0, len) : '';
+			const to = dateFilter.dateTo ? dateFilter.dateTo.substring(0, len) : '';
 
 			if (from && to) {
 				result[filterKey] = `${from}..${to}`;
@@ -383,13 +410,13 @@ export function urlParamsToFilter(filters: Record<string, string>): Record<strin
 				} else if (min !== undefined && !isNaN(min)) {
 					result[colId] = {
 						filterType: 'number',
-						type: 'greaterThan',
+						type: 'greaterThanOrEqual',
 						filter: min,
 					} satisfies AGNumberFilter;
 				} else if (max !== undefined && !isNaN(max)) {
 					result[colId] = {
 						filterType: 'number',
-						type: 'lessThan',
+						type: 'lessThanOrEqual',
 						filter: max,
 					} satisfies AGNumberFilter;
 				}
@@ -412,7 +439,7 @@ export function urlParamsToFilter(filters: Record<string, string>): Record<strin
 // ---------------------------------------------------------------------------
 
 /** GraphQL ContentSearchField enum values (backend `schema.graphql`) */
-export type ContentSearchFieldGQL = 'TITLE' | 'DESCRIPTION' | 'CHANNEL_TITLE' | 'TAGS';
+export type ContentSearchFieldGQL = 'TITLE' | 'DESCRIPTION' | 'CHANNEL_TITLE' | 'TAGS' | 'CAST' | 'DIRECTOR';
 
 /** UI scope key → GraphQL ContentSearchField enum value */
 const SCOPE_TO_GQL_FIELD: Record<SearchScopeKey, ContentSearchFieldGQL> = {
@@ -420,6 +447,8 @@ const SCOPE_TO_GQL_FIELD: Record<SearchScopeKey, ContentSearchFieldGQL> = {
 	desc: 'DESCRIPTION',
 	channel: 'CHANNEL_TITLE',
 	tags: 'TAGS',
+	cast: 'CAST',
+	director: 'DIRECTOR',
 };
 
 /** GraphQL ContentFilter input — defined here so Plan 02 (Wave 1) doesn't depend on Plan 03 */
@@ -443,6 +472,18 @@ export interface ContentFilterInput {
 	createdBefore?: string;
 	updatedAfter?: string;
 	updatedBefore?: string;
+	// Movie filters (movie rows only; other rows never match)
+	personId?: string;
+	personRole?: 'CAST' | 'DIRECTOR';
+	genreContains?: string;
+	castContains?: string;
+	ageRating?: string[];
+	releasedAfter?: string;
+	releasedBefore?: string;
+	minBoxOffice?: number;
+	maxBoxOffice?: number;
+	minTmdbScore?: number;
+	maxTmdbScore?: number;
 }
 
 /**
@@ -593,6 +634,75 @@ export function urlParamsToGraphQLFilter(
 				}
 				if (to) {
 					result.createdBefore = to;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'cast':
+				result.castContains = value;
+				hasAny = true;
+				break;
+
+			case 'genre':
+				result.genreContains = value;
+				hasAny = true;
+				break;
+
+			case 'rated': {
+				// Certifications are stored uppercase (PG-13); URL set values are lowercased.
+				const ratings = parseSetValue(value).map((v) => v.toUpperCase());
+				if (ratings.length > 0) {
+					result.ageRating = ratings;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'released': {
+				const { from, to } = parseDateRange(value);
+				if (from) {
+					result.releasedAfter = from;
+					hasAny = true;
+				}
+				if (to) {
+					result.releasedBefore = to;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'boxoffice': {
+				const { min, max } = parseNumberRange(value);
+				if (min !== undefined) {
+					result.minBoxOffice = min;
+					hasAny = true;
+				}
+				if (max !== undefined) {
+					result.maxBoxOffice = max;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'tmdb': {
+				const { min, max } = parseNumberRange(value);
+				if (min !== undefined) {
+					result.minTmdbScore = min;
+					hasAny = true;
+				}
+				if (max !== undefined) {
+					result.maxTmdbScore = max;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case PERSON_FILTER_KEY: {
+				const person = parsePersonFilter(value);
+				if (person) {
+					result.personId = String(person.id);
+					if (person.role) result.personRole = person.role.toUpperCase() as 'CAST' | 'DIRECTOR';
 					hasAny = true;
 				}
 				break;

@@ -426,14 +426,14 @@ describe('urlParamsToFilter', () => {
 	it('converts range "1000.." to number greaterThan', () => {
 		const result = urlParamsToFilter({ views: '1000..' });
 		expect(result).toEqual({
-			views: { filterType: 'number', type: 'greaterThan', filter: 1000 },
+			views: { filterType: 'number', type: 'greaterThanOrEqual', filter: 1000 },
 		});
 	});
 
 	it('converts range "..5000" to number lessThan', () => {
 		const result = urlParamsToFilter({ views: '..5000' });
 		expect(result).toEqual({
-			views: { filterType: 'number', type: 'lessThan', filter: 5000 },
+			views: { filterType: 'number', type: 'lessThanOrEqual', filter: 5000 },
 		});
 	});
 
@@ -454,7 +454,7 @@ describe('urlParamsToFilter', () => {
 	it('converts likes range', () => {
 		const result = urlParamsToFilter({ likes: '500..' });
 		expect(result).toEqual({
-			likes: { filterType: 'number', type: 'greaterThan', filter: 500 },
+			likes: { filterType: 'number', type: 'greaterThanOrEqual', filter: 500 },
 		});
 	});
 

@@ -17,6 +17,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/realtime"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/cached"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/handlers"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/wikidata"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
@@ -168,15 +169,29 @@ func main() {
 		log.Fatal(err)
 	}
 	var youtubeClient portservices.YouTubeClient
+	// Discover's Trending feed; left nil in demo mode (no fixture for it), so
+	// youtubeTrending reports "not configured" there.
+	var trendingClient portservices.YouTubeTrendingClient
 	if demoCfg.Enabled {
 		slog.Warn("DEMO MODE ENABLED — unsigned demo.<persona> tokens are accepted; never expose this instance publicly with real data")
 		youtubeClient = youtube.NewFixtureClient()
 	} else {
-		youtubeClient = youtube.NewCachingClient(
+		// The same client also caches the Discover page's Trending chart
+		// (YOUTUBE_TRENDING_CACHE_TTL_SECONDS, default 1 hour).
+		cachingClient := youtube.NewCachingClient(
 			youtube.NewClient(cfg.YouTube.APIKey),
 			time.Duration(cfg.YouTube.CacheTTLSeconds)*time.Second,
+			youtube.WithTrendingTTL(time.Duration(cfg.YouTube.TrendingCacheTTLSeconds)*time.Second),
 		)
-		slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds)
+		youtubeClient = cachingClient
+		trendingClient = cachingClient
+		slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds, "trendingTTLSeconds", cfg.YouTube.TrendingCacheTTLSeconds)
+	}
+	var movieClient portservices.MovieClient = tmdb.UnconfiguredClient{}
+	if cfg.TMDBReadAccessToken != "" {
+		movieClient = tmdb.NewClient(cfg.TMDBReadAccessToken)
+	} else {
+		slog.Warn("TMDB_API_READ_ACCESS_TOKEN is empty — movie lookups will fail")
 	}
 	wikidataClient := wikidata.NewClient()
 	contentRepo := postgres.NewGormContentRepository(db)
@@ -193,7 +208,7 @@ func main() {
 	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
 
 	// Initialize services
-	contentService := services.NewContentService(contentRepo, youtubeClient, services.WithBibleReference(bibleReferenceRepo))
+	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient))
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)

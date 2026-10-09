@@ -21,6 +21,12 @@ resolver:
 
 # Map GraphQL types to Go types
 models:
+  LengthDisplay:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.LengthDisplay
+  LengthPrecision:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.LengthPrecision
   ID:
     model:
       - github.com/99designs/gqlgen/graphql.ID
@@ -62,6 +68,9 @@ models:
   ContentSearchField:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ContentSearchField
+  PersonRole:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.PersonRole
   ReviewStatus:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ReviewStatus

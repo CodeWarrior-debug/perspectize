@@ -28,6 +28,9 @@ type CreatePassageInput struct {
 type ContentService interface {
 	// CreateFromYouTube creates content from a YouTube URL, attributed to the given user
 	CreateFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error)
+	// CreateFromMovie creates MOVIE content from a TMDB or IMDb movie URL (or bare IMDb id), attributed to the given user.
+	// If the movie already exists, returns the existing content along with ErrAlreadyExists.
+	CreateFromMovie(ctx context.Context, rawURL string, userID int) (*domain.Content, error)
 
 	// CreateFromPassage finds or creates the BIBLE_PASSAGE content row for a verse range.
 	// If the range already exists, returns the existing content along with ErrAlreadyExists.
@@ -62,4 +65,9 @@ type ContentService interface {
 
 	// UpdateSourceData refreshes an existing content item's metadata from its source
 	UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error)
+
+	// YouTubeTrending returns one page of YouTube's most-popular chart for a
+	// region (ISO 3166-1 alpha-2, e.g. "US"). Served from the backend cache, so
+	// Discover visitors share one API call per page per TTL.
+	YouTubeTrending(ctx context.Context, regionCode, pageToken string) (*TrendingPage, error)
 }

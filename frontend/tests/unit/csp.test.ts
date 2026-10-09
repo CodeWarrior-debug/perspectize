@@ -29,4 +29,17 @@ describe('app.html Content-Security-Policy', () => {
 	it('allows the Grafana Faro collector so RUM/errors/traces can be sent', () => {
 		expect(directive('connect-src')).toContain('https://*.grafana.net');
 	});
+
+	it('does not let the browser call the YouTube Data API (trending is served by the backend)', () => {
+		// Compare parsed hostnames, not substrings: keywords like 'self' aren't URLs,
+		// and a wildcard source (https://*.googleapis.com) must count too.
+		const hosts = directive('connect-src').flatMap((src) => {
+			try {
+				return [new URL(src.replace('*.', 'wildcard.')).hostname];
+			} catch {
+				return [];
+			}
+		});
+		expect(hosts.some((h) => h === 'googleapis.com' || h.endsWith('.googleapis.com'))).toBe(false);
+	});
 });

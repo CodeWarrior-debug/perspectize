@@ -165,3 +165,20 @@ func TestCategorizedRatingInputsToDomain(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
+
+func TestDomainToModel_MovieField(t *testing.T) {
+	body := json.RawMessage(`{"title":"Heat","revenue":187436818}`)
+
+	t.Run("MOVIE row exposes the shaped payload as movie", func(t *testing.T) {
+		m := domainToModel(&domain.Content{ID: 1, ContentType: domain.ContentTypeMovie, Response: body})
+		require.NotNil(t, m.Movie)
+		assert.Equal(t, "Heat", m.Movie["title"])
+		assert.Equal(t, m.Response, m.Movie)
+	})
+
+	t.Run("YOUTUBE_VIDEO row has null movie", func(t *testing.T) {
+		m := domainToModel(&domain.Content{ID: 2, ContentType: domain.ContentTypeYouTubeVideo, Response: body})
+		assert.Nil(t, m.Movie)
+		assert.NotNil(t, m.Response)
+	})
+}
