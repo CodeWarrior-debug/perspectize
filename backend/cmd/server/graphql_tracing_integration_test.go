@@ -80,7 +80,7 @@ func newTracingHarness(t *testing.T) *tracingHarness {
 	userRepo := postgres.NewGormUserRepository(db)
 	perspectiveRepo := postgres.NewGormPerspectiveRepository(db)
 
-	contentService := services.NewContentService(contentRepo, nil)
+	contentService := services.NewContentService(contentRepo, nil, nil)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
 
 	h := &tracingHarness{db: db}
