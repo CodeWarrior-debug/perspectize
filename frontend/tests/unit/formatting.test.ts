@@ -33,6 +33,7 @@ import {
 	formatMoneyExact,
 	vsBudgetPercent,
 	formatVsBudget,
+	durationTooltip,
 } from '$lib/utils/formatting';
 
 describe('shared h:mm:ss duration', () => {
@@ -1035,5 +1036,33 @@ describe('categoryCellRenderer', () => {
 
 		expect(result.querySelector('a')).toBeNull();
 		expect(result.querySelector('span')?.textContent).toBe('Science');
+	});
+});
+
+describe('durationTooltip (names the format, so the unit is clear)', () => {
+	const tip = (length: number | null, precision?: string) =>
+		durationTooltip({
+			data: { length, lengthUnits: 'seconds', lengthDisplay: precision ? { source: 'x', precision } : null },
+		});
+
+	it('movie runtime (MINUTES) reads as h:mm', () => {
+		expect(tip(179 * 60, 'MINUTES')).toBe('2:59 (h:mm)');
+	});
+
+	it('a video under an hour reads as m:ss', () => {
+		expect(tip(227, 'SECONDS')).toBe('3:47 (m:ss)');
+	});
+
+	it('a video of an hour or more reads as h:mm:ss', () => {
+		expect(tip(3723, 'SECONDS')).toBe('1:02:03 (h:mm:ss)');
+	});
+
+	it('no precision falls back to the seconds formats', () => {
+		expect(tip(227)).toBe('3:47 (m:ss)');
+	});
+
+	it('no length gives an empty tooltip', () => {
+		expect(tip(null, 'MINUTES')).toBe('');
+		expect(durationTooltip({})).toBe('');
 	});
 });

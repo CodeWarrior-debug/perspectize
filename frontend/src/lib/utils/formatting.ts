@@ -185,6 +185,22 @@ export function formatRemainingTime(ms: number): string {
 }
 
 /**
+ * Duration cell tooltip: the value plus the format it is in, so the unit is
+ * clear ("2:59 (h:mm)" for a movie runtime, "3:47 (m:ss)", "1:02:03 (h:mm:ss)").
+ */
+export function durationTooltip(params: {
+	data?: { length: number | null; lengthUnits: string | null; lengthDisplay?: LengthDisplay | null };
+}): string {
+	const d = params.data;
+	if (!d || d.length == null) return '';
+	const precision = d.lengthDisplay?.precision;
+	const text = formatDuration(d.length, d.lengthUnits, precision);
+	if (d.lengthUnits !== 'seconds') return text;
+	const unit = precision === 'MINUTES' ? 'h:mm' : d.length >= 3600 ? 'h:mm:ss' : 'm:ss';
+	return `${text} (${unit})`;
+}
+
+/**
  * AG Grid value getter for duration column.
  */
 export function durationValueGetter(params: {
