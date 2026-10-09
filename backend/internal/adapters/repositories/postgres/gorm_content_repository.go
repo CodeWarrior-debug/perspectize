@@ -207,6 +207,12 @@ func applyMovieColumnFilters(query *gorm.DB, f *domain.ContentFilter) *gorm.DB {
 	if f.GenreContains != nil && *f.GenreContains != "" {
 		query = query.Where("(response->'genres')::text ILIKE ?", "%"+*f.GenreContains+"%")
 	}
+	if f.CastContains != nil && *f.CastContains != "" {
+		// The Cast cell lists directors and cast, so match a name in either.
+		pattern := "%" + *f.CastContains + "%"
+		query = query.Where("("+contentSearchColumns[domain.ContentSearchFieldCast]+" OR "+
+			contentSearchColumns[domain.ContentSearchFieldDirector]+")", pattern, pattern)
+	}
 	if len(f.AgeRating) > 0 {
 		query = query.Where("response->>'certification' IN ?", f.AgeRating)
 	}

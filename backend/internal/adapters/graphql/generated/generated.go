@@ -75,6 +75,7 @@ type ComplexityRoot struct {
 		DisplayTitle       func(childComplexity int) int
 		ID                 func(childComplexity int) int
 		Length             func(childComplexity int) int
+		LengthDisplay      func(childComplexity int) int
 		LengthUnits        func(childComplexity int) int
 		LikeCount          func(childComplexity int) int
 		Movie              func(childComplexity int) int
@@ -152,6 +153,11 @@ type ComplexityRoot struct {
 		Strongs     func(childComplexity int) int
 		TagSource   func(childComplexity int) int
 		Translit    func(childComplexity int) int
+	}
+
+	LengthDisplay struct {
+		Precision func(childComplexity int) int
+		Source    func(childComplexity int) int
 	}
 
 	Message struct {
@@ -605,6 +611,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.Length(childComplexity), true
+	case "Content.lengthDisplay":
+		if e.ComplexityRoot.Content.LengthDisplay == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.LengthDisplay(childComplexity), true
 	case "Content.lengthUnits":
 		if e.ComplexityRoot.Content.LengthUnits == nil {
 			break
@@ -931,6 +943,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.InterlinearWord.Translit(childComplexity), true
+
+	case "LengthDisplay.precision":
+		if e.ComplexityRoot.LengthDisplay.Precision == nil {
+			break
+		}
+
+		return e.ComplexityRoot.LengthDisplay.Precision(childComplexity), true
+	case "LengthDisplay.source":
+		if e.ComplexityRoot.LengthDisplay.Source == nil {
+			break
+		}
+
+		return e.ComplexityRoot.LengthDisplay.Source(childComplexity), true
 
 	case "Message.body":
 		if e.ComplexityRoot.Message.Body == nil {
@@ -2240,6 +2265,24 @@ type WikidataSearchResult {
   entityType: String
 }
 
+"Smallest unit a source reports a length in."
+enum LengthPrecision {
+  "Format as h:mm:ss, or m:ss under an hour."
+  SECONDS
+  "Format as h:mm (e.g. a TMDB movie runtime)."
+  MINUTES
+}
+
+"""
+Where a content length came from and the smallest unit that source reports.
+` + "`" + `length` + "`" + ` is always seconds; show it to ` + "`" + `precision` + "`" + `.
+"""
+type LengthDisplay {
+  "Origin of the length, e.g. youtube, tmdb."
+  source: String!
+  precision: LengthPrecision!
+}
+
 type Content {
   id: ID!
   name: String!
@@ -2249,6 +2292,8 @@ type Content {
   addedBy: User
   length: Int
   lengthUnits: String
+  "Where length came from and the smallest unit it reports; format length to that precision."
+  lengthDisplay: LengthDisplay
   viewCount: Int
   likeCount: Int
   commentCount: Int
@@ -2310,6 +2355,8 @@ enum ContentSortBy {
   BOX_OFFICE
   VS_BUDGET
   AGE_RATING
+  RELEASE_DATE
+  TMDB_SCORE
 }
 
 enum SortOrder {
@@ -2440,6 +2487,7 @@ input ContentFilter {
   personRole: PersonRole
   # Movie column filters (movie rows only; other rows have no such data and never match)
   genreContains: String      # Case-insensitive contains on the genre names
+  castContains: String       # Case-insensitive contains on a cast or director name
   ageRating: [String!]       # Certification is any of these (e.g. PG-13, R)
   releasedAfter: String      # ISO date (YYYY-MM-DD), inclusive
   releasedBefore: String     # ISO date (YYYY-MM-DD), inclusive
@@ -2858,6 +2906,8 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_length(ctx, field)
 	case "lengthUnits":
 		return ec.fieldContext_Content_lengthUnits(ctx, field)
+	case "lengthDisplay":
+		return ec.fieldContext_Content_lengthDisplay(ctx, field)
 	case "viewCount":
 		return ec.fieldContext_Content_viewCount(ctx, field)
 	case "likeCount":
@@ -3020,6 +3070,16 @@ func (ec *executionContext) childFields_InterlinearWord(ctx context.Context, fie
 		return ec.fieldContext_InterlinearWord_segment(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type InterlinearWord", field.Name)
+}
+
+func (ec *executionContext) childFields_LengthDisplay(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "source":
+		return ec.fieldContext_LengthDisplay_source(ctx, field)
+	case "precision":
+		return ec.fieldContext_LengthDisplay_precision(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type LengthDisplay", field.Name)
 }
 
 func (ec *executionContext) childFields_Message(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -4701,6 +4761,38 @@ func (ec *executionContext) fieldContext_Content_lengthUnits(_ context.Context, 
 	return graphql.NewScalarFieldContext("Content", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _Content_lengthDisplay(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_lengthDisplay(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LengthDisplay, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *domain.LengthDisplay) graphql.Marshaler {
+			return ec.marshalOLengthDisplay2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐLengthDisplay(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_lengthDisplay(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Content",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_LengthDisplay(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Content_viewCount(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6023,6 +6115,52 @@ func (ec *executionContext) _InterlinearWord_segment(ctx context.Context, field 
 }
 func (ec *executionContext) fieldContext_InterlinearWord_segment(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("InterlinearWord", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _LengthDisplay_source(ctx context.Context, field graphql.CollectedField, obj *domain.LengthDisplay) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_LengthDisplay_source(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Source, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_LengthDisplay_source(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("LengthDisplay", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _LengthDisplay_precision(ctx context.Context, field graphql.CollectedField, obj *domain.LengthDisplay) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_LengthDisplay_precision(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Precision, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v domain.LengthPrecision) graphql.Marshaler {
+			return ec.marshalNLengthPrecision2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐLengthPrecision(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_LengthDisplay_precision(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("LengthDisplay", field, false, false, errors.New("field of type LengthPrecision does not have child fields"))
 }
 
 func (ec *executionContext) _Message_id(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
@@ -11883,7 +12021,7 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
+	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11953,6 +12091,13 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.GenreContains = data
+		case "castContains":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("castContains"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CastContains = data
 		case "ageRating":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ageRating"))
 			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
@@ -13246,6 +13391,11 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.RequiredNull {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "lengthDisplay":
+			out.Values[i] = ec._Content_lengthDisplay(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "viewCount":
 			out.Values[i] = ec._Content_viewCount(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
@@ -13920,6 +14070,49 @@ func (ec *executionContext) _InterlinearWord(ctx context.Context, sel ast.Select
 		case "segment":
 			out.Values[i] = ec._InterlinearWord_segment(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var lengthDisplayImplementors = []string{"LengthDisplay"}
+
+func (ec *executionContext) _LengthDisplay(ctx context.Context, sel ast.SelectionSet, obj *domain.LengthDisplay) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, lengthDisplayImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("LengthDisplay")
+		case "source":
+			out.Values[i] = ec._LengthDisplay_source(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "precision":
+			out.Values[i] = ec._LengthDisplay_precision(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		default:
@@ -16950,6 +17143,23 @@ func (ec *executionContext) marshalNInterlinearWord2ᚖgithubᚗcomᚋCodeWarrio
 	return ec._InterlinearWord(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNLengthPrecision2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐLengthPrecision(ctx context.Context, v any) (domain.LengthPrecision, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.LengthPrecision(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNLengthPrecision2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐLengthPrecision(ctx context.Context, sel ast.SelectionSet, v domain.LengthPrecision) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) marshalNMessage2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Message) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -17861,6 +18071,13 @@ func (ec *executionContext) marshalOJSON2map(ctx context.Context, sel ast.Select
 	_ = ctx
 	res := graphql.MarshalMap(v)
 	return res
+}
+
+func (ec *executionContext) marshalOLengthDisplay2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐLengthDisplay(ctx context.Context, sel ast.SelectionSet, v *domain.LengthDisplay) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._LengthDisplay(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOMessageThread2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageThread(ctx context.Context, sel ast.SelectionSet, v *model.MessageThread) graphql.Marshaler {

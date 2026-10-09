@@ -58,6 +58,8 @@ func TestCreateFromMovie_Success(t *testing.T) {
 	assert.Equal(t, 8160, *saved.Length)
 	require.NotNil(t, saved.LengthUnits)
 	assert.Equal(t, "seconds", *saved.LengthUnits)
+	// TMDB runtimes are whole minutes: Length stays seconds, precision says minutes.
+	assert.Equal(t, &domain.LengthDisplay{Source: "tmdb", Precision: domain.LengthPrecisionMinutes}, saved.LengthDisplay)
 }
 
 func TestCreateFromMovie_NilRuntime(t *testing.T) {
@@ -69,6 +71,7 @@ func TestCreateFromMovie_NilRuntime(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, got.Length)
 	assert.Nil(t, got.LengthUnits)
+	assert.Nil(t, got.LengthDisplay, "no runtime, nothing to describe")
 }
 
 func TestCreateFromMovie_DuplicateSkipsFetch(t *testing.T) {

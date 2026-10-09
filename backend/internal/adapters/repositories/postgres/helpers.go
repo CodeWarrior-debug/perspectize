@@ -100,6 +100,8 @@ var computedSortColumns = map[string]string{
 	"BoxOffice":    "box_office",
 	"VsBudget":     "vs_budget",
 	"AgeRating":    "age_rating",
+	"ReleaseDate":  "release_date_sort",
+	"TmdbScore":    "tmdb_score",
 }
 
 // computedSortSelects returns the ", (expr) AS alias" select-list suffix for every
@@ -131,13 +133,21 @@ const (
 	// nullAgeRatingAsc is above every rank (real ranks are 1-5).
 	nullAgeRatingAsc  int64 = 99
 	nullAgeRatingDesc int64 = 0
+	// Release dates are ISO strings: ASC needs one after every real date, DESC "" (before all).
+	nullReleaseDateAsc  = "9999-12-31"
+	nullReleaseDateDesc = ""
+	// TMDB vote averages are 0-10.
+	nullTmdbScoreAsc  float64 = 99
+	nullTmdbScoreDesc float64 = -1
 )
 
 // contentSortRule builds a single paginator.Rule for one content sort column.
 func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) paginator.Rule {
 	boxOfficeNull, vsBudgetNull, ageRatingNull := nullBoxOfficeDesc, nullVsBudgetDesc, nullAgeRatingDesc
+	releaseDateNull, tmdbScoreNull := nullReleaseDateDesc, nullTmdbScoreDesc
 	if order == domain.SortOrderAsc {
 		boxOfficeNull, vsBudgetNull, ageRatingNull = nullBoxOfficeAsc, nullVsBudgetAsc, nullAgeRatingAsc
+		releaseDateNull, tmdbScoreNull = nullReleaseDateAsc, nullTmdbScoreAsc
 	}
 	// Map domain.SortOrder to paginator.Order
 	var paginatorOrder paginator.Order
@@ -204,6 +214,21 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 			SQLRepr: "CASE response->>'certification' WHEN 'G' THEN 1 WHEN 'PG' THEN 2 " +
 				"WHEN 'PG-13' THEN 3 WHEN 'R' THEN 4 WHEN 'NC-17' THEN 5 ELSE NULL END",
 			NULLReplacement: ageRatingNull,
+		}
+	case domain.ContentSortByReleaseDate:
+		// ISO YYYY-MM-DD, so string order is date order; an empty date counts as unknown.
+		return paginator.Rule{
+			Key:             "ReleaseDate",
+			Order:           paginatorOrder,
+			SQLRepr:         "NULLIF(response->>'releaseDate', '')",
+			NULLReplacement: releaseDateNull,
+		}
+	case domain.ContentSortByTmdbScore:
+		return paginator.Rule{
+			Key:             "TmdbScore",
+			Order:           paginatorOrder,
+			SQLRepr:         "(response->>'voteAverage')::FLOAT8",
+			NULLReplacement: tmdbScoreNull,
 		}
 	case domain.ContentSortByPublishedAt:
 		return paginator.Rule{

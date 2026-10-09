@@ -72,6 +72,39 @@ func TestCreateContentFromMovie_Success(t *testing.T) {
 	assert.Equal(t, "The Matrix", data.CreateContentFromMovie.Name)
 }
 
+func TestCreateContentFromMovie_LengthDisplayMinutes(t *testing.T) {
+	repo := &mockContentRepository{getOrCreateByURLFn: func(ctx context.Context, c *domain.Content) (*domain.Content, bool, error) {
+		c.ID = 42
+		return c, false, nil
+	}}
+	runtime := 8520
+	mc := stubMovieClient{get: func(ctx context.Context, id int) (*portservices.MovieMetadata, error) {
+		return &portservices.MovieMetadata{TMDBID: 603, Title: "The Matrix", Response: json.RawMessage(`{}`), RuntimeSeconds: &runtime}, nil
+	}}
+	server := setupMovieServer(repo, mc)
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { createContentFromMovie(input: { url: "https://www.themoviedb.org/movie/603" }) { length lengthDisplay { source precision } } }`)
+	require.Empty(t, result.Errors)
+	assert.JSONEq(t, `{"createContentFromMovie":{"length":8520,"lengthDisplay":{"source":"tmdb","precision":"MINUTES"}}}`, string(result.Data))
+}
+
+func TestCreateContentFromMovie_NoRuntimeHasNoLengthDisplay(t *testing.T) {
+	repo := &mockContentRepository{getOrCreateByURLFn: func(ctx context.Context, c *domain.Content) (*domain.Content, bool, error) {
+		c.ID = 42
+		return c, false, nil
+	}}
+	mc := stubMovieClient{get: func(ctx context.Context, id int) (*portservices.MovieMetadata, error) {
+		return &portservices.MovieMetadata{TMDBID: 603, Title: "The Matrix", Response: json.RawMessage(`{}`)}, nil
+	}}
+	server := setupMovieServer(repo, mc)
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { createContentFromMovie(input: { url: "https://www.themoviedb.org/movie/603" }) { length lengthDisplay { source precision } } }`)
+	require.Empty(t, result.Errors)
+	assert.JSONEq(t, `{"createContentFromMovie":{"length":null,"lengthDisplay":null}}`, string(result.Data))
+}
+
 func TestCreateContentFromMovie_DuplicateReturnsExisting(t *testing.T) {
 	url := "https://www.themoviedb.org/movie/603"
 	repo := &mockContentRepository{getByURLFn: func(ctx context.Context, u string) (*domain.Content, error) {
