@@ -105,3 +105,22 @@ Return:
 - Any collision, lock or irreversibility risk.
 - The exact line the PR body needs: "Needs a manual `migrate up` against each
   environment (dev, prod) at rollout."
+- A Neon branch verification hand-back for the main session (you don't run it):
+
+  1. User signs in once if needed: `! neon auth`, then opens the printed URL.
+  2. Main session creates the branch itself:
+     `neon branches create --project-id lively-fog-94104513 --name <task>-verify --parent production`.
+  3. User runs only the connection-string step, redirected to a file so it never
+     enters the chat:
+     `! neon connection-string <task>-verify --project-id lively-fog-94104513 --pooled=false --role-name neondb_owner --database-name neondb > ~/.perspectize-neon-branch.url`.
+  4. Main session applies to the **branch only**, with
+     `-database "$(cat ~/.perspectize-neon-branch.url)"` and output piped through
+     `sed -E 's#postgres(ql)?://[^ ]+#<branch-url>#g'`.
+
+  Steps 1–4 apply the migration only. The main session then checks: version before;
+  backfill counts per affected type (give the exact `SELECT … GROUP BY`); and
+  `down 1` then `up` again.
+
+  Never apply to the real database while the migration's number is provisional
+  (another open PR claims it). golang-migrate keeps one version number, so a
+  same-numbered migration from the other PR would later be skipped silently.
