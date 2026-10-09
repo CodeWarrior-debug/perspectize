@@ -367,8 +367,8 @@ describe('Movie COLUMNS entries', () => {
 	const byId = (id: string) => COLUMNS.find((c) => c.colId === id);
 
 	it('Box office, Vs. budget and Rated sort server-side by their backend enums', () => {
-		expect(byId('boxOffice')).toMatchObject({ sortable: true, serverSort: 'BOX_OFFICE', label: 'Box office' });
-		expect(byId('vsBudget')).toMatchObject({ sortable: true, serverSort: 'VS_BUDGET', label: 'Vs. budget' });
+		expect(byId('boxOffice')).toMatchObject({ sortable: true, serverSort: 'BOX_OFFICE', label: 'Take' });
+		expect(byId('vsBudget')).toMatchObject({ sortable: true, serverSort: 'VS_BUDGET', label: 'ROI' });
 		expect(byId('rated')).toMatchObject({ sortable: true, serverSort: 'AGE_RATING', label: 'Rated' });
 		expect(COL_TO_SORT.boxOffice).toBe('BOX_OFFICE');
 		expect(COL_TO_SORT.vsBudget).toBe('VS_BUDGET');
@@ -579,33 +579,29 @@ describe('default column sets fit the 1212px grid', () => {
 		expect(total).toBeLessThanOrEqual(1212);
 	});
 
-	// KNOWN OVERFLOW: adding Type to the Movie set put the lg set 91px over the 1212px
-	// grid, so the last column clips on wide screens. Kept on purpose until the Movie
-	// columns are reviewed; `it.fails` starts failing once the set fits again, so switch
-	// this back to a plain `it` then.
-	it.fails('Movie lg set sums under 1212', () => {
+	it('Movie lg set sums under 1212', () => {
 		const { visible } = defaultColumnVisibility('lg', true);
 		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
 		expect(total).toBeLessThanOrEqual(1212);
 	});
 
-	it('Movie lg minimum widths are the tuned table plus Type (sum 1303)', () => {
+	it('Movie lg minimum widths are the tuned table plus Type (sum 1193)', () => {
 		const { visible } = defaultColumnVisibility('lg', true);
 		const widths = Object.fromEntries(visible.map((id) => [id, minWidth(id)]));
 		expect(widths).toMatchObject({
 			item: 185,
-			type: 96,
+			type: 84,
 			genre: 82,
 			rated: 82,
 			cast: 125,
 			duration: 111,
 			released: 105,
-			boxOffice: 138,
-			vsBudget: 118,
-			tmdbScore: 121,
+			boxOffice: 96,
+			vsBudget: 72,
+			tmdbScore: 111,
 			tags: 90,
 		});
-		expect(Object.values(widths).reduce((a, b) => a + b, 0)).toBe(1303);
+		expect(Object.values(widths).reduce((a, b) => a + b, 0)).toBe(1193);
 	});
 
 	it('no colDef has minWidth above maxWidth', () => {

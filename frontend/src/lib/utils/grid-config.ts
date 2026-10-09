@@ -319,7 +319,7 @@ export const COLUMNS: readonly ColumnMeta[] = [
 	},
 	{
 		colId: 'boxOffice',
-		label: 'Box office',
+		label: 'Take',
 		picker: 'data',
 		sortable: true,
 		sortValue: (row) => boxOfficeValueGetter({ data: row }),
@@ -330,7 +330,7 @@ export const COLUMNS: readonly ColumnMeta[] = [
 	},
 	{
 		colId: 'vsBudget',
-		label: 'Vs. budget',
+		label: 'ROI',
 		picker: 'data',
 		sortable: true,
 		sortValue: (row) => vsBudgetValueGetter({ data: row }),
@@ -340,7 +340,7 @@ export const COLUMNS: readonly ColumnMeta[] = [
 	},
 	{
 		colId: 'tmdbScore',
-		label: 'TMDB Score',
+		label: 'Rating',
 		picker: 'data',
 		sortable: true,
 		sortValue: (row) => tmdbScoreValueGetter({ data: row }),

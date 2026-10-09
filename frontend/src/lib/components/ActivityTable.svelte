@@ -633,6 +633,8 @@
 				colId: 'type',
 				headerName: 'Type',
 				flex: 0.5,
+				// The cell is a single icon; 84 still fits the header text, sort arrow and filter button.
+				minWidth: 84,
 				maxWidth: 100,
 
 				filter: ContentTypeFilter,
@@ -720,6 +722,7 @@
 				valueGetter: durationValueGetter,
 				filterValueGetter: durationFilterValueGetter,
 				comparator: durationComparator,
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.duration },
 				headerTooltip:
 					'Video duration from YouTube API. For movies this is the runtime in h:mm (TMDB reports whole minutes).',
 			},
@@ -781,9 +784,9 @@
 			},
 			{
 				colId: 'boxOffice',
-				headerName: 'Box office',
+				headerName: 'Take',
 				flex: 0.8,
-				minWidth: 138, // room for the sort arrow
+				minWidth: 96, // "Take" + sort arrow + filter button
 				maxWidth: 150,
 				filter: 'agNumberColumnFilter',
 				valueGetter: boxOfficeValueGetter,
@@ -795,23 +798,23 @@
 			},
 			{
 				colId: 'vsBudget',
-				headerName: 'Vs. budget',
+				headerName: 'ROI',
 				flex: 0.8,
-				minWidth: 118,
+				minWidth: 72, // "ROI" + sort arrow (no filter button)
 				maxWidth: 130,
 				filter: false,
 				valueGetter: vsBudgetValueGetter,
 				comparator: unknownLastComparator,
 				valueFormatter: (params) => formatVsBudgetCell(params.value),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.vsBudget },
-				headerTooltip: 'Box office as a percentage of budget. Ignores marketing, so under 100% does not mean a loss.',
+				headerTooltip: 'Box Office Take / Budget',
 				hide: true,
 			},
 			{
 				colId: 'tmdbScore',
-				headerName: 'TMDB Score',
+				headerName: 'Rating',
 				flex: 0.7,
-				minWidth: 121,
+				minWidth: 111,
 				maxWidth: 130,
 				filter: 'agNumberColumnFilter',
 				valueGetter: tmdbScoreValueGetter,
