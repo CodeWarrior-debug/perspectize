@@ -35,6 +35,12 @@ const (
 	LengthPrecisionMinutes = "minutes"
 )
 
+// Length sources. Migration 000030's backfill writes the same strings.
+const (
+	LengthSourceYouTube = "youtube"
+	LengthSourceTMDB    = "tmdb"
+)
+
 // LengthDisplay records where Content.Length came from and the smallest unit
 // that source reports. Length is always stored in seconds so it sorts and
 // filters across types; clients format it to Precision (a TMDB runtime is whole
@@ -43,6 +49,16 @@ const (
 type LengthDisplay struct {
 	Source    string `json:"source"`
 	Precision string `json:"precision"`
+}
+
+// YouTubeLengthDisplay is a YouTube video's length: seconds from the Data API.
+func YouTubeLengthDisplay() *LengthDisplay {
+	return &LengthDisplay{Source: LengthSourceYouTube, Precision: LengthPrecisionSeconds}
+}
+
+// TMDBLengthDisplay is a movie runtime: TMDB reports whole minutes.
+func TMDBLengthDisplay() *LengthDisplay {
+	return &LengthDisplay{Source: LengthSourceTMDB, Precision: LengthPrecisionMinutes}
 }
 
 // Content represents a media item that users create perspectives on
