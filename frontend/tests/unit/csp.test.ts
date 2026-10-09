@@ -26,6 +26,10 @@ describe('app.html Content-Security-Policy', () => {
 		expect(directive('frame-src')).toContain('https://www.youtube-nocookie.com');
 	});
 
+	it('allows the Grafana Faro collector so RUM/errors/traces can be sent', () => {
+		expect(directive('connect-src')).toContain('https://*.grafana.net');
+	});
+
 	it('does not let the browser call the YouTube Data API (trending is served by the backend)', () => {
 		// Compare parsed hostnames, not substrings: keywords like 'self' aren't URLs,
 		// and a wildcard source (https://*.googleapis.com) must count too.

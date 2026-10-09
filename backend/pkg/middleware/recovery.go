@@ -7,6 +7,8 @@ import (
 	"runtime/debug"
 
 	chimw "github.com/go-chi/chi/v5/middleware"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Recoverer is a middleware that catches panics and logs them as structured JSON
@@ -23,6 +25,11 @@ func Recoverer(next http.Handler) http.Handler {
 					"path", r.URL.Path,
 					"request_id", chimw.GetReqID(r.Context()),
 				)
+
+				span := trace.SpanFromContext(r.Context())
+				span.RecordError(fmt.Errorf("panic: %v", err))
+				span.SetStatus(codes.Error, "panic")
+
 				http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
 			}
 		}()

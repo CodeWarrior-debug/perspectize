@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build",
+		"build": "vite build && node scripts/strip-sourcemaps.mjs",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -28,12 +28,13 @@
 		"cap:sync": "cap sync",
 		"cap:open:ios": "cap open ios",
 		"cap:open:android": "cap open android",
-		"mobile:build": "vite build && cap sync"
+		"mobile:build": "vite build && node scripts/strip-sourcemaps.mjs && cap sync"
 	},
 	"devDependencies": {
 		"@capacitor/android": "^8.5.2",
 		"@capacitor/cli": "^8.5.2",
 		"@capacitor/ios": "^8.5.2",
+		"@grafana/faro-rollup-plugin": "0.13.0",
 		"@internationalized/date": "^3.12.4",
 		"@lhci/cli": "^0.15.1",
 		"@lucide/svelte": "^1.51.0",
@@ -72,6 +73,8 @@
 		"@ag-grid-community/theming": "32.3.9",
 		"@capacitor/core": "^8.5.2",
 		"@capacitor/haptics": "^8.0.2",
+		"@grafana/faro-web-sdk": "2.12.1",
+		"@grafana/faro-web-tracing": "2.12.1",
 		"@jaames/iro": "^5.5.2",
 		"@tanstack/svelte-form": "^1.33.5",
 		"@tanstack/svelte-query": "^6.3.1",
@@ -94,7 +97,6 @@
 		"graphql-ws": "^6.3.0",
 		"svelte-clerk": "^1.2.0",
 		"svelte-sonner": "^1.2.1",
-		"tailwind-merge": "^3.7.0",
-		"web-vitals": "^6.2.2"
+		"tailwind-merge": "^3.7.0"
 	}
 }
