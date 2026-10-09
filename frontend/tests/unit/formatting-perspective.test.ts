@@ -44,16 +44,10 @@ describe('PerspectiveHeaderRenderer class', () => {
 			expect(element.innerHTML).toContain('svg');
 		});
 
-		it('sets title attribute to accessibility text', () => {
+		it('sets no native title (the column headerTooltip is the only tooltip)', () => {
 			renderer.init();
 			const element = renderer.getGui();
-			expect(element.title).toBe('Perspectize — add or edit your perspective');
-		});
-
-		it('title attribute is exactly as specified', () => {
-			renderer.init();
-			const element = renderer.getGui();
-			expect(element.title).toBe('Perspectize — add or edit your perspective');
+			expect(element.hasAttribute('title')).toBe(false);
 		});
 	});
 
@@ -81,12 +75,6 @@ describe('PerspectiveHeaderRenderer class', () => {
 			renderer.init();
 			const element = renderer.getGui();
 			expect(element.className).toBe('flex items-center justify-center w-full h-full');
-		});
-
-		it('returns element with correct title', () => {
-			renderer.init();
-			const element = renderer.getGui();
-			expect(element.title).toBe('Perspectize — add or edit your perspective');
 		});
 	});
 
