@@ -311,7 +311,7 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		picker: 'data',
 		sortable: true,
 		sortValue: (row) => releasedValueGetter({ data: row }),
-		clientOnlySort: true,
+		serverSort: 'RELEASE_DATE',
 		filterKey: 'released',
 		filterValue: (row) => releasedValueGetter({ data: row }),
 		filterRange: 'date',
@@ -343,9 +343,8 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		label: 'TMDB Score',
 		picker: 'data',
 		sortable: true,
-		// No ContentSortBy key for the TMDB vote average, so client-side only.
 		sortValue: (row) => tmdbScoreValueGetter({ data: row }),
-		clientOnlySort: true,
+		serverSort: 'TMDB_SCORE',
 		filterKey: 'tmdb',
 		filterValue: (row) => tmdbScoreValueGetter({ data: row }),
 		filterRange: 'number',
@@ -756,6 +755,26 @@ export function parsePersonFilter(value: string | undefined): PersonFilter | nul
 /** Client-side twin of the server's person filter: the row is a Movie crediting this person (in the role, if given). */
 export function rowMatchesPerson(row: ContentItem, person: PersonFilter): boolean {
 	return moviePeople(row).some((p) => p.id === person.id && (!person.role || p.role === person.role));
+}
+
+/** The slice of AG Grid's API that syncItemHeader needs (kept small so it is unit-testable). */
+export interface HeaderApi {
+	getColumn(colId: string): { getColDef(): { headerName?: string } } | null | undefined;
+	refreshHeader(): void;
+}
+
+/**
+ * Set the Item column's header text, redrawing the header only when it actually
+ * changes. refreshHeader closes an open column-filter popup, and the caller's
+ * effect re-runs on every filter change, so an unconditional redraw closed the
+ * filter while the user was still typing. Returns whether it redrew.
+ */
+export function syncItemHeader(api: HeaderApi, name: string): boolean {
+	const colDef = api.getColumn('item')?.getColDef();
+	if (!colDef || colDef.headerName === name) return false;
+	colDef.headerName = name;
+	api.refreshHeader();
+	return true;
 }
 
 /** Item column header: "Film" when the type filter is exactly MOVIE, otherwise "Item". */

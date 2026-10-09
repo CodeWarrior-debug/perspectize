@@ -95,6 +95,7 @@
 		compareContentBySorts,
 		filterContentRows,
 		togglableColIds,
+		syncItemHeader,
 		PERSON_FILTER_KEY,
 		parsePersonFilter,
 		rowMatchesPerson,
@@ -1196,12 +1197,11 @@
 	});
 
 	// The Item column reads "Film" in the Movie view. headerName is read live; refreshHeader redraws it.
+	// syncItemHeader redraws only on a real rename: this effect re-runs on every filter change.
 	$effect(() => {
 		const headerName = itemColumnHeader(filters.type);
 		if (!gridApi || !gridReady) return;
-		const colDef = gridApi.getColumn('item')?.getColDef();
-		if (colDef) colDef.headerName = headerName;
-		gridApi.refreshHeader();
+		syncItemHeader(gridApi, headerName);
 	});
 
 	// Restore AG Grid filter state from URL on mount and mode changes

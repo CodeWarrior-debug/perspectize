@@ -383,11 +383,12 @@ describe('Movie COLUMNS entries', () => {
 		}
 	});
 
-	it('Released and TMDB Score sort client-side only (no ContentSortBy key)', () => {
+	it('Released and TMDB Score sort on the server (RELEASE_DATE, TMDB_SCORE)', () => {
+		expect(byId('released')?.serverSort).toBe('RELEASE_DATE');
+		expect(byId('tmdbScore')?.serverSort).toBe('TMDB_SCORE');
 		for (const id of ['released', 'tmdbScore']) {
 			expect(byId(id)?.sortable, id).toBe(true);
-			expect(byId(id)?.clientOnlySort, id).toBe(true);
-			expect(byId(id)?.serverSort, id).toBeUndefined();
+			expect(byId(id)?.clientOnlySort, id).toBeFalsy();
 		}
 	});
 
