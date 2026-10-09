@@ -2355,6 +2355,8 @@ enum ContentSortBy {
   BOX_OFFICE
   VS_BUDGET
   AGE_RATING
+  RELEASE_DATE
+  TMDB_SCORE
 }
 
 enum SortOrder {

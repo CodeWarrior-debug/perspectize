@@ -48,6 +48,19 @@ func TestMovieSortRules(t *testing.T) {
 		{"age rating asc", domain.ContentSortByAgeRating, domain.SortOrderAsc, paginator.Rule{
 			Key: "AgeRating", Order: paginator.ASC, SQLRepr: ageSQL, NULLReplacement: int64(99),
 		}},
+		// ISO dates sort lexically; a missing or empty date is NULL and sorts last both ways.
+		{"release date desc", domain.ContentSortByReleaseDate, domain.SortOrderDesc, paginator.Rule{
+			Key: "ReleaseDate", Order: paginator.DESC, SQLRepr: "NULLIF(response->>'releaseDate', '')", NULLReplacement: "",
+		}},
+		{"release date asc", domain.ContentSortByReleaseDate, domain.SortOrderAsc, paginator.Rule{
+			Key: "ReleaseDate", Order: paginator.ASC, SQLRepr: "NULLIF(response->>'releaseDate', '')", NULLReplacement: "9999-12-31",
+		}},
+		{"tmdb score desc", domain.ContentSortByTmdbScore, domain.SortOrderDesc, paginator.Rule{
+			Key: "TmdbScore", Order: paginator.DESC, SQLRepr: "(response->>'voteAverage')::FLOAT8", NULLReplacement: float64(-1),
+		}},
+		{"tmdb score asc", domain.ContentSortByTmdbScore, domain.SortOrderAsc, paginator.Rule{
+			Key: "TmdbScore", Order: paginator.ASC, SQLRepr: "(response->>'voteAverage')::FLOAT8", NULLReplacement: float64(99),
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

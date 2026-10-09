@@ -16,6 +16,8 @@ const (
 	ContentSortByBoxOffice    ContentSortBy = "BOX_OFFICE"
 	ContentSortByVsBudget     ContentSortBy = "VS_BUDGET"
 	ContentSortByAgeRating    ContentSortBy = "AGE_RATING"
+	ContentSortByReleaseDate  ContentSortBy = "RELEASE_DATE"
+	ContentSortByTmdbScore    ContentSortBy = "TMDB_SCORE"
 )
 
 // PersonRole is the role a person plays on a movie, used by ContentFilter.PersonRole.
