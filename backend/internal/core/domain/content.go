@@ -29,10 +29,13 @@ const (
 	ContentSearchFieldDirector     ContentSearchField = "DIRECTOR"
 )
 
-// Length precisions: the smallest unit a source reports a length in.
+// LengthPrecision is the smallest unit a source reports a length in. Stored
+// lowercase in content.length_display; converted in the repository mappers.
+type LengthPrecision string
+
 const (
-	LengthPrecisionSeconds = "seconds"
-	LengthPrecisionMinutes = "minutes"
+	LengthPrecisionSeconds LengthPrecision = "SECONDS"
+	LengthPrecisionMinutes LengthPrecision = "MINUTES"
 )
 
 // Length sources. Migration 000030's backfill writes the same strings.
@@ -47,8 +50,8 @@ const (
 // minutes, so it shows as h:mm, not h:mm:00). Stored as JSONB so new sources
 // and precisions need no migration.
 type LengthDisplay struct {
-	Source    string `json:"source"`
-	Precision string `json:"precision"`
+	Source    string
+	Precision LengthPrecision
 }
 
 // YouTubeLengthDisplay is a YouTube video's length: seconds from the Data API.

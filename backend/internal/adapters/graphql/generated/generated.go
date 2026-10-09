@@ -2265,15 +2265,22 @@ type WikidataSearchResult {
   entityType: String
 }
 
+"Smallest unit a source reports a length in."
+enum LengthPrecision {
+  "Format as h:mm:ss, or m:ss under an hour."
+  SECONDS
+  "Format as h:mm (e.g. a TMDB movie runtime)."
+  MINUTES
+}
+
 """
 Where a content length came from and the smallest unit that source reports.
-` + "`" + `length` + "`" + ` is always seconds; show it to ` + "`" + `precision` + "`" + ` ("minutes" -> h:mm, "seconds" -> h:mm:ss / m:ss).
+` + "`" + `length` + "`" + ` is always seconds; show it to ` + "`" + `precision` + "`" + `.
 """
 type LengthDisplay {
   "Origin of the length, e.g. youtube, tmdb."
   source: String!
-  "Smallest unit the source reports: seconds or minutes."
-  precision: String!
+  precision: LengthPrecision!
 }
 
 type Content {
@@ -6142,15 +6149,15 @@ func (ec *executionContext) _LengthDisplay_precision(ctx context.Context, field 
 			return obj.Precision, nil
 		},
 		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
-			return ec.marshalNString2string(ctx, selections, v)
+		func(ctx context.Context, selections ast.SelectionSet, v domain.LengthPrecision) graphql.Marshaler {
+			return ec.marshalNLengthPrecision2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐLengthPrecision(ctx, selections, v)
 		},
 		true,
 		true,
 	)
 }
 func (ec *executionContext) fieldContext_LengthDisplay_precision(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("LengthDisplay", field, false, false, errors.New("field of type String does not have child fields"))
+	return graphql.NewScalarFieldContext("LengthDisplay", field, false, false, errors.New("field of type LengthPrecision does not have child fields"))
 }
 
 func (ec *executionContext) _Message_id(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
@@ -17124,6 +17131,23 @@ func (ec *executionContext) marshalNInterlinearWord2ᚖgithubᚗcomᚋCodeWarrio
 		return graphql.Null
 	}
 	return ec._InterlinearWord(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNLengthPrecision2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐLengthPrecision(ctx context.Context, v any) (domain.LengthPrecision, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.LengthPrecision(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNLengthPrecision2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐLengthPrecision(ctx context.Context, sel ast.SelectionSet, v domain.LengthPrecision) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) marshalNMessage2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Message) graphql.Marshaler {

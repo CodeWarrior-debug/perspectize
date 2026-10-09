@@ -117,15 +117,22 @@ type WikidataSearchResult {
   entityType: String
 }
 
+"Smallest unit a source reports a length in."
+enum LengthPrecision {
+  "Format as h:mm:ss, or m:ss under an hour."
+  SECONDS
+  "Format as h:mm (e.g. a TMDB movie runtime)."
+  MINUTES
+}
+
 """
 Where a content length came from and the smallest unit that source reports.
-`length` is always seconds; show it to `precision` ("minutes" -> h:mm, "seconds" -> h:mm:ss / m:ss).
+`length` is always seconds; show it to `precision`.
 """
 type LengthDisplay {
   "Origin of the length, e.g. youtube, tmdb."
   source: String!
-  "Smallest unit the source reports: seconds or minutes."
-  precision: String!
+  precision: LengthPrecision!
 }
 
 type Content {

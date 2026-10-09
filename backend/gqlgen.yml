@@ -24,6 +24,9 @@ models:
   LengthDisplay:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.LengthDisplay
+  LengthPrecision:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.LengthPrecision
   ID:
     model:
       - github.com/99designs/gqlgen/graphql.ID
