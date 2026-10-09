@@ -245,8 +245,6 @@
 	function showColumnSwitchToast(view: ColumnView, previous: ColumnLayout) {
 		toast.warning(`Showing ${COLUMN_VIEW_LABEL[view]}`, {
 			id: 'column-view-switch',
-			// Long enough to read and pick an action (Sonner's default is 4s).
-			duration: 10_000,
 			action: {
 				label: 'Revert',
 				onClick: () => {
