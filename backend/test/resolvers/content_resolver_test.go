@@ -48,6 +48,16 @@ func (m *mockContentRepository) GetByID(ctx context.Context, id int) (*domain.Co
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockContentRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	out := []*domain.Content{}
+	for _, id := range ids {
+		if c, err := m.GetByID(ctx, id); err == nil && c != nil {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
 func (m *mockContentRepository) GetByURL(ctx context.Context, url string) (*domain.Content, error) {
 	if m.getByURLFn != nil {
 		return m.getByURLFn(ctx, url)
@@ -80,8 +90,16 @@ func (m *mockContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 	return nil
 }
 
-func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) error {
-	return nil
+// UpdatePrimaryCategoryID emulates UPDATE ... RETURNING against getByIDFn's
+// row: missing content is ErrNotFound, otherwise the row with the new FK.
+func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+	got, err := m.GetByID(ctx, contentID)
+	if err != nil {
+		return nil, err
+	}
+	cp := *got
+	cp.PrimaryCategoryID = categoryID
+	return &cp, nil
 }
 
 // mockYouTubeClient implements services.YouTubeClient for testing
@@ -127,6 +145,16 @@ func (m *mockUserRepository) GetByID(ctx context.Context, id int) (*domain.User,
 		return m.getByIDFn(ctx, id)
 	}
 	return nil, domain.ErrNotFound
+}
+
+func (m *mockUserRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.User, error) {
+	out := []*domain.User{}
+	for _, id := range ids {
+		if u, err := m.GetByID(ctx, id); err == nil && u != nil {
+			out = append(out, u)
+		}
+	}
+	return out, nil
 }
 
 func (m *mockUserRepository) GetByClerkID(ctx context.Context, clerkID string) (*domain.User, error) {
@@ -178,13 +206,23 @@ func (m *mockUserRepository) UpdateOnboarding(ctx context.Context, userID int, o
 	return &domain.User{ID: userID, Onboarding: onboarding}, nil
 }
 
+func (m *mockUserRepository) SetOnboardingDisplayNextSession(ctx context.Context, userID int, display bool) (*domain.User, error) {
+	u, err := m.GetByID(ctx, userID)
+	if err != nil || u.IsSentinel() {
+		return nil, domain.ErrNotFound // mirrors WHERE id = ? AND role <> 'sentinel'
+	}
+	u.Onboarding.DisplayNextSession = display
+	return u, nil
+}
+
 // mockPerspectiveRepository implements repositories.PerspectiveRepository for testing
 type mockPerspectiveRepository struct {
-	createFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
-	getByIDFn func(ctx context.Context, id int) (*domain.Perspective, error)
-	updateFn  func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
-	deleteFn  func(ctx context.Context, id int) error
-	listFn    func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
+	createFn    func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
+	getByIDFn   func(ctx context.Context, id int) (*domain.Perspective, error)
+	updateFn    func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
+	deleteFn    func(ctx context.Context, id int, ownerUserID int) error
+	listFn      func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
+	aggregateFn func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
 }
 
 func (m *mockPerspectiveRepository) Create(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
@@ -202,16 +240,16 @@ func (m *mockPerspectiveRepository) GetByID(ctx context.Context, id int) (*domai
 	return nil, domain.ErrNotFound
 }
 
-func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
+func (m *mockPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
 	if m.updateFn != nil {
-		return m.updateFn(ctx, p)
+		return m.updateFn(ctx, p, ownerUserID)
 	}
 	return p, nil
 }
 
-func (m *mockPerspectiveRepository) Delete(ctx context.Context, id int) error {
+func (m *mockPerspectiveRepository) Delete(ctx context.Context, id int, ownerUserID int) error {
 	if m.deleteFn != nil {
-		return m.deleteFn(ctx, id)
+		return m.deleteFn(ctx, id, ownerUserID)
 	}
 	return nil
 }
@@ -228,6 +266,9 @@ func (m *mockPerspectiveRepository) ReassignByUser(ctx context.Context, fromUser
 }
 
 func (m *mockPerspectiveRepository) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
+	if m.aggregateFn != nil {
+		return m.aggregateFn(ctx, contentIDs)
+	}
 	return map[int]*domain.PerspectiveAggregate{}, nil
 }
 
@@ -270,7 +311,8 @@ func (m *mockWikidataClient) GetWikipediaURL(ctx context.Context, qid string) (s
 type graphqlResponse struct {
 	Data   json.RawMessage `json:"data"`
 	Errors []struct {
-		Message string `json:"message"`
+		Message    string         `json:"message"`
+		Extensions map[string]any `json:"extensions"`
 	} `json:"errors"`
 }
 
@@ -303,7 +345,7 @@ func setupTestServer(repo *mockContentRepository, ytClient *mockYouTubeClient) *
 func setupTestServerWithRepos(repo *mockContentRepository, ytClient *mockYouTubeClient, perspectiveRepo *mockPerspectiveRepository, userRepo *mockUserRepository) *httptest.Server {
 	categoryRepo := &mockCategoryRepository{}
 	wikidataClient := &mockWikidataClient{}
-	contentService := services.NewContentService(repo, ytClient)
+	contentService := services.NewContentService(repo, ytClient, nil)
 	userService := services.NewUserService(userRepo, repo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, repo, wikidataClient)
@@ -360,7 +402,7 @@ func TestContentQuery_Success(t *testing.T) {
 				ID:          1,
 				Name:        "Test Video",
 				URL:         &url,
-				ContentType: domain.ContentTypeYouTube,
+				ContentType: domain.ContentTypeYouTubeVideo,
 			}, nil
 		},
 	}
@@ -385,8 +427,50 @@ func TestContentQuery_Success(t *testing.T) {
 
 	assert.Equal(t, "1", data.ContentByID.ID)
 	assert.Equal(t, "Test Video", data.ContentByID.Name)
-	assert.Equal(t, "YOUTUBE", data.ContentByID.ContentType)
+	assert.Equal(t, "YOUTUBE_VIDEO", data.ContentByID.ContentType)
 	assert.Equal(t, url, data.ContentByID.URL)
+}
+
+// The aggregates-only shortcut skips the content row read, so existence comes
+// from the aggregate query: an id it doesn't return is "content not found".
+func TestContentByID_AggregatesOnly_UnknownIDReturnsNotFound(t *testing.T) {
+	perspectiveRepo := &mockPerspectiveRepository{
+		aggregateFn: func(ctx context.Context, ids []int) (map[int]*domain.PerspectiveAggregate, error) {
+			return map[int]*domain.PerspectiveAggregate{}, nil
+		},
+	}
+	server := setupTestServerWithRepos(&mockContentRepository{}, &mockYouTubeClient{}, perspectiveRepo, &mockUserRepository{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ contentByID(id: "999") { id perspectiveCount averageRating qualityRatingCount } }`)
+
+	require.NotEmpty(t, result.Errors, "Expected an error for an unknown id")
+	assert.Contains(t, result.Errors[0].Message, "content not found")
+}
+
+func TestContentByID_AggregatesOnly_KnownIDWithoutPerspectivesResolvesNull(t *testing.T) {
+	perspectiveRepo := &mockPerspectiveRepository{
+		aggregateFn: func(ctx context.Context, ids []int) (map[int]*domain.PerspectiveAggregate, error) {
+			return map[int]*domain.PerspectiveAggregate{1: {ContentID: 1}}, nil
+		},
+	}
+	server := setupTestServerWithRepos(&mockContentRepository{}, &mockYouTubeClient{}, perspectiveRepo, &mockUserRepository{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ contentByID(id: "1") { id perspectiveCount averageRating } }`)
+
+	assert.Empty(t, result.Errors)
+	var data struct {
+		ContentByID struct {
+			ID               string   `json:"id"`
+			PerspectiveCount *int     `json:"perspectiveCount"`
+			AverageRating    *float64 `json:"averageRating"`
+		} `json:"contentByID"`
+	}
+	require.NoError(t, json.Unmarshal(result.Data, &data))
+	assert.Equal(t, "1", data.ContentByID.ID)
+	assert.Nil(t, data.ContentByID.PerspectiveCount)
+	assert.Nil(t, data.ContentByID.AverageRating)
 }
 
 func TestContentQuery_NotFound_ReturnsError(t *testing.T) {
@@ -507,7 +591,7 @@ func TestCreateContentFromYouTube_Success(t *testing.T) {
 
 	assert.Equal(t, "42", data.CreateContentFromYouTube.Content.ID)
 	assert.Equal(t, "Amazing Video", data.CreateContentFromYouTube.Content.Name)
-	assert.Equal(t, "YOUTUBE", data.CreateContentFromYouTube.Content.ContentType)
+	assert.Equal(t, "YOUTUBE_VIDEO", data.CreateContentFromYouTube.Content.ContentType)
 	assert.False(t, data.CreateContentFromYouTube.AlreadyExisted)
 }
 
@@ -590,7 +674,7 @@ func TestCreateContentFromYouTube_RejectsSpoofedUserID(t *testing.T) {
 
 func TestCreateContentFromYouTube_AlreadyExists(t *testing.T) {
 	canonicalURL := "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-	existing := &domain.Content{ID: 1, Name: "Existing Video", URL: &canonicalURL, ContentType: domain.ContentTypeYouTube}
+	existing := &domain.Content{ID: 1, Name: "Existing Video", URL: &canonicalURL, ContentType: domain.ContentTypeYouTubeVideo}
 	repo := &mockContentRepository{
 		getByURLFn: func(ctx context.Context, url string) (*domain.Content, error) {
 			// The canonical URL is found — service returns existing content + ErrAlreadyExists
@@ -648,7 +732,7 @@ func TestCreateContentFromYouTube_InvalidURL(t *testing.T) {
 
 func TestUpdateContentSourceData_Success(t *testing.T) {
 	url := "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-	existing := &domain.Content{ID: 5, Name: "Old Title", URL: &url, ContentType: domain.ContentTypeYouTube, AddedByUserID: 1}
+	existing := &domain.Content{ID: 5, Name: "Old Title", URL: &url, ContentType: domain.ContentTypeYouTubeVideo, AddedByUserID: 1}
 	metadata := &portservices.VideoMetadata{
 		Title:    "New Title",
 		Duration: 600,
@@ -662,7 +746,7 @@ func TestUpdateContentSourceData_Success(t *testing.T) {
 		},
 		updateMetadataFn: func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
 			capturedID = id
-			return &domain.Content{ID: id, Name: name, URL: &url, ContentType: domain.ContentTypeYouTube, AddedByUserID: 1}, nil
+			return &domain.Content{ID: id, Name: name, URL: &url, ContentType: domain.ContentTypeYouTubeVideo, AddedByUserID: 1}, nil
 		},
 	}
 
@@ -712,7 +796,7 @@ func TestUpdateContentSourceData_NotFound(t *testing.T) {
 
 func TestUpdateContentSourceData_YouTubeAPIError(t *testing.T) {
 	url := "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-	existing := &domain.Content{ID: 5, Name: "Old Title", URL: &url, ContentType: domain.ContentTypeYouTube}
+	existing := &domain.Content{ID: 5, Name: "Old Title", URL: &url, ContentType: domain.ContentTypeYouTubeVideo}
 	repo := &mockContentRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
 			return existing, nil
@@ -749,8 +833,8 @@ func TestPaginatedContentQuery_DefaultPagination(t *testing.T) {
 			url := "https://youtube.com/watch?v=abc123"
 			return &domain.PaginatedContent{
 				Items: []*domain.Content{
-					{ID: 1, Name: "Video 1", URL: &url, ContentType: domain.ContentTypeYouTube},
-					{ID: 2, Name: "Video 2", URL: &url, ContentType: domain.ContentTypeYouTube},
+					{ID: 1, Name: "Video 1", URL: &url, ContentType: domain.ContentTypeYouTubeVideo},
+					{ID: 2, Name: "Video 2", URL: &url, ContentType: domain.ContentTypeYouTubeVideo},
 				},
 				HasNext: false,
 				HasPrev: false,
@@ -796,7 +880,7 @@ func TestPaginatedContentQuery_WithFirstParameter(t *testing.T) {
 			url := "https://youtube.com/watch?v=abc123"
 			items := make([]*domain.Content, 5)
 			for i := 0; i < 5; i++ {
-				items[i] = &domain.Content{ID: i + 1, Name: fmt.Sprintf("Video %d", i+1), URL: &url, ContentType: domain.ContentTypeYouTube}
+				items[i] = &domain.Content{ID: i + 1, Name: fmt.Sprintf("Video %d", i+1), URL: &url, ContentType: domain.ContentTypeYouTubeVideo}
 			}
 			endCursor := "cursor123"
 			return &domain.PaginatedContent{
@@ -902,7 +986,7 @@ func TestPaginatedContentQuery_WithAfterCursor(t *testing.T) {
 			url := "https://youtube.com/watch?v=abc123"
 			return &domain.PaginatedContent{
 				Items: []*domain.Content{
-					{ID: 11, Name: "Video 11", URL: &url, ContentType: domain.ContentTypeYouTube},
+					{ID: 11, Name: "Video 11", URL: &url, ContentType: domain.ContentTypeYouTubeVideo},
 				},
 				HasNext: false,
 				HasPrev: true,
@@ -982,12 +1066,12 @@ func TestPaginatedContentQuery_WithContentTypeFilter(t *testing.T) {
 		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
 			require.NotNil(t, params.Filter)
 			require.NotNil(t, params.Filter.ContentType)
-			assert.Equal(t, domain.ContentTypeYouTube, *params.Filter.ContentType)
+			assert.Equal(t, domain.ContentTypeYouTubeVideo, *params.Filter.ContentType)
 
 			url := "https://youtube.com/watch?v=abc123"
 			return &domain.PaginatedContent{
 				Items: []*domain.Content{
-					{ID: 1, Name: "YouTube Video", URL: &url, ContentType: domain.ContentTypeYouTube},
+					{ID: 1, Name: "YouTube Video", URL: &url, ContentType: domain.ContentTypeYouTubeVideo},
 				},
 				HasNext: false,
 				HasPrev: false,
@@ -998,7 +1082,7 @@ func TestPaginatedContentQuery_WithContentTypeFilter(t *testing.T) {
 	server := setupTestServer(repo, &mockYouTubeClient{})
 	defer server.Close()
 
-	result := executeGraphQL(t, server, `{ content(filter: { contentType: YOUTUBE }) { items { id name contentType } } }`)
+	result := executeGraphQL(t, server, `{ content(filter: { contentType: YOUTUBE_VIDEO }) { items { id name contentType } } }`)
 
 	assert.Empty(t, result.Errors)
 
@@ -1016,7 +1100,25 @@ func TestPaginatedContentQuery_WithContentTypeFilter(t *testing.T) {
 
 	assert.Len(t, data.Content.Items, 1)
 	assert.Equal(t, "YouTube Video", data.Content.Items[0].Name)
-	assert.Equal(t, "YOUTUBE", data.Content.Items[0].ContentType)
+	assert.Equal(t, "YOUTUBE_VIDEO", data.Content.Items[0].ContentType)
+}
+
+func TestPaginatedContentQuery_WithContentTypesFilter(t *testing.T) {
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			require.NotNil(t, params.Filter)
+			assert.Nil(t, params.Filter.ContentType)
+			assert.Equal(t, []domain.ContentType{domain.ContentTypeYouTubeVideo, domain.ContentTypeClaim}, params.Filter.ContentTypes)
+			return &domain.PaginatedContent{Items: []*domain.Content{}}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: { contentTypes: [YOUTUBE_VIDEO, CLAIM] }) { items { id } } }`)
+
+	assert.Empty(t, result.Errors)
 }
 
 func TestPaginatedContentQuery_WithFilterAndTotalCount(t *testing.T) {
@@ -1039,7 +1141,7 @@ func TestPaginatedContentQuery_WithFilterAndTotalCount(t *testing.T) {
 	server := setupTestServer(repo, &mockYouTubeClient{})
 	defer server.Close()
 
-	result := executeGraphQL(t, server, `{ content(filter: { contentType: YOUTUBE }, includeTotalCount: true) { totalCount items { id } } }`)
+	result := executeGraphQL(t, server, `{ content(filter: { contentType: YOUTUBE_VIDEO }, includeTotalCount: true) { totalCount items { id } } }`)
 
 	assert.Empty(t, result.Errors)
 
@@ -1091,7 +1193,7 @@ func TestPaginatedContentQuery_WithMinLengthFilter(t *testing.T) {
 			length := 600
 			return &domain.PaginatedContent{
 				Items: []*domain.Content{
-					{ID: 1, Name: "Long Video", URL: &url, ContentType: domain.ContentTypeYouTube, Length: &length},
+					{ID: 1, Name: "Long Video", URL: &url, ContentType: domain.ContentTypeYouTubeVideo, Length: &length},
 				},
 				HasNext: false,
 				HasPrev: false,
@@ -1135,7 +1237,7 @@ func TestPaginatedContentQuery_WithMaxLengthFilter(t *testing.T) {
 			length := 120
 			return &domain.PaginatedContent{
 				Items: []*domain.Content{
-					{ID: 1, Name: "Short Video", URL: &url, ContentType: domain.ContentTypeYouTube, Length: &length},
+					{ID: 1, Name: "Short Video", URL: &url, ContentType: domain.ContentTypeYouTubeVideo, Length: &length},
 				},
 				HasNext: false,
 				HasPrev: false,
@@ -1180,7 +1282,7 @@ func TestPaginatedContentQuery_WithMinMaxLengthFilter(t *testing.T) {
 			length := 200
 			return &domain.PaginatedContent{
 				Items: []*domain.Content{
-					{ID: 1, Name: "Medium Video", URL: &url, ContentType: domain.ContentTypeYouTube, Length: &length},
+					{ID: 1, Name: "Medium Video", URL: &url, ContentType: domain.ContentTypeYouTubeVideo, Length: &length},
 				},
 				HasNext: false,
 				HasPrev: false,
@@ -1218,7 +1320,7 @@ func TestSetPrimaryCategory_Success(t *testing.T) {
 			return &domain.Content{
 				ID:                id,
 				Name:              "Test Video",
-				ContentType:       domain.ContentTypeYouTube,
+				ContentType:       domain.ContentTypeYouTubeVideo,
 				PrimaryCategoryID: &catID,
 			}, nil
 		},
@@ -1313,7 +1415,7 @@ func TestNewResolver(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepository{}
 	categoryRepo := &mockCategoryRepository{}
 	wikidataClient := &mockWikidataClient{}
-	contentService := services.NewContentService(repo, ytClient)
+	contentService := services.NewContentService(repo, ytClient, nil)
 	userService := services.NewUserService(userRepo, repo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, repo, wikidataClient)
@@ -1339,4 +1441,65 @@ func (m *mockContentRepository) ClearDisplayTitle(ctx context.Context, contentID
 		return m.clearDisplayTitleFn(ctx, contentID)
 	}
 	return nil
+}
+
+func TestPaginatedContentQuery_WithPersonFilter(t *testing.T) {
+	var got domain.ContentListParams
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			got = params
+			return &domain.PaginatedContent{}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: { personId: 525, personRole: DIRECTOR }) { items { id } } }`)
+	assert.Empty(t, result.Errors)
+
+	require.NotNil(t, got.Filter)
+	require.NotNil(t, got.Filter.PersonID)
+	assert.Equal(t, 525, *got.Filter.PersonID)
+	require.NotNil(t, got.Filter.PersonRole)
+	assert.Equal(t, domain.PersonRoleDirector, *got.Filter.PersonRole)
+}
+
+func TestPaginatedContentQuery_WithMovieColumnFilters(t *testing.T) {
+	var got domain.ContentListParams
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			got = params
+			return &domain.PaginatedContent{}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: {
+		genreContains: "drama", ageRating: ["PG-13", "R"],
+		releasedAfter: "2000-01-01", releasedBefore: "2010-12-31",
+		minBoxOffice: 1000000, maxBoxOffice: 2900000000.5,
+		minTmdbScore: 6.5, maxTmdbScore: 9
+	}) { items { id } } }`)
+	assert.Empty(t, result.Errors)
+
+	require.NotNil(t, got.Filter)
+	f := got.Filter
+	require.NotNil(t, f.GenreContains)
+	assert.Equal(t, "drama", *f.GenreContains)
+	assert.Equal(t, []string{"PG-13", "R"}, f.AgeRating)
+	require.NotNil(t, f.ReleasedAfter)
+	assert.Equal(t, "2000-01-01", *f.ReleasedAfter)
+	require.NotNil(t, f.ReleasedBefore)
+	assert.Equal(t, "2010-12-31", *f.ReleasedBefore)
+	require.NotNil(t, f.MinBoxOffice)
+	assert.Equal(t, 1000000.0, *f.MinBoxOffice)
+	require.NotNil(t, f.MaxBoxOffice)
+	assert.Equal(t, 2900000000.5, *f.MaxBoxOffice)
+	require.NotNil(t, f.MinTmdbScore)
+	assert.Equal(t, 6.5, *f.MinTmdbScore)
+	require.NotNil(t, f.MaxTmdbScore)
+	assert.Equal(t, 9.0, *f.MaxTmdbScore)
 }

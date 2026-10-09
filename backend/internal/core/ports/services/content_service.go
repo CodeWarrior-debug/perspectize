@@ -28,6 +28,9 @@ type CreatePassageInput struct {
 type ContentService interface {
 	// CreateFromYouTube creates content from a YouTube URL, attributed to the given user
 	CreateFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error)
+	// CreateFromMovie creates MOVIE content from a TMDB or IMDb movie URL (or bare IMDb id), attributed to the given user.
+	// If the movie already exists, returns the existing content along with ErrAlreadyExists.
+	CreateFromMovie(ctx context.Context, rawURL string, userID int) (*domain.Content, error)
 
 	// CreateFromPassage finds or creates the BIBLE_PASSAGE content row for a verse range.
 	// If the range already exists, returns the existing content along with ErrAlreadyExists.
@@ -50,6 +53,9 @@ type ContentService interface {
 
 	// GetByID retrieves content by ID
 	GetByID(ctx context.Context, id int) (*domain.Content, error)
+	// GetByIDs loads many content rows in one query (the content dataloader);
+	// missing ids are absent.
+	GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error)
 
 	// ListContent retrieves a paginated list of content
 	ListContent(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)

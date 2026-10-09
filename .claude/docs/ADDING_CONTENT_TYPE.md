@@ -158,7 +158,7 @@ In `backend/schema.graphql`:
 1. Add to ContentType enum:
    ```graphql
    enum ContentType {
-     YOUTUBE
+     YOUTUBE_VIDEO
      ARTICLE
    }
    ```
@@ -360,3 +360,7 @@ After adding a content type:
 5. Verify it appears in the table with correct icon and formatting
 6. Verify sorting/filtering works for new sortable fields
 7. Verify mobile responsiveness
+
+## Worked example: Movie
+
+`MOVIE` was added end to end following this guide. See the design in `docs/superpowers/specs/2026-10-07-movie-content-type-design.md` and what is built, unverified and left over in `docs/superpowers/plans/2026-10-07-movie-content-type-STATUS.md`.

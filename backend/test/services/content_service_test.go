@@ -39,6 +39,16 @@ func (m *mockContentRepository) GetByID(ctx context.Context, id int) (*domain.Co
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockContentRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	out := []*domain.Content{}
+	for _, id := range ids {
+		if c, err := m.GetByID(ctx, id); err == nil && c != nil {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
 func (m *mockContentRepository) GetByURL(ctx context.Context, url string) (*domain.Content, error) {
 	if m.getByURLFn != nil {
 		return m.getByURLFn(ctx, url)
@@ -71,8 +81,8 @@ func (m *mockContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 	return nil
 }
 
-func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) error {
-	return nil
+func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+	return &domain.Content{ID: contentID, PrimaryCategoryID: categoryID}, nil
 }
 
 // mockYouTubeClient implements services.YouTubeClient for testing
@@ -103,7 +113,7 @@ func TestGetByID_Success(t *testing.T) {
 		ID:          1,
 		Name:        "Test Video",
 		URL:         &url,
-		ContentType: domain.ContentTypeYouTube,
+		ContentType: domain.ContentTypeYouTubeVideo,
 	}
 
 	repo := &mockContentRepository{
@@ -113,7 +123,7 @@ func TestGetByID_Success(t *testing.T) {
 		},
 	}
 
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 	result, err := svc.GetByID(context.Background(), 1)
 
 	require.NoError(t, err)
@@ -127,7 +137,7 @@ func TestGetByID_NotFound(t *testing.T) {
 		},
 	}
 
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 	result, err := svc.GetByID(context.Background(), 999)
 
 	assert.Nil(t, result)
@@ -137,7 +147,7 @@ func TestGetByID_NotFound(t *testing.T) {
 
 func TestGetByID_InvalidID_Zero(t *testing.T) {
 	repo := &mockContentRepository{}
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 
 	result, err := svc.GetByID(context.Background(), 0)
 
@@ -149,7 +159,7 @@ func TestGetByID_InvalidID_Zero(t *testing.T) {
 
 func TestGetByID_InvalidID_Negative(t *testing.T) {
 	repo := &mockContentRepository{}
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 
 	result, err := svc.GetByID(context.Background(), -5)
 
@@ -165,7 +175,7 @@ func TestGetByID_RepositoryError(t *testing.T) {
 		},
 	}
 
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 	result, err := svc.GetByID(context.Background(), 1)
 
 	assert.Nil(t, result)
@@ -207,14 +217,14 @@ func TestCreateFromYouTube_Success(t *testing.T) {
 		},
 	}
 
-	svc := services.NewContentService(repo, ytClient)
+	svc := services.NewContentService(repo, ytClient, nil)
 
 	result, err := svc.CreateFromYouTube(context.Background(), "https://youtu.be/dQw4w9WgXcQ", 42)
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.ID)
 	assert.Equal(t, "Test Video Title", result.Name)
-	assert.Equal(t, domain.ContentTypeYouTube, result.ContentType)
+	assert.Equal(t, domain.ContentTypeYouTubeVideo, result.ContentType)
 	// URL stored is the canonical form, not the input URL
 	assert.Equal(t, &canonicalURL, result.URL)
 	assert.Equal(t, 42, result.AddedByUserID)
@@ -246,7 +256,7 @@ func TestCreateFromYouTube_ReturnExistingOnDuplicate(t *testing.T) {
 		},
 	}
 
-	svc := services.NewContentService(repo, ytClient)
+	svc := services.NewContentService(repo, ytClient, nil)
 
 	result, err := svc.CreateFromYouTube(context.Background(), canonicalURL, 1)
 
@@ -286,7 +296,7 @@ func TestCreateFromYouTube_NormalizesURLVariants(t *testing.T) {
 		},
 	}
 
-	svc := services.NewContentService(repo, ytClient)
+	svc := services.NewContentService(repo, ytClient, nil)
 
 	// Submit a youtu.be variant with ?si= param — should resolve to canonical
 	_, err := svc.CreateFromYouTube(context.Background(), "https://youtu.be/dQw4w9WgXcQ?si=abc", 1)
@@ -303,7 +313,7 @@ func TestCreateFromYouTube_InvalidURL(t *testing.T) {
 		},
 	}
 
-	svc := services.NewContentService(&mockContentRepository{}, ytClient)
+	svc := services.NewContentService(&mockContentRepository{}, ytClient, nil)
 
 	result, err := svc.CreateFromYouTube(context.Background(), "not-a-valid-url", 1)
 
@@ -328,7 +338,7 @@ func TestCreateFromYouTube_YouTubeAPIError(t *testing.T) {
 		},
 	}
 
-	svc := services.NewContentService(repo, ytClient)
+	svc := services.NewContentService(repo, ytClient, nil)
 
 	result, err := svc.CreateFromYouTube(context.Background(), "https://youtube.com/watch?v=abc123", 1)
 
@@ -362,7 +372,7 @@ func TestCreateFromYouTube_RepositoryCreateError(t *testing.T) {
 		},
 	}
 
-	svc := services.NewContentService(repo, ytClient)
+	svc := services.NewContentService(repo, ytClient, nil)
 
 	result, err := svc.CreateFromYouTube(context.Background(), "https://youtube.com/watch?v=abc123", 1)
 
@@ -384,7 +394,7 @@ func TestCreateFromYouTube_GetByURLUnexpectedError(t *testing.T) {
 		},
 	}
 
-	svc := services.NewContentService(repo, ytClient)
+	svc := services.NewContentService(repo, ytClient, nil)
 
 	result, err := svc.CreateFromYouTube(context.Background(), "https://youtube.com/watch?v=abc123", 1)
 
@@ -399,7 +409,7 @@ func TestNewContentService(t *testing.T) {
 	repo := &mockContentRepository{}
 	ytClient := &mockYouTubeClient{}
 
-	svc := services.NewContentService(repo, ytClient)
+	svc := services.NewContentService(repo, ytClient, nil)
 
 	assert.NotNil(t, svc)
 }
@@ -413,7 +423,7 @@ func TestUpdateSourceData_Success(t *testing.T) {
 		ID:            1,
 		Name:          "Old Title",
 		URL:           &url,
-		ContentType:   domain.ContentTypeYouTube,
+		ContentType:   domain.ContentTypeYouTubeVideo,
 		AddedByUserID: 7,
 		CreatedAt:     createdAt,
 	}
@@ -422,7 +432,7 @@ func TestUpdateSourceData_Success(t *testing.T) {
 		ID:            1,
 		Name:          "New Title",
 		URL:           &url,
-		ContentType:   domain.ContentTypeYouTube,
+		ContentType:   domain.ContentTypeYouTubeVideo,
 		AddedByUserID: 7,
 		CreatedAt:     createdAt, // unchanged
 	}
@@ -459,7 +469,7 @@ func TestUpdateSourceData_Success(t *testing.T) {
 		},
 	}
 
-	svc := services.NewContentService(repo, ytClient)
+	svc := services.NewContentService(repo, ytClient, nil)
 	result, err := svc.UpdateSourceData(context.Background(), 1)
 
 	require.NoError(t, err)
@@ -476,7 +486,7 @@ func TestUpdateSourceData_Success(t *testing.T) {
 
 func TestUpdateSourceData_InvalidID_Zero(t *testing.T) {
 	repo := &mockContentRepository{}
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 
 	result, err := svc.UpdateSourceData(context.Background(), 0)
 
@@ -491,7 +501,7 @@ func TestUpdateSourceData_ContentNotFound(t *testing.T) {
 			return nil, domain.ErrNotFound
 		},
 	}
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 
 	result, err := svc.UpdateSourceData(context.Background(), 999)
 
@@ -507,7 +517,7 @@ func TestUpdateSourceData_NoSourceURL(t *testing.T) {
 			return existing, nil
 		},
 	}
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 
 	result, err := svc.UpdateSourceData(context.Background(), 1)
 
@@ -532,7 +542,7 @@ func TestUpdateSourceData_YouTubeAPIError(t *testing.T) {
 			return nil, fmt.Errorf("youtube api unavailable")
 		},
 	}
-	svc := services.NewContentService(repo, ytClient)
+	svc := services.NewContentService(repo, ytClient, nil)
 
 	result, err := svc.UpdateSourceData(context.Background(), 1)
 
@@ -560,7 +570,7 @@ func TestUpdateSourceData_RepositoryUpdateError(t *testing.T) {
 			return &portservices.VideoMetadata{Title: "New", Duration: 1, Response: json.RawMessage(`{}`)}, nil
 		},
 	}
-	svc := services.NewContentService(repo, ytClient)
+	svc := services.NewContentService(repo, ytClient, nil)
 
 	result, err := svc.UpdateSourceData(context.Background(), 1)
 
@@ -625,7 +635,7 @@ func TestCreateFromPassage_NewRange_UsesCanonicalStringsAndComputedOrdinals(t *t
 			return c, false, nil
 		},
 	}
-	svc := services.NewContentService(repo, &mockYouTubeClient{}, services.WithBibleReference(&mockBibleReferenceRepo{books: testBibleBooks()}))
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil, services.WithBibleReference(&mockBibleReferenceRepo{books: testBibleBooks()}))
 
 	// Exodus 1:1-2 → ordinals after Genesis's 80 verses: 81..82
 	result, err := svc.CreateFromPassage(context.Background(), portservices.CreatePassageInput{
@@ -652,7 +662,7 @@ func TestCreateFromPassage_ExistingRange_ReturnsContentAndErrAlreadyExists(t *te
 			return existing, true, nil
 		},
 	}
-	svc := services.NewContentService(repo, &mockYouTubeClient{}, services.WithBibleReference(&mockBibleReferenceRepo{books: testBibleBooks()}))
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil, services.WithBibleReference(&mockBibleReferenceRepo{books: testBibleBooks()}))
 
 	result, err := svc.CreateFromPassage(context.Background(), portservices.CreatePassageInput{
 		BookID: 1, StartChapter: 1, StartVerse: 1, EndChapter: 1, EndVerse: 3, UserID: 1,
@@ -663,7 +673,7 @@ func TestCreateFromPassage_ExistingRange_ReturnsContentAndErrAlreadyExists(t *te
 }
 
 func TestCreateFromPassage_Validation(t *testing.T) {
-	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, services.WithBibleReference(&mockBibleReferenceRepo{books: testBibleBooks()}))
+	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil, services.WithBibleReference(&mockBibleReferenceRepo{books: testBibleBooks()}))
 
 	cases := map[string]portservices.CreatePassageInput{
 		"end verse before start":     {BookID: 1, StartChapter: 1, StartVerse: 5, EndChapter: 1, EndVerse: 2, UserID: 1},
@@ -684,12 +694,12 @@ func TestCreateFromPassage_Validation(t *testing.T) {
 func TestCreateFromPassage_BibleRepoErrorAndMissingConfig(t *testing.T) {
 	in := portservices.CreatePassageInput{BookID: 1, StartChapter: 1, StartVerse: 1, EndChapter: 1, EndVerse: 1, UserID: 1}
 
-	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, services.WithBibleReference(&mockBibleReferenceRepo{err: errors.New("db down")}))
+	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil, services.WithBibleReference(&mockBibleReferenceRepo{err: errors.New("db down")}))
 	_, err := svc.CreateFromPassage(context.Background(), in)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "db down")
 
-	unconfigured := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{})
+	unconfigured := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil)
 	_, err = unconfigured.CreateFromPassage(context.Background(), in)
 	require.Error(t, err)
 }
@@ -699,7 +709,7 @@ func TestPassageText_ReturnsVersesWithResolvedReferences(t *testing.T) {
 		books: testBibleBooks(), // Genesis 31/25/24, Exodus 22/25
 		texts: []domain.BibleVerseText{{VerseID: 31, Text: "last of Gen 1"}, {VerseID: 32, Text: "first of Gen 2"}, {VerseID: 33, Text: ""}},
 	}
-	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, services.WithBibleReference(bible))
+	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil, services.WithBibleReference(bible))
 
 	got, err := svc.PassageText(context.Background(), 31, 33)
 
@@ -713,7 +723,7 @@ func TestPassageText_ReturnsVersesWithResolvedReferences(t *testing.T) {
 }
 
 func TestPassageText_Errors(t *testing.T) {
-	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, services.WithBibleReference(&mockBibleReferenceRepo{
+	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil, services.WithBibleReference(&mockBibleReferenceRepo{
 		books: testBibleBooks(),
 		texts: []domain.BibleVerseText{{VerseID: 1, Text: "a"}},
 	}))
@@ -730,7 +740,7 @@ func TestPassageText_Errors(t *testing.T) {
 	_, err = svc.PassageText(ctx, 1, 3)
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 
-	unconfigured := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{})
+	unconfigured := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil)
 	_, err = unconfigured.PassageText(ctx, 1, 1)
 	require.Error(t, err)
 }
@@ -740,7 +750,7 @@ func interlinearPtr(n int) *int { return &n }
 func TestPassageInterlinear(t *testing.T) {
 	ctx := context.Background()
 	newSvc := func(repo *mockBibleReferenceRepo) *services.ContentService {
-		return services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, services.WithBibleReference(repo))
+		return services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil, services.WithBibleReference(repo))
 	}
 	words := []domain.InterlinearWordRow{
 		{VerseID: 1, BSBSort: 1, Language: "heb", SourceSort: interlinearPtr(1), Source: "a", Strongs: "H0001", StrongsSource: "tagged", SpanHead: interlinearPtr(1), ChunkText: "In", Gloss: "x"},
@@ -781,7 +791,7 @@ func TestPassageInterlinear(t *testing.T) {
 	})
 
 	t.Run("requires bible support to be configured", func(t *testing.T) {
-		unconfigured := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{})
+		unconfigured := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil)
 		_, err := unconfigured.PassageInterlinear(ctx, 1, 1)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not configured")

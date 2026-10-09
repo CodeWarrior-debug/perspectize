@@ -1,12 +1,15 @@
 import { validateYouTubeUrl } from './youtube';
+import { validateMovieInput } from './movie';
 import { parseReference, type PassageRange } from './passageParserAdapter';
 
 export type { PassageRange };
 
 export type DetectionResult =
-	| { type: 'YOUTUBE'; url: string }
+	| { type: 'YOUTUBE_VIDEO'; url: string }
 	/** `range` is the ONLY thing to persist; regenerate the canonical string from it, never store pasted text. */
 	| { type: 'BIBLE_PASSAGE'; range: PassageRange; source: 'text' | 'biblegateway' }
+	/** TMDB or IMDb title link (a bare IMDb id is also accepted, silently). */
+	| { type: 'MOVIE'; url: string }
 	| { type: 'CLAIM'; text: string }
 	| { type: null };
 
@@ -36,7 +39,7 @@ function parseBibleGatewayUrl(url: URL): PassageRange | null {
  * (AN Q21) so this has at most one entry, but the list shape lets a future ambiguous
  * type be added without a signature change.
  *
- * Precedence: YouTube URL > Bible Gateway URL > typed Bible reference > free-text claim.
+ * Precedence: YouTube URL > movie link > Bible Gateway URL > typed Bible reference > free-text claim.
  * Any other URL is never a claim and never guessed: empty candidates. A single bare
  * word is also not guessed as a claim.
  */
@@ -44,7 +47,9 @@ export function detectContentCandidates(input: string): DetectionResult[] {
 	const trimmed = input.trim();
 	if (!trimmed) return [];
 
-	if (validateYouTubeUrl(trimmed)) return [{ type: 'YOUTUBE', url: trimmed }];
+	if (validateYouTubeUrl(trimmed)) return [{ type: 'YOUTUBE_VIDEO', url: trimmed }];
+
+	if (validateMovieInput(trimmed)) return [{ type: 'MOVIE', url: trimmed }];
 
 	const url = parseUrl(trimmed);
 	if (url) {

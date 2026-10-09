@@ -1,4 +1,4 @@
-import { extractVideoIdFromUrl } from './formatting';
+import { extractVideoIdFromUrl, movieResponse } from './formatting';
 import {
 	BIBLE_PASSAGE_ICON_SVG_SCALABLE,
 	BIBLE_ICON_WRAPPER_CLASS,
@@ -27,7 +27,7 @@ function renderPassageCell(opts: {
 	const { id, name, url, displayTitle, verseStartID, verseEndID, onOpenDetails } = opts;
 
 	const cell = document.createElement('div');
-	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-2 cursor-pointer';
+	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-[3px] cursor-pointer';
 	cell.addEventListener('click', () => onOpenDetails?.(String(id)));
 
 	const iconBox = document.createElement('div');
@@ -81,6 +81,63 @@ function renderPassageCell(opts: {
 	return cell;
 }
 
+/**
+ * Movie variant of the Item cell: TMDB poster (small, 2:3) beside the title with
+ * the release year as a subtitle. Poster click opens the TMDB page, cell click
+ * opens the details modal. No poster (or no `movie`/`response`) leaves a plain tile.
+ */
+function renderMovieCell(opts: {
+	id: string | number;
+	name: string;
+	url: string | null;
+	movie?: unknown;
+	response?: unknown;
+	onOpenDetails?: (contentId: string) => void;
+}): HTMLElement {
+	const { id, name, url, movie, response, onOpenDetails } = opts;
+	const m = movieResponse({ contentType: 'MOVIE', movie, response });
+
+	const cell = document.createElement('div');
+	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-[3px] cursor-pointer';
+	cell.addEventListener('click', () => onOpenDetails?.(String(id)));
+
+	const thumb = document.createElement('div');
+	thumb.dataset.testid = 'item-thumb';
+	thumb.className = 'h-[42px] w-7 flex-none overflow-hidden rounded bg-muted';
+	thumb.addEventListener('click', (e) => {
+		e.stopPropagation();
+		if (url) window.open(url, '_blank', 'noopener,noreferrer');
+	});
+	if (m?.posterPath) {
+		const img = document.createElement('img');
+		img.src = `https://image.tmdb.org/t/p/w92${m.posterPath}`;
+		img.alt = '';
+		img.className = 'h-full w-full object-cover';
+		img.onerror = () => img.remove();
+		thumb.appendChild(img);
+	}
+
+	const textWrap = document.createElement('div');
+	textWrap.className = 'min-w-0 flex-1 text-left whitespace-normal';
+	const title = document.createElement('div');
+	title.dataset.testid = 'item-title';
+	title.className =
+		'line-clamp-1 font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
+	title.textContent = name;
+	textWrap.appendChild(title);
+	if (m?.year) {
+		const subtitle = document.createElement('div');
+		subtitle.dataset.testid = 'item-subtitle';
+		subtitle.className = 'line-clamp-1 text-[11px] leading-[1.5] text-muted-foreground';
+		subtitle.textContent = String(m.year);
+		textWrap.appendChild(subtitle);
+	}
+
+	cell.appendChild(thumb);
+	cell.appendChild(textWrap);
+	return cell;
+}
+
 export interface ActivityItemCellRendererParams {
 	data?: {
 		id: string | number;
@@ -90,6 +147,8 @@ export interface ActivityItemCellRendererParams {
 		displayTitle?: string | null;
 		verseStartID?: number | null;
 		verseEndID?: number | null;
+		movie?: unknown;
+		response?: unknown;
 	};
 	context?: { onOpenDetails?: (contentId: string) => void };
 }
@@ -111,18 +170,22 @@ const PLAY_ICON_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="non
 export function activityItemCellRenderer(params: ActivityItemCellRendererParams): HTMLElement | string {
 	if (!params.data) return '';
 
-	const { id, name, url, contentType, displayTitle, verseStartID, verseEndID } = params.data;
+	const { id, name, url, contentType, displayTitle, verseStartID, verseEndID, movie, response } = params.data;
 	const onOpenDetails = params.context?.onOpenDetails;
 
 	if (contentType === 'BIBLE_PASSAGE') {
 		return renderPassageCell({ id, name, url, displayTitle, verseStartID, verseEndID, onOpenDetails });
 	}
 
+	if (contentType === 'MOVIE') {
+		return renderMovieCell({ id, name, url, movie, response, onOpenDetails });
+	}
+
 	// No native `title` attribute here (or on the thumbnail below) — the column's
 	// context.tooltipSpec popover already shows details on cell hover, and a
 	// native title attribute on top of that shows two overlapping tooltip boxes.
 	const cell = document.createElement('div');
-	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-2 cursor-pointer';
+	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-[3px] cursor-pointer';
 	cell.addEventListener('click', () => {
 		onOpenDetails?.(String(id));
 	});
@@ -154,7 +217,7 @@ export function activityItemCellRenderer(params: ActivityItemCellRendererParams)
 	thumbWrap.appendChild(overlay);
 
 	// leading-[1.5] (rather than a tighter value) plus a real rowHeight margin
-	// in ActivityTable.svelte's `theme.rowHeight` is what keeps descenders
+	// in grid-theme.ts's `GRID_THEME_PARAMS.rowHeight` is what keeps descenders
 	// (g/y/p/q/j) on the clamped second line from being clipped by the row's
 	// own overflow:hidden — a tight line-height/row-height pairing clips
 	// even though line-clamp itself only ever cuts whole lines, not glyphs.

@@ -34,6 +34,12 @@ describe('FilterChips', () => {
 		expect(screen.getByText('contains "Fireship"')).toBeInTheDocument();
 	});
 
+	it('renders a chip for a set (content type) filter with display labels', () => {
+		renderChips({ type: { filterType: 'set', values: ['youtube_video', 'bible_passage'] } });
+		expect(screen.getByText('Type:')).toBeInTheDocument();
+		expect(screen.getByText('YouTube Video or Bible Passage')).toBeInTheDocument();
+	});
+
 	it('renders a chip for a number filter', () => {
 		renderChips({
 			views: { filterType: 'number', type: 'greaterThan', filter: 1000 },
@@ -162,5 +168,63 @@ describe('FilterChips', () => {
 		);
 		// Still renders chips (display is independent of gridApi), but remove buttons won't work
 		expect(screen.getByText('Channel:')).toBeInTheDocument();
+	});
+
+	describe('Movie filters', () => {
+		it('genre chip', () => {
+			renderChips({ genre: { filterType: 'text', type: 'contains', filter: 'sci' } });
+			expect(screen.getByText('Genre:')).toBeInTheDocument();
+			expect(screen.getByText('contains "sci"')).toBeInTheDocument();
+		});
+
+		it('rated chip lists certifications in capitals', () => {
+			renderChips({ rated: { filterType: 'set', values: ['pg-13', 'r'] } });
+			expect(screen.getByText('Rated:')).toBeInTheDocument();
+			expect(screen.getByText('PG-13 or R')).toBeInTheDocument();
+		});
+
+		it('released chip shows a date range', () => {
+			renderChips({ released: { filterType: 'date', type: 'inRange', dateFrom: '2010-07-15', dateTo: '2012-01-02' } });
+			expect(screen.getByText('Released:')).toBeInTheDocument();
+			expect(screen.getByText('Jul 15, 2010 \u2013 Jan 2, 2012')).toBeInTheDocument();
+		});
+
+		it('box office chip shows compact money', () => {
+			renderChips({ boxOffice: { filterType: 'number', type: 'greaterThanOrEqual', filter: 100_000_000 } });
+			expect(screen.getByText('Box office:')).toBeInTheDocument();
+			expect(screen.getByText(/\u2265 \$100/)).toBeInTheDocument();
+		});
+
+		it('TMDB score chip', () => {
+			renderChips({ tmdbScore: { filterType: 'number', type: 'inRange', filter: 7, filterTo: 9 } });
+			expect(screen.getByText('TMDB Score:')).toBeInTheDocument();
+			expect(screen.getByText('7 \u2013 9')).toBeInTheDocument();
+		});
+	});
+
+	describe('person filter chip', () => {
+		const person = { person: { filterType: 'person', filter: 'Christopher Nolan' } };
+
+		it('shows the person name', () => {
+			renderChips(person);
+			expect(screen.getByText('Person:')).toBeInTheDocument();
+			expect(screen.getByText('Christopher Nolan')).toBeInTheDocument();
+		});
+
+		it('removing it goes through onRemove even with a grid (the grid cannot clear it)', async () => {
+			const onRemove = vi.fn();
+			render(FilterChips, { props: { gridApi: mockGridApi(), filterModel: person, onRemove } });
+			await fireEvent.click(screen.getByLabelText('Remove Person filter'));
+			expect(onRemove).toHaveBeenCalledWith('person');
+			expect(mockSetFilterModel).not.toHaveBeenCalled();
+		});
+
+		it('Clear all uses onClearAll when a person filter is active', async () => {
+			const onClearAll = vi.fn();
+			render(FilterChips, { props: { gridApi: mockGridApi(), filterModel: person, onClearAll } });
+			await fireEvent.click(screen.getByText('Clear all'));
+			expect(onClearAll).toHaveBeenCalled();
+			expect(mockSetFilterModel).not.toHaveBeenCalled();
+		});
 	});
 });

@@ -13,4 +13,7 @@ var (
 	ErrDeleteSentinel = errors.New("cannot delete the system sentinel user")
 	ErrForbidden      = errors.New("access denied")
 	ErrRateLimited    = errors.New("rate limit exceeded")
+	// ErrContentNotAllowed is returned when content is refused by policy (e.g. NC-17 movies).
+	// The message is user-facing and surfaced verbatim by the resolver.
+	ErrContentNotAllowed = errors.New("While Perspectize does not intend to act as censor, adding NSFW content is not enabled until traffic necessitates a long-term decision about content access policies.")
 )

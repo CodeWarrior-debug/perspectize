@@ -48,6 +48,16 @@ Discover shipped (Browse still pending); PR #449 landed the duration badge, inli
 
 ---
 
+## OAuth External Account Sync (Optional)
+
+Brainstormed 2026-09-27: let users connect external accounts via OAuth (YouTube first) to **import** existing activity (liked videos → `Content` + draft, private perspectives) and **publish** a perspective back out (as a YouTube comment / like) as an explicit per-item action. Manual "Sync now" with a dry-run preview by default; scheduled sync only as an opt-in, import-only setting. Conflicts use a three-way diff against the last-synced snapshot with per-field ownership, and true conflicts are queued for the user. YouTube has no "list my comments" API and no like/comment webhooks, so comments are publish-only and all sync is polling.
+
+Full design: [docs/superpowers/specs/2026-09-28-oauth-external-sync-design.md](docs/superpowers/specs/2026-09-28-oauth-external-sync-design.md)
+
+**Priority:** Optional / unscheduled. Prerequisites: Google OAuth app verification, and the shared-quota fix ("YouTube Search Proxy" above) or a quota increase.
+
+---
+
 ## Unpopulated Nested GraphQL Fields — N+1 Guardrail Needed Before Implementing
 
 Discovered 2026-09-02 while investigating whether the Activity page has N+1 issues fetching user perspectives. It doesn't — `content` and `perspectives` are each single batched queries today. But three schema fields are declared and never populated, always resolving to `null`:
@@ -570,3 +580,47 @@ At current traffic this is fine. At real scale (many requests per second from th
 **Priority:** Low — not worth the complexity at current (Sevalla-hosted, low-traffic) scale. Revisit if/when request volume from authenticated users grows meaningfully.
 
 **Source:** Dev discussion (2026-09-10), during PR #356 (issue #246 userID-spoofing fix) — question about whether `auth.RequireAuth`'s context lookup or the upstream middleware's DB call would ever become a cost concern.
+
+---
+
+## Research Spike: Jev (TypeSafe AI "System One" model) for the future AI bot
+
+**Type:** Research Spike — not scoped, no code/config changes made.
+
+**Status:** Confirmed as a real product (TypeSafe AI, founder Diogo Almeida ex-OpenAI, $40M seed led by DCVC, early access 2026-09-15). It is a fast decision/classification model ("System One" — returns typed Choice/Score/Noul answers with calibrated probabilities in ~70-500ms), **not** a code-generation or reasoning model. It does not compete with Claude Code; it's a candidate cheap-and-fast "yes/no/classify" layer that could sit *alongside* an AI agent.
+
+**Why this is logged now instead of piloted:** research turned up ~15 third-party/community repos and Claude Code plugin/MCP integrations (`jev-kit`, `jev-code`, `limpet`, `fast-jev-compaction`, `jev-ci-triage`, two unrelated `jev-harness` projects, `jevtriage`, `jev-test-triage`, `jev-logtriage`, `graphql-classifier`, `jevcal`, plus four "awesome-jev" list repos) that appeared almost immediately after launch — a pattern worth treating with real suspicion (typosquatting / unvetted supply-chain risk), especially since several are pitched as plugging directly into CI merge gates, Claude Code's tool-call approval flow, or agent Stop hooks (i.e., things that could approve destructive commands or silently fail open). None of these should be installed without independently reading their source and confirming maintainer legitimacy first — a vendor README claim is not verification.
+
+**Where Jev could be worth real evaluation later:** when Perspectize implements its own AI bot feature (not yet built), Jev's fast/cheap classification could plausibly be useful as a pre-filter/guard layer in that bot's pipeline (e.g., cheap moderation/routing/confidence checks before an expensive model call) — that's the point at which a proper spend of time vetting official SDKs (Python/JS have official ones; Go only has unofficial community clients so far — `jev-go`, `go-jev`, `typesafe-go`) and re-running this research against the actual bot design would be worthwhile.
+
+**Do not pilot any of the community CI/agent-guard repos listed above until:** (1) the AI bot feature has a concrete design that identifies a real use case, and (2) each candidate repo is independently source-reviewed for what it actually does with any credentials/permissions it's given.
+
+**Priority:** Deferred — revisit specifically when AI bot implementation work is scoped, not before.
+
+**Source:** Dev research spike (2026-09-27/28), requested as "where can Jev enhance my workflow" — full findings captured in session, official links: https://typesafe.ai/blog/introducing-system-one-models-and-jev, https://docs.typesafe.ai/introduction/coding-agents.
+
+## Backend Proxy/Cache for the YouTube Data API (Discover Page)
+
+**Type:** Dev × Performance / Security
+
+`frontend/src/lib/services/youtubeApi.ts` calls the YouTube Data API v3 straight from the browser using `VITE_YOUTUBE_API_KEY`, a build-time env var that ends up embedded in the shipped JS bundle. There's no backend caching layer — every uncached Discover page trending/search request spends real YouTube API quota, and the key itself is visible to anyone who opens devtools.
+
+**What to do:**
+
+- Add a thin backend endpoint (or GraphQL resolver) that proxies `search.list` / `videos.list?chart=mostPopular` requests, holding `YOUTUBE_API_KEY` server-side only.
+- Cache trending/search responses server-side (in-memory or Redis, keyed by query/region) with a TTL matching or exceeding the frontend's current `staleTime` (5 min search / 1 hr trending), so concurrent users share one YouTube quota hit instead of each paying their own.
+- This also removes the API key from the client bundle entirely.
+
+**Priority:** Low-Medium — current MVP quota levels are fine (see `.planning/phases/15-discover-page/15-CONTEXT.md`), and the client-side gcTime/staleTime tuning done in the discover-thumbnail-facade fix already reduces redundant refetches. Worth doing once Discover traffic or quota usage grows.
+
+**Source:** Dev request (2026-09-28), Discover page slow-media-loading investigation (bugfix/discover-thumbnail-facade) — explicitly out of scope for that PR per its own instructions.
+
+## Multiple Perspectives per Content (Public + Private Slots)
+
+Nothing in the backend currently limits how many perspectives a user can have on one content entry (the old `UNIQUE(claim, user_id)` went away in migration 000007). Users will want a public and a private aspect on the same content. Proposed model: one perspective per `(user_id, content_id, privacy)` via a partial unique index, plus UI to switch between the two slots.
+
+**Blocked on two gates:** (1) the sharing model must be finalised first (the slot model assumes exactly two visibility levels), and (2) the aggregate **double-counting** audit — `AggregateByContentIDs`, `FeelingStats`, `CustomFieldStats`, `Compare.svelte`, and onboarding perspective counts all assume one perspective per user per content.
+
+**Spec:** [docs/superpowers/specs/2026-09-29-multiple-perspectives-per-content-design.md](docs/superpowers/specs/2026-09-29-multiple-perspectives-per-content-design.md)
+
+**Priority:** Optional / unscheduled.

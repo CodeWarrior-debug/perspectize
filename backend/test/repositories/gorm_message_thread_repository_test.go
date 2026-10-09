@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -23,9 +24,9 @@ func participantSeq(t *testing.T, thread *domain.MessageThread, userID int) int6
 	return 0
 }
 
-func TestGormThreadRepository_CreateAndGet(t *testing.T) {
+func TestGormMessageThreadRepository_CreateAndGet(t *testing.T) {
 	db := openTestDB(t)
-	repo := postgres.NewGormThreadRepository(db)
+	repo := postgres.NewGormMessageThreadRepository(db)
 	userRepo := postgres.NewGormUserRepository(db)
 	ctx := context.Background()
 
@@ -58,18 +59,18 @@ func TestGormThreadRepository_CreateAndGet(t *testing.T) {
 	assert.Equal(t, int64(1), seqCount)
 }
 
-func TestGormThreadRepository_GetThread_NotFound(t *testing.T) {
+func TestGormMessageThreadRepository_GetThread_NotFound(t *testing.T) {
 	db := openTestDB(t)
-	repo := postgres.NewGormThreadRepository(db)
+	repo := postgres.NewGormMessageThreadRepository(db)
 	ctx := context.Background()
 
 	_, err := repo.GetThread(ctx, -1)
 	assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
 }
 
-func TestGormThreadRepository_FindDirectThread(t *testing.T) {
+func TestGormMessageThreadRepository_FindDirectThread(t *testing.T) {
 	db := openTestDB(t)
-	repo := postgres.NewGormThreadRepository(db)
+	repo := postgres.NewGormMessageThreadRepository(db)
 	userRepo := postgres.NewGormUserRepository(db)
 	ctx := context.Background()
 
@@ -94,9 +95,9 @@ func TestGormThreadRepository_FindDirectThread(t *testing.T) {
 	assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
 }
 
-func TestGormThreadRepository_SetLastRead_ForwardOnly(t *testing.T) {
+func TestGormMessageThreadRepository_SetLastRead_ForwardOnly(t *testing.T) {
 	db := openTestDB(t)
-	repo := postgres.NewGormThreadRepository(db)
+	repo := postgres.NewGormMessageThreadRepository(db)
 	userRepo := postgres.NewGormUserRepository(db)
 	ctx := context.Background()
 
@@ -105,24 +106,43 @@ func TestGormThreadRepository_SetLastRead_ForwardOnly(t *testing.T) {
 	t.Cleanup(func() { cleanupUsers(t, db, a, b) })
 
 	threadID := mustCreateThread(t, repo, a, []int{a, b})
+	msgRepo := postgres.NewGormMessageRepository(db)
+	for i := 1; i <= 10; i++ {
+		_, err := msgRepo.Insert(ctx, &domain.Message{ThreadID: threadID, SenderID: b, Body: "m", ClientNonce: fmt.Sprintf("lr%d", i)})
+		require.NoError(t, err)
+	}
 
-	require.NoError(t, repo.SetLastRead(ctx, threadID, a, 5))
-	require.NoError(t, repo.SetLastRead(ctx, threadID, a, 3)) // backward — must be ignored
+	advance := func(seq int64) int64 {
+		t.Helper()
+		got, err := repo.SetLastRead(ctx, threadID, a, seq)
+		require.NoError(t, err)
+		return got
+	}
+
+	assert.Equal(t, int64(5), advance(5))
+	assert.Equal(t, int64(3), advance(3)) // backward — must be ignored
 
 	got, err := repo.GetThread(ctx, threadID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(5), participantSeq(t, got, a))
 
 	// Forward again still advances.
-	require.NoError(t, repo.SetLastRead(ctx, threadID, a, 9))
+	advance(9)
 	got, err = repo.GetThread(ctx, threadID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(9), participantSeq(t, got, a))
+
+	// Past the end is clamped to the thread's highest seq, and that value is
+	// what comes back (it is what the read receipt publishes).
+	assert.Equal(t, int64(10), advance(999_999))
+	got, err = repo.GetThread(ctx, threadID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(10), participantSeq(t, got, a))
 }
 
-func TestGormThreadRepository_SetLeft_ExcludesFromActive(t *testing.T) {
+func TestGormMessageThreadRepository_SetLeft_ExcludesFromActive(t *testing.T) {
 	db := openTestDB(t)
-	repo := postgres.NewGormThreadRepository(db)
+	repo := postgres.NewGormMessageThreadRepository(db)
 	userRepo := postgres.NewGormUserRepository(db)
 	ctx := context.Background()
 
@@ -140,9 +160,9 @@ func TestGormThreadRepository_SetLeft_ExcludesFromActive(t *testing.T) {
 	assert.True(t, got.IsActiveParticipant(a))
 }
 
-func TestGormThreadRepository_AddParticipants_ClearsLeftAt(t *testing.T) {
+func TestGormMessageThreadRepository_AddParticipants_ClearsLeftAt(t *testing.T) {
 	db := openTestDB(t)
-	repo := postgres.NewGormThreadRepository(db)
+	repo := postgres.NewGormMessageThreadRepository(db)
 	userRepo := postgres.NewGormUserRepository(db)
 	ctx := context.Background()
 
@@ -153,16 +173,20 @@ func TestGormThreadRepository_AddParticipants_ClearsLeftAt(t *testing.T) {
 	threadID := mustCreateThread(t, repo, a, []int{a, b})
 
 	require.NoError(t, repo.SetLeft(ctx, threadID, b, time.Now()))
-	require.NoError(t, repo.AddParticipants(ctx, threadID, []int{b}))
+	rows, err := repo.AddParticipants(ctx, threadID, []int{b})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Nil(t, rows[0].LeftAt, "returned row reflects the rejoin")
+	assert.Equal(t, domain.ThreadRoleMember, rows[0].Role)
 
 	got, err := repo.GetThread(ctx, threadID)
 	require.NoError(t, err)
 	assert.True(t, got.IsActiveParticipant(b), "rejoining participant should have left_at cleared")
 }
 
-func TestGormThreadRepository_SetMuted(t *testing.T) {
+func TestGormMessageThreadRepository_SetMuted(t *testing.T) {
 	db := openTestDB(t)
-	repo := postgres.NewGormThreadRepository(db)
+	repo := postgres.NewGormMessageThreadRepository(db)
 	userRepo := postgres.NewGormUserRepository(db)
 	ctx := context.Background()
 
@@ -192,18 +216,18 @@ func TestGormThreadRepository_SetMuted(t *testing.T) {
 	}
 }
 
-func TestGormThreadRepository_SetMuted_NotFound(t *testing.T) {
+func TestGormMessageThreadRepository_SetMuted_NotFound(t *testing.T) {
 	db := openTestDB(t)
-	repo := postgres.NewGormThreadRepository(db)
+	repo := postgres.NewGormMessageThreadRepository(db)
 	ctx := context.Background()
 
 	err := repo.SetMuted(ctx, -1, -1, true)
 	assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
 }
 
-func TestGormThreadRepository_ListThreadsForUser_DescByLastMessage(t *testing.T) {
+func TestGormMessageThreadRepository_ListThreadsForUser_DescByLastMessage(t *testing.T) {
 	db := openTestDB(t)
-	repo := postgres.NewGormThreadRepository(db)
+	repo := postgres.NewGormMessageThreadRepository(db)
 	userRepo := postgres.NewGormUserRepository(db)
 	ctx := context.Background()
 

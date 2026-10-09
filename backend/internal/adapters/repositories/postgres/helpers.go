@@ -87,8 +87,58 @@ func intSliceToInt64Array(ints []int) Int64Array {
 	return result
 }
 
+// computedSortColumns maps a content sort rule Key whose value is computed (no real
+// column) to the alias List selects it under. Each alias is the column tag of the
+// matching read-only ContentModel field, which is how gorm-cursor-paginator reads the
+// real sort value back when encoding the cursor.
+var computedSortColumns = map[string]string{
+	"ViewCount":    "view_count",
+	"LikeCount":    "like_count",
+	"PercentLiked": "percent_liked",
+	"PublishedAt":  "published_at_sort",
+	"ChannelTitle": "channel_title_sort",
+	"BoxOffice":    "box_office",
+	"VsBudget":     "vs_budget",
+	"AgeRating":    "age_rating",
+}
+
+// computedSortSelects returns the ", (expr) AS alias" select-list suffix for every
+// computed sort rule (empty when all rules sort on real columns). Must run on the rules
+// before they reach the paginator, which rewrites SQLRepr with its COALESCE wrapper.
+func computedSortSelects(rules []paginator.Rule) string {
+	var b strings.Builder
+	for _, r := range rules {
+		alias, ok := computedSortColumns[r.Key]
+		if !ok || r.SQLRepr == "" {
+			continue
+		}
+		b.WriteString(", (" + r.SQLRepr + ") AS " + alias)
+	}
+	return b.String()
+}
+
+// Sort-key NULL replacements. The paginator wraps each computed expression in
+// COALESCE(expr, replacement), so unknowns (NULL) sort LAST: ASC needs a high value and
+// DESC a low one. Values stay exactly representable as float64 because cursors
+// round-trip through JSON numbers (math.MaxInt64 would lose precision).
+const (
+	// nullBoxOfficeAsc is 2^53, the largest integer float64 holds exactly; real revenues are far below.
+	nullBoxOfficeAsc  int64 = 1 << 53
+	nullBoxOfficeDesc int64 = 0
+	// nullVsBudgetAsc exceeds any real revenue/budget multiple; DESC uses -1 (real multiples are >= 0).
+	nullVsBudgetAsc  float64 = 1e18
+	nullVsBudgetDesc float64 = -1
+	// nullAgeRatingAsc is above every rank (real ranks are 1-5).
+	nullAgeRatingAsc  int64 = 99
+	nullAgeRatingDesc int64 = 0
+)
+
 // contentSortRule builds a single paginator.Rule for one content sort column.
 func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) paginator.Rule {
+	boxOfficeNull, vsBudgetNull, ageRatingNull := nullBoxOfficeDesc, nullVsBudgetDesc, nullAgeRatingDesc
+	if order == domain.SortOrderAsc {
+		boxOfficeNull, vsBudgetNull, ageRatingNull = nullBoxOfficeAsc, nullVsBudgetAsc, nullAgeRatingAsc
+	}
 	// Map domain.SortOrder to paginator.Order
 	var paginatorOrder paginator.Order
 	if order == domain.SortOrderAsc {
@@ -129,6 +179,31 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 				"     / NULLIF((response->'items'->0->'statistics'->>'viewCount')::BIGINT, 0) " +
 				"END",
 			NULLReplacement: float64(-1),
+		}
+	case domain.ContentSortByBoxOffice:
+		return paginator.Rule{
+			Key:             "BoxOffice",
+			Order:           paginatorOrder,
+			SQLRepr:         "(response->>'revenue')::BIGINT",
+			NULLReplacement: boxOfficeNull,
+		}
+	case domain.ContentSortByVsBudget:
+		// Revenue as a multiple of budget; NULL when either is unknown or budget is 0.
+		return paginator.Rule{
+			Key:   "VsBudget",
+			Order: paginatorOrder,
+			SQLRepr: "CASE WHEN response->>'budget' IS NULL OR response->>'revenue' IS NULL " +
+				"OR (response->>'budget')::BIGINT = 0 THEN NULL " +
+				"ELSE (response->>'revenue')::FLOAT8 / NULLIF((response->>'budget')::BIGINT,0) END",
+			NULLReplacement: vsBudgetNull,
+		}
+	case domain.ContentSortByAgeRating:
+		return paginator.Rule{
+			Key:   "AgeRating",
+			Order: paginatorOrder,
+			SQLRepr: "CASE response->>'certification' WHEN 'G' THEN 1 WHEN 'PG' THEN 2 " +
+				"WHEN 'PG-13' THEN 3 WHEN 'R' THEN 4 WHEN 'NC-17' THEN 5 ELSE NULL END",
+			NULLReplacement: ageRatingNull,
 		}
 	case domain.ContentSortByPublishedAt:
 		return paginator.Rule{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -22,18 +23,38 @@ var _ Notifier = (*PgNotifier)(nil)
 
 // NewPgNotifier dials dsn and returns a notifier backed by the resulting pool.
 // The caller owns the pool and must call Close when done.
-func NewPgNotifier(ctx context.Context, dsn string) (*PgNotifier, error) {
-	pool, err := pgxpool.New(ctx, dsn)
+func NewPgNotifier(ctx context.Context, dsn string, tracer ...pgx.QueryTracer) (*PgNotifier, error) {
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("parse notifier dsn: %w", err)
+	}
+	// Optional tracer: the round-trip tests count pg_notify calls too.
+	if len(tracer) > 0 && tracer[0] != nil {
+		cfg.ConnConfig.Tracer = tracer[0]
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("create notifier pool: %w", err)
 	}
 	return &PgNotifier{pool: pool}, nil
 }
 
-// Notify emits payload on the thread_events channel.
-func (n *PgNotifier) Notify(ctx context.Context, payload string) error {
-	if _, err := n.pool.Exec(ctx, "SELECT pg_notify($1, $2)", listenChannel, payload); err != nil {
-		return fmt.Errorf("pg_notify %s: %w", listenChannel, err)
+// Notify emits every payload on the thread_events channel, in order, in one
+// round trip (pg_notify over unnest ... WITH ORDINALITY).
+func (n *PgNotifier) Notify(ctx context.Context, payloads ...string) error {
+	switch len(payloads) {
+	case 0:
+		return nil
+	case 1:
+		if _, err := n.pool.Exec(ctx, "SELECT pg_notify($1, $2)", listenChannel, payloads[0]); err != nil {
+			return fmt.Errorf("pg_notify %s: %w", listenChannel, err)
+		}
+		return nil
+	}
+	if _, err := n.pool.Exec(ctx,
+		"SELECT pg_notify($1, p) FROM unnest($2::text[]) WITH ORDINALITY AS t(p, n) ORDER BY n",
+		listenChannel, payloads); err != nil {
+		return fmt.Errorf("pg_notify %s (%d payloads): %w", listenChannel, len(payloads), err)
 	}
 	return nil
 }

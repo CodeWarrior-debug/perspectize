@@ -8,24 +8,30 @@ All git worktrees in this repo live under `.claude/worktrees/` — not sibling f
 
 ## Numbered reusable worktrees for Claude Code sessions
 
-For routine isolated work (branch inspection, PR analysis, one-off experiments — not necessarily a full feature implementation), Claude Code should use a fixed, bounded set of **3 reusable worktrees** instead of spinning up a new randomly-named one per task:
+For routine isolated work (branch inspection, PR analysis, one-off experiments — not necessarily a full feature implementation), Claude Code should use a fixed, bounded set of **5 reusable worktrees** instead of spinning up a new randomly-named one per task:
 
 ```
 .claude/worktrees/1
 .claude/worktrees/2
 .claude/worktrees/3
+.claude/worktrees/4
+.claude/worktrees/5
 ```
+
+**Claim order:** take the lowest-numbered slot that is free. A slot is free when it doesn't exist yet, or when it is clean, not `locked`, and its branch is finished (PR merged, remote branch gone). A finished slot holding only untracked files is still claimable (they survive a branch switch); mention them. Check for conflicts first: no open PR on its branch, and no overlap with another in-flight branch touching the same files. If a slot is not claimable, move to the next number. Create missing slots with `.claude/scripts/new-worktree.sh <branch> <n>`; reuse an existing one with `git -C .claude/worktrees/<n> checkout -b <new-branch> origin/main`, then `git branch --unset-upstream` so it can't push to `main`.
+
+**Overflow:** once all 5 numbered slots are busy, use a work-specific named worktree (e.g. `.claude/worktrees/idle-pause-realtime-stream`) instead of asking.
 
 **Reuse policy:**
 
-1. **Before reusing** `1`/`2`/`3` for a new task, check it first:
+1. **Before reusing** a numbered slot (`1`-`5`) for a new task, check it first:
    ```bash
    git worktree list
    git -C .claude/worktrees/<n> status
    ```
    If it's clean (no uncommitted changes) and not flagged `locked` in `git worktree list`, it's safe to switch its branch and reuse it.
 2. **If it has uncommitted changes or looks mid-task**, don't silently discard that state — surface what's in it and ask before switching its branch.
-3. **If all 3 are busy** when a 4th is needed, ask which to free up (commit/stash and reuse it, spin up a temporary overflow worktree outside the numbered set, or skip worktrees for that task) rather than deciding unilaterally.
+3. **If all 5 are busy**, use a named overflow worktree (see above) rather than freeing one of them.
 4. This numbered set is separate from worktrees created by other flows (e.g. `EnterWorktree`-spawned random-named directories, or a `superpowers:using-git-worktrees` isolation worktree for an in-flight feature) — leave those alone; they're not part of the reusable pool.
 
 **Why:** keeps worktree usage bounded and predictable instead of accumulating one-off directories under `.claude/worktrees/` indefinitely.

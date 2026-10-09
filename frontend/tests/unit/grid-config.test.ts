@@ -8,6 +8,11 @@ import {
 	SORTABLE_COLUMNS,
 	compareContentBySorts,
 	filterContentRows,
+	CLIENT_ONLY_SORT_COLS,
+	COL_TO_SORT,
+	sortableColumnsFor,
+	releasedComparator,
+	itemColumnHeader,
 } from '$lib/utils/grid-config';
 import type { ContentItem } from '$lib/queries/content';
 
@@ -17,7 +22,7 @@ function row(overrides: Partial<ContentItem>): ContentItem {
 		name: '',
 		addedByUserID: '1',
 		url: null,
-		contentType: 'YOUTUBE',
+		contentType: 'YOUTUBE_VIDEO',
 		length: null,
 		lengthUnits: null,
 		viewCount: null,
@@ -38,8 +43,12 @@ function row(overrides: Partial<ContentItem>): ContentItem {
 // ---------------------------------------------------------------------------
 describe('capitalizeContentType', () => {
 	it('capitalizes first letter and lowercases rest', () => {
-		expect(capitalizeContentType('YOUTUBE')).toBe('Youtube');
-		expect(capitalizeContentType('youtube_video')).toBe('Youtube_video');
+		expect(capitalizeContentType('CLAIM')).toBe('Claim');
+	});
+
+	it('shows youtube_video as "YouTube Video" in any casing', () => {
+		expect(capitalizeContentType('YOUTUBE_VIDEO')).toBe('YouTube Video');
+		expect(capitalizeContentType('youtube_video')).toBe('YouTube Video');
 	});
 
 	it('returns empty string for undefined', () => {
@@ -104,18 +113,30 @@ describe('durationComparator', () => {
 // Column-picker registry
 // ---------------------------------------------------------------------------
 describe('column-picker registry', () => {
-	it('DATA_COLUMNS holds the 12 user-togglable data columns', () => {
+	it('DATA_COLUMNS holds the 24 user-togglable data columns', () => {
 		expect(DATA_COLUMNS.map((c) => c.colId)).toEqual([
 			'type',
 			'category',
+			'genre',
+			'rated',
+			'cast',
 			'duration',
 			'views',
 			'likes',
 			'percentLiked',
+			'released',
+			'boxOffice',
+			'vsBudget',
+			'tmdbScore',
 			'publishDate',
 			'channel',
 			'tags',
 			'description',
+			'budget',
+			'votes',
+			'collection',
+			'synopsis',
+			'tmdbId',
 			'createdAt',
 			'updatedAt',
 		]);
@@ -141,13 +162,13 @@ describe('column-picker registry', () => {
 		}
 	});
 
-	it('togglableColIds(false) returns only the 12 data columns', () => {
+	it('togglableColIds(false) returns only the 24 data columns', () => {
 		expect(togglableColIds(false)).toEqual(DATA_COLUMNS.map((c) => c.colId));
 	});
 
-	it('togglableColIds(true) returns all 15 columns', () => {
+	it('togglableColIds(true) returns all 27 columns', () => {
 		const ids = togglableColIds(true);
-		expect(ids).toHaveLength(15);
+		expect(ids).toHaveLength(27);
 		expect(ids).toEqual([...DATA_COLUMNS.map((c) => c.colId), ...INTERNAL_COLUMNS.map((c) => c.colId)]);
 	});
 
@@ -168,6 +189,12 @@ describe('SORTABLE_COLUMNS', () => {
 		for (const col of SORTABLE_COLUMNS) {
 			expect(col.label.length).toBeGreaterThan(0);
 		}
+	});
+
+	it('includes the client-only Movie columns Released and TMDB Score', () => {
+		const ids = SORTABLE_COLUMNS.map((c) => c.colId);
+		expect(ids).toContain('released');
+		expect(ids).toContain('tmdbScore');
 	});
 
 	it('includes percentLiked — sortable in the grid, must stay sortable in the mobile/Loaded-mode picker too', () => {
@@ -261,9 +288,19 @@ describe('filterContentRows', () => {
 	});
 
 	it('filters by a text "contains" filter (e.g. the default type: youtube filter)', () => {
-		const rows = [row({ id: '1', contentType: 'YOUTUBE' }), row({ id: '2', contentType: 'CLAIM' })];
+		const rows = [row({ id: '1', contentType: 'YOUTUBE_VIDEO' }), row({ id: '2', contentType: 'CLAIM' })];
 		const result = filterContentRows(rows, { type: { filterType: 'text', type: 'contains', filter: 'youtube' } });
 		expect(result.map((r) => r.id)).toEqual(['1']);
+	});
+
+	it('filters by a set filter, matching any of the selected types', () => {
+		const rows = [
+			row({ id: '1', contentType: 'YOUTUBE' }),
+			row({ id: '2', contentType: 'CLAIM' }),
+			row({ id: '3', contentType: 'BIBLE_PASSAGE' }),
+		];
+		const result = filterContentRows(rows, { type: { filterType: 'set', values: ['youtube', 'bible_passage'] } });
+		expect(result.map((r) => r.id)).toEqual(['1', '3']);
 	});
 
 	it('filters by a number range (views)', () => {
@@ -299,8 +336,8 @@ describe('filterContentRows', () => {
 
 	it('applies multiple filters as AND', () => {
 		const rows = [
-			row({ id: '1', contentType: 'YOUTUBE', viewCount: 500 }),
-			row({ id: '2', contentType: 'YOUTUBE', viewCount: 5000 }),
+			row({ id: '1', contentType: 'YOUTUBE_VIDEO', viewCount: 500 }),
+			row({ id: '2', contentType: 'YOUTUBE_VIDEO', viewCount: 5000 }),
 			row({ id: '3', contentType: 'CLAIM', viewCount: 5000 }),
 		];
 		const result = filterContentRows(rows, {
@@ -314,5 +351,68 @@ describe('filterContentRows', () => {
 		const rows = [row({ id: '1' })];
 		const result = filterContentRows(rows, { notARealColumn: { filterType: 'text', type: 'contains', filter: 'x' } });
 		expect(result.map((r) => r.id)).toEqual(['1']);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Client-only sort columns (Released, TMDB Score)
+// ---------------------------------------------------------------------------
+describe('client-only sort columns', () => {
+	const movieRow = (id: string, releaseDate: string | null, voteAverage: number | null) =>
+		row({
+			id,
+			contentType: 'MOVIE',
+			response: { releaseDate, voteAverage, voteCount: voteAverage == null ? 0 : 1000 },
+		} as Partial<ContentItem>);
+	const rows = [movieRow('a', '2010-07-15', 8.4), movieRow('b', '1999-03-31', 7.1), movieRow('c', null, null)];
+	const ids = (sorts: { col: string; dir: 'asc' | 'desc' }[]) =>
+		[...rows].sort((x, y) => compareContentBySorts(x, y, sorts)).map((r) => r.id);
+
+	it('have no server sort key, so sortsToGraphQL drops them', () => {
+		expect(COL_TO_SORT).not.toHaveProperty('released');
+		expect(COL_TO_SORT).not.toHaveProperty('tmdbScore');
+		expect([...CLIENT_ONLY_SORT_COLS].sort()).toEqual(['released', 'tmdbScore']);
+	});
+
+	it('Loaded mode offers them in the sort picker', () => {
+		const loaded = sortableColumnsFor('loaded').map((c) => c.colId);
+		expect(loaded).toContain('released');
+		expect(loaded).toContain('tmdbScore');
+	});
+
+	it('All Items mode hides them from the sort picker but keeps server-sortable columns', () => {
+		const all = sortableColumnsFor('all').map((c) => c.colId);
+		expect(all).not.toContain('released');
+		expect(all).not.toContain('tmdbScore');
+		expect(all).toContain('boxOffice');
+		expect(all).toContain('item');
+	});
+
+	it('sorts Released chronologically with unknown last in both directions', () => {
+		expect(ids([{ col: 'released', dir: 'asc' }])).toEqual(['b', 'a', 'c']);
+		expect(ids([{ col: 'released', dir: 'desc' }])).toEqual(['a', 'b', 'c']);
+	});
+
+	it('sorts TMDB Score numerically with unrated last in both directions', () => {
+		expect(ids([{ col: 'tmdbScore', dir: 'asc' }])).toEqual(['b', 'a', 'c']);
+		expect(ids([{ col: 'tmdbScore', dir: 'desc' }])).toEqual(['a', 'b', 'c']);
+	});
+
+	it('releasedComparator orders dates and keeps unknown last when descending', () => {
+		expect(releasedComparator('1999-01-01', '2010-01-01')).toBeLessThan(0);
+		expect(releasedComparator(null, '2010-01-01', null, null, false)).toBeGreaterThan(0);
+		expect(releasedComparator(null, '2010-01-01', null, null, true)).toBeLessThan(0); // AG negates for desc
+		expect(releasedComparator('garbage', null)).toBe(0);
+	});
+});
+
+describe('itemColumnHeader', () => {
+	it('is "Film" when the type filter is exactly MOVIE', () => {
+		expect(itemColumnHeader('movie')).toBe('Film');
+	});
+	it('is "Item" for other filters, multiple types, or none', () => {
+		expect(itemColumnHeader('youtube_video')).toBe('Item');
+		expect(itemColumnHeader('movie,youtube_video')).toBe('Item');
+		expect(itemColumnHeader(undefined)).toBe('Item');
 	});
 });

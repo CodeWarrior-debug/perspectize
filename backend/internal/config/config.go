@@ -14,6 +14,10 @@ type Config struct {
 	YouTube  YouTubeConfig  `json:"youtube"`
 	Logging  LoggingConfig  `json:"logging"`
 
+	// TMDBReadAccessToken is the TMDB v4 read access token (TMDB_API_READ_ACCESS_TOKEN).
+	// Blank disables movie lookups without stopping the server.
+	TMDBReadAccessToken string `json:"tmdb_read_access_token,omitempty"`
+
 	// MessageRetentionMax caps how many of the newest messages each thread
 	// keeps. 0 (the default) disables the application-side retention sweep
 	// entirely — threads grow unbounded. Set via MESSAGE_RETENTION_MAX.
@@ -105,6 +109,10 @@ func Load(configPath string) (*Config, error) {
 		cfg.YouTube.APIKey = ytAPIKey
 	}
 
+	if tmdbToken := os.Getenv("TMDB_API_READ_ACCESS_TOKEN"); tmdbToken != "" {
+		cfg.TMDBReadAccessToken = tmdbToken
+	}
+
 	// Unlike getEnvInt (security.go), 0 is a valid value here — it disables
 	// the YouTube response cache entirely — so parse directly rather than
 	// treating 0 as "unset". An unset or invalid value falls back to
@@ -144,7 +152,7 @@ func (c *ServerConfig) GetAddr() string {
 }
 
 // GetDSN returns the PostgreSQL connection string (Data Source Name)
-// Prefers DATABASE_URL env var if set (for hosted databases like Sevalla)
+// Prefers DATABASE_URL env var if set (for hosted databases like Neon)
 func (c *DatabaseConfig) GetDSN() string {
 	if url := os.Getenv("DATABASE_URL"); url != "" {
 		return url

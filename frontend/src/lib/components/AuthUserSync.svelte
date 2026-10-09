@@ -1,19 +1,19 @@
 <script lang="ts">
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
-	import { useClerkContext } from 'svelte-clerk';
+	import { useAuthState } from '$lib/auth/useAuthState';
 	import { graphqlRequest } from '$lib/queries/client';
 	import { ME, type MeResponse } from '$lib/queries/users';
 	import { setSelectedUserId, clearUserSelection } from '$lib/stores/userSelection.svelte';
 
 	const queryClient = useQueryClient();
-	const clerk = useClerkContext();
+	const auth = useAuthState();
 
-	const clerkUserId = $derived(clerk.auth.userId);
+	const clerkUserId = $derived(auth.userId);
 
 	const meQuery = createQuery(() => ({
 		queryKey: ['me', clerkUserId],
 		queryFn: () => graphqlRequest<MeResponse>(ME),
-		enabled: clerk.isLoaded && !!clerkUserId,
+		enabled: auth.isLoaded && !!clerkUserId,
 		staleTime: 5 * 60 * 1000,
 	}));
 
@@ -23,15 +23,19 @@
 	let lastSyncedClerkUserId: string | null | undefined = undefined;
 
 	$effect(() => {
-		if (!clerk.isLoaded) return;
+		if (!auth.isLoaded) return;
 		const currentId = clerkUserId ?? null;
 		if (currentId === lastSyncedClerkUserId) return;
 
+		const isInitialResolution = lastSyncedClerkUserId === undefined;
 		lastSyncedClerkUserId = currentId;
 		// content.lists(), perspectives.listByUser(), etc. are all user-scoped —
 		// clear everything, not just the me query, so nothing leaks across
-		// accounts on a shared device.
-		queryClient.clear();
+		// accounts on a shared device. The first resolution isn't an account
+		// change and nothing user-scoped is cached yet; clearing then would
+		// detach queries siblings already started (demo mode has auth loaded at
+		// mount, so they'd never recover).
+		if (!isInitialResolution) queryClient.clear();
 
 		if (currentId === null) {
 			clearUserSelection();
@@ -39,7 +43,7 @@
 	});
 
 	$effect(() => {
-		if (clerk.isLoaded && clerkUserId && meQuery.data?.me) {
+		if (auth.isLoaded && clerkUserId && meQuery.data?.me) {
 			setSelectedUserId(parseInt(meQuery.data.me.id, 10));
 		}
 	});

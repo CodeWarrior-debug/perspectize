@@ -8,10 +8,20 @@ import (
 
 // PerspectiveRepository defines the contract for perspective persistence
 type PerspectiveRepository interface {
+	// Create inserts the perspective. Returns domain.ErrNotFound when its
+	// UserID doesn't reference an existing user.
 	Create(ctx context.Context, perspective *domain.Perspective) (*domain.Perspective, error)
 	GetByID(ctx context.Context, id int) (*domain.Perspective, error)
-	Update(ctx context.Context, perspective *domain.Perspective) (*domain.Perspective, error)
-	Delete(ctx context.Context, id int) error
+	// Update writes the perspective ONLY if it belongs to ownerUserID — like
+	// Delete, the ownership predicate is part of the UPDATE statement itself.
+	// Returns domain.ErrNotFound when no row matched.
+	Update(ctx context.Context, perspective *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
+	// Delete removes the perspective with the given id ONLY if it belongs to
+	// ownerUserID — the ownership predicate is part of the DELETE statement
+	// itself, so a caller can never remove another user's row even if every
+	// check above it were bypassed. Returns domain.ErrNotFound when no row
+	// matched (missing id and not-yours are deliberately indistinguishable).
+	Delete(ctx context.Context, id int, ownerUserID int) error
 	List(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
 	ReassignByUser(ctx context.Context, fromUserID, toUserID int) error
 

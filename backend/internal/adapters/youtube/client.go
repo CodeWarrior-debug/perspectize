@@ -36,23 +36,26 @@ func NewClient(apiKey string) *Client {
 // ingest. See FEATURE_BACKLOG.md "YouTube JSONB Storage" for the sizing
 // analysis behind this trim.
 type YouTubeAPIResponse struct {
-	Items []struct {
-		Snippet struct {
-			Title        string   `json:"title"`
-			Description  string   `json:"description"`
-			ChannelTitle string   `json:"channelTitle"`
-			PublishedAt  string   `json:"publishedAt"`
-			Tags         []string `json:"tags"`
-		} `json:"snippet"`
-		ContentDetails struct {
-			Duration string `json:"duration"`
-		} `json:"contentDetails"`
-		Statistics struct {
-			ViewCount    string `json:"viewCount"`
-			LikeCount    string `json:"likeCount"`
-			CommentCount string `json:"commentCount"`
-		} `json:"statistics"`
-	} `json:"items"`
+	Items []YouTubeAPIItem `json:"items"`
+}
+
+// YouTubeAPIItem is one trimmed video entry in YouTubeAPIResponse.
+type YouTubeAPIItem struct {
+	Snippet struct {
+		Title        string   `json:"title"`
+		Description  string   `json:"description"`
+		ChannelTitle string   `json:"channelTitle"`
+		PublishedAt  string   `json:"publishedAt"`
+		Tags         []string `json:"tags"`
+	} `json:"snippet"`
+	ContentDetails struct {
+		Duration string `json:"duration"`
+	} `json:"contentDetails"`
+	Statistics struct {
+		ViewCount    string `json:"viewCount"`
+		LikeCount    string `json:"likeCount"`
+		CommentCount string `json:"commentCount"`
+	} `json:"statistics"`
 }
 
 // sanitizeYouTubeError removes sensitive information from YouTube API errors.

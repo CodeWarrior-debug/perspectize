@@ -29,7 +29,125 @@ import {
 	getSourceDataCooldown,
 	formatRemainingTime,
 	SOURCE_DATA_COOLDOWN_MS,
+	formatMoneyCompact,
+	formatMoneyExact,
+	vsBudgetPercent,
+	formatVsBudget,
 } from '$lib/utils/formatting';
+
+describe('shared h:mm:ss duration', () => {
+	it.each([
+		[0, '0:00'],
+		[59, '0:59'],
+		[3599, '59:59'],
+		[3600, '1:00:00'],
+		[8520, '2:22:00'],
+		[8525, '2:22:05'],
+	])('formatDurationSeconds(%i) = %s and formatDuration agrees', (secs, expected) => {
+		expect(formatDurationSeconds(secs)).toBe(expected);
+		expect(formatDuration(secs, 'seconds')).toBe(expected);
+	});
+
+	it.each([
+		['1:02:03', 3723],
+		['2:22:00', 8520],
+		['0:01:05', 65],
+		['59:59', 3599],
+		['1:2:3:4', null],
+		['1:xx:03', null],
+	])('parseDurationInput(%s) = %s', (text, expected) => {
+		expect(parseDurationInput(text)).toBe(expected);
+	});
+
+	// CONCERN (pinned, not fixed): out-of-range minutes/seconds are not rejected.
+	// A 3-part value is h:mm:ss, so '1:30:99' = 1*3600 + 30*60 + 99 = 5499 (99 seconds
+	// carries over) instead of null. Today's behaviour; revisit if strict input is wanted.
+	it('parses a 3-part value as h:mm:ss and does not reject seconds >= 60', () => {
+		expect(parseDurationInput('1:30:99')).toBe(5499);
+		expect(parseDurationInput('1:30:00')).toBe(5400);
+	});
+
+	it('round-trips formatted values through parseDurationInput', () => {
+		for (const s of [0, 59, 3599, 3600, 8525]) {
+			expect(parseDurationInput(formatDurationSeconds(s))).toBe(s);
+		}
+	});
+});
+
+describe('formatMoneyCompact', () => {
+	it.each([
+		[null, '—'],
+		[0, '—'],
+		[12, '$12'],
+		[999, '$999'],
+		[1000, '$1K'],
+		[950_000, '$950K'],
+		[1_500, '$1.5K'],
+		[999_999, '$1M'],
+		[1_000_000, '$1M'],
+		[316_000_000, '$316M'],
+		[1_150_000_000, '$1.2B'],
+		[2_800_000_000, '$2.8B'],
+	])('formatMoneyCompact(%s) = %s', (v, expected) => {
+		expect(formatMoneyCompact(v)).toBe(expected);
+	});
+
+	// Rule: round to one decimal in the unit's own scale (half up); a rounded 1000
+	// promotes to the next unit. Boundary values around each unit edge.
+	it.each([
+		[999, '$999'],
+		[999_499, '$999.5K'], // 999.499K rounds to 999.5K (one decimal), no promotion yet
+		[999_500, '$999.5K'],
+		[999_950, '$1M'], // 999.95K rounds to 1000.0K, promoted
+		[999_999, '$1M'],
+		[1_000_000, '$1M'],
+		[316_400_000, '$316.4M'],
+		[1_000_000_000, '$1B'],
+		[999_950_000_000, '$1T'],
+		[1_000_000_000_000, '$1T'],
+		[1_200_000_000_000, '$1.2T'],
+	])('boundary: formatMoneyCompact(%s) = %s', (v, expected) => {
+		expect(formatMoneyCompact(v)).toBe(expected);
+	});
+});
+
+describe('formatMoneyExact', () => {
+	it.each([
+		[null, '—'],
+		[0, '—'],
+		[999, '$999'],
+		[1_234_567, '$1,234,567'],
+	])('formatMoneyExact(%s) = %s', (v, expected) => {
+		expect(formatMoneyExact(v)).toBe(expected);
+	});
+});
+
+describe('vsBudgetPercent / formatVsBudget', () => {
+	it.each([
+		[2_800_000_000, 80_000_000, 3500],
+		[50, 100, 50],
+		[null, 100, null],
+		[100, null, null],
+		[100, 0, null],
+		[0, 100, null],
+		[null, null, null],
+	])('vsBudgetPercent(%s, %s) = %s', (rev, budget, expected) => {
+		expect(vsBudgetPercent(rev, budget)).toBe(expected);
+	});
+
+	it.each([
+		[3455.2, '3,455%'],
+		[3500, '3,500%'],
+		[49.6, '50%'],
+		[0.3, '<1%'],
+		[0.49, '<1%'],
+		[0.5, '1%'],
+		[0, '0%'],
+		[null, '—'],
+	])('formatVsBudget(%s) = %s', (pct, expected) => {
+		expect(formatVsBudget(pct)).toBe(expected);
+	});
+});
 
 describe('formatDuration', () => {
 	it('returns dash for null length', () => {
@@ -57,7 +175,7 @@ describe('formatDuration', () => {
 	});
 
 	it('formats large durations', () => {
-		expect(formatDuration(3661, 'seconds')).toBe('61:01');
+		expect(formatDuration(3661, 'seconds')).toBe('1:01:01');
 	});
 
 	it('formats non-seconds units with value and unit', () => {
@@ -194,7 +312,7 @@ describe('formatDurationSeconds', () => {
 	});
 
 	it('formats large durations', () => {
-		expect(formatDurationSeconds(3661)).toBe('61:01');
+		expect(formatDurationSeconds(3661)).toBe('1:01:01');
 	});
 
 	it('formats sub-minute durations', () => {
@@ -613,19 +731,19 @@ describe('typeCellRenderer', () => {
 
 	it('includes sr-only span with content type for filter matching', () => {
 		const result = typeCellRenderer({
-			data: { contentType: 'YOUTUBE' },
+			data: { contentType: 'YOUTUBE_VIDEO' },
 		}) as HTMLElement;
 
 		const hidden = result.querySelector('.sr-only');
 		expect(hidden).toBeTruthy();
-		expect(hidden?.textContent).toBe('YOUTUBE');
+		expect(hidden?.textContent).toBe('YOUTUBE_VIDEO');
 	});
 
 	// Gap #12 in the UI gap audit: a CLAIM row rendered with the YouTube play
 	// icon, same as a YOUTUBE row — nothing distinguished them in the grid.
 	it('renders a different, theme-token-coloured icon for a CLAIM row (not the YouTube icon)', () => {
 		const claim = typeCellRenderer({ data: { contentType: 'CLAIM' } }) as HTMLElement;
-		const youtube = typeCellRenderer({ data: { contentType: 'YOUTUBE' } }) as HTMLElement;
+		const youtube = typeCellRenderer({ data: { contentType: 'YOUTUBE_VIDEO' } }) as HTMLElement;
 
 		const claimSvg = claim.querySelector('svg');
 		const claimPath = claimSvg?.querySelector('path')?.getAttribute('d');

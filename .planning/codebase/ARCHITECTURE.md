@@ -1,207 +1,160 @@
 # Architecture
 
-**Analysis Date:** 2026-09-04
+**Analysis Date:** 2026-10-01
 
 ## Pattern Overview
 
-**Overall:** Monorepo with two independently deployed stacks: a Go GraphQL API backend (`backend/`) built with **Hexagonal Architecture** (Ports and Adapters), and a SvelteKit SPA frontend (`frontend/`) consuming that API over GraphQL.
+**Overall:** Monorepo with two independently deployed stacks: a Go GraphQL API using Hexagonal Architecture (Ports and Adapters), and a client-only SvelteKit SPA that talks to it over GraphQL (HTTP + WebSocket subscriptions).
 
 **Key Characteristics:**
-- Backend domain logic has zero framework/infra dependencies; all I/O goes through port interfaces
-- Schema-first GraphQL (gqlgen) — `backend/schema.graphql` is the source of truth, generated code lives in `internal/adapters/graphql/generated/`
-- Frontend is a client-rendered SPA (`ssr = false`, `csr = true`) — no server-side rendering, talks to the backend purely via GraphQL over HTTP
-- Auth is delegated to Clerk (JWT bearer tokens on the frontend, Clerk SDK verification + webhook sync on the backend)
-- Multi-dimensional rating domain: "Perspectives" hold `quality` and `agreement` as 0–10000 integers (0.01% precision, avoids float issues) rather than binary like/dislike
+- Backend is schema-first GraphQL (gqlgen) with `schema.graphql` + `messaging.graphql` as the contract (`backend/gqlgen.yml`)
+- Dependencies point inward: `core/domain` has no adapter or GORM imports; services depend only on `core/ports` interfaces
+- Manual dependency injection in a single composition root: `backend/cmd/server/main.go`
+- Domain models are separate from GORM models; mappers convert between them (`backend/internal/adapters/repositories/postgres/gorm_mappers.go`)
+- Frontend is NOT hexagonal: components call domain-scoped `useX` hooks (TanStack Query) that hide GraphQL + cache wiring ("deep modules")
+- Frontend is a static SPA (`ssr = false`, `adapter-static`), plus Capacitor shells (`frontend/android`, `frontend/ios`)
+- Realtime messaging uses in-process Hub + Postgres LISTEN/NOTIFY fan-out across instances
+- Demo mode (`DEMO_MODE=true` backend, `VITE_DEMO_MODE=true` frontend) swaps Clerk and YouTube for fixtures
 
-## Layers (Backend — `backend/`)
+## Layers
 
-**Domain Layer (Core):**
-- Purpose: Pure business entities and rules, no external dependencies
+**Domain (core):**
+- Purpose: Pure business entities, enums, errors, pagination types
 - Location: `backend/internal/core/domain/`
-- Contains: `content.go`, `perspective.go`, `user.go`, `auth.go`, `claims.go`, `errors.go`, `pagination.go`
-- Depends on: nothing (standard library only)
-- Used by: services, ports
+- Contains: `content.go`, `perspective.go`, `user.go`, `category.go`, `messaging.go`, `realtime.go`, `bible_reference.go`, `bible_interlinear.go`, `auth.go`, `claims.go`, `pagination.go`, `buildinfo.go`, `errors.go`
+- Depends on: stdlib only
+- Used by: services, ports, all adapters
 
-**Ports Layer:**
-- Purpose: Interfaces defining contracts that adapters must satisfy
-- Location: `backend/internal/core/ports/repositories/` (e.g. `content_repository.go`, `user_repository.go`, `perspective_repository.go`) and `backend/internal/core/ports/services/` (e.g. `content_service.go`, `auth_service.go`)
+**Ports:**
+- Purpose: Interface contracts
+- Location: `backend/internal/core/ports/repositories/` (driven: `content_repository.go`, `perspective_repository.go`, `user_repository.go`, `category_repository.go`, `thread_repository.go`, `message_repository.go`, `bible_reference_repository.go`, `build_info_repository.go`) and `backend/internal/core/ports/services/` (`content_service.go`, `perspective_service.go`, `user_service.go`, `category_service.go`, `messaging_service.go`, `auth_service.go`, `token_verifier.go`, `youtube_client.go`, `wikidata_client.go`)
 - Depends on: domain
-- Used by: services (define contracts), adapters (implement contracts)
+- Used by: services (outbound ports), resolvers/directives (service ports)
 
-**Services Layer (Business Logic):**
-- Purpose: Orchestrates domain rules, validation, cross-entity logic
-- Location: `backend/internal/core/services/` — `content_service.go`, `user_service.go`, `perspective_service.go`, `auth_service.go`
-- Depends on: domain, ports (interfaces only — never concrete adapters)
-- Used by: GraphQL resolvers, directives
+**Services:**
+- Purpose: Business rules, validation, orchestration
+- Location: `backend/internal/core/services/` (`content_service.go`, `perspective_service.go`, `user_service.go`, `category_service.go`, `messaging_service.go`, `auth_service.go`, `build_info_service.go`, `ratelimit.go`, `retention.go`, `sanitize.go`)
+- Depends on: domain, ports
+- Used by: GraphQL resolvers, dataloaders, directives, realtime hub
 
-**Primary Adapter Layer (Driving — inbound):**
-- Purpose: Exposes the application to the outside world
-- Location: `backend/internal/adapters/graphql/` — `resolvers/` (`resolver.go`, `schema.resolvers.go`, `helpers.go`), `directives/` (`auth.go` — `@auth`/`@owner` directive implementations), `generated/` (gqlgen output, do not hand-edit), `model/` (GraphQL input/output structs)
-- Depends on: services (via constructor injection)
-- Used by: `cmd/server/main.go` (wires resolver into gqlgen handler)
+**Primary adapter (GraphQL):**
+- Purpose: Translate GraphQL operations into service calls
+- Location: `backend/internal/adapters/graphql/`
+  - `resolvers/` one file per domain: `content.resolvers.go`, `perspective.resolvers.go`, `user.resolvers.go`, `category.resolvers.go`, `messaging.resolvers.go`; `resolver.go` (root), `helpers.go` (model <-> domain mapping)
+  - `generated/generated.go` and `model/models_gen.go` are gqlgen output (do not edit); `model/messaging.go` is hand-written
+  - `directives/auth.go` implements `@auth` and `@owner`
+  - `dataloader/dataloader.go` per-request batching middleware
+- Depends on: services, domain
+- Used by: `cmd/server/main.go`
 
-**Secondary Adapter Layer (Driven — outbound):**
-- Purpose: Implements port interfaces against real infrastructure
-- Location: `backend/internal/adapters/repositories/postgres/` (GORM-backed repos: `gorm_content_repository.go`, `gorm_user_repository.go`, `gorm_perspective_repository.go`, `gorm_mappers.go`, `gorm_models.go`, `helpers.go`), `backend/internal/adapters/youtube/` (`client.go`, `cache.go`, `parser.go` — YouTube Data API client with in-memory TTL cache), `backend/internal/adapters/auth/` (`auth.go` middleware, `webhook_handler.go` for Clerk webhooks, `context.go`, `claims.go`)
-- Depends on: domain, ports (implements them)
-- Used by: `cmd/server/main.go` (constructed and injected into services)
+**Primary adapter (HTTP/auth/web):**
+- Purpose: Non-GraphQL HTTP concerns
+- Location: `backend/internal/adapters/auth/` (Clerk JWT middleware `clerk_middleware.go`, `token_verifier.go`, `demo_token_verifier.go`, `webhook_handler.go` for Clerk/Svix webhooks, `context.go` for `WithAuthenticatedUser`/`RequireAuth`), `backend/internal/adapters/web/handlers/version.go` (`/version`), `backend/internal/adapters/web/middleware/` (rate limit, secure headers, content-type CSRF check)
 
-**Infrastructure/Wiring Layer:**
-- Purpose: Composition root — constructs adapters, services, and the HTTP server, wires everything together
-- Location: `backend/cmd/server/main.go`
-- Depends on: everything (only place allowed to import both adapters and services concretely)
+**Secondary adapters (driven):**
+- Postgres via GORM: `backend/internal/adapters/repositories/postgres/` (`gorm_*_repository.go`, `gorm_models.go`, `gorm_mappers.go`, `gorm_messaging_mappers.go`, `helpers.go` cursors/sort whitelists, `array_types.go`). `*.sqlx.bak` files are dead backups of a previous sqlx implementation.
+- YouTube: `backend/internal/adapters/youtube/` (`client.go`, `cache.go` TTL caching wrapper, `fixture_client.go` for demo, `parser.go`)
+- Wikidata: `backend/internal/adapters/wikidata/client.go`
+- Realtime: `backend/internal/adapters/realtime/` (`hub.go`, `listener.go` Postgres LISTEN, `notifier.go` pg_notify, `presence.go`, `presence_session.go`)
 
-**Cross-cutting Support (`pkg/`):**
-- `backend/pkg/database/` — GORM connection setup (`postgres.go`), pool config, slow-query logging, DB stats endpoint (`stats.go`)
-- `backend/pkg/graphql/` — `intid.go` (custom `IntID` scalar), `timing.go` (operation timing middleware for gqlgen)
-- `backend/pkg/logger/` — structured `slog` JSON setup (`logger.go`)
-- `backend/pkg/middleware/` — generic HTTP middleware not specific to auth: `recovery.go` (panic recovery → JSON via slog), `timing.go` (request timing)
-- `backend/internal/config/` — `config.go` (env/JSON config loading), `security.go` (CORS origins, rate limits, Clerk secrets), `validation.go` (DATABASE_URL validation)
-- `backend/internal/adapters/web/middleware/` — HTTP-layer middleware wired in `main.go`: `auth.go`, `contenttype.go` (CSRF via Content-Type), `ratelimit.go`, `secureheaders.go` (HSTS, X-Frame-Options, etc.)
+**Shared infrastructure (`pkg/`):**
+- `backend/pkg/database/` (GORM connect, pool config, slow query logger, stats handler), `backend/pkg/graphql/` (`intid.go` IntID scalar, `timing.go` operation timer), `backend/pkg/logger/logger.go` (slog JSON), `backend/pkg/middleware/` (request timer, panic recoverer)
 
-**Dependency Rule:** Dependencies point inward only. `core/domain` never imports anything from `adapters/` or `pkg/`. `core/services` depends only on `core/ports` interfaces, never on concrete adapter types. `cmd/server/main.go` is the sole place that imports both adapters and services concretely to wire them together.
+**Config & support:**
+- `backend/internal/config/` (`config.go`, `security.go`, `demo.go`, `validation.go`), `backend/internal/demo/fixtures.go`, `backend/internal/perf/querycount/` (GORM statement counter for query-budget tests)
 
-## Layers (Frontend — `frontend/src/`)
-
-**Routing Layer:**
-- Purpose: SvelteKit file-based routing, page composition
-- Location: `frontend/src/routes/` — `+layout.svelte` (root layout: QueryClientProvider, Header, Toaster), `+layout.ts` (`ssr = false`, `csr = true`, `prerender = false`), `+page.svelte` (home page), `discover/+page.svelte` + `discover/+page.ts` (discover feature route)
-- Depends on: components, queries, stores
-- Used by: browser navigation only (SPA — no server rendering)
-
-**Component Layer:**
-- Purpose: Presentational and feature Svelte 5 components
-- Location: `frontend/src/lib/components/` — feature components at top level (`ActivityTable.svelte`, `ActivityCardList.svelte`, `ActivityDetailsModal.svelte`, `AddVideoDialog.svelte`, `PerspectivePopover.svelte`, `RatingInput.svelte`, `Header.svelte`, `PageWrapper.svelte`, etc.), `shadcn/` (shadcn-svelte UI primitives: `button/`, `dialog/`, `drawer/`, `input/`, `label/`, `popover/`, `select/`), `discover/` (discover-page-specific components)
-- Depends on: queries/hooks, stores, utils
-- Used by: routes
-
-**Query/Data Fetching Layer:**
-- Purpose: GraphQL query/mutation definitions and TanStack Query integration
-- Location: `frontend/src/lib/queries/` — `client.ts` (GraphQLClient instance, `VITE_GRAPHQL_URL`, `getAuthToken()`/`graphqlRequest()` helpers that attach Clerk bearer tokens), `keys.ts` (centralized query-key factory for cache invalidation), `content.ts`, `claims.ts`, `perspectives.ts`, `users.ts` (gql tagged-template query/mutation definitions), `hooks/` (TanStack Query wrapper hooks: `useAddVideo.ts`, `useCreateClaim.ts`, `useCreatePerspective.ts`, `useCreateUser.ts`, `useMe.svelte.ts`, `useUpdatePerspective.ts`, `useUpdateSourceData.ts`)
-- Depends on: `graphql-request`, `@tanstack/svelte-query`
-- Used by: components
-
-**State Management Layer:**
-- Purpose: Cross-component reactive state outside TanStack Query cache
-- Location: `frontend/src/lib/stores/` — `userSelection.svelte.ts` (Svelte 5 rune-based store, `.svelte.ts` suffix required for rune usage outside `.svelte` files)
-- Depends on: nothing internal
-- Used by: components needing shared UI state (e.g. selected user for perspective filtering)
-
-**Services Layer:**
-- Purpose: Non-GraphQL external integrations
-- Location: `frontend/src/lib/services/` — `youtubeApi.ts` (client-side YouTube helper)
-
-**Utilities & Assets:**
-- Location: `frontend/src/lib/utils/` — `formatting.ts`, `grid-config.ts` (AG Grid column/sort/pagination logic extracted as pure functions for testability), `gridUrlState.ts`, `ratings.ts`, `sanitize.ts`, `youtube.ts`, `native.ts`, `references.ts`, `activityItemCellRenderer.ts`; top-level `frontend/src/lib/utils.ts` (shared cn/class helpers), `frontend/src/lib/index.ts` (barrel export), `frontend/src/lib/vitals.ts`
-- Location: `frontend/src/lib/assets/`, `frontend/src/assets/glasses_svgs/` — static image/SVG assets
-
-**Global Styles:**
-- Location: `frontend/src/app.css` (Tailwind v4 `@theme` design tokens), `frontend/src/app.html` (HTML shell, CSP config)
+**Frontend layers:**
+- Routes: `frontend/src/routes/` (`+layout.svelte` mounts providers; pages `+page.svelte`, `discover/`, `compare/`, `messages/`)
+- Components: `frontend/src/lib/components/` (feature folders `auth/`, `discover/`, `interlinear/`, `messaging/`, `onboarding/`, `theme/`, plus `shadcn/` primitives)
+- Data access: `frontend/src/lib/queries/` (`client.ts`, `keys.ts`, one folder per domain: `content/`, `perspectives/`, `users/`, `categories/`, `bible/`, `messaging/`, each with `index.ts` gql definitions and `useX` hooks)
+- Auth facade: `frontend/src/lib/auth/` (`useAuthState.ts`, `token.ts`, `demo.svelte.ts`, `index.ts`)
+- Realtime client: `frontend/src/lib/messaging/` (`ws-client.svelte.ts`, `useInboxStream.svelte.ts`, `useThreadStream.svelte.ts`, caches, optimistic updates)
+- Utilities / pure logic: `frontend/src/lib/utils/` (grid-config, formatting, bible, passage parsing, URL state)
+- State: `frontend/src/lib/stores/userSelection.svelte.ts`, `frontend/src/lib/theme/store.svelte.ts`, `frontend/src/lib/onboarding/`
 
 ## Data Flow
 
-**GraphQL Query (e.g. list content):**
-1. Component calls a TanStack Query hook (function-wrapper pattern: `createQuery(() => ({...}))`) — `frontend/src/lib/queries/hooks/` or inline in component
-2. Hook calls `graphqlClient.request(...)` (or `graphqlRequest()` for authenticated calls) from `frontend/src/lib/queries/client.ts`, using a query defined in `frontend/src/lib/queries/content.ts`
-3. Request POSTed to `VITE_GRAPHQL_URL` (defaults `http://localhost:8080/graphql`) with `Authorization: Bearer <clerk-token>` if signed in
-4. Backend chi router (`backend/cmd/server/main.go`) applies middleware stack (rate limit → CORS → security headers → content-type validation → auth middleware → request timer → recoverer) then routes to `/graphql` handler (gqlgen)
-5. gqlgen dispatches to resolver method in `backend/internal/adapters/graphql/resolvers/schema.resolvers.go`
-6. Resolver calls into a `core/services` method (e.g. `ContentService.List`)
-7. Service applies business rules, calls repository port method
-8. `postgres.GormContentRepository` (implementing the port) executes the GORM query, maps GORM model → domain model via `gorm_mappers.go`
-9. Response flows back up: repository → service → resolver → gqlgen → JSON response
-10. TanStack Query caches the response under a hierarchical key (`queryKeys.content.list(filters)`)
+**GraphQL request (query/mutation):**
 
-**Mutation with Auth Directive (e.g. update perspective):**
-1. GraphQL schema field annotated `@auth` or `@owner` in `backend/schema.graphql`
-2. gqlgen invokes directive resolver in `backend/internal/adapters/graphql/directives/auth.go` before the field resolver
-3. `@owner` directive extracts the resource ID from the typed input struct via reflection (`fieldByJSONTag`) — NOT from a `map[string]interface{}` type assertion, which silently fails for real typed gqlgen inputs
-4. Directive validates the authenticated user (set into context by `auth.Middleware` in `backend/internal/adapters/auth/auth.go`, which verifies the Clerk JWT) owns the resource, else returns `ErrForbidden`
-5. On success, field resolver executes normally
+1. Client component calls a `useX` hook (e.g. `frontend/src/lib/queries/perspectives/useCreatePerspective.ts`), which calls `graphqlRequest()` in `frontend/src/lib/queries/client.ts` (adds `Authorization: Bearer <Clerk or demo token>`)
+2. chi router middleware chain in `backend/cmd/server/main.go`: RequestID, RealIP, GlobalRateLimit, CORS, SecureHeaders, ContentTypeValidation, `auth.Middleware` (verifies token, loads user via `userRepo`, puts `AuthenticatedUser` in ctx), dataloader middleware, RequestTimer, Recoverer
+3. gqlgen executes at `/graphql`; `@auth`/`@owner` directives (`directives/auth.go`) gate fields
+4. Resolver (`resolvers/<domain>.resolvers.go`) maps input via `helpers.go`, re-derives actor with `auth.RequireAuth(ctx)`, calls service port
+5. Service applies rules, calls repository ports (and YouTube/Wikidata clients)
+6. GORM repository maps GORM model -> domain; resolver maps domain -> `model.*`
+7. Hook invalidates exact query keys from `frontend/src/lib/queries/keys.ts`
 
-**Clerk User Sync (webhook):**
-1. Clerk sends webhook events (user created/updated) to `POST /webhooks/clerk`
-2. Route bypasses the standard auth middleware — Svix signature verification is the auth mechanism (`backend/internal/adapters/auth/webhook_handler.go`)
-3. Handler upserts the user via `UserRepository`
+**Realtime messaging:**
 
-**State Management (frontend):**
-- Server state (GraphQL data) lives entirely in TanStack Query's cache, keyed via the factory in `frontend/src/lib/queries/keys.ts`
-- Non-server UI state (e.g. currently selected user) lives in Svelte 5 rune-based stores in `frontend/src/lib/stores/` (`.svelte.ts` file suffix enables `$state`/`$derived` outside components)
-- No global client-side store framework (no Redux/Zustand equivalent) — TanStack Query + Svelte 5 runes covers both concerns
+1. Frontend `ws-client.svelte.ts` opens graphql-ws connection with token in `connection_init`
+2. `transport.Websocket.InitFunc` in `main.go` verifies token via shared `TokenVerifier`, loads user, starts `realtime.RunPresenceSession`
+3. Mutations in `messaging_service.go` persist then publish through the `Hub`; the Hub publishes via `PgNotifier` (pg_notify); each instance's `Listener` receives NOTIFY and feeds its in-process Hub to deliver to subscribers (`Subscription` type in `backend/messaging.graphql`)
+4. `useInboxStream` / `useThreadStream` patch TanStack caches
+
+**State Management:**
+- Server state: TanStack Query (staleTime 60s default in `+layout.svelte`), keys centralized in `queries/keys.ts`
+- Local/UI state: Svelte 5 runes; shared state in `*.svelte.ts` modules
+- Grid URL state: `frontend/src/lib/utils/gridUrlState.ts`
+- Per-request backend state: ctx values (authenticated user, dataloaders)
 
 ## Key Abstractions
 
-**Domain Models:**
-- Purpose: Represent core business entities independent of storage/transport
-- Examples: `backend/internal/core/domain/content.go`, `backend/internal/core/domain/perspective.go`, `backend/internal/core/domain/user.go`
-- Pattern: Plain Go structs, zero GORM/gqlgen tags — kept strictly separate from GORM persistence models
+**Repository port + GORM adapter:**
+- Purpose: Persistence contract hiding SQL
+- Examples: `backend/internal/core/ports/repositories/content_repository.go` -> `backend/internal/adapters/repositories/postgres/gorm_content_repository.go`
+- Pattern: Domain struct <-> GORM struct via `gorm_mappers.go`; keyset cursor pagination (`gorm-cursor-paginator` or `helpers.go` encode/decode)
 
-**GORM Models (Hex-Clean Separate Model Pattern):**
-- Purpose: Persistence-layer representation, decoupled from domain models
-- Examples: `backend/internal/adapters/repositories/postgres/gorm_models.go`
-- Pattern: `gorm:` tagged structs; bidirectional mapping to/from domain models happens explicitly in `gorm_mappers.go` — domain layer never sees a GORM tag
+**Service ports for external clients:**
+- Examples: `YouTubeClient` (`ports/services/youtube_client.go`) with implementations `youtube/client.go` (wrapped by `cache.go`) and `youtube/fixture_client.go`; `TokenVerifier` with Clerk and demo implementations
 
-**Repository Ports:**
-- Purpose: Define storage contracts the domain/services depend on, implemented by adapters
-- Examples: `backend/internal/core/ports/repositories/content_repository.go`, `.../user_repository.go`, `.../perspective_repository.go`
-- Pattern: Interface in `core/ports`, concrete GORM implementation in `adapters/repositories/postgres/gorm_*_repository.go`
+**Dataloader:**
+- `backend/internal/adapters/graphql/dataloader/dataloader.go` batches `Content.primaryCategory`, `perspectiveCount`, `averageRating` per request
 
-**Cursor-based Pagination:**
-- Purpose: Stable pagination over large lists without OFFSET
-- Examples: `backend/internal/core/domain/pagination.go`, `backend/internal/adapters/repositories/postgres/helpers.go` (`encodeCursor`/`decodeCursor`)
-- Pattern: Opaque base64 cursor (`cursor:<id>`), keyset pagination, fetch `limit+1` rows to compute `hasNextPage`, sort columns whitelisted to prevent SQL injection
+**Query budget:**
+- `backend/internal/perf/querycount/` asserts SQL statement counts in tests; frontend equivalent `frontend/tests/helpers/queryBudget.ts`
 
-**IntID Scalar:**
-- Purpose: Type-safe integer IDs in GraphQL filter/input fields (vs the built-in `ID` string scalar)
-- Examples: `backend/pkg/graphql/intid.go`, bound in `backend/gqlgen.yml`
-- Pattern: Custom gqlgen scalar; top-level query/mutation ID args still use plain `ID!` + `strconv.Atoi`
+**Domain-folder hook modules (frontend):**
+- `frontend/src/lib/queries/<domain>/index.ts` (gql docs) + `useX.ts` hooks hide cache invalidation
 
-**Query Key Factory (frontend):**
-- Purpose: Type-safe, hierarchical TanStack Query cache keys for predictable invalidation
-- Examples: `frontend/src/lib/queries/keys.ts`
-- Pattern: Nested object of key-builder functions per entity (`queryKeys.content.list(filters)`, `queryKeys.perspectives.detail(id)`)
+**Column metadata:**
+- `frontend/src/lib/utils/grid-config.ts` `COLUMNS` is the single source for picker, sort, filter, URL keys
+
+**Theme system:**
+- `frontend/src/lib/theme/` (`presets.ts`, `derive.ts`, `store.svelte.ts`) generates CSS variable tokens; `app.css` `[data-theme]` blocks generated by `frontend/gen-preset-css.mjs`
 
 ## Entry Points
 
-**Backend Server:**
+**Backend server:**
 - Location: `backend/cmd/server/main.go`
-- Triggers: `go run ./cmd/server`, `make run`, `make dev` (air hot-reload), Docker/Sevalla deployment
-- Responsibilities: load config/env, connect to Postgres (GORM), init Clerk SDK, construct repositories → services → resolver, build gqlgen handler with directives/complexity limits/persisted-query cache, build chi router with full middleware stack, register `/health`, `/ready`, `/graphql`, `/webhooks/clerk`, start HTTP server with graceful shutdown
+- Triggers: `make run` / Docker (`backend/Dockerfile`)
+- Responsibilities: config, DB connect, wiring repos/services/resolvers, chi router, `/graphql`, `/health`, `/ready`, `/version`, `/webhooks/clerk`, dev-only playground `/` and `/debug/db-stats`, graceful shutdown, optional OTel tracing, retention sweeper, realtime listener
 
-**Frontend App Shell:**
-- Location: `frontend/src/routes/+layout.svelte` + `frontend/src/routes/+layout.ts`
-- Triggers: any page load (SPA, client-side only — `ssr = false`)
-- Responsibilities: mount `QueryClientProvider`, render `Header`, `Toaster`, wrap page content
+**Seeders:**
+- `backend/cmd/seed-demo/main.go` (demo personas), `backend/cmd/seed-bible/main.go` (Bible reference data from `backend/cmd/seed-bible/data`)
 
-**GraphQL Schema (contract):**
-- Location: `backend/schema.graphql`
-- Triggers: `make graphql-gen` regenerates `backend/internal/adapters/graphql/generated/` after any schema edit
-- Responsibilities: single source of truth for the API contract consumed by both resolver implementations and (implicitly) frontend query definitions
+**Frontend:**
+- `frontend/src/routes/+layout.ts` (SPA config), `frontend/src/routes/+layout.svelte` (QueryClientProvider, ClerkProvider or demo, Header, Toaster, messaging widget, version watch), `frontend/src/app.html` (shell + stale-chunk recovery)
+
+**Demo / E2E:**
+- `frontend/demo/` Playwright tours/flows; `docker-compose.demo.yml` + `Makefile` `demo-*` targets
 
 ## Error Handling
 
-**Strategy (backend):** Sentinel errors defined once in the domain layer, propagated up through services and translated to GraphQL errors at the resolver boundary.
+**Strategy:** Sentinel domain errors translated at the adapter boundary.
 
 **Patterns:**
-- Domain sentinel errors: `backend/internal/core/domain/errors.go` — `ErrNotFound`, `ErrAlreadyExists`, `ErrInvalidInput`, `ErrInvalidURL`, `ErrYouTubeAPI`, `ErrInvalidRating`, `ErrSentinelUser`, `ErrDeleteSentinel`
-- Services return these sentinel errors (via `errors.Is`-compatible wrapping); resolvers/directives map them to GraphQL error responses
-- Auth-specific errors surface as `ErrUnauthorized`/`ErrForbidden` from the `@auth`/`@owner` directives (`backend/internal/adapters/graphql/directives/auth.go`)
-- Panic recovery centralized in `backend/pkg/middleware/recovery.go` (structured JSON via `slog`, not chi's default logger)
-
-**Strategy (frontend):** TanStack Query's built-in `isError`/`error` reactive state per query/mutation; no global error boundary framework beyond that.
+- `backend/internal/core/domain/errors.go` defines `ErrNotFound`, `ErrForbidden`, etc.; services return/wrap them; resolvers surface as GraphQL errors
+- Owner-only mutations guarded at four layers: `@owner` directive, resolver `auth.RequireAuth`, service actor check returning `ErrForbidden`, SQL scoped by `user_id`
+- Panics recovered by `backend/pkg/middleware/recovery.go`
+- Frontend: hooks surface `isError`; `LazyLoadError.svelte`; stale-chunk recovery in `app.html`
 
 ## Cross-Cutting Concerns
 
-**Logging:** `log/slog` structured JSON logging throughout the backend (`backend/pkg/logger/logger.go`, `RegisterSlowQueryLogger` in `pkg/database`, request timing in `pkg/middleware/timing.go` and `pkg/graphql/timing.go`). No backend `fmt.Println`/`log.Println` in request-handling code paths.
-
-**Validation:** `go-playground/validator` struct-tag validation on backend inputs; `backend/internal/config/validation.go` validates `DATABASE_URL` format specifically.
-
-**Authentication:** Clerk (hosted auth) — frontend obtains JWT via `window.Clerk.session.getToken()` (`frontend/src/lib/queries/client.ts`), backend verifies via Clerk SDK in `auth.Middleware` (`backend/internal/adapters/auth/auth.go`), field-level authorization enforced declaratively via `@auth`/`@owner` GraphQL directives rather than imperative checks scattered in resolvers.
-
-**Rate limiting / security headers:** Applied as chi middleware in `backend/cmd/server/main.go` before auth (`apimw.GlobalRateLimit`, `cors.Handler`, `apimw.SecureHeaders`, `apimw.ContentTypeValidation`) — order is deliberate (rate limit before auth to prevent DoS from unauthenticated flood).
-
-**Observability:** OpenTelemetry tracing optionally enabled via `OTEL_EXPORTER_OTLP_ENDPOINT` env var (`initTracer` in `main.go`); GraphQL operation timing middleware (`pkg/graphql/timing.go`); `/debug/db-stats` endpoint (non-production only) exposes connection pool stats.
+**Logging:** `log/slog` JSON (`backend/pkg/logger/logger.go`); request timing in `pkg/middleware/timing.go`; optional OpenTelemetry OTLP traces
+**Validation:** go-playground/validator and service rules; input sanitization `services/sanitize.go`; GraphQL complexity limit 500, APQ, introspection off in production
+**Authentication:** Clerk JWT verified by `auth.NewClerkTokenVerifier`; demo tokens `Bearer demo.<persona>` via `DemoTokenVerifier`; users created through Clerk webhook (`auth/webhook_handler.go`) and frontend `AuthUserSync.svelte`
+**Rate limiting:** global per-IP (`web/middleware/ratelimit.go`) and per-user sliding-window for messages (`services/ratelimit.go`)
 
 ---
 
-*Architecture analysis: 2026-09-04*
+*Architecture analysis: 2026-10-01*

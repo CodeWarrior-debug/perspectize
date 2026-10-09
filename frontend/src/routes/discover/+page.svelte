@@ -26,6 +26,7 @@
 		queryKey: youtubeKeys.trending(),
 		queryFn: () => fetchYouTubeTrending(),
 		staleTime: 60 * 60 * 1000,
+		gcTime: 24 * 60 * 60 * 1000,
 	}));
 
 	// Accumulated results (first page from the query + any Load More pages).

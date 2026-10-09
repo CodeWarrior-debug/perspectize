@@ -5,9 +5,10 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta
 			http-equiv="Content-Security-Policy"
-			content="default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.services https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://localhost:8080 ws://localhost:8080 https://*.sevalla.app wss://*.sevalla.app https://api.perspectize.com wss://api.perspectize.com https://*.clerk.accounts.dev https://*.clerk.services; font-src 'self' data:; worker-src 'self' blob:; frame-src https://challenges.cloudflare.com https://*.clerk.accounts.dev https://www.youtube.com https://www.youtube-nocookie.com; base-uri 'self'; form-action 'self';"
+			content="default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.services https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: https://image.tmdb.org; connect-src 'self' http://localhost:8080 ws://localhost:8080 https://*.sevalla.app wss://*.sevalla.app https://api.perspectize.com wss://api.perspectize.com https://*.clerk.accounts.dev https://*.clerk.services https://i.ytimg.com https://www.youtube-nocookie.com; font-src 'self' data:; worker-src 'self' blob:; frame-src https://challenges.cloudflare.com https://*.clerk.accounts.dev https://www.youtube.com https://www.youtube-nocookie.com; base-uri 'self'; form-action 'self';"
 		/>
 		<link rel="preload" href="/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin />
+		<link rel="preconnect" href="https://i.ytimg.com" />
 		<style>
 			/* Static pre-hydration loading state: paints before any JS runs, so the
 			   LCP element isn't stuck waiting on the full CSR bundle (incl. Clerk)

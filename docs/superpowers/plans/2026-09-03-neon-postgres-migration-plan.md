@@ -2,6 +2,39 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## Execution status (updated 2026-10-06)
+
+**Cut over.** The production database now runs on Neon (PostgreSQL 18.6, us-east-1) and the
+Sevalla-hosted backend app is connected to it. This plan was executed by hand with
+`pg_dump`/`pg_restore` rather than the scripted Tasks 1–5 below; the checkboxes in this file
+were not ticked and are kept as the original plan.
+
+| Plan item | Status |
+|---|---|
+| Confirm Sevalla version | Done: PostgreSQL 17.0 (Neon is 18.6; a 17 -> 18 restore is supported) |
+| Extension parity | Done by hand: Sevalla has only `plpgsql`, nothing to install |
+| Rehearsal restore on a scratch Neon branch | Done, then discarded; 14/14 tables matched exactly |
+| Maintenance window, final dump, restore into `production` | Done: all 14 tables matched Sevalla's exact row counts, `schema_migrations` = 29 (clean), `valid_integer_range` domain present |
+| Repoint backend `DATABASE_URL` and restart | Done on Sevalla; backend log shows a successful Neon connection |
+| End-to-end smoke test of the deployed site | Confirm and record here |
+| Backend test suite against Neon (Pre-flight) | Not run |
+| Decommission the Sevalla database | Pending: keep as rollback for about a week, then delete |
+| Reset the DB passwords that were exposed during cutover (Neon `neondb_owner`, Sevalla `admin`) | Pending |
+
+**Deviations from this plan** (the plan text below is unchanged):
+- **Direct connection, not pooled.** The app uses Neon's **direct** string, not the pooled one,
+  because the realtime listener uses `LISTEN`/`NOTIFY`, which Neon's PgBouncer (transaction
+  mode) does not support. So `DATABASE_URL_UNPOOLED` / `GetMigrationDSN()` (Tasks 1–2) were not
+  needed, and `DB_MAX_OPEN_CONNS` is sized against Neon's direct connection limit, not the
+  pooler's `default_pool_size`.
+- **Pool env vars, no code change.** `DB_MAX_OPEN_CONNS=10`, `DB_MAX_IDLE_CONNS=5`,
+  `DB_CONN_MAX_IDLE_TIME=4m` (under Neon's ~5 min autosuspend), `DB_CONN_MAX_LIFETIME=30m`;
+  documented in `backend/.env.example`.
+- **Hosting.** The backend is deployed on Sevalla (not DigitalOcean App Platform, as written
+  in Task 6); only the database moved.
+- **Neon free tier**, not Launch, as the floor assumed in the spec.
+- Scripts from Tasks 3–5 were not built; their checks were done manually (see table).
+
 **Goal:** Move Perspectize's production PostgreSQL database from Sevalla to Neon, with data intact, during a single brief maintenance window, with a documented rollback path.
 
 **Architecture:** `pg_dump`/`pg_restore` from Sevalla into a version-pinned Neon project during a short maintenance window. The app's `DATABASE_URL` is repointed from Sevalla to Neon's pooled connection string; a new `DATABASE_URL_UNPOOLED` env var carries Neon's direct connection string for migration tooling (`golang-migrate`, `pg_dump`), since Neon's pooler runs in PgBouncer transaction mode and can't support the session-level semantics those tools need.

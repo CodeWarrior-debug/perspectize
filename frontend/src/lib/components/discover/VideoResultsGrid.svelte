@@ -73,9 +73,10 @@
 		{/if}
 	{:else}
 		<div class="flex flex-col gap-4">
-			{#each items as video (video.id)}
+			{#each items as video, index (video.id)}
 				<VideoCard
 					{video}
+					{index}
 					isInLibrary={libraryUrls.has(toWatchUrl(video.id))}
 					isPending={pendingId === video.id}
 					{onAdd}

@@ -9,7 +9,7 @@
  * browser environment (manual verification or Playwright E2E tests).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/svelte';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import { QueryClient } from '@tanstack/svelte-query';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { mockPageState } from '../setup';
@@ -67,7 +67,7 @@ const mockDataResponse = {
 				id: '1',
 				name: 'Test Video',
 				url: 'https://youtube.com/watch?v=abc',
-				contentType: 'YOUTUBE',
+				contentType: 'YOUTUBE_VIDEO',
 				length: 300,
 				lengthUnits: 'seconds',
 				viewCount: 1500,
@@ -160,18 +160,80 @@ describe('ActivityTable', () => {
 			expect(mockRequest).toHaveBeenCalledWith(
 				expect.anything(),
 				expect.objectContaining({
-					filter: { search: 'sowell', searchFields: ['TITLE', 'DESCRIPTION', 'CHANNEL_TITLE', 'TAGS'] },
+					filter: {
+						search: 'sowell',
+						searchFields: ['TITLE', 'DESCRIPTION', 'CHANNEL_TITLE', 'TAGS'],
+						contentTypes: ['YOUTUBE_VIDEO'], // default Type filter is also server-side in Loaded mode
+					},
 				}),
 			);
 		});
 		unmount();
 
 		mockRequest.mockClear();
-		mockPageState.url = new URL('http://localhost/');
+		mockPageState.url = new URL('http://localhost/?f=none');
 		renderWithQuery(queryClient);
 		await waitFor(() => {
 			expect(mockRequest).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ filter: undefined }));
 		});
+	});
+
+	it('sends the Type filter to the server in Loaded mode (first 100 rows are already that type)', async () => {
+		mockPageState.url = new URL('http://localhost/?f.type=movie');
+		renderWithQuery();
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.objectContaining({ first: 100, filter: { contentTypes: ['MOVIE'] } }),
+			);
+		});
+	});
+
+	it('sends the Type filter together with search, but not other column filters, in Loaded mode', async () => {
+		mockPageState.url = new URL('http://localhost/?f.type=movie&q=heat&f.views=100..');
+		renderWithQuery();
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.objectContaining({
+					filter: expect.objectContaining({ contentTypes: ['MOVIE'], search: 'heat' }),
+				}),
+			);
+		});
+		const filter = mockRequest.mock.calls[0][1].filter;
+		expect(filter).not.toHaveProperty('minViewCount');
+	});
+
+	it('refetches in Loaded mode when the Type filter changes (query key mirrors the request)', async () => {
+		const queryClient = new QueryClient({
+			defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 }, mutations: { retry: false } },
+		});
+		mockPageState.url = new URL('http://localhost/?f.type=movie');
+		const { unmount } = renderWithQuery(queryClient);
+		await waitFor(() => expect(mockRequest).toHaveBeenCalled());
+		unmount();
+		mockRequest.mockClear();
+		mockPageState.url = new URL('http://localhost/?f=none');
+		renderWithQuery(queryClient);
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ filter: undefined }));
+		});
+	});
+
+	it("?open=<id> opens that item's details (fetched by ID when not loaded) and strips the param", async () => {
+		const { goto } = await import('$app/navigation');
+		const deepLinked = { ...mockDataResponse.content.items[0], id: '99', name: 'Deep Linked Video' };
+		mockRequest.mockImplementation(async (query: string) =>
+			String(query).includes('GetContentDetails') ? { contentByID: deepLinked } : mockEmptyResponse,
+		);
+		mockPageState.url = new URL('http://localhost/?q=sowell&open=99');
+		renderWithQuery();
+
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalledWith(expect.stringContaining('GetContentDetails'), { id: '99' });
+		});
+		expect(goto).toHaveBeenCalledWith('?q=sowell', expect.objectContaining({ replaceState: true }));
+		expect(await screen.findByText('Deep Linked Video')).toBeInTheDocument();
 	});
 
 	it('hides pagination controls in loaded mode (default)', async () => {

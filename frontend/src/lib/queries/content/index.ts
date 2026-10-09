@@ -3,7 +3,7 @@ import { gql } from 'graphql-request';
 export type { ContentFilterInput } from '$lib/utils/gridUrlState';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
-export type ContentType = 'YOUTUBE' | 'CLAIM' | 'BIBLE_PASSAGE';
+export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE';
 
 export interface ContentItem {
 	id: string;
@@ -24,6 +24,11 @@ export interface ContentItem {
 	publishedAt: string | null;
 	tags: string[] | null;
 	description: string | null;
+	// Source payload (JSON scalar). Movie rows read cast/revenue/etc. from it; YouTube rows carry the API items.
+	response?: Record<string, unknown> | null;
+	// MOVIE rows only: the shaped TMDB payload. List rows select this instead of `response`
+	// (so YouTube rows don't ship their snippet twice); null for every other type.
+	movie?: Record<string, unknown> | null;
 	primaryCategory: {
 		id: string;
 		wikidataQid: string;
@@ -101,6 +106,7 @@ export const LIST_CONTENT = gql`
 				publishedAt
 				tags
 				description
+				movie
 				primaryCategory {
 					id
 					wikidataQid
@@ -119,6 +125,42 @@ export const LIST_CONTENT = gql`
 				endCursor
 			}
 			totalCount
+		}
+	}
+`;
+
+// Compare page's "choose something to compare" picker: needs perspectiveCount
+// per row to filter down to content that actually has 2+ perspectives to
+// compare, which is why this is a separate query from LIST_CONTENT (see the
+// cost comment on GET_CONTENT_AGGREGATES below) — capped at a modest `first`
+// so the added per-row dataloader cost stays bounded to this one picker
+// fetch, not every Activity grid page load.
+export interface ComparePickerContentItem {
+	id: string;
+	name: string;
+	contentType: string;
+	channelTitle: string | null;
+	url: string | null;
+	perspectiveCount: number | null;
+}
+
+export interface ListComparableContentResponse {
+	content: {
+		items: ComparePickerContentItem[];
+	};
+}
+
+export const LIST_COMPARABLE_CONTENT = gql`
+	query ListComparableContent($first: Int = 40, $filter: ContentFilter) {
+		content(first: $first, sortBy: UPDATED_AT, sortOrder: DESC, filter: $filter, includeTotalCount: false) {
+			items {
+				id
+				name
+				contentType
+				channelTitle
+				url
+				perspectiveCount
+			}
 		}
 	}
 `;
@@ -144,6 +186,47 @@ export const GET_CONTENT = gql`
 		}
 	}
 `;
+
+// Same fields as a LIST_CONTENT row, so the details modal can render an item
+// that isn't in the currently loaded Activity page (deep link via `?open=<id>`).
+export const GET_CONTENT_DETAILS = gql`
+	query GetContentDetails($id: ID!) {
+		contentByID(id: $id) {
+			id
+			name
+			addedByUserID
+			url
+			contentType
+			verseStartID
+			verseEndID
+			displayTitle
+			length
+			lengthUnits
+			viewCount
+			likeCount
+			channelTitle
+			publishedAt
+			tags
+			description
+			response
+			movie
+			primaryCategory {
+				id
+				wikidataQid
+				label
+				description
+				entityType
+				wikipediaUrl
+			}
+			createdAt
+			updatedAt
+		}
+	}
+`;
+
+export interface ContentDetailsResponse {
+	contentByID: ContentItem | null;
+}
 
 // perspectiveCount/averageRating are computed aggregates over a content's
 // perspectives (see backend Content.perspectiveCount/averageRating resolvers)
@@ -205,6 +288,28 @@ export const CREATE_CONTENT_FROM_YOUTUBE = gql`
 		}
 	}
 `;
+
+// Idempotent: the server find-or-creates the movie row, so an existing movie
+// comes back as a normal Content (no "alreadyExisted" flag).
+export const CREATE_CONTENT_FROM_MOVIE = gql`
+	mutation CreateContentFromMovie($input: CreateContentFromMovieInput!) {
+		createContentFromMovie(input: $input) {
+			id
+			name
+			url
+			contentType
+		}
+	}
+`;
+
+export interface CreateContentFromMovieResponse {
+	createContentFromMovie: {
+		id: string;
+		name: string;
+		url: string | null;
+		contentType: string;
+	};
+}
 
 export const UPDATE_CONTENT_SOURCE_DATA = gql`
 	mutation UpdateContentSourceData($contentId: IntID!) {

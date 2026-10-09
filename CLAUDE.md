@@ -10,86 +10,27 @@ Monorepo with two stacks:
 - **Backend:** `backend/` — Go GraphQL API (see `backend/CLAUDE.md`)
 - **Frontend:** `frontend/` — SvelteKit web app (see `frontend/CLAUDE.md`)
 
-**CLAUDE.md structure:** Root file (this) contains shared concerns. Package-level files contain stack-specific instructions. Claude loads root + the relevant package file per session.
-
-## Context Lookup (graphify)
-
-qmd is fully retired — see the `## graphify` section near the bottom of this file for the current pre-search step.
+**CLAUDE.md structure:** This root file is loaded in every session, so it holds only repo-wide rules. Stack-specific rules live in `backend/CLAUDE.md` / `frontend/CLAUDE.md` (loaded once you touch files there); long procedures live in `.docs/` and are linked below. A safety rule that must hold before any stack file is read keeps a one-line stub here.
 
 ## GitHub & Repository Management
 
 **Git branch gotcha:** Local default branch is `master`, remote is `main`. Use `origin/main` (not `main`) for diff/log comparisons: `git diff origin/main...HEAD`.
 
-**Always use `gh` CLI** for GitHub operations. Do not use MCP plugins.
+**Use `gh` CLI** for GitHub operations locally, not MCP plugins. **Cloud sessions:** `gh` is unavailable — use the GitHub MCP tools (`mcp__github__*`).
 
-**Claude Code cloud sessions:** `gh` CLI is unavailable there — use the GitHub MCP tools (`mcp__github__*`) instead; the `gh api ... /pulls` examples below don't apply. Note `require-session-reflection-before-pr.sh` only pattern-matches a Bash `gh pr create` command, so it doesn't block PR creation via the MCP tool — but still run `/revise-claude-md` first, by convention, and include a Session Learnings section in the PR body.
+**PR autonomy:** In a **cloud** session (Claude Code on the web / managed container), open the PR yourself once the work is complete — **this overrides the harness default of "don't create a PR unless asked"**, so don't ask "want me to open a PR?". Cloud = `CLAUDE_CODE_REMOTE=true` (also: system prompt says "remote execution environment", paths under `/home/user/`). In a **local** session, don't open a PR unless asked — push and hand over the link. If you can't tell after checking those signals, assume local. Either way, never skip the pre-PR steps: Self-Verification below, and `/revise-claude-md`.
 
-**Note:** In Claude Code web sessions, `gh` CLI may not be authenticated. If `gh` auth fails:
-- **Creating a PR:** Push the branch with `git push -u origin <branch>` and let the user create the PR via the GitHub UI button. Prepare the PR title and body as copyable text for the user.
-- **Updating a PR:** Output the updated title/body as copyable text so the user can paste it into the GitHub UI.
+**`/revise-claude-md` must not block the PR:** show the proposed CLAUDE.md diffs in chat, put them in the PR body's Session Learnings, open the PR, then ask whether to commit them. Never edit CLAUDE.md files before approval.
 
-### PR Creation: Cloud vs. Local Execution
+**PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, the migration labels (kept in sync automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges.
 
-PR-creation autonomy depends on where the session is running:
-
-- **Cloud execution environment** (Claude Code on the web / managed remote container): Claude may create the PR itself, without waiting for explicit user request, whenever it judges the work complete and ready for review (push the branch, then `gh api ... /pulls` per the commands above, following the template rules below). Still never skip the pre-PR checklist (Self-Verification, `/revise-claude-md`, etc.).
-- **Local execution environment** (Claude Code running on the user's own machine): follow the rest of this file's rules as written — do NOT create a PR unless the user explicitly asks for one. Push the branch and hand the user the "Create a pull request" link, or prepare title/body as copyable text if `gh` isn't authenticated.
-
-If it's ambiguous which environment a session is running in, default to the local (ask-first) behavior.
-
-```bash
-# Pull requests
-gh pr create --title "Title" --body "..."  # Use PR template (see below)
-gh pr list
-gh pr view 123
-gh pr merge 123
-
-# Edit PR (use API — gh pr edit fails with Projects Classic deprecation)
-gh api repos/CodeWarrior-debug/perspectize/pulls/123 -X PATCH -f body="New description"
-
-# Issues (use API — gh issue view fails with Projects Classic deprecation)
-gh issue create --title "Title" --body "..."  # Use issue templates (see below)
-gh issue list
-gh api repos/CodeWarrior-debug/perspectize/issues/123 --jq '.title, .html_url'
-
-# API access
-gh api repos/CodeWarrior-debug/perspectize/pulls/123/comments
-```
-
-### GitHub Templates
-
-**Always use the repository templates** in `.github/` when creating PRs and issues.
-
-**Pull Requests** — per-type templates in `.github/PULL_REQUEST_TEMPLATE/`, picked by the PR's conventional-commit type:
-
-| Commit type | Template | Sections |
-|---|---|---|
-| `feat` | `feature.md` | Feature Description, Technical Changes, Demo (before/after screenshots), Test Plan |
-| `fix` | `bugfix.md` | Root Cause, Fix, Demo (before/after screenshots), Regression Test |
-| `chore`/`build`/`ci` | `chore.md` | Summary, Changes, Verification |
-| `docs` | `docs.md` | Summary, Files Changed, Verification |
-
-Because PRs are created via `gh api` (not `gh pr create`), GitHub's template picker never runs — read the matching template file yourself and shape the `-F body=@<file>` content to its sections before creating the PR. Any UI-visible change should fill in the Demo screenshot table (see [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md) for the `sv-` upload workflow) rather than leaving it blank.
-
-**Issues** — use templates from `.github/ISSUE_TEMPLATE/` (feature_request.md or bug_report.md).
-
-**Never create a GitHub issue just to have something for a PR to close.** Only put `Closes #N`/link an issue in a PR when that issue already existed before the PR work started (the user filed it, or it was already tracked). If no issue exists, don't manufacture one — just omit the issue reference and drop the `issueNumber` segment from the branch name (see Branch Naming below).
-
-GitHub Projects v2: See [.docs/GITHUB_PROJECTS.md](.docs/GITHUB_PROJECTS.md).
-
-### PR Merge Preferences
-
-```bash
-gh pr merge 123 --squash --delete-branch --admin
-```
-
-- `--squash` — Single commit (cleaner history)
-- `--delete-branch` — Auto-delete branch after merge
-- `--admin` — Bypass branch protection when needed
+**Never create a GitHub issue just to have something for a PR to close.** Only link an issue that existed before the PR work started; otherwise omit it and drop the issue segment from the branch name.
 
 ## Branch Naming
 
 **Always branch from updated `main`:** `git checkout main && git pull origin main && git checkout -b <name>`
+
+**Cloud sessions can start on a detached HEAD** (`git status` shows "HEAD detached from refs/heads/main"). Create the branch (`git checkout -b <type>/<name>`) before committing.
 
 **Format:** `type/initiativePrefix-issueNumber-description-in-kebab-case`
 
@@ -97,24 +38,9 @@ gh pr merge 123 --squash --delete-branch --admin
 |-----------|--------|
 | **type** | `feature`, `bugfix`, `chore` |
 | **initiativePrefix** | `INI` (Initialization Phase) — **omit along with issueNumber if no issue already exists** (initiativePrefix and issueNumber are a pair; both or neither) |
-| **issueNumber** | GitHub issue number — **omit this segment entirely if no issue already exists.** Do not create one just to fill it in (see GitHub Templates above). |
+| **issueNumber** | GitHub issue number — **omit this segment entirely if no issue already exists.** Do not create one just to fill it in. |
 
 Example: `feature/INI-16-youtube-post-graphql` (with a pre-existing issue) or `feature/youtube-post-graphql` (no issue — both `INI` and the number drop)
-
-### GitHub Issues with Plans
-
-Include a plan reference and dependencies if present: for new work, the superpowers plan/spec path (`docs/superpowers/plans/{name}-plan.md`); for legacy in-flight work, the GSD plan reference (`.planning/phases/{phase}/{plan}-PLAN.md`) and acceptance criteria from `must_haves.truths`.
-
-## Agent Delegation Strategy
-
-| Task Type | Model | Subagent | Rationale |
-|-----------|-------|----------|-----------|
-| Architecture decisions | Opus | - | Complex multi-file reasoning |
-| Go implementation | Sonnet | `go-backend` | Balanced quality/cost |
-| GraphQL schema design | Sonnet | `graphql-designer` | Schema patterns |
-| Database migrations | Sonnet | `db-migration` | SQL generation |
-| Code review | Haiku | `code-reviewer` | Fast pattern matching |
-| Test generation | Haiku | `test-writer` | Boilerplate generation |
 
 ## Coding Conventions
 
@@ -126,41 +52,32 @@ defer db.Close()
 
 **No chained bash commands:** Do not use `&&` to chain shell commands. Run each command as a separate Bash tool call. Chained commands don't match permission allow-list patterns and block on approval prompts. This applies to all agents and subagents.
 
-**Migration numbering:** Always check existing migration files before creating new ones. Plan-specified numbers may be stale — use `ls backend/migrations/ | tail -5` to find the next available number. Also check open PRs/branches for an in-flight migration claiming the same number (e.g. `git log --all --oneline -- 'backend/migrations/*'`); if one exists, take the next free number and note the collision in the file header. Prefer idempotent DDL (`DROP CONSTRAINT IF EXISTS` before `ADD`, `UPDATE ... WHERE col IS NULL` before `SET NOT NULL`) so a migration is safe on a fresh DB or one already patched out of band.
-
-**Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`) during dev or verification.** There is no local Docker Postgres — `DATABASE_URL` / the Makefile default points at the **shared Sevalla dev database**, so `make migrate-up` mutates shared state. Migrations are applied **manually per environment** at rollout time (verified: nothing on Sevalla runs them — no runner in `cmd/server`, no CI step, no release/pre-deploy hook; the `/migrations` dir baked into the image is never executed). Migration work = write + review the SQL only; a PR that adds a migration must state it needs a manual `migrate up` against each environment.
+**Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`) during dev or verification** — `DATABASE_URL` points at the **shared Neon database**. Migrations are written and reviewed only, then applied manually per environment at rollout. Details and migration numbering: `backend/CLAUDE.md` → Migrations.
 
 **Commit messages:** Conventional commit format (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`). One logical change per commit. GSD planning work (PLAN.md, CONTEXT.md, RESEARCH.md, ROADMAP.md) uses the `docs` tag — e.g., `docs(11,13): create execution plans`.
 
 ## Planning & Execution Workflow
 
-**Primary workflow: obra/superpowers** (plugin enabled in `.claude/settings.json`). Use `superpowers:writing-plans` (or its brainstorming/spec-writing counterparts) for planning, and `superpowers:executing-plans` / `superpowers:subagent-driven-development` for execution. Plans and specs live in `docs/superpowers/plans/` and `docs/superpowers/specs/` — see `docs/superpowers/plans/2026-08-15-clerk-derived-user-identity-plan.md` for the established format (plan header names the required execution sub-skill, links its spec, checkbox-tracked (`- [ ]`) tasks).
-
-**GSD is legacy — do NOT start new work with it.** Some milestones still have unfinished work tracked under the old workflow in `.planning/phases/` (`PROJECT.md`, `ROADMAP.md`, `STATE.md`, phase `PLAN.md`/`must_haves.truths` files). Finish those specific in-flight phases using their existing GSD plan files/commands rather than replanning them from scratch under superpowers — don't discard partially-done GSD work. All new planning and execution goes through superpowers. Branching for legacy GSD phases: see [.docs/GSD_BRANCHING.md](.docs/GSD_BRANCHING.md).
-
-**Superpowers is the preferred planning + execution orchestrator.** Select GSD commands are kept only for codebase mapping (`gsd:map-codebase`) and roadmap/milestone management (`gsd:new-milestone`, `gsd:add-phase`/`gsd:remove-phase`/`gsd:insert-phase`, `gsd:analyze-dependencies`, `gsd:milestone-summary`, `gsd:complete-milestone`, `gsd:docs-update`).
-
-**Vendored GSD is a frozen legacy subset** (`.claude/get-shit-done/`, curated `.claude/commands/gsd/`). Do not run `npx get-shit-done-cc` against this repo — a full install dumps ~200 unused command/agent/workflow files and bakes absolute paths into the command files. The `VERSION` marker tracks the toolchain maintainers run locally so the update-check hook stays quiet; it is not a claim that every vendored file is on that release. For phase CRUD / dependency analysis on newer GSD, use a personal global install.
+**New work uses obra/superpowers** (`superpowers:writing-plans` → `superpowers:executing-plans` / `superpowers:subagent-driven-development`; plans/specs in `docs/superpowers/`). **GSD is legacy** — only finish in-flight `.planning/phases/` work with its existing plan files; never start new work with it. If no `superpowers:*` skill is listed this session, any plan/spec you write must carry the "written without superpowers" banner. Details, spike-doc format, and which GSD commands remain: [.docs/PLANNING.md](.docs/PLANNING.md).
 
 ## Self-Verification (MANDATORY)
 
 **Before claiming work is complete, pushing, or creating a PR**, you MUST run verification. No exceptions.
 
-### Verification checklist
-
 1. **Build**: `go build ./...` in `backend/` — must compile with zero errors
-2. **Format**: `gofmt -l .` in `backend/` — must return empty (CI's `Build` job fails otherwise). `make install-hooks` (once per checkout) auto-fixes this on every commit — see the shared git pre-commit hook further down this file.
+2. **Format**: `gofmt -l .` in `backend/` — must return empty (CI's `Build` job fails otherwise). `make install-hooks` (once per checkout, run in `backend/`; there is no root target) auto-fixes this on every commit.
 3. **Backend tests**: `go test ./...` in `backend/` — all must pass
 4. **Frontend tests**: `pnpm run test:run` in `frontend/` — all must pass
-5. **Stale references**: If renaming/moving files or paths, grep the entire repo for old names
+5. **Query budget**: if the change touches DB access or data fetching, it carries a query-count test (backend) / cache-contract test (frontend) — [.docs/QUERY_BUDGET.md](.docs/QUERY_BUDGET.md).
+6. **Stale references**: If renaming/moving files or paths, grep the entire repo for old names
 
 Run the relevant subset (e.g., backend-only changes skip step 4). Report results explicitly — don't just say "tests pass", show the output summary.
 
-**Browser verification is local-only.** Driving the running app via the Chrome DevTools MCP (`.docs/VERIFICATION.md` §3) needs `.claude/.env` and `.claude/sv-profile/` — both gitignored and hand-provisioned per machine. Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in; run only the headless checklist (build, backend tests, frontend tests) and hand UI-behavior checks back to a local session.
+**Mutation testing** (`make mutate` in `backend/`, `pnpm run mutate` in `frontend/`; slow, run deliberately): a run where nothing survives is a harness bug, not a pass — hand-apply one mutant and confirm the suite fails before trusting a score. **Report results as what they say about the tests, not the tool:** "your tests caught X of Y planted bugs (killed)", "missed Z (lived/survived)", "N places no test runs (not covered)"; "efficacy" is the efficacy of the tests. Give the all-in figure (caught ÷ every planted bug) beside the efficacy figure. Language table, baselines and pitfalls: `docs/superpowers/specs/2026-09-29-test-hardening-spike.md`.
 
-See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow, and [.docs/PR_SCREENSHOTS.md](.docs/PR_SCREENSHOTS.md) for uploading `sv-` screenshots to a release and linking them in the PR.
+**Browser verification is local-only** (needs the gitignored `.claude/.env` + `.claude/sv-profile/`). Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in: run only the checklist above, and label a user-visible PR `needs-demo-video` instead of claiming it's ready (see [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md#demo-requirement-ready-for-review)).
 
-**Authenticated self-verify:** `.env*` files (except `.env.example`) are unreadable by design — that's expected, not a broken setup. Logged-in browser verification uses the persistent Chrome profile from `.claude/scripts/sv-chrome.sh`; see [.docs/VERIFICATION.md](.docs/VERIFICATION.md) §0. Never attempt to log in or enter credentials — ask the human to re-run the one-time login if signed out.
+**`.env*` files (except `.env.example`) are unreadable by design** — expected, not a broken setup. Never attempt to log in or enter credentials; ask the human to re-run the one-time login if signed out. Evidence capture: [.docs/VERIFICATION.md](.docs/VERIFICATION.md).
 
 ## Resources
 
@@ -173,44 +90,24 @@ See [.docs/VERIFICATION.md](.docs/VERIFICATION.md) for evidence capture workflow
 - [Security](.docs/SECURITY.md) — Secret management, rotation procedures, incident response
 - [Dependency Security](.docs/DEPENDENCY_SECURITY.md) — Trivy/pnpm-audit scanning, CVE remediation workflow, CI gotchas
 - [Worktrees](.docs/WORKTREES.md) — Location convention and the 3 numbered reusable worktrees for isolated Claude Code work
-
-**Frontend docs:**
-- [Frontend CLAUDE.md](frontend/CLAUDE.md) — SvelteKit, Svelte 5, TanStack Query patterns
-- [Design Spec](frontend/docs/DESIGN_SPEC.md) — Figma design system, color tokens, typography, component specs
-- [Figma Reference](frontend/docs/FIGMA.md) — File keys, pages, variables, code↔Figma mapping
+- [Demo Mode](.docs/DEMO_MODE.md) — Docker demo stack (persistent Postgres + seeded personas, no Clerk/YouTube), Playwright tours that run as E2E (`make demo-test`) or record videos (`make demo-record`)
+- [Query Budget](.docs/QUERY_BUDGET.md) — query-count tests, dataloaders, TanStack caching/eviction rules
+- [PR Workflow](.docs/PR_WORKFLOW.md) · [Planning](.docs/PLANNING.md) · [Hooks](.docs/HOOKS.md)
+- [claude-md-audit eval](evals/claude-md-audit/README.md) — `claude plugin eval` suite scoring the `claude-md-improver` skill; rerun after changing CLAUDE.md tooling or before trusting a cheaper model with audits
 
 **How-to guides:**
-- [Adding an AG Grid Column](.claude/docs/ADDING_AG_GRID_COLUMN.md) — Decision checklist for adding columns to the ActivityTable
 - [Adding a Content Type](.claude/docs/ADDING_CONTENT_TYPE.md) — End-to-end guide for new content types (backend + frontend)
-- [Code to Figma Canvas](.claude/docs/CODE_TO_FIGMA_CANVAS.md) — Capture running app into Figma to keep designs in sync
+- [Content Type Designer](tools/content-type-designer/README.md) — Plan a new type's columns, tooltips and details view before coding. `dist/` is committed: after editing `src/` run `npx tsc -p tsconfig.json` in that dir and commit both (don't commit its package-lock.json). ES modules won't load from file:// — serve it (`python3 -m http.server`) to test; Playwright is at /opt/node22/lib/node_modules/playwright in cloud sessions.
 
 **Planning & backlog:**
-- [Feature Backlog](FEATURE_BACKLOG.md) — Future ideas and enhancements not tied to any milestone. Capture ideas here during development; evaluate when planning new work.
+- [Feature Backlog](FEATURE_BACKLOG.md) — Future ideas not tied to any milestone. Capture ideas here during development; evaluate when planning new work.
 - [Bug Tracking](.docs/BUG_TRACKING.md) — How known bugs are tracked privately (gitignored files, persistent bugs phase)
 
 **Bug logging (MANDATORY):** When you discover a bug during development, review, or testing, log it in `.planning/phases/bugs/BACKLOG.md` with severity and location. Also create a GitHub issue using the bug report template — keep sensitive details (exact paths, line numbers, security specifics) in the backlog only. When a bug is fixed, move it to `.planning/phases/bugs/CLOSED.md` with the PR reference. These files are gitignored — never commit them.
 
-**Native PreToolUse hooks (`.claude/hooks/*.sh`, wired in `.claude/settings.json`; hookify plugin retired):**
-- **Secret protection:** `deny-env-read.sh` blocks any Bash command that reads a real `.env` file (deny-by-default; `.env.example` / `.env.test` stay readable). Pairs with `permissions.deny` Read rules. Real secret values are entered by humans only — see [.docs/SECURITY.md](.docs/SECURITY.md).
-- **Pre-PR:** `require-session-reflection-before-pr.sh` denies `gh pr create` until the `/revise-claude-md` command (from the `claude-md-management` plugin) has been run. It can't detect completion, so use `gh api` to create the PR after running the command. Example: `gh api repos/CodeWarrior-debug/perspectize/pulls -f title="..." -f body="..." -f head="branch" -f base="main"`
-  - `/revise-claude-md` (also the Skill entry `claude-md-management:revise-claude-md` once the plugin is loaded). If it won't resolve — Skill says "Unknown skill" and typing it shows nothing — the plugin marketplace cache is stale: run `/reload-plugins` (and `/plugin` to refresh), then retry.
-- **Pre-commit tests:** `require-tests.sh` injects a non-blocking reminder on `git commit` to verify test coverage for new/modified frontend `src/` files. Config, styles, docs, and test files are exempt.
-- **Pre-commit prettier:** `prettier-precommit.sh` injects a non-blocking reminder on `git commit` to run `pnpm exec prettier --write` on staged frontend files.
-- **Pre-commit gofmt (fallback):** `gofmt-precommit.sh` only fires when `core.hooksPath` isn't set to `.hooks` in the current checkout — see below for the real fix — and then reminds to run `make install-hooks` rather than to gofmt by hand.
-- **Matching is anchored on command position** (start of string or after a shell separator), not a raw substring search — a trigger phrase (e.g. `gh pr create`) appearing inside a quoted commit message or PR body elsewhere on the line does not fire the hook.
-
-**Shared git pre-commit hook (`.hooks/pre-commit`, real `core.hooksPath` hook — not a Claude Code hook):** Auto-formats staged `backend/*.go` (gofmt) and `frontend/src/*.{svelte,ts,js}` (prettier) files and re-stages them on every `git commit`, regardless of what tool/human is committing. Also **blocks** (does not auto-fix) new raw hex/rgb colour literals added to `frontend/src/lib/components/**` or `formatting.ts` — see `.docs/UI_THOROUGHNESS_CHECKLIST.md` §3.3; allowlist an intentional one inline with a `hex-ok: <reason>` comment. Not active by default — activate once per checkout with `make install-hooks` (from `backend/`, sets `core.hooksPath` to `.hooks`). This is what actually prevents the CI `Build` job's `gofmt -l .` check from failing (as it did on PR #366); the `.claude/hooks/gofmt-precommit.sh` PreToolUse reminder above is only a fallback for a checkout where this hasn't been activated yet.
-
-**Cloud/CI sessions start with `core.hooksPath` unset** — a fresh container checkout has never run `make install-hooks`, so commits made there get no gofmt/prettier auto-fix at all (the PreToolUse reminders above only fire on a matching Bash command, and there's no frontend-side reminder). Either run `make install-hooks` once per session, or manually run `gofmt -l .` (backend) / `pnpm exec prettier --check <files>` (frontend) before every commit and fix flagged files with `--write` before pushing.
+**Hooks:** Claude Code PreToolUse hooks guard `.env` reads and block `gh pr create` until `/revise-claude-md` has run (then create the PR with `gh api`). The real git pre-commit hook (gofmt + prettier auto-fix) is off until `make install-hooks` — **cloud/CI checkouts start without it**, so run `make install-hooks` in `backend/` once per session or check `gofmt -l .` / `pnpm exec prettier --check` before each commit. Full list: [.docs/HOOKS.md](.docs/HOOKS.md).
 
 **Cowork session cleanup:** Claude cowork (claude.ai web) sessions leave `_tmp_*` files and conversation transcript `.txt` files in the repo root and `frontend/`. Delete these before committing.
-
-## Merge Conflict Patterns
-
-**pnpm-lock.yaml conflicts:** Accept either side (`git checkout --theirs frontend/pnpm-lock.yaml`), then regenerate: `pnpm install --dir frontend`. Always use `--dir` instead of `cd` to avoid hook/shell side effects that can switch branches mid-operation.
-
-**External references:**
-- [gqlgen](https://gqlgen.com/) | [Hexagonal Architecture](https://alistair.cockburn.us/hexagonal-architecture/) | [Effective Go](https://go.dev/doc/effective_go) | [PostgreSQL 17](https://www.postgresql.org/docs/17/)
 
 ## graphify
 

@@ -55,14 +55,26 @@ type ContentModel struct {
 	VerseEndID        *int            `gorm:"column:verse_end_id"`
 	DisplayTitle      *string         `gorm:"column:display_title"`
 
-	// Dummy fields for gorm-cursor-paginator sort key validation.
-	// These are NOT database columns — SQLRepr provides the actual SQL.
-	// The gorm:"-" tag tells GORM to ignore them for queries/migrations.
-	ViewCount    int64   `gorm:"-"`
-	LikeCount    int64   `gorm:"-"`
-	PercentLiked float64 `gorm:"-"`
-	PublishedAt  string  `gorm:"-"`
-	ChannelTitle string  `gorm:"-"` // Dummy field for gorm-cursor-paginator sort key validation
+	// TotalCount is read-only and only present when List selects it: the
+	// filtered total, computed by a scalar subquery in the same statement as
+	// the page (one round trip instead of a separate COUNT(*)).
+	TotalCount *int64 `gorm:"column:total_count;->;-:migration"`
+
+	// Computed sort keys for gorm-cursor-paginator. The paginator builds a cursor by
+	// reading these struct fields off the last row, so List selects each active sort
+	// expression AS the column named here (see computedSortColumns) and GORM scans it
+	// back. They are pointers so a NULL expression stays nil (encoded as JSON null, and
+	// decoded back to the rule's NULLReplacement) instead of being encoded as a bogus
+	// 0 -- which made page 2 repeat page 1 (C-02). Read-only and never migrated: they
+	// are not real columns.
+	ViewCount    *int64   `gorm:"column:view_count;->;-:migration"`
+	LikeCount    *int64   `gorm:"column:like_count;->;-:migration"`
+	PercentLiked *float64 `gorm:"column:percent_liked;->;-:migration"`
+	PublishedAt  *string  `gorm:"column:published_at_sort;->;-:migration"`
+	BoxOffice    *int64   `gorm:"column:box_office;->;-:migration"`
+	VsBudget     *float64 `gorm:"column:vs_budget;->;-:migration"`
+	AgeRating    *int64   `gorm:"column:age_rating;->;-:migration"`
+	ChannelTitle *string  `gorm:"column:channel_title_sort;->;-:migration"`
 
 	CreatedAt time.Time `gorm:"autoCreateTime"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime"`

@@ -33,7 +33,7 @@ func TestGormContentRepository_GetByID(t *testing.T) {
 		db, mock := newMockDB(t)
 		mock.ExpectQuery(`SELECT \* FROM "content"`).
 			WillReturnRows(contentRows().AddRow(
-				11, "Some Video", "https://youtu.be/abc", "youtube", 4,
+				11, "Some Video", "https://youtu.be/abc", "youtube_video", 4,
 				300, "seconds", []byte(`{"items":[]}`), 9,
 				contentRepoTime, contentRepoTime))
 
@@ -42,7 +42,7 @@ func TestGormContentRepository_GetByID(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, 11, got.ID)
 		assert.Equal(t, "Some Video", got.Name)
-		assert.Equal(t, domain.ContentTypeYouTube, got.ContentType)
+		assert.Equal(t, domain.ContentTypeYouTubeVideo, got.ContentType)
 		assert.Equal(t, 4, got.AddedByUserID)
 		require.NotNil(t, got.Length)
 		assert.Equal(t, 300, *got.Length)
@@ -125,13 +125,13 @@ func TestGormContentRepository_Create(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).AddRow(21, contentRepoTime, contentRepoTime))
 
 		got, err := NewGormContentRepository(db).Create(ctx, &domain.Content{
-			Name: "New", URL: cStr("https://x"), ContentType: domain.ContentTypeYouTube, AddedByUserID: 4,
+			Name: "New", URL: cStr("https://x"), ContentType: domain.ContentTypeYouTubeVideo, AddedByUserID: 4,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, got)
 		assert.Equal(t, 21, got.ID)
 		assert.Equal(t, "New", got.Name)
-		assert.Equal(t, domain.ContentTypeYouTube, got.ContentType)
+		assert.Equal(t, domain.ContentTypeYouTubeVideo, got.ContentType)
 		assertAllExpectationsMet(t, mock)
 	})
 
@@ -151,15 +151,13 @@ func TestGormContentRepository_Create(t *testing.T) {
 func TestGormContentRepository_GetOrCreateByURL(t *testing.T) {
 	ctx := context.Background()
 	newContent := func() *domain.Content {
-		return &domain.Content{Name: "New", URL: cStr("https://x"), ContentType: domain.ContentTypeYouTube, AddedByUserID: 4}
+		return &domain.Content{Name: "New", URL: cStr("https://x"), ContentType: domain.ContentTypeYouTubeVideo, AddedByUserID: 4}
 	}
 
-	t.Run("fresh insert re-reads by id and reports alreadyExisted=false", func(t *testing.T) {
+	t.Run("fresh insert returns the RETURNING row and reports alreadyExisted=false", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`INSERT INTO "content" .* ON CONFLICT`).
-			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21))
-		mock.ExpectQuery(`SELECT \* FROM "content"`).
-			WillReturnRows(contentRows().AddRow(21, "New", "https://x", "youtube", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime))
+		mock.ExpectQuery(`INSERT INTO "content" .* ON CONFLICT .* RETURNING \*`).
+			WillReturnRows(contentRows().AddRow(21, "New", "https://x", "youtube_video", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime))
 
 		got, existed, err := NewGormContentRepository(db).GetOrCreateByURL(ctx, newContent(), true)
 		require.NoError(t, err)
@@ -169,12 +167,26 @@ func TestGormContentRepository_GetOrCreateByURL(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
+	t.Run("DO UPDATE refresh of an existing row reports alreadyExisted=true", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		// The refresh moves updated_at but keeps the original created_at.
+		mock.ExpectQuery(`INSERT INTO "content" .* ON CONFLICT .* DO UPDATE .* RETURNING \*`).
+			WillReturnRows(contentRows().AddRow(19, "Existing", "https://x", "youtube_video", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime.Add(time.Hour)))
+
+		got, existed, err := NewGormContentRepository(db).GetOrCreateByURL(ctx, newContent(), true)
+		require.NoError(t, err)
+		assert.True(t, existed)
+		require.NotNil(t, got)
+		assert.Equal(t, 19, got.ID)
+		assertAllExpectationsMet(t, mock)
+	})
+
 	t.Run("conflict with zero rows affected falls back to lookup by URL and reports alreadyExisted=true", func(t *testing.T) {
 		db, mock := newMockDB(t)
 		mock.ExpectQuery(`INSERT INTO "content" .* ON CONFLICT`).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}))
 		mock.ExpectQuery(`SELECT \* FROM "content" WHERE url`).
-			WillReturnRows(contentRows().AddRow(19, "Existing", "https://x", "youtube", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime))
+			WillReturnRows(contentRows().AddRow(19, "Existing", "https://x", "youtube_video", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime))
 
 		got, existed, err := NewGormContentRepository(db).GetOrCreateByURL(ctx, newContent(), false)
 		require.NoError(t, err)
@@ -210,28 +222,15 @@ func TestGormContentRepository_GetOrCreateByURL(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("wraps post-create re-read errors", func(t *testing.T) {
-		db, mock := newMockDB(t)
-		mock.ExpectQuery(`INSERT INTO "content"`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21))
-		mock.ExpectQuery(`SELECT \* FROM "content"`).WillReturnError(errors.New("post-create boom"))
-
-		got, existed, err := NewGormContentRepository(db).GetOrCreateByURL(ctx, newContent(), true)
-		assert.Nil(t, got)
-		assert.False(t, existed)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to fetch created content")
-		assertAllExpectationsMet(t, mock)
-	})
 }
 
 func TestGormContentRepository_UpdateMetadata(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("updates then re-reads", func(t *testing.T) {
+	t.Run("returns the updated row from RETURNING", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectQuery(`SELECT \* FROM "content"`).
-			WillReturnRows(contentRows().AddRow(11, "Refreshed", "https://x", "youtube", 4, 420, "seconds", []byte(`{"a":1}`), nil, contentRepoTime, contentRepoTime))
+		mock.ExpectQuery(`UPDATE "content" SET .* RETURNING \*`).
+			WillReturnRows(contentRows().AddRow(11, "Refreshed", "https://x", "youtube_video", 4, 420, "seconds", []byte(`{"a":1}`), nil, contentRepoTime, contentRepoTime))
 
 		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 11, "Refreshed", json.RawMessage(`{"a":1}`), cInt(420))
 		require.NoError(t, err)
@@ -242,9 +241,9 @@ func TestGormContentRepository_UpdateMetadata(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("zero rows affected means domain.ErrNotFound and no re-read", func(t *testing.T) {
+	t.Run("zero rows affected means domain.ErrNotFound", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(`UPDATE "content" SET`).WillReturnRows(contentRows())
 
 		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 404, "Refreshed", json.RawMessage(`{}`), nil)
 		assert.Nil(t, got)
@@ -254,7 +253,7 @@ func TestGormContentRepository_UpdateMetadata(t *testing.T) {
 
 	t.Run("wraps update errors", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnError(errors.New("meta boom"))
+		mock.ExpectQuery(`UPDATE "content" SET`).WillReturnError(errors.New("meta boom"))
 
 		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 11, "x", json.RawMessage(`{}`), nil)
 		assert.Nil(t, got)
@@ -263,17 +262,6 @@ func TestGormContentRepository_UpdateMetadata(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("wraps re-read errors", func(t *testing.T) {
-		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectQuery(`SELECT \* FROM "content"`).WillReturnError(errors.New("reread boom"))
-
-		got, err := NewGormContentRepository(db).UpdateMetadata(ctx, 11, "x", json.RawMessage(`{}`), nil)
-		assert.Nil(t, got)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to fetch updated content")
-		assertAllExpectationsMet(t, mock)
-	})
 }
 
 func TestGormContentRepository_ReassignByUser(t *testing.T) {
@@ -301,36 +289,43 @@ func TestGormContentRepository_ReassignByUser(t *testing.T) {
 func TestGormContentRepository_UpdatePrimaryCategoryID(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("succeeds when one row is updated", func(t *testing.T) {
+	t.Run("returns the updated row from RETURNING", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectQuery(`UPDATE "content" SET .* RETURNING \*`).
+			WillReturnRows(contentRows().AddRow(11, "c", "https://x", "youtube_video", 4, nil, nil, nil, 9, contentRepoTime, contentRepoTime))
 
-		assert.NoError(t, NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9)))
+		got, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9))
+		require.NoError(t, err)
+		require.NotNil(t, got.PrimaryCategoryID)
+		assert.Equal(t, 9, *got.PrimaryCategoryID)
 		assertAllExpectationsMet(t, mock)
 	})
 
 	t.Run("nil category id clears the FK", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectQuery(`UPDATE "content" SET`).
+			WillReturnRows(contentRows().AddRow(11, "c", "https://x", "youtube_video", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime))
 
-		assert.NoError(t, NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, nil))
+		got, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, nil)
+		require.NoError(t, err)
+		assert.Nil(t, got.PrimaryCategoryID)
 		assertAllExpectationsMet(t, mock)
 	})
 
 	t.Run("zero rows affected means domain.ErrNotFound", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(`UPDATE "content" SET`).WillReturnRows(contentRows())
 
-		err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 404, cInt(9))
+		_, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 404, cInt(9))
 		assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
 		assertAllExpectationsMet(t, mock)
 	})
 
 	t.Run("wraps update errors", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "content" SET`).WillReturnError(errors.New("cat fk boom"))
+		mock.ExpectQuery(`UPDATE "content" SET`).WillReturnError(errors.New("cat fk boom"))
 
-		err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9))
+		_, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to update primary category")
 		assertAllExpectationsMet(t, mock)
@@ -344,7 +339,7 @@ func TestGormContentRepository_List(t *testing.T) {
 		db, mock := newMockDB(t)
 		mock.ExpectQuery(`SELECT \* FROM "content"`).
 			WillReturnRows(contentRows().
-				AddRow(11, "A", "https://a", "youtube", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime).
+				AddRow(11, "A", "https://a", "youtube_video", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime).
 				AddRow(12, "B", "https://b", "claim", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime))
 
 		got, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{
@@ -360,12 +355,14 @@ func TestGormContentRepository_List(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("IncludeTotalCount issues a separate COUNT query", func(t *testing.T) {
+	t.Run("IncludeTotalCount rides in the page query as a scalar subquery", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`SELECT count\(\*\) FROM "content"`).
-			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(37))
-		mock.ExpectQuery(`SELECT \* FROM "content"`).
-			WillReturnRows(contentRows().AddRow(11, "A", "https://a", "youtube", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime))
+		mock.ExpectQuery(`SELECT content\.\*, \(SELECT COUNT\(\*\) FROM "content"\) AS total_count FROM "content"`).
+			WillReturnRows(sqlmock.NewRows([]string{
+				"id", "name", "url", "content_type", "added_by_user_id",
+				"length", "length_units", "response", "primary_category_id",
+				"created_at", "updated_at", "total_count",
+			}).AddRow(11, "A", "https://a", "youtube_video", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime, 37))
 
 		got, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{
 			SortBy:            domain.ContentSortByCreatedAt,
@@ -378,14 +375,25 @@ func TestGormContentRepository_List(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("count query failure is wrapped and short-circuits", func(t *testing.T) {
+	t.Run("an empty first page means a total of 0 without another query", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`SELECT count\(\*\) FROM "content"`).WillReturnError(errors.New("count boom"))
+		mock.ExpectQuery(`AS total_count FROM "content"`).WillReturnRows(contentRows())
+
+		got, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{IncludeTotalCount: true})
+		require.NoError(t, err)
+		require.NotNil(t, got.TotalCount)
+		assert.Equal(t, 0, *got.TotalCount)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("page query failure with a count is wrapped", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`AS total_count FROM "content"`).WillReturnError(errors.New("page boom"))
 
 		got, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{IncludeTotalCount: true})
 		assert.Nil(t, got)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to count content")
+		assert.Contains(t, err.Error(), "failed to list content")
 		assertAllExpectationsMet(t, mock)
 	})
 
@@ -412,7 +420,9 @@ func TestGormContentRepository_List(t *testing.T) {
 		// Only the WHERE-clause shape is matched here, not the bound argument value
 		// — contentTypeToDBValue's lowercasing is asserted directly in
 		// helpers_test.go; this case only proves the filter is wired into the query.
-		{"content type", &domain.ContentFilter{ContentType: func() *domain.ContentType { ct := domain.ContentTypeYouTube; return &ct }()}, `content_type = `},
+		{"content type", &domain.ContentFilter{ContentType: func() *domain.ContentType { ct := domain.ContentTypeYouTubeVideo; return &ct }()}, `content_type = `},
+		{"content types", &domain.ContentFilter{ContentTypes: []domain.ContentType{domain.ContentTypeYouTubeVideo, domain.ContentTypeClaim}}, `content_type IN \(`},
+		{"empty content types is ignored", &domain.ContentFilter{ContentTypes: []domain.ContentType{}}, `SELECT \* FROM "content"`},
 		{"min length", &domain.ContentFilter{MinLengthSeconds: cInt(60)}, `length >= `},
 		{"max length", &domain.ContentFilter{MaxLengthSeconds: cInt(600)}, `length <= `},
 		{"name search", &domain.ContentFilter{Search: cStr("go")}, `name ILIKE `},
@@ -500,8 +510,9 @@ func TestGormContentRepository_List(t *testing.T) {
 
 	t.Run("all filters combined produce a single query", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		ct := domain.ContentTypeYouTube
-		mock.ExpectQuery(`SELECT \* FROM "content" WHERE`).WillReturnRows(contentRows())
+		ct := domain.ContentTypeYouTubeVideo
+		// View-count sort is a computed key, so the page also selects it for the cursor.
+		mock.ExpectQuery(`SELECT content\.\*, .* AS view_count FROM "content" WHERE`).WillReturnRows(contentRows())
 
 		got, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{
 			First:     cInt(3),

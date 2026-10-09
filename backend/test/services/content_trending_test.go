@@ -34,7 +34,7 @@ func TestYouTubeTrending_NormalisesRegion(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			client := &recordingTrendingClient{}
-			svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, services.WithYouTubeTrending(client))
+			svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil, services.WithYouTubeTrending(client))
 
 			page, err := svc.YouTubeTrending(context.Background(), tc.in, " tok ")
 			require.NoError(t, err)
@@ -57,7 +57,7 @@ func TestYouTubeTrending_RejectsInvalidInput(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			client := &recordingTrendingClient{}
-			svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, services.WithYouTubeTrending(client))
+			svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil, services.WithYouTubeTrending(client))
 
 			_, err := svc.YouTubeTrending(context.Background(), tc.region, tc.token)
 			require.ErrorIs(t, err, domain.ErrInvalidInput)
@@ -67,7 +67,7 @@ func TestYouTubeTrending_RejectsInvalidInput(t *testing.T) {
 }
 
 func TestYouTubeTrending_NotConfigured(t *testing.T) {
-	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{})
+	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil)
 
 	_, err := svc.YouTubeTrending(context.Background(), "US", "")
 	require.ErrorIs(t, err, domain.ErrYouTubeAPI)

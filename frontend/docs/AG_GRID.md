@@ -46,12 +46,12 @@ Covers: sort field mapping, pagination math, responsive tiers, column visibility
 Test AG Grid integration in a real Chromium browser via `vitest-browser-svelte`:
 
 ```bash
-pnpm run test:browser      # Runs browser tests (requires Playwright)
+pnpm run test:browser      # Runs browser tests (Playwright drives the installed Google Chrome)
 pnpm run test:browser:watch  # Watch mode for browser tests
 pnpm run test:all          # Runs both unit + browser tests
 ```
 
-**First-time setup:** Install Playwright's Chromium: `npx playwright install chromium`
+**First-time setup:** none on macOS: `vitest.config.browser.ts` uses the installed Google Chrome. On other machines, either set `PW_CHROMIUM_EXECUTABLE` to a Chrome/Chromium binary or run `npx playwright install chromium`.
 
 Browser tests cover what jsdom cannot:
 

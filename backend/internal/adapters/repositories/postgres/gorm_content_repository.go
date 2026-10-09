@@ -53,6 +53,22 @@ func (r *GormContentRepository) GetByID(ctx context.Context, id int) (*domain.Co
 	return contentModelToDomain(&model), nil
 }
 
+// GetByIDs loads many content rows in one query (the content dataloader).
+func (r *GormContentRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	if len(ids) == 0 {
+		return []*domain.Content{}, nil
+	}
+	var models []ContentModel
+	if err := r.db.WithContext(ctx).Where("id = ANY(CAST(? AS bigint[]))", intsToArray(ids)).Find(&models).Error; err != nil {
+		return nil, fmt.Errorf("failed to get content by ids: %w", err)
+	}
+	out := make([]*domain.Content, len(models))
+	for i := range models {
+		out[i] = contentModelToDomain(&models[i])
+	}
+	return out, nil
+}
+
 // GetByURL retrieves a content record by its URL
 func (r *GormContentRepository) GetByURL(ctx context.Context, url string) (*domain.Content, error) {
 	var model ContentModel
@@ -71,6 +87,10 @@ func (r *GormContentRepository) GetByURL(ctx context.Context, url string) (*doma
 // When refreshOnConflict is true, updates response and updated_at on conflict (refreshes metadata).
 // When refreshOnConflict is false, does nothing on conflict (preserves original data).
 // Returns (content, alreadyExisted, error).
+//
+// One round trip in the common cases: RETURNING * hands back the inserted (or
+// refreshed) row. Only a DO NOTHING conflict returns no row, and costs a
+// second query to fetch the existing one.
 func (r *GormContentRepository) GetOrCreateByURL(ctx context.Context, content *domain.Content, refreshOnConflict bool) (*domain.Content, bool, error) {
 	model := contentDomainToModel(content)
 
@@ -83,13 +103,13 @@ func (r *GormContentRepository) GetOrCreateByURL(ctx context.Context, content *d
 		conflictClause.DoNothing = true
 	}
 
-	result := r.db.WithContext(ctx).Clauses(conflictClause).Create(model)
+	result := r.db.WithContext(ctx).Clauses(conflictClause, clause.Returning{}).Create(model)
 
 	if result.Error != nil {
 		return nil, false, fmt.Errorf("failed to upsert content: %w", result.Error)
 	}
 
-	// If RowsAffected == 0, the row already existed — fetch it by URL
+	// DO NOTHING on conflict: no row came back — fetch the existing one by URL
 	if result.RowsAffected == 0 {
 		existing, err := r.GetByURL(ctx, *content.URL)
 		if err != nil {
@@ -98,20 +118,23 @@ func (r *GormContentRepository) GetOrCreateByURL(ctx context.Context, content *d
 		return existing, true, nil
 	}
 
-	// Freshly created — re-fetch to get DB-generated timestamps
-	fresh, err := r.GetByID(ctx, model.ID)
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to fetch created content: %w", err)
-	}
-	return fresh, false, nil
+	// RETURNING filled model with the stored row. A fresh insert writes the
+	// same timestamp to created_at and updated_at (GORM stamps both from one
+	// clock read); a DO UPDATE refresh keeps the original created_at and
+	// moves only updated_at, so they differ.
+	alreadyExisted := !model.CreatedAt.Equal(model.UpdatedAt)
+	return contentModelToDomain(model), alreadyExisted, nil
 }
 
 // UpdateMetadata performs a direct UPDATE of an existing content row's refreshable
 // fields (name, response, length) plus updated_at. It never touches created_at or
 // added_by_user_id, and it does not insert — the row must already exist.
 func (r *GormContentRepository) UpdateMetadata(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
+	// RETURNING * gives back the updated row: one round trip, no re-read.
+	var updated ContentModel
 	result := r.db.WithContext(ctx).
-		Model(&ContentModel{}).
+		Model(&updated).
+		Clauses(clause.Returning{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"name":       name,
@@ -127,11 +150,7 @@ func (r *GormContentRepository) UpdateMetadata(ctx context.Context, id int, name
 		return nil, domain.ErrNotFound
 	}
 
-	fresh, err := r.GetByID(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch updated content: %w", err)
-	}
-	return fresh, nil
+	return contentModelToDomain(&updated), nil
 }
 
 // List retrieves a paginated list of content using cursor-based pagination
@@ -143,6 +162,73 @@ var contentSearchColumns = map[domain.ContentSearchField]string{
 	domain.ContentSearchFieldDescription:  "response->'items'->0->'snippet'->>'description' ILIKE ?",
 	domain.ContentSearchFieldChannelTitle: "response->'items'->0->'snippet'->>'channelTitle' ILIKE ?",
 	domain.ContentSearchFieldTags:         "(response->'items'->0->'snippet'->'tags')::text ILIKE ?",
+	// Movie people live in the response JSONB as arrays of {id,name,...}; one bound ? each.
+	// jsonb_typeof guards against a stored JSON null/scalar (COALESCE only covers SQL NULL).
+	domain.ContentSearchFieldCast: "EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(response->'cast') = 'array' THEN response->'cast' ELSE '[]'::jsonb END) p " +
+		"WHERE p->>'name' ILIKE ?)",
+	domain.ContentSearchFieldDirector: "EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(response->'directors') = 'array' THEN response->'directors' ELSE '[]'::jsonb END) p " +
+		"WHERE p->>'name' ILIKE ?)",
+}
+
+// applyPersonFilter matches movies by a TMDB person id in cast and/or directors using
+// JSONB containment. The id is marshalled in Go and bound as a parameter; role nil
+// means either role.
+//
+// No index serves this yet: at current movie volume a scan is cheaper. If EXPLAIN on
+// real data shows otherwise, add partial GIN indexes (jsonb_path_ops) on
+// response->'cast' and response->'directors' WHERE content_type = 'movie'; those only
+// apply when the query also filters to MOVIE, so pair personId with the type filter.
+func applyPersonFilter(query *gorm.DB, personID *int, role *domain.PersonRole) *gorm.DB {
+	if personID == nil {
+		return query
+	}
+	needle, err := json.Marshal([]map[string]int{{"id": *personID}})
+	if err != nil {
+		return query // unreachable: marshalling a map of ints cannot fail
+	}
+	// Literal (not a bound arg) so the planner can prove the partial-index predicate
+	// even under generic prepared plans. Person ids only mean something for movies.
+	movie := "content_type = '" + contentTypeToDBValue(domain.ContentTypeMovie) + "' AND "
+	switch {
+	case role != nil && *role == domain.PersonRoleCast:
+		return query.Where(movie+"response->'cast' @> ?::jsonb", string(needle))
+	case role != nil && *role == domain.PersonRoleDirector:
+		return query.Where(movie+"response->'directors' @> ?::jsonb", string(needle))
+	default:
+		return query.Where(movie+"(response->'cast' @> ?::jsonb OR response->'directors' @> ?::jsonb)", string(needle), string(needle))
+	}
+}
+
+// applyMovieColumnFilters applies the movie grid's per-column filters. All read the
+// shaped TMDB payload in the response JSONB. Rows without the key (non-movies, or
+// movies missing the value) yield NULL, so a set filter excludes them. Values are
+// always bound; releaseDate is an ISO string so lexical comparison is date order.
+func applyMovieColumnFilters(query *gorm.DB, f *domain.ContentFilter) *gorm.DB {
+	if f.GenreContains != nil && *f.GenreContains != "" {
+		query = query.Where("(response->'genres')::text ILIKE ?", "%"+*f.GenreContains+"%")
+	}
+	if len(f.AgeRating) > 0 {
+		query = query.Where("response->>'certification' IN ?", f.AgeRating)
+	}
+	if f.ReleasedAfter != nil {
+		query = query.Where("response->>'releaseDate' >= ?", *f.ReleasedAfter)
+	}
+	if f.ReleasedBefore != nil {
+		query = query.Where("response->>'releaseDate' <= ?", *f.ReleasedBefore)
+	}
+	if f.MinBoxOffice != nil {
+		query = query.Where("(response->>'revenue')::FLOAT8 >= ?", *f.MinBoxOffice)
+	}
+	if f.MaxBoxOffice != nil {
+		query = query.Where("(response->>'revenue')::FLOAT8 <= ?", *f.MaxBoxOffice)
+	}
+	if f.MinTmdbScore != nil {
+		query = query.Where("(response->>'voteAverage')::FLOAT8 >= ?", *f.MinTmdbScore)
+	}
+	if f.MaxTmdbScore != nil {
+		query = query.Where("(response->>'voteAverage')::FLOAT8 <= ?", *f.MaxTmdbScore)
+	}
+	return query
 }
 
 // maxSearchPhrases caps comma-separated phrases per search to bound query size.
@@ -215,6 +301,10 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		rules = buildContentSortRules(params.SortBy, params.SortOrder)
 	}
 
+	// The cursor is built from the last row's struct fields, so every computed sort
+	// expression must come back as a scanned column (C-02).
+	computedSelects := computedSortSelects(rules)
+
 	// Configure paginator options
 	opts := []paginator.Option{
 		paginator.WithRules(rules...),
@@ -234,6 +324,13 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		if params.Filter.ContentType != nil {
 			query = query.Where("content_type = ?", strings.ToLower(string(*params.Filter.ContentType)))
 		}
+		if len(params.Filter.ContentTypes) > 0 {
+			dbTypes := make([]string, len(params.Filter.ContentTypes))
+			for i, ct := range params.Filter.ContentTypes {
+				dbTypes[i] = contentTypeToDBValue(ct)
+			}
+			query = query.Where("content_type IN ?", dbTypes)
+		}
 		if params.Filter.MinLengthSeconds != nil {
 			query = query.Where("length >= ?", *params.Filter.MinLengthSeconds)
 		}
@@ -243,6 +340,8 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		if params.Filter.Search != nil && *params.Filter.Search != "" {
 			query = applyContentSearch(query, *params.Filter.Search, params.Filter.SearchFields)
 		}
+		query = applyPersonFilter(query, params.Filter.PersonID, params.Filter.PersonRole)
+		query = applyMovieColumnFilters(query, params.Filter)
 		// View count filters (JSONB extraction)
 		if params.Filter.MinViewCount != nil {
 			query = query.Where("(response->'items'->0->'statistics'->>'viewCount')::BIGINT >= ?", *params.Filter.MinViewCount)
@@ -291,17 +390,15 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		}
 	}
 
-	// Total count (before cursor/limit — respects filters only)
-	var totalCountInt *int
-	if params.IncludeTotalCount {
-		// Clone query to avoid Paginate() modifying count query
-		countQuery := query.Session(&gorm.Session{})
-		var count int64
-		if err := countQuery.Count(&count).Error; err != nil {
-			return nil, fmt.Errorf("failed to count content: %w", err)
-		}
-		countInt := int(count)
-		totalCountInt = &countInt
+	// Total count (before cursor/limit — respects filters only). It rides
+	// along in the page query as an uncorrelated scalar subquery, which
+	// Postgres evaluates once: one round trip for page + count, not two.
+	countQuery := query.Session(&gorm.Session{})
+	switch {
+	case params.IncludeTotalCount:
+		query = query.Select("content.*"+computedSelects+", (?) AS total_count", countQuery.Session(&gorm.Session{}).Select("COUNT(*)"))
+	case computedSelects != "":
+		query = query.Select("content.*" + computedSelects)
 	}
 
 	// Execute pagination
@@ -312,6 +409,22 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 	}
 	if pageResult.Error != nil {
 		return nil, fmt.Errorf("failed to list content: %w", pageResult.Error)
+	}
+
+	var totalCountInt *int
+	if params.IncludeTotalCount {
+		var count int64
+		switch {
+		case len(models) > 0 && models[0].TotalCount != nil:
+			count = *models[0].TotalCount
+		case params.After != nil:
+			// An empty page past the end carries no row to read the total from.
+			if err := countQuery.Count(&count).Error; err != nil {
+				return nil, fmt.Errorf("failed to count content: %w", err)
+			}
+		}
+		countInt := int(count)
+		totalCountInt = &countInt
 	}
 
 	// Map results to domain
@@ -343,18 +456,22 @@ func (r *GormContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 }
 
 // UpdatePrimaryCategoryID sets the primary_category_id FK on a content record
-func (r *GormContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) error {
+// and returns the updated row (RETURNING *). Zero rows means the content
+// doesn't exist, so callers need no separate existence check.
+func (r *GormContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+	var updated ContentModel
 	result := r.db.WithContext(ctx).
-		Model(&ContentModel{}).
+		Model(&updated).
+		Clauses(clause.Returning{}).
 		Where("id = ?", contentID).
 		Update("primary_category_id", categoryID)
 	if result.Error != nil {
-		return fmt.Errorf("failed to update primary category: %w", result.Error)
+		return nil, fmt.Errorf("failed to update primary category: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return domain.ErrNotFound
+		return nil, domain.ErrNotFound
 	}
-	return nil
+	return contentModelToDomain(&updated), nil
 }
 
 // SetDisplayTitleIfEmpty implements first-write-wins for a passage's optional

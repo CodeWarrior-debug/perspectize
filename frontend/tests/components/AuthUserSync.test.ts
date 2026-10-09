@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { flushSync } from 'svelte';
 import { render } from '@testing-library/svelte';
+import { reactiveClerk } from './authUserSyncClerk.svelte';
 import AuthUserSync from '$lib/components/AuthUserSync.svelte';
 
 const { mockSetSelectedUserId, mockClearUserSelection, mockQueryClientClear, mockClerkContext, mockQueryState } =
@@ -30,8 +32,12 @@ vi.mock('@tanstack/svelte-query', () => ({
 	})),
 }));
 
+// Tests that change auth mid-life need a $state-backed context, like the real
+// ClerkProvider; the plain object covers everything else.
+let useReactive = false;
+
 vi.mock('svelte-clerk', () => ({
-	useClerkContext: vi.fn(() => mockClerkContext),
+	useClerkContext: vi.fn(() => (useReactive ? reactiveClerk : mockClerkContext)),
 }));
 
 vi.mock('$lib/queries/client', () => ({
@@ -51,6 +57,9 @@ describe('AuthUserSync', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		capturedQueryOptions = undefined;
+		useReactive = false;
+		reactiveClerk.isLoaded = true;
+		reactiveClerk.auth.userId = null;
 		mockClerkContext.isLoaded = true;
 		mockClerkContext.auth.userId = null;
 		mockQueryState.isLoading = false;
@@ -67,43 +76,48 @@ describe('AuthUserSync', () => {
 		expect(mockClearUserSelection).not.toHaveBeenCalled();
 	});
 
-	it('on sign-in, clears query cache and syncs selected user from the me query', () => {
+	it('on initial sign-in, syncs selected user without clearing the cache (siblings may already be fetching)', () => {
 		mockClerkContext.isLoaded = true;
 		mockClerkContext.auth.userId = 'clerk_user_123';
 		mockQueryState.data = { me: { id: '5', username: 'alice' } };
 		render(AuthUserSync);
-		expect(mockQueryClientClear).toHaveBeenCalledTimes(1);
+		expect(mockQueryClientClear).not.toHaveBeenCalled();
 		expect(mockSetSelectedUserId).toHaveBeenCalledWith(5);
 		expect(mockClearUserSelection).not.toHaveBeenCalled();
 	});
 
-	it('on sign-out, clears query cache and clears user selection', () => {
+	it('on initial signed-out load, does not clear the cache but clears user selection', () => {
 		mockClerkContext.isLoaded = true;
 		mockClerkContext.auth.userId = null;
 		render(AuthUserSync);
-		expect(mockQueryClientClear).toHaveBeenCalledTimes(1);
+		expect(mockQueryClientClear).not.toHaveBeenCalled();
 		expect(mockClearUserSelection).toHaveBeenCalledTimes(1);
 		expect(mockSetSelectedUserId).not.toHaveBeenCalled();
 	});
 
-	it('account switch: mounting as a different signed-in user clears cache and re-syncs', () => {
-		// First mount simulates being signed in as user A. A fresh mount is used
-		// here (rather than mutating context mid-test) because the mocked
-		// useClerkContext() returns a plain object, not a Svelte $state-backed
-		// one like the real ClerkProvider — see AuthUserSync.svelte for why a
-		// real account switch re-fires the effect via genuine reactivity.
-		mockClerkContext.isLoaded = true;
-		mockClerkContext.auth.userId = 'clerk_user_A';
-		mockQueryState.data = { me: { id: '1', username: 'alice' } };
-		const first = render(AuthUserSync);
-		expect(mockSetSelectedUserId).toHaveBeenCalledWith(1);
-		first.unmount();
-
-		vi.clearAllMocks();
-
-		mockClerkContext.auth.userId = 'clerk_user_B';
-		mockQueryState.data = { me: { id: '2', username: 'bob' } };
+	it('on a later sign-out, clears query cache and clears user selection', () => {
+		reactiveClerk.auth.userId = 'clerk_user_A';
+		useReactive = true;
 		render(AuthUserSync);
+		expect(mockQueryClientClear).not.toHaveBeenCalled();
+
+		reactiveClerk.auth.userId = null;
+		flushSync();
+		expect(mockQueryClientClear).toHaveBeenCalledTimes(1);
+		expect(mockClearUserSelection).toHaveBeenCalledTimes(1);
+	});
+
+	it('account switch in place: clears the cache and re-syncs for the new user', () => {
+		reactiveClerk.auth.userId = 'clerk_user_A';
+		useReactive = true;
+		mockQueryState.data = { me: { id: '1', username: 'alice' } };
+		render(AuthUserSync);
+		expect(mockSetSelectedUserId).toHaveBeenCalledWith(1);
+		expect(mockQueryClientClear).not.toHaveBeenCalled();
+
+		mockQueryState.data = { me: { id: '2', username: 'bob' } };
+		reactiveClerk.auth.userId = 'clerk_user_B';
+		flushSync();
 		expect(mockQueryClientClear).toHaveBeenCalledTimes(1);
 		expect(mockSetSelectedUserId).toHaveBeenCalledWith(2);
 	});
