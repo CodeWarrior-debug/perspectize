@@ -687,7 +687,12 @@
 				flex: 2,
 				minWidth: 125,
 				sortable: false,
-				filter: false,
+				filter: 'agTextColumnFilter',
+				// Directors and cast names, matching the server's castContains.
+				filterValueGetter: (params) =>
+					moviePeople(params.data)
+						.map((p) => p.name)
+						.join(', '),
 				cellRenderer: castCellRenderer,
 				// Tighter cell padding so the two-line cast cell has room for names beside +N.
 				cellStyle: { '--ag-cell-horizontal-padding': '8px' },

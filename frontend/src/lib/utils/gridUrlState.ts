@@ -476,6 +476,7 @@ export interface ContentFilterInput {
 	personId?: string;
 	personRole?: 'CAST' | 'DIRECTOR';
 	genreContains?: string;
+	castContains?: string;
 	ageRating?: string[];
 	releasedAfter?: string;
 	releasedBefore?: string;
@@ -637,6 +638,11 @@ export function urlParamsToGraphQLFilter(
 				}
 				break;
 			}
+
+			case 'cast':
+				result.castContains = value;
+				hasAny = true;
+				break;
 
 			case 'genre':
 				result.genreContains = value;

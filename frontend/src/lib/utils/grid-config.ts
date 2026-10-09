@@ -246,7 +246,19 @@ export const COLUMNS: readonly ColumnMeta[] = [
 	},
 	// One column for people: directors first, then billed cast. Not sortable (a person list has no order);
 	// searched via the Cast / Director search scopes instead.
-	{ colId: 'cast', label: 'Cast', picker: 'data', sortable: false },
+	{
+		colId: 'cast',
+		label: 'Cast',
+		picker: 'data',
+		sortable: false,
+		// Matches a cast or director name, like the server's castContains.
+		filterKey: 'cast',
+		filterValue: (row) =>
+			moviePeople(row)
+				.map((p) => p.name)
+				.join(', ')
+				.toLowerCase() || null,
+	},
 	{
 		colId: 'duration',
 		label: 'Duration',
@@ -430,9 +442,8 @@ const MOVIE_DEFAULT_COLS = ['genre', 'rated', 'cast', 'released', 'boxOffice', '
 
 /**
  * Which grid columns the responsive system shows at a tier. With the type filter
- * exactly MOVIE (Type is redundant when one type is in view) the Movie default
- * set applies: ◎ Film Genre Rated Cast Duration Released Box office Vs. budget
- * TMDB Score Tags (Date Added, Budget, Collection, Votes, Synopsis, TMDB ID stay
+ * exactly MOVIE the Movie default set applies: ◎ Film Type Genre Rated Cast
+ * Duration Released Box office Vs. budget TMDB Score Tags (Date Added, Budget, Collection, Votes, Synopsis, TMDB ID stay
  * in the picker). Any other filter keeps the YouTube layout and hides the Movie
  * columns, which would be empty. Mirrored by the colDef `hide` flags in
  * ActivityTable.svelte (initial default); this is the override that wins.
@@ -444,7 +455,7 @@ export function defaultColumnVisibility(
 	const sm = tier !== 'xs';
 	const md = tier === 'md' || tier === 'lg';
 	const lg = tier === 'lg';
-	const visible: string[] = movieOnly ? ['perspectize', 'item'] : ['item', 'type', 'perspectize'];
+	const visible: string[] = movieOnly ? ['perspectize', 'item', 'type'] : ['item', 'type', 'perspectize'];
 	if (movieOnly) {
 		if (sm) visible.push('genre', 'rated');
 		if (md) visible.push('cast', 'duration', 'released');
