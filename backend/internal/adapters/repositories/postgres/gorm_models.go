@@ -49,6 +49,7 @@ type ContentModel struct {
 	AddedByUserID     int             `gorm:"column:added_by_user_id;not null"`
 	Length            *int            `gorm:""`
 	LengthUnits       *string         `gorm:""`
+	LengthDisplay     json.RawMessage `gorm:"type:jsonb"`
 	Response          json.RawMessage `gorm:"type:jsonb"`
 	PrimaryCategoryID *int            `gorm:"column:primary_category_id"`
 	VerseStartID      *int            `gorm:"column:verse_start_id"`

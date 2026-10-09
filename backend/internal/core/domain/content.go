@@ -29,6 +29,22 @@ const (
 	ContentSearchFieldDirector     ContentSearchField = "DIRECTOR"
 )
 
+// Length precisions: the smallest unit a source reports a length in.
+const (
+	LengthPrecisionSeconds = "seconds"
+	LengthPrecisionMinutes = "minutes"
+)
+
+// LengthDisplay records where Content.Length came from and the smallest unit
+// that source reports. Length is always stored in seconds so it sorts and
+// filters across types; clients format it to Precision (a TMDB runtime is whole
+// minutes, so it shows as h:mm, not h:mm:00). Stored as JSONB so new sources
+// and precisions need no migration.
+type LengthDisplay struct {
+	Source    string `json:"source"`
+	Precision string `json:"precision"`
+}
+
 // Content represents a media item that users create perspectives on
 type Content struct {
 	ID                int
@@ -38,6 +54,7 @@ type Content struct {
 	AddedByUserID     int
 	Length            *int
 	LengthUnits       *string
+	LengthDisplay     *LengthDisplay
 	Response          json.RawMessage
 	PrimaryCategoryID *int
 	VerseStartID      *int    // BIBLE_PASSAGE only — computed ordinal (see BibleVerseOrdinal), not a table FK

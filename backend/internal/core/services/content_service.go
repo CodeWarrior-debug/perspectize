@@ -89,6 +89,7 @@ func (s *ContentService) CreateFromYouTube(ctx context.Context, url string, user
 		AddedByUserID: userID,
 		Length:        &metadata.Duration,
 		LengthUnits:   &lengthUnits,
+		LengthDisplay: &domain.LengthDisplay{Source: "youtube", Precision: domain.LengthPrecisionSeconds},
 		Response:      metadata.Response,
 	}
 
@@ -496,6 +497,8 @@ func (s *ContentService) CreateFromMovie(ctx context.Context, rawURL string, use
 	if metadata.RuntimeSeconds != nil {
 		lengthUnits := "seconds"
 		content.LengthUnits = &lengthUnits
+		// TMDB reports runtime in whole minutes; Length holds them as seconds.
+		content.LengthDisplay = &domain.LengthDisplay{Source: "tmdb", Precision: domain.LengthPrecisionMinutes}
 	}
 
 	created, alreadyExisted, err := s.repo.GetOrCreateByURL(ctx, content, true)

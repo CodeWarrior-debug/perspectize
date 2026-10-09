@@ -117,6 +117,17 @@ type WikidataSearchResult {
   entityType: String
 }
 
+"""
+Where a content length came from and the smallest unit that source reports.
+`length` is always seconds; show it to `precision` ("minutes" -> h:mm, "seconds" -> h:mm:ss / m:ss).
+"""
+type LengthDisplay {
+  "Origin of the length, e.g. youtube, tmdb."
+  source: String!
+  "Smallest unit the source reports: seconds or minutes."
+  precision: String!
+}
+
 type Content {
   id: ID!
   name: String!
@@ -126,6 +137,8 @@ type Content {
   addedBy: User
   length: Int
   lengthUnits: String
+  "Where length came from and the smallest unit it reports; format length to that precision."
+  lengthDisplay: LengthDisplay
   viewCount: Int
   likeCount: Int
   commentCount: Int

@@ -21,6 +21,9 @@ resolver:
 
 # Map GraphQL types to Go types
 models:
+  LengthDisplay:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.LengthDisplay
   ID:
     model:
       - github.com/99designs/gqlgen/graphql.ID
