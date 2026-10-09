@@ -2485,6 +2485,7 @@ input ContentFilter {
   personRole: PersonRole
   # Movie column filters (movie rows only; other rows have no such data and never match)
   genreContains: String      # Case-insensitive contains on the genre names
+  castContains: String       # Case-insensitive contains on a cast or director name
   ageRating: [String!]       # Certification is any of these (e.g. PG-13, R)
   releasedAfter: String      # ISO date (YYYY-MM-DD), inclusive
   releasedBefore: String     # ISO date (YYYY-MM-DD), inclusive
@@ -12018,7 +12019,7 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
+	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12088,6 +12089,13 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.GenreContains = data
+		case "castContains":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("castContains"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CastContains = data
 		case "ageRating":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ageRating"))
 			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)

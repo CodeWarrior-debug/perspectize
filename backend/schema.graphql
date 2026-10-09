@@ -337,6 +337,7 @@ input ContentFilter {
   personRole: PersonRole
   # Movie column filters (movie rows only; other rows have no such data and never match)
   genreContains: String      # Case-insensitive contains on the genre names
+  castContains: String       # Case-insensitive contains on a cast or director name
   ageRating: [String!]       # Certification is any of these (e.g. PG-13, R)
   releasedAfter: String      # ISO date (YYYY-MM-DD), inclusive
   releasedBefore: String     # ISO date (YYYY-MM-DD), inclusive

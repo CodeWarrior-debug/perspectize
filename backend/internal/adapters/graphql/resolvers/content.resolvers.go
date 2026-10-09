@@ -493,6 +493,7 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		params.Filter.PersonID = filter.PersonID
 		params.Filter.PersonRole = filter.PersonRole
 		params.Filter.GenreContains = filter.GenreContains
+		params.Filter.CastContains = filter.CastContains
 		params.Filter.AgeRating = filter.AgeRating
 		params.Filter.ReleasedAfter = filter.ReleasedAfter
 		params.Filter.ReleasedBefore = filter.ReleasedBefore

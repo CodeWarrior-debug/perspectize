@@ -172,6 +172,12 @@ func TestList_MovieColumnFilters(t *testing.T) {
 			`WHERE \(response->>'voteAverage'\)::FLOAT8 >= \$1 ORDER BY`, []driver.Value{6.5, int64(11)}},
 		{"max tmdb score", domain.ContentFilter{MaxTmdbScore: f64(9)},
 			`WHERE \(response->>'voteAverage'\)::FLOAT8 <= \$1 ORDER BY`, []driver.Value{9.0, int64(11)}},
+		{"cast contains matches cast or director names", domain.ContentFilter{CastContains: cStr("keanu")},
+			`WHERE \(EXISTS \(SELECT 1 FROM jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'cast'\) = 'array' .*p->>'name' ILIKE \$1\) ` +
+				`OR EXISTS \(SELECT 1 FROM jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'directors'\) = 'array' .*p->>'name' ILIKE \$2\)\) ORDER BY`,
+			[]driver.Value{"%keanu%", "%keanu%", int64(11)}},
+		{"empty cast contains adds nothing", domain.ContentFilter{CastContains: cStr("")},
+			`SELECT \* FROM "content" ORDER BY`, []driver.Value{int64(11)}},
 		{"empty genre and ratings add nothing", domain.ContentFilter{GenreContains: cStr(""), AgeRating: []string{}},
 			`SELECT \* FROM "content" ORDER BY`, []driver.Value{int64(11)}},
 		{"filters AND together", domain.ContentFilter{GenreContains: cStr("x"), MinTmdbScore: f64(7)},

@@ -1478,7 +1478,7 @@ func TestPaginatedContentQuery_WithMovieColumnFilters(t *testing.T) {
 	defer server.Close()
 
 	result := executeGraphQL(t, server, `{ content(filter: {
-		genreContains: "drama", ageRating: ["PG-13", "R"],
+		genreContains: "drama", castContains: "wachowski", ageRating: ["PG-13", "R"],
 		releasedAfter: "2000-01-01", releasedBefore: "2010-12-31",
 		minBoxOffice: 1000000, maxBoxOffice: 2900000000.5,
 		minTmdbScore: 6.5, maxTmdbScore: 9
@@ -1489,6 +1489,8 @@ func TestPaginatedContentQuery_WithMovieColumnFilters(t *testing.T) {
 	f := got.Filter
 	require.NotNil(t, f.GenreContains)
 	assert.Equal(t, "drama", *f.GenreContains)
+	require.NotNil(t, f.CastContains)
+	assert.Equal(t, "wachowski", *f.CastContains)
 	assert.Equal(t, []string{"PG-13", "R"}, f.AgeRating)
 	require.NotNil(t, f.ReleasedAfter)
 	assert.Equal(t, "2000-01-01", *f.ReleasedAfter)

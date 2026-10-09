@@ -80,6 +80,7 @@ type ContentFilter struct {
 	PersonID          *int                        `json:"personId,omitempty"`
 	PersonRole        *domain.PersonRole          `json:"personRole,omitempty"`
 	GenreContains     *string                     `json:"genreContains,omitempty"`
+	CastContains      *string                     `json:"castContains,omitempty"`
 	AgeRating         []string                    `json:"ageRating,omitempty"`
 	ReleasedAfter     *string                     `json:"releasedAfter,omitempty"`
 	ReleasedBefore    *string                     `json:"releasedBefore,omitempty"`
