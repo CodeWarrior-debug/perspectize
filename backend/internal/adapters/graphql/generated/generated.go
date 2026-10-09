@@ -322,6 +322,7 @@ type ComplexityRoot struct {
 		UserByUsername     func(childComplexity int, username string) int
 		Users              func(childComplexity int) int
 		WikidataSearch     func(childComplexity int, query string, language *string, limit *int) int
+		YoutubeTrending    func(childComplexity int, regionCode *string, pageToken *string) int
 	}
 
 	ReadReceiptChanged struct {
@@ -374,6 +375,21 @@ type ComplexityRoot struct {
 		EntityType  func(childComplexity int) int
 		Label       func(childComplexity int) int
 		Qid         func(childComplexity int) int
+	}
+
+	YouTubeTrendingPage struct {
+		Items         func(childComplexity int) int
+		NextPageToken func(childComplexity int) int
+	}
+
+	YouTubeTrendingVideo struct {
+		ChannelTitle func(childComplexity int) int
+		Description  func(childComplexity int) int
+		Duration     func(childComplexity int) int
+		ID           func(childComplexity int) int
+		PublishedAt  func(childComplexity int) int
+		ThumbnailURL func(childComplexity int) int
+		Title        func(childComplexity int) int
 	}
 }
 
@@ -446,6 +462,7 @@ type QueryResolver interface {
 	UserByUsername(ctx context.Context, username string) (*model.User, error)
 	Users(ctx context.Context) ([]*model.User, error)
 	WikidataSearch(ctx context.Context, query string, language *string, limit *int) ([]*model.WikidataSearchResult, error)
+	YoutubeTrending(ctx context.Context, regionCode *string, pageToken *string) (*model.YouTubeTrendingPage, error)
 	PerspectiveByID(ctx context.Context, id string) (*model.Perspective, error)
 	Perspectives(ctx context.Context, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) (*model.PaginatedPerspectives, error)
 	FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*model.FeelingStats, error)
@@ -1847,6 +1864,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.WikidataSearch(childComplexity, args["query"].(string), args["language"].(*string), args["limit"].(*int)), true
+	case "Query.youtubeTrending":
+		if e.ComplexityRoot.Query.YoutubeTrending == nil {
+			break
+		}
+
+		args, err := ec.field_Query_youtubeTrending_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.YoutubeTrending(childComplexity, args["regionCode"].(*string), args["pageToken"].(*string)), true
 
 	case "ReadReceiptChanged.lastReadSeq":
 		if e.ComplexityRoot.ReadReceiptChanged.LastReadSeq == nil {
@@ -2028,6 +2056,62 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.WikidataSearchResult.Qid(childComplexity), true
+
+	case "YouTubeTrendingPage.items":
+		if e.ComplexityRoot.YouTubeTrendingPage.Items == nil {
+			break
+		}
+
+		return e.ComplexityRoot.YouTubeTrendingPage.Items(childComplexity), true
+	case "YouTubeTrendingPage.nextPageToken":
+		if e.ComplexityRoot.YouTubeTrendingPage.NextPageToken == nil {
+			break
+		}
+
+		return e.ComplexityRoot.YouTubeTrendingPage.NextPageToken(childComplexity), true
+
+	case "YouTubeTrendingVideo.channelTitle":
+		if e.ComplexityRoot.YouTubeTrendingVideo.ChannelTitle == nil {
+			break
+		}
+
+		return e.ComplexityRoot.YouTubeTrendingVideo.ChannelTitle(childComplexity), true
+	case "YouTubeTrendingVideo.description":
+		if e.ComplexityRoot.YouTubeTrendingVideo.Description == nil {
+			break
+		}
+
+		return e.ComplexityRoot.YouTubeTrendingVideo.Description(childComplexity), true
+	case "YouTubeTrendingVideo.duration":
+		if e.ComplexityRoot.YouTubeTrendingVideo.Duration == nil {
+			break
+		}
+
+		return e.ComplexityRoot.YouTubeTrendingVideo.Duration(childComplexity), true
+	case "YouTubeTrendingVideo.id":
+		if e.ComplexityRoot.YouTubeTrendingVideo.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.YouTubeTrendingVideo.ID(childComplexity), true
+	case "YouTubeTrendingVideo.publishedAt":
+		if e.ComplexityRoot.YouTubeTrendingVideo.PublishedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.YouTubeTrendingVideo.PublishedAt(childComplexity), true
+	case "YouTubeTrendingVideo.thumbnailUrl":
+		if e.ComplexityRoot.YouTubeTrendingVideo.ThumbnailURL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.YouTubeTrendingVideo.ThumbnailURL(childComplexity), true
+	case "YouTubeTrendingVideo.title":
+		if e.ComplexityRoot.YouTubeTrendingVideo.Title == nil {
+			break
+		}
+
+		return e.ComplexityRoot.YouTubeTrendingVideo.Title(childComplexity), true
 
 	}
 	return 0, false
@@ -2256,6 +2340,23 @@ type Category {
   wikipediaUrl: String
   createdAt: String!
   updatedAt: String!
+}
+
+# One video from YouTube's most-popular chart (Discover page Trending feed).
+type YouTubeTrendingVideo {
+  id: String!
+  title: String!
+  channelTitle: String!
+  description: String!
+  publishedAt: String!
+  thumbnailUrl: String!
+  # ISO 8601 duration, e.g. "PT4M13S"
+  duration: String!
+}
+
+type YouTubeTrendingPage {
+  items: [YouTubeTrendingVideo!]!
+  nextPageToken: String
 }
 
 type WikidataSearchResult {
@@ -2692,6 +2793,10 @@ type Query {
 
   # Category queries
   wikidataSearch(query: String!, language: String, limit: Int): [WikidataSearchResult!]!
+
+  # Discover page: YouTube's Trending chart, served from the backend cache so
+  # visitors share one API call per page per hour. regionCode defaults to US.
+  youtubeTrending(regionCode: String, pageToken: String): YouTubeTrendingPage!
 
   # Perspective queries
   perspectiveByID(id: ID!): Perspective
@@ -3324,6 +3429,36 @@ func (ec *executionContext) childFields_WikidataSearchResult(ctx context.Context
 		return ec.fieldContext_WikidataSearchResult_entityType(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type WikidataSearchResult", field.Name)
+}
+
+func (ec *executionContext) childFields_YouTubeTrendingPage(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "items":
+		return ec.fieldContext_YouTubeTrendingPage_items(ctx, field)
+	case "nextPageToken":
+		return ec.fieldContext_YouTubeTrendingPage_nextPageToken(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type YouTubeTrendingPage", field.Name)
+}
+
+func (ec *executionContext) childFields_YouTubeTrendingVideo(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_YouTubeTrendingVideo_id(ctx, field)
+	case "title":
+		return ec.fieldContext_YouTubeTrendingVideo_title(ctx, field)
+	case "channelTitle":
+		return ec.fieldContext_YouTubeTrendingVideo_channelTitle(ctx, field)
+	case "description":
+		return ec.fieldContext_YouTubeTrendingVideo_description(ctx, field)
+	case "publishedAt":
+		return ec.fieldContext_YouTubeTrendingVideo_publishedAt(ctx, field)
+	case "thumbnailUrl":
+		return ec.fieldContext_YouTubeTrendingVideo_thumbnailUrl(ctx, field)
+	case "duration":
+		return ec.fieldContext_YouTubeTrendingVideo_duration(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type YouTubeTrendingVideo", field.Name)
 }
 
 func (ec *executionContext) childFields___Directive(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -4253,6 +4388,28 @@ func (ec *executionContext) field_Query_wikidataSearch_args(ctx context.Context,
 		return nil, err
 	}
 	args["limit"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_youtubeTrending_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "regionCode",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["regionCode"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "pageToken",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["pageToken"] = arg1
 	return args, nil
 }
 
@@ -9773,6 +9930,50 @@ func (ec *executionContext) fieldContext_Query_wikidataSearch(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_youtubeTrending(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_youtubeTrending(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().YoutubeTrending(ctx, fc.Args["regionCode"].(*string), fc.Args["pageToken"].(*string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.YouTubeTrendingPage) graphql.Marshaler {
+			return ec.marshalNYouTubeTrendingPage2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐYouTubeTrendingPage(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_youtubeTrending(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_YouTubeTrendingPage(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_youtubeTrending_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_perspectiveByID(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -10912,6 +11113,222 @@ func (ec *executionContext) _WikidataSearchResult_entityType(ctx context.Context
 }
 func (ec *executionContext) fieldContext_WikidataSearchResult_entityType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("WikidataSearchResult", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _YouTubeTrendingPage_items(ctx context.Context, field graphql.CollectedField, obj *model.YouTubeTrendingPage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_YouTubeTrendingPage_items(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Items, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.YouTubeTrendingVideo) graphql.Marshaler {
+			return ec.marshalNYouTubeTrendingVideo2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐYouTubeTrendingVideoᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_YouTubeTrendingPage_items(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "YouTubeTrendingPage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_YouTubeTrendingVideo(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _YouTubeTrendingPage_nextPageToken(ctx context.Context, field graphql.CollectedField, obj *model.YouTubeTrendingPage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_YouTubeTrendingPage_nextPageToken(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.NextPageToken, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_YouTubeTrendingPage_nextPageToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("YouTubeTrendingPage", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _YouTubeTrendingVideo_id(ctx context.Context, field graphql.CollectedField, obj *model.YouTubeTrendingVideo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_YouTubeTrendingVideo_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_YouTubeTrendingVideo_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("YouTubeTrendingVideo", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _YouTubeTrendingVideo_title(ctx context.Context, field graphql.CollectedField, obj *model.YouTubeTrendingVideo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_YouTubeTrendingVideo_title(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Title, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_YouTubeTrendingVideo_title(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("YouTubeTrendingVideo", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _YouTubeTrendingVideo_channelTitle(ctx context.Context, field graphql.CollectedField, obj *model.YouTubeTrendingVideo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_YouTubeTrendingVideo_channelTitle(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ChannelTitle, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_YouTubeTrendingVideo_channelTitle(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("YouTubeTrendingVideo", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _YouTubeTrendingVideo_description(ctx context.Context, field graphql.CollectedField, obj *model.YouTubeTrendingVideo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_YouTubeTrendingVideo_description(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Description, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_YouTubeTrendingVideo_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("YouTubeTrendingVideo", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _YouTubeTrendingVideo_publishedAt(ctx context.Context, field graphql.CollectedField, obj *model.YouTubeTrendingVideo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_YouTubeTrendingVideo_publishedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PublishedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_YouTubeTrendingVideo_publishedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("YouTubeTrendingVideo", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _YouTubeTrendingVideo_thumbnailUrl(ctx context.Context, field graphql.CollectedField, obj *model.YouTubeTrendingVideo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_YouTubeTrendingVideo_thumbnailUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ThumbnailURL, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_YouTubeTrendingVideo_thumbnailUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("YouTubeTrendingVideo", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _YouTubeTrendingVideo_duration(ctx context.Context, field graphql.CollectedField, obj *model.YouTubeTrendingVideo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_YouTubeTrendingVideo_duration(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Duration, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_YouTubeTrendingVideo_duration(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("YouTubeTrendingVideo", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) ___Directive_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) {
@@ -15755,6 +16172,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "youtubeTrending":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_youtubeTrending(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "perspectiveByID":
 			field := field
 
@@ -16370,6 +16809,117 @@ func (ec *executionContext) _WikidataSearchResult(ctx context.Context, sel ast.S
 		case "entityType":
 			out.Values[i] = ec._WikidataSearchResult_entityType(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var youTubeTrendingPageImplementors = []string{"YouTubeTrendingPage"}
+
+func (ec *executionContext) _YouTubeTrendingPage(ctx context.Context, sel ast.SelectionSet, obj *model.YouTubeTrendingPage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, youTubeTrendingPageImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("YouTubeTrendingPage")
+		case "items":
+			out.Values[i] = ec._YouTubeTrendingPage_items(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "nextPageToken":
+			out.Values[i] = ec._YouTubeTrendingPage_nextPageToken(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var youTubeTrendingVideoImplementors = []string{"YouTubeTrendingVideo"}
+
+func (ec *executionContext) _YouTubeTrendingVideo(ctx context.Context, sel ast.SelectionSet, obj *model.YouTubeTrendingVideo) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, youTubeTrendingVideoImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("YouTubeTrendingVideo")
+		case "id":
+			out.Values[i] = ec._YouTubeTrendingVideo_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "title":
+			out.Values[i] = ec._YouTubeTrendingVideo_title(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "channelTitle":
+			out.Values[i] = ec._YouTubeTrendingVideo_channelTitle(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "description":
+			out.Values[i] = ec._YouTubeTrendingVideo_description(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "publishedAt":
+			out.Values[i] = ec._YouTubeTrendingVideo_publishedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "thumbnailUrl":
+			out.Values[i] = ec._YouTubeTrendingVideo_thumbnailUrl(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "duration":
+			out.Values[i] = ec._YouTubeTrendingVideo_duration(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		default:
@@ -17556,6 +18106,42 @@ func (ec *executionContext) marshalNWikidataSearchResult2ᚖgithubᚗcomᚋCodeW
 		return graphql.Null
 	}
 	return ec._WikidataSearchResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNYouTubeTrendingPage2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐYouTubeTrendingPage(ctx context.Context, sel ast.SelectionSet, v *model.YouTubeTrendingPage) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._YouTubeTrendingPage(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNYouTubeTrendingVideo2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐYouTubeTrendingVideoᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.YouTubeTrendingVideo) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNYouTubeTrendingVideo2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐYouTubeTrendingVideo(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNYouTubeTrendingVideo2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐYouTubeTrendingVideo(ctx context.Context, sel ast.SelectionSet, v *model.YouTubeTrendingVideo) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._YouTubeTrendingVideo(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {
