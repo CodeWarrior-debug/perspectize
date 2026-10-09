@@ -120,6 +120,19 @@ Values that fail the regex, or that arrive after the cap is reached, are reporte
 free text on a metric. They belong on spans, if anywhere. Budget: < 3,500 active series
 against Grafana Cloud free tier's 10k.
 
+## What spans never carry
+
+- **GraphQL variables:** `otelgqlgen` runs `WithoutVariables`.
+- **SQL bind values:** GORM spans record the parameterized statement only.
+- **Outbound query-string values:** otelhttp records the full request URL as
+  `url.full` on client spans, and the YouTube client sends its API key as `?key=`
+  (TMDB search sends the user's text as `?query=`). `telemetry.Setup` wraps the trace
+  exporter in `telemetry.RedactURLs`, which replaces every query value with
+  `REDACTED` on export (`…/videos?id=REDACTED&key=REDACTED`). Any new
+  `TracerProvider` that exports real spans must wrap its exporter the same way.
+  Wrap new outbound HTTP clients in `otelhttp.NewTransport`, and send credentials
+  in headers where the API allows it.
+
 ## Sampling
 
 The sampler is configured only through env vars (the standard OTel SDK variables, no

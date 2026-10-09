@@ -99,7 +99,7 @@ func Setup(ctx context.Context, cfg Config) (shutdown func(context.Context) erro
 		return nil, fmt.Errorf("telemetry: creating OTLP trace exporter: %w", err)
 	}
 	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(traceExporter),
+		sdktrace.WithBatcher(RedactURLs(traceExporter)),
 		sdktrace.WithResource(res),
 	)
 	shutdownFuncs = append(shutdownFuncs, tp.Shutdown)
