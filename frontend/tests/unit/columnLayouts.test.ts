@@ -77,12 +77,12 @@ describe('defaultLayout', () => {
 		for (const colId of togglableColIds(true)) expect(layout).toHaveProperty(colId);
 	});
 
-	it('shows the Movie set in the movie view and hides YouTube-only columns', () => {
+	it('shows the Movie set (with Type) in the movie view and hides YouTube-only columns', () => {
 		const layout = defaultLayout('lg', 'movie');
+		expect(layout.type).toBe(true);
 		expect(layout.cast).toBe(true);
 		expect(layout.boxOffice).toBe(true);
 		expect(layout.channel).toBe(false);
-		expect(layout.type).toBe(false);
 	});
 
 	it('hides picker-only columns such as Date Added', () => {
