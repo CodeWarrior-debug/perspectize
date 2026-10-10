@@ -46,7 +46,7 @@ Refs: Ousterhout, *A Philosophy of Software Design*; Matt Pocock, [How To Make C
 
 ## Stack
 
-Go 1.26+ (pinned via `toolchain` in go.mod + Dockerfile) · gqlgen (schema-first) · PostgreSQL 17 (GORM + pgx/v5) · golang-migrate · go-playground/validator · testify · log/slog · godotenv
+Go 1.27+ (`go 1.27.2` in go.mod, `golang:1.27-alpine` in Dockerfile) · gqlgen (schema-first) · PostgreSQL 17 (GORM + pgx/v5) · golang-migrate · go-playground/validator · testify · log/slog · godotenv
 
 ### ORM: GORM (Hex-Clean Separate Model Pattern)
 
@@ -171,6 +171,8 @@ CORS middleware is part of the API middleware chain in `internal/server/api.go` 
 
 **Adding repository interface methods:** When adding a new method to a port interface (e.g., `ListAll` on `UserRepository`), all test mocks that implement that interface must also be updated or compilation fails. Check `test/` for mock implementations.
 
+**`encoding/json` runs on the v2 engine (Go 1.27):** Unmarshal is ~35% faster, but each small `json.Marshal` costs +2 allocs (~20–40% slower). A reused `jsontext.Encoder` is slower still; only hand appenders (`jsontext.AppendQuote`) win, and they aren't worth it at DB-bound µs scale. Benches: `go test -run '^$' -bench . ./internal/adapters/{repositories/postgres,realtime,tmdb}/`. A/B the old engine with `GOEXPERIMENT=nojsonv2`.
+
 **JSON scalar:** Use `graphql.Map` (configured as `JSON` in `gqlgen.yml`) for JSONB data.
 
 **gqlgen test client (`gqlgen/client`):** rejects response keys with no matching struct field (`'x' has invalid keys`). Spell out *every* selected field in the decode target, or decode into `map[string]json.RawMessage`.
@@ -215,15 +217,15 @@ models:
 
 ## Go Version Management
 
-**`go.mod` uses `toolchain` directive** to decouple minimum version from local dev version:
-- `go 1.26` — minimum required (set by dependencies like gqlgen)
-- `toolchain go1.26.0` — version used for local development
+**`go.mod` pins the exact patch** (`go 1.27.2`, no `toolchain` line). CI's setup-go installs exactly that version, so bump the patch here to move CI.
 
 **Dockerfile pins the base image** (`golang:1.27-alpine`) so Sevalla builds always use a known-good version.
 
 **CI uses `go-version-file`** (`backend/go.mod`) so GitHub Actions auto-detects the version.
 
-**When Go updates locally** (e.g., Homebrew): only the `toolchain` line changes. The `go` minimum stays stable unless a dependency forces it up. Update the Dockerfile base image to match.
+**Cloud containers ship an older Go;** `GOTOOLCHAIN=auto` downloads the go.mod version on first use. Prefix `GOTOOLCHAIN=go1.X.Y` to run a specific one (e.g. A/B against the previous release).
+
+**Upgrading Go:** `go mod edit -go=<ver>` → `go mod tidy` → bump both Dockerfiles (`Dockerfile`, `Dockerfile.demo`) → README prerequisites.
 
 **Never hardcode Go versions** in CI or deployment configs. Always reference `go.mod`.
 
