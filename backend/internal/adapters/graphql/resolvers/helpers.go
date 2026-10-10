@@ -12,9 +12,34 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/dataloader"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
+
+// movieSearchPageToModel maps one TMDB search page to the GraphQL shape. The
+// canonical url is what createContentFromMovie takes, so the add path dedupes
+// the same way as a pasted link. Items is never null.
+func movieSearchPageToModel(page *portservices.MovieSearchPage) *model.MovieSearchPage {
+	out := &model.MovieSearchPage{
+		Items:        make([]*model.MovieSearchResult, 0, len(page.Items)),
+		Page:         page.Page,
+		TotalPages:   page.TotalPages,
+		TotalResults: page.TotalResults,
+	}
+	for _, item := range page.Items {
+		out.Items = append(out.Items, &model.MovieSearchResult{
+			TmdbID:      item.TMDBID,
+			Title:       item.Title,
+			ReleaseDate: item.ReleaseDate,
+			Overview:    item.Overview,
+			PosterPath:  item.PosterPath,
+			VoteAverage: item.VoteAverage,
+			URL:         tmdb.CanonicalMovieURL(item.TMDBID),
+		})
+	}
+	return out
+}
 
 // userDomainToModel converts a domain User to a GraphQL model User
 func userDomainToModel(u *domain.User) *model.User {

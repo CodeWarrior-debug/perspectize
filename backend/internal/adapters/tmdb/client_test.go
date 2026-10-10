@@ -5,11 +5,14 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const testToken = "SECRET-TOKEN-XYZ"
@@ -184,4 +187,131 @@ func TestFindMovieByIMDbID_RejectsShortID(t *testing.T) {
 	if _, err := c.FindMovieByIMDbID(context.Background(), "tt123"); !errors.Is(err, ErrInvalidMovieInput) {
 		t.Errorf("want ErrInvalidMovieInput, got %v", err)
 	}
+}
+
+func TestSearchMovies_SendsParamsAndParses(t *testing.T) {
+	var gotPath, gotAuth string
+	var gotParams url.Values
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotParams = r.URL.Query()
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"page":2,"total_pages":5,"total_results":93,"results":[
+			{"id":603,"title":"The Matrix","release_date":"1999-03-30","overview":"A hacker.","poster_path":"/m.jpg","vote_average":8.2,"vote_count":25000}]}`))
+	})
+
+	page, err := c.SearchMovies(context.Background(), "matrix", 2)
+	require.NoError(t, err)
+
+	assert.Equal(t, "/search/movie", gotPath)
+	assert.Equal(t, "Bearer "+testToken, gotAuth)
+	assert.Equal(t, "matrix", gotParams.Get("query"))
+	assert.Equal(t, "2", gotParams.Get("page"))
+	assert.Equal(t, "false", gotParams.Get("include_adult"))
+	assert.Equal(t, "en-US", gotParams.Get("language"))
+
+	assert.Equal(t, 2, page.Page)
+	assert.Equal(t, 5, page.TotalPages)
+	assert.Equal(t, 93, page.TotalResults)
+	require.Len(t, page.Items, 1)
+	item := page.Items[0]
+	assert.Equal(t, 603, item.TMDBID)
+	assert.Equal(t, "The Matrix", item.Title)
+	assert.Equal(t, "A hacker.", item.Overview)
+	require.NotNil(t, item.ReleaseDate)
+	assert.Equal(t, "1999-03-30", *item.ReleaseDate)
+	require.NotNil(t, item.PosterPath)
+	assert.Equal(t, "/m.jpg", *item.PosterPath)
+	require.NotNil(t, item.VoteAverage)
+	assert.InDelta(t, 8.2, *item.VoteAverage, 0.001)
+}
+
+func TestSearchMovies_UnknownValuesAreNil(t *testing.T) {
+	tests := []struct {
+		name, body                      string
+		wantDate, wantPoster, wantScore bool
+	}{
+		{
+			name: "no date, null poster, no votes",
+			body: `{"results":[{"id":1,"title":"T","release_date":"","overview":"","poster_path":null,"vote_average":0,"vote_count":0}]}`,
+		},
+		{
+			name:       "date, poster and votes present",
+			body:       `{"results":[{"id":2,"title":"U","release_date":"2001-01-01","overview":"o","poster_path":"/p.jpg","vote_average":7.5,"vote_count":3}]}`,
+			wantDate:   true,
+			wantPoster: true,
+			wantScore:  true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(tc.body))
+			})
+			page, err := c.SearchMovies(context.Background(), "x", 1)
+			require.NoError(t, err)
+			require.Len(t, page.Items, 1)
+			item := page.Items[0]
+			assert.Equal(t, tc.wantDate, item.ReleaseDate != nil)
+			assert.Equal(t, tc.wantPoster, item.PosterPath != nil)
+			assert.Equal(t, tc.wantScore, item.VoteAverage != nil)
+		})
+	}
+}
+
+func TestSearchMovies_NoResultsIsEmptyNotNil(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"page":1,"total_pages":0,"total_results":0,"results":[]}`))
+	})
+	page, err := c.SearchMovies(context.Background(), "nothing", 1)
+	require.NoError(t, err)
+	assert.NotNil(t, page.Items)
+	assert.Empty(t, page.Items)
+	assert.Equal(t, 0, page.TotalResults)
+}
+
+func TestSearchMovies_ErrorsSanitized(t *testing.T) {
+	tests := []struct {
+		status   int
+		notFound bool
+	}{
+		{401, false},
+		{500, false},
+		{404, true},
+	}
+	for _, tc := range tests {
+		t.Run(http.StatusText(tc.status), func(t *testing.T) {
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tc.status)
+				_, _ = w.Write([]byte(`{"status_message":"upstream says ` + testToken + `"}`))
+			})
+			_, err := c.SearchMovies(context.Background(), "matrix", 1)
+			require.Error(t, err)
+			assert.Equal(t, tc.notFound, errors.Is(err, domain.ErrNotFound))
+			if !tc.notFound {
+				assert.ErrorIs(t, err, ErrTMDBAPI)
+			}
+			assert.NotContains(t, err.Error(), testToken)
+			assert.NotContains(t, err.Error(), "upstream says")
+		})
+	}
+}
+
+func TestSearchMovies_TransportErrorSanitized(t *testing.T) {
+	c := NewClient(testToken)
+	c.baseURL = "http://127.0.0.1:1/3?api_key=" + testToken
+	_, err := c.SearchMovies(context.Background(), "matrix", 1)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), testToken)
+	assert.NotContains(t, err.Error(), "http://")
+}
+
+func TestSearchMovies_MalformedBodyIsSanitizedAPIError(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"results": "not-a-list ` + testToken + `"}`))
+	})
+	_, err := c.SearchMovies(context.Background(), "matrix", 1)
+	require.ErrorIs(t, err, ErrTMDBAPI)
+	assert.NotContains(t, err.Error(), testToken)
 }

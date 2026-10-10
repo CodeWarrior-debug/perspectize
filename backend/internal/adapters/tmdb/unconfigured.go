@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
 
@@ -22,4 +23,14 @@ func (UnconfiguredClient) GetMovie(context.Context, int) (*services.MovieMetadat
 // FindMovieByIMDbID always fails with ErrNotConfigured.
 func (UnconfiguredClient) FindMovieByIMDbID(context.Context, string) (int, error) {
 	return 0, ErrNotConfigured
+}
+
+// SearchMovies always fails with ErrNotConfigured.
+func (UnconfiguredClient) SearchMovies(context.Context, string, int) (*services.MovieSearchPage, error) {
+	return nil, ErrNotConfigured
+}
+
+// TrendingMovies always fails with ErrNotConfigured.
+func (UnconfiguredClient) TrendingMovies(context.Context, domain.TrendingWindow, int) (*services.MovieSearchPage, error) {
+	return nil, ErrNotConfigured
 }
