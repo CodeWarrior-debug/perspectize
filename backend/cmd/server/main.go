@@ -187,9 +187,16 @@ func main() {
 		trendingClient = cachingClient
 		slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds, "trendingTTLSeconds", cfg.YouTube.TrendingCacheTTLSeconds)
 	}
+	// Movie lookups and Discover's Movies search share one TMDB client.
 	var movieClient portservices.MovieClient = tmdb.UnconfiguredClient{}
+	var movieSearchClient portservices.MovieSearchClient = tmdb.UnconfiguredClient{}
+	var movieTrendingClient portservices.MovieTrendingClient = tmdb.UnconfiguredClient{}
 	if cfg.TMDBReadAccessToken != "" {
-		movieClient = tmdb.NewClient(cfg.TMDBReadAccessToken)
+		tmdbClient := tmdb.NewClient(cfg.TMDBReadAccessToken)
+		movieClient = tmdbClient
+		movieSearchClient = tmdbClient
+		// Trending is cached (1h, per window + page); search stays uncached.
+		movieTrendingClient = tmdb.NewTrendingCache(tmdbClient, tmdb.DefaultTrendingTTL)
 	} else {
 		slog.Warn("TMDB_API_READ_ACCESS_TOKEN is empty — movie lookups will fail")
 	}
@@ -208,7 +215,7 @@ func main() {
 	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
 
 	// Initialize services
-	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient))
+	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient), services.WithMovieSearch(movieSearchClient), services.WithMovieTrending(movieTrendingClient))
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)

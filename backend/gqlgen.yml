@@ -78,6 +78,11 @@ models:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.UserRole
 
+  # Discover enums - bind directly to domain types
+  TrendingWindow:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.TrendingWindow
+
   # Messaging enums - bind directly to domain types
   ThreadRole:
     model:
