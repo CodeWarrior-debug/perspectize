@@ -11,7 +11,7 @@ The Discover page (`/discover`) is YouTube-only today. Add a **Movies** source: 
 ## Decisions
 
 - **Search runs through our backend** (`movieSearch` GraphQL query → TMDB `/search/movie`). The TMDB read token never reaches the browser, same as YouTube trending.
-- **Public query** (no `@auth`), like `youtubeTrending`. Adding still requires sign-in. Abuse is bounded by the existing HTTP rate limiter plus a backend TTL cache keyed by normalized query + page, so repeat searches don't hit TMDB.
+- **Public query** (no `@auth`), like `youtubeTrending`. Adding still requires sign-in. Abuse is bounded by the existing HTTP rate limiter. **Searches are not cached server-side** (user decision); each search goes to TMDB.
 - **Separate port** `MovieSearchClient` (not a new method on `MovieClient`), mirroring `YouTubeTrendingClient`, so existing `MovieClient` mocks stay untouched.
 - **Adult results excluded** (`include_adult=false`).
 - **UI:** a two-option source switch (YouTube | Movies) at the top of Discover, persisted in the URL as `?source=movies`. YouTube stays the default and is unchanged.
@@ -55,11 +55,11 @@ Errors: blank/too-long query (>100 chars after trim) or page outside 1..500 → 
    `MovieSearchClient interface { SearchMovies(ctx, query string, page int) (*MovieSearchPage, error) }`.
 2. `internal/adapters/tmdb/client.go`: `(*Client).SearchMovies` → `GET /search/movie?query=&page=&include_adult=false&language=en-US`, parse `page,total_pages,total_results,results[id,title,release_date,overview,poster_path,vote_average,vote_count]`. Empty `release_date` → nil; `vote_count == 0` → nil score; `url = CanonicalMovieURL(id)` is set by the resolver or kept on the struct. Reuse `c.get` (sanitized errors). Note `c.get` maps 404 to "movie not found"; fine.
 3. `unconfigured.go`: `SearchMovies` → `ErrNotConfigured`. `fixture_client.go`: return one result built from the movie_603 fixture (id 603) for any query — offline demo/round-trip.
-4. `internal/adapters/tmdb/cache.go` (new): `SearchCache` wrapping a `MovieSearchClient` with a TTL (default 1h) and a max entry count (default 1000; on overflow, drop expired then clear). Key = `strings.ToLower(query)|page`. Mutex-guarded, `slog` events like the YouTube trending cache. Errors are not cached.
+4. ~~Search cache~~ — dropped: searches are not cached server-side.
 5. `internal/core/services/content_service.go`: option `WithMovieSearch(client)`, method `SearchMovies(ctx, query string, page int)` doing validation (trim; 1..100 runes; page 0→1; 1..500) then delegating. Nil client → wrapped `tmdb.ErrNotConfigured`-style error (not `ErrInvalidInput`). Add the method to the `ContentService` port interface and every mock implementing it.
 6. `schema.graphql`: add the contract above. Run `make graphql-gen` in `backend/` (beware the known `schema.resolvers.go` collision — keep the resolver in `content.resolvers.go`). Resolver `MovieSearch` mirrors `YoutubeTrending` error handling and maps fields (`url` = `tmdb.CanonicalMovieURL`).
-7. `cmd/server/main.go`: when a token is set, wrap `tmdb.NewClient` in the cache and pass it via `services.WithMovieSearch`; otherwise pass `tmdb.UnconfiguredClient{}`. Demo mode: if the roundtrip harness / demo wiring builds a `FixtureClient`, pass it too.
-8. Tests (testify, table-driven, repo mocks): client (httptest server: params sent, parsing, nil date/score, error sanitizing), cache (hit, miss, case-insensitive key, errors not cached, TTL expiry, overflow), service validation table, resolver (mapping + error passthrough/generic). No DB access → no query-count test needed.
+7. `cmd/server/main.go`: when a token is set, pass `tmdb.NewClient` (no cache wrapper) via `services.WithMovieSearch`; otherwise pass `tmdb.UnconfiguredClient{}`. Demo mode: if the roundtrip harness / demo wiring builds a `FixtureClient`, pass it too.
+8. Tests (testify, table-driven, repo mocks): client (httptest server: params sent, parsing, nil date/score, error sanitizing), service validation table, resolver (mapping + error passthrough/generic). No DB access → no query-count test needed.
 
 ## Task 2 — Frontend (svelte-frontend + vitest)
 
@@ -72,3 +72,8 @@ Errors: blank/too-long query (>100 chars after trim) or page outside 1..500 → 
 ## Verification (orchestrator)
 
 `go build ./...`, `gofmt -l .`, `go test ./...` in `backend/`; `pnpm run test:run`, `pnpm run check`, prettier in `frontend/`; adversarial diff review; `graphify update .`. No browser verification in cloud → PR labelled `needs-demo-video`.
+
+## Task 3 — Trending movies (follow-up, after Tasks 1–2 land)
+
+- Backend: `movieTrending(window: TrendingWindow = WEEK, page: Int): MovieSearchPage!` (`enum TrendingWindow { DAY WEEK }`) → TMDB `GET /trending/movie/{day|week}`. Trending pages ARE cached server-side (TTL ~1h, keyed by window + page), like YouTube Trending; search stays uncached.
+- Frontend: Movies tab shows "Trending movies this week" while the search box is empty (fewer than 2 chars); results switch to search once typing.
