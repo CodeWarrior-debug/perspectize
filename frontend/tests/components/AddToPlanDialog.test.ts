@@ -9,8 +9,8 @@ const mocks = vi.hoisted(() => ({
 	onClose: vi.fn(),
 }));
 
-vi.mock('$lib/components/PerspectiveEditor.svelte', async () => {
-	const mod = await import('../helpers/FakePerspectiveEditor.svelte');
+vi.mock('$lib/components/CommentsEditor.svelte', async () => {
+	const mod = await import('../helpers/FakeCommentsEditor.svelte');
 	return { default: mod.default };
 });
 
@@ -77,7 +77,7 @@ describe('AddToPlanDialog', () => {
 	it('opens the todo dialog in create mode with the content and the consume action', async () => {
 		renderDialog();
 
-		expect(await screen.findByText('New todo')).toBeInTheDocument();
+		expect(await screen.findByRole('heading', { name: 'Add Todo' })).toBeInTheDocument();
 		expect(await screen.findByTestId('todo-content-name')).toHaveTextContent('A great video');
 		expect(document.querySelector('#todo-action')).toHaveValue('Consume');
 	});

@@ -11,8 +11,8 @@ const mocks = vi.hoisted(() => ({
 	toastError: vi.fn(),
 }));
 
-vi.mock('$lib/components/PerspectiveEditor.svelte', async () => {
-	const mod = await import('../helpers/FakePerspectiveEditor.svelte');
+vi.mock('$lib/components/CommentsEditor.svelte', async () => {
+	const mod = await import('../helpers/FakeCommentsEditor.svelte');
 	return { default: mod.default };
 });
 
@@ -38,6 +38,17 @@ vi.mock('$lib/queries/userTodos/useTodoActions', () => ({
 
 vi.mock('$lib/queries/userTodos/useCreateTodoAction', () => ({
 	useCreateTodoAction: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+}));
+
+vi.mock('$lib/queries/content/useContentPicker', () => ({
+	useContentPicker: vi.fn(() => ({
+		data: {
+			content: {
+				items: [{ id: '9', name: 'A great video', contentType: 'YOUTUBE_VIDEO', channelTitle: null }],
+			},
+		},
+		isPending: false,
+	})),
 }));
 
 vi.mock('$lib/utils/toast', () => ({
@@ -147,11 +158,83 @@ describe('TodoDialog', () => {
 		});
 	});
 
-	describe('name-only and content modes', () => {
-		it('asks for a name when the todo has no content, and creates it with that name', async () => {
+	describe('title', () => {
+		it('says Add Todo when creating and Edit todo when editing', () => {
+			const { unmount } = render(TodoDialog, { props: { open: true, lists: LISTS } });
+			expect(screen.getByRole('heading', { name: 'Add Todo' })).toBeInTheDocument();
+			unmount();
+
+			render(TodoDialog, { props: { open: true, lists: LISTS, todo: todo() } });
+			expect(screen.getByRole('heading', { name: 'Edit todo' })).toBeInTheDocument();
+		});
+	});
+
+	describe('layout', () => {
+		it('pins Save and Cancel outside the scrolling body, so they show in the first view on a small phone', () => {
 			render(TodoDialog, { props: { open: true, lists: LISTS } });
-			expect(field('#todo-name')).toBeInTheDocument();
+			const body = screen.getByTestId('todo-form-body');
+			const footer = screen.getByTestId('todo-form-footer');
+
+			expect(body.className).toContain('overflow-y-auto');
+			expect(footer).toContainElement(screen.getByRole('button', { name: 'Save' }));
+			expect(footer).toContainElement(screen.getByRole('button', { name: 'Cancel' }));
+			expect(body).not.toContainElement(screen.getByRole('button', { name: 'Save' }));
+		});
+
+		it('keeps a validation error in the pinned footer, not scrolled out of sight', async () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS } });
+			submit();
+			expect(screen.getByTestId('todo-form-footer')).toContainElement(await screen.findByRole('alert'));
+		});
+	});
+
+	describe('item picker (create mode, no content given)', () => {
+		it('puts the item picker and action before the name, and greys the name out', () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS } });
+			const picker = screen.getByRole('button', { name: 'Not in Perspectize' });
+			const action = field('#todo-action');
+			const name = field('#todo-name');
+
+			expect(picker.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+			expect(action.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+			expect(name).toBeDisabled();
 			expect(document.querySelector('[data-testid="todo-content-name"]')).toBeNull();
+		});
+
+		it('creates a todo for the picked item, showing its title in the greyed name', async () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS } });
+			fireEvent.click(screen.getByRole('option', { name: /A great video/ }));
+
+			expect(await screen.findByTestId('todo-item-picked')).toHaveTextContent('A great video');
+			expect(field('#todo-name')).toBeDisabled();
+			expect(field('#todo-name')).toHaveValue('A great video');
+
+			await pickAction('Consume');
+			submit();
+
+			await waitFor(() => expect(mocks.createMutateAsync).toHaveBeenCalledTimes(1));
+			const input = mocks.createMutateAsync.mock.calls[0][0];
+			expect(input).toMatchObject({ contentId: 9, actionId: 2 });
+			expect(input).not.toHaveProperty('name');
+		});
+
+		it('Change drops the picked item and returns to the search, with an empty name', async () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS } });
+			fireEvent.click(screen.getByRole('option', { name: /A great video/ }));
+			fireEvent.click(await screen.findByRole('button', { name: 'Change' }));
+
+			expect(await screen.findByRole('option', { name: /A great video/ })).toBeInTheDocument();
+			expect(screen.queryByTestId('todo-item-picked')).toBeNull();
+			expect(field('#todo-name')).toHaveValue('');
+			expect(field('#todo-name')).toBeDisabled();
+		});
+
+		it('Not in Perspectize unlocks the name, and the todo is created with that name only', async () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS } });
+			fireEvent.click(screen.getByRole('button', { name: 'Not in Perspectize' }));
+
+			await waitFor(() => expect(field('#todo-name')).toBeEnabled());
+			expect(screen.queryAllByRole('option', { name: /A great video/ })).toHaveLength(0);
 
 			await pickAction('Consume');
 			fireEvent.input(field('#todo-name'), { target: { value: '  Read the paper ' } });
@@ -168,14 +251,93 @@ describe('TodoDialog', () => {
 			expect(mocks.updateMutateAsync).not.toHaveBeenCalled();
 		});
 
-		it('blocks saving a new todo that has neither content nor a name', async () => {
+		it('Search instead goes back to the picker and locks the name again', async () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS } });
+			fireEvent.click(screen.getByRole('button', { name: 'Not in Perspectize' }));
+			fireEvent.click(await screen.findByRole('button', { name: 'Search instead' }));
+
+			expect(await screen.findByRole('option', { name: /A great video/ })).toBeInTheDocument();
+			expect(field('#todo-name')).toBeDisabled();
+		});
+
+		it('blocks saving when no item is picked and the name was never unlocked', async () => {
 			render(TodoDialog, { props: { open: true, lists: LISTS } });
 			await pickAction('Consume');
 			submit();
-			expect(await screen.findByRole('alert')).toHaveTextContent('Name the todo, or link it to content.');
+			expect(await screen.findByRole('alert')).toHaveTextContent(
+				'Pick an item, or choose Not in Perspectize and name it.',
+			);
 			expect(mocks.createMutateAsync).not.toHaveBeenCalled();
 		});
 
+		it('blocks saving a free-text todo whose name is blank', async () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS } });
+			fireEvent.click(screen.getByRole('button', { name: 'Not in Perspectize' }));
+			await pickAction('Consume');
+			submit();
+			expect(await screen.findByRole('alert')).toHaveTextContent(
+				'Pick an item, or choose Not in Perspectize and name it.',
+			);
+			expect(mocks.createMutateAsync).not.toHaveBeenCalled();
+		});
+
+		it('does not show the picker when content was handed in (Add to plan)', () => {
+			render(TodoDialog, {
+				props: { open: true, lists: LISTS, newContent: { id: 9, name: 'A great video' }, defaultActionId: 2 },
+			});
+			expect(screen.queryByRole('button', { name: 'Not in Perspectize' })).toBeNull();
+			expect(field('[data-testid="todo-content-name"]')).toHaveTextContent('A great video');
+			expect(document.querySelector('#todo-name')).toBeNull();
+		});
+
+		it('edits a name-only todo with an editable name and no picker', () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS, todo: todo() } });
+			expect(field('#todo-name')).toBeEnabled();
+			expect(field('#todo-name')).toHaveValue('Read the paper');
+			expect(screen.queryByRole('button', { name: 'Not in Perspectize' })).toBeNull();
+		});
+	});
+
+	describe('comments', () => {
+		it('keeps the editor collapsed behind Add comments on a new todo', () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS } });
+			expect(screen.getByRole('button', { name: 'Add comments' })).toBeInTheDocument();
+			expect(screen.queryByLabelText('Comment')).toBeNull();
+		});
+
+		it('opens a basic-toolbar editor when Add comments is clicked, and sends what was typed', async () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS } });
+			fireEvent.click(screen.getByRole('button', { name: 'Add comments' }));
+
+			const editor = await screen.findByLabelText('Comment');
+			expect(editor).toHaveAttribute('data-toolbar', 'basic');
+			expect(screen.queryByRole('button', { name: 'Add comments' })).toBeNull();
+
+			fireEvent.click(screen.getByRole('button', { name: 'Not in Perspectize' }));
+			await pickAction('Consume');
+			fireEvent.input(field('#todo-name'), { target: { value: 'Read the paper' } });
+			fireEvent.input(editor, { target: { value: '<p>start with chapter 2</p>' } });
+			submit();
+
+			await waitFor(() => expect(mocks.createMutateAsync).toHaveBeenCalledTimes(1));
+			expect(mocks.createMutateAsync).toHaveBeenCalledWith(
+				expect.objectContaining({ comments: '<p>start with chapter 2</p>' }),
+			);
+		});
+
+		it('shows the editor already open when the todo being edited has comments', () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS, todo: todo({ comments: '<p>chapter 2</p>' }) } });
+			expect(screen.getByLabelText('Comment')).toHaveValue('<p>chapter 2</p>');
+			expect(screen.queryByRole('button', { name: 'Add comments' })).toBeNull();
+		});
+
+		it('keeps it collapsed when editing a todo that has none', () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS, todo: todo({ comments: null }) } });
+			expect(screen.getByRole('button', { name: 'Add comments' })).toBeInTheDocument();
+		});
+	});
+
+	describe('content modes', () => {
 		it('shows the content read-only, with no name field, when the todo has content', () => {
 			render(TodoDialog, {
 				props: {

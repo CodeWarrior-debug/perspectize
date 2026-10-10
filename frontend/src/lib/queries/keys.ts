@@ -34,6 +34,10 @@ export const queryKeys = {
 		// from `list` above (adds perspectiveCount, no pagination), keyed by
 		// the debounced search term.
 		comparePicker: (search: string) => [...queryKeys.content.lists(), 'compare-picker', search] as const,
+		// ListContentPicker (plan/ItemPicker.svelte): keyed by the debounced search
+		// and the pressed type chips (ContentType enum values, sorted).
+		itemPicker: (search: string, types: readonly string[]) =>
+			[...queryKeys.content.lists(), 'item-picker', search, types] as const,
 	},
 
 	bible: {

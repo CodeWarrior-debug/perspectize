@@ -31,3 +31,12 @@ export function toastWithAction(message: string, action: ToastActionButton, opts
 		...rest,
 	});
 }
+
+/**
+ * True when an event target is inside a sonner toast. A toast renders outside any
+ * open modal, so a modal's outside-click dismissal must ignore it, or tapping a
+ * toast's action button would also close the dialog that raised the toast.
+ */
+export function isInsideToast(target: EventTarget | null): boolean {
+	return target instanceof Element && target.closest('[data-sonner-toast]') !== null;
+}

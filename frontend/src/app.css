@@ -1101,3 +1101,10 @@
 	cursor: default;
 	text-decoration: none;
 }
+
+/* A modal dialog sets `pointer-events: none` on <body>, and a toast inherits it, so a toast's action
+   button (e.g. "Mark 100% complete too?" raised while a dialog is open) can't be clicked. Re-enable it
+   on the toast only; the dialog ignores clicks inside a toast (see isInsideToast in utils/toast.ts). */
+[data-sonner-toast] {
+	pointer-events: auto;
+}

@@ -1525,7 +1525,7 @@
 </div>
 
 <!-- Perspective create/edit modal — rendered outside the grid for correct portal behavior.
-     Dynamically imported: it's the only path into the Tiptap-based PerspectiveEditor
+     Dynamically imported: it's the only path into the Tiptap-based CommentsEditor
      (~170KB gzipped), which would otherwise load eagerly on every visit to this page
      even for users who never open the editor. -->
 {#if popoverOpen && popoverContentId !== null}

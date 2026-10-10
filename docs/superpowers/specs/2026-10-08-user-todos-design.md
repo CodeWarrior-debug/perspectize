@@ -219,7 +219,7 @@ Mutations (all `@auth`, ownership in service + SQL, no `@owner`): `createUserTod
 - Nav: add `{ href: '/plan', label: 'Plan' }` to `Header.svelte` `navLinks`.
 - AG Grid following `docs/AG_GRID.md` and `ADDING_AG_GRID_COLUMN.md`: column metadata in one module (like `grid-config.ts` `COLUMNS`), responsive tiers decided per column, mobile card fallback.
 - Columns: Content / Name, Action, Priority (rating display via `ratingToDisplay`), Status, % Complete, Start, End, Due, List (name + position), Privacy, Comments (preview), **Add perspective** (button; disabled with a tooltip on name-only rows).
-- Editing: a todo dialog using `RatingInput` for priority, the comments editor used by `PerspectiveEditor.svelte` (extract a shared editor component if it isn't standalone), `SafeHtml.svelte` for display.
+- Editing: a todo dialog using `RatingInput` for priority, the comments editor used by `CommentsEditor.svelte` (extract a shared editor component if it isn't standalone), `SafeHtml.svelte` for display.
 - Action picker: a combobox listing actions in `typical_sequence` order, each item's `description` as its hover tooltip; typing a value that isn't there offers "Add “…”" (calls `createTodoAction`).
 - List switcher: all / one list / unlisted. With one list selected, rows sort by position and drag to reorder (`reorderUserTodoList`).
 - "Add to plan" on Activity rows and in `ActivityDetailsModal`, action defaulting to `consume`.

@@ -20,7 +20,7 @@
 	} from '$lib/components/shadcn';
 	import RatingInput from '$lib/components/RatingInput.svelte';
 	import Thumbs from '$lib/components/Thumbs.svelte';
-	import PerspectiveEditor from '$lib/components/PerspectiveEditor.svelte';
+	import CommentsEditor from '$lib/components/CommentsEditor.svelte';
 	import AddFieldSearch from '$lib/components/AddFieldSearch.svelte';
 	import { sanitizeHtml } from '$lib/utils/sanitize';
 	import { hasReviewContent, reviewPreviewText } from '$lib/utils/reviewContent';
@@ -496,7 +496,7 @@
 			</button>
 		{:else}
 			<div class="flex-1 min-w-0 relative">
-				<PerspectiveEditor
+				<CommentsEditor
 					value={comment}
 					onChange={handleCommentChange}
 					minHeight={68}

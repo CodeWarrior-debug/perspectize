@@ -162,7 +162,7 @@
 - [ ] Nav: add `{ href: '/plan', label: 'Plan' }` to `navLinks`.
 - [ ] `plan-grid-config.ts`: one metadata array for the columns in the spec, with responsive tiers; unit-test it (pattern: `grid-config.test.ts`). Follow `docs/AG_GRID.md` and `ADDING_AG_GRID_COLUMN.md`; keep `hide` and the responsive `$effect` in sync; mobile card fallback.
 - [ ] Priority cell via `ratingToDisplay`; comments preview via `SafeHtml.svelte`; Add perspective cell opens `PerspectivePopover` (lazy import as `ActivityTable.svelte` does), disabled with a tooltip on name-only rows.
-- [ ] `TodoDialog`: `RatingInput` for priority; comments editor reused from `PerspectiveEditor.svelte` (extract a shared component if it isn't standalone); dates; privacy; list.
+- [ ] `TodoDialog`: `RatingInput` for priority; comments editor reused from `CommentsEditor.svelte` (extract a shared component if it isn't standalone); dates; privacy; list.
 - [ ] `ActionPicker`: combobox ordered by `typicalSequence` then label; each item's `description` as a hover tooltip; typed unknown value offers "Add “…”" → `useCreateTodoAction`.
 - [ ] `ListSwitcher`: all / one list / unlisted; with one list, sort by position and drag to reorder → `useReorderUserTodoList`.
 - [ ] Done ↔ 100% prompts via `toastWithAction`; Yes sends the paired field (and `endDate` if empty).

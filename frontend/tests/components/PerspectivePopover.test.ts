@@ -40,8 +40,8 @@ vi.mock('$lib/utils/perspectiveDraft', () => ({
 	clearDraft: mocks.mockClearDraft,
 }));
 
-vi.mock('$lib/components/PerspectiveEditor.svelte', async () => {
-	const mod = await import('../helpers/FakePerspectiveEditor.svelte');
+vi.mock('$lib/components/CommentsEditor.svelte', async () => {
+	const mod = await import('../helpers/FakeCommentsEditor.svelte');
 	return { default: mod.default };
 });
 

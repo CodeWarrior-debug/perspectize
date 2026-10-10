@@ -2,9 +2,10 @@
 	import { toast } from 'svelte-sonner';
 	import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label } from '$lib/components/shadcn';
 	import RatingInput from '$lib/components/RatingInput.svelte';
-	import PerspectiveEditor from '$lib/components/PerspectiveEditor.svelte';
+	import CommentsEditor from '$lib/components/CommentsEditor.svelte';
 	import ActionPicker from '$lib/components/plan/ActionPicker.svelte';
-	import { toastWithAction } from '$lib/utils/toast';
+	import ItemPicker from '$lib/components/plan/ItemPicker.svelte';
+	import { isInsideToast, toastWithAction } from '$lib/utils/toast';
 	import {
 		buildCreateInput,
 		buildUpdateInput,
@@ -23,8 +24,10 @@
 
 	/**
 	 * TodoDialog: create a todo (`todo` null) or edit one. Mounted only while open,
-	 * so the form starts from the props. Content is read-only when the todo has it;
-	 * otherwise a free-text name is entered.
+	 * so the form starts from the props. Content is read-only when the todo has it.
+	 * A new todo with no content handed in picks its item from search (Item, then
+	 * Action); Name stays greyed out until "Not in Perspectize" is chosen. The
+	 * Save/Cancel footer is pinned so it is visible without scrolling on a phone.
 	 */
 	let {
 		open = $bindable(true),
@@ -96,6 +99,44 @@
 
 	const contentName = $derived(todo?.content?.name ?? newContent?.name ?? null);
 	const hasContent = $derived(todo ? todo.content !== null : form.contentId !== null);
+
+	// ---- Item (create mode with no content handed in) ------------------------
+
+	/** Only a brand-new todo with nothing attached gets to pick its item. */
+	const showItemPicker = $derived(!todo && newContent === null);
+	/** The item chosen from search. */
+	let picked = $state<{ id: number; name: string } | null>(null);
+	/** The user said the item isn't in Perspectize, so Name is theirs to type. */
+	let freeText = $state(false);
+	/** Name is locked while an item is (or is yet to be) picked from search. */
+	const nameLocked = $derived(showItemPicker && !freeText);
+	const nameShown = $derived(nameLocked ? (picked?.name ?? '') : form.name);
+
+	function pickItem(item: { id: number; name: string }) {
+		picked = item;
+		form.contentId = item.id;
+		error = null;
+	}
+
+	function clearItem() {
+		picked = null;
+		form.contentId = null;
+	}
+
+	function startFreeText() {
+		freeText = true;
+		clearItem();
+		error = null;
+	}
+
+	function stopFreeText() {
+		freeText = false;
+		form.name = '';
+	}
+
+	// Comments stay collapsed behind a button unless there is already something to show.
+	// svelte-ignore state_referenced_locally
+	let commentsOpen = $state(Boolean(todo?.comments));
 	// The user's pick wins; until then the default (e.g. `consume` from Add to plan) applies.
 	const actionId = $derived(form.actionId ?? defaultActionId);
 
@@ -157,7 +198,9 @@
 			return;
 		}
 		if (!hasContent && form.name.trim() === '') {
-			error = 'Name the todo, or link it to content.';
+			error = showItemPicker
+				? 'Pick an item, or choose Not in Perspectize and name it.'
+				: 'Name the todo, or link it to content.';
 			return;
 		}
 		const values: TodoFormValues = { ...form, actionId };
@@ -179,130 +222,174 @@
 </script>
 
 <Dialog bind:open>
-	<DialogContent class="max-h-[90vh] overflow-y-auto p-0 sm:max-w-[560px]" overlayClass="bg-black/45">
+	<!-- Flex column: header and footer stay put, only the form body scrolls (dvh: the phone browser toolbar eats vh). -->
+	<DialogContent
+		class="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[560px]"
+		overlayClass="bg-black/45"
+		onInteractOutside={(e) => {
+			// The prompt toasts render outside the modal: clicking one must not dismiss this dialog.
+			if (isInsideToast(e.target)) e.preventDefault();
+		}}
+	>
 		<DialogHeader class="px-6 pt-6">
-			<DialogTitle>{todo ? 'Edit todo' : 'New todo'}</DialogTitle>
+			<DialogTitle>{todo ? 'Edit todo' : 'Add Todo'}</DialogTitle>
 		</DialogHeader>
 
-		<form class="flex flex-col gap-4 px-6 pb-6 pt-2" onsubmit={save}>
-			{#if contentName !== null}
-				<div class="flex flex-col gap-1">
-					<span class="text-sm font-medium">Content</span>
-					<p class="text-sm text-muted-foreground" data-testid="todo-content-name">{contentName}</p>
-				</div>
-			{:else}
-				<div class="flex flex-col gap-1">
-					<Label for="todo-name">Name</Label>
-					<Input id="todo-name" type="text" bind:value={form.name} placeholder="What is this about?" />
-				</div>
-			{/if}
+		<form class="flex min-h-0 flex-1 flex-col" onsubmit={save}>
+			<div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-4 pt-2" data-testid="todo-form-body">
+				{#if showItemPicker}
+					<div class="flex flex-col gap-1">
+						<span class="text-sm font-medium">Item</span>
+						{#if picked}
+							<div class="border-border flex items-center justify-between gap-2 rounded-md border px-3 py-2">
+								<p class="min-w-0 truncate text-sm" data-testid="todo-item-picked">{picked.name}</p>
+								<Button type="button" variant="outline" size="sm" onclick={clearItem}>Change</Button>
+							</div>
+						{:else if freeText}
+							<div class="border-border flex items-center justify-between gap-2 rounded-md border px-3 py-2">
+								<p class="text-muted-foreground text-sm">Not in Perspectize</p>
+								<Button type="button" variant="outline" size="sm" onclick={stopFreeText}>Search instead</Button>
+							</div>
+						{:else}
+							<ItemPicker onPick={pickItem} onFreeText={startFreeText} />
+						{/if}
+					</div>
+				{:else if contentName !== null}
+					<div class="flex flex-col gap-1">
+						<span class="text-sm font-medium">Item</span>
+						<p class="text-sm text-muted-foreground" data-testid="todo-content-name">{contentName}</p>
+					</div>
+				{/if}
 
-			<div class="flex flex-col gap-1">
-				<Label for="todo-action">Action</Label>
-				<ActionPicker id="todo-action" value={actionId} onChange={(action) => (form.actionId = Number(action.id))} />
-			</div>
+				<div class="flex flex-col gap-1">
+					<Label for="todo-action">Action</Label>
+					<ActionPicker id="todo-action" value={actionId} onChange={(action) => (form.actionId = Number(action.id))} />
+				</div>
 
-			<RatingInput
-				label="Priority"
-				name="priority"
-				compact
-				bind:value={form.priority}
-				onRemove={() => (form.priority = null)}
-			/>
+				{#if showItemPicker || contentName === null}
+					<div class="flex flex-col gap-1">
+						<Label for="todo-name">Name</Label>
+						<Input
+							id="todo-name"
+							type="text"
+							disabled={nameLocked}
+							value={nameShown}
+							oninput={(e) => (form.name = e.currentTarget.value)}
+							placeholder={nameLocked ? 'Pick an item, or choose Not in Perspectize' : 'What is this about?'}
+						/>
+					</div>
+				{/if}
 
-			<div class="grid grid-cols-2 gap-3">
-				<div class="flex flex-col gap-1">
-					<Label for="todo-status">Status</Label>
-					<select
-						id="todo-status"
-						class="border-input bg-background h-9 rounded-md border px-3 text-sm"
-						value={form.status}
-						onchange={(e) => onStatusChange(e.currentTarget.value as UserTodoStatus)}
-					>
-						{#each STATUS_OPTIONS as opt (opt.value)}
-							<option value={opt.value}>{opt.label}</option>
-						{/each}
-					</select>
-				</div>
-				<div class="flex flex-col gap-1">
-					<Label for="todo-percent">% complete</Label>
-					<Input
-						id="todo-percent"
-						type="number"
-						min={0}
-						max={100}
-						step={1}
-						value={form.percentComplete}
-						oninput={(e) => (form.percentComplete = Number(e.currentTarget.value))}
-						onchange={(e) => onPercentCommit(Number(e.currentTarget.value))}
-					/>
-				</div>
-			</div>
-
-			<div class="grid grid-cols-3 gap-3">
-				<div class="flex flex-col gap-1">
-					<Label for="todo-start">Start</Label>
-					<Input id="todo-start" type="date" bind:value={form.startDate} />
-				</div>
-				<div class="flex flex-col gap-1">
-					<Label for="todo-end">End</Label>
-					<Input id="todo-end" type="date" bind:value={form.endDate} />
-				</div>
-				<div class="flex flex-col gap-1">
-					<Label for="todo-due">Due</Label>
-					<Input id="todo-due" type="date" bind:value={form.dueDate} />
-				</div>
-			</div>
-
-			<div class="grid grid-cols-2 gap-3">
-				<div class="flex flex-col gap-1">
-					<Label for="todo-privacy">Privacy</Label>
-					<select
-						id="todo-privacy"
-						class="border-input bg-background h-9 rounded-md border px-3 text-sm"
-						bind:value={form.privacy}
-					>
-						{#each PRIVACY_OPTIONS as opt (opt.value)}
-							<option value={opt.value}>{opt.label}</option>
-						{/each}
-					</select>
-				</div>
-				<div class="flex flex-col gap-1">
-					<Label for="todo-list">List</Label>
-					<select
-						id="todo-list"
-						class="border-input bg-background h-9 rounded-md border px-3 text-sm"
-						value={form.listId === null ? '' : String(form.listId)}
-						onchange={(e) => {
-							const v = e.currentTarget.value;
-							form.listId = v === '' ? null : Number(v);
-						}}
-					>
-						<option value="">No list</option>
-						{#each lists as list (list.id)}
-							<option value={list.id}>{list.name}</option>
-						{/each}
-					</select>
-				</div>
-			</div>
-
-			<div class="flex flex-col gap-1">
-				<Label>Comments</Label>
-				<PerspectiveEditor
-					value={form.comments}
-					onChange={(html) => (form.comments = html)}
-					minHeight={96}
-					placeholder="Notes on this todo"
+				<RatingInput
+					label="Priority"
+					name="priority"
+					compact
+					bind:value={form.priority}
+					onRemove={() => (form.priority = null)}
 				/>
+
+				<div class="grid grid-cols-2 gap-3">
+					<div class="flex flex-col gap-1">
+						<Label for="todo-status">Status</Label>
+						<select
+							id="todo-status"
+							class="border-input bg-background h-9 rounded-md border px-3 text-sm"
+							value={form.status}
+							onchange={(e) => onStatusChange(e.currentTarget.value as UserTodoStatus)}
+						>
+							{#each STATUS_OPTIONS as opt (opt.value)}
+								<option value={opt.value}>{opt.label}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="flex flex-col gap-1">
+						<Label for="todo-percent">% complete</Label>
+						<Input
+							id="todo-percent"
+							type="number"
+							min={0}
+							max={100}
+							step={1}
+							value={form.percentComplete}
+							oninput={(e) => (form.percentComplete = Number(e.currentTarget.value))}
+							onchange={(e) => onPercentCommit(Number(e.currentTarget.value))}
+						/>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-3 gap-3">
+					<div class="flex flex-col gap-1">
+						<Label for="todo-start">Start</Label>
+						<Input id="todo-start" type="date" bind:value={form.startDate} />
+					</div>
+					<div class="flex flex-col gap-1">
+						<Label for="todo-end">End</Label>
+						<Input id="todo-end" type="date" bind:value={form.endDate} />
+					</div>
+					<div class="flex flex-col gap-1">
+						<Label for="todo-due">Due</Label>
+						<Input id="todo-due" type="date" bind:value={form.dueDate} />
+					</div>
+				</div>
+
+				<div class="grid grid-cols-2 gap-3">
+					<div class="flex flex-col gap-1">
+						<Label for="todo-privacy">Privacy</Label>
+						<select
+							id="todo-privacy"
+							class="border-input bg-background h-9 rounded-md border px-3 text-sm"
+							bind:value={form.privacy}
+						>
+							{#each PRIVACY_OPTIONS as opt (opt.value)}
+								<option value={opt.value}>{opt.label}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="flex flex-col gap-1">
+						<Label for="todo-list">List</Label>
+						<select
+							id="todo-list"
+							class="border-input bg-background h-9 rounded-md border px-3 text-sm"
+							value={form.listId === null ? '' : String(form.listId)}
+							onchange={(e) => {
+								const v = e.currentTarget.value;
+								form.listId = v === '' ? null : Number(v);
+							}}
+						>
+							<option value="">No list</option>
+							{#each lists as list (list.id)}
+								<option value={list.id}>{list.name}</option>
+							{/each}
+						</select>
+					</div>
+				</div>
+
+				{#if commentsOpen}
+					<div class="flex flex-col gap-1">
+						<Label>Comments</Label>
+						<CommentsEditor
+							toolbar="basic"
+							value={form.comments}
+							onChange={(html) => (form.comments = html)}
+							minHeight={96}
+							placeholder="Notes on this todo"
+						/>
+					</div>
+				{:else}
+					<Button type="button" variant="ghost" size="sm" class="self-start" onclick={() => (commentsOpen = true)}>
+						Add comments
+					</Button>
+				{/if}
 			</div>
 
-			{#if error}
-				<p role="alert" class="text-destructive text-sm">{error}</p>
-			{/if}
-
-			<div class="flex justify-end gap-2">
-				<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>
-				<Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+			<div class="border-border flex flex-col gap-2 border-t px-6 py-3" data-testid="todo-form-footer">
+				{#if error}
+					<p role="alert" class="text-destructive text-sm">{error}</p>
+				{/if}
+				<div class="flex justify-end gap-2">
+					<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>
+					<Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+				</div>
 			</div>
 		</form>
 	</DialogContent>

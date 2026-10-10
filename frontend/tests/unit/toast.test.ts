@@ -4,7 +4,7 @@ const { toastFn } = vi.hoisted(() => ({ toastFn: vi.fn((..._args: unknown[]) => 
 
 vi.mock('svelte-sonner', () => ({ toast: toastFn }));
 
-import { ACTION_TOAST_DURATION_MS, toastWithAction } from '$lib/utils/toast';
+import { ACTION_TOAST_DURATION_MS, isInsideToast, toastWithAction } from '$lib/utils/toast';
 
 describe('toastWithAction', () => {
 	beforeEach(() => {
@@ -55,5 +55,29 @@ describe('toastWithAction', () => {
 		toastWithAction('Mark this todo done?', action, { secondary });
 
 		expect(toastFn).toHaveBeenCalledWith('Mark this todo done?', { duration: 4000, action, cancel: secondary });
+	});
+});
+
+describe('isInsideToast', () => {
+	function toastWith(child: Element) {
+		const toast = document.createElement('li');
+		toast.setAttribute('data-sonner-toast', '');
+		toast.append(child);
+		document.body.append(toast);
+		return child;
+	}
+
+	it('is true for the toast itself and anything inside it', () => {
+		const button = toastWith(document.createElement('button'));
+		expect(isInsideToast(button)).toBe(true);
+		expect(isInsideToast(button.parentElement)).toBe(true);
+	});
+
+	it('is false for anything outside a toast, and for a non-element target', () => {
+		const elsewhere = document.createElement('button');
+		document.body.append(elsewhere);
+		expect(isInsideToast(elsewhere)).toBe(false);
+		expect(isInsideToast(null)).toBe(false);
+		expect(isInsideToast(document)).toBe(false);
 	});
 });
