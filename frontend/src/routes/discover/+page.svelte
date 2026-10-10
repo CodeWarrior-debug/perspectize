@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import PageWrapper from '$lib/components/PageWrapper.svelte';
 	import SearchBar from '$lib/components/discover/SearchBar.svelte';
+	import MovieSearchPanel from '$lib/components/discover/MovieSearchPanel.svelte';
 	import VideoResultsGrid from '$lib/components/discover/VideoResultsGrid.svelte';
 	import { Button } from '$lib/components/shadcn';
 	import { graphqlRequest } from '$lib/queries/client';
@@ -13,8 +16,22 @@
 	} from '$lib/queries/content';
 	import { queryKeys } from '$lib/queries/keys';
 	import { useAddVideo } from '$lib/queries/content/useAddVideo';
+	import { useAddMovie } from '$lib/queries/content/useAddMovie';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import { fetchYouTubeTrending, toWatchUrl, youtubeKeys, type VideoItem } from '$lib/services/youtubeApi';
+
+	// Two sources share this page. The choice lives in the URL (?source=movies),
+	// so a reload or a shared link lands on the same tab. YouTube is the default.
+	type Source = 'youtube' | 'movies';
+	const source = $derived<Source>(page.url.searchParams.get('source') === 'movies' ? 'movies' : 'youtube');
+
+	function setSource(next: Source) {
+		if (next === source) return;
+		const url = new URL(page.url);
+		if (next === 'movies') url.searchParams.set('source', 'movies');
+		else url.searchParams.delete('source');
+		goto(`${url.pathname}${url.search}`, { replaceState: true, keepFocus: true, noScroll: true });
+	}
 
 	// The search box hands off to youtube.com (search.list is capped at 100
 	// calls a day per project), so Trending is the page's only in-app feed.
@@ -22,11 +39,32 @@
 	let searchQuery = $state('');
 	let searchInputRef: HTMLInputElement | null = $state(null);
 
+	// Movies source: the panel owns its search; the page owns the input ref
+	// (for Cmd/Ctrl+K), the typed text (for Escape), and the add mutation.
+	let movieQuery = $state('');
+	let movieInputRef: HTMLInputElement | null = $state(null);
+	let pendingMovieUrl = $state<string | null>(null);
+	const addMovie = useAddMovie();
+
+	function handleAddMovie(url: string, { clearOnSuccess = false } = {}) {
+		pendingMovieUrl = url;
+		addMovie.mutate(url, {
+			onSuccess: () => {
+				// A pasted link is cleared once added, like the YouTube search box.
+				if (clearOnSuccess) movieQuery = '';
+			},
+			onSettled: () => {
+				pendingMovieUrl = null;
+			},
+		});
+	}
+
 	const trendingResult = createQuery(() => ({
 		queryKey: youtubeKeys.trending(),
 		queryFn: () => fetchYouTubeTrending(),
 		staleTime: 60 * 60 * 1000,
 		gcTime: 24 * 60 * 60 * 1000,
+		enabled: source === 'youtube',
 	}));
 
 	// Accumulated results (first page from the query + any Load More pages).
@@ -122,17 +160,22 @@
 		});
 	}
 
-	// Keyboard shortcuts: Cmd+K (Mac) / Ctrl+K (Win) focuses the search box from
-	// anywhere on the page; Escape clears it.
+	// Keyboard shortcuts: Cmd+K (Mac) / Ctrl+K (Win) focuses the search box of the
+	// active source from anywhere on the page; Escape clears it.
 	$effect(() => {
 		function handleKeydown(event: KeyboardEvent) {
 			const isModK = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
 			if (isModK) {
 				event.preventDefault();
-				searchInputRef?.focus();
-			} else if (event.key === 'Escape' && searchQuery) {
-				event.preventDefault();
-				searchQuery = '';
+				(source === 'movies' ? movieInputRef : searchInputRef)?.focus();
+			} else if (event.key === 'Escape') {
+				if (source === 'movies' && movieQuery) {
+					event.preventDefault();
+					movieQuery = '';
+				} else if (source === 'youtube' && searchQuery) {
+					event.preventDefault();
+					searchQuery = '';
+				}
 			}
 		}
 		window.addEventListener('keydown', handleKeydown);
@@ -165,35 +208,80 @@
 	<div class="flex flex-col gap-6">
 		<div>
 			<h1 class="text-2xl md:text-3xl font-semibold text-foreground">Discover</h1>
-			<p class="text-sm text-muted-foreground mt-1">Browse what's trending on YouTube and add videos to Perspectize</p>
+			<p class="text-sm text-muted-foreground mt-1">
+				{source === 'movies'
+					? 'Search TMDB for movies and add them to Perspectize'
+					: "Browse what's trending on YouTube and add videos to Perspectize"}
+			</p>
 		</div>
 
-		<SearchBar bind:value={searchQuery} bind:inputRef={searchInputRef} onAddUrl={handleAddUrl} isAdding={isAddingUrl} />
+		<div
+			role="tablist"
+			aria-label="Discover source"
+			class="flex gap-1 p-1 w-fit rounded-md bg-muted/60 border border-border"
+		>
+			<Button
+				role="tab"
+				aria-selected={source === 'youtube'}
+				variant={source === 'youtube' ? 'default' : 'ghost'}
+				size="sm"
+				onclick={() => setSource('youtube')}
+			>
+				YouTube
+			</Button>
+			<Button
+				role="tab"
+				aria-selected={source === 'movies'}
+				variant={source === 'movies' ? 'default' : 'ghost'}
+				size="sm"
+				onclick={() => setSource('movies')}
+			>
+				Movies
+			</Button>
+		</div>
 
-		{#if trendingResult.isError}
-			{@const errorInfo = classifyError(trendingResult.error)}
-			<div class="flex flex-col items-center gap-3 py-12 text-center">
-				<p class="text-sm text-destructive">{errorInfo.message}</p>
-				{#if errorInfo.showRetry}
-					<Button variant="outline" size="sm" onclick={handleRetry}>Retry</Button>
-				{/if}
-			</div>
-		{:else}
-			<VideoResultsGrid
-				items={allResults}
-				{nextPageToken}
-				onLoadMore={handleLoadMore}
+		{#if source === 'movies'}
+			<MovieSearchPanel
+				bind:value={movieQuery}
+				bind:inputRef={movieInputRef}
 				{libraryUrls}
-				label="Trending on YouTube"
-				onAdd={handleAdd}
-				{pendingId}
-				isLoading={trendingResult.isPending}
-				{isLoadingMore}
-				{addedContentByVideoId}
-				userId={currentUserId}
+				pendingUrl={pendingMovieUrl}
+				onAdd={handleAddMovie}
+				onAddUrl={(url) => handleAddMovie(url, { clearOnSuccess: true })}
 			/>
-			{#if loadMoreError}
-				<p class="text-sm text-destructive">{loadMoreError}</p>
+		{:else}
+			<SearchBar
+				bind:value={searchQuery}
+				bind:inputRef={searchInputRef}
+				onAddUrl={handleAddUrl}
+				isAdding={isAddingUrl}
+			/>
+
+			{#if trendingResult.isError}
+				{@const errorInfo = classifyError(trendingResult.error)}
+				<div class="flex flex-col items-center gap-3 py-12 text-center">
+					<p class="text-sm text-destructive">{errorInfo.message}</p>
+					{#if errorInfo.showRetry}
+						<Button variant="outline" size="sm" onclick={handleRetry}>Retry</Button>
+					{/if}
+				</div>
+			{:else}
+				<VideoResultsGrid
+					items={allResults}
+					{nextPageToken}
+					onLoadMore={handleLoadMore}
+					{libraryUrls}
+					label="Trending on YouTube"
+					onAdd={handleAdd}
+					{pendingId}
+					isLoading={trendingResult.isPending}
+					{isLoadingMore}
+					{addedContentByVideoId}
+					userId={currentUserId}
+				/>
+				{#if loadMoreError}
+					<p class="text-sm text-destructive">{loadMoreError}</p>
+				{/if}
 			{/if}
 		{/if}
 	</div>
