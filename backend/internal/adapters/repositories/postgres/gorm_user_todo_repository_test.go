@@ -608,13 +608,17 @@ func TestGormUserTodoRepository_Reorder(t *testing.T) {
 func TestGormUserTodoRepository_ReassignByUser(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("moves every todo of fromUserID in one UPDATE", func(t *testing.T) {
+	t.Run("moves every todo of fromUserID in one UPDATE, closing open rows to dropped", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "user_todos" SET "user_id"=\$1,"updated_at"=\$2 WHERE user_id = \$3`).
+		// Open rows become dropped so they can't collide with the sentinel's open
+		// todos on user_todos_open_content_action_unique.
+		mock.ExpectExec(`UPDATE "user_todos" SET "status"=CASE WHEN status IN \('not_started','in_progress'\) THEN 'dropped' ELSE status END,"user_id"=\$1,"updated_at"=\$2 WHERE user_id = \$3`).
 			WithArgs(3, sqlmock.AnyArg(), 2).
 			WillReturnResult(sqlmock.NewResult(0, 0))
 
+		c := querycount.Attach(t, db)
 		assert.NoError(t, NewGormUserTodoRepository(db).ReassignByUser(ctx, 2, 3))
+		c.AssertExactly(t, 1)
 		assertAllExpectationsMet(t, mock)
 	})
 

@@ -470,3 +470,47 @@ func TestUserTodoIntegration_ReassignByUser(t *testing.T) {
 		assert.True(t, a.IsPreset(), "owner A keeps no custom actions after reassignment: %s", a.Key)
 	}
 }
+
+// TestUserTodoIntegration_ReassignByUserOpenCollision reassigns a user whose open
+// todo has the same content and action as an open todo the sentinel already
+// holds. Without closing the moved open rows, the partial unique index
+// user_todos_open_content_action_unique would reject the UPDATE.
+func TestUserTodoIntegration_ReassignByUserOpenCollision(t *testing.T) {
+	f := newUserTodoFixture(t)
+	ctx := context.Background()
+
+	sentinelOpen, err := f.todos.Create(ctx, &domain.UserTodo{
+		UserID: f.sentinel, ContentID: pInt(f.contentID), ActionID: f.consumeID,
+		Status: domain.UserTodoStatusInProgress, Privacy: domain.PrivacyPublic,
+	})
+	require.NoError(t, err)
+
+	ownerOpen, err := f.todos.Create(ctx, &domain.UserTodo{
+		UserID: f.ownerA, ContentID: pInt(f.contentID), ActionID: f.consumeID,
+		Status: domain.UserTodoStatusNotStarted, Privacy: domain.PrivacyPublic,
+	})
+	require.NoError(t, err)
+
+	ownerDone, err := f.todos.Create(ctx, &domain.UserTodo{
+		UserID: f.ownerA, ContentID: pInt(f.contentID), ActionID: f.consumeID,
+		Status: domain.UserTodoStatusDone, PercentComplete: 100, Privacy: domain.PrivacyPublic,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, f.todos.ReassignByUser(ctx, f.ownerA, f.sentinel), "open collision must not fail the reassign")
+
+	kept, err := f.todos.GetByID(ctx, sentinelOpen.ID)
+	require.NoError(t, err)
+	assert.Equal(t, f.sentinel, kept.UserID)
+	assert.Equal(t, domain.UserTodoStatusInProgress, kept.Status, "the sentinel's own open todo is untouched")
+
+	moved, err := f.todos.GetByID(ctx, ownerOpen.ID)
+	require.NoError(t, err)
+	assert.Equal(t, f.sentinel, moved.UserID)
+	assert.Equal(t, domain.UserTodoStatusDropped, moved.Status, "the moved open todo is closed to dropped")
+
+	finished, err := f.todos.GetByID(ctx, ownerDone.ID)
+	require.NoError(t, err)
+	assert.Equal(t, f.sentinel, finished.UserID)
+	assert.Equal(t, domain.UserTodoStatusDone, finished.Status, "finished rows keep their status")
+}

@@ -320,11 +320,19 @@ func (r *GormUserTodoRepository) Reorder(ctx context.Context, listID int, todoID
 }
 
 // ReassignByUser moves ownership of every todo from fromUserID to toUserID.
+// Open todos (not_started, in_progress) are closed to dropped in the same
+// statement: the partial unique index user_todos_open_content_action_unique
+// allows one open todo per owner, content and action, and the sentinel may
+// already hold one for the same content and action. Dropped rows fall outside
+// that index. Finished (done, dropped) rows keep their status.
 func (r *GormUserTodoRepository) ReassignByUser(ctx context.Context, fromUserID, toUserID int) error {
 	err := r.db.WithContext(ctx).
 		Model(&UserTodoModel{}).
 		Where("user_id = ?", fromUserID).
-		Update("user_id", toUserID).Error
+		Updates(map[string]any{
+			"user_id": toUserID,
+			"status":  gorm.Expr("CASE WHEN status IN ('not_started','in_progress') THEN 'dropped' ELSE status END"),
+		}).Error
 	if err != nil {
 		return fmt.Errorf("failed to reassign user todos: %w", err)
 	}

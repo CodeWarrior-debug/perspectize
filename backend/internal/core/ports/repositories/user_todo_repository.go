@@ -21,17 +21,22 @@ type UserTodoRepository interface {
 	GetByIDs(ctx context.Context, ids []int) ([]*domain.UserTodo, error)
 
 	// Create inserts the todo. Returns domain.ErrAlreadyExists when the owner
-	// already has an open todo for the same content and action, and
-	// domain.ErrNotFound when a referenced user, content, action or list is missing.
+	// already has an open todo for the same content and action,
+	// domain.ErrNotFound when the owning user is missing, and
+	// domain.ErrInvalidInput when a referenced content, action or list is missing
+	// (Postgres FK violation 23503).
 	Create(ctx context.Context, todo *domain.UserTodo) (*domain.UserTodo, error)
 
 	// Update writes the todo ONLY if it belongs to actorUserID; the ownership
-	// predicate is part of the UPDATE statement itself. Returns domain.ErrNotFound
-	// when no row matched.
+	// predicate is part of the UPDATE statement itself. On a zero-row miss it
+	// reads the row's owner: domain.ErrForbidden when the row exists under another
+	// owner, domain.ErrNotFound when no row has that id. Missing content, action
+	// or list returns domain.ErrInvalidInput (23503).
 	Update(ctx context.Context, todo *domain.UserTodo, actorUserID int) (*domain.UserTodo, error)
 
 	// Delete removes the todo with the given id ONLY if it belongs to
-	// actorUserID. Returns domain.ErrNotFound when no row matched.
+	// actorUserID. On a zero-row miss: domain.ErrForbidden when the row exists
+	// under another owner, domain.ErrNotFound when no row has that id.
 	Delete(ctx context.Context, id int, actorUserID int) error
 
 	// NextListPosition returns max(list_position)+1 for the list, or 1 when the
@@ -68,15 +73,21 @@ type UserTodoListRepository interface {
 	GetByIDs(ctx context.Context, ids []int) ([]*domain.UserTodoList, error)
 
 	// Create inserts the list. Returns domain.ErrAlreadyExists when the owner
-	// already has a list with the same name.
+	// already has a list with the same name, and domain.ErrNotFound when the
+	// owning user is missing.
 	Create(ctx context.Context, list *domain.UserTodoList) (*domain.UserTodoList, error)
 
-	// Update writes the list ONLY if it belongs to actorUserID. Returns
-	// domain.ErrNotFound when no row matched.
+	// Update writes the list ONLY if it belongs to actorUserID. On a zero-row
+	// miss: domain.ErrForbidden when the row exists under another owner,
+	// domain.ErrNotFound when no row has that id. A name clash returns
+	// domain.ErrAlreadyExists.
 	Update(ctx context.Context, list *domain.UserTodoList, actorUserID int) (*domain.UserTodoList, error)
 
 	// Delete removes the list with the given id ONLY if it belongs to
-	// actorUserID. Returns domain.ErrNotFound when no row matched.
+	// actorUserID. Returns domain.ErrInvalidInput while todos still reference
+	// the list (the service unlists them first). On a zero-row miss:
+	// domain.ErrForbidden when the row exists under another owner,
+	// domain.ErrNotFound when no row has that id.
 	Delete(ctx context.Context, id int, actorUserID int) error
 
 	// ReassignByUser moves ownership of every list from fromUserID to toUserID.
