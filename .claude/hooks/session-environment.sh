@@ -24,4 +24,11 @@ if [ "$(git config --get core.hooksPath || true)" != ".hooks" ]; then
   CONTEXT="$CONTEXT core.hooksPath is not .hooks in this checkout: gofmt/prettier will not auto-fix on commit."
 fi
 
+# graphify: the CLI and the (untracked) graphify-out/ graph live on the owner's machine.
+if ! command -v graphify >/dev/null 2>&1; then
+  CONTEXT="$CONTEXT graphify CLI is not installed: skip graphify query/update and use Grep/Glob or an Explore agent for codebase questions."
+elif [ ! -f "$REPO_ROOT/graphify-out/graph.json" ]; then
+  CONTEXT="$CONTEXT graphify is installed but graphify-out/graph.json does not exist: answer codebase questions with Grep/Glob, not graphify query."
+fi
+
 jq -n --arg ctx "$CONTEXT" '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $ctx}}'

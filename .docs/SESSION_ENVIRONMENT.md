@@ -12,6 +12,7 @@ Several repo rules depend on where the session runs. The `session-environment.sh
 | Starting state | Often a **detached HEAD**: create a branch before committing. | Normal branch checkout. |
 | Git pre-commit hook | `core.hooksPath` unset: run `make install-hooks` in `backend/` once, or check `gofmt -l .` / `pnpm exec prettier --check` by hand. | Usually installed already. |
 | Browser verification | Not possible (needs the gitignored `.claude/.env` and `.claude/sv-profile/`; never attempt the Clerk sign-in). Label user-visible PRs `needs-demo-video`. | Available. |
+| graphify | CLI not installed and `graphify-out/` is untracked, so it doesn't exist. Skip `graphify query` / `update .`; use Grep/Glob or an Explore agent. | Available once installed and a graph has been built. |
 | Remaining local-only work | Label the PR `needs-local-session-takeover` and list the steps. | Remove that label once done. |
 | Migrations | Written and reviewed only, never applied, in both environments (`DATABASE_URL` is the shared Neon database). | Same. |
 
