@@ -80,6 +80,12 @@
 
 	// ---- Sorting and reordering ---------------------------------------------
 
+	/** The grid is rebuilt when list mode flips (see PlanTable), which clears its header sort; drop ours too. */
+	function selectFilter(next: ListSelection) {
+		if ((next.kind === 'list') !== (selection.kind === 'list')) userSort = null;
+		selection = next;
+	}
+
 	function handleReorder(ids: number[]) {
 		if (selection.kind !== 'list') return;
 		const current = rows.map((r) => Number(r.id));
@@ -96,10 +102,10 @@
 <section class="flex flex-col gap-4">
 	<div class="flex flex-wrap items-center justify-between gap-3">
 		<h1 class="text-2xl font-semibold tracking-tight">Plan</h1>
-		<Button type="button" onclick={openCreate}>New todo</Button>
+		<Button type="button" onclick={openCreate}>Add Todo</Button>
 	</div>
 
-	<ListSwitcher {lists} {selection} {userId} onSelect={(next) => (selection = next)} />
+	<ListSwitcher {lists} {selection} {userId} onSelect={selectFilter} />
 
 	{#if todosQuery.isPending}
 		<p class="text-muted-foreground py-12 text-center">Loading your plan…</p>

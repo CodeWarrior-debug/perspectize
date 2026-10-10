@@ -188,7 +188,8 @@ export function buildPlanColumnDefs(listMode: boolean, tier: ResponsiveTier = 'l
 		return {
 			colId,
 			headerName: meta.label,
-			sortable: meta.sortable,
+			// In list mode the order is the list position (and what drag-reorder writes), so no header sorts.
+			sortable: meta.sortable && !listMode,
 			hide: !shown.has(colId),
 			...sizing(colId),
 		};

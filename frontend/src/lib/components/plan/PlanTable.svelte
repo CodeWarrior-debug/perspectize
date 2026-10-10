@@ -64,10 +64,8 @@
 			rowDragManaged: true,
 			animateRows: false,
 			overlayNoRowsTemplate:
-				'<div class="py-12 text-center text-muted-foreground">No todos here yet. Use New todo to start a plan.</div>',
+				'<div class="py-12 text-center text-muted-foreground">No todos here yet. Use Add Todo to start a plan.</div>',
 			onGridReady: (params) => {
-				// In list mode the order is the list position, so any header sort starts cleared.
-				if (inListMode) params.api.applyColumnState({ defaultState: { sort: null } });
 				gridApi = params.api;
 				gridReady = true;
 			},
@@ -151,15 +149,22 @@
 	// since a remounted grid starts from the column defs' own hide flags.
 	$effect(() => {
 		const shown = new Set(planColumnsForTier(tier));
-		if (!gridApi || !gridReady) return;
-		gridApi.setColumnsVisible(
-			PLAN_COL_IDS.filter((id) => shown.has(id)),
-			true,
-		);
-		gridApi.setColumnsVisible(
-			PLAN_COL_IDS.filter((id) => !shown.has(id)),
-			false,
-		);
+		const api = gridApi;
+		if (!api || !gridReady) return;
+		// A frame later, as ActivityTable does: called straight from gridReady the column API
+		// throws ("setColumnMovingCss" of undefined) because the body controller isn't up yet.
+		const frame = requestAnimationFrame(() => {
+			if (api.isDestroyed()) return;
+			api.setColumnsVisible(
+				PLAN_COL_IDS.filter((id) => shown.has(id)),
+				true,
+			);
+			api.setColumnsVisible(
+				PLAN_COL_IDS.filter((id) => !shown.has(id)),
+				false,
+			);
+		});
+		return () => cancelAnimationFrame(frame);
 	});
 </script>
 
@@ -188,7 +193,7 @@
 				</button>
 			</li>
 		{:else}
-			<li class="text-muted-foreground py-12 text-center">No todos here yet. Use New todo to start a plan.</li>
+			<li class="text-muted-foreground py-12 text-center">No todos here yet. Use Add Todo to start a plan.</li>
 		{/each}
 	</ul>
 {:else}

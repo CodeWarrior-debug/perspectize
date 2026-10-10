@@ -173,6 +173,18 @@ describe('buildPlanColumnDefs', () => {
 		expect(rowDrag(true)).toBe(true);
 	});
 
+	it('makes no header sortable in list mode: the order is the list position, and a sort would hide it and block dragging', () => {
+		expect(buildPlanColumnDefs(true).filter((d) => d.sortable)).toEqual([]);
+	});
+
+	it('outside list mode, makes exactly the server-sortable headers sortable', () => {
+		const sortable = buildPlanColumnDefs(false)
+			.filter((d) => d.sortable)
+			.map((d) => d.colId);
+		expect(sortable).toEqual(PLAN_COLUMNS.filter((c) => c.sortable).map((c) => c.colId));
+		expect(sortable.length).toBeGreaterThan(0);
+	});
+
 	it('shows the Add perspective value only for rows with content', () => {
 		const add = buildPlanColumnDefs(false).find((d) => d.colId === 'addPerspective');
 		const getter = add?.valueGetter as unknown as (p: { data: UserTodoItem }) => string;
