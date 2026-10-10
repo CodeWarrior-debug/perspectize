@@ -509,7 +509,7 @@ func TestCreateUserTodo_ListAssignment(t *testing.T) {
 		{"own list appends at next position", ownedList(todoActor, domain.PrivacyPublic), nil, nil, 4},
 		{"own private list also works", ownedList(todoActor, domain.PrivacyPrivate), nil, nil, 4},
 		{"another user's public list is forbidden", ownedList(todoOther, domain.PrivacyPublic), nil, domain.ErrForbidden, 0},
-		{"another user's private list is forbidden", ownedList(todoOther, domain.PrivacyPrivate), nil, domain.ErrForbidden, 0},
+		{"another user's private list is not found", ownedList(todoOther, domain.PrivacyPrivate), nil, domain.ErrNotFound, 0},
 		{"missing list is not found", nil, domain.ErrNotFound, domain.ErrNotFound, 0},
 	}
 	for _, tc := range cases {

@@ -576,15 +576,16 @@ func (s *UserTodoService) requireUsableAction(ctx context.Context, actorUserID, 
 }
 
 // placeInList assigns todo to listID and appends it at the end of that list.
-// The actor must own the list. A list that belongs to someone else is
-// ErrForbidden; a missing list is ErrNotFound.
+// The actor must own the list. Someone else's PUBLIC list is ErrForbidden and
+// their PRIVATE one is ErrNotFound, so a private list id isn't confirmed to
+// exist; a missing list is ErrNotFound.
 func (s *UserTodoService) placeInList(ctx context.Context, actorUserID int, todo *domain.UserTodo, listID int) error {
 	list, err := s.lists.GetByID(ctx, listID)
 	if err != nil {
 		return fmt.Errorf("failed to get user todo list: %w", err)
 	}
 	if list.UserID != actorUserID {
-		return fmt.Errorf("%w: you can only add todos to your own lists", domain.ErrForbidden)
+		return notOwnedUserTodoError(list.Privacy)
 	}
 	position, err := s.todos.NextListPosition(ctx, listID)
 	if err != nil {
