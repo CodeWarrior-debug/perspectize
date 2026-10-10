@@ -367,3 +367,132 @@ func perspectiveDomainToModel(p *domain.Perspective) *PerspectiveModel {
 
 	return m
 }
+
+// todoActionModelToDomain converts a GORM TodoActionModel to domain.TodoAction
+func todoActionModelToDomain(m *TodoActionModel) *domain.TodoAction {
+	if m == nil {
+		return nil
+	}
+	return &domain.TodoAction{
+		ID:              m.ID,
+		Key:             m.Key,
+		Label:           m.Label,
+		Description:     m.Description,
+		TypicalSequence: m.TypicalSequence,
+		UserID:          m.UserID,
+		CreatedAt:       m.CreatedAt,
+		UpdatedAt:       m.UpdatedAt,
+	}
+}
+
+// todoActionDomainToModel converts a domain.TodoAction to GORM TodoActionModel
+func todoActionDomainToModel(a *domain.TodoAction) *TodoActionModel {
+	if a == nil {
+		return nil
+	}
+	return &TodoActionModel{
+		ID:              a.ID,
+		Key:             a.Key,
+		Label:           a.Label,
+		Description:     a.Description,
+		TypicalSequence: a.TypicalSequence,
+		UserID:          a.UserID,
+		// CreatedAt and UpdatedAt are managed by GORM
+	}
+}
+
+// userTodoListModelToDomain converts a GORM UserTodoListModel to domain.UserTodoList
+func userTodoListModelToDomain(m *UserTodoListModel) *domain.UserTodoList {
+	if m == nil {
+		return nil
+	}
+	return &domain.UserTodoList{
+		ID:          m.ID,
+		UserID:      m.UserID,
+		Name:        m.Name,
+		Description: m.Description,
+		Privacy:     privacyFromDBValue(m.Privacy),
+		CreatedAt:   m.CreatedAt,
+		UpdatedAt:   m.UpdatedAt,
+	}
+}
+
+// userTodoListDomainToModel converts a domain.UserTodoList to GORM UserTodoListModel.
+// An empty privacy is written as public, the column default.
+func userTodoListDomainToModel(l *domain.UserTodoList) *UserTodoListModel {
+	if l == nil {
+		return nil
+	}
+	privacy := l.Privacy
+	if privacy == "" {
+		privacy = domain.PrivacyPublic
+	}
+	return &UserTodoListModel{
+		ID:          l.ID,
+		UserID:      l.UserID,
+		Name:        l.Name,
+		Description: l.Description,
+		Privacy:     privacyToDBValue(privacy),
+		// CreatedAt and UpdatedAt are managed by GORM
+	}
+}
+
+// userTodoModelToDomain converts a GORM UserTodoModel to domain.UserTodo
+func userTodoModelToDomain(m *UserTodoModel) *domain.UserTodo {
+	if m == nil {
+		return nil
+	}
+	return &domain.UserTodo{
+		ID:              m.ID,
+		UserID:          m.UserID,
+		ContentID:       m.ContentID,
+		Name:            m.Name,
+		ActionID:        m.ActionID,
+		Priority:        m.Priority,
+		Status:          userTodoStatusFromDBValue(m.Status),
+		PercentComplete: m.PercentComplete,
+		StartDate:       m.StartDate,
+		EndDate:         m.EndDate,
+		DueDate:         m.DueDate,
+		Comments:        m.Comments,
+		Privacy:         privacyFromDBValue(m.Privacy),
+		ListID:          m.ListID,
+		ListPosition:    m.ListPosition,
+		CreatedAt:       m.CreatedAt,
+		UpdatedAt:       m.UpdatedAt,
+	}
+}
+
+// userTodoDomainToModel converts a domain.UserTodo to GORM UserTodoModel. Empty
+// status and privacy are written as the column defaults (not_started, public).
+func userTodoDomainToModel(t *domain.UserTodo) *UserTodoModel {
+	if t == nil {
+		return nil
+	}
+	status := t.Status
+	if status == "" {
+		status = domain.UserTodoStatusNotStarted
+	}
+	privacy := t.Privacy
+	if privacy == "" {
+		privacy = domain.PrivacyPublic
+	}
+	return &UserTodoModel{
+		ID:              t.ID,
+		UserID:          t.UserID,
+		ContentID:       t.ContentID,
+		Name:            t.Name,
+		ActionID:        t.ActionID,
+		Priority:        t.Priority,
+		Status:          userTodoStatusToDBValue(status),
+		PercentComplete: t.PercentComplete,
+		StartDate:       t.StartDate,
+		EndDate:         t.EndDate,
+		DueDate:         t.DueDate,
+		Comments:        t.Comments,
+		Privacy:         privacyToDBValue(privacy),
+		ListID:          t.ListID,
+		ListPosition:    t.ListPosition,
+		// CreatedAt and UpdatedAt are managed by GORM
+	}
+}

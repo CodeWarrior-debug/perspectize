@@ -157,3 +157,58 @@ type MessageModel struct {
 }
 
 func (MessageModel) TableName() string { return "messages" }
+
+// TodoActionModel is the GORM persistence model for todo_actions. UserID nil is
+// a global preset; a set UserID is an action the user entered.
+type TodoActionModel struct {
+	ID              int       `gorm:"primaryKey;autoIncrement"`
+	Key             string    `gorm:"column:key;not null"`
+	Label           string    `gorm:"column:label;not null"`
+	Description     string    `gorm:"column:description;not null"`
+	TypicalSequence *int      `gorm:"column:typical_sequence"`
+	UserID          *int      `gorm:"column:user_id"`
+	CreatedAt       time.Time `gorm:"autoCreateTime"`
+	UpdatedAt       time.Time `gorm:"autoUpdateTime"`
+}
+
+// TableName returns the table name for TodoActionModel
+func (TodoActionModel) TableName() string { return "todo_actions" }
+
+// UserTodoListModel is the GORM persistence model for user_todo_lists.
+type UserTodoListModel struct {
+	ID          int       `gorm:"primaryKey;autoIncrement"`
+	UserID      int       `gorm:"column:user_id;not null"`
+	Name        string    `gorm:"column:name;not null"`
+	Description *string   `gorm:"column:description"`
+	Privacy     string    `gorm:"column:privacy;not null"`
+	CreatedAt   time.Time `gorm:"autoCreateTime"`
+	UpdatedAt   time.Time `gorm:"autoUpdateTime"`
+}
+
+// TableName returns the table name for UserTodoListModel
+func (UserTodoListModel) TableName() string { return "user_todo_lists" }
+
+// UserTodoModel is the GORM persistence model for user_todos. Dates are
+// date-only columns, so they are typed `date` and carried as *time.Time.
+type UserTodoModel struct {
+	ID              int        `gorm:"primaryKey;autoIncrement"`
+	UserID          int        `gorm:"column:user_id;not null"`
+	ContentID       *int       `gorm:"column:content_id"`
+	Name            *string    `gorm:"column:name"`
+	ActionID        int        `gorm:"column:action_id;not null"`
+	Priority        *int       `gorm:"column:priority"`
+	Status          string     `gorm:"column:status;not null"`
+	PercentComplete int        `gorm:"column:percent_complete;not null"`
+	StartDate       *time.Time `gorm:"column:start_date;type:date"`
+	EndDate         *time.Time `gorm:"column:end_date;type:date"`
+	DueDate         *time.Time `gorm:"column:due_date;type:date"`
+	Comments        *string    `gorm:"column:comments"`
+	Privacy         string     `gorm:"column:privacy;not null"`
+	ListID          *int       `gorm:"column:list_id"`
+	ListPosition    *int       `gorm:"column:list_position"`
+	CreatedAt       time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt       time.Time  `gorm:"autoUpdateTime"`
+}
+
+// TableName returns the table name for UserTodoModel
+func (UserTodoModel) TableName() string { return "user_todos" }
