@@ -109,6 +109,8 @@ The failure is confined to that last step: `generated.go` and `models_gen.go` ar
 
 **Adding a query/mutation arg regenerates the resolver signature, positionally.** After `make graphql-gen`, the new arg lands wherever it sits in the schema's arg list — not appended at the end of the Go signature. Read the stub in the stray `schema.resolvers.go` (see above) to get the exact updated signature, then copy it verbatim into the real per-domain resolver file; don't hand-guess the param order.
 
+**`make graphql-gen` after a Go upgrade:** `export data version N is greater than maximum supported version` means `golang.org/x/tools` in go.mod is too old for the toolchain's export data. Bump it (`go get golang.org/x/tools@<newer>`, then `go mod tidy`; Go 1.27 needs ≥ v0.51.0) and confirm regeneration leaves `generated.go` unchanged.
+
 **Schema shape conventions:** timestamps and dates are `String` (ISO; there is no Date scalar). Lists return `Paginated<X> { items, pageInfo, totalCount }` and take `first`/`after`/`last`/`before`/`sortBy`/`sortOrder`/`includeTotalCount`/`filter` (see `perspectives`). Owner-only writes are `create<X>(input)` / `update<X>(input)` with `@auth` and `delete<X>(id: ID!): Boolean! @auth`, with ownership enforced in the service and the SQL (see Gotchas).
 
 ## Testing
