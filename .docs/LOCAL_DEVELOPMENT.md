@@ -42,7 +42,8 @@ go mod download
 # 5. Install shared git hooks (auto-formats staged Go/Svelte/TS on commit)
 make install-hooks
 
-# 6. Run migrations
+# 6. Run migrations (a local/demo database only. With a Neon DATABASE_URL this hits the
+#    shared database: see .docs/MIGRATION_ROLLOUT.md)
 make migrate-up
 
 # 7. Start the server
@@ -123,6 +124,8 @@ LOG_FORMAT=text  # text or json
 ```
 
 ### 3. Database Migrations
+
+> `make migrate-*` runs against whatever `DATABASE_URL` your backend env file points at, which is normally the **shared Neon database**. Use these targets only against a local or demo database. Rolling out to Neon is a manual, one-migration-at-a-time procedure: [MIGRATION_ROLLOUT.md](MIGRATION_ROLLOUT.md).
 
 ```bash
 # Apply all migrations

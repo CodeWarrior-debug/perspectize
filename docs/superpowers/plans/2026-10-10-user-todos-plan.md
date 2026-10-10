@@ -42,7 +42,7 @@
 
 | File | Responsibility |
 |---|---|
-| `backend/migrations/000030_add_user_todos.{up,down}.sql` | 3 tables, presets seed, CHECKs, FKs, indexes (number provisional) |
+| `backend/migrations/000031_add_user_todos.{up,down}.sql` | 3 tables, presets seed, CHECKs, FKs, indexes (number provisional) |
 | `backend/internal/core/domain/user_todo.go` | `UserTodo`, `UserTodoList`, `TodoAction`, `UserTodoStatus`, inputs, list params |
 | `backend/internal/core/domain/errors.go` | `ErrInvalidPercent` |
 | `backend/internal/core/ports/repositories/user_todo_repository.go` | `UserTodoRepository`, `UserTodoListRepository` |
@@ -69,7 +69,7 @@
 
 ### Task 1: Migration
 
-**Files:** create `backend/migrations/000030_add_user_todos.up.sql`, `000030_add_user_todos.down.sql`.
+**Files:** create `backend/migrations/000031_add_user_todos.up.sql`, `000031_add_user_todos.down.sql`.
 
 - [ ] Confirm the next free number: `ls backend/migrations` (last is `000029_add_hot_query_indexes` as of 2026-10-10). Numbers stay provisional until merge.
 - [ ] `todo_actions`: columns per spec; `user_id` FK `users(id)` `ON DELETE RESTRICT`; `UNIQUE NULLS NOT DISTINCT (user_id, key)`; `updated_at` trigger (`update_updated_at`, as in `000004`).
@@ -162,7 +162,7 @@
 - [ ] Nav: add `{ href: '/plan', label: 'Plan' }` to `navLinks`.
 - [ ] `plan-grid-config.ts`: one metadata array for the columns in the spec, with responsive tiers; unit-test it (pattern: `grid-config.test.ts`). Follow `docs/AG_GRID.md` and `ADDING_AG_GRID_COLUMN.md`; keep `hide` and the responsive `$effect` in sync; mobile card fallback.
 - [ ] Priority cell via `ratingToDisplay`; comments preview via `SafeHtml.svelte`; Add perspective cell opens `PerspectivePopover` (lazy import as `ActivityTable.svelte` does), disabled with a tooltip on name-only rows.
-- [ ] `TodoDialog`: `RatingInput` for priority; comments editor reused from `PerspectiveEditor.svelte` (extract a shared component if it isn't standalone); dates; privacy; list.
+- [ ] `TodoDialog`: `RatingInput` for priority; comments editor reused from `CommentsEditor.svelte` (extract a shared component if it isn't standalone); dates; privacy; list.
 - [ ] `ActionPicker`: combobox ordered by `typicalSequence` then label; each item's `description` as a hover tooltip; typed unknown value offers "Add “…”" → `useCreateTodoAction`.
 - [ ] `ListSwitcher`: all / one list / unlisted; with one list, sort by position and drag to reorder → `useReorderUserTodoList`.
 - [ ] Done ↔ 100% prompts via `toastWithAction`; Yes sends the paired field (and `endDate` if empty).

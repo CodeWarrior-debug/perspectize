@@ -44,14 +44,14 @@ A user can record what they think about content (a perspective) but not what the
 | Cursor pagination, `Paginated<X> { items, pageInfo, totalCount }` | `schema.graphql` `perspectives(...)`; `gorm-cursor-paginator` (check both `err` and `pageResult.Error`) | `userTodos(...)` |
 | HTML sanitized server-side and client-side | `services/sanitize.go` (`sanitizeReview`, bluemonday) and `lib/utils/sanitize.ts` (DOMPurify); render via `SafeHtml.svelte` | `comments` |
 | FK delete behavior by kind: ownership and content FKs block, optional pointers `SET NULL`, aggregate children `CASCADE`; user deletes reassign to the `[deleted]` sentinel | migrations `000004`, `000006`, `000013`, `000015`, `000020`; `UserService.Delete`; FK-violation mapping in `gorm_perspective_repository.go` | every FK here blocks; see **Foreign keys** |
-| Migrations written, never applied in dev; idempotent DDL; provisional numbers | root + `backend/CLAUDE.md` → Migrations | next free number today is `000030` |
+| Migrations written, never applied in dev; idempotent DDL; provisional numbers | root + `backend/CLAUDE.md` → Migrations | numbered `000031` (main took `000030` meanwhile) |
 | Frontend: one query folder per domain, keys from `queryKeys`, cache wiring inside the hook, mutations evict exactly what changed | `frontend/CLAUDE.md` → Deep Modules, Query caching | `lib/queries/userTodos/` |
 | One-word verb nav labels | `Header.svelte` `navLinks` (Activity, Discover, Compare) | **Plan** at `/plan` |
 | AG Grid column metadata in one place | `lib/utils/grid-config.ts` `COLUMNS` | plan grid gets its own `COLUMNS`-style metadata module |
 
 ## Data model
 
-Migration `000030_add_user_todos` (number provisional, finalized before merge). Lowercase stored enums with `CHECK`s; `updated_at` via the existing `update_updated_at` trigger on each table.
+Migration `000031_add_user_todos` (number provisional, finalized before merge). Lowercase stored enums with `CHECK`s; `updated_at` via the existing `update_updated_at` trigger on each table.
 
 ### `todo_actions` (lookup, cached)
 
@@ -219,7 +219,7 @@ Mutations (all `@auth`, ownership in service + SQL, no `@owner`): `createUserTod
 - Nav: add `{ href: '/plan', label: 'Plan' }` to `Header.svelte` `navLinks`.
 - AG Grid following `docs/AG_GRID.md` and `ADDING_AG_GRID_COLUMN.md`: column metadata in one module (like `grid-config.ts` `COLUMNS`), responsive tiers decided per column, mobile card fallback.
 - Columns: Content / Name, Action, Priority (rating display via `ratingToDisplay`), Status, % Complete, Start, End, Due, List (name + position), Privacy, Comments (preview), **Add perspective** (button; disabled with a tooltip on name-only rows).
-- Editing: a todo dialog using `RatingInput` for priority, the comments editor used by `PerspectiveEditor.svelte` (extract a shared editor component if it isn't standalone), `SafeHtml.svelte` for display.
+- Editing: a todo dialog using `RatingInput` for priority, the comments editor used by `CommentsEditor.svelte` (extract a shared editor component if it isn't standalone), `SafeHtml.svelte` for display.
 - Action picker: a combobox listing actions in `typical_sequence` order, each item's `description` as its hover tooltip; typing a value that isn't there offers "Add “…”" (calls `createTodoAction`).
 - List switcher: all / one list / unlisted. With one list selected, rows sort by position and drag to reorder (`reorderUserTodoList`).
 - "Add to plan" on Activity rows and in `ActivityDetailsModal`, action defaulting to `consume`.

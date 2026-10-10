@@ -38,7 +38,7 @@ For routine isolated work (branch inspection, PR analysis, one-off experiments â
 
 ## Worktrees on an existing branch: use the script
 
-`.worktreeinclude` (repo root) lists gitignored files that a fresh worktree needs: `.env` files with `DATABASE_URL`, and machine-local Claude settings. Claude Code copies them **only** into worktrees it creates itself (`EnterWorktree`, `--worktree`, agent `isolation: worktree`). Those always start a **new** branch.
+`.worktreeinclude` (repo root) lists gitignored files that a fresh worktree needs: `.env` files with `DATABASE_URL`, and machine-local Claude settings. Claude Code copies them **only** into worktrees it creates itself (`EnterWorktree`, `--worktree`, agent `isolation: worktree`). Those always start a **new** branch, created from `main`, not from the session's current branch. A subagent working on a feature branch must first `git merge --ff-only <feature-branch>` in its worktree, and the lead cherry-picks the subagent's commits back onto the feature branch.
 
 To put a worktree on an **existing** branch (e.g. a long-running integration branch), use the script instead of raw `git worktree add`, which skips the copy and leaves a checkout with no env files:
 

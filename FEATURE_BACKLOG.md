@@ -624,3 +624,14 @@ Nothing in the backend currently limits how many perspectives a user can have on
 **Spec:** [docs/superpowers/specs/2026-09-29-multiple-perspectives-per-content-design.md](docs/superpowers/specs/2026-09-29-multiple-perspectives-per-content-design.md)
 
 **Priority:** Optional / unscheduled.
+
+## Subtasks on Plans, and Sharing Task Lists
+
+Two related extensions to the Plan page (user todos, PR #576). Both are exploration, not commitments.
+
+- **Subtasks:** let a Todo have child Todos (a plan inside a plan). Open questions: one level or nested; does the parent's percent complete roll up from its children; how drag-reorder and list position work inside a parent; whether a child can live in a different list; what the card list and the grid show (indent, expand/collapse, count badge).
+- **Sharing task lists generally:** let a user share a Todo list, not just their own view of it. Open questions: read-only vs collaborative editing; who sees what when Todos link to items that have private perspectives; per-list vs per-Todo privacy (Todos already carry a privacy setting); how this relates to the sharing model gating [Multiple Perspectives per Content](#multiple-perspectives-per-content-public--private-slots).
+
+**Depends on:** the sharing model being finalised, and the shared BaseTable work in #577 so a shared or nested list does not become a third copy of the grid.
+
+**Priority:** Optional / unscheduled.

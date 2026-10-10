@@ -15,6 +15,7 @@
 	} from '$lib/utils/formatting';
 	import { passageIconLabels } from '$lib/utils/bible';
 	import BiblePassageIcon from '$lib/components/BiblePassageIcon.svelte';
+	import AddToPlanButton from '$lib/components/plan/AddToPlanButton.svelte';
 
 	interface CardRow {
 		id: string | number;
@@ -46,9 +47,12 @@
 		onOpenDetails,
 		onAddPerspective = () => {},
 		perspectiveContentIds = new Set<string>(),
+		onAddToPlan,
 	}: {
 		rowData: CardRow[];
 		onOpenDetails: (contentId: string) => void;
+		/** Shows an "Add to plan" action per card (signed-in users only) when provided. */
+		onAddToPlan?: (contentId: string) => void;
 		/** Opens the perspective create/edit sheet for a row. Mirrors the grid's Perspectize column. */
 		onAddPerspective?: (contentId: string) => void;
 		/** Content ids the current user already has a perspective on — drives the glasses vs "+" affordance. */
@@ -210,6 +214,9 @@
 				>
 					<PlusIcon class="size-4" />
 				</button>
+			{/if}
+			{#if onAddToPlan}
+				<AddToPlanButton variant="icon" onclick={() => onAddToPlan(String(row.id))} />
 			{/if}
 		</div>
 	{/each}

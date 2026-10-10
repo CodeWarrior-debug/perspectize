@@ -103,6 +103,7 @@ Return:
 - The file paths you created.
 - A 2–4 line summary of what `up` and `down` do.
 - Any collision, lock or irreversibility risk.
+- The rollout procedure lives in `.docs/MIGRATION_ROLLOUT.md` (default `up 1`, snapshot first); reference it, don't restate it.
 - The exact line the PR body needs: "Needs a manual `migrate up` against each
   environment (dev, prod) at rollout."
 - A Neon branch verification hand-back for the main session (you don't run it):

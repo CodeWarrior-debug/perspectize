@@ -178,6 +178,33 @@ export const LIST_COMPARABLE_CONTENT = gql`
 	}
 `;
 
+export interface ContentPickerItem {
+	id: string;
+	name: string;
+	contentType: string;
+	channelTitle: string | null;
+}
+
+export interface ContentPickerResponse {
+	content: {
+		items: ContentPickerItem[];
+	};
+}
+
+/** Search-as-you-type item picker (Plan's Add Todo dialog): just enough to show and choose a row. */
+export const LIST_CONTENT_PICKER = gql`
+	query ListContentPicker($first: Int = 20, $filter: ContentFilter) {
+		content(first: $first, sortBy: UPDATED_AT, sortOrder: DESC, filter: $filter, includeTotalCount: false) {
+			items {
+				id
+				name
+				contentType
+				channelTitle
+			}
+		}
+	}
+`;
+
 export const GET_CONTENT = gql`
 	query GetContent($id: ID!) {
 		contentByID(id: $id) {

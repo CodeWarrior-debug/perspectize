@@ -33,10 +33,10 @@ func (s *stubMovieTrending) TrendingMovies(ctx context.Context, window domain.Tr
 func setupMovieTrendingServer(trending *stubMovieTrending) *httptest.Server {
 	repo := &mockContentRepository{}
 	contentService := services.NewContentService(repo, &mockYouTubeClient{}, nil, services.WithMovieTrending(trending))
-	userService := services.NewUserService(&mockUserRepository{}, repo, &mockPerspectiveRepository{})
+	userService := services.NewUserService(&mockUserRepository{}, repo, &mockPerspectiveRepository{}, nil, nil, nil)
 	perspectiveService := services.NewPerspectiveService(&mockPerspectiveRepository{}, &mockUserRepository{})
 	categoryService := services.NewCategoryService(&mockCategoryRepository{}, repo, &mockWikidataClient{})
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)
+	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil, nil)
 	directiveRoot := directives.NewDirectiveRoot(contentService, perspectiveService)
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{
 		Resolvers:  resolver,

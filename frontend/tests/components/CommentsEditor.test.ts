@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/svelte';
-import PerspectiveEditor from '$lib/components/PerspectiveEditor.svelte';
+import CommentsEditor from '$lib/components/CommentsEditor.svelte';
 
-describe('PerspectiveEditor', () => {
+describe('CommentsEditor', () => {
 	it('renders the default toolbar buttons', async () => {
-		render(PerspectiveEditor, { props: { value: '', onChange: vi.fn() } });
+		render(CommentsEditor, { props: { value: '', onChange: vi.fn() } });
 
 		await waitFor(() => {
 			expect(screen.getByLabelText('Bold')).toBeInTheDocument();
@@ -19,7 +19,7 @@ describe('PerspectiveEditor', () => {
 	});
 
 	it('renders desktop-only table controls when isMobile is false', async () => {
-		render(PerspectiveEditor, {
+		render(CommentsEditor, {
 			props: { value: '', onChange: vi.fn(), isMobile: false },
 		});
 
@@ -32,7 +32,7 @@ describe('PerspectiveEditor', () => {
 	});
 
 	it('does not render table controls when isMobile is true', async () => {
-		render(PerspectiveEditor, {
+		render(CommentsEditor, {
 			props: { value: '', onChange: vi.fn(), isMobile: true },
 		});
 
@@ -45,9 +45,37 @@ describe('PerspectiveEditor', () => {
 		expect(screen.queryByLabelText('Delete table')).not.toBeInTheDocument();
 	});
 
+	it('basic toolbar keeps text formatting and links, and drops image and table controls', async () => {
+		render(CommentsEditor, {
+			props: { value: '', onChange: vi.fn(), toolbar: 'basic', isMobile: false },
+		});
+
+		await waitFor(() => {
+			expect(screen.getByLabelText('Bold')).toBeInTheDocument();
+		});
+		for (const label of ['Italic', 'Underline', 'Bullet list', 'Numbered list', 'Text style', 'Link']) {
+			expect(screen.getByLabelText(label)).toBeInTheDocument();
+		}
+		for (const label of ['Image', 'Insert table', 'Add row', 'Add column', 'Delete table']) {
+			expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+		}
+	});
+
+	it('basic toolbar still shows an existing table, so editing a comment that has one loses nothing', async () => {
+		const html = '<table><tbody><tr><td><p>cell text</p></td></tr></tbody></table>';
+		const { container } = render(CommentsEditor, {
+			props: { value: html, onChange: vi.fn(), toolbar: 'basic' },
+		});
+
+		await waitFor(() => {
+			expect(container.querySelector('table td')).not.toBeNull();
+		});
+		expect(container.querySelector('table td')?.textContent).toContain('cell text');
+	});
+
 	it('toolbar buttons activate on click (keyboard Enter/Space fire click, not mousedown)', async () => {
 		const onChange = vi.fn();
-		render(PerspectiveEditor, { props: { value: '<p>hello</p>', onChange } });
+		render(CommentsEditor, { props: { value: '<p>hello</p>', onChange } });
 
 		await waitFor(() => {
 			expect(screen.getByLabelText('Insert table')).toBeInTheDocument();
@@ -61,7 +89,7 @@ describe('PerspectiveEditor', () => {
 	});
 
 	it('exposes toggle state to assistive tech via aria-pressed on toggle buttons only', async () => {
-		render(PerspectiveEditor, { props: { value: '<p>hello</p>', onChange: vi.fn() } });
+		render(CommentsEditor, { props: { value: '<p>hello</p>', onChange: vi.fn() } });
 
 		await waitFor(() => {
 			expect(screen.getByLabelText('Bold')).toBeInTheDocument();
@@ -74,7 +102,7 @@ describe('PerspectiveEditor', () => {
 	it('does not register duplicate Link/Underline extensions (StarterKit already bundles them)', async () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		try {
-			render(PerspectiveEditor, { props: { value: '', onChange: vi.fn() } });
+			render(CommentsEditor, { props: { value: '', onChange: vi.fn() } });
 			await waitFor(() => {
 				expect(screen.getByLabelText('Bold')).toBeInTheDocument();
 			});
@@ -87,7 +115,7 @@ describe('PerspectiveEditor', () => {
 
 	it('drops strike and inline-code formatting the sanitizers would strip on save', async () => {
 		const onChange = vi.fn();
-		render(PerspectiveEditor, {
+		render(CommentsEditor, {
 			props: { value: '<p><s>gone</s> <code>gone2</code></p>', onChange },
 		});
 
@@ -105,7 +133,7 @@ describe('PerspectiveEditor', () => {
 	});
 
 	it('text-style dropdown follows the cursor between a heading and a paragraph', async () => {
-		render(PerspectiveEditor, {
+		render(CommentsEditor, {
 			props: { value: '<h2>title</h2><p>body</p>', onChange: vi.fn() },
 		});
 

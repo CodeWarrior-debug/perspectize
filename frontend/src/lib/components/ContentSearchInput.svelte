@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Input } from '$lib/components/shadcn';
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
 
@@ -43,6 +44,7 @@
 	<Input
 		bind:ref={inputRef}
 		type="text"
+		{...NO_AUTOFILL}
 		placeholder="Search Content Sources..."
 		bind:value
 		class="pl-9 {value ? 'pr-9' : ''}"

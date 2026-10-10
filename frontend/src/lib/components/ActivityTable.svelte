@@ -82,6 +82,7 @@
 		synopsisValueGetter,
 		tmdbIdValueGetter,
 		textOrEmpty,
+		EMPTY_VALUE,
 	} from '$lib/utils/formatting';
 	import {
 		capitalizeContentType,
@@ -101,6 +102,8 @@
 		rowMatchesPerson,
 	} from '$lib/utils/grid-config';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
+	import { emptyCellClassRules } from '$lib/utils/grid-empty';
+	import { useCardMode, useResponsiveTier } from '$lib/utils/responsive.svelte';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
 	import {
@@ -128,6 +131,7 @@
 	import { ContentTypeFilter, AgeRatingFilter } from '$lib/utils/contentTypeFilter';
 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
+	import AddToPlanDialog from '$lib/components/plan/AddToPlanDialog.svelte';
 	import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
 	import CategoryTypeahead from '$lib/components/CategoryTypeahead.svelte';
 	import { useSetPrimaryCategory } from '$lib/queries/categories/useSetPrimaryCategory';
@@ -190,8 +194,23 @@
 		openPerspective(contentId, row?.name ?? '');
 	}
 
+	// "Add to plan" target (the TodoDialog in create mode). Set from the details modal
+	// or a card; the details modal closes first so the two dialogs never stack.
+	let planContent = $state<{ id: number; name: string } | null>(null);
+
+	function handleAddToPlan(content: { id: string; name: string }) {
+		handleCloseDetails();
+		planContent = { id: parseInt(content.id, 10), name: content.name };
+	}
+
+	function handleAddToPlanFromCard(contentId: string) {
+		const row = rowData.find((item) => String(item.id) === contentId);
+		handleAddToPlan({ id: contentId, name: row?.name ?? '' });
+	}
+
 	// Mobile card-list breakpoint (< 860px) — replaces the AG Grid entirely, per design handoff.
-	let cardMode = $state(false);
+	const card = useCardMode();
+	const cardMode = $derived(card.current);
 
 	// Signed-in user — drives the admin-only "Internal" group in the column picker.
 	const meCtx = useMe();
@@ -331,7 +350,8 @@
 	let sortPickerOpen = $state(false);
 	let activeFilterModel = $state<Record<string, any>>({});
 	// Responsive tier: 'xs' (<445px), 'sm' (445-639px), 'md' (640-899px), 'lg' (900px+)
-	let responsiveTier = $state<'xs' | 'sm' | 'md' | 'lg'>('lg');
+	const responsive = useResponsiveTier();
+	const responsiveTier = $derived(responsive.current);
 	const isMobile = $derived(responsiveTier === 'xs' || responsiveTier === 'sm');
 
 	// Current user for the perspectives query — derived straight from the Clerk
@@ -937,7 +957,7 @@
 				sortable: false,
 				filter: false,
 				valueGetter: tmdbIdValueGetter,
-				valueFormatter: (params) => (params.value == null ? '—' : String(params.value)),
+				valueFormatter: (params) => (params.value == null ? EMPTY_VALUE : String(params.value)),
 				headerTooltip: 'TMDB movie id',
 				hide: true,
 			},
@@ -1050,6 +1070,7 @@
 		pagination: false, // Manual pagination
 		defaultColDef: {
 			resizable: true,
+			cellClassRules: emptyCellClassRules,
 		},
 		tooltipShowDelay: 1000,
 		tooltipInteraction: true,
@@ -1237,41 +1258,6 @@
 		gridApi.setGridOption('overlayNoRowsTemplate', template);
 	});
 
-	// Responsive breakpoint detection — 4 tiers for progressive column reveal
-	$effect(() => {
-		if (typeof window === 'undefined') return;
-		const mqSm = window.matchMedia('(min-width: 445px)');
-		const mqMd = window.matchMedia('(min-width: 640px)');
-		const mqLg = window.matchMedia('(min-width: 900px)');
-		const update = () => {
-			if (mqLg.matches) responsiveTier = 'lg';
-			else if (mqMd.matches) responsiveTier = 'md';
-			else if (mqSm.matches) responsiveTier = 'sm';
-			else responsiveTier = 'xs';
-		};
-		update();
-		mqSm.addEventListener('change', update);
-		mqMd.addEventListener('change', update);
-		mqLg.addEventListener('change', update);
-		return () => {
-			mqSm.removeEventListener('change', update);
-			mqMd.removeEventListener('change', update);
-			mqLg.removeEventListener('change', update);
-		};
-	});
-
-	// Card-mode breakpoint: below 860px, replace the grid with stacked cards entirely.
-	$effect(() => {
-		if (typeof window === 'undefined') return;
-		const mq = window.matchMedia('(max-width: 859px)');
-		const update = () => {
-			cardMode = mq.matches;
-		};
-		update();
-		mq.addEventListener('change', update);
-		return () => mq.removeEventListener('change', update);
-	});
-
 	// Null out gridApi on destroy to prevent $effect callbacks hitting a destroyed grid
 	$effect(() => {
 		return () => {
@@ -1402,6 +1388,7 @@
 				{perspectiveContentIds}
 				onOpenDetails={handleOpenDetails}
 				onAddPerspective={handleAddPerspectiveFromCard}
+				onAddToPlan={currentUserId !== null ? handleAddToPlanFromCard : undefined}
 			/>
 		</div>
 	{:else}
@@ -1509,7 +1496,7 @@
 </div>
 
 <!-- Perspective create/edit modal — rendered outside the grid for correct portal behavior.
-     Dynamically imported: it's the only path into the Tiptap-based PerspectiveEditor
+     Dynamically imported: it's the only path into the Tiptap-based CommentsEditor
      (~170KB gzipped), which would otherwise load eagerly on every visit to this page
      even for users who never open the editor. -->
 {#if popoverOpen && popoverContentId !== null}
@@ -1534,7 +1521,13 @@
 	content={detailsModalContent}
 	open={detailsModalContentId !== null}
 	onClose={handleCloseDetails}
+	onAddToPlan={currentUserId !== null ? handleAddToPlan : undefined}
 />
+
+<!-- "Add to plan" todo dialog. Mounted only while open; the caller is signed in by construction. -->
+{#if planContent !== null && currentUserId !== null}
+	<AddToPlanDialog content={planContent} userId={currentUserId} onClose={() => (planContent = null)} />
+{/if}
 
 <!-- Column picker — session-only show/hide, admin-gated internal columns.
      Mounted only while open (matches PerspectivePopover) so bits-ui's body

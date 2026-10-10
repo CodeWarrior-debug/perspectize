@@ -25,9 +25,11 @@
 	import TrashIcon from '@lucide/svelte/icons/trash-2';
 
 	/**
-	 * PerspectiveEditor — Tiptap editor for writing a perspective's review.
-	 * bold/italic/underline/list toolbar, plus headings (H2/H3), links,
-	 * image-by-URL, and tables (structural editing desktop-only).
+	 * CommentsEditor — Tiptap editor for rich-text comments (a perspective's
+	 * `review`, a todo's `comments`). bold/italic/underline/list toolbar, plus
+	 * headings (H2/H3), links, image-by-URL, and tables (structural editing
+	 * desktop-only). `toolbar="basic"` drops image and table controls; the
+	 * extensions stay registered so existing images/tables still render and save.
 	 */
 	let {
 		value = '',
@@ -38,6 +40,7 @@
 		onPopout,
 		expanded = false,
 		isMobile = false,
+		toolbar = 'full',
 	}: {
 		value?: string;
 		onChange: (html: string) => void;
@@ -48,6 +51,8 @@
 		/** Grows the writing area in place; the popout button toggles it via `onPopout`. */
 		expanded?: boolean;
 		isMobile?: boolean;
+		/** `basic` hides the image and table buttons (short notes); `full` is the perspective editor. */
+		toolbar?: 'full' | 'basic';
 	} = $props();
 
 	let editorElement: HTMLDivElement;
@@ -248,7 +253,11 @@
 			: [],
 	);
 
-	const visibleItems = $derived(items.filter((i) => !i.desktopOnly || !isMobile));
+	const BASIC_TOOLBAR_IDS = new Set(['bold', 'italic', 'underline', 'bulletList', 'orderedList', 'link']);
+
+	const visibleItems = $derived(
+		items.filter((i) => (!i.desktopOnly || !isMobile) && (toolbar === 'full' || BASIC_TOOLBAR_IDS.has(i.id))),
+	);
 
 	const headingLevels = [
 		{ value: '0', label: 'Paragraph' },

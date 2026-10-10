@@ -82,7 +82,7 @@ Marks a PR opened from a **cloud** session whose remaining work needs the user's
 
 ## Migration labels
 
-Migrations are never applied automatically (see `backend/CLAUDE.md` → Migrations): someone runs `migrate up` by hand against each environment after the PR merges. These labels track that, so a merged PR with a pending migration can't be forgotten.
+Migrations are never applied automatically (see `backend/CLAUDE.md` → Migrations): someone runs `migrate up` by hand against each environment (procedure: [MIGRATION_ROLLOUT.md](MIGRATION_ROLLOUT.md)), before the PR merges when the migration is additive. These labels track that, so a merged PR with a pending migration can't be forgotten.
 
 | Label | Put it on | Take it off |
 |-------|-----------|-------------|

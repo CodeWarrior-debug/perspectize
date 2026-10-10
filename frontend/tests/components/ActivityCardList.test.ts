@@ -1,6 +1,19 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import ActivityCardList from '$lib/components/ActivityCardList.svelte';
+
+// The "Add to plan" button reads the auth facade; the real module needs Clerk, so stub it.
+const authState = vi.hoisted(() => ({ userId: null as string | null }));
+vi.mock('$lib/auth/useAuthState', () => ({
+	useAuthState: () => ({
+		get isLoaded() {
+			return true;
+		},
+		get userId() {
+			return authState.userId;
+		},
+	}),
+}));
 
 const rowData = [
 	{
@@ -67,6 +80,37 @@ describe('ActivityCardList', () => {
 		await fireEvent.click(screen.getByTestId('card-perspective-2'));
 		expect(onAddPerspective).toHaveBeenCalledWith('2');
 		expect(onOpenDetails).not.toHaveBeenCalled();
+	});
+
+	describe('add to plan', () => {
+		beforeEach(() => {
+			authState.userId = null;
+		});
+
+		it('shows an Add to plan action per card for a signed-in user, and calls onAddToPlan with the row id', async () => {
+			authState.userId = 'user_1';
+			const onAddToPlan = vi.fn();
+			const onOpenDetails = vi.fn();
+			render(ActivityCardList, { props: { rowData, onOpenDetails, onAddToPlan } });
+
+			const buttons = screen.getAllByRole('button', { name: 'Add to plan' });
+			expect(buttons).toHaveLength(rowData.length);
+
+			await fireEvent.click(buttons[1]);
+			expect(onAddToPlan).toHaveBeenCalledWith('2');
+			expect(onOpenDetails).not.toHaveBeenCalled();
+		});
+
+		it('hides Add to plan for a signed-out user', () => {
+			render(ActivityCardList, { props: { rowData, onOpenDetails: vi.fn(), onAddToPlan: vi.fn() } });
+			expect(screen.queryByRole('button', { name: 'Add to plan' })).toBeNull();
+		});
+
+		it('renders no Add to plan action when the parent does not handle it', () => {
+			authState.userId = 'user_1';
+			render(ActivityCardList, { props: { rowData, onOpenDetails: vi.fn() } });
+			expect(screen.queryByRole('button', { name: 'Add to plan' })).toBeNull();
+		});
 	});
 
 	// Gap #13 in the UI gap audit: the card used to show only name/channel/
