@@ -43,7 +43,7 @@ A user can record what they think about content (a perspective) but not what the
 | Cached lookup repositories | `adapters/repositories/cached/category_repository.go` | `cached.TodoActionRepository` |
 | Cursor pagination, `Paginated<X> { items, pageInfo, totalCount }` | `schema.graphql` `perspectives(...)`; `gorm-cursor-paginator` (check both `err` and `pageResult.Error`) | `userTodos(...)` |
 | HTML sanitized server-side and client-side | `services/sanitize.go` (`sanitizeReview`, bluemonday) and `lib/utils/sanitize.ts` (DOMPurify); render via `SafeHtml.svelte` | `comments` |
-| All FKs `ON DELETE RESTRICT`; deletes reassign (sentinel `[deleted]` user) or clear references first | migration `000006_user_mutations_sentinel`; FK-violation mapping in `gorm_perspective_repository.go` | every FK here; see **Foreign keys** |
+| FK delete behavior by kind: ownership and content FKs block, optional pointers `SET NULL`, aggregate children `CASCADE`; user deletes reassign to the `[deleted]` sentinel | migrations `000004`, `000006`, `000013`, `000015`, `000020`; `UserService.Delete`; FK-violation mapping in `gorm_perspective_repository.go` | every FK here blocks; see **Foreign keys** |
 | Migrations written, never applied in dev; idempotent DDL; provisional numbers | root + `backend/CLAUDE.md` → Migrations | next free number today is `000030` |
 | Frontend: one query folder per domain, keys from `queryKeys`, cache wiring inside the hook, mutations evict exactly what changed | `frontend/CLAUDE.md` → Deep Modules, Query caching | `lib/queries/userTodos/` |
 | One-word verb nav labels | `Header.svelte` `navLinks` (Activity, Discover, Compare) | **Plan** at `/plan` |
@@ -127,13 +127,20 @@ Constraints and indexes:
 
 ### Foreign keys
 
-Every FK is `ON DELETE RESTRICT`, the repo-wide rule set in migration `000006_user_mutations_sentinel` ("All FKs use ON DELETE RESTRICT; the delete service reassigns owned content/perspectives to this sentinel"). The database is the gate; services clear or reassign references before deleting, and never rely on cascades.
+Checked against every FK in `migrations/*.up.sql` (the "All FKs use ON DELETE RESTRICT" comment in `000006` overstates it). The actual pattern:
+
+- **Ownership FKs to `users` block** (explicit `RESTRICT` or the default `NO ACTION`); `UserService.Delete` reassigns rows to the `[deleted]` sentinel first.
+- **FKs to `content` block** (`perspectives.content_id`, default `NO ACTION`).
+- **Optional pointers use `SET NULL`** (`perspectives.primary_perspective_id`, `content.primary_category_id`).
+- **Child rows of an aggregate use `CASCADE`** (`thread_participants`, `messages`, `thread_sequences` → `message_threads`).
+
+Todos are neither children of content, of users, of actions nor of lists, so every FK here blocks (written as explicit `ON DELETE RESTRICT`, matching `000006`). The database is the gate; services clear or reassign references before deleting.
 
 | Parent deleted | DB behavior | What the app does |
 |---|---|---|
 | `content` | Blocked while any todo references it (`user_todos_content_fk`). | Nothing deletes content today. A future content delete must keep the gate and map SQLSTATE `23503` on `user_todos_content_fk` to a domain error (add `domain.ErrInUse`, "still referenced"), the same way `gorm_perspective_repository.go` maps `pgForeignKeyViolation` on its user FK. It must not copy titles into `name` or null the column to get around it. |
-| `users` | Blocked while the user owns todos, lists or custom actions. | The existing user-delete service reassigns them to the `[deleted]` sentinel along with content and perspectives (extend it and its tests). |
-| `user_todo_lists` | Blocked while todos are in the list. | `DeleteUserTodoList` first unlists its todos (`UPDATE … SET list_id = NULL, list_position = NULL WHERE list_id = ? AND owner_user_id = ?`), then deletes the list, both owner-scoped. Todos are never deleted with a list. |
+| `users` | Blocked while the user owns todos, lists or custom actions. | `UserService.Delete` reassigns them to the `[deleted]` sentinel, as it does for content and perspectives today (add `ReassignByUser` to the todo, list and action repositories and call them there; extend its tests). |
+| `user_todo_lists` | Blocked while todos are in the list. (`list_id` is an optional pointer, which elsewhere would be `SET NULL`; that would leave `list_position` set and break the both-or-neither CHECK, so it blocks instead.) | `DeleteUserTodoList` first unlists its todos (`UPDATE … SET list_id = NULL, list_position = NULL WHERE list_id = ? AND owner_user_id = ?`), then deletes the list, both owner-scoped. Todos are never deleted with a list. |
 | `todo_actions` | Blocked while todos use the action. | No delete in v1; presets are permanent and custom actions are kept. |
 
 Because content can't vanish under a todo, `CHECK (content_id IS NOT NULL OR name IS NOT NULL)` holds without any delete-time workaround.
@@ -229,7 +236,7 @@ Vitest for the toast helper, rating/percent formatting, column metadata, and eac
 
 ## Future: assignees
 
-Add `user_todo_assignees (todo_id FK, user_id FK, both ON DELETE RESTRICT per the repo rule, assigned_at, PRIMARY KEY (todo_id, user_id))` (same shape as `thread_participants`). The read predicate becomes *public OR owner OR assignee*; assignees may update `status`, `percent_complete` and dates, while only the owner edits the rest and deletes. Nothing in v1 needs renaming for this: the owner column is already `owner_user_id` and the GraphQL field is `owner`.
+Add `user_todo_assignees (todo_id FK ON DELETE CASCADE as an aggregate child, user_id FK blocking with sentinel reassignment, assigned_at, PRIMARY KEY (todo_id, user_id))` (same shape as `thread_participants`). The read predicate becomes *public OR owner OR assignee*; assignees may update `status`, `percent_complete` and dates, while only the owner edits the rest and deletes. Nothing in v1 needs renaming for this: the owner column is already `owner_user_id` and the GraphQL field is `owner`.
 
 ## Rollout
 
@@ -237,7 +244,7 @@ The migration is written and reviewed, never applied in dev (shared Neon DB). Th
 
 ## Decisions to confirm
 
-Settled in review (2026-10-10): first status is `not_started`; privacy column defaulting to public; owner naming ready for assignees; priority on the 0–10000 rating scale with the shared helpers; `cite` / `archive` dropped and actions ordered by `typical_sequence` with tooltips, stored in a cached table; one list per todo; the page is **Plan**; all FKs `ON DELETE RESTRICT`, so content with todos can't be deleted (DB-level gate, respected by the app).
+Settled in review (2026-10-10): first status is `not_started`; privacy column defaulting to public; owner naming ready for assignees; priority on the 0–10000 rating scale with the shared helpers; `cite` / `archive` dropped and actions ordered by `typical_sequence` with tooltips, stored in a cached table; one list per todo; the page is **Plan**; every FK blocks, so content with todos can't be deleted (DB-level gate, respected by the app).
 
 Still open:
 1. User-entered actions as rows in `todo_actions` with `owner_user_id` (vs. a free-text column on the todo). Chosen so the picker, ordering and tooltips work the same for both.
