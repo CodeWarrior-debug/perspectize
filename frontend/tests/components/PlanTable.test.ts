@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import PlanTable from '$lib/components/plan/PlanTable.svelte';
 import { PLAN_COL_IDS, planColumnsForTier } from '$lib/utils/plan-grid-config';
+import type { UserTodoItem } from '$lib/queries/userTodos';
 
 /**
  * AG Grid does not render in jsdom, so the grid component is replaced by one that records
@@ -40,7 +41,7 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
 	};
 }
 
-function renderTable(props: { listMode?: boolean } = {}) {
+function renderTable(props: { listMode?: boolean; rows?: UserTodoItem[] } = {}) {
 	const onReorder = vi.fn();
 	const onSortChange = vi.fn();
 	render(PlanTable, {
@@ -103,6 +104,46 @@ describe('PlanTable', () => {
 			await vi.advanceTimersByTimeAsync(50);
 
 			expect(api.setColumnsVisible).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('card list (below 860px)', () => {
+		const todo = (overrides: Partial<UserTodoItem>): UserTodoItem => ({
+			id: '5',
+			user: { id: '7', username: 'ada' },
+			content: null,
+			name: 'Read the paper',
+			action: { id: '2', key: 'consume', label: 'Consume', description: '', typicalSequence: 2, isPreset: true },
+			priority: null,
+			status: 'NOT_STARTED',
+			percentComplete: 0,
+			startDate: null,
+			endDate: null,
+			dueDate: null,
+			comments: null,
+			privacy: 'PUBLIC',
+			list: null,
+			listPosition: null,
+			createdAt: '2026-10-01T00:00:00Z',
+			updatedAt: '2026-10-01T00:00:00Z',
+			...overrides,
+		});
+
+		it('shows the content type under the title of a todo that has content', () => {
+			setViewport(400);
+			renderTable({ rows: [todo({ content: { id: '12', name: 'Heat', contentType: 'MOVIE' }, name: null })] });
+			const card = within(screen.getByTestId('plan-card-list')).getByText('Heat').closest('li') as HTMLElement;
+			expect(within(card).getByText('Movie')).toBeInTheDocument();
+		});
+
+		it('shows no type line for a free-text todo', () => {
+			setViewport(400);
+			renderTable({ rows: [todo({})] });
+			const card = within(screen.getByTestId('plan-card-list'))
+				.getByText('Read the paper')
+				.closest('li') as HTMLElement;
+			expect(within(card).queryByText('Movie')).toBeNull();
+			expect(within(card).queryByTestId('plan-card-type')).toBeNull();
 		});
 	});
 

@@ -102,11 +102,11 @@
 		<label class="sr-only" for="plan-list-select">Show</label>
 		<select
 			id="plan-list-select"
-			class="border-input bg-background h-9 min-w-40 rounded-md border px-3 text-sm"
+			class="border-input bg-background h-9 min-w-40 rounded-md border px-3 text-sm select-inset"
 			value={selectValue}
 			onchange={(e) => onSelectChange(e.currentTarget.value)}
 		>
-			<option value="all">All todos</option>
+			<option value="all">All My Todos</option>
 			<option value="unlisted">Unlisted</option>
 			{#each lists as list (list.id)}
 				<option value={`list:${list.id}`}>{list.name}</option>

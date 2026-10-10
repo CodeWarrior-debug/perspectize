@@ -50,10 +50,25 @@ export interface UserTodoListItem {
 	updatedAt: string;
 }
 
+/**
+ * The content a todo is about. `id` and `name` are always present; the rest is what the
+ * Item cell needs to draw a thumbnail (the same fields the Activity table fetches).
+ */
+export interface TodoContentRef {
+	id: string;
+	name: string;
+	url?: string | null;
+	contentType?: string;
+	displayTitle?: string | null;
+	verseStartID?: number | null;
+	verseEndID?: number | null;
+	movie?: unknown;
+}
+
 export interface UserTodoItem {
 	id: string;
 	user: TodoUserRef;
-	content: { id: string; name: string } | null;
+	content: TodoContentRef | null;
 	/** Free-text name; only meaningful when `content` is null. */
 	name: string | null;
 	action: TodoActionItem;
@@ -254,6 +269,12 @@ const USER_TODO_FIELDS = gql`
 		content {
 			id
 			name
+			url
+			contentType
+			displayTitle
+			verseStartID
+			verseEndID
+			movie
 		}
 		name
 		action {

@@ -20,6 +20,7 @@
 		planListLabel,
 		planPercentLabel,
 		planStatusLabel,
+		planTypeLabel,
 		serverSortFor,
 	} from '$lib/utils/plan-grid-config';
 	import { addPerspectiveDisabledReason } from '$lib/utils/plan-todo-helpers';
@@ -175,6 +176,9 @@
 			<li class="border-border bg-card text-card-foreground flex flex-col gap-2 rounded-lg border p-3">
 				<button type="button" class="flex flex-col gap-1 text-left" onclick={() => onOpen(todo)}>
 					<span class="font-medium">{planContentLabel(todo)}</span>
+					{#if todo.content}
+						<span class="text-muted-foreground text-xs" data-testid="plan-card-type">{planTypeLabel(todo)}</span>
+					{/if}
 					<span class="text-muted-foreground text-xs">
 						{todo.action.label} · {planStatusLabel(todo.status)} · {planPercentLabel(todo.percentComplete)}
 					</span>

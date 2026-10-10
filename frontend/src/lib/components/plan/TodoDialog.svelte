@@ -293,7 +293,7 @@
 						<Label for="todo-status">Status</Label>
 						<select
 							id="todo-status"
-							class="border-input bg-background h-9 rounded-md border px-3 text-sm"
+							class="border-input bg-background h-9 rounded-md border px-3 text-sm select-inset"
 							value={form.status}
 							onchange={(e) => onStatusChange(e.currentTarget.value as UserTodoStatus)}
 						>
@@ -337,7 +337,7 @@
 						<Label for="todo-privacy">Privacy</Label>
 						<select
 							id="todo-privacy"
-							class="border-input bg-background h-9 rounded-md border px-3 text-sm"
+							class="border-input bg-background h-9 rounded-md border px-3 text-sm select-inset"
 							bind:value={form.privacy}
 						>
 							{#each PRIVACY_OPTIONS as opt (opt.value)}
@@ -349,7 +349,7 @@
 						<Label for="todo-list">List</Label>
 						<select
 							id="todo-list"
-							class="border-input bg-background h-9 rounded-md border px-3 text-sm"
+							class="border-input bg-background h-9 rounded-md border px-3 text-sm select-inset"
 							value={form.listId === null ? '' : String(form.listId)}
 							onchange={(e) => {
 								const v = e.currentTarget.value;

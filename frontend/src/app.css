@@ -1108,3 +1108,18 @@
 [data-sonner-toast] {
 	pointer-events: auto;
 }
+
+/* A native <select> whose arrow sits inset from the right edge (the browser's own arrow is flush against it).
+   The chevron is two currentColor gradients, so it follows the theme. Pair with the usual border/height classes. */
+select.select-inset {
+	appearance: none;
+	padding-inline-end: 2rem;
+	background-image:
+		linear-gradient(45deg, transparent 50%, currentColor 50%),
+		linear-gradient(135deg, currentColor 50%, transparent 50%);
+	background-position:
+		calc(100% - 1.15rem) 50%,
+		calc(100% - 0.8rem) 50%;
+	background-size: 0.35rem 0.35rem;
+	background-repeat: no-repeat;
+}

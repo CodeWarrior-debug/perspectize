@@ -110,6 +110,12 @@ describe('PlanBoard: the Unlisted and single-list views are filtered by the serv
 		render(PlanBoard, { props: { userId: USER_ID } });
 	});
 
+	it('opens on "All My Todos", the picker default', () => {
+		const picker = screen.getByLabelText('Show') as HTMLSelectElement;
+		expect(picker.selectedOptions[0]).toHaveTextContent('All My Todos');
+		expect(picker.value).toBe('all');
+	});
+
 	it('starts with every todo of the signed-in user, in no list order', () => {
 		expect(currentArgs().filter).toEqual({ userId: USER_ID });
 		expect(currentArgs().sortBy).toBe('CREATED_AT');

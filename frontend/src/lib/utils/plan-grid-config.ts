@@ -4,15 +4,17 @@
  * formatters the cells use. Mirrors `grid-config.ts`'s `COLUMNS` pattern for
  * the Activity grid. Nothing here touches the DOM.
  */
-import type { ColDef, ValueFormatterParams, ValueGetterParams } from '@ag-grid-community/core';
+import type { ColDef, ICellRendererParams, ValueFormatterParams, ValueGetterParams } from '@ag-grid-community/core';
 import type { TodoPrivacy, UserTodoItem, UserTodoSortBy, UserTodoStatus } from '$lib/queries/userTodos';
-import type { ResponsiveTier } from './grid-config';
+import { contentTypeLabel, type ResponsiveTier } from './grid-config';
 import { ratingToDisplay } from './ratings';
 import { addPerspectiveDisabledReason } from './plan-todo-helpers';
+import { planItemCellRenderer } from './planItemCellRenderer';
 
 export type PlanColId =
-	| 'content'
 	| 'action'
+	| 'content'
+	| 'type'
 	| 'priority'
 	| 'status'
 	| 'percentComplete'
@@ -42,8 +44,9 @@ export interface PlanColumnMeta {
 
 /** Column order = header order. Widths sum to ~1.5k px at lg, so the grid scrolls sideways on small screens. */
 export const PLAN_COLUMNS: readonly PlanColumnMeta[] = [
-	{ colId: 'content', label: 'Content', minWidth: 200, flex: 2, minTier: 'xs', sortable: false },
-	{ colId: 'action', label: 'Action', minWidth: 100, minTier: 'xs', sortable: false },
+	{ colId: 'action', label: 'Action', minWidth: 140, minTier: 'xs', sortable: false },
+	{ colId: 'content', label: 'Item', minWidth: 200, flex: 2, minTier: 'xs', sortable: false },
+	{ colId: 'type', label: 'Type', minWidth: 140, minTier: 'md', sortable: false },
 	{
 		colId: 'priority',
 		label: 'Priority',
@@ -144,6 +147,12 @@ export function planContentLabel(todo: Pick<UserTodoItem, 'content' | 'name'>): 
 	return todo.content?.name || todo.name || 'Untitled';
 }
 
+/** The content's type as the Activity Type column labels it, or a dash for a free-text todo. */
+export function planTypeLabel(todo: Pick<UserTodoItem, 'content'>): string {
+	const type = todo.content?.contentType;
+	return type ? contentTypeLabel(type.toLowerCase()) : PLAN_EMPTY;
+}
+
 /** Plain-text preview of the rich-text comments: tags stripped, whitespace collapsed, cut at `max` characters. */
 export function planCommentsPreview(html: string | null | undefined, max = 80): string {
 	if (!html) return '';
@@ -165,7 +174,7 @@ export const ADD_PERSPECTIVE_LABEL = 'Add';
 
 /**
  * Column definitions for the Plan grid. `listMode` turns on drag-to-reorder
- * on the Content column (rows are then in list order). `tier` sets the initial
+ * on the Action column (rows are then in list order). `tier` sets the initial
  * `hide` flags; the grid's responsive effect keeps them in step afterwards.
  */
 export function buildPlanColumnDefs(listMode: boolean, tier: ResponsiveTier = 'lg'): ColDef<UserTodoItem>[] {
@@ -197,13 +206,21 @@ export function buildPlanColumnDefs(listMode: boolean, tier: ResponsiveTier = 'l
 
 	return [
 		{
-			...common('content'),
-			valueGetter: (p: ValueGetterParams<UserTodoItem>) => (p.data ? planContentLabel(p.data) : ''),
-			rowDrag: () => listMode,
-		},
-		{
 			...common('action'),
 			valueGetter: (p: ValueGetterParams<UserTodoItem>) => p.data?.action.label ?? '',
+			// The leftmost column carries the drag handle, in list mode only (rows are then in list order).
+			// A plain boolean, not a function: AG Grid reserves room for the handle whenever rowDrag is a
+			// function, even one that returns false, which squeezed this column's text outside list mode.
+			rowDrag: listMode,
+		},
+		{
+			...common('content'),
+			valueGetter: (p: ValueGetterParams<UserTodoItem>) => (p.data ? planContentLabel(p.data) : ''),
+			cellRenderer: (p: ICellRendererParams<UserTodoItem>) => (p.data ? planItemCellRenderer(p.data) : ''),
+		},
+		{
+			...common('type'),
+			valueGetter: (p: ValueGetterParams<UserTodoItem>) => (p.data ? planTypeLabel(p.data) : ''),
 		},
 		{
 			...common('priority'),

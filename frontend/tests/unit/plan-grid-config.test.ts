@@ -78,8 +78,9 @@ describe('PLAN_COLUMNS metadata', () => {
 
 describe('planColumnsForTier', () => {
 	it('shows the essentials on xs and adds columns as the tier widens', () => {
-		expect(planColumnsForTier('xs')).toEqual(['content', 'action', 'priority']);
-		expect(planColumnsForTier('sm')).toEqual(['content', 'action', 'priority', 'status', 'addPerspective']);
+		expect(planColumnsForTier('xs')).toEqual(['action', 'content', 'priority']);
+		expect(planColumnsForTier('sm')).toEqual(['action', 'content', 'priority', 'status', 'addPerspective']);
+		expect(planColumnsForTier('md')).toContain('type');
 		expect(planColumnsForTier('md')).toContain('percentComplete');
 		expect(planColumnsForTier('md')).toContain('dueDate');
 		expect(planColumnsForTier('md')).not.toContain('startDate');
@@ -164,13 +165,15 @@ describe('buildPlanColumnDefs', () => {
 		expect(lg.every((d) => d.hide === false)).toBe(true);
 	});
 
-	it('enables row drag on the content column only in list mode', () => {
-		const rowDrag = (listMode: boolean) => {
-			const content = buildPlanColumnDefs(listMode).find((d) => d.colId === 'content');
-			return (content?.rowDrag as () => boolean)();
+	it('puts the row-drag handle on the leftmost column (Action), and only in list mode', () => {
+		const rowDrag = (listMode: boolean, colId: string) => {
+			const col = buildPlanColumnDefs(listMode).find((d) => d.colId === colId);
+			// A plain boolean: AG Grid reserves room for the handle whenever rowDrag is a function, even one returning false.
+			return col?.rowDrag === true;
 		};
-		expect(rowDrag(false)).toBe(false);
-		expect(rowDrag(true)).toBe(true);
+		expect(rowDrag(false, 'action')).toBe(false);
+		expect(rowDrag(true, 'action')).toBe(true);
+		expect(rowDrag(true, 'content')).toBe(false);
 	});
 
 	it('makes no header sortable in list mode: the order is the list position, and a sort would hide it and block dragging', () => {
@@ -183,6 +186,39 @@ describe('buildPlanColumnDefs', () => {
 			.map((d) => d.colId);
 		expect(sortable).toEqual(PLAN_COLUMNS.filter((c) => c.sortable).map((c) => c.colId));
 		expect(sortable.length).toBeGreaterThan(0);
+	});
+
+	it('orders the leftmost columns Action, Item, Type, and labels the content column Item as Activity does', () => {
+		const defs = buildPlanColumnDefs(false);
+		expect(defs.slice(0, 3).map((d) => d.colId)).toEqual(['action', 'content', 'type']);
+		expect(defs.slice(0, 3).map((d) => d.headerName)).toEqual(['Action', 'Item', 'Type']);
+		expect(PLAN_COL_IDS.slice(0, 3)).toEqual(['action', 'content', 'type']);
+	});
+
+	it('gives Action and Type room for their text: "Consume" with a drag handle, "YouTube Video"', () => {
+		const width = (colId: string) => PLAN_COLUMNS.find((c) => c.colId === colId)?.minWidth ?? 0;
+		expect(width('action')).toBeGreaterThanOrEqual(140);
+		expect(width('type')).toBeGreaterThanOrEqual(140);
+	});
+
+	it('draws the Item column with the Activity item cell', () => {
+		const content = buildPlanColumnDefs(false).find((d) => d.colId === 'content');
+		expect(typeof content?.cellRenderer).toBe('function');
+	});
+
+	it('shows the content type in the Type column, and a dash for a free-text todo', () => {
+		const type = buildPlanColumnDefs(false).find((d) => d.colId === 'type');
+		const getter = type?.valueGetter as unknown as (p: { data: UserTodoItem }) => string;
+		expect(getter({ data: todo({ content: { id: '9', name: 'Heat', contentType: 'MOVIE' } }) })).toBe('Movie');
+		expect(getter({ data: todo({ content: { id: '9', name: 'Psalm', contentType: 'BIBLE_PASSAGE' } }) })).toBe(
+			'Bible Passage',
+		);
+		expect(getter({ data: todo() })).toBe(PLAN_EMPTY);
+	});
+
+	it('hides the Type column below the md tier', () => {
+		expect(planColumnsForTier('sm')).not.toContain('type');
+		expect(planColumnsForTier('md')).toContain('type');
 	});
 
 	it('shows the Add perspective value only for rows with content', () => {
