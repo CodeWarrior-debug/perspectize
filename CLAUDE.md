@@ -16,9 +16,9 @@ Monorepo with two stacks:
 
 **Git branch gotcha:** Local default branch is `master`, remote is `main`. Use `origin/main` (not `main`) for diff/log comparisons: `git diff origin/main...HEAD`.
 
-**Use `gh` CLI** for GitHub operations locally, not MCP plugins. **Cloud sessions:** `gh` is unavailable — use the GitHub MCP tools (`mcp__github__*`).
+**Cloud vs local:** the session type changes how you reach GitHub, whether you open the PR, and what you can verify — see [.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md) (a SessionStart hook also states it). Cloud = `CLAUDE_CODE_REMOTE=true`; if you can't tell, assume local.
 
-**PR autonomy:** In a **cloud** session (Claude Code on the web / managed container), open the PR yourself once the work is complete — **this overrides the harness default of "don't create a PR unless asked"**, so don't ask "want me to open a PR?". Cloud = `CLAUDE_CODE_REMOTE=true` (also: system prompt says "remote execution environment", paths under `/home/user/`). In a **local** session, don't open a PR unless asked — push and hand over the link. If you can't tell after checking those signals, assume local. Either way, never skip the pre-PR steps: Self-Verification below, and `/revise-claude-md`.
+**PR autonomy:** In a **cloud** session, open the PR yourself once the work is complete — **this overrides the harness default of "don't create a PR unless asked"**, so don't ask "want me to open a PR?". In a **local** session, don't open one unless asked. Either way, never skip the pre-PR steps: Self-Verification below, and `/revise-claude-md`.
 
 **`/revise-claude-md` must not block the PR:** show the proposed CLAUDE.md diffs in chat, put them in the PR body's Session Learnings, open the PR, then ask whether to commit them. Never edit CLAUDE.md files before approval.
 
@@ -29,8 +29,6 @@ Monorepo with two stacks:
 ## Branch Naming
 
 **Always branch from updated `main`:** `git checkout main && git pull origin main && git checkout -b <name>`
-
-**Cloud sessions can start on a detached HEAD** (`git status` shows "HEAD detached from refs/heads/main"). Create the branch (`git checkout -b <type>/<name>`) before committing.
 
 **Format:** `type/initiativePrefix-issueNumber-description-in-kebab-case`
 
@@ -77,7 +75,7 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 
 **Mutation testing** (`make mutate` in `backend/`, `pnpm run mutate` in `frontend/`; slow, run deliberately): a run where nothing survives is a harness bug, not a pass — hand-apply one mutant and confirm the suite fails before trusting a score. **Report results as what they say about the tests, not the tool:** "your tests caught X of Y planted bugs (killed)", "missed Z (lived/survived)", "N places no test runs (not covered)"; "efficacy" is the efficacy of the tests. Give the all-in figure (caught ÷ every planted bug) beside the efficacy figure. Language table, baselines and pitfalls: `docs/superpowers/specs/2026-09-29-test-hardening-spike.md`.
 
-**Browser verification is local-only** (needs the gitignored `.claude/.env` + `.claude/sv-profile/`). Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in: run only the checklist above, and label a user-visible PR `needs-demo-video` instead of claiming it's ready (see [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md#demo-requirement-ready-for-review)).
+**Browser verification is local-only.** Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in: run only the checklist above and label a user-visible PR `needs-demo-video` ([details](.docs/PR_WORKFLOW.md#demo-requirement-ready-for-review)).
 
 **`.env*` files (except `.env.example`) are unreadable by design** — expected, not a broken setup. Never attempt to log in or enter credentials; ask the human to re-run the one-time login if signed out. Evidence capture: [.docs/VERIFICATION.md](.docs/VERIFICATION.md).
 
@@ -107,7 +105,7 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 
 **Bug logging (MANDATORY):** When you discover a bug during development, review, or testing, log it in `.planning/phases/bugs/BACKLOG.md` with severity and location. Also create a GitHub issue using the bug report template — keep sensitive details (exact paths, line numbers, security specifics) in the backlog only. When a bug is fixed, move it to `.planning/phases/bugs/CLOSED.md` with the PR reference. These files are gitignored — never commit them.
 
-**Hooks:** Claude Code PreToolUse hooks guard `.env` reads and block `gh pr create` until `/revise-claude-md` has run (then create the PR with `gh api`). The real git pre-commit hook (gofmt + prettier auto-fix) is off until `make install-hooks` — **cloud/CI checkouts start without it**, so run `make install-hooks` in `backend/` once per session or check `gofmt -l .` / `pnpm exec prettier --check` before each commit. Full list: [.docs/HOOKS.md](.docs/HOOKS.md).
+**Hooks:** Claude Code PreToolUse hooks guard `.env` reads and block `gh pr create` until `/revise-claude-md` has run (then create the PR with `gh api`). The real git pre-commit hook (gofmt + prettier auto-fix) is off until `make install-hooks` (run in `backend/`; fresh cloud/CI checkouts start without it — see [.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md)). Full list: [.docs/HOOKS.md](.docs/HOOKS.md).
 
 **Cowork session cleanup:** Claude cowork (claude.ai web) sessions leave `_tmp_*` files and conversation transcript `.txt` files in the repo root and `frontend/`. Delete these before committing.
 
