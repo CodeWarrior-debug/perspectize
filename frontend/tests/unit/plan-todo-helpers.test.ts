@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+	completedTodoInput,
 	actionAddText,
 	actionMatchesQuery,
 	addPerspectiveDisabledReason,
@@ -261,5 +262,30 @@ describe('todayIso', () => {
 	it('formats the local calendar day as YYYY-MM-DD', () => {
 		expect(todayIso(new Date(2026, 9, 10, 23, 30))).toBe('2026-10-10');
 		expect(todayIso(new Date(2026, 0, 3, 0, 5))).toBe('2026-01-03');
+	});
+});
+
+describe('completedTodoInput', () => {
+	const now = new Date(2026, 9, 10, 12);
+
+	it('sets DONE and 100% and fills an empty end date', () => {
+		expect(completedTodoInput({ id: '5', endDate: null }, true, now)).toEqual({
+			id: 5,
+			status: 'DONE',
+			percentComplete: 100,
+			endDate: '2026-10-10',
+		});
+	});
+
+	it('keeps the percent when fullPercent is false', () => {
+		expect(completedTodoInput({ id: '5' }, false, now)).toEqual({ id: 5, status: 'DONE', endDate: '2026-10-10' });
+	});
+
+	it('leaves an existing end date alone', () => {
+		expect(completedTodoInput({ id: '7', endDate: '2026-10-01' }, true, now)).toEqual({
+			id: 7,
+			status: 'DONE',
+			percentComplete: 100,
+		});
 	});
 });

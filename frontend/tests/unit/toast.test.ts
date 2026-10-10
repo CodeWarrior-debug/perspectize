@@ -47,4 +47,13 @@ describe('toastWithAction', () => {
 	it('returns the id svelte-sonner gives the toast', () => {
 		expect(toastWithAction('Saved', { label: 'Undo', onClick: () => {} })).toBe('toast-1');
 	});
+
+	it('renders a secondary choice as the cancel button and keeps it out of the other options', () => {
+		const action = { label: 'Done + 100%', onClick: () => {} };
+		const secondary = { label: 'Done, keep %', onClick: () => {} };
+
+		toastWithAction('Mark this todo done?', action, { secondary });
+
+		expect(toastFn).toHaveBeenCalledWith('Mark this todo done?', { duration: 4000, action, cancel: secondary });
+	});
 });

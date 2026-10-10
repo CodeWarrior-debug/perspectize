@@ -1258,24 +1258,45 @@ describe('PerspectivePopover: mark an open todo done after a save', () => {
 		});
 	});
 
-	it('offers "Mark this todo done?" for an open consume todo, and Yes sets it DONE', async () => {
+	it('offers "Mark this todo done?" with Done + 100% as the default and Done, keep % as the other choice', async () => {
 		mocks.mockFetchTodos.mockResolvedValue([openTodo('5', 'consume')]);
 		await saveNewPerspective();
 
 		expect(mocks.mockToastWithAction).toHaveBeenCalledTimes(1);
-		const [message, action] = mocks.mockToastWithAction.mock.calls[0];
+		const [message, action, opts] = mocks.mockToastWithAction.mock.calls[0];
 		expect(message).toBe('Mark this todo done?');
-		expect(action.label).toBe('Yes');
+		expect(action.label).toBe('Done + 100%');
+		expect(opts.secondary.label).toBe('Done, keep %');
 
 		expect(mocks.mockUpdateTodoMutateAsync).not.toHaveBeenCalled();
 		action.onClick();
-		expect(mocks.mockUpdateTodoMutateAsync).toHaveBeenCalledWith({ id: 5, status: 'DONE' });
+		expect(mocks.mockUpdateTodoMutateAsync).toHaveBeenCalledWith({
+			id: 5,
+			status: 'DONE',
+			percentComplete: 100,
+			endDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+		});
+	});
+
+	it('"Done, keep %" marks the todo done without touching its percent', async () => {
+		mocks.mockFetchTodos.mockResolvedValue([openTodo('5', 'consume')]);
+		await saveNewPerspective();
+
+		const [, , opts] = mocks.mockToastWithAction.mock.calls[0];
+		opts.secondary.onClick();
+		const sent = (mocks.mockUpdateTodoMutateAsync.mock.calls[0] as unknown[])[0];
+		expect(sent).toMatchObject({ id: 5, status: 'DONE' });
+		expect(sent).not.toHaveProperty('percentComplete');
 	});
 
 	it('also offers it for an open review todo', async () => {
 		mocks.mockFetchTodos.mockResolvedValue([openTodo('8', 'review', 'IN_PROGRESS')]);
 		await saveNewPerspective();
-		expect(mocks.mockToastWithAction).toHaveBeenCalledWith('Mark this todo done?', expect.anything());
+		expect(mocks.mockToastWithAction).toHaveBeenCalledWith(
+			'Mark this todo done?',
+			expect.anything(),
+			expect.anything(),
+		);
 	});
 
 	it('shows no prompt when the open todos are other actions', async () => {

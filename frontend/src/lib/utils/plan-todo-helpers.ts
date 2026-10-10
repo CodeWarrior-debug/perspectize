@@ -113,6 +113,25 @@ export function addPerspectiveDisabledReason(todo: Pick<UserTodoItem, 'content'>
 }
 
 /** Local calendar day as YYYY-MM-DD (not UTC, so a late-evening user keeps today). */
+/**
+ * Update input that marks a todo done from the post-save prompt. The default
+ * choice also sets 100%; the other keeps the current percent. Either fills an
+ * empty end date with today.
+ */
+export function completedTodoInput(
+	todo: { id: string; endDate?: string | null },
+	fullPercent: boolean,
+	now: Date = new Date(),
+): { id: number; status: 'DONE'; percentComplete?: number; endDate?: string } {
+	const input: { id: number; status: 'DONE'; percentComplete?: number; endDate?: string } = {
+		id: Number(todo.id),
+		status: 'DONE',
+	};
+	if (fullPercent) input.percentComplete = 100;
+	if (!todo.endDate) input.endDate = todayIso(now);
+	return input;
+}
+
 export function todayIso(now: Date = new Date()): string {
 	const y = now.getFullYear();
 	const m = String(now.getMonth() + 1).padStart(2, '0');

@@ -31,7 +31,7 @@
 	import { useDeletePerspective } from '$lib/queries/perspectives/useDeletePerspective';
 	import { useFetchUserTodos } from '$lib/queries/userTodos/useFetchUserTodos';
 	import { useUpdateUserTodo } from '$lib/queries/userTodos/useUpdateUserTodo';
-	import { openConsumeOrReviewTodos } from '$lib/utils/plan-todo-helpers';
+	import { completedTodoInput, openConsumeOrReviewTodos } from '$lib/utils/plan-todo-helpers';
 	import { toastWithAction } from '$lib/utils/toast';
 	import { isOptimisticId, type PerspectiveItem } from '$lib/queries/perspectives';
 	import FeelWheel, { type Feeling } from '$lib/components/FeelWheel.svelte';
@@ -247,16 +247,18 @@
 		if (items === null) return;
 		const open = openConsumeOrReviewTodos(items);
 		if (open.length === 0) return;
-		toastWithAction('Mark this todo done?', {
-			label: 'Yes',
-			onClick: () => {
-				for (const todo of open) {
-					updateTodo.mutateAsync({ id: Number(todo.id), status: 'DONE' }).catch((err: unknown) => {
-						toast.error(err instanceof Error ? err.message : 'Could not update the todo');
-					});
-				}
-			},
-		});
+		const complete = (fullPercent: boolean) => {
+			for (const todo of open) {
+				updateTodo.mutateAsync(completedTodoInput(todo, fullPercent)).catch((err: unknown) => {
+					toast.error(err instanceof Error ? err.message : 'Could not update the todo');
+				});
+			}
+		};
+		toastWithAction(
+			'Mark this todo done?',
+			{ label: 'Done + 100%', onClick: () => complete(true) },
+			{ secondary: { label: 'Done, keep %', onClick: () => complete(false) } },
+		);
 	}
 	const isPending = $derived(createMutation.isPending || updateMutation.isPending || deleteMutation.isPending);
 

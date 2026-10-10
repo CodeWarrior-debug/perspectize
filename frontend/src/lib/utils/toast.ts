@@ -12,10 +12,22 @@ export interface ToastActionButton {
 	onClick: () => void;
 }
 
+export interface ToastWithActionOptions extends ExternalToast {
+	/** A second, less prominent choice, rendered as sonner's cancel button. */
+	secondary?: ToastActionButton;
+}
+
 /**
- * A toast with one action button, lasting ACTION_TOAST_DURATION_MS. `opts` is
- * spread last, so a caller can pass e.g. an `id`, or override the duration.
+ * A toast with an action button (and optionally a second choice), lasting
+ * ACTION_TOAST_DURATION_MS. Remaining `opts` are spread last, so a caller can
+ * pass e.g. an `id`, or override the duration.
  */
-export function toastWithAction(message: string, action: ToastActionButton, opts?: ExternalToast) {
-	return toast(message, { duration: ACTION_TOAST_DURATION_MS, action, ...opts });
+export function toastWithAction(message: string, action: ToastActionButton, opts?: ToastWithActionOptions) {
+	const { secondary, ...rest } = opts ?? {};
+	return toast(message, {
+		duration: ACTION_TOAST_DURATION_MS,
+		action,
+		...(secondary ? { cancel: secondary } : {}),
+		...rest,
+	});
 }
