@@ -257,3 +257,58 @@ func usCertification(m tmdbMovie) string {
 	}
 	return first
 }
+
+// tmdbSearchMovie is one entry of a /search/movie response.
+type tmdbSearchMovie struct {
+	ID          int     `json:"id"`
+	Title       string  `json:"title"`
+	ReleaseDate string  `json:"release_date"`
+	Overview    string  `json:"overview"`
+	PosterPath  *string `json:"poster_path"`
+	VoteAverage float64 `json:"vote_average"`
+	VoteCount   int     `json:"vote_count"`
+}
+
+// toSearchResult maps TMDB's "unknown" markers to nil: an empty release date
+// and a zero vote count (no score yet).
+func (m tmdbSearchMovie) toSearchResult() services.MovieSearchResult {
+	res := services.MovieSearchResult{
+		TMDBID:     m.ID,
+		Title:      m.Title,
+		Overview:   m.Overview,
+		PosterPath: m.PosterPath,
+	}
+	if m.ReleaseDate != "" {
+		date := m.ReleaseDate
+		res.ReleaseDate = &date
+	}
+	if m.VoteCount > 0 {
+		score := m.VoteAverage
+		res.VoteAverage = &score
+	}
+	return res
+}
+
+// ParseMovieSearch shapes a raw TMDB /search/movie payload. Pure function, no network.
+func ParseMovieSearch(raw []byte) (*services.MovieSearchPage, error) {
+	var body struct {
+		Page         int               `json:"page"`
+		TotalPages   int               `json:"total_pages"`
+		TotalResults int               `json:"total_results"`
+		Results      []tmdbSearchMovie `json:"results"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		// Deliberately not wrapping err: decoder errors can echo upstream content.
+		return nil, fmt.Errorf("%w: failed to parse search response", ErrTMDBAPI)
+	}
+	items := make([]services.MovieSearchResult, 0, len(body.Results))
+	for _, r := range body.Results {
+		items = append(items, r.toSearchResult())
+	}
+	return &services.MovieSearchPage{
+		Items:        items,
+		Page:         body.Page,
+		TotalPages:   body.TotalPages,
+		TotalResults: body.TotalResults,
+	}, nil
+}
