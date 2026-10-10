@@ -1,3 +1,4 @@
+import { EMPTY_VALUE } from '$lib/utils/formatting';
 import { describe, it, expect } from 'vitest';
 import {
 	PLAN_COLUMNS,
@@ -13,7 +14,6 @@ import {
 	planPrivacyLabel,
 	planStatusLabel,
 	serverSortFor,
-	PLAN_EMPTY,
 } from '$lib/utils/plan-grid-config';
 import type { UserTodoItem, UserTodoSortBy } from '$lib/queries/userTodos';
 
@@ -97,7 +97,7 @@ describe('formatters', () => {
 		expect(planStatusLabel('IN_PROGRESS')).toBe('In progress');
 		expect(planStatusLabel('DONE')).toBe('Done');
 		expect(planStatusLabel('DROPPED')).toBe('Dropped');
-		expect(planStatusLabel(null)).toBe(PLAN_EMPTY);
+		expect(planStatusLabel(null)).toBe(EMPTY_VALUE);
 	});
 
 	it('formats percent and clamps it to 0-100', () => {
@@ -105,32 +105,32 @@ describe('formatters', () => {
 		expect(planPercentLabel(0)).toBe('0%');
 		expect(planPercentLabel(150)).toBe('100%');
 		expect(planPercentLabel(-5)).toBe('0%');
-		expect(planPercentLabel(null)).toBe(PLAN_EMPTY);
+		expect(planPercentLabel(null)).toBe(EMPTY_VALUE);
 	});
 
 	it('shows priority on the 0-10 rating display scale', () => {
 		expect(planPriorityLabel(9234)).toBe('9.234');
 		expect(planPriorityLabel(0)).toBe('0.000');
-		expect(planPriorityLabel(null)).toBe(PLAN_EMPTY);
+		expect(planPriorityLabel(null)).toBe(EMPTY_VALUE);
 	});
 
 	it('shows a YYYY-MM-DD date as a calendar day, not shifted by timezone', () => {
 		expect(planDateLabel('2026-10-10')).toBe('Oct 10, 2026');
 		expect(planDateLabel('2026-01-01')).toBe('Jan 1, 2026');
-		expect(planDateLabel(null)).toBe(PLAN_EMPTY);
-		expect(planDateLabel('not a date')).toBe(PLAN_EMPTY);
+		expect(planDateLabel(null)).toBe(EMPTY_VALUE);
+		expect(planDateLabel('not a date')).toBe(EMPTY_VALUE);
 	});
 
 	it('shows the list name with its position', () => {
 		expect(planListLabel({ name: 'Reading' }, 3)).toBe('Reading · 3');
 		expect(planListLabel({ name: 'Reading' }, null)).toBe('Reading');
-		expect(planListLabel(null, null)).toBe(PLAN_EMPTY);
+		expect(planListLabel(null, null)).toBe(EMPTY_VALUE);
 	});
 
 	it('labels both privacy values', () => {
 		expect(planPrivacyLabel('PUBLIC')).toBe('Public');
 		expect(planPrivacyLabel('PRIVATE')).toBe('Private');
-		expect(planPrivacyLabel(null)).toBe(PLAN_EMPTY);
+		expect(planPrivacyLabel(null)).toBe(EMPTY_VALUE);
 	});
 
 	it('names a row by its content, then its free-text name, then a placeholder', () => {
@@ -213,7 +213,7 @@ describe('buildPlanColumnDefs', () => {
 		expect(getter({ data: todo({ content: { id: '9', name: 'Psalm', contentType: 'BIBLE_PASSAGE' } }) })).toBe(
 			'Bible Passage',
 		);
-		expect(getter({ data: todo() })).toBe(PLAN_EMPTY);
+		expect(getter({ data: todo() })).toBe(EMPTY_VALUE);
 	});
 
 	it('hides the Type column below the md tier', () => {
@@ -225,7 +225,7 @@ describe('buildPlanColumnDefs', () => {
 		const add = buildPlanColumnDefs(false).find((d) => d.colId === 'addPerspective');
 		const getter = add?.valueGetter as unknown as (p: { data: UserTodoItem }) => string;
 		expect(getter({ data: todo({ content: { id: '9', name: 'Video' } }) })).toBe('Add');
-		expect(getter({ data: todo() })).toBe(PLAN_EMPTY);
+		expect(getter({ data: todo() })).toBe(EMPTY_VALUE);
 	});
 
 	it('explains the disabled Add perspective cell in its tooltip', () => {

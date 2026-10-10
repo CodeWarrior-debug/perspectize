@@ -10,8 +10,10 @@
 		SortChangedEvent,
 	} from '@ag-grid-community/core';
 	import type { UserTodoItem, UserTodoSortBy } from '$lib/queries/userTodos';
-	import type { ResponsiveTier } from '$lib/utils/grid-config';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
+	import { emptyCellClassRules } from '$lib/utils/grid-empty';
+	import EmptyAware from '$lib/components/EmptyAware.svelte';
+	import { useCardMode, useResponsiveTier } from '$lib/utils/responsive.svelte';
 	import {
 		buildPlanColumnDefs,
 		PLAN_COL_IDS,
@@ -51,8 +53,10 @@
 
 	let gridApi = $state<GridApi<UserTodoItem> | null>(null);
 	let gridReady = $state(false);
-	let tier = $state<ResponsiveTier>('lg');
-	let cardMode = $state(false);
+	const responsive = useResponsiveTier();
+	const card = useCardMode();
+	const tier = $derived(responsive.current);
+	const cardMode = $derived(card.current);
 
 	const modules = [ClientSideRowModelModule];
 	const theme = themeQuartz.withParams(GRID_THEME_PARAMS);
@@ -61,6 +65,7 @@
 		return {
 			// Initial visibility is left to the tier effect below, so this doesn't read `tier`.
 			columnDefs: buildPlanColumnDefs(inListMode),
+			defaultColDef: { cellClassRules: emptyCellClassRules },
 			getRowId: (params) => params.data.id,
 			rowDragManaged: true,
 			animateRows: false,
@@ -101,41 +106,6 @@
 	// Rebuilt only when list mode flips: the grid is keyed on it below and remounts,
 	// because rowDrag is read once per column definition.
 	const gridOptions = $derived(buildGridOptions(listMode));
-
-	// Responsive tiers (same breakpoints as ActivityTable).
-	$effect(() => {
-		if (typeof window === 'undefined') return;
-		const mqSm = window.matchMedia('(min-width: 445px)');
-		const mqMd = window.matchMedia('(min-width: 640px)');
-		const mqLg = window.matchMedia('(min-width: 900px)');
-		const update = () => {
-			if (mqLg.matches) tier = 'lg';
-			else if (mqMd.matches) tier = 'md';
-			else if (mqSm.matches) tier = 'sm';
-			else tier = 'xs';
-		};
-		update();
-		mqSm.addEventListener('change', update);
-		mqMd.addEventListener('change', update);
-		mqLg.addEventListener('change', update);
-		return () => {
-			mqSm.removeEventListener('change', update);
-			mqMd.removeEventListener('change', update);
-			mqLg.removeEventListener('change', update);
-		};
-	});
-
-	// Card-mode breakpoint: below 860px the grid is replaced by stacked cards.
-	$effect(() => {
-		if (typeof window === 'undefined') return;
-		const mq = window.matchMedia('(max-width: 859px)');
-		const update = () => {
-			cardMode = mq.matches;
-		};
-		update();
-		mq.addEventListener('change', update);
-		return () => mq.removeEventListener('change', update);
-	});
 
 	// Unmounting the grid (card mode, or a list-mode remount) leaves a stale API behind;
 	// clear it so the effects below don't call into a destroyed grid.
@@ -180,10 +150,14 @@
 						<span class="text-muted-foreground text-xs" data-testid="plan-card-type">{planTypeLabel(todo)}</span>
 					{/if}
 					<span class="text-muted-foreground text-xs">
-						{todo.action.label} · {planStatusLabel(todo.status)} · {planPercentLabel(todo.percentComplete)}
+						{todo.action.label} · <EmptyAware text={planStatusLabel(todo.status)} /> · <EmptyAware
+							text={planPercentLabel(todo.percentComplete)}
+						/>
 					</span>
 					{#if todo.list}
-						<span class="text-muted-foreground text-xs">{planListLabel(todo.list, todo.listPosition)}</span>
+						<span class="text-muted-foreground text-xs"
+							><EmptyAware text={planListLabel(todo.list, todo.listPosition)} /></span
+						>
 					{/if}
 				</button>
 				<button

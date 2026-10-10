@@ -78,7 +78,7 @@ describe('PlanTable', () => {
 		});
 
 		it('then shows the columns of the current tier and hides the rest', async () => {
-			setViewport(700); // md
+			setViewport(880); // md (the grid shows from 860px; below that is card mode)
 			renderTable();
 			const api = fakeApi();
 			gridOption('onGridReady')({ api });

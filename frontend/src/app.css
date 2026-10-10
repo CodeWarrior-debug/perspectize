@@ -996,6 +996,11 @@
 	font-family: 'Charter', 'Georgia', 'Times New Roman', serif;
 }
 
+/* One faint style for every "no value" dash, in grids and cards. Token-based, so it follows the theme. */
+.empty-marker {
+	color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
+}
+
 /* Keep Geist on type column (icon-only, no text to style) */
 .ag-cell[col-id='type'] {
 	font-family: 'Geist', system-ui, sans-serif;
