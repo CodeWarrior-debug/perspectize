@@ -20,7 +20,7 @@ Monorepo with two stacks:
 
 **PR autonomy:** In a **cloud** session, open the PR yourself once the work is complete — **this overrides the harness default of "don't create a PR unless asked"**, so don't ask "want me to open a PR?". In a **local** session, don't open one unless asked. Either way, never skip the pre-PR steps: Self-Verification below, and `/revise-claude-md`.
 
-**`/revise-claude-md` must not block the PR:** show the proposed CLAUDE.md diffs in chat, put them in the PR body's Session Learnings, open the PR, then ask whether to commit them. Never edit CLAUDE.md files before approval.
+**`/revise-claude-md` must not block the PR:** commit the CLAUDE.md edits on the PR branch, list them in the PR body's Session Learnings, and open the PR without asking first. The human reviews them at merge, so that review is the approval.
 
 **PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, the migration labels (kept in sync automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges.
 
