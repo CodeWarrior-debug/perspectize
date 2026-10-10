@@ -83,7 +83,9 @@ describe('useAddVideo — YouTube Music', () => {
 		options.onSuccess({
 			createContentFromYouTubeMusic: { ...track([]).createContentFromYouTubeMusic, alreadyExisted: true },
 		});
-		expect(mockToast.warning).toHaveBeenCalledWith('This song has already been added');
+		expect(mockToast.warning).toHaveBeenCalledWith('This song has already been added', {
+			action: { label: 'Go to song', onClick: expect.any(Function) },
+		});
 	});
 
 	it('shows the album/playlist message from the server', () => {

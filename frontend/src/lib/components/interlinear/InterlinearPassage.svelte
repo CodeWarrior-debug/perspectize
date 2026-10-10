@@ -14,6 +14,7 @@
 		type InterlinearEvent,
 	} from '$lib/utils/interlinear';
 	import WordPopover from './WordPopover.svelte';
+	import VerseNumber from '$lib/components/VerseNumber.svelte';
 
 	let { verses, interlinear }: { verses: VerseText[]; interlinear: InterlinearVerse[] } = $props();
 
@@ -142,7 +143,10 @@
 			{@const iv = byVerse.get(v.verseId)}
 			{#if iv}
 				<span
-					>{#each iv.segments as seg, i (i)}{#if seg.spaceBefore}{' '}{/if}{#if iv.words.some((w) => w.segment === i)}<button
+					><VerseNumber
+						verseId={iv.verseId}
+						verse={iv.verse}
+					/>{#each iv.segments as seg, i (i)}{#if seg.spaceBefore}{' '}{/if}{#if iv.words.some((w) => w.segment === i)}<button
 								type="button"
 								data-segment="{iv.verseId}:{i}"
 								aria-describedby={active !== null && active === primaryWordKey(iv, i)
@@ -153,7 +157,7 @@
 							>{:else}<span>{seg.text}</span>{/if}{/each}{' '}</span
 				>
 			{:else if v.text}
-				<span><sup class="mr-0.5 ml-0.5 text-[10px] text-muted-foreground">{v.verse}</sup>{v.text}{' '}</span>
+				<span><VerseNumber verseId={v.verseId} verse={v.verse} />{v.text}{' '}</span>
 			{/if}
 		{/each}
 	</div>
@@ -172,7 +176,7 @@
 				ondblclick={onDblClick}
 			>
 				{#each chipVerses as iv (iv.verseId)}
-					<span class="self-center text-[10px] text-muted-foreground">{iv.verse}</span>
+					<VerseNumber verseId={iv.verseId} verse={iv.verse} variant="label" />
 					{#each englishOrderWords(iv) as w (w.id)}
 						<button
 							type="button"

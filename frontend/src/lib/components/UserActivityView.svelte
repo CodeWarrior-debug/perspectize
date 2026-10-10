@@ -2,10 +2,7 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import { graphqlRequest } from '$lib/queries/client';
 	import { LIST_CONTENT, type ContentResponse } from '$lib/queries/content';
-	import {
-		LIST_ACTIVITY_PERSPECTIVES,
-		type ListActivityPerspectivesResponse,
-	} from '$lib/queries/perspectives';
+	import { LIST_ACTIVITY_PERSPECTIVES, type ListActivityPerspectivesResponse } from '$lib/queries/perspectives';
 	import { LIST_USERS, type UsersResponse } from '$lib/queries/users';
 	import { queryKeys } from '$lib/queries/keys';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
@@ -71,9 +68,7 @@
 		staleTime: 30 * 1000,
 	}));
 
-	const loading = $derived(
-		usersQuery.isLoading || contentQuery.isLoading || perspectivesQuery.isLoading,
-	);
+	const loading = $derived(usersQuery.isLoading || contentQuery.isLoading || perspectivesQuery.isLoading);
 	// Surfaced explicitly rather than left to fall through to empty arrays — a failed
 	// content/perspectives request must not render as "no activity" for every user.
 	//
@@ -234,7 +229,9 @@
 				{:else}
 					<div class="flex flex-col gap-2.5">
 						{#each group.events.slice(0, EVENTS_PER_USER) as event, i (i)}
-							<div class="flex items-center gap-3 rounded-lg border border-border bg-card p-2.5 hover:bg-primary/[0.06]">
+							<div
+								class="flex items-center gap-3 rounded-lg border border-border bg-card p-2.5 hover:bg-primary/[0.06]"
+							>
 								<button
 									type="button"
 									title="Open original content in new tab"

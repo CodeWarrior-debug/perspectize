@@ -149,77 +149,77 @@
 
 	<!-- Stepper row -->
 	<div class="flex items-center justify-center">
-	<div class="inline-flex items-center gap-1.5 relative">
-		<!-- Decrement button -->
-		<button
-			type="button"
-			onmousedown={startDecrement}
-			onmouseup={stopRepeat}
-			onmouseleave={stopRepeat}
-			ontouchstart={startDecrement}
-			ontouchend={stopRepeat}
-			class="flex items-center justify-center transition-opacity hover:opacity-70 select-none text-muted-foreground"
-			aria-label="Decrease {label}"
-		>
-			<ChevronDownIcon class="size-3.5" strokeWidth={2} />
-		</button>
-
-		<!-- Number input -->
-		<input
-			id={name}
-			{name}
-			type="number"
-			min={RATING_MIN}
-			max={RATING_MAX}
-			step="any"
-			value={hasInteracted ? displayValue.toFixed(3) : RATING_DEFAULT_DISPLAY.toFixed(3)}
-			onchange={handleInputChange}
-			onfocus={handleFocus}
-			class="text-center bg-transparent border-none outline-none font-mono text-sm font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-			style="width: 60px; color: {numberColor};"
-			aria-label="{label} rating"
-		/>
-
-		<!-- Increment button -->
-		<button
-			type="button"
-			onmousedown={startIncrement}
-			onmouseup={stopRepeat}
-			onmouseleave={stopRepeat}
-			ontouchstart={startIncrement}
-			ontouchend={stopRepeat}
-			class="flex items-center justify-center transition-opacity hover:opacity-70 select-none text-muted-foreground"
-			aria-label="Increase {label}"
-		>
-			<ChevronUpIcon class="size-3.5" strokeWidth={2} />
-		</button>
-
-		<!-- Clear button (X) — shown only when hasInteracted and no onRemove handler -->
-		{#if !onRemove && hasInteracted}
+		<div class="inline-flex items-center gap-1.5 relative">
+			<!-- Decrement button -->
 			<button
 				type="button"
-				onclick={clearRating}
-				class="absolute -right-5 flex items-center justify-center transition-opacity hover:opacity-70 text-muted-foreground"
-				aria-label="Clear {label} rating"
+				onmousedown={startDecrement}
+				onmouseup={stopRepeat}
+				onmouseleave={stopRepeat}
+				ontouchstart={startDecrement}
+				ontouchend={stopRepeat}
+				class="flex items-center justify-center transition-opacity hover:opacity-70 select-none text-muted-foreground"
+				aria-label="Decrease {label}"
 			>
-				<XIcon class="size-3" />
+				<ChevronDownIcon class="size-3.5" strokeWidth={2} />
 			</button>
-		{/if}
 
-		<!-- Remove field button (X) — snug to the right of the stepper row, vertically centered on it -->
-		{#if onRemove}
+			<!-- Number input -->
+			<input
+				id={name}
+				{name}
+				type="number"
+				min={RATING_MIN}
+				max={RATING_MAX}
+				step="any"
+				value={hasInteracted ? displayValue.toFixed(3) : RATING_DEFAULT_DISPLAY.toFixed(3)}
+				onchange={handleInputChange}
+				onfocus={handleFocus}
+				class="text-center bg-transparent border-none outline-none font-mono text-sm font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+				style="width: 60px; color: {numberColor};"
+				aria-label="{label} rating"
+			/>
+
+			<!-- Increment button -->
 			<button
 				type="button"
-				onclick={onRemove}
-				class="hover-tooltip flex items-center justify-center bg-card border border-border rounded-full shadow-sm text-muted-foreground hover:opacity-70 transition-opacity z-10"
-				style="position: absolute; top: 50%; left: 100%; margin-left: 4px; transform: translateY(-50%); width: 16px; height: 16px;"
-				aria-label="Remove {label}"
-				data-tooltip="Remove {label}"
+				onmousedown={startIncrement}
+				onmouseup={stopRepeat}
+				onmouseleave={stopRepeat}
+				ontouchstart={startIncrement}
+				ontouchend={stopRepeat}
+				class="flex items-center justify-center transition-opacity hover:opacity-70 select-none text-muted-foreground"
+				aria-label="Increase {label}"
 			>
-				<XIcon class="size-2" strokeWidth={3} />
+				<ChevronUpIcon class="size-3.5" strokeWidth={2} />
 			</button>
-		{/if}
-	</div>
+
+			<!-- Clear button (X) — shown only when hasInteracted and no onRemove handler -->
+			{#if !onRemove && hasInteracted}
+				<button
+					type="button"
+					onclick={clearRating}
+					class="absolute -right-5 flex items-center justify-center transition-opacity hover:opacity-70 text-muted-foreground"
+					aria-label="Clear {label} rating"
+				>
+					<XIcon class="size-3" />
+				</button>
+			{/if}
+
+			<!-- Remove field button (X) — snug to the right of the stepper row, vertically centered on it -->
+			{#if onRemove}
+				<button
+					type="button"
+					onclick={onRemove}
+					class="hover-tooltip flex items-center justify-center bg-card border border-border rounded-full shadow-sm text-muted-foreground hover:opacity-70 transition-opacity z-10"
+					style="position: absolute; top: 50%; left: 100%; margin-left: 4px; transform: translateY(-50%); width: 16px; height: 16px;"
+					aria-label="Remove {label}"
+					data-tooltip="Remove {label}"
+				>
+					<XIcon class="size-2" strokeWidth={3} />
+				</button>
+			{/if}
+		</div>
 	</div>
 
 	<!-- Progress bar -->

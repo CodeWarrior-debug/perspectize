@@ -311,6 +311,8 @@ type PassageInterlinear {
 # Filters for content queries
 input ContentFilter {
   contentType: ContentType
+  # Match any of these types (OR'd). Omitted/empty = no type filter. ANDed with contentType if both are set.
+  contentTypes: [ContentType!]
   minLengthSeconds: Int
   maxLengthSeconds: Int
   search: String

@@ -27,6 +27,13 @@ export const queryKeys = {
 		banner: (id: string) => [...queryKeys.content.details(), 'banner', id] as const,
 		// YOUTUBE_MUSIC details (related media + lyrics availability); separate key for the same reason.
 		music: (id: string) => [...queryKeys.content.details(), 'music', id] as const,
+		// Full ContentItem row (GET_CONTENT_DETAILS) for a details modal opened on an
+		// item that isn't in the loaded Activity rows (e.g. via `?open=<id>`).
+		row: (id: string) => [...queryKeys.content.details(), 'row', id] as const,
+		// ListComparableContent (ComparePicker.svelte) — a distinct shape/query
+		// from `list` above (adds perspectiveCount, no pagination), keyed by
+		// the debounced search term.
+		comparePicker: (search: string) => [...queryKeys.content.lists(), 'compare-picker', search] as const,
 	},
 
 	bible: {

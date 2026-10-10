@@ -1,5 +1,6 @@
 import { createMutation, useQueryClient, type QueryClient } from '@tanstack/svelte-query';
 import { toast } from 'svelte-sonner';
+import { goto } from '$app/navigation';
 import { graphqlRequest } from '../client';
 import {
 	CREATE_CONTENT_FROM_YOUTUBE,
@@ -13,6 +14,7 @@ import {
 import { promoteRelatedMedia } from './useMusicTrack';
 import { queryKeys } from '../keys';
 import { classifyYouTubeUrl } from '$lib/utils/youtube';
+import { activityContentHref } from '$lib/utils/contentLinks';
 
 type AddResult = CreateContentResult & { isMusic: boolean; relatedMedia: RelatedMedia[] };
 type AddResponse = CreateContentResponse | CreateMusicContentResponse;
@@ -61,7 +63,13 @@ export function useAddVideo() {
 			const noun = result.isMusic ? 'song' : 'video';
 
 			if (result?.alreadyExisted) {
-				toast.warning(`This ${noun} has already been added`);
+				// VIDEO-05: Warn user that video already exists, and offer a way to it
+				const existingId = newItem?.id;
+				toast.warning(`This ${noun} has already been added`, {
+					action: existingId
+						? { label: `Go to ${noun}`, onClick: () => goto(activityContentHref(existingId)) }
+						: undefined,
+				});
 			} else {
 				toast.success(`Added: ${newItem?.name ?? noun}`);
 			}

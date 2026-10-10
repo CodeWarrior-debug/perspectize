@@ -2549,6 +2549,8 @@ type PassageInterlinear {
 # Filters for content queries
 input ContentFilter {
   contentType: ContentType
+  # Match any of these types (OR'd). Omitted/empty = no type filter. ANDed with contentType if both are set.
+  contentTypes: [ContentType!]
   minLengthSeconds: Int
   maxLengthSeconds: Int
   search: String
@@ -12550,7 +12552,7 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"contentType", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
+	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12564,6 +12566,13 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.ContentType = data
+		case "contentTypes":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("contentTypes"))
+			data, err := ec.unmarshalOContentType2ᚕgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentTypeᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ContentTypes = data
 		case "minLengthSeconds":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minLengthSeconds"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
@@ -17291,6 +17300,23 @@ func (ec *executionContext) unmarshalNContentSortInput2ᚖgithubᚗcomᚋCodeWar
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNContentType2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentType(ctx context.Context, v any) (domain.ContentType, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.ContentType(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNContentType2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentType(ctx context.Context, sel ast.SelectionSet, v domain.ContentType) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) unmarshalNCreateClaimInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateClaimInput(ctx context.Context, v any) (model.CreateClaimInput, error) {
 	res, err := ec.unmarshalInputCreateClaimInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -18253,6 +18279,42 @@ func (ec *executionContext) unmarshalOContentSortInput2ᚕᚖgithubᚗcomᚋCode
 		}
 	}
 	return res, nil
+}
+
+func (ec *executionContext) unmarshalOContentType2ᚕgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentTypeᚄ(ctx context.Context, v any) ([]domain.ContentType, error) {
+	if v == nil {
+		return nil, nil
+	}
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]domain.ContentType, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNContentType2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentType(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOContentType2ᚕgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentTypeᚄ(ctx context.Context, sel ast.SelectionSet, v []domain.ContentType) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNContentType2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentType(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOContentType2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐContentType(ctx context.Context, v any) (*domain.ContentType, error) {
