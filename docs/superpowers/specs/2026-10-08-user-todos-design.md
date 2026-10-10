@@ -246,8 +246,7 @@ The migration is written and reviewed, never applied in dev (shared Neon DB). Th
 
 Settled in review (2026-10-10): first status is `not_started`; privacy column defaulting to public; owner naming ready for assignees; priority on the 0–10000 rating scale with the shared helpers; `cite` / `archive` dropped and actions ordered by `typical_sequence` with tooltips, stored in a cached table; one list per todo; the page is **Plan**; every FK blocks, so content with todos can't be deleted (DB-level gate, respected by the app).
 
+Also settled (2026-10-10): the preset order above (acquire → … → revisit); lists carry their own `privacy`, independent of their todos'; `dropped` is the fourth status.
+
 Still open:
-1. User-entered actions as rows in `todo_actions` with `owner_user_id` (vs. a free-text column on the todo). Chosen so the picker, ordering and tooltips work the same for both.
-2. Preset order above (acquire → … → revisit).
-3. Lists carry their own `privacy`, independent of their todos'.
-4. `dropped` as the fourth status.
+1. User-entered actions as rows in `todo_actions` with `owner_user_id` (vs. a free-text column on the todo). Chosen so the picker, ordering and tooltips work the same for both. The plan assumes rows; switching to free text changes Task 1 (migration) and the action repository.
