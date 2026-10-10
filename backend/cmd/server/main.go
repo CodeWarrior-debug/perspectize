@@ -216,6 +216,7 @@ func main() {
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
+	userTodoService := services.NewUserTodoService(todoRepo, todoListRepo, todoActionRepo)
 	buildInfoService := services.NewBuildInfoService(buildInfoRepo)
 
 	// Messaging realtime plumbing: the hub fans events out in-process, the
@@ -267,6 +268,7 @@ func main() {
 		UserService:         userService,
 		PerspectiveService:  perspectiveService,
 		CategoryService:     categoryService,
+		UserTodoService:     userTodoService,
 		MessagingService:    messagingService,
 		UserRepo:            userRepo,
 		ThreadRepo:          threadRepo,

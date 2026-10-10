@@ -125,15 +125,16 @@ func newHarnessWithPool(t *testing.T, pool database.PoolConfig) *harness {
 	require.NoError(t, err)
 	hub := realtime.NewHub(messageRepo, threadRepo, notifier)
 
+	todoRepo := postgres.NewGormUserTodoRepository(db)
+	todoListRepo := postgres.NewGormUserTodoListRepository(db)
+	todoActionRepo := cached.NewTodoActionRepository(postgres.NewGormTodoActionRepository(db), cached.DefaultTodoActionTTL)
+
 	deps := server.Deps{
-		ContentService: services.NewContentService(h.contentRepo, youtube.NewFixtureClient(), tmdb.NewFixtureClient(), services.WithBibleReference(bibleReferenceRepo)),
-		UserService: services.NewUserService(userRepo, h.contentRepo, perspectiveRepo,
-			postgres.NewGormUserTodoRepository(db),
-			postgres.NewGormUserTodoListRepository(db),
-			cached.NewTodoActionRepository(postgres.NewGormTodoActionRepository(db), cached.DefaultTodoActionTTL),
-		),
+		ContentService:     services.NewContentService(h.contentRepo, youtube.NewFixtureClient(), tmdb.NewFixtureClient(), services.WithBibleReference(bibleReferenceRepo)),
+		UserService:        services.NewUserService(userRepo, h.contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo),
 		PerspectiveService: services.NewPerspectiveService(perspectiveRepo, userRepo),
 		CategoryService:    services.NewCategoryService(categoryRepo, h.contentRepo, noWikidata{}),
+		UserTodoService:    services.NewUserTodoService(todoRepo, todoListRepo, todoActionRepo),
 		MessagingService:   services.NewMessagingService(threadRepo, messageRepo, hub, services.NewSlidingWindowLimiter(1000, time.Second)),
 		UserRepo:           userRepo,
 		ThreadRepo:         threadRepo,
@@ -277,6 +278,10 @@ func (h *harness) cleanup() {
 	db := h.db.WithContext(ctx)
 	if len(h.userIDs) > 0 {
 		_ = db.Exec("DELETE FROM perspectives WHERE user_id IN ?", h.userIDs).Error
+		// Todos reference content, lists and actions with RESTRICT, so they go first.
+		_ = db.Exec("DELETE FROM user_todos WHERE user_id IN ?", h.userIDs).Error
+		_ = db.Exec("DELETE FROM user_todo_lists WHERE user_id IN ?", h.userIDs).Error
+		_ = db.Exec("DELETE FROM todo_actions WHERE user_id IN ?", h.userIDs).Error
 		_ = db.Exec("DELETE FROM message_threads WHERE created_by IN ?", h.userIDs).Error
 		_ = db.Exec("DELETE FROM messages WHERE sender_id IN ?", h.userIDs).Error
 		_ = db.Exec("DELETE FROM thread_participants WHERE user_id IN ?", h.userIDs).Error
