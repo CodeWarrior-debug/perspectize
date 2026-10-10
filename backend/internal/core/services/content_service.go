@@ -23,6 +23,8 @@ type ContentService struct {
 	bibleRepo     repositories.BibleReferenceRepository
 	trending      portservices.YouTubeTrendingClient
 	movieClient   portservices.MovieClient
+	movieSearch   portservices.MovieSearchClient
+	movieTrending portservices.MovieTrendingClient
 }
 
 // ContentServiceOption configures optional ContentService dependencies.
@@ -37,6 +39,18 @@ func WithBibleReference(repo repositories.BibleReferenceRepository) ContentServi
 // caching client so every caller shares its cache.
 func WithYouTubeTrending(client portservices.YouTubeTrendingClient) ContentServiceOption {
 	return func(s *ContentService) { s.trending = client }
+}
+
+// WithMovieSearch enables the Discover page's Movies source (TMDB title search).
+// Searches are not cached server-side; each call reaches TMDB.
+func WithMovieSearch(client portservices.MovieSearchClient) ContentServiceOption {
+	return func(s *ContentService) { s.movieSearch = client }
+}
+
+// WithMovieTrending enables the Discover page's trending movies list. Pass the
+// caching client so every caller shares its cache.
+func WithMovieTrending(client portservices.MovieTrendingClient) ContentServiceOption {
+	return func(s *ContentService) { s.movieTrending = client }
 }
 
 // NewContentService creates a new content service
@@ -454,6 +468,48 @@ func (s *ContentService) YouTubeTrending(ctx context.Context, regionCode, pageTo
 		return nil, fmt.Errorf("%w: pageToken is too long", domain.ErrInvalidInput)
 	}
 	return s.trending.GetTrending(ctx, region, strings.TrimSpace(pageToken))
+}
+
+// SearchMovies returns one page of TMDB title search results. The query is
+// trimmed and must be 1-100 runes. Page 0 means page 1; otherwise it must be
+// 1-500. Invalid input never reaches TMDB.
+func (s *ContentService) SearchMovies(ctx context.Context, query string, page int) (*portservices.MovieSearchPage, error) {
+	if s.movieSearch == nil {
+		return nil, fmt.Errorf("%w: movie search is not configured", tmdb.ErrNotConfigured)
+	}
+	q := strings.TrimSpace(query)
+	if n := utf8.RuneCountInString(q); n < 1 || n > 100 {
+		return nil, fmt.Errorf("%w: query must be 1-100 characters", domain.ErrInvalidInput)
+	}
+	if page == 0 {
+		page = 1
+	}
+	if page < 1 || page > 500 {
+		return nil, fmt.Errorf("%w: page must be between 1 and 500", domain.ErrInvalidInput)
+	}
+	return s.movieSearch.SearchMovies(ctx, q, page)
+}
+
+// TrendingMovies returns one page of TMDB's trending movies. An empty window
+// means WEEK and anything other than DAY or WEEK is invalid. Page 0 means 1;
+// otherwise it must be 1-500. Invalid input never reaches TMDB.
+func (s *ContentService) TrendingMovies(ctx context.Context, window domain.TrendingWindow, page int) (*portservices.MovieSearchPage, error) {
+	if s.movieTrending == nil {
+		return nil, fmt.Errorf("%w: movie trending is not configured", tmdb.ErrNotConfigured)
+	}
+	if window == "" {
+		window = domain.TrendingWindowWeek
+	}
+	if window != domain.TrendingWindowDay && window != domain.TrendingWindowWeek {
+		return nil, fmt.Errorf("%w: window must be DAY or WEEK", domain.ErrInvalidInput)
+	}
+	if page == 0 {
+		page = 1
+	}
+	if page < 1 || page > 500 {
+		return nil, fmt.Errorf("%w: page must be between 1 and 500", domain.ErrInvalidInput)
+	}
+	return s.movieTrending.TrendingMovies(ctx, window, page)
 }
 
 // ErrMovieClientUnavailable is returned by CreateFromMovie when the service was

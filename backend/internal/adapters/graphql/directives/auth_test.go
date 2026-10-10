@@ -29,6 +29,14 @@ func (m *mockContentService) YouTubeTrending(ctx context.Context, regionCode, pa
 	return nil, nil
 }
 
+func (m *mockContentService) SearchMovies(ctx context.Context, query string, page int) (*portservices.MovieSearchPage, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) TrendingMovies(ctx context.Context, window domain.TrendingWindow, page int) (*portservices.MovieSearchPage, error) {
+	return nil, nil
+}
+
 func (m *mockContentService) CreateFromMovie(ctx context.Context, rawURL string, userID int) (*domain.Content, error) {
 	return nil, nil
 }

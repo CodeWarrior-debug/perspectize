@@ -584,3 +584,48 @@ func (r *queryResolver) YoutubeTrending(ctx context.Context, regionCode *string,
 	}
 	return out, nil
 }
+
+// MovieSearch is the resolver for the movieSearch field. It is public (no @auth)
+// like youtubeTrending; adding a found movie still requires sign-in through
+// createContentFromMovie. TMDB failures are logged server-side and returned as a
+// generic message, so the token and upstream details never reach the client.
+func (r *queryResolver) MovieSearch(ctx context.Context, query string, page *int) (*model.MovieSearchPage, error) {
+	pageNum := 0 // service treats 0 as page 1
+	if page != nil {
+		pageNum = *page
+	}
+
+	result, err := r.ContentService.SearchMovies(ctx, query, pageNum)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("%w", err)
+		}
+		slog.Error("failed to search movies", "error", err)
+		return nil, fmt.Errorf("movie search is unavailable right now")
+	}
+	return movieSearchPageToModel(result), nil
+}
+
+// MovieTrending is the resolver for the movieTrending field. It is public (no @auth)
+// like movieSearch. A nil window reaches the service as "" (WEEK) and a nil page as
+// 0 (page 1). TMDB failures are logged server-side and returned as a generic message.
+func (r *queryResolver) MovieTrending(ctx context.Context, window *domain.TrendingWindow, page *int) (*model.MovieSearchPage, error) {
+	var win domain.TrendingWindow // service treats empty as WEEK
+	if window != nil {
+		win = *window
+	}
+	pageNum := 0 // service treats 0 as page 1
+	if page != nil {
+		pageNum = *page
+	}
+
+	result, err := r.ContentService.TrendingMovies(ctx, win, pageNum)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("%w", err)
+		}
+		slog.Error("failed to load trending movies", "error", err)
+		return nil, fmt.Errorf("trending movies are unavailable right now")
+	}
+	return movieSearchPageToModel(result), nil
+}

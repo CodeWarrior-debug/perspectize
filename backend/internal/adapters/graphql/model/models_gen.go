@@ -257,6 +257,23 @@ type MessagePosted struct {
 
 func (MessagePosted) IsThreadEvent() {}
 
+type MovieSearchPage struct {
+	Items        []*MovieSearchResult `json:"items"`
+	Page         int                  `json:"page"`
+	TotalPages   int                  `json:"totalPages"`
+	TotalResults int                  `json:"totalResults"`
+}
+
+type MovieSearchResult struct {
+	TmdbID      int      `json:"tmdbId"`
+	Title       string   `json:"title"`
+	ReleaseDate *string  `json:"releaseDate,omitempty"`
+	Overview    string   `json:"overview"`
+	PosterPath  *string  `json:"posterPath,omitempty"`
+	VoteAverage *float64 `json:"voteAverage,omitempty"`
+	URL         string   `json:"url"`
+}
+
 type Mutation struct {
 }
 

@@ -127,6 +127,34 @@ type YouTubeTrendingPage {
   nextPageToken: String
 }
 
+# One movie from TMDB search (Discover page Movies source).
+type MovieSearchResult {
+  tmdbId: Int!
+  title: String!
+  # YYYY-MM-DD; null when TMDB has no date
+  releaseDate: String
+  overview: String!
+  # TMDB image path, e.g. "/abc.jpg"; prefix with https://image.tmdb.org/t/p/<size>
+  posterPath: String
+  # TMDB vote average 0-10; null when there are no votes
+  voteAverage: Float
+  # Canonical content URL (https://www.themoviedb.org/movie/<id>) — pass to createContentFromMovie
+  url: String!
+}
+
+type MovieSearchPage {
+  items: [MovieSearchResult!]!
+  page: Int!
+  totalPages: Int!
+  totalResults: Int!
+}
+
+# Time window for TMDB trending lists.
+enum TrendingWindow {
+  DAY
+  WEEK
+}
+
 type WikidataSearchResult {
   qid: String!
   label: String!
@@ -565,6 +593,12 @@ type Query {
   # Discover page: YouTube's Trending chart, served from the backend cache so
   # visitors share one API call per page per hour. regionCode defaults to US.
   youtubeTrending(regionCode: String, pageToken: String): YouTubeTrendingPage!
+
+  # Discover page: TMDB movie search (not cached server-side). page defaults to 1 (max 500).
+  movieSearch(query: String!, page: Int): MovieSearchPage!
+
+  # Discover page: TMDB trending movies, cached server-side (~1h). window defaults to WEEK; page defaults to 1 (max 500).
+  movieTrending(window: TrendingWindow = WEEK, page: Int): MovieSearchPage!
 
   # Perspective queries
   perspectiveByID(id: ID!): Perspective

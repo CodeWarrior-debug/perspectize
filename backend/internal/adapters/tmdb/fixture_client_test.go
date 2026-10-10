@@ -21,3 +21,18 @@ func TestFixtureClient(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 603, id)
 }
+
+func TestFixtureClient_SearchMovies(t *testing.T) {
+	page, err := NewFixtureClient().SearchMovies(context.Background(), "anything at all", 1)
+	require.NoError(t, err)
+	assert.Equal(t, 1, page.TotalPages)
+	assert.Equal(t, 1, page.TotalResults)
+	require.Len(t, page.Items, 1)
+	assert.Equal(t, 603, page.Items[0].TMDBID)
+	assert.NotEmpty(t, page.Items[0].Title)
+}
+
+func TestUnconfiguredClient_SearchMoviesNotConfigured(t *testing.T) {
+	_, err := UnconfiguredClient{}.SearchMovies(context.Background(), "matrix", 1)
+	assert.ErrorIs(t, err, ErrNotConfigured)
+}
