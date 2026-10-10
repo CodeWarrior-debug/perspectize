@@ -50,12 +50,41 @@ describe('planItemCellRenderer', () => {
 	});
 
 	describe('a todo with no content', () => {
-		it('is just its free-text name', () => {
-			expect(planItemCellRenderer(todo({ name: 'Read the paper' }))).toBe('Read the paper');
+		const title = (cell: HTMLElement) => cell.querySelector('[data-testid="item-title"]');
+
+		it('shows its free-text name as the title', () => {
+			const cell = planItemCellRenderer(todo({ name: 'Read the paper' })) as HTMLElement;
+			expect(title(cell)?.textContent).toBe('Read the paper');
 		});
 
-		it('says Untitled when it has neither', () => {
-			expect(planItemCellRenderer(todo({ name: null }))).toBe('Untitled');
+		it('says Untitled when it has neither a name nor content', () => {
+			const cell = planItemCellRenderer(todo({ name: null })) as HTMLElement;
+			expect(title(cell)?.textContent).toBe('Untitled');
+		});
+
+		it('has the same left padding as a thumbnail row, so its text starts where the thumbnails start', () => {
+			const withThumb = planItemCellRenderer(todo({ content: VIDEO })) as HTMLElement;
+			const textOnly = planItemCellRenderer(todo()) as HTMLElement;
+
+			expect(withThumb.classList.contains('px-2.5')).toBe(true);
+			expect(textOnly.classList.contains('px-2.5')).toBe(true);
+			// The text is the first thing in the row: no spacer pushes it in to line up with the title.
+			expect(textOnly.firstElementChild).toBe(title(textOnly));
+		});
+
+		it('is set in the same type as a thumbnail row title', () => {
+			const withThumb = planItemCellRenderer(todo({ content: VIDEO })) as HTMLElement;
+			const textOnly = planItemCellRenderer(todo()) as HTMLElement;
+			for (const cls of ['text-[13px]', 'leading-[1.5]', 'font-[family-name:var(--font-family-serif)]']) {
+				expect(title(withThumb)?.classList.contains(cls)).toBe(true);
+				expect(title(textOnly)?.classList.contains(cls)).toBe(true);
+			}
+		});
+
+		it('lets a click reach the cell, so the todo opens for editing', () => {
+			const { host, onCellClick } = mount(planItemCellRenderer(todo()));
+			host.querySelector<HTMLElement>('[data-testid="item-title"]')?.click();
+			expect(onCellClick).toHaveBeenCalledTimes(1);
 		});
 	});
 
