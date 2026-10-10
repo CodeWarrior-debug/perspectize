@@ -109,6 +109,8 @@ The failure is confined to that last step: `generated.go` and `models_gen.go` ar
 
 **Adding a query/mutation arg regenerates the resolver signature, positionally.** After `make graphql-gen`, the new arg lands wherever it sits in the schema's arg list — not appended at the end of the Go signature. Read the stub in the stray `schema.resolvers.go` (see above) to get the exact updated signature, then copy it verbatim into the real per-domain resolver file; don't hand-guess the param order.
 
+**Schema shape conventions:** timestamps and dates are `String` (ISO; there is no Date scalar). Lists return `Paginated<X> { items, pageInfo, totalCount }` and take `first`/`after`/`last`/`before`/`sortBy`/`sortOrder`/`includeTotalCount`/`filter` (see `perspectives`). Owner-only writes are `create<X>(input)` / `update<X>(input)` with `@auth` and `delete<X>(id: ID!): Boolean! @auth`, with ownership enforced in the service and the SQL (see Gotchas).
+
 ## Testing
 
 - **Unit:** Mock deps, no DB. `make test`.
@@ -140,6 +142,8 @@ c.AssertExactly(t, 1) // batch: 1 query for 50 ids, never 50
 
 Full table and examples: [.docs/QUERY_BUDGET.md](../.docs/QUERY_BUDGET.md).
 
+**Cached repositories** (`adapters/repositories/cached/`) wrap a small, rarely written table that most requests read (users, categories): an id-keyed TTL cache with an injected clock and a generation counter, where writes refresh their own entry from the `RETURNING` row. Wired in `cmd/server/main.go`. Use the same shape for new lookup tables.
+
 ## Code Style
 
 Structured logging with `slog` · dependency injection via ports.
@@ -164,6 +168,8 @@ CORS middleware is part of the API middleware chain in `internal/server/api.go` 
 ## Gotchas
 
 **Owner-only mutations need a guard at every layer, not just `@owner`.** The directive is one check; also re-derive the actor in the resolver via `auth.RequireAuth(ctx)` (never trust a client-supplied user ID), pass it into the service method (e.g. `Delete(ctx, id, actorUserID)`) and return `domain.ErrForbidden` there, and scope the SQL itself (`WHERE user_id = ? AND id = ?`). See `deletePerspective`. `updatePerspective` and `deletePerspective` deliberately skip `@owner`, because its lookup was a duplicate round trip. The service check plus owner-scoped SQL are the two guards there, and the service returns the same not-found / access-denied split. When a non-owner hits someone else's **non-PUBLIC** perspective, `@owner` answers "resource not found", not "access denied", so the ID isn't confirmed to exist (matches `perspectiveByID` returning null).
+
+**User-visible, user-owned rows carry `privacy`** (`PUBLIC` / `PRIVATE`, default `PUBLIC`, reusing `domain.Privacy`). List reads return public OR the viewer's own rows (`ViewerID` + `RestrictToPublicOrOwner`); a by-id read returns `null`, not an error, for someone else's private row. Details: [.docs/DOMAIN_GUIDE.md](../.docs/DOMAIN_GUIDE.md#privacy).
 
 **A model-bound schema field with no resolver is always null.** When `gqlgen.yml` binds a type to a Go model that lacks the field (e.g. `Perspective.user`), gqlgen resolves it silently to null. Add `resolver: true` for that field in `gqlgen.yml` and resolve it through a dataloader.
 
@@ -215,6 +221,8 @@ models:
 
 **New enum checklist:** UPPERCASE constants → bind in `gqlgen.yml` → DB converter if stored → `make graphql-gen`
 
+**Stored-enum hardening:** a DB-stored enum column is lowercase `text`, `NOT NULL`, defaulted, and `CHECK (col IN (...))`-constrained (see `000018_harden_perspective_privacy`).
+
 ## Go Version Management
 
 **`go.mod` pins the exact patch** (`go 1.27.2`, no `toolchain` line). CI's setup-go installs exactly that version, so bump the patch here to move CI.
@@ -234,6 +242,11 @@ models:
 **Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`) during dev or verification.** Docker itself is installed (Docker Desktop; start it with `open -a Docker`), but the normal dev setup has no local Postgres — `DATABASE_URL` / the Makefile default points at the **shared Neon database**, so `make migrate-up` mutates shared state. The only local Postgres is the isolated demo stack's (`make demo-up` from the repo root, port 5434, its own volume) — that one is safe to reset and never touches Neon. Migrations are applied **manually per environment** at rollout time (verified: nothing on Sevalla runs them — no runner in `cmd/server`, no CI step, no release/pre-deploy hook; the `/migrations` dir baked into the image is never executed). Migration work = write + review the SQL only; a PR that adds a migration must state it needs a manual `migrate up` against each environment. The `Migration labels` workflow tags it `migrations-unapplied`. Swap that for `migrations-applied` by hand once it's applied everywhere (`.docs/PR_WORKFLOW.md` → Migration labels).
 
 **Migration numbering:** Always check existing migration files before creating new ones. Plan-specified numbers may be stale — use `ls migrations/ | tail -5` to find the next available number. Numbers on open PRs are **provisional**: don't renumber around other in-flight branches. Finalize the number as the last step before merging (rename to the next free number on `main`). It can't wait until after merge, because golang-migrate won't run with two files sharing a version on `main`. `check-migration-number-before-apply` still on a PR means that rename is due. Prefer idempotent DDL (`DROP CONSTRAINT IF EXISTS` before `ADD`, `UPDATE ... WHERE col IS NULL` before `SET NOT NULL`) so a migration is safe on a fresh DB or one already patched out of band.
+
+**FK delete behavior depends on the FK's kind** (verified across all migrations; the "All FKs use ON DELETE RESTRICT" comment in `000006` predates the exceptions):
+- Ownership FKs to `users` and FKs to `content` **block** (explicit `ON DELETE RESTRICT` for new ones). `UserService.Delete` reassigns owned rows to the `[deleted]` sentinel before deleting the user, so a new user-owned table needs a `ReassignByUser` call there (messaging isn't covered yet: #574).
+- Optional pointers use **`SET NULL`** (`primary_category_id`, `primary_perspective_id`).
+- Child rows of an aggregate use **`CASCADE`** (messaging tables → `message_threads`).
 
 ## Agent Delegation
 
