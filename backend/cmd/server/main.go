@@ -200,6 +200,10 @@ func main() {
 	// they invalidate it (see cached.UserRepository).
 	userRepo := cached.NewUserRepository(postgres.NewGormUserRepository(db), cached.DefaultUserTTL)
 	perspectiveRepo := postgres.NewGormPerspectiveRepository(db)
+	todoRepo := postgres.NewGormUserTodoRepository(db)
+	todoListRepo := postgres.NewGormUserTodoListRepository(db)
+	// Cached: presets never change at runtime and every Plan row resolves its action.
+	todoActionRepo := cached.NewTodoActionRepository(postgres.NewGormTodoActionRepository(db), cached.DefaultTodoActionTTL)
 	// Cached: the content grid resolves every row's primaryCategory through it.
 	categoryRepo := cached.NewCategoryRepository(postgres.NewGormCategoryRepository(db), cached.DefaultCategoryTTL)
 	threadRepo := postgres.NewGormMessageThreadRepository(db)
@@ -209,7 +213,7 @@ func main() {
 
 	// Initialize services
 	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient))
-	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
+	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
 	buildInfoService := services.NewBuildInfoService(buildInfoRepo)

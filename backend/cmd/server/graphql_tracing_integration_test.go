@@ -81,7 +81,7 @@ func newTracingHarness(t *testing.T) *tracingHarness {
 	perspectiveRepo := postgres.NewGormPerspectiveRepository(db)
 
 	contentService := services.NewContentService(contentRepo, nil, nil)
-	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
+	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, nil, nil, nil)
 
 	h := &tracingHarness{db: db}
 

@@ -126,8 +126,12 @@ func newHarnessWithPool(t *testing.T, pool database.PoolConfig) *harness {
 	hub := realtime.NewHub(messageRepo, threadRepo, notifier)
 
 	deps := server.Deps{
-		ContentService:     services.NewContentService(h.contentRepo, youtube.NewFixtureClient(), tmdb.NewFixtureClient(), services.WithBibleReference(bibleReferenceRepo)),
-		UserService:        services.NewUserService(userRepo, h.contentRepo, perspectiveRepo),
+		ContentService: services.NewContentService(h.contentRepo, youtube.NewFixtureClient(), tmdb.NewFixtureClient(), services.WithBibleReference(bibleReferenceRepo)),
+		UserService: services.NewUserService(userRepo, h.contentRepo, perspectiveRepo,
+			postgres.NewGormUserTodoRepository(db),
+			postgres.NewGormUserTodoListRepository(db),
+			cached.NewTodoActionRepository(postgres.NewGormTodoActionRepository(db), cached.DefaultTodoActionTTL),
+		),
 		PerspectiveService: services.NewPerspectiveService(perspectiveRepo, userRepo),
 		CategoryService:    services.NewCategoryService(categoryRepo, h.contentRepo, noWikidata{}),
 		MessagingService:   services.NewMessagingService(threadRepo, messageRepo, hub, services.NewSlidingWindowLimiter(1000, time.Second)),

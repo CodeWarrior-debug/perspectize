@@ -30,7 +30,7 @@ func (s *stubTrending) GetTrending(ctx context.Context, regionCode, pageToken st
 func setupTrendingServer(trending *stubTrending) *httptest.Server {
 	repo := &mockContentRepository{}
 	contentService := services.NewContentService(repo, &mockYouTubeClient{}, nil, services.WithYouTubeTrending(trending))
-	userService := services.NewUserService(&mockUserRepository{}, repo, &mockPerspectiveRepository{})
+	userService := services.NewUserService(&mockUserRepository{}, repo, &mockPerspectiveRepository{}, nil, nil, nil)
 	perspectiveService := services.NewPerspectiveService(&mockPerspectiveRepository{}, &mockUserRepository{})
 	categoryService := services.NewCategoryService(&mockCategoryRepository{}, repo, &mockWikidataClient{})
 	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)

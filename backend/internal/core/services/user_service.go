@@ -18,6 +18,9 @@ type UserService struct {
 	repo            repositories.UserRepository
 	contentRepo     repositories.ContentRepository
 	perspectiveRepo repositories.PerspectiveRepository
+	todoRepo        repositories.UserTodoRepository
+	listRepo        repositories.UserTodoListRepository
+	actionRepo      repositories.TodoActionRepository
 }
 
 // NewUserService creates a new user service
@@ -25,11 +28,17 @@ func NewUserService(
 	repo repositories.UserRepository,
 	contentRepo repositories.ContentRepository,
 	perspectiveRepo repositories.PerspectiveRepository,
+	todoRepo repositories.UserTodoRepository,
+	listRepo repositories.UserTodoListRepository,
+	actionRepo repositories.TodoActionRepository,
 ) *UserService {
 	return &UserService{
 		repo:            repo,
 		contentRepo:     contentRepo,
 		perspectiveRepo: perspectiveRepo,
+		todoRepo:        todoRepo,
+		listRepo:        listRepo,
+		actionRepo:      actionRepo,
 	}
 }
 
@@ -210,8 +219,9 @@ func (s *UserService) Update(ctx context.Context, actor *domain.AuthenticatedUse
 	return updated, nil
 }
 
-// Delete reassigns the user's content and perspectives to the sentinel
-// "[deleted]" user, then removes the user row.
+// Delete reassigns the user's content, perspectives, todos, todo lists and
+// custom todo actions to the sentinel "[deleted]" user, then removes the user
+// row.
 func (s *UserService) Delete(ctx context.Context, actor *domain.AuthenticatedUser, id int) error {
 	if id <= 0 {
 		return fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
@@ -243,6 +253,15 @@ func (s *UserService) Delete(ctx context.Context, actor *domain.AuthenticatedUse
 	}
 	if err := s.perspectiveRepo.ReassignByUser(ctx, id, sentinel.ID); err != nil {
 		return fmt.Errorf("failed to reassign perspectives: %w", err)
+	}
+	if err := s.todoRepo.ReassignByUser(ctx, id, sentinel.ID); err != nil {
+		return fmt.Errorf("failed to reassign todos: %w", err)
+	}
+	if err := s.listRepo.ReassignByUser(ctx, id, sentinel.ID); err != nil {
+		return fmt.Errorf("failed to reassign todo lists: %w", err)
+	}
+	if err := s.actionRepo.ReassignByUser(ctx, id, sentinel.ID); err != nil {
+		return fmt.Errorf("failed to reassign todo actions: %w", err)
 	}
 
 	// Now safe to delete — no FKs reference this user

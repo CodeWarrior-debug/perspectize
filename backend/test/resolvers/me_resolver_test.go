@@ -23,7 +23,7 @@ func setupTestServerWithUserRepo(userRepo *mockUserRepository) *httptest.Server 
 	contentRepo := &mockContentRepository{}
 	perspectiveRepo := &mockPerspectiveRepository{}
 	contentService := services.NewContentService(contentRepo, &mockYouTubeClient{}, nil)
-	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
+	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, nil, nil, nil)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})
 	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)
@@ -46,7 +46,7 @@ func setupTestServerNoAuth(userRepo *mockUserRepository) *httptest.Server {
 	contentRepo := &mockContentRepository{}
 	perspectiveRepo := &mockPerspectiveRepository{}
 	contentService := services.NewContentService(contentRepo, &mockYouTubeClient{}, nil)
-	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
+	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, nil, nil, nil)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})
 	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)
