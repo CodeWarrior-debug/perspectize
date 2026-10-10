@@ -159,13 +159,24 @@ describe('TodoDialog', () => {
 	});
 
 	describe('title', () => {
-		it('says Add Todo when creating and Edit todo when editing', () => {
+		it('says Add Todo when creating and Edit Todo when editing', () => {
 			const { unmount } = render(TodoDialog, { props: { open: true, lists: LISTS } });
 			expect(screen.getByRole('heading', { name: 'Add Todo' })).toBeInTheDocument();
 			unmount();
 
 			render(TodoDialog, { props: { open: true, lists: LISTS, todo: todo() } });
-			expect(screen.getByRole('heading', { name: 'Edit todo' })).toBeInTheDocument();
+			expect(screen.getByRole('heading', { name: 'Edit Todo' })).toBeInTheDocument();
+		});
+	});
+
+	describe('password managers', () => {
+		it('are asked not to offer to fill the todo Name (a title, not a person), even while it is locked', () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS } });
+			const name = field('#todo-name');
+			expect(name).toBeDisabled();
+			expect(name).toHaveAttribute('data-lpignore', 'true');
+			expect(name).toHaveAttribute('data-1p-ignore', 'true');
+			expect(name).toHaveAttribute('data-bwignore', 'true');
 		});
 	});
 

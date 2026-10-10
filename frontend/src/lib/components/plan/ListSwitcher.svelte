@@ -83,7 +83,7 @@
 
 	async function removeSelected() {
 		if (!selectedList) return;
-		if (!window.confirm(`Delete the list "${selectedList.name}"? Its todos stay, unlisted.`)) return;
+		if (!window.confirm(`Delete the list "${selectedList.name}"? Its Todos stay, unlisted.`)) return;
 		error = null;
 		busy = true;
 		try {

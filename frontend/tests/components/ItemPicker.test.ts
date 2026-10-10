@@ -35,6 +35,14 @@ describe('ItemPicker', () => {
 		}));
 	});
 
+	it('asks password managers not to offer to fill the search box', () => {
+		render(ItemPicker, { props: { onPick: vi.fn(), onFreeText: vi.fn() } });
+		const search = screen.getByPlaceholderText(/Search/);
+		expect(search).toHaveAttribute('data-lpignore', 'true');
+		expect(search).toHaveAttribute('data-1p-ignore', 'true');
+		expect(search).toHaveAttribute('data-bwignore', 'true');
+	});
+
 	describe('type chips', () => {
 		it('offers one chip per content type, none pressed, and searches every type to begin with', () => {
 			render(ItemPicker, { props: { onPick: vi.fn(), onFreeText: vi.fn() } });

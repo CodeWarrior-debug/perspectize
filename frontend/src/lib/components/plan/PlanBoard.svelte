@@ -122,7 +122,7 @@
 		/>
 		{#if hasMore}
 			<p class="text-muted-foreground text-sm">
-				Showing the first {PAGE_SIZE} of {totalCount ?? 'many'} todos.
+				Showing the first {PAGE_SIZE} of {totalCount ?? 'many'} Todos.
 			</p>
 		{/if}
 	{/if}

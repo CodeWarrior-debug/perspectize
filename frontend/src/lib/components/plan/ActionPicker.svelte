@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { useTodoActions } from '$lib/queries/userTodos/useTodoActions';
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import { useCreateTodoAction } from '$lib/queries/userTodos/useCreateTodoAction';
 	import type { TodoActionItem } from '$lib/queries/userTodos';
 	import { actionAddText, actionMatchesQuery, sortTodoActions } from '$lib/utils/plan-todo-helpers';
@@ -84,7 +85,7 @@
 		{id}
 		type="text"
 		role="combobox"
-		autocomplete="off"
+		{...NO_AUTOFILL}
 		aria-expanded={open}
 		aria-controls={listId}
 		aria-autocomplete="list"

@@ -43,6 +43,14 @@ describe('ActionPicker', () => {
 		];
 	});
 
+	it('asks password managers not to offer to fill it', () => {
+		render(ActionPicker, { props: { value: null, onChange: vi.fn() } });
+		const input = screen.getByRole('combobox');
+		expect(input).toHaveAttribute('data-lpignore', 'true');
+		expect(input).toHaveAttribute('data-1p-ignore', 'true');
+		expect(input).toHaveAttribute('data-bwignore', 'true');
+	});
+
 	function openPicker() {
 		const input = screen.getByRole('combobox');
 		fireEvent.focus(input);

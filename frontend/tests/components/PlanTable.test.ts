@@ -136,6 +136,14 @@ describe('PlanTable', () => {
 			expect(within(card).getByText('Movie')).toBeInTheDocument();
 		});
 
+		it('says "No Todos here yet" with no rows, pointing at Add Todo', () => {
+			setViewport(400);
+			renderTable({ rows: [] });
+			expect(
+				within(screen.getByTestId('plan-card-list')).getByText('No Todos here yet. Use Add Todo to start a plan.'),
+			).toBeInTheDocument();
+		});
+
 		it('shows no type line for a free-text todo', () => {
 			setViewport(400);
 			renderTable({ rows: [todo({})] });

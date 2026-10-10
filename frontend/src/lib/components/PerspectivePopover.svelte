@@ -250,12 +250,12 @@
 		const complete = (fullPercent: boolean) => {
 			for (const todo of open) {
 				updateTodo.mutateAsync(completedTodoInput(todo, fullPercent)).catch((err: unknown) => {
-					toast.error(err instanceof Error ? err.message : 'Could not update the todo');
+					toast.error(err instanceof Error ? err.message : 'Could not update the Todo');
 				});
 			}
 		};
 		toastWithAction(
-			'Mark this todo done?',
+			'Mark this Todo done?',
 			{ label: 'Done + 100%', onClick: () => complete(true) },
 			{ secondary: { label: 'Done, keep %', onClick: () => complete(false) } },
 		);

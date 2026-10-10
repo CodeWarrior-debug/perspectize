@@ -45,5 +45,5 @@
 		defaultActionId={consumeId}
 	/>
 {:catch}
-	<LazyLoadError what="the todo editor" floating />
+	<LazyLoadError what="the Todo editor" floating />
 {/await}

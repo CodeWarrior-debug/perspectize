@@ -1258,13 +1258,13 @@ describe('PerspectivePopover: mark an open todo done after a save', () => {
 		});
 	});
 
-	it('offers "Mark this todo done?" with Done + 100% as the default and Done, keep % as the other choice', async () => {
+	it('offers "Mark this Todo done?" with Done + 100% as the default and Done, keep % as the other choice', async () => {
 		mocks.mockFetchTodos.mockResolvedValue([openTodo('5', 'consume')]);
 		await saveNewPerspective();
 
 		expect(mocks.mockToastWithAction).toHaveBeenCalledTimes(1);
 		const [message, action, opts] = mocks.mockToastWithAction.mock.calls[0];
-		expect(message).toBe('Mark this todo done?');
+		expect(message).toBe('Mark this Todo done?');
 		expect(action.label).toBe('Done + 100%');
 		expect(opts.secondary.label).toBe('Done, keep %');
 
@@ -1293,7 +1293,7 @@ describe('PerspectivePopover: mark an open todo done after a save', () => {
 		mocks.mockFetchTodos.mockResolvedValue([openTodo('8', 'review', 'IN_PROGRESS')]);
 		await saveNewPerspective();
 		expect(mocks.mockToastWithAction).toHaveBeenCalledWith(
-			'Mark this todo done?',
+			'Mark this Todo done?',
 			expect.anything(),
 			expect.anything(),
 		);

@@ -5,6 +5,7 @@
 	import CommentsEditor from '$lib/components/CommentsEditor.svelte';
 	import ActionPicker from '$lib/components/plan/ActionPicker.svelte';
 	import ItemPicker from '$lib/components/plan/ItemPicker.svelte';
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import { isInsideToast, toastWithAction } from '$lib/utils/toast';
 	import {
 		buildCreateInput,
@@ -170,7 +171,7 @@
 		form.endDate = patch.endDate;
 		if (todo) {
 			updateTodo.mutateAsync({ id: Number(todo.id), ...patch }).catch((err: unknown) => {
-				toast.error(err instanceof Error ? err.message : 'Could not update the todo');
+				toast.error(err instanceof Error ? err.message : 'Could not update the Todo');
 			});
 		}
 	}
@@ -200,7 +201,7 @@
 		if (!hasContent && form.name.trim() === '') {
 			error = showItemPicker
 				? 'Pick an item, or choose Not in Perspectize and name it.'
-				: 'Name the todo, or link it to content.';
+				: 'Name the Todo, or link it to content.';
 			return;
 		}
 		const values: TodoFormValues = { ...form, actionId };
@@ -214,7 +215,7 @@
 			open = false;
 			onSaved?.();
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Could not save the todo';
+			error = err instanceof Error ? err.message : 'Could not save the Todo';
 		} finally {
 			saving = false;
 		}
@@ -232,7 +233,7 @@
 		}}
 	>
 		<DialogHeader class="px-6 pt-6">
-			<DialogTitle>{todo ? 'Edit todo' : 'Add Todo'}</DialogTitle>
+			<DialogTitle>{todo ? 'Edit Todo' : 'Add Todo'}</DialogTitle>
 		</DialogHeader>
 
 		<form class="flex min-h-0 flex-1 flex-col" onsubmit={save}>
@@ -272,6 +273,7 @@
 						<Input
 							id="todo-name"
 							type="text"
+							{...NO_AUTOFILL}
 							disabled={nameLocked}
 							value={nameShown}
 							oninput={(e) => (form.name = e.currentTarget.value)}
@@ -372,7 +374,7 @@
 							value={form.comments}
 							onChange={(html) => (form.comments = html)}
 							minHeight={96}
-							placeholder="Notes on this todo"
+							placeholder="Notes on this Todo"
 						/>
 					</div>
 				{:else}

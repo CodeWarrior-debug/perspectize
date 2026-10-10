@@ -65,7 +65,7 @@
 			rowDragManaged: true,
 			animateRows: false,
 			overlayNoRowsTemplate:
-				'<div class="py-12 text-center text-muted-foreground">No todos here yet. Use Add Todo to start a plan.</div>',
+				'<div class="py-12 text-center text-muted-foreground">No Todos here yet. Use Add Todo to start a plan.</div>',
 			onGridReady: (params) => {
 				gridApi = params.api;
 				gridReady = true;
@@ -197,7 +197,7 @@
 				</button>
 			</li>
 		{:else}
-			<li class="text-muted-foreground py-12 text-center">No todos here yet. Use Add Todo to start a plan.</li>
+			<li class="text-muted-foreground py-12 text-center">No Todos here yet. Use Add Todo to start a plan.</li>
 		{/each}
 	</ul>
 {:else}
