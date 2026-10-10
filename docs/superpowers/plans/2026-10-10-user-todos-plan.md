@@ -42,7 +42,7 @@
 
 | File | Responsibility |
 |---|---|
-| `backend/migrations/000030_add_user_todos.{up,down}.sql` | 3 tables, presets seed, CHECKs, FKs, indexes (number provisional) |
+| `backend/migrations/000031_add_user_todos.{up,down}.sql` | 3 tables, presets seed, CHECKs, FKs, indexes (number provisional) |
 | `backend/internal/core/domain/user_todo.go` | `UserTodo`, `UserTodoList`, `TodoAction`, `UserTodoStatus`, inputs, list params |
 | `backend/internal/core/domain/errors.go` | `ErrInvalidPercent` |
 | `backend/internal/core/ports/repositories/user_todo_repository.go` | `UserTodoRepository`, `UserTodoListRepository` |
@@ -69,7 +69,7 @@
 
 ### Task 1: Migration
 
-**Files:** create `backend/migrations/000030_add_user_todos.up.sql`, `000030_add_user_todos.down.sql`.
+**Files:** create `backend/migrations/000031_add_user_todos.up.sql`, `000031_add_user_todos.down.sql`.
 
 - [ ] Confirm the next free number: `ls backend/migrations` (last is `000029_add_hot_query_indexes` as of 2026-10-10). Numbers stay provisional until merge.
 - [ ] `todo_actions`: columns per spec; `user_id` FK `users(id)` `ON DELETE RESTRICT`; `UNIQUE NULLS NOT DISTINCT (user_id, key)`; `updated_at` trigger (`update_updated_at`, as in `000004`).
