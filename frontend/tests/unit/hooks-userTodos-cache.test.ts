@@ -17,6 +17,7 @@ import {
 	type UserTodosArgs,
 } from '$lib/queries/userTodos';
 import { useUserTodos } from '$lib/queries/userTodos/useUserTodos';
+import { useFetchUserTodos } from '$lib/queries/userTodos/useFetchUserTodos';
 import { useUserTodoLists } from '$lib/queries/userTodos/useUserTodoLists';
 import { useTodoActions } from '$lib/queries/userTodos/useTodoActions';
 import { useCreateUserTodo } from '$lib/queries/userTodos/useCreateUserTodo';
@@ -159,6 +160,7 @@ describe('query key hygiene: every variable useUserTodos sends changes the key',
 		['filter.userId', { filter: { userId: 42 } }],
 		['filter.contentId', { filter: { contentId: 3 } }],
 		['filter.listId', { filter: { listId: 3 } }],
+		['filter.unlisted', { filter: { unlisted: true } }],
 		['filter.status', { filter: { status: ['DONE' as const] } }],
 		['filter.actionId', { filter: { actionId: 2 } }],
 	])('changing %s changes the key', (_name, change) => {
@@ -174,10 +176,43 @@ describe('query key hygiene: every variable useUserTodos sends changes the key',
 		expect(opts.queryKey).toEqual(queryKeys.userTodos.list({ ...base, filter: { listId: 3 } }));
 	});
 
+	it('the Unlisted view sends unlisted to the server and keys on it', async () => {
+		const unlisted = { ...base, filter: { userId: 42, unlisted: true } };
+		const opts = asOptions(useUserTodos(() => unlisted));
+		await opts.queryFn();
+		expect(graphqlRequest.mock.calls[0][1]).toEqual(unlisted);
+		expect(opts.queryKey).toEqual(queryKeys.userTodos.list(unlisted));
+	});
+
 	it('useUserTodoLists: each owner gets its own entry', () => {
 		const forOwner42 = asOptions(useUserTodoLists(() => 42)).queryKey;
 		const forOwner7 = asOptions(useUserTodoLists(() => 7)).queryKey;
 		expect(hashKey(forOwner42)).not.toBe(hashKey(forOwner7));
+	});
+});
+
+describe('useFetchUserTodos: on-demand lookup shares the useUserTodos entry', () => {
+	const LOOKUP: UserTodosArgs = {
+		first: 50,
+		filter: { userId: 42, contentId: 3, status: ['NOT_STARTED', 'IN_PROGRESS'] },
+	};
+
+	it('one lookup costs one call, and a second lookup inside staleTime costs none', async () => {
+		graphqlRequest.mockResolvedValue({ userTodos: { items: [], pageInfo: {}, totalCount: null } });
+		const lookup = useFetchUserTodos();
+		expect(await lookup(LOOKUP)).toEqual([]);
+		expect(await lookup(LOOKUP)).toEqual([]);
+		expect(graphqlRequest).toHaveBeenCalledTimes(1);
+		expect(graphqlRequest.mock.calls[0][1]).toEqual(LOOKUP);
+	});
+
+	it('fills the same cache entry that useUserTodos reads for those variables', async () => {
+		const items = [{ id: '9' }] as unknown as UserTodoItem[];
+		graphqlRequest.mockResolvedValue({ userTodos: { items, pageInfo: {}, totalCount: null } });
+		await useFetchUserTodos()(LOOKUP);
+		expect(client.getQueryData(queryKeys.userTodos.list(LOOKUP))).toEqual({
+			userTodos: { items, pageInfo: {}, totalCount: null },
+		});
 	});
 });
 

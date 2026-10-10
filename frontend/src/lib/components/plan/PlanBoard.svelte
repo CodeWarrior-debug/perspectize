@@ -11,7 +11,7 @@
 	import { useMyPerspectives } from '$lib/queries/perspectives/useMyPerspectives';
 	import type { PerspectiveItem } from '$lib/queries/perspectives';
 	import type { UserTodoItem, UserTodoSortBy } from '$lib/queries/userTodos';
-	import { rowsForSelection, type ListSelection } from '$lib/utils/plan-todo-helpers';
+	import { filterForSelection, type ListSelection } from '$lib/utils/plan-todo-helpers';
 
 	/**
 	 * PlanBoard: the signed-in user's plan. Owns the query, the list selection and
@@ -33,10 +33,7 @@
 		// One list is ordered by position (the order drag-reorder writes); otherwise the header sort.
 		sortBy: selection.kind === 'list' ? 'LIST_POSITION' : (userSort?.sortBy ?? 'CREATED_AT'),
 		sortOrder: selection.kind === 'list' ? 'ASC' : (userSort?.sortOrder ?? 'DESC'),
-		filter: {
-			userId,
-			...(selection.kind === 'list' ? { listId: selection.id } : {}),
-		},
+		filter: filterForSelection(userId, selection),
 	}));
 
 	const listsQuery = useUserTodoLists(() => userId);
@@ -52,8 +49,8 @@
 		return map;
 	});
 
-	const pageItems = $derived(todosQuery.data?.userTodos.items ?? []);
-	const rows = $derived(rowsForSelection(pageItems, selection));
+	// The server already applied the selection's filter, so the page is the rows.
+	const rows = $derived(todosQuery.data?.userTodos.items ?? []);
 	const totalCount = $derived(todosQuery.data?.userTodos.totalCount ?? null);
 	const hasMore = $derived(todosQuery.data?.userTodos.pageInfo.hasNextPage ?? false);
 

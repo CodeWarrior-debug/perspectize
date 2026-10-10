@@ -13,6 +13,24 @@ const mocks = vi.hoisted(() => ({
 	mockSaveDraft: vi.fn(),
 	mockLoadDraft: vi.fn(() => null as string | null),
 	mockClearDraft: vi.fn(),
+	mockFetchTodos: vi.fn<(args: unknown) => Promise<unknown[]>>(async () => []),
+	mockUpdateTodoMutateAsync: vi.fn(async () => ({})),
+	mockToastWithAction: vi.fn(),
+}));
+
+vi.mock('$lib/queries/userTodos/useFetchUserTodos', () => ({
+	useFetchUserTodos: vi.fn(() => mocks.mockFetchTodos),
+}));
+
+vi.mock('$lib/queries/userTodos/useUpdateUserTodo', () => ({
+	useUpdateUserTodo: vi.fn(() => ({
+		mutateAsync: mocks.mockUpdateTodoMutateAsync,
+		isPending: false,
+	})),
+}));
+
+vi.mock('$lib/utils/toast', () => ({
+	toastWithAction: mocks.mockToastWithAction,
 }));
 
 vi.mock('$lib/utils/perspectiveDraft', () => ({
@@ -1195,5 +1213,89 @@ describe('PerspectivePopover component', () => {
 			await fireEvent.click(screen.getByRole('button', { name: 'Collapse comment' }));
 			expect(screen.getByLabelText('Comment')).toHaveValue('<p>draft</p>');
 		});
+	});
+});
+
+describe('PerspectivePopover: mark an open todo done after a save', () => {
+	const openTodo = (id: string, key: string, status = 'NOT_STARTED') => ({
+		id,
+		action: { id: '1', key, label: key, description: '', typicalSequence: 1, isPreset: true },
+		status,
+	});
+
+	/** Create a perspective with a thumbs-up, the smallest valid save. */
+	async function saveNewPerspective() {
+		renderPopover({ existingPerspective: null });
+		await tick();
+		await fireEvent.click(screen.getByLabelText('Thumbs up'));
+		await fireEvent.click(screen.getByRole('button', { name: 'Save perspective' }));
+		await flushPromises();
+	}
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mocks.mockCreateMutateAsync.mockReset();
+		mocks.mockCreateMutateAsync.mockResolvedValue({});
+		mocks.mockFetchTodos.mockReset();
+		mocks.mockFetchTodos.mockResolvedValue([]);
+		mocks.mockUpdateTodoMutateAsync.mockReset();
+		mocks.mockUpdateTodoMutateAsync.mockResolvedValue({});
+		mocks.mockToastWithAction.mockClear();
+	});
+
+	it('does not look up todos when the popover opens', async () => {
+		renderPopover({ existingPerspective: null });
+		await tick();
+		expect(mocks.mockFetchTodos).not.toHaveBeenCalled();
+	});
+
+	it('looks up the open todos for this user and content only after a successful save', async () => {
+		await saveNewPerspective();
+		expect(mocks.mockFetchTodos).toHaveBeenCalledTimes(1);
+		expect(mocks.mockFetchTodos).toHaveBeenCalledWith({
+			first: 50,
+			filter: { userId: 42, contentId: 1, status: ['NOT_STARTED', 'IN_PROGRESS'] },
+		});
+	});
+
+	it('offers "Mark this todo done?" for an open consume todo, and Yes sets it DONE', async () => {
+		mocks.mockFetchTodos.mockResolvedValue([openTodo('5', 'consume')]);
+		await saveNewPerspective();
+
+		expect(mocks.mockToastWithAction).toHaveBeenCalledTimes(1);
+		const [message, action] = mocks.mockToastWithAction.mock.calls[0];
+		expect(message).toBe('Mark this todo done?');
+		expect(action.label).toBe('Yes');
+
+		expect(mocks.mockUpdateTodoMutateAsync).not.toHaveBeenCalled();
+		action.onClick();
+		expect(mocks.mockUpdateTodoMutateAsync).toHaveBeenCalledWith({ id: 5, status: 'DONE' });
+	});
+
+	it('also offers it for an open review todo', async () => {
+		mocks.mockFetchTodos.mockResolvedValue([openTodo('8', 'review', 'IN_PROGRESS')]);
+		await saveNewPerspective();
+		expect(mocks.mockToastWithAction).toHaveBeenCalledWith('Mark this todo done?', expect.anything());
+	});
+
+	it('shows no prompt when the open todos are other actions', async () => {
+		mocks.mockFetchTodos.mockResolvedValue([openTodo('9', 'research')]);
+		await saveNewPerspective();
+		expect(mocks.mockToastWithAction).not.toHaveBeenCalled();
+	});
+
+	it('shows no prompt and keeps the save when the todo lookup fails', async () => {
+		mocks.mockFetchTodos.mockRejectedValue(new Error('network'));
+		await saveNewPerspective();
+		expect(mocks.mockToastWithAction).not.toHaveBeenCalled();
+		expect(mocks.mockClearDraft).toHaveBeenCalledWith('draft:1:42');
+	});
+
+	it('does not look up todos when the save itself fails', async () => {
+		mocks.mockCreateMutateAsync.mockReset();
+		mocks.mockCreateMutateAsync.mockRejectedValue(new Error('server'));
+		await saveNewPerspective();
+		expect(mocks.mockFetchTodos).not.toHaveBeenCalled();
+		expect(mocks.mockToastWithAction).not.toHaveBeenCalled();
 	});
 });

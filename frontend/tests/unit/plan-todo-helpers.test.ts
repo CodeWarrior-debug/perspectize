@@ -8,8 +8,9 @@ import {
 	clampPercent,
 	completionFollowUp,
 	normalizeComments,
+	filterForSelection,
+	openConsumeOrReviewTodos,
 	percentPrompt,
-	rowsForSelection,
 	sortTodoActions,
 	statusPrompt,
 	todayIso,
@@ -129,17 +130,34 @@ describe('completion prompts', () => {
 	});
 });
 
-describe('rowsForSelection', () => {
-	const listed = todo({ id: '1', list: { id: '5', name: 'Reading' }, listPosition: 1 });
-	const loose = todo({ id: '2', list: null });
-
-	it('keeps every row for All and passes a list through', () => {
-		expect(rowsForSelection([listed, loose], { kind: 'all' })).toHaveLength(2);
-		expect(rowsForSelection([listed, loose], { kind: 'list', id: 5 })).toHaveLength(2);
+describe('filterForSelection', () => {
+	it('filters All by owner only', () => {
+		expect(filterForSelection(7, { kind: 'all' })).toEqual({ userId: 7 });
 	});
 
-	it('keeps only unlisted rows for Unlisted', () => {
-		expect(rowsForSelection([listed, loose], { kind: 'unlisted' }).map((r) => r.id)).toEqual(['2']);
+	it('filters Unlisted server-side with the unlisted flag', () => {
+		expect(filterForSelection(7, { kind: 'unlisted' })).toEqual({ userId: 7, unlisted: true });
+	});
+
+	it('filters one list by its id, never by unlisted', () => {
+		const filter = filterForSelection(7, { kind: 'list', id: 5 });
+		expect(filter).toEqual({ userId: 7, listId: 5 });
+		expect(filter).not.toHaveProperty('unlisted');
+	});
+});
+
+describe('openConsumeOrReviewTodos', () => {
+	const open = (key: string, status: UserTodoItem['status'] = 'NOT_STARTED') =>
+		todo({ id: key, action: action(key, key, 1), status });
+
+	it('keeps open consume and review todos', () => {
+		const items = [open('consume'), open('review', 'IN_PROGRESS')];
+		expect(openConsumeOrReviewTodos(items).map((t) => t.id)).toEqual(['consume', 'review']);
+	});
+
+	it('ignores other actions and finished todos', () => {
+		const items = [open('research'), open('consume', 'DONE'), open('review', 'DROPPED')];
+		expect(openConsumeOrReviewTodos(items)).toEqual([]);
 	});
 });
 

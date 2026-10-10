@@ -9,6 +9,7 @@ import type {
 	TodoActionItem,
 	TodoPrivacy,
 	UpdateUserTodoInput,
+	UserTodoFilter,
 	UserTodoItem,
 	UserTodoStatus,
 } from '$lib/queries/userTodos';
@@ -85,13 +86,25 @@ export function completionFollowUp(
 export type ListSelection = { kind: 'all' } | { kind: 'unlisted' } | { kind: 'list'; id: number };
 
 /**
- * The rows to show for the switcher's selection. "Unlisted" is applied to the
- * loaded page (the API has no unlisted filter); a single list is already
- * filtered by the server, so it passes through.
+ * The server filter for the switcher's selection. All three views are filtered
+ * server-side, so paging and counts are correct for each.
  */
-export function rowsForSelection(rows: readonly UserTodoItem[], selection: ListSelection): UserTodoItem[] {
-	if (selection.kind === 'unlisted') return rows.filter((r) => r.list === null);
-	return [...rows];
+export function filterForSelection(userId: number, selection: ListSelection): UserTodoFilter {
+	if (selection.kind === 'list') return { userId, listId: selection.id };
+	if (selection.kind === 'unlisted') return { userId, unlisted: true };
+	return { userId };
+}
+
+/** Action keys whose open todo a saved perspective can complete. */
+const PERSPECTIVE_COMPLETES_ACTIONS: readonly string[] = ['consume', 'review'];
+
+/** The open consume/review todos among `items` (the caller's lookup for one content). */
+export function openConsumeOrReviewTodos(items: readonly UserTodoItem[]): UserTodoItem[] {
+	return items.filter(
+		(t) =>
+			PERSPECTIVE_COMPLETES_ACTIONS.includes(t.action.key) &&
+			(t.status === 'NOT_STARTED' || t.status === 'IN_PROGRESS'),
+	);
 }
 
 /** Null when the row can take a perspective; otherwise the reason it can't. */

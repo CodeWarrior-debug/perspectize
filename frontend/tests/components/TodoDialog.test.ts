@@ -115,6 +115,38 @@ describe('TodoDialog', () => {
 		mocks.toastError.mockReset();
 	});
 
+	describe('default action (Add to plan)', () => {
+		it('preselects the default action and shows its label, with no pick needed', async () => {
+			render(TodoDialog, {
+				props: { open: true, lists: LISTS, newContent: { id: 9, name: 'A great video' }, defaultActionId: 2 },
+			});
+			expect(field('#todo-action')).toHaveValue('Consume');
+
+			submit();
+			await waitFor(() => expect(mocks.createMutateAsync).toHaveBeenCalledTimes(1));
+			expect(mocks.createMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ contentId: 9, actionId: 2 }));
+		});
+
+		it('lets a pick override the default action', async () => {
+			render(TodoDialog, {
+				props: { open: true, lists: LISTS, newContent: { id: 9, name: 'A great video' }, defaultActionId: 2 },
+			});
+			await pickAction('Acquire');
+			submit();
+			await waitFor(() => expect(mocks.createMutateAsync).toHaveBeenCalledTimes(1));
+			expect(mocks.createMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ actionId: 1 }));
+		});
+
+		it('still asks for an action when no default has arrived yet', async () => {
+			render(TodoDialog, {
+				props: { open: true, lists: LISTS, newContent: { id: 9, name: 'A great video' }, defaultActionId: null },
+			});
+			submit();
+			expect(await screen.findByRole('alert')).toHaveTextContent('Choose an action.');
+			expect(mocks.createMutateAsync).not.toHaveBeenCalled();
+		});
+	});
+
 	describe('name-only and content modes', () => {
 		it('asks for a name when the todo has no content, and creates it with that name', async () => {
 			render(TodoDialog, { props: { open: true, lists: LISTS } });

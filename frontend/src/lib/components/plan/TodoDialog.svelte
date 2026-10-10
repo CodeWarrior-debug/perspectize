@@ -32,6 +32,7 @@
 		newContent = null,
 		lists = [],
 		defaultListId = null,
+		defaultActionId = null,
 		onSaved,
 	}: {
 		open?: boolean;
@@ -41,6 +42,8 @@
 		newContent?: { id: number; name: string } | null;
 		lists?: readonly UserTodoListItem[];
 		defaultListId?: number | null;
+		/** Action preselected in create mode until the user picks another. Read live, so it can arrive after mount. */
+		defaultActionId?: number | null;
 		onSaved?: () => void;
 	} = $props();
 
@@ -93,6 +96,8 @@
 
 	const contentName = $derived(todo?.content?.name ?? newContent?.name ?? null);
 	const hasContent = $derived(todo ? todo.content !== null : form.contentId !== null);
+	// The user's pick wins; until then the default (e.g. `consume` from Add to plan) applies.
+	const actionId = $derived(form.actionId ?? defaultActionId);
 
 	const STATUS_OPTIONS: { value: UserTodoStatus; label: string }[] = [
 		{ value: 'NOT_STARTED', label: 'Not started' },
@@ -147,7 +152,7 @@
 	async function save(e: SubmitEvent) {
 		e.preventDefault();
 		error = null;
-		if (form.actionId === null) {
+		if (actionId === null) {
 			error = 'Choose an action.';
 			return;
 		}
@@ -155,12 +160,13 @@
 			error = 'Name the todo, or link it to content.';
 			return;
 		}
+		const values: TodoFormValues = { ...form, actionId };
 		saving = true;
 		try {
 			if (todo) {
-				await updateTodo.mutateAsync(buildUpdateInput(Number(todo.id), form, hasContent));
+				await updateTodo.mutateAsync(buildUpdateInput(Number(todo.id), values, hasContent));
 			} else {
-				await createTodo.mutateAsync(buildCreateInput(form));
+				await createTodo.mutateAsync(buildCreateInput(values));
 			}
 			open = false;
 			onSaved?.();
@@ -193,11 +199,7 @@
 
 			<div class="flex flex-col gap-1">
 				<Label for="todo-action">Action</Label>
-				<ActionPicker
-					id="todo-action"
-					value={form.actionId}
-					onChange={(action) => (form.actionId = Number(action.id))}
-				/>
+				<ActionPicker id="todo-action" value={actionId} onChange={(action) => (form.actionId = Number(action.id))} />
 			</div>
 
 			<RatingInput

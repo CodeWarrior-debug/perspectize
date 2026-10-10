@@ -24,6 +24,7 @@
 	import PassagePositionBar from '$lib/components/PassagePositionBar.svelte';
 	import PassageLinks from '$lib/components/PassageLinks.svelte';
 	import { useSetPassageDisplayTitle } from '$lib/queries/bible/useSetPassageDisplayTitle';
+	import AddToPlanButton from '$lib/components/plan/AddToPlanButton.svelte';
 
 	interface ModalContent {
 		id: string;
@@ -53,10 +54,13 @@
 		content,
 		open = false,
 		onClose,
+		onAddToPlan,
 	}: {
 		content: ModalContent | null;
 		open?: boolean;
 		onClose: () => void;
+		/** Shows "Add to plan" (signed-in users only) when provided. The caller owns the todo dialog. */
+		onAddToPlan?: (content: ModalContent) => void;
 	} = $props();
 
 	const isMovie = $derived(content?.contentType === 'MOVIE');
@@ -331,6 +335,9 @@
 							>
 								Compare
 							</a>
+							{#if onAddToPlan}
+								<AddToPlanButton variant="text" onclick={() => onAddToPlan(content)} />
+							{/if}
 							{#if !isPassage && !isMovie}
 								<button
 									type="button"

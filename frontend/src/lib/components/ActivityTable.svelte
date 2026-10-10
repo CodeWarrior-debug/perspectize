@@ -128,6 +128,7 @@
 	import { ContentTypeFilter, AgeRatingFilter } from '$lib/utils/contentTypeFilter';
 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
+	import AddToPlanDialog from '$lib/components/plan/AddToPlanDialog.svelte';
 	import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
 	import CategoryTypeahead from '$lib/components/CategoryTypeahead.svelte';
 	import { useSetPrimaryCategory } from '$lib/queries/categories/useSetPrimaryCategory';
@@ -188,6 +189,20 @@
 	function handleAddPerspectiveFromCard(contentId: string) {
 		const row = rowData.find((item) => String(item.id) === contentId);
 		openPerspective(contentId, row?.name ?? '');
+	}
+
+	// "Add to plan" target (the TodoDialog in create mode). Set from the details modal
+	// or a card; the details modal closes first so the two dialogs never stack.
+	let planContent = $state<{ id: number; name: string } | null>(null);
+
+	function handleAddToPlan(content: { id: string; name: string }) {
+		handleCloseDetails();
+		planContent = { id: parseInt(content.id, 10), name: content.name };
+	}
+
+	function handleAddToPlanFromCard(contentId: string) {
+		const row = rowData.find((item) => String(item.id) === contentId);
+		handleAddToPlan({ id: contentId, name: row?.name ?? '' });
 	}
 
 	// Mobile card-list breakpoint (< 860px) — replaces the AG Grid entirely, per design handoff.
@@ -1402,6 +1417,7 @@
 				{perspectiveContentIds}
 				onOpenDetails={handleOpenDetails}
 				onAddPerspective={handleAddPerspectiveFromCard}
+				onAddToPlan={currentUserId !== null ? handleAddToPlanFromCard : undefined}
 			/>
 		</div>
 	{:else}
@@ -1534,7 +1550,13 @@
 	content={detailsModalContent}
 	open={detailsModalContentId !== null}
 	onClose={handleCloseDetails}
+	onAddToPlan={currentUserId !== null ? handleAddToPlan : undefined}
 />
+
+<!-- "Add to plan" todo dialog. Mounted only while open; the caller is signed in by construction. -->
+{#if planContent !== null && currentUserId !== null}
+	<AddToPlanDialog content={planContent} userId={currentUserId} onClose={() => (planContent = null)} />
+{/if}
 
 <!-- Column picker — session-only show/hide, admin-gated internal columns.
      Mounted only while open (matches PerspectivePopover) so bits-ui's body

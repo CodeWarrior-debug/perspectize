@@ -89,6 +89,8 @@ export interface UserTodoFilter {
 	listId?: number;
 	status?: UserTodoStatus[];
 	actionId?: number;
+	/** Todos in no list. Server-side, so the Unlisted view pages correctly. */
+	unlisted?: boolean;
 }
 
 /**
