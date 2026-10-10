@@ -163,9 +163,38 @@ type CreatePerspectiveInput struct {
 	Review                *string                   `json:"review,omitempty"`
 }
 
+type CreateTodoActionInput struct {
+	Label       string  `json:"label"`
+	Description *string `json:"description,omitempty"`
+}
+
 type CreateUserInput struct {
 	Username string  `json:"username"`
 	Email    *string `json:"email,omitempty"`
+}
+
+type CreateUserTodoInput struct {
+	ContentID       *int                   `json:"contentId,omitempty"`
+	Name            *string                `json:"name,omitempty"`
+	ActionID        int                    `json:"actionId"`
+	Priority        *int                   `json:"priority,omitempty"`
+	Status          *domain.UserTodoStatus `json:"status,omitempty"`
+	PercentComplete *int                   `json:"percentComplete,omitempty"`
+	// ISO date, YYYY-MM-DD.
+	StartDate *string `json:"startDate,omitempty"`
+	// ISO date, YYYY-MM-DD.
+	EndDate *string `json:"endDate,omitempty"`
+	// ISO date, YYYY-MM-DD.
+	DueDate  *string         `json:"dueDate,omitempty"`
+	Comments *string         `json:"comments,omitempty"`
+	Privacy  *domain.Privacy `json:"privacy,omitempty"`
+	ListID   *int            `json:"listId,omitempty"`
+}
+
+type CreateUserTodoListInput struct {
+	Name        string          `json:"name"`
+	Description *string         `json:"description,omitempty"`
+	Privacy     *domain.Privacy `json:"privacy,omitempty"`
 }
 
 type CustomFieldStats struct {
@@ -279,6 +308,12 @@ type PaginatedPerspectives struct {
 	TotalCount *int           `json:"totalCount,omitempty"`
 }
 
+type PaginatedUserTodos struct {
+	Items      []*UserTodo `json:"items"`
+	PageInfo   *PageInfo   `json:"pageInfo"`
+	TotalCount *int        `json:"totalCount,omitempty"`
+}
+
 type ParticipantChanged struct {
 	ThreadID string                `json:"threadId"`
 	UserID   string                `json:"userId"`
@@ -384,6 +419,16 @@ func (StreamReset) IsThreadEvent() {}
 type Subscription struct {
 }
 
+type TodoAction struct {
+	ID          string `json:"id"`
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+	// Picker order for presets; null for actions the user entered.
+	TypicalSequence *int `json:"typicalSequence,omitempty"`
+	IsPreset        bool `json:"isPreset"`
+}
+
 type TypingChanged struct {
 	ThreadID string `json:"threadId"`
 	UserID   string `json:"userId"`
@@ -433,6 +478,43 @@ type UpdateUserInput struct {
 	Email    *string `json:"email,omitempty"`
 }
 
+// Partial update: omit a field to leave it unchanged. For contentId, name,
+// priority, startDate, endDate, dueDate, comments and listId, an explicit null
+// clears the field. The other fields are not clearable: null is the same as omitted.
+type UpdateUserTodoInput struct {
+	ID int `json:"id"`
+	// Omit = unchanged; null = clear.
+	ContentID graphql.Omittable[*int] `json:"contentId,omitempty"`
+	// Omit = unchanged; null = clear.
+	Name     graphql.Omittable[*string] `json:"name,omitempty"`
+	ActionID *int                       `json:"actionId,omitempty"`
+	// Omit = unchanged; null = clear.
+	Priority        graphql.Omittable[*int] `json:"priority,omitempty"`
+	Status          *domain.UserTodoStatus  `json:"status,omitempty"`
+	PercentComplete *int                    `json:"percentComplete,omitempty"`
+	// Omit = unchanged; null = clear. ISO date, YYYY-MM-DD.
+	StartDate graphql.Omittable[*string] `json:"startDate,omitempty"`
+	// Omit = unchanged; null = clear. ISO date, YYYY-MM-DD.
+	EndDate graphql.Omittable[*string] `json:"endDate,omitempty"`
+	// Omit = unchanged; null = clear. ISO date, YYYY-MM-DD.
+	DueDate graphql.Omittable[*string] `json:"dueDate,omitempty"`
+	// Omit = unchanged; null = clear.
+	Comments graphql.Omittable[*string] `json:"comments,omitempty"`
+	Privacy  *domain.Privacy            `json:"privacy,omitempty"`
+	// Omit = unchanged; null = unlist.
+	ListID graphql.Omittable[*int] `json:"listId,omitempty"`
+}
+
+// Partial update: omit a field to leave it unchanged. An explicit null clears
+// description. Name and privacy are not clearable.
+type UpdateUserTodoListInput struct {
+	ID   int     `json:"id"`
+	Name *string `json:"name,omitempty"`
+	// Omit = unchanged; null = clear.
+	Description graphql.Omittable[*string] `json:"description,omitempty"`
+	Privacy     *domain.Privacy            `json:"privacy,omitempty"`
+}
+
 type User struct {
 	ID         string          `json:"id"`
 	Username   string          `json:"username"`
@@ -448,6 +530,56 @@ type UserOnboarding struct {
 	Version            int     `json:"version"`
 	DisplayNextSession bool    `json:"displayNextSession"`
 	CompletedAt        *string `json:"completedAt,omitempty"`
+}
+
+type UserTodo struct {
+	ID      string   `json:"id"`
+	User    *User    `json:"user"`
+	Content *Content `json:"content,omitempty"`
+	// Free-text name; only meaningful when content is null.
+	Name            *string               `json:"name,omitempty"`
+	Action          *TodoAction           `json:"action"`
+	Priority        *int                  `json:"priority,omitempty"`
+	Status          domain.UserTodoStatus `json:"status"`
+	PercentComplete int                   `json:"percentComplete"`
+	// ISO date, YYYY-MM-DD.
+	StartDate *string `json:"startDate,omitempty"`
+	// ISO date, YYYY-MM-DD. When the todo was finished.
+	EndDate *string `json:"endDate,omitempty"`
+	// ISO date, YYYY-MM-DD. The target date.
+	DueDate *string `json:"dueDate,omitempty"`
+	// Sanitized HTML.
+	Comments     *string        `json:"comments,omitempty"`
+	Privacy      domain.Privacy `json:"privacy"`
+	List         *UserTodoList  `json:"list,omitempty"`
+	ListPosition *int           `json:"listPosition,omitempty"`
+	CreatedAt    string         `json:"createdAt"`
+	UpdatedAt    string         `json:"updatedAt"`
+	ActionID     int            `json:"-"`
+	ContentID    *int           `json:"-"`
+	ListID       *int           `json:"-"`
+	UserID       int            `json:"-"`
+}
+
+type UserTodoFilter struct {
+	UserID    *int `json:"userId,omitempty"`
+	ContentID *int `json:"contentId,omitempty"`
+	ListID    *int `json:"listId,omitempty"`
+	// Only todos in no list. Ignored when listId is set.
+	Unlisted *bool                   `json:"unlisted,omitempty"`
+	Status   []domain.UserTodoStatus `json:"status,omitempty"`
+	ActionID *int                    `json:"actionId,omitempty"`
+}
+
+type UserTodoList struct {
+	ID          string         `json:"id"`
+	User        *User          `json:"user"`
+	Name        string         `json:"name"`
+	Description *string        `json:"description,omitempty"`
+	Privacy     domain.Privacy `json:"privacy"`
+	CreatedAt   string         `json:"createdAt"`
+	UpdatedAt   string         `json:"updatedAt"`
+	UserID      int            `json:"-"`
 }
 
 type WikidataSearchResult struct {

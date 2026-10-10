@@ -633,3 +633,273 @@ func onlyIDAndAggregatesSelected(ctx context.Context) bool {
 	}
 	return true
 }
+
+// ---- User todo ("Plan") mappers ----
+
+// todoDateLayout is the wire format of every todo date: an ISO calendar date.
+const todoDateLayout = "2006-01-02"
+
+// dateToString formats a date-only value for the wire. Nil stays nil.
+func dateToString(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := t.Format(todoDateLayout)
+	return &s
+}
+
+// parseTodoDate parses an optional ISO date input. A malformed date is a client
+// error, not a server one.
+func parseTodoDate(field string, raw *string) (*time.Time, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	t, err := time.Parse(todoDateLayout, *raw)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s must be an ISO date (YYYY-MM-DD)", domain.ErrInvalidInput, field)
+	}
+	return &t, nil
+}
+
+// omittableTodoDate reads a tri-state date input. Unset leaves the value alone,
+// an explicit null clears it, and a date sets it.
+func omittableTodoDate(field string, o graphql.Omittable[*string]) (*time.Time, bool, error) {
+	raw, cleared := omittablePtr(o)
+	date, err := parseTodoDate(field, raw)
+	if err != nil {
+		return nil, false, err
+	}
+	return date, cleared, nil
+}
+
+// userTodoDomainToModel converts a domain todo to its GraphQL model. The owner,
+// content, action and list ids ride along for the field resolvers.
+func userTodoDomainToModel(t *domain.UserTodo) *model.UserTodo {
+	return &model.UserTodo{
+		ID:              strconv.Itoa(t.ID),
+		Name:            t.Name,
+		Priority:        t.Priority,
+		Status:          t.Status,
+		PercentComplete: t.PercentComplete,
+		StartDate:       dateToString(t.StartDate),
+		EndDate:         dateToString(t.EndDate),
+		DueDate:         dateToString(t.DueDate),
+		Comments:        t.Comments,
+		Privacy:         t.Privacy,
+		ListPosition:    t.ListPosition,
+		CreatedAt:       t.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:       t.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UserID:          t.UserID,
+		ContentID:       t.ContentID,
+		ActionID:        t.ActionID,
+		ListID:          t.ListID,
+	}
+}
+
+// userTodosToModel converts a slice of domain todos, preserving order.
+func userTodosToModel(todos []*domain.UserTodo) []*model.UserTodo {
+	out := make([]*model.UserTodo, len(todos))
+	for i, t := range todos {
+		out[i] = userTodoDomainToModel(t)
+	}
+	return out
+}
+
+// todoActionDomainToModel converts a domain action to its GraphQL model.
+func todoActionDomainToModel(a *domain.TodoAction) *model.TodoAction {
+	return &model.TodoAction{
+		ID:              strconv.Itoa(a.ID),
+		Key:             a.Key,
+		Label:           a.Label,
+		Description:     a.Description,
+		TypicalSequence: a.TypicalSequence,
+		IsPreset:        a.IsPreset(),
+	}
+}
+
+// todoActionsToModel converts a slice of domain actions, preserving order.
+func todoActionsToModel(actions []*domain.TodoAction) []*model.TodoAction {
+	out := make([]*model.TodoAction, len(actions))
+	for i, a := range actions {
+		out[i] = todoActionDomainToModel(a)
+	}
+	return out
+}
+
+// userTodoListDomainToModel converts a domain list to its GraphQL model.
+func userTodoListDomainToModel(l *domain.UserTodoList) *model.UserTodoList {
+	return &model.UserTodoList{
+		ID:          strconv.Itoa(l.ID),
+		Name:        l.Name,
+		Description: l.Description,
+		Privacy:     l.Privacy,
+		CreatedAt:   l.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:   l.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UserID:      l.UserID,
+	}
+}
+
+// userTodoListsToModel converts a slice of domain lists, preserving order.
+func userTodoListsToModel(lists []*domain.UserTodoList) []*model.UserTodoList {
+	out := make([]*model.UserTodoList, len(lists))
+	for i, l := range lists {
+		out[i] = userTodoListDomainToModel(l)
+	}
+	return out
+}
+
+// modelToUserTodoFilter converts the GraphQL filter. A nil filter stays nil.
+func modelToUserTodoFilter(f *model.UserTodoFilter) *domain.UserTodoFilter {
+	if f == nil {
+		return nil
+	}
+	return &domain.UserTodoFilter{
+		UserID:    f.UserID,
+		ContentID: f.ContentID,
+		ListID:    f.ListID,
+		Unlisted:  f.Unlisted != nil && *f.Unlisted,
+		Statuses:  f.Status,
+		ActionID:  f.ActionID,
+	}
+}
+
+// modelToCreateUserTodoInput converts the GraphQL create input. The owner is
+// not set here: the service takes it from the authenticated actor.
+func modelToCreateUserTodoInput(input model.CreateUserTodoInput) (domain.CreateUserTodoInput, error) {
+	startDate, err := parseTodoDate("startDate", input.StartDate)
+	if err != nil {
+		return domain.CreateUserTodoInput{}, err
+	}
+	endDate, err := parseTodoDate("endDate", input.EndDate)
+	if err != nil {
+		return domain.CreateUserTodoInput{}, err
+	}
+	dueDate, err := parseTodoDate("dueDate", input.DueDate)
+	if err != nil {
+		return domain.CreateUserTodoInput{}, err
+	}
+	return domain.CreateUserTodoInput{
+		ContentID:       input.ContentID,
+		Name:            input.Name,
+		ActionID:        input.ActionID,
+		Priority:        input.Priority,
+		Status:          input.Status,
+		PercentComplete: input.PercentComplete,
+		StartDate:       startDate,
+		EndDate:         endDate,
+		DueDate:         dueDate,
+		Comments:        input.Comments,
+		Privacy:         input.Privacy,
+		ListID:          input.ListID,
+	}, nil
+}
+
+// modelToUpdateUserTodoInput converts the GraphQL partial update. The tri-state
+// fields (omitted, explicit null, value) become the value plus Clear* flags the
+// service merges.
+func modelToUpdateUserTodoInput(input model.UpdateUserTodoInput) (domain.UpdateUserTodoInput, error) {
+	out := domain.UpdateUserTodoInput{
+		ID:              input.ID,
+		ActionID:        input.ActionID,
+		Status:          input.Status,
+		PercentComplete: input.PercentComplete,
+		Privacy:         input.Privacy,
+	}
+	out.ContentID, out.ClearContentID = omittablePtr(input.ContentID)
+	out.Name, out.ClearName = omittablePtr(input.Name)
+	out.Priority, out.ClearPriority = omittablePtr(input.Priority)
+	out.Comments, out.ClearComments = omittablePtr(input.Comments)
+	out.ListID, out.ClearListID = omittablePtr(input.ListID)
+
+	var err error
+	if out.StartDate, out.ClearStartDate, err = omittableTodoDate("startDate", input.StartDate); err != nil {
+		return domain.UpdateUserTodoInput{}, err
+	}
+	if out.EndDate, out.ClearEndDate, err = omittableTodoDate("endDate", input.EndDate); err != nil {
+		return domain.UpdateUserTodoInput{}, err
+	}
+	if out.DueDate, out.ClearDueDate, err = omittableTodoDate("dueDate", input.DueDate); err != nil {
+		return domain.UpdateUserTodoInput{}, err
+	}
+	return out, nil
+}
+
+// modelToCreateTodoActionInput converts the GraphQL action input. A missing
+// description is stored as an empty string.
+func modelToCreateTodoActionInput(input model.CreateTodoActionInput) domain.CreateTodoActionInput {
+	out := domain.CreateTodoActionInput{Label: input.Label}
+	if input.Description != nil {
+		out.Description = *input.Description
+	}
+	return out
+}
+
+// modelToCreateUserTodoListInput converts the GraphQL list create input.
+func modelToCreateUserTodoListInput(input model.CreateUserTodoListInput) domain.CreateUserTodoListInput {
+	return domain.CreateUserTodoListInput{
+		Name:        input.Name,
+		Description: input.Description,
+		Privacy:     input.Privacy,
+	}
+}
+
+// modelToUpdateUserTodoListInput converts the GraphQL list partial update. An
+// explicit null on description clears it.
+func modelToUpdateUserTodoListInput(input model.UpdateUserTodoListInput) domain.UpdateUserTodoListInput {
+	out := domain.UpdateUserTodoListInput{
+		ID:      input.ID,
+		Name:    input.Name,
+		Privacy: input.Privacy,
+	}
+	out.Description, out.ClearDescription = omittablePtr(input.Description)
+	return out
+}
+
+// todoActionByID resolves a todo's action through the per-request loader, or
+// directly when the loader middleware isn't installed.
+func (r *Resolver) todoActionByID(ctx context.Context, id int) (*domain.TodoAction, error) {
+	if l := dataloader.For(ctx); l != nil {
+		action, err := l.TodoActionByID.Load(ctx, id)
+		if dataloader.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to get todo action: %w", domain.ErrNotFound)
+		}
+		return action, err
+	}
+	actions, err := r.UserTodoService.GetTodoActionsByIDs(ctx, []int{id})
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range actions {
+		if a != nil && a.ID == id {
+			return a, nil
+		}
+	}
+	return nil, fmt.Errorf("failed to get todo action: %w", domain.ErrNotFound)
+}
+
+// userTodoListByKey resolves a todo's list as the viewer sees it. A nil result
+// means the list is absent, or PRIVATE to someone other than the viewer.
+func (r *Resolver) userTodoListByKey(ctx context.Context, key dataloader.UserTodoListKey) (*domain.UserTodoList, error) {
+	if l := dataloader.For(ctx); l != nil {
+		list, err := l.UserTodoListByID.Load(ctx, key)
+		if dataloader.IsNotFound(err) {
+			return nil, nil
+		}
+		return list, err
+	}
+	var viewer *int
+	if key.ViewerID != 0 {
+		v := key.ViewerID
+		viewer = &v
+	}
+	lists, err := r.UserTodoService.GetUserTodoListsByIDs(ctx, []int{key.ListID}, viewer)
+	if err != nil {
+		return nil, err
+	}
+	for _, l := range lists {
+		if l != nil && l.ID == key.ListID {
+			return l, nil
+		}
+	}
+	return nil, nil
+}

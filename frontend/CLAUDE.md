@@ -71,7 +71,7 @@ pnpm run test         # Tests in watch mode
 
 **`pnpm exec` must run from `frontend/`** — running from repo root fails with `ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE`. Use `cd frontend && pnpm exec ...` or `pnpm --dir frontend exec ...`.
 
-**Cloud/CI sandbox sessions start with no `frontend/node_modules`** (a fresh container/checkout, unlike a local dev machine). `pnpm run check`, `test:run`, etc. fail with confusing module-resolution errors — not an "install first" message — until `pnpm install` is run once in `frontend/`.
+**Cloud/CI sandbox sessions start with no `frontend/node_modules`** (a fresh container/checkout, unlike a local dev machine). `pnpm run check`, `test:run`, etc. fail with confusing module-resolution errors — not an "install first" message — until `pnpm install` is run once in `frontend/`. Cloud containers ship Node 22.22.0 while jsdom requires ^22.22.2, so `pnpm install --frozen-lockfile` fails the engine check (easy to miss when output is redirected); use `pnpm install --frozen-lockfile --config.engine-strict=false`.
 
 **`pnpm-lock.yaml` merge conflicts:** accept either side (`git checkout --theirs frontend/pnpm-lock.yaml`), then regenerate with `pnpm install --dir frontend`. Use `--dir` instead of `cd` to avoid hook/shell side effects that can switch branches mid-operation.
 
@@ -156,7 +156,7 @@ Full table: [../.docs/QUERY_BUDGET.md](../.docs/QUERY_BUDGET.md).
 ## UI conventions
 
 - **Nav labels are one word** (`Header.svelte` `navLinks`: Activity, Discover, Compare); name new top-level pages with a one-word verb.
-- **Toasts:** svelte-sonner, default 2s (`<Toaster duration={2000}>` in `+layout.svelte`). A toast that carries an action button passes `duration: 4000` so there's time to click it.
+- **Toasts:** svelte-sonner, default 2s (`<Toaster duration={2000}>` in `+layout.svelte`). A toast that carries an action button uses `toastWithAction` (`lib/utils/toast.ts`, `ACTION_TOAST_DURATION_MS` = 4s) so there's time to click it; its `secondary` option adds a second choice.
 - **User-supplied HTML:** sanitize with `sanitizeHtml` (`lib/utils/sanitize.ts`, DOMPurify) and render through `SafeHtml.svelte`; the backend mirrors the same tag set with bluemonday (`services/sanitize.go`). Change both together. See [.docs/SECURITY.md](../.docs/SECURITY.md#user-supplied-html).
 
 ## Icons (Lucide)

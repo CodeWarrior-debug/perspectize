@@ -523,6 +523,18 @@ type Mutation {
 
   # Category mutations
   setPrimaryCategory(input: SetPrimaryCategoryInput!): Content! @auth
+
+  # User todo ("Plan") mutations. Ownership is enforced in UserTodoService and
+  # the owner-scoped SQL under it, not by @owner; the actor is the session user.
+  createUserTodo(input: CreateUserTodoInput!): UserTodo! @auth
+  updateUserTodo(input: UpdateUserTodoInput!): UserTodo! @auth
+  deleteUserTodo(id: ID!): Boolean! @auth
+  createTodoAction(input: CreateTodoActionInput!): TodoAction! @auth
+  createUserTodoList(input: CreateUserTodoListInput!): UserTodoList! @auth
+  updateUserTodoList(input: UpdateUserTodoListInput!): UserTodoList! @auth
+  deleteUserTodoList(id: ID!): Boolean! @auth
+  # Rewrites the list's positions to 1..N in the order of todoIds.
+  reorderUserTodoList(listId: IntID!, todoIds: [IntID!]!): [UserTodo!]! @auth
 }
 
 type Query {
@@ -596,6 +608,28 @@ type Query {
   # value), and what percent of ALL perspectives in scope that is. Same
   # scoping/privacy rules as feelingStats.
   customFieldStats(contentID: IntID, key: String!): CustomFieldStats!
+
+  # User todo ("Plan") queries. Privacy-filtered like perspectives: public rows
+  # plus the viewer's own, for anonymous and signed-in callers alike.
+  userTodos(
+    first: Int = 10
+    after: String
+    last: Int
+    before: String
+    sortBy: UserTodoSortBy = CREATED_AT
+    sortOrder: SortOrder = DESC
+    includeTotalCount: Boolean = false
+    filter: UserTodoFilter
+  ): PaginatedUserTodos!
+
+  # Null for a todo that doesn't exist or is someone else's PRIVATE todo.
+  userTodoByID(id: ID!): UserTodo
+
+  # Private lists are returned only to their owner.
+  userTodoLists(userId: IntID!): [UserTodoList!]!
+
+  # Presets plus the caller's own actions, in picker order.
+  todoActions: [TodoAction!]! @auth
 }
 
 # See Query.feelingStats. averageIntensity/stdDevIntensity are null when
@@ -620,4 +654,153 @@ type CustomFieldStats {
   count: Int!
   totalPerspectives: Int!
   percentOfPerspectives: Float
+}
+
+# User todos ("Plan"). Spec: docs/superpowers/specs/2026-10-08-user-todos-design.md.
+enum UserTodoStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+  DROPPED
+}
+
+enum UserTodoSortBy {
+  PRIORITY
+  DUE_DATE
+  CREATED_AT
+  UPDATED_AT
+  LIST_POSITION
+}
+
+# A todo's action (consume, research, share, ...). isPreset is false for an
+# action the viewer entered themselves.
+type TodoAction {
+  id: ID!
+  key: String!
+  label: String!
+  description: String!
+  "Picker order for presets; null for actions the user entered."
+  typicalSequence: Int
+  isPreset: Boolean!
+}
+
+type UserTodoList {
+  id: ID!
+  user: User!
+  name: String!
+  description: String
+  privacy: Privacy!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type UserTodo {
+  id: ID!
+  user: User!
+  content: Content
+  "Free-text name; only meaningful when content is null."
+  name: String
+  action: TodoAction!
+  priority: Int
+  status: UserTodoStatus!
+  percentComplete: Int!
+  "ISO date, YYYY-MM-DD."
+  startDate: String
+  "ISO date, YYYY-MM-DD. When the todo was finished."
+  endDate: String
+  "ISO date, YYYY-MM-DD. The target date."
+  dueDate: String
+  "Sanitized HTML."
+  comments: String
+  privacy: Privacy!
+  list: UserTodoList
+  listPosition: Int
+  createdAt: String!
+  updatedAt: String!
+}
+
+type PaginatedUserTodos {
+  items: [UserTodo!]!
+  pageInfo: PageInfo!
+  totalCount: Int
+}
+
+input UserTodoFilter {
+  userId: IntID
+  contentId: IntID
+  listId: IntID
+  "Only todos in no list. Ignored when listId is set."
+  unlisted: Boolean
+  status: [UserTodoStatus!]
+  actionId: IntID
+}
+
+input CreateUserTodoInput {
+  contentId: IntID
+  name: String
+  actionId: IntID!
+  priority: Int
+  status: UserTodoStatus
+  percentComplete: Int
+  "ISO date, YYYY-MM-DD."
+  startDate: String
+  "ISO date, YYYY-MM-DD."
+  endDate: String
+  "ISO date, YYYY-MM-DD."
+  dueDate: String
+  comments: String
+  privacy: Privacy
+  listId: IntID
+}
+
+"""
+Partial update: omit a field to leave it unchanged. For contentId, name,
+priority, startDate, endDate, dueDate, comments and listId, an explicit null
+clears the field. The other fields are not clearable: null is the same as omitted.
+"""
+input UpdateUserTodoInput {
+  id: IntID!
+  "Omit = unchanged; null = clear."
+  contentId: IntID
+  "Omit = unchanged; null = clear."
+  name: String
+  actionId: IntID
+  "Omit = unchanged; null = clear."
+  priority: Int
+  status: UserTodoStatus
+  percentComplete: Int
+  "Omit = unchanged; null = clear. ISO date, YYYY-MM-DD."
+  startDate: String
+  "Omit = unchanged; null = clear. ISO date, YYYY-MM-DD."
+  endDate: String
+  "Omit = unchanged; null = clear. ISO date, YYYY-MM-DD."
+  dueDate: String
+  "Omit = unchanged; null = clear."
+  comments: String
+  privacy: Privacy
+  "Omit = unchanged; null = unlist."
+  listId: IntID
+}
+
+input CreateTodoActionInput {
+  label: String!
+  description: String
+}
+
+input CreateUserTodoListInput {
+  name: String!
+  description: String
+  privacy: Privacy
+}
+
+"""
+Partial update: omit a field to leave it unchanged. An explicit null clears
+description. Name and privacy are not clearable.
+"""
+input UpdateUserTodoListInput {
+  id: IntID!
+  name: String
+  "Omit = unchanged; null = clear."
+  description: String
+  privacy: Privacy
 }

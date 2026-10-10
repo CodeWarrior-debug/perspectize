@@ -99,6 +99,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-environment.sh\" 2>/dev/null || true"
+          },
+          {
+            "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/monthly-routine-check.sh\" 2>/dev/null || true"
           }
         ]

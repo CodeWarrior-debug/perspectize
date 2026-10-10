@@ -81,7 +81,7 @@ func newTracingHarness(t *testing.T) *tracingHarness {
 	perspectiveRepo := postgres.NewGormPerspectiveRepository(db)
 
 	contentService := services.NewContentService(contentRepo, nil, nil)
-	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
+	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, nil, nil, nil)
 
 	h := &tracingHarness{db: db}
 
@@ -110,7 +110,7 @@ func newTracingHarness(t *testing.T) *tracingHarness {
 		h.contentIDs = append(h.contentIDs, c.ID)
 	}
 
-	resolver := resolvers.NewResolver(contentService, userService, nil, nil, nil, nil, nil)
+	resolver := resolvers.NewResolver(contentService, userService, nil, nil, nil, nil, nil, nil)
 	directiveRoot := directives.NewDirectiveRoot(contentService, nil)
 	gqlConfig := generated.Config{
 		Resolvers: resolver,

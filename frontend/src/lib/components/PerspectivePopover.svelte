@@ -29,6 +29,10 @@
 	import { useCreatePerspective } from '$lib/queries/perspectives/useCreatePerspective';
 	import { useUpdatePerspective } from '$lib/queries/perspectives/useUpdatePerspective';
 	import { useDeletePerspective } from '$lib/queries/perspectives/useDeletePerspective';
+	import { useFetchUserTodos } from '$lib/queries/userTodos/useFetchUserTodos';
+	import { useUpdateUserTodo } from '$lib/queries/userTodos/useUpdateUserTodo';
+	import { completedTodoInput, openConsumeOrReviewTodos } from '$lib/utils/plan-todo-helpers';
+	import { toastWithAction } from '$lib/utils/toast';
 	import { isOptimisticId, type PerspectiveItem } from '$lib/queries/perspectives';
 	import FeelWheel, { type Feeling } from '$lib/components/FeelWheel.svelte';
 
@@ -227,6 +231,35 @@
 	const createMutation = useCreatePerspective();
 	const updateMutation = useUpdatePerspective();
 	const deleteMutation = useDeletePerspective();
+	const fetchTodos = useFetchUserTodos();
+	const updateTodo = useUpdateUserTodo();
+
+	/**
+	 * After a save succeeds: if the user has an open consume or review todo for this
+	 * content, offer to mark it done. Looked up here, on save, so opening the
+	 * popover costs no request. A failed lookup just skips the prompt.
+	 */
+	async function offerMarkTodosDone(saved: number) {
+		const items = await fetchTodos({
+			first: 50,
+			filter: { userId, contentId: saved, status: ['NOT_STARTED', 'IN_PROGRESS'] },
+		}).catch(() => null);
+		if (items === null) return;
+		const open = openConsumeOrReviewTodos(items);
+		if (open.length === 0) return;
+		const complete = (fullPercent: boolean) => {
+			for (const todo of open) {
+				updateTodo.mutateAsync(completedTodoInput(todo, fullPercent)).catch((err: unknown) => {
+					toast.error(err instanceof Error ? err.message : 'Could not update the todo');
+				});
+			}
+		};
+		toastWithAction(
+			'Mark this todo done?',
+			{ label: 'Done + 100%', onClick: () => complete(true) },
+			{ secondary: { label: 'Done, keep %', onClick: () => complete(false) } },
+		);
+	}
 	const isPending = $derived(createMutation.isPending || updateMutation.isPending || deleteMutation.isPending);
 
 	const hasComment = $derived(hasReviewContent(comment));
@@ -343,6 +376,7 @@
 		const afterSave = () => {
 			clearDraft(key);
 			onSuccess?.();
+			if (userId > 0) void offerMarkTodosDone(contentId);
 		};
 
 		if (isEditMode && existingPerspective) {

@@ -35,6 +35,19 @@ vi.mock('svelte-sonner', () => ({
 
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
 
+// The "Add to plan" button reads the auth facade; the real module needs Clerk, so stub it.
+const authState = vi.hoisted(() => ({ userId: null as string | null }));
+vi.mock('$lib/auth/useAuthState', () => ({
+	useAuthState: () => ({
+		get isLoaded() {
+			return true;
+		},
+		get userId() {
+			return authState.userId;
+		},
+	}),
+}));
+
 function reset() {
 	vi.clearAllMocks();
 	mocks.mockMutationState.isPending = false;
@@ -511,6 +524,33 @@ describe('ActivityDetailsModal', () => {
 		it('does not offer original language for a YouTube video', () => {
 			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 			expect(screen.queryByRole('button', { name: /original language/i })).not.toBeInTheDocument();
+		});
+	});
+
+	describe('add to plan', () => {
+		beforeEach(() => {
+			authState.userId = null;
+		});
+
+		it('shows Add to plan for a signed-in user and passes the content to onAddToPlan', async () => {
+			authState.userId = 'user_1';
+			const onAddToPlan = vi.fn();
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan } });
+
+			await fireEvent.click(screen.getByRole('button', { name: 'Add to plan' }));
+			expect(onAddToPlan).toHaveBeenCalledTimes(1);
+			expect(onAddToPlan).toHaveBeenCalledWith(content);
+		});
+
+		it('hides Add to plan for a signed-out user', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			expect(screen.queryByRole('button', { name: 'Add to plan' })).toBeNull();
+		});
+
+		it('renders no Add to plan action when the parent does not handle it', () => {
+			authState.userId = 'user_1';
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			expect(screen.queryByRole('button', { name: 'Add to plan' })).toBeNull();
 		});
 	});
 });

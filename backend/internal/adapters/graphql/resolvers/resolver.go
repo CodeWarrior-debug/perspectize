@@ -23,6 +23,7 @@ type Resolver struct {
 	UserService        portservices.UserService
 	PerspectiveService portservices.PerspectiveService
 	CategoryService    portservices.CategoryService
+	UserTodoService    portservices.UserTodoService
 
 	// Messaging feature dependencies.
 	Messaging portservices.MessagingService
@@ -36,6 +37,7 @@ func NewResolver(
 	userService portservices.UserService,
 	perspectiveService portservices.PerspectiveService,
 	categoryService portservices.CategoryService,
+	userTodoService portservices.UserTodoService,
 	messagingService portservices.MessagingService,
 	hub *realtime.Hub,
 	presence *realtime.PresenceTracker,
@@ -45,6 +47,7 @@ func NewResolver(
 		UserService:        userService,
 		PerspectiveService: perspectiveService,
 		CategoryService:    categoryService,
+		UserTodoService:    userTodoService,
 		Messaging:          messagingService,
 		Hub:                hub,
 		Presence:           presence,

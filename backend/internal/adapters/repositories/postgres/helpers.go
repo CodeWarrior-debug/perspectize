@@ -364,3 +364,67 @@ func buildPerspectiveSortRules(sortBy domain.PerspectiveSortBy, order domain.Sor
 
 	return []paginator.Rule{primaryRule, tieBreaker}
 }
+
+// userTodoStatusToDBValue converts domain UserTodoStatus to lowercase for database storage
+func userTodoStatusToDBValue(s domain.UserTodoStatus) string {
+	return strings.ToLower(string(s))
+}
+
+// userTodoStatusFromDBValue converts lowercase database value to domain UserTodoStatus
+func userTodoStatusFromDBValue(s string) domain.UserTodoStatus {
+	return domain.UserTodoStatus(strings.ToUpper(s))
+}
+
+// NULL sort-key replacements for user todos. The paginator wraps a nullable
+// key in COALESCE(column, replacement), so a NULL sorts after every real value
+// for ASC and before every real value for DESC: NULLs always land last.
+const (
+	// Priority is 0..RatingMax.
+	userTodoPriorityNullAsc  = domain.RatingMax + 1
+	userTodoPriorityNullDesc = -1
+	// Dates: 9999-12-31 is after any real date; 0001-01-01 is before any.
+	userTodoDueDateNullAsc  = "9999-12-31"
+	userTodoDueDateNullDesc = "0001-01-01"
+	// list_position is a positive int4.
+	userTodoListPositionNullAsc  = 2147483647
+	userTodoListPositionNullDesc = -1
+)
+
+// buildUserTodoSortRules builds paginator rules for user todo sorting: the
+// requested column, then an ID tie-breaker in the same direction. Only the
+// whitelisted sort columns below reach SQL (no caller-supplied column names).
+// An unknown sortBy falls back to CreatedAt DESC.
+func buildUserTodoSortRules(sortBy domain.UserTodoSortBy, order domain.SortOrder) []paginator.Rule {
+	asc := order == domain.SortOrderAsc
+	paginatorOrder := paginator.DESC
+	if asc {
+		paginatorOrder = paginator.ASC
+	}
+
+	var primaryRule paginator.Rule
+	switch sortBy {
+	case domain.UserTodoSortByPriority:
+		primaryRule = paginator.Rule{Key: "Priority", Order: paginatorOrder, NULLReplacement: userTodoPriorityNullDesc}
+		if asc {
+			primaryRule.NULLReplacement = userTodoPriorityNullAsc
+		}
+	case domain.UserTodoSortByDueDate:
+		primaryRule = paginator.Rule{Key: "DueDate", Order: paginatorOrder, NULLReplacement: userTodoDueDateNullDesc}
+		if asc {
+			primaryRule.NULLReplacement = userTodoDueDateNullAsc
+		}
+	case domain.UserTodoSortByUpdatedAt:
+		primaryRule = paginator.Rule{Key: "UpdatedAt", Order: paginatorOrder}
+	case domain.UserTodoSortByListPosition:
+		primaryRule = paginator.Rule{Key: "ListPosition", Order: paginatorOrder, NULLReplacement: userTodoListPositionNullDesc}
+		if asc {
+			primaryRule.NULLReplacement = userTodoListPositionNullAsc
+		}
+	case domain.UserTodoSortByCreatedAt:
+		primaryRule = paginator.Rule{Key: "CreatedAt", Order: paginatorOrder}
+	default:
+		primaryRule = paginator.Rule{Key: "CreatedAt", Order: paginator.DESC}
+	}
+
+	return []paginator.Rule{primaryRule, {Key: "ID", Order: paginatorOrder}}
+}

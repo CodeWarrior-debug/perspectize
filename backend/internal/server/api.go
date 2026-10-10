@@ -43,6 +43,7 @@ type Deps struct {
 	UserService        portservices.UserService
 	PerspectiveService portservices.PerspectiveService
 	CategoryService    portservices.CategoryService
+	UserTodoService    portservices.UserTodoService
 	MessagingService   portservices.MessagingService
 
 	UserRepo   repositories.UserRepository
@@ -65,7 +66,7 @@ type Deps struct {
 func NewGraphQLServer(d Deps) *handler.Server {
 	resolver := resolvers.NewResolver(
 		d.ContentService, d.UserService, d.PerspectiveService, d.CategoryService,
-		d.MessagingService, d.Hub, d.Presence,
+		d.UserTodoService, d.MessagingService, d.Hub, d.Presence,
 	)
 	directiveRoot := directives.NewDirectiveRoot(d.ContentService, d.PerspectiveService)
 	gqlConfig := generated.Config{
@@ -167,6 +168,7 @@ func Middleware(d Deps) []func(http.Handler) http.Handler {
 			User:        d.UserService,
 			Content:     d.ContentService,
 			Messaging:   d.MessagingService,
+			UserTodo:    d.UserTodoService,
 		}),
 		perfmw.RequestTimer, // structured request timing (replaces chi Logger)
 		perfmw.Recoverer,    // structured panic recovery (JSON via slog)
