@@ -7,6 +7,7 @@
 import type { ColDef, ICellRendererParams, ValueFormatterParams, ValueGetterParams } from '@ag-grid-community/core';
 import type { TodoPrivacy, UserTodoItem, UserTodoSortBy, UserTodoStatus } from '$lib/queries/userTodos';
 import { contentTypeLabel, type ResponsiveTier } from './grid-config';
+import { EMPTY_VALUE } from './formatting';
 import { ratingToDisplay } from './ratings';
 import { addPerspectiveDisabledReason } from './plan-todo-helpers';
 import { planItemCellRenderer } from './planItemCellRenderer';
@@ -93,7 +94,6 @@ export function serverSortFor(colId: string): UserTodoSortBy | null {
 // ---------------------------------------------------------------------------
 
 /** Shown for any empty value. */
-export const PLAN_EMPTY = '—';
 
 const STATUS_LABELS: Record<UserTodoStatus, string> = {
 	NOT_STARTED: 'Not started',
@@ -103,17 +103,17 @@ const STATUS_LABELS: Record<UserTodoStatus, string> = {
 };
 
 export function planStatusLabel(status: UserTodoStatus | null | undefined): string {
-	return status ? (STATUS_LABELS[status] ?? PLAN_EMPTY) : PLAN_EMPTY;
+	return status ? (STATUS_LABELS[status] ?? EMPTY_VALUE) : EMPTY_VALUE;
 }
 
 export function planPercentLabel(percent: number | null | undefined): string {
-	if (percent === null || percent === undefined || !Number.isFinite(percent)) return PLAN_EMPTY;
+	if (percent === null || percent === undefined || !Number.isFinite(percent)) return EMPTY_VALUE;
 	return `${Math.min(100, Math.max(0, Math.round(percent)))}%`;
 }
 
 /** Priority is stored on the 0-10000 rating scale; display it with the shared rating helper. */
 export function planPriorityLabel(priority: number | null | undefined): string {
-	if (priority === null || priority === undefined) return PLAN_EMPTY;
+	if (priority === null || priority === undefined) return EMPTY_VALUE;
 	return ratingToDisplay(priority);
 }
 
@@ -123,22 +123,22 @@ export function planPriorityLabel(priority: number | null | undefined): string {
  * and shows the previous day west of UTC.
  */
 export function planDateLabel(iso: string | null | undefined): string {
-	if (!iso) return PLAN_EMPTY;
+	if (!iso) return EMPTY_VALUE;
 	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-	if (!match) return PLAN_EMPTY;
+	if (!match) return EMPTY_VALUE;
 	const [, y, m, d] = match;
 	const date = new Date(Number(y), Number(m) - 1, Number(d));
-	if (Number.isNaN(date.getTime())) return PLAN_EMPTY;
+	if (Number.isNaN(date.getTime())) return EMPTY_VALUE;
 	return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export function planListLabel(list: { name: string } | null, position: number | null): string {
-	if (!list) return PLAN_EMPTY;
+	if (!list) return EMPTY_VALUE;
 	return position === null ? list.name : `${list.name} · ${position}`;
 }
 
 export function planPrivacyLabel(privacy: TodoPrivacy | null | undefined): string {
-	if (!privacy) return PLAN_EMPTY;
+	if (!privacy) return EMPTY_VALUE;
 	return privacy === 'PRIVATE' ? 'Private' : 'Public';
 }
 
@@ -150,7 +150,7 @@ export function planContentLabel(todo: Pick<UserTodoItem, 'content' | 'name'>): 
 /** The content's type as the Activity Type column labels it, or a dash for a free-text todo. */
 export function planTypeLabel(todo: Pick<UserTodoItem, 'content'>): string {
 	const type = todo.content?.contentType;
-	return type ? contentTypeLabel(type.toLowerCase()) : PLAN_EMPTY;
+	return type ? contentTypeLabel(type.toLowerCase()) : EMPTY_VALUE;
 }
 
 /** Plain-text preview of the rich-text comments: tags stripped, whitespace collapsed, cut at `max` characters. */
@@ -269,7 +269,7 @@ export function buildPlanColumnDefs(listMode: boolean, tier: ResponsiveTier = 'l
 		{
 			...common('addPerspective'),
 			valueGetter: (p: ValueGetterParams<UserTodoItem>) =>
-				p.data && addPerspectiveDisabledReason(p.data) === null ? ADD_PERSPECTIVE_LABEL : PLAN_EMPTY,
+				p.data && addPerspectiveDisabledReason(p.data) === null ? ADD_PERSPECTIVE_LABEL : EMPTY_VALUE,
 			tooltipValueGetter: (p) =>
 				p.data ? (addPerspectiveDisabledReason(p.data) ?? 'Add a perspective on this content') : undefined,
 		},

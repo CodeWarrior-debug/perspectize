@@ -82,6 +82,7 @@
 		synopsisValueGetter,
 		tmdbIdValueGetter,
 		textOrEmpty,
+		EMPTY_VALUE,
 	} from '$lib/utils/formatting';
 	import {
 		capitalizeContentType,
@@ -101,6 +102,7 @@
 		rowMatchesPerson,
 	} from '$lib/utils/grid-config';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
+	import { emptyCellClassRules } from '$lib/utils/grid-empty';
 	import { useCardMode, useResponsiveTier } from '$lib/utils/responsive.svelte';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
@@ -955,7 +957,7 @@
 				sortable: false,
 				filter: false,
 				valueGetter: tmdbIdValueGetter,
-				valueFormatter: (params) => (params.value == null ? '—' : String(params.value)),
+				valueFormatter: (params) => (params.value == null ? EMPTY_VALUE : String(params.value)),
 				headerTooltip: 'TMDB movie id',
 				hide: true,
 			},
@@ -1068,6 +1070,7 @@
 		pagination: false, // Manual pagination
 		defaultColDef: {
 			resizable: true,
+			cellClassRules: emptyCellClassRules,
 		},
 		tooltipShowDelay: 1000,
 		tooltipInteraction: true,

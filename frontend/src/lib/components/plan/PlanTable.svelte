@@ -11,6 +11,8 @@
 	} from '@ag-grid-community/core';
 	import type { UserTodoItem, UserTodoSortBy } from '$lib/queries/userTodos';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
+	import { emptyCellClassRules } from '$lib/utils/grid-empty';
+	import EmptyAware from '$lib/components/EmptyAware.svelte';
 	import { useCardMode, useResponsiveTier } from '$lib/utils/responsive.svelte';
 	import {
 		buildPlanColumnDefs,
@@ -63,6 +65,7 @@
 		return {
 			// Initial visibility is left to the tier effect below, so this doesn't read `tier`.
 			columnDefs: buildPlanColumnDefs(inListMode),
+			defaultColDef: { cellClassRules: emptyCellClassRules },
 			getRowId: (params) => params.data.id,
 			rowDragManaged: true,
 			animateRows: false,
@@ -147,10 +150,14 @@
 						<span class="text-muted-foreground text-xs" data-testid="plan-card-type">{planTypeLabel(todo)}</span>
 					{/if}
 					<span class="text-muted-foreground text-xs">
-						{todo.action.label} · {planStatusLabel(todo.status)} · {planPercentLabel(todo.percentComplete)}
+						{todo.action.label} · <EmptyAware text={planStatusLabel(todo.status)} /> · <EmptyAware
+							text={planPercentLabel(todo.percentComplete)}
+						/>
 					</span>
 					{#if todo.list}
-						<span class="text-muted-foreground text-xs">{planListLabel(todo.list, todo.listPosition)}</span>
+						<span class="text-muted-foreground text-xs"
+							><EmptyAware text={planListLabel(todo.list, todo.listPosition)} /></span
+						>
 					{/if}
 				</button>
 				<button
