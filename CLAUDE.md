@@ -54,6 +54,8 @@ defer db.Close()
 
 **Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`) during dev or verification** — `DATABASE_URL` points at the **shared Neon database**. Migrations are written and reviewed only, then applied manually per environment at rollout. Details and migration numbering: `backend/CLAUDE.md` → Migrations.
 
+**Rating-style numeric fields use the `valid_integer_range` domain (0–10000)** — priority, quality, agreement, importance, confidence. Reuse it for any new "how much" field instead of inventing a scale.
+
 **Commit messages:** Conventional commit format (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`). One logical change per commit. GSD planning work (PLAN.md, CONTEXT.md, RESEARCH.md, ROADMAP.md) uses the `docs` tag — e.g., `docs(11,13): create execution plans`.
 
 ## Planning & Execution Workflow
