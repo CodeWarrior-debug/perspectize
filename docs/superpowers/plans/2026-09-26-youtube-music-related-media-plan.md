@@ -12,15 +12,19 @@
 - A new `promoteRelatedMedia` mutation reuses `CreateFromYouTube`.
 - The frontend adds routing in Add Content, a `MediaPlayer` component with embed fallback, and a related-media list in the details modal.
 
-**Tech Stack:** Go 1.25+, gqlgen, GORM/Postgres 17, Svelte 5 runes, TanStack Query, AG Grid.
+**Tech Stack:** Go 1.27 (toolchain pinned in `go.mod`), gqlgen, GORM / Postgres 17 on Neon, Svelte 5 runes, TanStack Query, AG Grid.
+
+**Phases.** Phase A (tasks 1–9) was built 2026-09-27 on PR #440 against the `main` of that day. Phase B (tasks B1–B9) is the 2026-10-10 review: it brings the branch up to `main` @ `dfa1fc7`, adds the feature flag, and pins the query budgets. Phase B is required before merge; nothing from Phase A is deployed or applied anywhere.
 
 **Spec:** `docs/superpowers/specs/2026-09-26-youtube-music-related-media-design.md`. Decisions are argued there, not here.
 
 ## Global Constraints
 
 - Branch: `claude/music-content-api-oyfdht`.
-- **Never run `make migrate-up`.** Write the SQL only. The PR must state that it needs a manual `migrate up` in each environment.
-- Before numbering the migration, check `ls backend/migrations/ | tail -5` and in-flight branches.
+- **Never run `make migrate-up`** against `DATABASE_URL` (the shared Neon database). Write the SQL only. DB-backed tests in a cloud session run against a **local** Postgres (`backend/CLAUDE.md` → Testing); rehearsing the migration happens on a Neon branch (task B8).
+- Migration numbers are provisional until merge (`.docs/PR_WORKFLOW.md` → Migration labels). Check `git ls-tree origin/main backend/migrations/` and in-flight branches; finalize as the last step before merging.
+- **Query budget is a gate** (`.docs/QUERY_BUDGET.md`): every new repository or service path has its statement count asserted; a repo call inside a loop is rejected.
+- **Feature-flagged.** All four music mutations are behind `FEATURE_YOUTUBE_MUSIC` (spec decision 11). Default off.
 - Run `make graphql-gen` after any `schema.graphql` edit. Then delete the stray `schema.resolvers.go` after diffing it (see `backend/CLAUDE.md`).
 - External calls are always mocked in tests. No test hits InnerTube, MusicBrainz or YouTube.
 - Frontend: Svelte 5 runes only, and the TanStack function-wrapper pattern.
@@ -114,8 +118,108 @@
   - Tests cover each row of the state table, including that "Open lyrics" never renders for a search URL, that no search URL is artist-only, and the stale-refresh trigger.
 - [x] **Link target verified 2026-09-27:** per-track pages exist at `/tracks/:id`. See spec decision 10.
 
-## Task 10 — Verify
+## Task 10 — Verify (Phase A, done 2026-09-27)
 
-- [x] Run these and record the output summaries: `go build ./...`, `gofmt -l .` (empty), `go test ./...`, and `pnpm install` then `pnpm run test:run` in `frontend/`.
-- [ ] Run `graphify update .`. _(Not run: `graphify` isn't installed in the cloud session. Run it locally.)_
-- [ ] PR (`feat` template): state the manual migration and the unofficial InnerTube dependency, and leave the UI demo screenshots for a local session. Cloud sessions can't sign in through Clerk.
+- [x] `go build ./...` OK · `gofmt -l .` empty · `go test ./...` 25 packages ok · `pnpm run test:run` 145 files / 1744 tests.
+- [x] `graphify update .` could not run (not installed in the cloud session). Run locally. _(carried to B8)_
+- [x] PR #440 retitled as `feat`, description on the feature template.
+
+---
+
+# Phase B — bring up to `main` and harden (2026-10-10)
+
+Order matters: B1 before everything; B2 and B3 before B5's budgets are pinned; B8 last.
+
+## Task B1 — Merge `origin/main` and adapt to the rename
+
+**Suggested subagent:** `go-backend` for the backend half, `svelte-frontend` for the frontend half (review: `code-reviewer`).
+
+- [ ] `git merge origin/main`. Expected conflicts (from a dry run): `cmd/server/main.go`, `generated.go`, `models_gen.go`, `resolvers/helpers.go`, `domain/content.go`, `domain/errors.go`, `services/content_service.go`, `schema.graphql`, `test/resolvers/content_resolver_test.go`, `test/services/user_service_test.go`, `ActivityDetailsModal.svelte`, `AddContentPopover.svelte`, `queries/content/index.ts`. Take `main`'s side for generated files and re-run `make graphql-gen` (then diff and delete the stray `schema.resolvers.go`).
+- [ ] Rename: `domain.ContentTypeYouTube` → `ContentTypeYouTubeVideo` in `content_music.go` (promotion) and its tests; `'YOUTUBE'` → `'YOUTUBE_VIDEO'` in `useAddVideo.ts`, `AddContentPopover.svelte`, `discover/+page.svelte` and the music tests. `NormalizeYouTubeURL` is unchanged, so `linkExistingVideos` already finds `youtube_video` rows by URL.
+- [ ] `NewContentService(repo, yt, movie, opts...)`: update every music test constructor to pass a movie client (`tmdb.UnconfiguredClient{}` or the existing mock).
+- [ ] Re-apply the Phase A `AddContentPopover.svelte` changes on top of `main`'s version (it now routes `MOVIE` too): music chip, collection notice, `classifyYouTubeUrl` import. Keep `useAddVideo` as the last `createMutation` call (its comment explains why).
+- [ ] Wire `WithMusicEnrichment(...)` in `main.go` next to `WithYouTubeTrending(...)`.
+- [ ] Green: `go build ./...`, `go test ./...`, `pnpm run check` (only the two pre-existing errors from #471), `pnpm run test:run`.
+
+## Task B2 — Migration renumber and index expression
+
+**Suggested subagent:** `db-migration`.
+
+- [ ] Rename `000029_youtube_music_isrc_index.*` → `000031_youtube_music_isrc_index.*` (000029 and 000030 are on `main`). Update the header note: "next free on main as of 2026-10-10; still provisional until merge".
+- [ ] Index expression follows spec decision 12: `CREATE INDEX IF NOT EXISTS idx_content_isrc ON content ((response->'music'->>'isrc')) WHERE content_type = 'youtube_music';`. Down file unchanged.
+- [ ] If spec decision 18 changes the type name, change the DB value here and in the domain converter in the same commit.
+- [ ] Do not apply it. The `Migration labels` workflow sets `migrations-unapplied` on the PR by itself.
+
+## Task B3 — Response layout and the `music` field
+
+**Suggested subagent:** `go-backend`, then `svelte-frontend`.
+
+- [ ] Backend: `musicFields.merge` writes `response.music = {...}` instead of top-level keys. `relatedMedia` and `lyrics` stay top-level. `musicSummary` / `readMusicSummary` read `response.music.artist(s)`.
+- [ ] `GormContentRepository.GetByISRC` queries `response->'music'->>'isrc'` so it matches the index.
+- [ ] Schema: `Content.music: JSON` ("YouTube Music metadata; null for other types"), populated in `domainToModel` the way `movie` is (`if c.ContentType == domain.ContentTypeYouTubeMusic { m.Music = responseMap["music"] }`).
+- [ ] Frontend: `MusicTrack.music` replaces `MusicTrack.response`; `GET_MUSIC_TRACK`, `REFRESH_LYRICS_AVAILABILITY` and `MARK_RELATED_MEDIA_UNAVAILABLE` select `music { }` and never `response`. `MusicTrackPanel` reads `data.music.artist`.
+- [ ] Tests: the service tests' `repo.field(...)` assertions move to the `music` sub-object; a resolver test selects `music` and checks `artist`, `isrc`, `coverImageUrl`.
+
+## Task B4 — Feature flag `FEATURE_YOUTUBE_MUSIC`
+
+**Suggested subagent:** `go-backend` (backend), `svelte-frontend` (frontend); review `code-reviewer`.
+
+- [ ] Config: `Config.Features struct { YouTubeMusic bool }`, read from `FEATURE_YOUTUBE_MUSIC` (`"true"` only), default false. Add the variable to `backend/.env.example` with a one-line comment. Test in `test/config/` (unset → false; `true` → true; `t.Setenv` isolation per `clearConfigEnvVars`).
+- [ ] Domain: `ErrFeatureDisabled = errors.New("feature is not enabled")`.
+- [ ] Schema: `type Features { youtubeMusic: Boolean! }`, `features: Features!` on `Query` (no `@auth`). `make graphql-gen`; move the stub into `content.resolvers.go` (or a new `features.resolvers.go` if the domain-per-file rule in `backend/CLAUDE.md` prefers it).
+- [ ] Resolver: `Resolver` gains a `Features` field set in `NewResolver` (main.go passes `cfg.Features`). The four music mutations start with `if !r.Features.YouTubeMusic { return nil, fmt.Errorf("YouTube Music tracks are not enabled") }`. Reads (`music`, `relatedMedia`, `lyrics`) are not gated.
+- [ ] `go vet -tags perf ./internal/perf/...` after changing `NewResolver` (the perf harness constructs a resolver and rots otherwise).
+- [ ] Resolver tests: `features` returns the configured value; each music mutation returns the not-enabled error when off and proceeds when on; `setupTestServer` gets a `features` parameter defaulting to on so existing music tests keep passing.
+- [ ] Frontend: `src/lib/queries/features/index.ts` (`GET_FEATURES`, `Features` type) and `useFeatures.ts` (`staleTime: Infinity`, `enabled: browser`, `retry: false`); a `featureEnabled(query, 'youtubeMusic')` helper returns false while pending, on error, or when the field is missing.
+- [ ] Gates: `useAddVideo.mutationFn` takes `{ url, musicEnabled }` (or reads the flag through a passed accessor) and only routes to the music mutation when enabled; `AddContentPopover` shows the "YouTube Music" chip and the collection notice only when enabled; `AddVideoDialog` likewise.
+- [ ] Tests: `tests/unit/hooks-useFeatures.test.ts` with the real `QueryClient` helper (`mountConsumers` → one fetch; error → all false); `hooks-useAddVideo-music.test.ts` adds "flag off → video mutation, no music chip".
+
+## Task B5 — Query budgets
+
+**Suggested subagent:** `go-backend` (review: `code-reviewer`).
+
+- [ ] Repository: add `GetByURLs(ctx, urls []string) ([]*domain.Content, error)` (one `WHERE url IN (?)`, empty input issues no query). `linkExistingVideos` builds the canonical URLs and calls it once. Update every `ContentRepository` mock.
+- [ ] `CheckLyrics` returns the updated `*domain.Content` so `RefreshLyricsAvailability` no longer re-reads the row; `MarkRelatedMediaUnavailable` likewise returns the content.
+- [ ] `query_count_test.go`: `GetByISRC` = 1; `SetResponseKey` = 1; `GetByURLs` = 1 for 50 URLs and 0 for none.
+- [ ] Service round-trip counts (go-sqlmock or the local Postgres harness), each pinned with `AssertExactly`:
+  - new track, no counterparts: `GetByURL` + upsert = **2** (+ `GetByISRC` = **3** when an ISRC resolved; + `GetByURLs` = **4** when counterparts exist);
+  - duplicate by URL = **1**; duplicate by ISRC = `GetByURL` + `GetByISRC` + `SetResponseKey` = **3**;
+  - `PromoteRelatedMedia` = `GetByID` + (`GetByURL` + upsert) + 2 × `SetResponseKey` = **5**;
+  - `MarkRelatedMediaUnavailable` = **2**; `CheckLyrics` = `GetByID` + `SetResponseKey` = **2** (0 writes when the stored result is reused).
+  - The background lyrics check is counted separately from the add (it runs after the add returns).
+- [ ] Frontend cache contract (`tests/unit/query-cache-contract.test.ts` style, real `QueryClient`): `useMusicTrack` has an explicit `staleTime` (60 s) and a second mount inside it costs 0 fetches; `usePromoteRelatedMedia.onSuccess` invalidates exactly `content.music(id)` and `content.lists()` and leaves `content.detail(id)` untouched; `useRefreshLyrics` writes `setQueryData` and invalidates nothing.
+
+## Task B6 — Conventions from Movie
+
+**Suggested subagent:** `go-backend`.
+
+- [ ] `CreateFromYouTubeMusic` sets `LengthDisplay: domain.YouTubeLengthDisplay()`.
+- [ ] `ytmusic`, `musicbrainz`, `lrclib` clients: `Transport: otelhttp.NewTransport(http.DefaultTransport)`, and `slog.Error` with the path on non-200 responses (they already log; add the path).
+- [ ] Policy guard, if spec decision 19 is confirmed: refuse the add with `domain.ErrContentNotAllowed` when the Data API payload has `contentDetails.contentRating.ytRating == "ytAgeRestricted"`, checked after metadata and before any write, like `movieNotAllowed`. The frontend maps it with the existing `contentNotAllowedMessage` helper. One service test and one resolver test.
+- [ ] Extend `.claude/docs/ADDING_CONTENT_TYPE.md`'s worked-examples list with a pointer to this spec (one line, next to Movie).
+
+## Task B7 — Grid columns for music rows
+
+**Suggested subagent:** `svelte-frontend` (review: `code-reviewer`).
+
+- [ ] Channel column: for `YOUTUBE_MUSIC` rows the cell shows `music.artist` (fall back to `channelTitle`). The list query already selects `channelTitle`; add `music` to the list selection only if the artist is needed there (it is), the same way `movie` is selected.
+- [ ] Per-type default set in `grid-config.ts`: `YOUTUBE_MUSIC_DEFAULT_COLS` (Artist via the Channel column, Album, Released, Length, Genre), applied when the type filter is exactly `YOUTUBE_MUSIC`, mirroring `MOVIE_DEFAULT_COLS` and `defaultColumnVisibility`. Item header "Track" in that view (mirror the "Film" switch).
+- [ ] Album, Released and Genre read `music.album` / `music.releaseDate` / `music.genre`; they are picker-only outside the music view.
+- [ ] Item thumbnail: `music.coverImageUrl` when present (Cover Art Archive; `img-src https:` already allows it), else the `i.ytimg` thumbnail.
+- [ ] Tests in `tests/unit/` for the column set, the header switch, and the renderers (`formatting.test.ts`, a `musicColumns.test.ts` mirroring `movieColumns.test.ts`). Mobile card list: no music fields (parity with Movie), note it in the STATUS file.
+
+## Task B8 — Verification and rollout
+
+- [ ] Backend: `go build ./...`, `gofmt -l .` empty, `go vet ./... && go vet -tags perf ./internal/perf/...`, `go test ./...`. In a cloud session also run the DB-backed tests against a local Postgres per `backend/CLAUDE.md` → Testing so `GetByISRC`, `SetResponseKey`, `GetByURLs` and the index are exercised; confirm in the CI `Test & Lint` log that they ran rather than skipped.
+- [ ] Frontend: `pnpm run test:run`, `pnpm run check` (baseline: the two #471 errors only), `pnpm exec prettier --check` on touched files.
+- [ ] `graphify update .` locally.
+- [ ] Rehearse 000031 on a **Neon branch** from a local session (`.claude/skills/neon-postgres-branches`): create a branch from production, run `migrate up` against the branch's connection string only, confirm `\d content` shows `idx_content_isrc`, then delete the branch. Never against the parent.
+- [ ] PR #440: keep `needs-demo-video` until a local session records the demo (add a YT Music song, play it, open lyrics, promote the official video, paste a playlist link, flip the flag off and confirm a music link adds as a plain video). Run `/revise-claude-md` and add a **Session Learnings** section to the PR body (`.docs/PR_WORKFLOW.md`).
+- [ ] Last step before merge: confirm 000031 is still the next free number on `main` and `check-migration-number-before-apply` is off; renumber if not.
+- [ ] Rollout order: backend deploy (flag off) → `migrate up` 000031 per environment → swap `migrations-unapplied` for `migrations-applied` → `FEATURE_YOUTUBE_MUSIC=true` in dev → verify → prod → frontend deploy can go any time (it reads the flag).
+
+## Task B9 — Docs and handover
+
+- [ ] Write `docs/superpowers/plans/2026-09-26-youtube-music-related-media-STATUS.md` in the Movie STATUS format: what is built (commit list), not verified, morning checklist, known follow-ups (grid thumbnail on the card list, InnerTube retry job, `core/services` → `adapters/youtube` import, the `tools/content-type-designer/proposals/` folder).
+- [ ] Move or drop `tools/content-type-designer/proposals/`: `main` now keeps previews under `tools/content-type-designer/previews/` built by the `content-type-preview` skill. Either rebuild the YouTube Music preview with that skill or delete the proposals folder and link the spec instead.
+- [ ] Close the loop on #470 (check constraint) in the STATUS follow-ups; it is not blocked on this PR.
