@@ -10,7 +10,7 @@
 
 **Tech Stack:** Go (gqlgen, GORM, gorm-cursor-paginator, bluemonday, testify, sqlmock, `internal/perf/querycount`), PostgreSQL 17, SvelteKit 5 (runes), TanStack Query, AG Grid (`ag-grid-svelte5`), svelte-sonner, Vitest.
 
-**Spec:** `docs/superpowers/specs/2026-10-08-user-todos-design.md`. Read it in full first. Its settled decisions are not to be reopened. The one open decision (user-entered actions stored as `todo_actions` rows) is **assumed** here; if the owner picks free text instead, Tasks 1, 3 and 4 change.
+**Spec:** `docs/superpowers/specs/2026-10-08-user-todos-design.md`. Read it in full first. All its decisions are settled (including user-entered actions as `todo_actions` rows and `user_id` as the owner column); do not reopen them.
 
 ## Global Constraints
 
@@ -72,10 +72,10 @@
 **Files:** create `backend/migrations/000030_add_user_todos.up.sql`, `000030_add_user_todos.down.sql`.
 
 - [ ] Confirm the next free number: `ls backend/migrations` (last is `000029_add_hot_query_indexes` as of 2026-10-10). Numbers stay provisional until merge.
-- [ ] `todo_actions`: columns per spec; `owner_user_id` FK `users(id)` `ON DELETE RESTRICT`; `UNIQUE NULLS NOT DISTINCT (owner_user_id, key)`; `updated_at` trigger (`update_updated_at`, as in `000004`).
+- [ ] `todo_actions`: columns per spec; `user_id` FK `users(id)` `ON DELETE RESTRICT`; `UNIQUE NULLS NOT DISTINCT (user_id, key)`; `updated_at` trigger (`update_updated_at`, as in `000004`).
 - [ ] Seed the 10 presets with `INSERT … ON CONFLICT DO NOTHING` (idempotent), keys/labels/descriptions/sequence exactly as the spec table.
-- [ ] `user_todo_lists`: per spec; `privacy` `NOT NULL DEFAULT 'public'` + `CHECK`; `UNIQUE (owner_user_id, name)`; trigger.
-- [ ] `user_todos`: per spec; `priority valid_integer_range`; status/privacy/percent `CHECK`s; `CHECK (content_id IS NOT NULL OR name IS NOT NULL)`; `CHECK ((list_id IS NULL) = (list_position IS NULL))`; all FKs `ON DELETE RESTRICT` with named constraints (`user_todos_owner_fk`, `user_todos_content_fk`, `user_todos_action_fk`, `user_todos_list_fk`); partial unique index on open todos; indexes `(owner_user_id, status)` and `(list_id, list_position)`; trigger.
+- [ ] `user_todo_lists`: per spec; `privacy` `NOT NULL DEFAULT 'public'` + `CHECK`; `UNIQUE (user_id, name)`; trigger.
+- [ ] `user_todos`: per spec; `priority valid_integer_range`; status/privacy/percent `CHECK`s; `CHECK (content_id IS NOT NULL OR name IS NOT NULL)`; `CHECK ((list_id IS NULL) = (list_position IS NULL))`; all FKs `ON DELETE RESTRICT` with named constraints (`user_todos_user_fk`, `user_todos_content_fk`, `user_todos_action_fk`, `user_todos_list_fk`); partial unique index on open todos; indexes `(user_id, status)` and `(list_id, list_position)`; trigger.
 - [ ] `down`: drop `user_todos`, `user_todo_lists`, `todo_actions` (`IF EXISTS`), in that order.
 - [ ] Validate the SQL against a **local** Postgres only (`pg_ctlcluster 16 main start`, a throwaway DB): up, down, up again. Never Neon.
 - [ ] Commit `feat(db): add user todos tables`.
@@ -85,7 +85,7 @@
 **Files:** `domain/user_todo.go`, `domain/errors.go`, the three port files.
 
 - [ ] `UserTodoStatus` consts `NOT_STARTED`, `IN_PROGRESS`, `DONE`, `DROPPED`; `UserTodoSortBy` (`PRIORITY`, `DUE_DATE`, `CREATED_AT`, `UPDATED_AT`, `LIST_POSITION`).
-- [ ] Structs `TodoAction`, `UserTodoList`, `UserTodo` (dates as `*time.Time` date-only; `Comments *string`; `Privacy Privacy`; `OwnerUserID int`).
+- [ ] Structs `TodoAction`, `UserTodoList`, `UserTodo` (dates as `*time.Time` date-only; `Comments *string`; `Privacy Privacy`; `UserID int`).
 - [ ] Inputs `CreateUserTodoInput`, `UpdateUserTodoInput` (pointer fields, like `UpdatePerspectiveInput`), list inputs, `UserTodoListParams` with `ViewerID *int`, `RestrictToPublicOrOwner bool`, `Filter`.
 - [ ] `ErrInvalidPercent`.
 - [ ] Ports: repository methods sized for the service (list page, `GetByID`, `GetByIDs` for loaders, create, owner-scoped update/delete, `AssignToList`, `UnlistAll(listID, ownerID)`, `Reorder`, `ReassignByUser`); action repo `GetByIDs`, `ListForUser`, `Create`, `ReassignByUser`. No pass-through methods the service won't add rules to.
@@ -95,7 +95,7 @@
 
 **Files:** `gorm_user_todo_repository.go`, `gorm_todo_action_repository.go`, `gorm_models.go`, `gorm_mappers.go`, `helpers.go`, matching `_test.go` files.
 
-- [ ] Write sqlmock tests first (pattern: `gorm_perspective_repository_test.go`): list page with and without `includeTotalCount`; privacy predicate (`privacy = 'public' OR owner_user_id = ?`) when `RestrictToPublicOrOwner`; `GetByIDs` uses `= ANY(CAST(? AS bigint[]))`; owner-scoped `UPDATE … RETURNING`; zero-row update → follow-up read splits `ErrNotFound` / `ErrForbidden`; unique-violation on the open-todo index → `ErrAlreadyExists`; `UnlistAll` + delete for lists; `Reorder` as one `UPDATE … FROM (VALUES …)`; `ReassignByUser` for todos, lists, actions.
+- [ ] Write sqlmock tests first (pattern: `gorm_perspective_repository_test.go`): list page with and without `includeTotalCount`; privacy predicate (`privacy = 'public' OR user_id = ?`) when `RestrictToPublicOrOwner`; `GetByIDs` uses `= ANY(CAST(? AS bigint[]))`; owner-scoped `UPDATE … RETURNING`; zero-row update → follow-up read splits `ErrNotFound` / `ErrForbidden`; unique-violation on the open-todo index → `ErrAlreadyExists`; `UnlistAll` + delete for lists; `Reorder` as one `UPDATE … FROM (VALUES …)`; `ReassignByUser` for todos, lists, actions.
 - [ ] `querycount` budgets: list page 1 (+1 with total); `GetByIDs` 1 for 1 and for 50 ids, 0 for none; single writes 1.
 - [ ] Implement with `gorm-cursor-paginator` (check both `err` and `pageResult.Error`), status converter (lowercase ↔ UPPERCASE) and sort whitelist in `helpers.go`.
 - [ ] `go test ./internal/adapters/repositories/...`; `gofmt -l .` empty; commit.
@@ -128,7 +128,7 @@
 **Files:** `schema.graphql`, `gqlgen.yml`, `resolvers/user_todo.resolvers.go`, `resolvers/helpers.go`, `dataloader/dataloader.go`, `cmd/server/main.go`, `internal/server/api.go`, `test/resolvers/…`, `test/roundtrips/user_todo_test.go`.
 
 - [ ] Schema exactly as the spec (types, enums, `PaginatedUserTodos`, `UserTodoFilter` with `IntID`, queries without `@auth` except `todoActions`, mutations with `@auth`).
-- [ ] `gqlgen.yml`: bind `UserTodoStatus`, `UserTodoSortBy`; `resolver: true` for `UserTodo.owner/content/action/list` and `UserTodoList.owner`.
+- [ ] `gqlgen.yml`: bind `UserTodoStatus`, `UserTodoSortBy`; `resolver: true` for `UserTodo.user/content/action/list` and `UserTodoList.user`.
 - [ ] `make graphql-gen`; diff and delete stray `schema.resolvers.go`; move stubs.
 - [ ] Dataloaders: add `TodoActionByID`, `UserTodoListByID` to `Loaders`/`NewLoaders`/`Services`; reuse `UserByID`, `ContentByID`. Loader tests: N loads → 1 call.
 - [ ] Mapping lives once in `helpers.go`.

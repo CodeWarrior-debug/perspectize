@@ -6,7 +6,7 @@
 **Branch:** `chore/user-todos-spec` (spec only; implementation gets its own `feature/` branch)
 **Type:** feature
 **Tracking issue:** none for this spec. Follow-up: #571 (plan columns on the Activity table)
-**Status:** draft, owner decisions below are settled; the few open ones are under **Decisions to confirm**
+**Status:** draft; all owner decisions are settled (see **Decisions**); needs a superpowers-enabled review before execution
 
 ## Problem
 
@@ -62,10 +62,10 @@ Migration `000030_add_user_todos` (number provisional, finalized before merge). 
 | `label` | `text NOT NULL` | Shown in the picker (`Consume`). |
 | `description` | `text NOT NULL DEFAULT ''` | Shown as the picker item's hover tooltip. |
 | `typical_sequence` | `integer NULL` | The order a consumer typically does these in; the picker sorts by it. `NULL` for user-entered actions, which sort after the presets by label. |
-| `owner_user_id` | `integer NULL` FK `users(id)` ON DELETE RESTRICT | `NULL` = preset (global). Set = a user-entered action, visible only in that user's picker. |
+| `user_id` | `integer NULL` FK `users(id)` ON DELETE RESTRICT | `NULL` = preset (global). Set = a user-entered action, visible only in that user's picker. |
 | `created_at`, `updated_at` | `timestamptz NOT NULL DEFAULT NOW()` | |
 
-Constraints: `UNIQUE NULLS NOT DISTINCT (owner_user_id, key)` (PG 15+) so presets can't collide and a user can't duplicate their own key.
+Constraints: `UNIQUE NULLS NOT DISTINCT (user_id, key)` (PG 15+) so presets can't collide and a user can't duplicate their own key.
 
 Seeded presets (in the migration), in typical sequence:
 
@@ -89,20 +89,20 @@ Seeded presets (in the migration), in typical sequence:
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `serial` PK | |
-| `owner_user_id` | `integer NOT NULL` FK `users(id)` ON DELETE RESTRICT | |
+| `user_id` | `integer NOT NULL` FK `users(id)` ON DELETE RESTRICT | |
 | `name` | `varchar(100) NOT NULL` | |
 | `description` | `text NULL` | |
 | `privacy` | `text NOT NULL DEFAULT 'public'` `CHECK (privacy IN ('public','private'))` | Same rule as todos. |
 | `created_at`, `updated_at` | `timestamptz` | |
 
-`UNIQUE (owner_user_id, name)`.
+`UNIQUE (user_id, name)`.
 
 ### `user_todos`
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `serial` PK | |
-| `owner_user_id` | `integer NOT NULL` FK `users(id)` ON DELETE RESTRICT | Named *owner* (not `user_id`) so assignees can be added beside it without ambiguity. |
+| `user_id` | `integer NOT NULL` FK `users(id)` ON DELETE RESTRICT | The owner. Named `user_id` like every existing table (owner decision, 2026-10-10); future assignees get their own table, so there's no ambiguity. |
 | `content_id` | `integer NULL` FK `content(id)` ON DELETE RESTRICT, constraint `user_todos_content_fk` | Content that any todo points at cannot be deleted (DB-level gate; see **Foreign keys**). |
 | `name` | `varchar(255) NULL` | Only when there is no content (not found, an idea, an outside list). Ignored in the UI when `content_id` is set. |
 | `action_id` | `integer NOT NULL` FK `todo_actions(id)` | |
@@ -119,8 +119,8 @@ Seeded presets (in the migration), in typical sequence:
 Constraints and indexes:
 - `CHECK (content_id IS NOT NULL OR name IS NOT NULL)`
 - `CHECK ((list_id IS NULL) = (list_position IS NULL))`
-- Partial unique `(owner_user_id, content_id, action_id) WHERE content_id IS NOT NULL AND status IN ('not_started','in_progress')`: one open todo per owner, content and action; a finished one doesn't block a later `revisit`.
-- Index `(owner_user_id, status)` for the Plan page; index `(list_id, list_position)` for list order. Further indexes only with an `EXPLAIN` on real data (as the movie spec did).
+- Partial unique `(user_id, content_id, action_id) WHERE content_id IS NOT NULL AND status IN ('not_started','in_progress')`: one open todo per owner, content and action; a finished one doesn't block a later `revisit`.
+- Index `(user_id, status)` for the Plan page; index `(list_id, list_position)` for list order. Further indexes only with an `EXPLAIN` on real data (as the movie spec did).
 - List and todo must share an owner: enforced in the service (a cross-table `CHECK` isn't possible), and in the `UPDATE` WHERE when assigning.
 
 `down` drops the three tables (todos, lists, actions) in reverse order.
@@ -140,7 +140,7 @@ Todos are neither children of content, of users, of actions nor of lists, so eve
 |---|---|---|
 | `content` | Blocked while any todo references it (`user_todos_content_fk`). | Nothing deletes content today. A future content delete must keep the gate and map SQLSTATE `23503` on `user_todos_content_fk` to a domain error (add `domain.ErrInUse`, "still referenced"), the same way `gorm_perspective_repository.go` maps `pgForeignKeyViolation` on its user FK. It must not copy titles into `name` or null the column to get around it. |
 | `users` | Blocked while the user owns todos, lists or custom actions. | `UserService.Delete` reassigns them to the `[deleted]` sentinel, as it does for content and perspectives today (add `ReassignByUser` to the todo, list and action repositories and call them there; extend its tests). |
-| `user_todo_lists` | Blocked while todos are in the list. (`list_id` is an optional pointer, which elsewhere would be `SET NULL`; that would leave `list_position` set and break the both-or-neither CHECK, so it blocks instead.) | `DeleteUserTodoList` first unlists its todos (`UPDATE … SET list_id = NULL, list_position = NULL WHERE list_id = ? AND owner_user_id = ?`), then deletes the list, both owner-scoped. Todos are never deleted with a list. |
+| `user_todo_lists` | Blocked while todos are in the list. (`list_id` is an optional pointer, which elsewhere would be `SET NULL`; that would leave `list_position` set and break the both-or-neither CHECK, so it blocks instead.) | `DeleteUserTodoList` first unlists its todos (`UPDATE … SET list_id = NULL, list_position = NULL WHERE list_id = ? AND user_id = ?`), then deletes the list, both owner-scoped. Todos are never deleted with a list. |
 | `todo_actions` | Blocked while todos use the action. | No delete in v1; presets are permanent and custom actions are kept. |
 
 Because content can't vanish under a todo, `CHECK (content_id IS NOT NULL OR name IS NOT NULL)` holds without any delete-time workaround.
@@ -178,27 +178,27 @@ enum UserTodoStatus { NOT_STARTED IN_PROGRESS DONE DROPPED }
 enum UserTodoSortBy { PRIORITY DUE_DATE CREATED_AT UPDATED_AT LIST_POSITION }
 
 type TodoAction { id: ID! key: String! label: String! description: String! typicalSequence: Int isPreset: Boolean! }
-type UserTodoList { id: ID! owner: User! name: String! description: String privacy: Privacy! createdAt: String! updatedAt: String! }
+type UserTodoList { id: ID! user: User! name: String! description: String privacy: Privacy! createdAt: String! updatedAt: String! }
 type UserTodo {
-  id: ID!  owner: User!  content: Content  name: String  action: TodoAction!
+  id: ID!  user: User!  content: Content  name: String  action: TodoAction!
   priority: Int  status: UserTodoStatus!  percentComplete: Int!
   startDate: String  endDate: String  dueDate: String     # ISO YYYY-MM-DD
   comments: String  privacy: Privacy!  list: UserTodoList  listPosition: Int
   createdAt: String!  updatedAt: String!
 }
 type PaginatedUserTodos { items: [UserTodo!]! pageInfo: PageInfo! totalCount: Int }
-input UserTodoFilter { ownerUserId: IntID  contentId: IntID  listId: IntID  status: [UserTodoStatus!]  actionId: IntID }
+input UserTodoFilter { userId: IntID  contentId: IntID  listId: IntID  status: [UserTodoStatus!]  actionId: IntID }
 ```
 
 Queries (open, privacy-filtered like `perspectives`):
 - `userTodos(first: Int = 10, after, last, before, sortBy: UserTodoSortBy = CREATED_AT, sortOrder: SortOrder = DESC, includeTotalCount: Boolean = false, filter: UserTodoFilter): PaginatedUserTodos!`
 - `userTodoByID(id: ID!): UserTodo`: `null` for someone else's private todo.
-- `userTodoLists(ownerUserId: IntID!): [UserTodoList!]!`: private lists only to their owner.
+- `userTodoLists(userId: IntID!): [UserTodoList!]!`: private lists only to their owner.
 - `todoActions: [TodoAction!]! @auth`: presets plus the caller's own, ordered by `typical_sequence NULLS LAST, label`.
 
 Mutations (all `@auth`, ownership in service + SQL, no `@owner`): `createUserTodo(input)`, `updateUserTodo(input)`, `deleteUserTodo(id): Boolean!`, `createTodoAction(input: { label, description })`, `createUserTodoList(input)`, `updateUserTodoList(input)`, `deleteUserTodoList(id): Boolean!`, `reorderUserTodoList(listId: IntID!, todoIds: [IntID!]!): [UserTodo!]!`.
 
-`gqlgen.yml`: bind the enum; `resolver: true` for `UserTodo.owner`, `.content`, `.action`, `.list` and `UserTodoList.owner`, each through a dataloader (existing user and content loaders; new action and list loaders).
+`gqlgen.yml`: bind the enum; `resolver: true` for `UserTodo.user`, `.content`, `.action`, `.list` and `UserTodoList.user`, each through a dataloader (existing user and content loaders; new action and list loaders).
 
 ### Tests
 
@@ -236,17 +236,18 @@ Vitest for the toast helper, rating/percent formatting, column metadata, and eac
 
 ## Future: assignees
 
-Add `user_todo_assignees (todo_id FK ON DELETE CASCADE as an aggregate child, user_id FK blocking with sentinel reassignment, assigned_at, PRIMARY KEY (todo_id, user_id))` (same shape as `thread_participants`). The read predicate becomes *public OR owner OR assignee*; assignees may update `status`, `percent_complete` and dates, while only the owner edits the rest and deletes. Nothing in v1 needs renaming for this: the owner column is already `owner_user_id` and the GraphQL field is `owner`.
+Add `user_todo_assignees (todo_id FK ON DELETE CASCADE as an aggregate child, user_id FK blocking with sentinel reassignment, assigned_at, PRIMARY KEY (todo_id, user_id))` (same shape as `thread_participants`). The read predicate becomes *public OR owner OR assignee*; assignees may update `status`, `percent_complete` and dates, while only the owner edits the rest and deletes. Nothing in v1 needs renaming: `user_todos.user_id` stays the owner, and assignees are rows in their own table (GraphQL `assignees: [User!]!` beside `user`).
 
 ## Rollout
 
 The migration is written and reviewed, never applied in dev (shared Neon DB). The PR carrying it gets `migrations-unapplied` from the workflow and needs a manual `migrate up` per environment.
 
-## Decisions to confirm
+## Decisions
 
-Settled in review (2026-10-10): first status is `not_started`; privacy column defaulting to public; owner naming ready for assignees; priority on the 0–10000 rating scale with the shared helpers; `cite` / `archive` dropped and actions ordered by `typical_sequence` with tooltips, stored in a cached table; one list per todo; the page is **Plan**; every FK blocks, so content with todos can't be deleted (DB-level gate, respected by the app).
+Settled in review (2026-10-10): first status is `not_started`; privacy column defaulting to public; the owner column is `user_id` like every other table, with assignees in their own table later; priority on the 0–10000 rating scale with the shared helpers; `cite` / `archive` dropped and actions ordered by `typical_sequence` with tooltips, stored in a cached table; one list per todo; the page is **Plan**; every FK blocks, so content with todos can't be deleted (DB-level gate, respected by the app).
 
 Also settled (2026-10-10): the preset order above (acquire → … → revisit); lists carry their own `privacy`, independent of their todos'; `dropped` is the fourth status.
 
-Still open:
-1. User-entered actions as rows in `todo_actions` with `owner_user_id` (vs. a free-text column on the todo). Chosen so the picker, ordering and tooltips work the same for both. The plan assumes rows; switching to free text changes Task 1 (migration) and the action repository.
+Also settled (2026-10-10): user-entered actions are rows in `todo_actions` with `user_id` set and no sequence.
+
+No decisions remain open.
