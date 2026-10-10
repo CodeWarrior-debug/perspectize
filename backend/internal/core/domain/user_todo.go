@@ -147,6 +147,8 @@ type UpdateUserTodoListInput struct {
 	Name        *string
 	Description *string
 	Privacy     *Privacy
+	// ClearDescription sets Description to NULL (Description is ignored).
+	ClearDescription bool
 }
 
 // UserTodoFilter contains filter criteria for user todo queries
