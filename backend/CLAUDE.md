@@ -46,7 +46,7 @@ Refs: Ousterhout, *A Philosophy of Software Design*; Matt Pocock, [How To Make C
 
 ## Stack
 
-Go 1.26+ (pinned via `toolchain` in go.mod + Dockerfile) · gqlgen (schema-first) · PostgreSQL 17 (GORM + pgx/v5) · golang-migrate · go-playground/validator · testify · log/slog · godotenv
+Go 1.27+ (`go 1.27.2` in go.mod, `golang:1.27-alpine` in Dockerfile) · gqlgen (schema-first) · PostgreSQL 17 (GORM + pgx/v5) · golang-migrate · go-playground/validator · testify · log/slog · godotenv
 
 ### ORM: GORM (Hex-Clean Separate Model Pattern)
 
@@ -109,6 +109,8 @@ The failure is confined to that last step: `generated.go` and `models_gen.go` ar
 
 **Adding a query/mutation arg regenerates the resolver signature, positionally.** After `make graphql-gen`, the new arg lands wherever it sits in the schema's arg list — not appended at the end of the Go signature. Read the stub in the stray `schema.resolvers.go` (see above) to get the exact updated signature, then copy it verbatim into the real per-domain resolver file; don't hand-guess the param order.
 
+**Schema shape conventions:** timestamps and dates are `String` (ISO; there is no Date scalar). Lists return `Paginated<X> { items, pageInfo, totalCount }` and take `first`/`after`/`last`/`before`/`sortBy`/`sortOrder`/`includeTotalCount`/`filter` (see `perspectives`). Owner-only writes are `create<X>(input)` / `update<X>(input)` with `@auth` and `delete<X>(id: ID!): Boolean! @auth`, with ownership enforced in the service and the SQL (see Gotchas).
+
 ## Testing
 
 - **Unit:** Mock deps, no DB. `make test`.
@@ -140,6 +142,8 @@ c.AssertExactly(t, 1) // batch: 1 query for 50 ids, never 50
 
 Full table and examples: [.docs/QUERY_BUDGET.md](../.docs/QUERY_BUDGET.md).
 
+**Cached repositories** (`adapters/repositories/cached/`) wrap a small, rarely written table that most requests read (users, categories): an id-keyed TTL cache with an injected clock and a generation counter, where writes refresh their own entry from the `RETURNING` row. Wired in `cmd/server/main.go`. Use the same shape for new lookup tables.
+
 ## Code Style
 
 Structured logging with `slog` · dependency injection via ports.
@@ -159,17 +163,23 @@ Error handling & DB query patterns: [.docs/GO_PATTERNS.md](../.docs/GO_PATTERNS.
 
 ## CORS
 
-CORS middleware is part of the API middleware chain in `internal/server/api.go` (`server.Middleware`, built from `server.Deps`, which `cmd/server/main.go` fills in). The allowed origins come from `CORS_ORIGINS` (`internal/config/security.go`, comma-separated). It defaults to `*` when unset (and the example env file sets `*`), so set it to the frontend's origin in every deployed environment.
+CORS middleware is part of the API middleware chain in `internal/server/api.go` (`server.Middleware`, built from `server.Deps`, which `cmd/server/main.go` fills in); the options come from `server.CORSOptions()`. The allowed origins come from `CORS_ORIGINS` (`internal/config/security.go`, comma-separated). It defaults to `*` when unset (and the example env file sets `*`), so set it to the frontend's origin in every deployed environment. `AllowedHeaders` must list every custom header the frontend sends (`traceparent`, `tracestate`, `X-Client-Version`, `X-Client-Platform`) or browser preflight rejects the request.
 
 ## Gotchas
 
 **Owner-only mutations need a guard at every layer, not just `@owner`.** The directive is one check; also re-derive the actor in the resolver via `auth.RequireAuth(ctx)` (never trust a client-supplied user ID), pass it into the service method (e.g. `Delete(ctx, id, actorUserID)`) and return `domain.ErrForbidden` there, and scope the SQL itself (`WHERE user_id = ? AND id = ?`). See `deletePerspective`. `updatePerspective` and `deletePerspective` deliberately skip `@owner`, because its lookup was a duplicate round trip. The service check plus owner-scoped SQL are the two guards there, and the service returns the same not-found / access-denied split. When a non-owner hits someone else's **non-PUBLIC** perspective, `@owner` answers "resource not found", not "access denied", so the ID isn't confirmed to exist (matches `perspectiveByID` returning null).
+
+**The owning user's column is always `user_id`** (FK `users(id)`), on new tables too. Other users related to a row (participants, assignees) go in their own join table, not in a second column on the row.
+
+**User-visible, user-owned rows carry `privacy`** (`PUBLIC` / `PRIVATE`, default `PUBLIC`, reusing `domain.Privacy`). List reads return public OR the viewer's own rows (`ViewerID` + `RestrictToPublicOrOwner`); a by-id read returns `null`, not an error, for someone else's private row. Details: [.docs/DOMAIN_GUIDE.md](../.docs/DOMAIN_GUIDE.md#privacy).
 
 **A model-bound schema field with no resolver is always null.** When `gqlgen.yml` binds a type to a Go model that lacks the field (e.g. `Perspective.user`), gqlgen resolves it silently to null. Add `resolver: true` for that field in `gqlgen.yml` and resolve it through a dataloader.
 
 **GraphQL defaults:** gqlgen passes `first: Int = 10` as non-nil pointer (value `10`), not `nil`. Tests must expect the default value.
 
 **Adding repository interface methods:** When adding a new method to a port interface (e.g., `ListAll` on `UserRepository`), all test mocks that implement that interface must also be updated or compilation fails. Check `test/` for mock implementations.
+
+**`encoding/json` runs on the v2 engine (Go 1.27):** Unmarshal is ~35% faster, but each small `json.Marshal` costs +2 allocs (~20–40% slower). A reused `jsontext.Encoder` is slower still; only hand appenders (`jsontext.AppendQuote`) win, and they aren't worth it at DB-bound µs scale. Benches: `go test -run '^$' -bench . ./internal/adapters/{repositories/postgres,realtime,tmdb}/`. A/B the old engine with `GOEXPERIMENT=nojsonv2`.
 
 **JSON scalar:** Use `graphql.Map` (configured as `JSON` in `gqlgen.yml`) for JSONB data.
 
@@ -178,6 +188,10 @@ CORS middleware is part of the API middleware chain in `internal/server/api.go` 
 **Non-schema model fields:** use `extraFields` under a type in `gqlgen.yml` (e.g. `Content.PrimaryCategoryID`) to carry data (like an FK) onto a generated model for a resolver to use, then `go run github.com/99designs/gqlgen generate`. Populate it in `domainToModel`.
 
 **Directive arg introspection:** `graphql.GetFieldContext(ctx).Args["input"]` is the *typed* input struct (e.g. `model.UpdatePerspectiveInput`), not `map[string]interface{}`. Directive/middleware code that digs a value out of an input object must read the struct (by `json` tag via reflection), not just type-assert to a map — a map-only assertion silently fails for every real request. See `directives/auth.go` `extractResourceID`/`fieldByJSONTag`.
+
+**Metric cardinality:** any metric attribute whose value comes from request input (operation name, client version/platform) must go through `telemetry.BoundedSet` (`pkg/telemetry/bounded.go`).
+
+**GORM tracing is in-house** (`pkg/database/tracing.go`). Don't add `gorm.io/plugin/opentelemetry` — it pulls ClickHouse + MySQL drivers into the binary. SQL spans are named `"<VERB> <table>"` (e.g. `SELECT content`), not `gorm.Query`.
 
 **`Perspective.ReviewStatus`** is moderation state (`PENDING`/`APPROVED`/`REJECTED`) — don't reuse it for draft/imported markers; use `labels` or `customFields`.
 
@@ -209,17 +223,19 @@ models:
 
 **New enum checklist:** UPPERCASE constants → bind in `gqlgen.yml` → DB converter if stored → `make graphql-gen`
 
+**Stored-enum hardening:** a DB-stored enum column is lowercase `text`, `NOT NULL`, defaulted, and `CHECK (col IN (...))`-constrained (see `000018_harden_perspective_privacy`).
+
 ## Go Version Management
 
-**`go.mod` uses `toolchain` directive** to decouple minimum version from local dev version:
-- `go 1.26` — minimum required (set by dependencies like gqlgen)
-- `toolchain go1.26.0` — version used for local development
+**`go.mod` pins the exact patch** (`go 1.27.2`, no `toolchain` line). CI's setup-go installs exactly that version, so bump the patch here to move CI.
 
 **Dockerfile pins the base image** (`golang:1.27-alpine`) so Sevalla builds always use a known-good version.
 
 **CI uses `go-version-file`** (`backend/go.mod`) so GitHub Actions auto-detects the version.
 
-**When Go updates locally** (e.g., Homebrew): only the `toolchain` line changes. The `go` minimum stays stable unless a dependency forces it up. Update the Dockerfile base image to match.
+**Cloud containers ship an older Go;** `GOTOOLCHAIN=auto` downloads the go.mod version on first use. Prefix `GOTOOLCHAIN=go1.X.Y` to run a specific one (e.g. A/B against the previous release).
+
+**Upgrading Go:** `go mod edit -go=<ver>` → `go mod tidy` → bump both Dockerfiles (`Dockerfile`, `Dockerfile.demo`) → README prerequisites.
 
 **Never hardcode Go versions** in CI or deployment configs. Always reference `go.mod`.
 
@@ -229,16 +245,23 @@ models:
 
 **Migration numbering:** Always check existing migration files before creating new ones. Plan-specified numbers may be stale — use `ls migrations/ | tail -5` to find the next available number. Numbers on open PRs are **provisional**: don't renumber around other in-flight branches. Finalize the number as the last step before merging (rename to the next free number on `main`). It can't wait until after merge, because golang-migrate won't run with two files sharing a version on `main`. `check-migration-number-before-apply` still on a PR means that rename is due. Prefer idempotent DDL (`DROP CONSTRAINT IF EXISTS` before `ADD`, `UPDATE ... WHERE col IS NULL` before `SET NOT NULL`) so a migration is safe on a fresh DB or one already patched out of band.
 
+**FK delete behavior depends on the FK's kind** (verified across all migrations; the "All FKs use ON DELETE RESTRICT" comment in `000006` predates the exceptions):
+- Ownership FKs to `users` and FKs to `content` **block** (explicit `ON DELETE RESTRICT` for new ones). `UserService.Delete` reassigns owned rows to the `[deleted]` sentinel before deleting the user, so a new user-owned table needs a `ReassignByUser` call there (messaging isn't covered yet: #574).
+- Optional pointers use **`SET NULL`** (`primary_category_id`, `primary_perspective_id`).
+- Child rows of an aggregate use **`CASCADE`** (messaging tables → `message_threads`).
+
 ## Agent Delegation
 
-| Task Type | Model | Subagent | Rationale |
-|-----------|-------|----------|-----------|
-| Architecture decisions | Opus | - | Complex multi-file reasoning |
-| Go implementation | Sonnet | `go-backend` | Balanced quality/cost |
-| GraphQL schema design | Sonnet | `graphql-designer` | Schema patterns |
-| Database migrations | Sonnet | `db-migration` | SQL generation |
-| Code review | Haiku | `code-reviewer` | Fast pattern matching |
-| Test generation | Haiku | `test-writer` | Boilerplate generation |
+Each subagent's model is set in its `model:` frontmatter (`.claude/agents/*.md`) — don't restate it here, and don't override it with the Agent tool's `model` parameter.
+
+| Task Type | Subagent |
+|-----------|----------|
+| Architecture decisions | main session (no subagent) |
+| Go implementation | `go-backend` |
+| GraphQL schema design | `graphql-designer` |
+| Database migrations | `db-migration` |
+| Code review | `code-reviewer` |
+| Test generation | `test-writer` |
 
 ## References
 

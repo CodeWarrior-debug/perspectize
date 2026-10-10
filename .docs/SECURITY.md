@@ -5,7 +5,7 @@ This document covers security practices, secret management, and rotation procedu
 ## Overview
 
 Perspectize implements multiple security layers:
-- **Authentication:** JWT-based with httpOnly cookies (Plan 09-01)
+- **Authentication:** Clerk session tokens, verified by the backend's Clerk middleware (`internal/adapters/auth`)
 - **Authorization:** Directive-based ownership checks (Plan 09-02)
 - **API Protection:** Rate limiting, query complexity, CORS, CSRF (Plan 09-03)
 - **HTTP Security:** Security headers, CSP, HTTPS (Plan 09-04)
@@ -13,16 +13,9 @@ Perspectize implements multiple security layers:
 
 ## Secret Management
 
-### JWT Secret
+### Clerk Secret Key
 
-**Generation:**
-```bash
-# Generate 64-byte random secret (recommended)
-openssl rand -base64 64
-
-# Minimum 32 bytes for HS256 security
-openssl rand -base64 32
-```
+**Source:** Clerk Dashboard > API Keys
 
 **Storage:**
 - **Development:** `.env` file (gitignored)
@@ -30,9 +23,8 @@ openssl rand -base64 32
 - **Never:** Commit to git, hardcode in config files, share via email/chat
 
 **Validation:**
-- Backend validates JWT_SECRET >=32 bytes at startup
-- Production fails fast if secret too short
-- Development logs warning only
+- Production fails fast if `CLERK_SECRET_KEY` is missing
+- Development logs a warning only (Clerk auth will not work)
 
 ### YouTube API Key
 
@@ -88,23 +80,18 @@ values. Enforcement:
 
 ## Secret Rotation
 
-### JWT Secret Rotation
+### Clerk Secret Key Rotation
 
 **When to rotate:**
-- Every 90 days (recommended)
 - Immediately if suspected compromise
 - After team member departure with access
 
 **Procedure:**
-1. Generate new secret: `openssl rand -base64 64`
-2. Update `JWT_SECRET` in Sevalla environment variables
+1. Create a new secret key in Clerk Dashboard > API Keys
+2. Update `CLERK_SECRET_KEY` in Sevalla environment variables
 3. Restart backend service
-4. All existing tokens invalidated (users must re-authenticate)
+4. Revoke the old key in Clerk Dashboard
 5. Log rotation event with timestamp
-
-**Zero-downtime rotation (advanced):**
-- Requires dual-secret support (validate with old OR new secret for grace period)
-- Not implemented in Phase 9 (manual rotation acceptable for initial security)
 
 ### YouTube API Key Rotation
 
@@ -139,13 +126,13 @@ values. Enforcement:
 
 **Setting secrets:**
 1. Sevalla Dashboard > Your App > Settings > Environment Variables
-2. Add variables: `JWT_SECRET`, `YOUTUBE_API_KEY`, `CORS_ORIGINS`
+2. Add variables: `CLERK_SECRET_KEY`, `YOUTUBE_API_KEY`, `CORS_ORIGINS`
 3. Click "Restart" after saving changes
 4. Verify via app logs that new secrets loaded
 
 **Production checklist:**
 - [ ] `APP_ENV=production` set
-- [ ] `JWT_SECRET` >=64 bytes
+- [ ] `CLERK_SECRET_KEY` set (production key, not the dev instance's)
 - [ ] `YOUTUBE_API_KEY` with API restrictions
 - [ ] `CORS_ORIGINS=https://app.perspectize.com` (no wildcard)
 - [ ] `RATE_LIMIT_PER_MIN=100` or appropriate for traffic
@@ -167,12 +154,12 @@ curl -I https://api.perspectize.com
 
 ## Security Incident Response
 
-### Suspected JWT Secret Compromise
+### Suspected Clerk Secret Key Compromise
 
-1. Immediately rotate JWT_SECRET (see rotation procedure)
+1. Immediately rotate CLERK_SECRET_KEY (see rotation procedure)
 2. Review recent access logs for suspicious activity
 3. Check Sevalla access logs for unauthorized environment variable changes
-4. Notify users of forced logout (all tokens invalidated)
+4. Review active sessions in Clerk Dashboard and revoke any suspicious ones
 5. Document incident with timeline
 
 ### API Key Exposure
@@ -201,7 +188,7 @@ curl -I https://api.perspectize.com
 - **Rate limiting:** `"rate limit exceeded"` (sustained = possible DoS)
 - **API errors:** YouTube API errors (quota exceeded, invalid key)
 - **Database errors:** Connection failures (credentials issue, network issue)
-- **Secret validation:** `"JWT_SECRET too short"` warnings
+- **Secret validation:** `"CLERK_SECRET_KEY not set"` warnings
 
 ### Alerts to Configure
 
@@ -210,6 +197,10 @@ curl -I https://api.perspectize.com
 - Database connection pool exhausted
 - 5xx errors >5% of requests
 - HTTPS certificate expiring <30 days (Sevalla auto-renews)
+
+## User-supplied HTML
+
+Rich text (e.g. a perspective's review) is sanitized on **both** sides with the same tag set: the frontend with DOMPurify (`frontend/src/lib/utils/sanitize.ts` `sanitizeHtml`, rendered through `SafeHtml.svelte`), the backend with bluemonday (`backend/internal/core/services/sanitize.go`) before storage, because non-browser clients bypass the frontend. A new HTML field reuses both; changing the allowed tags means changing both files.
 
 ## References
 

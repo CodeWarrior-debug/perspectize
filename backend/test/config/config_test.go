@@ -13,7 +13,7 @@ import (
 // run against config file values only. t.Setenv restores originals on cleanup.
 func clearConfigEnvVars(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"DATABASE_URL", "DATABASE_PASSWORD", "YOUTUBE_API_KEY", "TMDB_API_READ_ACCESS_TOKEN", "YOUTUBE_API_CACHE_TTL_SECONDS", "MESSAGE_RETENTION_MAX", "MESSAGE_RETENTION_SWEEP_MINUTES"} {
+	for _, key := range []string{"DATABASE_URL", "DATABASE_PASSWORD", "YOUTUBE_API_KEY", "TMDB_API_READ_ACCESS_TOKEN", "YOUTUBE_API_CACHE_TTL_SECONDS", "YOUTUBE_TRENDING_CACHE_TTL_SECONDS", "MESSAGE_RETENTION_MAX", "MESSAGE_RETENTION_SWEEP_MINUTES"} {
 		t.Setenv(key, "")
 	}
 }
@@ -39,6 +39,7 @@ func TestLoad_RealConfigFile(t *testing.T) {
 	assert.Equal(t, "disable", cfg.Database.SSLMode)
 	assert.Equal(t, "", cfg.YouTube.APIKey, "API key should be empty in example config")
 	assert.Equal(t, config.DefaultYouTubeCacheTTLSeconds, cfg.YouTube.CacheTTLSeconds, "cache TTL should default to 6 hours when not set in config file")
+	assert.Equal(t, config.DefaultYouTubeTrendingCacheTTLSeconds, cfg.YouTube.TrendingCacheTTLSeconds, "trending TTL should default to 1 hour")
 	assert.Equal(t, "info", cfg.Logging.Level)
 	assert.Equal(t, "json", cfg.Logging.Format)
 }
@@ -73,6 +74,31 @@ func TestLoad_YouTubeCacheTTL_InvalidFallsBackToDefault(t *testing.T) {
 	cfg, err := config.Load("../../config/config.example.json")
 	assert.NoError(t, err)
 	assert.Equal(t, config.DefaultYouTubeCacheTTLSeconds, cfg.YouTube.CacheTTLSeconds)
+}
+
+// TestLoad_YouTubeTrendingCacheTTL covers the trending TTL env var: an
+// override, 0 (disables the trending cache), and garbage (keeps the default).
+func TestLoad_YouTubeTrendingCacheTTL(t *testing.T) {
+	tests := []struct {
+		name, value string
+		want        int
+	}{
+		{"override", "120", 120},
+		{"zero disables", "0", 0},
+		{"invalid keeps default", "soon", config.DefaultYouTubeTrendingCacheTTLSeconds},
+		{"negative keeps default", "-5", config.DefaultYouTubeTrendingCacheTTLSeconds},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			clearConfigEnvVars(t)
+			t.Setenv("YOUTUBE_TRENDING_CACHE_TTL_SECONDS", tc.value)
+
+			cfg, err := config.Load("../../config/config.example.json")
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, cfg.YouTube.TrendingCacheTTLSeconds)
+			assert.Equal(t, config.DefaultYouTubeCacheTTLSeconds, cfg.YouTube.CacheTTLSeconds, "metadata TTL is independent")
+		})
+	}
 }
 
 // TestLoad_MessageRetention verifies the retention env vars are parsed onto Config.

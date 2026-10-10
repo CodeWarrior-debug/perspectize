@@ -2,7 +2,6 @@
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import PageWrapper from '$lib/components/PageWrapper.svelte';
 	import SearchBar from '$lib/components/discover/SearchBar.svelte';
-	import FilterBar from '$lib/components/discover/FilterBar.svelte';
 	import VideoResultsGrid from '$lib/components/discover/VideoResultsGrid.svelte';
 	import { Button } from '$lib/components/shadcn';
 	import { graphqlRequest } from '$lib/queries/client';
@@ -15,119 +14,52 @@
 	import { queryKeys } from '$lib/queries/keys';
 	import { useAddVideo } from '$lib/queries/content/useAddVideo';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
-	import {
-		fetchYouTubeSearch,
-		fetchYouTubeTrending,
-		toVideoItem,
-		toWatchUrl,
-		youtubeKeys,
-		type SearchFilters,
-		type VideoItem,
-	} from '$lib/services/youtubeApi';
+	import { fetchYouTubeTrending, toWatchUrl, youtubeKeys, type VideoItem } from '$lib/services/youtubeApi';
 
+	// The search box hands off to youtube.com (search.list is capped at 100
+	// calls a day per project), so Trending is the page's only in-app feed.
+	// It is served from the backend cache — see youtubeApi.ts.
 	let searchQuery = $state('');
-	let debouncedQuery = $state('');
 	let searchInputRef: HTMLInputElement | null = $state(null);
-
-	// Filters only apply to search (videos.list?chart=mostPopular, used for
-	// Trending, does not support duration/date/order params).
-	let filters = $state<SearchFilters>({ videoDuration: undefined, publishedAfter: undefined, order: 'relevance' });
-
-	// Internal view seam (not a visible toggle yet): a future Browse mode can
-	// extend this union ('search' | 'trending' | 'browse') and slot into the
-	// same layout without reworking the page.
-	const view = $derived<'search' | 'trending'>(debouncedQuery ? 'search' : 'trending');
-
-	const searchResult = createQuery(() => ({
-		queryKey: youtubeKeys.search(debouncedQuery, filters),
-		queryFn: () => fetchYouTubeSearch({ query: debouncedQuery, ...filters }),
-		enabled: view === 'search',
-		staleTime: 5 * 60 * 1000,
-		// At least staleTime, so a query that's still fresh isn't also evicted from
-		// the cache by the QueryClient's default 5-minute gcTime — otherwise
-		// navigating away from /discover for a few minutes (or just switching
-		// between search/trending) throws the cached page away and re-hits the
-		// YouTube API (quota cost + a round trip) even though staleTime said the
-		// data was still good.
-		gcTime: 30 * 60 * 1000,
-	}));
 
 	const trendingResult = createQuery(() => ({
 		queryKey: youtubeKeys.trending(),
 		queryFn: () => fetchYouTubeTrending(),
-		enabled: view === 'trending',
 		staleTime: 60 * 60 * 1000,
 		gcTime: 24 * 60 * 60 * 1000,
 	}));
 
-	// Accumulated results (first page from the active query + any Load More pages).
+	// Accumulated results (first page from the query + any Load More pages).
 	let allResults = $state<VideoItem[]>([]);
 	let nextPageToken = $state<string | undefined>(undefined);
 	let isLoadingMore = $state(false);
 	let loadMoreError = $state<string | null>(null);
 
-	// Sync accumulated results whenever the active query's (first-page) data
-	// changes. Because each view has its own dedicated query/queryKey, this
-	// also naturally resets accumulation when the search query or view changes.
+	// Reset accumulation whenever the first page changes (initial load, refetch).
 	$effect(() => {
-		if (view === 'search') {
-			const data = searchResult.data;
-			allResults = data ? data.items.map(toVideoItem) : [];
-			nextPageToken = data?.nextPageToken;
-		} else {
-			const data = trendingResult.data;
-			allResults = data ? data.items.map(toVideoItem) : [];
-			nextPageToken = data?.nextPageToken;
-		}
+		const data = trendingResult.data;
+		allResults = data ? data.items : [];
+		nextPageToken = data?.nextPageToken;
 		loadMoreError = null;
 	});
 
-	function filtersEqual(a: SearchFilters, b: SearchFilters): boolean {
-		return a.videoDuration === b.videoDuration && a.publishedAfter === b.publishedAfter && a.order === b.order;
-	}
-
 	async function handleLoadMore() {
 		if (!nextPageToken || isLoadingMore) return;
-		// Capture the query/view/filters this request is for. If the user changes
-		// the search query, the filters, or the view flips between
-		// search/trending while this request is in flight, the $effect above
-		// will already have reset allResults/nextPageToken for the new query —
-		// the guard below stops this now-stale response from clobbering that
-		// newer state.
-		const requestView = view;
-		const requestQuery = debouncedQuery;
-		const requestFilters = { ...filters };
 		const requestToken = nextPageToken;
-
 		isLoadingMore = true;
 		loadMoreError = null;
 		try {
-			if (requestView === 'search') {
-				const response = await fetchYouTubeSearch({
-					query: requestQuery,
-					pageToken: requestToken,
-					...requestFilters,
-				});
-				if (view === requestView && debouncedQuery === requestQuery && filtersEqual(filters, requestFilters)) {
-					allResults = [...allResults, ...response.items.map(toVideoItem)];
-					nextPageToken = response.nextPageToken;
-				}
-			} else {
-				const response = await fetchYouTubeTrending('US', requestToken);
-				if (view === requestView && debouncedQuery === requestQuery) {
-					allResults = [...allResults, ...response.items.map(toVideoItem)];
-					nextPageToken = response.nextPageToken;
-				}
+			const response = await fetchYouTubeTrending('US', requestToken);
+			// Ignore a response that lands after a refetch replaced the first page.
+			if (nextPageToken === requestToken) {
+				allResults = [...allResults, ...response.items];
+				nextPageToken = response.nextPageToken;
 			}
-		} catch (err) {
-			if (view === requestView && debouncedQuery === requestQuery && filtersEqual(filters, requestFilters)) {
-				loadMoreError = err instanceof Error ? err.message : 'Failed to load more results';
+		} catch {
+			if (nextPageToken === requestToken) {
+				loadMoreError = 'Could not load more trending videos. Try again in a moment.';
 			}
 		} finally {
-			// Always clear the in-flight flag (regardless of whether the query
-			// changed), otherwise a stale request would leave Load More stuck
-			// in its loading state for the new query, which owns its own
-			// nextPageToken via the $effect above.
 			isLoadingMore = false;
 		}
 	}
@@ -176,31 +108,31 @@
 		});
 	}
 
-	const activeQuery = $derived(view === 'search' ? searchResult : trendingResult);
+	// A YouTube link pasted into the search box is added directly.
+	let isAddingUrl = $state(false);
+	function handleAddUrl(url: string) {
+		isAddingUrl = true;
+		addVideo.mutate(url, {
+			onSuccess: () => {
+				searchQuery = '';
+			},
+			onSettled: () => {
+				isAddingUrl = false;
+			},
+		});
+	}
 
-	// Keyboard shortcuts: Cmd+K (Mac) / Ctrl+K (Win) focuses the search bar from
-	// anywhere on the page; Escape clears the query, which flips `view` back to
-	// 'trending' via the derived state above.
-	//
-	// Guard: FilterBar's bits-ui Select popovers also close on Escape. Bits-ui
-	// mounts the open listbox's content in the DOM only while it is open (see
-	// SelectContent's presence-based mount), so a `[role="listbox"]` element in
-	// the document is a reliable "a select dropdown is currently open" signal.
-	// When that's the case, treat Escape as "close the dropdown" only — don't
-	// also wipe the user's search/filters as a side effect.
+	// Keyboard shortcuts: Cmd+K (Mac) / Ctrl+K (Win) focuses the search box from
+	// anywhere on the page; Escape clears it.
 	$effect(() => {
 		function handleKeydown(event: KeyboardEvent) {
 			const isModK = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
 			if (isModK) {
 				event.preventDefault();
 				searchInputRef?.focus();
-			} else if (event.key === 'Escape') {
-				if (document.querySelector('[role="listbox"]')) {
-					return;
-				}
+			} else if (event.key === 'Escape' && searchQuery) {
 				event.preventDefault();
 				searchQuery = '';
-				debouncedQuery = '';
 			}
 		}
 		window.addEventListener('keydown', handleKeydown);
@@ -212,32 +144,20 @@
 		showRetry: boolean;
 	}
 
-	// Classifies a query error into the specific user-facing message the task
-	// calls for: quota exceeded (403) gets a targeted message with no retry
-	// (retrying immediately won't help), network failures and anything else
-	// get a generic message plus a retry button.
+	// Network failures get a connection message; anything else (quota, YouTube
+	// outage — the backend reports both as "trending is unavailable") gets a
+	// generic one. Both can be retried: the backend cache refills on success.
 	function classifyError(error: unknown): ErrorInfo {
 		if (error instanceof TypeError) {
-			return { message: 'Unable to reach YouTube. Check your connection.', showRetry: true };
+			return { message: 'Unable to reach Perspectize. Check your connection.', showRetry: true };
 		}
-		const message = error instanceof Error ? error.message : '';
-		if (message.includes('403')) {
-			return {
-				message: 'YouTube API quota exceeded. Try again tomorrow or reduce search frequency.',
-				showRetry: false,
-			};
-		}
-		return { message: 'Something went wrong.', showRetry: true };
+		return { message: 'Trending is unavailable right now.', showRetry: true };
 	}
 
 	const queryClient = useQueryClient();
 
 	function handleRetry() {
-		if (view === 'search') {
-			queryClient.refetchQueries({ queryKey: youtubeKeys.searches() });
-		} else {
-			queryClient.refetchQueries({ queryKey: youtubeKeys.trending() });
-		}
+		queryClient.refetchQueries({ queryKey: youtubeKeys.trending() });
 	}
 </script>
 
@@ -245,17 +165,13 @@
 	<div class="flex flex-col gap-6">
 		<div>
 			<h1 class="text-2xl md:text-3xl font-semibold text-foreground">Discover</h1>
-			<p class="text-sm text-muted-foreground mt-1">Search YouTube and add videos to Perspectize</p>
+			<p class="text-sm text-muted-foreground mt-1">Browse what's trending on YouTube and add videos to Perspectize</p>
 		</div>
 
-		<SearchBar bind:value={searchQuery} bind:debouncedQuery bind:inputRef={searchInputRef} />
+		<SearchBar bind:value={searchQuery} bind:inputRef={searchInputRef} onAddUrl={handleAddUrl} isAdding={isAddingUrl} />
 
-		{#if view === 'search'}
-			<FilterBar bind:filters />
-		{/if}
-
-		{#if activeQuery.isError}
-			{@const errorInfo = classifyError(activeQuery.error)}
+		{#if trendingResult.isError}
+			{@const errorInfo = classifyError(trendingResult.error)}
 			<div class="flex flex-col items-center gap-3 py-12 text-center">
 				<p class="text-sm text-destructive">{errorInfo.message}</p>
 				{#if errorInfo.showRetry}
@@ -268,12 +184,11 @@
 				{nextPageToken}
 				onLoadMore={handleLoadMore}
 				{libraryUrls}
-				label={view === 'trending' ? 'Showing Trending Content' : undefined}
+				label="Trending on YouTube"
 				onAdd={handleAdd}
 				{pendingId}
-				isLoading={activeQuery.isLoading}
+				isLoading={trendingResult.isPending}
 				{isLoadingMore}
-				query={debouncedQuery}
 				{addedContentByVideoId}
 				userId={currentUserId}
 			/>

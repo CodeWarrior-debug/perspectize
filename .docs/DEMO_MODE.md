@@ -89,7 +89,7 @@ Host the files as release assets (same flow as [PR_SCREENSHOTS.md](PR_SCREENSHOT
 
 ## Not covered yet / next steps
 
-- **Discover page** calls the YouTube API from the browser (`VITE_YOUTUBE_API_KEY`); it is empty in demo mode. A fixture-backed search would need a backend proxy.
+- **Discover page:** Trending comes from the backend's `youtubeTrending` query, and demo mode has no Trending fixture, so the feed shows "Trending is unavailable right now." Search hands off to youtube.com, so it needs no fixture. A fixture-backed Trending client would fill the feed.
 - **Clerk UI itself** (sign-up, profile modal, webhook sync) is out of scope — demo mode replaces it rather than exercising it.
 - **A hosted public demo** (e.g. a Sevalla app with its own database, reset nightly) is feasible with `seed-demo -reset -allow-remote` on a schedule, but needs an explicit decision: anyone could post content as the personas.
 - **Captions/voice-over**: captions are burned in; a narration track or chaptering could be layered on the same scripts.

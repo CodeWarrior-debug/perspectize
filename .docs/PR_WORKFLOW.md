@@ -75,6 +75,11 @@ Marks a PR opened from a **cloud** session whose remaining work needs the user's
 - **Cloud sessions:** apply the label (and list the local-only steps) instead of claiming unverified work is done.
 - **Local sessions:** remove the label once every checklist item under "Local session takeover" is done.
 
+## CI
+
+- **Trigger:** `ci.yml` runs only on PRs and pushes to `main`. Pushing a feature branch with no PR runs nothing, so a PR is the way to get CI's verdict.
+- **DB-backed tests in cloud sessions:** integration tests (`backend/test/**`, `cmd/server/*_integration_test.go`) skip without `DATABASE_URL`. Don't set up Postgres in a cloud session (the permission classifier denies creating roles/DBs). Open the PR and let CI's Postgres service run them, then check the `Test & Lint` job log to confirm they actually ran rather than skipped.
+
 ## Migration labels
 
 Migrations are never applied automatically (see `backend/CLAUDE.md` → Migrations): someone runs `migrate up` by hand against each environment after the PR merges. These labels track that, so a merged PR with a pending migration can't be forgotten.

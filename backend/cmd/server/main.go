@@ -27,37 +27,54 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/server"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/database"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/logger"
+	"github.com/CodeWarrior-debug/perspectize/backend/pkg/telemetry"
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	otelruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"gorm.io/gorm"
 )
 
 func main() {
 	// Configure structured JSON logging for Sevalla log viewer
 	logger.Setup()
 
-	// Initialize OTel tracing when OTEL_EXPORTER_OTLP_ENDPOINT is set.
-	// The OTLP HTTP exporter reads OTEL_EXPORTER_OTLP_ENDPOINT,
-	// OTEL_EXPORTER_OTLP_HEADERS, and OTEL_SERVICE_NAME automatically.
-	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
-		shutdown, err := initTracer(context.Background())
-		if err != nil {
-			slog.Warn("failed to initialize OpenTelemetry", "error", err)
-		} else {
-			defer shutdown(context.Background())
-			slog.Info("OpenTelemetry tracing enabled")
-		}
-	}
-
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
 		if os.Getenv("APP_ENV") != "production" {
 			slog.Warn(".env file not found", "hint", "set APP_ENV=production to suppress")
+		}
+	}
+
+	// Initialize OpenTelemetry (Tracer/Meter/Logger providers). This is a
+	// no-op, warn-and-continue setup: when OTEL_EXPORTER_OTLP_ENDPOINT is
+	// unset (local dev, CI), telemetry.Setup leaves the default no-op
+	// providers in place and returns a no-op shutdown.
+	telemetryShutdown, err := telemetry.Setup(context.Background(), telemetry.Config{
+		Environment: os.Getenv("APP_ENV"),
+	})
+	if err != nil {
+		slog.Warn("failed to initialize OpenTelemetry", "error", err)
+	} else {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := telemetryShutdown(ctx); err != nil {
+				slog.Warn("failed to shut down OpenTelemetry", "error", err)
+			}
+		}()
+		if telemetry.Enabled() {
+			// stdout JSON stays as-is; Info+ records are also exported via OTLP.
+			logger.EnableOTLP(nil)
+			if err := otelruntime.Start(otelruntime.WithMeterProvider(otel.GetMeterProvider())); err != nil {
+				slog.Warn("go runtime metrics not started", "error", err)
+			}
+			if _, err := telemetry.RegisterBuildInfo(telemetry.Meter()); err != nil {
+				slog.Warn("app.build.info metric not registered", "error", err)
+			}
+			slog.Info("OpenTelemetry enabled")
 		}
 	}
 
@@ -96,8 +113,21 @@ func main() {
 	sqlDB, _ := db.DB()
 	defer sqlDB.Close()
 
+	// Pool gauges (idle/used/max/wait) — no-op until a MeterProvider is installed.
+	if _, err := database.RegisterPoolMetrics(telemetry.Meter(), sqlDB); err != nil {
+		slog.Warn("db pool metrics not registered", "error", err)
+	}
+
 	// Register slow query logger (logs queries >100ms)
 	database.RegisterSlowQueryLogger(db)
+
+	// Register the in-house GORM tracing callbacks: one span per SQL
+	// statement, no bind-variable recording (db.query.text is always the
+	// parameterized statement, never Dialector.Explain()'d). Warn-and-
+	// continue: a failure here must not prevent the server from starting.
+	if err := instrumentDB(db); err != nil {
+		slog.Warn("gorm tracing callbacks not registered", "error", err)
+	}
 
 	// Test connection
 	if err := database.PingGORM(context.Background(), db); err != nil {
@@ -139,15 +169,23 @@ func main() {
 		log.Fatal(err)
 	}
 	var youtubeClient portservices.YouTubeClient
+	// Discover's Trending feed; left nil in demo mode (no fixture for it), so
+	// youtubeTrending reports "not configured" there.
+	var trendingClient portservices.YouTubeTrendingClient
 	if demoCfg.Enabled {
 		slog.Warn("DEMO MODE ENABLED — unsigned demo.<persona> tokens are accepted; never expose this instance publicly with real data")
 		youtubeClient = youtube.NewFixtureClient()
 	} else {
-		youtubeClient = youtube.NewCachingClient(
+		// The same client also caches the Discover page's Trending chart
+		// (YOUTUBE_TRENDING_CACHE_TTL_SECONDS, default 1 hour).
+		cachingClient := youtube.NewCachingClient(
 			youtube.NewClient(cfg.YouTube.APIKey),
 			time.Duration(cfg.YouTube.CacheTTLSeconds)*time.Second,
+			youtube.WithTrendingTTL(time.Duration(cfg.YouTube.TrendingCacheTTLSeconds)*time.Second),
 		)
-		slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds)
+		youtubeClient = cachingClient
+		trendingClient = cachingClient
+		slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds, "trendingTTLSeconds", cfg.YouTube.TrendingCacheTTLSeconds)
 	}
 	var movieClient portservices.MovieClient = tmdb.UnconfiguredClient{}
 	if cfg.TMDBReadAccessToken != "" {
@@ -170,7 +208,7 @@ func main() {
 	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
 
 	// Initialize services
-	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, services.WithBibleReference(bibleReferenceRepo))
+	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient))
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
@@ -289,7 +327,7 @@ func main() {
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	server := &http.Server{
 		Addr:         addr,
-		Handler:      r, // chi router
+		Handler:      withTracing(r), // chi router, wrapped in an otelhttp root span
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -315,6 +353,35 @@ func main() {
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+// withTracing wraps h in an otelhttp root span per request. WebSocket
+// handshakes are excluded (a span held open for the life of a subscription
+// would be useless), as are /health and /ready, which are polled far too
+// often to be worth a span each. The span name is "METHOD path" — the route
+// set is small and static (/graphql, /webhooks/clerk), so this doesn't
+// create high cardinality.
+func withTracing(h http.Handler) http.Handler {
+	return otelhttp.NewHandler(h, "http.server",
+		otelhttp.WithFilter(func(req *http.Request) bool {
+			if isWebsocketHandshake(req) {
+				return false
+			}
+			return req.URL.Path != "/health" && req.URL.Path != "/ready"
+		}),
+		otelhttp.WithSpanNameFormatter(func(_ string, req *http.Request) string {
+			return req.Method + " " + req.URL.Path
+		}),
+	)
+}
+
+// instrumentDB registers the in-house GORM tracing callbacks (pkg/database):
+// one span per SQL statement, query bind variables never recorded. A nil
+// TracerProvider means the callbacks resolve otel.GetTracerProvider() (or
+// the specific provider passed) lazily on every call, so this can run
+// before telemetry.Setup installs the global provider.
+func instrumentDB(db *gorm.DB) error {
+	return database.RegisterTracing(db, nil)
 }
 
 // clearDeadlinesForWebsocket removes the connection deadlines that
@@ -347,23 +414,4 @@ func isWebsocketHandshake(r *http.Request) bool {
 		strings.EqualFold(r.Header.Get("Upgrade"), "websocket") &&
 		strings.Contains(strings.ToLower(r.Header.Get("Connection")), "upgrade") &&
 		r.Header.Get("Sec-WebSocket-Key") != ""
-}
-
-// initTracer sets up an OTel TracerProvider with an OTLP HTTP exporter.
-// Returns a shutdown function that flushes pending spans on exit.
-func initTracer(ctx context.Context) (func(context.Context) error, error) {
-	exporter, err := otlptracehttp.New(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("creating OTLP exporter: %w", err)
-	}
-
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("perspectize-backend"),
-		)),
-	)
-	otel.SetTracerProvider(tp)
-	return tp.Shutdown, nil
 }

@@ -493,6 +493,7 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		params.Filter.PersonID = filter.PersonID
 		params.Filter.PersonRole = filter.PersonRole
 		params.Filter.GenreContains = filter.GenreContains
+		params.Filter.CastContains = filter.CastContains
 		params.Filter.AgeRating = filter.AgeRating
 		params.Filter.ReleasedAfter = filter.ReleasedAfter
 		params.Filter.ReleasedBefore = filter.ReleasedBefore
@@ -542,4 +543,44 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 	}
 
 	return conn, nil
+}
+
+// YoutubeTrending is the resolver for the youtubeTrending field. It is public
+// (no @auth) like the Discover page itself; the service serves it from the
+// backend cache.
+func (r *queryResolver) YoutubeTrending(ctx context.Context, regionCode *string, pageToken *string) (*model.YouTubeTrendingPage, error) {
+	region, token := "", ""
+	if regionCode != nil {
+		region = *regionCode
+	}
+	if pageToken != nil {
+		token = *pageToken
+	}
+
+	page, err := r.ContentService.YouTubeTrending(ctx, region, token)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("%w", err)
+		}
+		slog.Error("failed to fetch YouTube trending", "regionCode", region, "error", err)
+		return nil, fmt.Errorf("trending is unavailable right now")
+	}
+
+	out := &model.YouTubeTrendingPage{Items: make([]*model.YouTubeTrendingVideo, 0, len(page.Items))}
+	for _, v := range page.Items {
+		out.Items = append(out.Items, &model.YouTubeTrendingVideo{
+			ID:           v.ID,
+			Title:        v.Title,
+			ChannelTitle: v.ChannelTitle,
+			Description:  v.Description,
+			PublishedAt:  v.PublishedAt,
+			ThumbnailURL: v.ThumbnailURL,
+			Duration:     v.Duration,
+		})
+	}
+	if page.NextPageToken != "" {
+		next := page.NextPageToken
+		out.NextPageToken = &next
+	}
+	return out, nil
 }

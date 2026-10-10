@@ -91,6 +91,7 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 - [Dependency Security](.docs/DEPENDENCY_SECURITY.md) — Trivy/pnpm-audit scanning, CVE remediation workflow, CI gotchas
 - [Worktrees](.docs/WORKTREES.md) — Location convention and the 3 numbered reusable worktrees for isolated Claude Code work
 - [Demo Mode](.docs/DEMO_MODE.md) — Docker demo stack (persistent Postgres + seeded personas, no Clerk/YouTube), Playwright tours that run as E2E (`make demo-test`) or record videos (`make demo-record`)
+- [Observability](.docs/OBSERVABILITY.md) — OTel/Faro → Grafana runbook: local tracer stack (`make obs-up` / `make obs-smoke`, otel-lgtm + Alloy on the demo stack), prod env vars, versioning, cardinality/sampling, OTel→Prometheus metric names
 - [Query Budget](.docs/QUERY_BUDGET.md) — query-count tests, dataloaders, TanStack caching/eviction rules
 - [PR Workflow](.docs/PR_WORKFLOW.md) · [Planning](.docs/PLANNING.md) · [Hooks](.docs/HOOKS.md) · [Session Environment](.docs/SESSION_ENVIRONMENT.md) (cloud vs local differences; injected at session start)
 - [claude-md-audit eval](evals/claude-md-audit/README.md) — `claude plugin eval` suite scoring the `claude-md-improver` skill; rerun after changing CLAUDE.md tooling or before trusting a cheaper model with audits
@@ -117,4 +118,4 @@ Rules:
 - For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost) — only if the `graphify` CLI is installed. Cloud sessions usually don't have it or the graph: use Grep/Glob instead ([.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md)).
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost) — only if the `graphify` CLI is installed. Cloud sessions usually don't have it or the graph: use Grep/Glob instead, and say in the PR that the update was skipped ([.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md)).

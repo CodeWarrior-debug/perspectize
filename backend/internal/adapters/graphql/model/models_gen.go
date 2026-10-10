@@ -38,22 +38,24 @@ type Category struct {
 }
 
 type Content struct {
-	ID            string         `json:"id"`
-	Name          string         `json:"name"`
-	URL           *string        `json:"url,omitempty"`
-	ContentType   string         `json:"contentType"`
-	AddedByUserID string         `json:"addedByUserID"`
-	AddedBy       *User          `json:"addedBy,omitempty"`
-	Length        *int           `json:"length,omitempty"`
-	LengthUnits   *string        `json:"lengthUnits,omitempty"`
-	ViewCount     *int           `json:"viewCount,omitempty"`
-	LikeCount     *int           `json:"likeCount,omitempty"`
-	CommentCount  *int           `json:"commentCount,omitempty"`
-	ChannelTitle  *string        `json:"channelTitle,omitempty"`
-	PublishedAt   *string        `json:"publishedAt,omitempty"`
-	Tags          []string       `json:"tags,omitempty"`
-	Description   *string        `json:"description,omitempty"`
-	Response      map[string]any `json:"response,omitempty"`
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	URL           *string `json:"url,omitempty"`
+	ContentType   string  `json:"contentType"`
+	AddedByUserID string  `json:"addedByUserID"`
+	AddedBy       *User   `json:"addedBy,omitempty"`
+	Length        *int    `json:"length,omitempty"`
+	LengthUnits   *string `json:"lengthUnits,omitempty"`
+	// Where length came from and the smallest unit it reports; format length to that precision.
+	LengthDisplay *domain.LengthDisplay `json:"lengthDisplay,omitempty"`
+	ViewCount     *int                  `json:"viewCount,omitempty"`
+	LikeCount     *int                  `json:"likeCount,omitempty"`
+	CommentCount  *int                  `json:"commentCount,omitempty"`
+	ChannelTitle  *string               `json:"channelTitle,omitempty"`
+	PublishedAt   *string               `json:"publishedAt,omitempty"`
+	Tags          []string              `json:"tags,omitempty"`
+	Description   *string               `json:"description,omitempty"`
+	Response      map[string]any        `json:"response,omitempty"`
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
 	Movie              map[string]any `json:"movie,omitempty"`
 	PrimaryCategory    *Category      `json:"primaryCategory,omitempty"`
@@ -78,6 +80,7 @@ type ContentFilter struct {
 	PersonID          *int                        `json:"personId,omitempty"`
 	PersonRole        *domain.PersonRole          `json:"personRole,omitempty"`
 	GenreContains     *string                     `json:"genreContains,omitempty"`
+	CastContains      *string                     `json:"castContains,omitempty"`
 	AgeRating         []string                    `json:"ageRating,omitempty"`
 	ReleasedAfter     *string                     `json:"releasedAfter,omitempty"`
 	ReleasedBefore    *string                     `json:"releasedBefore,omitempty"`
@@ -452,6 +455,21 @@ type WikidataSearchResult struct {
 	Label       string  `json:"label"`
 	Description *string `json:"description,omitempty"`
 	EntityType  *string `json:"entityType,omitempty"`
+}
+
+type YouTubeTrendingPage struct {
+	Items         []*YouTubeTrendingVideo `json:"items"`
+	NextPageToken *string                 `json:"nextPageToken,omitempty"`
+}
+
+type YouTubeTrendingVideo struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	ChannelTitle string `json:"channelTitle"`
+	Description  string `json:"description"`
+	PublishedAt  string `json:"publishedAt"`
+	ThumbnailURL string `json:"thumbnailUrl"`
+	Duration     string `json:"duration"`
 }
 
 type ParticipantChangeKind string

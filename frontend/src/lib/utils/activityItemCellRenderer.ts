@@ -10,6 +10,19 @@ import {
 import { passageIconLabels } from './bible';
 
 /**
+ * Every Item-cell image sits in one fixed slot (40 wide, 42 tall = the poster
+ * height), centered both ways, so titles line up across types: a 16:9 video
+ * thumbnail and the passage icon are 40x32, a 2:3 poster is 28x42 with side
+ * padding. Change the slot here, not per type.
+ */
+function thumbSlot(child: HTMLElement): HTMLElement {
+	const slot = document.createElement('div');
+	slot.className = 'flex h-[42px] w-10 flex-none items-center justify-center';
+	slot.appendChild(child);
+	return slot;
+}
+
+/**
  * Bible passage variant of the Item cell: an icon tile instead of a thumbnail
  * (no image request), the reference (`name`) as the title, and — once someone
  * has set a display title — that title as primary text with the reference as
@@ -32,7 +45,8 @@ function renderPassageCell(opts: {
 
 	const iconBox = document.createElement('div');
 	iconBox.dataset.testid = 'item-thumb';
-	iconBox.className = 'flex h-8 w-10 flex-none items-center justify-center rounded bg-muted text-primary';
+	// No tile background: the book sits on the row's own colour, like a poster or thumbnail.
+	iconBox.className = 'flex h-8 w-10 flex-none items-center justify-center rounded text-primary';
 	iconBox.addEventListener('click', (e) => {
 		e.stopPropagation();
 		if (url) window.open(url, '_blank', 'noopener,noreferrer');
@@ -76,7 +90,7 @@ function renderPassageCell(opts: {
 		textWrap.appendChild(subtitle);
 	}
 
-	cell.appendChild(iconBox);
+	cell.appendChild(thumbSlot(iconBox));
 	cell.appendChild(textWrap);
 	return cell;
 }
@@ -133,7 +147,7 @@ function renderMovieCell(opts: {
 		textWrap.appendChild(subtitle);
 	}
 
-	cell.appendChild(thumb);
+	cell.appendChild(thumbSlot(thumb));
 	cell.appendChild(textWrap);
 	return cell;
 }
@@ -227,7 +241,7 @@ export function activityItemCellRenderer(params: ActivityItemCellRendererParams)
 		'line-clamp-2 min-w-0 flex-1 whitespace-normal text-left font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
 	title.textContent = name;
 
-	cell.appendChild(thumbWrap);
+	cell.appendChild(thumbSlot(thumbWrap));
 	cell.appendChild(title);
 
 	return cell;

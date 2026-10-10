@@ -1,5 +1,12 @@
 import { gql } from 'graphql-request';
 
+/** Content.lengthDisplay: the source of a length and the smallest unit it reports. */
+export interface LengthDisplay {
+	source: string;
+	/** LengthPrecision enum: SECONDS or MINUTES. Kept a string so a new value formats as seconds, not a type error. */
+	precision: string;
+}
+
 export type { ContentFilterInput } from '$lib/utils/gridUrlState';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
@@ -18,6 +25,8 @@ export interface ContentItem {
 	displayTitle?: string | null;
 	length: number | null;
 	lengthUnits: string | null;
+	/** Where `length` came from and its precision; format to it (MINUTES -> h:mm). */
+	lengthDisplay?: LengthDisplay | null;
 	viewCount: number | null;
 	likeCount: number | null;
 	channelTitle: string | null;
@@ -100,6 +109,10 @@ export const LIST_CONTENT = gql`
 				displayTitle
 				length
 				lengthUnits
+				lengthDisplay {
+					source
+					precision
+				}
 				viewCount
 				likeCount
 				channelTitle
@@ -177,6 +190,10 @@ export const GET_CONTENT = gql`
 			displayTitle
 			length
 			lengthUnits
+			lengthDisplay {
+				source
+				precision
+			}
 			viewCount
 			likeCount
 			commentCount
@@ -202,6 +219,10 @@ export const GET_CONTENT_DETAILS = gql`
 			displayTitle
 			length
 			lengthUnits
+			lengthDisplay {
+				source
+				precision
+			}
 			viewCount
 			likeCount
 			channelTitle
@@ -267,6 +288,10 @@ export const CREATE_CONTENT_FROM_YOUTUBE = gql`
 				contentType
 				length
 				lengthUnits
+				lengthDisplay {
+					source
+					precision
+				}
 				viewCount
 				likeCount
 				channelTitle
@@ -320,6 +345,10 @@ export const UPDATE_CONTENT_SOURCE_DATA = gql`
 			contentType
 			length
 			lengthUnits
+			lengthDisplay {
+				source
+				precision
+			}
 			viewCount
 			likeCount
 			channelTitle
