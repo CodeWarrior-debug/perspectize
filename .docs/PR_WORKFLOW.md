@@ -25,7 +25,9 @@ gh api repos/CodeWarrior-debug/perspectize/pulls/123/comments
 
 **Creating a PR:** the `require-session-reflection-before-pr.sh` hook blocks `gh pr create` until `/revise-claude-md` has run, and it can't detect completion. After running it, create the PR with `gh api repos/CodeWarrior-debug/perspectize/pulls -f title="..." -f body="..." -f head="branch" -f base="main"`.
 
-**`gh` not authenticated (web sessions):**
+**Cloud sessions:** `gh` is unavailable. Open the PR yourself with the GitHub MCP `create_pull_request` tool and set labels with `issue_write` — see [SESSION_ENVIRONMENT.md](SESSION_ENVIRONMENT.md).
+
+**Local `gh` not authenticated:**
 - **Creating a PR:** push with `git push -u origin <branch>` and let the user create the PR via the GitHub UI button. Prepare the title and body as copyable text.
 - **Updating a PR:** output the updated title/body as copyable text for the user to paste.
 

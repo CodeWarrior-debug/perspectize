@@ -94,7 +94,7 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 - [Worktrees](.docs/WORKTREES.md) — Location convention and the 3 numbered reusable worktrees for isolated Claude Code work
 - [Demo Mode](.docs/DEMO_MODE.md) — Docker demo stack (persistent Postgres + seeded personas, no Clerk/YouTube), Playwright tours that run as E2E (`make demo-test`) or record videos (`make demo-record`)
 - [Query Budget](.docs/QUERY_BUDGET.md) — query-count tests, dataloaders, TanStack caching/eviction rules
-- [PR Workflow](.docs/PR_WORKFLOW.md) · [Planning](.docs/PLANNING.md) · [Hooks](.docs/HOOKS.md)
+- [PR Workflow](.docs/PR_WORKFLOW.md) · [Planning](.docs/PLANNING.md) · [Hooks](.docs/HOOKS.md) · [Session Environment](.docs/SESSION_ENVIRONMENT.md) (cloud vs local differences; injected at session start)
 - [claude-md-audit eval](evals/claude-md-audit/README.md) — `claude plugin eval` suite scoring the `claude-md-improver` skill; rerun after changing CLAUDE.md tooling or before trusting a cheaper model with audits
 
 **How-to guides:**
