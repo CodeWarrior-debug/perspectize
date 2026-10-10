@@ -210,7 +210,7 @@
 			<h1 class="text-2xl md:text-3xl font-semibold text-foreground">Discover</h1>
 			<p class="text-sm text-muted-foreground mt-1">
 				{source === 'movies'
-					? 'Search TMDB for movies and add them to Perspectize'
+					? 'Search TMDB or browse trending movies and add them to Perspectize'
 					: "Browse what's trending on YouTube and add videos to Perspectize"}
 			</p>
 		</div>

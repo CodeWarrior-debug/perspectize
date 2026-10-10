@@ -2,6 +2,7 @@
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { Button, Input } from '$lib/components/shadcn';
 	import MovieCard from './MovieCard.svelte';
+	import MovieTrendingFeed from './MovieTrendingFeed.svelte';
 	import {
 		MOVIE_SEARCH_DEBOUNCE_MS,
 		MOVIE_SEARCH_MAX_LENGTH,
@@ -10,6 +11,7 @@
 		searchMovies,
 		tmdbKeys,
 		type MovieSearchPage,
+		type TrendingWindow,
 	} from '$lib/services/tmdbApi';
 	import { validateMovieInput } from '$lib/utils/movie';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
@@ -18,7 +20,8 @@
 
 	// Movies source of the Discover page. Search runs through the backend
 	// (movieSearch), debounced so a keystroke burst costs one call. A pasted
-	// TMDB/IMDb link skips search and is added directly.
+	// TMDB/IMDb link skips search and is added directly. While the box has fewer
+	// than 2 characters, trending movies show instead.
 	let {
 		value = $bindable(''),
 		inputRef = $bindable(null),
@@ -42,6 +45,10 @@
 
 	const trimmed = $derived(value.trim());
 	const isLink = $derived(validateMovieInput(trimmed));
+	// Trending shows only while idle: fewer than 2 characters and no pasted link.
+	const showTrending = $derived(!isLink && trimmed.length < MOVIE_SEARCH_MIN_LENGTH);
+	// The window toggle lives here so it survives a search and coming back to idle.
+	let trendingWindow = $state<TrendingWindow>('WEEK');
 
 	// The term that is actually searched. Short input clears it at once; longer
 	// input waits for a quiet period, so only the last pause reaches TMDB.
@@ -183,17 +190,14 @@
 		<p class="text-sm text-muted-foreground text-center py-12">
 			That looks like a movie link. Add it to Perspectize directly.
 		</p>
-	{:else if !searchEnabled && trimmed.length > 0 && trimmed.length < MOVIE_SEARCH_MIN_LENGTH}
-		<p class="text-sm text-muted-foreground text-center py-12">Type at least 2 characters to search.</p>
-	{:else if !searchEnabled}
-		<p class="text-sm text-muted-foreground text-center py-12">Search TMDB for a movie to add it to Perspectize.</p>
-	{:else if search.isError}
-		{@const errorInfo = classifyError(search.error)}
-		<div class="flex flex-col items-center gap-3 py-12 text-center">
-			<p class="text-sm text-destructive">{errorInfo.message}</p>
-			<Button variant="outline" size="sm" onclick={() => search.refetch()}>Retry</Button>
-		</div>
-	{:else if isDebouncing || search.isPending}
+	{:else if showTrending}
+		<p class="text-sm text-muted-foreground text-center">
+			{trimmed.length > 0
+				? 'Type at least 2 characters to search.'
+				: 'Search TMDB for a movie to add it to Perspectize.'}
+		</p>
+		<MovieTrendingFeed bind:timeWindow={trendingWindow} {libraryUrls} {pendingUrl} {onAdd} />
+	{:else if isDebouncing || (searchEnabled && search.isPending)}
 		<div class="flex flex-col gap-4" aria-busy="true" aria-label="Searching movies">
 			{#each Array(4) as _, i (i)}
 				<div class="flex flex-col sm:flex-row gap-4 p-3 border border-border rounded-lg bg-card animate-pulse">
@@ -205,6 +209,14 @@
 					</div>
 				</div>
 			{/each}
+		</div>
+	{:else if !searchEnabled}
+		<p class="text-sm text-muted-foreground text-center py-12">Search TMDB for a movie to add it to Perspectize.</p>
+	{:else if search.isError}
+		{@const errorInfo = classifyError(search.error)}
+		<div class="flex flex-col items-center gap-3 py-12 text-center">
+			<p class="text-sm text-destructive">{errorInfo.message}</p>
+			<Button variant="outline" size="sm" onclick={() => search.refetch()}>Retry</Button>
 		</div>
 	{:else if items.length === 0}
 		<div class="text-center py-12">

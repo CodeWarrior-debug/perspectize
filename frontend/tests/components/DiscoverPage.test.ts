@@ -4,7 +4,7 @@ import { tick } from 'svelte';
 import Page from '../../src/routes/discover/+page.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
-import { MOVIE_SEARCH } from '$lib/services/tmdbApi';
+import { MOVIE_SEARCH, MOVIE_TRENDING } from '$lib/services/tmdbApi';
 import { YOUTUBE_TRENDING } from '$lib/services/youtubeApi';
 import { LIST_CONTENT } from '$lib/queries/content';
 
@@ -28,6 +28,7 @@ function respond(doc: string) {
 	if (doc === YOUTUBE_TRENDING) return { youtubeTrending: { items: [], nextPageToken: null } };
 	if (doc === LIST_CONTENT) return { content: { items: [] } };
 	if (doc === MOVIE_SEARCH) return { movieSearch: { items: [], page: 1, totalPages: 0, totalResults: 0 } };
+	if (doc === MOVIE_TRENDING) return { movieTrending: { items: [], page: 1, totalPages: 0, totalResults: 0 } };
 	throw new Error('unexpected document');
 }
 
@@ -60,7 +61,7 @@ describe('Discover page source switch', () => {
 		expect(screen.getByRole('tab', { name: 'Movies' })).toHaveAttribute('aria-selected', 'true');
 		expect(screen.getByRole('textbox', { name: /search movies by title/i })).toBeInTheDocument();
 		expect(screen.queryByRole('textbox', { name: 'Search YouTube, or paste a video link' })).not.toBeInTheDocument();
-		expect(screen.getByText('Search TMDB for movies and add them to Perspectize')).toBeInTheDocument();
+		expect(screen.getByText('Search TMDB or browse trending movies and add them to Perspectize')).toBeInTheDocument();
 	});
 
 	it('does not fetch YouTube trending while the Movies source is shown', async () => {

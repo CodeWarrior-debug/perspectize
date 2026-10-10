@@ -4,7 +4,7 @@ import { tick, type Component } from 'svelte';
 import MovieSearchPanel from '$lib/components/discover/MovieSearchPanel.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
-import { MOVIE_SEARCH, MOVIE_SEARCH_DEBOUNCE_MS, type MovieSearchPage } from '$lib/services/tmdbApi';
+import { MOVIE_SEARCH, MOVIE_SEARCH_DEBOUNCE_MS, MOVIE_TRENDING, type MovieSearchPage } from '$lib/services/tmdbApi';
 
 const mocks = vi.hoisted(() => ({ graphqlRequest: vi.fn() }));
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
@@ -45,6 +45,26 @@ async function flush() {
 	}
 }
 
+/** Calls made for one GraphQL document. The trending feed also calls the client while idle. */
+function callsFor(document: string) {
+	return mocks.graphqlRequest.mock.calls.filter(([doc]) => doc === document);
+}
+
+/**
+ * Route each GraphQL document to its responder. The search responder gets the
+ * variables; the trending responder gets `{ window, page }`.
+ */
+function respondWith(
+	search: (variables: { query: string; page: number }) => unknown,
+	trending: (variables: { window: string; page: number }) => unknown = () => ({
+		movieTrending: movieSearchPage({ items: [], totalPages: 1, totalResults: 0 }),
+	}),
+) {
+	mocks.graphqlRequest.mockImplementation(async (doc: string, variables: never) =>
+		doc === MOVIE_TRENDING ? trending(variables) : search(variables),
+	);
+}
+
 function renderPanel(overrides: Record<string, unknown> = {}) {
 	const props = {
 		libraryUrls: new Set<string>(),
@@ -71,6 +91,7 @@ describe('MovieSearchPanel', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 		mocks.graphqlRequest.mockReset();
+		respondWith(() => ({ movieSearch: movieSearchPage({}) }));
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 	});
 
@@ -81,22 +102,24 @@ describe('MovieSearchPanel', () => {
 
 	describe('debounced search', () => {
 		it('sends one search after the 350 ms pause, not before', async () => {
-			mocks.graphqlRequest.mockResolvedValue({ movieSearch: movieSearchPage({}) });
 			renderPanel();
+			await settle();
+			mocks.graphqlRequest.mockClear();
 
 			await typeText('matrix');
 			await settle(MOVIE_SEARCH_DEBOUNCE_MS - 1);
-			expect(mocks.graphqlRequest).not.toHaveBeenCalled();
+			expect(callsFor(MOVIE_SEARCH)).toHaveLength(0);
 
 			await settle(1);
-			expect(mocks.graphqlRequest).toHaveBeenCalledTimes(1);
+			expect(callsFor(MOVIE_SEARCH)).toHaveLength(1);
 			expect(mocks.graphqlRequest).toHaveBeenCalledWith(MOVIE_SEARCH, { query: 'matrix', page: 1 });
 			expect(screen.getByRole('link', { name: 'The Matrix' })).toBeInTheDocument();
 		});
 
 		it('collapses a burst of keystrokes into one call with the last term', async () => {
-			mocks.graphqlRequest.mockResolvedValue({ movieSearch: movieSearchPage({}) });
 			renderPanel();
+			await settle();
+			mocks.graphqlRequest.mockClear();
 
 			for (const partial of ['m', 'ma', 'mat', 'matr', 'matri']) {
 				await typeText(partial);
@@ -104,23 +127,21 @@ describe('MovieSearchPanel', () => {
 			}
 			await settle(MOVIE_SEARCH_DEBOUNCE_MS);
 
-			expect(mocks.graphqlRequest).toHaveBeenCalledTimes(1);
+			expect(callsFor(MOVIE_SEARCH)).toHaveLength(1);
 			expect(mocks.graphqlRequest).toHaveBeenCalledWith(MOVIE_SEARCH, { query: 'matri', page: 1 });
 		});
 
 		it('never searches under 2 characters', async () => {
-			mocks.graphqlRequest.mockResolvedValue({ movieSearch: movieSearchPage({}) });
 			renderPanel();
 
 			await typeText('a');
 			await settle(5000);
 
-			expect(mocks.graphqlRequest).not.toHaveBeenCalled();
+			expect(callsFor(MOVIE_SEARCH)).toHaveLength(0);
 			expect(screen.getByText('Type at least 2 characters to search.')).toBeInTheDocument();
 		});
 
 		it('trims surrounding spaces before searching', async () => {
-			mocks.graphqlRequest.mockResolvedValue({ movieSearch: movieSearchPage({}) });
 			renderPanel();
 
 			await typeText('  heat  ');
@@ -130,21 +151,33 @@ describe('MovieSearchPanel', () => {
 		});
 
 		it('shows the loading skeleton while the first page is in flight', async () => {
-			mocks.graphqlRequest.mockReturnValue(new Promise(() => {}));
+			respondWith(() => new Promise(() => {}));
 			renderPanel();
 
 			await typeText('matrix');
 			await settle(MOVIE_SEARCH_DEBOUNCE_MS);
 
-			expect(document.querySelector('[aria-busy="true"]')).toBeInTheDocument();
+			expect(document.querySelector('[aria-label="Searching movies"]')).toBeInTheDocument();
+		});
+
+		it('goes straight from the idle prompt to the skeleton during the debounce pause', async () => {
+			renderPanel();
+			await settle();
+
+			await typeText('matrix');
+			await settle(MOVIE_SEARCH_DEBOUNCE_MS - 1);
+
+			expect(callsFor(MOVIE_SEARCH)).toHaveLength(0);
+			expect(document.querySelector('[aria-label="Searching movies"]')).toBeInTheDocument();
+			expect(screen.queryByText('Search TMDB for a movie to add it to Perspectize.')).not.toBeInTheDocument();
 		});
 	});
 
 	describe('results', () => {
 		it('renders a card per result and marks tracked movies In Library', async () => {
-			mocks.graphqlRequest.mockResolvedValue({
+			respondWith(() => ({
 				movieSearch: movieSearchPage({ items: [movie(603, 'The Matrix'), movie(949, 'Heat')], totalPages: 1 }),
-			});
+			}));
 			renderPanel({ libraryUrls: new Set([TMDB_LINK]) });
 
 			await typeText('matrix');
@@ -157,7 +190,6 @@ describe('MovieSearchPanel', () => {
 		});
 
 		it('passes the card url to onAdd', async () => {
-			mocks.graphqlRequest.mockResolvedValue({ movieSearch: movieSearchPage({}) });
 			const props = renderPanel();
 
 			await typeText('matrix');
@@ -168,9 +200,9 @@ describe('MovieSearchPanel', () => {
 		});
 
 		it('shows the no-results message for a term with no matches', async () => {
-			mocks.graphqlRequest.mockResolvedValue({
+			respondWith(() => ({
 				movieSearch: movieSearchPage({ items: [], totalPages: 0, totalResults: 0 }),
-			});
+			}));
 			renderPanel();
 
 			await typeText('zzqx');
@@ -188,7 +220,7 @@ describe('MovieSearchPanel', () => {
 
 	describe('Load More', () => {
 		it('accumulates the next page and hides Load More on the last page', async () => {
-			mocks.graphqlRequest.mockImplementation(async (_doc: string, variables: { page: number }) => ({
+			respondWith((variables) => ({
 				movieSearch:
 					variables.page === 1
 						? movieSearchPage({ items: [movie(603, 'The Matrix')], page: 1, totalPages: 2, totalResults: 2 })
@@ -208,7 +240,7 @@ describe('MovieSearchPanel', () => {
 		});
 
 		it('shows an inline error when the next page fails and keeps the first page', async () => {
-			mocks.graphqlRequest.mockImplementation(async (_doc: string, variables: { page: number }) => {
+			respondWith(async (variables) => {
 				if (variables.page === 2) throw new Error('boom');
 				return { movieSearch: movieSearchPage({ totalPages: 2, totalResults: 2 }) };
 			});
@@ -226,8 +258,12 @@ describe('MovieSearchPanel', () => {
 
 	describe('errors', () => {
 		it('shows the generic message with a Retry that searches again', async () => {
-			mocks.graphqlRequest.mockRejectedValueOnce(new Error('movie search is unavailable right now'));
-			mocks.graphqlRequest.mockResolvedValueOnce({ movieSearch: movieSearchPage({}) });
+			let attempts = 0;
+			respondWith(async () => {
+				attempts += 1;
+				if (attempts === 1) throw new Error('movie search is unavailable right now');
+				return { movieSearch: movieSearchPage({}) };
+			});
 			renderPanel();
 
 			await typeText('matrix');
@@ -237,12 +273,14 @@ describe('MovieSearchPanel', () => {
 			await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 			await settle();
 
-			expect(mocks.graphqlRequest).toHaveBeenCalledTimes(2);
+			expect(callsFor(MOVIE_SEARCH)).toHaveLength(2);
 			expect(screen.getByRole('link', { name: 'The Matrix' })).toBeInTheDocument();
 		});
 
 		it('shows the connection message for a network failure', async () => {
-			mocks.graphqlRequest.mockRejectedValue(new TypeError('Failed to fetch'));
+			respondWith(async () => {
+				throw new TypeError('Failed to fetch');
+			});
 			renderPanel();
 
 			await typeText('matrix');
@@ -259,7 +297,7 @@ describe('MovieSearchPanel', () => {
 			await typeText(TMDB_LINK);
 			await settle(5000);
 
-			expect(mocks.graphqlRequest).not.toHaveBeenCalled();
+			expect(callsFor(MOVIE_SEARCH)).toHaveLength(0);
 			await fireEvent.click(screen.getByRole('button', { name: 'Add to Perspectize' }));
 			expect(props.onAddUrl).toHaveBeenCalledWith(TMDB_LINK);
 		});
@@ -270,9 +308,24 @@ describe('MovieSearchPanel', () => {
 			await typeText('tt0133093');
 			await settle(5000);
 
-			expect(mocks.graphqlRequest).not.toHaveBeenCalled();
+			expect(callsFor(MOVIE_SEARCH)).toHaveLength(0);
 			await fireEvent.click(screen.getByRole('button', { name: 'Add to Perspectize' }));
 			expect(props.onAddUrl).toHaveBeenCalledWith('tt0133093');
+		});
+
+		it('hides trending while a pasted link is shown', async () => {
+			respondWith(
+				() => ({ movieSearch: movieSearchPage({}) }),
+				() => ({ movieTrending: movieSearchPage({ items: [movie(949, 'Heat')] }) }),
+			);
+			renderPanel();
+			await settle();
+			expect(screen.getByRole('link', { name: 'Heat' })).toBeInTheDocument();
+
+			await typeText(TMDB_LINK);
+			await settle();
+
+			expect(screen.queryByText('Trending movies')).not.toBeInTheDocument();
 		});
 
 		it('disables the link submit while any movie is being added', async () => {
@@ -299,6 +352,225 @@ describe('MovieSearchPanel', () => {
 			renderPanel();
 
 			expect(searchInput()).toHaveAttribute('maxlength', '100');
+		});
+	});
+
+	describe('trending feed', () => {
+		const DUNE = movie(1, 'Dune');
+		const OPPENHEIMER = movie(2, 'Oppenheimer');
+
+		it('shows trending movies with the idle prompt when the box is empty', async () => {
+			respondWith(
+				() => ({ movieSearch: movieSearchPage({}) }),
+				() => ({ movieTrending: movieSearchPage({ items: [DUNE, OPPENHEIMER] }) }),
+			);
+			renderPanel();
+			await settle();
+
+			expect(screen.getByText('Search TMDB for a movie to add it to Perspectize.')).toBeInTheDocument();
+			expect(screen.getByText('Trending movies')).toBeInTheDocument();
+			expect(screen.getByRole('link', { name: 'Dune' })).toBeInTheDocument();
+			expect(screen.getByRole('link', { name: 'Oppenheimer' })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'This week' })).toHaveAttribute('aria-pressed', 'true');
+			expect(screen.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-pressed', 'false');
+			expect(callsFor(MOVIE_SEARCH)).toHaveLength(0);
+		});
+
+		it('keeps the 2-character hint and the trending feed visible with one character typed', async () => {
+			respondWith(
+				() => ({ movieSearch: movieSearchPage({}) }),
+				() => ({ movieTrending: movieSearchPage({ items: [DUNE] }) }),
+			);
+			renderPanel();
+			await settle();
+
+			await typeText('d');
+			await settle(MOVIE_SEARCH_DEBOUNCE_MS);
+
+			expect(screen.getByText('Type at least 2 characters to search.')).toBeInTheDocument();
+			expect(screen.getByRole('link', { name: 'Dune' })).toBeInTheDocument();
+			expect(callsFor(MOVIE_SEARCH)).toHaveLength(0);
+		});
+
+		it('hides trending once a search is active and makes no trending call while searching', async () => {
+			respondWith(
+				() => ({ movieSearch: movieSearchPage({}) }),
+				() => ({ movieTrending: movieSearchPage({ items: [DUNE] }) }),
+			);
+			renderPanel();
+			await settle();
+			mocks.graphqlRequest.mockClear();
+
+			await typeText('matrix');
+			await settle(MOVIE_SEARCH_DEBOUNCE_MS);
+
+			expect(screen.queryByText('Trending movies')).not.toBeInTheDocument();
+			expect(screen.getByRole('link', { name: 'The Matrix' })).toBeInTheDocument();
+			expect(callsFor(MOVIE_TRENDING)).toHaveLength(0);
+			expect(callsFor(MOVIE_SEARCH)).toHaveLength(1);
+		});
+
+		it('shows trending again from cache when the box is cleared, without a new call', async () => {
+			respondWith(
+				() => ({ movieSearch: movieSearchPage({}) }),
+				() => ({ movieTrending: movieSearchPage({ items: [DUNE] }) }),
+			);
+			renderPanel();
+			await settle();
+			await typeText('matrix');
+			await settle(MOVIE_SEARCH_DEBOUNCE_MS);
+			mocks.graphqlRequest.mockClear();
+
+			await fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+			await settle();
+
+			expect(screen.getByRole('link', { name: 'Dune' })).toBeInTheDocument();
+			expect(callsFor(MOVIE_TRENDING)).toHaveLength(0);
+		});
+
+		it('refetches with DAY when Today is chosen and shows that window', async () => {
+			respondWith(
+				() => ({ movieSearch: movieSearchPage({}) }),
+				(variables) => ({
+					movieTrending: movieSearchPage({ items: [variables.window === 'DAY' ? movie(3, 'Day Pick') : DUNE] }),
+				}),
+			);
+			renderPanel();
+			await settle();
+
+			await fireEvent.click(screen.getByRole('button', { name: 'Today' }));
+			await settle();
+
+			expect(mocks.graphqlRequest).toHaveBeenLastCalledWith(MOVIE_TRENDING, { window: 'DAY', page: 1 });
+			expect(screen.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-pressed', 'true');
+			expect(screen.getByRole('link', { name: 'Day Pick' })).toBeInTheDocument();
+			expect(screen.queryByRole('link', { name: 'Dune' })).not.toBeInTheDocument();
+
+			await fireEvent.click(screen.getByRole('button', { name: 'This week' }));
+			await settle();
+
+			// Back to This week is still fresh in the cache: no third call.
+			expect(screen.getByRole('link', { name: 'Dune' })).toBeInTheDocument();
+			expect(callsFor(MOVIE_TRENDING)).toHaveLength(2);
+		});
+
+		it('keeps the chosen window across a search and back to idle', async () => {
+			respondWith(
+				() => ({ movieSearch: movieSearchPage({}) }),
+				(variables) => ({
+					movieTrending: movieSearchPage({ items: [variables.window === 'DAY' ? movie(3, 'Day Pick') : DUNE] }),
+				}),
+			);
+			renderPanel();
+			await settle();
+			await fireEvent.click(screen.getByRole('button', { name: 'Today' }));
+			await settle();
+
+			await typeText('matrix');
+			await settle(MOVIE_SEARCH_DEBOUNCE_MS);
+			await fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+			await settle();
+
+			expect(screen.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-pressed', 'true');
+			expect(screen.getByRole('link', { name: 'Day Pick' })).toBeInTheDocument();
+		});
+
+		it('accumulates the next trending page and drops it when the window changes', async () => {
+			respondWith(
+				() => ({ movieSearch: movieSearchPage({}) }),
+				(variables) => {
+					if (variables.window === 'DAY') {
+						return { movieTrending: movieSearchPage({ items: [movie(3, 'Day Pick')], totalPages: 1 }) };
+					}
+					return variables.page === 1
+						? { movieTrending: movieSearchPage({ items: [DUNE], page: 1, totalPages: 2, totalResults: 2 }) }
+						: {
+								movieTrending: movieSearchPage({ items: [movie(4, 'Heat')], page: 2, totalPages: 2, totalResults: 2 }),
+							};
+				},
+			);
+			renderPanel();
+			await settle();
+
+			await fireEvent.click(screen.getByRole('button', { name: 'Load More' }));
+			await settle();
+
+			expect(mocks.graphqlRequest).toHaveBeenLastCalledWith(MOVIE_TRENDING, { window: 'WEEK', page: 2 });
+			expect(screen.getByRole('link', { name: 'Dune' })).toBeInTheDocument();
+			expect(screen.getByRole('link', { name: 'Heat' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Load More' })).not.toBeInTheDocument();
+
+			await fireEvent.click(screen.getByRole('button', { name: 'Today' }));
+			await settle();
+
+			expect(screen.getByRole('link', { name: 'Day Pick' })).toBeInTheDocument();
+			expect(screen.queryByRole('link', { name: 'Heat' })).not.toBeInTheDocument();
+
+			await fireEvent.click(screen.getByRole('button', { name: 'This week' }));
+			await settle();
+
+			expect(screen.getByRole('link', { name: 'Dune' })).toBeInTheDocument();
+			expect(screen.queryByRole('link', { name: 'Heat' })).not.toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Load More' })).toBeInTheDocument();
+		});
+
+		it('shows the trending error with a Retry that loads the feed again', async () => {
+			let attempts = 0;
+			respondWith(
+				() => ({ movieSearch: movieSearchPage({}) }),
+				async () => {
+					attempts += 1;
+					if (attempts === 1) throw new Error('trending is down');
+					return { movieTrending: movieSearchPage({ items: [DUNE] }) };
+				},
+			);
+			renderPanel();
+			await settle();
+
+			expect(screen.getByText('Trending movies are unavailable right now.')).toBeInTheDocument();
+			await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+			await settle();
+
+			expect(screen.getByRole('link', { name: 'Dune' })).toBeInTheDocument();
+			expect(callsFor(MOVIE_TRENDING)).toHaveLength(2);
+		});
+
+		it('shows the connection message for a trending network failure', async () => {
+			respondWith(
+				() => ({ movieSearch: movieSearchPage({}) }),
+				async () => {
+					throw new TypeError('Failed to fetch');
+				},
+			);
+			renderPanel();
+			await settle();
+
+			expect(screen.getByText('Unable to reach Perspectize. Check your connection.')).toBeInTheDocument();
+		});
+
+		it('shows a loading skeleton while the first trending page is in flight', async () => {
+			respondWith(
+				() => ({ movieSearch: movieSearchPage({}) }),
+				() => new Promise(() => {}),
+			);
+			renderPanel();
+			await settle();
+
+			expect(document.querySelector('[aria-label="Loading trending movies"]')).toBeInTheDocument();
+		});
+
+		it('marks trending movies already in the library and adds the others by their url', async () => {
+			respondWith(
+				() => ({ movieSearch: movieSearchPage({}) }),
+				() => ({ movieTrending: movieSearchPage({ items: [DUNE, OPPENHEIMER] }) }),
+			);
+			const props = renderPanel({ libraryUrls: new Set([DUNE.url]) });
+			await settle();
+
+			expect(screen.getAllByRole('button', { name: 'In Library' })).toHaveLength(1);
+			await fireEvent.click(screen.getByRole('button', { name: 'Add to Perspectize' }));
+
+			expect(props.onAdd).toHaveBeenCalledWith(OPPENHEIMER.url);
 		});
 	});
 });

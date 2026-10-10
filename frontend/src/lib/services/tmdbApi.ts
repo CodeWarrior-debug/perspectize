@@ -56,6 +56,41 @@ export interface MovieSearchResponse {
 	movieSearch: MovieSearchPage;
 }
 
+/** Trending window: today (DAY) or this week (WEEK), as the backend's TrendingWindow enum. */
+export type TrendingWindow = 'DAY' | 'WEEK';
+
+export const MOVIE_TRENDING = gql`
+	query MovieTrending($window: TrendingWindow, $page: Int) {
+		movieTrending(window: $window, page: $page) {
+			items {
+				tmdbId
+				title
+				releaseDate
+				overview
+				posterPath
+				voteAverage
+				url
+			}
+			page
+			totalPages
+			totalResults
+		}
+	}
+`;
+
+export interface MovieTrendingResponse {
+	movieTrending: MovieSearchPage;
+}
+
+/** Trending pages are cached server-side for about an hour; a 30-minute client window keeps the feed snappy. */
+export const MOVIE_TRENDING_STALE_TIME = 30 * 60 * 1000;
+
+/** Fetch one page of TMDB trending movies for the window from the backend. Throws the GraphQL/network error unchanged. */
+export async function fetchTrendingMovies(window: TrendingWindow = 'WEEK', page = 1): Promise<MovieSearchPage> {
+	const data = await graphqlRequest<MovieTrendingResponse>(MOVIE_TRENDING, { window, page });
+	return data.movieTrending;
+}
+
 /** Minimum trimmed length before a search is sent. */
 export const MOVIE_SEARCH_MIN_LENGTH = 2;
 /** Matches the backend limit (100 runes after trim); keeps the input from ever hitting it. */
@@ -87,4 +122,5 @@ export function releaseYear(date: string | null | undefined): number | null {
 export const tmdbKeys = {
 	all: ['tmdb'] as const,
 	search: (query: string, page: number) => [...tmdbKeys.all, 'search', query, page] as const,
+	trending: (window: TrendingWindow, page: number) => [...tmdbKeys.all, 'trending', window, page] as const,
 };
