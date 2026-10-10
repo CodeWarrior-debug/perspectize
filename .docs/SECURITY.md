@@ -198,6 +198,10 @@ curl -I https://api.perspectize.com
 - 5xx errors >5% of requests
 - HTTPS certificate expiring <30 days (Sevalla auto-renews)
 
+## User-supplied HTML
+
+Rich text (e.g. a perspective's review) is sanitized on **both** sides with the same tag set: the frontend with DOMPurify (`frontend/src/lib/utils/sanitize.ts` `sanitizeHtml`, rendered through `SafeHtml.svelte`), the backend with bluemonday (`backend/internal/core/services/sanitize.go`) before storage, because non-browser clients bypass the frontend. A new HTML field reuses both; changing the allowed tags means changing both files.
+
 ## References
 
 - [OWASP Secrets Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html)

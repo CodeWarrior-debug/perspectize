@@ -153,6 +153,12 @@ The aim is one network call per distinct piece of data, deliberate freshness, an
 
 Full table: [../.docs/QUERY_BUDGET.md](../.docs/QUERY_BUDGET.md).
 
+## UI conventions
+
+- **Nav labels are one word** (`Header.svelte` `navLinks`: Activity, Discover, Compare); name new top-level pages with a one-word verb.
+- **Toasts:** svelte-sonner, default 2s (`<Toaster duration={2000}>` in `+layout.svelte`). A toast that carries an action button passes `duration: 4000` so there's time to click it.
+- **User-supplied HTML:** sanitize with `sanitizeHtml` (`lib/utils/sanitize.ts`, DOMPurify) and render through `SafeHtml.svelte`; the backend mirrors the same tag set with bluemonday (`services/sanitize.go`). Change both together. See [.docs/SECURITY.md](../.docs/SECURITY.md#user-supplied-html).
+
 ## Icons (Lucide)
 
 Per-icon imports from `@lucide/svelte` for tree-shaking:
