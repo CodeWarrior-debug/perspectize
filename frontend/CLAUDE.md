@@ -94,7 +94,7 @@ This project uses **Svelte 5 runes** exclusively. Do not use Svelte 4 syntax.
 
 **Runes in a plain `.ts` module require the `.svelte.ts` extension.** `$state`/`$derived`/etc. only compile in `.svelte` files or files named `*.svelte.ts` — a rune used in a bare `.ts` file fails at build/type-check time with no Svelte-specific error pointing at the cause. Any non-component module that needs reactive state (e.g. a shared store) must be named `foo.svelte.ts`, not `foo.ts` — see `frontend/src/lib/theme/store.svelte.ts`.
 
-**`$effect` only tracks state read _synchronously_ in the effect body.** A value read solely inside a `setTimeout`/`Promise`/`await` callback is NOT a tracked dependency, so the effect runs once on mount and never re-runs. For a debounce, copy the reactive value into a local const at the top of the effect first (`const term = searchTerm;`), then use the local inside the timer — see `discover/SearchBar.svelte`. (Bug history: `CategoryTypeahead.svelte`'s Wikidata search read `searchTerm` only inside its `setTimeout`, so the debounced term never updated and the search query never fired.)
+**`$effect` only tracks state read _synchronously_ in the effect body.** A value read solely inside a `setTimeout`/`Promise`/`await` callback is NOT a tracked dependency, so the effect runs once on mount and never re-runs. For a debounce, copy the reactive value into a local const at the top of the effect first (`const term = searchTerm;`), then use the local inside the timer — see `CategoryTypeahead.svelte`. (Bug history: its Wikidata search once read `searchTerm` only inside its `setTimeout`, so the debounced term never updated and the search query never fired.)
 
 **An `$effect` that writes a `$state` var and then reads that same var back (even just-assigned) loops.** Svelte 5 flags this as `effect_update_depth_exceeded` — assigning `foo = x` then reading `foo.length` later in the same effect re-triggers the effect indefinitely, even though the value is unchanged. Fix: read from a local `const` derived off the source (prop) instead of reading the `$state` var back. See `PerspectivePopover.svelte`'s `existingPerspective` reset effect.
 
@@ -152,6 +152,12 @@ The aim is one network call per distinct piece of data, deliberate freshness, an
 - No fetch from an `$effect` that can loop, or per keystroke without a debounce.
 
 Full table: [../.docs/QUERY_BUDGET.md](../.docs/QUERY_BUDGET.md).
+
+## UI conventions
+
+- **Nav labels are one word** (`Header.svelte` `navLinks`: Activity, Discover, Compare); name new top-level pages with a one-word verb.
+- **Toasts:** svelte-sonner, default 2s (`<Toaster duration={2000}>` in `+layout.svelte`). A toast that carries an action button passes `duration: 4000` so there's time to click it.
+- **User-supplied HTML:** sanitize with `sanitizeHtml` (`lib/utils/sanitize.ts`, DOMPurify) and render through `SafeHtml.svelte`; the backend mirrors the same tag set with bluemonday (`services/sanitize.go`). Change both together. See [.docs/SECURITY.md](../.docs/SECURITY.md#user-supplied-html).
 
 ## Icons (Lucide)
 

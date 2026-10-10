@@ -113,6 +113,17 @@ Is the field unique to this content type?
 
 ---
 
+## Decision 7: Discover Page
+
+Every type gets an explicit answer, even when the answer is "not on Discover". Decide:
+
+- **Placement:** search and a feed, feed only, search only, or not on Discover. Say why: is this type usually *browsed* (it belongs on Discover) or *pasted/typed* (the Add Content card covers it)?
+- **Feed:** what the page shows for this type when the search box is empty. If it is called "trending", name the number it ranks by. A source with no popularity data is "featured" or "curated", not trending.
+- **Search:** in-app, or handed off to the source's own site? Hand off when the search API is scarce or costly: YouTube's `search.list` allows 100 calls a day for the whole project, so Discover opens youtube.com in a new tab and adds a pasted link directly. For in-app search: does a result carry title and image, or only an id that needs a second request per card? Which filters make sense for this type?
+- **Feed fetched from:** browser (the API must send CORS headers, and its host goes in `connect-src` in `frontend/src/app.html`) or backend (no CORS, heavy ranking work, or an undocumented feed worth caching).
+
+Worked examples live in `tools/content-type-designer` (section 7): YouTube (search hands off to youtube.com; Trending chart served from the backend cache), Bible passage (proposed: Verse of the day only, from Bible Gateway's feed, fetched and cached by the backend), Painting (proposed: Met search + highlights ranked by Wikipedia pageviews).
+
 ## Implementation Steps
 
 ### Step A: Backend Domain
@@ -335,6 +346,7 @@ If the type introduces new columns, see [ADDING_AG_GRID_COLUMN.md](./ADDING_AG_G
 | Cross-type URL uniqueness | Keep / Relax | Migration to alter constraint |
 | Frontend form | New / Extend / Unified | Component architecture |
 | Table display | Icon, thumbnail, new columns | Renderer updates, see AG Grid guide |
+| Discover page | Search + feed / feed / search / not on Discover — with a reason | Card component, source client or backend feed job, CSP |
 
 ---
 
@@ -348,3 +360,7 @@ After adding a content type:
 5. Verify it appears in the table with correct icon and formatting
 6. Verify sorting/filtering works for new sortable fields
 7. Verify mobile responsiveness
+
+## Worked example: Movie
+
+`MOVIE` was added end to end following this guide. See the design in `docs/superpowers/specs/2026-10-07-movie-content-type-design.md` and what is built, unverified and left over in `docs/superpowers/plans/2026-10-07-movie-content-type-STATUS.md`.

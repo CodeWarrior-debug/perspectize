@@ -1,7 +1,7 @@
 ---
 name: figma-designer
 description: Figma design-to-code specialist. Use when the user shares a Figma file/frame/node link, asks to implement a design from Figma, wants design tokens/variables pulled from Figma, needs a Code Connect mapping, or wants a screenshot/design context extracted from a Figma file. Has its own scoped connection to the Figma MCP server, so the main session never loads Figma's tool set. IMPORTANT: Before spawning a new agent, check if there is already a running or recently completed figma-designer agent that you can continue via SendMessage — this keeps the Figma MCP connection and already-fetched node/design context alive across a multi-part task instead of re-establishing it per message.
-model: sonnet
+model: haiku
 tools:
   - Read
   - Write

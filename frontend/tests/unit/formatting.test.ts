@@ -29,7 +29,126 @@ import {
 	getSourceDataCooldown,
 	formatRemainingTime,
 	SOURCE_DATA_COOLDOWN_MS,
+	formatMoneyCompact,
+	formatMoneyExact,
+	vsBudgetPercent,
+	formatVsBudget,
+	durationTooltip,
 } from '$lib/utils/formatting';
+
+describe('shared h:mm:ss duration', () => {
+	it.each([
+		[0, '0:00'],
+		[59, '0:59'],
+		[3599, '59:59'],
+		[3600, '1:00:00'],
+		[8520, '2:22:00'],
+		[8525, '2:22:05'],
+	])('formatDurationSeconds(%i) = %s and formatDuration agrees', (secs, expected) => {
+		expect(formatDurationSeconds(secs)).toBe(expected);
+		expect(formatDuration(secs, 'seconds')).toBe(expected);
+	});
+
+	it.each([
+		['1:02:03', 3723],
+		['2:22:00', 8520],
+		['0:01:05', 65],
+		['59:59', 3599],
+		['1:2:3:4', null],
+		['1:xx:03', null],
+	])('parseDurationInput(%s) = %s', (text, expected) => {
+		expect(parseDurationInput(text)).toBe(expected);
+	});
+
+	// CONCERN (pinned, not fixed): out-of-range minutes/seconds are not rejected.
+	// A 3-part value is h:mm:ss, so '1:30:99' = 1*3600 + 30*60 + 99 = 5499 (99 seconds
+	// carries over) instead of null. Today's behaviour; revisit if strict input is wanted.
+	it('parses a 3-part value as h:mm:ss and does not reject seconds >= 60', () => {
+		expect(parseDurationInput('1:30:99')).toBe(5499);
+		expect(parseDurationInput('1:30:00')).toBe(5400);
+	});
+
+	it('round-trips formatted values through parseDurationInput', () => {
+		for (const s of [0, 59, 3599, 3600, 8525]) {
+			expect(parseDurationInput(formatDurationSeconds(s))).toBe(s);
+		}
+	});
+});
+
+describe('formatMoneyCompact', () => {
+	it.each([
+		[null, '—'],
+		[0, '—'],
+		[12, '$12'],
+		[999, '$999'],
+		[1000, '$1K'],
+		[950_000, '$950K'],
+		[1_500, '$1.5K'],
+		[999_999, '$1M'],
+		[1_000_000, '$1M'],
+		[316_000_000, '$316M'],
+		[1_150_000_000, '$1.2B'],
+		[2_800_000_000, '$2.8B'],
+	])('formatMoneyCompact(%s) = %s', (v, expected) => {
+		expect(formatMoneyCompact(v)).toBe(expected);
+	});
+
+	// Rule: round to one decimal in the unit's own scale (half up); a rounded 1000
+	// promotes to the next unit. Boundary values around each unit edge.
+	it.each([
+		[999, '$999'],
+		[999_499, '$999.5K'], // 999.499K rounds to 999.5K (one decimal), no promotion yet
+		[999_500, '$999.5K'],
+		[999_950, '$1M'], // 999.95K rounds to 1000.0K, promoted
+		[999_999, '$1M'],
+		[1_000_000, '$1M'],
+		[316_400_000, '$316.4M'],
+		[1_000_000_000, '$1B'],
+		[999_950_000_000, '$1T'],
+		[1_000_000_000_000, '$1T'],
+		[1_200_000_000_000, '$1.2T'],
+	])('boundary: formatMoneyCompact(%s) = %s', (v, expected) => {
+		expect(formatMoneyCompact(v)).toBe(expected);
+	});
+});
+
+describe('formatMoneyExact', () => {
+	it.each([
+		[null, '—'],
+		[0, '—'],
+		[999, '$999'],
+		[1_234_567, '$1,234,567'],
+	])('formatMoneyExact(%s) = %s', (v, expected) => {
+		expect(formatMoneyExact(v)).toBe(expected);
+	});
+});
+
+describe('vsBudgetPercent / formatVsBudget', () => {
+	it.each([
+		[2_800_000_000, 80_000_000, 3500],
+		[50, 100, 50],
+		[null, 100, null],
+		[100, null, null],
+		[100, 0, null],
+		[0, 100, null],
+		[null, null, null],
+	])('vsBudgetPercent(%s, %s) = %s', (rev, budget, expected) => {
+		expect(vsBudgetPercent(rev, budget)).toBe(expected);
+	});
+
+	it.each([
+		[3455.2, '3,455%'],
+		[3500, '3,500%'],
+		[49.6, '50%'],
+		[0.3, '<1%'],
+		[0.49, '<1%'],
+		[0.5, '1%'],
+		[0, '0%'],
+		[null, '—'],
+	])('formatVsBudget(%s) = %s', (pct, expected) => {
+		expect(formatVsBudget(pct)).toBe(expected);
+	});
+});
 
 describe('formatDuration', () => {
 	it('returns dash for null length', () => {
@@ -42,6 +161,25 @@ describe('formatDuration', () => {
 
 	it('formats seconds as minutes:seconds', () => {
 		expect(formatDuration(300, 'seconds')).toBe('5:00');
+	});
+
+	it('MINUTES precision (TMDB runtime) formats as h:mm, no seconds', () => {
+		expect(formatDuration(142 * 60, 'seconds', 'MINUTES')).toBe('2:22');
+		expect(formatDuration(120 * 60, 'seconds', 'MINUTES')).toBe('2:00');
+		expect(formatDuration(45 * 60, 'seconds', 'MINUTES')).toBe('0:45');
+	});
+
+	it('SECONDS precision keeps h:mm:ss', () => {
+		expect(formatDuration(142 * 60, 'seconds', 'SECONDS')).toBe('2:22:00');
+	});
+
+	it('no or unknown precision falls back to seconds formatting', () => {
+		expect(formatDuration(142 * 60, 'seconds', null)).toBe('2:22:00');
+		expect(formatDuration(142 * 60, 'seconds', 'HOURS')).toBe('2:22:00');
+	});
+
+	it('MINUTES precision with no length is a dash', () => {
+		expect(formatDuration(null, 'seconds', 'MINUTES')).toBe('—');
 	});
 
 	it('formats seconds with padded seconds part', () => {
@@ -57,7 +195,7 @@ describe('formatDuration', () => {
 	});
 
 	it('formats large durations', () => {
-		expect(formatDuration(3661, 'seconds')).toBe('61:01');
+		expect(formatDuration(3661, 'seconds')).toBe('1:01:01');
 	});
 
 	it('formats non-seconds units with value and unit', () => {
@@ -149,6 +287,14 @@ describe('durationValueGetter', () => {
 		expect(durationValueGetter({ data: { length: 300, lengthUnits: 'seconds' } })).toBe('5:00');
 	});
 
+	it('formats to the row lengthDisplay precision', () => {
+		expect(
+			durationValueGetter({
+				data: { length: 142 * 60, lengthUnits: 'seconds', lengthDisplay: { source: 'tmdb', precision: 'MINUTES' } },
+			}),
+		).toBe('2:22');
+	});
+
 	it('returns dash for null length', () => {
 		expect(durationValueGetter({ data: { length: null, lengthUnits: null } })).toBe('—');
 	});
@@ -194,7 +340,7 @@ describe('formatDurationSeconds', () => {
 	});
 
 	it('formats large durations', () => {
-		expect(formatDurationSeconds(3661)).toBe('61:01');
+		expect(formatDurationSeconds(3661)).toBe('1:01:01');
 	});
 
 	it('formats sub-minute durations', () => {
@@ -890,5 +1036,33 @@ describe('categoryCellRenderer', () => {
 
 		expect(result.querySelector('a')).toBeNull();
 		expect(result.querySelector('span')?.textContent).toBe('Science');
+	});
+});
+
+describe('durationTooltip (names the format, so the unit is clear)', () => {
+	const tip = (length: number | null, precision?: string) =>
+		durationTooltip({
+			data: { length, lengthUnits: 'seconds', lengthDisplay: precision ? { source: 'x', precision } : null },
+		});
+
+	it('movie runtime (MINUTES) reads as h:mm', () => {
+		expect(tip(179 * 60, 'MINUTES')).toBe('2:59 (h:mm)');
+	});
+
+	it('a video under an hour reads as m:ss', () => {
+		expect(tip(227, 'SECONDS')).toBe('3:47 (m:ss)');
+	});
+
+	it('a video of an hour or more reads as h:mm:ss', () => {
+		expect(tip(3723, 'SECONDS')).toBe('1:02:03 (h:mm:ss)');
+	});
+
+	it('no precision falls back to the seconds formats', () => {
+		expect(tip(227)).toBe('3:47 (m:ss)');
+	});
+
+	it('no length gives an empty tooltip', () => {
+		expect(tip(null, 'MINUTES')).toBe('');
+		expect(durationTooltip({})).toBe('');
 	});
 });

@@ -58,6 +58,7 @@ func domainToModel(c *domain.Content) *model.Content {
 		AddedByUserID: strconv.Itoa(c.AddedByUserID),
 		Length:        c.Length,
 		LengthUnits:   c.LengthUnits,
+		LengthDisplay: c.LengthDisplay,
 		CreatedAt:     c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:     c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		// Non-schema field — lets contentResolver.PrimaryCategory batch-load the
@@ -75,6 +76,9 @@ func domainToModel(c *domain.Content) *model.Content {
 			slog.Warn("failed to parse content response JSON", "contentID", c.ID, "error", err)
 		} else {
 			m.Response = responseMap
+			if c.ContentType == domain.ContentTypeMovie {
+				m.Movie = responseMap
+			}
 		}
 
 		// Extract fields from the YouTube API response

@@ -110,6 +110,38 @@ func categoryDomainToModel(c *domain.Category) *CategoryModel {
 	}
 }
 
+// lengthDisplayJSON is the stored shape of content.length_display: lowercase
+// precision ("seconds"/"minutes"), matching migration 000030's backfill.
+type lengthDisplayJSON struct {
+	Source    string `json:"source"`
+	Precision string `json:"precision"`
+}
+
+// lengthDisplayFromJSON decodes the length_display JSONB column. NULL or an
+// unreadable value is nil, so the client falls back to formatting by length_units.
+func lengthDisplayFromJSON(raw json.RawMessage) *domain.LengthDisplay {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var j lengthDisplayJSON
+	if err := json.Unmarshal(raw, &j); err != nil {
+		return nil
+	}
+	return &domain.LengthDisplay{Source: j.Source, Precision: domain.LengthPrecision(strings.ToUpper(j.Precision))}
+}
+
+// lengthDisplayToJSON encodes LengthDisplay for the length_display JSONB column (nil -> NULL).
+func lengthDisplayToJSON(d *domain.LengthDisplay) json.RawMessage {
+	if d == nil {
+		return nil
+	}
+	raw, err := json.Marshal(lengthDisplayJSON{Source: d.Source, Precision: strings.ToLower(string(d.Precision))})
+	if err != nil {
+		return nil
+	}
+	return raw
+}
+
 // contentModelToDomain converts a GORM ContentModel to domain.Content
 func contentModelToDomain(m *ContentModel) *domain.Content {
 	if m == nil {
@@ -123,6 +155,7 @@ func contentModelToDomain(m *ContentModel) *domain.Content {
 		AddedByUserID:     m.AddedByUserID,
 		Length:            m.Length,
 		LengthUnits:       m.LengthUnits,
+		LengthDisplay:     lengthDisplayFromJSON(m.LengthDisplay),
 		Response:          m.Response,
 		PrimaryCategoryID: m.PrimaryCategoryID,
 		VerseStartID:      m.VerseStartID,
@@ -146,6 +179,7 @@ func contentDomainToModel(c *domain.Content) *ContentModel {
 		AddedByUserID:     c.AddedByUserID,
 		Length:            c.Length,
 		LengthUnits:       c.LengthUnits,
+		LengthDisplay:     lengthDisplayToJSON(c.LengthDisplay),
 		Response:          c.Response,
 		PrimaryCategoryID: c.PrimaryCategoryID,
 		VerseStartID:      c.VerseStartID,

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 const (
@@ -61,9 +62,12 @@ type Client struct {
 // No API key is needed — Wikidata is a free public API.
 func NewClient() *Client {
 	return &Client{
-		httpClient: &http.Client{Timeout: 10 * time.Second},
-		baseURL:    defaultBaseURL,
-		userAgent:  userAgent,
+		httpClient: &http.Client{
+			Timeout:   10 * time.Second,
+			Transport: otelhttp.NewTransport(http.DefaultTransport),
+		},
+		baseURL:   defaultBaseURL,
+		userAgent: userAgent,
 	}
 }
 

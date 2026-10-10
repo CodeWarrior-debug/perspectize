@@ -39,6 +39,7 @@
 		urlParamsToFilter,
 		filterToUrlParams,
 		filtersEqual,
+		nonGridFilters,
 	} from '$lib/utils/gridUrlState';
 	import type { DataMode, GridParams, SortSpec } from '$lib/utils/gridUrlState';
 	import {
@@ -56,20 +57,64 @@
 		formatPercentLiked,
 		formatPublishDate,
 		formatTags,
+		contentTags,
 		truncateDescription,
 		contentRowId,
 		headerMinWidth,
+		castCellRenderer,
+		genreValueGetter,
+		ratedValueGetter,
+		releasedValueGetter,
+		releasedFilterDate,
+		formatReleased,
+		moviePeople,
+		PERSON_ID_ATTR,
+		boxOfficeValueGetter,
+		formatBoxOffice,
+		vsBudgetValueGetter,
+		formatVsBudgetCell,
+		tmdbScoreValueGetter,
+		formatTmdbScore,
+		hasLowVoteCount,
+		budgetValueGetter,
+		votesValueGetter,
+		collectionValueGetter,
+		synopsisValueGetter,
+		tmdbIdValueGetter,
+		textOrEmpty,
 	} from '$lib/utils/formatting';
 	import {
 		capitalizeContentType,
 		durationComparator,
+		unknownLastComparator,
+		releasedComparator,
+		itemColumnHeader,
+		ratedComparator,
+		CLIENT_ONLY_SORT_COLS,
+		sortableColumnsFor,
 		compareContentBySorts,
 		filterContentRows,
 		togglableColIds,
+		syncItemHeader,
+		PERSON_FILTER_KEY,
+		parsePersonFilter,
+		rowMatchesPerson,
 	} from '$lib/utils/grid-config';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
+	import {
+		COLUMN_VIEW_LABEL,
+		clearLayout,
+		columnViewFor,
+		defaultLayout,
+		loadLayout,
+		planColumnSwitch,
+		saveLayout,
+		type ColumnLayout,
+		type ColumnView,
+	} from '$lib/utils/columnLayouts';
+	import { toast } from 'svelte-sonner';
 	import SortPickerDialog from '$lib/components/SortPickerDialog.svelte';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import ArrowUpDownIcon from '@lucide/svelte/icons/arrow-up-down';
@@ -80,7 +125,7 @@
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
-	import { ContentTypeFilter } from '$lib/utils/contentTypeFilter';
+	import { ContentTypeFilter, AgeRatingFilter } from '$lib/utils/contentTypeFilter';
 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
 	import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
@@ -151,13 +196,16 @@
 	// Signed-in user — drives the admin-only "Internal" group in the column picker.
 	const meCtx = useMe();
 
-	// Column picker (session-only). Once the user makes a manual choice,
-	// `userColumnOverride` is non-null and the responsive $effect below stops
-	// touching column visibility for the rest of the session. A page refresh
-	// clears it and automatic responsive layout resumes.
+	// Column picker. Each column view (Movie, or the general set; see columnLayouts.ts)
+	// keeps its own saved setup in localStorage once the user changes a column, and the
+	// visibility $effect below applies it instead of that view's responsive defaults.
+	// `layoutVersion` bumps after every save/clear so that effect and the picker re-read.
 	let columnPickerOpen = $state(false);
-	let userColumnOverride = $state<Record<string, boolean> | null>(null);
-	const overrideActive = $derived(userColumnOverride !== null);
+	let layoutVersion = $state(0);
+	const customLayout = $derived.by(() => {
+		void layoutVersion;
+		return loadLayout(columnView) !== null;
+	});
 
 	function currentVisibility(): Record<string, boolean> {
 		const out: Record<string, boolean> = {};
@@ -171,16 +219,52 @@
 
 	function handleColumnToggle(colId: string, next: boolean) {
 		if (!gridApi || !gridReady) return;
-		if (userColumnOverride === null) userColumnOverride = currentVisibility();
-		userColumnOverride = { ...userColumnOverride, [colId]: next };
+		const base = loadLayout(columnView) ?? currentVisibility();
+		saveLayout(columnView, { ...base, [colId]: next });
 		gridApi.setColumnsVisible([colId], next);
+		layoutVersion++;
+	}
+
+	function handleColumnsReset() {
+		clearLayout(columnView);
+		layoutVersion++;
+	}
+
+	function applyLayout(api: GridApi, layout: ColumnLayout) {
+		const entries = Object.entries(layout);
+		api.setColumnsVisible(
+			entries.filter(([, v]) => v).map(([c]) => c),
+			true,
+		);
+		api.setColumnsVisible(
+			entries.filter(([, v]) => !v).map(([c]) => c),
+			false,
+		);
+	}
+
+	/** After a switch of column view: offer the previous columns back, or the picker. */
+	function showColumnSwitchToast(view: ColumnView, previous: ColumnLayout) {
+		toast.warning(`Showing ${COLUMN_VIEW_LABEL[view]}`, {
+			id: 'column-view-switch',
+			action: {
+				label: 'Revert',
+				onClick: () => {
+					saveLayout(view, previous);
+					layoutVersion++;
+				},
+			},
+			cancel: {
+				label: 'Choose columns',
+				onClick: () => (columnPickerOpen = true),
+			},
+		});
 	}
 
 	// Checkbox state for the dialog — recomputed when it opens and after every
 	// toggle so the checkboxes track the live grid.
 	const pickerVisibility = $derived.by(() => {
 		void columnPickerOpen;
-		void userColumnOverride;
+		void layoutVersion;
 		return columnPickerOpen ? currentVisibility() : {};
 	});
 
@@ -206,6 +290,17 @@
 	const searchText = $derived(gridParams.q);
 	const searchFields = $derived(gridParams.qFields);
 	const filters = $derived(gridParams.filters);
+	/** Which saved/default column set applies (columnLayouts.ts): Movie, or the general set. */
+	const columnView = $derived(columnViewFor(filters.type));
+	// `f.person` (TMDB id, optional `:cast`/`:director`): has no grid column, so it is tracked apart from the grid filter model.
+	const personFilter = $derived(parsePersonFilter(filters[PERSON_FILTER_KEY]));
+
+	/** Filter to movies crediting this person (clicking a name in the Cast cell). */
+	function filterByPerson(personId: string) {
+		hover.close();
+		cursors = [null];
+		updateUrl({ filters: { ...gridParams.filters, [PERSON_FILTER_KEY]: personId }, page: 1 });
+	}
 
 	// ---------------------------------------------------------------------------
 	// URL update helper
@@ -283,14 +378,14 @@
 	// Data fetching (mode-conditional)
 	// ---------------------------------------------------------------------------
 
-	// In server-side mode, build GraphQL filter from URL params + search
-	// In client-side mode, pass search as simple filter (no column filters)
+	// In server-side mode, build GraphQL filter from URL params + search.
+	// In client-side mode, pass search plus the Type filter only (other column filters stay
+	// client-side). Type must go to the server too: "Loaded" fetches just the 100 most recent
+	// rows, so filtering by type only in the grid hides every older row of that type.
 	const graphqlFilter = $derived(
 		mode === 'all'
 			? urlParamsToGraphQLFilter(filters, searchText, searchFields)
-			: searchText
-				? urlParamsToGraphQLFilter({}, searchText, searchFields)
-				: undefined,
+			: urlParamsToGraphQLFilter(filters.type ? { type: filters.type } : {}, searchText, searchFields),
 	);
 
 	const contentQuery = createQuery(() => ({
@@ -368,6 +463,19 @@
 	});
 	const loadedItemsCount = $derived(displayedRowCount ?? rowData.length);
 	const loading = $derived(contentQuery.isLoading || contentQuery.isPlaceholderData);
+	// Chip text for the person filter: the name from any loaded row, else the bare TMDB id.
+	const personChipLabel = $derived.by(() => {
+		if (!personFilter) return '';
+		for (const r of rowData) {
+			const hit = moviePeople(r).find((p) => p.id === personFilter.id);
+			if (hit) return hit.name;
+		}
+		return `TMDB #${personFilter.id}`;
+	});
+	const chipFilterModel = $derived<Record<string, any>>({
+		...(gridApi ? activeFilterModel : urlParamsToFilter(filters)),
+		...(personFilter ? { [PERSON_FILTER_KEY]: { filterType: 'person', filter: personChipLabel } } : {}),
+	});
 	const hasActiveFilters = $derived(Object.keys(filters).length > 0 || searchText !== '');
 
 	// ---------------------------------------------------------------------------
@@ -395,7 +503,8 @@
 	const sortedRowData = $derived(
 		mode === 'loaded' && cardMode
 			? (() => {
-					const filtered = filterContentRows(rowData, urlParamsToFilter(filters));
+					const byColumns = filterContentRows(rowData, urlParamsToFilter(filters));
+					const filtered = personFilter ? byColumns.filter((r) => rowMatchesPerson(r, personFilter)) : byColumns;
 					return clientSorts.length > 0
 						? [...filtered].sort((a, b) => compareContentBySorts(a, b, clientSorts))
 						: filtered;
@@ -448,7 +557,10 @@
 		// When switching Loaded → All: sync AG Grid filter state to URL params
 		if (newMode === 'all' && gridApi) {
 			const filterModel = gridApi.getFilterModel();
-			const urlFilters = filterToUrlParams(filterModel as Record<string, unknown>);
+			const urlFilters = {
+				...filterToUrlParams(filterModel as Record<string, unknown>),
+				...nonGridFilters(gridParams.filters),
+			};
 			updateUrl({ mode: newMode, page: 1, filters: urlFilters });
 		} else {
 			updateUrl({ mode: newMode, page: 1 });
@@ -508,7 +620,7 @@
 				colId: 'item',
 				headerName: 'Item',
 				flex: 2,
-				minWidth: 200,
+				minWidth: 185,
 
 				filter: 'agTextColumnFilter',
 				filterValueGetter: (params) => params.data?.name ?? '',
@@ -521,6 +633,8 @@
 				colId: 'type',
 				headerName: 'Type',
 				flex: 0.5,
+				// The cell is a single icon; 84 still fits the header text, sort arrow and filter button.
+				minWidth: 84,
 				maxWidth: 100,
 
 				filter: ContentTypeFilter,
@@ -539,10 +653,64 @@
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.category },
 				hide: true,
 			},
+			// Movie columns (TMDB). Hidden by default; the responsive effect shows the Movie
+			// default set when the type filter is exactly MOVIE. Minimum widths are tuned so
+			// that set fits the 1212px grid: perspectize 50 + item 185 + genre 82 + rated 82
+			// + cast 125 + duration 111 + released 105 + box office 138 + vs. budget 118
+			// + TMDB score 121 + tags 90 = 1207. Box office keeps room for its sort arrow.
+			{
+				colId: 'genre',
+				headerName: 'Genre',
+				flex: 1,
+				minWidth: 82,
+				maxWidth: 180,
+				sortable: false,
+				filter: 'agTextColumnFilter',
+				valueGetter: genreValueGetter,
+				valueFormatter: (params) => textOrEmpty(params.value),
+				headerTooltip: 'TMDB genres',
+				hide: true,
+			},
+			{
+				colId: 'rated',
+				headerName: 'Rated',
+				flex: 0.5,
+				minWidth: 82,
+				maxWidth: 100,
+				filter: AgeRatingFilter,
+				valueGetter: ratedValueGetter,
+				comparator: ratedComparator,
+				valueFormatter: (params) => textOrEmpty(params.value),
+				headerTooltip: 'US age rating (G, PG, PG-13, R, NC-17). Sorts by rating, not A-Z; unrated last.',
+				hide: true,
+			},
+			{
+				colId: 'cast',
+				headerName: 'Cast',
+				flex: 2,
+				minWidth: 125,
+				sortable: false,
+				filter: 'agTextColumnFilter',
+				// Directors and cast names, matching the server's castContains.
+				filterValueGetter: (params) =>
+					moviePeople(params.data)
+						.map((p) => p.name)
+						.join(', '),
+				cellRenderer: castCellRenderer,
+				// Tighter cell padding so the two-line cast cell has room for names beside +N.
+				cellStyle: { '--ag-cell-horizontal-padding': '8px' },
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.cast },
+				headerTooltip:
+					'Directors lead (marked dir.), then billed cast. Only the top 15 cast are stored, so only they are searchable.',
+				hide: true,
+			},
 			{
 				colId: 'duration',
-				headerName: 'Length',
+				headerName: 'Duration',
 				flex: 0.7,
+				// Explicit floor: headerMinWidth('Duration') is 126, which pushed the YouTube lg set
+				// past the 1212px grid and clipped Tags. 111 (what 'Length' used) keeps it at 1211.
+				minWidth: 111,
 				maxWidth: 120,
 
 				filter: 'agNumberColumnFilter',
@@ -554,7 +722,9 @@
 				valueGetter: durationValueGetter,
 				filterValueGetter: durationFilterValueGetter,
 				comparator: durationComparator,
-				headerTooltip: 'Video duration from YouTube API',
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.duration },
+				headerTooltip:
+					'Video duration from YouTube API. For movies this is the runtime in h:mm (TMDB reports whole minutes).',
 			},
 			{
 				colId: 'views',
@@ -598,6 +768,65 @@
 				headerTooltip: 'Likes as a percentage of views',
 			},
 			{
+				colId: 'released',
+				headerName: 'Released',
+				flex: 1,
+				minWidth: 105,
+				maxWidth: 140,
+				comparator: releasedComparator,
+				filter: 'agDateColumnFilter',
+				// AG's date filter compares local dates; the ISO release date would read as the day before west of UTC.
+				filterValueGetter: (params) => releasedFilterDate(releasedValueGetter({ data: params.data })),
+				valueGetter: releasedValueGetter,
+				valueFormatter: (params) => formatReleased(params.value),
+				headerTooltip: 'Theatrical release date from TMDB',
+				hide: true,
+			},
+			{
+				colId: 'boxOffice',
+				headerName: 'Take',
+				flex: 0.8,
+				minWidth: 96, // "Take" + sort arrow + filter button
+				maxWidth: 150,
+				filter: 'agNumberColumnFilter',
+				valueGetter: boxOfficeValueGetter,
+				comparator: unknownLastComparator,
+				valueFormatter: (params) => formatBoxOffice(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.boxOffice },
+				headerTooltip: 'Worldwide gross (USD) from TMDB. A dash means TMDB has no figure.',
+				hide: true,
+			},
+			{
+				colId: 'vsBudget',
+				headerName: 'ROI',
+				flex: 0.8,
+				minWidth: 72, // "ROI" + sort arrow (no filter button)
+				maxWidth: 130,
+				filter: false,
+				valueGetter: vsBudgetValueGetter,
+				comparator: unknownLastComparator,
+				valueFormatter: (params) => formatVsBudgetCell(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.vsBudget },
+				headerTooltip: 'Box Office Take / Budget',
+				hide: true,
+			},
+			{
+				colId: 'tmdbScore',
+				headerName: 'Rating',
+				flex: 0.7,
+				minWidth: 111,
+				maxWidth: 130,
+				filter: 'agNumberColumnFilter',
+				valueGetter: tmdbScoreValueGetter,
+				comparator: unknownLastComparator,
+				valueFormatter: (params) => formatTmdbScore(params.value),
+				// Muted when the score rests on fewer than 50 votes.
+				cellClass: (params) => (hasLowVoteCount({ data: params.data }) ? 'text-muted-foreground' : ''),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.tmdbScore },
+				headerTooltip: 'TMDB user score out of 10. Muted when fewer than 50 votes.',
+				hide: true,
+			},
+			{
 				colId: 'publishDate',
 				field: 'publishedAt',
 				headerName: 'Date',
@@ -625,16 +854,18 @@
 			},
 			{
 				colId: 'tags',
-				field: 'tags',
 				headerName: 'Tags',
 				flex: 1.5,
+				minWidth: 90,
 				maxWidth: 250,
 				sortable: false,
 				filter: 'agTextColumnFilter',
-				filterValueGetter: (params) => formatTags(params.data?.tags ?? null),
+				// YouTube tags, or TMDB keywords for a Movie (see contentTags).
+				valueGetter: (params) => contentTags(params.data),
+				filterValueGetter: (params) => formatTags(contentTags(params.data)),
 				valueFormatter: (params) => formatTags(params.value),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.tags },
-				headerTooltip: 'Tags from YouTube API',
+				headerTooltip: 'Tags from YouTube API, or TMDB keywords for movies',
 			},
 			{
 				colId: 'description',
@@ -646,6 +877,68 @@
 				valueFormatter: (params) => truncateDescription(params.value, 80),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.description },
 				headerTooltip: 'Video description from YouTube API',
+				hide: true,
+			},
+			// Movie picker-only columns (never in the default set).
+			{
+				colId: 'budget',
+				headerName: 'Budget',
+				flex: 0.8,
+				maxWidth: 130,
+				sortable: false,
+				filter: false,
+				valueGetter: budgetValueGetter,
+				valueFormatter: (params) => formatBoxOffice(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.budget },
+				headerTooltip: 'Production budget (USD) from TMDB. A dash means TMDB has no figure.',
+				hide: true,
+			},
+			{
+				colId: 'votes',
+				headerName: 'Votes',
+				flex: 0.7,
+				maxWidth: 110,
+				sortable: false,
+				filter: false,
+				valueGetter: votesValueGetter,
+				valueFormatter: (params) => formatCount(params.value),
+				headerTooltip: 'Number of TMDB votes behind the score',
+				hide: true,
+			},
+			{
+				colId: 'collection',
+				headerName: 'Collection',
+				flex: 1,
+				maxWidth: 200,
+				sortable: false,
+				filter: false,
+				valueGetter: collectionValueGetter,
+				valueFormatter: (params) => textOrEmpty(params.value),
+				headerTooltip: 'TMDB collection (franchise) this film belongs to',
+				hide: true,
+			},
+			{
+				colId: 'synopsis',
+				headerName: 'Synopsis',
+				flex: 2,
+				sortable: false,
+				filter: false,
+				valueGetter: synopsisValueGetter,
+				valueFormatter: (params) => truncateDescription(params.value, 80),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.synopsis },
+				headerTooltip: 'Plot overview from TMDB',
+				hide: true,
+			},
+			{
+				colId: 'tmdbId',
+				headerName: 'TMDB ID',
+				flex: 0.6,
+				maxWidth: 110,
+				sortable: false,
+				filter: false,
+				valueGetter: tmdbIdValueGetter,
+				valueFormatter: (params) => (params.value == null ? '—' : String(params.value)),
+				headerTooltip: 'TMDB movie id',
 				hide: true,
 			},
 			{
@@ -772,6 +1065,11 @@
 
 			if (event.colDef.colId === 'perspectize') {
 				openPerspective(String(event.data.id), event.data.name);
+			} else if (event.colDef.colId === 'cast') {
+				// A name in the Cast cell filters to that person (TMDB id carried on the span).
+				const nameEl = (event.event?.target as HTMLElement | null)?.closest<HTMLElement>(`[${PERSON_ID_ATTR}]`);
+				const personId = nameEl?.getAttribute(PERSON_ID_ATTR);
+				if (personId) filterByPerson(personId);
 			} else if (event.colDef.colId === 'category') {
 				hover.close(); // don't leave the hover copy-popover open under the typeahead
 				const rect =
@@ -832,6 +1130,9 @@
 			cursors = [null]; // Reset cursor stack
 			updateUrl({ sorts: newSorts.length > 0 ? newSorts : [], page: 1 });
 		},
+		// The person filter has no column, so "Loaded" mode applies it here, alongside the column filters.
+		isExternalFilterPresent: () => personFilter != null,
+		doesExternalFilterPass: (node) => (personFilter && node.data ? rowMatchesPerson(node.data, personFilter) : false),
 		onFilterChanged: (event: FilterChangedEvent) => {
 			hover.close();
 			// Immediate: update chip display
@@ -844,7 +1145,10 @@
 			clearTimeout(debounceTimer);
 			debounceTimer = setTimeout(() => {
 				const filterModel = event.api.getFilterModel();
-				const urlFilters = filterToUrlParams(filterModel as Record<string, unknown>);
+				const urlFilters = {
+					...filterToUrlParams(filterModel as Record<string, unknown>),
+					...nonGridFilters(gridParams.filters),
+				};
 				if (filtersEqual(urlFilters, gridParams.filters)) return;
 				if (mode === 'loaded') {
 					updateUrl({ filters: urlFilters });
@@ -873,9 +1177,34 @@
 		if (!gridApi || !gridReady || mode !== 'all') return;
 		skipNextSortEvent = true;
 		gridApi.applyColumnState({
-			state: gridParams.sorts.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
+			// Drop client-only columns (a stale URL sort): the server cannot honour them.
+			state: gridParams.sorts
+				.filter((s) => !CLIENT_ONLY_SORT_COLS.includes(s.col))
+				.map((s, i) => ({ colId: s.col, sort: s.dir, sortIndex: i })),
 			defaultState: { sort: null },
 		});
+	});
+
+	// Client-only sort columns (no ContentSortBy key) can sort in "Loaded" mode but would
+	// silently do nothing in "All Items" mode, so switch their header sorting off there.
+	// AG Grid reads colDef.sortable live; refreshHeader redraws the header without touching
+	// the column visibility state the responsive effect owns.
+	$effect(() => {
+		const sortableHere = mode === 'loaded';
+		if (!gridApi || !gridReady) return;
+		for (const colId of CLIENT_ONLY_SORT_COLS) {
+			const colDef = gridApi.getColumn(colId)?.getColDef();
+			if (colDef) colDef.sortable = sortableHere;
+		}
+		gridApi.refreshHeader();
+	});
+
+	// The Item column reads "Film" in the Movie view. headerName is read live; refreshHeader redraws it.
+	// syncItemHeader redraws only on a real rename: this effect re-runs on every filter change.
+	$effect(() => {
+		const headerName = itemColumnHeader(filters.type);
+		if (!gridApi || !gridReady) return;
+		syncItemHeader(gridApi, headerName);
 	});
 
 	// Restore AG Grid filter state from URL on mount and mode changes
@@ -883,6 +1212,13 @@
 		if (!gridApi || !gridReady) return;
 		const filterModel = urlParamsToFilter(gridParams.filters);
 		gridApi.setFilterModel(Object.keys(filterModel).length > 0 ? filterModel : null);
+	});
+
+	// Re-run the grid's filters when the person filter changes (external filters aren't tracked by the model).
+	$effect(() => {
+		void personFilter;
+		if (!gridApi || !gridReady) return;
+		gridApi.onFilterChanged();
 	});
 
 	// Update loading state reactively
@@ -970,39 +1306,36 @@
 	// sm (445-639): Perspectize, Item, Type, Category, Channel
 	// md (640-899): Perspectize, Item, Type, Category, Channel, Duration, Date
 	// lg (900+):    Perspectize, Item, Type, Category, Channel, Duration, Date, Views, Likes, Tags
+	// With the type filter exactly MOVIE, the Movie set applies instead (defaultColumnVisibility).
+	// A view with a saved setup (column picker) shows that instead of its defaults, which
+	// also re-applies it after a grid remount (cardMode toggle, error recovery).
+	// Switching view (e.g. to exactly MOVIE) shows a toast offering the previous columns back.
+	let lastColumnView: ColumnView | null = null; // plain, not $state: written by the effect it guards
 	$effect(() => {
-		if (!gridApi || !gridReady) return;
-		const api = gridApi;
-		// Once the user takes manual control via the column picker, that map is the
-		// source of truth for the rest of the session — re-applied here so it also
-		// survives a grid remount (cardMode toggle, error recovery). A page refresh
-		// clears userColumnOverride and restores breakpoint-driven visibility.
-		if (userColumnOverride) {
-			const override = userColumnOverride;
-			requestAnimationFrame(() => {
-				if (!gridApi) return;
-				for (const [colId, visible] of Object.entries(override)) {
-					api.setColumnsVisible([colId], visible);
-				}
-			});
+		if (!gridApi || !gridReady) {
+			// No grid: the next mount is a fresh start, not a switch, so no toast.
+			lastColumnView = null;
 			return;
 		}
+		const api = gridApi;
+		void layoutVersion;
+		// Read synchronously, before the rAF, so this effect re-runs when they change.
 		const tier = responsiveTier;
+		const view = columnView;
+		const prevView = lastColumnView;
+		lastColumnView = view;
+		const current = prevView !== null && prevView !== view ? currentVisibility() : {};
+		const plan = planColumnSwitch({
+			prevView,
+			view,
+			current,
+			saved: loadLayout(view),
+			defaults: defaultLayout(tier, view),
+		});
 		requestAnimationFrame(() => {
 			if (!gridApi) return; // Grid may have been destroyed before rAF fires
-			const alwaysVisible = ['item', 'type', 'perspectize'];
-			const smCols = ['category', 'channel'];
-			const mdCols = ['duration', 'publishDate'];
-			const lgCols = ['views', 'likes', 'percentLiked', 'tags'];
-			// createdAt/updatedAt stay hidden via their colDef `hide: true` until the
-			// user enables them in the column picker; id/addedByUserID/url likewise, admins only.
-			const alwaysHidden = ['description'];
-
-			api.setColumnsVisible(alwaysVisible, true);
-			api.setColumnsVisible(alwaysHidden, false);
-			api.setColumnsVisible(smCols, tier !== 'xs');
-			api.setColumnsVisible(mdCols, tier === 'md' || tier === 'lg');
-			api.setColumnsVisible(lgCols, tier === 'lg');
+			applyLayout(api, plan.apply);
+			if (plan.toast) showColumnSwitchToast(view, current);
 		});
 	});
 
@@ -1031,7 +1364,7 @@
 	<!-- Active Filter Chips — always visible so users can clear filters even during errors -->
 	<FilterChips
 		{gridApi}
-		filterModel={gridApi ? activeFilterModel : urlParamsToFilter(filters)}
+		filterModel={chipFilterModel}
 		onRemove={(colId) => {
 			const next = { ...gridParams.filters };
 			delete next[colId];
@@ -1211,15 +1544,21 @@
 		bind:open={columnPickerOpen}
 		isAdmin={meCtx.isAdmin}
 		visibility={pickerVisibility}
-		{overrideActive}
+		{customLayout}
 		onToggle={handleColumnToggle}
+		onReset={handleColumnsReset}
 	/>
 {/if}
 
 <!-- Sort picker — works identically on mobile and desktop, and in both data modes;
      see handleSortsApply for how each mode is wired underneath. -->
 {#if sortPickerOpen}
-	<SortPickerDialog bind:open={sortPickerOpen} sorts={activeSorts} onApply={handleSortsApply} />
+	<SortPickerDialog
+		bind:open={sortPickerOpen}
+		sorts={activeSorts}
+		onApply={handleSortsApply}
+		columns={sortableColumnsFor(mode)}
+	/>
 {/if}
 
 <!-- Category typeahead popover — rendered outside the grid for correct portal positioning -->

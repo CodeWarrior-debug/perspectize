@@ -186,3 +186,25 @@ describe('eviction: useSetPassageDisplayTitle.onSuccess patches in place, evicts
 		expect(client.getQueryData(otherRowKey)).toBe(otherRow);
 	});
 });
+
+describe('eviction: useAddMovie.onSuccess invalidates content lists only', () => {
+	it('marks every content list stale and leaves details, rows and other domains alone', async () => {
+		const affected = [queryKeys.content.list({ first: 50 }), queryKeys.content.list({ first: 10, search: 'matrix' })];
+		const unrelated = [
+			queryKeys.content.detail('3'),
+			queryKeys.content.row('3'),
+			queryKeys.perspectives.listByContent(3),
+			queryKeys.users.list(),
+			queryKeys.bible.passageText(1, 2),
+		];
+		for (const k of [...affected, ...unrelated]) seed(client, k);
+
+		const { useAddMovie } = await import('$lib/queries/content/useAddMovie');
+		useAddMovie();
+		capturedDeleteOptions.onSuccess({ createContentFromMovie: { id: '9', name: 'The Matrix', contentType: 'MOVIE' } });
+
+		const outcome = invalidationOutcome(client, [...affected, ...unrelated]);
+		expect(outcome.invalidated).toEqual(affected);
+		expect(outcome.untouched).toEqual(unrelated);
+	});
+});

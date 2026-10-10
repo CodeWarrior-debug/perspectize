@@ -110,11 +110,46 @@ type Category {
   updatedAt: String!
 }
 
+# One video from YouTube's most-popular chart (Discover page Trending feed).
+type YouTubeTrendingVideo {
+  id: String!
+  title: String!
+  channelTitle: String!
+  description: String!
+  publishedAt: String!
+  thumbnailUrl: String!
+  # ISO 8601 duration, e.g. "PT4M13S"
+  duration: String!
+}
+
+type YouTubeTrendingPage {
+  items: [YouTubeTrendingVideo!]!
+  nextPageToken: String
+}
+
 type WikidataSearchResult {
   qid: String!
   label: String!
   description: String
   entityType: String
+}
+
+"Smallest unit a source reports a length in."
+enum LengthPrecision {
+  "Format as h:mm:ss, or m:ss under an hour."
+  SECONDS
+  "Format as h:mm (e.g. a TMDB movie runtime)."
+  MINUTES
+}
+
+"""
+Where a content length came from and the smallest unit that source reports.
+`length` is always seconds; show it to `precision`.
+"""
+type LengthDisplay {
+  "Origin of the length, e.g. youtube, tmdb."
+  source: String!
+  precision: LengthPrecision!
 }
 
 type Content {
@@ -126,6 +161,8 @@ type Content {
   addedBy: User
   length: Int
   lengthUnits: String
+  "Where length came from and the smallest unit it reports; format length to that precision."
+  lengthDisplay: LengthDisplay
   viewCount: Int
   likeCount: Int
   commentCount: Int
@@ -134,6 +171,8 @@ type Content {
   tags: [String!]
   description: String
   response: JSON
+  "Movie-specific metadata (the shaped TMDB payload); null for other content types."
+  movie: JSON
   primaryCategory: Category
   # BIBLE_PASSAGE only: computed verse ordinals (see bible_book.verses_per_chapter)
   # and the optional, first-write-wins display title. Null for other content types.
@@ -182,6 +221,11 @@ enum ContentSortBy {
   PUBLISHED_AT
   CHANNEL_TITLE
   LENGTH
+  BOX_OFFICE
+  VS_BUDGET
+  AGE_RATING
+  RELEASE_DATE
+  TMDB_SCORE
 }
 
 enum SortOrder {
@@ -199,6 +243,7 @@ enum ContentType {
   YOUTUBE_VIDEO
   CLAIM
   BIBLE_PASSAGE
+  MOVIE
 }
 
 # Text columns that ContentFilter.search can be scoped to.
@@ -207,9 +252,22 @@ enum ContentSearchField {
   DESCRIPTION
   CHANNEL_TITLE
   TAGS
+  CAST
+  DIRECTOR
+}
+
+# Role a person plays on a movie (ContentFilter.personRole).
+enum PersonRole {
+  CAST
+  DIRECTOR
 }
 
 # Inputs
+input CreateContentFromMovieInput {
+  # IMDb or TMDB movie URL
+  url: String!
+}
+
 input CreateContentFromYouTubeInput {
   url: String!
   userId: IntID!
@@ -293,6 +351,19 @@ input ContentFilter {
   search: String
   # Which columns `search` matches against (OR'd together). Omitted/empty = TITLE only.
   searchFields: [ContentSearchField!]
+  # Match movies by person; personRole narrows to CAST or DIRECTOR (omitted = either).
+  personId: IntID
+  personRole: PersonRole
+  # Movie column filters (movie rows only; other rows have no such data and never match)
+  genreContains: String      # Case-insensitive contains on the genre names
+  castContains: String       # Case-insensitive contains on a cast or director name
+  ageRating: [String!]       # Certification is any of these (e.g. PG-13, R)
+  releasedAfter: String      # ISO date (YYYY-MM-DD), inclusive
+  releasedBefore: String     # ISO date (YYYY-MM-DD), inclusive
+  minBoxOffice: Float        # Revenue in dollars, inclusive
+  maxBoxOffice: Float
+  minTmdbScore: Float        # TMDB vote average (0-10), inclusive
+  maxTmdbScore: Float
   # View/like count filters
   minViewCount: Int
   maxViewCount: Int
@@ -419,6 +490,9 @@ type Mutation {
   createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   updateContentSourceData(contentId: IntID!): Content! @auth
 
+  # Movie mutations
+  createContentFromMovie(input: CreateContentFromMovieInput!): Content! @auth
+
   # Bible passage mutations
   createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth
   # First-write-wins: if a title already exists, returns the content with the existing title.
@@ -487,6 +561,10 @@ type Query {
 
   # Category queries
   wikidataSearch(query: String!, language: String, limit: Int): [WikidataSearchResult!]!
+
+  # Discover page: YouTube's Trending chart, served from the backend cache so
+  # visitors share one API call per page per hour. regionCode defaults to US.
+  youtubeTrending(regionCode: String, pageToken: String): YouTubeTrendingPage!
 
   # Perspective queries
   perspectiveByID(id: ID!): Perspective
