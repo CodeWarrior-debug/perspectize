@@ -88,6 +88,7 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 - [Domain Guide](.docs/DOMAIN_GUIDE.md) — Domain layer rules and patterns
 - [Go Patterns](.docs/GO_PATTERNS.md) — Error handling and DB query patterns
 - [Security](.docs/SECURITY.md) — Secret management, rotation procedures, incident response
+- [Migration Rollout](.docs/MIGRATION_ROLLOUT.md) — applying a migration to the production Neon DB: one at a time, snapshot first, verify, roll back
 - [Dependency Security](.docs/DEPENDENCY_SECURITY.md) — Trivy/pnpm-audit scanning, CVE remediation workflow, CI gotchas
 - [Worktrees](.docs/WORKTREES.md) — Location convention and the 3 numbered reusable worktrees for isolated Claude Code work
 - [Demo Mode](.docs/DEMO_MODE.md) — Docker demo stack (persistent Postgres + seeded personas, no Clerk/YouTube), Playwright tours that run as E2E (`make demo-test`) or record videos (`make demo-record`)

@@ -185,6 +185,22 @@ describe('clampPercent and normalizeComments', () => {
 		expect(normalizeComments('')).toBeNull();
 		expect(normalizeComments('<p>Notes</p>')).toBe('<p>Notes</p>');
 	});
+
+	it('treats whitespace-only and nbsp-only editor output as no comments', () => {
+		expect(normalizeComments('<p>&nbsp;</p>')).toBeNull();
+		expect(normalizeComments('<p> </p><p>\n</p>')).toBeNull();
+	});
+
+	it('keeps comments that are only an image or a table', () => {
+		expect(normalizeComments('<p><img src="a.png"></p>')).toBe('<p><img src="a.png"></p>');
+		expect(normalizeComments('<table><tr><td></td></tr></table>')).toBe('<table><tr><td></td></tr></table>');
+	});
+
+	it('does not mistake nested or broken tags for empty text', () => {
+		const nested = '<scr<script>ipt>alert(1)</scr</script>ipt>';
+		expect(normalizeComments(nested)).toBe(nested);
+		expect(normalizeComments('<p>5 < 6 and 7 > 3</p>')).toBe('<p>5 < 6 and 7 > 3</p>');
+	});
 });
 
 describe('buildCreateInput', () => {

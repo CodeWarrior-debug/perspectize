@@ -164,13 +164,15 @@ export function clampPercent(value: number): number {
 	return Math.min(100, Math.max(0, Math.round(value)));
 }
 
-/** Editor output with no text is stored as no comments at all. */
+/**
+ * Editor output with no text is stored as no comments at all. The HTML is parsed (never run) to
+ * see whether any text or an image/table is left, rather than stripping tags with a regex, which
+ * a nested tag like `<scr<script>ipt>` defeats. The original HTML is returned untouched.
+ */
 export function normalizeComments(html: string): string | null {
-	const text = html
-		.replace(/<[^>]*>/g, '')
-		.replace(/&nbsp;/g, ' ')
-		.trim();
-	return text === '' && !/<(img|table)\b/i.test(html) ? null : html;
+	const body = new DOMParser().parseFromString(html, 'text/html').body;
+	const hasText = (body.textContent ?? '').trim() !== '';
+	return hasText || body.querySelector('img, table') !== null ? html : null;
 }
 
 function emptyToNull(value: string): string | null {
