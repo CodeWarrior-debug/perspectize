@@ -1,0 +1,98 @@
+# Perspectize local observability "tracer bullet" — an OVERLAY on the demo
+# stack, so the Phase 25 telemetry pipeline (backend OTLP + frontend Faro)
+# can be exercised end to end before any Grafana Cloud account exists.
+#
+#   make obs-up      demo stack + this overlay; Grafana at http://localhost:3000
+#   make obs-smoke   generate traffic, assert metrics/traces/logs arrived
+#   make obs-down    stop everything (demo data volume kept; LGTM data is not)
+#
+# Always used together with docker-compose.demo.yml:
+#   docker compose -f docker-compose.demo.yml -f docker-compose.observability.yml ...
+# The project name (perspectize-demo) comes from the demo file, so these
+# services share its network and `obs-down` stops both. Runbook:
+# .docs/OBSERVABILITY.md. Everything binds to 127.0.0.1 only.
+
+services:
+  # grafana/otel-lgtm: OTel Collector + Prometheus + Tempo + Loki + Grafana
+  # in one container. Pinned; tags checked on Docker Hub 2026-09-29
+  # (0.34.0 = digest sha256:b966ea107831…, same digest as :latest then).
+  # 0.34.0 bundles Grafana v13.2.2, Prometheus v3.14.0, Tempo v3.0.3,
+  # Loki v3.7.8, otelcol-contrib v0.161.0 (docker/Dockerfile at tag v0.34.0).
+  lgtm:
+    image: grafana/otel-lgtm:0.34.0
+    environment:
+      # Local only: the image already defaults to anonymous Admin
+      # (docker/run-grafana.sh); stated explicitly so it's obvious.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/grafana/conf/provisioning/dashboards/perspectize/perspectize-api.json
+    ports:
+      - "127.0.0.1:3000:3000" # Grafana
+      - "127.0.0.1:4317:4317" # OTLP gRPC (collector)
+      - "127.0.0.1:4318:4318" # OTLP HTTP (collector)
+      # Direct backend query APIs, used by ops/observability/smoke.sh.
+      - "127.0.0.1:9090:9090" # Prometheus
+      - "127.0.0.1:3200:3200" # Tempo
+      - "127.0.0.1:3100:3100" # Loki
+    volumes:
+      # Provisioning paths. Grafana runs from /otel-lgtm/grafana, so its
+      # provisioning root is /otel-lgtm/grafana/conf/provisioning — the image
+      # COPYs its own datasources/ and dashboards/ providers there
+      # (docker/Dockerfile), and the README's "Add custom dashboards" section
+      # mounts custom dashboards + a provider YAML under
+      # .../provisioning/dashboards/ exactly like this
+      # (github.com/grafana/docker-otel-lgtm/blob/v0.34.0/README.md).
+      # Alert rules use Grafana's standard provisioning/alerting/ directory.
+      - ./ops/grafana/provisioning/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/perspectize.yaml:ro
+      - ./ops/grafana/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards/perspectize:ro
+      - ./ops/grafana/alerts/perspectize-alerts.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/perspectize-alerts.yaml:ro
+    # The image ships a HEALTHCHECK (docker/healthcheck.sh: waits for the
+    # /tmp/ready file run-all.sh writes once every component is up). Only
+    # the timing is overridden so `--wait` isn't stuck on a 30s interval.
+    healthcheck:
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  # Grafana Alloy: receives Faro Web SDK payloads from the browser and
+  # forwards traces (OTLP) and logs (Loki push) into lgtm.
+  # Pinned; v1.20.1 checked on Docker Hub 2026-09-29 (digest sha256:2aa2099af76c…).
+  alloy:
+    image: grafana/alloy:v1.20.1
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./ops/observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+    ports:
+      - "127.0.0.1:12347:12347" # faro.receiver (VITE_FARO_URL)
+      - "127.0.0.1:12345:12345" # Alloy UI / component graph (debugging)
+    depends_on:
+      lgtm:
+        condition: service_healthy
+
+  backend:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+      OTEL_SERVICE_NAME: perspectize-backend
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      # pkg/buildinfo reads these (Sevalla injects them in prod). `make obs-up`
+      # passes the host checkout's HEAD so service.version = short SHA.
+      SVL_DEPLOYMENT_COMMIT_SHA: ${GIT_COMMIT:-}
+      SVL_DEPLOYMENT_BRANCH: ${GIT_BRANCH:-}
+    depends_on:
+      lgtm:
+        condition: service_healthy
+
+  frontend:
+    build:
+      args:
+        # Browser → Alloy faro.receiver. frontend/Dockerfile.demo also adds
+        # this origin to the demo image's CSP connect-src.
+        VITE_FARO_URL: http://localhost:12347/collect
+        VITE_APP_ENV: demo
+    depends_on:
+      - alloy

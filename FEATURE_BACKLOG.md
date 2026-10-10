@@ -18,6 +18,8 @@ By design, the aggregate currently counts **every** perspective on the content, 
 
 ## YouTube Search Proxy (Shared Quota Fix)
 
+**Resolved differently (2026-09-27, branch `claude/content-type-visual-media-wrao93`):** in-app search was dropped instead of proxied. Google now caps `search.list` at 100 calls/day per project (its own bucket, separate from the 10,000 units), and a user signing in with Google doesn't change that: their calls still go through this project's OAuth client. So the Discover search box now opens `youtube.com/results` in a new tab, and a pasted YouTube link in that box is added directly. Trending moved behind the backend: `youtubeTrending` GraphQL query → `youtube.CachingClient.GetTrending`, cached per region + page (`YOUTUBE_TRENDING_CACHE_TTL_SECONDS`, default 1 h). The browser no longer calls googleapis.com at all (`VITE_YOUTUBE_API_KEY` removed; `connect-src` no longer lists it). The original notes are kept below for history.
+
 Discovered 2026-08-15: the Discover page's search (`fetchYouTubeSearch` in `frontend/src/lib/services/youtubeApi.ts`) calls YouTube's `search.list` **directly from the browser** using a single build-time key (`VITE_YOUTUBE_API_KEY`). `search.list` costs a flat 100 units/call, and the default daily quota is 10,000 units — so the whole deployed app shares roughly **~100 searches/day total**, not per-user, since every browser uses the same key. Client-side caching (TanStack Query, 5 min staleTime for search / 1 hour for trending) helps within a session but doesn't share across users or browser tabs.
 
 **What to do:**

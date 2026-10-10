@@ -1,7 +1,7 @@
 ---
 name: graphql-designer
 description: GraphQL schema designer and resolver implementer for the gqlgen backend. Use when a change adds or alters a type, field, query, mutation, argument, enum, directive or dataloader in backend/schema.graphql or messaging.graphql, or when a plan task is tagged graphql-designer. Handles make graphql-gen and its known schema.resolvers.go collision. See "When to invoke" in the agent body.
-model: sonnet
+model: haiku
 color: cyan
 tools:
   - Read

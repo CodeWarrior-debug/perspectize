@@ -367,8 +367,8 @@ describe('Movie COLUMNS entries', () => {
 	const byId = (id: string) => COLUMNS.find((c) => c.colId === id);
 
 	it('Box office, Vs. budget and Rated sort server-side by their backend enums', () => {
-		expect(byId('boxOffice')).toMatchObject({ sortable: true, serverSort: 'BOX_OFFICE', label: 'Box office' });
-		expect(byId('vsBudget')).toMatchObject({ sortable: true, serverSort: 'VS_BUDGET', label: 'Vs. budget' });
+		expect(byId('boxOffice')).toMatchObject({ sortable: true, serverSort: 'BOX_OFFICE', label: 'Take' });
+		expect(byId('vsBudget')).toMatchObject({ sortable: true, serverSort: 'VS_BUDGET', label: 'ROI' });
 		expect(byId('rated')).toMatchObject({ sortable: true, serverSort: 'AGE_RATING', label: 'Rated' });
 		expect(COL_TO_SORT.boxOffice).toBe('BOX_OFFICE');
 		expect(COL_TO_SORT.vsBudget).toBe('VS_BUDGET');
@@ -383,11 +383,12 @@ describe('Movie COLUMNS entries', () => {
 		}
 	});
 
-	it('Released and TMDB Score sort client-side only (no ContentSortBy key)', () => {
+	it('Released and TMDB Score sort on the server (RELEASE_DATE, TMDB_SCORE)', () => {
+		expect(byId('released')?.serverSort).toBe('RELEASE_DATE');
+		expect(byId('tmdbScore')?.serverSort).toBe('TMDB_SCORE');
 		for (const id of ['released', 'tmdbScore']) {
 			expect(byId(id)?.sortable, id).toBe(true);
-			expect(byId(id)?.clientOnlySort, id).toBe(true);
-			expect(byId(id)?.serverSort, id).toBeUndefined();
+			expect(byId(id)?.clientOnlySort, id).toBeFalsy();
 		}
 	});
 
@@ -427,6 +428,7 @@ describe('Movie default column set', () => {
 			expect.arrayContaining([
 				'perspectize',
 				'item',
+				'type',
 				'genre',
 				'rated',
 				'cast',
@@ -439,14 +441,13 @@ describe('Movie default column set', () => {
 			]),
 		);
 		expect(visible).not.toContain('createdAt');
-		expect(visible).not.toContain('type');
 		for (const id of ['budget', 'votes', 'collection', 'synopsis', 'tmdbId', 'views', 'likes', 'channel']) {
 			expect(visible, id).not.toContain(id);
 		}
 	});
 
 	it('reveals Movie columns progressively by tier', () => {
-		expect(defaultColumnVisibility('xs', true).visible).toEqual(['perspectize', 'item']);
+		expect(defaultColumnVisibility('xs', true).visible).toEqual(['perspectize', 'item', 'type']);
 		const md = defaultColumnVisibility('md', true).visible;
 		expect(md).toContain('cast');
 		expect(md).not.toContain('boxOffice');
@@ -572,31 +573,35 @@ describe('default column sets fit the 1212px grid', () => {
 		const name = b.match(/headerName:\s*'([^']*)'/)?.[1] ?? '';
 		return headerMinWidth(name, !/\n\s*filter:\s*false/.test(b));
 	}
-	it.each([
-		['YouTube', false],
-		['Movie', true],
-	])('%s lg set sums under 1212', (_n, movieOnly) => {
-		const { visible } = defaultColumnVisibility('lg', movieOnly as boolean);
+	it('YouTube lg set sums under 1212', () => {
+		const { visible } = defaultColumnVisibility('lg', false);
 		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
 		expect(total).toBeLessThanOrEqual(1212);
 	});
 
-	it('Movie lg minimum widths are the tuned table (sum 1207)', () => {
+	it('Movie lg set sums under 1212', () => {
+		const { visible } = defaultColumnVisibility('lg', true);
+		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
+		expect(total).toBeLessThanOrEqual(1212);
+	});
+
+	it('Movie lg minimum widths are the tuned table plus Type (sum 1193)', () => {
 		const { visible } = defaultColumnVisibility('lg', true);
 		const widths = Object.fromEntries(visible.map((id) => [id, minWidth(id)]));
 		expect(widths).toMatchObject({
 			item: 185,
+			type: 84,
 			genre: 82,
 			rated: 82,
 			cast: 125,
 			duration: 111,
 			released: 105,
-			boxOffice: 138,
-			vsBudget: 118,
-			tmdbScore: 121,
+			boxOffice: 96,
+			vsBudget: 72,
+			tmdbScore: 111,
 			tags: 90,
 		});
-		expect(Object.values(widths).reduce((a, b) => a + b, 0)).toBe(1207);
+		expect(Object.values(widths).reduce((a, b) => a + b, 0)).toBe(1193);
 	});
 
 	it('no colDef has minWidth above maxWidth', () => {

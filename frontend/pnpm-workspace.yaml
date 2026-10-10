@@ -6,6 +6,12 @@ onlyBuiltDependencies:
   - esbuild
   - '@clerk/shared'
 
+# Refuse package versions published less than 24h (1440 minutes) ago. Sevalla's
+# build already enforces this; pnpm 10.33 (local + CI) doesn't by default, so
+# without this line a fresh transitive release passes CI and then fails the
+# Sevalla deploy. See .docs/DEPENDENCY_SECURITY.md #7.
+minimumReleaseAge: 1440
+
 # Single source of truth for dependency overrides.
 #
 # These MUST NOT be duplicated in package.json's `pnpm.overrides` block: pnpm
@@ -35,6 +41,7 @@ overrides:
   qs: ^6.16.0
   tmp: ^0.2.6
   '@lucide/svelte': 1.43.0
+  source-map-js: ^1.2.2
 # Dropped when the two override sources were reconciled: `rollup: ^4.59.0`,
 # `minimatch: ^10.2.3` and `tinyglobby>picomatch: ^4.0.4`. The first two were
 # never in effect (package.json won, and the tree still resolves rollup@2.80.0

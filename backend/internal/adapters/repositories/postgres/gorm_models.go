@@ -49,6 +49,7 @@ type ContentModel struct {
 	AddedByUserID     int             `gorm:"column:added_by_user_id;not null"`
 	Length            *int            `gorm:""`
 	LengthUnits       *string         `gorm:""`
+	LengthDisplay     json.RawMessage `gorm:"type:jsonb"`
 	Response          json.RawMessage `gorm:"type:jsonb"`
 	PrimaryCategoryID *int            `gorm:"column:primary_category_id"`
 	VerseStartID      *int            `gorm:"column:verse_start_id"`
@@ -74,6 +75,8 @@ type ContentModel struct {
 	BoxOffice    *int64   `gorm:"column:box_office;->;-:migration"`
 	VsBudget     *float64 `gorm:"column:vs_budget;->;-:migration"`
 	AgeRating    *int64   `gorm:"column:age_rating;->;-:migration"`
+	ReleaseDate  *string  `gorm:"column:release_date_sort;->;-:migration"`
+	TmdbScore    *float64 `gorm:"column:tmdb_score;->;-:migration"`
 	ChannelTitle *string  `gorm:"column:channel_title_sort;->;-:migration"`
 
 	CreatedAt time.Time `gorm:"autoCreateTime"`

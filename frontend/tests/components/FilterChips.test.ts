@@ -189,15 +189,15 @@ describe('FilterChips', () => {
 			expect(screen.getByText('Jul 15, 2010 \u2013 Jan 2, 2012')).toBeInTheDocument();
 		});
 
-		it('box office chip shows compact money', () => {
+		it('Take (box office) chip shows compact money', () => {
 			renderChips({ boxOffice: { filterType: 'number', type: 'greaterThanOrEqual', filter: 100_000_000 } });
-			expect(screen.getByText('Box office:')).toBeInTheDocument();
+			expect(screen.getByText('Take:')).toBeInTheDocument();
 			expect(screen.getByText(/\u2265 \$100/)).toBeInTheDocument();
 		});
 
-		it('TMDB score chip', () => {
+		it('Rating (TMDB score) chip', () => {
 			renderChips({ tmdbScore: { filterType: 'number', type: 'inRange', filter: 7, filterTo: 9 } });
-			expect(screen.getByText('TMDB Score:')).toBeInTheDocument();
+			expect(screen.getByText('Rating:')).toBeInTheDocument();
 			expect(screen.getByText('7 \u2013 9')).toBeInTheDocument();
 		});
 	});

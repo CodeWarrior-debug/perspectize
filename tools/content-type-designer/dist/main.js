@@ -1,13 +1,15 @@
 import { COLUMNS, GROUP_LABELS, TMDB_TYPES, TYPES } from './catalog.js';
 import { detailsFor } from './details.js';
+import { detect } from './detect.js';
 import { el } from './dom.js';
 import { buildMatrix, buildSoloViews, buildSpec } from './emit.js';
 import { openDetails } from './modal.js';
-import { bindingFor, cellSortValue, cellText, gapText, profileFor, resolveGrid, samplesFor, sortConflict, typeLabel, unitsFor } from './model.js';
+import { THUMBS } from './thumbs.js';
+import { bindingFor, cellSortValue, cellText, gapText, previewRowsFor, profileFor, resolveGrid, samplesFor, sortConflict, typeLabel, unitsFor } from './model.js';
 import { attachTip, cellTipContent } from './tip.js';
 const STORAGE_KEY = 'perspectize.content-type-designer.v1';
 /** Seed the type currently being designed, so a fresh open / reset lands on a filled-in form. */
-const DEFAULT_SEED = 'movie';
+const DEFAULT_SEED = 'painting';
 function seededState(typeId) {
     const state = blankState();
     const t = TYPES.find((x) => x.id === typeId);
@@ -58,6 +60,13 @@ function load() {
         const parsed = JSON.parse(raw);
         if (!parsed.draft || !parsed.decisions)
             return null;
+        // Drafts saved before a field existed pick it up from their seed, once.
+        const seed = TYPES.find((t) => t.id === parsed.seed);
+        if (seed) {
+            parsed.draft.discover ??= seed.discover && { ...seed.discover, filters: [...seed.discover.filters] };
+            parsed.draft.detect ??= seed.detect;
+            parsed.draft.detailOnly ??= seed.detailOnly;
+        }
         return parsed;
     }
     catch {
@@ -158,6 +167,15 @@ function renderIngestion() {
             field('Enrichment source', input(d.enrichment, (v) => (d.enrichment = v), 'TMDB /movie/{id}'), 'Name the exact endpoint — it decides the adapter and the API key.'),
             field('Accepted URL shapes', input(d.urlPattern, (v) => (d.urlPattern = v), 'optional: themoviedb.org/movie/<id>')),
             field('Identity / dedup key', input(d.identity, (v) => (d.identity = v), 'tmdbId (fallback: title + year)'), 'Types without a URL still need a natural key, or duplicates pile up.')
+        ]),
+        grid2([
+            field('Link hosts for auto-detect', input((d.detect?.hosts ?? []).join(', '), (v) => {
+                const hosts = v.split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+                d.detect = { hosts, path: d.detect?.path ?? '', examples: d.detect?.examples ?? [] };
+            }, 'metmuseum.org, www.metmuseum.org'), 'Comma-separated. Leave blank and the Add Content card never guesses this type.'),
+            field('Link path pattern', input(d.detect?.path ?? '', (v) => {
+                d.detect = { hosts: d.detect?.hosts ?? [], path: v, examples: d.detect?.examples ?? [] };
+            }, '^/art/collection/search/(\\d+)/?$'), 'Regular expression over the URL path. Group 1 is the external id. Try it in section 6.')
         ]),
         checkbox(d.urlRequired, (v) => (d.urlRequired = v), 'A URL is required to create this type'),
         checkbox(d.sharesUrlSpace, (v) => (d.sharesUrlSpace = v), 'The same URL may exist under another content type (relaxes the global UNIQUE(url) constraint — migration)')
@@ -605,20 +623,17 @@ function renderSortAlert(current, grid) {
 /** Illustrative rows for the selected types that ship samples; null when none do. */
 function renderSamples(current, grid) {
     const visible = grid.visible;
+    const fullness = current.fullness ?? 'usual';
     const rows = [];
-    for (const id of current.selected) {
-        for (const cells of samplesFor(id, current))
-            rows.push({ typeId: id, cells });
-    }
+    for (const id of current.selected)
+        rows.push(...previewRowsFor(id, current, fullness));
     if (rows.length === 0)
         return null;
     const valueOf = (row, colId) => {
         if (colId === 'type')
             return typeLabel(row.typeId, current.draft);
-        const col = visible.find((rc) => rc.col.id === colId)?.col;
-        if (!col || !bindingFor(col, row.typeId, current))
-            return undefined;
-        return row.cells[colId];
+        const pc = row.cells[colId];
+        return pc && (pc.state === 'value' || pc.state === 'placeholder') ? cellText(pc.cell) : undefined;
     };
     const keys = (current.sort ?? []).filter((k) => visible.some((rc) => rc.col.id === k.colId && rc.col.sortable));
     const alert = renderSortAlert(current, grid);
@@ -643,13 +658,380 @@ function renderSamples(current, grid) {
         }
         return th;
     }));
-    const body = rows.map(({ typeId, cells }) => el('tr', {}, visible.map((rc) => bodyCell(rc, typeId, cells, current))));
+    const focus = current.focus;
+    const body = rows.map((row) => {
+        const tr = el('tr', {}, visible.map((rc) => {
+            if (rc.col.id === 'perspectize') {
+                const btn = el('button', { type: 'button', class: 'cell-btn', title: 'Add perspective — shows the form in section 5' }, ['◎']);
+                btn.addEventListener('click', () => focusRow(row, 'perspective'));
+                return el('td', { class: 'center' }, [btn]);
+            }
+            if (rc.col.id === 'type')
+                return el('td', { class: 'muted' }, [typeLabel(row.typeId, current.draft)]);
+            const binding = bindingFor(rc.col, row.typeId, current);
+            if (!binding)
+                return el('td', { class: 'gap', title: `Not bound for this type — renders "${rc.col.gapFallback}"` }, [gapText(rc.col)]);
+            const pc = row.cells[rc.col.id] ?? { state: 'allowed-empty' };
+            const tooltip = binding.tooltip ?? rc.col.tooltip;
+            const td = rc.col.id === 'item' ? itemCell(row, pc, tooltip, binding.appearance) : stateCell(pc, tooltip, binding.label || rc.col.generic, binding.applicability);
+            if (rc.col.align)
+                td.classList.add(rc.col.align);
+            return td;
+        }));
+        if (focus && focus.typeId === row.typeId && focus.index === row.index)
+            tr.classList.add('focused');
+        return tr;
+    });
+    const modes = [
+        ['full', 'Full'],
+        ['usual', 'Usual'],
+        ['minimum', 'Minimum']
+    ];
+    const seg = el('div', { class: 'seg', role: 'group' });
+    for (const [mode, label] of modes) {
+        const b = el('button', { type: 'button', class: mode === fullness ? 'on' : '' }, [label]);
+        b.setAttribute('aria-pressed', String(mode === fullness));
+        b.addEventListener('click', () => {
+            state.fullness = mode;
+            save();
+            render();
+        });
+        seg.append(b);
+    }
+    const legend = el('div', { class: 'legend' }, [
+        el('span', {}, [el('i', { class: 'sw ph' }, ['‹a›']), ' made-up value to show a full row']),
+        el('span', {}, [el('i', { class: 'sw ok' }, ['—']), ' empty, and allowed']),
+        el('span', {}, [el('i', { class: 'sw bad' }, ['!']), ' empty, but required']),
+        el('span', {}, [el('i', { class: 'sw gap' }, ['—']), ' column not used by this type'])
+    ]);
     return el('div', { class: 'samples' }, [
+        el('div', { class: 'samples-bar' }, [
+            el('span', { class: 'field-label' }, ['Row fill']),
+            seg,
+            el('span', { class: 'muted small' }, [
+                fullness === 'full'
+                    ? 'Every field the type declares, filled in.'
+                    : fullness === 'minimum'
+                        ? 'Only required fields — what the sparsest allowed row looks like.'
+                        : 'Rows as they typically arrive from the source.'
+            ])
+        ]),
+        legend,
         el('p', { class: 'muted small' }, [
-            'Sample rows — click a header to sort (again to reverse, a third time to clear); hover for its tooltip; click a title for the details view. "·" means the sample has no value for a bound column; a dashed header mixes units.'
+            'Click a title to see its details view and the add-perspective form below. The thumbnail opens the source page. Hover any cell for its tooltip; click a header to sort (again to reverse, a third time to clear). A dashed header mixes units.'
         ]),
         ...(alert ? [alert] : []),
         el('div', { class: 'sample-scroll app-grid' }, [el('table', {}, [el('thead', {}, [head]), el('tbody', {}, body)])])
+    ]);
+}
+/* ------------------------------------------------------ cells & app mocks */
+const ICONS = {
+    'play-badge': '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="7 4 20 12 7 20"/></svg>',
+    'book-cross': '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M12 8v6M9.5 10.5h5"/></svg>',
+    palette: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-1.9-.5-1.2.3-2.3 1.6-2.3H17a4 4 0 0 0 4-4c0-5.2-4-9.8-9-9.8z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10" cy="7" r="1.2" fill="currentColor"/><circle cx="15" cy="7.5" r="1.2" fill="currentColor"/></svg>',
+    default: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>'
+};
+function iconFor(typeId) {
+    return ICONS[profileFor(typeId, state.draft)?.icon ?? ''] ?? ICONS.default;
+}
+function thumbBox(typeId, cell, size, contain) {
+    const img = typeof cell === 'object' ? cell.img : undefined;
+    const href = typeof cell === 'object' ? cell.href : undefined;
+    const box = el('span', { class: `thumb thumb-${size}${contain ? ' contain' : ''}` });
+    if (img) {
+        box.append(el('img', { src: THUMBS[img] ?? img, alt: '', loading: 'lazy' }));
+    }
+    else {
+        box.classList.add('icon');
+        box.innerHTML = iconFor(typeId);
+    }
+    if (!href)
+        return box;
+    const a = el('a', { href, target: '_blank', rel: 'noopener noreferrer', title: `Open ${hostOf(href)} in a new tab` }, [box]);
+    a.className = 'thumb-link';
+    return a;
+}
+function hostOf(href) {
+    try {
+        return new URL(href).hostname.replace(/^www\./, '');
+    }
+    catch {
+        return href;
+    }
+}
+function itemCell(row, pc, tooltip, appearance) {
+    const contain = /object-fit:\s*contain/.test(appearance ?? '');
+    const cell = pc.cell;
+    const title = el('button', { type: 'button', class: 'item-title', title: tooltip }, [cellText(cell) ?? '—']);
+    title.addEventListener('click', () => focusRow(row, 'details'));
+    const sub = typeof cell === 'object' && cell.sub ? [el('span', { class: 'cell-sub' }, [cell.sub])] : [];
+    return el('td', { class: `item-td${pc.state === 'placeholder' ? ' ph' : ''}` }, [
+        el('div', { class: 'item' }, [thumbBox(row.typeId, cell, 'cell', contain), el('div', { class: 'item-text' }, [title, ...sub])])
+    ]);
+}
+function sampleCell(value, tooltip) {
+    if (value === undefined)
+        return el('td', { class: 'unset', title: 'No sample value' }, ['·']);
+    if (typeof value === 'string')
+        return el('td', { title: tooltip }, [value]);
+    return el('td', { title: tooltip }, [
+        el('span', { class: 'cell-title' }, [value.text]),
+        ...(value.sub ? [el('span', { class: 'cell-sub' }, [value.sub])] : [])
+    ]);
+}
+function stateCell(pc, tooltip, label, applicability) {
+    if (pc.state === 'allowed-empty') {
+        return el('td', { class: 'empty-ok', title: `Empty is allowed — "${label}" is ${applicability}` }, ['—']);
+    }
+    if (pc.state === 'missing-required') {
+        return el('td', { class: 'empty-bad', title: `"${label}" is required, but this sample has no value` }, ['!']);
+    }
+    const td = sampleCell(pc.cell, pc.state === 'placeholder' ? `Made-up value — ${tooltip}` : tooltip);
+    if (pc.state === 'placeholder')
+        td.classList.add('ph');
+    return td;
+}
+function focusRow(row, target) {
+    state.focus = { typeId: row.typeId, index: row.index };
+    save();
+    render();
+    document.getElementById(target === 'details' ? 'mock-details' : 'mock-perspective')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+/** The row the mocks show: the focused one if it is still in view, else the first row. */
+function focusedRow() {
+    const fullness = state.fullness ?? 'usual';
+    const rows = state.selected.flatMap((id) => previewRowsFor(id, state, fullness));
+    const f = state.focus;
+    return rows.find((r) => f && r.typeId === f.typeId && r.index === f.index) ?? rows[0] ?? null;
+}
+const MOCK_SKIP = new Set(['perspectize', 'item', 'type', 'creator', 'description', 'tags', 'identifier', 'updatedAt', 'id']);
+function mockValue(pc) {
+    if (!pc || pc.state === 'allowed-empty')
+        return el('span', { class: 'm-empty', title: 'Empty is allowed' }, ['—']);
+    if (pc.state === 'missing-required')
+        return el('span', { class: 'm-bad', title: 'Required, but missing' }, ['missing']);
+    const cell = pc.cell;
+    const text = cellText(cell) ?? '';
+    const sub = typeof cell === 'object' && cell.sub ? cell.sub : '';
+    return el('span', { class: pc.state === 'placeholder' ? 'm-ph' : '' }, [text, ...(sub ? [el('span', { class: 'm-sub' }, [sub])] : [])]);
+}
+function renderDetailsMock(row) {
+    const profile = profileFor(row.typeId, state.draft);
+    const itemPc = row.cells.item;
+    const itemCellVal = itemPc?.cell;
+    const itemBinding = bindingFor(COLUMNS.find((c) => c.id === 'item'), row.typeId, state);
+    const contain = /object-fit:\s*contain/.test(itemBinding?.appearance ?? '');
+    const href = typeof itemCellVal === 'object' ? itemCellVal.href : undefined;
+    const creatorPc = row.cells.creator;
+    const tiles = [
+        el('div', { class: 'm-tile', title: 'Illustrative count' }, [el('div', { class: 'm-lbl' }, ['Perspectives']), el('div', { class: 'm-big' }, ['3'])]),
+        el('div', { class: 'm-tile', title: 'Illustrative average' }, [el('div', { class: 'm-lbl' }, ['Avg. Rating']), el('div', { class: 'm-big' }, ['4.3'])])
+    ];
+    for (const col of COLUMNS) {
+        if (MOCK_SKIP.has(col.id))
+            continue;
+        const binding = bindingFor(col, row.typeId, state);
+        if (!binding)
+            continue;
+        tiles.push(el('div', { class: 'm-tile', title: binding.tooltip ?? col.tooltip }, [el('div', { class: 'm-lbl' }, [binding.label || col.generic]), el('div', { class: 'm-val' }, [mockValue(row.cells[col.id])])]));
+    }
+    const detailOnly = profile?.detailOnly ?? [];
+    const minimum = (state.fullness ?? 'usual') === 'minimum';
+    const detailList = detailOnly.length
+        ? [
+            el('div', { class: 'm-section' }, [
+                el('div', { class: 'm-lbl' }, ['Details']),
+                el('dl', { class: 'm-dl' }, detailOnly.flatMap((f) => {
+                    const v = minimum ? undefined : row.row[`detail:${f.label}`];
+                    return [el('dt', {}, [f.label]), el('dd', {}, [v === undefined ? el('span', { class: 'm-empty', title: 'Empty is allowed' }, ['—']) : cellText(v) ?? ''])];
+                }))
+            ])
+        ]
+        : [];
+    const textSection = (colId, heading) => {
+        const binding = bindingFor(COLUMNS.find((c) => c.id === colId), row.typeId, state);
+        if (!binding)
+            return [];
+        return [el('div', { class: 'm-section' }, [el('div', { class: 'm-lbl' }, [binding.label || heading]), el('div', { class: 'm-serif' }, [mockValue(row.cells[colId])])])];
+    };
+    const refresh = profile && (profile.ingestion === 'api' || profile.ingestion === 'scrape');
+    return el('div', { class: 'appmock m-dialog', id: 'mock-details' }, [
+        el('div', { class: 'm-head' }, [el('span', {}, [(profile?.label ?? 'Content').toUpperCase()]), el('span', { class: 'm-x' }, ['✕'])]),
+        el('div', { class: 'm-body' }, [
+            el('div', { class: 'm-hero' }, [
+                thumbBox(row.typeId, itemCellVal, 'modal', contain),
+                el('div', { class: 'm-hero-text' }, [
+                    el('div', { class: 'm-title' }, [cellText(itemCellVal) ?? '—']),
+                    ...(creatorPc ? [el('div', { class: 'm-creator' }, [mockValue(creatorPc)])] : [])
+                ])
+            ]),
+            ...(href ? [el('a', { class: 'm-open', href, target: '_blank', rel: 'noopener noreferrer' }, [`Open on ${hostOf(href)} ↗`])] : []),
+            el('div', { class: 'm-grid' }, tiles),
+            ...detailList,
+            ...textSection('description', 'Description'),
+            ...textSection('tags', 'Tags'),
+            el('div', { class: 'm-foot' }, [
+                el('div', {}, [el('div', { class: 'm-lbl' }, ['Last updated in Perspectize']), el('div', { class: 'm-serif' }, [cellText(row.row.updatedAt) ?? cellText(row.row.createdAt) ?? '—'])]),
+                ...(refresh ? [el('span', { class: 'm-btn' }, ['Refresh from source'])] : [])
+            ])
+        ])
+    ]);
+}
+const THUMB_UP = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 10v11H3V10zM7 10l4-8a3 3 0 0 1 3 3v4h5.5a2 2 0 0 1 2 2.3l-1.4 8a2 2 0 0 1-2 1.7H7"/></svg>';
+function renderPerspectiveMock(row) {
+    const name = cellText(row.cells.item?.cell) ?? 'Untitled';
+    const up = el('span', { class: 'm-thumb' });
+    up.innerHTML = THUMB_UP;
+    const down = el('span', { class: 'm-thumb down' });
+    down.innerHTML = THUMB_UP;
+    const rating = (label) => el('div', { class: 'm-rating' }, [
+        el('div', { class: 'm-rating-head' }, [el('span', {}, [label]), el('span', { class: 'm-muted' }, ['×'])]),
+        el('div', { class: 'm-track' }, [el('span', {}), el('span', {}), el('span', {}), el('span', {}), el('span', {})])
+    ]);
+    return el('div', { class: 'appmock m-dialog', id: 'mock-perspective' }, [
+        el('div', { class: 'm-p-head' }, [el('div', { class: 'm-p-title' }, ['Add perspective ', el('span', { class: 'm-muted', title: 'Add as much or as little as you like' }, ['ⓘ'])]), el('div', { class: 'm-p-name' }, [name])]),
+        el('div', { class: 'm-p-row' }, [
+            el('div', { class: 'm-overall' }, [el('span', { class: 'm-lbl' }, ['Overall']), el('div', { class: 'm-thumbs' }, [up, down])]),
+            el('div', { class: 'm-editor' }, ['Add a comment'])
+        ]),
+        el('div', { class: 'm-body' }, [
+            el('div', { class: 'm-ratings' }, [rating('Quality'), rating('Agreement'), rating('Importance'), rating('Confidence')]),
+            el('div', { class: 'm-input' }, ['Add a field — e.g. clarity']),
+            el('div', { class: 'm-private' }, [el('div', {}, [el('div', {}, ['Private']), el('div', { class: 'm-muted small' }, ['Only you can see private perspectives'])]), el('span', { class: 'm-switch' })]),
+            el('div', { class: 'm-actions' }, [el('span', { class: 'm-btn' }, ['Cancel']), el('span', { class: 'm-btn primary' }, ['Save'])])
+        ])
+    ]);
+}
+function renderSurfaces() {
+    const row = focusedRow();
+    const blurb = 'What a row opens into. Pick a row by clicking its title in the preview above, or choose one here. These are mockups of ActivityDetailsModal.svelte and PerspectivePopover.svelte, drawn from the bindings, not the real components.';
+    if (!row)
+        return el('section', { id: 'surfaces' }, [el('h2', {}, ['5 · Row details & perspective']), el('p', { class: 'blurb' }, [blurb]), el('p', { class: 'muted' }, ['Select a type with sample rows in section 4.'])]);
+    const fullness = state.fullness ?? 'usual';
+    const pick = el('select', { id: 'focus-row' });
+    for (const id of state.selected) {
+        for (const r of previewRowsFor(id, state, fullness)) {
+            const v = `${r.typeId}|${r.index}`;
+            pick.append(el('option', { value: v, selected: r.typeId === row.typeId && r.index === row.index }, [`${typeLabel(r.typeId, state.draft)} — ${cellText(r.cells.item?.cell) ?? 'row'}`]));
+        }
+    }
+    pick.addEventListener('change', () => {
+        const [typeId, index] = pick.value.split('|');
+        state.focus = { typeId, index: Number(index) };
+        save();
+        render();
+    });
+    const note = 'The form is the same for every type; only the title line comes from the content. Check that the standard fields (Quality, Agreement, Importance, Confidence) make sense for this type.';
+    return el('section', { id: 'surfaces' }, [
+        el('h2', {}, ['5 · Row details & perspective']),
+        el('p', { class: 'blurb' }, [blurb]),
+        field('Showing', pick, `Fill state follows the preview: ${fullness}.`),
+        el('div', { class: 'mock-pair' }, [
+            el('figure', {}, [renderDetailsMock(row), el('figcaption', {}, ['Details view — opens from the row title'])]),
+            el('figure', {}, [renderPerspectiveMock(row), el('figcaption', {}, ['Add perspective — opens from ◎. ', note])])
+        ])
+    ]);
+}
+/* ---------------------------------------------------------- add content */
+const FIXED_EXAMPLES = [
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    'John 3:16-18',
+    'https://www.biblegateway.com/passage/?search=Micah+6%3A8',
+    'https://en.wikipedia.org/wiki/Wheat_Field_with_Cypresses',
+    'Painting is only worth it for the story it tells'
+];
+function renderAddCard() {
+    const d = state.draft;
+    const detectable = !!(d.detect && d.detect.hosts.length && d.detect.path);
+    const inputEl = el('input', { id: 'add-input', type: 'text', value: state.addInput ?? '', placeholder: 'Paste a link or type a reference', autocomplete: 'off' });
+    const chipSlot = el('div', { class: 'm-chiprow' });
+    const resultSlot = el('div', {});
+    const traceSlot = el('div', {});
+    const addBtn = el('span', { class: 'm-btn primary' }, ['Add']);
+    const paint = () => {
+        const r = detect(inputEl.value, state);
+        const menu = el('select');
+        menu.setAttribute('aria-label', 'Change type (mockup)');
+        menu.append(el('option', { value: '', disabled: true, selected: r.type === null }, ['Select a type']));
+        const options = [
+            ['YOUTUBE', 'YouTube'],
+            ['BIBLE_PASSAGE', 'Bible passage'],
+            ...(d.enumValue ? [[d.enumValue, `${d.label || 'New type'} (new)`]] : [])
+        ];
+        for (const [v, label] of options)
+            menu.append(el('option', { value: v, selected: v === r.type }, [label]));
+        chipSlot.replaceChildren(el('span', { class: `m-chip${r.type ? ' on' : ''}` }, [r.type ? `Detected: ${r.label}` : 'Select a type']), menu);
+        addBtn.classList.toggle('disabled', !r.type || r.type === 'CLAIM');
+        const extras = [];
+        if (r.type === 'CLAIM')
+            extras.push(el('p', { class: 'm-muted small' }, ["Claims can't be added from here yet. Pick a type above to continue."]));
+        if (r.type && r.type === d.enumValue && r.externalId) {
+            extras.push(el('p', { class: 'm-muted small' }, [`On Add, the backend fetches ${r.externalId} from: ${d.enrichment.split(' — ')[0]}.`]));
+            const match = samplesFor(d.id, state).find((row) => (cellText(row.identifier) ?? '').includes(r.externalId));
+            if (match) {
+                extras.push(el('div', { class: 'm-found' }, [
+                    thumbBox(d.id, match.item, 'cell', /object-fit:\s*contain/.test(bindingFor(COLUMNS.find((c) => c.id === 'item'), d.id, state)?.appearance ?? '')),
+                    el('div', {}, [el('div', { class: 'm-serif' }, [cellText(match.item) ?? '']), el('div', { class: 'm-muted small' }, [cellText(match.creator) ?? ''])])
+                ]));
+            }
+        }
+        resultSlot.replaceChildren(...extras);
+        const table = el('table', { class: 'trace' }, [
+            el('thead', {}, [el('tr', {}, [el('th', {}, ['Step']), el('th', {}, ['Result']), el('th', {}, ['Detail']), el('th', {}, ['Where'])])]),
+            el('tbody', {}, r.steps.map((st) => el('tr', { class: `t-${st.outcome}` }, [
+                el('td', {}, [st.rule]),
+                el('td', {}, [st.outcome === 'match' ? 'match' : st.outcome === 'skipped' ? 'skipped' : 'no']),
+                el('td', { class: 'muted' }, [st.note ?? '']),
+                el('td', { class: `muted small${st.source.startsWith('NEW') ? ' new' : ''}` }, [st.source])
+            ])))
+        ]);
+        traceSlot.replaceChildren(el('div', { class: 'sample-scroll' }, [table]));
+    };
+    inputEl.addEventListener('input', () => {
+        state.addInput = inputEl.value;
+        save();
+        paint();
+    });
+    const exampleList = [...(d.detect?.examples ?? []), ...FIXED_EXAMPLES];
+    const examples = el('div', { class: 'chips' }, exampleList.map((ex) => {
+        // Drop the scheme and keep the tail: three Met links differ only at the end.
+        const short = ex.replace(/^https?:\/\/(www\.)?/, '');
+        const b = el('button', { type: 'button', class: 'chip', title: ex }, [short.length > 44 ? `${short.slice(0, 14)}…${short.slice(-28)}` : short]);
+        b.addEventListener('click', () => {
+            inputEl.value = ex;
+            state.addInput = ex;
+            save();
+            paint();
+        });
+        return b;
+    }));
+    paint();
+    const description = detectable
+        ? `Paste a YouTube link, a ${d.label || 'new type'} link, or type a Bible reference like John 3:16-18.`
+        : 'Paste a YouTube link, or type a Bible reference like John 3:16-18.';
+    return el('section', { id: 'addcard' }, [
+        el('h2', {}, ['6 · Add Content card']),
+        el('p', { class: 'blurb' }, [
+            'Type or paste into the card to see what it detects, step by step, in the same order as detectContentType.ts. The new type’s rule comes from the link fields in section 2.'
+        ]),
+        ...(detectable ? [] : [el('p', { class: 'w-warn' }, ['No link rule yet: this type is never auto-detected. Fill in the link hosts and path pattern in section 2.'])]),
+        el('div', { class: 'add-pair' }, [
+            el('figure', {}, [
+                el('div', { class: 'appmock m-dialog m-pop' }, [
+                    el('div', { class: 'm-body' }, [
+                        el('div', { class: 'm-pop-title' }, ['Add Content']),
+                        el('p', { class: 'm-muted small' }, [description]),
+                        el('label', { class: 'm-label', htmlFor: 'add-input' }, ['Link or reference']),
+                        el('div', { class: 'm-inputwrap' }, [inputEl, el('span', { class: 'm-paste', title: 'Paste from clipboard' }, ['⎘'])]),
+                        chipSlot,
+                        resultSlot,
+                        el('div', { class: 'm-actions' }, [el('span', { class: 'm-btn' }, ['Cancel']), addBtn])
+                    ])
+                ]),
+                el('figcaption', {}, ['Mockup of AddContentPopover.svelte — the input is live.'])
+            ]),
+            el('div', { class: 'trace-wrap' }, [el('span', { class: 'field-label' }, ['Try an example']), examples, el('span', { class: 'field-label' }, ['How it was detected']), traceSlot])
+        ])
     ]);
 }
 function renderNotes() {
@@ -665,7 +1047,7 @@ function renderNotes() {
         save();
         renderDerived();
     });
-    return section('5 · Process notes', 'Carried into the emitted spec verbatim.', [
+    return section('8 · Process notes', 'Carried into the emitted spec verbatim.', [
         field('Testing approach', testing),
         field('Conventions to ignore for this work only', dev)
     ]);
@@ -694,10 +1076,19 @@ function renderOutput() {
         tabs.append(tab);
     }
     copy.addEventListener('click', async () => {
-        await navigator.clipboard.writeText(pre.textContent ?? '');
-        copy.textContent = 'Copied';
-        setTimeout(() => (copy.textContent = 'Copy'), 1200);
+        try {
+            await navigator.clipboard.writeText(pre.textContent ?? '');
+            copy.textContent = 'Copied';
+        }
+        catch {
+            // Clipboard refused (embedded frame, older app view): select the text for a manual copy.
+            getSelection()?.selectAllChildren(pre);
+            copy.textContent = 'Selected — press Ctrl/⌘ C';
+        }
+        setTimeout(() => (copy.textContent = 'Copy'), 1600);
     });
+    // Script-started downloads are blocked inside embedded frames (e.g. a claude.ai artifact).
+    download.hidden = window.self !== window.top;
     download.addEventListener('click', () => {
         const blob = new Blob([pre.textContent ?? ''], { type: 'text/markdown' });
         const a = el('a', {
@@ -709,10 +1100,134 @@ function renderOutput() {
     });
     paint();
     renderOutput.repaint = paint;
-    return section('6 · Output', 'Deterministic — the same answers always produce the same text. No model is called.', [
+    return section('9 · Output', 'Deterministic — the same answers always produce the same text. No model is called.', [
         tabs,
         el('div', { class: 'row' }, [copy, download]),
         pre
+    ]);
+}
+/* ------------------------------------------------------------- discover */
+const PLACEMENTS = {
+    'search-and-feed': 'Search and a feed',
+    'feed-only': 'Feed only',
+    'search-only': 'Search only',
+    'not-on-discover': 'Not on Discover'
+};
+function blankDiscover() {
+    return { placement: 'not-on-discover', status: 'proposed', search: '', feedLabel: '', feedKind: 'none', feedSource: '', refresh: '', fetchFrom: 'backend', filters: [], reason: '' };
+}
+function renderDiscover() {
+    const d = state.draft;
+    const blurb = 'Every type needs a decision here, even if the answer is "not on Discover". Say what the page shows when the search box is empty, and what "trending" actually counts.';
+    if (!d.discover) {
+        const decide = el('button', { type: 'button', class: 'primary' }, ['Decide']);
+        decide.addEventListener('click', () => {
+            d.discover = blankDiscover();
+            save();
+            render();
+        });
+        return section('7 · Discover page', blurb, [el('p', { class: 'w-error' }, ['Not decided. The spec lists this as a must-fix until it is.']), decide]);
+    }
+    const dc = d.discover;
+    const hasSearch = dc.placement === 'search-and-feed' || dc.placement === 'search-only';
+    const hasFeed = dc.placement === 'search-and-feed' || dc.placement === 'feed-only';
+    const missing = [];
+    if (!dc.reason.trim())
+        missing.push('why this placement');
+    if (hasSearch && !dc.search.trim())
+        missing.push('the search endpoint');
+    if (hasFeed && (!dc.feedLabel.trim() || !dc.feedSource.trim()))
+        missing.push('the feed heading and source');
+    if (hasFeed && dc.feedKind === 'trending' && !/view|popular|rank|count|play|chart/i.test(dc.feedSource))
+        missing.push('what "trending" counts');
+    return section('7 · Discover page', blurb, [
+        grid2([
+            field('Placement', select(dc.placement, Object.keys(PLACEMENTS), (v) => (dc.placement = v), PLACEMENTS)),
+            field('Status', select(dc.status, ['proposed', 'shipped'], (v) => (dc.status = v), { proposed: 'Proposed', shipped: 'Shipped (the app does this today)' })),
+            ...(hasSearch
+                ? [
+                    field('Search mode', select(dc.searchMode ?? 'in-app', ['in-app', 'hand-off'], (v) => (dc.searchMode = v), {
+                        'in-app': 'In-app — the app calls a search API',
+                        'hand-off': "Hand-off — open the source's own search in a new tab"
+                    }), 'Hand off when the search API is too scarce or costly (YouTube: 100 calls a day for the whole site).'),
+                    field('Search', input(dc.search, (v) => (dc.search = v), 'endpoint, and how a result becomes a card'), 'Does a result carry title and image, or only an id to look up?')
+                ]
+                : []),
+            ...(hasSearch
+                ? [field('Filters', input(dc.filters.join(', '), (v) => (dc.filters = v.split(',').map((f) => f.trim()).filter(Boolean)), 'Era, Department'), 'Comma-separated.')]
+                : []),
+            ...(hasFeed
+                ? [
+                    field('Feed heading', input(dc.feedLabel, (v) => (dc.feedLabel = v), 'Trending, Verse of the day…')),
+                    field('Feed kind', select(dc.feedKind, ['trending', 'daily', 'curated', 'recent', 'none'], (v) => (dc.feedKind = v), {
+                        trending: 'Trending — ranked by a popularity signal',
+                        daily: 'Daily pick from the source',
+                        curated: 'Curated list',
+                        recent: 'Recently added',
+                        none: 'None'
+                    })),
+                    field('Feed source & ranking signal', input(dc.feedSource, (v) => (dc.feedSource = v), 'endpoint + what it counts'), 'If it says trending, name the number it ranks by.'),
+                    field('Refresh', input(dc.refresh, (v) => (dc.refresh = v), 'daily backend job'))
+                ]
+                : []),
+            field('Feed fetched from', select(dc.fetchFrom, ['browser', 'backend'], (v) => (dc.fetchFrom = v), {
+                browser: 'Browser (needs CORS + a connect-src entry)',
+                backend: 'Backend (cached)'
+            })),
+            field('Why this placement', input(dc.reason, (v) => (dc.reason = v), 'Browsed or pasted? What would a user look for here?'))
+        ]),
+        ...(missing.length ? [el('p', { class: 'w-warn' }, [`Still to fill in: ${missing.join('; ')}.`])] : []),
+        renderDiscoverMock()
+    ]);
+}
+/** A strip of the Discover page as this type would add to it. */
+function renderDiscoverMock() {
+    const d = state.draft;
+    const dc = d.discover;
+    const tabs = TYPES.filter((t) => t.id !== state.seed && t.discover && t.discover.placement !== 'not-on-discover');
+    const own = dc && dc.placement !== 'not-on-discover';
+    const strip = el('div', { class: 'm-tabs' }, [
+        ...tabs.map((t) => t.discover.status === 'shipped'
+            ? el('span', { class: 'm-tab' }, [t.label])
+            : el('span', { class: 'm-tab proposed', title: 'Proposed, not built' }, [t.label])),
+        ...(own ? [el('span', { class: 'm-tab on' }, [`${d.label || 'New type'}`, el('sup', {}, ['new'])])] : [])
+    ]);
+    // A daily pick is one item; a feed or search shows a grid.
+    const rows = samplesFor(d.id, state).slice(0, dc?.feedKind === 'daily' && dc.placement === 'feed-only' ? 1 : 4);
+    const contain = /object-fit:\s*contain/.test(bindingFor(COLUMNS.find((c) => c.id === 'item'), d.id, state)?.appearance ?? '');
+    let body;
+    if (!dc)
+        body = el('p', { class: 'm-muted small' }, ['No Discover decision yet.']);
+    else if (!own)
+        body = el('p', { class: 'm-muted small' }, [`${d.label || 'This type'} does not appear on Discover. ${dc.reason}`]);
+    else {
+        const hasSearch = dc.placement !== 'feed-only';
+        const cards = rows.map((row) => el('div', { class: 'd-card' }, [
+            el('div', { class: `d-img${contain ? ' contain' : ''}` }, [thumbBox(d.id, row.item, 'modal', contain)]),
+            el('div', { class: 'd-title' }, [cellText(row.item) ?? '']),
+            el('div', { class: 'm-muted small' }, [[cellText(row.creator), cellText(row.date)].filter(Boolean).join(' · ') || cellText(row.description) || '']),
+            el('span', { class: 'm-btn primary d-add' }, ['Add to Perspectize'])
+        ]));
+        body = el('div', {}, [
+            ...(hasSearch
+                ? [
+                    el('div', { class: 'm-inputwrap d-search' }, [
+                        el('span', { class: 'd-input' }, [
+                            dc.searchMode === 'hand-off' ? `Search ${d.label || 'the source'}, or paste a link   ↗ opens in a new tab` : `Search ${d.plural || 'items'}…`
+                        ])
+                    ]),
+                    ...(dc.filters.length ? [el('div', { class: 'd-filters' }, dc.filters.map((f) => el('span', { class: 'd-filter' }, [`${f} ▾`])))] : [])
+                ]
+                : []),
+            ...(dc.placement !== 'search-only'
+                ? [el('div', { class: 'd-feedhead' }, [el('span', {}, [`Showing ${dc.feedLabel || 'feed'}`]), el('span', { class: 'm-muted small' }, [dc.refresh])])]
+                : []),
+            cards.length ? el('div', { class: 'd-grid' }, cards) : el('p', { class: 'm-muted small' }, ['No sample rows to show as cards.'])
+        ]);
+    }
+    return el('figure', { id: 'discover-mock' }, [
+        el('div', { class: 'appmock' }, [el('div', { class: 'm-body' }, [el('div', { class: 'm-pop-title' }, ['Discover']), strip, body])]),
+        el('figcaption', {}, ['Mockup of routes/discover/+page.svelte with this type added. Cards use the sample rows; the real feed comes from the source above.'])
     ]);
 }
 /* ------------------------------------------------------------------ layout */
@@ -726,7 +1241,7 @@ function render() {
     const root = document.getElementById('app');
     if (!root)
         return;
-    root.replaceChildren(renderSolo(), renderIdentity(), renderIngestion(), renderColumns(), renderPreview(), renderNotes(), renderOutput());
+    root.replaceChildren(renderSolo(), renderIdentity(), renderIngestion(), renderColumns(), renderPreview(), renderSurfaces(), renderAddCard(), renderDiscover(), renderNotes(), renderOutput());
 }
 /** Text-only inputs do not change layout, so they just repaint the output. */
 function renderDerived() {
@@ -734,6 +1249,9 @@ function renderDerived() {
     repaint?.();
     document.getElementById('cross')?.replaceWith(renderPreview());
     document.getElementById('solo')?.replaceWith(renderSolo());
+    document.getElementById('surfaces')?.replaceWith(renderSurfaces());
+    document.getElementById('addcard')?.replaceWith(renderAddCard());
+    document.getElementById('discover-mock')?.replaceWith(renderDiscoverMock());
 }
 const reset = document.getElementById('reset');
 reset?.addEventListener('click', () => {

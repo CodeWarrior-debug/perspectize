@@ -33,6 +33,7 @@ import {
 	formatMoneyExact,
 	vsBudgetPercent,
 	formatVsBudget,
+	durationTooltip,
 } from '$lib/utils/formatting';
 
 describe('shared h:mm:ss duration', () => {
@@ -162,6 +163,25 @@ describe('formatDuration', () => {
 		expect(formatDuration(300, 'seconds')).toBe('5:00');
 	});
 
+	it('MINUTES precision (TMDB runtime) formats as h:mm, no seconds', () => {
+		expect(formatDuration(142 * 60, 'seconds', 'MINUTES')).toBe('2:22');
+		expect(formatDuration(120 * 60, 'seconds', 'MINUTES')).toBe('2:00');
+		expect(formatDuration(45 * 60, 'seconds', 'MINUTES')).toBe('0:45');
+	});
+
+	it('SECONDS precision keeps h:mm:ss', () => {
+		expect(formatDuration(142 * 60, 'seconds', 'SECONDS')).toBe('2:22:00');
+	});
+
+	it('no or unknown precision falls back to seconds formatting', () => {
+		expect(formatDuration(142 * 60, 'seconds', null)).toBe('2:22:00');
+		expect(formatDuration(142 * 60, 'seconds', 'HOURS')).toBe('2:22:00');
+	});
+
+	it('MINUTES precision with no length is a dash', () => {
+		expect(formatDuration(null, 'seconds', 'MINUTES')).toBe('—');
+	});
+
 	it('formats seconds with padded seconds part', () => {
 		expect(formatDuration(65, 'seconds')).toBe('1:05');
 	});
@@ -265,6 +285,14 @@ describe('durationValueGetter', () => {
 
 	it('returns formatted duration for seconds', () => {
 		expect(durationValueGetter({ data: { length: 300, lengthUnits: 'seconds' } })).toBe('5:00');
+	});
+
+	it('formats to the row lengthDisplay precision', () => {
+		expect(
+			durationValueGetter({
+				data: { length: 142 * 60, lengthUnits: 'seconds', lengthDisplay: { source: 'tmdb', precision: 'MINUTES' } },
+			}),
+		).toBe('2:22');
 	});
 
 	it('returns dash for null length', () => {
@@ -1008,5 +1036,33 @@ describe('categoryCellRenderer', () => {
 
 		expect(result.querySelector('a')).toBeNull();
 		expect(result.querySelector('span')?.textContent).toBe('Science');
+	});
+});
+
+describe('durationTooltip (names the format, so the unit is clear)', () => {
+	const tip = (length: number | null, precision?: string) =>
+		durationTooltip({
+			data: { length, lengthUnits: 'seconds', lengthDisplay: precision ? { source: 'x', precision } : null },
+		});
+
+	it('movie runtime (MINUTES) reads as h:mm', () => {
+		expect(tip(179 * 60, 'MINUTES')).toBe('2:59 (h:mm)');
+	});
+
+	it('a video under an hour reads as m:ss', () => {
+		expect(tip(227, 'SECONDS')).toBe('3:47 (m:ss)');
+	});
+
+	it('a video of an hour or more reads as h:mm:ss', () => {
+		expect(tip(3723, 'SECONDS')).toBe('1:02:03 (h:mm:ss)');
+	});
+
+	it('no precision falls back to the seconds formats', () => {
+		expect(tip(227)).toBe('3:47 (m:ss)');
+	});
+
+	it('no length gives an empty tooltip', () => {
+		expect(tip(null, 'MINUTES')).toBe('');
+		expect(durationTooltip({})).toBe('');
 	});
 });

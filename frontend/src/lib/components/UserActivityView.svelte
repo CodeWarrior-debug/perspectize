@@ -91,6 +91,7 @@
 		channelTitle: string | null;
 		length: number | null;
 		lengthUnits: string | null;
+		precision: string | null;
 		private: boolean;
 	};
 
@@ -131,6 +132,7 @@
 				channelTitle: c.channelTitle,
 				length: c.length,
 				lengthUnits: c.lengthUnits,
+				precision: c.lengthDisplay?.precision ?? null,
 				private: false,
 			});
 		}
@@ -146,6 +148,7 @@
 				channelTitle: p.content?.channelTitle ?? null,
 				length: p.content?.length ?? null,
 				lengthUnits: p.content?.lengthUnits ?? null,
+				precision: p.content?.lengthDisplay?.precision ?? null,
 				private: p.privacy === 'PRIVATE',
 			});
 		}
@@ -283,7 +286,7 @@
 											<span>&middot;</span>
 										{/if}
 										{#if event.length}
-											<span>{formatDuration(event.length, event.lengthUnits)}</span>
+											<span>{formatDuration(event.length, event.lengthUnits, event.precision)}</span>
 											<span>&middot;</span>
 										{/if}
 										<span>{formatDateTime(event.ts)}</span>
