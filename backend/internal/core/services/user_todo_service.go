@@ -468,10 +468,14 @@ func notOwnedUserTodoError(privacy domain.Privacy) error {
 // left alone; Clear* fields reset their paired value. Text and dates are
 // normalized here, so validation sees the final state.
 func mergeUserTodoUpdate(todo *domain.UserTodo, input domain.UpdateUserTodoInput) {
-	if input.ContentID != nil {
+	if input.ClearContentID {
+		todo.ContentID = nil
+	} else if input.ContentID != nil {
 		todo.ContentID = input.ContentID
 	}
-	if input.Name != nil {
+	if input.ClearName {
+		todo.Name = nil
+	} else if input.Name != nil {
 		todo.Name = normalizeTodoName(input.Name)
 	}
 	if input.ActionID != nil {
@@ -503,7 +507,9 @@ func mergeUserTodoUpdate(todo *domain.UserTodo, input domain.UpdateUserTodoInput
 	} else if input.DueDate != nil {
 		todo.DueDate = dateOnly(input.DueDate)
 	}
-	if input.Comments != nil {
+	if input.ClearComments {
+		todo.Comments = nil
+	} else if input.Comments != nil {
 		todo.Comments = sanitizeTodoComments(input.Comments)
 	}
 	if input.Privacy != nil {

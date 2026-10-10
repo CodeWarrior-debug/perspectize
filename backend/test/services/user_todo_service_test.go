@@ -657,6 +657,67 @@ func TestUpdateUserTodo_ClearPriority(t *testing.T) {
 	assert.Nil(t, got.Priority)
 }
 
+func TestUpdateUserTodo_ClearContentNameAndComments(t *testing.T) {
+	t.Run("clearing content keeps a todo that has a name", func(t *testing.T) {
+		existing := ownedTodo(todoActor, domain.PrivacyPublic)
+		name := "Read the report"
+		existing.Name = &name
+		var got *domain.UserTodo
+		todos := &mockUserTodoRepo{
+			getByIDFn: func(ctx context.Context, id int) (*domain.UserTodo, error) { return existing, nil },
+			updateFn: func(ctx context.Context, todo *domain.UserTodo, actorUserID int) (*domain.UserTodo, error) {
+				got = todo
+				return todo, nil
+			},
+		}
+		svc := newTodoService(todos, nil, nil)
+
+		_, err := svc.UpdateUserTodo(context.Background(), todoActor, domain.UpdateUserTodoInput{ID: 10, ClearContentID: true})
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Nil(t, got.ContentID)
+		require.NotNil(t, got.Name)
+		assert.Equal(t, "Read the report", *got.Name)
+	})
+
+	t.Run("clearing content of a todo with no name is invalid and writes nothing", func(t *testing.T) {
+		existing := ownedTodo(todoActor, domain.PrivacyPublic)
+		updated := false
+		todos := &mockUserTodoRepo{
+			getByIDFn: func(ctx context.Context, id int) (*domain.UserTodo, error) { return existing, nil },
+			updateFn: func(ctx context.Context, todo *domain.UserTodo, actorUserID int) (*domain.UserTodo, error) {
+				updated = true
+				return todo, nil
+			},
+		}
+		svc := newTodoService(todos, nil, nil)
+
+		_, err := svc.UpdateUserTodo(context.Background(), todoActor, domain.UpdateUserTodoInput{ID: 10, ClearContentID: true})
+		assert.ErrorIs(t, err, domain.ErrInvalidInput)
+		assert.False(t, updated)
+	})
+
+	t.Run("clearing comments stores nil", func(t *testing.T) {
+		existing := ownedTodo(todoActor, domain.PrivacyPublic)
+		comments := "<p>old</p>"
+		existing.Comments = &comments
+		var got *domain.UserTodo
+		todos := &mockUserTodoRepo{
+			getByIDFn: func(ctx context.Context, id int) (*domain.UserTodo, error) { return existing, nil },
+			updateFn: func(ctx context.Context, todo *domain.UserTodo, actorUserID int) (*domain.UserTodo, error) {
+				got = todo
+				return todo, nil
+			},
+		}
+		svc := newTodoService(todos, nil, nil)
+
+		_, err := svc.UpdateUserTodo(context.Background(), todoActor, domain.UpdateUserTodoInput{ID: 10, ClearComments: true})
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Nil(t, got.Comments)
+	})
+}
+
 func TestUpdateUserTodo_ValidationRejectsBeforeWriting(t *testing.T) {
 	cases := []struct {
 		name    string

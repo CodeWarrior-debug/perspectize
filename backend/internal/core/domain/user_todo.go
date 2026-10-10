@@ -126,10 +126,13 @@ type UpdateUserTodoInput struct {
 	Privacy         *Privacy
 	ListID          *int
 
+	ClearContentID bool
+	ClearName      bool
 	ClearPriority  bool
 	ClearStartDate bool
 	ClearEndDate   bool
 	ClearDueDate   bool
+	ClearComments  bool
 	ClearListID    bool
 }
 
