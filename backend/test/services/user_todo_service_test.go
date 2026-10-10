@@ -1508,3 +1508,48 @@ func TestUserTodoService_RepositoryErrorsAreWrapped(t *testing.T) {
 	_, err := svc.ListUserTodos(context.Background(), domain.UserTodoListParams{})
 	assert.True(t, errors.Is(err, boom))
 }
+
+func TestListUserTodos_ListFilterHidesOthersPrivateList(t *testing.T) {
+	cases := []struct {
+		name      string
+		list      *domain.UserTodoList
+		listErr   error
+		viewer    *int
+		wantEmpty bool
+	}{
+		{"own private list is listed", ownedList(todoActor, domain.PrivacyPrivate), nil, intPtr(todoActor), false},
+		{"other's public list is listed", ownedList(todoOther, domain.PrivacyPublic), nil, intPtr(todoActor), false},
+		{"other's private list is empty", ownedList(todoOther, domain.PrivacyPrivate), nil, intPtr(todoActor), true},
+		{"private list for anonymous is empty", ownedList(todoOther, domain.PrivacyPrivate), nil, nil, true},
+		{"missing list is empty", nil, domain.ErrNotFound, intPtr(todoActor), true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			listCalled := false
+			todos := &mockUserTodoRepo{listFn: func(ctx context.Context, params domain.UserTodoListParams) (*domain.PaginatedUserTodos, error) {
+				listCalled = true
+				return &domain.PaginatedUserTodos{Items: []*domain.UserTodo{ownedTodo(todoOther, domain.PrivacyPublic)}}, nil
+			}}
+			lists := &mockUserTodoListRepo{getByIDFn: func(ctx context.Context, id int) (*domain.UserTodoList, error) {
+				return tc.list, tc.listErr
+			}}
+			svc := newTodoService(todos, lists, nil)
+
+			page, err := svc.ListUserTodos(context.Background(), domain.UserTodoListParams{
+				ViewerID:          tc.viewer,
+				IncludeTotalCount: true,
+				Filter:            &domain.UserTodoFilter{ListID: intPtr(30)},
+			})
+			require.NoError(t, err)
+			if tc.wantEmpty {
+				assert.False(t, listCalled, "todos must not be queried for a hidden list")
+				assert.Empty(t, page.Items)
+				require.NotNil(t, page.TotalCount)
+				assert.Equal(t, 0, *page.TotalCount)
+			} else {
+				assert.True(t, listCalled)
+				assert.Len(t, page.Items, 1)
+			}
+		})
+	}
+}

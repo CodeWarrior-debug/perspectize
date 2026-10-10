@@ -50,6 +50,20 @@ func (s *UserTodoService) ListUserTodos(ctx context.Context, params domain.UserT
 		return nil, fmt.Errorf("%w: last must be between 1 and 100", domain.ErrInvalidInput)
 	}
 
+	// Filtering by someone else's private list answers like a missing list
+	// (an empty page), so membership of their public todos isn't revealed.
+	if params.Filter != nil && params.Filter.ListID != nil {
+		list, err := s.lists.GetByID(ctx, *params.Filter.ListID)
+		if err != nil && !errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("failed to get user todo list: %w", err)
+		}
+		hidden := list != nil && list.Privacy == domain.PrivacyPrivate &&
+			(params.ViewerID == nil || *params.ViewerID != list.UserID)
+		if err != nil || hidden {
+			return emptyUserTodoPage(params.IncludeTotalCount), nil
+		}
+	}
+
 	params.RestrictToPublicOrOwner = true
 	result, err := s.todos.List(ctx, params)
 	if err != nil {
@@ -457,6 +471,16 @@ func canViewUserTodoRow(privacy domain.Privacy, ownerID int, viewerID *int) bool
 // notOwnedUserTodoError answers a write on a row the actor doesn't own. A PUBLIC
 // row is visible to the actor, so the refusal is ErrForbidden. A PRIVATE row
 // answers ErrNotFound, so its id isn't confirmed to exist.
+// emptyUserTodoPage is the page returned for a list the viewer may not see.
+func emptyUserTodoPage(includeTotalCount bool) *domain.PaginatedUserTodos {
+	page := &domain.PaginatedUserTodos{Items: []*domain.UserTodo{}}
+	if includeTotalCount {
+		zero := 0
+		page.TotalCount = &zero
+	}
+	return page
+}
+
 func notOwnedUserTodoError(privacy domain.Privacy) error {
 	if privacy == domain.PrivacyPublic {
 		return fmt.Errorf("%w: you can only modify your own items", domain.ErrForbidden)
