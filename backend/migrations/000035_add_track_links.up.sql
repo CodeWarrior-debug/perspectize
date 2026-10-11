@@ -1,4 +1,3 @@
-```sql
 -- PROVISIONAL NUMBER until merge. Never applied to the shared DB by the
 -- AUDIO_TRACK work. ADR 0005: one content row per recording; every link to
 -- it (including the first pasted one, which is also content.url) is a row
