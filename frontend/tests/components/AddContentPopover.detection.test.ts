@@ -6,6 +6,7 @@ import AddContentPopover from '$lib/components/AddContentPopover.svelte';
 const mocks = vi.hoisted(() => ({
 	video: { mutate: vi.fn(), isPending: false, isSuccess: false },
 	passage: { mutate: vi.fn(), isPending: false, isSuccess: false },
+	audio: { mutate: vi.fn(), reset: vi.fn(), isPending: false, isSuccess: false },
 	movie: {
 		mutate: vi.fn(),
 		reset: vi.fn(),
@@ -17,6 +18,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/queries/content/useAddVideo', () => ({ useAddVideo: () => mocks.video }));
+vi.mock('$lib/queries/content/useAddAudioTrack', () => ({ useAddAudioTrack: () => mocks.audio }));
+vi.mock('$lib/queries/content/useAudioTrack', () => ({ useMusicGenres: () => ({ data: [] }) }));
 vi.mock('$lib/queries/content/useAddMovie', () => ({ useAddMovie: () => mocks.movie }));
 vi.mock('$lib/queries/content/useAddPassage', () => ({ useAddPassage: () => mocks.passage }));
 
