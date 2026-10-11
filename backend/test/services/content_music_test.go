@@ -63,7 +63,7 @@ func (r *fakeMusicRepo) GetByISRC(_ context.Context, isrc string) (*domain.Conte
 			ISRC string `json:"isrc"`
 		}
 		_ = json.Unmarshal(c.Response, &m)
-		if c.ContentType == domain.ContentTypeYouTubeMusic && m.ISRC == isrc {
+		if c.ContentType == domain.ContentTypeAudioTrack && m.ISRC == isrc {
 			return c, nil
 		}
 	}
@@ -153,14 +153,14 @@ func syncRunner() services.ContentServiceOption { return services.WithAsync(func
 
 const musicURL = "https://music.youtube.com/watch?v=" + audioID
 
-func TestCreateFromYouTubeMusic_FullEnrichment(t *testing.T) {
+func TestCreateAudioTrackFromYouTube_FullEnrichment(t *testing.T) {
 	repo := newFakeMusicRepo()
 	lyr := &fakeLyrics{match: &portservices.LyricsMatch{Available: true, LRCLibID: 36978827, HasSynced: true}}
 	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(fullTrack(), isrcMatch(), lyr), syncRunner())
 
-	c, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
+	c, err := svc.CreateAudioTrackFromYouTube(context.Background(), musicURL, 7)
 	require.NoError(t, err)
-	assert.Equal(t, domain.ContentTypeYouTubeMusic, c.ContentType)
+	assert.Equal(t, domain.ContentTypeAudioTrack, c.ContentType)
 	assert.Equal(t, musicURL, *c.URL)
 	assert.Equal(t, "Bohemian Rhapsody", c.Name, "YouTube Music's clean title wins over the video title")
 	assert.Equal(t, []bool{false}, repo.upserts, "music upserts must not refresh (it would wipe relatedMedia and lyrics)")
@@ -192,11 +192,11 @@ func TestCreateFromYouTubeMusic_FullEnrichment(t *testing.T) {
 	assert.Equal(t, 36978827, *lyrics.LRCLibID)
 }
 
-func TestCreateFromYouTubeMusic_NoMusicBrainzMatch(t *testing.T) {
+func TestCreateAudioTrackFromYouTube_NoMusicBrainzMatch(t *testing.T) {
 	repo := newFakeMusicRepo()
 	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(fullTrack(), &fakeMB{err: domain.ErrNotFound}, nil), syncRunner())
 
-	c, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
+	c, err := svc.CreateAudioTrackFromYouTube(context.Background(), musicURL, 7)
 	require.NoError(t, err)
 	m := map[string]json.RawMessage{}
 	require.NoError(t, json.Unmarshal(c.Response, &m))
@@ -205,12 +205,12 @@ func TestCreateFromYouTubeMusic_NoMusicBrainzMatch(t *testing.T) {
 	assert.NotContains(t, m, "enrichmentPending")
 }
 
-func TestCreateFromYouTubeMusic_YTMusicDown(t *testing.T) {
+func TestCreateAudioTrackFromYouTube_YTMusicDown(t *testing.T) {
 	repo := newFakeMusicRepo()
 	mb := isrcMatch()
 	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(&fakeYTMusic{err: errors.New("403")}, mb, nil), syncRunner())
 
-	c, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
+	c, err := svc.CreateAudioTrackFromYouTube(context.Background(), musicURL, 7)
 	require.NoError(t, err, "unofficial enrichment failing must not block the add")
 	var pending bool
 	var artist string
@@ -222,33 +222,33 @@ func TestCreateFromYouTubeMusic_YTMusicDown(t *testing.T) {
 	assert.Equal(t, "Bohemian Rhapsody (Remastered 2011)", c.Name)
 }
 
-func TestCreateFromYouTubeMusic_DataAPIFailureIsFatal(t *testing.T) {
+func TestCreateAudioTrackFromYouTube_DataAPIFailureIsFatal(t *testing.T) {
 	yt := &mockYouTubeClient{getVideoMetadataFn: func(context.Context, string) (*portservices.VideoMetadata, error) {
 		return nil, errors.New("quota")
 	}}
 	svc := services.NewContentService(newFakeMusicRepo(), yt, nil, services.WithMusicEnrichment(fullTrack(), nil, nil), syncRunner())
-	_, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
+	_, err := svc.CreateAudioTrackFromYouTube(context.Background(), musicURL, 7)
 	assert.Error(t, err)
 }
 
-func TestCreateFromYouTubeMusic_DuplicateURL(t *testing.T) {
+func TestCreateAudioTrackFromYouTube_DuplicateURL(t *testing.T) {
 	repo := newFakeMusicRepo()
 	u := musicURL
-	existing := repo.add(&domain.Content{URL: &u, ContentType: domain.ContentTypeYouTubeMusic})
+	existing := repo.add(&domain.Content{URL: &u, ContentType: domain.ContentTypeAudioTrack})
 	svc := services.NewContentService(repo, ytMeta(audioID), nil, syncRunner())
 
-	c, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL+"&list=RDAMVM"+audioID, 7)
+	c, err := svc.CreateAudioTrackFromYouTube(context.Background(), musicURL+"&list=RDAMVM"+audioID, 7)
 	assert.ErrorIs(t, err, domain.ErrAlreadyExists)
 	assert.Equal(t, existing.ID, c.ID)
 }
 
-func TestCreateFromYouTubeMusic_DuplicateISRCAddsRelatedMedia(t *testing.T) {
+func TestCreateAudioTrackFromYouTube_DuplicateISRCAddsRelatedMedia(t *testing.T) {
 	repo := newFakeMusicRepo()
 	u := "https://music.youtube.com/watch?v=OTHEROTHER1"
-	existing := repo.add(&domain.Content{URL: &u, ContentType: domain.ContentTypeYouTubeMusic, Response: json.RawMessage(`{"isrc":"GBUM71029604","relatedMedia":[]}`)})
+	existing := repo.add(&domain.Content{URL: &u, ContentType: domain.ContentTypeAudioTrack, Response: json.RawMessage(`{"isrc":"GBUM71029604","relatedMedia":[]}`)})
 	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(fullTrack(), isrcMatch(), nil), syncRunner())
 
-	c, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
+	c, err := svc.CreateAudioTrackFromYouTube(context.Background(), musicURL, 7)
 	assert.ErrorIs(t, err, domain.ErrAlreadyExists)
 	assert.Equal(t, existing.ID, c.ID)
 	assert.Len(t, repo.rows, 1, "no second row for the same recording")
@@ -260,13 +260,13 @@ func TestCreateFromYouTubeMusic_DuplicateISRCAddsRelatedMedia(t *testing.T) {
 	assert.Equal(t, "duplicate-isrc", refs[0].AddedFrom)
 }
 
-func TestCreateFromYouTubeMusic_LinksExistingVideoRow(t *testing.T) {
+func TestCreateAudioTrackFromYouTube_LinksExistingVideoRow(t *testing.T) {
 	repo := newFakeMusicRepo()
 	vu := "https://www.youtube.com/watch?v=" + videoID
 	video := repo.add(&domain.Content{URL: &vu, ContentType: domain.ContentTypeYouTubeVideo})
 	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(fullTrack(), nil, nil), syncRunner())
 
-	c, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
+	c, err := svc.CreateAudioTrackFromYouTube(context.Background(), musicURL, 7)
 	require.NoError(t, err)
 	var refs []domain.RelatedMedia
 	repo.field(t, c.ID, "relatedMedia", &refs)
@@ -275,20 +275,20 @@ func TestCreateFromYouTubeMusic_LinksExistingVideoRow(t *testing.T) {
 	assert.Equal(t, video.ID, *refs[0].ContentID)
 }
 
-func TestCreateFromYouTubeMusic_RejectsNonTracks(t *testing.T) {
+func TestCreateAudioTrackFromYouTube_RejectsNonTracks(t *testing.T) {
 	svc := services.NewContentService(newFakeMusicRepo(), ytMeta(audioID), nil)
-	_, err := svc.CreateFromYouTubeMusic(context.Background(), "https://music.youtube.com/playlist?list=OLAK5uy_x", 7)
+	_, err := svc.CreateAudioTrackFromYouTube(context.Background(), "https://music.youtube.com/playlist?list=OLAK5uy_x", 7)
 	assert.ErrorIs(t, err, domain.ErrNotATrack)
-	_, err = svc.CreateFromYouTubeMusic(context.Background(), "https://www.youtube.com/watch?v="+audioID, 7)
+	_, err = svc.CreateAudioTrackFromYouTube(context.Background(), "https://www.youtube.com/watch?v="+audioID, 7)
 	assert.ErrorIs(t, err, domain.ErrInvalidURL)
-	_, err = svc.CreateFromYouTubeMusic(context.Background(), "https://example.com", 7)
+	_, err = svc.CreateAudioTrackFromYouTube(context.Background(), "https://example.com", 7)
 	assert.ErrorIs(t, err, domain.ErrInvalidURL)
 }
 
 func TestPromoteRelatedMedia(t *testing.T) {
 	repo := newFakeMusicRepo()
 	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(fullTrack(), nil, nil), syncRunner())
-	track, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
+	track, err := svc.CreateAudioTrackFromYouTube(context.Background(), musicURL, 7)
 	require.NoError(t, err)
 
 	// CreateFromYouTube (reused for promotion) derives the ID via the client.
@@ -320,7 +320,7 @@ func TestPromoteRelatedMedia(t *testing.T) {
 func TestMarkRelatedMediaUnavailable(t *testing.T) {
 	repo := newFakeMusicRepo()
 	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(fullTrack(), nil, nil), syncRunner())
-	track, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
+	track, err := svc.CreateAudioTrackFromYouTube(context.Background(), musicURL, 7)
 	require.NoError(t, err)
 
 	require.NoError(t, svc.MarkRelatedMediaUnavailable(context.Background(), track.ID, videoID))
@@ -353,7 +353,7 @@ func TestCheckLyrics(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := newFakeMusicRepo()
 			u := musicURL
-			c := repo.add(&domain.Content{Name: "Bohemian Rhapsody", URL: &u, ContentType: domain.ContentTypeYouTubeMusic, Length: &length, Response: tt.response})
+			c := repo.add(&domain.Content{Name: "Bohemian Rhapsody", URL: &u, ContentType: domain.ContentTypeAudioTrack, Length: &length, Response: tt.response})
 			lyr := &fakeLyrics{match: &portservices.LyricsMatch{Available: false}}
 			svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(nil, nil, lyr))
 

@@ -233,11 +233,11 @@ type ComplexityRoot struct {
 	Mutation struct {
 		AddThreadParticipants           func(childComplexity int, threadID string, userIds []string) int
 		ClearPassageDisplayTitle        func(childComplexity int, contentID int) int
+		CreateAudioTrack                func(childComplexity int, input model.CreateContentFromYouTubeInput) int
 		CreateClaim                     func(childComplexity int, input model.CreateClaimInput) int
 		CreateContentFromMovie          func(childComplexity int, input model.CreateContentFromMovieInput) int
 		CreateContentFromPassage        func(childComplexity int, input model.CreateContentFromPassageInput) int
 		CreateContentFromYouTube        func(childComplexity int, input model.CreateContentFromYouTubeInput) int
-		CreateContentFromYouTubeMusic   func(childComplexity int, input model.CreateContentFromYouTubeInput) int
 		CreateMessageThread             func(childComplexity int, input model.CreateMessageThreadInput) int
 		CreatePerspective               func(childComplexity int, input model.CreatePerspectiveInput) int
 		CreateTodoAction                func(childComplexity int, input model.CreateTodoActionInput) int
@@ -523,7 +523,7 @@ type MessageThreadResolver interface {
 type MutationResolver interface {
 	CreateContentFromYouTube(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error)
 	UpdateContentSourceData(ctx context.Context, contentID int) (*model.Content, error)
-	CreateContentFromYouTubeMusic(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error)
+	CreateAudioTrack(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error)
 	PromoteRelatedMedia(ctx context.Context, contentID int, videoID string) (*model.Content, error)
 	MarkRelatedMediaUnavailable(ctx context.Context, contentID int, videoID string) (*model.Content, error)
 	RefreshLyricsAvailability(ctx context.Context, contentID int) (*model.Content, error)
@@ -1380,6 +1380,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.ClearPassageDisplayTitle(childComplexity, args["contentId"].(int)), true
+	case "Mutation.createAudioTrack":
+		if e.ComplexityRoot.Mutation.CreateAudioTrack == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createAudioTrack_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateAudioTrack(childComplexity, args["input"].(model.CreateContentFromYouTubeInput)), true
 	case "Mutation.createClaim":
 		if e.ComplexityRoot.Mutation.CreateClaim == nil {
 			break
@@ -1424,17 +1435,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateContentFromYouTube(childComplexity, args["input"].(model.CreateContentFromYouTubeInput)), true
-	case "Mutation.createContentFromYouTubeMusic":
-		if e.ComplexityRoot.Mutation.CreateContentFromYouTubeMusic == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_createContentFromYouTubeMusic_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.ComplexityRoot.Mutation.CreateContentFromYouTubeMusic(childComplexity, args["input"].(model.CreateContentFromYouTubeInput)), true
 	case "Mutation.createMessageThread":
 		if e.ComplexityRoot.Mutation.CreateMessageThread == nil {
 			break
@@ -3124,10 +3124,10 @@ type Content {
   # less than perspectiveCount since Quality is optional. Meant for a tooltip
   # on the average rating display ("N quality ratings").
   qualityRatingCount: Int
-  # YOUTUBE_MUSIC: other uploads of the same song. References only; they are not
+  # AUDIO_TRACK: other uploads of the same song. References only; they are not
   # content rows unless a user promotes one (contentId is then set). Empty otherwise.
   relatedMedia: [RelatedMedia!]!
-  # YOUTUBE_MUSIC: whether LRCLIB has lyrics. Lyrics text is never stored or served.
+  # AUDIO_TRACK: whether LRCLIB has lyrics. Lyrics text is never stored or served.
   # Null until the first check has run.
   lyrics: LyricsAvailability
   createdAt: String!
@@ -3201,7 +3201,7 @@ enum ContentType {
   YOUTUBE_VIDEO
   CLAIM
   BIBLE_PASSAGE
-  YOUTUBE_MUSIC
+  AUDIO_TRACK
   MOVIE
 }
 
@@ -3452,7 +3452,8 @@ type Mutation {
   updateContentSourceData(contentId: IntID!): Content! @auth
 
   # YouTube Music mutations
-  createContentFromYouTubeMusic(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
+  "Adds an AUDIO_TRACK from a music.youtube.com song link. Returns the existing row when it is already stored."
+  createAudioTrack(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   # Explicit user action: make a related video its own YOUTUBE item. Returns that item.
   promoteRelatedMedia(contentId: IntID!, videoId: String!): Content! @auth
   # Called by the player when a related video cannot be embedded. Returns the track.
@@ -4713,6 +4714,20 @@ func (ec *executionContext) field_Mutation_clearPassageDisplayTitle_args(ctx con
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_createAudioTrack_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.CreateContentFromYouTubeInput, error) {
+			return ec.unmarshalNCreateContentFromYouTubeInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromYouTubeInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createClaim_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -4747,20 +4762,6 @@ func (ec *executionContext) field_Mutation_createContentFromPassage_args(ctx con
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.CreateContentFromPassageInput, error) {
 			return ec.unmarshalNCreateContentFromPassageInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromPassageInput(ctx, v)
-		})
-	if err != nil {
-		return nil, err
-	}
-	args["input"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_createContentFromYouTubeMusic_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
-		func(ctx context.Context, v any) (model.CreateContentFromYouTubeInput, error) {
-			return ec.unmarshalNCreateContentFromYouTubeInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromYouTubeInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -8878,17 +8879,17 @@ func (ec *executionContext) fieldContext_Mutation_updateContentSourceData(ctx co
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_createContentFromYouTubeMusic(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_createAudioTrack(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Mutation_createContentFromYouTubeMusic(ctx, field)
+			return ec.fieldContext_Mutation_createAudioTrack(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().CreateContentFromYouTubeMusic(ctx, fc.Args["input"].(model.CreateContentFromYouTubeInput))
+			return ec.Resolvers.Mutation().CreateAudioTrack(ctx, fc.Args["input"].(model.CreateContentFromYouTubeInput))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
@@ -8911,7 +8912,7 @@ func (ec *executionContext) _Mutation_createContentFromYouTubeMusic(ctx context.
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_Mutation_createContentFromYouTubeMusic(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_createAudioTrack(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -8928,7 +8929,7 @@ func (ec *executionContext) fieldContext_Mutation_createContentFromYouTubeMusic(
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_createContentFromYouTubeMusic_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Mutation_createAudioTrack_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -19525,9 +19526,9 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "createContentFromYouTubeMusic":
+		case "createAudioTrack":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_createContentFromYouTubeMusic(ctx, field)
+				return ec._Mutation_createAudioTrack(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++

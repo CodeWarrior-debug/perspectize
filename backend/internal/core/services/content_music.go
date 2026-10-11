@@ -22,7 +22,7 @@ const (
 	lyricsCheckTimeout = 10 * time.Second
 )
 
-// WithMusicEnrichment enables YOUTUBE_MUSIC enrichment and lyrics checks. Any client may be nil;
+// WithMusicEnrichment enables AUDIO_TRACK enrichment and lyrics checks. Any client may be nil;
 // the matching enrichment step is then skipped.
 func WithMusicEnrichment(yt portservices.YTMusicClient, mb portservices.MusicBrainzClient, lyrics portservices.LyricsClient) ContentServiceOption {
 	return func(s *ContentService) {
@@ -43,11 +43,11 @@ func (s *ContentService) runAsync(f func()) {
 	go f()
 }
 
-// CreateFromYouTubeMusic creates a YOUTUBE_MUSIC row from a music.youtube.com track URL.
+// CreateAudioTrackFromYouTube creates a AUDIO_TRACK row from a music.youtube.com track URL.
 // Only the YouTube Data API call is fatal; YouTube Music and MusicBrainz enrichment are
 // best-effort. A duplicate (by URL or ISRC) returns the existing row with ErrAlreadyExists
 // after recording the pasted video as related media.
-func (s *ContentService) CreateFromYouTubeMusic(ctx context.Context, url string, userID int) (*domain.Content, error) {
+func (s *ContentService) CreateAudioTrackFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error) {
 	kind, videoID, err := youtube.ClassifyURL(url)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidURL, err)
@@ -98,7 +98,7 @@ func (s *ContentService) CreateFromYouTubeMusic(ctx context.Context, url string,
 	content := &domain.Content{
 		Name:          metadata.Title,
 		URL:           &canonicalURL,
-		ContentType:   domain.ContentTypeYouTubeMusic,
+		ContentType:   domain.ContentTypeAudioTrack,
 		AddedByUserID: userID,
 		Length:        &metadata.Duration,
 		LengthUnits:   &lengthUnits,
@@ -128,7 +128,7 @@ func (s *ContentService) CreateFromYouTubeMusic(ctx context.Context, url string,
 	return created, nil
 }
 
-// musicFields are the top-level response keys a YOUTUBE_MUSIC row adds beside the
+// musicFields are the top-level response keys a AUDIO_TRACK row adds beside the
 // YouTube Data API payload.
 type musicFields struct {
 	VideoID           string                `json:"videoId"`
@@ -340,7 +340,7 @@ func (s *ContentService) CheckLyrics(ctx context.Context, contentID int, force b
 	if err != nil {
 		return nil, err
 	}
-	if c.ContentType != domain.ContentTypeYouTubeMusic {
+	if c.ContentType != domain.ContentTypeAudioTrack {
 		return nil, fmt.Errorf("%w: lyrics are only checked for music tracks", domain.ErrInvalidInput)
 	}
 	summary := readMusicSummary(c)

@@ -220,10 +220,10 @@ type Content {
   # less than perspectiveCount since Quality is optional. Meant for a tooltip
   # on the average rating display ("N quality ratings").
   qualityRatingCount: Int
-  # YOUTUBE_MUSIC: other uploads of the same song. References only; they are not
+  # AUDIO_TRACK: other uploads of the same song. References only; they are not
   # content rows unless a user promotes one (contentId is then set). Empty otherwise.
   relatedMedia: [RelatedMedia!]!
-  # YOUTUBE_MUSIC: whether LRCLIB has lyrics. Lyrics text is never stored or served.
+  # AUDIO_TRACK: whether LRCLIB has lyrics. Lyrics text is never stored or served.
   # Null until the first check has run.
   lyrics: LyricsAvailability
   createdAt: String!
@@ -297,7 +297,7 @@ enum ContentType {
   YOUTUBE_VIDEO
   CLAIM
   BIBLE_PASSAGE
-  YOUTUBE_MUSIC
+  AUDIO_TRACK
   MOVIE
 }
 
@@ -548,7 +548,8 @@ type Mutation {
   updateContentSourceData(contentId: IntID!): Content! @auth
 
   # YouTube Music mutations
-  createContentFromYouTubeMusic(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
+  "Adds an AUDIO_TRACK from a music.youtube.com song link. Returns the existing row when it is already stored."
+  createAudioTrack(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   # Explicit user action: make a related video its own YOUTUBE item. Returns that item.
   promoteRelatedMedia(contentId: IntID!, videoId: String!): Content! @auth
   # Called by the player when a related video cannot be embedded. Returns the track.

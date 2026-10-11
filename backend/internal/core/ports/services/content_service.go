@@ -32,9 +32,9 @@ type ContentService interface {
 	// If the movie already exists, returns the existing content along with ErrAlreadyExists.
 	CreateFromMovie(ctx context.Context, rawURL string, userID int) (*domain.Content, error)
 
-	// CreateFromYouTubeMusic creates a YOUTUBE_MUSIC row from a music.youtube.com track URL.
+	// CreateAudioTrackFromYouTube creates a AUDIO_TRACK row from a music.youtube.com track URL.
 	// Duplicates (by URL or ISRC) return the existing row along with ErrAlreadyExists.
-	CreateFromYouTubeMusic(ctx context.Context, url string, userID int) (*domain.Content, error)
+	CreateAudioTrackFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error)
 
 	// PromoteRelatedMedia makes a related video its own YOUTUBE row (or finds it) and links both ways.
 	PromoteRelatedMedia(ctx context.Context, contentID int, videoID string, userID int) (*domain.Content, error)

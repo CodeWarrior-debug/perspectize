@@ -12,7 +12,7 @@ const (
 	ContentTypeYouTubeVideo ContentType = "YOUTUBE_VIDEO"
 	ContentTypeClaim        ContentType = "CLAIM"
 	ContentTypeBiblePassage ContentType = "BIBLE_PASSAGE"
-	ContentTypeYouTubeMusic ContentType = "YOUTUBE_MUSIC"
+	ContentTypeAudioTrack   ContentType = "AUDIO_TRACK"
 	ContentTypeMovie        ContentType = "MOVIE"
 )
 

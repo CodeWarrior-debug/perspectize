@@ -20,7 +20,7 @@ func musicYT() *mockYouTubeClient {
 	}}
 }
 
-func TestCreateContentFromYouTubeMusic_Success(t *testing.T) {
+func TestCreateAudioTrack_Success(t *testing.T) {
 	repo := &mockContentRepository{
 		getOrCreateByURLFn: func(_ context.Context, c *domain.Content) (*domain.Content, bool, error) {
 			c.ID = 5
@@ -30,7 +30,7 @@ func TestCreateContentFromYouTubeMusic_Success(t *testing.T) {
 	server := setupTestServer(repo, musicYT())
 	defer server.Close()
 
-	result := executeGraphQL(t, server, `mutation { createContentFromYouTubeMusic(input: { url: "`+trackURL+`", userId: 0 }) {
+	result := executeGraphQL(t, server, `mutation { createAudioTrack(input: { url: "`+trackURL+`", userId: 0 }) {
 		content { id contentType url relatedMedia { videoId } lyrics { available } } alreadyExisted } }`)
 	require.Empty(t, result.Errors)
 
@@ -44,11 +44,11 @@ func TestCreateContentFromYouTubeMusic_Success(t *testing.T) {
 				Lyrics       *json.RawMessage  `json:"lyrics"`
 			} `json:"content"`
 			AlreadyExisted bool `json:"alreadyExisted"`
-		} `json:"createContentFromYouTubeMusic"`
+		} `json:"createAudioTrack"`
 	}
 	require.NoError(t, json.Unmarshal(result.Data, &data))
 	assert.Equal(t, "5", data.Create.Content.ID)
-	assert.Equal(t, "YOUTUBE_MUSIC", data.Create.Content.ContentType)
+	assert.Equal(t, "AUDIO_TRACK", data.Create.Content.ContentType)
 	assert.Equal(t, trackURL, data.Create.Content.URL)
 	assert.NotNil(t, data.Create.Content.RelatedMedia, "relatedMedia is a non-null list")
 	assert.Empty(t, data.Create.Content.RelatedMedia)
@@ -56,7 +56,7 @@ func TestCreateContentFromYouTubeMusic_Success(t *testing.T) {
 	assert.False(t, data.Create.AlreadyExisted)
 }
 
-func TestCreateContentFromYouTubeMusic_ErrorMessages(t *testing.T) {
+func TestCreateAudioTrack_ErrorMessages(t *testing.T) {
 	server := setupTestServer(&mockContentRepository{}, musicYT())
 	defer server.Close()
 
@@ -65,7 +65,7 @@ func TestCreateContentFromYouTubeMusic_ErrorMessages(t *testing.T) {
 		"https://www.youtube.com/watch?v=dQw4w9WgXcQ":       "invalid YouTube Music URL",
 	}
 	for url, want := range tests {
-		result := executeGraphQL(t, server, `mutation { createContentFromYouTubeMusic(input: { url: "`+url+`", userId: 0 }) { alreadyExisted } }`)
+		result := executeGraphQL(t, server, `mutation { createAudioTrack(input: { url: "`+url+`", userId: 0 }) { alreadyExisted } }`)
 		require.NotEmpty(t, result.Errors, url)
 		assert.Contains(t, result.Errors[0].Message, want)
 	}
@@ -80,7 +80,7 @@ func TestRefreshLyricsAvailability_MapsStoredFields(t *testing.T) {
 	})
 	repo := &mockContentRepository{
 		getByIDFn: func(_ context.Context, id int) (*domain.Content, error) {
-			return &domain.Content{ID: id, Name: "Song", URL: &u, ContentType: domain.ContentTypeYouTubeMusic, Response: resp}, nil
+			return &domain.Content{ID: id, Name: "Song", URL: &u, ContentType: domain.ContentTypeAudioTrack, Response: resp}, nil
 		},
 	}
 	server := setupTestServer(repo, musicYT())
@@ -136,7 +136,7 @@ func TestMarkRelatedMediaUnavailable_UnknownVideo(t *testing.T) {
 	u := trackURL
 	repo := &mockContentRepository{
 		getByIDFn: func(_ context.Context, id int) (*domain.Content, error) {
-			return &domain.Content{ID: id, URL: &u, ContentType: domain.ContentTypeYouTubeMusic, Response: json.RawMessage(`{"relatedMedia":[]}`)}, nil
+			return &domain.Content{ID: id, URL: &u, ContentType: domain.ContentTypeAudioTrack, Response: json.RawMessage(`{"relatedMedia":[]}`)}, nil
 		},
 	}
 	server := setupTestServer(repo, musicYT())

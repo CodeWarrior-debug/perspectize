@@ -35,7 +35,7 @@ type ContentRepository interface {
 	SetDisplayTitleIfEmpty(ctx context.Context, contentID int, title string) (string, error)
 	// ClearDisplayTitle resets display_title to NULL (admin escape hatch) so it can be set again.
 	ClearDisplayTitle(ctx context.Context, contentID int) error
-	// GetByISRC returns the YOUTUBE_MUSIC row whose response carries this ISRC.
+	// GetByISRC returns the AUDIO_TRACK row whose response carries this ISRC.
 	GetByISRC(ctx context.Context, isrc string) (*domain.Content, error)
 	// SetResponseKey atomically sets one top-level key of the response JSONB,
 	// leaving every other key untouched. Returns ErrNotFound if the row is missing.

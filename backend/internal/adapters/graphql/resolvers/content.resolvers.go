@@ -376,8 +376,8 @@ func (r *mutationResolver) UpdateContentSourceData(ctx context.Context, contentI
 	return domainToModel(content), nil
 }
 
-// CreateContentFromYouTubeMusic is the resolver for the createContentFromYouTubeMusic field.
-func (r *mutationResolver) CreateContentFromYouTubeMusic(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error) {
+// CreateAudioTrack is the resolver for the createAudioTrack field.
+func (r *mutationResolver) CreateAudioTrack(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error) {
 	authUser, err := auth.RequireAuth(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("access denied: authentication required")
@@ -386,7 +386,7 @@ func (r *mutationResolver) CreateContentFromYouTubeMusic(ctx context.Context, in
 		return nil, fmt.Errorf("access denied: cannot create content for another user")
 	}
 
-	content, err := r.ContentService.CreateFromYouTubeMusic(ctx, input.URL, authUser.ID)
+	content, err := r.ContentService.CreateAudioTrackFromYouTube(ctx, input.URL, authUser.ID)
 	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
 		return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: true}, nil
 	}

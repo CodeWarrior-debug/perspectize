@@ -341,7 +341,7 @@ func TestOwner_ResourceNotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "resource not found")
 }
 
-func (m *mockContentService) CreateFromYouTubeMusic(ctx context.Context, url string, userID int) (*domain.Content, error) {
+func (m *mockContentService) CreateAudioTrackFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error) {
 	return nil, nil
 }
 
