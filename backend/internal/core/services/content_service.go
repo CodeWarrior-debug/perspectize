@@ -29,6 +29,8 @@ type ContentService struct {
 	movieClient   portservices.MovieClient
 	movieSearch   portservices.MovieSearchClient
 	movieTrending portservices.MovieTrendingClient
+	audio         repositories.AudioTrackRepository
+	genres        repositories.MusicGenreRepository
 }
 
 // ContentServiceOption configures optional ContentService dependencies.

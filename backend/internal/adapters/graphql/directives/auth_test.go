@@ -356,3 +356,19 @@ func (m *mockContentService) MarkRelatedMediaUnavailable(ctx context.Context, co
 func (m *mockContentService) CheckLyrics(ctx context.Context, contentID int, force bool) (*domain.LyricsAvailability, error) {
 	return nil, nil
 }
+
+func (m *mockContentService) CreateAudioTrack(context.Context, portservices.CreateAudioTrackInput) (*portservices.CreateAudioTrackResult, error) {
+	return nil, nil
+}
+func (m *mockContentService) MusicGenres(context.Context) ([]domain.MusicGenre, error) {
+	return nil, nil
+}
+func (m *mockContentService) SetTrackGenre(context.Context, int, int, int) (*domain.Content, error) {
+	return nil, nil
+}
+func (m *mockContentService) TrackLinksByContentIDs(context.Context, []int) (map[int][]domain.TrackLink, error) {
+	return nil, nil
+}
+func (m *mockContentService) MarkTrackLinkUnavailable(context.Context, int) (*domain.TrackLink, error) {
+	return nil, nil
+}
