@@ -1,3 +1,4 @@
+import type { LengthDisplay } from '$lib/queries/content';
 import { gql } from 'graphql-request';
 
 /**
@@ -10,6 +11,15 @@ import { gql } from 'graphql-request';
  * as "no perspective" (see the UI gap audit, gap #4).
  */
 export const MAX_PERSPECTIVES_PER_LIST = 100;
+
+/** Prefix of the placeholder id useCreatePerspective gives its optimistic row
+ *  until the server returns the real one. */
+export const OPTIMISTIC_PREFIX = 'optimistic-';
+
+/** True for an optimistic row's placeholder id — not yet addressable by id on the server. */
+export function isOptimisticId(id: string | null | undefined): boolean {
+	return typeof id === 'string' && id.startsWith(OPTIMISTIC_PREFIX);
+}
 
 export interface FeelingEntry {
 	emoji: string;
@@ -44,6 +54,10 @@ export interface CreatePerspectiveResponse {
 
 export interface UpdatePerspectiveResponse {
 	updatePerspective: PerspectiveItem;
+}
+
+export interface DeletePerspectiveResponse {
+	deletePerspective: boolean;
 }
 
 export interface ListPerspectivesByUserResponse {
@@ -100,6 +114,15 @@ export const UPDATE_PERSPECTIVE = gql`
 	}
 `;
 
+// Owner-only on the server (@auth @owner directive, an actor check in
+// PerspectiveService.Delete, and a user_id-scoped DELETE in the repository), so
+// the UI hiding the button for non-owners is a courtesy, not the enforcement.
+export const DELETE_PERSPECTIVE = gql`
+	mutation DeletePerspective($id: ID!) {
+		deletePerspective(id: $id)
+	}
+`;
+
 export const LIST_PERSPECTIVES_BY_USER = gql`
 	${PERSPECTIVE_FIELDS}
 	query ListPerspectivesByUser($userID: IntID, $first: Int) {
@@ -113,7 +136,9 @@ export const LIST_PERSPECTIVES_BY_USER = gql`
 
 export interface ListPerspectivesByContentResponse {
 	perspectives: {
-		items: PerspectiveItem[];
+		// `user` comes from the server on fetch; rows patched in by the
+		// create/update hooks (own rows only) don't carry it.
+		items: (PerspectiveItem & { user?: { id: string; username: string } | null })[];
 	};
 }
 
@@ -127,63 +152,12 @@ export const LIST_PERSPECTIVES_BY_CONTENT = gql`
 		perspectives(filter: { contentID: $contentID }, first: $first) {
 			items {
 				...PerspectiveFields
-			}
-		}
-	}
-`;
-
-// Activity feed: recent perspectives across all users, newest updated first.
-// The backend's default read-authorization (RestrictToPublicOrOwner) already
-// scopes this to public rows plus the signed-in viewer's own — passing an
-// explicit `privacy: PUBLIC` filter additionally hides the viewer's own
-// private perspectives, which is how the "include my private perspectives"
-// toggle on the user-activity view is implemented client-side.
-export interface ActivityPerspectiveItem {
-	id: string;
-	userID: string;
-	contentID: string | null;
-	privacy: string;
-	description: string | null;
-	content: {
-		id: string;
-		name: string;
-		url: string | null;
-		channelTitle: string | null;
-		length: number | null;
-		lengthUnits: string | null;
-	} | null;
-	createdAt: string;
-	updatedAt: string;
-}
-
-export interface ListActivityPerspectivesResponse {
-	perspectives: {
-		items: ActivityPerspectiveItem[];
-	};
-}
-
-// Selects the same thumbnail-card fields as LIST_CONTENT (url/channelTitle/length/
-// lengthUnits) on the nested content, so the by-user activity view can render a
-// perspective event with the same card look as a content-added event.
-export const LIST_ACTIVITY_PERSPECTIVES = gql`
-	query ListActivityPerspectives($first: Int, $filter: PerspectiveFilter) {
-		perspectives(first: $first, sortBy: UPDATED_AT, sortOrder: DESC, filter: $filter) {
-			items {
-				id
-				userID
-				contentID
-				privacy
-				description
-				content {
+				# Batched server-side; replaces downloading the whole users table
+				# just to label the Compare picker.
+				user {
 					id
-					name
-					url
-					channelTitle
-					length
-					lengthUnits
+					username
 				}
-				createdAt
-				updatedAt
 			}
 		}
 	}

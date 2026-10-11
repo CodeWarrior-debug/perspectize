@@ -12,68 +12,72 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/99designs/gqlgen/graphql/handler"
-	"github.com/99designs/gqlgen/graphql/handler/extension"
-	"github.com/99designs/gqlgen/graphql/handler/lru"
-	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
-	graphqldl "github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/dataloader"
-	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/directives"
-	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/generated"
-	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/resolvers"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/lrclib"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/musicbrainz"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/realtime"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/cached"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/handlers"
-	apimw "github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/middleware"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/wikidata"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/ytmusic"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/config"
-	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/server"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/database"
-	gqltiming "github.com/CodeWarrior-debug/perspectize/backend/pkg/graphql"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/logger"
-	perfmw "github.com/CodeWarrior-debug/perspectize/backend/pkg/middleware"
+	"github.com/CodeWarrior-debug/perspectize/backend/pkg/telemetry"
 	"github.com/clerk/clerk-sdk-go/v2"
-	coderws "github.com/coder/websocket"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
-	"github.com/vektah/gqlparser/v2/ast"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	otelruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"gorm.io/gorm"
 )
 
 func main() {
 	// Configure structured JSON logging for Sevalla log viewer
 	logger.Setup()
 
-	// Initialize OTel tracing when OTEL_EXPORTER_OTLP_ENDPOINT is set.
-	// The OTLP HTTP exporter reads OTEL_EXPORTER_OTLP_ENDPOINT,
-	// OTEL_EXPORTER_OTLP_HEADERS, and OTEL_SERVICE_NAME automatically.
-	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
-		shutdown, err := initTracer(context.Background())
-		if err != nil {
-			slog.Warn("failed to initialize OpenTelemetry", "error", err)
-		} else {
-			defer shutdown(context.Background())
-			slog.Info("OpenTelemetry tracing enabled")
-		}
-	}
-
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
 		if os.Getenv("APP_ENV") != "production" {
 			slog.Warn(".env file not found", "hint", "set APP_ENV=production to suppress")
+		}
+	}
+
+	// Initialize OpenTelemetry (Tracer/Meter/Logger providers). This is a
+	// no-op, warn-and-continue setup: when OTEL_EXPORTER_OTLP_ENDPOINT is
+	// unset (local dev, CI), telemetry.Setup leaves the default no-op
+	// providers in place and returns a no-op shutdown.
+	telemetryShutdown, err := telemetry.Setup(context.Background(), telemetry.Config{
+		Environment: os.Getenv("APP_ENV"),
+	})
+	if err != nil {
+		slog.Warn("failed to initialize OpenTelemetry", "error", err)
+	} else {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := telemetryShutdown(ctx); err != nil {
+				slog.Warn("failed to shut down OpenTelemetry", "error", err)
+			}
+		}()
+		if telemetry.Enabled() {
+			// stdout JSON stays as-is; Info+ records are also exported via OTLP.
+			logger.EnableOTLP(nil)
+			if err := otelruntime.Start(otelruntime.WithMeterProvider(otel.GetMeterProvider())); err != nil {
+				slog.Warn("go runtime metrics not started", "error", err)
+			}
+			if _, err := telemetry.RegisterBuildInfo(telemetry.Meter()); err != nil {
+				slog.Warn("app.build.info metric not registered", "error", err)
+			}
+			slog.Info("OpenTelemetry enabled")
 		}
 	}
 
@@ -112,8 +116,21 @@ func main() {
 	sqlDB, _ := db.DB()
 	defer sqlDB.Close()
 
+	// Pool gauges (idle/used/max/wait) — no-op until a MeterProvider is installed.
+	if _, err := database.RegisterPoolMetrics(telemetry.Meter(), sqlDB); err != nil {
+		slog.Warn("db pool metrics not registered", "error", err)
+	}
+
 	// Register slow query logger (logs queries >100ms)
 	database.RegisterSlowQueryLogger(db)
+
+	// Register the in-house GORM tracing callbacks: one span per SQL
+	// statement, no bind-variable recording (db.query.text is always the
+	// parameterized statement, never Dialector.Explain()'d). Warn-and-
+	// continue: a failure here must not prevent the server from starting.
+	if err := instrumentDB(db); err != nil {
+		slog.Warn("gorm tracing callbacks not registered", "error", err)
+	}
 
 	// Test connection
 	if err := database.PingGORM(context.Background(), db); err != nil {
@@ -155,34 +172,67 @@ func main() {
 		log.Fatal(err)
 	}
 	var youtubeClient portservices.YouTubeClient
+	// Discover's Trending feed; left nil in demo mode (no fixture for it), so
+	// youtubeTrending reports "not configured" there.
+	var trendingClient portservices.YouTubeTrendingClient
 	if demoCfg.Enabled {
 		slog.Warn("DEMO MODE ENABLED — unsigned demo.<persona> tokens are accepted; never expose this instance publicly with real data")
 		youtubeClient = youtube.NewFixtureClient()
 	} else {
-		youtubeClient = youtube.NewCachingClient(
+		// The same client also caches the Discover page's Trending chart
+		// (YOUTUBE_TRENDING_CACHE_TTL_SECONDS, default 1 hour).
+		cachingClient := youtube.NewCachingClient(
 			youtube.NewClient(cfg.YouTube.APIKey),
 			time.Duration(cfg.YouTube.CacheTTLSeconds)*time.Second,
+			youtube.WithTrendingTTL(time.Duration(cfg.YouTube.TrendingCacheTTLSeconds)*time.Second),
 		)
-		slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds)
+		youtubeClient = cachingClient
+		trendingClient = cachingClient
+		slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds, "trendingTTLSeconds", cfg.YouTube.TrendingCacheTTLSeconds)
+	}
+	// Movie lookups and Discover's Movies search share one TMDB client.
+	var movieClient portservices.MovieClient = tmdb.UnconfiguredClient{}
+	var movieSearchClient portservices.MovieSearchClient = tmdb.UnconfiguredClient{}
+	var movieTrendingClient portservices.MovieTrendingClient = tmdb.UnconfiguredClient{}
+	if cfg.TMDBReadAccessToken != "" {
+		tmdbClient := tmdb.NewClient(cfg.TMDBReadAccessToken)
+		movieClient = tmdbClient
+		movieSearchClient = tmdbClient
+		// Trending is cached (1h, per window + page); search stays uncached.
+		movieTrendingClient = tmdb.NewTrendingCache(tmdbClient, tmdb.DefaultTrendingTTL)
+	} else {
+		slog.Warn("TMDB_API_READ_ACCESS_TOKEN is empty — movie lookups will fail")
 	}
 	wikidataClient := wikidata.NewClient()
 	contentRepo := postgres.NewGormContentRepository(db)
-	userRepo := postgres.NewGormUserRepository(db)
+	// Cached: the auth middleware resolves the Clerk ID -> user on every
+	// authenticated request. All user writes go through this same instance so
+	// they invalidate it (see cached.UserRepository).
+	userRepo := cached.NewUserRepository(postgres.NewGormUserRepository(db), cached.DefaultUserTTL)
 	perspectiveRepo := postgres.NewGormPerspectiveRepository(db)
-	categoryRepo := postgres.NewGormCategoryRepository(db)
-	threadRepo := postgres.NewGormThreadRepository(db)
+	todoRepo := postgres.NewGormUserTodoRepository(db)
+	todoListRepo := postgres.NewGormUserTodoListRepository(db)
+	// Cached: presets never change at runtime and every Plan row resolves its action.
+	todoActionRepo := cached.NewTodoActionRepository(postgres.NewGormTodoActionRepository(db), cached.DefaultTodoActionTTL)
+	// Cached: the content grid resolves every row's primaryCategory through it.
+	categoryRepo := cached.NewCategoryRepository(postgres.NewGormCategoryRepository(db), cached.DefaultCategoryTTL)
+	threadRepo := postgres.NewGormMessageThreadRepository(db)
 	messageRepo := postgres.NewGormMessageRepository(db)
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
 	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
 
 	// Initialize services
-	contentService := services.NewContentService(contentRepo, youtubeClient,
+	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient,
 		services.WithBibleReference(bibleReferenceRepo),
+		services.WithYouTubeTrending(trendingClient),
+		services.WithMovieSearch(movieSearchClient),
+		services.WithMovieTrending(movieTrendingClient),
 		services.WithMusicEnrichment(ytmusic.NewClient(), musicbrainz.NewClient(), lrclib.NewClient()),
 	)
-	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
+	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
+	userTodoService := services.NewUserTodoService(todoRepo, todoListRepo, todoActionRepo)
 	buildInfoService := services.NewBuildInfoService(buildInfoRepo)
 
 	// Messaging realtime plumbing: the hub fans events out in-process, the
@@ -228,96 +278,30 @@ func main() {
 		tokenVerifier = auth.NewDemoTokenVerifier(tokenVerifier)
 	}
 
-	// Initialize GraphQL with directive wiring
-	resolver := resolvers.NewResolver(
-		contentService, userService, perspectiveService, categoryService,
-		messagingService, hub, presence,
-	)
-	directiveRoot := directives.NewDirectiveRoot(contentService, perspectiveService)
-	gqlConfig := generated.Config{
-		Resolvers: resolver,
-		Directives: generated.DirectiveRoot{
-			Auth:  directiveRoot.Auth,
-			Owner: directiveRoot.Owner,
-		},
+	// GraphQL server + API middleware stack (shared with test/roundtrips).
+	apiDeps := server.Deps{
+		ContentService:      contentService,
+		UserService:         userService,
+		PerspectiveService:  perspectiveService,
+		CategoryService:     categoryService,
+		UserTodoService:     userTodoService,
+		MessagingService:    messagingService,
+		UserRepo:            userRepo,
+		ThreadRepo:          threadRepo,
+		Hub:                 hub,
+		Presence:            presence,
+		TokenVerifier:       tokenVerifier,
+		CORSOrigins:         secCfg.CORSOrigins,
+		RateLimitPerMin:     secCfg.RateLimitPerMin,
+		EnableIntrospection: os.Getenv("APP_ENV") != "production",
 	}
-	srv := handler.New(generated.NewExecutableSchema(gqlConfig))
-	srv.AddTransport(transport.Options{})
-	// WebSocket transport for GraphQL subscriptions. InitFunc authenticates the
-	// connection from the graphql-ws connection_init payload, then starts a
-	// presence session that marks the user ONLINE for the life of the socket
-	// and OFFLINE a grace period after the last one closes.
-	srv.AddTransport(transport.Websocket{
-		// gqlgen v0.17.95's default WebsocketImplementation (coder/websocket)
-		// rejects cross-origin upgrades unless told otherwise. Reuse the
-		// configured CORS allowlist instead of same-origin-only.
-		Implementation:        coderWebsocketImplementationFor(secCfg.CORSOrigins),
-		KeepAlivePingInterval: 10 * time.Second,
-		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
-			token := initPayload.Authorization()
-			if token == "" {
-				if v, ok := initPayload["authToken"].(string); ok {
-					token = v
-				}
-			}
-			token = strings.TrimPrefix(token, "Bearer ")
-			if token == "" {
-				return ctx, nil, fmt.Errorf("unauthenticated websocket: missing token")
-			}
-			identity, err := tokenVerifier.Verify(ctx, token)
-			if err != nil || identity.ClerkID == "" {
-				return ctx, nil, fmt.Errorf("unauthenticated websocket: invalid token")
-			}
-			user, err := userRepo.GetByClerkID(ctx, identity.ClerkID)
-			if err != nil || user == nil {
-				return ctx, nil, fmt.Errorf("unauthenticated websocket: unknown user")
-			}
-			authUser := &domain.AuthenticatedUser{
-				ID:       user.ID,
-				ClerkID:  identity.ClerkID,
-				Username: user.Username,
-				Email:    user.Email,
-				Role:     user.Role,
-			}
-			go realtime.RunPresenceSession(ctx, presence, hub, threadRepo, user.ID, realtime.DefaultPresenceConfig())
-			return auth.WithAuthenticatedUser(ctx, authUser), &initPayload, nil
-		},
-	})
-	srv.AddTransport(transport.GET{})
-	srv.AddTransport(transport.POST{})
-	srv.AddTransport(transport.MultipartForm{})
-	srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
-	srv.Use(extension.AutomaticPersistedQuery{
-		Cache: lru.New[string](100),
-	})
-	// C-04: Query complexity limit — reject expensive queries
-	srv.Use(extension.FixedComplexityLimit(500))
-	// C-10: Enable introspection only in non-production
-	if os.Getenv("APP_ENV") != "production" {
-		srv.Use(extension.Introspection{})
-	}
-	srv.AroundOperations(gqltiming.OperationTimer())
+	srv := server.NewGraphQLServer(apiDeps)
 
 	// Setup chi router
 	r := chi.NewRouter()
-
-	// Middleware stack (order matters: rate limit before auth to prevent DoS)
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(apimw.GlobalRateLimit(secCfg.RateLimitPerMin)) // H-11: rate limiting before auth
-	r.Use(cors.Handler(cors.Options{                     // C-05: CORS restricted to config origins
-		AllowedOrigins:   secCfg.CORSOrigins,
-		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders:   []string{"Content-Type", "Authorization"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	}))
-	r.Use(apimw.SecureHeaders())       // M-14: security headers (HSTS, X-Content-Type-Options, X-Frame-Options)
-	r.Use(apimw.ContentTypeValidation) // M-15: CSRF protection via Content-Type
-	r.Use(auth.Middleware(userRepo, tokenVerifier))
-	r.Use(graphqldl.Middleware(categoryService, perspectiveService)) // per-request GraphQL dataloaders (batches Content.primaryCategory, Content.perspectiveCount/averageRating)
-	r.Use(perfmw.RequestTimer)                                       // structured request timing (replaces chi Logger)
-	r.Use(perfmw.Recoverer)                                          // structured panic recovery (JSON via slog)
+	for _, mw := range server.Middleware(apiDeps) {
+		r.Use(mw)
+	}
 
 	// Webhook routes — skip auth middleware; Svix signature provides verification
 	webhookSecret := os.Getenv("CLERK_WEBHOOK_SIGNING_SECRET")
@@ -365,7 +349,7 @@ func main() {
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	server := &http.Server{
 		Addr:         addr,
-		Handler:      r, // chi router
+		Handler:      withTracing(r), // chi router, wrapped in an otelhttp root span
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -393,27 +377,33 @@ func main() {
 	}
 }
 
-// coderWebsocketImplementationFor builds the coder/websocket-backed
-// implementation gqlgen's transport.Websocket uses, honoring the same CORS
-// allowlist as the HTTP transport. A bare "*" (the configured allow-all case)
-// maps to InsecureSkipVerify, since coder/websocket's OriginPatterns
-// deliberately doesn't accept "*" as a pattern (it wants InsecureSkipVerify
-// used explicitly instead, to make an intentionally-open policy visible in
-// the code). Anything else is passed through as an OriginPatterns entry —
-// each pattern already matches "scheme://host" when it contains "://", which
-// is exactly the shape our configured origins are in. The InitFunc still
-// requires a valid token before any data flows regardless of origin.
-func coderWebsocketImplementationFor(allowedOrigins []string) transport.CoderWebsocketImplementation {
-	opts := coderws.AcceptOptions{}
-	for _, allowed := range allowedOrigins {
-		if allowed == "*" {
-			opts.InsecureSkipVerify = true
-			opts.OriginPatterns = nil
-			break
-		}
-		opts.OriginPatterns = append(opts.OriginPatterns, allowed)
-	}
-	return transport.CoderWebsocketImplementation{AcceptOptions: opts}
+// withTracing wraps h in an otelhttp root span per request. WebSocket
+// handshakes are excluded (a span held open for the life of a subscription
+// would be useless), as are /health and /ready, which are polled far too
+// often to be worth a span each. The span name is "METHOD path" — the route
+// set is small and static (/graphql, /webhooks/clerk), so this doesn't
+// create high cardinality.
+func withTracing(h http.Handler) http.Handler {
+	return otelhttp.NewHandler(h, "http.server",
+		otelhttp.WithFilter(func(req *http.Request) bool {
+			if isWebsocketHandshake(req) {
+				return false
+			}
+			return req.URL.Path != "/health" && req.URL.Path != "/ready"
+		}),
+		otelhttp.WithSpanNameFormatter(func(_ string, req *http.Request) string {
+			return req.Method + " " + req.URL.Path
+		}),
+	)
+}
+
+// instrumentDB registers the in-house GORM tracing callbacks (pkg/database):
+// one span per SQL statement, query bind variables never recorded. A nil
+// TracerProvider means the callbacks resolve otel.GetTracerProvider() (or
+// the specific provider passed) lazily on every call, so this can run
+// before telemetry.Setup installs the global provider.
+func instrumentDB(db *gorm.DB) error {
+	return database.RegisterTracing(db, nil)
 }
 
 // clearDeadlinesForWebsocket removes the connection deadlines that
@@ -446,23 +436,4 @@ func isWebsocketHandshake(r *http.Request) bool {
 		strings.EqualFold(r.Header.Get("Upgrade"), "websocket") &&
 		strings.Contains(strings.ToLower(r.Header.Get("Connection")), "upgrade") &&
 		r.Header.Get("Sec-WebSocket-Key") != ""
-}
-
-// initTracer sets up an OTel TracerProvider with an OTLP HTTP exporter.
-// Returns a shutdown function that flushes pending spans on exit.
-func initTracer(ctx context.Context) (func(context.Context) error, error) {
-	exporter, err := otlptracehttp.New(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("creating OTLP exporter: %w", err)
-	}
-
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("perspectize-backend"),
-		)),
-	)
-	otel.SetTracerProvider(tp)
-	return tp.Shutdown, nil
 }

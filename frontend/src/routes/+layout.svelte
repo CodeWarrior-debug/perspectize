@@ -17,7 +17,7 @@
 	import MessagingWidget from '$lib/components/messaging/MessagingWidget.svelte';
 	import GuestLanding from '$lib/components/onboarding/GuestLanding.svelte';
 	import OnboardingShell from '$lib/components/onboarding/OnboardingShell.svelte';
-	import { reportWebVitals } from '$lib/vitals';
+	import { initTelemetry } from '$lib/telemetry';
 	import { watchForNewVersion } from '$lib/utils/versionWatch';
 	import { attachVersionHotkey } from '$lib/utils/versionHotkey';
 	import { printVersionInfo } from '$lib/utils/versionInfo';
@@ -50,7 +50,7 @@
 	});
 
 	onMount(() => {
-		reportWebVitals();
+		void initTelemetry();
 		const stopVersionWatch = watchForNewVersion({
 			check: () => updated.check(),
 			reload: () => location.reload(),

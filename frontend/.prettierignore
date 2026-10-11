@@ -8,3 +8,5 @@ pnpm-lock.yaml
 ios/
 # Hand-laid-out data (one record per line); Prettier would expand it thousands of lines
 src/lib/data/*.json
+reports/
+.stryker-tmp/

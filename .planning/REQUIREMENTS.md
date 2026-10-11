@@ -90,7 +90,7 @@
 | Decision | Options | Status |
 |----------|---------|--------|
 | Frontend hosting | GitHub Pages, Vercel, Cloudflare Pages, Netlify | TBD in Phase 5 |
-| Database provider | Sevalla (current) vs Neon (PostgreSQL 17, better analytics) | TBD — evaluate Neon for analytics drivers |
+| Database provider | Sevalla (current) vs Neon (PostgreSQL 17, better analytics) | Decided: Neon (PostgreSQL 18.6), cut over 2026-10-06; Sevalla DB kept briefly as rollback |
 
 **GitHub Project:** https://github.com/users/CodeWarrior-debug/projects/4
 

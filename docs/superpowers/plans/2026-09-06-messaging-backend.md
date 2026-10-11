@@ -42,13 +42,13 @@
 | `backend/internal/core/domain/messaging.go` | Domain structs (`MessageThread`, `ThreadParticipant`, `Message`) and enums (`ThreadRole`, `PresenceState`). Pure Go. |
 | `backend/internal/core/domain/realtime.go` | Transport-agnostic realtime event structs (`ThreadEvent` and its variants, `InboxEvent`, `EventEnvelope`) and the `Identity` struct. |
 | `backend/internal/core/ports/services/token_verifier.go` | `TokenVerifier` interface. |
-| `backend/internal/core/ports/repositories/thread_repository.go` | `ThreadRepository` interface. |
+| `backend/internal/core/ports/repositories/message_thread_repository.go` | `MessageThreadRepository` interface. |
 | `backend/internal/core/ports/repositories/message_repository.go` | `MessageRepository` interface. |
 | `backend/internal/core/ports/services/messaging_service.go` | `MessagingService` interface + input structs + `EventPublisher` interface. |
 | `backend/internal/core/services/messaging_service.go` | `MessagingServiceImpl` — business logic, authorization, rate limiting, idempotency. |
 | `backend/internal/core/services/ratelimit.go` | Tiny in-memory per-key token bucket used by the service. |
 | `backend/internal/adapters/auth/token_verifier.go` | `ClerkTokenVerifier` implementing `TokenVerifier` over the Clerk SDK. |
-| `backend/internal/adapters/repositories/postgres/gorm_thread_repository.go` | `GormThreadRepository`. |
+| `backend/internal/adapters/repositories/postgres/gorm_message_thread_repository.go` | `GormMessageThreadRepository`. |
 | `backend/internal/adapters/repositories/postgres/gorm_message_repository.go` | `GormMessageRepository`. |
 | `backend/internal/adapters/realtime/hub.go` | `Hub` — subscriber registry, fan-out, backpressure, `EventPublisher` impl. |
 | `backend/internal/adapters/realtime/listener.go` | `pgListener` — dedicated `pgx` `LISTEN thread_events` loop with reconnect. |
@@ -57,7 +57,7 @@
 | `backend/test/services/messaging_service_test.go` | Service unit tests (mock repos + mock publisher). |
 | `backend/test/realtime/hub_test.go` | Hub unit tests (in-memory, no DB). |
 | `backend/test/realtime/presence_test.go` | Presence unit tests (fake clock). |
-| `backend/test/repositories/gorm_thread_repository_test.go` | DB-gated thread repo tests. |
+| `backend/test/repositories/gorm_message_thread_repository_test.go` | DB-gated thread repo tests. |
 | `backend/test/repositories/gorm_message_repository_test.go` | DB-gated message repo tests (seq trigger, replay, retention). |
 | `backend/test/messaging/e2e_test.go` | DB-gated end-to-end: two users chatting, reconnect replay, read receipts, cross-instance, idempotency. |
 
@@ -661,7 +661,7 @@ Claude-Session: https://claude.ai/code/session_01AMzMYxN9wh1wmKVQorbcyb"
 ## Task 4: Repository ports + GORM models + mappers
 
 **Files:**
-- Create: `backend/internal/core/ports/repositories/thread_repository.go`
+- Create: `backend/internal/core/ports/repositories/message_thread_repository.go`
 - Create: `backend/internal/core/ports/repositories/message_repository.go`
 - Modify: `backend/internal/adapters/repositories/postgres/gorm_models.go`
 - Create: `backend/internal/adapters/repositories/postgres/gorm_messaging_mappers.go`
@@ -670,7 +670,7 @@ Claude-Session: https://claude.ai/code/session_01AMzMYxN9wh1wmKVQorbcyb"
 **Interfaces:**
 - Consumes: `domain.MessageThread`, `domain.ThreadParticipant`, `domain.Message` (Task 2).
 - Produces:
-  - `repositories.ThreadRepository`:
+  - `repositories.MessageThreadRepository`:
     ```go
     CreateThread(ctx, createdBy int, title *string, participantUserIDs []int) (*domain.MessageThread, error)
     GetThread(ctx, threadID int) (*domain.MessageThread, error)                       // includes Participants
@@ -826,7 +826,7 @@ func messageThreadModelToDomain(m *MessageThreadModel, parts []ThreadParticipant
 
 - [ ] **Step 5: Write the port files**
 
-`thread_repository.go` and `message_repository.go` — the interface blocks from the **Interfaces** section above, each in `package repositories`, importing `context`, `time`, and `domain`.
+`message_thread_repository.go` and `message_repository.go` — the interface blocks from the **Interfaces** section above, each in `package repositories`, importing `context`, `time`, and `domain`.
 
 - [ ] **Step 6: Run the mapper test**
 
@@ -839,7 +839,7 @@ Expected: no errors.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add backend/internal/core/ports/repositories/thread_repository.go backend/internal/core/ports/repositories/message_repository.go backend/internal/adapters/repositories/postgres/gorm_models.go backend/internal/adapters/repositories/postgres/gorm_messaging_mappers.go backend/internal/adapters/repositories/postgres/gorm_messaging_mappers_test.go
+git add backend/internal/core/ports/repositories/message_thread_repository.go backend/internal/core/ports/repositories/message_repository.go backend/internal/adapters/repositories/postgres/gorm_models.go backend/internal/adapters/repositories/postgres/gorm_messaging_mappers.go backend/internal/adapters/repositories/postgres/gorm_messaging_mappers_test.go
 git commit -m "feat(messaging): repository ports, GORM models, mappers
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
@@ -848,24 +848,24 @@ Claude-Session: https://claude.ai/code/session_01AMzMYxN9wh1wmKVQorbcyb"
 
 ---
 
-## Task 5: GormThreadRepository
+## Task 5: GormMessageThreadRepository
 
 **Files:**
-- Create: `backend/internal/adapters/repositories/postgres/gorm_thread_repository.go`
-- Test: `backend/test/repositories/gorm_thread_repository_test.go`
+- Create: `backend/internal/adapters/repositories/postgres/gorm_message_thread_repository.go`
+- Test: `backend/test/repositories/gorm_message_thread_repository_test.go`
 
 **Interfaces:**
-- Consumes: `repositories.ThreadRepository` (Task 4), GORM models/mappers (Task 4).
-- Produces: `postgres.NewGormThreadRepository(db *gorm.DB) *GormThreadRepository` with `var _ repositories.ThreadRepository = (*GormThreadRepository)(nil)`.
+- Consumes: `repositories.MessageThreadRepository` (Task 4), GORM models/mappers (Task 4).
+- Produces: `postgres.NewGormMessageThreadRepository(db *gorm.DB) *GormMessageThreadRepository` with `var _ repositories.MessageThreadRepository = (*GormMessageThreadRepository)(nil)`.
 
 - [ ] **Step 1: Write the failing DB-gated test**
 
-`backend/test/repositories/gorm_thread_repository_test.go` — establish a shared helper `openTestDB(t)` (copy the connect-or-skip pattern from `test/database/postgres_test.go`, reading `DATABASE_URL`; `t.Skip` if unreachable). Then:
+`backend/test/repositories/gorm_message_thread_repository_test.go` — establish a shared helper `openTestDB(t)` (copy the connect-or-skip pattern from `test/database/postgres_test.go`, reading `DATABASE_URL`; `t.Skip` if unreachable). Then:
 
 ```go
-func TestGormThreadRepository_CreateAndGet(t *testing.T) {
+func TestGormMessageThreadRepository_CreateAndGet(t *testing.T) {
 	db := openTestDB(t)
-	repo := postgres.NewGormThreadRepository(db)
+	repo := postgres.NewGormMessageThreadRepository(db)
 	userRepo := postgres.NewGormUserRepository(db)
 	ctx := context.Background()
 
@@ -884,30 +884,30 @@ func TestGormThreadRepository_CreateAndGet(t *testing.T) {
 	assert.True(t, got.IsActiveParticipant(b))
 }
 
-func TestGormThreadRepository_FindDirectThread(t *testing.T) {
+func TestGormMessageThreadRepository_FindDirectThread(t *testing.T) {
 	// CreateThread(a, nil, {a,b}) then FindDirectThread(a,b) returns it;
 	// FindDirectThread(a, c) returns domain.ErrNotFound.
 }
 
-func TestGormThreadRepository_SetLastRead_ForwardOnly(t *testing.T) {
+func TestGormMessageThreadRepository_SetLastRead_ForwardOnly(t *testing.T) {
 	// SetLastRead(t, a, 5) then SetLastRead(t, a, 3) leaves last_read_seq at 5.
 }
 
-func TestGormThreadRepository_SetLeft_ExcludesFromActive(t *testing.T) {
+func TestGormMessageThreadRepository_SetLeft_ExcludesFromActive(t *testing.T) {
 	// After SetLeft(threadID, b, now), GetThread(threadID).IsActiveParticipant(b) == false.
 }
 
-func TestGormThreadRepository_ListThreadsForUser_DescByLastMessage(t *testing.T) {
+func TestGormMessageThreadRepository_ListThreadsForUser_DescByLastMessage(t *testing.T) {
 	// Two threads; bump last_message_at on the second; ListThreadsForUser returns it first.
 }
 ```
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `cd backend && go test ./test/repositories/ -run TestGormThreadRepository -v`
+Run: `cd backend && go test ./test/repositories/ -run TestGormMessageThreadRepository -v`
 Expected: FAIL (or SKIP if no DB — then set `DATABASE_URL` to the dev DB and re-run; it must actually run for this task).
 
-- [ ] **Step 3: Implement `GormThreadRepository`**
+- [ ] **Step 3: Implement `GormMessageThreadRepository`**
 
 Key points:
 - `CreateThread`: run in a transaction — `Create(&MessageThreadModel{CreatedBy: createdBy, LastMessageAt: time.Now()})`, then bulk-insert `ThreadParticipantModel` rows (creator gets `Role: "OWNER"`, others `"MEMBER"`), then reload with participants. The `trg_init_thread_sequence` trigger creates the `thread_sequences` row automatically.
@@ -932,14 +932,14 @@ Wrap all errors `fmt.Errorf("...: %w", err)`; map `gorm.ErrRecordNotFound` → `
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd backend && DATABASE_URL="$DATABASE_URL" go test ./test/repositories/ -run TestGormThreadRepository -v`
+Run: `cd backend && DATABASE_URL="$DATABASE_URL" go test ./test/repositories/ -run TestGormMessageThreadRepository -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/internal/adapters/repositories/postgres/gorm_thread_repository.go backend/test/repositories/gorm_thread_repository_test.go
-git commit -m "feat(messaging): GormThreadRepository with 1:1 dedup and read pointer
+git add backend/internal/adapters/repositories/postgres/gorm_message_thread_repository.go backend/test/repositories/gorm_message_thread_repository_test.go
+git commit -m "feat(messaging): GormMessageThreadRepository with 1:1 dedup and read pointer
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01AMzMYxN9wh1wmKVQorbcyb"
@@ -1134,7 +1134,7 @@ Claude-Session: https://claude.ai/code/session_01AMzMYxN9wh1wmKVQorbcyb"
 - Test: `backend/test/services/messaging_service_test.go`
 
 **Interfaces:**
-- Consumes: `repositories.ThreadRepository`, `repositories.MessageRepository` (Task 4), `services.SlidingWindowLimiter` (Task 7), `domain` types (Task 2).
+- Consumes: `repositories.MessageThreadRepository`, `repositories.MessageRepository` (Task 4), `services.SlidingWindowLimiter` (Task 7), `domain` types (Task 2).
 - Produces:
   - `portservices.EventPublisher interface { PublishEphemeral(ctx context.Context, env domain.EventEnvelope) error }` — the service calls this for typing/read-receipt/participant events; the Hub (Task 9) implements it.
   - `portservices.MessagingService`:
@@ -1229,7 +1229,7 @@ import (
 const maxMessageBodyBytes = 8192
 
 type MessagingServiceImpl struct {
-	threadRepo repositories.ThreadRepository
+	threadRepo repositories.MessageThreadRepository
 	msgRepo    repositories.MessageRepository
 	publisher  portservices.EventPublisher
 	limiter    *SlidingWindowLimiter
@@ -1238,7 +1238,7 @@ type MessagingServiceImpl struct {
 var _ portservices.MessagingService = (*MessagingServiceImpl)(nil)
 
 func NewMessagingService(
-	threadRepo repositories.ThreadRepository,
+	threadRepo repositories.MessageThreadRepository,
 	msgRepo repositories.MessageRepository,
 	publisher portservices.EventPublisher,
 	limiter *SlidingWindowLimiter,
@@ -1883,14 +1883,14 @@ Patterns:
   }
   ```
 - `toModelThreadEvent(domain.ThreadEvent) model.ThreadEvent` — type switch mapping each domain variant to its `model.*` struct (`model.MessagePosted{Message: toModelMessage(e.Message)}`, etc.). Put in `helpers.go`.
-- `inboxEvents` — minimal viable: subscribe the actor to a per-user hub topic. Simplest implementation that satisfies the spec: reuse the Hub keyed by a negative pseudo-thread-id `-userID`, and have the service publish an `InboxEvent`-shaped envelope on message send... **Defer complexity:** for this task, implement `inboxEvents` to emit one event immediately (current unread summary per thread) then close, OR wire it to a `Hub.SubscribeInbox(userID)` topic that the listener also feeds from `MESSAGE_POSTED` by looking up thread participants. Pick `SubscribeInbox`; add `Hub.SubscribeInbox(userID int) (<-chan domain.InboxEvent, func())` and, in `PublishEnvelope` for `MESSAGE_POSTED`, after loading the message, load participant user IDs (`threadRepo.GetThread`) and push an `InboxEvent` to each participant's inbox channel. This means the Hub needs a `threadRepo repositories.ThreadRepository` dependency — add it to `NewHub` (update Task 9 signature and its tests to pass a stub).
+- `inboxEvents` — minimal viable: subscribe the actor to a per-user hub topic. Simplest implementation that satisfies the spec: reuse the Hub keyed by a negative pseudo-thread-id `-userID`, and have the service publish an `InboxEvent`-shaped envelope on message send... **Defer complexity:** for this task, implement `inboxEvents` to emit one event immediately (current unread summary per thread) then close, OR wire it to a `Hub.SubscribeInbox(userID)` topic that the listener also feeds from `MESSAGE_POSTED` by looking up thread participants. Pick `SubscribeInbox`; add `Hub.SubscribeInbox(userID int) (<-chan domain.InboxEvent, func())` and, in `PublishEnvelope` for `MESSAGE_POSTED`, after loading the message, load participant user IDs (`threadRepo.GetThread`) and push an `InboxEvent` to each participant's inbox channel. This means the Hub needs a `threadRepo repositories.MessageThreadRepository` dependency — add it to `NewHub` (update Task 9 signature and its tests to pass a stub).
 
 - [ ] **Step 7: Wire `main.go`**
 
 After the existing repo/service construction:
 
 ```go
-threadRepo := postgres.NewGormThreadRepository(db)
+threadRepo := postgres.NewGormMessageThreadRepository(db)
 messageRepo := postgres.NewGormMessageRepository(db)
 hub := realtime.NewHub(messageRepo, threadRepo)
 presence := realtime.NewPresenceTracker()
@@ -2111,7 +2111,7 @@ Claude-Session: https://claude.ai/code/session_01AMzMYxN9wh1wmKVQorbcyb"
 | Domain models, enums, realtime events | 2 |
 | `TokenVerifier` port + Clerk adapter + middleware refactor | 3 |
 | Repository ports + GORM models + mappers | 4 |
-| `ThreadRepository` (create, 1:1 dedup, list, add/leave, read pointer) | 5 |
+| `MessageThreadRepository` (create, 1:1 dedup, list, add/leave, read pointer) | 5 |
 | `MessageRepository` (insert via trigger, history paging, replay, MaxSeq) | 6 |
 | Idempotent send via `client_nonce` unique constraint | 1 (constraint), 6 (repo), verified 12 |
 | Rate limiting (10 / 10s / user) | 7, 8 |

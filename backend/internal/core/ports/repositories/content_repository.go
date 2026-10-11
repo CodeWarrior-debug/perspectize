@@ -11,6 +11,8 @@ import (
 type ContentRepository interface {
 	Create(ctx context.Context, content *domain.Content) (*domain.Content, error)
 	GetByID(ctx context.Context, id int) (*domain.Content, error)
+	// GetByIDs loads many content rows in one query; missing ids are absent.
+	GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error)
 	GetByURL(ctx context.Context, url string) (*domain.Content, error)
 	// GetOrCreateByURL atomically inserts content or returns existing content matching the URL.
 	// When refreshOnConflict is true (default), updates response and updated_at on conflict.
@@ -23,8 +25,10 @@ type ContentRepository interface {
 	UpdateMetadata(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error)
 	List(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)
 	ReassignByUser(ctx context.Context, fromUserID, toUserID int) error
-	// UpdatePrimaryCategoryID sets the primary_category_id FK on a content record
-	UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) error
+	// UpdatePrimaryCategoryID sets the primary_category_id FK on a content
+	// record and returns the updated row. A missing content id is
+	// domain.ErrNotFound.
+	UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error)
 	// SetDisplayTitleIfEmpty sets a passage's optional display_title only if none exists
 	// (first-write-wins). Returns the title that is now stored: the caller's if it won,
 	// the existing one if it lost the race. Losing is not an error.

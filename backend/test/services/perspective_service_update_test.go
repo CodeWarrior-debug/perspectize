@@ -3,6 +3,7 @@ package services_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
@@ -48,7 +49,7 @@ func TestPerspectiveUpdate_OmittedFieldsLeaveExistingValuesUnchanged(t *testing.
 	}
 	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
 
-	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1})
+	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1}, 1)
 
 	require.NoError(t, err)
 	assert.Equal(t, intPtr(7500), result.Quality)
@@ -68,7 +69,7 @@ func TestPerspectiveUpdate_SetsRatings(t *testing.T) {
 	}
 	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
 
-	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Quality: intPtr(3000)})
+	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Quality: intPtr(3000)}, 1)
 
 	require.NoError(t, err)
 	assert.Equal(t, intPtr(3000), result.Quality)
@@ -83,7 +84,7 @@ func TestPerspectiveUpdate_InvalidRating(t *testing.T) {
 	}
 	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
 
-	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Quality: intPtr(99999)})
+	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Quality: intPtr(99999)}, 1)
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domain.ErrInvalidRating)
@@ -108,7 +109,7 @@ func TestPerspectiveUpdate_ClearRatings(t *testing.T) {
 			}
 			svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
 
-			result, err := svc.Update(context.Background(), tt.input)
+			result, err := svc.Update(context.Background(), tt.input, 1)
 
 			require.NoError(t, err)
 			assert.Nil(t, tt.get(result))
@@ -128,7 +129,7 @@ func TestPerspectiveUpdate_ClearWinsOverAnInvalidValue(t *testing.T) {
 	// wins, and the (unused) value is never validated.
 	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{
 		ID: 1, ClearQuality: true, Quality: intPtr(99999),
-	})
+	}, 1)
 
 	require.NoError(t, err)
 	assert.Nil(t, result.Quality)
@@ -141,7 +142,7 @@ func TestPerspectiveUpdate_ClearLike(t *testing.T) {
 	}
 	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
 
-	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, ClearLike: true})
+	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, ClearLike: true}, 1)
 
 	require.NoError(t, err)
 	assert.Nil(t, result.Like)
@@ -154,7 +155,7 @@ func TestPerspectiveUpdate_SetsLikeWhenProvided(t *testing.T) {
 	}
 	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
 
-	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Like: strPtr("down")})
+	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Like: strPtr("down")}, 1)
 
 	require.NoError(t, err)
 	require.NotNil(t, result.Like)
@@ -168,7 +169,7 @@ func TestPerspectiveUpdate_ClearReview(t *testing.T) {
 	}
 	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
 
-	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, ClearReview: true})
+	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, ClearReview: true}, 1)
 
 	require.NoError(t, err)
 	assert.Nil(t, result.Review)
@@ -181,7 +182,7 @@ func TestPerspectiveUpdate_ClearFeelings(t *testing.T) {
 	}
 	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
 
-	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, ClearFeelings: true})
+	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, ClearFeelings: true}, 1)
 
 	require.NoError(t, err)
 	assert.Nil(t, result.Feelings)
@@ -199,7 +200,7 @@ func TestPerspectiveUpdate_FeelingsOverMaxStillRejected(t *testing.T) {
 		tooMany[i] = domain.FeelingEntry{Emoji: "😀", Intensity: 1}
 	}
 
-	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Feelings: tooMany})
+	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Feelings: tooMany}, 1)
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
@@ -212,7 +213,7 @@ func TestPerspectiveUpdate_ClearCustomFields(t *testing.T) {
 	}
 	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
 
-	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, ClearCustomFields: true})
+	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, ClearCustomFields: true}, 1)
 
 	require.NoError(t, err)
 	assert.Nil(t, result.CustomFields)
@@ -227,8 +228,76 @@ func TestPerspectiveUpdate_SetsCustomFieldsWhenProvided(t *testing.T) {
 
 	result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{
 		ID: 1, CustomFields: json.RawMessage(`{"clarity":9000}`),
-	})
+	}, 1)
 
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"clarity":9000}`, string(result.CustomFields))
+}
+
+// --- Ownership / actor handling ---
+
+func TestPerspectiveUpdate_Ownership(t *testing.T) {
+	tests := []struct {
+		name       string
+		ownerID    int
+		privacy    domain.Privacy
+		actor      int
+		wantErr    error
+		wantGet    bool
+		wantUpdate bool
+	}{
+		{"owner succeeds", 7, domain.PrivacyPrivate, 7, nil, true, true},
+		{"non-owner on public is forbidden", 7, domain.PrivacyPublic, 8, domain.ErrForbidden, true, false},
+		{"non-owner on private looks not found", 7, domain.PrivacyPrivate, 8, domain.ErrNotFound, true, false},
+		{"zero actor is forbidden before any read", 7, domain.PrivacyPublic, 0, domain.ErrForbidden, false, false},
+		{"negative actor is forbidden before any read", 7, domain.PrivacyPublic, -1, domain.ErrForbidden, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotRead, gotUpdate bool
+			var gotOwner int
+			repo := &mockPerspectiveRepository{
+				getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
+					gotRead = true
+					return &domain.Perspective{ID: id, UserID: tt.ownerID, Privacy: tt.privacy}, nil
+				},
+				updateFn: func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
+					gotUpdate = true
+					gotOwner = ownerUserID
+					return p, nil
+				},
+			}
+			svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+
+			result, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Like: strPtr("up")}, tt.actor)
+
+			assert.Equal(t, tt.wantGet, gotRead)
+			assert.Equal(t, tt.wantUpdate, gotUpdate)
+			if tt.wantErr != nil {
+				assert.Nil(t, result)
+				assert.True(t, errors.Is(err, tt.wantErr), "expected %v, got %v", tt.wantErr, err)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, tt.actor, gotOwner, "repo.Update must receive the actor id")
+		})
+	}
+}
+
+func TestPerspectiveUpdate_RepoUpdateNotFoundIsPropagated(t *testing.T) {
+	// Row vanished or changed hands between the read and the owner-scoped UPDATE.
+	repo := &mockPerspectiveRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
+			return &domain.Perspective{ID: id, UserID: 7}, nil
+		},
+		updateFn: func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
+			return nil, domain.ErrNotFound
+		},
+	}
+	svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+
+	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Like: strPtr("up")}, 7)
+
+	assert.True(t, errors.Is(err, domain.ErrNotFound), "got %v", err)
 }

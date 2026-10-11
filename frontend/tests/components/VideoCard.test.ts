@@ -29,7 +29,7 @@ const addedContent: ContentItem = {
 	name: 'A great video',
 	addedByUserID: '1',
 	url: 'https://www.youtube.com/watch?v=abc123',
-	contentType: 'YOUTUBE',
+	contentType: 'YOUTUBE_VIDEO',
 	length: 253,
 	lengthUnits: 'seconds',
 	viewCount: 1_500_000,

@@ -27,9 +27,26 @@ describe('detectContentType', () => {
 	const txt = (range: unknown) => ({ type: 'BIBLE_PASSAGE', range, source: 'text' });
 	const claim = (text: string) => ({ type: 'CLAIM', text });
 	const cases: Array<[string, string, unknown]> = [
-		['youtube watch url', yt, { type: 'YOUTUBE', url: yt }],
-		['youtube url with surrounding whitespace', `  ${yt}  `, { type: 'YOUTUBE', url: yt }],
-		['youtu.be short url', 'https://youtu.be/abc123', { type: 'YOUTUBE', url: 'https://youtu.be/abc123' }],
+		['youtube watch url', yt, { type: 'YOUTUBE_VIDEO', url: yt }],
+		['youtube url with surrounding whitespace', `  ${yt}  `, { type: 'YOUTUBE_VIDEO', url: yt }],
+		['youtu.be short url', 'https://youtu.be/abc123', { type: 'YOUTUBE_VIDEO', url: 'https://youtu.be/abc123' }],
+		[
+			'tmdb movie url',
+			'https://www.themoviedb.org/movie/603-the-matrix',
+			{ type: 'MOVIE', url: 'https://www.themoviedb.org/movie/603-the-matrix' },
+		],
+		[
+			'tmdb movie url with padding',
+			'  https://www.themoviedb.org/movie/603  ',
+			{ type: 'MOVIE', url: 'https://www.themoviedb.org/movie/603' },
+		],
+		[
+			'imdb title url',
+			'https://www.imdb.com/title/tt0133093/',
+			{ type: 'MOVIE', url: 'https://www.imdb.com/title/tt0133093/' },
+		],
+		['bare imdb id is accepted silently', 'tt0133093', { type: 'MOVIE', url: 'tt0133093' }],
+		['tmdb tv url is not a movie', 'https://www.themoviedb.org/tv/1399', { type: null }],
 		['bible gateway url', bg, gw],
 		[
 			'bible gateway url, abbreviated book, different version',
@@ -69,7 +86,7 @@ describe('detectContentType', () => {
 	});
 
 	it('a youtube URL that also has a bible-looking query stays youtube', () => {
-		expect(detectContentType('https://www.youtube.com/watch?v=abc&search=Genesis+1:1').type).toBe('YOUTUBE');
+		expect(detectContentType('https://www.youtube.com/watch?v=abc&search=Genesis+1:1').type).toBe('YOUTUBE_VIDEO');
 	});
 
 	it('a bible gateway url passes only the decoded search text to the parser', () => {

@@ -20,6 +20,7 @@
 		{ href: '/', label: 'Activity' },
 		{ href: '/discover', label: 'Discover' },
 		{ href: '/compare', label: 'Compare' },
+		{ href: '/plan', label: 'Plan' },
 	];
 
 	function isActive(href: string): boolean {

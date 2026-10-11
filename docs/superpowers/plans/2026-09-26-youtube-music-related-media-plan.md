@@ -145,7 +145,7 @@ Order matters: B1 before everything; B2 and B3 before B5's budgets are pinned; B
 
 **Suggested subagent:** `db-migration`.
 
-- [ ] Rename `000029_youtube_music_isrc_index.*` → `000031_youtube_music_isrc_index.*` (000029 and 000030 are on `main`). Update the header note: "next free on main as of 2026-10-10; still provisional until merge".
+- [ ] Rename `000029_youtube_music_isrc_index.*` → `000032_youtube_music_isrc_index.*` (000029–000031 are on `main`). Update the header note: "next free on main as of 2026-10-10; still provisional until merge".
 - [ ] Index expression follows spec decision 12: `CREATE INDEX IF NOT EXISTS idx_content_isrc ON content ((response->'music'->>'isrc')) WHERE content_type = 'youtube_music';`. Down file unchanged.
 - [ ] If spec decision 18 changes the type name, change the DB value here and in the domain converter in the same commit.
 - [ ] Do not apply it. The `Migration labels` workflow sets `migrations-unapplied` on the PR by itself.
@@ -213,10 +213,10 @@ Order matters: B1 before everything; B2 and B3 before B5's budgets are pinned; B
 - [ ] Backend: `go build ./...`, `gofmt -l .` empty, `go vet ./... && go vet -tags perf ./internal/perf/...`, `go test ./...`. In a cloud session also run the DB-backed tests against a local Postgres per `backend/CLAUDE.md` → Testing so `GetByISRC`, `SetResponseKey`, `GetByURLs` and the index are exercised; confirm in the CI `Test & Lint` log that they ran rather than skipped.
 - [ ] Frontend: `pnpm run test:run`, `pnpm run check` (baseline: the two #471 errors only), `pnpm exec prettier --check` on touched files.
 - [ ] `graphify update .` locally.
-- [ ] Rehearse 000031 on a **Neon branch** from a local session (`.claude/skills/neon-postgres-branches`): create a branch from production, run `migrate up` against the branch's connection string only, confirm `\d content` shows `idx_content_isrc`, then delete the branch. Never against the parent.
+- [ ] Rehearse 000032 on a **Neon branch** from a local session (`.claude/skills/neon-postgres-branches`): create a branch from production, run `migrate up` against the branch's connection string only, confirm `\d content` shows `idx_content_isrc`, then delete the branch. Never against the parent.
 - [ ] PR #440: keep `needs-demo-video` until a local session records the demo (add a YT Music song, play it, open lyrics, promote the official video, paste a playlist link, flip the flag off and confirm a music link adds as a plain video). Run `/revise-claude-md` and add a **Session Learnings** section to the PR body (`.docs/PR_WORKFLOW.md`).
-- [ ] Last step before merge: confirm 000031 is still the next free number on `main` and `check-migration-number-before-apply` is off; renumber if not.
-- [ ] Rollout order: backend deploy (flag off) → `migrate up` 000031 per environment → swap `migrations-unapplied` for `migrations-applied` → `FEATURE_YOUTUBE_MUSIC=true` in dev → verify → prod → frontend deploy can go any time (it reads the flag).
+- [ ] Last step before merge: confirm 000032 is still the next free number on `main` and `check-migration-number-before-apply` is off; renumber if not.
+- [ ] Rollout order: backend deploy (flag off) → `migrate up` 000032 per environment → swap `migrations-unapplied` for `migrations-applied` → `FEATURE_YOUTUBE_MUSIC=true` in dev → verify → prod → frontend deploy can go any time (it reads the flag).
 
 ## Task B9 — Docs and handover
 

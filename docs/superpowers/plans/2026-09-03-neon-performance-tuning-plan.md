@@ -2,6 +2,16 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## Execution status (updated 2026-10-06)
+
+**Not started.** The migration this plan depends on cut over on 2026-10-06 (see the migration
+plan's "Execution status"). **The `sevalla-baseline` benchmark was not captured before
+cutover.** The Sevalla database is still running as a rollback copy and holds the same data,
+so a baseline can still be taken against it, but only until it is decommissioned (planned
+about a week after cutover). Capture it first or drop the before/after comparison.
+Neon runs the **direct** connection (not the pooler) because of `LISTEN`/`NOTIFY`, so any
+pooling-related tuning here must be re-derived for that setup.
+
 **Goal:** Establish a Sevalla-baseline-vs-tuned-Neon before/after benchmark for Perspectize's
 hot queries, and land pooling/indexing/extension tuning changes using Neon's branching feature
 so tuning happens with zero production load and a documented rollback point.

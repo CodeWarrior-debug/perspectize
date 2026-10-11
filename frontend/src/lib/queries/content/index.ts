@@ -1,15 +1,25 @@
 import { gql } from 'graphql-request';
 import type { LyricsAvailability } from '$lib/utils/lyricsLinks';
 
+/** Content.lengthDisplay: the source of a length and the smallest unit it reports. */
+export interface LengthDisplay {
+	source: string;
+	/** LengthPrecision enum: SECONDS or MINUTES. Kept a string so a new value formats as seconds, not a type error. */
+	precision: string;
+}
+
 export type { ContentFilterInput } from '$lib/utils/gridUrlState';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
-export type ContentType = 'YOUTUBE' | 'CLAIM' | 'BIBLE_PASSAGE' | 'YOUTUBE_MUSIC';
+export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'YOUTUBE_MUSIC';
 
 export interface ContentItem {
 	id: string;
 	name: string;
 	addedByUserID: string;
+	// Client-side only (not in the GraphQL selection): ActivityTable fills it from the
+	// cached users list, so the User column can render/sort/filter without a per-row join.
+	addedByUsername?: string | null;
 	url: string | null;
 	contentType: string;
 	// BIBLE_PASSAGE only: computed verse ordinals and the optional,
@@ -19,12 +29,19 @@ export interface ContentItem {
 	displayTitle?: string | null;
 	length: number | null;
 	lengthUnits: string | null;
+	/** Where `length` came from and its precision; format to it (MINUTES -> h:mm). */
+	lengthDisplay?: LengthDisplay | null;
 	viewCount: number | null;
 	likeCount: number | null;
 	channelTitle: string | null;
 	publishedAt: string | null;
 	tags: string[] | null;
 	description: string | null;
+	// Source payload (JSON scalar). Movie rows read cast/revenue/etc. from it; YouTube rows carry the API items.
+	response?: Record<string, unknown> | null;
+	// MOVIE rows only: the shaped TMDB payload. List rows select this instead of `response`
+	// (so YouTube rows don't ship their snippet twice); null for every other type.
+	movie?: Record<string, unknown> | null;
 	primaryCategory: {
 		id: string;
 		wikidataQid: string;
@@ -129,12 +146,17 @@ export const LIST_CONTENT = gql`
 				displayTitle
 				length
 				lengthUnits
+				lengthDisplay {
+					source
+					precision
+				}
 				viewCount
 				likeCount
 				channelTitle
 				publishedAt
 				tags
 				description
+				movie
 				primaryCategory {
 					id
 					wikidataQid
@@ -193,6 +215,33 @@ export const LIST_COMPARABLE_CONTENT = gql`
 	}
 `;
 
+export interface ContentPickerItem {
+	id: string;
+	name: string;
+	contentType: string;
+	channelTitle: string | null;
+}
+
+export interface ContentPickerResponse {
+	content: {
+		items: ContentPickerItem[];
+	};
+}
+
+/** Search-as-you-type item picker (Plan's Add Todo dialog): just enough to show and choose a row. */
+export const LIST_CONTENT_PICKER = gql`
+	query ListContentPicker($first: Int = 20, $filter: ContentFilter) {
+		content(first: $first, sortBy: UPDATED_AT, sortOrder: DESC, filter: $filter, includeTotalCount: false) {
+			items {
+				id
+				name
+				contentType
+				channelTitle
+			}
+		}
+	}
+`;
+
 export const GET_CONTENT = gql`
 	query GetContent($id: ID!) {
 		contentByID(id: $id) {
@@ -205,6 +254,10 @@ export const GET_CONTENT = gql`
 			displayTitle
 			length
 			lengthUnits
+			lengthDisplay {
+				source
+				precision
+			}
 			viewCount
 			likeCount
 			commentCount
@@ -230,12 +283,18 @@ export const GET_CONTENT_DETAILS = gql`
 			displayTitle
 			length
 			lengthUnits
+			lengthDisplay {
+				source
+				precision
+			}
 			viewCount
 			likeCount
 			channelTitle
 			publishedAt
 			tags
 			description
+			response
+			movie
 			primaryCategory {
 				id
 				wikidataQid
@@ -293,6 +352,10 @@ export const CREATE_CONTENT_FROM_YOUTUBE = gql`
 				contentType
 				length
 				lengthUnits
+				lengthDisplay {
+					source
+					precision
+				}
 				viewCount
 				likeCount
 				channelTitle
@@ -405,6 +468,28 @@ export const PROMOTE_RELATED_MEDIA = gql`
 	}
 `;
 
+// Idempotent: the server find-or-creates the movie row, so an existing movie
+// comes back as a normal Content (no "alreadyExisted" flag).
+export const CREATE_CONTENT_FROM_MOVIE = gql`
+	mutation CreateContentFromMovie($input: CreateContentFromMovieInput!) {
+		createContentFromMovie(input: $input) {
+			id
+			name
+			url
+			contentType
+		}
+	}
+`;
+
+export interface CreateContentFromMovieResponse {
+	createContentFromMovie: {
+		id: string;
+		name: string;
+		url: string | null;
+		contentType: string;
+	};
+}
+
 export const UPDATE_CONTENT_SOURCE_DATA = gql`
 	mutation UpdateContentSourceData($contentId: IntID!) {
 		updateContentSourceData(contentId: $contentId) {
@@ -414,6 +499,10 @@ export const UPDATE_CONTENT_SOURCE_DATA = gql`
 			contentType
 			length
 			lengthUnits
+			lengthDisplay {
+				source
+				precision
+			}
 			viewCount
 			likeCount
 			channelTitle

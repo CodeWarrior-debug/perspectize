@@ -41,6 +41,16 @@ func (m *mockUserRepository) GetByID(ctx context.Context, id int) (*domain.User,
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockUserRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.User, error) {
+	out := []*domain.User{}
+	for _, id := range ids {
+		if u, err := m.GetByID(ctx, id); err == nil && u != nil {
+			out = append(out, u)
+		}
+	}
+	return out, nil
+}
+
 func (m *mockUserRepository) GetByClerkID(ctx context.Context, clerkID string) (*domain.User, error) {
 	return nil, domain.ErrNotFound
 }
@@ -70,6 +80,18 @@ func (m *mockUserRepository) Update(ctx context.Context, user *domain.User) (*do
 	if m.updateFn != nil {
 		return m.updateFn(ctx, user)
 	}
+	// Emulate the users_unique_username / users_unique_email constraints the
+	// real UPDATE relies on: another user already holding the value is a clash.
+	if m.getByUsernameFn != nil {
+		if other, err := m.getByUsernameFn(ctx, user.Username); err == nil && other != nil && other.ID != user.ID {
+			return nil, fmt.Errorf("%w: username already taken", domain.ErrAlreadyExists)
+		}
+	}
+	if m.getByEmailFn != nil && user.Email != "" {
+		if other, err := m.getByEmailFn(ctx, user.Email); err == nil && other != nil && other.ID != user.ID {
+			return nil, fmt.Errorf("%w: email already registered", domain.ErrAlreadyExists)
+		}
+	}
 	return user, nil
 }
 
@@ -96,7 +118,33 @@ func (m *mockUserRepository) UpdateOnboarding(ctx context.Context, userID int, o
 	if m.updateOnboardingFn != nil {
 		return m.updateOnboardingFn(ctx, userID, onboarding)
 	}
+	if _, err := m.writableUser(ctx, userID); err != nil {
+		return nil, err
+	}
 	return &domain.User{ID: userID, Onboarding: onboarding}, nil
+}
+
+func (m *mockUserRepository) SetOnboardingDisplayNextSession(ctx context.Context, userID int, display bool) (*domain.User, error) {
+	u, err := m.writableUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	u.Onboarding.DisplayNextSession = display
+	return u, nil
+}
+
+// writableUser emulates the real repository's onboarding UPDATE predicate
+// (WHERE id = ? AND role <> 'sentinel'): a missing user or the sentinel is a
+// zero-row update, i.e. domain.ErrNotFound.
+func (m *mockUserRepository) writableUser(ctx context.Context, userID int) (*domain.User, error) {
+	if m.getByIDFn == nil {
+		return &domain.User{ID: userID}, nil
+	}
+	u, err := m.getByIDFn(ctx, userID)
+	if err != nil || u == nil || u.IsSentinel() {
+		return nil, domain.ErrNotFound
+	}
+	return u, nil
 }
 
 // mockContentRepoForUser implements repositories.ContentRepository for user tests
@@ -109,6 +157,16 @@ func (m *mockContentRepoForUser) Create(ctx context.Context, content *domain.Con
 }
 func (m *mockContentRepoForUser) GetByID(ctx context.Context, id int) (*domain.Content, error) {
 	return nil, domain.ErrNotFound
+}
+
+func (m *mockContentRepoForUser) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	out := []*domain.Content{}
+	for _, id := range ids {
+		if c, err := m.GetByID(ctx, id); err == nil && c != nil {
+			out = append(out, c)
+		}
+	}
+	return out, nil
 }
 func (m *mockContentRepoForUser) GetByURL(ctx context.Context, url string) (*domain.Content, error) {
 	return nil, domain.ErrNotFound
@@ -128,8 +186,8 @@ func (m *mockContentRepoForUser) ReassignByUser(ctx context.Context, fromUserID,
 	}
 	return nil
 }
-func (m *mockContentRepoForUser) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) error {
-	return nil
+func (m *mockContentRepoForUser) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+	return &domain.Content{ID: contentID, PrimaryCategoryID: categoryID}, nil
 }
 
 // mockPerspectiveRepoForUser implements repositories.PerspectiveRepository for user tests
@@ -143,10 +201,10 @@ func (m *mockPerspectiveRepoForUser) Create(ctx context.Context, p *domain.Persp
 func (m *mockPerspectiveRepoForUser) GetByID(ctx context.Context, id int) (*domain.Perspective, error) {
 	return nil, domain.ErrNotFound
 }
-func (m *mockPerspectiveRepoForUser) Update(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
+func (m *mockPerspectiveRepoForUser) Update(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
 	return p, nil
 }
-func (m *mockPerspectiveRepoForUser) Delete(ctx context.Context, id int) error {
+func (m *mockPerspectiveRepoForUser) Delete(ctx context.Context, id int, ownerUserID int) error {
 	return nil
 }
 func (m *mockPerspectiveRepoForUser) List(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error) {
@@ -168,15 +226,25 @@ func (m *mockPerspectiveRepoForUser) CustomFieldStats(ctx context.Context, conte
 	return &domain.CustomFieldStats{Key: key}, nil
 }
 
-// newTestUserService creates a UserService with default mocks for content/perspective repos
+// newTestUserService creates a UserService with default mocks for content/perspective and todo repos
 func newTestUserService(repo *mockUserRepository) *services.UserService {
-	return services.NewUserService(repo, &mockContentRepoForUser{}, &mockPerspectiveRepoForUser{})
+	return services.NewUserService(repo, &mockContentRepoForUser{}, &mockPerspectiveRepoForUser{},
+		&mockUserTodoRepo{}, &mockUserTodoListRepo{}, &mockTodoActionRepo{})
 }
 
 // newTestUserServiceFull creates a UserService with explicit content/perspective repo mocks
 func newTestUserServiceFull(repo *mockUserRepository, contentRepo *mockContentRepoForUser, perspectiveRepo *mockPerspectiveRepoForUser) *services.UserService {
-	return services.NewUserService(repo, contentRepo, perspectiveRepo)
+	return services.NewUserService(repo, contentRepo, perspectiveRepo,
+		&mockUserTodoRepo{}, &mockUserTodoListRepo{}, &mockTodoActionRepo{})
 }
+
+// newTestUserServiceWithTodos creates a UserService with explicit todo, list and action repo mocks
+func newTestUserServiceWithTodos(repo *mockUserRepository, contentRepo *mockContentRepoForUser, perspectiveRepo *mockPerspectiveRepoForUser, todos *mockUserTodoRepo, lists *mockUserTodoListRepo, actions *mockTodoActionRepo) *services.UserService {
+	return services.NewUserService(repo, contentRepo, perspectiveRepo, todos, lists, actions)
+}
+
+// testAdmin is the actor for tests of behaviour other than authorization.
+var testAdmin = &domain.AuthenticatedUser{ID: 999, Role: domain.UserRoleAdmin}
 
 // --- Create Tests ---
 
@@ -189,7 +257,7 @@ func TestCreate_Success(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Create(context.Background(), "testuser", "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "testuser", "test@example.com")
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.ID)
@@ -202,7 +270,7 @@ func TestCreate_UsernameEmpty(t *testing.T) {
 	repo := &mockUserRepository{}
 	svc := newTestUserService(repo)
 
-	result, err := svc.Create(context.Background(), "", "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "", "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -214,7 +282,7 @@ func TestCreate_UsernameWhitespace(t *testing.T) {
 	repo := &mockUserRepository{}
 	svc := newTestUserService(repo)
 
-	result, err := svc.Create(context.Background(), "   ", "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "   ", "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -227,7 +295,7 @@ func TestCreate_UsernameTooLong(t *testing.T) {
 	svc := newTestUserService(repo)
 
 	// Username with 25 characters (limit is 24)
-	result, err := svc.Create(context.Background(), "abcdefghijklmnopqrstuvwxy", "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "abcdefghijklmnopqrstuvwxy", "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -244,7 +312,7 @@ func TestCreate_EmailEmpty_Succeeds(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Create(context.Background(), "testuser", "")
+	result, err := svc.Create(context.Background(), testAdmin, "testuser", "")
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.ID)
@@ -267,7 +335,7 @@ func TestCreate_EmailInvalid(t *testing.T) {
 
 	for _, email := range testCases {
 		t.Run(email, func(t *testing.T) {
-			result, err := svc.Create(context.Background(), "testuser", email)
+			result, err := svc.Create(context.Background(), testAdmin, "testuser", email)
 
 			assert.Nil(t, result)
 			require.Error(t, err)
@@ -285,7 +353,7 @@ func TestCreate_UsernameAlreadyExists(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Create(context.Background(), "existinguser", "new@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "existinguser", "new@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -301,7 +369,7 @@ func TestCreate_EmailAlreadyExists(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Create(context.Background(), "newuser", "existing@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "newuser", "existing@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -317,7 +385,7 @@ func TestCreate_RepositoryCreateError(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Create(context.Background(), "testuser", "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "testuser", "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -332,7 +400,7 @@ func TestCreate_GetByUsernameUnexpectedError(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Create(context.Background(), "testuser", "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "testuser", "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -347,7 +415,7 @@ func TestCreate_GetByEmailUnexpectedError(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Create(context.Background(), "testuser", "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "testuser", "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -522,7 +590,7 @@ func TestUpdate_Success(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{
 		ID:       2,
 		Username: &newUsername,
 	})
@@ -541,7 +609,7 @@ func TestUpdate_SentinelUserBlocked(t *testing.T) {
 
 	newUsername := "hacker"
 	svc := newTestUserService(repo)
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{
 		ID:       1,
 		Username: &newUsername,
 	})
@@ -555,7 +623,7 @@ func TestUpdate_InvalidID(t *testing.T) {
 	repo := &mockUserRepository{}
 	svc := newTestUserService(repo)
 
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{ID: 0})
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{ID: 0})
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -577,7 +645,7 @@ func TestUpdate_UsernameAlreadyTaken(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{
 		ID:       2,
 		Username: &takenName,
 	})
@@ -611,7 +679,7 @@ func TestDelete_Success(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepoForUser{}
 	svc := newTestUserServiceFull(repo, contentRepo, perspectiveRepo)
 
-	err := svc.Delete(context.Background(), 2)
+	err := svc.Delete(context.Background(), testAdmin, 2)
 	require.NoError(t, err)
 }
 
@@ -623,7 +691,7 @@ func TestDelete_SentinelUserBlocked(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	err := svc.Delete(context.Background(), 1)
+	err := svc.Delete(context.Background(), testAdmin, 1)
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrDeleteSentinel))
@@ -633,7 +701,7 @@ func TestDelete_InvalidID(t *testing.T) {
 	repo := &mockUserRepository{}
 	svc := newTestUserService(repo)
 
-	err := svc.Delete(context.Background(), 0)
+	err := svc.Delete(context.Background(), testAdmin, 0)
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrInvalidInput))
@@ -647,7 +715,7 @@ func TestDelete_UserNotFound(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	err := svc.Delete(context.Background(), 999)
+	err := svc.Delete(context.Background(), testAdmin, 999)
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrNotFound))
@@ -675,7 +743,7 @@ func TestDelete_ReassignContentFails(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepoForUser{}
 	svc := newTestUserServiceFull(repo, contentRepo, perspectiveRepo)
 
-	err := svc.Delete(context.Background(), 2)
+	err := svc.Delete(context.Background(), testAdmin, 2)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to reassign content")
@@ -703,10 +771,119 @@ func TestDelete_ReassignPerspectivesFails(t *testing.T) {
 	}
 	svc := newTestUserServiceFull(repo, contentRepo, perspectiveRepo)
 
-	err := svc.Delete(context.Background(), 2)
+	err := svc.Delete(context.Background(), testAdmin, 2)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to reassign perspectives")
+}
+
+// Delete reassigns content, perspectives, then todos, lists and custom actions,
+// and only then removes the user row. The order matters: the list FK and the
+// todo FKs must not be left pointing at a deleted user.
+func TestDelete_ReassignsEverythingInOrder(t *testing.T) {
+	var calls []string
+	sentinelUser := &domain.User{ID: 1, Username: domain.DeletedUserUsername, Role: domain.UserRoleSentinel}
+	repo := &mockUserRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.User, error) {
+			return &domain.User{ID: 2, Username: "testuser", Role: domain.UserRoleDefault}, nil
+		},
+		getByUsernameFn: func(ctx context.Context, username string) (*domain.User, error) {
+			return sentinelUser, nil
+		},
+		deleteFn: func(ctx context.Context, id int) error {
+			calls = append(calls, "user.delete")
+			return nil
+		},
+	}
+	contentRepo := &mockContentRepoForUser{reassignByUserFn: func(ctx context.Context, from, to int) error {
+		assert.Equal(t, 2, from)
+		assert.Equal(t, 1, to, "reassigned to the sentinel")
+		calls = append(calls, "content")
+		return nil
+	}}
+	perspectiveRepo := &mockPerspectiveRepoForUser{reassignByUserFn: func(ctx context.Context, from, to int) error {
+		calls = append(calls, "perspectives")
+		return nil
+	}}
+	todos := &mockUserTodoRepo{calls: &calls, reassignByUserFn: func(ctx context.Context, from, to int) error {
+		assert.Equal(t, 2, from)
+		assert.Equal(t, 1, to)
+		return nil
+	}}
+	lists := &mockUserTodoListRepo{calls: &calls, reassignByUserFn: func(ctx context.Context, from, to int) error {
+		assert.Equal(t, 2, from)
+		assert.Equal(t, 1, to)
+		return nil
+	}}
+	actions := &mockTodoActionRepo{calls: &calls, reassignByUserFn: func(ctx context.Context, from, to int) error {
+		assert.Equal(t, 2, from)
+		assert.Equal(t, 1, to)
+		return nil
+	}}
+	svc := newTestUserServiceWithTodos(repo, contentRepo, perspectiveRepo, todos, lists, actions)
+
+	require.NoError(t, svc.Delete(context.Background(), testAdmin, 2))
+	assert.Equal(t, []string{
+		"content", "perspectives",
+		"todos.reassign", "lists.reassign", "actions.reassign",
+		"user.delete",
+	}, calls)
+}
+
+func TestDelete_TodoReassignFailureStopsBeforeUserDelete(t *testing.T) {
+	cases := []struct {
+		name        string
+		todos       *mockUserTodoRepo
+		lists       *mockUserTodoListRepo
+		actions     *mockTodoActionRepo
+		wantMessage string
+	}{
+		{
+			name:        "todos fail",
+			todos:       &mockUserTodoRepo{reassignByUserFn: func(ctx context.Context, from, to int) error { return errors.New("todo boom") }},
+			lists:       &mockUserTodoListRepo{},
+			actions:     &mockTodoActionRepo{},
+			wantMessage: "failed to reassign todos",
+		},
+		{
+			name:        "lists fail",
+			todos:       &mockUserTodoRepo{},
+			lists:       &mockUserTodoListRepo{reassignByUserFn: func(ctx context.Context, from, to int) error { return errors.New("list boom") }},
+			actions:     &mockTodoActionRepo{},
+			wantMessage: "failed to reassign todo lists",
+		},
+		{
+			name:        "actions fail",
+			todos:       &mockUserTodoRepo{},
+			lists:       &mockUserTodoListRepo{},
+			actions:     &mockTodoActionRepo{reassignByUserFn: func(ctx context.Context, from, to int) error { return errors.New("action boom") }},
+			wantMessage: "failed to reassign todo actions",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			deleted := false
+			sentinelUser := &domain.User{ID: 1, Username: domain.DeletedUserUsername, Role: domain.UserRoleSentinel}
+			repo := &mockUserRepository{
+				getByIDFn: func(ctx context.Context, id int) (*domain.User, error) {
+					return &domain.User{ID: 2, Username: "testuser", Role: domain.UserRoleDefault}, nil
+				},
+				getByUsernameFn: func(ctx context.Context, username string) (*domain.User, error) {
+					return sentinelUser, nil
+				},
+				deleteFn: func(ctx context.Context, id int) error {
+					deleted = true
+					return nil
+				},
+			}
+			svc := newTestUserServiceWithTodos(repo, &mockContentRepoForUser{}, &mockPerspectiveRepoForUser{}, tc.todos, tc.lists, tc.actions)
+
+			err := svc.Delete(context.Background(), testAdmin, 2)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantMessage)
+			assert.False(t, deleted, "the user row must not be deleted when reassignment fails")
+		})
+	}
 }
 
 // --- Reserved Username Tests ---
@@ -715,7 +892,7 @@ func TestCreate_ReservedDeletedUsername(t *testing.T) {
 	repo := &mockUserRepository{}
 	svc := newTestUserService(repo)
 
-	result, err := svc.Create(context.Background(), domain.DeletedUserUsername, "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, domain.DeletedUserUsername, "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -727,7 +904,7 @@ func TestCreate_ReservedSystemUsername(t *testing.T) {
 	repo := &mockUserRepository{}
 	svc := newTestUserService(repo)
 
-	result, err := svc.Create(context.Background(), domain.SystemUserUsername, "test@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, domain.SystemUserUsername, "test@example.com")
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -744,7 +921,7 @@ func TestUpdate_ReservedDeletedUsername(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{
 		ID:       2,
 		Username: &reserved,
 	})
@@ -764,7 +941,7 @@ func TestUpdate_ReservedSystemUsername(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{
 		ID:       2,
 		Username: &reserved,
 	})
@@ -784,7 +961,7 @@ func TestUpdate_SystemSentinelBlocked(t *testing.T) {
 
 	newUsername := "hacker"
 	svc := newTestUserService(repo)
-	result, err := svc.Update(context.Background(), portservices.UpdateUserInput{
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{
 		ID:       1,
 		Username: &newUsername,
 	})
@@ -802,7 +979,7 @@ func TestDelete_SystemSentinelBlocked(t *testing.T) {
 	}
 
 	svc := newTestUserService(repo)
-	err := svc.Delete(context.Background(), 1)
+	err := svc.Delete(context.Background(), testAdmin, 1)
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrDeleteSentinel))
@@ -829,7 +1006,7 @@ func TestCreate_SetsDefaultOnboarding(t *testing.T) {
 	}
 	svc := newTestUserService(repo)
 
-	result, err := svc.Create(context.Background(), "newbie", "n@example.com")
+	result, err := svc.Create(context.Background(), testAdmin, "newbie", "n@example.com")
 	require.NoError(t, err)
 	require.NotNil(t, captured)
 	assert.Equal(t, domain.DefaultUserOnboarding(), captured.Onboarding)
@@ -976,4 +1153,80 @@ func (m *mockContentRepoForUser) GetByISRC(ctx context.Context, isrc string) (*d
 
 func (m *mockContentRepoForUser) SetResponseKey(ctx context.Context, contentID int, key string, value json.RawMessage) error {
 	return nil
+}
+
+// --- Authorization ---
+
+func TestUserMutations_Authorization(t *testing.T) {
+	target := &domain.User{ID: 5, Username: "target", Email: "t@example.com", Role: domain.UserRoleDefault}
+	newRepo := func(wrote *bool) *mockUserRepository {
+		return &mockUserRepository{
+			getByIDFn: func(ctx context.Context, id int) (*domain.User, error) { cp := *target; return &cp, nil },
+			getByUsernameFn: func(ctx context.Context, username string) (*domain.User, error) {
+				if username == domain.DeletedUserUsername {
+					return &domain.User{ID: 1, Username: username, Role: domain.UserRoleSentinel}, nil
+				}
+				return nil, domain.ErrNotFound
+			},
+			updateFn: func(ctx context.Context, u *domain.User) (*domain.User, error) {
+				*wrote = true
+				return u, nil
+			},
+			deleteFn: func(ctx context.Context, id int) error {
+				*wrote = true
+				return nil
+			},
+		}
+	}
+	name := "renamed"
+	other := &domain.AuthenticatedUser{ID: 6, Role: domain.UserRoleDefault}
+	self := &domain.AuthenticatedUser{ID: 5, Role: domain.UserRoleDefault}
+
+	tests := []struct {
+		name    string
+		actor   *domain.AuthenticatedUser
+		allowed bool
+	}{
+		{"another user", other, false},
+		{"no actor", nil, false},
+		{"the user themself", self, true},
+		{"an admin", testAdmin, true},
+	}
+	for _, tc := range tests {
+		t.Run("update/"+tc.name, func(t *testing.T) {
+			wrote := false
+			svc := newTestUserService(newRepo(&wrote))
+			_, err := svc.Update(context.Background(), tc.actor, portservices.UpdateUserInput{ID: 5, Username: &name})
+			if tc.allowed {
+				require.NoError(t, err)
+				assert.True(t, wrote)
+			} else {
+				assert.True(t, errors.Is(err, domain.ErrForbidden), "got %v", err)
+				assert.False(t, wrote, "nothing may be written for an unauthorized actor")
+			}
+		})
+		t.Run("delete/"+tc.name, func(t *testing.T) {
+			wrote := false
+			svc := newTestUserService(newRepo(&wrote))
+			err := svc.Delete(context.Background(), tc.actor, 5)
+			if tc.allowed {
+				require.NoError(t, err)
+				assert.True(t, wrote)
+			} else {
+				assert.True(t, errors.Is(err, domain.ErrForbidden), "got %v", err)
+				assert.False(t, wrote, "nothing may be written for an unauthorized actor")
+			}
+		})
+	}
+
+	for _, actor := range []*domain.AuthenticatedUser{nil, self, other} {
+		created := false
+		repo := &mockUserRepository{createFn: func(ctx context.Context, u *domain.User) (*domain.User, error) {
+			created = true
+			return u, nil
+		}}
+		_, err := newTestUserService(repo).Create(context.Background(), actor, "newbie", "n@example.com")
+		assert.True(t, errors.Is(err, domain.ErrForbidden), "non-admin create: got %v", err)
+		assert.False(t, created)
+	}
 }

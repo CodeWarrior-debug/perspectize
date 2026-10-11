@@ -122,7 +122,7 @@ func TestRefreshLyricsAvailability_MapsStoredFields(t *testing.T) {
 func TestRefreshLyricsAvailability_RejectsNonMusic(t *testing.T) {
 	repo := &mockContentRepository{
 		getByIDFn: func(_ context.Context, id int) (*domain.Content, error) {
-			return &domain.Content{ID: id, ContentType: domain.ContentTypeYouTube}, nil
+			return &domain.Content{ID: id, ContentType: domain.ContentTypeYouTubeVideo}, nil
 		},
 	}
 	server := setupTestServer(repo, musicYT())
@@ -145,5 +145,3 @@ func TestMarkRelatedMediaUnavailable_UnknownVideo(t *testing.T) {
 	require.NotEmpty(t, result.Errors)
 	assert.Contains(t, result.Errors[0].Message, "related video not found")
 }
-
-func intPtr(n int) *int { return &n }

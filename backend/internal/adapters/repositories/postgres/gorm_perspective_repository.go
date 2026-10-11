@@ -7,9 +7,18 @@ import (
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
+	"github.com/jackc/pgx/v5/pgconn"
 	paginator "github.com/pilagod/gorm-cursor-paginator/v2/paginator"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+// pgForeignKeyViolation is Postgres' SQLSTATE for an FK violation (23503).
+const pgForeignKeyViolation = "23503"
+
+// perspectivesUserFK is the FK from perspectives.user_id to users.id
+// (migrations 000004/000006).
+const perspectivesUserFK = "perspectives_users_fk"
 
 // GormPerspectiveRepository implements the PerspectiveRepository interface using GORM
 type GormPerspectiveRepository struct {
@@ -24,16 +33,23 @@ func NewGormPerspectiveRepository(db *gorm.DB) *GormPerspectiveRepository {
 	return &GormPerspectiveRepository{db: db}
 }
 
-// Create inserts a new perspective record into the database
+// Create inserts a new perspective record into the database in one round
+// trip: RETURNING * hands back the DB-generated id and timestamps, so there is
+// no follow-up SELECT. A user_id that doesn't exist fails the FK and comes
+// back as domain.ErrNotFound (the service relies on this instead of a
+// separate user lookup).
 func (r *GormPerspectiveRepository) Create(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
 	model := perspectiveDomainToModel(p)
 
-	if err := r.db.WithContext(ctx).Create(model).Error; err != nil {
+	if err := r.db.WithContext(ctx).Clauses(clause.Returning{}).Create(model).Error; err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolation && pgErr.ConstraintName == perspectivesUserFK {
+			return nil, fmt.Errorf("%w: user with id %d not found", domain.ErrNotFound, p.UserID)
+		}
 		return nil, fmt.Errorf("failed to insert perspective: %w", err)
 	}
 
-	// Fetch fresh record with DB-generated timestamps
-	return r.GetByID(ctx, model.ID)
+	return perspectiveModelToDomain(model), nil
 }
 
 // GetByID retrieves a perspective by its ID
@@ -50,21 +66,48 @@ func (r *GormPerspectiveRepository) GetByID(ctx context.Context, id int) (*domai
 	return perspectiveModelToDomain(&model), nil
 }
 
-// Update updates an existing perspective
-func (r *GormPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
+// Update writes every column of p in one round trip, scoped to its owner:
+// UPDATE ... WHERE id = ? AND user_id = ? RETURNING *. The ownership predicate
+// is part of the statement (same as Delete), and RETURNING carries the
+// trigger-maintained updated_at back, so there is no follow-up SELECT.
+// Returns domain.ErrNotFound when no row matched (missing id and not-yours are
+// deliberately indistinguishable).
+//
+// Deliberately not gorm's Save(): when an UPDATE matches zero rows Save falls
+// back to an INSERT ... ON CONFLICT DO UPDATE, which would bypass the owner
+// predicate entirely.
+func (r *GormPerspectiveRepository) Update(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
+	if ownerUserID <= 0 {
+		return nil, domain.ErrNotFound
+	}
 	model := perspectiveDomainToModel(p)
 
-	if err := r.db.WithContext(ctx).Save(model).Error; err != nil {
-		return nil, fmt.Errorf("failed to update perspective: %w", err)
+	// Select("*") writes nil/zero fields too, so a cleared rating really is
+	// cleared; the identity and creation columns are never rewritten.
+	result := r.db.WithContext(ctx).
+		Model(model).
+		Clauses(clause.Returning{}).
+		Where("user_id = ?", ownerUserID).
+		Select("*").
+		Omit("id", "user_id", "created_at").
+		Updates(model)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to update perspective: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return nil, domain.ErrNotFound
 	}
 
-	// Fetch fresh record with updated timestamps
-	return r.GetByID(ctx, model.ID)
+	return perspectiveModelToDomain(model), nil
 }
 
-// Delete removes a perspective by ID
-func (r *GormPerspectiveRepository) Delete(ctx context.Context, id int) error {
-	result := r.db.WithContext(ctx).Delete(&PerspectiveModel{}, id)
+// Delete removes a perspective by ID, scoped to its owner (see the port's doc
+// comment): DELETE ... WHERE id = ? AND user_id = ?.
+func (r *GormPerspectiveRepository) Delete(ctx context.Context, id int, ownerUserID int) error {
+	if ownerUserID <= 0 {
+		return domain.ErrNotFound
+	}
+	result := r.db.WithContext(ctx).Where("user_id = ?", ownerUserID).Delete(&PerspectiveModel{}, id)
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete perspective: %w", result.Error)
 	}
@@ -186,6 +229,11 @@ type aggregateRow struct {
 // (COUNT(*), every perspective) since Quality is optional — that's the
 // number shown in the average-rating tooltip so "N ratings" always matches
 // what AverageQuality was actually computed over.
+//
+// Driven from the content table (LEFT JOIN), so every EXISTING content id gets
+// an entry — Count 0 when it has no perspectives — and only ids with no
+// content row are absent. Callers can therefore tell "no such content" (absent)
+// from "no perspectives yet" (Count == 0) in the same single query.
 func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 	if len(contentIDs) == 0 {
 		return map[int]*domain.PerspectiveAggregate{}, nil
@@ -193,10 +241,11 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 
 	var rows []aggregateRow
 	err := r.db.WithContext(ctx).
-		Model(&PerspectiveModel{}).
-		Select("content_id AS content_id, COUNT(*) AS count, COUNT(quality) AS quality_count, AVG(quality) AS avg_quality").
-		Where("content_id IN ?", contentIDs).
-		Group("content_id").
+		Table("content AS c").
+		Select("c.id AS content_id, COUNT(p.id) AS count, COUNT(p.quality) AS quality_count, AVG(p.quality) AS avg_quality").
+		Joins("LEFT JOIN perspectives p ON p.content_id = c.id").
+		Where("c.id = ANY(CAST(? AS bigint[]))", intsToArray(contentIDs)).
+		Group("c.id").
 		Find(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to aggregate perspectives by content: %w", err)

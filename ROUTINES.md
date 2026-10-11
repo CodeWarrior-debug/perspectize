@@ -1,11 +1,12 @@
 # Routines
 
-Tracks runs of scheduled maintenance routines for this repo. Task lists for each routine live in skills (not here) — see `.claude/skills/monthly-maintenance/SKILL.md` for the monthly routine's task list.
+Tracks runs of scheduled maintenance routines for this repo. Task lists for each routine live in skills (not here); this file only records date, completion, the measured bundle-size and LOC snapshots, and a short comment — see `.claude/skills/monthly-maintenance/SKILL.md` for the monthly routine's task list.
 
 ## Monthly Maintenance
 
 Triggered automatically (via a SessionStart hook) on the first session after the 1st of each month, but only once at least 10 merges have landed on `main` since the last recorded run below.
 
-| Date (Month-Year) | Completed (Y/N) | Comments |
-|---|---|---|
-| 2026-09 | Y | Deleted 3 stale local merged branches (2 others skipped — checked out in active worktrees). No open dependabot/security PRs to merge (2 gradle bumps already landed). Ran `graphify update` and refreshed `.planning/codebase/` via gsd:map-codebase. Flagged: 4 open high-severity Dependabot alerts for `fast-uri` with no PR yet — needs manual follow-up. |
+| Date (Month-Year) | Completed (Y/N) | Bundle size / speed | Files / LOC / est. tokens (total) | Routine cost (active time / output tokens) | Comments |
+|---|---|---|---|---|---|
+| 2026-09 | Y | — | — | — | Deleted 3 stale local merged branches (2 others skipped — checked out in active worktrees). No open dependabot/security PRs to merge (2 gradle bumps already landed). Ran `graphify update` and refreshed `.planning/codebase/` via gsd:map-codebase. Flagged: 4 open high-severity Dependabot alerts for `fast-uri` with no PR yet — needs manual follow-up. |
+| 2026-10 | Y | Cloud run: build 4,428 KB; client JS 2.39 MB raw / 707 KB gz, CSS 110 KB raw / 19 KB gz (largest chunk 988 KB). Lighthouse (cloud, median of 3): `/` and `/discover` perf 83, FCP ~3.2 s, LCP ~3.65 s, TBT 0, CLS 0. k6 (local server, shared dev DB, 20 iters/op, read-only, 0% errors): health p95 2.4 ms; contentList p95 48 ms; perspectivesList 53 ms; users 48 ms; wikidataSearch 168 ms (perspectiveByID/userByUsername skipped: no ids supplied). Local chunk attribution: 988 KB = AG Grid; 432 KB = Tiptap/ProseMirror; 156 KB = root layout (Clerk); 100 KB = global CSS | 1,495 files / 276,904 LOC / ~2.78M tokens | cloud ~8 min / 8.5K out; local ~7 min / 22K out (local session also covered a PR demo, so overstated) | Cloud: bumped frontend minor/patch deps and raised pnpm overrides (`pnpm audit` 16 → 4 findings; extract-zip has no patch, uuid via Capacitor CLI); backend direct deps all current; no dependabot/security PRs. Local: deleted the 7 merged remote branches and 7 merged local branches; `graphify update .`; refreshed `.planning/codebase/` via gsd:map-codebase. Cleared 24 `~/Downloads/screenshots/sv-*` files for merged PRs. Video-capture compaction: deleted the frozen `record-clip.snapshot.mjs` and the merged-PR recorders `demo-bible-verse-jump` (#468) and `demo-type-checkbox-filter` (#469), synced the Recorders index, no scenarios promoted; the owner cleared the unmappable topic-named clips by hand. |

@@ -1,4 +1,5 @@
 import { COLUMNS, GROUP_LABELS, TYPES, type ColumnDef } from './catalog.js';
+import { detailsFor, type DetailsLayout } from './details.js';
 import { bindingFor, gapText, resolveGrid, samplesFor, typeLabel, unitsFor, type DraftState } from './model.js';
 
 const YES = 'yes';
@@ -28,6 +29,22 @@ function storageNote(col: ColumnDef): string {
       return 'computed at read time — not stored';
   }
 }
+
+/**
+ * Go package directory for the enrichment adapter. The draft's id is always
+ * 'draft' in the form, so derive it from the enum instead (PODCAST_EPISODE →
+ * podcastepisode; Go package names are lowercase with no underscores).
+ */
+function adapterPackage(enumValue: string): string {
+  return enumValue.toLowerCase().replace(/[^a-z0-9]/g, '') || 'newtype';
+}
+
+const DISCOVER_LABELS: Record<string, string> = {
+  'search-and-feed': 'Search and a feed',
+  'feed-only': 'Feed only',
+  'search-only': 'Search only',
+  'not-on-discover': 'Not on Discover'
+};
 
 export function buildSpec(state: DraftState): string {
   const d = state.draft;
@@ -75,13 +92,19 @@ export function buildSpec(state: DraftState): string {
             ? 'MUST relax the global `UNIQUE(url)` constraint — this type can share a URL with another type. Migration required: replace with `UNIQUE(url, content_type)` or a partial index.'
             : 'Keep the existing global `UNIQUE(url)` constraint.'
         ],
-        ['Thumbnail strategy', d.thumbnail]
+        ['Thumbnail strategy', d.thumbnail],
+        [
+          'Add Content link detection',
+          d.detect && d.detect.hosts.length && d.detect.path
+            ? `Hosts ${d.detect.hosts.join(', ')}; path \`${d.detect.path}\` (group 1 = external id). Checked after the YouTube and Bible Gateway rules, before "any other link is never guessed".`
+            : 'None — this type is never auto-detected; the user picks it from the type menu.'
+        ]
       ]
     )
   );
   if (d.ingestion === 'api' || d.ingestion === 'scrape') {
     out.push(
-      `Adapter to build: \`backend/internal/adapters/${d.id}/\` (\`client.go\`, \`parser.go\`) behind a port interface in \`backend/internal/core/ports/services/\`, wired in \`cmd/server/main.go\`.`
+      `Adapter to build: \`backend/internal/adapters/${adapterPackage(d.enumValue)}/\` (\`client.go\`, \`parser.go\`) behind a port interface in \`backend/internal/core/ports/services/\`, wired in \`cmd/server/main.go\`.`
     );
   } else if (d.ingestion === 'manual' || d.ingestion === 'url-only') {
     out.push('No external adapter. All fields come from the create form, so form validation is the only guard on data quality.');
@@ -89,6 +112,42 @@ export function buildSpec(state: DraftState): string {
     out.push('No external adapter. The service resolves an existing `content` row (and a person record) instead of fetching.');
   }
   out.push('');
+
+  out.push('### Discover page');
+  out.push('');
+  const dc = d.discover;
+  if (!dc) {
+    out.push('**Not decided.** Every type needs a Discover decision, even "not on Discover". See section 6.');
+    out.push('');
+  } else {
+    const hasSearch = dc.placement === 'search-and-feed' || dc.placement === 'search-only';
+    const hasFeed = dc.placement === 'search-and-feed' || dc.placement === 'feed-only';
+    out.push(
+      table(
+        ['Decision', 'Value'],
+        [
+          ['Placement', `${DISCOVER_LABELS[dc.placement]} (${dc.status})`],
+          ...(hasSearch
+            ? [
+                ['Search mode', dc.searchMode === 'hand-off' ? 'hand-off (opens the source site; pasted links are added)' : 'in-app'],
+                ['Search', dc.search || '(missing)'],
+                ['Filters', dc.filters.join(', ') || 'none']
+              ]
+            : []),
+          ...(hasFeed
+            ? [
+                ['Feed heading', dc.feedLabel || '(missing)'],
+                ['Feed kind', dc.feedKind],
+                ['Feed source & ranking signal', dc.feedSource || '(missing)'],
+                ['Refresh', dc.refresh || '(missing)']
+              ]
+            : []),
+          ['Feed fetched from', dc.fetchFrom],
+          ['Why', dc.reason || '(missing)']
+        ]
+      )
+    );
+  }
 
   out.push('## 3. Fields for this type');
   out.push('');
@@ -147,6 +206,12 @@ export function buildSpec(state: DraftState): string {
         })
       )
     );
+  }
+
+  if (d.detailOnly?.length) {
+    out.push('### Details modal only (never grid columns)');
+    out.push('');
+    out.push(table(['Field', 'Value path'], d.detailOnly.map((f) => [f.label, f.path])));
   }
 
   out.push('## 4. Fields deliberately not carried');
@@ -261,6 +326,8 @@ export function buildSpec(state: DraftState): string {
 
   out.push('## 6. Consistency review');
   out.push('');
+  if (!d.discover) out.push('- **MUST FIX**: no Discover page decision. Decide placement (search, feed, both, or not on Discover) and say why.');
+  else if (!d.discover.reason.trim()) out.push('- **MUST FIX**: the Discover decision has no reason.');
   if (grid.warnings.length === 0) {
     out.push('No gaps flagged for this selection.');
   } else {
@@ -279,6 +346,10 @@ export function buildSpec(state: DraftState): string {
       grid.columns.filter((rc) => !rc.visible && rc.bound.length > 0).map((rc) => [rc.col.generic || rc.col.id, rc.reason])
     )
   );
+
+  out.push('## 7b. Details view');
+  out.push('');
+  out.push(...detailsSpec(state, d.id));
 
   out.push('## 8. Testing approach');
   out.push('');
@@ -299,7 +370,7 @@ export function buildSpec(state: DraftState): string {
       ? `Domain: add sort enums in \`domain/pagination.go\` for ${sortables.map((c) => c.id).join(', ')}.`
       : 'Domain: no new sort enums.',
     d.ingestion === 'api' || d.ingestion === 'scrape'
-      ? `Adapter: \`backend/internal/adapters/${d.id}/\` against ${d.enrichment}.`
+      ? `Adapter: \`backend/internal/adapters/${adapterPackage(d.enumValue)}/\` against ${d.enrichment}.`
       : 'Adapter: none.',
     `Schema: add \`${d.enumValue}\` to the ContentType enum and a \`createContentFrom${d.label.replace(/[^A-Za-z0-9]/g, '')}\` mutation + input in \`backend/schema.graphql\`, then \`make graphql-gen\`.`,
     `Service: \`CreateFrom${d.label.replace(/[^A-Za-z0-9]/g, '')}\` in \`content_service.go\` — dedupe on ${d.identity}, validate, enrich, persist.`,
@@ -319,7 +390,17 @@ export function buildSpec(state: DraftState): string {
     'Resolver: mutation handler in `schema.resolvers.go`.',
     'Frontend: types + queries in `src/lib/queries/content.ts`; mutation hook alongside `useAddVideo.ts`.',
     d.urlRequired ? `Frontend: URL validation for ${d.urlPattern} in \`src/lib/utils/\`.` : 'Frontend: form validation for the manual fields (no URL rule).',
-    `Frontend: \`typeCellRenderer\` icon (${d.icon}) and \`itemCellRenderer\` tile (${d.thumbnail}) in \`src/lib/utils/formatting.ts\`.`,
+    ...(d.detect && d.detect.hosts.length && d.detect.path
+      ? [
+          `Frontend: detection in \`src/lib/utils/detectContentType.ts\` — add \`{ type: '${d.enumValue}' }\` for hosts ${d.detect.hosts.join(', ')} matching \`${d.detect.path}\`, after the Bible Gateway check and before the "any other URL" fallthrough; add unit cases for each example in the tester.`,
+          `Frontend: \`AddContentPopover.svelte\` — chip label, a "${d.label}" option in the type menu, submit wiring, and the popover description text.`
+        ]
+      : []),
+    ...discoverSteps(d),
+    `Frontend: \`typeCellRenderer\` icon (${d.icon}) in \`src/lib/utils/formatting.ts\`; Item cell tile (${d.thumbnail}) in \`src/lib/utils/activityItemCellRenderer.ts\`.`,
+    ...(d.detailOnly?.length
+      ? [`Frontend: \`ActivityDetailsModal.svelte\` — a ${d.label} branch with the bound fields as tiles and ${d.detailOnly.map((f) => f.label).join(', ')} in a details list.`]
+      : []),
     `Frontend: column defs + tooltips in \`ActivityTable.svelte\` per section 5, with the alias swap from the per-type header table.`,
     'Tests: domain enum, service create paths, resolver mutation + filter-by-type, formatting renderers, query definitions.',
     'Verify: `go build ./...`, `go test ./...`, `pnpm run test:run`.'
@@ -348,4 +429,136 @@ export function buildMatrix(state: DraftState): string {
     '',
     table(['Column', ...ids.map((id) => (id === state.draft.id ? `${typeLabel(id, state.draft)} (draft)` : typeLabel(id, state.draft)))], rows)
   ].join('\n');
+}
+
+function discoverSteps(d: DraftState['draft']): string[] {
+  const dc = d.discover;
+  if (!dc) return ['Discover: decide placement first (section 7 of the tool).'];
+  if (dc.placement === 'not-on-discover') return [];
+  const steps: string[] = [];
+  const hasSearch = dc.placement !== 'feed-only';
+  const hasFeed = dc.placement !== 'search-only';
+  steps.push(
+    `Discover: a ${d.label} source in \`routes/discover/+page.svelte\` (the page's view union today is 'search' | 'trending'), a card component beside \`discover/VideoCard.svelte\`, and "already in library" matching on the normalised url.`
+  );
+  const handOff = dc.searchMode === 'hand-off';
+  if (hasSearch && handOff) steps.push(`Discover search hand-off: the search box opens the source's own search in a new tab (see \`discover/SearchBar.svelte\`), and a pasted ${d.label} link in the same box is added directly — ${dc.search}`);
+  if (hasSearch && !handOff) steps.push(`Discover search: client in \`src/lib/services/\` beside \`youtubeApi.ts\` — ${dc.search}${dc.filters.length ? ` Filters: ${dc.filters.join(', ')}.` : ''}`);
+  if (hasFeed && dc.fetchFrom === 'backend') steps.push(`Discover feed "${dc.feedLabel}": backend fetch + cache (${dc.refresh}) exposed through GraphQL — ${dc.feedSource}`);
+  if (hasFeed && dc.fetchFrom === 'browser') steps.push(`Discover feed "${dc.feedLabel}": browser fetch (${dc.refresh}) — ${dc.feedSource}`);
+  if (dc.fetchFrom === 'browser' || (hasSearch && !handOff)) steps.push('CSP: add the browser-called API host to `connect-src` in `frontend/src/app.html`.');
+  return steps;
+}
+
+function layoutOf(state: DraftState, typeId: string): DetailsLayout {
+  const lookup = typeId === state.draft.id ? state.seed ?? typeId : typeId;
+  return detailsFor(lookup, typeLabel(typeId, state.draft), (col) => bindingFor(col, typeId, state)?.defaultVisible === true);
+}
+
+/** The details-view part of a type's spec: header, hero, tiles, sections. */
+function detailsSpec(state: DraftState, typeId: string): string[] {
+  const layout = layoutOf(state, typeId);
+  const col = (id?: string) => (id ? COLUMNS.find((c) => c.id === id) : undefined);
+  const out: string[] = [];
+  const subtitle = layout.subtitle.map((s) => (typeof s === 'string' ? s : `${s.key} + " ${s.suffix}"`));
+  out.push(
+    table(
+      ['Part', 'Decision'],
+      [
+        ['Header band', layout.heading.toUpperCase()],
+        ['Media', layout.media],
+        ['Breadcrumb', layout.breadcrumb?.join(' › ') || '—'],
+        ['Title / tagline', `item${layout.tagline ? ` / ${layout.tagline} (italic)` : ''}`],
+        ['Subtitle', subtitle.join(' · ') || '—'],
+        ['Links', [layout.link ?? 'url', ...(layout.links ?? []).map((l) => l.label)].join(', ')],
+        ['Actions', layout.actions.join(', ')],
+        ['Prev / next', layout.prevNext ? layout.prevNext.join(' / ') : '—'],
+        ['Attribution', layout.attribution ?? '—']
+      ]
+    )
+  );
+  out.push(
+    table(
+      ['Tile', 'Value from', 'Tooltip'],
+      layout.tiles.map((t) => {
+        const b = t.col ? bindingFor(col(t.col)!, typeId, state) : undefined;
+        return [
+          t.label ?? b?.label ?? col(t.col)?.generic ?? t.key ?? '',
+          t.source ?? b?.path ?? (t.col ? `(not bound for this type: ${t.col})` : ''),
+          t.tooltip ?? b?.tooltip ?? col(t.col)?.tooltip ?? '—'
+        ];
+      })
+    )
+  );
+  out.push(
+    table(
+      ['Section', 'Kind', 'Value from', 'Notes'],
+      layout.sections.map((sec) => {
+        const b = sec.col ? bindingFor(col(sec.col)!, typeId, state) : undefined;
+        return [
+          sec.label,
+          sec.kind,
+          sec.source ?? b?.path ?? sec.key ?? '',
+          [sec.tooltip ?? b?.tooltip, sec.spoiler ? 'spoiler-blurred until hover' : ''].filter(Boolean).join(' — ') || '—'
+        ];
+      })
+    )
+  );
+  if (layout.notes?.length) {
+    for (const n of layout.notes) out.push(`- ${n}`);
+    out.push('');
+  }
+  return out;
+}
+
+/**
+ * Per-type single-type views for every type selected in section 4: the
+ * suggested default columns (with what-if overrides), header + cell tooltips,
+ * what stays in the column picker, and the details view layout.
+ */
+export function buildSoloViews(state: DraftState): string {
+  const out: string[] = ['# Single-type views', ''];
+  out.push(
+    'What the Activity table shows when exactly one type is filtered in, and what its details modal shows. Generated by `tools/content-type-designer` from the types selected in section 4.'
+  );
+  out.push('');
+  for (const typeId of state.selected) {
+    const label = typeLabel(typeId, state.draft);
+    const solo: DraftState = { ...state, selected: [typeId] };
+    const overrides = state.soloOverrides?.[typeId];
+    const grid = resolveGrid(solo, overrides);
+    out.push(`## ${label}`);
+    out.push('');
+    out.push(`### Default columns (${grid.visible.length})`);
+    out.push('');
+    out.push(
+      table(
+        ['#', 'Header', 'Column', 'Header tooltip', 'Cell popover', 'Cell appearance'],
+        grid.visible.map((rc, i) => {
+          const b = bindingFor(rc.col, typeId, solo);
+          return [
+            String(i + 1),
+            rc.header || '(icon)',
+            `${rc.col.id}${overrides?.[rc.col.id] !== undefined ? ' (what-if)' : ''}`,
+            rc.tooltip,
+            b?.cellTip ?? 'default — displayed text, copy copies the raw value',
+            b?.appearance ?? '—'
+          ];
+        })
+      )
+    );
+    const off = grid.columns.filter((rc) => !rc.visible && rc.bound.length > 0);
+    out.push('### In the column picker (off by default)');
+    out.push('');
+    out.push(table(['Header', 'Column', 'Why off'], off.map((rc) => [rc.header || rc.col.generic, rc.col.id, rc.reason])));
+    const warnings = grid.warnings;
+    if (warnings.length) {
+      for (const w of warnings) out.push(`- **${w.severity.toUpperCase()}**: ${w.message}`);
+      out.push('');
+    }
+    out.push('### Details view');
+    out.push('');
+    out.push(...detailsSpec(state, typeId));
+  }
+  return out.join('\n');
 }

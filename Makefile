@@ -4,7 +4,7 @@
 #
 # The database is remote (Sevalla) — nothing to start locally for it.
 
-.PHONY: start stop restart status logs help demo-up demo-down demo-reset demo-wipe demo-logs demo-test demo-record
+.PHONY: start stop restart status logs help demo-up demo-down demo-reset demo-wipe demo-logs demo-test demo-record obs-up obs-down obs-smoke
 .DEFAULT_GOAL := help
 
 BACKEND_PORT  := 8080
@@ -26,6 +26,11 @@ help:
 	@echo "  make demo-test    - reset, then run tours + flows as Playwright E2E"
 	@echo "  make demo-record  - reset, then record tours to frontend/demo/out/videos/"
 	@echo "  make demo-down    - stop (keeps data)  |  make demo-wipe - stop + delete data"
+	@echo ""
+	@echo "Observability tracer (demo stack + local Grafana LGTM; see .docs/OBSERVABILITY.md):"
+	@echo "  make obs-up       - demo stack + lgtm + alloy, telemetry on; Grafana http://localhost:3000"
+	@echo "  make obs-smoke    - send GraphQL traffic, assert metrics/traces/logs reached Grafana"
+	@echo "  make obs-down     - stop demo + observability containers (demo data kept)"
 
 start:
 	@mkdir -p $(PID_DIR) $(LOG_DIR)
@@ -102,3 +107,24 @@ demo-test: demo-reset
 demo-record: demo-reset
 	$(DEMO_ENV) pnpm --dir frontend run demo:record
 	@echo "Videos: frontend/demo/out/videos/*.webm"
+
+# --- Observability tracer ---------------------------------------------------
+# The demo stack plus docker-compose.observability.yml: grafana/otel-lgtm
+# (Grafana/Prometheus/Tempo/Loki) and Alloy (Faro receiver), with the backend's
+# OTLP export and the frontend's Faro SDK switched on. Same compose project as
+# the demo stack, so stop it with obs-down (demo-down would leave lgtm/alloy
+# running as orphans). Runbook: .docs/OBSERVABILITY.md.
+OBS_COMPOSE := docker compose -f docker-compose.demo.yml -f docker-compose.observability.yml
+
+obs-up:
+	GIT_COMMIT=$$(git rev-parse HEAD) GIT_BRANCH=$$(git rev-parse --abbrev-ref HEAD) \
+		$(OBS_COMPOSE) up -d --build --wait backend frontend alloy lgtm
+	@echo "Grafana: http://localhost:3000  (dashboard: Perspectize / Perspectize API; anonymous admin)"
+	@echo "Demo:    http://localhost:4173  (API http://localhost:8081/graphql, Faro -> http://localhost:12347/collect)"
+	@echo "Next:    make obs-smoke"
+
+obs-down:
+	$(OBS_COMPOSE) down
+
+obs-smoke:
+	bash ops/observability/smoke.sh

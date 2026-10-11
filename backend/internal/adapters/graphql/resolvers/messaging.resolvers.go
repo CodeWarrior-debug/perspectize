@@ -23,7 +23,7 @@ func (r *messageResolver) Sender(ctx context.Context, obj *model.Message) (*mode
 	if _, ok := auth.ForContext(ctx); !ok {
 		return nil, domain.ErrForbidden
 	}
-	u, err := r.UserService.GetByID(ctx, obj.SrcSenderID)
+	u, err := r.userByID(ctx, obj.SrcSenderID)
 	if err != nil {
 		return nil, err
 	}
@@ -61,18 +61,19 @@ func (r *messageThreadResolver) Participants(ctx context.Context, obj *model.Mes
 
 // LatestSeq is the resolver for the latestSeq field.
 //
-// obj was produced by messageThreads / messageThread, both of which already
-// authorized the actor for this thread, so this uses the trusted ThreadMaxSeq
-// (no repeated participant lookup) and memoizes the result on obj.
+// obj was produced by a query or mutation that already authorized the actor
+// for this thread, so this uses the trusted ThreadStats, batched across every
+// thread in the response by the per-request loader.
 func (r *messageThreadResolver) LatestSeq(ctx context.Context, obj *model.MessageThread) (int, error) {
-	if _, ok := auth.ForContext(ctx); !ok {
+	actor, ok := auth.ForContext(ctx)
+	if !ok {
 		return 0, domain.ErrForbidden
 	}
-	seq, err := r.latestSeqOf(ctx, obj)
+	st, err := r.threadStatsFor(ctx, actor.ID, obj)
 	if err != nil {
 		return 0, err
 	}
-	return int(seq), nil
+	return int(st.LatestSeq), nil
 }
 
 // MyLastReadSeq is the resolver for the myLastReadSeq field.
@@ -87,19 +88,18 @@ func (r *messageThreadResolver) MyLastReadSeq(ctx context.Context, obj *model.Me
 // UnreadCount is the resolver for the unreadCount field.
 //
 // Counts the rows newer than the actor's read pointer rather than subtracting
-// seqs, so pruned gaps do not inflate the count. Like latestSeq it relies on
-// the authorization the parent query already performed, so it costs exactly one
-// query per thread.
+// seqs, so pruned gaps do not inflate the count. Batched with latestSeq (same
+// loader, same query) across every thread in the response.
 func (r *messageThreadResolver) UnreadCount(ctx context.Context, obj *model.MessageThread) (int, error) {
 	actor, ok := auth.ForContext(ctx)
 	if !ok {
 		return 0, domain.ErrForbidden
 	}
-	tid, err := parseIntID("id", obj.ID)
+	st, err := r.threadStatsFor(ctx, actor.ID, obj)
 	if err != nil {
 		return 0, err
 	}
-	return r.Messaging.UnreadCount(ctx, tid, lastReadSeqFor(obj.Src, actor.ID))
+	return st.Unread, nil
 }
 
 // Muted is the resolver for the muted field.
@@ -486,7 +486,7 @@ func (r *threadParticipantResolver) User(ctx context.Context, obj *model.ThreadP
 	if _, ok := auth.ForContext(ctx); !ok {
 		return nil, domain.ErrForbidden
 	}
-	u, err := r.UserService.GetByID(ctx, obj.SrcUserID)
+	u, err := r.userByID(ctx, obj.SrcUserID)
 	if err != nil {
 		return nil, err
 	}

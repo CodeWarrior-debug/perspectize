@@ -1,6 +1,6 @@
 # Backend Dependency Upgrade Analysis
 
-**Generated:** 2026-09-12 · **Last applied:** 2026-09-12
+**Generated:** 2026-10-01 · **Last applied:** 2026-09-12
 **Scope:** `backend/go.mod` (Go GraphQL API), **direct (non-indirect) dependencies only**
 **Tool used:** `go list -m -u -versions ./...` (Go's built-in module tooling — there's no widely-adopted third-party "ncu for Go"; `go list -u` against the module graph is the standard equivalent) plus `go.mod`'s own `go`/`toolchain` directives and `proxy.golang.org` publish timestamps for age.
 
@@ -8,7 +8,7 @@ This report lives alongside the monthly maintenance routine (see [SKILL.md](SKIL
 
 ## Result summary
 
-The backend is in **very good shape**: of 20 direct dependencies, **19 are already on the latest published version**. One was behind and has since been bumped:
+The backend is in **very good shape**: of 23 direct dependencies, **all 23 are on the latest published version** as of 2026-10-01 (no action this run). Last month's only bump, for the record:
 
 | Package | Was | Now | Behind (at time of check) | Function | Benefits of upgrading | Drawbacks / Risks | Status |
 |---|---|---|---|---|---|---|---|
@@ -26,7 +26,6 @@ Toolchain: `go.mod` already pins `go 1.26` / `toolchain go1.26.0`, matching the 
 | `github.com/go-chi/chi/v5` | v5.3.2 | HTTP router |
 | `github.com/go-chi/cors` | v1.2.2 | CORS middleware for chi |
 | `github.com/go-chi/httprate` | v0.16.0 | Rate-limiting middleware for chi |
-| `github.com/golang-jwt/jwt/v5` | v5.3.1 | JWT parsing/verification |
 | `github.com/joho/godotenv` | v1.5.1 | `.env` file loading for local dev |
 | `github.com/pilagod/gorm-cursor-paginator/v2` | v2.7.0 | Cursor-based pagination helper for GORM queries |
 | `github.com/stretchr/testify` | v1.12.1 | Test assertions/mocks |

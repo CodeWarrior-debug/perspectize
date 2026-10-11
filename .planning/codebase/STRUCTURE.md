@@ -1,213 +1,179 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-09-04
+**Analysis Date:** 2026-10-01
 
 ## Directory Layout
 
 ```
-perspectize/                          # Monorepo root
-├── backend/                          # Go GraphQL API (hexagonal architecture)
-│   ├── cmd/server/                   # Entry point (main.go)
-│   ├── config/                       # Runtime JSON config (config.example.json)
+perspectize/
+├── backend/                    # Go GraphQL API (hexagonal)
+│   ├── cmd/
+│   │   ├── server/main.go      # Composition root + HTTP server
+│   │   ├── seed-demo/          # Demo persona seeder
+│   │   └── seed-bible/         # Bible reference data seeder (+ data/)
 │   ├── internal/
 │   │   ├── core/
-│   │   │   ├── domain/               # Pure domain models + sentinel errors
-│   │   │   ├── ports/
-│   │   │   │   ├── repositories/     # Repository interfaces
-│   │   │   │   └── services/         # Service interfaces
-│   │   │   └── services/             # Business logic implementations
+│   │   │   ├── domain/         # Pure models, errors, pagination
+│   │   │   ├── ports/{repositories,services}/  # Interfaces
+│   │   │   └── services/       # Business logic
 │   │   ├── adapters/
-│   │   │   ├── graphql/
-│   │   │   │   ├── directives/       # @auth/@owner directive implementations
-│   │   │   │   ├── generated/        # gqlgen output — DO NOT hand-edit
-│   │   │   │   ├── model/            # GraphQL input/output model structs
-│   │   │   │   └── resolvers/        # Resolver implementations
-│   │   │   ├── repositories/postgres/ # GORM repository implementations
-│   │   │   ├── auth/                 # Clerk middleware, webhook handler
-│   │   │   ├── web/middleware/       # HTTP middleware (CORS-adjacent, rate limit, headers)
-│   │   │   └── youtube/              # YouTube Data API client + cache
-│   │   └── config/                   # Config loading, security config, validation
-│   ├── pkg/                          # Reusable, non-domain-specific packages
-│   │   ├── database/                 # GORM connection, pool, slow-query log, stats
-│   │   ├── graphql/                  # IntID scalar, gqlgen operation timing
-│   │   ├── logger/                   # slog setup
-│   │   └── middleware/               # Generic HTTP middleware (recovery, timing)
-│   ├── migrations/                   # golang-migrate SQL migration files
-│   ├── test/                         # Test suites, mirrors internal/ by concern
-│   │   ├── config/ database/ domain/ graphql/ resolvers/ services/ youtube/
-│   ├── coverage/                     # Generated coverage reports (not committed source)
-│   ├── schema.graphql                # GraphQL schema (source of truth)
-│   ├── gqlgen.yml                    # gqlgen codegen config (model bindings)
-│   └── Dockerfile                    # Sevalla build (context=backend, path=backend/Dockerfile)
-│
-├── frontend/                         # SvelteKit SPA
+│   │   │   ├── graphql/{resolvers,generated,model,directives,dataloader}/
+│   │   │   ├── repositories/postgres/   # GORM repos, models, mappers
+│   │   │   ├── auth/           # Clerk/demo token verification, webhook
+│   │   │   ├── web/{handlers,middleware}/
+│   │   │   ├── youtube/  wikidata/  realtime/
+│   │   ├── config/             # config.go, security.go, demo.go
+│   │   ├── demo/               # Demo fixtures
+│   │   └── perf/querycount/    # Query-count test helper (+ perf-tagged harness)
+│   ├── pkg/{database,graphql,logger,middleware}/
+│   ├── migrations/             # golang-migrate SQL (NNNNNN_name.up/down.sql)
+│   ├── test/{config,database,domain,graphql,messaging,realtime,repositories,resolvers,services,youtube}/
+│   ├── perf/k6/  docs/perf/    # Load testing
+│   ├── schema.graphql  messaging.graphql  gqlgen.yml
+│   ├── Dockerfile  Dockerfile.demo  docker-compose.yml  Makefile
+│   └── config/                 # config.example.json
+├── frontend/                   # SvelteKit 5 SPA
 │   ├── src/
-│   │   ├── routes/                   # File-based routing
-│   │   │   ├── +layout.svelte        # Root layout (QueryClientProvider, Header, Toaster)
-│   │   │   ├── +layout.ts            # ssr=false, csr=true, prerender=false
-│   │   │   ├── +page.svelte          # Home page
-│   │   │   └── discover/             # Discover feature route
+│   │   ├── routes/             # +layout.*, +page.svelte, discover/, compare/, messages/
 │   │   ├── lib/
-│   │   │   ├── components/           # Svelte 5 components
-│   │   │   │   ├── shadcn/           # shadcn-svelte primitives (button/, dialog/, drawer/, ...)
-│   │   │   │   └── discover/         # Discover-page-specific components
-│   │   │   ├── queries/              # GraphQL query/mutation defs + TanStack Query
-│   │   │   │   └── hooks/            # TanStack Query hook wrappers (useXxx)
-│   │   │   ├── services/             # Non-GraphQL client integrations (youtubeApi.ts)
-│   │   │   ├── stores/               # Svelte 5 rune-based shared state (.svelte.ts)
-│   │   │   ├── utils/                # Pure utility/helper functions
-│   │   │   └── assets/               # Static assets bundled via lib
-│   │   ├── assets/glasses_svgs/      # Additional static SVG assets
-│   │   ├── app.css                   # Tailwind v4 design tokens (@theme)
-│   │   └── app.html                  # HTML shell, CSP
-│   ├── static/                       # Public static files (served as-is)
-│   ├── tests/                        # Vitest tests (unit/, components/, browser/, fixtures/, helpers/)
-│   ├── docs/                         # Frontend-specific docs (AG_GRID.md, DESIGN_SPEC.md, FIGMA.md)
-│   ├── android/ ios/                 # Capacitor native shells (if mobile packaging is active)
-│   └── build/ .svelte-kit/           # Generated build output — not source
-│
-├── .docs/                            # Monorepo-level reference docs (ARCHITECTURE, SECURITY, GO_PATTERNS, ...)
-├── .github/                          # PR/issue templates, CI workflows
-├── .planning/                        # GSD legacy planning artifacts (phases, roadmap, codebase docs)
-├── docs/superpowers/                 # Active planning system: plans/ and specs/
-├── .claude/                          # Claude Code config: agents, commands, skills, docs
-└── graphify-out/                     # Knowledge graph output (graph.json, wiki, cache)
+│   │   │   ├── components/     # Svelte components + feature folders + shadcn/
+│   │   │   ├── queries/        # client.ts, keys.ts, <domain>/ (gql + hooks)
+│   │   │   ├── auth/  messaging/  onboarding/  theme/  stores/
+│   │   │   ├── utils/  services/  data/  assets/
+│   │   ├── types/  app.css  app.html  app.d.ts
+│   ├── tests/{unit,components,browser,helpers,fixtures,utils}/
+│   ├── demo/{tours,flows}/     # Playwright demo/E2E
+│   ├── static/                 # incl. load-bearing _headers, _redirects
+│   ├── android/  ios/          # Capacitor shells
+│   ├── docs/  perf/
+│   └── svelte.config.js  vite.config.ts  vitest.config*.ts  stryker*.{json,mjs}  gen-preset-css.mjs
+├── .docs/                      # Repo-wide how-to docs (ARCHITECTURE, QUERY_BUDGET, DEMO_MODE...)
+├── .claude/                    # docs/, skills, worktrees (gitignored)
+├── .github/workflows/          # ci, frontend-test, mutation, codeql, trivy, migration-labels, tag-main
+├── .planning/                  # GSD (legacy) planning + codebase maps (gitignored phases)
+├── docs/superpowers/           # Active plans/specs
+├── tools/                      # content-type-designer, design-sync, video-capture, ...
+├── data/bible/                 # Bible source data
+├── evals/                      # claude-md-audit eval
+├── graphify-out/               # Knowledge graph output
+├── docker-compose.demo.yml     # Isolated demo stack
+└── Makefile                    # demo-* and repo-level targets
 ```
 
 ## Directory Purposes
 
-**`backend/internal/core/domain/`:**
-- Purpose: Pure business entities and domain-level errors — no external dependencies (no GORM, no gqlgen)
-- Contains: `content.go`, `perspective.go`, `user.go`, `auth.go`, `claims.go`, `errors.go`, `pagination.go`
-- Key files: `errors.go` (all sentinel errors used across the backend)
-
-**`backend/internal/core/ports/`:**
-- Purpose: Interfaces defining what adapters must implement
-- Contains: `repositories/` (data-access contracts), `services/` (service contracts, mostly for auth)
-
-**`backend/internal/core/services/`:**
-- Purpose: Business logic — validation, orchestration, rules — depends only on ports (never concrete adapters)
-- Key files: `content_service.go`, `user_service.go`, `perspective_service.go`, `auth_service.go`
+**`backend/internal/core/`:**
+- Purpose: Hexagon core; never import `adapters/`
+- Key files: `domain/errors.go`, `services/content_service.go`, `ports/repositories/content_repository.go`
 
 **`backend/internal/adapters/graphql/resolvers/`:**
-- Purpose: gqlgen resolver implementations, the primary (driving) adapter
-- Key files: `resolver.go` (struct + constructor wiring services), `schema.resolvers.go` (generated stubs filled in by hand), `helpers.go` (cursor encode/decode, sort whitelisting)
+- Purpose: One file per domain, plus root `resolver.go` (holds service deps; `NewResolver`) and `helpers.go` (mapping)
+- Do not keep `schema.resolvers.go` (gqlgen regenerates a colliding stub; see `backend/CLAUDE.md`)
 
 **`backend/internal/adapters/repositories/postgres/`:**
-- Purpose: GORM-backed implementations of repository ports (Hex-Clean Separate Model Pattern)
-- Key files: `gorm_models.go` (persistence structs), `gorm_mappers.go` (domain ↔ GORM conversion), `gorm_content_repository.go`, `gorm_user_repository.go`, `gorm_perspective_repository.go`, `helpers.go`
-- Note: `.sqlx.bak` files present (`content_repository.go.sqlx.bak`, etc.) are legacy sqlx implementations kept as reference, superseded by GORM — do not extend them
+- Purpose: GORM implementations; `gorm_models.go` structs, `gorm_mappers.go` conversions
 
-**`backend/migrations/`:**
-- Purpose: Version-controlled SQL migrations (golang-migrate format: `NNNNNN_description.up.sql` / `.down.sql`)
-- Note: always check existing files with `ls backend/migrations/ | tail -5` before assigning a new number — plan-specified numbers can be stale
+**`backend/test/`:**
+- Purpose: Black-box tests by layer (services, resolvers, realtime, messaging e2e). Many unit tests are also co-located as `*_test.go` beside source in `internal/adapters/**`.
 
 **`frontend/src/lib/queries/`:**
-- Purpose: All GraphQL communication — query/mutation string definitions, the GraphQL client, cache-key factory
-- Key files: `client.ts` (GraphQLClient + auth header injection), `keys.ts` (query key factory), `content.ts`/`claims.ts`/`perspectives.ts`/`users.ts` (per-entity `gql` definitions), `hooks/` (TanStack Query wrapper hooks per mutation)
+- Purpose: Only place that talks to GraphQL; one folder per domain
 
 **`frontend/src/lib/components/shadcn/`:**
-- Purpose: shadcn-svelte UI primitives, installed via CLI
-- Note: CLI sometimes installs into a `ui/` directory instead of `shadcn/` despite `components.json` alias config — after installing, verify location and move if needed; always add new components to `shadcn/index.ts` barrel export
+- Purpose: shadcn-svelte primitives (not `ui/`), barrel export in `shadcn/index.ts`
 
-**`frontend/tests/`:**
-- Purpose: Vitest test suite
-- Contains: `unit/`, `components/`, `browser/` (Vitest Browser Mode), `fixtures/`, `helpers/` (e.g. `TestWrapper.svelte` for dynamic component testing)
+**`frontend/static/`:**
+- `_headers` and `_redirects` are required for correct SPA caching on Sevalla/Cloudflare
 
 ## Key File Locations
 
 **Entry Points:**
-- `backend/cmd/server/main.go`: backend HTTP server composition root
-- `frontend/src/routes/+layout.svelte` + `+layout.ts`: frontend app shell
+- `backend/cmd/server/main.go`: server wiring
+- `frontend/src/routes/+layout.svelte`: app providers
+- `frontend/src/app.html`: HTML shell
 
 **Configuration:**
-- `backend/config/config.example.json`, `backend/internal/config/config.go`: backend config loading (env > JSON)
-- `backend/internal/config/security.go`: CORS origins, rate limits, Clerk secret loading
-- `backend/gqlgen.yml`: GraphQL codegen config, model bindings
-- `frontend/vite.config.ts`, `frontend/svelte.config.js`: frontend build config
-- `frontend/src/app.css`: design tokens
+- `backend/gqlgen.yml`, `backend/internal/config/*.go`, `backend/config/`
+- `frontend/svelte.config.js`, `frontend/vite.config.ts`, `frontend/components.json`, `frontend/tailwind.config.ts`, `frontend/tsconfig.json`
+- Env templates: `.env.example` files (never read `.env`)
 
 **Core Logic:**
-- `backend/internal/core/services/`: all backend business logic
-- `backend/schema.graphql`: API contract
-- `frontend/src/lib/utils/grid-config.ts`: AG Grid pure-function logic (sort mapping, pagination bounds, responsive tiers) — extracted here specifically for testability since AG Grid itself doesn't render in jsdom
+- `backend/internal/core/services/*.go`
+- `frontend/src/lib/queries/**`, `frontend/src/lib/utils/grid-config.ts`
+
+**GraphQL contract:**
+- `backend/schema.graphql`, `backend/messaging.graphql`
 
 **Testing:**
-- `backend/test/`: mirrors `internal/` by concern (config, database, domain, graphql, resolvers, services, youtube)
-- `frontend/tests/`: unit, components, browser, fixtures, helpers
+- Backend: `backend/test/**`, co-located `*_test.go`, `backend/internal/perf/querycount/`
+- Frontend: `frontend/tests/{unit,components,browser}/`, helper `frontend/tests/helpers/queryBudget.ts`, demo E2E `frontend/demo/`
 
 ## Naming Conventions
 
 **Backend files:**
-- Go source: `snake_case.go` (e.g. `content_service.go`, `gorm_content_repository.go`)
-- Tests: `*_test.go` co-located logically under `backend/test/<concern>/` (not co-located with source files)
-- GORM repository implementations prefixed `gorm_` to distinguish from the port interface and legacy `.sqlx.bak` files
+- snake_case Go files: `content_service.go`; resolvers `<domain>.resolvers.go`; GORM impls `gorm_<entity>_repository.go`; ports `<entity>_repository.go` / `<entity>_service.go`; tests `*_test.go`
+- Migrations: `NNNNNN_description.up.sql` / `.down.sql` (zero-padded sequence; check `ls migrations | tail` for next number)
+- Constructors `NewXxx`; GORM-backed types prefixed `Gorm`
 
 **Frontend files:**
-- Svelte components: `PascalCase.svelte` (e.g. `ActivityTable.svelte`, `AddVideoDialog.svelte`)
-- TypeScript modules: `camelCase.ts` (e.g. `formatting.ts`, `gridUrlState.ts`)
-- Svelte 5 rune-based `.ts` files needing runes outside a `.svelte` file: `*.svelte.ts` suffix (e.g. `userSelection.svelte.ts`, `useMe.svelte.ts`)
-- TanStack Query hooks: `useXxx.ts` / `useXxx.svelte.ts`
-- SvelteKit route files: fixed names `+page.svelte`, `+page.ts`, `+layout.svelte`, `+layout.ts` per SvelteKit convention
+- Components: PascalCase `.svelte` (`ActivityTable.svelte`)
+- Hooks: `useThing.ts`, or `useThing.svelte.ts` when using runes
+- Rune modules: `*.svelte.ts` (required for `$state` outside components)
+- Utilities: camelCase `.ts` (`grid-config.ts` and `grid-theme.ts` are kebab exceptions)
+- Routes: SvelteKit `+page.svelte`, `+layout.svelte`, `[param]/`
+- Tests: `tests/unit/<name>.test.ts`, `tests/components/<Component>.test.ts`
 
 **Directories:**
-- Backend: lowercase, singular-plural per Go convention (`domain`, `ports`, `services`, `repositories`)
-- Frontend: lowercase (`components`, `queries`, `stores`, `utils`)
+- Backend lower-case single words; frontend feature folders lower-case (`messaging/`), query domains lower-case plural
 
 ## Where to Add New Code
 
-**New Backend Feature (end-to-end):**
-1. Domain model: `backend/internal/core/domain/<feature>.go`
-2. Repository port: `backend/internal/core/ports/repositories/<feature>_repository.go`
-3. Service: `backend/internal/core/services/<feature>_service.go`
-4. Repository impl: `backend/internal/adapters/repositories/postgres/gorm_<feature>_repository.go`
-5. Schema: edit `backend/schema.graphql`, run `make graphql-gen`
-6. Resolver: `backend/internal/adapters/graphql/resolvers/schema.resolvers.go` (fill in generated stub)
-7. Wire: construct + inject in `backend/cmd/server/main.go`
-8. Tests: `backend/test/services/`, `backend/test/repositories/` (or matching concern directory)
+**New backend feature (follow `backend/CLAUDE.md` "Adding a New Feature"):**
+- Domain: `backend/internal/core/domain/<feature>.go`
+- Port: `backend/internal/core/ports/repositories/<feature>_repository.go` (+ `ports/services/` if resolvers consume it)
+- Service: `backend/internal/core/services/<feature>_service.go`
+- Repository: `backend/internal/adapters/repositories/postgres/gorm_<feature>_repository.go` plus entries in `gorm_models.go`/`gorm_mappers.go`
+- Schema: `backend/schema.graphql` (or `messaging.graphql`), then `make graphql-gen`
+- Resolver: `backend/internal/adapters/graphql/resolvers/<domain>.resolvers.go`; mapping in `helpers.go`
+- Wiring: `backend/cmd/server/main.go` and `resolvers/resolver.go`
+- Migration: `backend/migrations/` (write only; never apply to shared DB)
+- Tests: `backend/test/services/`, `backend/test/resolvers/`, query-count test in repository package
 
-**New Frontend Feature/Component:**
-- Component: `frontend/src/lib/components/<Feature>.svelte` (or a feature subdirectory like `discover/` if it's page-scoped)
-- GraphQL query/mutation: add to relevant file in `frontend/src/lib/queries/` (or new file per entity), add cache keys to `frontend/src/lib/queries/keys.ts`
-- Data-fetching hook: `frontend/src/lib/queries/hooks/use<Feature>.ts`
-- Route: `frontend/src/routes/<feature>/+page.svelte` + `+page.ts`
+**New frontend feature:**
+- gql + hooks: `frontend/src/lib/queries/<domain>/index.ts` and `useX.ts`; keys in `frontend/src/lib/queries/keys.ts`
+- Components: `frontend/src/lib/components/<Name>.svelte` or a feature folder
+- Page: `frontend/src/routes/<route>/+page.svelte`
+- Pure logic: `frontend/src/lib/utils/`
+- shadcn primitive: `frontend/src/lib/components/shadcn/<name>/` plus barrel export
+- Grid column: one `COLUMNS` entry in `frontend/src/lib/utils/grid-config.ts` (see `.claude/docs/ADDING_AG_GRID_COLUMN.md`)
+- Tests: `frontend/tests/components/` (mock each `useX` hook) and `frontend/tests/unit/`
 
 **Utilities:**
-- Backend shared helpers: `backend/pkg/` (framework-agnostic) or `backend/internal/adapters/graphql/resolvers/helpers.go` (resolver-specific)
-- Frontend shared helpers: `frontend/src/lib/utils/` (pure functions), `frontend/src/lib/utils.ts` (class/cn helpers)
+- Backend shared: `backend/pkg/`; frontend shared: `frontend/src/lib/utils/`
 
 ## Special Directories
 
-**`backend/internal/adapters/graphql/generated/`:**
-- Purpose: gqlgen-generated resolver interfaces, models, executable schema
-- Generated: Yes (via `make graphql-gen`)
-- Committed: Yes (checked in per gqlgen convention, but never hand-edited)
+**`backend/internal/adapters/graphql/generated/` and `model/models_gen.go`:**
+- Generated: Yes (`make graphql-gen`); Committed: Yes
 
-**`backend/coverage/`, `frontend/coverage/`:**
-- Purpose: Generated test coverage reports
-- Generated: Yes
-- Committed: No (build artifact)
+**`backend/coverage/`, `backend/coverage.out`, `backend/coverage.html`, `frontend/coverage/`:**
+- Generated: Yes; reports and artifacts
 
-**`frontend/.svelte-kit/`, `frontend/build/`:**
-- Purpose: SvelteKit build output
-- Generated: Yes
-- Committed: No
+**`frontend/build/`, `frontend/demo/out/`:**
+- Generated: Yes; build output and demo videos/reports
 
 **`frontend/android/`, `frontend/ios/`:**
-- Purpose: Capacitor native shell projects for mobile packaging
-- Generated: Partially (scaffolded by Capacitor CLI, then customized)
-- Committed: Yes
+- Capacitor native projects; Committed: Yes
 
-**`.planning/`:**
-- Purpose: Legacy GSD planning artifacts (phases, roadmap, this codebase-mapping output)
-- Generated: Mixed (some hand-written, some generated by GSD commands)
-- Committed: Yes, but new work should use `docs/superpowers/` instead — see root `CLAUDE.md`
+**`.claude/worktrees/`, `.planning/phases/`:**
+- Local-only (gitignored)
 
 **`graphify-out/`:**
-- Purpose: Knowledge graph of the codebase (`graph.json`, wiki, per-date snapshots) used by the `graphify` tool for code navigation
-- Generated: Yes (`graphify update .`)
-- Committed: Appears versioned by date subdirectories — treat as generated cache, do not hand-edit
+- Generated knowledge graph; refresh via `graphify update .`
+
+**`backend/internal/adapters/repositories/postgres/*.sqlx.bak`:**
+- Stale backups of the pre-GORM implementation; not compiled
 
 ---
 
-*Structure analysis: 2026-09-04*
+*Structure analysis: 2026-10-01*

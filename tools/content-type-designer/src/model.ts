@@ -1,11 +1,13 @@
 import {
   COLUMNS,
   SAMPLES,
+  SAMPLE_FULL,
   TYPES,
   type Binding,
   type ColumnDef,
   type ContentTypeProfile,
   type SampleCell,
+  type SampleRow,
   type TypeId
 } from './catalog.js';
 
@@ -30,6 +32,41 @@ export interface DraftState {
   seed?: string;
   /** Preview sort, highest priority first. Empty/undefined = unsorted. */
   sort?: SortKey[];
+  /** Type shown in the single-type view. */
+  soloType?: string;
+  /** Single-type what-ifs: typeId -> columnId -> forced on/off, over the suggested default. */
+  soloOverrides?: Record<string, Record<string, boolean>>;
+  /** Single-type view sort (one key). */
+  soloSort?: SortKey;
+  /** Which fill state the sample rows show. Undefined = 'usual'. */
+  fullness?: Fullness;
+  /** Row shown in the details / perspective mocks. */
+  focus?: { typeId: string; index: number };
+  /** Text in the Add Content tester. */
+  addInput?: string;
+}
+
+/** full = every binding filled; usual = the sample as recorded; minimum = required fields only. */
+export type Fullness = 'full' | 'usual' | 'minimum';
+
+/**
+ * How one preview cell should be read:
+ * value — real sample data; placeholder — invented to show a "full" row;
+ * allowed-empty — blank, and the binding permits that; missing-required — blank but required.
+ */
+export type CellState = 'value' | 'placeholder' | 'allowed-empty' | 'missing-required';
+
+export interface PreviewCell {
+  state: CellState;
+  cell?: SampleCell;
+}
+
+export interface PreviewRow {
+  typeId: string;
+  /** Index into samplesFor(typeId), or -1 for the SAMPLE_FULL row. */
+  index: number;
+  row: SampleRow;
+  cells: Record<string, PreviewCell>;
 }
 
 export interface SortKey {
@@ -89,7 +126,12 @@ function ruleSatisfied(rule: VisibilityRule, onCount: number, total: number): bo
   return onCount * 2 > total;
 }
 
-export function resolveGrid(state: DraftState): GridPreview {
+/**
+ * Resolve which columns show, with which headers, for the current selection.
+ * `overrides` (single-type what-ifs) force a bound column on or off after the
+ * visibility rule has run; pinned columns ignore them.
+ */
+export function resolveGrid(state: DraftState, overrides?: Record<string, boolean>): GridPreview {
   const selection = state.selected.filter((id, i, a) => a.indexOf(id) === i);
   const columns: ResolvedColumn[] = COLUMNS.map((col) => {
     const bound: string[] = [];
@@ -122,9 +164,17 @@ export function resolveGrid(state: DraftState): GridPreview {
     if (bound.length === 0) {
       visible = false;
       reason = 'No selected type binds this column.';
+    } else if (col.hideWhenSolo && total === 1) {
+      visible = false;
+      reason = 'Hidden when one type is filtered in — every row would say the same thing.';
     } else if (visible && col.gapFallback === 'hide-column' && coverage < 0.5) {
       visible = false;
       reason = `Hidden: only ${bound.length}/${total} types bind it and its gap policy is hide-column.`;
+    }
+    const forced = overrides?.[col.id];
+    if (forced !== undefined && bound.length > 0 && !col.pinned) {
+      visible = forced;
+      reason = `What-if: forced ${forced ? 'on' : 'off'} in the single-type view.`;
     }
 
     return {
@@ -200,6 +250,15 @@ function analyse(state: DraftState, columns: ResolvedColumn[]): Warning[] {
       const binding = bindingFor(rc.col, typeId, state);
       // Only a field the type wants *on screen* can be "lost" by the rule; a
       // required-but-off-by-default field (ids, timestamps) is not a gap.
+      if (rc.col.hideWhenSolo && selection.length === 1) continue;
+      if (binding?.applicability === 'required' && binding.defaultVisible && !rc.visible && binding.carriedBy) {
+        warnings.push({
+          severity: 'info',
+          columnId: rc.col.id,
+          message: `${typeLabel(typeId, state.draft)} "${binding.label}" is hidden for this selection but still visible in the ${binding.carriedBy}.`
+        });
+        continue;
+      }
       if (binding?.applicability === 'required' && binding.defaultVisible && !rc.visible) {
         warnings.push({
           severity: 'error',
@@ -242,9 +301,55 @@ export function sharedWithOthers(state: DraftState): { col: ColumnDef; others: s
 }
 
 /** Sample rows for a type; the draft borrows the rows of the type it was seeded from. */
-export function samplesFor(id: string, state: DraftState): Record<string, SampleCell>[] {
+export function samplesFor(id: string, state: DraftState): SampleRow[] {
   const source = id === state.draft.id ? state.seed : id;
   return (source && SAMPLES[source as TypeId]) || [];
+}
+
+function fullRowFor(id: string, state: DraftState): SampleRow | undefined {
+  const source = id === state.draft.id ? state.seed : id;
+  return source ? SAMPLE_FULL[source as TypeId] : undefined;
+}
+
+/**
+ * Rows for the preview in the requested fill state. Full and minimum show one
+ * row per type (the point is the contrast, not the volume); usual shows every
+ * sample as recorded.
+ */
+export function previewRowsFor(id: string, state: DraftState, fullness: Fullness): PreviewRow[] {
+  const samples = samplesFor(id, state);
+  const full = fullRowFor(id, state);
+  const picked: { index: number; row: SampleRow }[] =
+    fullness === 'usual'
+      ? samples.map((row, index) => ({ index, row }))
+      : fullness === 'full' && full
+        ? [{ index: -1, row: full }]
+        : samples.length
+          ? [{ index: 0, row: samples[0] }]
+          : [];
+
+  return picked.map(({ index, row }) => {
+    const cells: Record<string, PreviewCell> = {};
+    for (const col of COLUMNS) {
+      const binding = bindingFor(col, id, state);
+      if (!binding) continue;
+      const cell = row[col.id];
+      const required = binding.applicability === 'required';
+      if (fullness === 'minimum' && !required) {
+        cells[col.id] = { state: 'allowed-empty' };
+      } else if (cell !== undefined) {
+        // Minimum keeps the required title but drops its image and subtitle —
+        // the thumbnail is never required, so the fallback tile is what shows.
+        const trimmed = fullness === 'minimum' && typeof cell === 'object' ? { text: cell.text } : cell;
+        cells[col.id] = { state: 'value', cell: trimmed };
+      } else if (fullness === 'full') {
+        cells[col.id] = { state: 'placeholder', cell: `‹${binding.label || col.generic}›` };
+      } else {
+        cells[col.id] = { state: required ? 'missing-required' : 'allowed-empty' };
+      }
+    }
+    return { typeId: id, index, row, cells };
+  });
 }
 
 /** Text a preview cell shows for a column the row's type does not bind. */
@@ -268,6 +373,17 @@ export function sortConflict(keys: SortKey[] | undefined, grid: GridPreview): Re
   if (!first) return null;
   const rc = grid.columns.find((c) => c.col.id === first.colId);
   return rc && unitsFor(rc).length > 1 ? rc : null;
+}
+
+/** Display text of a sample cell. */
+export function cellText(value: SampleCell | undefined): string | undefined {
+  return value === undefined ? undefined : typeof value === 'string' ? value : value.text;
+}
+
+/** Sort key for a sample cell: its explicit `sort`, else the parsed display text. */
+export function cellSortValue(value: SampleCell | undefined): number | string | null {
+  if (value !== undefined && typeof value !== 'string' && value.sort !== undefined) return value.sort;
+  return sortValue(cellText(value));
 }
 
 /** Parse a preview cell into something orderable: h:mm:ss → seconds, "1,204" / "4.1%" → number. */

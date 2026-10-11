@@ -15,7 +15,7 @@ const maxMessageBodyBytes = 8192
 
 // MessagingServiceImpl is the business-logic implementation of MessagingService.
 type MessagingServiceImpl struct {
-	threadRepo repositories.ThreadRepository
+	threadRepo repositories.MessageThreadRepository
 	msgRepo    repositories.MessageRepository
 	publisher  portservices.EventPublisher
 	limiter    *SlidingWindowLimiter
@@ -25,7 +25,7 @@ var _ portservices.MessagingService = (*MessagingServiceImpl)(nil)
 
 // NewMessagingService constructs the messaging business-logic service.
 func NewMessagingService(
-	threadRepo repositories.ThreadRepository,
+	threadRepo repositories.MessageThreadRepository,
 	msgRepo repositories.MessageRepository,
 	publisher portservices.EventPublisher,
 	limiter *SlidingWindowLimiter,
@@ -35,19 +35,27 @@ func NewMessagingService(
 
 // AssertParticipant verifies that the actor is an active participant in the thread.
 func (s *MessagingServiceImpl) AssertParticipant(ctx context.Context, actorUserID, threadID int) error {
+	_, err := s.participantThread(ctx, actorUserID, threadID)
+	return err
+}
+
+// participantThread loads the thread (one query, participants included) and
+// verifies the actor is an active participant, returning the loaded thread so
+// callers don't read it again.
+func (s *MessagingServiceImpl) participantThread(ctx context.Context, actorUserID, threadID int) (*domain.MessageThread, error) {
 	thread, err := s.threadRepo.GetThread(ctx, threadID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if thread == nil {
 		// A repository that reports "missing" as (nil, nil) must not reach
 		// IsActiveParticipant — that is a value receiver and would panic.
-		return fmt.Errorf("%w: thread %d", domain.ErrNotFound, threadID)
+		return nil, fmt.Errorf("%w: thread %d", domain.ErrNotFound, threadID)
 	}
 	if !thread.IsActiveParticipant(actorUserID) {
-		return fmt.Errorf("%w: not a participant of thread %d", domain.ErrForbidden, threadID)
+		return nil, fmt.Errorf("%w: not a participant of thread %d", domain.ErrForbidden, threadID)
 	}
-	return nil
+	return thread, nil
 }
 
 // SendMessage persists a new message to a thread from the actor.
@@ -72,87 +80,101 @@ func (s *MessagingServiceImpl) SendMessage(ctx context.Context, actorUserID int,
 	})
 }
 
-// EditMessage updates the body of a message the actor sent.
+// EditMessage updates the body of a message the actor sent. The sender and
+// not-deleted checks are part of the UPDATE, so the happy path is one round
+// trip; only a miss reads the message, to say why.
 func (s *MessagingServiceImpl) EditMessage(ctx context.Context, actorUserID int, messageID int64, body string) (*domain.Message, error) {
-	msg, err := s.msgRepo.GetByID(ctx, messageID)
-	if err != nil {
-		return nil, err
-	}
-	if msg.SenderID != actorUserID {
-		return nil, fmt.Errorf("%w: only the sender may edit message %d", domain.ErrForbidden, messageID)
-	}
-	if msg.DeletedAt != nil {
-		return nil, fmt.Errorf("%w: message %d is deleted", domain.ErrInvalidInput, messageID)
-	}
 	if len(body) == 0 || len([]byte(body)) > maxMessageBodyBytes {
 		return nil, fmt.Errorf("%w: message body must be 1..%d bytes", domain.ErrInvalidInput, maxMessageBodyBytes)
 	}
-	updated, err := s.msgRepo.UpdateBody(ctx, messageID, body, time.Now().UTC())
+	updated, err := s.msgRepo.UpdateBody(ctx, messageID, actorUserID, body, time.Now().UTC())
+	if errors.Is(err, domain.ErrNotFound) {
+		msg, why := s.explainOwnMessageMiss(ctx, actorUserID, messageID, "edit")
+		if why != nil {
+			return nil, why
+		}
+		return nil, fmt.Errorf("%w: message %d is deleted", domain.ErrInvalidInput, msg.ID)
+	}
 	if err != nil {
 		return nil, err
 	}
 	_ = s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
 		Type:      "MESSAGE_EDITED",
-		ThreadID:  msg.ThreadID,
-		Seq:       msg.Seq,
+		ThreadID:  updated.ThreadID,
+		Seq:       updated.Seq,
 		MessageID: messageID,
 	})
 	return updated, nil
 }
 
 // DeleteMessage soft-deletes a message the actor sent. Idempotent when the
-// message is already deleted.
+// message is already deleted (returned as is, nothing published).
 func (s *MessagingServiceImpl) DeleteMessage(ctx context.Context, actorUserID int, messageID int64) (*domain.Message, error) {
-	msg, err := s.msgRepo.GetByID(ctx, messageID)
-	if err != nil {
-		return nil, err
+	tombstoned, err := s.msgRepo.SoftDelete(ctx, messageID, actorUserID, time.Now().UTC())
+	if errors.Is(err, domain.ErrNotFound) {
+		msg, why := s.explainOwnMessageMiss(ctx, actorUserID, messageID, "delete")
+		if why != nil {
+			return nil, why
+		}
+		return msg, nil // already deleted
 	}
-	if msg.SenderID != actorUserID {
-		return nil, fmt.Errorf("%w: only the sender may delete message %d", domain.ErrForbidden, messageID)
-	}
-	if msg.DeletedAt != nil {
-		return msg, nil
-	}
-	tombstoned, err := s.msgRepo.SoftDelete(ctx, messageID, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
 	_ = s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
 		Type:      "MESSAGE_DELETED",
-		ThreadID:  msg.ThreadID,
-		Seq:       msg.Seq,
+		ThreadID:  tombstoned.ThreadID,
+		Seq:       tombstoned.Seq,
 		MessageID: messageID,
 	})
 	return tombstoned, nil
 }
 
-// MuteThread sets the actor's muted flag for a thread they participate in.
+// explainOwnMessageMiss runs after a sender-scoped message UPDATE matched no
+// row. It returns an error when the message is missing or not the actor's;
+// otherwise the message exists, is the actor's and is already deleted, and it
+// is returned for the caller to handle.
+func (s *MessagingServiceImpl) explainOwnMessageMiss(ctx context.Context, actorUserID int, messageID int64, verb string) (*domain.Message, error) {
+	msg, err := s.msgRepo.GetByID(ctx, messageID)
+	if err != nil {
+		return nil, err
+	}
+	if msg.SenderID != actorUserID {
+		return nil, fmt.Errorf("%w: only the sender may %s message %d", domain.ErrForbidden, verb, messageID)
+	}
+	return msg, nil
+}
+
+// MuteThread sets the actor's muted flag for a thread they participate in and
+// returns the thread with that flag applied (no re-read: the write changes
+// nothing else).
 func (s *MessagingServiceImpl) MuteThread(ctx context.Context, actorUserID, threadID int, muted bool) (*domain.MessageThread, error) {
-	if err := s.AssertParticipant(ctx, actorUserID, threadID); err != nil {
+	thread, err := s.participantThread(ctx, actorUserID, threadID)
+	if err != nil {
 		return nil, err
 	}
 	if err := s.threadRepo.SetMuted(ctx, threadID, actorUserID, muted); err != nil {
 		return nil, err
 	}
-	return s.threadRepo.GetThread(ctx, threadID)
+	for i := range thread.Participants {
+		if thread.Participants[i].UserID == actorUserID {
+			thread.Participants[i].Muted = muted
+		}
+	}
+	return thread, nil
 }
 
-// MarkRead updates the actor's read receipt position in the thread.
+// MarkRead updates the actor's read receipt position in the thread. The seq
+// is clamped to the thread's highest message by the repository, in the same
+// statement as the update, and the thread loaded for the participation check
+// is returned with the new pointer applied (no re-read).
 func (s *MessagingServiceImpl) MarkRead(ctx context.Context, actorUserID, threadID int, seq int64) (*domain.MessageThread, error) {
-	if err := s.AssertParticipant(ctx, actorUserID, threadID); err != nil {
-		return nil, err
-	}
-	// Clamp to the thread's highest seq: an arbitrary client-supplied value
-	// would otherwise pin last_read_seq past the end of the thread and poison
-	// every derived read receipt and unread count.
-	maxSeq, err := s.msgRepo.MaxSeq(ctx, threadID)
+	thread, err := s.participantThread(ctx, actorUserID, threadID)
 	if err != nil {
 		return nil, err
 	}
-	if seq > maxSeq {
-		seq = maxSeq
-	}
-	if err := s.threadRepo.SetLastRead(ctx, threadID, actorUserID, seq); err != nil {
+	seq, err = s.threadRepo.SetLastRead(ctx, threadID, actorUserID, seq)
+	if err != nil {
 		return nil, err
 	}
 	_ = s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
@@ -161,7 +183,13 @@ func (s *MessagingServiceImpl) MarkRead(ctx context.Context, actorUserID, thread
 		UserID:      actorUserID,
 		LastReadSeq: seq,
 	})
-	return s.threadRepo.GetThread(ctx, threadID)
+	for i := range thread.Participants {
+		p := &thread.Participants[i]
+		if p.UserID == actorUserID && seq > p.LastReadSeq {
+			p.LastReadSeq = seq // forward-only, like the UPDATE
+		}
+	}
+	return thread, nil
 }
 
 // SetTyping broadcasts the actor's typing status to the thread.
@@ -207,23 +235,41 @@ func (s *MessagingServiceImpl) CreateThread(ctx context.Context, actorUserID int
 	return s.threadRepo.CreateThread(ctx, actorUserID, title, ids)
 }
 
-// AddParticipants adds new users to an existing thread.
+// AddParticipants adds new users to an existing thread and returns it with
+// them: the upserted rows are merged into the thread loaded for the
+// participation check (no reload), and the ADDED events go out in one batch.
 func (s *MessagingServiceImpl) AddParticipants(ctx context.Context, actorUserID, threadID int, userIDs []int) (*domain.MessageThread, error) {
-	if err := s.AssertParticipant(ctx, actorUserID, threadID); err != nil {
+	thread, err := s.participantThread(ctx, actorUserID, threadID)
+	if err != nil {
 		return nil, err
 	}
-	if err := s.threadRepo.AddParticipants(ctx, threadID, userIDs); err != nil {
+	added, err := s.threadRepo.AddParticipants(ctx, threadID, userIDs)
+	if err != nil {
 		return nil, err
 	}
-	for _, uid := range userIDs {
-		_ = s.publisher.PublishEphemeral(ctx, domain.EventEnvelope{
+	envs := make([]domain.EventEnvelope, len(userIDs))
+	for i, uid := range userIDs {
+		envs[i] = domain.EventEnvelope{
 			Type:     "PARTICIPANT_CHANGED",
 			ThreadID: threadID,
 			UserID:   uid,
 			Change:   "ADDED",
-		})
+		}
 	}
-	return s.threadRepo.GetThread(ctx, threadID)
+	_ = s.publisher.PublishEphemeral(ctx, envs...)
+
+	byUser := make(map[int]int, len(thread.Participants))
+	for i, p := range thread.Participants {
+		byUser[p.UserID] = i
+	}
+	for _, p := range added {
+		if i, ok := byUser[p.UserID]; ok {
+			thread.Participants[i] = p
+		} else {
+			thread.Participants = append(thread.Participants, p)
+		}
+	}
+	return thread, nil
 }
 
 // LeaveThread marks the actor as having left the thread.
@@ -263,12 +309,10 @@ func (s *MessagingServiceImpl) ListSince(ctx context.Context, actorUserID, threa
 	return s.msgRepo.ListSince(ctx, threadID, sinceSeq)
 }
 
-// GetThread returns the thread, including its participants.
+// GetThread returns the thread, including its participants. The load that
+// checks participation is the result.
 func (s *MessagingServiceImpl) GetThread(ctx context.Context, actorUserID, threadID int) (*domain.MessageThread, error) {
-	if err := s.AssertParticipant(ctx, actorUserID, threadID); err != nil {
-		return nil, err
-	}
-	return s.threadRepo.GetThread(ctx, threadID)
+	return s.participantThread(ctx, actorUserID, threadID)
 }
 
 // MaxSeq returns the highest message sequence number in the thread.
@@ -279,18 +323,9 @@ func (s *MessagingServiceImpl) MaxSeq(ctx context.Context, actorUserID, threadID
 	return s.msgRepo.MaxSeq(ctx, threadID)
 }
 
-// ThreadMaxSeq returns the highest message sequence number in the thread
-// WITHOUT re-checking participation. It is the trusted variant used by GraphQL
-// field resolvers on a thread the query has already authorized; callers that
-// have not authorized the thread must use MaxSeq.
-func (s *MessagingServiceImpl) ThreadMaxSeq(ctx context.Context, threadID int) (int64, error) {
-	return s.msgRepo.MaxSeq(ctx, threadID)
-}
-
-// UnreadCount returns the number of messages in the thread newer than sinceSeq,
-// WITHOUT re-checking participation — same trusted-caller contract as
-// ThreadMaxSeq. Counting rows keeps the number right even when pruning has left
-// gaps in the sequence.
-func (s *MessagingServiceImpl) UnreadCount(ctx context.Context, threadID int, sinceSeq int64) (int, error) {
-	return s.msgRepo.CountSince(ctx, threadID, sinceSeq)
+// ThreadStats returns latestSeq and the viewer's unread count per thread
+// WITHOUT re-checking participation — only for already-authorized threads (see
+// the port). Counting rows keeps unread right even when pruning left gaps.
+func (s *MessagingServiceImpl) ThreadStats(ctx context.Context, viewerUserID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
+	return s.msgRepo.ThreadStats(ctx, viewerUserID, threadIDs)
 }

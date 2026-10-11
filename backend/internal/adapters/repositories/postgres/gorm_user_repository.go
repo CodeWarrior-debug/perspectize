@@ -3,11 +3,17 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	repositories "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+// pgUniqueViolation is Postgres' SQLSTATE for a unique violation (23505).
+const pgUniqueViolation = "23505"
 
 // GormUserRepository implements the UserRepository interface using GORM
 type GormUserRepository struct {
@@ -47,6 +53,22 @@ func (r *GormUserRepository) GetByID(ctx context.Context, id int) (*domain.User,
 	}
 
 	return userModelToDomain(&model), nil
+}
+
+// GetByIDs loads many users in one query (the per-request user dataloader).
+func (r *GormUserRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.User, error) {
+	if len(ids) == 0 {
+		return []*domain.User{}, nil
+	}
+	var models []UserModel
+	if err := r.db.WithContext(ctx).Where("id = ANY(CAST(? AS bigint[]))", intsToArray(ids)).Find(&models).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*domain.User, len(models))
+	for i := range models {
+		out[i] = userModelToDomain(&models[i])
+	}
+	return out, nil
 }
 
 // GetByClerkID retrieves a user by their Clerk user ID
@@ -117,22 +139,31 @@ func (r *GormUserRepository) Update(ctx context.Context, user *domain.User) (*do
 	model := userDomainToModel(user)
 	model.ID = user.ID
 
-	result := r.db.WithContext(ctx).Model(model).Updates(map[string]interface{}{
-		"username":      model.Username,
-		"email":         model.Email,
-		"clerk_user_id": model.ClerkUserID,
-	})
+	// RETURNING * hands back the row with its new updated_at: no re-read.
+	var updated UserModel
+	result := r.db.WithContext(ctx).Model(&updated).
+		Clauses(clause.Returning{}).
+		Where("id = ?", user.ID).
+		Updates(map[string]interface{}{
+			"username":      model.Username,
+			"email":         model.Email,
+			"clerk_user_id": model.ClerkUserID,
+		})
 	if result.Error != nil {
+		// The unique constraints are the uniqueness check (no pre-query).
+		var pgErr *pgconn.PgError
+		if errors.As(result.Error, &pgErr) && pgErr.Code == pgUniqueViolation {
+			switch pgErr.ConstraintName {
+			case "users_unique_username":
+				return nil, fmt.Errorf("%w: username already taken", domain.ErrAlreadyExists)
+			case "users_unique_email":
+				return nil, fmt.Errorf("%w: email already registered", domain.ErrAlreadyExists)
+			}
+		}
 		return nil, result.Error
 	}
 	if result.RowsAffected == 0 {
 		return nil, domain.ErrNotFound
-	}
-
-	// Re-read to get updated timestamps
-	var updated UserModel
-	if err := r.db.WithContext(ctx).First(&updated, user.ID).Error; err != nil {
-		return nil, err
 	}
 
 	return userModelToDomain(&updated), nil
@@ -205,22 +236,36 @@ func (r *GormUserRepository) DeactivateByClerkID(ctx context.Context, clerkID st
 	return nil
 }
 
-// UpdateOnboarding replaces the onboarding JSONB for a user.
+// sentinelRole is how UserRoleSentinel is stored (roles are lowercased; see
+// userDomainToModel). The system user's onboarding is never writable.
+const sentinelRole = "sentinel"
+
+// UpdateOnboarding replaces the onboarding JSONB for a non-sentinel user in
+// one round trip (UPDATE ... RETURNING *). Returns domain.ErrNotFound when no
+// such user exists -- or it is the sentinel; the caller disambiguates.
 func (r *GormUserRepository) UpdateOnboarding(ctx context.Context, userID int, onboarding domain.UserOnboarding) (*domain.User, error) {
-	raw := onboardingToJSON(onboarding)
-	result := r.db.WithContext(ctx).Model(&UserModel{}).
-		Where("id = ?", userID).
-		Update("onboarding", raw)
+	return r.updateOnboarding(ctx, userID, onboardingToJSON(onboarding))
+}
+
+// SetOnboardingDisplayNextSession flips only onboarding.displayNextSession,
+// in SQL, so the caller doesn't need to read the current onboarding first.
+// Same not-found/sentinel contract as UpdateOnboarding.
+func (r *GormUserRepository) SetOnboardingDisplayNextSession(ctx context.Context, userID int, display bool) (*domain.User, error) {
+	return r.updateOnboarding(ctx, userID,
+		gorm.Expr(`jsonb_set(onboarding, '{displayNextSession}', to_jsonb(?::boolean))`, display))
+}
+
+func (r *GormUserRepository) updateOnboarding(ctx context.Context, userID int, value interface{}) (*domain.User, error) {
+	var updated UserModel
+	result := r.db.WithContext(ctx).Model(&updated).
+		Clauses(clause.Returning{}).
+		Where("id = ? AND role <> ?", userID, sentinelRole).
+		Update("onboarding", value)
 	if result.Error != nil {
 		return nil, result.Error
 	}
 	if result.RowsAffected == 0 {
 		return nil, domain.ErrNotFound
-	}
-
-	var updated UserModel
-	if err := r.db.WithContext(ctx).First(&updated, userID).Error; err != nil {
-		return nil, err
 	}
 	return userModelToDomain(&updated), nil
 }

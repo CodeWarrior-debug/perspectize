@@ -156,7 +156,7 @@ const musicURL = "https://music.youtube.com/watch?v=" + audioID
 func TestCreateFromYouTubeMusic_FullEnrichment(t *testing.T) {
 	repo := newFakeMusicRepo()
 	lyr := &fakeLyrics{match: &portservices.LyricsMatch{Available: true, LRCLibID: 36978827, HasSynced: true}}
-	svc := services.NewContentService(repo, ytMeta(audioID), services.WithMusicEnrichment(fullTrack(), isrcMatch(), lyr), syncRunner())
+	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(fullTrack(), isrcMatch(), lyr), syncRunner())
 
 	c, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
 	require.NoError(t, err)
@@ -194,7 +194,7 @@ func TestCreateFromYouTubeMusic_FullEnrichment(t *testing.T) {
 
 func TestCreateFromYouTubeMusic_NoMusicBrainzMatch(t *testing.T) {
 	repo := newFakeMusicRepo()
-	svc := services.NewContentService(repo, ytMeta(audioID), services.WithMusicEnrichment(fullTrack(), &fakeMB{err: domain.ErrNotFound}, nil), syncRunner())
+	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(fullTrack(), &fakeMB{err: domain.ErrNotFound}, nil), syncRunner())
 
 	c, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
 	require.NoError(t, err)
@@ -208,7 +208,7 @@ func TestCreateFromYouTubeMusic_NoMusicBrainzMatch(t *testing.T) {
 func TestCreateFromYouTubeMusic_YTMusicDown(t *testing.T) {
 	repo := newFakeMusicRepo()
 	mb := isrcMatch()
-	svc := services.NewContentService(repo, ytMeta(audioID), services.WithMusicEnrichment(&fakeYTMusic{err: errors.New("403")}, mb, nil), syncRunner())
+	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(&fakeYTMusic{err: errors.New("403")}, mb, nil), syncRunner())
 
 	c, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
 	require.NoError(t, err, "unofficial enrichment failing must not block the add")
@@ -226,7 +226,7 @@ func TestCreateFromYouTubeMusic_DataAPIFailureIsFatal(t *testing.T) {
 	yt := &mockYouTubeClient{getVideoMetadataFn: func(context.Context, string) (*portservices.VideoMetadata, error) {
 		return nil, errors.New("quota")
 	}}
-	svc := services.NewContentService(newFakeMusicRepo(), yt, services.WithMusicEnrichment(fullTrack(), nil, nil), syncRunner())
+	svc := services.NewContentService(newFakeMusicRepo(), yt, nil, services.WithMusicEnrichment(fullTrack(), nil, nil), syncRunner())
 	_, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
 	assert.Error(t, err)
 }
@@ -235,7 +235,7 @@ func TestCreateFromYouTubeMusic_DuplicateURL(t *testing.T) {
 	repo := newFakeMusicRepo()
 	u := musicURL
 	existing := repo.add(&domain.Content{URL: &u, ContentType: domain.ContentTypeYouTubeMusic})
-	svc := services.NewContentService(repo, ytMeta(audioID), syncRunner())
+	svc := services.NewContentService(repo, ytMeta(audioID), nil, syncRunner())
 
 	c, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL+"&list=RDAMVM"+audioID, 7)
 	assert.ErrorIs(t, err, domain.ErrAlreadyExists)
@@ -246,7 +246,7 @@ func TestCreateFromYouTubeMusic_DuplicateISRCAddsRelatedMedia(t *testing.T) {
 	repo := newFakeMusicRepo()
 	u := "https://music.youtube.com/watch?v=OTHEROTHER1"
 	existing := repo.add(&domain.Content{URL: &u, ContentType: domain.ContentTypeYouTubeMusic, Response: json.RawMessage(`{"isrc":"GBUM71029604","relatedMedia":[]}`)})
-	svc := services.NewContentService(repo, ytMeta(audioID), services.WithMusicEnrichment(fullTrack(), isrcMatch(), nil), syncRunner())
+	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(fullTrack(), isrcMatch(), nil), syncRunner())
 
 	c, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
 	assert.ErrorIs(t, err, domain.ErrAlreadyExists)
@@ -263,8 +263,8 @@ func TestCreateFromYouTubeMusic_DuplicateISRCAddsRelatedMedia(t *testing.T) {
 func TestCreateFromYouTubeMusic_LinksExistingVideoRow(t *testing.T) {
 	repo := newFakeMusicRepo()
 	vu := "https://www.youtube.com/watch?v=" + videoID
-	video := repo.add(&domain.Content{URL: &vu, ContentType: domain.ContentTypeYouTube})
-	svc := services.NewContentService(repo, ytMeta(audioID), services.WithMusicEnrichment(fullTrack(), nil, nil), syncRunner())
+	video := repo.add(&domain.Content{URL: &vu, ContentType: domain.ContentTypeYouTubeVideo})
+	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(fullTrack(), nil, nil), syncRunner())
 
 	c, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
 	require.NoError(t, err)
@@ -276,7 +276,7 @@ func TestCreateFromYouTubeMusic_LinksExistingVideoRow(t *testing.T) {
 }
 
 func TestCreateFromYouTubeMusic_RejectsNonTracks(t *testing.T) {
-	svc := services.NewContentService(newFakeMusicRepo(), ytMeta(audioID))
+	svc := services.NewContentService(newFakeMusicRepo(), ytMeta(audioID), nil)
 	_, err := svc.CreateFromYouTubeMusic(context.Background(), "https://music.youtube.com/playlist?list=OLAK5uy_x", 7)
 	assert.ErrorIs(t, err, domain.ErrNotATrack)
 	_, err = svc.CreateFromYouTubeMusic(context.Background(), "https://www.youtube.com/watch?v="+audioID, 7)
@@ -287,18 +287,18 @@ func TestCreateFromYouTubeMusic_RejectsNonTracks(t *testing.T) {
 
 func TestPromoteRelatedMedia(t *testing.T) {
 	repo := newFakeMusicRepo()
-	svc := services.NewContentService(repo, ytMeta(audioID), services.WithMusicEnrichment(fullTrack(), nil, nil), syncRunner())
+	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(fullTrack(), nil, nil), syncRunner())
 	track, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
 	require.NoError(t, err)
 
 	// CreateFromYouTube (reused for promotion) derives the ID via the client.
 	yt := ytMeta(videoID)
 	yt.extractVideoIDFn = func(string) (string, error) { return videoID, nil }
-	svc = services.NewContentService(repo, yt, services.WithMusicEnrichment(fullTrack(), nil, nil), syncRunner())
+	svc = services.NewContentService(repo, yt, nil, services.WithMusicEnrichment(fullTrack(), nil, nil), syncRunner())
 
 	video, err := svc.PromoteRelatedMedia(context.Background(), track.ID, videoID, 7)
 	require.NoError(t, err)
-	assert.Equal(t, domain.ContentTypeYouTube, video.ContentType)
+	assert.Equal(t, domain.ContentTypeYouTubeVideo, video.ContentType)
 
 	var refs []domain.RelatedMedia
 	repo.field(t, track.ID, "relatedMedia", &refs)
@@ -319,7 +319,7 @@ func TestPromoteRelatedMedia(t *testing.T) {
 
 func TestMarkRelatedMediaUnavailable(t *testing.T) {
 	repo := newFakeMusicRepo()
-	svc := services.NewContentService(repo, ytMeta(audioID), services.WithMusicEnrichment(fullTrack(), nil, nil), syncRunner())
+	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(fullTrack(), nil, nil), syncRunner())
 	track, err := svc.CreateFromYouTubeMusic(context.Background(), musicURL, 7)
 	require.NoError(t, err)
 
@@ -355,7 +355,7 @@ func TestCheckLyrics(t *testing.T) {
 			u := musicURL
 			c := repo.add(&domain.Content{Name: "Bohemian Rhapsody", URL: &u, ContentType: domain.ContentTypeYouTubeMusic, Length: &length, Response: tt.response})
 			lyr := &fakeLyrics{match: &portservices.LyricsMatch{Available: false}}
-			svc := services.NewContentService(repo, ytMeta(audioID), services.WithMusicEnrichment(nil, nil, lyr))
+			svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(nil, nil, lyr))
 
 			_, err := svc.CheckLyrics(context.Background(), c.ID, tt.force)
 			require.NoError(t, err)
@@ -366,8 +366,8 @@ func TestCheckLyrics(t *testing.T) {
 
 func TestCheckLyrics_OnlyMusic(t *testing.T) {
 	repo := newFakeMusicRepo()
-	c := repo.add(&domain.Content{ContentType: domain.ContentTypeYouTube})
-	svc := services.NewContentService(repo, ytMeta(audioID), services.WithMusicEnrichment(nil, nil, &fakeLyrics{}))
+	c := repo.add(&domain.Content{ContentType: domain.ContentTypeYouTubeVideo})
+	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(nil, nil, &fakeLyrics{}))
 	_, err := svc.CheckLyrics(context.Background(), c.ID, true)
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }

@@ -10,6 +10,7 @@
 		resolveQuietGraduate,
 		markQuietGraduateAttempted,
 		getCoachForceOpen,
+		getCoachReplayNonce,
 	} from '$lib/onboarding/coachGate.svelte';
 	import { CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
 	import { useMarkOnboardingSeen } from '$lib/queries/users/useMarkOnboardingSeen';
@@ -97,5 +98,8 @@
 </script>
 
 {#if showCoachUi && userId > 0}
-	<OnboardingCoach {userId} />
+	<!-- Keyed so a replay discards a coach that was already dismissed (its local state) and starts at step 1. -->
+	{#key getCoachReplayNonce()}
+		<OnboardingCoach {userId} />
+	{/key}
 {/if}

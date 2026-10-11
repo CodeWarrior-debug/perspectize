@@ -166,7 +166,7 @@ describe('VideoResultsGrid', () => {
 			name: 'Video 1',
 			addedByUserID: '1',
 			url: toWatchUrl('1'),
-			contentType: 'YOUTUBE',
+			contentType: 'YOUTUBE_VIDEO',
 			length: 90,
 			lengthUnits: 'seconds',
 			viewCount: 10,

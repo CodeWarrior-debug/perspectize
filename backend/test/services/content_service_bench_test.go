@@ -15,7 +15,7 @@ func BenchmarkContentService_GetByID(b *testing.B) {
 		ID:          1,
 		Name:        "Benchmark Video",
 		URL:         &url,
-		ContentType: domain.ContentTypeYouTube,
+		ContentType: domain.ContentTypeYouTubeVideo,
 	}
 
 	repo := &mockContentRepository{
@@ -23,7 +23,7 @@ func BenchmarkContentService_GetByID(b *testing.B) {
 			return content, nil
 		},
 	}
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -40,7 +40,7 @@ func BenchmarkContentService_ListContent(b *testing.B) {
 			ID:          i + 1,
 			Name:        "Video",
 			URL:         &url,
-			ContentType: domain.ContentTypeYouTube,
+			ContentType: domain.ContentTypeYouTubeVideo,
 			Response:    json.RawMessage(`{}`),
 		}
 	}
@@ -55,7 +55,7 @@ func BenchmarkContentService_ListContent(b *testing.B) {
 			return result, nil
 		},
 	}
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 	ctx := context.Background()
 	first := 10
 

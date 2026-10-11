@@ -18,6 +18,8 @@ By design, the aggregate currently counts **every** perspective on the content, 
 
 ## YouTube Search Proxy (Shared Quota Fix)
 
+**Resolved differently (2026-09-27, branch `claude/content-type-visual-media-wrao93`):** in-app search was dropped instead of proxied. Google now caps `search.list` at 100 calls/day per project (its own bucket, separate from the 10,000 units), and a user signing in with Google doesn't change that: their calls still go through this project's OAuth client. So the Discover search box now opens `youtube.com/results` in a new tab, and a pasted YouTube link in that box is added directly. Trending moved behind the backend: `youtubeTrending` GraphQL query → `youtube.CachingClient.GetTrending`, cached per region + page (`YOUTUBE_TRENDING_CACHE_TTL_SECONDS`, default 1 h). The browser no longer calls googleapis.com at all (`VITE_YOUTUBE_API_KEY` removed; `connect-src` no longer lists it). The original notes are kept below for history.
+
 Discovered 2026-08-15: the Discover page's search (`fetchYouTubeSearch` in `frontend/src/lib/services/youtubeApi.ts`) calls YouTube's `search.list` **directly from the browser** using a single build-time key (`VITE_YOUTUBE_API_KEY`). `search.list` costs a flat 100 units/call, and the default daily quota is 10,000 units — so the whole deployed app shares roughly **~100 searches/day total**, not per-user, since every browser uses the same key. Client-side caching (TanStack Query, 5 min staleTime for search / 1 hour for trending) helps within a session but doesn't share across users or browser tabs.
 
 **What to do:**
@@ -581,6 +583,22 @@ At current traffic this is fine. At real scale (many requests per second from th
 
 ---
 
+## Research Spike: Jev (TypeSafe AI "System One" model) for the future AI bot
+
+**Type:** Research Spike — not scoped, no code/config changes made.
+
+**Status:** Confirmed as a real product (TypeSafe AI, founder Diogo Almeida ex-OpenAI, $40M seed led by DCVC, early access 2026-09-15). It is a fast decision/classification model ("System One" — returns typed Choice/Score/Noul answers with calibrated probabilities in ~70-500ms), **not** a code-generation or reasoning model. It does not compete with Claude Code; it's a candidate cheap-and-fast "yes/no/classify" layer that could sit *alongside* an AI agent.
+
+**Why this is logged now instead of piloted:** research turned up ~15 third-party/community repos and Claude Code plugin/MCP integrations (`jev-kit`, `jev-code`, `limpet`, `fast-jev-compaction`, `jev-ci-triage`, two unrelated `jev-harness` projects, `jevtriage`, `jev-test-triage`, `jev-logtriage`, `graphql-classifier`, `jevcal`, plus four "awesome-jev" list repos) that appeared almost immediately after launch — a pattern worth treating with real suspicion (typosquatting / unvetted supply-chain risk), especially since several are pitched as plugging directly into CI merge gates, Claude Code's tool-call approval flow, or agent Stop hooks (i.e., things that could approve destructive commands or silently fail open). None of these should be installed without independently reading their source and confirming maintainer legitimacy first — a vendor README claim is not verification.
+
+**Where Jev could be worth real evaluation later:** when Perspectize implements its own AI bot feature (not yet built), Jev's fast/cheap classification could plausibly be useful as a pre-filter/guard layer in that bot's pipeline (e.g., cheap moderation/routing/confidence checks before an expensive model call) — that's the point at which a proper spend of time vetting official SDKs (Python/JS have official ones; Go only has unofficial community clients so far — `jev-go`, `go-jev`, `typesafe-go`) and re-running this research against the actual bot design would be worthwhile.
+
+**Do not pilot any of the community CI/agent-guard repos listed above until:** (1) the AI bot feature has a concrete design that identifies a real use case, and (2) each candidate repo is independently source-reviewed for what it actually does with any credentials/permissions it's given.
+
+**Priority:** Deferred — revisit specifically when AI bot implementation work is scoped, not before.
+
+**Source:** Dev research spike (2026-09-27/28), requested as "where can Jev enhance my workflow" — full findings captured in session, official links: https://typesafe.ai/blog/introducing-system-one-models-and-jev, https://docs.typesafe.ai/introduction/coding-agents.
+
 ## Backend Proxy/Cache for the YouTube Data API (Discover Page)
 
 **Type:** Dev × Performance / Security
@@ -596,3 +614,24 @@ At current traffic this is fine. At real scale (many requests per second from th
 **Priority:** Low-Medium — current MVP quota levels are fine (see `.planning/phases/15-discover-page/15-CONTEXT.md`), and the client-side gcTime/staleTime tuning done in the discover-thumbnail-facade fix already reduces redundant refetches. Worth doing once Discover traffic or quota usage grows.
 
 **Source:** Dev request (2026-09-28), Discover page slow-media-loading investigation (bugfix/discover-thumbnail-facade) — explicitly out of scope for that PR per its own instructions.
+
+## Multiple Perspectives per Content (Public + Private Slots)
+
+Nothing in the backend currently limits how many perspectives a user can have on one content entry (the old `UNIQUE(claim, user_id)` went away in migration 000007). Users will want a public and a private aspect on the same content. Proposed model: one perspective per `(user_id, content_id, privacy)` via a partial unique index, plus UI to switch between the two slots.
+
+**Blocked on two gates:** (1) the sharing model must be finalised first (the slot model assumes exactly two visibility levels), and (2) the aggregate **double-counting** audit — `AggregateByContentIDs`, `FeelingStats`, `CustomFieldStats`, `Compare.svelte`, and onboarding perspective counts all assume one perspective per user per content.
+
+**Spec:** [docs/superpowers/specs/2026-09-29-multiple-perspectives-per-content-design.md](docs/superpowers/specs/2026-09-29-multiple-perspectives-per-content-design.md)
+
+**Priority:** Optional / unscheduled.
+
+## Subtasks on Plans, and Sharing Task Lists
+
+Two related extensions to the Plan page (user todos, PR #576). Both are exploration, not commitments.
+
+- **Subtasks:** let a Todo have child Todos (a plan inside a plan). Open questions: one level or nested; does the parent's percent complete roll up from its children; how drag-reorder and list position work inside a parent; whether a child can live in a different list; what the card list and the grid show (indent, expand/collapse, count badge).
+- **Sharing task lists generally:** let a user share a Todo list, not just their own view of it. Open questions: read-only vs collaborative editing; who sees what when Todos link to items that have private perspectives; per-list vs per-Todo privacy (Todos already carry a privacy setting); how this relates to the sharing model gating [Multiple Perspectives per Content](#multiple-perspectives-per-content-public--private-slots).
+
+**Depends on:** the sharing model being finalised, and the shared BaseTable work in #577 so a shared or nested list does not become a third copy of the grid.
+
+**Priority:** Optional / unscheduled.

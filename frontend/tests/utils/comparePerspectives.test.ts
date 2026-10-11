@@ -171,34 +171,75 @@ describe('compareFeelings', () => {
 });
 
 describe('compareOverall', () => {
-	it('agrees when both thumbs match', () => {
+	it('is "agree" when both thumbs are up', () => {
 		const left = makePerspective({ like: 'THUMBS_UP' });
 		const right = makePerspective({ like: 'THUMBS_UP' });
-		expect(compareOverall(left, right)).toEqual({ left: 'THUMBS_UP', right: 'THUMBS_UP', agree: true });
+		expect(compareOverall(left, right)).toEqual({ left: 'THUMBS_UP', right: 'THUMBS_UP', status: 'agree' });
 	});
 
-	it('differs when thumbs are opposite', () => {
+	it('is "agree" when both thumbs are down', () => {
+		const left = makePerspective({ like: 'THUMBS_DOWN' });
+		const right = makePerspective({ like: 'THUMBS_DOWN' });
+		expect(compareOverall(left, right).status).toBe('agree');
+	});
+
+	it('is "differ" when thumbs are opposite', () => {
 		const left = makePerspective({ like: 'THUMBS_UP' });
 		const right = makePerspective({ like: 'THUMBS_DOWN' });
-		expect(compareOverall(left, right).agree).toBe(false);
+		expect(compareOverall(left, right)).toEqual({ left: 'THUMBS_UP', right: 'THUMBS_DOWN', status: 'differ' });
 	});
 
-	it('differs when either side has no thumb set', () => {
+	it('is "oneSided" when the left side has no thumb set', () => {
+		const left = makePerspective({ like: null });
+		const right = makePerspective({ like: 'THUMBS_UP' });
+		expect(compareOverall(left, right)).toEqual({ left: null, right: 'THUMBS_UP', status: 'oneSided' });
+	});
+
+	it('is "oneSided" when the right side has no thumb set', () => {
 		const left = makePerspective({ like: 'THUMBS_UP' });
 		const right = makePerspective({ like: null });
-		expect(compareOverall(left, right).agree).toBe(false);
+		expect(compareOverall(left, right)).toEqual({ left: 'THUMBS_UP', right: null, status: 'oneSided' });
+	});
+
+	it('is "none" when neither side has a thumb set', () => {
+		const left = makePerspective({ like: null });
+		const right = makePerspective({ like: null });
+		expect(compareOverall(left, right)).toEqual({ left: null, right: null, status: 'none' });
 	});
 });
 
 describe('summarize', () => {
-	it('counts rows by status', () => {
+	it('counts rows by status, with zero one-sided counts when not given any', () => {
 		const rows = [
 			{ key: 'a', label: 'A', leftDisplay: 0, rightDisplay: 0, delta: 0, pctDiff: 0, status: 'similar' as const },
 			{ key: 'b', label: 'B', leftDisplay: 0, rightDisplay: 0, delta: 2, pctDiff: 20, status: 'diverges' as const },
 			{ key: 'c', label: 'C', leftDisplay: 0, rightDisplay: 0, delta: 10, pctDiff: 100, status: 'conflict' as const },
 			{ key: 'd', label: 'D', leftDisplay: 0, rightDisplay: 0, delta: 0.5, pctDiff: 5, status: 'similar' as const },
 		];
-		expect(summarize(rows)).toEqual({ similar: 2, diverges: 1, conflict: 1 });
+		expect(summarize(rows)).toEqual({ similar: 2, diverges: 1, conflict: 1, leftOnly: 0, rightOnly: 0 });
+	});
+
+	it('counts one-sided rows by side, alongside the shared-dimension counts', () => {
+		const rows = [
+			{ key: 'a', label: 'A', leftDisplay: 0, rightDisplay: 0, delta: 0, pctDiff: 0, status: 'similar' as const },
+		];
+		const oneSided = [
+			{ key: 'b', label: 'B', side: 'left' as const, display: 5 },
+			{ key: 'c', label: 'C', side: 'left' as const, display: 6 },
+			{ key: 'd', label: 'D', side: 'right' as const, display: 7 },
+		];
+		expect(summarize(rows, oneSided)).toEqual({ similar: 1, diverges: 0, conflict: 0, leftOnly: 2, rightOnly: 1 });
+	});
+
+	it('is all zero-count fields when there are no rated dimensions on either side', () => {
+		expect(summarize([], [])).toEqual({ similar: 0, diverges: 0, conflict: 0, leftOnly: 0, rightOnly: 0 });
+	});
+
+	it('reflects zero overlap when every dimension is one-sided', () => {
+		const oneSided = [{ key: 'a', label: 'A', side: 'left' as const, display: 8 }];
+		const result = summarize([], oneSided);
+		expect(result.similar + result.diverges + result.conflict).toBe(0);
+		expect(result.leftOnly).toBe(1);
 	});
 });
 

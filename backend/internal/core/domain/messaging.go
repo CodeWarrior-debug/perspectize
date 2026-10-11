@@ -32,6 +32,14 @@ type MessageThread struct {
 	Participants  []ThreadParticipant
 }
 
+// ThreadStats is the per-viewer summary a thread list shows: the thread's
+// highest message seq and how many messages are newer than the viewer's read
+// pointer (counted as rows, so pruned gaps don't inflate it).
+type ThreadStats struct {
+	LatestSeq int64
+	Unread    int
+}
+
 // ThreadParticipant represents a user's membership in a message thread.
 type ThreadParticipant struct {
 	ThreadID    int

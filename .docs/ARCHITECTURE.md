@@ -48,10 +48,10 @@ Perspectize is a multi-dimensional perspective rating platform for YouTube conte
 | Component | Choice | Alternatives Considered | Why This Choice |
 |-----------|--------|------------------------|-----------------|
 | Router | chi | Fiber, Gin, stdlib only | Lightweight, net/http compatible |
-| Database | sqlx + pgx | GORM, ent | Direct SQL control, performance |
+| Database | GORM + pgx | sqlx, ent | ORM productivity; pgx is the driver (pooling, `LISTEN`/`NOTIFY`). Migrated from sqlx in phase 07.1 |
 | Migrations | golang-migrate | goose, GORM AutoMigrate | Version-controlled SQL, PostgreSQL features |
 | GraphQL | gqlgen | graphql-go | Schema-first, type-safe, performant |
-| Validation | validator/v10 | ozzo-validation | De facto standard, struct tags |
+| Validation | Hand-written checks in the domain and services | validator/v10, ozzo-validation | Keeps rules next to the domain types |
 | Logging | log/slog | zap, zerolog | Standard library, sufficient features |
 | Testing | testify + sqlmock | gomock, testcontainers | Simple mocking, good assertions |
 
@@ -106,7 +106,7 @@ This project follows **Hexagonal Architecture** (Ports and Adapters pattern):
 
 **Adapters (Infrastructure):**
 - `internal/adapters/graphql/` - PRIMARY adapter: GraphQL API (gqlgen)
-- `internal/adapters/repositories/` - SECONDARY adapter: PostgreSQL (sqlx + pgx)
+- `internal/adapters/repositories/` - SECONDARY adapter: PostgreSQL (GORM + pgx)
 - `internal/adapters/youtube/` - SECONDARY adapter: YouTube Data API
 
 **Dependency Rule:** Dependencies point inward. Domain never depends on adapters. Adapters depend on domain ports.
@@ -292,29 +292,19 @@ DROP TABLE IF EXISTS user_preferences;
 
 ### Input Validation
 
-- All inputs validated using go-playground/validator
-- SQL injection prevented by sqlx parameterized queries
+- Inputs are validated in the domain and service layers
+- SQL injection prevented by parameterized queries (GORM and pgx)
 - XSS prevented by Go's template escaping (if HTML rendered)
 
-### Authentication (Planned)
+### Authentication
 
-```
-+------------------------------------------------------------------+
-|                    Future Auth Flow                               |
-+------------------------------------------------------------------+
-|  1. OAuth 2.0 with YouTube (for creators)                        |
-|  2. JWT tokens for API authentication                            |
-|  3. Refresh token rotation                                       |
-|  4. Rate limiting per user/IP                                    |
-+------------------------------------------------------------------+
-```
+- Clerk issues session JWTs; `internal/adapters/auth` verifies them in middleware and resolves the local user (cached for 60 s).
+- Write operations are guarded by directives and service-level owner checks.
+- Demo mode (`DEMO_MODE=true`, refused in production) accepts `demo.<persona>` tokens for the seeded sample users; see [Demo Mode](DEMO_MODE.md).
 
 ### Rate Limiting
 
-```go
-// Planned implementation using golang.org/x/time/rate
-limiter := rate.NewLimiter(rate.Limit(10), 20) // 10 req/sec, burst 20
-```
+A global limiter (`go-chi/httprate`, via `apimw.GlobalRateLimit`) runs **before** auth to blunt floods. The limit is `RATE_LIMIT_PER_MIN`, default 100 per minute.
 
 ## Performance Targets
 
@@ -397,5 +387,5 @@ logger.Info("perspective created",
 - [Effective Go](https://go.dev/doc/effective_go)
 - [chi Router Documentation](https://go-chi.io/)
 - [gqlgen Documentation](https://gqlgen.com/)
-- [sqlx Documentation](https://jmoiron.github.io/sqlx/)
+- [GORM Documentation](https://gorm.io/docs/) and [pgx](https://github.com/jackc/pgx)
 - [Hexagonal Architecture](https://alistair.cockburn.us/hexagonal-architecture/)

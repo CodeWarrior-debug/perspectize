@@ -29,7 +29,7 @@ const items = [
 	{
 		id: '10',
 		name: 'One Perspective Video',
-		contentType: 'YOUTUBE',
+		contentType: 'YOUTUBE_VIDEO',
 		channelTitle: 'Chan',
 		url: null,
 		perspectiveCount: 1,
@@ -37,12 +37,12 @@ const items = [
 	{
 		id: '11',
 		name: 'Two Perspective Video',
-		contentType: 'YOUTUBE',
+		contentType: 'YOUTUBE_VIDEO',
 		channelTitle: 'Chan',
 		url: null,
 		perspectiveCount: 2,
 	},
-	{ id: '12', name: 'No Perspectives', contentType: 'YOUTUBE', channelTitle: 'Chan', url: null, perspectiveCount: 0 },
+	{ id: '12', name: 'No Perspectives', contentType: 'YOUTUBE_VIDEO', channelTitle: 'Chan', url: null, perspectiveCount: 0 },
 ];
 
 describe('ComparePicker', () => {

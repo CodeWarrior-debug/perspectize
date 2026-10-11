@@ -99,7 +99,20 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-environment.sh\" 2>/dev/null || true"
+          },
+          {
+            "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/monthly-routine-check.sh\" 2>/dev/null || true"
+          }
+        ]
+      },
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/graphify-refresh-on-main.sh\" 2>/dev/null || true"
           }
         ]
       }
@@ -127,6 +140,10 @@
           },
           {
             "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/query-budget-precommit.sh\""
+          },
+          {
+            "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-session-reflection-before-pr.sh\""
           }
         ]
@@ -138,6 +155,7 @@
     "claude-md-management@claude-plugins-official": true,
     "context7@claude-plugins-official": false,
     "frontend-design@claude-plugins-official": true,
+    "plugin-dev@claude-plugins-official": true,
     "superpowers@superpowers-dev": true
   },
   "extraKnownMarketplaces": {
