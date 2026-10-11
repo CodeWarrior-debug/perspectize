@@ -31,7 +31,7 @@ func TestCreateAudioTrack_Success(t *testing.T) {
 		services.WithAudioTracks(audio, newMockGenres()))
 	defer server.Close()
 
-	result := executeGraphQL(t, server, `mutation { createAudioTrack(input: { url: "`+trackURL+`", userId: 0 }) {
+	result := executeGraphQL(t, server, `mutation { createAudioTrack(input: { url: "`+trackURL+`" }) {
 		content { id contentType url relatedMedia { videoId } lyrics { available } } alreadyExisted } }`)
 	require.Empty(t, result.Errors)
 
@@ -57,7 +57,7 @@ func TestCreateAudioTrack_Success(t *testing.T) {
 	assert.False(t, data.Create.AlreadyExisted)
 }
 
-func TestCreateAudioTrack_ErrorMessages(t *testing.T) {
+func TestCreateAudioTrack_YouTubeErrorMessages(t *testing.T) {
 	server := setupTestServerWithRepos(&mockContentRepository{}, musicYT(), &mockPerspectiveRepository{}, &mockUserRepository{},
 		services.WithAudioTracks(&mockAudioTrackRepository{}, newMockGenres()))
 	defer server.Close()
@@ -67,7 +67,7 @@ func TestCreateAudioTrack_ErrorMessages(t *testing.T) {
 		"https://www.youtube.com/watch?v=dQw4w9WgXcQ":       "unsupported music link",
 	}
 	for url, want := range tests {
-		result := executeGraphQL(t, server, `mutation { createAudioTrack(input: { url: "`+url+`", userId: 0 }) { alreadyExisted } }`)
+		result := executeGraphQL(t, server, `mutation { createAudioTrack(input: { url: "`+url+`" }) { alreadyExisted } }`)
 		require.NotEmpty(t, result.Errors, url)
 		assert.Contains(t, result.Errors[0].Message, want)
 	}

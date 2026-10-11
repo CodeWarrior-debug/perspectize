@@ -51,6 +51,12 @@ models:
   SortOrder:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.SortOrder
+  TrackLinkKind:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.TrackLinkKind
+  TrackLinkSource:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.TrackLinkSource
   ContentSortBy:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ContentSortBy
@@ -142,6 +148,10 @@ models:
       averageRating:
         resolver: true
       qualityRatingCount:
+        resolver: true
+      genre:
+        resolver: true
+      trackLinks:
         resolver: true
     # Non-schema field: carries the primary_category_id FK already loaded by
     # the content list query so the primaryCategory resolver can batch-load the

@@ -377,19 +377,71 @@ func (r *mutationResolver) UpdateContentSourceData(ctx context.Context, contentI
 }
 
 // CreateAudioTrack is the resolver for the createAudioTrack field.
-func (r *mutationResolver) CreateAudioTrack(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error) {
+func (r *mutationResolver) CreateAudioTrack(ctx context.Context, input model.CreateAudioTrackInput) (*model.CreateAudioTrackResult, error) {
 	authUser, err := auth.RequireAuth(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("access denied: authentication required")
 	}
-	if input.UserID != 0 && input.UserID != authUser.ID {
-		return nil, fmt.Errorf("access denied: cannot create content for another user")
+	in := portservices.CreateAudioTrackInput{
+		URL: input.URL, UserID: authUser.ID, GenreID: input.GenreID, SameAsContentID: input.SameAsContentID,
+		CreateNew: input.CreateNew != nil && *input.CreateNew,
 	}
-	res, err := r.ContentService.CreateAudioTrack(ctx, portservices.CreateAudioTrackInput{URL: input.URL, UserID: authUser.ID, CreateNew: true})
+	if input.Title != nil {
+		in.Title = *input.Title
+	}
+	if input.Artist != nil {
+		in.Artist = *input.Artist
+	}
+	res, err := r.ContentService.CreateAudioTrack(ctx, in)
 	if err != nil {
 		return nil, audioTrackError(err)
 	}
-	return &model.CreateContentResult{Content: domainToModel(res.Content), AlreadyExisted: res.AlreadyExisted}, nil
+	out := &model.CreateAudioTrackResult{AlreadyExisted: res.AlreadyExisted, SameSongCandidates: make([]*model.Content, 0, len(res.Candidates))}
+	if res.Content != nil {
+		out.Content = domainToModel(res.Content)
+	}
+	for _, c := range res.Candidates {
+		out.SameSongCandidates = append(out.SameSongCandidates, domainToModel(c))
+	}
+	return out, nil
+}
+
+// SetTrackGenre is the resolver for the setTrackGenre field.
+func (r *mutationResolver) SetTrackGenre(ctx context.Context, contentID int, genreID int) (*model.Content, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	c, err := r.ContentService.SetTrackGenre(ctx, contentID, genreID, authUser.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrGenreLocked):
+			return nil, domain.ErrGenreLocked
+		case errors.Is(err, domain.ErrNotFound):
+			return nil, fmt.Errorf("track not found")
+		case errors.Is(err, domain.ErrInvalidInput):
+			return nil, fmt.Errorf("unknown genre")
+		}
+		slog.Error("setting track genre failed", "contentID", contentID, "error", err)
+		return nil, fmt.Errorf("failed to set genre")
+	}
+	return domainToModel(c), nil
+}
+
+// MarkTrackLinkUnavailable is the resolver for the markTrackLinkUnavailable field.
+func (r *mutationResolver) MarkTrackLinkUnavailable(ctx context.Context, linkID int) (*model.TrackLink, error) {
+	if _, err := auth.RequireAuth(ctx); err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	l, err := r.ContentService.MarkTrackLinkUnavailable(ctx, linkID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("track link not found")
+		}
+		slog.Error("marking track link unavailable failed", "linkID", linkID, "error", err)
+		return nil, fmt.Errorf("failed to update track link")
+	}
+	return trackLinkToModel(*l), nil
 }
 
 // PromoteRelatedMedia is the resolver for the promoteRelatedMedia field.
@@ -700,4 +752,68 @@ func (r *queryResolver) MovieTrending(ctx context.Context, window *domain.Trendi
 		return nil, fmt.Errorf("trending movies are unavailable right now")
 	}
 	return movieSearchPageToModel(result), nil
+}
+
+// Genre is the AUDIO_TRACK genre, resolved from the cached genre list (no query when warm).
+func (r *contentResolver) Genre(ctx context.Context, obj *model.Content) (*model.MusicGenre, error) {
+	if obj.GenreID == nil {
+		return nil, nil
+	}
+	id, err := strconv.Atoi(*obj.GenreID)
+	if err != nil {
+		return nil, nil
+	}
+	genres, err := r.ContentService.MusicGenres(ctx)
+	if err != nil {
+		slog.Error("resolving genre failed", "contentID", obj.ID, "error", err)
+		return nil, nil
+	}
+	for _, g := range genres {
+		if g.ID == id {
+			return musicGenreToModel(g), nil
+		}
+	}
+	return nil, nil
+}
+
+// TrackLinks batches through the per-request loader; non-track rows cost nothing.
+func (r *contentResolver) TrackLinks(ctx context.Context, obj *model.Content) ([]*model.TrackLink, error) {
+	out := []*model.TrackLink{}
+	if obj.ContentType != string(domain.ContentTypeAudioTrack) {
+		return out, nil
+	}
+	id, err := strconv.Atoi(obj.ID)
+	if err != nil {
+		return out, nil
+	}
+	var links []domain.TrackLink
+	if loaders := dataloader.For(ctx); loaders != nil {
+		links, err = loaders.TrackLinksByContentID.Load(ctx, id)
+	} else {
+		var byID map[int][]domain.TrackLink
+		byID, err = r.ContentService.TrackLinksByContentIDs(ctx, []int{id})
+		links = byID[id]
+	}
+	if err != nil {
+		slog.Error("resolving track links failed", "contentID", id, "error", err)
+		return out, nil
+	}
+	for _, l := range links {
+		out = append(out, trackLinkToModel(l))
+	}
+	return out, nil
+}
+
+// MusicGenres is the resolver for the musicGenres field.
+func (r *queryResolver) MusicGenres(ctx context.Context) ([]*model.MusicGenre, error) {
+	genres, err := r.ContentService.MusicGenres(ctx)
+	if err != nil {
+		slog.Error("listing music genres failed", "error", err)
+		return nil, fmt.Errorf("failed to load genres")
+	}
+	out := make([]*model.MusicGenre, len(genres))
+	for i, g := range genres {
+		out[i] = musicGenreToModel(g)
+	}
+	return out, nil
 }

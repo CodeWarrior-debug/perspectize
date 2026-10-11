@@ -96,6 +96,10 @@ func domainToModel(c *domain.Content) *model.Content {
 		RelatedMedia:      relatedMediaToModel(c),
 		Lyrics:            lyricsToModel(domain.ReadLyricsAvailability(c.Response)),
 	}
+	if c.GenreID != nil {
+		g := strconv.Itoa(*c.GenreID)
+		m.GenreID = &g
+	}
 
 	// Parse the raw response JSON into a map for GraphQL
 	if len(c.Response) > 0 {
@@ -987,4 +991,25 @@ func audioTrackError(err error) error {
 	}
 	slog.Error("creating audio track failed", "error", err)
 	return fmt.Errorf("failed to add track")
+}
+
+func musicGenreToModel(g domain.MusicGenre) *model.MusicGenre {
+	out := &model.MusicGenre{ID: strconv.Itoa(g.ID), Name: g.Name}
+	if g.ParentID != nil {
+		p := strconv.Itoa(*g.ParentID)
+		out.ParentID = &p
+	}
+	return out
+}
+
+func trackLinkToModel(l domain.TrackLink) *model.TrackLink {
+	out := &model.TrackLink{
+		ID: strconv.Itoa(l.ID), Provider: string(l.Provider), ProviderTrackID: l.ProviderTrackID, URL: l.URL,
+		Kind: l.Kind, Source: l.Source,
+	}
+	if l.UnavailableAt != nil {
+		s := l.UnavailableAt.UTC().Format(time.RFC3339)
+		out.UnavailableAt = &s
+	}
+	return out
 }

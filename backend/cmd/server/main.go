@@ -221,6 +221,10 @@ func main() {
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
 	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
 
+	audioTrackRepo := postgres.NewGormAudioTrackRepository(db)
+	// Cached: the genre tree is seeded and effectively static; every track resolves its genre through it.
+	musicGenreRepo := cached.NewMusicGenreRepository(postgres.NewGormMusicGenreRepository(db), cached.DefaultMusicGenreTTL)
+
 	// Initialize services
 	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient,
 		services.WithBibleReference(bibleReferenceRepo),
@@ -228,6 +232,7 @@ func main() {
 		services.WithMovieSearch(movieSearchClient),
 		services.WithMovieTrending(movieTrendingClient),
 		services.WithMusicEnrichment(ytmusic.NewClient(), musicbrainz.NewClient(), lrclib.NewClient()),
+		services.WithAudioTracks(audioTrackRepo, musicGenreRepo),
 	)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
