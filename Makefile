@@ -11,11 +11,16 @@ BACKEND_PORT  := 8080
 FRONTEND_PORT := 5173
 PID_DIR := .dev
 LOG_DIR := logs
+# Agent registry (.claude/agent-registry): `make start` registers your servers as the
+# holder of verification slot 1, so a waiting agent pings you instead of guessing.
+REGISTRY := node .claude/agent-registry/agent-registry.mjs
+# Stop a process and its descendants (air and pnpm spawn children). Children first.
+KILL_TREE = kt() { for c in $$(pgrep -P $$1 2>/dev/null); do kt $$c; done; kill $$1 2>/dev/null; }
 
 help:
 	@echo "Perspectize dev servers:"
 	@echo "  make start    - start backend (:$(BACKEND_PORT)) + frontend (:$(FRONTEND_PORT)) detached"
-	@echo "  make stop     - stop both"
+	@echo "  make stop     - stop what make start in THIS checkout started (never other checkouts' servers)"
 	@echo "  make restart  - stop then start"
 	@echo "  make status   - show what's listening on :$(BACKEND_PORT) / :$(FRONTEND_PORT)"
 	@echo "  make logs     - tail -f $(LOG_DIR)/*.log"
@@ -48,25 +53,23 @@ start:
 		nohup pnpm --dir frontend run dev > $(LOG_DIR)/frontend.log 2>&1 & echo $$! > $(PID_DIR)/frontend.pid; \
 		echo "frontend: started (pid $$(cat $(PID_DIR)/frontend.pid)), log $(LOG_DIR)/frontend.log"; \
 	fi
+	@$(REGISTRY) human-start --slot 1 --pid-file $(PID_DIR)/backend.pid --pid-file $(PID_DIR)/frontend.pid 2>/dev/null || true
 	@echo "Run 'make logs' to follow output, 'make stop' to shut down."
 
+# Stops only what `make start` in THIS checkout started (its pid files and their
+# children). It never kills by port or by name: other checkouts and agents run
+# dev servers too.
 stop:
-	@for name in backend frontend; do \
+	@$(KILL_TREE); for name in backend frontend; do \
 		if [ -f $(PID_DIR)/$$name.pid ]; then \
 			pid=$$(cat $(PID_DIR)/$$name.pid); \
-			if kill $$pid 2>/dev/null; then echo "$$name: sent TERM to pid $$pid"; fi; \
+			kt $$pid && echo "$$name: stopped pid $$pid and its children"; \
 			rm -f $(PID_DIR)/$$name.pid; \
+		else \
+			echo "$$name: no pid file in this checkout, nothing to stop (see 'make status')"; \
 		fi; \
 	done
-	@sleep 1
-	@# Fallbacks — air/pnpm spawn children that may outlive the parent pid.
-	@for port in $(BACKEND_PORT) $(FRONTEND_PORT); do \
-		pids=$$(lsof -ti tcp:$$port 2>/dev/null); \
-		if [ -n "$$pids" ]; then echo "port $$port: killing $$pids"; kill $$pids 2>/dev/null || true; fi; \
-	done
-	@pkill -f 'go tool air' 2>/dev/null || true
-	@pkill -f 'backend/tmp/main' 2>/dev/null || true
-	@pkill -f 'vite dev' 2>/dev/null || true
+	@$(REGISTRY) human-stop --slot 1 2>/dev/null || true
 	@echo "stopped."
 
 restart: stop start

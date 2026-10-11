@@ -90,7 +90,8 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 - [Security](.docs/SECURITY.md) — Secret management, rotation procedures, incident response
 - [Migration Rollout](.docs/MIGRATION_ROLLOUT.md) — applying a migration to the production Neon DB: one at a time, snapshot first, verify, roll back
 - [Dependency Security](.docs/DEPENDENCY_SECURITY.md) — Trivy/pnpm-audit scanning, CVE remediation workflow, CI gotchas
-- [Worktrees](.docs/WORKTREES.md) — Location convention and the 3 numbered reusable worktrees for isolated Claude Code work
+- [Worktrees](.docs/WORKTREES.md) — Location convention and the 5 numbered reusable worktrees for isolated Claude Code work
+- [Agent registry](.claude/agent-registry/README.md) — per-machine claims (`LOCAL_AGENT_CHECKOUTS.md`) and the one-at-a-time verification slot (`LOCAL_AGENT_VERIFICATION.md`). One-time setup per machine: `node .claude/agent-registry/agent-registry.mjs install`
 - [Demo Mode](.docs/DEMO_MODE.md) — Docker demo stack (persistent Postgres + seeded personas, no Clerk/YouTube), Playwright tours that run as E2E (`make demo-test`) or record videos (`make demo-record`)
 - [Observability](.docs/OBSERVABILITY.md) — OTel/Faro → Grafana runbook: local tracer stack (`make obs-up` / `make obs-smoke`, otel-lgtm + Alloy on the demo stack), prod env vars, versioning, cardinality/sampling, OTel→Prometheus metric names
 - [Query Budget](.docs/QUERY_BUDGET.md) — query-count tests, dataloaders, TanStack caching/eviction rules
