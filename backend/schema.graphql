@@ -110,11 +110,74 @@ type Category {
   updatedAt: String!
 }
 
+# One video from YouTube's most-popular chart (Discover page Trending feed).
+type YouTubeTrendingVideo {
+  id: String!
+  title: String!
+  channelTitle: String!
+  description: String!
+  publishedAt: String!
+  thumbnailUrl: String!
+  # ISO 8601 duration, e.g. "PT4M13S"
+  duration: String!
+}
+
+type YouTubeTrendingPage {
+  items: [YouTubeTrendingVideo!]!
+  nextPageToken: String
+}
+
+# One movie from TMDB search (Discover page Movies source).
+type MovieSearchResult {
+  tmdbId: Int!
+  title: String!
+  # YYYY-MM-DD; null when TMDB has no date
+  releaseDate: String
+  overview: String!
+  # TMDB image path, e.g. "/abc.jpg"; prefix with https://image.tmdb.org/t/p/<size>
+  posterPath: String
+  # TMDB vote average 0-10; null when there are no votes
+  voteAverage: Float
+  # Canonical content URL (https://www.themoviedb.org/movie/<id>) — pass to createContentFromMovie
+  url: String!
+}
+
+type MovieSearchPage {
+  items: [MovieSearchResult!]!
+  page: Int!
+  totalPages: Int!
+  totalResults: Int!
+}
+
+# Time window for TMDB trending lists.
+enum TrendingWindow {
+  DAY
+  WEEK
+}
+
 type WikidataSearchResult {
   qid: String!
   label: String!
   description: String
   entityType: String
+}
+
+"Smallest unit a source reports a length in."
+enum LengthPrecision {
+  "Format as h:mm:ss, or m:ss under an hour."
+  SECONDS
+  "Format as h:mm (e.g. a TMDB movie runtime)."
+  MINUTES
+}
+
+"""
+Where a content length came from and the smallest unit that source reports.
+`length` is always seconds; show it to `precision`.
+"""
+type LengthDisplay {
+  "Origin of the length, e.g. youtube, tmdb."
+  source: String!
+  precision: LengthPrecision!
 }
 
 type Content {
@@ -126,6 +189,8 @@ type Content {
   addedBy: User
   length: Int
   lengthUnits: String
+  "Where length came from and the smallest unit it reports; format length to that precision."
+  lengthDisplay: LengthDisplay
   viewCount: Int
   likeCount: Int
   commentCount: Int
@@ -187,6 +252,10 @@ enum ContentSortBy {
   BOX_OFFICE
   VS_BUDGET
   AGE_RATING
+  RELEASE_DATE
+  TMDB_SCORE
+  # Username of the user who added the content (case-insensitive)
+  ADDED_BY
 }
 
 enum SortOrder {
@@ -317,6 +386,7 @@ input ContentFilter {
   personRole: PersonRole
   # Movie column filters (movie rows only; other rows have no such data and never match)
   genreContains: String      # Case-insensitive contains on the genre names
+  castContains: String       # Case-insensitive contains on a cast or director name
   ageRating: [String!]       # Certification is any of these (e.g. PG-13, R)
   releasedAfter: String      # ISO date (YYYY-MM-DD), inclusive
   releasedBefore: String     # ISO date (YYYY-MM-DD), inclusive
@@ -336,6 +406,8 @@ input ContentFilter {
   channelTitle: String       # ILIKE search
   tagContains: String        # Tag text contains
   descriptionSearch: String  # ILIKE search on description
+  # ILIKE search on the username of the user who added the content
+  addedByUsername: String
   # Record date filters
   createdAfter: String
   createdBefore: String
@@ -483,6 +555,18 @@ type Mutation {
 
   # Category mutations
   setPrimaryCategory(input: SetPrimaryCategoryInput!): Content! @auth
+
+  # User todo ("Plan") mutations. Ownership is enforced in UserTodoService and
+  # the owner-scoped SQL under it, not by @owner; the actor is the session user.
+  createUserTodo(input: CreateUserTodoInput!): UserTodo! @auth
+  updateUserTodo(input: UpdateUserTodoInput!): UserTodo! @auth
+  deleteUserTodo(id: ID!): Boolean! @auth
+  createTodoAction(input: CreateTodoActionInput!): TodoAction! @auth
+  createUserTodoList(input: CreateUserTodoListInput!): UserTodoList! @auth
+  updateUserTodoList(input: UpdateUserTodoListInput!): UserTodoList! @auth
+  deleteUserTodoList(id: ID!): Boolean! @auth
+  # Rewrites the list's positions to 1..N in the order of todoIds.
+  reorderUserTodoList(listId: IntID!, todoIds: [IntID!]!): [UserTodo!]! @auth
 }
 
 type Query {
@@ -522,6 +606,16 @@ type Query {
   # Category queries
   wikidataSearch(query: String!, language: String, limit: Int): [WikidataSearchResult!]!
 
+  # Discover page: YouTube's Trending chart, served from the backend cache so
+  # visitors share one API call per page per hour. regionCode defaults to US.
+  youtubeTrending(regionCode: String, pageToken: String): YouTubeTrendingPage!
+
+  # Discover page: TMDB movie search (not cached server-side). page defaults to 1 (max 500).
+  movieSearch(query: String!, page: Int): MovieSearchPage!
+
+  # Discover page: TMDB trending movies, cached server-side (~1h). window defaults to WEEK; page defaults to 1 (max 500).
+  movieTrending(window: TrendingWindow = WEEK, page: Int): MovieSearchPage!
+
   # Perspective queries
   perspectiveByID(id: ID!): Perspective
   perspectives(
@@ -552,6 +646,28 @@ type Query {
   # value), and what percent of ALL perspectives in scope that is. Same
   # scoping/privacy rules as feelingStats.
   customFieldStats(contentID: IntID, key: String!): CustomFieldStats!
+
+  # User todo ("Plan") queries. Privacy-filtered like perspectives: public rows
+  # plus the viewer's own, for anonymous and signed-in callers alike.
+  userTodos(
+    first: Int = 10
+    after: String
+    last: Int
+    before: String
+    sortBy: UserTodoSortBy = CREATED_AT
+    sortOrder: SortOrder = DESC
+    includeTotalCount: Boolean = false
+    filter: UserTodoFilter
+  ): PaginatedUserTodos!
+
+  # Null for a todo that doesn't exist or is someone else's PRIVATE todo.
+  userTodoByID(id: ID!): UserTodo
+
+  # Private lists are returned only to their owner.
+  userTodoLists(userId: IntID!): [UserTodoList!]!
+
+  # Presets plus the caller's own actions, in picker order.
+  todoActions: [TodoAction!]! @auth
 }
 
 # See Query.feelingStats. averageIntensity/stdDevIntensity are null when
@@ -576,4 +692,153 @@ type CustomFieldStats {
   count: Int!
   totalPerspectives: Int!
   percentOfPerspectives: Float
+}
+
+# User todos ("Plan"). Spec: docs/superpowers/specs/2026-10-08-user-todos-design.md.
+enum UserTodoStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+  DROPPED
+}
+
+enum UserTodoSortBy {
+  PRIORITY
+  DUE_DATE
+  CREATED_AT
+  UPDATED_AT
+  LIST_POSITION
+}
+
+# A todo's action (consume, research, share, ...). isPreset is false for an
+# action the viewer entered themselves.
+type TodoAction {
+  id: ID!
+  key: String!
+  label: String!
+  description: String!
+  "Picker order for presets; null for actions the user entered."
+  typicalSequence: Int
+  isPreset: Boolean!
+}
+
+type UserTodoList {
+  id: ID!
+  user: User!
+  name: String!
+  description: String
+  privacy: Privacy!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type UserTodo {
+  id: ID!
+  user: User!
+  content: Content
+  "Free-text name; only meaningful when content is null."
+  name: String
+  action: TodoAction!
+  priority: Int
+  status: UserTodoStatus!
+  percentComplete: Int!
+  "ISO date, YYYY-MM-DD."
+  startDate: String
+  "ISO date, YYYY-MM-DD. When the todo was finished."
+  endDate: String
+  "ISO date, YYYY-MM-DD. The target date."
+  dueDate: String
+  "Sanitized HTML."
+  comments: String
+  privacy: Privacy!
+  list: UserTodoList
+  listPosition: Int
+  createdAt: String!
+  updatedAt: String!
+}
+
+type PaginatedUserTodos {
+  items: [UserTodo!]!
+  pageInfo: PageInfo!
+  totalCount: Int
+}
+
+input UserTodoFilter {
+  userId: IntID
+  contentId: IntID
+  listId: IntID
+  "Only todos in no list. Ignored when listId is set."
+  unlisted: Boolean
+  status: [UserTodoStatus!]
+  actionId: IntID
+}
+
+input CreateUserTodoInput {
+  contentId: IntID
+  name: String
+  actionId: IntID!
+  priority: Int
+  status: UserTodoStatus
+  percentComplete: Int
+  "ISO date, YYYY-MM-DD."
+  startDate: String
+  "ISO date, YYYY-MM-DD."
+  endDate: String
+  "ISO date, YYYY-MM-DD."
+  dueDate: String
+  comments: String
+  privacy: Privacy
+  listId: IntID
+}
+
+"""
+Partial update: omit a field to leave it unchanged. For contentId, name,
+priority, startDate, endDate, dueDate, comments and listId, an explicit null
+clears the field. The other fields are not clearable: null is the same as omitted.
+"""
+input UpdateUserTodoInput {
+  id: IntID!
+  "Omit = unchanged; null = clear."
+  contentId: IntID
+  "Omit = unchanged; null = clear."
+  name: String
+  actionId: IntID
+  "Omit = unchanged; null = clear."
+  priority: Int
+  status: UserTodoStatus
+  percentComplete: Int
+  "Omit = unchanged; null = clear. ISO date, YYYY-MM-DD."
+  startDate: String
+  "Omit = unchanged; null = clear. ISO date, YYYY-MM-DD."
+  endDate: String
+  "Omit = unchanged; null = clear. ISO date, YYYY-MM-DD."
+  dueDate: String
+  "Omit = unchanged; null = clear."
+  comments: String
+  privacy: Privacy
+  "Omit = unchanged; null = unlist."
+  listId: IntID
+}
+
+input CreateTodoActionInput {
+  label: String!
+  description: String
+}
+
+input CreateUserTodoListInput {
+  name: String!
+  description: String
+  privacy: Privacy
+}
+
+"""
+Partial update: omit a field to leave it unchanged. An explicit null clears
+description. Name and privacy are not clearable.
+"""
+input UpdateUserTodoListInput {
+  id: IntID!
+  name: String
+  "Omit = unchanged; null = clear."
+  description: String
+  privacy: Privacy
 }

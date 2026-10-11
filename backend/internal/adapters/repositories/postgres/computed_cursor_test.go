@@ -72,6 +72,10 @@ func TestList_ComputedSortKeyCursor(t *testing.T) {
 		{"box office null desc", domain.ContentSortByBoxOffice, domain.SortOrderDesc, "box_office", nil, `null`, nullBoxOfficeDesc},
 		{"vs budget null asc", domain.ContentSortByVsBudget, domain.SortOrderAsc, "vs_budget", nil, `null`, nullVsBudgetAsc},
 		{"age rating null desc", domain.ContentSortByAgeRating, domain.SortOrderDesc, "age_rating", nil, `null`, nullAgeRatingDesc},
+		{"release date", domain.ContentSortByReleaseDate, domain.SortOrderDesc, "release_date_sort", "2001-12-18", `"2001-12-18"`, "2001-12-18"},
+		{"release date null asc", domain.ContentSortByReleaseDate, domain.SortOrderAsc, "release_date_sort", nil, `null`, nullReleaseDateAsc},
+		{"tmdb score", domain.ContentSortByTmdbScore, domain.SortOrderDesc, "tmdb_score", 8.4, `8.4`, 8.4},
+		{"tmdb score null desc", domain.ContentSortByTmdbScore, domain.SortOrderDesc, "tmdb_score", nil, `null`, nullTmdbScoreDesc},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -346,10 +346,10 @@ func setupTestServerWithRepos(repo *mockContentRepository, ytClient *mockYouTube
 	categoryRepo := &mockCategoryRepository{}
 	wikidataClient := &mockWikidataClient{}
 	contentService := services.NewContentService(repo, ytClient, nil)
-	userService := services.NewUserService(userRepo, repo, perspectiveRepo)
+	userService := services.NewUserService(userRepo, repo, perspectiveRepo, nil, nil, nil)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, repo, wikidataClient)
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)
+	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil, nil)
 	directiveRoot := directives.NewDirectiveRoot(contentService, perspectiveService)
 	gqlConfig := generated.Config{
 		Resolvers: resolver,
@@ -1121,6 +1121,41 @@ func TestPaginatedContentQuery_WithContentTypesFilter(t *testing.T) {
 	assert.Empty(t, result.Errors)
 }
 
+func TestPaginatedContentQuery_WithAddedByUsernameFilter(t *testing.T) {
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			require.NotNil(t, params.Filter)
+			require.NotNil(t, params.Filter.AddedByUsername)
+			assert.Equal(t, "ann", *params.Filter.AddedByUsername)
+			return &domain.PaginatedContent{Items: []*domain.Content{}}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: { addedByUsername: "ann" }) { items { id } } }`)
+
+	assert.Empty(t, result.Errors)
+}
+
+func TestPaginatedContentQuery_SortByAddedBy(t *testing.T) {
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			assert.Equal(t, domain.ContentSortByAddedBy, params.SortBy)
+			assert.Equal(t, domain.SortOrderAsc, params.SortOrder)
+			return &domain.PaginatedContent{Items: []*domain.Content{}}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(sortBy: ADDED_BY, sortOrder: ASC) { items { id } } }`)
+
+	assert.Empty(t, result.Errors)
+}
+
 func TestPaginatedContentQuery_WithFilterAndTotalCount(t *testing.T) {
 	repo := &mockContentRepository{
 		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
@@ -1416,11 +1451,11 @@ func TestNewResolver(t *testing.T) {
 	categoryRepo := &mockCategoryRepository{}
 	wikidataClient := &mockWikidataClient{}
 	contentService := services.NewContentService(repo, ytClient, nil)
-	userService := services.NewUserService(userRepo, repo, perspectiveRepo)
+	userService := services.NewUserService(userRepo, repo, perspectiveRepo, nil, nil, nil)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, repo, wikidataClient)
 
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)
+	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil, nil)
 
 	assert.NotNil(t, resolver)
 	assert.Equal(t, contentService, resolver.ContentService)
@@ -1478,7 +1513,7 @@ func TestPaginatedContentQuery_WithMovieColumnFilters(t *testing.T) {
 	defer server.Close()
 
 	result := executeGraphQL(t, server, `{ content(filter: {
-		genreContains: "drama", ageRating: ["PG-13", "R"],
+		genreContains: "drama", castContains: "wachowski", ageRating: ["PG-13", "R"],
 		releasedAfter: "2000-01-01", releasedBefore: "2010-12-31",
 		minBoxOffice: 1000000, maxBoxOffice: 2900000000.5,
 		minTmdbScore: 6.5, maxTmdbScore: 9
@@ -1489,6 +1524,8 @@ func TestPaginatedContentQuery_WithMovieColumnFilters(t *testing.T) {
 	f := got.Filter
 	require.NotNil(t, f.GenreContains)
 	assert.Equal(t, "drama", *f.GenreContains)
+	require.NotNil(t, f.CastContains)
+	assert.Equal(t, "wachowski", *f.CastContains)
 	assert.Equal(t, []string{"PG-13", "R"}, f.AgeRating)
 	require.NotNil(t, f.ReleasedAfter)
 	assert.Equal(t, "2000-01-01", *f.ReleasedAfter)

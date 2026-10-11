@@ -206,6 +206,7 @@ func (s *seeder) seedContent(ctx context.Context) error {
 				AddedByUserID: s.userIDs[v.AddedBy],
 				Length:        &meta.Duration,
 				LengthUnits:   &units,
+				LengthDisplay: domain.YouTubeLengthDisplay(),
 				Response:      meta.Response,
 			})
 			if err != nil {

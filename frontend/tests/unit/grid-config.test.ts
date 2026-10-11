@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
+	syncItemHeader,
 	capitalizeContentType,
 	durationComparator,
 	DATA_COLUMNS,
@@ -113,7 +114,7 @@ describe('durationComparator', () => {
 // Column-picker registry
 // ---------------------------------------------------------------------------
 describe('column-picker registry', () => {
-	it('DATA_COLUMNS holds the 24 user-togglable data columns', () => {
+	it('DATA_COLUMNS holds the 25 user-togglable data columns', () => {
 		expect(DATA_COLUMNS.map((c) => c.colId)).toEqual([
 			'type',
 			'category',
@@ -130,6 +131,7 @@ describe('column-picker registry', () => {
 			'tmdbScore',
 			'publishDate',
 			'channel',
+			'user',
 			'tags',
 			'description',
 			'budget',
@@ -162,13 +164,13 @@ describe('column-picker registry', () => {
 		}
 	});
 
-	it('togglableColIds(false) returns only the 24 data columns', () => {
+	it('togglableColIds(false) returns only the 25 data columns', () => {
 		expect(togglableColIds(false)).toEqual(DATA_COLUMNS.map((c) => c.colId));
 	});
 
-	it('togglableColIds(true) returns all 27 columns', () => {
+	it('togglableColIds(true) returns all 28 columns', () => {
 		const ids = togglableColIds(true);
-		expect(ids).toHaveLength(27);
+		expect(ids).toHaveLength(28);
 		expect(ids).toEqual([...DATA_COLUMNS.map((c) => c.colId), ...INTERNAL_COLUMNS.map((c) => c.colId)]);
 	});
 
@@ -355,6 +357,44 @@ describe('filterContentRows', () => {
 });
 
 // ---------------------------------------------------------------------------
+// User column (adder's username, filled in client-side from the users list)
+// ---------------------------------------------------------------------------
+describe('user column', () => {
+	it('is offered in the sort picker', () => {
+		expect(SORTABLE_COLUMNS.map((c) => c.colId)).toContain('user');
+	});
+
+	it('sorts case-insensitively by username, ascending and descending', () => {
+		const rows = [
+			row({ id: 'a', addedByUsername: 'bob' }),
+			row({ id: 'b', addedByUsername: 'Ann' }),
+			row({ id: 'c', addedByUsername: 'cy' }),
+		];
+		const asc = [...rows].sort((x, y) => compareContentBySorts(x, y, [{ col: 'user', dir: 'asc' }]));
+		expect(asc.map((r) => r.id)).toEqual(['b', 'a', 'c']);
+		const desc = [...rows].sort((x, y) => compareContentBySorts(x, y, [{ col: 'user', dir: 'desc' }]));
+		expect(desc.map((r) => r.id)).toEqual(['c', 'a', 'b']);
+	});
+
+	it('sorts rows with no resolved username last in both directions', () => {
+		const rows = [row({ id: 'n', addedByUsername: null }), row({ id: 'a', addedByUsername: 'ann' })];
+		for (const dir of ['asc', 'desc'] as const) {
+			const sorted = [...rows].sort((x, y) => compareContentBySorts(x, y, [{ col: 'user', dir }]));
+			expect(sorted.map((r) => r.id)).toEqual(['a', 'n']);
+		}
+	});
+
+	it('filters by username substring, case-insensitively', () => {
+		const rows = [
+			row({ id: 'a', addedByUsername: 'Annabel' }),
+			row({ id: 'b', addedByUsername: 'bob' }),
+			row({ id: 'c', addedByUsername: null }),
+		];
+		const out = filterContentRows(rows, { user: { filterType: 'text', type: 'contains', filter: 'ANN' } });
+		expect(out.map((r) => r.id)).toEqual(['a']);
+	});
+});
+
 // Client-only sort columns (Released, TMDB Score)
 // ---------------------------------------------------------------------------
 describe('client-only sort columns', () => {
@@ -368,10 +408,10 @@ describe('client-only sort columns', () => {
 	const ids = (sorts: { col: string; dir: 'asc' | 'desc' }[]) =>
 		[...rows].sort((x, y) => compareContentBySorts(x, y, sorts)).map((r) => r.id);
 
-	it('have no server sort key, so sortsToGraphQL drops them', () => {
-		expect(COL_TO_SORT).not.toHaveProperty('released');
-		expect(COL_TO_SORT).not.toHaveProperty('tmdbScore');
-		expect([...CLIENT_ONLY_SORT_COLS].sort()).toEqual(['released', 'tmdbScore']);
+	it('map to server sort keys, so All Items mode sorts them across every page', () => {
+		expect(COL_TO_SORT).toMatchObject({ released: 'RELEASE_DATE', tmdbScore: 'TMDB_SCORE' });
+		expect(CLIENT_ONLY_SORT_COLS).not.toContain('released');
+		expect(CLIENT_ONLY_SORT_COLS).not.toContain('tmdbScore');
 	});
 
 	it('Loaded mode offers them in the sort picker', () => {
@@ -380,12 +420,11 @@ describe('client-only sort columns', () => {
 		expect(loaded).toContain('tmdbScore');
 	});
 
-	it('All Items mode hides them from the sort picker but keeps server-sortable columns', () => {
+	it('All Items mode offers them in the sort picker too', () => {
 		const all = sortableColumnsFor('all').map((c) => c.colId);
-		expect(all).not.toContain('released');
-		expect(all).not.toContain('tmdbScore');
+		expect(all).toContain('released');
+		expect(all).toContain('tmdbScore');
 		expect(all).toContain('boxOffice');
-		expect(all).toContain('item');
 	});
 
 	it('sorts Released chronologically with unknown last in both directions', () => {
@@ -414,5 +453,32 @@ describe('itemColumnHeader', () => {
 		expect(itemColumnHeader('youtube_video')).toBe('Item');
 		expect(itemColumnHeader('movie,youtube_video')).toBe('Item');
 		expect(itemColumnHeader(undefined)).toBe('Item');
+	});
+});
+
+describe('syncItemHeader (Film/Item header without closing an open filter popup)', () => {
+	function fakeApi(headerName: string) {
+		const colDef = { headerName };
+		const refreshHeader = vi.fn();
+		return { colDef, refreshHeader, api: { getColumn: () => ({ getColDef: () => colDef }), refreshHeader } };
+	}
+
+	it('renames and redraws when the name changes (Item -> Film)', () => {
+		const { colDef, refreshHeader, api } = fakeApi('Item');
+		expect(syncItemHeader(api, 'Film')).toBe(true);
+		expect(colDef.headerName).toBe('Film');
+		expect(refreshHeader).toHaveBeenCalledOnce();
+	});
+
+	it('does not redraw when the name is unchanged (any other filter edit)', () => {
+		const { refreshHeader, api } = fakeApi('Film');
+		expect(syncItemHeader(api, 'Film')).toBe(false);
+		expect(refreshHeader).not.toHaveBeenCalled();
+	});
+
+	it('does nothing when the Item column is missing', () => {
+		const refreshHeader = vi.fn();
+		expect(syncItemHeader({ getColumn: () => null, refreshHeader }, 'Film')).toBe(false);
+		expect(refreshHeader).not.toHaveBeenCalled();
 	});
 });

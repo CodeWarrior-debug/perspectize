@@ -468,6 +468,7 @@ export interface ContentFilterInput {
 	channelTitle?: string;
 	tagContains?: string;
 	descriptionSearch?: string;
+	addedByUsername?: string;
 	createdAfter?: string;
 	createdBefore?: string;
 	updatedAfter?: string;
@@ -476,6 +477,7 @@ export interface ContentFilterInput {
 	personId?: string;
 	personRole?: 'CAST' | 'DIRECTOR';
 	genreContains?: string;
+	castContains?: string;
 	ageRating?: string[];
 	releasedAfter?: string;
 	releasedBefore?: string;
@@ -615,6 +617,11 @@ export function urlParamsToGraphQLFilter(
 				hasAny = true;
 				break;
 
+			case 'user':
+				result.addedByUsername = value;
+				hasAny = true;
+				break;
+
 			case 'tags':
 				result.tagContains = value;
 				hasAny = true;
@@ -637,6 +644,11 @@ export function urlParamsToGraphQLFilter(
 				}
 				break;
 			}
+
+			case 'cast':
+				result.castContains = value;
+				hasAny = true;
+				break;
 
 			case 'genre':
 				result.genreContains = value;

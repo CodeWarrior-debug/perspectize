@@ -573,6 +573,11 @@ describe('urlParamsToGraphQLFilter', () => {
 		expect(result).toEqual({ channelTitle: 'mkbhd' });
 	});
 
+	it('maps f.user to addedByUsername', () => {
+		const result = urlParamsToGraphQLFilter({ user: 'ann' }, '');
+		expect(result).toEqual({ addedByUsername: 'ann' });
+	});
+
 	it('maps f.tags to tagContains', () => {
 		const result = urlParamsToGraphQLFilter({ tags: 'cooking' }, '');
 		expect(result).toEqual({ tagContains: 'cooking' });
@@ -633,6 +638,7 @@ describe('COL_TO_SORT / SORT_TO_COL', () => {
 		expect(COL_TO_SORT.percentLiked).toBe('PERCENT_LIKED');
 		expect(COL_TO_SORT.publishDate).toBe('PUBLISHED_AT');
 		expect(COL_TO_SORT.channel).toBe('CHANNEL_TITLE');
+		expect(COL_TO_SORT.user).toBe('ADDED_BY');
 		expect(COL_TO_SORT.createdAt).toBe('CREATED_AT');
 		expect(COL_TO_SORT.updatedAt).toBe('UPDATED_AT');
 	});
@@ -645,6 +651,7 @@ describe('COL_TO_SORT / SORT_TO_COL', () => {
 		expect(SORT_TO_COL.PERCENT_LIKED).toBe('percentLiked');
 		expect(SORT_TO_COL.PUBLISHED_AT).toBe('publishDate');
 		expect(SORT_TO_COL.CHANNEL_TITLE).toBe('channel');
+		expect(SORT_TO_COL.ADDED_BY).toBe('user');
 		expect(SORT_TO_COL.CREATED_AT).toBe('createdAt');
 		expect(SORT_TO_COL.UPDATED_AT).toBe('updatedAt');
 	});

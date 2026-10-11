@@ -65,4 +65,19 @@ type ContentService interface {
 
 	// UpdateSourceData refreshes an existing content item's metadata from its source
 	UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error)
+
+	// YouTubeTrending returns one page of YouTube's most-popular chart for a
+	// region (ISO 3166-1 alpha-2, e.g. "US"). Served from the backend cache, so
+	// Discover visitors share one API call per page per TTL.
+	YouTubeTrending(ctx context.Context, regionCode, pageToken string) (*TrendingPage, error)
+
+	// SearchMovies returns one page of TMDB title search results for the Discover
+	// page's Movies source. The query is trimmed and must be 1-100 characters;
+	// page 0 means 1 and must otherwise be 1-500. Served from the backend cache.
+	SearchMovies(ctx context.Context, query string, page int) (*MovieSearchPage, error)
+
+	// TrendingMovies returns one page of TMDB's trending movies for the Discover
+	// page. The window defaults to WEEK; page 0 means 1, otherwise 1-500. Served
+	// from the backend cache.
+	TrendingMovies(ctx context.Context, window domain.TrendingWindow, page int) (*MovieSearchPage, error)
 }

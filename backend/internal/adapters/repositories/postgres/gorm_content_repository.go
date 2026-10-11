@@ -207,6 +207,12 @@ func applyMovieColumnFilters(query *gorm.DB, f *domain.ContentFilter) *gorm.DB {
 	if f.GenreContains != nil && *f.GenreContains != "" {
 		query = query.Where("(response->'genres')::text ILIKE ?", "%"+*f.GenreContains+"%")
 	}
+	if f.CastContains != nil && *f.CastContains != "" {
+		// The Cast cell lists directors and cast, so match a name in either.
+		pattern := "%" + *f.CastContains + "%"
+		query = query.Where("("+contentSearchColumns[domain.ContentSearchFieldCast]+" OR "+
+			contentSearchColumns[domain.ContentSearchFieldDirector]+")", pattern, pattern)
+	}
 	if len(f.AgeRating) > 0 {
 		query = query.Where("response->>'certification' IN ?", f.AgeRating)
 	}
@@ -374,6 +380,10 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		// Description search (JSONB extraction + ILIKE)
 		if params.Filter.DescriptionSearch != nil && *params.Filter.DescriptionSearch != "" {
 			query = query.Where("response->'items'->0->'snippet'->>'description' ILIKE ?", "%"+*params.Filter.DescriptionSearch+"%")
+		}
+		// Adder username filter (subquery on users, no JOIN — see ADDED_BY sort rule)
+		if params.Filter.AddedByUsername != nil && *params.Filter.AddedByUsername != "" {
+			query = query.Where("added_by_user_id IN (SELECT id FROM users WHERE username ILIKE ?)", "%"+*params.Filter.AddedByUsername+"%")
 		}
 		// Created/Updated date filters (direct columns)
 		if params.Filter.CreatedAfter != nil {

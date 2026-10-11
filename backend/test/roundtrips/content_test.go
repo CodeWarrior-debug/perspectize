@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -275,6 +276,76 @@ func TestContentByIDWithRowFields(t *testing.T) {
 	h.roundTrips(2, token, `query($id: ID!) { contentByID(id: $id) { id name perspectiveCount } }`, map[string]any{"id": contentID})
 	msg := h.gqlError(token, `query { contentByID(id: "999999999") { id name } }`, nil)
 	require.Contains(t, msg, "content not found")
+}
+
+// Sorting by the adder's username and filtering by it both resolve through a
+// correlated subquery on users (no JOIN, no extra statement), and the cursor
+// must keep paging correctly over that computed key.
+func TestListContentByAddedBy(t *testing.T) {
+	h := newHarness(t)
+	firstUser, token := h.user("aaa")
+	lastUser, _ := h.user("zzz")
+	tag := fmt.Sprintf("ab%d", time.Now().UnixNano())
+	var wantAsc []string
+	for i := 0; i < 3; i++ {
+		wantAsc = append(wantAsc, fmt.Sprint(h.content(firstUser, fmt.Sprintf("%s-a%d", tag, i))))
+	}
+	for i := 0; i < 3; i++ {
+		wantAsc = append(wantAsc, fmt.Sprint(h.content(lastUser, fmt.Sprintf("%s-z%d", tag, i))))
+	}
+	h.warm(token)
+
+	type page struct {
+		Items []struct {
+			ID string `json:"id"`
+		} `json:"items"`
+		PageInfo struct {
+			HasNextPage bool    `json:"hasNextPage"`
+			EndCursor   *string `json:"endCursor"`
+		} `json:"pageInfo"`
+	}
+	collect := func(vars map[string]any) []string {
+		var ids []string
+		var after any
+		// Bounded: a cursor that fails to advance would otherwise page forever.
+		for pages := 0; pages < 10; pages++ {
+			vars["after"] = after
+			p := decode[page](t, h.gql(token, listContentQuery, vars), "content")
+			for _, it := range p.Items {
+				ids = append(ids, it.ID)
+			}
+			if !p.PageInfo.HasNextPage {
+				return ids
+			}
+			after = *p.PageInfo.EndCursor
+		}
+		t.Fatalf("cursor never reached the last page; got %v", ids)
+		return nil
+	}
+
+	t.Run("sort ASC pages across users in username order", func(t *testing.T) {
+		got := collect(map[string]any{"first": 2, "sortBy": "ADDED_BY", "sortOrder": "ASC", "filter": map[string]any{"search": tag}})
+		require.Equal(t, wantAsc, got)
+	})
+
+	t.Run("sort DESC reverses it", func(t *testing.T) {
+		got := collect(map[string]any{"first": 2, "sortBy": "ADDED_BY", "sortOrder": "DESC", "filter": map[string]any{"search": tag}})
+		want := make([]string, len(wantAsc))
+		for i, id := range wantAsc {
+			want[len(wantAsc)-1-i] = id
+		}
+		require.Equal(t, want, got)
+	})
+
+	t.Run("filter keeps only that user's content, case-insensitively", func(t *testing.T) {
+		var username string
+		require.NoError(t, h.db.Raw("SELECT username FROM users WHERE id = ?", lastUser).Scan(&username).Error)
+		got := collect(map[string]any{
+			"first":  100,
+			"filter": map[string]any{"search": tag, "addedByUsername": strings.ToUpper(username)},
+		})
+		require.ElementsMatch(t, wantAsc[3:], got)
+	})
 }
 
 const createFromMovieMutation = `mutation($input: CreateContentFromMovieInput!) {

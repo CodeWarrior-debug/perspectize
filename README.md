@@ -14,7 +14,7 @@ Perspectize helps users organize and analyze video content by automatically fetc
 
 ## Tech Stack
 
-**Backend** — Go 1.26+
+**Backend** — Go 1.27+
 - GraphQL API with gqlgen
 - PostgreSQL database with GORM and pgx
 - Hexagonal architecture (ports & adapters)
@@ -51,7 +51,7 @@ perspectize/
 
 ### Prerequisites
 
-- Go 1.26+
+- Go 1.27+
 - Node.js 22+ (CI runs 24) and pnpm 10
 - PostgreSQL 17 (what CI runs; older versions are untested)
 - YouTube Data API key and Clerk keys, or use the demo stack below

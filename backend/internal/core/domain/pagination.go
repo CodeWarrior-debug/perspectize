@@ -16,6 +16,9 @@ const (
 	ContentSortByBoxOffice    ContentSortBy = "BOX_OFFICE"
 	ContentSortByVsBudget     ContentSortBy = "VS_BUDGET"
 	ContentSortByAgeRating    ContentSortBy = "AGE_RATING"
+	ContentSortByAddedBy      ContentSortBy = "ADDED_BY"
+	ContentSortByReleaseDate  ContentSortBy = "RELEASE_DATE"
+	ContentSortByTmdbScore    ContentSortBy = "TMDB_SCORE"
 )
 
 // PersonRole is the role a person plays on a movie, used by ContentFilter.PersonRole.
@@ -63,6 +66,8 @@ type ContentFilter struct {
 	ChannelTitle      *string
 	TagContains       *string
 	DescriptionSearch *string
+	// AddedByUsername matches the adder's username (ILIKE, via the users table)
+	AddedByUsername *string
 	// Record date filters (direct columns)
 	CreatedAfter  *string
 	CreatedBefore *string
@@ -73,6 +78,7 @@ type ContentFilter struct {
 	PersonRole *PersonRole
 	// Movie column filters (JSONB extraction on movie rows).
 	GenreContains  *string
+	CastContains   *string // cast or director name contains (case-insensitive)
 	AgeRating      []string
 	ReleasedAfter  *string // ISO date, inclusive
 	ReleasedBefore *string // ISO date, inclusive

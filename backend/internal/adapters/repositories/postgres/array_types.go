@@ -103,7 +103,15 @@ func (a StringArray) Value() (driver.Value, error) {
 		return "{}", nil
 	}
 
+	// Size once: braces, separators, optional quotes, plus headroom for
+	// escapes. jsonb[] elements are full of quotes, so growing as we go
+	// would reallocate several times per array.
+	n := 2
+	for _, s := range a {
+		n += len(s) + 3
+	}
 	var buf strings.Builder
+	buf.Grow(n + n/8)
 	buf.WriteByte('{')
 
 	for i, s := range a {
@@ -117,12 +125,13 @@ func (a StringArray) Value() (driver.Value, error) {
 			buf.WriteByte('"')
 		}
 
-		// Escape backslashes and quotes
-		for _, ch := range s {
-			if ch == '\\' || ch == '"' {
+		// Escape backslashes and quotes. Byte-wise is UTF-8 safe: both are
+		// ASCII and never appear inside a multibyte sequence.
+		for j := 0; j < len(s); j++ {
+			if s[j] == '\\' || s[j] == '"' {
 				buf.WriteByte('\\')
 			}
-			buf.WriteRune(ch)
+			buf.WriteByte(s[j])
 		}
 
 		if needsQuoting {
