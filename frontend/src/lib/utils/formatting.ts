@@ -456,7 +456,7 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 
 	const iconTypes: Record<string, { svg: string; label: string }> = {
 		BIBLE_PASSAGE: { svg: BIBLE_PASSAGE_ICON_SVG, label: 'Bible Passage' },
-		YOUTUBE_MUSIC: { svg: MUSIC_TRACK_ICON_SVG, label: 'YouTube Music Track' },
+		AUDIO_TRACK: { svg: MUSIC_TRACK_ICON_SVG, label: 'Audio Track' },
 	};
 	const iconType = iconTypes[params.data.contentType];
 	if (iconType) {

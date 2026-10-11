@@ -11,7 +11,7 @@ import {
 } from './index';
 import { queryKeys } from '../keys';
 
-/** Loads a YOUTUBE_MUSIC row's related media and lyrics availability for the details modal. */
+/** Loads a AUDIO_TRACK row's related media and lyrics availability for the details modal. */
 export function useMusicTrack(contentId: () => string | null) {
 	return createQuery(() => ({
 		queryKey: queryKeys.content.music(contentId() ?? ''),

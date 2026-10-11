@@ -793,15 +793,15 @@ describe('typeCellRenderer', () => {
 		expect(result.querySelector('.sr-only')?.textContent).toBe('Bible Passage');
 	});
 
-	it('shows the music icon (not the YouTube icon) for YOUTUBE_MUSIC', () => {
+	it('shows the music icon (not the YouTube icon) for AUDIO_TRACK', () => {
 		const result = typeCellRenderer({
-			data: { contentType: 'YOUTUBE_MUSIC' },
+			data: { contentType: 'AUDIO_TRACK' },
 		}) as HTMLElement;
 
 		expect(result.querySelector('svg[data-icon="music-track"]')).toBeTruthy();
 		expect(result.querySelector('svg[fill="#FF0000"]')).toBeNull();
 		expect(result.classList.contains('text-primary')).toBe(true);
-		expect(result.querySelector('.sr-only')?.textContent).toBe('YouTube Music Track');
+		expect(result.querySelector('.sr-only')?.textContent).toBe('Audio Track');
 	});
 });
 

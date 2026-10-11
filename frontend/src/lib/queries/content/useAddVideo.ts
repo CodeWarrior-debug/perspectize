@@ -4,10 +4,10 @@ import { goto } from '$app/navigation';
 import { graphqlRequest } from '../client';
 import {
 	CREATE_CONTENT_FROM_YOUTUBE,
-	CREATE_CONTENT_FROM_YOUTUBE_MUSIC,
+	CREATE_AUDIO_TRACK,
 	type CreateContentResponse,
 	type CreateContentResult,
-	type CreateMusicContentResponse,
+	type CreateAudioTrackResponse,
 	type ContentResponse,
 	type RelatedMedia,
 } from './index';
@@ -17,12 +17,12 @@ import { classifyYouTubeUrl } from '$lib/utils/youtube';
 import { activityContentHref } from '$lib/utils/contentLinks';
 
 type AddResult = CreateContentResult & { isMusic: boolean; relatedMedia: RelatedMedia[] };
-type AddResponse = CreateContentResponse | CreateMusicContentResponse;
+type AddResponse = CreateContentResponse | CreateAudioTrackResponse;
 
 /** Normalizes either mutation's response; null if the shape is unexpected. */
 export function toAddResult(data: AddResponse | null | undefined): AddResult | null {
-	if (data && 'createContentFromYouTubeMusic' in data && data.createContentFromYouTubeMusic) {
-		const r = data.createContentFromYouTubeMusic;
+	if (data && 'createAudioTrack' in data && data.createAudioTrack) {
+		const r = data.createAudioTrack;
 		return { ...r, isMusic: true, relatedMedia: r.content?.relatedMedia ?? [] };
 	}
 	if (data && 'createContentFromYouTube' in data && data.createContentFromYouTube) {
@@ -49,7 +49,7 @@ export function useAddVideo() {
 			// backend resolves it via auth.RequireAuth when zero.
 			const input = { input: { url, userId: 0 } };
 			if (classifyYouTubeUrl(url) === 'musicTrack') {
-				return graphqlRequest<CreateMusicContentResponse>(CREATE_CONTENT_FROM_YOUTUBE_MUSIC, input);
+				return graphqlRequest<CreateAudioTrackResponse>(CREATE_AUDIO_TRACK, input);
 			}
 			return graphqlRequest<CreateContentResponse>(CREATE_CONTENT_FROM_YOUTUBE, input);
 		},

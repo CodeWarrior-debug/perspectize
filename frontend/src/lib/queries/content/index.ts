@@ -11,7 +11,7 @@ export interface LengthDisplay {
 export type { ContentFilterInput } from '$lib/utils/gridUrlState';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
-export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'YOUTUBE_MUSIC';
+export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'AUDIO_TRACK';
 
 export interface ContentItem {
 	id: string;
@@ -81,8 +81,8 @@ export interface CreateContentResponse {
 	createContentFromYouTube: CreateContentResult;
 }
 
-export interface CreateMusicContentResponse {
-	createContentFromYouTubeMusic: CreateContentResult & {
+export interface CreateAudioTrackResponse {
+	createAudioTrack: CreateContentResult & {
 		content: ContentItem & { relatedMedia: RelatedMedia[] };
 	};
 }
@@ -102,7 +102,7 @@ export interface RelatedMedia {
 
 export type { LyricsAvailability };
 
-// The details-modal view of a YOUTUBE_MUSIC row. `response` carries artist/album.
+// The details-modal view of a AUDIO_TRACK row. `response` carries artist/album.
 export interface MusicTrack {
 	id: string;
 	name: string;
@@ -378,9 +378,9 @@ export const CREATE_CONTENT_FROM_YOUTUBE = gql`
 	}
 `;
 
-export const CREATE_CONTENT_FROM_YOUTUBE_MUSIC = gql`
-	mutation CreateContentFromYouTubeMusic($input: CreateContentFromYouTubeInput!) {
-		createContentFromYouTubeMusic(input: $input) {
+export const CREATE_AUDIO_TRACK = gql`
+	mutation CreateAudioTrack($input: CreateContentFromYouTubeInput!) {
+		createAudioTrack(input: $input) {
 			content {
 				id
 				name

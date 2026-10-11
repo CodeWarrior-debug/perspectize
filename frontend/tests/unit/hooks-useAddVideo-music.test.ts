@@ -18,7 +18,7 @@ vi.mock('svelte-sonner', () => ({ toast: mockToast }));
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: mockGraphqlRequest }));
 
 const track = (relatedMedia: any[]) => ({
-	createContentFromYouTubeMusic: {
+	createAudioTrack: {
 		content: { id: '9', name: 'Bohemian Rhapsody', relatedMedia },
 		alreadyExisted: false,
 	},
@@ -35,7 +35,7 @@ describe('useAddVideo — YouTube Music', () => {
 	it('sends music.youtube.com track links to the music mutation', async () => {
 		mockGraphqlRequest.mockResolvedValue(track([]));
 		await options.mutationFn('https://music.youtube.com/watch?v=dQw4w9WgXcQ');
-		expect(String(mockGraphqlRequest.mock.calls[0][0])).toContain('createContentFromYouTubeMusic');
+		expect(String(mockGraphqlRequest.mock.calls[0][0])).toContain('createAudioTrack');
 		expect(mockGraphqlRequest.mock.calls[0][1]).toEqual({
 			input: { url: 'https://music.youtube.com/watch?v=dQw4w9WgXcQ', userId: 0 },
 		});
@@ -46,7 +46,7 @@ describe('useAddVideo — YouTube Music', () => {
 		await options.mutationFn('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
 		const doc = String(mockGraphqlRequest.mock.calls[0][0]);
 		expect(doc).toContain('createContentFromYouTube(');
-		expect(doc).not.toContain('createContentFromYouTubeMusic');
+		expect(doc).not.toContain('createAudioTrack');
 	});
 
 	it('offers the official video once, as a toast action', () => {
@@ -70,18 +70,18 @@ describe('useAddVideo — YouTube Music', () => {
 	});
 
 	it.each([
-		['a duplicate add', { ...track([official]).createContentFromYouTubeMusic, alreadyExisted: true }],
-		['a video already in Perspectize', track([{ ...official, contentId: '4' }]).createContentFromYouTubeMusic],
-		['a broken video', track([{ ...official, unavailable: true }]).createContentFromYouTubeMusic],
-		['only non-official uploads', track([{ ...official, kind: 'live' }]).createContentFromYouTubeMusic],
+		['a duplicate add', { ...track([official]).createAudioTrack, alreadyExisted: true }],
+		['a video already in Perspectize', track([{ ...official, contentId: '4' }]).createAudioTrack],
+		['a broken video', track([{ ...official, unavailable: true }]).createAudioTrack],
+		['only non-official uploads', track([{ ...official, kind: 'live' }]).createAudioTrack],
 	])('does not prompt for %s', (_name, result) => {
-		options.onSuccess({ createContentFromYouTubeMusic: result });
+		options.onSuccess({ createAudioTrack: result });
 		expect(mockToast).not.toHaveBeenCalled();
 	});
 
 	it('says "song" for a duplicate music add', () => {
 		options.onSuccess({
-			createContentFromYouTubeMusic: { ...track([]).createContentFromYouTubeMusic, alreadyExisted: true },
+			createAudioTrack: { ...track([]).createAudioTrack, alreadyExisted: true },
 		});
 		expect(mockToast.warning).toHaveBeenCalledWith('This song has already been added', {
 			action: { label: 'Go to song', onClick: expect.any(Function) },

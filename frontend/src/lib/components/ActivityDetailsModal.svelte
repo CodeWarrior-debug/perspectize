@@ -66,7 +66,7 @@
 
 	const isMovie = $derived(content?.contentType === 'MOVIE');
 	const isPassage = $derived(content?.contentType === 'BIBLE_PASSAGE');
-	const isMusic = $derived(content?.contentType === 'YOUTUBE_MUSIC');
+	const isMusic = $derived(content?.contentType === 'AUDIO_TRACK');
 	const hasVerseRange = $derived(isPassage && content?.verseStartID != null && content?.verseEndID != null);
 	const setPassageTitle = useSetPassageDisplayTitle();
 	let titleDraft = $state('');
@@ -136,7 +136,7 @@
 						: isPassage
 							? 'Bible Passage'
 							: isMusic
-								? 'YouTube Music Track'
+								? 'Audio Track'
 								: isMovie
 									? 'Movie'
 									: 'YouTube Video'}
