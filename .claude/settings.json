@@ -115,6 +115,20 @@
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/graphify-refresh-on-main.sh\" 2>/dev/null || true"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/agent-registry/agent-registry.mjs",
+              "hook",
+              "session-start"
+            ],
+            "timeout": 15
+          }
+        ]
       }
     ],
     "PostToolUse": [],
@@ -145,6 +159,37 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-session-reflection-before-pr.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/agent-registry/agent-registry.mjs",
+              "hook",
+              "pre-tool-use"
+            ],
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/agent-registry/agent-registry.mjs",
+              "hook",
+              "session-end"
+            ],
+            "timeout": 15
           }
         ]
       }
