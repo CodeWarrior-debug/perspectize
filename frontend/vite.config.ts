@@ -3,10 +3,17 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
+import { faroSourcemapConfig } from './scripts/faro-sourcemaps';
 import { computeTag } from './src/lib/utils/buildTag';
 
+// Opt-in Faro source-map upload: empty (no sourcemaps, no plugin) unless
+// FARO_SOURCEMAP_API_KEY is set; throws if the key is set without its companion vars.
+const faro = faroSourcemapConfig(process.env);
 // Resolves frontend build facts for the zzzv console hotkey (see
 // lib/utils/versionHotkey.ts) from the local git checkout, at build time.
+// Its `tag` is also the app version sent as X-Client-Version / to Faro
+// (lib/buildInfo.ts). Separate from SvelteKit's kit.version (stale-tab
+// reload hash, see lib/utils/versionWatch.ts).
 // Falls back to "unknown" for everything if there's no .git available —
 // e.g. the Sevalla static-site build environment isn't confirmed to have
 // one (their env vars are Application-only per docs.sevalla.com), so this
@@ -48,6 +55,7 @@ function withoutPrerenderedGlob(patterns: string[]): string[] {
 }
 
 export default defineConfig({
+	// The vitest 'unit' project below `extends` this file, so it inherits these too.
 	define: {
 		__BUILD_INFO__: JSON.stringify(buildInfo),
 	},
@@ -87,11 +95,13 @@ export default defineConfig({
 				],
 			},
 		}),
+		...faro.plugins,
 	],
 	resolve: {
 		conditions: ['browser'],
 	},
 	build: {
+		...(faro.sourcemap ? { sourcemap: faro.sourcemap } : {}),
 		rollupOptions: {
 			output: {
 				// Tiptap/ProseMirror (the perspective editor's rich-text engine, ~170KB

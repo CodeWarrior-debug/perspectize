@@ -86,7 +86,7 @@ func newServer(t *testing.T) *testServer {
 	limiter := services.NewSlidingWindowLimiter(10, 10*time.Second)
 	ts.messaging = services.NewMessagingService(ts.threadRepo, ts.messageRepo, ts.hub, limiter)
 
-	userService := services.NewUserService(ts.userRepo, contentRepo, perspectiveRepo)
+	userService := services.NewUserService(ts.userRepo, contentRepo, perspectiveRepo, nil, nil, nil)
 
 	listenerCtx, cancelListener := context.WithCancel(context.Background())
 	listener := realtime.NewListener(dsn, ts.hub)
@@ -103,7 +103,7 @@ func newServer(t *testing.T) *testServer {
 	t.Cleanup(cancelListener)
 	t.Cleanup(func() { ts.cleanupRows(t) })
 
-	resolver := resolvers.NewResolver(nil, userService, nil, nil, ts.messaging, ts.hub, presence)
+	resolver := resolvers.NewResolver(nil, userService, nil, nil, nil, ts.messaging, ts.hub, presence)
 	directiveRoot := directives.NewDirectiveRoot(nil, nil)
 	gqlConfig := generated.Config{
 		Resolvers: resolver,

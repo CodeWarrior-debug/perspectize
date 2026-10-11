@@ -14,7 +14,7 @@
 	import { graphqlRequest } from '$lib/queries/client';
 	import { LIST_COMPARABLE_CONTENT, type ListComparableContentResponse } from '$lib/queries/content';
 	import { queryKeys } from '$lib/queries/keys';
-	import SearchBar from '$lib/components/discover/SearchBar.svelte';
+	import ContentSearchInput from '$lib/components/ContentSearchInput.svelte';
 	import { Button } from '$lib/components/shadcn';
 	import { extractVideoIdFromUrl } from '$lib/utils/formatting';
 
@@ -51,7 +51,7 @@
 		</p>
 	</div>
 
-	<SearchBar bind:value={searchValue} bind:debouncedQuery />
+	<ContentSearchInput bind:value={searchValue} bind:debouncedQuery />
 
 	<div class="flex flex-col gap-2">
 		{#if query.isPending}

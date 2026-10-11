@@ -38,22 +38,24 @@ type Category struct {
 }
 
 type Content struct {
-	ID            string         `json:"id"`
-	Name          string         `json:"name"`
-	URL           *string        `json:"url,omitempty"`
-	ContentType   string         `json:"contentType"`
-	AddedByUserID string         `json:"addedByUserID"`
-	AddedBy       *User          `json:"addedBy,omitempty"`
-	Length        *int           `json:"length,omitempty"`
-	LengthUnits   *string        `json:"lengthUnits,omitempty"`
-	ViewCount     *int           `json:"viewCount,omitempty"`
-	LikeCount     *int           `json:"likeCount,omitempty"`
-	CommentCount  *int           `json:"commentCount,omitempty"`
-	ChannelTitle  *string        `json:"channelTitle,omitempty"`
-	PublishedAt   *string        `json:"publishedAt,omitempty"`
-	Tags          []string       `json:"tags,omitempty"`
-	Description   *string        `json:"description,omitempty"`
-	Response      map[string]any `json:"response,omitempty"`
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	URL           *string `json:"url,omitempty"`
+	ContentType   string  `json:"contentType"`
+	AddedByUserID string  `json:"addedByUserID"`
+	AddedBy       *User   `json:"addedBy,omitempty"`
+	Length        *int    `json:"length,omitempty"`
+	LengthUnits   *string `json:"lengthUnits,omitempty"`
+	// Where length came from and the smallest unit it reports; format length to that precision.
+	LengthDisplay *domain.LengthDisplay `json:"lengthDisplay,omitempty"`
+	ViewCount     *int                  `json:"viewCount,omitempty"`
+	LikeCount     *int                  `json:"likeCount,omitempty"`
+	CommentCount  *int                  `json:"commentCount,omitempty"`
+	ChannelTitle  *string               `json:"channelTitle,omitempty"`
+	PublishedAt   *string               `json:"publishedAt,omitempty"`
+	Tags          []string              `json:"tags,omitempty"`
+	Description   *string               `json:"description,omitempty"`
+	Response      map[string]any        `json:"response,omitempty"`
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
 	Movie              map[string]any `json:"movie,omitempty"`
 	PrimaryCategory    *Category      `json:"primaryCategory,omitempty"`
@@ -78,6 +80,7 @@ type ContentFilter struct {
 	PersonID          *int                        `json:"personId,omitempty"`
 	PersonRole        *domain.PersonRole          `json:"personRole,omitempty"`
 	GenreContains     *string                     `json:"genreContains,omitempty"`
+	CastContains      *string                     `json:"castContains,omitempty"`
 	AgeRating         []string                    `json:"ageRating,omitempty"`
 	ReleasedAfter     *string                     `json:"releasedAfter,omitempty"`
 	ReleasedBefore    *string                     `json:"releasedBefore,omitempty"`
@@ -161,9 +164,38 @@ type CreatePerspectiveInput struct {
 	Review                *string                   `json:"review,omitempty"`
 }
 
+type CreateTodoActionInput struct {
+	Label       string  `json:"label"`
+	Description *string `json:"description,omitempty"`
+}
+
 type CreateUserInput struct {
 	Username string  `json:"username"`
 	Email    *string `json:"email,omitempty"`
+}
+
+type CreateUserTodoInput struct {
+	ContentID       *int                   `json:"contentId,omitempty"`
+	Name            *string                `json:"name,omitempty"`
+	ActionID        int                    `json:"actionId"`
+	Priority        *int                   `json:"priority,omitempty"`
+	Status          *domain.UserTodoStatus `json:"status,omitempty"`
+	PercentComplete *int                   `json:"percentComplete,omitempty"`
+	// ISO date, YYYY-MM-DD.
+	StartDate *string `json:"startDate,omitempty"`
+	// ISO date, YYYY-MM-DD.
+	EndDate *string `json:"endDate,omitempty"`
+	// ISO date, YYYY-MM-DD.
+	DueDate  *string         `json:"dueDate,omitempty"`
+	Comments *string         `json:"comments,omitempty"`
+	Privacy  *domain.Privacy `json:"privacy,omitempty"`
+	ListID   *int            `json:"listId,omitempty"`
+}
+
+type CreateUserTodoListInput struct {
+	Name        string          `json:"name"`
+	Description *string         `json:"description,omitempty"`
+	Privacy     *domain.Privacy `json:"privacy,omitempty"`
 }
 
 type CustomFieldStats struct {
@@ -255,6 +287,23 @@ type MessagePosted struct {
 
 func (MessagePosted) IsThreadEvent() {}
 
+type MovieSearchPage struct {
+	Items        []*MovieSearchResult `json:"items"`
+	Page         int                  `json:"page"`
+	TotalPages   int                  `json:"totalPages"`
+	TotalResults int                  `json:"totalResults"`
+}
+
+type MovieSearchResult struct {
+	TmdbID      int      `json:"tmdbId"`
+	Title       string   `json:"title"`
+	ReleaseDate *string  `json:"releaseDate,omitempty"`
+	Overview    string   `json:"overview"`
+	PosterPath  *string  `json:"posterPath,omitempty"`
+	VoteAverage *float64 `json:"voteAverage,omitempty"`
+	URL         string   `json:"url"`
+}
+
 type Mutation struct {
 }
 
@@ -275,6 +324,12 @@ type PaginatedPerspectives struct {
 	Items      []*Perspective `json:"items"`
 	PageInfo   *PageInfo      `json:"pageInfo"`
 	TotalCount *int           `json:"totalCount,omitempty"`
+}
+
+type PaginatedUserTodos struct {
+	Items      []*UserTodo `json:"items"`
+	PageInfo   *PageInfo   `json:"pageInfo"`
+	TotalCount *int        `json:"totalCount,omitempty"`
 }
 
 type ParticipantChanged struct {
@@ -382,6 +437,16 @@ func (StreamReset) IsThreadEvent() {}
 type Subscription struct {
 }
 
+type TodoAction struct {
+	ID          string `json:"id"`
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+	// Picker order for presets; null for actions the user entered.
+	TypicalSequence *int `json:"typicalSequence,omitempty"`
+	IsPreset        bool `json:"isPreset"`
+}
+
 type TypingChanged struct {
 	ThreadID string `json:"threadId"`
 	UserID   string `json:"userId"`
@@ -431,6 +496,43 @@ type UpdateUserInput struct {
 	Email    *string `json:"email,omitempty"`
 }
 
+// Partial update: omit a field to leave it unchanged. For contentId, name,
+// priority, startDate, endDate, dueDate, comments and listId, an explicit null
+// clears the field. The other fields are not clearable: null is the same as omitted.
+type UpdateUserTodoInput struct {
+	ID int `json:"id"`
+	// Omit = unchanged; null = clear.
+	ContentID graphql.Omittable[*int] `json:"contentId,omitempty"`
+	// Omit = unchanged; null = clear.
+	Name     graphql.Omittable[*string] `json:"name,omitempty"`
+	ActionID *int                       `json:"actionId,omitempty"`
+	// Omit = unchanged; null = clear.
+	Priority        graphql.Omittable[*int] `json:"priority,omitempty"`
+	Status          *domain.UserTodoStatus  `json:"status,omitempty"`
+	PercentComplete *int                    `json:"percentComplete,omitempty"`
+	// Omit = unchanged; null = clear. ISO date, YYYY-MM-DD.
+	StartDate graphql.Omittable[*string] `json:"startDate,omitempty"`
+	// Omit = unchanged; null = clear. ISO date, YYYY-MM-DD.
+	EndDate graphql.Omittable[*string] `json:"endDate,omitempty"`
+	// Omit = unchanged; null = clear. ISO date, YYYY-MM-DD.
+	DueDate graphql.Omittable[*string] `json:"dueDate,omitempty"`
+	// Omit = unchanged; null = clear.
+	Comments graphql.Omittable[*string] `json:"comments,omitempty"`
+	Privacy  *domain.Privacy            `json:"privacy,omitempty"`
+	// Omit = unchanged; null = unlist.
+	ListID graphql.Omittable[*int] `json:"listId,omitempty"`
+}
+
+// Partial update: omit a field to leave it unchanged. An explicit null clears
+// description. Name and privacy are not clearable.
+type UpdateUserTodoListInput struct {
+	ID   int     `json:"id"`
+	Name *string `json:"name,omitempty"`
+	// Omit = unchanged; null = clear.
+	Description graphql.Omittable[*string] `json:"description,omitempty"`
+	Privacy     *domain.Privacy            `json:"privacy,omitempty"`
+}
+
 type User struct {
 	ID         string          `json:"id"`
 	Username   string          `json:"username"`
@@ -448,11 +550,76 @@ type UserOnboarding struct {
 	CompletedAt        *string `json:"completedAt,omitempty"`
 }
 
+type UserTodo struct {
+	ID      string   `json:"id"`
+	User    *User    `json:"user"`
+	Content *Content `json:"content,omitempty"`
+	// Free-text name; only meaningful when content is null.
+	Name            *string               `json:"name,omitempty"`
+	Action          *TodoAction           `json:"action"`
+	Priority        *int                  `json:"priority,omitempty"`
+	Status          domain.UserTodoStatus `json:"status"`
+	PercentComplete int                   `json:"percentComplete"`
+	// ISO date, YYYY-MM-DD.
+	StartDate *string `json:"startDate,omitempty"`
+	// ISO date, YYYY-MM-DD. When the todo was finished.
+	EndDate *string `json:"endDate,omitempty"`
+	// ISO date, YYYY-MM-DD. The target date.
+	DueDate *string `json:"dueDate,omitempty"`
+	// Sanitized HTML.
+	Comments     *string        `json:"comments,omitempty"`
+	Privacy      domain.Privacy `json:"privacy"`
+	List         *UserTodoList  `json:"list,omitempty"`
+	ListPosition *int           `json:"listPosition,omitempty"`
+	CreatedAt    string         `json:"createdAt"`
+	UpdatedAt    string         `json:"updatedAt"`
+	ActionID     int            `json:"-"`
+	ContentID    *int           `json:"-"`
+	ListID       *int           `json:"-"`
+	UserID       int            `json:"-"`
+}
+
+type UserTodoFilter struct {
+	UserID    *int `json:"userId,omitempty"`
+	ContentID *int `json:"contentId,omitempty"`
+	ListID    *int `json:"listId,omitempty"`
+	// Only todos in no list. Ignored when listId is set.
+	Unlisted *bool                   `json:"unlisted,omitempty"`
+	Status   []domain.UserTodoStatus `json:"status,omitempty"`
+	ActionID *int                    `json:"actionId,omitempty"`
+}
+
+type UserTodoList struct {
+	ID          string         `json:"id"`
+	User        *User          `json:"user"`
+	Name        string         `json:"name"`
+	Description *string        `json:"description,omitempty"`
+	Privacy     domain.Privacy `json:"privacy"`
+	CreatedAt   string         `json:"createdAt"`
+	UpdatedAt   string         `json:"updatedAt"`
+	UserID      int            `json:"-"`
+}
+
 type WikidataSearchResult struct {
 	Qid         string  `json:"qid"`
 	Label       string  `json:"label"`
 	Description *string `json:"description,omitempty"`
 	EntityType  *string `json:"entityType,omitempty"`
+}
+
+type YouTubeTrendingPage struct {
+	Items         []*YouTubeTrendingVideo `json:"items"`
+	NextPageToken *string                 `json:"nextPageToken,omitempty"`
+}
+
+type YouTubeTrendingVideo struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	ChannelTitle string `json:"channelTitle"`
+	Description  string `json:"description"`
+	PublishedAt  string `json:"publishedAt"`
+	ThumbnailURL string `json:"thumbnailUrl"`
+	Duration     string `json:"duration"`
 }
 
 type ParticipantChangeKind string

@@ -33,12 +33,24 @@ type Loaders struct {
 	UserByID *dataloadgen.Loader[int, *domain.User]
 	// ThreadStats batches MessageThread.latestSeq / unreadCount per viewer.
 	ThreadStats *dataloadgen.Loader[ThreadStatsKey, domain.ThreadStats]
+	// TodoActionByID batches UserTodo.action lookups.
+	TodoActionByID *dataloadgen.Loader[int, *domain.TodoAction]
+	// UserTodoListByID batches UserTodo.list lookups. The key carries the
+	// viewer, because a PRIVATE list is returned only to its owner.
+	UserTodoListByID *dataloadgen.Loader[UserTodoListKey, *domain.UserTodoList]
 }
 
 // ThreadStatsKey identifies one viewer's stats for one thread.
 type ThreadStatsKey struct {
 	ViewerID int
 	ThreadID int
+}
+
+// UserTodoListKey identifies one list as seen by one viewer. ViewerID 0 is an
+// anonymous caller.
+type UserTodoListKey struct {
+	ViewerID int
+	ListID   int
 }
 
 // Services are the ports the loaders batch through.
@@ -48,6 +60,7 @@ type Services struct {
 	User        portservices.UserService
 	Content     portservices.ContentService
 	Messaging   portservices.MessagingService
+	UserTodo    portservices.UserTodoService
 }
 
 // NewLoaders builds a fresh set of loaders backed by the given services.
@@ -57,12 +70,16 @@ func NewLoaders(s Services) *Loaders {
 	ub := &userBatcher{service: s.User}
 	tb := &threadStatsBatcher{service: s.Messaging}
 	cnb := &contentBatcher{service: s.Content}
+	tab := &todoActionBatcher{service: s.UserTodo}
+	tlb := &userTodoListBatcher{service: s.UserTodo}
 	return &Loaders{
 		CategoryByID:                    dataloadgen.NewMappedLoader(cb.byID),
 		PerspectiveAggregateByContentID: dataloadgen.NewMappedLoader(pb.byContentID),
 		UserByID:                        dataloadgen.NewMappedLoader(ub.byID),
 		ThreadStats:                     dataloadgen.NewMappedLoader(tb.byKey),
 		ContentByID:                     dataloadgen.NewMappedLoader(cnb.byID),
+		TodoActionByID:                  dataloadgen.NewMappedLoader(tab.byID),
+		UserTodoListByID:                dataloadgen.NewMappedLoader(tlb.byKey),
 	}
 }
 
@@ -142,6 +159,57 @@ func (b *threadStatsBatcher) byKey(ctx context.Context, keys []ThreadStatsKey) (
 		}
 		for tid, st := range stats {
 			out[ThreadStatsKey{ViewerID: viewer, ThreadID: tid}] = st
+		}
+	}
+	return out, nil
+}
+
+// todoActionBatcher resolves a batch of todo action IDs in one service call.
+type todoActionBatcher struct {
+	service portservices.UserTodoService
+}
+
+func (b *todoActionBatcher) byID(ctx context.Context, ids []int) (map[int]*domain.TodoAction, error) {
+	actions, err := b.service.GetTodoActionsByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int]*domain.TodoAction, len(actions))
+	for _, a := range actions {
+		if a != nil {
+			out[a.ID] = a
+		}
+	}
+	return out, nil
+}
+
+// userTodoListBatcher resolves many (viewer, list) keys. Each viewer's lists go
+// through GetUserTodoListsByIDs with that viewer, so a PRIVATE list another user
+// owns is absent from the map and its key surfaces as not-found.
+type userTodoListBatcher struct {
+	service portservices.UserTodoService
+}
+
+func (b *userTodoListBatcher) byKey(ctx context.Context, keys []UserTodoListKey) (map[UserTodoListKey]*domain.UserTodoList, error) {
+	byViewer := make(map[int][]int)
+	for _, k := range keys {
+		byViewer[k.ViewerID] = append(byViewer[k.ViewerID], k.ListID)
+	}
+	out := make(map[UserTodoListKey]*domain.UserTodoList, len(keys))
+	for viewer, listIDs := range byViewer {
+		var viewerID *int
+		if viewer != 0 {
+			v := viewer
+			viewerID = &v
+		}
+		lists, err := b.service.GetUserTodoListsByIDs(ctx, listIDs, viewerID)
+		if err != nil {
+			return nil, err
+		}
+		for _, l := range lists {
+			if l != nil {
+				out[UserTodoListKey{ViewerID: viewer, ListID: l.ID}] = l
+			}
 		}
 	}
 	return out, nil

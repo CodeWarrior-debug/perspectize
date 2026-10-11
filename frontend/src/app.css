@@ -996,6 +996,11 @@
 	font-family: 'Charter', 'Georgia', 'Times New Roman', serif;
 }
 
+/* One faint style for every "no value" dash, in grids and cards. Token-based, so it follows the theme. */
+.empty-marker {
+	color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
+}
+
 /* Keep Geist on type column (icon-only, no text to style) */
 .ag-cell[col-id='type'] {
 	font-family: 'Geist', system-ui, sans-serif;
@@ -1100,4 +1105,26 @@
 	opacity: 0.4;
 	cursor: default;
 	text-decoration: none;
+}
+
+/* A modal dialog sets `pointer-events: none` on <body>, and a toast inherits it, so a toast's action
+   button (e.g. "Mark 100% complete too?" raised while a dialog is open) can't be clicked. Re-enable it
+   on the toast only; the dialog ignores clicks inside a toast (see isInsideToast in utils/toast.ts). */
+[data-sonner-toast] {
+	pointer-events: auto;
+}
+
+/* A native <select> whose arrow sits inset from the right edge (the browser's own arrow is flush against it).
+   The chevron is two currentColor gradients, so it follows the theme. Pair with the usual border/height classes. */
+select.select-inset {
+	appearance: none;
+	padding-inline-end: 2rem;
+	background-image:
+		linear-gradient(45deg, transparent 50%, currentColor 50%),
+		linear-gradient(135deg, currentColor 50%, transparent 50%);
+	background-position:
+		calc(100% - 1.15rem) 50%,
+		calc(100% - 0.8rem) 50%;
+	background-size: 0.35rem 0.35rem;
+	background-repeat: no-repeat;
 }

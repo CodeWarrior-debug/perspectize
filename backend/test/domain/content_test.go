@@ -92,6 +92,8 @@ func TestMovieConstants(t *testing.T) {
 	assert.Equal(t, domain.ContentSortBy("BOX_OFFICE"), domain.ContentSortByBoxOffice)
 	assert.Equal(t, domain.ContentSortBy("VS_BUDGET"), domain.ContentSortByVsBudget)
 	assert.Equal(t, domain.ContentSortBy("AGE_RATING"), domain.ContentSortByAgeRating)
+	assert.Equal(t, domain.ContentSortBy("RELEASE_DATE"), domain.ContentSortByReleaseDate)
+	assert.Equal(t, domain.ContentSortBy("TMDB_SCORE"), domain.ContentSortByTmdbScore)
 	assert.Equal(t, domain.PersonRole("CAST"), domain.PersonRoleCast)
 	assert.Equal(t, domain.PersonRole("DIRECTOR"), domain.PersonRoleDirector)
 }

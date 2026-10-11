@@ -26,7 +26,6 @@ Toolchain: `go.mod` already pins `go 1.26` / `toolchain go1.26.0`, matching the 
 | `github.com/go-chi/chi/v5` | v5.3.2 | HTTP router |
 | `github.com/go-chi/cors` | v1.2.2 | CORS middleware for chi |
 | `github.com/go-chi/httprate` | v0.16.0 | Rate-limiting middleware for chi |
-| `github.com/golang-jwt/jwt/v5` | v5.3.1 | JWT parsing/verification |
 | `github.com/joho/godotenv` | v1.5.1 | `.env` file loading for local dev |
 | `github.com/pilagod/gorm-cursor-paginator/v2` | v2.7.0 | Cursor-based pagination helper for GORM queries |
 | `github.com/stretchr/testify` | v1.12.1 | Test assertions/mocks |

@@ -1,6 +1,19 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import ActivityCardList from '$lib/components/ActivityCardList.svelte';
+
+// The "Add to plan" button reads the auth facade; the real module needs Clerk, so stub it.
+const authState = vi.hoisted(() => ({ userId: null as string | null }));
+vi.mock('$lib/auth/useAuthState', () => ({
+	useAuthState: () => ({
+		get isLoaded() {
+			return true;
+		},
+		get userId() {
+			return authState.userId;
+		},
+	}),
+}));
 
 const rowData = [
 	{
@@ -67,6 +80,37 @@ describe('ActivityCardList', () => {
 		await fireEvent.click(screen.getByTestId('card-perspective-2'));
 		expect(onAddPerspective).toHaveBeenCalledWith('2');
 		expect(onOpenDetails).not.toHaveBeenCalled();
+	});
+
+	describe('add to plan', () => {
+		beforeEach(() => {
+			authState.userId = null;
+		});
+
+		it('shows an Add to plan action per card for a signed-in user, and calls onAddToPlan with the row id', async () => {
+			authState.userId = 'user_1';
+			const onAddToPlan = vi.fn();
+			const onOpenDetails = vi.fn();
+			render(ActivityCardList, { props: { rowData, onOpenDetails, onAddToPlan } });
+
+			const buttons = screen.getAllByRole('button', { name: 'Add to plan' });
+			expect(buttons).toHaveLength(rowData.length);
+
+			await fireEvent.click(buttons[1]);
+			expect(onAddToPlan).toHaveBeenCalledWith('2');
+			expect(onOpenDetails).not.toHaveBeenCalled();
+		});
+
+		it('hides Add to plan for a signed-out user', () => {
+			render(ActivityCardList, { props: { rowData, onOpenDetails: vi.fn(), onAddToPlan: vi.fn() } });
+			expect(screen.queryByRole('button', { name: 'Add to plan' })).toBeNull();
+		});
+
+		it('renders no Add to plan action when the parent does not handle it', () => {
+			authState.userId = 'user_1';
+			render(ActivityCardList, { props: { rowData, onOpenDetails: vi.fn() } });
+			expect(screen.queryByRole('button', { name: 'Add to plan' })).toBeNull();
+		});
 	});
 
 	// Gap #13 in the UI gap audit: the card used to show only name/channel/
@@ -181,6 +225,76 @@ describe('ActivityCardList', () => {
 			expect(screen.queryByTestId(/card-movie-facts/)).not.toBeInTheDocument();
 			expect(screen.getByText('Jordan Peterson')).toBeInTheDocument();
 			expect(screen.getByText('1.3 M views')).toBeInTheDocument();
+		});
+	});
+
+	describe('thumbnail states (poster, empty slot, video, passage)', () => {
+		const film = {
+			id: '6',
+			name: 'Fellowship',
+			url: 'https://www.themoviedb.org/movie/120',
+			channelTitle: null,
+			length: 10740,
+			lengthUnits: 'seconds',
+			contentType: 'MOVIE',
+			response: { posterPath: '/poster.jpg' },
+		};
+		const thumb = (id: string) => screen.getByTestId(`card-thumb-${id}`);
+
+		it('movie with a poster: TMDB poster fitted (not cropped), no play badge, no grey tile', () => {
+			render(ActivityCardList, { props: { rowData: [film], onOpenDetails: vi.fn() } });
+			const img = thumb('6').querySelector('img');
+			expect(img?.getAttribute('src')).toBe('https://image.tmdb.org/t/p/w154/poster.jpg');
+			expect(img?.className).toContain('object-contain');
+			expect(screen.queryByTestId('card-play-badge')).not.toBeInTheDocument();
+			expect(thumb('6').className).not.toContain('bg-muted');
+		});
+
+		it('movie without a poster: grey placeholder slot, no image, no play badge', () => {
+			render(ActivityCardList, { props: { rowData: [{ ...film, response: {} }], onOpenDetails: vi.fn() } });
+			expect(thumb('6').querySelector('img')).toBeNull();
+			expect(screen.queryByTestId('card-play-badge')).not.toBeInTheDocument();
+			expect(thumb('6').className).toContain('bg-muted');
+		});
+
+		it('video: YouTube thumbnail cropped to fill, with the play badge', () => {
+			render(ActivityCardList, { props: { rowData: [rowData[0]], onOpenDetails: vi.fn() } });
+			const img = thumb('1').querySelector('img');
+			expect(img?.getAttribute('src')).toBe('https://i.ytimg.com/vi/abc123/hqdefault.jpg');
+			expect(img?.className).toContain('object-cover');
+			expect(screen.getByTestId('card-play-badge')).toBeInTheDocument();
+		});
+
+		it('passage: book icon on the card colour, no grey tile, no play badge', () => {
+			render(ActivityCardList, {
+				props: {
+					rowData: [
+						{
+							id: '7',
+							name: 'John 1:1-5',
+							url: null,
+							channelTitle: null,
+							length: null,
+							lengthUnits: null,
+							contentType: 'BIBLE_PASSAGE',
+						},
+					],
+					onOpenDetails: vi.fn(),
+				},
+			});
+			expect(thumb('7').className).not.toContain('bg-muted');
+			expect(screen.queryByTestId('card-play-badge')).not.toBeInTheDocument();
+		});
+
+		it('movie runtime shows to its reported precision (h:mm for MINUTES)', () => {
+			render(ActivityCardList, {
+				props: {
+					rowData: [{ ...film, lengthDisplay: { source: 'tmdb', precision: 'MINUTES' } }],
+					onOpenDetails: vi.fn(),
+				},
+			});
+			expect(screen.getByTestId('card-movie-facts-6')).toHaveTextContent('2:59');
+			expect(screen.getByTestId('card-movie-facts-6')).not.toHaveTextContent('2:59:00');
 		});
 	});
 

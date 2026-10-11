@@ -31,9 +31,10 @@ function youtube(id = '9'): ContentItem {
 const ids = (rows: ContentItem[]) => rows.map((r) => r.id);
 
 describe('Movie filter column registry', () => {
-	it('registers a filter on genre, rated, released, box office and TMDB score', () => {
+	it('registers a filter on genre, cast, rated, released, box office and TMDB score', () => {
 		expect(COL_TO_FILTER_KEY).toMatchObject({
 			genre: 'genre',
+			cast: 'cast',
 			rated: 'rated',
 			released: 'released',
 			boxOffice: 'boxoffice',
@@ -64,6 +65,13 @@ describe('Movie filters: grid model <-> URL round trip', () => {
 		const model = { genre: { filterType: 'text', type: 'contains', filter: 'sci' } };
 		const url = filterToUrlParams(model);
 		expect(url).toEqual({ genre: 'sci' });
+		expect(urlParamsToFilter(url)).toEqual(model);
+	});
+
+	it('cast text filter', () => {
+		const model = { cast: { filterType: 'text', type: 'contains', filter: 'nolan' } };
+		const url = filterToUrlParams(model);
+		expect(url).toEqual({ cast: 'nolan' });
 		expect(urlParamsToFilter(url)).toEqual(model);
 	});
 
@@ -135,6 +143,10 @@ describe('Movie filters: grid model <-> URL round trip', () => {
 describe('Movie filters: GraphQL ContentFilter mapping', () => {
 	it('maps genre to genreContains', () => {
 		expect(urlParamsToGraphQLFilter({ genre: 'sci' }, '')).toEqual({ genreContains: 'sci' });
+	});
+
+	it('maps cast to castContains', () => {
+		expect(urlParamsToGraphQLFilter({ cast: 'nolan' }, '')).toEqual({ castContains: 'nolan' });
 	});
 
 	it('maps rated to uppercase ageRating list', () => {
@@ -213,6 +225,14 @@ describe('filterContentRows: Movie filters (matches server semantics)', () => {
 	const bare = movie({}, 'bare'); // no genre / rating / date / revenue / score
 	const yt = youtube('yt');
 	const rows = [inception, drama, bare, yt];
+
+	it('cast: case-insensitive contains on a cast or director name; rows without people excluded', () => {
+		const f = (filter: string) =>
+			ids(filterContentRows(rows, { cast: { filterType: 'text', type: 'contains', filter } }));
+		expect(f('NOLAN')).toEqual(['inception']); // director
+		expect(f('dicap')).toEqual(['inception']); // cast
+		expect(f('zzz')).toEqual([]);
+	});
 
 	it('genre: case-insensitive contains; rows without genres excluded', () => {
 		const f = (filter: string) =>

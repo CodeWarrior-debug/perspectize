@@ -167,6 +167,22 @@ func TestGormContentRepository_GetOrCreateByURL(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
+	t.Run("insert names length_display and reads it back from RETURNING", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		// Inserts name every column, so migration 000030 must be applied before this deploys.
+		mock.ExpectQuery(`INSERT INTO "content" \(.*"length_display".*\) .* ON CONFLICT .* RETURNING \*`).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "content_type", "length", "length_units", "length_display", "created_at", "updated_at"}).
+				AddRow(22, "Film", "movie", 8520, "seconds", []byte(`{"source":"tmdb","precision":"minutes"}`), contentRepoTime, contentRepoTime))
+
+		c := newContent()
+		c.ContentType = domain.ContentTypeMovie
+		c.LengthDisplay = domain.TMDBLengthDisplay()
+		got, _, err := NewGormContentRepository(db).GetOrCreateByURL(ctx, c, true)
+		require.NoError(t, err)
+		assert.Equal(t, &domain.LengthDisplay{Source: "tmdb", Precision: domain.LengthPrecisionMinutes}, got.LengthDisplay)
+		assertAllExpectationsMet(t, mock)
+	})
+
 	t.Run("DO UPDATE refresh of an existing row reports alreadyExisted=true", func(t *testing.T) {
 		db, mock := newMockDB(t)
 		// The refresh moves updated_at but keeps the original created_at.

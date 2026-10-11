@@ -21,7 +21,10 @@ type ContentService struct {
 	repo          repositories.ContentRepository
 	youtubeClient portservices.YouTubeClient
 	bibleRepo     repositories.BibleReferenceRepository
+	trending      portservices.YouTubeTrendingClient
 	movieClient   portservices.MovieClient
+	movieSearch   portservices.MovieSearchClient
+	movieTrending portservices.MovieTrendingClient
 }
 
 // ContentServiceOption configures optional ContentService dependencies.
@@ -30,6 +33,24 @@ type ContentServiceOption func(*ContentService)
 // WithBibleReference enables BIBLE_PASSAGE creation by supplying the reference-data repository.
 func WithBibleReference(repo repositories.BibleReferenceRepository) ContentServiceOption {
 	return func(s *ContentService) { s.bibleRepo = repo }
+}
+
+// WithYouTubeTrending enables the Discover page's Trending feed. Pass the
+// caching client so every caller shares its cache.
+func WithYouTubeTrending(client portservices.YouTubeTrendingClient) ContentServiceOption {
+	return func(s *ContentService) { s.trending = client }
+}
+
+// WithMovieSearch enables the Discover page's Movies source (TMDB title search).
+// Searches are not cached server-side; each call reaches TMDB.
+func WithMovieSearch(client portservices.MovieSearchClient) ContentServiceOption {
+	return func(s *ContentService) { s.movieSearch = client }
+}
+
+// WithMovieTrending enables the Discover page's trending movies list. Pass the
+// caching client so every caller shares its cache.
+func WithMovieTrending(client portservices.MovieTrendingClient) ContentServiceOption {
+	return func(s *ContentService) { s.movieTrending = client }
 }
 
 // NewContentService creates a new content service
@@ -89,6 +110,7 @@ func (s *ContentService) CreateFromYouTube(ctx context.Context, url string, user
 		AddedByUserID: userID,
 		Length:        &metadata.Duration,
 		LengthUnits:   &lengthUnits,
+		LengthDisplay: domain.YouTubeLengthDisplay(),
 		Response:      metadata.Response,
 	}
 
@@ -429,6 +451,67 @@ func (s *ContentService) PassageInterlinear(ctx context.Context, startVerseID, e
 	return &domain.PassageInterlinear{Verses: verses}, nil
 }
 
+// YouTubeTrending returns one page of YouTube's most-popular chart. The region
+// defaults to "US" and must be a two-letter ISO 3166-1 code.
+func (s *ContentService) YouTubeTrending(ctx context.Context, regionCode, pageToken string) (*portservices.TrendingPage, error) {
+	if s.trending == nil {
+		return nil, fmt.Errorf("%w: trending is not configured", domain.ErrYouTubeAPI)
+	}
+	region := strings.ToUpper(strings.TrimSpace(regionCode))
+	if region == "" {
+		region = "US"
+	}
+	if len(region) != 2 || region[0] < 'A' || region[0] > 'Z' || region[1] < 'A' || region[1] > 'Z' {
+		return nil, fmt.Errorf("%w: regionCode must be a two-letter country code", domain.ErrInvalidInput)
+	}
+	if len(pageToken) > 128 {
+		return nil, fmt.Errorf("%w: pageToken is too long", domain.ErrInvalidInput)
+	}
+	return s.trending.GetTrending(ctx, region, strings.TrimSpace(pageToken))
+}
+
+// SearchMovies returns one page of TMDB title search results. The query is
+// trimmed and must be 1-100 runes. Page 0 means page 1; otherwise it must be
+// 1-500. Invalid input never reaches TMDB.
+func (s *ContentService) SearchMovies(ctx context.Context, query string, page int) (*portservices.MovieSearchPage, error) {
+	if s.movieSearch == nil {
+		return nil, fmt.Errorf("%w: movie search is not configured", tmdb.ErrNotConfigured)
+	}
+	q := strings.TrimSpace(query)
+	if n := utf8.RuneCountInString(q); n < 1 || n > 100 {
+		return nil, fmt.Errorf("%w: query must be 1-100 characters", domain.ErrInvalidInput)
+	}
+	if page == 0 {
+		page = 1
+	}
+	if page < 1 || page > 500 {
+		return nil, fmt.Errorf("%w: page must be between 1 and 500", domain.ErrInvalidInput)
+	}
+	return s.movieSearch.SearchMovies(ctx, q, page)
+}
+
+// TrendingMovies returns one page of TMDB's trending movies. An empty window
+// means WEEK and anything other than DAY or WEEK is invalid. Page 0 means 1;
+// otherwise it must be 1-500. Invalid input never reaches TMDB.
+func (s *ContentService) TrendingMovies(ctx context.Context, window domain.TrendingWindow, page int) (*portservices.MovieSearchPage, error) {
+	if s.movieTrending == nil {
+		return nil, fmt.Errorf("%w: movie trending is not configured", tmdb.ErrNotConfigured)
+	}
+	if window == "" {
+		window = domain.TrendingWindowWeek
+	}
+	if window != domain.TrendingWindowDay && window != domain.TrendingWindowWeek {
+		return nil, fmt.Errorf("%w: window must be DAY or WEEK", domain.ErrInvalidInput)
+	}
+	if page == 0 {
+		page = 1
+	}
+	if page < 1 || page > 500 {
+		return nil, fmt.Errorf("%w: page must be between 1 and 500", domain.ErrInvalidInput)
+	}
+	return s.movieTrending.TrendingMovies(ctx, window, page)
+}
+
 // ErrMovieClientUnavailable is returned by CreateFromMovie when the service was
 // built without a movie client. Resolvers show clients a generic message.
 var ErrMovieClientUnavailable = errors.New("movie lookup is unavailable: no movie client configured")
@@ -496,6 +579,8 @@ func (s *ContentService) CreateFromMovie(ctx context.Context, rawURL string, use
 	if metadata.RuntimeSeconds != nil {
 		lengthUnits := "seconds"
 		content.LengthUnits = &lengthUnits
+		// TMDB reports runtime in whole minutes; Length holds them as seconds.
+		content.LengthDisplay = domain.TMDBLengthDisplay()
 	}
 
 	created, alreadyExisted, err := s.repo.GetOrCreateByURL(ctx, content, true)

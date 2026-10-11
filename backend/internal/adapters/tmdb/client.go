@@ -9,7 +9,11 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
@@ -29,13 +33,17 @@ type Client struct {
 	baseURL    string
 }
 
-var _ services.MovieClient = (*Client)(nil)
+var (
+	_ services.MovieClient         = (*Client)(nil)
+	_ services.MovieSearchClient   = (*Client)(nil)
+	_ services.MovieTrendingClient = (*Client)(nil)
+)
 
 // NewClient creates a TMDB client authenticated with a v4 read-access bearer token.
 func NewClient(token string) *Client {
 	return &Client{
 		token:      token,
-		httpClient: &http.Client{Timeout: 10 * time.Second},
+		httpClient: &http.Client{Timeout: 10 * time.Second, Transport: otelhttp.NewTransport(http.DefaultTransport)},
 		baseURL:    "https://api.themoviedb.org/3",
 	}
 }
@@ -134,4 +142,36 @@ func (c *Client) FindMovieByIMDbID(ctx context.Context, imdbID string) (int, err
 		return 0, fmt.Errorf("%w: no movie for IMDb id %s", domain.ErrNotFound, imdbID)
 	}
 	return res.MovieResults[0].ID, nil
+}
+
+// SearchMovies runs a TMDB title search. Adult titles are excluded. Errors are
+// sanitized by get: no token, no URL, no upstream body.
+func (c *Client) SearchMovies(ctx context.Context, query string, page int) (*services.MovieSearchPage, error) {
+	q := url.Values{}
+	q.Set("query", query)
+	q.Set("page", strconv.Itoa(page))
+	q.Set("include_adult", "false")
+	q.Set("language", "en-US")
+	body, err := c.get(ctx, "/search/movie", q)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMovieSearch(body)
+}
+
+// TrendingMovies fetches TMDB's trending movies for a day or week window. The
+// window is lowercased into the path (/trending/movie/day|week). Anything other
+// than DAY or WEEK is rejected here so it can never shape the URL.
+func (c *Client) TrendingMovies(ctx context.Context, window domain.TrendingWindow, page int) (*services.MovieSearchPage, error) {
+	if window != domain.TrendingWindowDay && window != domain.TrendingWindowWeek {
+		return nil, fmt.Errorf("%w: unknown trending window", domain.ErrInvalidInput)
+	}
+	q := url.Values{}
+	q.Set("page", strconv.Itoa(page))
+	q.Set("language", "en-US")
+	body, err := c.get(ctx, "/trending/movie/"+strings.ToLower(string(window)), q)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMovieSearch(body)
 }

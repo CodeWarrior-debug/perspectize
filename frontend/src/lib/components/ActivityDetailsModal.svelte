@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { LengthDisplay } from '$lib/queries/content';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import XIcon from '@lucide/svelte/icons/x';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
@@ -23,6 +24,7 @@
 	import PassagePositionBar from '$lib/components/PassagePositionBar.svelte';
 	import PassageLinks from '$lib/components/PassageLinks.svelte';
 	import { useSetPassageDisplayTitle } from '$lib/queries/bible/useSetPassageDisplayTitle';
+	import AddToPlanButton from '$lib/components/plan/AddToPlanButton.svelte';
 
 	interface ModalContent {
 		id: string;
@@ -35,6 +37,7 @@
 		likeCount: number | null;
 		length: number | null;
 		lengthUnits: string | null;
+		lengthDisplay?: LengthDisplay | null;
 		publishedAt: string | null;
 		createdAt?: string;
 		updatedAt: string;
@@ -51,10 +54,13 @@
 		content,
 		open = false,
 		onClose,
+		onAddToPlan,
 	}: {
 		content: ModalContent | null;
 		open?: boolean;
 		onClose: () => void;
+		/** Shows "Add to plan" (signed-in users only) when provided. The caller owns the todo dialog. */
+		onAddToPlan?: (content: ModalContent) => void;
 	} = $props();
 
 	const isMovie = $derived(content?.contentType === 'MOVIE');
@@ -254,7 +260,12 @@
 						</div>
 					</div>
 					{#if isMovie}
-						<MovieTiles row={content} length={content.length} lengthUnits={content.lengthUnits} />
+						<MovieTiles
+							row={content}
+							length={content.length}
+							lengthUnits={content.lengthUnits}
+							precision={content.lengthDisplay?.precision}
+						/>
 					{:else if !isPassage}
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Views</div>
@@ -271,7 +282,7 @@
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Duration</div>
 							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
-								{formatDuration(content.length, content.lengthUnits)}
+								{formatDuration(content.length, content.lengthUnits, content.lengthDisplay?.precision)}
 							</div>
 						</div>
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
@@ -324,6 +335,9 @@
 							>
 								Compare
 							</a>
+							{#if onAddToPlan}
+								<AddToPlanButton variant="text" onclick={() => onAddToPlan(content)} />
+							{/if}
 							{#if !isPassage && !isMovie}
 								<button
 									type="button"

@@ -232,6 +232,8 @@ func TestCreateFromYouTube_Success(t *testing.T) {
 	assert.Equal(t, 300, *result.Length)
 	require.NotNil(t, result.LengthUnits)
 	assert.Equal(t, "seconds", *result.LengthUnits)
+	// YouTube reports seconds, so clients keep h:mm:ss / m:ss.
+	assert.Equal(t, &domain.LengthDisplay{Source: "youtube", Precision: domain.LengthPrecisionSeconds}, result.LengthDisplay)
 }
 
 func TestCreateFromYouTube_ReturnExistingOnDuplicate(t *testing.T) {

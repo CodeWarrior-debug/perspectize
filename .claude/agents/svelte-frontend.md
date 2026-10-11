@@ -1,7 +1,7 @@
 ---
 name: svelte-frontend
 description: SvelteKit implementer for frontend/ (Svelte 5 runes, TanStack Query + graphql-request, shadcn-svelte, Tailwind v4, AG Grid). Use when a task adds or changes a component, route, query hook or frontend utility, when a backend schema change needs matching frontend queries, or when a plan task is tagged svelte-frontend. Not for visual design direction (frontend-design skill), Figma extraction (figma-designer) or Go code. See "When to invoke" in the agent body.
-model: sonnet
+model: haiku
 color: magenta
 tools:
   - Read

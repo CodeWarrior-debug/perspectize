@@ -21,6 +21,12 @@ resolver:
 
 # Map GraphQL types to Go types
 models:
+  LengthDisplay:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.LengthDisplay
+  LengthPrecision:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.LengthPrecision
   ID:
     model:
       - github.com/99designs/gqlgen/graphql.ID
@@ -71,6 +77,19 @@ models:
   UserRole:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.UserRole
+
+  # User todo enums - bind directly to domain types
+  UserTodoStatus:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.UserTodoStatus
+  UserTodoSortBy:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.UserTodoSortBy
+
+  # Discover enums - bind directly to domain types
+  TrendingWindow:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.TrendingWindow
 
   # Messaging enums - bind directly to domain types
   ThreadRole:
@@ -153,4 +172,57 @@ models:
       customFields:
         omittable: true
       feelings:
+        omittable: true
+  # User todos. Each relationship resolves through a per-request dataloader;
+  # the owner/content/action/list ids ride on the generated models as extraFields
+  # so the resolvers can batch on them.
+  UserTodo:
+    fields:
+      user:
+        resolver: true
+      content:
+        resolver: true
+      action:
+        resolver: true
+      list:
+        resolver: true
+    extraFields:
+      UserID:
+        type: "int"
+      ContentID:
+        type: "*int"
+      ActionID:
+        type: "int"
+      ListID:
+        type: "*int"
+  UserTodoList:
+    fields:
+      user:
+        resolver: true
+    extraFields:
+      UserID:
+        type: "int"
+  # Tri-state update fields: an omitted key leaves the value unchanged; an
+  # explicit `null` clears it. See modelToUpdateUserTodoInput in helpers.go.
+  UpdateUserTodoInput:
+    fields:
+      contentId:
+        omittable: true
+      name:
+        omittable: true
+      priority:
+        omittable: true
+      startDate:
+        omittable: true
+      endDate:
+        omittable: true
+      dueDate:
+        omittable: true
+      comments:
+        omittable: true
+      listId:
+        omittable: true
+  UpdateUserTodoListInput:
+    fields:
+      description:
         omittable: true

@@ -1,3 +1,4 @@
+import type { LengthDisplay } from '$lib/queries/content';
 import { gql } from 'graphql-request';
 
 /**
@@ -181,6 +182,7 @@ export interface ActivityPerspectiveItem {
 		channelTitle: string | null;
 		length: number | null;
 		lengthUnits: string | null;
+		lengthDisplay?: LengthDisplay | null;
 	} | null;
 	createdAt: string;
 	updatedAt: string;
@@ -211,6 +213,10 @@ export const LIST_ACTIVITY_PERSPECTIVES = gql`
 					channelTitle
 					length
 					lengthUnits
+					lengthDisplay {
+						source
+						precision
+					}
 				}
 				createdAt
 				updatedAt
