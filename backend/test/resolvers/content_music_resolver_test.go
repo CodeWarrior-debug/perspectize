@@ -8,6 +8,7 @@ import (
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,13 +22,13 @@ func musicYT() *mockYouTubeClient {
 }
 
 func TestCreateAudioTrack_Success(t *testing.T) {
-	repo := &mockContentRepository{
-		getOrCreateByURLFn: func(_ context.Context, c *domain.Content) (*domain.Content, bool, error) {
-			c.ID = 5
-			return c, false, nil
-		},
-	}
-	server := setupTestServer(repo, musicYT())
+	audio := &mockAudioTrackRepository{createWithLinkFn: func(_ context.Context, c *domain.Content, link domain.TrackLink) (*domain.Content, bool, error) {
+		c.ID = 5
+		assert.Equal(t, domain.TrackLinkKindEmbed, link.Kind)
+		return c, false, nil
+	}}
+	server := setupTestServerWithRepos(&mockContentRepository{}, musicYT(), &mockPerspectiveRepository{}, &mockUserRepository{},
+		services.WithAudioTracks(audio, newMockGenres()))
 	defer server.Close()
 
 	result := executeGraphQL(t, server, `mutation { createAudioTrack(input: { url: "`+trackURL+`", userId: 0 }) {
@@ -57,12 +58,13 @@ func TestCreateAudioTrack_Success(t *testing.T) {
 }
 
 func TestCreateAudioTrack_ErrorMessages(t *testing.T) {
-	server := setupTestServer(&mockContentRepository{}, musicYT())
+	server := setupTestServerWithRepos(&mockContentRepository{}, musicYT(), &mockPerspectiveRepository{}, &mockUserRepository{},
+		services.WithAudioTracks(&mockAudioTrackRepository{}, newMockGenres()))
 	defer server.Close()
 
 	tests := map[string]string{
 		"https://music.youtube.com/playlist?list=OLAK5uy_x": "paste a song link, not an album, playlist, or artist",
-		"https://www.youtube.com/watch?v=dQw4w9WgXcQ":       "invalid YouTube Music URL",
+		"https://www.youtube.com/watch?v=dQw4w9WgXcQ":       "unsupported music link",
 	}
 	for url, want := range tests {
 		result := executeGraphQL(t, server, `mutation { createAudioTrack(input: { url: "`+url+`", userId: 0 }) { alreadyExisted } }`)

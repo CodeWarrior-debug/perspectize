@@ -4,6 +4,8 @@ import "context"
 
 // YTMusicTrack is metadata YouTube Music (InnerTube) reports for a video ID.
 type YTMusicTrack struct {
+	// Explicit: the track carries YouTube Music's explicit badge.
+	Explicit     bool
 	Title        string
 	Artists      []string
 	Album        string

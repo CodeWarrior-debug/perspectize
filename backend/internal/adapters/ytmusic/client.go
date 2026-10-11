@@ -65,6 +65,13 @@ type videoRenderer struct {
 			} `json:"watchEndpointMusicSupportedConfigs"`
 		} `json:"watchEndpoint"`
 	} `json:"navigationEndpoint"`
+	Badges []struct {
+		MusicInlineBadgeRenderer struct {
+			Icon struct {
+				IconType string `json:"iconType"`
+			} `json:"icon"`
+		} `json:"musicInlineBadgeRenderer"`
+	} `json:"badges"`
 }
 
 type queueItem struct {
@@ -177,6 +184,11 @@ func toTrack(v *videoRenderer) *portservices.YTMusicTrack {
 			t.Artists = append(t.Artists, r.Text)
 		case "MUSIC_PAGE_TYPE_ALBUM":
 			t.Album = r.Text
+		}
+	}
+	for _, b := range v.Badges {
+		if b.MusicInlineBadgeRenderer.Icon.IconType == "MUSIC_EXPLICIT_BADGE" {
+			t.Explicit = true
 		}
 	}
 	return t

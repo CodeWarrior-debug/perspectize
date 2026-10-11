@@ -50,10 +50,6 @@ type ContentService interface {
 	// If the movie already exists, returns the existing content along with ErrAlreadyExists.
 	CreateFromMovie(ctx context.Context, rawURL string, userID int) (*domain.Content, error)
 
-	// CreateAudioTrackFromYouTube creates a AUDIO_TRACK row from a music.youtube.com track URL.
-	// Duplicates (by URL or ISRC) return the existing row along with ErrAlreadyExists.
-	CreateAudioTrackFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error)
-
 	// AUDIO_TRACK (ADRs 0001, 0005, 0006).
 	CreateAudioTrack(ctx context.Context, in CreateAudioTrackInput) (*CreateAudioTrackResult, error)
 	MusicGenres(ctx context.Context) ([]domain.MusicGenre, error)

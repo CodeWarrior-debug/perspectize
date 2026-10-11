@@ -15,6 +15,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 // movieSearchPageToModel maps one TMDB search page to the GraphQL shape. The
@@ -968,4 +969,22 @@ func (r *Resolver) userTodoListByKey(ctx context.Context, key dataloader.UserTod
 		}
 	}
 	return nil, nil
+}
+
+// audioTrackError maps CreateAudioTrack failures to user-facing messages.
+func audioTrackError(err error) error {
+	switch {
+	case errors.Is(err, domain.ErrNotATrack):
+		return fmt.Errorf("paste a song link, not an album, playlist, or artist")
+	case errors.Is(err, domain.ErrInvalidURL):
+		return fmt.Errorf("unsupported music link: paste a YouTube Music, Spotify, Apple Music or Amazon Music song link")
+	case errors.Is(err, domain.ErrInvalidInput):
+		return err
+	case errors.Is(err, domain.ErrNotFound):
+		return fmt.Errorf("track not found")
+	case errors.Is(err, domain.ErrContentNotAllowed):
+		return &gqlerror.Error{Message: domain.ErrContentNotAllowed.Error(), Extensions: map[string]any{"code": "CONTENT_NOT_ALLOWED"}}
+	}
+	slog.Error("creating audio track failed", "error", err)
+	return fmt.Errorf("failed to add track")
 }

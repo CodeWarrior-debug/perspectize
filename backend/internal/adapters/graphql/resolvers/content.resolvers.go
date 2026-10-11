@@ -385,21 +385,11 @@ func (r *mutationResolver) CreateAudioTrack(ctx context.Context, input model.Cre
 	if input.UserID != 0 && input.UserID != authUser.ID {
 		return nil, fmt.Errorf("access denied: cannot create content for another user")
 	}
-
-	content, err := r.ContentService.CreateAudioTrackFromYouTube(ctx, input.URL, authUser.ID)
-	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
-		return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: true}, nil
-	}
+	res, err := r.ContentService.CreateAudioTrack(ctx, portservices.CreateAudioTrackInput{URL: input.URL, UserID: authUser.ID, CreateNew: true})
 	if err != nil {
-		switch {
-		case errors.Is(err, domain.ErrNotATrack):
-			return nil, fmt.Errorf("paste a song link, not an album, playlist, or artist")
-		case errors.Is(err, domain.ErrInvalidURL):
-			return nil, fmt.Errorf("invalid YouTube Music URL")
-		}
-		return nil, fmt.Errorf("failed to create content from YouTube Music")
+		return nil, audioTrackError(err)
 	}
-	return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: false}, nil
+	return &model.CreateContentResult{Content: domainToModel(res.Content), AlreadyExisted: res.AlreadyExisted}, nil
 }
 
 // PromoteRelatedMedia is the resolver for the promoteRelatedMedia field.

@@ -124,3 +124,14 @@ func TestParseClock(t *testing.T) {
 	assert.Equal(t, 3725, parseClock("1:02:05"))
 	assert.Equal(t, 0, parseClock("live"))
 }
+
+func TestToTrack_ExplicitBadge(t *testing.T) {
+	var v videoRenderer
+	require.NoError(t, json.Unmarshal([]byte(`{"videoId":"X","title":{"runs":[{"text":"Song"}]},`+
+		`"badges":[{"musicInlineBadgeRenderer":{"icon":{"iconType":"MUSIC_EXPLICIT_BADGE"}}}]}`), &v))
+	assert.True(t, toTrack(&v).Explicit)
+
+	var clean videoRenderer
+	require.NoError(t, json.Unmarshal([]byte(`{"videoId":"Y","title":{"runs":[{"text":"Song"}]}}`), &clean))
+	assert.False(t, toTrack(&clean).Explicit)
+}

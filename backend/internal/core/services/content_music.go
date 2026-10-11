@@ -43,91 +43,6 @@ func (s *ContentService) runAsync(f func()) {
 	go f()
 }
 
-// CreateAudioTrackFromYouTube creates a AUDIO_TRACK row from a music.youtube.com track URL.
-// Only the YouTube Data API call is fatal; YouTube Music and MusicBrainz enrichment are
-// best-effort. A duplicate (by URL or ISRC) returns the existing row with ErrAlreadyExists
-// after recording the pasted video as related media.
-func (s *ContentService) CreateAudioTrackFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error) {
-	kind, videoID, err := youtube.ClassifyURL(url)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidURL, err)
-	}
-	switch kind {
-	case youtube.URLKindMusicCollection:
-		return nil, domain.ErrNotATrack
-	case youtube.URLKindVideo:
-		return nil, fmt.Errorf("%w: not a YouTube Music track link", domain.ErrInvalidURL)
-	}
-
-	canonicalURL := youtube.NormalizeYouTubeMusicURL(videoID)
-	if existing, err := s.repo.GetByURL(ctx, canonicalURL); err == nil && existing != nil {
-		return existing, domain.ErrAlreadyExists
-	} else if err != nil && !errors.Is(err, domain.ErrNotFound) {
-		return nil, fmt.Errorf("failed to check existing content: %w", err)
-	}
-
-	metadata, err := s.youtubeClient.GetVideoMetadata(ctx, videoID)
-	if err != nil {
-		slog.Error("failed to fetch YouTube metadata for music track", "videoID", videoID, "userID", userID, "error", err)
-		return nil, fmt.Errorf("failed to fetch video metadata")
-	}
-
-	enrichCtx, cancel := context.WithTimeout(ctx, musicEnrichTimeout)
-	defer cancel()
-	e := s.enrichMusic(enrichCtx, videoID, metadata)
-
-	if e.music.ISRC != "" {
-		if existing, err := s.repo.GetByISRC(ctx, e.music.ISRC); err == nil && existing != nil {
-			ref := domain.RelatedMedia{Provider: providerYouTube, VideoID: videoID, Kind: domain.RelatedMediaKindOther, Title: metadata.Title, AddedFrom: "duplicate-isrc"}
-			if err := s.addRelatedMedia(ctx, existing, ref); err != nil {
-				slog.Warn("failed to record duplicate as related media", "contentID", existing.ID, "error", err)
-			}
-			return existing, domain.ErrAlreadyExists
-		} else if err != nil && !errors.Is(err, domain.ErrNotFound) {
-			return nil, fmt.Errorf("failed to check existing isrc: %w", err)
-		}
-	}
-
-	related := s.linkExistingVideos(ctx, e.relatedMedia)
-	response, err := buildMusicResponse(metadata.Response, e.music, related)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build music response: %w", err)
-	}
-
-	lengthUnits := "seconds"
-	content := &domain.Content{
-		Name:          metadata.Title,
-		URL:           &canonicalURL,
-		ContentType:   domain.ContentTypeAudioTrack,
-		AddedByUserID: userID,
-		Length:        &metadata.Duration,
-		LengthUnits:   &lengthUnits,
-		Response:      response,
-	}
-	if e.title != "" {
-		content.Name = e.title
-	}
-
-	// refreshOnConflict=false: a refresh would overwrite relatedMedia and lyrics.
-	created, alreadyExisted, err := s.repo.GetOrCreateByURL(ctx, content, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save content: %w", err)
-	}
-	if alreadyExisted {
-		return created, domain.ErrAlreadyExists
-	}
-
-	id := created.ID
-	s.runAsync(func() {
-		bg, cancel := context.WithTimeout(context.Background(), lyricsCheckTimeout)
-		defer cancel()
-		if _, err := s.CheckLyrics(bg, id, true); err != nil {
-			slog.Warn("background lyrics check failed", "contentID", id, "error", err)
-		}
-	})
-	return created, nil
-}
-
 type enriched struct {
 	music        domain.MusicFields
 	title        string
@@ -145,6 +60,7 @@ func (s *ContentService) enrichMusic(ctx context.Context, videoID string, meta *
 		m.EnrichmentPending = true
 	} else {
 		e.title, m.Artists, m.Album, m.VideoType = track.Title, track.Artists, track.Album, track.VideoType
+		m.Explicit = track.Explicit
 		for _, c := range track.Counterparts {
 			e.relatedMedia, _ = domain.AddRelatedMedia(e.relatedMedia, domain.RelatedMedia{
 				Provider: providerYouTube, VideoID: c.VideoID, Kind: relatedKind(c.VideoType), Title: c.Title, AddedFrom: "ytmusic-counterpart",
@@ -206,11 +122,24 @@ func buildMusicResponse(ytResponse json.RawMessage, music domain.MusicFields, re
 	return json.Marshal(out)
 }
 
-// linkExistingVideos sets ContentID on references that already exist as YOUTUBE rows.
+// linkExistingVideos sets ContentID on references that already exist as
+// YOUTUBE rows, in one query for the whole list.
 func (s *ContentService) linkExistingVideos(ctx context.Context, refs []domain.RelatedMedia) []domain.RelatedMedia {
+	if len(refs) == 0 || s.audio == nil {
+		return refs
+	}
+	urls := make([]string, len(refs))
 	for i := range refs {
-		if existing, err := s.repo.GetByURL(ctx, youtube.NormalizeYouTubeURL(refs[i].VideoID)); err == nil && existing != nil {
-			id := existing.ID
+		urls[i] = youtube.NormalizeYouTubeURL(refs[i].VideoID)
+	}
+	found, err := s.audio.ContentByURLs(ctx, urls)
+	if err != nil {
+		slog.Warn("failed to look up existing related videos", "error", err)
+		return refs
+	}
+	for i := range refs {
+		if c, ok := found[urls[i]]; ok {
+			id := c.ID
 			refs[i].ContentID = &id
 		}
 	}

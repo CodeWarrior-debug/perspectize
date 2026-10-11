@@ -342,10 +342,10 @@ func setupTestServer(repo *mockContentRepository, ytClient *mockYouTubeClient) *
 // setupTestServerWithRepos is like setupTestServer but lets the caller supply
 // mockPerspectiveRepository/mockUserRepository (e.g. to assert on createPerspective
 // calls or stub GetByID for the resolver's post-auth user lookup).
-func setupTestServerWithRepos(repo *mockContentRepository, ytClient *mockYouTubeClient, perspectiveRepo *mockPerspectiveRepository, userRepo *mockUserRepository) *httptest.Server {
+func setupTestServerWithRepos(repo *mockContentRepository, ytClient *mockYouTubeClient, perspectiveRepo *mockPerspectiveRepository, userRepo *mockUserRepository, opts ...services.ContentServiceOption) *httptest.Server {
 	categoryRepo := &mockCategoryRepository{}
 	wikidataClient := &mockWikidataClient{}
-	contentService := services.NewContentService(repo, ytClient, nil)
+	contentService := services.NewContentService(repo, ytClient, nil, opts...)
 	userService := services.NewUserService(userRepo, repo, perspectiveRepo, nil, nil, nil)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, repo, wikidataClient)
