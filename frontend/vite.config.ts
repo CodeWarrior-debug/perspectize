@@ -59,6 +59,10 @@ export default defineConfig({
 	define: {
 		__BUILD_INFO__: JSON.stringify(buildInfo),
 	},
+	// Fail if the port is taken rather than drifting to the next one: the Clerk sign-in
+	// is per origin, and the agent registry's verification slots assume fixed ports.
+	server: { strictPort: true },
+	preview: { strictPort: true },
 	plugins: [
 		sveltekit(),
 		tailwindcss(),
