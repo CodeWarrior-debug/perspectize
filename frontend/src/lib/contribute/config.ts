@@ -6,15 +6,27 @@
 
 import type { Component } from 'svelte';
 import HeartHandshakeIcon from '@lucide/svelte/icons/heart-handshake';
+import TicketIcon from '@lucide/svelte/icons/ticket';
+
+/** Subscription prices in whole US dollars. Keep in sync with the Stripe prices behind the two Payment Links. */
+export const MONTHLY_PRICE = 5;
+export const ANNUAL_PRICE = 36;
+
+/** Percent saved by paying annually instead of twelve monthly payments, rounded to a whole number. */
+export function annualDiscountPercent(monthly: number = MONTHLY_PRICE, annual: number = ANNUAL_PRICE): number {
+	return Math.round((1 - annual / (monthly * 12)) * 100);
+}
 
 export interface ContributeLink {
 	id: string;
 	label: string;
 	href: string;
+	/** Short note shown beside the label, e.g. "Save 40%". */
+	badge?: string;
 }
 
 export interface ContributePath {
-	id: 'support' | 'develop' | 'qa';
+	id: 'support' | 'subscribe' | 'develop' | 'qa';
 	title: string;
 	description: string;
 	// aria-hidden is in the prop type so the panel can hide the decorative svg.
@@ -24,6 +36,8 @@ export interface ContributePath {
 
 export interface ContributeEnv {
 	VITE_SUPPORT_URL?: string;
+	VITE_SUPPORT_MONTHLY_URL?: string;
+	VITE_SUPPORT_ANNUAL_URL?: string;
 	VITE_FEATURE_CONTRIBUTE_TAB?: string;
 }
 
@@ -39,6 +53,19 @@ export function safeExternalUrl(value: string | undefined): string | undefined {
 	}
 }
 
+function subscriptionLinks(env: ContributeEnv): ContributeLink[] {
+	const monthly = safeExternalUrl(env.VITE_SUPPORT_MONTHLY_URL);
+	const annual = safeExternalUrl(env.VITE_SUPPORT_ANNUAL_URL);
+	const links: ContributeLink[] = [];
+	if (monthly) links.push({ id: 'monthly', label: `$${MONTHLY_PRICE} / month`, href: monthly });
+	if (annual) {
+		// The discount is only meaningful next to the monthly option it is measured against.
+		const badge = monthly ? `Save ${annualDiscountPercent()}%` : undefined;
+		links.push({ id: 'annual', label: `$${ANNUAL_PRICE} / year`, href: annual, badge });
+	}
+	return links;
+}
+
 export function buildContributePaths(env: ContributeEnv): ContributePath[] {
 	const candidates: ContributePath[] = [
 		{
@@ -49,6 +76,13 @@ export function buildContributePaths(env: ContributeEnv): ContributePath[] {
 			links: [{ id: 'stripe', label: 'Leave a tip', href: safeExternalUrl(env.VITE_SUPPORT_URL) }].filter(
 				(link): link is ContributeLink => link.href !== undefined,
 			),
+		},
+		{
+			id: 'subscribe',
+			title: 'Become a supporter',
+			description: 'Guaranteed access to Perspectize through the term.',
+			icon: TicketIcon,
+			links: subscriptionLinks(env),
 		},
 	];
 	return candidates.filter((path) => path.links.length > 0);
@@ -61,6 +95,8 @@ export function isContributeTabEnabled(env: ContributeEnv, paths: ContributePath
 // Mapped explicitly: Vite's ImportMetaEnv has no named keys in common with ContributeEnv (a weak type).
 const contributeEnv: ContributeEnv = {
 	VITE_SUPPORT_URL: import.meta.env.VITE_SUPPORT_URL,
+	VITE_SUPPORT_MONTHLY_URL: import.meta.env.VITE_SUPPORT_MONTHLY_URL,
+	VITE_SUPPORT_ANNUAL_URL: import.meta.env.VITE_SUPPORT_ANNUAL_URL,
 	VITE_FEATURE_CONTRIBUTE_TAB: import.meta.env.VITE_FEATURE_CONTRIBUTE_TAB,
 };
 

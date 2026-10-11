@@ -22,6 +22,9 @@
 						{#each path.links as link (link.id)}
 							<Button href={link.href} target="_blank" rel="noopener noreferrer">
 								{link.label}
+								{#if link.badge}
+									<span class="rounded-sm bg-primary-foreground/20 px-1.5 py-0.5 text-xs">{link.badge}</span>
+								{/if}
 								<ExternalLinkIcon class="size-4" aria-hidden="true" />
 								<span class="sr-only">(opens in a new tab)</span>
 							</Button>

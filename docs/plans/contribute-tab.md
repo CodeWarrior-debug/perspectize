@@ -196,3 +196,8 @@ Provider: **Stripe Payment Link** (user decision). GitHub Sponsors is deferred t
 8. **Placement:** last, after Send Feedback. Label "Contribute"; blurb drafted in the PR.
 9. **Plan location:** `docs/plans/contribute-tab.md`, as requested.
 10. **a11y tests:** role- and attribute-based assertions. No new `vitest-axe` dependency.
+11. **Subscriptions (added to Phase 1):** a second `subscribe` path, "Become a supporter", with **$5 / month** and **$36 / year** Stripe Payment Links. The only benefit stated is "Guaranteed access to Perspectize through the term." (user decision). The annual link carries a "Save 40%" badge, computed by `annualDiscountPercent()` from `MONTHLY_PRICE` / `ANNUAL_PRICE` in `config.ts` (40% = 1 − 36 / 60). The badge shows only when the monthly link is also configured, since it is measured against it.
+    - Env vars: `VITE_SUPPORT_MONTHLY_URL` and `VITE_SUPPORT_ANNUAL_URL`. Each link is dropped when unset or not `https:`; the whole path is dropped when both are, so the tip button and the subscriptions can ship independently.
+    - **Prices live in two places.** The displayed amounts come from `config.ts`; the charged amounts come from the Stripe prices behind the Payment Links. Change both together.
+    - Stripe Billing (recurring) fees are higher than the one-off 2.9% + $0.30. Confirm the current rate in the Stripe dashboard before quoting a figure.
+    - Still to do in Stripe: a recurring product with the two prices, one Payment Link each, and the customer portal enabled so supporters can cancel themselves.

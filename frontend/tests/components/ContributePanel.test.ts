@@ -88,6 +88,37 @@ describe('ContributePanel', () => {
 		expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(3);
 	});
 
+	describe('link badge', () => {
+		const subscribePath: ContributePath = {
+			id: 'subscribe',
+			title: 'Become a supporter',
+			description: 'Guaranteed access to Perspectize through the term.',
+			icon,
+			links: [
+				{ id: 'monthly', label: '$5 / month', href: 'https://m.example.com' },
+				{ id: 'annual', label: '$36 / year', href: 'https://a.example.com', badge: 'Save 40%' },
+			],
+		};
+
+		it('shows the badge beside the link that has one', () => {
+			render(ContributePanel, { props: { paths: [subscribePath] } });
+			const annual = screen.getByRole('link', { name: /\$36 \/ year/ });
+			expect(annual.textContent).toContain('Save 40%');
+		});
+
+		it('shows no badge on a link without one', () => {
+			render(ContributePanel, { props: { paths: [subscribePath] } });
+			const monthly = screen.getByRole('link', { name: /\$5 \/ month/ });
+			expect(monthly.textContent).not.toContain('Save');
+		});
+
+		it('renders both subscription links and the guaranteed-access description', () => {
+			render(ContributePanel, { props: { paths: [subscribePath] } });
+			expect(screen.getAllByRole('link')).toHaveLength(2);
+			expect(screen.getByText('Guaranteed access to Perspectize through the term.')).toBeTruthy();
+		});
+	});
+
 	it('renders no list when there are no paths', () => {
 		render(ContributePanel, { props: { paths: [] } });
 		expect(screen.queryByRole('list')).toBeNull();

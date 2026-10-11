@@ -20,6 +20,8 @@ interface ImportMetaEnv {
 	/** Deployment environment reported to Faro (falls back to the Vite mode). */
 	readonly VITE_APP_ENV?: string;
 	readonly VITE_SUPPORT_URL?: string;
+	readonly VITE_SUPPORT_MONTHLY_URL?: string;
+	readonly VITE_SUPPORT_ANNUAL_URL?: string;
 	readonly VITE_FEATURE_CONTRIBUTE_TAB?: string;
 }
 
