@@ -70,10 +70,6 @@ export function useUpdatePerspective() {
 	const queryClient = useQueryClient();
 	// PerspectiveItem-shaped branches only — patching by id never inserts a row, so a
 	// list that doesn't contain this perspective is untouched by the loop below.
-	// activityFeeds() is deliberately excluded: it caches a different row shape
-	// (ActivityPerspectiveItem, nested `content`, no rating fields) and is
-	// privacy-filtered server-side, so a PUBLIC<->PRIVATE toggle needs a real refetch
-	// to be re-filtered correctly, not a same-shape patch.
 	const rowListFilters: { queryKey: readonly unknown[] }[] = [
 		{ queryKey: queryKeys.perspectives.byUserLists() },
 		{ queryKey: queryKeys.perspectives.byContentLists() },
@@ -128,12 +124,6 @@ export function useUpdatePerspective() {
 				queryClient.setQueriesData<ListPerspectivesByUserResponse>(f, swap);
 				queryClient.invalidateQueries({ ...f, refetchType: 'none' });
 			}
-			// Activity rows carry nested `content` and are privacy-filtered — refetch
-			// rather than patch, so e.g. a PUBLIC->PRIVATE toggle drops the row out of
-			// activityFeed(false) instead of leaving it there until something else
-			// happens to refetch it.
-			queryClient.invalidateQueries({ queryKey: queryKeys.perspectives.activityFeeds() });
-
 			// Editing a perspective — including toggling its Privacy — changes this
 			// content's perspectiveCount/averageRating (see useContentAggregates,
 			// which now counts private perspectives too). Evict the cached aggregate

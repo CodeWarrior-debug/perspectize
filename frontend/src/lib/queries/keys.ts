@@ -77,12 +77,6 @@ export const queryKeys = {
 		// ListPerspectivesByContentResponse -- also PerspectiveItem rows.
 		byContentLists: () => [...queryKeys.perspectives.lists(), 'byContent'] as const,
 		listByContent: (contentId: number) => [...queryKeys.perspectives.byContentLists(), { contentId }] as const,
-		// ListActivityPerspectivesResponse -- ActivityPerspectiveItem rows (nested
-		// `content`, no rating fields: a DIFFERENT shape) and privacy-filtered by the
-		// server (includePrivate). Never patch this with a PerspectiveItem -- refetch
-		// it instead, so privacy scoping and the nested content stay correct.
-		activityFeeds: () => [...queryKeys.perspectives.lists(), 'activityFeed'] as const,
-		activityFeed: (includePrivate: boolean) => [...queryKeys.perspectives.activityFeeds(), { includePrivate }] as const,
 		details: () => [...queryKeys.perspectives.all(), 'detail'] as const,
 		detail: (id: string) => [...queryKeys.perspectives.details(), id] as const,
 	},

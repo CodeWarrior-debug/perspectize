@@ -16,6 +16,7 @@ const (
 	ContentSortByBoxOffice    ContentSortBy = "BOX_OFFICE"
 	ContentSortByVsBudget     ContentSortBy = "VS_BUDGET"
 	ContentSortByAgeRating    ContentSortBy = "AGE_RATING"
+	ContentSortByAddedBy      ContentSortBy = "ADDED_BY"
 	ContentSortByReleaseDate  ContentSortBy = "RELEASE_DATE"
 	ContentSortByTmdbScore    ContentSortBy = "TMDB_SCORE"
 )
@@ -65,6 +66,8 @@ type ContentFilter struct {
 	ChannelTitle      *string
 	TagContains       *string
 	DescriptionSearch *string
+	// AddedByUsername matches the adder's username (ILIKE, via the users table)
+	AddedByUsername *string
 	// Record date filters (direct columns)
 	CreatedAfter  *string
 	CreatedBefore *string
