@@ -41,7 +41,7 @@ Pasting a YouTube Music link into Add Content produces a **music track** item th
     - Applies to `YOUTUBE_MUSIC` and `MUSIC_TRACK` rows.
     - **Resolved 2026-09-27:** LRCLIB has per-track pages. `https://lrclib.net/tracks/<lrclibId>` renders that song's plain and synced lyrics, and search is `https://lrclib.net/search/<url-encoded title artist>`. Both were verified in a headless browser, and the routes were confirmed in LRCLIB's app bundle. Guessed paths like `/lyrics/<id>` and `/search?q=` render a blank page and must not be used. Its metadata is volunteer-entered and messy: the top search hit for Bohemian Rhapsody had the artist set to "Bohemian Rhapsody - Queen", and a 3:38 cut was listed. The ±3s duration match is therefore required, not optional.
 
-## Flow states (expected share)
+## Flow states (expected share) — estimates, superseded by the measured results below
 
 | State | ~Share | Outcome |
 |---|---|---|
@@ -116,3 +116,35 @@ Pasting a YouTube Music link into Add Content produces a **music track** item th
 - No browser run of any UI (cloud session; no Clerk sign-in). PR #440 carries `needs-demo-video` for a local session.
 - Migration 000031 is written, not applied anywhere, and not yet rehearsed on a Neon branch.
 - The InnerTube `next` endpoint has only been exercised on one real response (a live official video). The audio-track-with-counterpart shape is built from ytmusicapi's documented structure, not a capture.
+
+## Smoke test, 2026-10-11 (measured)
+
+51 real tracks (8 new releases from YouTube Music's new-videos shelf, 7 mainstream, 8 oldies, 7 from the 90s to 2010s, 6 very old, 2 classical, 5 non-English, 6 indie, 2 odd uploads) run through the shipped adapters: InnerTube `next` → MusicBrainz → LRCLIB. Inputs: `docs/superpowers/plans/smoke/2026-10-11-youtube-music-tracks.json`; per-track output: `…-results.jsonl`. The Data API layer was skipped (no key in the cloud session), so duration is InnerTube's.
+
+| Measure | Result |
+|---|---|
+| InnerTube returned title, artist and length | 51 / 51 |
+| InnerTube's artist equals the artist I searched for | 7 / 43 rows with a known artist (the other 36 are uploader channels on fan uploads); the 8 new releases had no expectation |
+| Album | 0 / 51 |
+| Sibling uploads (counterparts) | 0 / 51 |
+| ISRC found, code as shipped | **1 / 51** |
+| ISRC found after stripping title decorations (re-run on the 16 uploads whose artist was right) | 3 / 16 |
+| MusicBrainz 503 or timeout | 8 / 51 (one pass, no retry) |
+| Lyrics available at LRCLIB | 4 / 44 checked (7 checks returned 503) |
+
+**Read this first: the sample is skewed.** I found the 43 searched tracks by logged-out search, which mostly returns fan uploads and lyric videos, not official tracks. The 7/43 artist figure measures that search method, not what a user pastes from their own YouTube Music app (usually an official track). Treat the numbers as a floor for uploads, not a forecast for real use; plan task B13 measures real pasted links.
+
+**What this means**
+- **The flow-state table above was optimistic.** "Full enrichment 55–65%" is not supported. On videos and uploads (all this test could reach) it is closer to a few percent. Official audio tracks, the case the design assumed, could not be sampled; see the next point.
+- **Logged out, YouTube Music hides official audio tracks.** From this environment, search returns videos and uploads, the "songs" filter returns no results, and album, chart and home pages are blocked (404, 403 or empty). Zero of 51 tracks had type `ATV` (audio), so album and sibling-upload fields were never exercised against a real response. Whether a production server on Sevalla sees the same is unknown and must be checked before relying on those fields.
+- **Titles need cleaning before matching.** "Anti-Hero (Official Music Video)" found nothing; "Anti-Hero" found the ISRC. Same for "(Lyrics)", "[4K]", "ft." suffixes and "Artist - Title" patterns.
+- **A video and its audio do not share an ISRC.** The Anti-Hero match was the 5:09 video recording (`USUMV…`), not the 3:20 single. So ISRC dedupe cannot merge a video with its audio track; it only merges two uploads of the same recording.
+- **The lookup cap hides ISRCs.** Led Zeppelin's "Stairway to Heaven" had 10 candidates; only the first 3 are looked up.
+- **LRCLIB metadata can be wrong.** A "prokoman1 / Billie Holiday-Strange fruit-HD" entry matched exactly because LRCLIB itself lists the uploader as the artist. A name match is not proof the lyrics are for that song.
+- **Both services return 503 under light load.** MusicBrainz and LRCLIB each failed on a visible share of calls; there is no retry today.
+
+**Consequences for the design** (carried into plan tasks B10–B13)
+- Decision 4 (identity chain) keeps ISRC first but must not claim to merge a video with its audio; the realistic dedupe key for most rows will be the video ID.
+- Decision 3 layer 3 (MusicBrainz) is best-effort enrichment, not the expected path. The grid must look right with it empty (the preview shows exactly that).
+- The "artist" shown for a fan upload is the uploader. The grid flags it; parsing "Artist - Title" out of the video title is a planned improvement.
+- The preview `tools/content-type-designer/previews/youtube-music-activity.html` renders 12 of these real rows, including the failures.

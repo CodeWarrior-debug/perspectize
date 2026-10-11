@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>YouTube Music track · Activity preview</title>
+<!-- THROWAWAY DESIGN PREVIEW, not product code. Rows are real results from a 51-track smoke test run 2026-10-11 against live YouTube Music (logged out), MusicBrainz and LRCLIB. Built by hand: the content-type-preview skill is not reachable from this session. -->
+<style>
+  :root{--bg:#fff;--fg:#1a1a1a;--muted:#f5f5f5;--muted-fg:#6b7280;--border:#e5e7eb;--primary:#1a365d;--primary-fg:#fff;--card:#fff;--accent:#0F9D8C;
+    --pop-bg:#111827;--pop-fg:#f9fafb;--pop-muted:#9ca3af;--ok:#15803d;--warn:#b45309;--info:#1d4ed8}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .serif{font-family:ui-serif,Georgia,"Times New Roman",serif}
+  header.top{display:flex;align-items:center;gap:14px;padding:10px 20px;border-bottom:1px solid var(--border);background:var(--card)}
+  header.top .brand{font-weight:700;color:var(--primary);letter-spacing:.02em}
+  header.top .crumb{color:var(--muted-fg)}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border:1px solid var(--border);border-radius:999px;background:var(--muted);font-size:11px}
+  .chip b{color:var(--accent)}
+  main{padding:16px 20px;max-width:1280px;margin:0 auto}
+  .note{background:#fffbeb;border:1px solid #fde68a;color:#78350f;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:12px}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 12px;font-size:11px;color:var(--muted-fg)}
+  .badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+  .badge.shipped{background:#dcfce7;color:var(--ok)}.badge.planned{background:#fef3c7;color:var(--warn)}.badge.proposed{background:#dbeafe;color:var(--info)}
+  .fill{font-size:10px;padding:1px 6px;border-radius:4px;background:var(--muted);color:var(--muted-fg)}
+  .grid{border:1px solid var(--border);border-radius:8px;overflow-x:auto;background:var(--card)}
+  table{border-collapse:collapse;width:100%}
+  th{position:relative;text-align:left;font-weight:600;font-size:12px;background:var(--muted);padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap;cursor:default;user-select:none}
+  th .st{margin-left:6px}
+  th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+  th.c,td.c{text-align:center}
+  td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle;cursor:default}
+  td:last-child,th:last-child{white-space:nowrap}
+  tr:last-child td{border-bottom:0}
+  tbody tr:hover td{background:#f9fafb}
+  tbody tr.open td{background:#eef2f7}
+  .item{display:flex;align-items:center;gap:10px;min-width:220px}
+  .tile{width:40px;height:32px;border-radius:6px;background:var(--muted);display:grid;place-items:center;color:var(--primary);flex:none;overflow:hidden}
+  .tile svg{width:20px;height:20px}
+  .tile img{width:100%;height:100%;object-fit:cover}
+  .tile.poster{width:24px;height:36px}
+  .item .t{font-family:ui-serif,Georgia,serif;font-size:13px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+  .item .t.sans{font-family:inherit}
+  .item .t:hover{text-decoration:underline;color:var(--primary)}
+  .item .s{font-size:11px;color:var(--muted-fg);line-height:1.2}
+  .pill{display:inline-block;padding:1px 7px;border-radius:999px;background:var(--muted);border:1px solid var(--border);font-size:11px}
+  .suffix{color:var(--muted-fg);font-size:11px;margin-left:4px}
+  .dash{color:#9ca3af}
+  .pz{width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;border:1px solid var(--border);color:var(--muted-fg);cursor:pointer;font-size:12px}
+  .pz.has{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
+  .tagwrap{display:flex;gap:4px;flex-wrap:wrap;max-width:170px}
+  .tag{font-size:10px;padding:0 6px;border-radius:4px;background:#eef2f7;color:#334155;white-space:nowrap}
+  .flag{font-size:10px;color:var(--muted-fg);margin-left:4px;border:1px dashed var(--border);padding:0 4px;border-radius:3px}
+  .pop{position:fixed;z-index:50;background:var(--pop-bg);color:var(--pop-fg);padding:9px 11px;border-radius:8px;max-width:320px;font-size:12px;line-height:1.4;box-shadow:0 10px 30px rgba(0,0,0,.35);pointer-events:none;display:none}
+  .pop .h{font-weight:600;margin-bottom:3px;display:flex;align-items:center;gap:6px}
+  .pop .v{font-size:13px;margin:2px 0 4px}
+  .pop .m{color:var(--pop-muted);border-top:1px dashed #374151;margin-top:6px;padding-top:6px;font-size:11px}
+  .pop .m code{color:#e5e7eb;font-size:10.5px}
+  .pop .badge{font-size:9px}
+  .ov{position:fixed;inset:0;background:rgba(17,24,39,.45);display:none;align-items:center;justify-content:center;z-index:40;padding:20px}
+  .ov.show{display:flex}
+  .modal{background:var(--card);width:min(880px,100%);max-height:92vh;overflow:auto;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  .mh{background:var(--primary);color:var(--primary-fg);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:2}
+  .mh .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.7}
+  .mh .ttl{font-family:ui-serif,Georgia,serif;font-size:18px;margin-top:2px}
+  .mh .sub{font-size:12px;opacity:.8}
+  .mh button{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px}
+  .mh button.pri{background:#fff;color:var(--primary);border-color:#fff;font-weight:600}
+  .mb{padding:16px 18px;display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
+  @media (max-width:760px){.mb{grid-template-columns:1fr}}
+  .sec{margin-bottom:16px}
+  .sec h4{margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-fg)}
+  .media{width:100%;max-height:260px;object-fit:cover;border-radius:8px;margin-bottom:12px;background:var(--muted)}
+  .text{font-family:ui-serif,Georgia,serif;font-size:14px;line-height:1.6;white-space:pre-wrap}
+  .text.sans{font-family:inherit;font-size:13px}
+  .text sup{font-size:9px;color:var(--muted-fg);margin-right:3px}
+  .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  .tl{border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--card);cursor:default}
+  .tl .k{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-fg);display:flex;justify-content:space-between;gap:6px}
+  .tl .v{font-size:14px;margin-top:2px}
+  .tl .v small{color:var(--muted-fg);font-size:11px}
+  .bar{position:relative;height:10px;background:var(--muted);border:1px solid var(--border);border-radius:999px;margin:6px 0 4px}
+  .bar .mk{position:absolute;top:-3px;bottom:-3px;width:1px;background:#9ca3af}
+  .bar .seg{position:absolute;top:1px;bottom:1px;background:var(--accent);border-radius:999px;min-width:4px}
+  .bar-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--muted-fg)}
+  .links a{color:var(--primary);text-decoration:none}
+  .links a:hover{text-decoration:underline}
+  .links select{font-size:12px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--card)}
+  .links ul{margin:4px 0 0;padding-left:16px}
+  .ctrl{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 18px;border-top:1px solid var(--border);color:var(--muted-fg);font-size:12px}
+  .ctrl button{border:1px solid var(--border);background:var(--card);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px}
+  .empty{color:var(--muted-fg);font-style:italic}
+  .persp{border-top:1px solid var(--border);padding:14px 18px;background:#fafafa}
+  .persp h3{margin:0 0 10px;font-size:13px;display:flex;align-items:center;gap:8px}
+  .rating{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .rating label{width:84px;font-size:12px}
+  .rating .track{position:relative;width:110px;height:8px;background:var(--border);border-radius:999px}
+  .rating .track i{position:absolute;left:0;top:0;bottom:0;background:var(--primary);border-radius:999px}
+  .rating .n{width:22px;text-align:right;font-variant-numeric:tabular-nums;font-size:12px}
+  .rating button{width:20px;height:20px;border:1px solid var(--border);background:#fff;border-radius:4px;cursor:pointer;font-size:12px;line-height:1}
+  .rating .x{border:0;background:transparent;color:var(--muted-fg);cursor:pointer}
+  .ext{border:1px solid var(--border);border-radius:8px;padding:10px;background:#fff;margin:10px 0}
+  .ext .hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .seg2{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+  .seg2 button{border:0;background:#fff;padding:3px 10px;font-size:12px;cursor:pointer}
+  .seg2 button.on{background:var(--primary);color:#fff}
+  .opts{display:flex;flex-wrap:wrap;gap:6px}
+  .opts button{border:1px solid var(--border);background:#fff;border-radius:999px;padding:2px 10px;font-size:12px;cursor:pointer}
+  .opts button.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+  textarea,input[type=text]{width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font:inherit;background:#fff}
+  .row{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:10px}
+  .sw{display:inline-flex;align-items:center;gap:6px;font-size:12px}
+  .sw i{width:30px;height:16px;border-radius:999px;background:var(--border);position:relative;display:inline-block}
+  .sw i::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff}
+  .sw.on i{background:var(--primary)}.sw.on i::after{left:16px}
+  .btn{border:1px solid var(--border);background:#fff;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px}
+  .btn.pri{background:var(--primary);color:#fff;border-color:var(--primary);font-weight:600}
+  .addf{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--border);border-radius:6px;padding:4px 8px;color:var(--muted-fg);font-size:12px;margin-top:4px}
+
+  :root{--accent:#D64F8A}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:0 0 12px}
+  .stat{border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--card)}
+  .stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}.stat span{font-size:11px;color:var(--muted-fg)}
+  .warn{background:#fef2f2;border-color:#fecaca;color:#7f1d1d}
+  .flagu{font-size:10px;color:#9a3412;margin-left:4px;border:1px dashed #fdba74;padding:0 4px;border-radius:3px}
+  .player{aspect-ratio:16/9;border-radius:8px;background:#111827;color:#9ca3af;display:grid;place-items:center;font-size:12px;text-align:center;padding:12px;margin-bottom:12px}
+  .lk{display:block;margin:0 0 8px}.lk a{color:var(--primary)}.lk small{display:block;color:var(--muted-fg);font-size:11px}
+  .lyrics-note{color:var(--muted-fg);font-size:12px;margin:0 0 6px}
+  .nr{font-size:12px;color:var(--muted-fg);border:1px dashed var(--border);border-radius:8px;padding:8px 10px}
+  .why{font-size:12px;background:var(--muted);border-radius:8px;padding:8px 10px;margin-bottom:12px}
+  .mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+</style></head><body>
+<header class="top"><span class="brand">Perspectize</span><span class="crumb">Activity</span><span class="chip">Type filter <b>YouTube Music track</b></span></header>
+<main>
+<div class="note"><b>Real data, logged-out view.</b> Every row below is a real result from a smoke test on 2026-10-11: 51 tracks (new releases, mainstream, oldies, very old, classical, non-English, indie, odd uploads) through YouTube Music InnerTube, MusicBrainz and LRCLIB. Logged out, YouTube Music returned only music videos and uploads, never official audio tracks, so the official-audio path (album, sibling uploads) is not measured here.</div>
+<div class="stats">
+ <div class="stat"><b>51 / 51</b><span>InnerTube returned artist + length</span></div>
+ <div class="stat warn"><b>1 / 51</b><span>ISRC found by the code as shipped</span></div>
+ <div class="stat"><b>3 / 16</b><span>ISRC after cleaning titles (artist-owned uploads)</span></div>
+ <div class="stat"><b>4 / 44</b><span>lyrics found at LRCLIB (7 checks failed with 503)</span></div>
+ <div class="stat warn"><b>0 / 51</b><span>album or sibling uploads (official audio only)</span></div>
+</div>
+<div class="legend"><span><span class="badge shipped">built</span> in PR #440</span><span><span class="badge planned">planned</span> Phase B</span><span><span class="fill">filled</span> value came from a real API</span><span><span class="flagu">channel</span> InnerTube returned the uploader, not the artist</span></div>
+<div class="grid"><table id="g"><thead><tr id="hr"></tr></thead><tbody id="tb"></tbody></table></div>
+<p style="color:var(--muted-fg);font-size:12px">Hover a header or cell for its source. Click a title for the details view. Rows are in the order of the smoke test categories, not sorted.</p>
+</main>
+<div class="pop" id="pop"></div>
+<div class="ov" id="ov"><div class="modal" id="modal"></div></div>
+<script>
+const ROWS=[{"id": "WDgiZpKJBHQ", "cat": "new-release", "note": "Full enrichment on shipped code: artist, ISRC, release date and genre all came back.", "title": "Amor Factura", "artist": "Ricardo Arjona, Grupo Firme", "dur": 237, "isrc": "USA2P2669032", "rel": "2026-10-02", "genre": "latin ballad", "kind": "Official video", "ofc": true, "lyr": null, "lyrAvail": false, "fix": false, "byline": "Ricardo Arjona & Grupo Firme • 9.1M views"}, {"id": "b1kbLwvqugk", "cat": "mainstream", "note": "ISRC found only after stripping \"(Official Music Video)\" from the title (planned fix B6b). The match is the 5:09 VIDEO recording (USUMV prefix), not the 3:20 audio single, so the video and the audio carry different ISRCs.", "title": "Anti-Hero (Official Music Video)", "artist": "Taylor Swift", "dur": 310, "isrc": "USUMV2203078", "rel": "2022-10-21", "genre": "", "kind": "Official video", "ofc": true, "lyr": null, "lyrAvail": false, "fix": true, "byline": "Video • Taylor Swift • 247M views"}, {"id": "421w1j87fEM", "cat": "non-English", "note": "ISRC found after title cleaning (planned B6b). Official video, artist correct, lyrics available.", "title": "Last Last", "artist": "Burna Boy", "dur": 174, "isrc": "USAT22204901", "rel": "2022-04-11", "genre": "afrobeat", "kind": "Official video", "ofc": true, "lyr": {"id": 36463703, "synced": true}, "lyrAvail": true, "fix": true, "byline": "Video • Burna Boy • 366M views"}, {"id": "dQw4w9WgXcQ", "cat": "90s-2010s", "note": "Artist correct, lyrics available, but MusicBrainz candidates had no ISRC within the 3-lookup cap.", "title": "Never Gonna Give You Up", "artist": "Rick Astley", "dur": 214, "isrc": "", "rel": "", "genre": "", "kind": "Official video", "ofc": true, "lyr": {"id": 37481838, "synced": true}, "lyrAvail": true, "fix": false, "byline": "Video • Rick Astley • 1.8B views"}, {"id": "Ly6ZhQVnVow", "cat": "oldies", "note": "Artist correct (uploaded by the band). MusicBrainz returned 10 candidates, none of the first 3 had an ISRC.", "title": "Stairway to Heaven", "artist": "Led Zeppelin", "dur": 649, "isrc": "", "rel": "", "genre": "", "kind": "Upload", "ofc": false, "lyr": null, "lyrAvail": false, "fix": false, "byline": "Video • Led Zeppelin • 82M views"}, {"id": "7hlGqj3ImQI", "cat": "indie/obscure", "note": "Artist correct, lyrics available. The only MusicBrainz candidate has no ISRC.", "title": "Maria También", "artist": "Khruangbin", "dur": 195, "isrc": "", "rel": "", "genre": "", "kind": "Official video", "ofc": true, "lyr": null, "lyrAvail": true, "fix": false, "byline": "Video • Khruangbin • 4.1M views"}, {"id": "c4V0FNZfEv0", "cat": "non-English", "note": "A live TV performance of the song, so no studio recording matches by length or title.", "title": "BTS (방탄소년단) 'Dynamite' @ Good Morning America", "artist": "BTS", "dur": 201, "isrc": "", "rel": "", "genre": "", "kind": "Official video", "ofc": true, "lyr": null, "lyrAvail": false, "fix": false, "byline": "Video • BTS • 133M views"}, {"id": "DWFyvWa-Cfg", "cat": "mainstream", "note": "An upload by someone else. InnerTube names the uploader as the artist, so the MusicBrainz search never had a chance.", "title": "Ed Sheeran - Shape Of You (Live Loop Pedal)", "artist": "Rafael Borgert", "dur": 282, "isrc": "", "rel": "", "genre": "", "kind": "Upload", "ofc": false, "lyr": null, "lyrAvail": false, "fix": false, "byline": "Video • Rafael Borgert • 402K views"}, {"id": "8fIUkINS1uo", "cat": "mainstream", "note": "A lyric-video upload. Artist is the uploader and the title carries \"(Lyrics)\".", "title": "Adele - Hello (Lyrics)", "artist": "Rare Vibes", "dur": 290, "isrc": "", "rel": "", "genre": "", "kind": "Upload", "ofc": false, "lyr": null, "lyrAvail": false, "fix": false, "byline": "Video • Rare Vibes • 3.6M views"}, {"id": "Web007rzSOI", "cat": "very old", "note": "Very old recording uploaded by a fan. LRCLIB matched, but its entry lists the uploader as the artist, so the lyrics association is shaky.", "title": "Billie Holiday-Strange fruit- HD", "artist": "prokoman1", "dur": 183, "isrc": "", "rel": "", "genre": "", "kind": "Upload", "ofc": false, "lyr": {"id": 15103190, "synced": true}, "lyrAvail": true, "fix": false, "byline": "Video • prokoman1 • 11M views"}, {"id": "h_HNB_-boTk", "cat": "very old", "note": "1925 recording from a 78rpm archive channel. Not in MusicBrainz with a usable ISRC.", "title": "Bessie Smith, St.  Louis Blues (1925)", "artist": "78rps", "dur": 190, "isrc": "", "rel": "", "genre": "", "kind": "Upload", "ofc": false, "lyr": null, "lyrAvail": false, "fix": false, "byline": "Video • 78rps • 1.2K views"}, {"id": "8Ed479ExmIs", "cat": "new-release", "note": "Brand-new Thai release. Not in MusicBrainz yet.", "title": "ไม่สมศักดิ์ศรี", "artist": "Genierock", "dur": 319, "isrc": "", "rel": "", "genre": "", "kind": "Official video", "ofc": true, "lyr": null, "lyrAvail": false, "fix": false, "byline": "Genierock • 2.1M views"}];
+const COLS=[
+ {id:'pz',cls:'c',label:'',st:'shipped',body:'Add or edit your perspective on this track.',src:'derived: perspectives WHERE content_id AND user_id'},
+ {id:'item',label:'Track',st:'planned',body:'Track title with its thumbnail. The shipped header still reads Item; a per-type Track label is planned (B7). The thumbnail is the YouTube image today; Cover Art Archive artwork replaces it when MusicBrainz matches.',src:'content.name + response.music.coverImageUrl | i.ytimg.com'},
+ {id:'type',cls:'c',label:'Type',st:'shipped',body:'Content type icon.',src:'content.content_type'},
+ {id:'artist',label:'Artist',st:'planned',body:'From InnerTube. Correct for official videos, but for fan uploads it is the uploader channel (flagged here). Shown in the Channel column for music rows (B7).',src:'response.music.artist'},
+ {id:'album',label:'Album',st:'planned',body:'Only official audio tracks carry an album. Every row here is a video or an upload, so this column is empty in the test.',src:'response.music.album'},
+ {id:'rel',label:'Released',st:'planned',body:'First release date of the matched MusicBrainz recording. Empty when there is no match.',src:'response.music.releaseDate'},
+ {id:'len',cls:'num',label:'Length',st:'shipped',body:'Video duration. For music videos this can be longer than the audio track.',src:'content.length (seconds, length_display = youtube)'},
+ {id:'genre',label:'Genre',st:'planned',body:'Top MusicBrainz genre of the matched recording.',src:'response.music.genre'},
+];
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hr=document.getElementById('hr');
+COLS.forEach(c=>{const th=document.createElement('th');th.className=c.cls||'';th.innerHTML=esc(c.label||'◎')+'<span class="st badge '+c.st+'">'+(c.st==='shipped'?'built':c.st)+'</span>';th.onmouseenter=e=>pop(e,c.label||'Perspectize',null,c.body,c.src,c.st);th.onmouseleave=hide;hr.appendChild(th)});
+const tb=document.getElementById('tb');
+const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+const mmss=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+ROWS.forEach((r,i)=>{
+ const tr=document.createElement('tr');
+ const dash='<span class="dash">—</span>';
+ const cells={
+  pz:'<span class="pz">◎</span>',
+  item:'<div class="item"><div class="tile">'+ICON+'</div><div><div class="t sans">'+esc(r.title)+'</div><div class="s">'+esc(r.kind)+'</div></div></div>',
+  type:'<span style="color:var(--primary)">'+ICON.replace('<svg','<svg style="width:18px;height:18px"')+'</span>',
+  artist:esc(r.artist)+(r.ofc?'':'<span class="flagu">channel</span>'),
+  album:dash,
+  rel:r.rel?esc(r.rel)+' <span class="fill">MusicBrainz</span>':dash,
+  len:mmss(r.dur),
+  genre:r.genre?'<span class="pill">'+esc(r.genre)+'</span>':dash,
+ };
+ COLS.forEach(c=>{const td=document.createElement('td');td.className=c.cls||'';td.innerHTML=cells[c.id];
+  const empty=cells[c.id]===dash;
+  td.onmouseenter=e=>pop(e,c.label||'Perspectize',(c.id==='len'?mmss(r.dur):null),empty?emptyWhy(c.id,r):c.body,c.src,c.st);td.onmouseleave=hide;
+  if(c.id==='item')td.querySelector('.t').onclick=()=>open(i);tr.appendChild(td)});
+ tb.appendChild(tr)});
+function emptyWhy(id,r){
+ if(id==='album')return 'No album. Only official audio tracks list one; this is a '+r.kind.toLowerCase()+'.';
+ if(id==='rel'||id==='genre')return 'No MusicBrainz match for this track, so there is no '+(id==='rel'?'release date':'genre')+'.';
+ return '';}
+const P=document.getElementById('pop');
+function pop(e,h,v,b,src,st){P.innerHTML='<div class="h">'+esc(h)+' <span class="badge '+st+'">'+(st==='shipped'?'built':st)+'</span></div>'+(v?'<div class="v">'+esc(v)+'</div>':'')+'<div>'+esc(b)+'</div><div class="m">source <code>'+esc(src)+'</code></div>';P.style.display='block';const x=Math.min(e.clientX+14,innerWidth-340);P.style.left=x+'px';P.style.top=Math.min(e.clientY+16,innerHeight-160)+'px'}
+function hide(){P.style.display='none'}
+const sr=(t,a)=>'https://lrclib.net/search/'+encodeURIComponent((t+' '+a).trim());
+function lyricsBlock(r){
+ let h='<div class="sec"><h4>Lyrics</h4>';
+ const who="'"+r.title+"' – "+r.artist;
+ if(r.lyr){h+='<span class="lk"><a href="https://lrclib.net/tracks/'+r.lyr.id+'" target="_blank" rel="noopener noreferrer">Open lyrics</a>'+(r.lyr.synced?' <span class="fill">synced</span>':'')+'</span>'}
+ else if(r.ofc||r.artist){h+=(r.lyrAvail?'':'<p class="lyrics-note">No lyrics found for this song.</p>')+'<span class="lk"><a href="'+sr(r.title,r.artist)+'" target="_blank" rel="noopener noreferrer">Search LRCLIB for '+esc(who)+'</a><small>Opens a search results page, not this song directly.</small></span>'}
+ h+='<span class="lk"><a href="https://music.youtube.com/watch?v='+r.id+'" target="_blank" rel="noopener noreferrer">Open song in YouTube Music</a><small>Lyrics tab shown there if available.</small></span></div>';
+ return h}
+function open(i){const r=ROWS[i];
+ document.getElementById('modal').innerHTML='<div class="mh"><div><div class="k">YouTube Music Track</div><div class="ttl">'+esc(r.title)+'</div><div class="sub">'+esc(r.artist)+(r.ofc?'':' (uploader channel)')+'</div></div><div><button id="x">Close</button></div></div>'+
+ '<div class="mb"><div><div class="why"><b>What happened for this row:</b> '+esc(r.note)+'</div><div class="player">Embedded player (youtube-nocookie)<br><span class="mono">'+esc(r.id)+'</span><br>falls back to related uploads, then "Open in YouTube Music"</div>'+lyricsBlock(r)+
+ '<div class="sec"><h4>Other uploads of this song</h4><div class="nr">None found. Sibling uploads come from official audio tracks, which logged-out YouTube Music did not return for any of 51 tracks in this test.</div></div></div>'+
+ '<div><div class="sec"><h4>Details</h4><div class="tiles">'+
+ [['Length',mmss(r.dur)],['Released',r.rel||'—'],['Genre',r.genre||'—'],['ISRC',r.isrc||'—'],['Source',r.kind],['Test category',r.cat]].map(([k,v])=>'<div class="tl"><div class="k">'+k+'</div><div class="v'+(k==='ISRC'?' mono':'')+'">'+esc(v)+'</div></div>').join('')+
+ '</div></div></div></div>';
+ document.getElementById('ov').classList.add('show');document.getElementById('x').onclick=close}
+function close(){document.getElementById('ov').classList.remove('show')}
+document.getElementById('ov').onclick=e=>{if(e.target.id==='ov')close()};document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+</script></body></html>

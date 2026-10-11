@@ -223,3 +223,34 @@ Order matters: B1 before everything; B2 and B3 before B5's budgets are pinned; B
 - [ ] Write `docs/superpowers/plans/2026-09-26-youtube-music-related-media-STATUS.md` in the Movie STATUS format: what is built (commit list), not verified, morning checklist, known follow-ups (grid thumbnail on the card list, InnerTube retry job, `core/services` → `adapters/youtube` import, the `tools/content-type-designer/proposals/` folder).
 - [ ] Move or drop `tools/content-type-designer/proposals/`: `main` now keeps previews under `tools/content-type-designer/previews/` built by the `content-type-preview` skill. Either rebuild the YouTube Music preview with that skill or delete the proposals folder and link the spec instead.
 - [ ] Close the loop on #470 (check constraint) in the STATUS follow-ups; it is not blocked on this PR.
+
+---
+
+## Phase B additions from the 2026-10-11 smoke test
+
+Evidence: spec section "Smoke test, 2026-10-11 (measured)". Do these before B8 so the rollout verifies the fixed behaviour.
+
+## Task B10 — Title normalization before matching
+
+**Suggested subagent:** `go-backend`.
+
+- [ ] Add `normalizeTrackTitle(title string) string` in `adapters/musicbrainz` (or `services`): strip bracketed or parenthesised decorations containing official, lyric(s), audio, video, 4K, HD, live, remaster(ed), visualizer, MV, letra, `ft.`/`feat.` blocks; strip a leading `Artist - ` when it equals the artist; collapse whitespace and trailing separators. Table-driven tests from the real titles in `smoke/2026-10-11-youtube-music-results.jsonl` ("Anti-Hero (Official Music Video)" → "Anti-Hero", "ROSALÍA - MALAMENTE (Letra/Lyrics)" → "MALAMENTE").
+- [ ] Use the normalized title for the MusicBrainz and LRCLIB queries only; keep the original as `content.name`.
+- [ ] Expect: artist-owned uploads move from 1/16 to about 3/16. Re-run the smoke harness and record the new number in the spec.
+
+## Task B11 — Artist for fan uploads
+
+- [ ] When InnerTube's `videoType` is not `audio` or `official_video` and the title matches `Artist - Title`, offer that artist (flagged `artistSource: "title"`) in `response.music.artist`, keeping the uploader as `response.music.channel`. Never overwrite an InnerTube artist from an official video.
+- [ ] Grid: the "channel" flag in the preview shows when `artistSource` is not `innertube`.
+
+## Task B12 — Retries and caps
+
+- [ ] MusicBrainz and LRCLIB clients: retry 503 and timeouts twice with backoff (1 s, 2 s), honouring `Retry-After` when present. Keep the ctx deadline; a persistent failure still returns an error that callers treat as non-fatal.
+- [ ] MusicBrainz candidate lookups: raise the cap from 3 to 5 and stop at the first ISRC; measure the cost in requests per add. Alternative to evaluate: filter the search so only candidates with an ISRC come back.
+- [ ] Tests: 503 then 200 succeeds; persistent 503 fails once after the retries.
+
+## Task B13 — Official-audio path check (before relying on album and siblings)
+
+- [ ] From a **local** session (signed-in or at least a residential IP), run the smoke harness on 20 tracks pasted from the user's own YouTube Music app and record: share of `audio` types, album present, counterparts present. If a production-like server (Sevalla) can be exercised, run it there too.
+- [ ] If the logged-out server never sees official audio tracks, drop the album and sibling-upload claims from the PR description, keep the code paths (they are harmless), and revisit with the optional OAuth sync design (#480).
+- [ ] Do not store or use anyone's Google session on the server for this feature.
