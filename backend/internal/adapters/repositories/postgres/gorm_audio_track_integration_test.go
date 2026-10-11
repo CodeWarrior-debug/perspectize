@@ -25,9 +25,9 @@ func TestAudioTrackIntegration(t *testing.T) {
 	ctx := context.Background()
 	users := NewGormUserRepository(db)
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
-	adder, err := users.CreateFromClerk(ctx, "at-adder-"+suffix, "at-adder-"+suffix, "")
+	adder, err := users.CreateFromClerk(ctx, "at-a-"+suffix[len(suffix)-12:], "at-a-"+suffix[len(suffix)-12:], "")
 	require.NoError(t, err)
-	other, err := users.CreateFromClerk(ctx, "at-other-"+suffix, "at-other-"+suffix, "")
+	other, err := users.CreateFromClerk(ctx, "at-o-"+suffix[len(suffix)-12:], "at-o-"+suffix[len(suffix)-12:], "")
 	require.NoError(t, err)
 	var contentIDs []int
 	t.Cleanup(func() {
