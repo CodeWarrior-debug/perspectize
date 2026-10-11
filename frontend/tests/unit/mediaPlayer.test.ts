@@ -40,25 +40,50 @@ describe('playbackQueue', () => {
 });
 
 describe('parseEmbedMessage', () => {
-	const err = (info: unknown) => JSON.stringify({ event: 'onError', info });
+	const msg = (event: string, info: unknown) => JSON.stringify({ event, info });
 
-	it.each([100, 101, 150, 153])('treats code %i as unplayable', (code) => {
-		expect(parseEmbedMessage(EMBED_ORIGIN, err(code))).toEqual({ type: 'unplayable', code });
+	// Review Focus 4: ticket 03 — only 101 and 150 mark a link unavailable.
+	it('only 101 and 150 mark', () => {
+		expect(parseEmbedMessage(EMBED_ORIGIN, msg('onError', 101))).toEqual({
+			type: 'unplayable',
+			code: 101,
+			markUnavailable: true,
+		});
+		expect(parseEmbedMessage(EMBED_ORIGIN, msg('onError', 150))).toEqual({
+			type: 'unplayable',
+			code: 150,
+			markUnavailable: true,
+		});
+		expect(parseEmbedMessage(EMBED_ORIGIN, msg('onError', 100))).toEqual({
+			type: 'unplayable',
+			code: 100,
+			markUnavailable: false,
+		});
+		expect(parseEmbedMessage(EMBED_ORIGIN, msg('onError', 153))).toEqual({ type: 'config', code: 153 });
+		expect(parseEmbedMessage(EMBED_ORIGIN, msg('onError', 2))).toEqual({ type: 'error', code: 2 });
+		expect(parseEmbedMessage(EMBED_ORIGIN, msg('onError', 5))).toEqual({ type: 'error', code: 5 });
 	});
 
-	it('reports other errors without skipping the video', () => {
-		expect(parseEmbedMessage(EMBED_ORIGIN, err(5))).toEqual({ type: 'error', code: 5 });
+	it('reads play state from onStateChange and infoDelivery', () => {
+		expect(parseEmbedMessage(EMBED_ORIGIN, msg('onStateChange', 1))).toEqual({ type: 'playing' });
+		expect(parseEmbedMessage(EMBED_ORIGIN, msg('onStateChange', 2))).toEqual({ type: 'paused' });
+		expect(parseEmbedMessage(EMBED_ORIGIN, msg('onStateChange', 0))).toEqual({ type: 'ended' });
+		expect(parseEmbedMessage(EMBED_ORIGIN, msg('infoDelivery', { playerState: 1 }))).toEqual({ type: 'playing' });
+		expect(parseEmbedMessage(EMBED_ORIGIN, msg('infoDelivery', { currentTime: 3 }))).toBeNull();
 	});
 
-	it('ignores other origins, non-errors, and junk', () => {
-		expect(parseEmbedMessage('https://evil.example', err(150))).toBeNull();
-		expect(parseEmbedMessage(EMBED_ORIGIN, JSON.stringify({ event: 'infoDelivery', info: {} }))).toBeNull();
+	it('ignores other origins and junk', () => {
+		expect(parseEmbedMessage('https://evil.example', msg('onError', 150))).toBeNull();
 		expect(parseEmbedMessage(EMBED_ORIGIN, 'not json')).toBeNull();
-		expect(parseEmbedMessage(EMBED_ORIGIN, { event: 'onError', info: 150 })).toBeNull();
+		expect(parseEmbedMessage(EMBED_ORIGIN, { event: 'onError' })).toBeNull();
 	});
 });
 
 describe('embedUrl', () => {
+	it('never autoplays', () => {
+		expect(embedUrl('AAAAAAAAAAA', 'http://localhost')).toContain('autoplay=0');
+	});
+
 	it('uses the privacy-enhanced domain with the JS API enabled', () => {
 		const u = new URL(embedUrl('dQw4w9WgXcQ', 'https://perspectize.com'));
 		expect(u.origin).toBe(EMBED_ORIGIN);

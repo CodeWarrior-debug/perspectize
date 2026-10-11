@@ -2,9 +2,12 @@ import type { RelatedMedia } from '$lib/queries/content';
 
 export const EMBED_ORIGIN = 'https://www.youtube-nocookie.com';
 
-// Embed errors that mean "this video will never play here": 100 removed/private,
-// 101 and 150 embedding disabled by the owner (often a label), 153 missing referrer.
-const UNPLAYABLE = new Set([100, 101, 150, 153]);
+// Ticket 03: only these mark a link unavailable (per link, never re-checked in v1).
+const MARK_UNAVAILABLE = new Set([101, 150]);
+// "This upload will not play here": try the next upload of the same song.
+const SKIP_TO_NEXT = new Set([100, 101, 150]);
+// 153 = the embed got no referrer: our setup, not the song. Never marks anything.
+const CONFIG_ERROR = 153;
 
 const KIND_ORDER: Record<string, number> = { audio: 0, official_video: 1, lyric_video: 2, other: 3, live: 4 };
 
@@ -22,7 +25,20 @@ export function playbackQueue(primaryVideoId: string | null, related: RelatedMed
 	return ids;
 }
 
-export type EmbedEvent = { type: 'unplayable'; code: number } | { type: 'error'; code: number } | null;
+export type EmbedEvent =
+	| { type: 'unplayable'; code: number; markUnavailable: boolean }
+	| { type: 'config'; code: number }
+	| { type: 'error'; code: number }
+	| { type: 'playing' }
+	| { type: 'paused' }
+	| { type: 'ended' }
+	| null;
+
+const STATE_EVENTS: Record<number, EmbedEvent> = {
+	0: { type: 'ended' },
+	1: { type: 'playing' },
+	2: { type: 'paused' },
+};
 
 /** Reads a postMessage from a youtube-nocookie embed (enablejsapi=1). Ignores everything else. */
 export function parseEmbedMessage(origin: string, data: unknown): EmbedEvent {
@@ -33,12 +49,27 @@ export function parseEmbedMessage(origin: string, data: unknown): EmbedEvent {
 	} catch {
 		return null;
 	}
-	if (msg?.event !== 'onError' || typeof msg.info !== 'number') return null;
-	return UNPLAYABLE.has(msg.info) ? { type: 'unplayable', code: msg.info } : { type: 'error', code: msg.info };
+	if (msg?.event === 'onError' && typeof msg.info === 'number') {
+		if (msg.info === CONFIG_ERROR) return { type: 'config', code: msg.info };
+		if (SKIP_TO_NEXT.has(msg.info))
+			return { type: 'unplayable', code: msg.info, markUnavailable: MARK_UNAVAILABLE.has(msg.info) };
+		return { type: 'error', code: msg.info };
+	}
+	if (msg?.event === 'onStateChange' && typeof msg.info === 'number') return STATE_EVENTS[msg.info] ?? null;
+	if (msg?.event === 'infoDelivery' && msg.info && typeof msg.info === 'object') {
+		const state = (msg.info as { playerState?: unknown }).playerState;
+		return typeof state === 'number' ? (STATE_EVENTS[state] ?? null) : null;
+	}
+	return null;
 }
 
+/** Sent on iframe load: the embed only posts events after the parent says it is listening. */
+export const LISTEN_COMMAND = JSON.stringify({ event: 'listening', id: 'perspectize-player' });
+export const PAUSE_COMMAND = JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] });
+
 export function embedUrl(videoId: string, pageOrigin: string): string {
-	const q = new URLSearchParams({ enablejsapi: '1', origin: pageOrigin, rel: '0', modestbranding: '1' });
+	// autoplay=0: nothing plays until the user presses play (ticket 03).
+	const q = new URLSearchParams({ enablejsapi: '1', origin: pageOrigin, rel: '0', modestbranding: '1', autoplay: '0' });
 	return `${EMBED_ORIGIN}/embed/${encodeURIComponent(videoId)}?${q}`;
 }
 
