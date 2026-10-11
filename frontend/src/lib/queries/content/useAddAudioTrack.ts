@@ -1,6 +1,7 @@
 import { createMutation, useQueryClient, type QueryClient } from '@tanstack/svelte-query';
 import { toast } from 'svelte-sonner';
 import { goto } from '$app/navigation';
+import { page } from '$app/state';
 import { graphqlRequest } from '../client';
 import {
 	CREATE_AUDIO_TRACK,
@@ -12,6 +13,7 @@ import { promoteRelatedMedia } from './useAudioTrack';
 import { queryKeys } from '../keys';
 import { activityContentHref } from '$lib/utils/contentLinks';
 import { contentNotAllowedMessage } from '$lib/utils/movie';
+import { parseGridParams, showTypeHref, typeFilterExcludes } from '$lib/utils/gridUrlState';
 
 export type AddAudioTrackResult = CreateAudioTrackResponse['createAudioTrack'];
 
@@ -35,6 +37,21 @@ export function promotableOfficialVideo(result: AddAudioTrackResult): RelatedMed
 	return (
 		result.content.relatedMedia?.find((r) => r.kind === 'official_video' && !r.contentId && !r.unavailable) ?? null
 	);
+}
+
+/**
+ * Toast action for a newly added track. When the grid's Type filter would hide it, the
+ * action is "Show" (switches the filter to Audio Track; never done silently), otherwise "Go to track".
+ */
+export function addedTrackAction(
+	trackId: string,
+	search: URLSearchParams,
+	go: (href: string) => unknown = goto,
+): { label: string; onClick: () => void } {
+	if (typeFilterExcludes(parseGridParams(search).filters, 'audio_track')) {
+		return { label: 'Show', onClick: () => void go(showTypeHref(search, 'audio_track')) };
+	}
+	return { label: 'Go to track', onClick: () => void go(activityContentHref(trackId)) };
 }
 
 export function audioTrackErrorMessage(err: Error): string {
@@ -67,7 +84,7 @@ export function useAddAudioTrack() {
 				toast.warning(`This song has already been added: ${track.name}`, { action: goToTrack });
 				return;
 			}
-			toast.success(`Added: ${track.name}`, { action: goToTrack });
+			toast.success(`Added: ${track.name}`, { action: addedTrackAction(track.id, page.url.searchParams) });
 			const official = promotableOfficialVideo(result);
 			if (official) {
 				toast('This song also has an official video.', {
