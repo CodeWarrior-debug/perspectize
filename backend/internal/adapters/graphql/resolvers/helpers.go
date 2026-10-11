@@ -106,6 +106,11 @@ func domainToModel(c *domain.Content) *model.Content {
 			if c.ContentType == domain.ContentTypeMovie {
 				m.Movie = responseMap
 			}
+			if c.ContentType == domain.ContentTypeAudioTrack {
+				if music, ok := responseMap[domain.ResponseKeyMusic].(map[string]interface{}); ok {
+					m.AudioTrack = music
+				}
+			}
 		}
 
 		// Extract fields from the YouTube API response

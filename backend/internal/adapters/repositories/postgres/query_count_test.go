@@ -82,3 +82,17 @@ func TestQueryCount_PerspectiveAggregateByContentIDs_IsOneQueryForAnyBatchSize(t
 	})
 	assertAllExpectationsMet(t, mock)
 }
+
+func TestQueryCount_GetByISRC_ReadsNestedMusicKeyInOneQuery(t *testing.T) {
+	db, mock := newMockDB(t)
+	mock.ExpectQuery(`content_type = \$1 AND response->'music'->>'isrc' = \$2`).
+		WithArgs("audio_track", "GBUM71029604", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "content_type"}).AddRow(9, "Song", "audio_track"))
+
+	c := querycount.Attach(t, db)
+	got, err := NewGormContentRepository(db).GetByISRC(context.Background(), "GBUM71029604")
+	require.NoError(t, err)
+	assert.Equal(t, 9, got.ID)
+	c.AssertExactly(t, 1)
+	assertAllExpectationsMet(t, mock)
+}

@@ -145,3 +145,34 @@ func TestMarkRelatedMediaUnavailable_UnknownVideo(t *testing.T) {
 	require.NotEmpty(t, result.Errors)
 	assert.Contains(t, result.Errors[0].Message, "related video not found")
 }
+
+func TestContentAudioTrackField_ExposesMusicObjectOnlyForTracks(t *testing.T) {
+	u := trackURL
+	repo := &mockContentRepository{
+		getByIDFn: func(_ context.Context, id int) (*domain.Content, error) {
+			if id == 1 {
+				return &domain.Content{ID: 1, Name: "Song", URL: &u, ContentType: domain.ContentTypeAudioTrack,
+					Response: json.RawMessage(`{"music":{"provider":"youtube","artist":"Queen","explicit":true}}`)}, nil
+			}
+			return &domain.Content{ID: 2, Name: "Clip", ContentType: domain.ContentTypeYouTubeVideo,
+				Response: json.RawMessage(`{"music":{"artist":"spoof"}}`)}, nil
+		},
+	}
+	server := setupTestServer(repo, musicYT())
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ a: contentByID(id: 1) { audioTrack } b: contentByID(id: 2) { audioTrack } }`)
+	require.Empty(t, result.Errors)
+	var data struct {
+		A struct {
+			AudioTrack map[string]any `json:"audioTrack"`
+		} `json:"a"`
+		B struct {
+			AudioTrack map[string]any `json:"audioTrack"`
+		} `json:"b"`
+	}
+	require.NoError(t, json.Unmarshal(result.Data, &data))
+	assert.Equal(t, "Queen", data.A.AudioTrack["artist"])
+	assert.Equal(t, true, data.A.AudioTrack["explicit"])
+	assert.Nil(t, data.B.AudioTrack)
+}

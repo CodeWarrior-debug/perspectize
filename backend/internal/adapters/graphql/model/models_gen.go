@@ -57,7 +57,9 @@ type Content struct {
 	Description   *string               `json:"description,omitempty"`
 	Response      map[string]any        `json:"response,omitempty"`
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
-	Movie              map[string]any      `json:"movie,omitempty"`
+	Movie map[string]any `json:"movie,omitempty"`
+	// AUDIO_TRACK metadata (response.music: provider, artist, album, isrc, explicit, suggestedGenreId…); null for other content types.
+	AudioTrack         map[string]any      `json:"audioTrack,omitempty"`
 	PrimaryCategory    *Category           `json:"primaryCategory,omitempty"`
 	VerseStartID       *int                `json:"verseStartID,omitempty"`
 	VerseEndID         *int                `json:"verseEndID,omitempty"`

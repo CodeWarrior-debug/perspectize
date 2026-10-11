@@ -74,10 +74,10 @@ func (s *ContentService) CreateAudioTrackFromYouTube(ctx context.Context, url st
 
 	enrichCtx, cancel := context.WithTimeout(ctx, musicEnrichTimeout)
 	defer cancel()
-	music := s.enrichMusic(enrichCtx, videoID, metadata)
+	e := s.enrichMusic(enrichCtx, videoID, metadata)
 
-	if music.ISRC != "" {
-		if existing, err := s.repo.GetByISRC(ctx, music.ISRC); err == nil && existing != nil {
+	if e.music.ISRC != "" {
+		if existing, err := s.repo.GetByISRC(ctx, e.music.ISRC); err == nil && existing != nil {
 			ref := domain.RelatedMedia{Provider: providerYouTube, VideoID: videoID, Kind: domain.RelatedMediaKindOther, Title: metadata.Title, AddedFrom: "duplicate-isrc"}
 			if err := s.addRelatedMedia(ctx, existing, ref); err != nil {
 				slog.Warn("failed to record duplicate as related media", "contentID", existing.ID, "error", err)
@@ -88,8 +88,8 @@ func (s *ContentService) CreateAudioTrackFromYouTube(ctx context.Context, url st
 		}
 	}
 
-	music.RelatedMedia = s.linkExistingVideos(ctx, music.RelatedMedia)
-	response, err := music.merge(metadata.Response)
+	related := s.linkExistingVideos(ctx, e.relatedMedia)
+	response, err := buildMusicResponse(metadata.Response, e.music, related)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build music response: %w", err)
 	}
@@ -104,8 +104,8 @@ func (s *ContentService) CreateAudioTrackFromYouTube(ctx context.Context, url st
 		LengthUnits:   &lengthUnits,
 		Response:      response,
 	}
-	if music.Title != "" {
-		content.Name = music.Title
+	if e.title != "" {
+		content.Name = e.title
 	}
 
 	// refreshOnConflict=false: a refresh would overwrite relatedMedia and lyrics.
@@ -128,26 +128,15 @@ func (s *ContentService) CreateAudioTrackFromYouTube(ctx context.Context, url st
 	return created, nil
 }
 
-// musicFields are the top-level response keys a AUDIO_TRACK row adds beside the
-// YouTube Data API payload.
-type musicFields struct {
-	VideoID           string                `json:"videoId"`
-	Title             string                `json:"-"`
-	Artist            string                `json:"artist,omitempty"`
-	Artists           []string              `json:"artists,omitempty"`
-	Album             string                `json:"album,omitempty"`
-	VideoType         string                `json:"videoType,omitempty"`
-	ISRC              string                `json:"isrc,omitempty"`
-	ReleaseDate       string                `json:"releaseDate,omitempty"`
-	Genre             string                `json:"genre,omitempty"`
-	MusicBrainzID     string                `json:"musicbrainzId,omitempty"`
-	CoverImageURL     string                `json:"coverImageUrl,omitempty"`
-	EnrichmentPending bool                  `json:"enrichmentPending,omitempty"`
-	RelatedMedia      []domain.RelatedMedia `json:"relatedMedia"`
+type enriched struct {
+	music        domain.MusicFields
+	title        string
+	relatedMedia []domain.RelatedMedia
 }
 
-func (s *ContentService) enrichMusic(ctx context.Context, videoID string, meta *portservices.VideoMetadata) *musicFields {
-	m := &musicFields{VideoID: videoID, RelatedMedia: []domain.RelatedMedia{}}
+func (s *ContentService) enrichMusic(ctx context.Context, videoID string, meta *portservices.VideoMetadata) *enriched {
+	e := &enriched{music: domain.MusicFields{Provider: domain.ProviderYouTube, VideoID: videoID}, relatedMedia: []domain.RelatedMedia{}}
+	m := &e.music
 
 	if s.ytMusic == nil {
 		m.EnrichmentPending = true
@@ -155,9 +144,9 @@ func (s *ContentService) enrichMusic(ctx context.Context, videoID string, meta *
 		slog.Warn("YouTube Music enrichment failed", "videoID", videoID, "error", err)
 		m.EnrichmentPending = true
 	} else {
-		m.Title, m.Artists, m.Album, m.VideoType = track.Title, track.Artists, track.Album, track.VideoType
+		e.title, m.Artists, m.Album, m.VideoType = track.Title, track.Artists, track.Album, track.VideoType
 		for _, c := range track.Counterparts {
-			m.RelatedMedia, _ = domain.AddRelatedMedia(m.RelatedMedia, domain.RelatedMedia{
+			e.relatedMedia, _ = domain.AddRelatedMedia(e.relatedMedia, domain.RelatedMedia{
 				Provider: providerYouTube, VideoID: c.VideoID, Kind: relatedKind(c.VideoType), Title: c.Title, AddedFrom: "ytmusic-counterpart",
 			})
 		}
@@ -168,7 +157,7 @@ func (s *ContentService) enrichMusic(ctx context.Context, videoID string, meta *
 		m.Artist = strings.TrimSuffix(meta.ChannelName, " - Topic")
 	}
 
-	title := m.Title
+	title := e.title
 	if title == "" {
 		title = meta.Title
 	}
@@ -182,7 +171,7 @@ func (s *ContentService) enrichMusic(ctx context.Context, videoID string, meta *
 			slog.Warn("MusicBrainz lookup failed", "videoID", videoID, "error", err)
 		}
 	}
-	return m
+	return e
 }
 
 func relatedKind(videoType string) domain.RelatedMediaKind {
@@ -196,25 +185,24 @@ func relatedKind(videoType string) domain.RelatedMediaKind {
 	}
 }
 
-// merge adds the music keys to the YouTube Data API payload.
-func (m *musicFields) merge(ytResponse json.RawMessage) (json.RawMessage, error) {
+// buildMusicResponse stores the YouTube Data API payload with music and relatedMedia beside it.
+func buildMusicResponse(ytResponse json.RawMessage, music domain.MusicFields, related []domain.RelatedMedia) (json.RawMessage, error) {
 	out := map[string]json.RawMessage{}
 	if len(ytResponse) > 0 {
 		if err := json.Unmarshal(ytResponse, &out); err != nil {
 			return nil, err
 		}
 	}
-	fields, err := json.Marshal(m)
+	mj, err := json.Marshal(music)
 	if err != nil {
 		return nil, err
 	}
-	var extra map[string]json.RawMessage
-	if err := json.Unmarshal(fields, &extra); err != nil {
+	rj, err := json.Marshal(related)
+	if err != nil {
 		return nil, err
 	}
-	for k, v := range extra {
-		out[k] = v
-	}
+	out[domain.ResponseKeyMusic] = mj
+	out[keyRelatedMedia] = rj
 	return json.Marshal(out)
 }
 
@@ -320,17 +308,22 @@ func (s *ContentService) MarkRelatedMediaUnavailable(ctx context.Context, conten
 }
 
 func readMusicSummary(c *domain.Content) musicSummary {
-	var m musicSummary
+	m := domain.ReadMusic(c.Response)
+	out := musicSummary{Artist: m.Artist, Artists: m.Artists}
 	if len(c.Response) > 0 {
-		_ = json.Unmarshal(c.Response, &m)
+		var wrap struct {
+			Lyrics *domain.LyricsAvailability `json:"lyrics"`
+		}
+		_ = json.Unmarshal(c.Response, &wrap)
+		out.Lyrics = wrap.Lyrics
 	}
-	return m
+	return out
 }
 
 type musicSummary struct {
-	Artist  string                     `json:"artist"`
-	Artists []string                   `json:"artists"`
-	Lyrics  *domain.LyricsAvailability `json:"lyrics"`
+	Artist  string
+	Artists []string
+	Lyrics  *domain.LyricsAvailability
 }
 
 // CheckLyrics looks up lyrics availability and stores only the result. Unless force is

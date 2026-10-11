@@ -59,11 +59,7 @@ func (r *fakeMusicRepo) GetOrCreateByURL(ctx context.Context, c *domain.Content,
 
 func (r *fakeMusicRepo) GetByISRC(_ context.Context, isrc string) (*domain.Content, error) {
 	for _, c := range r.rows {
-		var m struct {
-			ISRC string `json:"isrc"`
-		}
-		_ = json.Unmarshal(c.Response, &m)
-		if c.ContentType == domain.ContentTypeAudioTrack && m.ISRC == isrc {
+		if c.ContentType == domain.ContentTypeAudioTrack && domain.ReadMusic(c.Response).ISRC == isrc {
 			return c, nil
 		}
 	}
@@ -165,13 +161,10 @@ func TestCreateAudioTrackFromYouTube_FullEnrichment(t *testing.T) {
 	assert.Equal(t, "Bohemian Rhapsody", c.Name, "YouTube Music's clean title wins over the video title")
 	assert.Equal(t, []bool{false}, repo.upserts, "music upserts must not refresh (it would wipe relatedMedia and lyrics)")
 
-	var isrc, artist, album string
-	repo.field(t, c.ID, "isrc", &isrc)
-	repo.field(t, c.ID, "artist", &artist)
-	repo.field(t, c.ID, "album", &album)
-	assert.Equal(t, "GBUM71029604", isrc)
-	assert.Equal(t, "Queen", artist)
-	assert.Equal(t, "A Night at the Opera", album)
+	music := domain.ReadMusic(repo.rows[c.ID].Response)
+	assert.Equal(t, "GBUM71029604", music.ISRC)
+	assert.Equal(t, "Queen", music.Artist)
+	assert.Equal(t, "A Night at the Opera", music.Album)
 
 	var items []json.RawMessage
 	repo.field(t, c.ID, "items", &items)
@@ -200,9 +193,9 @@ func TestCreateAudioTrackFromYouTube_NoMusicBrainzMatch(t *testing.T) {
 	require.NoError(t, err)
 	m := map[string]json.RawMessage{}
 	require.NoError(t, json.Unmarshal(c.Response, &m))
-	assert.NotContains(t, m, "isrc")
-	assert.Contains(t, m, "artist")
-	assert.NotContains(t, m, "enrichmentPending")
+	assert.Empty(t, domain.ReadMusic(c.Response).ISRC)
+	assert.NotEmpty(t, domain.ReadMusic(c.Response).Artist)
+	assert.False(t, domain.ReadMusic(c.Response).EnrichmentPending)
 }
 
 func TestCreateAudioTrackFromYouTube_YTMusicDown(t *testing.T) {
@@ -212,12 +205,9 @@ func TestCreateAudioTrackFromYouTube_YTMusicDown(t *testing.T) {
 
 	c, err := svc.CreateAudioTrackFromYouTube(context.Background(), musicURL, 7)
 	require.NoError(t, err, "unofficial enrichment failing must not block the add")
-	var pending bool
-	var artist string
-	repo.field(t, c.ID, "enrichmentPending", &pending)
-	repo.field(t, c.ID, "artist", &artist)
-	assert.True(t, pending)
-	assert.Equal(t, "Queen", artist, "falls back to the channel name without \" - Topic\"")
+	music := domain.ReadMusic(c.Response)
+	assert.True(t, music.EnrichmentPending)
+	assert.Equal(t, "Queen", music.Artist, "falls back to the channel name without \" - Topic\"")
 	assert.Zero(t, mb.calls, "MusicBrainz needs YouTube Music's artist list, so it is skipped")
 	assert.Equal(t, "Bohemian Rhapsody (Remastered 2011)", c.Name)
 }
@@ -245,7 +235,7 @@ func TestCreateAudioTrackFromYouTube_DuplicateURL(t *testing.T) {
 func TestCreateAudioTrackFromYouTube_DuplicateISRCAddsRelatedMedia(t *testing.T) {
 	repo := newFakeMusicRepo()
 	u := "https://music.youtube.com/watch?v=OTHEROTHER1"
-	existing := repo.add(&domain.Content{URL: &u, ContentType: domain.ContentTypeAudioTrack, Response: json.RawMessage(`{"isrc":"GBUM71029604","relatedMedia":[]}`)})
+	existing := repo.add(&domain.Content{URL: &u, ContentType: domain.ContentTypeAudioTrack, Response: json.RawMessage(`{"music":{"provider":"youtube","isrc":"GBUM71029604"},"relatedMedia":[]}`)})
 	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(fullTrack(), isrcMatch(), nil), syncRunner())
 
 	c, err := svc.CreateAudioTrackFromYouTube(context.Background(), musicURL, 7)
@@ -370,4 +360,22 @@ func TestCheckLyrics_OnlyMusic(t *testing.T) {
 	svc := services.NewContentService(repo, ytMeta(audioID), nil, services.WithMusicEnrichment(nil, nil, &fakeLyrics{}))
 	_, err := svc.CheckLyrics(context.Background(), c.ID, true)
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+}
+
+func TestCreateAudioTrackFromYouTube_WritesMusicObject(t *testing.T) {
+	repo := newFakeMusicRepo()
+	svc := services.NewContentService(repo, ytMeta(audioID), nil,
+		services.WithMusicEnrichment(fullTrack(), isrcMatch(), &fakeLyrics{match: &portservices.LyricsMatch{}}), syncRunner())
+
+	got, err := svc.CreateAudioTrackFromYouTube(context.Background(), musicURL, 7)
+	require.NoError(t, err)
+
+	var top map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(got.Response, &top))
+	assert.NotContains(t, top, "artist", "music keys are no longer top-level")
+	assert.Contains(t, top, "relatedMedia")
+	m := domain.ReadMusic(got.Response)
+	assert.Equal(t, domain.ProviderYouTube, m.Provider)
+	assert.NotEmpty(t, m.Artist)
+	assert.Equal(t, "GBUM71029604", m.ISRC)
 }
