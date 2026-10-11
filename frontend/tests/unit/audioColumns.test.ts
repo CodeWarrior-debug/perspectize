@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
 	defaultColumnVisibility,
 	isAudioOnlyTypeFilter,
 	itemColumnHeader,
+	channelColumnHeader,
+	syncItemHeader,
 	capitalizeContentType,
 } from '$lib/utils/grid-config';
 import {
@@ -79,5 +81,30 @@ describe('audio cells', () => {
 		expect((typeCellRenderer({ data: { contentType: 'AUDIO_TRACK' } }) as HTMLElement).textContent).toContain(
 			'Audio Track',
 		);
+	});
+});
+
+describe('channel column header', () => {
+	it('reads "Artist" only when the type filter is exactly AUDIO_TRACK', () => {
+		expect(channelColumnHeader('audio_track')).toBe('Artist');
+	});
+
+	it('keeps "Channel" for every other view', () => {
+		expect(channelColumnHeader('youtube_video')).toBe('Channel');
+		expect(channelColumnHeader('movie')).toBe('Channel');
+		expect(channelColumnHeader('audio_track,youtube_video')).toBe('Channel');
+		expect(channelColumnHeader(undefined)).toBe('Channel');
+	});
+
+	it('renames the channel colDef and redraws once, then switches back', () => {
+		const colDef = { headerName: 'Channel' };
+		const refreshHeader = vi.fn();
+		const api = { getColumn: (id: string) => (id === 'channel' ? { getColDef: () => colDef } : null), refreshHeader };
+		expect(syncItemHeader(api, channelColumnHeader('audio_track'), 'channel')).toBe(true);
+		expect(colDef.headerName).toBe('Artist');
+		expect(syncItemHeader(api, channelColumnHeader('audio_track'), 'channel')).toBe(false);
+		expect(syncItemHeader(api, channelColumnHeader('youtube_video'), 'channel')).toBe(true);
+		expect(colDef.headerName).toBe('Channel');
+		expect(refreshHeader).toHaveBeenCalledTimes(2);
 	});
 });

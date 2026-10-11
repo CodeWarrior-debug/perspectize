@@ -801,8 +801,8 @@ export interface HeaderApi {
  * effect re-runs on every filter change, so an unconditional redraw closed the
  * filter while the user was still typing. Returns whether it redrew.
  */
-export function syncItemHeader(api: HeaderApi, name: string): boolean {
-	const colDef = api.getColumn('item')?.getColDef();
+export function syncItemHeader(api: HeaderApi, name: string, colId = 'item'): boolean {
+	const colDef = api.getColumn(colId)?.getColDef();
 	if (!colDef || colDef.headerName === name) return false;
 	colDef.headerName = name;
 	api.refreshHeader();
@@ -812,4 +812,9 @@ export function syncItemHeader(api: HeaderApi, name: string): boolean {
 /** Item column header: "Film" when the type filter is exactly MOVIE, otherwise "Item". */
 export function itemColumnHeader(typeFilter: string | undefined): string {
 	return isMovieOnlyTypeFilter(typeFilter) ? 'Film' : isAudioOnlyTypeFilter(typeFilter) ? 'Track' : 'Item';
+}
+
+/** Channel column header: "Artist" when the type filter is exactly AUDIO_TRACK (the column carries the artist), otherwise "Channel". */
+export function channelColumnHeader(typeFilter: string | undefined): string {
+	return isAudioOnlyTypeFilter(typeFilter) ? 'Artist' : 'Channel';
 }

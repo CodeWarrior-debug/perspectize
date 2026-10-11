@@ -92,6 +92,7 @@
 		unknownLastComparator,
 		releasedComparator,
 		itemColumnHeader,
+		channelColumnHeader,
 		ratedComparator,
 		CLIENT_ONLY_SORT_COLS,
 		sortableColumnsFor,
@@ -1254,6 +1255,13 @@
 		const headerName = itemColumnHeader(filters.type);
 		if (!gridApi || !gridReady) return;
 		syncItemHeader(gridApi, headerName);
+	});
+
+	// The Channel column reads "Artist" in the Audio track view (it carries the artist there).
+	$effect(() => {
+		const headerName = channelColumnHeader(filters.type);
+		if (!gridApi || !gridReady) return;
+		syncItemHeader(gridApi, headerName, 'channel');
 	});
 
 	// Restore AG Grid filter state from URL on mount and mode changes
