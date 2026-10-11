@@ -269,7 +269,8 @@
 
 				{#if showItemPicker || contentName === null}
 					<div class="flex flex-col gap-1">
-						<Label for="todo-name">Name</Label>
+						<!-- Not "Name": LastPass reads that label as an identity form and decorates a field here, ignoring data-lpignore. -->
+						<Label for="todo-name">Title</Label>
 						<Input
 							id="todo-name"
 							type="text"

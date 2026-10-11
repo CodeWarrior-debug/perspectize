@@ -170,6 +170,12 @@ describe('TodoDialog', () => {
 	});
 
 	describe('password managers', () => {
+		it('labels the todo title "Title", never "Name" (LastPass treats a Name label as an identity form and ignores data-lpignore)', () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS } });
+			expect(screen.getByLabelText('Title')).toBe(field('#todo-name'));
+			expect(screen.queryByLabelText('Name')).toBeNull();
+		});
+
 		it('are asked not to offer to fill the todo Name (a title, not a person), even while it is locked', () => {
 			render(TodoDialog, { props: { open: true, lists: LISTS } });
 			const name = field('#todo-name');
