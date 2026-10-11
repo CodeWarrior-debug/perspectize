@@ -1,9 +1,23 @@
-import { toast, type ExternalToast } from 'svelte-sonner';
+import { toast, type ExternalToast, type ToasterProps } from 'svelte-sonner';
+
+/**
+ * Props for the app's one `<Toaster>` (+layout.svelte renders it in both auth
+ * branches, so they share this). `expand` keeps simultaneous toasts separated
+ * vertically, each sliding into its own slot; sonner's default collapses them
+ * into an overlapping stack that only fans out on hover, which hid one toast
+ * behind another (e.g. "Perspective saved" over "Mark this Todo done?").
+ */
+export const TOASTER_PROPS = {
+	position: 'top-right',
+	duration: 2000,
+	richColors: true,
+	expand: true,
+} as const satisfies ToasterProps;
 
 /**
  * How long a toast with an action button stays up. The app-wide default
- * (`<Toaster duration={2000}>` in +layout.svelte) is too short to reach the
- * button, so every toast that carries an action uses this instead.
+ * (`TOASTER_PROPS.duration`) is too short to reach the button, so every toast
+ * that carries an action uses this instead.
  */
 export const ACTION_TOAST_DURATION_MS = 4000;
 
