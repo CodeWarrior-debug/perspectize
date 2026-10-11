@@ -85,6 +85,11 @@ describe('defaultLayout', () => {
 		expect(layout.channel).toBe(false);
 	});
 
+	it('maps AUDIO_TRACK to the audio view with the Listen column on', () => {
+		expect(columnViewFor('audio_track')).toBe('audio');
+		expect(defaultLayout('md', 'audio').listen).toBe(true);
+	});
+
 	it('hides picker-only columns such as Date Added', () => {
 		expect(defaultLayout('lg', 'general').createdAt).toBe(false);
 	});

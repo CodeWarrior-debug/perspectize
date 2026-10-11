@@ -61,6 +61,8 @@
 		truncateDescription,
 		contentRowId,
 		headerMinWidth,
+		channelValueGetter,
+		listenCellRenderer,
 		castCellRenderer,
 		genreValueGetter,
 		ratedValueGetter,
@@ -687,6 +689,14 @@
 			// + cast 125 + duration 111 + released 105 + box office 138 + vs. budget 118
 			// + TMDB score 121 + tags 90 = 1207. Box office keeps room for its sort arrow.
 			{
+				colId: 'listen',
+				headerName: 'Listen',
+				cellRenderer: listenCellRenderer,
+				sortable: false,
+				hide: true,
+				minWidth: 90,
+			},
+			{
 				colId: 'genre',
 				headerName: 'Genre',
 				flex: 1,
@@ -872,7 +882,7 @@
 			},
 			{
 				colId: 'channel',
-				field: 'channelTitle',
+				valueGetter: channelValueGetter,
 				headerName: 'Channel',
 				flex: 1.2,
 				maxWidth: 200,

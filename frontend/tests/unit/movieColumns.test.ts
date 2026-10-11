@@ -579,6 +579,11 @@ describe('default column sets fit the 1212px grid', () => {
 		expect(total).toBeLessThanOrEqual(1212);
 	});
 
+	it('audio lg set fits the 1212px grid', () => {
+		const { visible } = defaultColumnVisibility('lg', false, true);
+		expect(visible.reduce((sum, id) => sum + minWidth(id), 0)).toBeLessThanOrEqual(1212);
+	});
+
 	it('Movie lg set sums under 1212', () => {
 		const { visible } = defaultColumnVisibility('lg', true);
 		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
