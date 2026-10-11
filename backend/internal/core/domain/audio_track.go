@@ -1,6 +1,9 @@
 package domain
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 // TrackProvider is where a track link points. Stored lowercase.
 type TrackProvider string
@@ -52,4 +55,33 @@ func ReadMusic(raw json.RawMessage) MusicFields {
 // ADR 0005: it is its own track, never merged with the official recording.
 func IsUnofficialUpload(m MusicFields) bool {
 	return m.Provider == ProviderYouTube && m.VideoType == "other"
+}
+
+// TrackLinkKind says whether a link plays in-page (EMBED) or opens the provider (LISTEN).
+type TrackLinkKind string
+
+const (
+	TrackLinkKindListen TrackLinkKind = "LISTEN"
+	TrackLinkKindEmbed  TrackLinkKind = "EMBED"
+)
+
+// TrackLinkSource says how a link got onto the track.
+type TrackLinkSource string
+
+const (
+	TrackLinkSourcePasted  TrackLinkSource = "PASTED"
+	TrackLinkSourceMatched TrackLinkSource = "MATCHED" // reserved for the matcher (ticket 02); unused in v1
+)
+
+// TrackLink is one track_links row.
+type TrackLink struct {
+	ID              int
+	ContentID       int
+	Provider        TrackProvider
+	ProviderTrackID string
+	URL             string
+	Kind            TrackLinkKind
+	Source          TrackLinkSource
+	UnavailableAt   *time.Time
+	CreatedAt       time.Time
 }
