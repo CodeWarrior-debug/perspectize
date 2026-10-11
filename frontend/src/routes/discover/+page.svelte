@@ -10,7 +10,7 @@
 	import { graphqlRequest } from '$lib/queries/client';
 	import { LIST_CONTENT, type ContentResponse, type ContentItem } from '$lib/queries/content';
 	import { queryKeys } from '$lib/queries/keys';
-	import { useAddVideo, toAddResult } from '$lib/queries/content/useAddVideo';
+	import { useAddVideo } from '$lib/queries/content/useAddVideo';
 	import { useAddMovie } from '$lib/queries/content/useAddMovie';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import { fetchYouTubeTrending, toWatchUrl, youtubeKeys, type VideoItem } from '$lib/services/youtubeApi';
@@ -130,7 +130,7 @@
 		pendingId = videoId;
 		addVideo.mutate(toWatchUrl(videoId), {
 			onSuccess: (data) => {
-				const content = toAddResult(data)?.content;
+				const content = data?.createContentFromYouTube?.content;
 				if (content) {
 					addedContentByVideoId = new Map(addedContentByVideoId).set(videoId, content);
 				}

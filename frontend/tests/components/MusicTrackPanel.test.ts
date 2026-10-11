@@ -8,8 +8,8 @@ const h = vi.hoisted(() => ({
 	promote: vi.fn(),
 }));
 
-vi.mock('$lib/queries/content/useMusicTrack', () => ({
-	useMusicTrack: () => ({
+vi.mock('$lib/queries/content/useAudioTrack', () => ({
+	useAudioTrack: () => ({
 		get data() {
 			return h.trackData;
 		},
@@ -37,7 +37,7 @@ function data(over: Record<string, unknown> = {}) {
 		id: '9',
 		name: 'Bohemian Rhapsody',
 		url,
-		response: { artist: 'Queen' },
+		audioTrack: { artist: 'Queen' },
 		relatedMedia: [official],
 		lyrics: { available: true, lrclibId: 1, hasSynced: true, checkedAt: '2026-09-27T12:00:00Z' },
 		...over,

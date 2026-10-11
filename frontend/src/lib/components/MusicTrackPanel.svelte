@@ -2,24 +2,24 @@
 	import MediaPlayer from '$lib/components/MediaPlayer.svelte';
 	import LyricsLinks from '$lib/components/LyricsLinks.svelte';
 	import {
-		useMusicTrack,
+		useAudioTrack,
 		useRefreshLyrics,
 		useMarkRelatedMediaUnavailable,
 		usePromoteRelatedMedia,
-	} from '$lib/queries/content/useMusicTrack';
+	} from '$lib/queries/content/useAudioTrack';
 	import { extractVideoIdFromUrl } from '$lib/utils/formatting';
 	import { playbackQueue, lyricsNeedRecheck } from '$lib/utils/mediaPlayer';
 	import type { RelatedMedia } from '$lib/queries/content';
 
 	let { contentId, name, url, open }: { contentId: string; name: string; url: string | null; open: boolean } = $props();
 
-	const track = useMusicTrack(() => (open ? contentId : null));
+	const track = useAudioTrack(() => (open ? contentId : null));
 	const refreshLyrics = useRefreshLyrics();
 	const markUnavailable = useMarkRelatedMediaUnavailable();
 	const promote = usePromoteRelatedMedia();
 
 	const data = $derived(track.data ?? null);
-	const artist = $derived(data?.response?.artist ?? null);
+	const artist = $derived(data?.audioTrack?.artist ?? null);
 	const related = $derived(data?.relatedMedia ?? []);
 	const queue = $derived(playbackQueue(extractVideoIdFromUrl(url), related));
 

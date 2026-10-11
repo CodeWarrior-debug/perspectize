@@ -42,8 +42,9 @@
 	function handleSubmit(e: Event) {
 		e.preventDefault();
 
-		if (classifyYouTubeUrl(url) === 'musicCollection') {
-			error = 'Paste a song link, not an album, playlist, or artist';
+		const kind = classifyYouTubeUrl(url);
+		if (kind === 'musicTrack' || kind === 'musicCollection') {
+			error = 'Music links are added from Add Content, as audio tracks.';
 			return;
 		}
 		if (!validateYouTubeUrl(url)) {

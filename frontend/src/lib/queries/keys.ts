@@ -27,8 +27,9 @@ export const queryKeys = {
 		// share a cache key, or whichever query populates the cache first wins
 		// for the shared staleTime window and the other reads wrong fields.
 		banner: (id: string) => [...queryKeys.content.details(), 'banner', id] as const,
-		// AUDIO_TRACK details (related media + lyrics availability); separate key for the same reason.
-		music: (id: string) => [...queryKeys.content.details(), 'music', id] as const,
+		// AUDIO_TRACK details (links, genre, related media, lyrics); its own key because
+		// it selects different fields from detail/row.
+		audioTrack: (id: string) => [...queryKeys.content.details(), 'audioTrack', id] as const,
 		// Full ContentItem row (GET_CONTENT_DETAILS) for a details modal opened on an
 		// item that isn't in the loaded Activity rows (e.g. via `?open=<id>`).
 		row: (id: string) => [...queryKeys.content.details(), 'row', id] as const,
@@ -48,6 +49,12 @@ export const queryKeys = {
 			[...queryKeys.bible.all(), 'passage', startVerseId, endVerseId] as const,
 		passageInterlinear: (startVerseId: number, endVerseId: number) =>
 			[...queryKeys.bible.all(), 'interlinear', startVerseId, endVerseId] as const,
+	},
+
+	music: {
+		all: () => [...queryKeys.all, 'music'] as const,
+		// The seeded genre tree; never changes at runtime (staleTime Infinity).
+		genres: () => [...queryKeys.music.all(), 'genres'] as const,
 	},
 
 	users: {

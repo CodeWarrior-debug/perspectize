@@ -42,6 +42,9 @@ export interface ContentItem {
 	// MOVIE rows only: the shaped TMDB payload. List rows select this instead of `response`
 	// (so YouTube rows don't ship their snippet twice); null for every other type.
 	movie?: Record<string, unknown> | null;
+	// AUDIO_TRACK rows only: response.music, and the genre from the seeded tree.
+	audioTrack?: AudioTrackMeta | null;
+	genre?: { id: string; name: string } | null;
 	primaryCategory: {
 		id: string;
 		wikidataQid: string;
@@ -81,12 +84,6 @@ export interface CreateContentResponse {
 	createContentFromYouTube: CreateContentResult;
 }
 
-export interface CreateAudioTrackResponse {
-	createAudioTrack: CreateContentResult & {
-		content: ContentItem & { relatedMedia: RelatedMedia[] };
-	};
-}
-
 export type RelatedMediaKind = 'audio' | 'official_video' | 'lyric_video' | 'live' | 'other';
 
 // A reference to another upload of the same song. Not a content row unless a
@@ -102,14 +99,72 @@ export interface RelatedMedia {
 
 export type { LyricsAvailability };
 
-// The details-modal view of a AUDIO_TRACK row. `response` carries artist/album.
-export interface MusicTrack {
+export interface TrackLink {
+	id: string;
+	provider: string;
+	providerTrackId: string;
+	url: string;
+	kind: 'LISTEN' | 'EMBED';
+	source: 'PASTED' | 'MATCHED';
+	unavailableAt: string | null;
+}
+
+export interface MusicGenre {
+	id: string;
+	name: string;
+	parentId: string | null;
+}
+
+/** response.music on an AUDIO_TRACK row (Content.audioTrack). */
+export interface AudioTrackMeta {
+	provider?: string;
+	videoId?: string;
+	artist?: string;
+	album?: string;
+	videoType?: string;
+	explicit?: boolean;
+	coverImageUrl?: string;
+	suggestedGenreId?: number;
+	releaseDate?: string;
+}
+
+/** The details-modal view of an AUDIO_TRACK row. */
+export interface AudioTrack {
 	id: string;
 	name: string;
 	url: string | null;
+	addedByUserID: string;
+	createdAt: string;
+	genreId: string | null;
+	genre: MusicGenre | null;
+	audioTrack: AudioTrackMeta | null;
+	trackLinks: TrackLink[];
 	relatedMedia: RelatedMedia[];
 	lyrics: LyricsAvailability | null;
-	response: { artist?: string; album?: string; videoId?: string; coverImageUrl?: string } | null;
+}
+
+export interface SameSongCandidate {
+	id: string;
+	name: string;
+	url: string | null;
+	audioTrack: AudioTrackMeta | null;
+}
+
+export interface CreateAudioTrackInput {
+	url: string;
+	title?: string;
+	artist?: string;
+	genreId?: number;
+	sameAsContentId?: number;
+	createNew?: boolean;
+}
+
+export interface CreateAudioTrackResponse {
+	createAudioTrack: {
+		content: (ContentItem & { relatedMedia: RelatedMedia[] }) | null;
+		alreadyExisted: boolean;
+		sameSongCandidates: SameSongCandidate[];
+	};
 }
 
 export interface UpdateContentSourceDataResponse {
@@ -157,6 +212,11 @@ export const LIST_CONTENT = gql`
 				tags
 				description
 				movie
+				audioTrack
+				genre {
+					id
+					name
+				}
 				primaryCategory {
 					id
 					wikidataQid
@@ -295,6 +355,11 @@ export const GET_CONTENT_DETAILS = gql`
 			description
 			response
 			movie
+			audioTrack
+			genre {
+				id
+				name
+			}
 			primaryCategory {
 				id
 				wikidataQid
@@ -379,7 +444,7 @@ export const CREATE_CONTENT_FROM_YOUTUBE = gql`
 `;
 
 export const CREATE_AUDIO_TRACK = gql`
-	mutation CreateAudioTrack($input: CreateContentFromYouTubeInput!) {
+	mutation CreateAudioTrack($input: CreateAudioTrackInput!) {
 		createAudioTrack(input: $input) {
 			content {
 				id
@@ -388,57 +453,85 @@ export const CREATE_AUDIO_TRACK = gql`
 				contentType
 				length
 				lengthUnits
-				viewCount
-				likeCount
-				channelTitle
-				publishedAt
-				tags
-				description
-				primaryCategory {
+				addedByUserID
+				audioTrack
+				genre {
 					id
-					wikidataQid
-					label
-					description
-					entityType
+					name
 				}
 				relatedMedia {
+					provider
 					videoId
 					kind
+					title
 					contentId
+					unavailable
 				}
 				createdAt
 				updatedAt
 			}
 			alreadyExisted
+			sameSongCandidates {
+				id
+				name
+				url
+				audioTrack
+			}
 		}
 	}
 `;
 
-const MUSIC_TRACK_FIELDS = `
+const AUDIO_TRACK_FIELDS = `
 	id
 	name
 	url
-	response
-	relatedMedia {
-		provider
-		videoId
-		kind
-		title
-		contentId
-		unavailable
-	}
-	lyrics {
-		available
-		lrclibId
-		hasSynced
-		checkedAt
+	addedByUserID
+	createdAt
+	genreId
+	genre { id name parentId }
+	audioTrack
+	trackLinks { id provider providerTrackId url kind source unavailableAt }
+	relatedMedia { provider videoId kind title contentId unavailable }
+	lyrics { available lrclibId hasSynced checkedAt }
+`;
+
+export const GET_AUDIO_TRACK = gql`
+	query GetAudioTrack($id: ID!) {
+		contentByID(id: $id) {
+			${AUDIO_TRACK_FIELDS}
+		}
 	}
 `;
 
-export const GET_MUSIC_TRACK = gql`
-	query GetMusicTrack($id: ID!) {
-		contentByID(id: $id) {
-			${MUSIC_TRACK_FIELDS}
+export const LIST_MUSIC_GENRES = gql`
+	query ListMusicGenres {
+		musicGenres {
+			id
+			name
+			parentId
+		}
+	}
+`;
+
+export const SET_TRACK_GENRE = gql`
+	mutation SetTrackGenre($contentId: IntID!, $genreId: IntID!) {
+		setTrackGenre(contentId: $contentId, genreId: $genreId) {
+			id
+			genreId
+			genre {
+				id
+				name
+				parentId
+			}
+		}
+	}
+`;
+
+export const MARK_TRACK_LINK_UNAVAILABLE = gql`
+	mutation MarkTrackLinkUnavailable($linkId: IntID!) {
+		markTrackLinkUnavailable(linkId: $linkId) {
+			id
+			unavailableAt
 		}
 	}
 `;
@@ -446,7 +539,7 @@ export const GET_MUSIC_TRACK = gql`
 export const REFRESH_LYRICS_AVAILABILITY = gql`
 	mutation RefreshLyricsAvailability($contentId: IntID!) {
 		refreshLyricsAvailability(contentId: $contentId) {
-			${MUSIC_TRACK_FIELDS}
+			${AUDIO_TRACK_FIELDS}
 		}
 	}
 `;
@@ -454,7 +547,7 @@ export const REFRESH_LYRICS_AVAILABILITY = gql`
 export const MARK_RELATED_MEDIA_UNAVAILABLE = gql`
 	mutation MarkRelatedMediaUnavailable($contentId: IntID!, $videoId: String!) {
 		markRelatedMediaUnavailable(contentId: $contentId, videoId: $videoId) {
-			${MUSIC_TRACK_FIELDS}
+			${AUDIO_TRACK_FIELDS}
 		}
 	}
 `;
