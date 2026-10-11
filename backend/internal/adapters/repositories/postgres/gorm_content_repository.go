@@ -205,7 +205,10 @@ func applyPersonFilter(query *gorm.DB, personID *int, role *domain.PersonRole) *
 // always bound; releaseDate is an ISO string so lexical comparison is date order.
 func applyMovieColumnFilters(query *gorm.DB, f *domain.ContentFilter) *gorm.DB {
 	if f.GenreContains != nil && *f.GenreContains != "" {
-		query = query.Where("(response->'genres')::text ILIKE ?", "%"+*f.GenreContains+"%")
+		// Movies keep their TMDB genre list in response; AUDIO_TRACK rows point at
+		// the seeded genre tree (ADR 0006). One filter box covers both.
+		pattern := "%" + *f.GenreContains + "%"
+		query = query.Where("((response->'genres')::text ILIKE ? OR genre_id IN (SELECT id FROM music_genres WHERE name ILIKE ?))", pattern, pattern)
 	}
 	if f.CastContains != nil && *f.CastContains != "" {
 		// The Cast cell lists directors and cast, so match a name in either.
