@@ -14,7 +14,7 @@ Monorepo with two stacks:
 
 ## GitHub & Repository Management
 
-**Git branch gotcha:** Local default branch is `master`, remote is `main`. Use `origin/main` (not `main`) for diff/log comparisons: `git diff origin/main...HEAD`.
+**Git branch gotcha:** The default branch is `main` locally and on the remote, but local `main` is rarely checked out or pulled, so it lags. Use `origin/main` (not `main`) for diff/log comparisons: `git diff origin/main...HEAD`.
 
 **Cloud vs local:** the session type changes how you reach GitHub, whether you open the PR, and what you can verify — see [.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md) (a SessionStart hook also states it). Cloud = `CLAUDE_CODE_REMOTE=true`; if you can't tell, assume local.
 
