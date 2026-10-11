@@ -4,6 +4,7 @@ import {
 	PLAN_COLUMNS,
 	PLAN_COL_IDS,
 	buildPlanColumnDefs,
+	editFieldFor,
 	planColumnsForTier,
 	planCommentsPreview,
 	planContentLabel,
@@ -73,6 +74,31 @@ describe('PLAN_COLUMNS metadata', () => {
 
 	it('gives every column a positive minimum width', () => {
 		for (const c of PLAN_COLUMNS) expect(c.minWidth).toBeGreaterThan(0);
+	});
+});
+
+describe('editFieldFor: the Edit Todo field a cell click focuses', () => {
+	it.each([
+		['action', 'action'],
+		['content', 'name'],
+		['type', 'name'],
+		['priority', 'priority'],
+		['status', 'status'],
+		['percentComplete', 'percentComplete'],
+		['startDate', 'startDate'],
+		['endDate', 'endDate'],
+		['dueDate', 'dueDate'],
+		['list', 'list'],
+		['privacy', 'privacy'],
+		['comments', 'comments'],
+	] as const)('%s focuses %s', (colId, field) => {
+		expect(editFieldFor(colId)).toBe(field);
+	});
+
+	it('leaves the Perspective column (it has its own action) and unknown columns to the default focus', () => {
+		expect(editFieldFor('addPerspective')).toBeNull();
+		expect(editFieldFor('nope')).toBeNull();
+		expect(editFieldFor(undefined)).toBeNull();
 	});
 });
 

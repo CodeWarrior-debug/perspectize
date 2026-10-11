@@ -9,7 +9,7 @@ import type { TodoPrivacy, UserTodoItem, UserTodoSortBy, UserTodoStatus } from '
 import { contentTypeLabel, type ResponsiveTier } from './grid-config';
 import { EMPTY_VALUE } from './formatting';
 import { ratingToDisplay } from './ratings';
-import { addPerspectiveDisabledReason } from './plan-todo-helpers';
+import { addPerspectiveDisabledReason, type TodoFocusField } from './plan-todo-helpers';
 import { planItemCellRenderer } from './planItemCellRenderer';
 
 export type PlanColId =
@@ -41,13 +41,15 @@ export interface PlanColumnMeta {
 	sortable: boolean;
 	/** The API sort key a server sort sends; present only when the API supports it. */
 	serverSort?: UserTodoSortBy;
+	/** The Edit Todo field a click on this column's cell focuses; omitted to keep the dialog's default focus. */
+	editField?: TodoFocusField;
 }
 
 /** Column order = header order. Widths sum to ~1.5k px at lg, so the grid scrolls sideways on small screens. */
 export const PLAN_COLUMNS: readonly PlanColumnMeta[] = [
-	{ colId: 'action', label: 'Action', minWidth: 140, minTier: 'xs', sortable: false },
-	{ colId: 'content', label: 'Item', minWidth: 200, flex: 2, minTier: 'xs', sortable: false },
-	{ colId: 'type', label: 'Type', minWidth: 140, minTier: 'md', sortable: false },
+	{ colId: 'action', label: 'Action', minWidth: 140, minTier: 'xs', sortable: false, editField: 'action' },
+	{ colId: 'content', label: 'Item', minWidth: 200, flex: 2, minTier: 'xs', sortable: false, editField: 'name' },
+	{ colId: 'type', label: 'Type', minWidth: 140, minTier: 'md', sortable: false, editField: 'name' },
 	{
 		colId: 'priority',
 		label: 'Priority',
@@ -55,12 +57,28 @@ export const PLAN_COLUMNS: readonly PlanColumnMeta[] = [
 		minTier: 'xs',
 		sortable: true,
 		serverSort: 'PRIORITY',
+		editField: 'priority',
 	},
-	{ colId: 'status', label: 'Status', minWidth: 110, minTier: 'sm', sortable: false },
-	{ colId: 'percentComplete', label: '% Complete', minWidth: 100, minTier: 'md', sortable: false },
-	{ colId: 'startDate', label: 'Start', minWidth: 100, minTier: 'lg', sortable: false },
-	{ colId: 'endDate', label: 'End', minWidth: 100, minTier: 'lg', sortable: false },
-	{ colId: 'dueDate', label: 'Due', minWidth: 100, minTier: 'md', sortable: true, serverSort: 'DUE_DATE' },
+	{ colId: 'status', label: 'Status', minWidth: 110, minTier: 'sm', sortable: false, editField: 'status' },
+	{
+		colId: 'percentComplete',
+		label: '% Complete',
+		minWidth: 100,
+		minTier: 'md',
+		sortable: false,
+		editField: 'percentComplete',
+	},
+	{ colId: 'startDate', label: 'Start', minWidth: 100, minTier: 'lg', sortable: false, editField: 'startDate' },
+	{ colId: 'endDate', label: 'End', minWidth: 100, minTier: 'lg', sortable: false, editField: 'endDate' },
+	{
+		colId: 'dueDate',
+		label: 'Due',
+		minWidth: 100,
+		minTier: 'md',
+		sortable: true,
+		serverSort: 'DUE_DATE',
+		editField: 'dueDate',
+	},
 	{
 		colId: 'list',
 		label: 'List',
@@ -68,9 +86,18 @@ export const PLAN_COLUMNS: readonly PlanColumnMeta[] = [
 		minTier: 'md',
 		sortable: true,
 		serverSort: 'LIST_POSITION',
+		editField: 'list',
 	},
-	{ colId: 'privacy', label: 'Privacy', minWidth: 90, minTier: 'lg', sortable: false },
-	{ colId: 'comments', label: 'Comments', minWidth: 160, flex: 1, minTier: 'lg', sortable: false },
+	{ colId: 'privacy', label: 'Privacy', minWidth: 90, minTier: 'lg', sortable: false, editField: 'privacy' },
+	{
+		colId: 'comments',
+		label: 'Comments',
+		minWidth: 160,
+		flex: 1,
+		minTier: 'lg',
+		sortable: false,
+		editField: 'comments',
+	},
 	{ colId: 'addPerspective', label: 'Perspective', minWidth: 120, minTier: 'sm', sortable: false },
 ];
 
@@ -87,6 +114,11 @@ export const PLAN_COL_IDS: readonly PlanColId[] = PLAN_COLUMNS.map((c) => c.colI
 /** The API sort for a sortable column, or null when the column has no server sort. */
 export function serverSortFor(colId: string): UserTodoSortBy | null {
 	return PLAN_COLUMNS.find((c) => c.colId === colId)?.serverSort ?? null;
+}
+
+/** The Edit Todo field to focus for a click on a column's cell, or null for the dialog's default. */
+export function editFieldFor(colId: string | undefined): TodoFocusField | null {
+	return PLAN_COLUMNS.find((c) => c.colId === colId)?.editField ?? null;
 }
 
 // ---------------------------------------------------------------------------

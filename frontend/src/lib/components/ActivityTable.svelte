@@ -16,13 +16,8 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { graphqlRequest } from '$lib/queries/client';
-	import {
-		GET_CONTENT_DETAILS,
-		LIST_CONTENT,
-		type ContentDetailsResponse,
-		type ContentItem,
-		type ContentResponse,
-	} from '$lib/queries/content';
+	import { LIST_CONTENT, type ContentItem, type ContentResponse } from '$lib/queries/content';
+	import { useContentDetails } from '$lib/queries/content/useContentDetails';
 	import { OPEN_CONTENT_PARAM } from '$lib/utils/contentLinks';
 	import {
 		LIST_PERSPECTIVES_BY_USER,
@@ -461,12 +456,10 @@
 	const detailsModalRow = $derived(rowData.find((item) => String(item.id) === detailsModalContentId) ?? null);
 	// A deep-linked item (`?open=<id>`, e.g. from a "Go to" toast or a verse jump) is
 	// often not on the loaded page — fetch just that row so the modal can still open.
-	const detailsFallbackQuery = createQuery(() => ({
-		queryKey: queryKeys.content.row(detailsModalContentId ?? ''),
-		queryFn: () => graphqlRequest<ContentDetailsResponse>(GET_CONTENT_DETAILS, { id: detailsModalContentId }),
-		enabled: detailsModalContentId !== null && detailsModalRow === null && !contentQuery.isPending,
-		staleTime: 60 * 1000,
-	}));
+	const detailsFallbackQuery = useContentDetails(
+		() => detailsModalContentId,
+		() => detailsModalRow === null && !contentQuery.isPending,
+	);
 	const detailsModalContent = $derived(detailsModalRow ?? detailsFallbackQuery.data?.contentByID ?? null);
 
 	// Consume `?open=<id>`: open that item's details, then strip the param (replaceState)
