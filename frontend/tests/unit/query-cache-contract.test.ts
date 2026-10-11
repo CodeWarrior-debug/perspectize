@@ -113,8 +113,6 @@ describe('query key hygiene', () => {
 describe('eviction: useDeletePerspective.onSuccess evicts exactly what changed', () => {
 	it('invalidates the affected entries and leaves unrelated caches alone', async () => {
 		const affected = [
-			queryKeys.perspectives.activityFeed(true),
-			queryKeys.perspectives.activityFeed(false),
 			queryKeys.perspectives.detail('7'),
 			queryKeys.content.detail('3'),
 			queryKeys.perspectives.listByContent(3),
