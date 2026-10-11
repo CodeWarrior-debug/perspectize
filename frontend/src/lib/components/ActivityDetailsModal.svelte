@@ -23,7 +23,7 @@
 	import PassageText from '$lib/components/PassageText.svelte';
 	import PassagePositionBar from '$lib/components/PassagePositionBar.svelte';
 	import PassageLinks from '$lib/components/PassageLinks.svelte';
-	import MusicTrackPanel from '$lib/components/MusicTrackPanel.svelte';
+	import AudioTrackPanel from '$lib/components/AudioTrackPanel.svelte';
 	import { useSetPassageDisplayTitle } from '$lib/queries/bible/useSetPassageDisplayTitle';
 	import AddToPlanButton from '$lib/components/plan/AddToPlanButton.svelte';
 
@@ -66,7 +66,7 @@
 
 	const isMovie = $derived(content?.contentType === 'MOVIE');
 	const isPassage = $derived(content?.contentType === 'BIBLE_PASSAGE');
-	const isMusic = $derived(content?.contentType === 'AUDIO_TRACK');
+	const isAudioTrack = $derived(content?.contentType === 'AUDIO_TRACK');
 	const hasVerseRange = $derived(isPassage && content?.verseStartID != null && content?.verseEndID != null);
 	const setPassageTitle = useSetPassageDisplayTitle();
 	let titleDraft = $state('');
@@ -135,7 +135,7 @@
 						? 'Claim'
 						: isPassage
 							? 'Bible Passage'
-							: isMusic
+							: isAudioTrack
 								? 'Audio Track'
 								: isMovie
 									? 'Movie'
@@ -234,8 +234,8 @@
 					</div>
 				{/if}
 
-				{#if isMusic}
-					<MusicTrackPanel contentId={content.id} name={content.name} url={content.url} {open} />
+				{#if isAudioTrack}
+					<AudioTrackPanel contentId={content.id} name={content.name} url={content.url} {open} />
 				{/if}
 
 				<!-- A passage's stored url is its version-less dedupe key; PassageLinks shows versioned links instead. -->
