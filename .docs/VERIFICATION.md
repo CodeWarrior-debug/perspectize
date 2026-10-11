@@ -2,6 +2,14 @@
 
 Before marking any work complete, run interactive verification.
 
+> **Agents: start every browser verification with the `pr-verification` skill**
+> (`.claude/skills/pr-verification/SKILL.md`). It takes the machine-wide verification
+> slot from the agent registry (`.claude/agent-registry/`), so parallel sessions never
+> fight over `:8080`/`:5173` or the sv-chrome profile. It waits for a busy slot without
+> spending tokens, serves *your* checkout on the slot's ports, and releases everything
+> afterwards. Everything below (the signed-in profile, CDP scripts, evidence) is what you
+> do once you hold the slot.
+
 ## 0. Authenticated session (one-time setup)
 
 Self-verify drives Chrome through a persistent, pre-authenticated profile so it
@@ -80,14 +88,15 @@ overwrites your clipboard. Add scenarios in the `SCENARIOS` object; helpers
 a cell scrolls it into view, and a scroll cancels a pending popover open — the
 helper scrolls first and settles before hovering.
 
-**Verifying from a worktree.** A worktree has no gitignored `frontend/.env`, and
-the Clerk session doesn't carry across dev-server ports. Serve the worktree's code
-on a spare port with a throwaway wrapper config (outside the repo) that spreads the
-worktree's `vite.config.ts` and sets `root` to the worktree's `frontend/` and
-`envDir` to the main checkout's `frontend/` (vite has no `--envDir` CLI flag; don't
-symlink or read `.env`). Run it with `vite dev --config <wrapper> --port 5174
---strictPort`, ask the human to sign in once at that origin in the `sv-chrome.sh`
-Chrome, then run the script with `BASE_URL=http://localhost:5174`. The `chat-panel`
+**Verifying from a worktree.** A worktree has no gitignored env files, and the
+Clerk session doesn't carry across dev-server ports. Hold the verification slot
+(`pr-verification` skill), then run `node .claude/scripts/verification-servers.mjs
+--backend-port <b> --frontend-port <f>`. It serves the worktree's code on the
+slot's ports: slot 1 is `:8080`/`:5173`, where the sv-chrome sign-in already
+lives. It uses a throwaway vite wrapper config with `envDir` set to the main
+checkout's `frontend/`, and passes the main checkout's backend env to the child
+process (vite has no `--envDir` CLI flag; never symlink or read the env files).
+Then run the script with `BASE_URL=http://localhost:<f>`. The `chat-panel`
 scenario measures the messaging panel's top edge against the app header at several
 viewport heights.
 
