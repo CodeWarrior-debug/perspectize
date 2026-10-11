@@ -141,6 +141,7 @@ Pasting a YouTube Music link into Add Content produces a **music track** item th
 - **A video and its audio do not share an ISRC.** The Anti-Hero match was the 5:09 video recording (`USUMV…`), not the 3:20 single. So ISRC dedupe cannot merge a video with its audio track; it only merges two uploads of the same recording.
 - **The lookup cap hides ISRCs.** Led Zeppelin's "Stairway to Heaven" had 10 candidates; only the first 3 are looked up.
 - **LRCLIB metadata can be wrong.** A "prokoman1 / Billie Holiday-Strange fruit-HD" entry matched exactly because LRCLIB itself lists the uploader as the artist. A name match is not proof the lyrics are for that song.
+- **Embedding was allowed for 51 of 51 videos** (public oEmbed check, no login), so the fallback to related uploads was never needed on this sample. oEmbed does not catch every failure: YouTube **Error 153** ("player configuration error") appears when the embedding page has no referrer, for example a page opened from a file. The app sends a referrer by default (no `Referrer-Policy` is set in `app.html`), so it should not hit this, but see plan task B14.
 - **Both services return 503 under light load.** MusicBrainz and LRCLIB each failed on a visible share of calls; there is no retry today.
 
 **Consequences for the design** (carried into plan tasks B10–B13)

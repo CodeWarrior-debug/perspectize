@@ -254,3 +254,12 @@ Evidence: spec section "Smoke test, 2026-10-11 (measured)". Do these before B8 s
 - [ ] From a **local** session (signed-in or at least a residential IP), run the smoke harness on 20 tracks pasted from the user's own YouTube Music app and record: share of `audio` types, album present, counterparts present. If a production-like server (Sevalla) can be exercised, run it there too.
 - [ ] If the logged-out server never sees official audio tracks, drop the album and sibling-upload claims from the PR description, keep the code paths (they are harmless), and revisit with the optional OAuth sync design (#480).
 - [ ] Do not store or use anyone's Google session on the server for this feature.
+
+## Task B14 — Embed error 153 must not mark a video unavailable
+
+**Suggested subagent:** `svelte-frontend`.
+
+- [ ] `parseEmbedMessage` in `frontend/src/lib/utils/mediaPlayer.ts` lists 153 as "unplayable". Error 153 means the embedding page sent no referrer (seen in the preview when opened from a file), which is an environment problem, not a property of the video. Change it to a separate `{type: 'config'}` event: show "The player couldn't start here" with the "Open in YouTube Music" link, do **not** advance the queue, and do **not** call `markRelatedMediaUnavailable` (that write is permanent and would grey out every related upload for everyone).
+- [ ] Keep 100, 101 and 150 as unplayable (removed, private, embedding disabled).
+- [ ] Tests: a 153 message neither advances `MediaPlayer` nor calls `onUnplayable`; update the `it.each([100, 101, 150, 153])` case in `tests/unit/mediaPlayer.test.ts`.
+- [ ] Keep the `strict-origin-when-cross-origin` `referrerpolicy` on the iframe and add a test that the iframe has it. Do not add a `Referrer-Policy: no-referrer` header or meta tag anywhere in the app.
