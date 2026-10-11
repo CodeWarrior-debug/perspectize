@@ -168,6 +168,17 @@ describe('AddContentPopover audio tracks', () => {
 		await tick();
 	}
 
+	it('keeps the long audio chip from overflowing and leaves the clear buttons reachable', async () => {
+		await openWith('https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC');
+		const chip = screen.getByTestId('type-chip');
+		expect(chip).toHaveClass('truncate', 'whitespace-nowrap');
+		expect(chip.parentElement).toHaveClass('flex-wrap');
+		const clearAll = screen.getByRole('button', { name: 'Clear all' });
+		expect(clearAll.parentElement).toHaveClass('shrink-0');
+		await fireEvent.click(clearAll);
+		expect(screen.getByLabelText('Link or reference')).toHaveValue('');
+	});
+
 	it('detects a Spotify song and requires a title', async () => {
 		await openWith('https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=x');
 		expect(screen.getByTestId('type-chip')).toHaveTextContent('Detected: Audio track (Spotify)');

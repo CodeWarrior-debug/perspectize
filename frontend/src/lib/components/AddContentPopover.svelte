@@ -306,11 +306,13 @@
 				/>
 			{/if}
 
-			<div class="flex items-center gap-2 text-sm">
-				<span data-testid="type-chip" class="text-muted-foreground">{chipLabel}</span>
+			<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+				<span data-testid="type-chip" class="text-muted-foreground max-w-full truncate whitespace-nowrap"
+					>{chipLabel}</span
+				>
 				<select
 					aria-label="Change type"
-					class="border-input bg-background h-8 rounded-md border px-2 text-sm"
+					class="border-input bg-background h-8 max-w-full shrink-0 rounded-md border px-2 text-sm"
 					value={effectiveType === 'YOUTUBE_VIDEO' ||
 					effectiveType === 'BIBLE_PASSAGE' ||
 					effectiveType === 'MOVIE' ||
@@ -326,7 +328,7 @@
 					<option value="MOVIE">Movie</option>
 					<option value="AUDIO_TRACK">Audio track</option>
 				</select>
-				<div class="ml-auto flex items-center gap-1">
+				<div class="ml-auto flex shrink-0 items-center gap-1">
 					<button
 						type="button"
 						onclick={clearType}
