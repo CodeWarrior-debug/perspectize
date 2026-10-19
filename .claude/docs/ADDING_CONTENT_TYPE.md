@@ -124,6 +124,18 @@ Every type gets an explicit answer, even when the answer is "not on Discover". D
 
 Worked examples live in `tools/content-type-designer` (section 7): YouTube (search hands off to youtube.com; Trending chart served from the backend cache), Bible passage (proposed: Verse of the day only, from Bible Gateway's feed, fetched and cached by the backend), Painting (proposed: Met search + highlights ranked by Wikipedia pageviews).
 
+## Decision 8: Source Terms and Liability
+
+Before Decision 1, check what the source's terms let you **store**, not just fetch. A working API may still forbid it: Meta's oEmbed is "front-end views only", and its `robots.txt` and Automated Data Collection Terms ban scraping. In that case the fields are user-entered and the type has no thumbnail. Also check:
+
+- Does the source license embedding? YouTube does; Meta doesn't.
+- Does the player need a click-to-load consent gate? Any social-plugin player does.
+- Which CSP hosts does the player need?
+
+Worked example: `docs/superpowers/specs/2026-10-19-facebook-video-content-type-design.md` §2 and §6.
+
+**A new enum value needs no migration:** `content.content_type` has no CHECK constraint.
+
 ## Implementation Steps
 
 ### Step A: Backend Domain
@@ -347,6 +359,7 @@ If the type introduces new columns, see [ADDING_AG_GRID_COLUMN.md](./ADDING_AG_G
 | Frontend form | New / Extend / Unified | Component architecture |
 | Table display | Icon, thumbnail, new columns | Renderer updates, see AG Grid guide |
 | Discover page | Search + feed / feed / search / not on Discover — with a reason | Card component, source client or backend feed job, CSP |
+| Source terms | May store / front-end only / no access | Whether fields are fetched or user-entered; consent gate; launch prerequisites |
 
 ---
 
