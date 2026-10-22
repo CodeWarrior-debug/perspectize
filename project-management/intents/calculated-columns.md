@@ -56,7 +56,7 @@ The end goal above covers every content type in the Activity grid. Delivery is s
 
 **Phase 0 — Plan gets a client vs server sort mode (prerequisite).**
 - Today Plan sorts on the server only. `PlanTable.svelte` maps the first sorted column to `UserTodoSortBy` (5 values) and refetches; sort is single-column, over a page of up to 100 rows.
-- Plan needs the same choice Activity already has:
+- Plan needs the same choice Activity already has, through **an explicit toggle like Activity's Loaded / All Items** (decided):
   - **client sort/filter** over the loaded rows, using AG Grid's client-side row model;
   - **server sort/filter** across all of the user's todos.
 - Without that, a calculated column can't be proven client-side on Plan.
@@ -141,7 +141,16 @@ The end goal above covers every content type in the Activity grid. Delivery is s
     - Phase 1: migration, compiler + tests, GraphQL, client evaluator, editor UI — all on Plan.
     - Phase 2: content operands and the Activity grid.
   - The integration branch is rebased on `origin/main` regularly so the final merge stays small.
-  - It merges to `main` only when the end-to-end outcome above is verified. Built-in metrics such as % Liked keep working unchanged until then.
+  - When it merges to `main` is decided as the phases land (open question 9). Built-in metrics such as % Liked keep working unchanged until then.
+- **Split backend and frontend PRs and deploys, so work can be tested without users seeing it.**
+  - **Backend slices ship first, and dark.** Each one is purely additive:
+    - the `metric_definitions` table;
+    - optional new GraphQL arguments and fields (e.g. a metric reference on the sort and filter inputs);
+    - definition CRUD.
+  - Existing clients never send the new arguments, so nothing changes for users. These slices can be exercised through backend tests and the GraphQL endpoint. They can also go to `main` and deploy early, which keeps the long-running branch smaller.
+  - **Frontend slices stay hidden until ready.** Pages, toggles and editors are released separately from the backend, behind whatever mechanism open question 10 picks.
+  - Each phase's PRs are therefore split by stack, typically migration → backend → frontend. Each PR links back to this intent.
+  - Phase 0 (Plan's sort toggle) is user-visible on its own, but harmless. It can ship normally once verified.
   - The migration is applied to each environment at rollout, not during development.
 
 ## Open questions
@@ -177,10 +186,13 @@ The end goal above covers every content type in the Activity grid. Delivery is s
    Separately, should a definition be able to *optionally* narrow itself to chosen types, purely as a display filter?
 7. **Perspective-based operands.** Should formulas be able to use per-content perspective aggregates (count, avg quality) in v1? These are not server-sortable today and would need a JOIN or a denormalised count. That is backlog item "Perspectize Column Sorting & Filtering".
 8. **Scale threshold.** At what content-row count do unindexed computed sorts become too slow on Neon, and does that trigger option 1c? The spec needs a measured number, not a guess.
-9. **When does the long-running branch reach `main`?**
+9. **When does the long-running branch reach `main`?** *Decided as the phases land; deliberately left open.*
    - a) After Phase 1, once calculated columns on Plan are verified; Phase 2 then gets a fresh integration branch.
    - b) Only after Phase 2, with the whole outcome in one merge.
-10. **Plan sort-mode UX.** Should Plan copy Activity's explicit mode toggle (Loaded / All Items)? Or should it pick automatically: client mode when the user has ≤ one page of todos, server mode beyond that?
+10. **How is in-progress UI hidden once its PR reaches `main`?** There is no feature-flag mechanism in the repo today.
+   - a) A build-time frontend env flag (e.g. `PUBLIC_FEATURE_CALCULATED_COLUMNS`). It is off in production and on in local, demo and preview builds.
+   - b) A runtime per-user allowlist (e.g. a flag on `users`, or an env list of user ids), checked by the frontend and by `@auth`-guarded resolvers. Lets the owner test in production with real data.
+   - c) No flag: frontend PRs stay on the integration branch and are tested from preview or local builds only.
 
 ## Downstream
 
