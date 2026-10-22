@@ -148,7 +148,11 @@ The end goal above covers every content type in the Activity grid. Delivery is s
     - optional new GraphQL arguments and fields (e.g. a metric reference on the sort and filter inputs);
     - definition CRUD.
   - Existing clients never send the new arguments, so nothing changes for users. These slices can be exercised through backend tests and the GraphQL endpoint. They can also go to `main` and deploy early, which keeps the long-running branch smaller.
-  - **Frontend slices stay hidden until ready.** Pages, toggles and editors are released separately from the backend, behind whatever mechanism open question 10 picks.
+  - **Frontend slices stay hidden until ready.** Pages, toggles and editors are released separately from the backend.
+  - **Release approach (decided): dark-launched backend, merge-gated frontend, role-gated later.**
+    - *Dark launch:* backend slices deploy to production unused.
+    - *Merge-gated release:* there is no feature flag. Frontend PRs stay on the integration branch, are tested from local or preview builds, and reach users only when merged to `main`.
+    - *Role-gated release (later):* once RBAC exists, unfinished or premium UI can ship to `main` behind a role or permission check instead of waiting on the branch. That is out of scope for this intent.
   - Each phase's PRs are therefore split by stack, typically migration → backend → frontend. Each PR links back to this intent.
   - Phase 0 (Plan's sort toggle) is user-visible on its own, but harmless. It can ship normally once verified.
   - The migration is applied to each environment at rollout, not during development.
@@ -189,10 +193,7 @@ The end goal above covers every content type in the Activity grid. Delivery is s
 9. **When does the long-running branch reach `main`?** *Decided as the phases land; deliberately left open.*
    - a) After Phase 1, once calculated columns on Plan are verified; Phase 2 then gets a fresh integration branch.
    - b) Only after Phase 2, with the whole outcome in one merge.
-10. **How is in-progress UI hidden once its PR reaches `main`?** There is no feature-flag mechanism in the repo today.
-   - a) A build-time frontend env flag (e.g. `PUBLIC_FEATURE_CALCULATED_COLUMNS`). It is off in production and on in local, demo and preview builds.
-   - b) A runtime per-user allowlist (e.g. a flag on `users`, or an env list of user ids), checked by the frontend and by `@auth`-guarded resolvers. Lets the owner test in production with real data.
-   - c) No flag: frontend PRs stay on the integration branch and are tested from preview or local builds only.
+10. ~~How is in-progress UI hidden?~~ **Decided: (c) no flag for now, with RBAC later** — see "Release approach" under Constraints.
 
 ## Downstream
 
