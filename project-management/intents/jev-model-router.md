@@ -57,3 +57,4 @@ Jeeves, the planned Perspectize AI assistant ([FEATURE_BACKLOG.md → Jeeves AI 
 - Plan(s): [docs/superpowers/plans/2026-10-22-jev-model-router-plan.md](../../docs/superpowers/plans/2026-10-22-jev-model-router-plan.md)
 - PRs (one line each, add as they open; tick on merge):
   - [ ] docs: Jev model router intent and plan (this PR)
+  - [ ] feat(router): Jev-based Claude tier router for omp subagents (dry-run) — https://github.com/CodeWarrior-debug/oh-my-pi-home/pull/1 — open
