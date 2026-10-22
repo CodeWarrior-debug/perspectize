@@ -35,6 +35,7 @@ A locked design ready to hand to `superpowers:writing-plans`: ADRs for the decis
 
 ## Not yet specified
 
+- Possible enhancement (owner, 2026-10-22): a playback setting beyond today's "Allow more than one player at a time" override. Closing the details modal currently stops playback (ticket 03, Q6); the owner finds that problematic and wants a setting that controls whether playback may continue or overlap. Not changing the shipped default now. Needs a persistent player surface (mini-player) to design properly.
 - A "challenge categorization" feature for changing a genre after the 30-day window — not in the repo; needs its own design.
 - The 30-day rule for stored YouTube API data (videos and tracks) — decision tracked in [issue 589](https://github.com/CodeWarrior-debug/perspectize/issues/589); the first provider rule in the safeguards ticket waits on it.
 - Apple MusicKit playback details (developer token, origin claim, user-token handling) — waits on the subscriber listening test.
