@@ -72,4 +72,4 @@ The **Downstream** section is how this folder stays an index: fill it in as each
 
 ## Status
 
-The convention is new. No intents exist yet: start one by copying [`intents/_template.md`](intents/_template.md). The existing specs and plans under `docs/superpowers/` pre-date it and need no backfill.
+The convention is new. Start one by copying [`intents/_template.md`](intents/_template.md). The existing specs and plans under `docs/superpowers/` pre-date it and need no backfill.
