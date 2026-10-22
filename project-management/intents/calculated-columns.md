@@ -119,4 +119,4 @@ A signed-in user can define a named **calculated column** from a formula over a 
 - Plan(s): <!-- link(s) -->
 - Integration branch: <!-- feature/calculated-columns -->
 - PRs (one line each, add as they open; tick on merge):
-  - [ ] Intent: calculated columns — <!-- PR link --> — open
+  - [ ] Intent: calculated columns — https://github.com/CodeWarrior-debug/perspectize/pull/601 — open
