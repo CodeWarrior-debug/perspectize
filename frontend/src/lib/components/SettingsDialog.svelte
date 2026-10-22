@@ -2,6 +2,7 @@
 	import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/shadcn';
 	import ThemeCustomizePanel from '$lib/components/theme/ThemeCustomizePanel.svelte';
 	import FeedbackDialog from '$lib/components/FeedbackDialog.svelte';
+	import PlaybackSettingsRow from '$lib/components/PlaybackSettingsRow.svelte';
 	import type { ThemeStore } from '$lib/theme/store.svelte';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import { replayCoach } from '$lib/onboarding/coachGate.svelte';
@@ -63,6 +64,9 @@
 							<Button type="button" variant="outline" onclick={restartOnboarding} disabled={!meCtx.me}>
 								Restart onboarding
 							</Button>
+						</div>
+						<div class="rounded-md border border-border p-3">
+							<PlaybackSettingsRow />
 						</div>
 					</div>
 				{:else if activeSection === 'theme'}

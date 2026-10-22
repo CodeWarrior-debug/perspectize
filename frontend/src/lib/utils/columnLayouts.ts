@@ -1,4 +1,10 @@
-import { defaultColumnVisibility, isMovieOnlyTypeFilter, togglableColIds, type ResponsiveTier } from './grid-config';
+import {
+	defaultColumnVisibility,
+	isAudioOnlyTypeFilter,
+	isMovieOnlyTypeFilter,
+	togglableColIds,
+	type ResponsiveTier,
+} from './grid-config';
 
 /**
  * columnLayouts — per-view Activity table column setups (issue #559).
@@ -10,7 +16,7 @@ import { defaultColumnVisibility, isMovieOnlyTypeFilter, togglableColIds, type R
  * in localStorage so they survive a refresh; failures fall back to defaults.
  */
 
-export type ColumnView = 'movie' | 'general';
+export type ColumnView = 'movie' | 'audio' | 'general';
 
 /** colId -> visible. */
 export type ColumnLayout = Record<string, boolean>;
@@ -20,11 +26,13 @@ export const COLUMN_LAYOUTS_KEY = 'perspectize:activityColumns:v1';
 /** Toast wording for each view ("Showing Movie columns"). */
 export const COLUMN_VIEW_LABEL: Record<ColumnView, string> = {
 	movie: 'Movie columns',
+	audio: 'Audio track columns',
 	general: 'standard columns',
 };
 
 export function columnViewFor(typeFilter: string | undefined): ColumnView {
-	return isMovieOnlyTypeFilter(typeFilter) ? 'movie' : 'general';
+	if (isMovieOnlyTypeFilter(typeFilter)) return 'movie';
+	return isAudioOnlyTypeFilter(typeFilter) ? 'audio' : 'general';
 }
 
 function isLayout(value: unknown): value is ColumnLayout {
@@ -79,7 +87,7 @@ export function clearLayout(view: ColumnView): void {
  * Date Added that a previous custom layout turned on.
  */
 export function defaultLayout(tier: ResponsiveTier, view: ColumnView): ColumnLayout {
-	const { visible } = defaultColumnVisibility(tier, view === 'movie');
+	const { visible } = defaultColumnVisibility(tier, view === 'movie', view === 'audio');
 	const shown = new Set(visible);
 	const layout: ColumnLayout = {};
 	for (const colId of new Set([...togglableColIds(true), ...visible])) layout[colId] = shown.has(colId);

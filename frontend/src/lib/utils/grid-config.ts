@@ -12,6 +12,7 @@ import {
 	boxOfficeValueGetter,
 	vsBudgetValueGetter,
 	genreValueGetter,
+	channelValueGetter,
 	ratedValueGetter,
 	releasedValueGetter,
 	tmdbScoreValueGetter,
@@ -39,6 +40,7 @@ const CONTENT_TYPE_LABELS: Partial<Record<ContentType, string>> = {
 	// CLAIM: 'Claim', // not ready in the UI yet; uncomment to offer it in the filter
 	BIBLE_PASSAGE: 'Bible Passage',
 	MOVIE: 'Movie',
+	AUDIO_TRACK: 'Audio Track',
 };
 
 /** Type-filter options. `value` is the lowercased form used in the filter model and `f.type=` URL param. */
@@ -232,6 +234,7 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		filterKey: 'genre',
 		filterValue: (row) => genreValueGetter({ data: row })?.toLowerCase() ?? null,
 	},
+	{ colId: 'listen', label: 'Listen', picker: 'data', sortable: false },
 	{
 		colId: 'rated',
 		label: 'Rated',
@@ -365,10 +368,10 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		label: 'Channel',
 		picker: 'data',
 		sortable: true,
-		sortValue: (row) => row.channelTitle?.toLowerCase() ?? null,
+		sortValue: (row) => channelValueGetter({ data: row })?.toLowerCase() ?? null,
 		serverSort: 'CHANNEL_TITLE',
 		filterKey: 'channel',
-		filterValue: (row) => row.channelTitle?.toLowerCase() ?? null,
+		filterValue: (row) => channelValueGetter({ data: row })?.toLowerCase() ?? null,
 	},
 	{
 		colId: 'user',
@@ -445,6 +448,16 @@ export function isMovieOnlyTypeFilter(typeFilter: string | undefined): boolean {
 	return types.length === 1 && types[0] === 'movie';
 }
 
+/** True when the `f.type` URL value names exactly one type and it is AUDIO_TRACK. */
+export function isAudioOnlyTypeFilter(typeFilter: string | undefined): boolean {
+	if (!typeFilter) return false;
+	const types = typeFilter
+		.split(',')
+		.map((t) => t.trim().toLowerCase())
+		.filter(Boolean);
+	return types.length === 1 && types[0] === 'audio_track';
+}
+
 /** Per-tier column lists. Columns in `hidden` are forced off; createdAt/updatedAt and the admin columns are in neither list (colDef `hide: true`, picker only). */
 const MOVIE_ONLY_PICKER = ['budget', 'votes', 'collection', 'synopsis', 'tmdbId'];
 const MOVIE_DEFAULT_COLS = ['genre', 'rated', 'cast', 'released', 'boxOffice', 'vsBudget', 'tmdbScore'];
@@ -460,6 +473,7 @@ const MOVIE_DEFAULT_COLS = ['genre', 'rated', 'cast', 'released', 'boxOffice', '
 export function defaultColumnVisibility(
 	tier: ResponsiveTier,
 	movieOnly: boolean,
+	audioOnly = false,
 ): { visible: string[]; hidden: string[] } {
 	const sm = tier !== 'xs';
 	const md = tier === 'md' || tier === 'lg';
@@ -469,6 +483,11 @@ export function defaultColumnVisibility(
 		if (sm) visible.push('genre', 'rated');
 		if (md) visible.push('cast', 'duration', 'released');
 		if (lg) visible.push('boxOffice', 'vsBudget', 'tmdbScore', 'tags');
+	} else if (audioOnly) {
+		// Track, Type, ◎ | Artist, Genre | Duration, Listen | Tags (the channel column carries the artist).
+		if (sm) visible.push('channel', 'genre');
+		if (md) visible.push('duration', 'listen');
+		if (lg) visible.push('tags');
 	} else {
 		if (sm) visible.push('category', 'channel');
 		if (md) visible.push('duration', 'publishDate');
@@ -487,6 +506,7 @@ export function defaultColumnVisibility(
 		'user',
 		'tags',
 		'description',
+		'listen',
 		...MOVIE_DEFAULT_COLS,
 		...MOVIE_ONLY_PICKER,
 	];
@@ -781,8 +801,8 @@ export interface HeaderApi {
  * effect re-runs on every filter change, so an unconditional redraw closed the
  * filter while the user was still typing. Returns whether it redrew.
  */
-export function syncItemHeader(api: HeaderApi, name: string): boolean {
-	const colDef = api.getColumn('item')?.getColDef();
+export function syncItemHeader(api: HeaderApi, name: string, colId = 'item'): boolean {
+	const colDef = api.getColumn(colId)?.getColDef();
 	if (!colDef || colDef.headerName === name) return false;
 	colDef.headerName = name;
 	api.refreshHeader();
@@ -791,5 +811,10 @@ export function syncItemHeader(api: HeaderApi, name: string): boolean {
 
 /** Item column header: "Film" when the type filter is exactly MOVIE, otherwise "Item". */
 export function itemColumnHeader(typeFilter: string | undefined): string {
-	return isMovieOnlyTypeFilter(typeFilter) ? 'Film' : 'Item';
+	return isMovieOnlyTypeFilter(typeFilter) ? 'Film' : isAudioOnlyTypeFilter(typeFilter) ? 'Track' : 'Item';
+}
+
+/** Channel column header: "Artist" when the type filter is exactly AUDIO_TRACK (the column carries the artist), otherwise "Channel". */
+export function channelColumnHeader(typeFilter: string | undefined): string {
+	return isAudioOnlyTypeFilter(typeFilter) ? 'Artist' : 'Channel';
 }

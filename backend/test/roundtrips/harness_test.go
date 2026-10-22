@@ -129,8 +129,11 @@ func newHarnessWithPool(t *testing.T, pool database.PoolConfig) *harness {
 	todoListRepo := postgres.NewGormUserTodoListRepository(db)
 	todoActionRepo := cached.NewTodoActionRepository(postgres.NewGormTodoActionRepository(db), cached.DefaultTodoActionTTL)
 
+	audioTrackRepo := postgres.NewGormAudioTrackRepository(db)
+	musicGenreRepo := cached.NewMusicGenreRepository(postgres.NewGormMusicGenreRepository(db), cached.DefaultMusicGenreTTL)
+
 	deps := server.Deps{
-		ContentService:     services.NewContentService(h.contentRepo, youtube.NewFixtureClient(), tmdb.NewFixtureClient(), services.WithBibleReference(bibleReferenceRepo), services.WithMovieSearch(tmdb.NewFixtureClient()), services.WithMovieTrending(tmdb.NewFixtureClient())),
+		ContentService:     services.NewContentService(h.contentRepo, youtube.NewFixtureClient(), tmdb.NewFixtureClient(), services.WithBibleReference(bibleReferenceRepo), services.WithMovieSearch(tmdb.NewFixtureClient()), services.WithMovieTrending(tmdb.NewFixtureClient()), services.WithAudioTracks(audioTrackRepo, musicGenreRepo)),
 		UserService:        services.NewUserService(userRepo, h.contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo),
 		PerspectiveService: services.NewPerspectiveService(perspectiveRepo, userRepo),
 		CategoryService:    services.NewCategoryService(categoryRepo, h.contentRepo, noWikidata{}),

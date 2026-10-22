@@ -2,6 +2,11 @@
 	import { Input, Label } from '$lib/components/shadcn';
 	import FormPopover from '$lib/components/FormPopover.svelte';
 	import PassagePicker from '$lib/components/PassagePicker.svelte';
+	import AudioTrackFields from '$lib/components/AudioTrackFields.svelte';
+	import { useAddAudioTrack } from '$lib/queries/content/useAddAudioTrack';
+	import { useMusicGenres } from '$lib/queries/content/useAudioTrack';
+	import { PROVIDER_LABEL } from '$lib/utils/audioLinks';
+	import type { CreateAudioTrackInput, SameSongCandidate } from '$lib/queries/content';
 	import { useAddMovie } from '$lib/queries/content/useAddMovie';
 	import { useAddVideo } from '$lib/queries/content/useAddVideo';
 	import { useAddPassage } from '$lib/queries/content/useAddPassage';
@@ -16,7 +21,7 @@
 	import EraserIcon from '@lucide/svelte/icons/eraser';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 
-	type ChosenType = 'YOUTUBE_VIDEO' | 'BIBLE_PASSAGE' | 'MOVIE';
+	type ChosenType = 'YOUTUBE_VIDEO' | 'BIBLE_PASSAGE' | 'MOVIE' | 'AUDIO_TRACK';
 
 	let {
 		triggerVariant = 'default',
@@ -26,9 +31,15 @@
 
 	// Created first so the YouTube hook stays the last createMutation call (existing tests capture its options).
 	const movieMutation = useAddMovie();
+	// Also before useAddVideo, which must stay the last createMutation call.
+	const audioMutation = useAddAudioTrack();
 
 	let open = $state(false);
 	let input = $state('');
+	let audioTitle = $state('');
+	let audioArtist = $state('');
+	let audioGenreId = $state<string | null>(null);
+	let candidates = $state<SameSongCandidate[]>([]);
 	let error = $state('');
 	// User's explicit type choice; wins over autodetect until the input changes.
 	let manualType = $state<ChosenType | null>(null);
@@ -44,6 +55,10 @@
 			error = '';
 			manualType = null;
 			rangeOverride = null;
+			audioTitle = '';
+			audioArtist = '';
+			audioGenreId = null;
+			candidates = [];
 			// Read the prior value via untrack so this effect doesn't depend on the
 			// state it writes — otherwise the write re-triggers the effect forever
 			// (effect_update_depth_exceeded).
@@ -52,6 +67,7 @@
 			// without untrack a success re-runs this effect (open is still true) and resets the
 			// mutation before the close-on-success effect sees `isSuccess`.
 			untrack(() => movieMutation.reset());
+			untrack(() => audioMutation.reset());
 		}
 	});
 
@@ -61,17 +77,25 @@
 		rangeOverride ?? (detected.type === 'BIBLE_PASSAGE' ? detected.range : defaultRange(1)),
 	);
 	const rangeValid = $derived(isRangeOrdered(range) && isRangeInBounds(range));
+	const audioLink = $derived(detected.type === 'AUDIO_TRACK' ? detected.link : null);
+	const genresQuery = useMusicGenres(() => open && effectiveType === 'AUDIO_TRACK');
+	const genres = $derived(genresQuery.data ?? []);
+	// Prefill the title from an Apple slug once per pasted link; the user can edit it.
+	$effect(() => {
+		const suggested = audioLink?.suggestedTitle ?? '';
+		if (suggested) untrack(() => (audioTitle = suggested));
+	});
 
 	// useAddVideo stays the last createMutation call, keeping the existing YouTube-path
 	// tests' captured options unchanged.
 	const passageMutation = useAddPassage();
 	const videoMutation = useAddVideo();
-	const isPending = $derived(videoMutation.isPending || passageMutation.isPending || movieMutation.isPending);
+	const isPending = $derived(
+		videoMutation.isPending || passageMutation.isPending || movieMutation.isPending || audioMutation.isPending,
+	);
 
 	$effect(() => {
-		if (videoMutation.isSuccess || passageMutation.isSuccess || movieMutation.isSuccess) {
-			open = false;
-		}
+		if (videoMutation.isSuccess || passageMutation.isSuccess || movieMutation.isSuccess) open = false;
 	});
 
 	const notAllowedMessage = $derived(contentNotAllowedMessage(movieMutation.error));
@@ -85,11 +109,21 @@
 					? 'Bible passage'
 					: effectiveType === 'MOVIE'
 						? 'Movie'
-						: 'Claim';
+						: effectiveType === 'AUDIO_TRACK'
+							? audioLink
+								? `Audio track (${PROVIDER_LABEL[audioLink.provider]})`
+								: 'Audio track'
+							: 'Claim';
 		return manualType ? `Type: ${name}` : `Detected: ${name}`;
 	});
 
+	const isMusicCollection = $derived(detected.type === 'AUDIO_TRACK' && detected.link === null);
+
 	const isSubmitDisabled = $derived.by(() => {
+		if (effectiveType === 'AUDIO_TRACK') {
+			if (!audioLink) return true;
+			return audioLink.provider !== 'youtube' && !audioTitle.trim();
+		}
 		if (effectiveType === 'YOUTUBE_VIDEO' || effectiveType === 'MOVIE') return !input.trim();
 		if (effectiveType === 'BIBLE_PASSAGE') return !rangeValid;
 		return true;
@@ -112,11 +146,22 @@
 	// chosen type itself so the user doesn't lose their place (e.g. re-typing a
 	// passage reference after a typo shouldn't require re-selecting the type).
 	function clearType() {
-		if (effectiveType === 'YOUTUBE_VIDEO' || effectiveType === 'BIBLE_PASSAGE' || effectiveType === 'MOVIE') {
+		if (
+			effectiveType === 'YOUTUBE_VIDEO' ||
+			effectiveType === 'BIBLE_PASSAGE' ||
+			effectiveType === 'MOVIE' ||
+			effectiveType === 'AUDIO_TRACK'
+		) {
 			// Clearing the text would otherwise make autodetection fall back to "no
 			// type" — pin the type explicitly so the user stays on the same type.
 			manualType = effectiveType;
 			input = '';
+		}
+		if (effectiveType === 'AUDIO_TRACK') {
+			audioTitle = '';
+			audioArtist = '';
+			audioGenreId = null;
+			candidates = [];
 		}
 		if (effectiveType === 'BIBLE_PASSAGE') {
 			rangeOverride = defaultRange(1);
@@ -127,12 +172,39 @@
 
 	function handleTypeChange(e: Event) {
 		const value = (e.currentTarget as HTMLSelectElement).value;
-		manualType = value === 'YOUTUBE_VIDEO' || value === 'BIBLE_PASSAGE' || value === 'MOVIE' ? value : null;
+		manualType =
+			value === 'YOUTUBE_VIDEO' || value === 'BIBLE_PASSAGE' || value === 'MOVIE' || value === 'AUDIO_TRACK'
+				? value
+				: null;
 		error = '';
 	}
 
+	function audioInput(extra: Partial<CreateAudioTrackInput> = {}): CreateAudioTrackInput {
+		const req: CreateAudioTrackInput = { url: audioLink!.canonicalUrl };
+		if (audioLink!.provider !== 'youtube') {
+			req.title = audioTitle.trim();
+			if (audioArtist.trim()) req.artist = audioArtist.trim();
+		}
+		if (audioGenreId) req.genreId = Number(audioGenreId);
+		return { ...req, ...extra };
+	}
+
+	function submitAudio(extra: Partial<CreateAudioTrackInput> = {}) {
+		audioMutation.mutate(audioInput(extra), {
+			onSuccess: (r) => {
+				candidates = r.sameSongCandidates;
+				// A same-song prompt keeps the popover open; anything else is done.
+				if (candidates.length === 0) open = false;
+			},
+		});
+	}
+
 	function handleSubmit() {
-		if (effectiveType === 'YOUTUBE_VIDEO') {
+		if (effectiveType === 'AUDIO_TRACK') {
+			if (!audioLink) return;
+			error = '';
+			submitAudio();
+		} else if (effectiveType === 'YOUTUBE_VIDEO') {
 			const url = input.trim();
 			if (!validateYouTubeUrl(url)) {
 				error = 'Please enter a valid YouTube URL';
@@ -172,7 +244,7 @@
 	{triggerVariant}
 	triggerLabel="Add Content"
 	title="Add Content"
-	description="Paste a YouTube, TMDB or IMDb link, or type a Bible reference like John 3:16-18."
+	description="Paste a YouTube, YouTube Music, Spotify, Apple Music, Amazon Music, TMDB or IMDb link, or type a Bible reference like John 3:16-18."
 	submitLabel="Add"
 	pendingLabel="Adding..."
 	{isPending}
@@ -209,6 +281,10 @@
 			</div>
 			{#if error}
 				<p class="text-sm text-red-600">{error}</p>
+			{:else if isMusicCollection}
+				<p data-testid="music-collection-notice" class="text-sm text-red-600">
+					This is an album, playlist, or artist link. Paste a link to a single song.
+				</p>
 			{/if}
 			{#if effectiveType === 'MOVIE' && movieMutation.isError}
 				<p class="text-sm text-red-600">
@@ -216,12 +292,31 @@
 				</p>
 			{/if}
 
-			<div class="flex items-center gap-2 text-sm">
-				<span data-testid="type-chip" class="text-muted-foreground">{chipLabel}</span>
+			{#if effectiveType === 'AUDIO_TRACK' && audioLink}
+				<AudioTrackFields
+					link={audioLink}
+					bind:title={audioTitle}
+					bind:artist={audioArtist}
+					bind:genreId={audioGenreId}
+					{genres}
+					{candidates}
+					disabled={isPending}
+					onSameSong={(id) => submitAudio({ sameAsContentId: Number(id) })}
+					onDifferentSong={() => submitAudio({ createNew: true })}
+				/>
+			{/if}
+
+			<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+				<span data-testid="type-chip" class="text-muted-foreground max-w-full truncate whitespace-nowrap"
+					>{chipLabel}</span
+				>
 				<select
 					aria-label="Change type"
-					class="border-input bg-background h-8 rounded-md border px-2 text-sm"
-					value={effectiveType === 'YOUTUBE_VIDEO' || effectiveType === 'BIBLE_PASSAGE' || effectiveType === 'MOVIE'
+					class="border-input bg-background h-8 max-w-full shrink-0 rounded-md border px-2 text-sm"
+					value={effectiveType === 'YOUTUBE_VIDEO' ||
+					effectiveType === 'BIBLE_PASSAGE' ||
+					effectiveType === 'MOVIE' ||
+					effectiveType === 'AUDIO_TRACK'
 						? effectiveType
 						: ''}
 					onchange={handleTypeChange}
@@ -231,13 +326,17 @@
 					<option value="YOUTUBE_VIDEO">YouTube</option>
 					<option value="BIBLE_PASSAGE">Bible passage</option>
 					<option value="MOVIE">Movie</option>
+					<option value="AUDIO_TRACK">Audio track</option>
 				</select>
-				<div class="ml-auto flex items-center gap-1">
+				<div class="ml-auto flex shrink-0 items-center gap-1">
 					<button
 						type="button"
 						onclick={clearType}
 						disabled={isPending ||
-							(effectiveType !== 'YOUTUBE_VIDEO' && effectiveType !== 'BIBLE_PASSAGE' && effectiveType !== 'MOVIE')}
+							(effectiveType !== 'YOUTUBE_VIDEO' &&
+								effectiveType !== 'BIBLE_PASSAGE' &&
+								effectiveType !== 'MOVIE' &&
+								effectiveType !== 'AUDIO_TRACK')}
 						aria-label="Clear type"
 						title="Clear this type's fields"
 						class="text-muted-foreground hover:text-foreground flex items-center gap-1 rounded-md px-1.5 py-1 transition-colors disabled:pointer-events-none disabled:opacity-40"

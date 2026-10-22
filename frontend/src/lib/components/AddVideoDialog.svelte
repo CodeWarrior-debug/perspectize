@@ -11,7 +11,7 @@
 		Label,
 	} from '$lib/components/shadcn';
 	import { useAddVideo } from '$lib/queries/content/useAddVideo';
-	import { validateYouTubeUrl } from '$lib/utils/youtube';
+	import { validateYouTubeUrl, classifyYouTubeUrl } from '$lib/utils/youtube';
 
 	// Props
 	let {
@@ -42,6 +42,11 @@
 	function handleSubmit(e: Event) {
 		e.preventDefault();
 
+		const kind = classifyYouTubeUrl(url);
+		if (kind === 'musicTrack' || kind === 'musicCollection') {
+			error = 'Music links are added from Add Content, as audio tracks.';
+			return;
+		}
 		if (!validateYouTubeUrl(url)) {
 			error = 'Please enter a valid YouTube URL';
 			return;
@@ -61,7 +66,7 @@
 	<DialogContent>
 		<DialogHeader>
 			<DialogTitle>Add Video</DialogTitle>
-			<DialogDescription>Paste a YouTube URL to add it to your library.</DialogDescription>
+			<DialogDescription>Paste a YouTube or YouTube Music link to add it to your library.</DialogDescription>
 		</DialogHeader>
 
 		<form onsubmit={handleSubmit}>

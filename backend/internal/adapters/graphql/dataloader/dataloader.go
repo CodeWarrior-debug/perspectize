@@ -38,6 +38,8 @@ type Loaders struct {
 	// UserTodoListByID batches UserTodo.list lookups. The key carries the
 	// viewer, because a PRIVATE list is returned only to its owner.
 	UserTodoListByID *dataloadgen.Loader[UserTodoListKey, *domain.UserTodoList]
+	// TrackLinksByContentID batches Content.trackLinks for AUDIO_TRACK rows.
+	TrackLinksByContentID *dataloadgen.Loader[int, []domain.TrackLink]
 }
 
 // ThreadStatsKey identifies one viewer's stats for one thread.
@@ -72,6 +74,7 @@ func NewLoaders(s Services) *Loaders {
 	cnb := &contentBatcher{service: s.Content}
 	tab := &todoActionBatcher{service: s.UserTodo}
 	tlb := &userTodoListBatcher{service: s.UserTodo}
+	tkb := &trackLinkBatcher{service: s.Content}
 	return &Loaders{
 		CategoryByID:                    dataloadgen.NewMappedLoader(cb.byID),
 		PerspectiveAggregateByContentID: dataloadgen.NewMappedLoader(pb.byContentID),
@@ -80,6 +83,7 @@ func NewLoaders(s Services) *Loaders {
 		ContentByID:                     dataloadgen.NewMappedLoader(cnb.byID),
 		TodoActionByID:                  dataloadgen.NewMappedLoader(tab.byID),
 		UserTodoListByID:                dataloadgen.NewMappedLoader(tlb.byKey),
+		TrackLinksByContentID:           dataloadgen.NewMappedLoader(tkb.byContentID),
 	}
 }
 
@@ -256,4 +260,22 @@ func (b *perspectiveAggregateBatcher) byContentID(ctx context.Context, contentID
 // which resolvers should surface as a nil value rather than a GraphQL error.
 func IsNotFound(err error) bool {
 	return errors.Is(err, dataloadgen.ErrNotFound)
+}
+
+// trackLinkBatcher resolves the links of many tracks in one query. Every key
+// is present in the result, so a track without links is an empty list.
+type trackLinkBatcher struct {
+	service portservices.ContentService
+}
+
+func (b *trackLinkBatcher) byContentID(ctx context.Context, ids []int) (map[int][]domain.TrackLink, error) {
+	links, err := b.service.TrackLinksByContentIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int][]domain.TrackLink, len(ids))
+	for _, id := range ids {
+		out[id] = links[id]
+	}
+	return out, nil
 }
