@@ -2,7 +2,7 @@
 
 ⚠️ Written without superpowers loaded — a superpowers-enabled session should review via writing-plans before this is executed.
 
-**Status:** Proposal (not started), unscheduled. **Date:** 2026-10-19. No plan file yet. The **Decisions to confirm** at the end need an owner answer before `writing-plans`.
+**Status:** **Deferred** by [ADR 0001](../../adr/0001-defer-facebook-video-content-type.md) (2026-10-22): storing metadata needs a Meta review we probably wouldn't pass. Read the ADR's revisit conditions before picking this up. **Date:** 2026-10-19. No plan file yet. The **Decisions to confirm** at the end need an owner answer before `writing-plans`.
 
 **Not legal advice.** The compliance and liability sections summarise public sources so the owner knows what to ask. Have counsel review §6 before public launch.
 

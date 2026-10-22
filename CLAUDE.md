@@ -109,6 +109,7 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 
 **Planning & backlog:**
 - [Feature Backlog](FEATURE_BACKLOG.md) — Future ideas not tied to any milestone. Capture ideas here during development; evaluate when planning new work.
+- [ADRs](docs/adr/README.md) — recorded decisions, including features deliberately deferred and when to revisit them. Check before proposing a feature an ADR has already deferred.
 - [Bug Tracking](.docs/BUG_TRACKING.md) — How known bugs are tracked privately (gitignored files, persistent bugs phase)
 - **Jeeves ("jeevesbot")** — the planned AI assistant: [FEATURE_BACKLOG.md](FEATURE_BACKLOG.md#jeeves-ai-assistant), research in `.planning/v1.1-research/AI-ASSISTANT.md`, model-tier routing in [intents/jev-model-router.md](project-management/intents/jev-model-router.md). It will not run on oh-my-pi; harness-specific work lives in the owner's omp config repo.
 

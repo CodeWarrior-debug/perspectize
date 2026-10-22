@@ -646,4 +646,4 @@ Paste a public Facebook video or Reel link; it plays inline behind a click-to-lo
 
 **Blocks public launch (not the build):** the app has no privacy policy, terms, DMCA agent or report flow yet; the spec's §6.2 lists them. Seven decisions to confirm are in its §9.
 
-**Priority:** Unscheduled.
+**Priority:** Deferred by [ADR 0001](docs/adr/0001-defer-facebook-video-content-type.md): storing metadata needs a Meta App Review and Business Verification we probably wouldn't pass. Revisit conditions are in the ADR.
