@@ -6,7 +6,13 @@ Status: draft <!-- draft | accepted | done | superseded by <link> -->
 
 The grid can only sort and filter by a fixed set of fields. Today that set is the 15 values of the `ContentSortBy` enum and the hard-coded min/max fields of `ContentFilter`.
 
-A user who wants to rank content by something that matters to *them* has no way to say so. For example, "popularity" for YouTube videos could be a weighted blend of views and likes; "sleeper hits" could be high like ratio on low views. They end up eyeballing several columns at once.
+A user who wants to rank content by something that matters to *them* has no way to say so. This applies to **every content type**, not one: YouTube videos, movies, Bible passages, claims, and any type added later. Some examples:
+
+- **YouTube:** "popularity" as a weighted blend of views and likes, or "sleeper hits" as a high like ratio on low views.
+- **Movies:** "return on budget" blended with TMDB score.
+- **Any type:** "contested" as many perspectives with widely spread quality ratings.
+
+Today users end up eyeballing several columns at once.
 
 Every derived metric we *do* have, `PERCENT_LIKED` and `VS_BUDGET`, was hand-written in five places:
 
@@ -22,10 +28,15 @@ That means a new metric costs a backend and a frontend change plus a deploy. The
 
 A signed-in user can define a named **calculated column** from a formula over a fixed catalogue of metrics. They can show it in the grid, sort by it, and filter it by range. It gives the same result whether evaluated in the browser or in Postgres.
 
-- **Definable without code.** A formula like `popularity = 0.7 * log10(viewCount + 1) + 0.3 * log10(likeCount + 1)` is built from:
-  - catalogue operands: viewCount, likeCount, commentCount, length, age since publish, tmdbScore, and later perspective aggregates;
-  - numeric weights and constants;
-  - a small set of safe functions: `+ - * /`, `log10`, `sqrt`, `min`, `max`, `coalesce`, safe division.
+- **Works for every content type.** Calculated columns are a general grid capability, not a YouTube feature. The operand catalogue has two kinds of entry:
+  - **Shared operands** that exist for every type: length, age since added, and perspective aggregates (count, average quality, spread).
+  - **Type-specific operands** that each content type registers: YouTube views/likes/comments and publish age; movie revenue, budget and TMDB score; and whatever later types bring.
+  - Adding a new content type includes registering its numeric operands in one place, so its fields become usable in formulas without touching the compiler or evaluator. That step belongs in the [Adding a Content Type](../../.claude/docs/ADDING_CONTENT_TYPE.md) guide.
+  - A formula can mix operands from different types. An operand that doesn't apply to a row evaluates to NULL unless the formula wraps it in `coalesce`.
+- **Definable without code.** A formula is built from catalogue operands, numeric weights and constants, and a small set of safe functions: `+ - * /`, `log10`, `sqrt`, `min`, `max`, `coalesce`, safe division. Examples:
+  - YouTube popularity: `0.7 * log10(viewCount + 1) + 0.3 * log10(likeCount + 1)`
+  - Movie value: `0.5 * (revenue / budget) + 0.5 * tmdbScore`
+  - Any type, contested: `perspectiveCount * qualitySpread`
 - **Runs on either side, same answer.**
   - **Client-side** in Loaded mode, which uses AG Grid's client-side row model and up to 100 rows.
   - **Server-side** in All Items mode, through the existing keyset pagination.
@@ -40,7 +51,8 @@ A signed-in user can define a named **calculated column** from a formula over a 
 
 ## Affected users and systems
 
-- **Users:** anyone browsing the Activity grid. The first visible use case is YouTube, then movies (box office / budget / TMDB blends).
+- **Users:** anyone browsing the Activity grid, across all content types: YouTube videos, movies, Bible passages, claims, and future types. YouTube is only the motivating example.
+- **Content-type plumbing:** each type's numeric fields are registered as operands, in one catalogue shared by backend and frontend. The [Adding a Content Type](../../.claude/docs/ADDING_CONTENT_TYPE.md) guide gains a step for this.
 - **Frontend:**
   - `ActivityTable.svelte` (colDefs, both data modes);
   - `grid-config.ts` (`COLUMNS` / `ColumnMeta`; dynamic entries join the static list);
@@ -54,7 +66,7 @@ A signed-in user can define a named **calculated column** from a formula over a 
   - the postgres content repository and `helpers.go` (sort-rule and cursor-select generation from a compiled expression);
   - a new domain package for the expression tree: validation, compilation, versioning.
 - **Database:**
-  - a new `metric_definitions` table (owner, name, content-type scope, expression JSONB, formula version, visibility);
+  - a new `metric_definitions` table (owner, name, expression JSONB, formula version, visibility, optional content-type display filter);
   - typed operand columns or a view in place of JSONB string casts;
   - possibly a later expression index or materialized cache. This becomes the **first grid preference stored in the database**; column layouts are localStorage-only today.
 - **Precedent to reuse:** [Analysis depth metric](../../docs/superpowers/specs/2026-09-26-analysis-depth-metric-design.md). It brings user-owned weights in JSONB, a versioned formula, (user, type) → (user, all) → default resolution, and an opt-in sortable column.
@@ -76,6 +88,7 @@ A signed-in user can define a named **calculated column** from a formula over a 
   - existing sort and filter URLs;
   - saved localStorage column layouts (`perspectize:activityColumns:v1` may need a v2 migration);
   - the Loaded / All Items mode toggle.
+- **Planning tool undecided.** Given the size, this may be planned with Wayfinder rather than the default superpowers spec → plan flow. Decide before the spec starts.
 - **Delivery approach: a long-running feature branch.**
   - This work spans a migration, a backend expression compiler, GraphQL changes and frontend UI. It should not land on `main` half-finished.
   - Work happens on a long-lived integration branch (e.g. `feature/calculated-columns`).
@@ -93,11 +106,12 @@ A signed-in user can define a named **calculated column** from a formula over a 
    - b) **One generic SQL function shipped by migration**, e.g. `metric_eval(content_row, expr JSONB)`, which interprets the tree in PL/pgSQL. The logic stays fully in the database, but it is slower per row, hard to optimise, and a second interpreter to keep in parity.
    - c) **Materialised metric cache.** A `content_metric_values (metric_id, content_id, value)` table, refreshed on definition change and nightly stats sync. It is indexable and fast to sort, but it adds staleness and refresh jobs. Possibly a later optimisation on top of (a), not instead of it.
    - d) **Per-metric views or generated columns.** Ruled out under Constraints; listed only to record the rejection.
-2. **How do operands become clean typed columns?** Today views/likes/comments are JSONB strings cast with `::BIGINT`.
-   - a) `STORED` generated columns on `content` (e.g. `view_count BIGINT GENERATED ALWAYS AS (...)`). Indexable, with no write-path changes.
-   - b) Plain columns populated on ingest and YouTube stats refresh.
+2. **How do operands become clean numbers?** Type-specific fields live in the `content.response` JSONB (YouTube stats are strings cast with `::BIGINT`). The answer has to scale to every current and future content type.
+   - a) `STORED` generated columns on `content` (e.g. `view_count BIGINT GENERATED ALWAYS AS (...)`). Indexable, with no write-path changes. But with every type registering operands, the shared `content` table grows a mostly-NULL column per operand, and each new operand needs a migration.
+   - b) Plain columns populated on ingest and on each type's stats refresh (YouTube, TMDB, …). Same column growth as (a).
    - c) A `content_metrics` SQL view over `content`. Nothing is stored, so it can't be indexed.
-   - d) Leave the JSONB casts inside the compiler's operand templates for now.
+   - d) Each registered operand carries its own SQL template (a JSONB path plus cast) used by the compiler. New types add operands with no migration. Promote individual hot operands to (a) later, behind the same operand key, when one needs an index.
+   - e) A narrow `content_operand_values (content_id, operand_key, value NUMERIC)` table filled on ingest and refresh. Adding a type's operands needs no migration, but every operand in a formula becomes a join or pivot.
 3. **Who can see a definition?**
    - a) Private to its owner only.
    - b) Private by default, optionally shared publicly. Others can add it as a column; it is read-only to them.
@@ -109,7 +123,11 @@ A signed-in user can define a named **calculated column** from a formula over a 
 5. **Normalisation across rows.** "Popularity" usually wants views and likes on comparable scales.
    - a) Per-row transforms only (log, sqrt). Simple and the same on client and server.
    - b) Population-relative transforms (percentile, z-score over the current filtered set). These need window functions server-side and differ between a 100-row loaded page and all rows, so the spec must say whose population counts.
-6. **Content-type scope.** Should a definition be tied to one content type (YouTube operands differ from movie operands)? Or can it span types, with operands that don't apply evaluating to NULL and sorting last?
+6. **Operands that don't apply to a row.** Formulas span all content types, so a YouTube-only operand meets movie rows. Should a missing operand:
+   - a) evaluate to NULL, making the whole result NULL so the row sorts last, unless the author wraps it in `coalesce`;
+   - b) evaluate to 0;
+   - c) use a per-operand default the author picks in the editor?
+   Separately, should a definition be able to *optionally* narrow itself to chosen types, purely as a display filter?
 7. **Perspective-based operands.** Should formulas be able to use per-content perspective aggregates (count, avg quality) in v1? These are not server-sortable today and would need a JOIN or a denormalised count. That is backlog item "Perspectize Column Sorting & Filtering".
 8. **Scale threshold.** At what content-row count do unindexed computed sorts become too slow on Neon, and does that trigger option 1c? The spec needs a measured number, not a guess.
 
