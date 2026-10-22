@@ -13,7 +13,7 @@ import (
 // run against config file values only. t.Setenv restores originals on cleanup.
 func clearConfigEnvVars(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"DATABASE_URL", "DATABASE_PASSWORD", "YOUTUBE_API_KEY", "TMDB_API_READ_ACCESS_TOKEN", "YOUTUBE_API_CACHE_TTL_SECONDS", "YOUTUBE_TRENDING_CACHE_TTL_SECONDS", "MESSAGE_RETENTION_MAX", "MESSAGE_RETENTION_SWEEP_MINUTES"} {
+	for _, key := range []string{"DATABASE_URL", "DATABASE_PASSWORD", "YOUTUBE_API_KEY", "TMDB_API_READ_ACCESS_TOKEN", "YOUTUBE_API_CACHE_TTL_SECONDS", "YOUTUBE_TRENDING_CACHE_TTL_SECONDS", "MESSAGE_RETENTION_MAX", "MESSAGE_RETENTION_SWEEP_MINUTES", "SERVER_PORT", "PORT"} {
 		t.Setenv(key, "")
 	}
 }
@@ -252,4 +252,37 @@ func TestLoad_TMDBReadAccessTokenBlankByDefault(t *testing.T) {
 	cfg, err := config.Load("/nonexistent/config.json")
 	assert.NoError(t, err)
 	assert.Equal(t, "", cfg.TMDBReadAccessToken)
+}
+
+func TestLoad_ServerPort(t *testing.T) {
+	tests := []struct {
+		name, serverPort string
+		want             int
+	}{
+		{"unset keeps the config file's port", "", 8080},
+		{"SERVER_PORT moves it (a verification slot)", "8090", 8090},
+		{"not a number is ignored", "abc", 8080},
+		{"zero is ignored", "0", 8080},
+		{"out of range is ignored", "70000", 8080},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearConfigEnvVars(t)
+			t.Setenv("SERVER_PORT", tt.serverPort)
+
+			cfg, err := config.Load("../../config/config.example.json")
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, cfg.Server.Port)
+		})
+	}
+}
+
+// PORT is the hosting platform's variable; the server must not start listening elsewhere because of it.
+func TestLoad_PlatformPortIsNotRead(t *testing.T) {
+	clearConfigEnvVars(t)
+	t.Setenv("PORT", "3000")
+
+	cfg, err := config.Load("../../config/config.example.json")
+	assert.NoError(t, err)
+	assert.Equal(t, 8080, cfg.Server.Port)
 }

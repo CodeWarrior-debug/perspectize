@@ -65,7 +65,7 @@ GitHub Projects v2: see [GITHUB_PROJECTS.md](GITHUB_PROJECTS.md).
 - `needs-demo-video` and `ready for review` are **mutually exclusive** — never both on the same PR. If a PR is blocked by something else (merge conflict, a real failing/un-run CI check, an unresolved bug), it's fine for it to carry neither label rather than force-fitting one.
 - An owner-only follow-up that needs a credential no agent has (`ANTHROPIC_API_KEY`, a Chrome origin-trial flag, a live Sevalla checkpoint) does **not** by itself block `ready for review` — that's normal handoff, not a missing demo. What blocks it is *this PR's own visible surface* going unverified.
 
-See [VERIFICATION.md](VERIFICATION.md) for the evidence capture workflow.
+See [VERIFICATION.md](VERIFICATION.md) for the evidence capture workflow. **A local agent capturing the demo starts with the `pr-verification` skill.** It takes the machine-wide verification slot, so parallel agents never collide on the dev-server ports or the signed-in Chrome. When the slot stays busy past its 2-hour limit, the agent labels the PR `needs-demo-video` and says so, as a cloud session would.
 
 ## `needs-local-session-takeover` label
 

@@ -6,6 +6,7 @@
 	import { ClerkProvider, ClerkLoaded, ClerkLoading } from 'svelte-clerk';
 	import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
 	import { Toaster } from 'svelte-sonner';
+	import { TOASTER_PROPS } from '$lib/utils/toast';
 	import favicon from '$lib/assets/favicon.svg';
 	import { DEMO_MODE } from '$lib/auth';
 	import AuthShow from '$lib/components/auth/AuthShow.svelte';
@@ -97,13 +98,13 @@
 {#if DEMO_MODE}
 	<!-- Demo mode: no Clerk at all — seeded personas sign in via DemoPersonaDialog. -->
 	<QueryClientProvider client={queryClient}>
-		<Toaster position="top-right" duration={2000} richColors />
+		<Toaster {...TOASTER_PROPS} />
 		{@render app()}
 	</QueryClientProvider>
 {:else}
 	<ClerkProvider {publishableKey}>
 		<QueryClientProvider client={queryClient}>
-			<Toaster position="top-right" duration={2000} richColors />
+			<Toaster {...TOASTER_PROPS} />
 
 			<ClerkLoading>
 				<div class="flex h-screen items-center justify-center">

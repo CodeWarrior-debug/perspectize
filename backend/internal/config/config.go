@@ -129,6 +129,14 @@ func Load(configPath string) (*Config, error) {
 		}
 	}
 
+	// SERVER_PORT moves the listen port (local verification slots run a second
+	// backend beside the usual :8080). Not PORT: hosting platforms set that one.
+	if v := os.Getenv("SERVER_PORT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n < 65536 {
+			cfg.Server.Port = n
+		}
+	}
+
 	// Message retention: 0 / unset / invalid => unbounded (no application-side
 	// sweep). Only a positive value enables pruning.
 	if v := os.Getenv("MESSAGE_RETENTION_MAX"); v != "" {
