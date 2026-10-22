@@ -189,4 +189,4 @@ The end goal above covers every content type in the Activity grid. Delivery is s
 - Integration branch: <!-- feature/calculated-columns -->
 - PRs (one line each, add as they open; tick on merge):
   - [x] Intent: calculated columns — https://github.com/CodeWarrior-debug/perspectize/pull/601 — merged
-  - [ ] Intent: Plan pilot phasing — <!-- PR link --> — open
+  - [ ] Intent: Plan pilot phasing — https://github.com/CodeWarrior-debug/perspectize/pull/602 — open
