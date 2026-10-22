@@ -154,13 +154,12 @@ describe('useUpdatePerspective hook', () => {
 			expect(ctx.previous).toHaveLength(1);
 		});
 
-		it('patches both the byUser and byContent branches (a row can be cached under either), never activityFeed', async () => {
+		it('patches both the byUser and byContent branches (a row can be cached under either)', async () => {
 			await capturedMutationOptions.onMutate({ id: 5, quality: 6000 });
 
 			const patchedFilters = mockSetQueriesData.mock.calls.map((call: any[]) => call[0].queryKey);
 			expect(patchedFilters).toContainEqual(['app', 'perspectives', 'list', 'byUser']);
 			expect(patchedFilters).toContainEqual(['app', 'perspectives', 'list', 'byContent']);
-			expect(patchedFilters).not.toContainEqual(expect.arrayContaining(['activityFeed']));
 		});
 	});
 
@@ -310,17 +309,6 @@ describe('useUpdatePerspective hook', () => {
 					refetchType: 'none',
 				}),
 			);
-		});
-
-		it('invalidates the activity feeds instead of patching them (different row shape, privacy-filtered)', () => {
-			capturedMutationOptions.onSuccess({ updatePerspective: updatedRow });
-			expect(mockInvalidateQueries).toHaveBeenCalledWith({
-				queryKey: ['app', 'perspectives', 'list', 'activityFeed'],
-			});
-			for (const call of mockSetQueriesData.mock.calls) {
-				const key = call[0]?.queryKey ?? call[0];
-				expect(key).not.toContain('activityFeed');
-			}
 		});
 
 		it("invalidates the edited content's aggregate cache (perspectiveCount/averageRating can change)", () => {

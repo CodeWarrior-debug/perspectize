@@ -87,8 +87,75 @@ func intSliceToInt64Array(ints []int) Int64Array {
 	return result
 }
 
+// addedBySortExpr is the ADDED_BY sort key: the adder's lowercased username, as a
+// correlated scalar subquery rather than a JOIN (the paginator splices it into ORDER BY
+// and the cursor WHERE, and the list query stays single-table). It is listed in
+// computedSortColumns, so List selects it AS added_by for the cursor.
+const addedBySortExpr = "LOWER((SELECT u.username FROM users u WHERE u.id = content.added_by_user_id))"
+
+// computedSortColumns maps a content sort rule Key whose value is computed (no real
+// column) to the alias List selects it under. Each alias is the column tag of the
+// matching read-only ContentModel field, which is how gorm-cursor-paginator reads the
+// real sort value back when encoding the cursor.
+var computedSortColumns = map[string]string{
+	"ViewCount":    "view_count",
+	"LikeCount":    "like_count",
+	"PercentLiked": "percent_liked",
+	"PublishedAt":  "published_at_sort",
+	"ChannelTitle": "channel_title_sort",
+	"BoxOffice":    "box_office",
+	"VsBudget":     "vs_budget",
+	"AgeRating":    "age_rating",
+	"AddedBy":      "added_by",
+	"ReleaseDate":  "release_date_sort",
+	"TmdbScore":    "tmdb_score",
+}
+
+// computedSortSelects returns the ", (expr) AS alias" select-list suffix for every
+// computed sort rule (empty when all rules sort on real columns). Must run on the rules
+// before they reach the paginator, which rewrites SQLRepr with its COALESCE wrapper.
+func computedSortSelects(rules []paginator.Rule) string {
+	var b strings.Builder
+	for _, r := range rules {
+		alias, ok := computedSortColumns[r.Key]
+		if !ok || r.SQLRepr == "" {
+			continue
+		}
+		b.WriteString(", (" + r.SQLRepr + ") AS " + alias)
+	}
+	return b.String()
+}
+
+// Sort-key NULL replacements. The paginator wraps each computed expression in
+// COALESCE(expr, replacement), so unknowns (NULL) sort LAST: ASC needs a high value and
+// DESC a low one. Values stay exactly representable as float64 because cursors
+// round-trip through JSON numbers (math.MaxInt64 would lose precision).
+const (
+	// nullBoxOfficeAsc is 2^53, the largest integer float64 holds exactly; real revenues are far below.
+	nullBoxOfficeAsc  int64 = 1 << 53
+	nullBoxOfficeDesc int64 = 0
+	// nullVsBudgetAsc exceeds any real revenue/budget multiple; DESC uses -1 (real multiples are >= 0).
+	nullVsBudgetAsc  float64 = 1e18
+	nullVsBudgetDesc float64 = -1
+	// nullAgeRatingAsc is above every rank (real ranks are 1-5).
+	nullAgeRatingAsc  int64 = 99
+	nullAgeRatingDesc int64 = 0
+	// Release dates are ISO strings: ASC needs one after every real date, DESC "" (before all).
+	nullReleaseDateAsc  = "9999-12-31"
+	nullReleaseDateDesc = ""
+	// TMDB vote averages are 0-10.
+	nullTmdbScoreAsc  float64 = 99
+	nullTmdbScoreDesc float64 = -1
+)
+
 // contentSortRule builds a single paginator.Rule for one content sort column.
 func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) paginator.Rule {
+	boxOfficeNull, vsBudgetNull, ageRatingNull := nullBoxOfficeDesc, nullVsBudgetDesc, nullAgeRatingDesc
+	releaseDateNull, tmdbScoreNull := nullReleaseDateDesc, nullTmdbScoreDesc
+	if order == domain.SortOrderAsc {
+		boxOfficeNull, vsBudgetNull, ageRatingNull = nullBoxOfficeAsc, nullVsBudgetAsc, nullAgeRatingAsc
+		releaseDateNull, tmdbScoreNull = nullReleaseDateAsc, nullTmdbScoreAsc
+	}
 	// Map domain.SortOrder to paginator.Order
 	var paginatorOrder paginator.Order
 	if order == domain.SortOrderAsc {
@@ -130,6 +197,46 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 				"END",
 			NULLReplacement: float64(-1),
 		}
+	case domain.ContentSortByBoxOffice:
+		return paginator.Rule{
+			Key:             "BoxOffice",
+			Order:           paginatorOrder,
+			SQLRepr:         "(response->>'revenue')::BIGINT",
+			NULLReplacement: boxOfficeNull,
+		}
+	case domain.ContentSortByVsBudget:
+		// Revenue as a multiple of budget; NULL when either is unknown or budget is 0.
+		return paginator.Rule{
+			Key:   "VsBudget",
+			Order: paginatorOrder,
+			SQLRepr: "CASE WHEN response->>'budget' IS NULL OR response->>'revenue' IS NULL " +
+				"OR (response->>'budget')::BIGINT = 0 THEN NULL " +
+				"ELSE (response->>'revenue')::FLOAT8 / NULLIF((response->>'budget')::BIGINT,0) END",
+			NULLReplacement: vsBudgetNull,
+		}
+	case domain.ContentSortByAgeRating:
+		return paginator.Rule{
+			Key:   "AgeRating",
+			Order: paginatorOrder,
+			SQLRepr: "CASE response->>'certification' WHEN 'G' THEN 1 WHEN 'PG' THEN 2 " +
+				"WHEN 'PG-13' THEN 3 WHEN 'R' THEN 4 WHEN 'NC-17' THEN 5 ELSE NULL END",
+			NULLReplacement: ageRatingNull,
+		}
+	case domain.ContentSortByReleaseDate:
+		// ISO YYYY-MM-DD, so string order is date order; an empty date counts as unknown.
+		return paginator.Rule{
+			Key:             "ReleaseDate",
+			Order:           paginatorOrder,
+			SQLRepr:         "NULLIF(response->>'releaseDate', '')",
+			NULLReplacement: releaseDateNull,
+		}
+	case domain.ContentSortByTmdbScore:
+		return paginator.Rule{
+			Key:             "TmdbScore",
+			Order:           paginatorOrder,
+			SQLRepr:         "(response->>'voteAverage')::FLOAT8",
+			NULLReplacement: tmdbScoreNull,
+		}
 	case domain.ContentSortByPublishedAt:
 		return paginator.Rule{
 			Key:             "PublishedAt",
@@ -142,6 +249,13 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 			Key:             "ChannelTitle",
 			Order:           paginatorOrder,
 			SQLRepr:         "response->'items'->0->'snippet'->>'channelTitle'",
+			NULLReplacement: "",
+		}
+	case domain.ContentSortByAddedBy:
+		return paginator.Rule{
+			Key:             "AddedBy",
+			Order:           paginatorOrder,
+			SQLRepr:         addedBySortExpr,
 			NULLReplacement: "",
 		}
 	case domain.ContentSortByLength:
@@ -263,4 +377,68 @@ func buildPerspectiveSortRules(sortBy domain.PerspectiveSortBy, order domain.Sor
 	}
 
 	return []paginator.Rule{primaryRule, tieBreaker}
+}
+
+// userTodoStatusToDBValue converts domain UserTodoStatus to lowercase for database storage
+func userTodoStatusToDBValue(s domain.UserTodoStatus) string {
+	return strings.ToLower(string(s))
+}
+
+// userTodoStatusFromDBValue converts lowercase database value to domain UserTodoStatus
+func userTodoStatusFromDBValue(s string) domain.UserTodoStatus {
+	return domain.UserTodoStatus(strings.ToUpper(s))
+}
+
+// NULL sort-key replacements for user todos. The paginator wraps a nullable
+// key in COALESCE(column, replacement), so a NULL sorts after every real value
+// for ASC and before every real value for DESC: NULLs always land last.
+const (
+	// Priority is 0..RatingMax.
+	userTodoPriorityNullAsc  = domain.RatingMax + 1
+	userTodoPriorityNullDesc = -1
+	// Dates: 9999-12-31 is after any real date; 0001-01-01 is before any.
+	userTodoDueDateNullAsc  = "9999-12-31"
+	userTodoDueDateNullDesc = "0001-01-01"
+	// list_position is a positive int4.
+	userTodoListPositionNullAsc  = 2147483647
+	userTodoListPositionNullDesc = -1
+)
+
+// buildUserTodoSortRules builds paginator rules for user todo sorting: the
+// requested column, then an ID tie-breaker in the same direction. Only the
+// whitelisted sort columns below reach SQL (no caller-supplied column names).
+// An unknown sortBy falls back to CreatedAt DESC.
+func buildUserTodoSortRules(sortBy domain.UserTodoSortBy, order domain.SortOrder) []paginator.Rule {
+	asc := order == domain.SortOrderAsc
+	paginatorOrder := paginator.DESC
+	if asc {
+		paginatorOrder = paginator.ASC
+	}
+
+	var primaryRule paginator.Rule
+	switch sortBy {
+	case domain.UserTodoSortByPriority:
+		primaryRule = paginator.Rule{Key: "Priority", Order: paginatorOrder, NULLReplacement: userTodoPriorityNullDesc}
+		if asc {
+			primaryRule.NULLReplacement = userTodoPriorityNullAsc
+		}
+	case domain.UserTodoSortByDueDate:
+		primaryRule = paginator.Rule{Key: "DueDate", Order: paginatorOrder, NULLReplacement: userTodoDueDateNullDesc}
+		if asc {
+			primaryRule.NULLReplacement = userTodoDueDateNullAsc
+		}
+	case domain.UserTodoSortByUpdatedAt:
+		primaryRule = paginator.Rule{Key: "UpdatedAt", Order: paginatorOrder}
+	case domain.UserTodoSortByListPosition:
+		primaryRule = paginator.Rule{Key: "ListPosition", Order: paginatorOrder, NULLReplacement: userTodoListPositionNullDesc}
+		if asc {
+			primaryRule.NULLReplacement = userTodoListPositionNullAsc
+		}
+	case domain.UserTodoSortByCreatedAt:
+		primaryRule = paginator.Rule{Key: "CreatedAt", Order: paginatorOrder}
+	default:
+		primaryRule = paginator.Rule{Key: "CreatedAt", Order: paginator.DESC}
+	}
+
+	return []paginator.Rule{primaryRule, {Key: "ID", Order: paginatorOrder}}
 }

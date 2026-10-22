@@ -426,14 +426,14 @@ describe('urlParamsToFilter', () => {
 	it('converts range "1000.." to number greaterThan', () => {
 		const result = urlParamsToFilter({ views: '1000..' });
 		expect(result).toEqual({
-			views: { filterType: 'number', type: 'greaterThan', filter: 1000 },
+			views: { filterType: 'number', type: 'greaterThanOrEqual', filter: 1000 },
 		});
 	});
 
 	it('converts range "..5000" to number lessThan', () => {
 		const result = urlParamsToFilter({ views: '..5000' });
 		expect(result).toEqual({
-			views: { filterType: 'number', type: 'lessThan', filter: 5000 },
+			views: { filterType: 'number', type: 'lessThanOrEqual', filter: 5000 },
 		});
 	});
 
@@ -454,7 +454,7 @@ describe('urlParamsToFilter', () => {
 	it('converts likes range', () => {
 		const result = urlParamsToFilter({ likes: '500..' });
 		expect(result).toEqual({
-			likes: { filterType: 'number', type: 'greaterThan', filter: 500 },
+			likes: { filterType: 'number', type: 'greaterThanOrEqual', filter: 500 },
 		});
 	});
 
@@ -573,6 +573,11 @@ describe('urlParamsToGraphQLFilter', () => {
 		expect(result).toEqual({ channelTitle: 'mkbhd' });
 	});
 
+	it('maps f.user to addedByUsername', () => {
+		const result = urlParamsToGraphQLFilter({ user: 'ann' }, '');
+		expect(result).toEqual({ addedByUsername: 'ann' });
+	});
+
 	it('maps f.tags to tagContains', () => {
 		const result = urlParamsToGraphQLFilter({ tags: 'cooking' }, '');
 		expect(result).toEqual({ tagContains: 'cooking' });
@@ -633,6 +638,7 @@ describe('COL_TO_SORT / SORT_TO_COL', () => {
 		expect(COL_TO_SORT.percentLiked).toBe('PERCENT_LIKED');
 		expect(COL_TO_SORT.publishDate).toBe('PUBLISHED_AT');
 		expect(COL_TO_SORT.channel).toBe('CHANNEL_TITLE');
+		expect(COL_TO_SORT.user).toBe('ADDED_BY');
 		expect(COL_TO_SORT.createdAt).toBe('CREATED_AT');
 		expect(COL_TO_SORT.updatedAt).toBe('UPDATED_AT');
 	});
@@ -645,6 +651,7 @@ describe('COL_TO_SORT / SORT_TO_COL', () => {
 		expect(SORT_TO_COL.PERCENT_LIKED).toBe('percentLiked');
 		expect(SORT_TO_COL.PUBLISHED_AT).toBe('publishDate');
 		expect(SORT_TO_COL.CHANNEL_TITLE).toBe('channel');
+		expect(SORT_TO_COL.ADDED_BY).toBe('user');
 		expect(SORT_TO_COL.CREATED_AT).toBe('createdAt');
 		expect(SORT_TO_COL.UPDATED_AT).toBe('updatedAt');
 	});

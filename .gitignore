@@ -55,6 +55,12 @@ CLAUDE.local.md
 # Claude Code isolated worktrees (EnterWorktree tool, standardized location)
 .claude/worktrees/
 
+# Agent registry: per-machine state (tracked templates: LOCAL_AGENT_*.example.md)
+/LOCAL_AGENT_CHECKOUTS.md
+/LOCAL_AGENT_VERIFICATION.md
+/LOCAL_AGENT_*.md.*.tmp
+/.agent-registry.lock/
+
 # Self-verify browser profile (holds a logged-in session — never commit)
 .claude/sv-profile/
 

@@ -1,0 +1,16 @@
+# Grafana dashboard provider for the local observability tracer
+# (docker-compose.observability.yml mounts this file at
+# /otel-lgtm/grafana/conf/provisioning/dashboards/perspectize.yaml and
+# ops/grafana/dashboards/ at the path below). Not used by Grafana Cloud —
+# see ops/grafana/README.md for importing there.
+apiVersion: 1
+
+providers:
+  - name: Perspectize
+    type: file
+    folder: Perspectize
+    # Local copies are edit-and-export scratch space; the JSON in git is the source.
+    allowUiUpdates: true
+    options:
+      path: /otel-lgtm/grafana/conf/provisioning/dashboards/perspectize
+      foldersFromFilesStructure: false

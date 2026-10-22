@@ -28,7 +28,7 @@ describe('column label parity', () => {
 	const headerLabels = gridHeaderLabels();
 
 	it('found grid header labels to compare against (sanity check the parser)', () => {
-		expect(headerLabels.duration).toBe('Length');
+		expect(headerLabels.duration).toBe('Duration');
 		expect(headerLabels.publishDate).toBe('Date');
 	});
 

@@ -221,17 +221,6 @@ describe('useCreatePerspective hook', () => {
 			);
 		});
 
-		it('invalidates the activity feeds — never patched with a PerspectiveItem, since their row shape and privacy filtering differ', () => {
-			capturedMutationOptions.onSuccess(
-				{ createPerspective: createdRow },
-				{ userID: 42 },
-				{ previous: [], tempId: 'x' },
-			);
-			expect(mockInvalidateQueries).toHaveBeenCalledWith({
-				queryKey: ['app', 'perspectives', 'list', 'activityFeed'],
-			});
-		});
-
 		it("invalidates the created content's listByContent cache (e.g. an open Compare picker), exact", () => {
 			capturedMutationOptions.onSuccess(
 				{ createPerspective: createdRow },
@@ -244,7 +233,7 @@ describe('useCreatePerspective hook', () => {
 			});
 		});
 
-		it('does not patch listByContent or activityFeed with the new row (only invalidates them)', () => {
+		it('does not patch listByContent with the new row (only invalidates it)', () => {
 			capturedMutationOptions.onSuccess(
 				{ createPerspective: createdRow },
 				{ userID: 42 },
@@ -253,7 +242,6 @@ describe('useCreatePerspective hook', () => {
 			for (const call of mockSetQueriesData.mock.calls) {
 				const key = call[0]?.queryKey ?? call[0];
 				expect(key).not.toContain('byContent');
-				expect(key).not.toContain('activityFeed');
 			}
 		});
 

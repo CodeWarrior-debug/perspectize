@@ -1,7 +1,7 @@
 ---
 name: test-writer
 description: Go test author for the backend. Use when new or changed Go code needs tests, when a coverage gap is identified, when a bug needs a failing regression test before the fix, or when a plan task is tagged test-writer. Writes table-driven testify tests using the repo's hand-written mocks and its sqlmock-backed GORM harness. Not for frontend (Vitest) tests. See "When to invoke" in the agent body.
-model: sonnet
+model: haiku
 color: green
 tools:
   - Read

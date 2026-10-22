@@ -49,6 +49,7 @@ type ContentModel struct {
 	AddedByUserID     int             `gorm:"column:added_by_user_id;not null"`
 	Length            *int            `gorm:""`
 	LengthUnits       *string         `gorm:""`
+	LengthDisplay     json.RawMessage `gorm:"type:jsonb"`
 	Response          json.RawMessage `gorm:"type:jsonb"`
 	PrimaryCategoryID *int            `gorm:"column:primary_category_id"`
 	VerseStartID      *int            `gorm:"column:verse_start_id"`
@@ -61,14 +62,29 @@ type ContentModel struct {
 	// the page (one round trip instead of a separate COUNT(*)).
 	TotalCount *int64 `gorm:"column:total_count;->;-:migration"`
 
-	// Dummy fields for gorm-cursor-paginator sort key validation.
-	// These are NOT database columns — SQLRepr provides the actual SQL.
-	// The gorm:"-" tag tells GORM to ignore them for queries/migrations.
-	ViewCount    int64   `gorm:"-"`
-	LikeCount    int64   `gorm:"-"`
-	PercentLiked float64 `gorm:"-"`
-	PublishedAt  string  `gorm:"-"`
-	ChannelTitle string  `gorm:"-"` // Dummy field for gorm-cursor-paginator sort key validation
+	// Computed sort keys for gorm-cursor-paginator. The paginator builds a cursor by
+	// reading these struct fields off the last row, so List selects each active sort
+	// expression AS the column named here (see computedSortColumns) and GORM scans it
+	// back. They are pointers so a NULL expression stays nil (encoded as JSON null, and
+	// decoded back to the rule's NULLReplacement) instead of being encoded as a bogus
+	// 0 -- which made page 2 repeat page 1 (C-02). Read-only and never migrated: they
+	// are not real columns.
+	ViewCount    *int64   `gorm:"column:view_count;->;-:migration"`
+	LikeCount    *int64   `gorm:"column:like_count;->;-:migration"`
+	PercentLiked *float64 `gorm:"column:percent_liked;->;-:migration"`
+	PublishedAt  *string  `gorm:"column:published_at_sort;->;-:migration"`
+	BoxOffice    *int64   `gorm:"column:box_office;->;-:migration"`
+	VsBudget     *float64 `gorm:"column:vs_budget;->;-:migration"`
+	AgeRating    *int64   `gorm:"column:age_rating;->;-:migration"`
+	ReleaseDate  *string  `gorm:"column:release_date_sort;->;-:migration"`
+	TmdbScore    *float64 `gorm:"column:tmdb_score;->;-:migration"`
+	ChannelTitle *string  `gorm:"column:channel_title_sort;->;-:migration"`
+
+	// AddedBy is the lowercased adder username, read-only and populated only when List
+	// selects it for the ADDED_BY sort. Unlike the dummies above it must carry a real
+	// value: the paginator builds the next cursor from this field, so an always-empty one
+	// would make every "next page" a repeat of the first.
+	AddedBy string `gorm:"column:added_by;->;-:migration"`
 
 	CreatedAt time.Time `gorm:"autoCreateTime"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime"`
@@ -148,3 +164,58 @@ type MessageModel struct {
 }
 
 func (MessageModel) TableName() string { return "messages" }
+
+// TodoActionModel is the GORM persistence model for todo_actions. UserID nil is
+// a global preset; a set UserID is an action the user entered.
+type TodoActionModel struct {
+	ID              int       `gorm:"primaryKey;autoIncrement"`
+	Key             string    `gorm:"column:key;not null"`
+	Label           string    `gorm:"column:label;not null"`
+	Description     string    `gorm:"column:description;not null"`
+	TypicalSequence *int      `gorm:"column:typical_sequence"`
+	UserID          *int      `gorm:"column:user_id"`
+	CreatedAt       time.Time `gorm:"autoCreateTime"`
+	UpdatedAt       time.Time `gorm:"autoUpdateTime"`
+}
+
+// TableName returns the table name for TodoActionModel
+func (TodoActionModel) TableName() string { return "todo_actions" }
+
+// UserTodoListModel is the GORM persistence model for user_todo_lists.
+type UserTodoListModel struct {
+	ID          int       `gorm:"primaryKey;autoIncrement"`
+	UserID      int       `gorm:"column:user_id;not null"`
+	Name        string    `gorm:"column:name;not null"`
+	Description *string   `gorm:"column:description"`
+	Privacy     string    `gorm:"column:privacy;not null"`
+	CreatedAt   time.Time `gorm:"autoCreateTime"`
+	UpdatedAt   time.Time `gorm:"autoUpdateTime"`
+}
+
+// TableName returns the table name for UserTodoListModel
+func (UserTodoListModel) TableName() string { return "user_todo_lists" }
+
+// UserTodoModel is the GORM persistence model for user_todos. Dates are
+// date-only columns, so they are typed `date` and carried as *time.Time.
+type UserTodoModel struct {
+	ID              int        `gorm:"primaryKey;autoIncrement"`
+	UserID          int        `gorm:"column:user_id;not null"`
+	ContentID       *int       `gorm:"column:content_id"`
+	Name            *string    `gorm:"column:name"`
+	ActionID        int        `gorm:"column:action_id;not null"`
+	Priority        *int       `gorm:"column:priority"`
+	Status          string     `gorm:"column:status;not null"`
+	PercentComplete int        `gorm:"column:percent_complete;not null"`
+	StartDate       *time.Time `gorm:"column:start_date;type:date"`
+	EndDate         *time.Time `gorm:"column:end_date;type:date"`
+	DueDate         *time.Time `gorm:"column:due_date;type:date"`
+	Comments        *string    `gorm:"column:comments"`
+	Privacy         string     `gorm:"column:privacy;not null"`
+	ListID          *int       `gorm:"column:list_id"`
+	ListPosition    *int       `gorm:"column:list_position"`
+	CreatedAt       time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt       time.Time  `gorm:"autoUpdateTime"`
+}
+
+// TableName returns the table name for UserTodoModel
+func (UserTodoModel) TableName() string { return "user_todos" }

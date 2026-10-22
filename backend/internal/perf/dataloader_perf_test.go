@@ -112,12 +112,12 @@ func TestContentListDataloaderPerf(t *testing.T) {
 	perspectiveRepo := postgres.NewGormPerspectiveRepository(db)
 	categoryRepo := postgres.NewGormCategoryRepository(db)
 
-	contentService := services.NewContentService(contentRepo, nil)
-	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
+	contentService := services.NewContentService(contentRepo, nil, nil)
+	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, nil, nil, nil)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, nil)
 
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)
+	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil, nil)
 	execSchema := generated.NewExecutableSchema(generated.Config{
 		Resolvers: resolver,
 		Directives: generated.DirectiveRoot{

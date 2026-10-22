@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
 	LIST_CONTENT,
 	GET_CONTENT,
+	GET_CONTENT_DETAILS,
 	CREATE_CONTENT_FROM_YOUTUBE,
+	CREATE_CONTENT_FROM_MOVIE,
 	type ContentItem,
 	type ContentResponse,
 	type CreateContentResponse,
@@ -77,6 +79,11 @@ describe('GraphQL query definitions', () => {
 	});
 
 	describe('LIST_CONTENT', () => {
+		it('selects the shaped `movie` payload instead of the raw `response`', () => {
+			expect(LIST_CONTENT).toMatch(/\bmovie\b/);
+			expect(LIST_CONTENT).not.toMatch(/\bresponse\b/);
+		});
+
 		it('is defined and is a string', () => {
 			expect(LIST_CONTENT).toBeDefined();
 			expect(typeof LIST_CONTENT).toBe('string');
@@ -150,6 +157,28 @@ describe('GraphQL query definitions', () => {
 			expect(GET_CONTENT).toContain('likeCount');
 			expect(GET_CONTENT).toContain('commentCount');
 			expect(GET_CONTENT).toContain('response');
+		});
+	});
+
+	describe('GET_CONTENT_DETAILS', () => {
+		it('selects both `response` and `movie`', () => {
+			expect(GET_CONTENT_DETAILS).toMatch(/\bresponse\b/);
+			expect(GET_CONTENT_DETAILS).toMatch(/\bmovie\b/);
+		});
+	});
+
+	describe('CREATE_CONTENT_FROM_MOVIE', () => {
+		it('is a CreateContentFromMovie mutation taking CreateContentFromMovieInput', () => {
+			expect(CREATE_CONTENT_FROM_MOVIE).toContain(
+				'mutation CreateContentFromMovie($input: CreateContentFromMovieInput!)',
+			);
+			expect(CREATE_CONTENT_FROM_MOVIE).toContain('createContentFromMovie(input: $input)');
+		});
+
+		it('requests the fields the success toast and its Go-to action need', () => {
+			for (const field of ['id', 'name', 'contentType', 'url']) {
+				expect(CREATE_CONTENT_FROM_MOVIE).toContain(field);
+			}
 		});
 	});
 

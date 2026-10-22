@@ -4,6 +4,8 @@ Details behind the two-line summary in the root [CLAUDE.md](../CLAUDE.md).
 
 **Primary workflow: obra/superpowers** (plugin enabled in `.claude/settings.json`). Use `superpowers:writing-plans` (or its brainstorming/spec-writing counterparts) for planning, and `superpowers:executing-plans` / `superpowers:subagent-driven-development` for execution. Plans and specs live in `docs/superpowers/plans/` and `docs/superpowers/specs/` — see `docs/superpowers/plans/2026-08-15-clerk-derived-user-identity-plan.md` for the established format (plan header names the required execution sub-skill, links its spec, checkbox-tracked (`- [ ]`) tasks).
 
+**Intents come before specs.** For work big enough to need a spec, write the "why" first as `project-management/intents/<feature>.md` (copy `_template.md`) and get the user's sign-off before starting the spec. The spec links back to its intent; one intent usually fans out into several plans/PRs. Convention and rationale: [project-management/README.md](../project-management/README.md).
+
 **Lightweight spike/research docs** (pre-planning, not meant for autonomous execution — e.g. a cost/feasibility writeup before committing to a real plan) also live in `docs/superpowers/specs/`, dated like plans/specs, but state "Status: spike, not a superpowers plan" up top instead of a sub-skill header. Link them from `.planning/ROADMAP.md` at the relevant phase so they aren't orphaned.
 
 **Optional/unscheduled roadmap items:** write a superpowers spec (`docs/superpowers/specs/YYYY-MM-DD-<name>-design.md`, `Status: optional roadmap item — unscheduled`, no plan file) + a short [FEATURE_BACKLOG.md](../FEATURE_BACKLOG.md) entry linking it. Don't add to legacy `.planning/ROADMAP.md`.

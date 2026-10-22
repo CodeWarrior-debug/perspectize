@@ -20,6 +20,8 @@ For routine isolated work (branch inspection, PR analysis, one-off experiments â
 
 **Claim order:** take the lowest-numbered slot that is free. A slot is free when it doesn't exist yet, or when it is clean, not `locked`, and its branch is finished (PR merged, remote branch gone). A finished slot holding only untracked files is still claimable (they survive a branch switch); mention them. Check for conflicts first: no open PR on its branch, and no overlap with another in-flight branch touching the same files. If a slot is not claimable, move to the next number. Create missing slots with `.claude/scripts/new-worktree.sh <branch> <n>`; reuse an existing one with `git -C .claude/worktrees/<n> checkout -b <new-branch> origin/main`, then `git branch --unset-upstream` so it can't push to `main`.
 
+**Live claims:** a worktree (or the main checkout) can also be busy because another Claude session on this machine is writing to it. The agent registry records that in `LOCAL_AGENT_CHECKOUTS.md` at the main checkout root, and its PreToolUse hook denies writes there. Treat a claimed slot as busy; `node .claude/agent-registry/agent-registry.mjs status` lists the claims and drops dead ones.
+
 **Overflow:** once all 5 numbered slots are busy, use a work-specific named worktree (e.g. `.claude/worktrees/idle-pause-realtime-stream`) instead of asking.
 
 **Reuse policy:**
@@ -38,7 +40,7 @@ For routine isolated work (branch inspection, PR analysis, one-off experiments â
 
 ## Worktrees on an existing branch: use the script
 
-`.worktreeinclude` (repo root) lists gitignored files that a fresh worktree needs: `.env` files with `DATABASE_URL`, and machine-local Claude settings. Claude Code copies them **only** into worktrees it creates itself (`EnterWorktree`, `--worktree`, agent `isolation: worktree`). Those always start a **new** branch.
+`.worktreeinclude` (repo root) lists gitignored files that a fresh worktree needs: `.env` files with `DATABASE_URL`, and machine-local Claude settings. Claude Code copies them **only** into worktrees it creates itself (`EnterWorktree`, `--worktree`, agent `isolation: worktree`). Those always start a **new** branch, created from `main`, not from the session's current branch. A subagent working on a feature branch must first `git merge --ff-only <feature-branch>` in its worktree, and the lead cherry-picks the subagent's commits back onto the feature branch.
 
 To put a worktree on an **existing** branch (e.g. a long-running integration branch), use the script instead of raw `git worktree add`, which skips the copy and leaves a checkout with no env files:
 

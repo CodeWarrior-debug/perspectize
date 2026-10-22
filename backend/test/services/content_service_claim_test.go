@@ -27,7 +27,7 @@ func TestCreateClaim_NoParent_IsPrivateAndOmitsParent(t *testing.T) {
 			return nil, nil
 		},
 	}
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 
 	got, err := svc.CreateClaim(context.Background(), portservices.CreateClaimInput{
 		Text:   "  Water boils at 100C at sea level  ",
@@ -60,7 +60,7 @@ func TestCreateClaim_WithParent_RecordsParent(t *testing.T) {
 			return &domain.Content{ID: 3}, nil
 		},
 	}
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 
 	_, err := svc.CreateClaim(context.Background(), portservices.CreateClaimInput{
 		Text: "A claim about it", UserID: 7, ParentContentID: claimIntPtr(3),
@@ -74,7 +74,7 @@ func TestCreateClaim_WithParent_RecordsParent(t *testing.T) {
 }
 
 func TestCreateClaim_MissingParent_NotFound(t *testing.T) {
-	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{})
+	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil)
 
 	_, err := svc.CreateClaim(context.Background(), portservices.CreateClaimInput{
 		Text: "A claim", UserID: 7, ParentContentID: claimIntPtr(99),
@@ -94,7 +94,7 @@ func TestCreateClaim_InvalidInput(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{})
+			svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil)
 			_, err := svc.CreateClaim(context.Background(), tt.input)
 			assert.True(t, errors.Is(err, domain.ErrInvalidInput))
 		})

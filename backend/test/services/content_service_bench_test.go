@@ -23,7 +23,7 @@ func BenchmarkContentService_GetByID(b *testing.B) {
 			return content, nil
 		},
 	}
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -55,7 +55,7 @@ func BenchmarkContentService_ListContent(b *testing.B) {
 			return result, nil
 		},
 	}
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 	ctx := context.Background()
 	first := 10
 

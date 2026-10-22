@@ -12,7 +12,7 @@
 		SelectContent,
 		SelectItem,
 	} from '$lib/components/shadcn';
-	import { SORTABLE_COLUMNS } from '$lib/utils/grid-config';
+	import { SORTABLE_COLUMNS, type TogglableColumn } from '$lib/utils/grid-config';
 	import type { SortSpec } from '$lib/utils/gridUrlState';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
@@ -26,9 +26,11 @@
 		sorts: SortSpec[];
 		/** Called with the full replacement list on every change (add/remove/reorder/direction). */
 		onApply: (sorts: SortSpec[]) => void;
+		/** Columns offered in the picker; defaults to every sortable column. */
+		columns?: readonly TogglableColumn[];
 	}
 
-	let { open = $bindable(false), sorts, onApply }: Props = $props();
+	let { open = $bindable(false), sorts, onApply, columns = SORTABLE_COLUMNS }: Props = $props();
 
 	// Local draft so the row list doesn't jump while editing (parent re-render churn
 	// on every apply is fine functionally, but the direction toggle feels laggy
@@ -39,7 +41,7 @@
 	});
 
 	const usedCols = $derived(new Set(draft.map((s) => s.col)));
-	const availableCols = $derived(SORTABLE_COLUMNS.filter((c) => !usedCols.has(c.colId)));
+	const availableCols = $derived(columns.filter((c) => !usedCols.has(c.colId)));
 	const columnLabel = (colId: string) => SORTABLE_COLUMNS.find((c) => c.colId === colId)?.label ?? colId;
 
 	function commit(next: SortSpec[]) {

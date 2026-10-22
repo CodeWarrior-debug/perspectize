@@ -25,7 +25,9 @@ gh api repos/CodeWarrior-debug/perspectize/pulls/123/comments
 
 **Creating a PR:** the `require-session-reflection-before-pr.sh` hook blocks `gh pr create` until `/revise-claude-md` has run, and it can't detect completion. After running it, create the PR with `gh api repos/CodeWarrior-debug/perspectize/pulls -f title="..." -f body="..." -f head="branch" -f base="main"`.
 
-**`gh` not authenticated (web sessions):**
+**Cloud sessions:** `gh` is unavailable. Open the PR yourself with the GitHub MCP `create_pull_request` tool and set labels with `issue_write` — see [SESSION_ENVIRONMENT.md](SESSION_ENVIRONMENT.md).
+
+**Local `gh` not authenticated:**
 - **Creating a PR:** push with `git push -u origin <branch>` and let the user create the PR via the GitHub UI button. Prepare the title and body as copyable text.
 - **Updating a PR:** output the updated title/body as copyable text for the user to paste.
 
@@ -59,11 +61,11 @@ GitHub Projects v2: see [GITHUB_PROJECTS.md](GITHUB_PROJECTS.md).
 - **No demo needed** (a one-line reason in the Demo section is enough, e.g. "no visible UI change: formatting and test-type fixes"): docs/plan/research records, formatting/lint passes, test-only changes, type-only fixes, tooling/hooks/CI config, and refactors with no behaviour change.
 - A qualifying PR is `ready for review` only once it has either: (a) `sv-` screenshots/video actually captured and linked in the Demo section (see [PR_SCREENSHOTS.md](PR_SCREENSHOTS.md)), or (b) an explicit, specific justification for why none applies — "dark by default, no UI surface", "no visible UI change", not a generic "N/A". A Demo section that just says screenshots are still needed does not qualify, no matter how green CI is.
 - **A cloud session cannot produce that evidence** (no Clerk sign-in). So a cloud session finishing a qualifying (user-visible) PR must apply the `needs-demo-video` label at creation time (`gh api repos/CodeWarrior-debug/perspectize/issues/<n>/labels -f "labels[]=needs-demo-video"` — `gh pr edit` fails here) rather than leaving the PR unlabeled or self-declaring it ready. This is what flags the PR for a local session to pick up and finish.
-- A local session that adds the missing evidence swaps the label: remove `needs-demo-video`, add `ready for review`, and paste the linked evidence into the PR's Demo section (don't just upload assets and leave the placeholder text).
+- A local session that adds the missing evidence swaps the label: remove `needs-demo-video`, add `ready for review`, and paste the linked evidence into the PR's Demo section (don't just upload assets and leave the placeholder text). **Embed a video as an animated GIF preview linked to the mp4**, not a bare link: release-hosted mp4s don't play inline on GitHub. Recipe and markdown: [PR_SCREENSHOTS.md → Embedding](PR_SCREENSHOTS.md#embedding--gif-preview-linked-to-the-mp4).
 - `needs-demo-video` and `ready for review` are **mutually exclusive** — never both on the same PR. If a PR is blocked by something else (merge conflict, a real failing/un-run CI check, an unresolved bug), it's fine for it to carry neither label rather than force-fitting one.
 - An owner-only follow-up that needs a credential no agent has (`ANTHROPIC_API_KEY`, a Chrome origin-trial flag, a live Sevalla checkpoint) does **not** by itself block `ready for review` — that's normal handoff, not a missing demo. What blocks it is *this PR's own visible surface* going unverified.
 
-See [VERIFICATION.md](VERIFICATION.md) for the evidence capture workflow.
+See [VERIFICATION.md](VERIFICATION.md) for the evidence capture workflow. **A local agent capturing the demo starts with the `pr-verification` skill.** It takes the machine-wide verification slot, so parallel agents never collide on the dev-server ports or the signed-in Chrome. When the slot stays busy past its 2-hour limit, the agent labels the PR `needs-demo-video` and says so, as a cloud session would.
 
 ## `needs-local-session-takeover` label
 
@@ -73,9 +75,14 @@ Marks a PR opened from a **cloud** session whose remaining work needs the user's
 - **Cloud sessions:** apply the label (and list the local-only steps) instead of claiming unverified work is done.
 - **Local sessions:** remove the label once every checklist item under "Local session takeover" is done.
 
+## CI
+
+- **Trigger:** `ci.yml` runs only on PRs and pushes to `main`. Pushing a feature branch with no PR runs nothing, so a PR is the way to get CI's verdict.
+- **DB-backed tests in cloud sessions:** integration tests (`backend/test/**`, `cmd/server/*_integration_test.go`) skip without `DATABASE_URL`. Don't set up Postgres in a cloud session (the permission classifier denies creating roles/DBs). Open the PR and let CI's Postgres service run them, then check the `Test & Lint` job log to confirm they actually ran rather than skipped.
+
 ## Migration labels
 
-Migrations are never applied automatically (see `backend/CLAUDE.md` → Migrations): someone runs `migrate up` by hand against each environment after the PR merges. These labels track that, so a merged PR with a pending migration can't be forgotten.
+Migrations are never applied automatically (see `backend/CLAUDE.md` → Migrations): someone runs `migrate up` by hand against each environment (procedure: [MIGRATION_ROLLOUT.md](MIGRATION_ROLLOUT.md)), before the PR merges when the migration is additive. These labels track that, so a merged PR with a pending migration can't be forgotten.
 
 | Label | Put it on | Take it off |
 |-------|-----------|-------------|

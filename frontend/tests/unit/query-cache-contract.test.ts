@@ -113,8 +113,6 @@ describe('query key hygiene', () => {
 describe('eviction: useDeletePerspective.onSuccess evicts exactly what changed', () => {
 	it('invalidates the affected entries and leaves unrelated caches alone', async () => {
 		const affected = [
-			queryKeys.perspectives.activityFeed(true),
-			queryKeys.perspectives.activityFeed(false),
 			queryKeys.perspectives.detail('7'),
 			queryKeys.content.detail('3'),
 			queryKeys.perspectives.listByContent(3),
@@ -184,5 +182,27 @@ describe('eviction: useSetPassageDisplayTitle.onSuccess patches in place, evicts
 		// Entries without this passage's title come back as the same object: no re-render.
 		expect(client.getQueryData(aggregatesKey)).toBe(aggregates);
 		expect(client.getQueryData(otherRowKey)).toBe(otherRow);
+	});
+});
+
+describe('eviction: useAddMovie.onSuccess invalidates content lists only', () => {
+	it('marks every content list stale and leaves details, rows and other domains alone', async () => {
+		const affected = [queryKeys.content.list({ first: 50 }), queryKeys.content.list({ first: 10, search: 'matrix' })];
+		const unrelated = [
+			queryKeys.content.detail('3'),
+			queryKeys.content.row('3'),
+			queryKeys.perspectives.listByContent(3),
+			queryKeys.users.list(),
+			queryKeys.bible.passageText(1, 2),
+		];
+		for (const k of [...affected, ...unrelated]) seed(client, k);
+
+		const { useAddMovie } = await import('$lib/queries/content/useAddMovie');
+		useAddMovie();
+		capturedDeleteOptions.onSuccess({ createContentFromMovie: { id: '9', name: 'The Matrix', contentType: 'MOVIE' } });
+
+		const outcome = invalidationOutcome(client, [...affected, ...unrelated]);
+		expect(outcome.invalidated).toEqual(affected);
+		expect(outcome.untouched).toEqual(unrelated);
 	});
 });

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { LengthDisplay } from '$lib/queries/content';
 	import { createQuery } from '@tanstack/svelte-query';
 	import { goto } from '$app/navigation';
 	import { graphqlRequest } from '$lib/queries/client';
@@ -40,6 +41,7 @@
 		displayTitle?: string | null;
 		length: number | null;
 		lengthUnits: string | null;
+		lengthDisplay?: LengthDisplay | null;
 	}
 	interface GetContentResponse {
 		contentByID: CompareContentBanner | null;
@@ -214,7 +216,9 @@
 			<span class="text-[13px] font-medium text-foreground">{content!.name}</span>
 		</div>
 		{#if content!.length != null && content!.lengthUnits != null}
-			<span class="text-[12px] text-muted-foreground">{formatDuration(content!.length, content!.lengthUnits)}</span>
+			<span class="text-[12px] text-muted-foreground"
+				>{formatDuration(content!.length, content!.lengthUnits, content!.lengthDisplay?.precision)}</span
+			>
 		{/if}
 	{/snippet}
 

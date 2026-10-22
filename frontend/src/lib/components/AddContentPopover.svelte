@@ -2,10 +2,12 @@
 	import { Input, Label } from '$lib/components/shadcn';
 	import FormPopover from '$lib/components/FormPopover.svelte';
 	import PassagePicker from '$lib/components/PassagePicker.svelte';
+	import { useAddMovie } from '$lib/queries/content/useAddMovie';
 	import { useAddVideo } from '$lib/queries/content/useAddVideo';
 	import { useAddPassage } from '$lib/queries/content/useAddPassage';
 	import { useCreateClaim } from '$lib/queries/content/useCreateClaim';
 	import { validateYouTubeUrl } from '$lib/utils/youtube';
+	import { contentNotAllowedMessage, validateMovieInput } from '$lib/utils/movie';
 	import { detectContentType } from '$lib/utils/detectContentType';
 	import type { PassageRange } from '$lib/utils/bible';
 	import { defaultRange, isRangeInBounds, isRangeOrdered } from '$lib/utils/passageRange';
@@ -15,14 +17,18 @@
 	import EraserIcon from '@lucide/svelte/icons/eraser';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 
-	type ChosenType = 'YOUTUBE_VIDEO' | 'BIBLE_PASSAGE' | 'CLAIM';
-	const CHOSEN_TYPES: ChosenType[] = ['YOUTUBE_VIDEO', 'BIBLE_PASSAGE', 'CLAIM'];
+	type ChosenType = 'YOUTUBE_VIDEO' | 'BIBLE_PASSAGE' | 'MOVIE' | 'CLAIM';
+	const CHOSEN_TYPES: ChosenType[] = ['YOUTUBE_VIDEO', 'BIBLE_PASSAGE', 'MOVIE', 'CLAIM'];
 
 	let {
 		triggerVariant = 'default',
 	}: {
 		triggerVariant?: 'default' | 'outline' | 'ghost';
 	} = $props();
+
+	// Created first so the YouTube hook stays the last createMutation call (existing tests capture its options).
+	const claimMutation = useCreateClaim();
+	const movieMutation = useAddMovie();
 
 	let open = $state(false);
 	let input = $state('');
@@ -45,6 +51,10 @@
 			// state it writes — otherwise the write re-triggers the effect forever
 			// (effect_update_depth_exceeded).
 			pickerResetToken = untrack(() => pickerResetToken) + 1;
+			// Only `open` may be a dependency here: `reset` reads the reactive mutation object, so
+			// without untrack a success re-runs this effect (open is still true) and resets the
+			// mutation before the close-on-success effect sees `isSuccess`.
+			untrack(() => movieMutation.reset());
 		}
 	});
 
@@ -58,28 +68,40 @@
 	);
 	const rangeValid = $derived(isRangeOrdered(range) && isRangeInBounds(range));
 
-	// claim and passage hooks are created first so the YouTube hook stays the last
-	// createMutation call, keeping the existing YouTube-path tests' captured options unchanged.
-	const claimMutation = useCreateClaim();
 	const passageMutation = useAddPassage();
 	const videoMutation = useAddVideo();
-	const isPending = $derived(videoMutation.isPending || passageMutation.isPending || claimMutation.isPending);
+	const isPending = $derived(
+		videoMutation.isPending || passageMutation.isPending || movieMutation.isPending || claimMutation.isPending,
+	);
 
 	$effect(() => {
-		if (videoMutation.isSuccess || passageMutation.isSuccess || claimMutation.isSuccess) {
+		if (
+			videoMutation.isSuccess ||
+			passageMutation.isSuccess ||
+			movieMutation.isSuccess ||
+			claimMutation.isSuccess
+		) {
 			open = false;
 		}
 	});
 
+	const notAllowedMessage = $derived(contentNotAllowedMessage(movieMutation.error));
+
 	const chipLabel = $derived.by(() => {
 		if (!effectiveType) return 'Select a type';
 		const name =
-			effectiveType === 'YOUTUBE_VIDEO' ? 'YouTube' : effectiveType === 'BIBLE_PASSAGE' ? 'Bible passage' : 'Claim';
+			effectiveType === 'YOUTUBE_VIDEO'
+				? 'YouTube'
+				: effectiveType === 'BIBLE_PASSAGE'
+					? 'Bible passage'
+					: effectiveType === 'MOVIE'
+						? 'Movie'
+						: 'Claim';
 		return manualType ? `Type: ${name}` : `Detected: ${name}`;
 	});
 
 	const isSubmitDisabled = $derived.by(() => {
-		if (effectiveType === 'YOUTUBE_VIDEO') return !input.trim();
+		if (effectiveType === 'YOUTUBE_VIDEO' || effectiveType === 'MOVIE') return !input.trim();
 		if (effectiveType === 'BIBLE_PASSAGE') return !rangeValid;
 		if (effectiveType === 'CLAIM') return !claimValid;
 		return true;
@@ -130,6 +152,14 @@
 			}
 			error = '';
 			videoMutation.mutate(url);
+		} else if (effectiveType === 'MOVIE') {
+			const url = input.trim();
+			if (!validateMovieInput(url)) {
+				error = 'Please enter a valid TMDB or IMDb movie link';
+				return;
+			}
+			error = '';
+			movieMutation.mutate(url);
 		} else if (effectiveType === 'BIBLE_PASSAGE') {
 			if (!rangeValid) return;
 			error = '';
@@ -159,7 +189,7 @@
 	{triggerVariant}
 	triggerLabel="Add Content"
 	title="Add Content"
-	description="Paste a YouTube link, type a Bible reference like John 3:16-18, or write a claim."
+	description="Paste a YouTube, TMDB or IMDb link, type a Bible reference like John 3:16-18, or write a claim."
 	submitLabel="Add"
 	pendingLabel="Adding..."
 	{isPending}
@@ -197,6 +227,11 @@
 			{#if error}
 				<p class="text-sm text-red-600">{error}</p>
 			{/if}
+			{#if effectiveType === 'MOVIE' && movieMutation.isError}
+				<p class="text-sm text-red-600">
+					{notAllowedMessage ?? 'Could not add this movie. Check the link and try again.'}
+				</p>
+			{/if}
 
 			<div class="flex items-center gap-2 text-sm">
 				<span data-testid="type-chip" class="text-muted-foreground">{chipLabel}</span>
@@ -210,6 +245,7 @@
 					<option value="" disabled>Select a type</option>
 					<option value="YOUTUBE_VIDEO">YouTube</option>
 					<option value="BIBLE_PASSAGE">Bible passage</option>
+					<option value="MOVIE">Movie</option>
 					<option value="CLAIM">Claim</option>
 				</select>
 				<div class="ml-auto flex items-center gap-1">
@@ -245,6 +281,12 @@
 					{:else}
 						Write the claim as a statement of at least two words.
 					{/if}
+				</p>
+			{/if}
+
+			{#if effectiveType === 'MOVIE'}
+				<p class="text-xs text-muted-foreground">
+					This product uses the TMDB API but is not endorsed or certified by TMDB.
 				</p>
 			{/if}
 

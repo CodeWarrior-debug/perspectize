@@ -15,6 +15,47 @@ func intPtr(i int) *int       { return &i }
 
 var mapperFixedTime = time.Date(2026, 3, 14, 15, 9, 26, 0, time.UTC)
 
+// --- Content length_display (JSONB) ---
+
+func TestLengthDisplayJSON(t *testing.T) {
+	t.Run("domain enum is stored lowercase", func(t *testing.T) {
+		raw := lengthDisplayToJSON(&domain.LengthDisplay{Source: "tmdb", Precision: domain.LengthPrecisionMinutes})
+		assert.JSONEq(t, `{"source":"tmdb","precision":"minutes"}`, string(raw))
+	})
+
+	t.Run("stored lowercase reads back as the domain enum", func(t *testing.T) {
+		got := lengthDisplayFromJSON(json.RawMessage(`{"source":"youtube","precision":"seconds"}`))
+		assert.Equal(t, &domain.LengthDisplay{Source: "youtube", Precision: domain.LengthPrecisionSeconds}, got)
+	})
+
+	t.Run("round trip", func(t *testing.T) {
+		in := &domain.LengthDisplay{Source: "tmdb", Precision: domain.LengthPrecisionMinutes}
+		assert.Equal(t, in, lengthDisplayFromJSON(lengthDisplayToJSON(in)))
+	})
+
+	t.Run("nil writes NULL", func(t *testing.T) {
+		assert.Nil(t, lengthDisplayToJSON(nil))
+	})
+
+	for name, raw := range map[string]json.RawMessage{
+		"SQL NULL":   nil,
+		"JSON null":  json.RawMessage(`null`),
+		"malformed":  json.RawMessage(`{"source":`),
+		"wrong type": json.RawMessage(`[1,2]`),
+	} {
+		t.Run(name+" reads as nil", func(t *testing.T) {
+			assert.Nil(t, lengthDisplayFromJSON(raw))
+		})
+	}
+
+	t.Run("content mappers carry it both ways", func(t *testing.T) {
+		d := &domain.Content{ContentType: domain.ContentTypeMovie, LengthDisplay: &domain.LengthDisplay{Source: "tmdb", Precision: domain.LengthPrecisionMinutes}}
+		m := contentDomainToModel(d)
+		assert.JSONEq(t, `{"source":"tmdb","precision":"minutes"}`, string(m.LengthDisplay))
+		assert.Equal(t, d.LengthDisplay, contentModelToDomain(m).LengthDisplay)
+	})
+}
+
 // --- User ---
 
 func TestUserModelToDomain(t *testing.T) {

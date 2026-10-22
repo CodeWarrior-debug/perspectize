@@ -2,6 +2,14 @@
 
 Before marking any work complete, run interactive verification.
 
+> **Agents: start every browser verification with the `pr-verification` skill**
+> (`.claude/skills/pr-verification/SKILL.md`). It takes the machine-wide verification
+> slot from the agent registry (`.claude/agent-registry/`), so parallel sessions never
+> fight over `:8080`/`:5173` or the sv-chrome profile. It waits for a busy slot without
+> spending tokens, serves *your* checkout on the slot's ports, and releases everything
+> afterwards. Everything below (the signed-in profile, CDP scripts, evidence) is what you
+> do once you hold the slot.
+
 ## 0. Authenticated session (one-time setup)
 
 Self-verify drives Chrome through a persistent, pre-authenticated profile so it
@@ -80,14 +88,15 @@ overwrites your clipboard. Add scenarios in the `SCENARIOS` object; helpers
 a cell scrolls it into view, and a scroll cancels a pending popover open — the
 helper scrolls first and settles before hovering.
 
-**Verifying from a worktree.** A worktree has no gitignored `frontend/.env`, and
-the Clerk session doesn't carry across dev-server ports. Serve the worktree's code
-on a spare port with a throwaway wrapper config (outside the repo) that spreads the
-worktree's `vite.config.ts` and sets `root` to the worktree's `frontend/` and
-`envDir` to the main checkout's `frontend/` (vite has no `--envDir` CLI flag; don't
-symlink or read `.env`). Run it with `vite dev --config <wrapper> --port 5174
---strictPort`, ask the human to sign in once at that origin in the `sv-chrome.sh`
-Chrome, then run the script with `BASE_URL=http://localhost:5174`. The `chat-panel`
+**Verifying from a worktree.** A worktree has no gitignored env files, and the
+Clerk session doesn't carry across dev-server ports. Hold the verification slot
+(`pr-verification` skill), then run `node .claude/scripts/verification-servers.mjs
+--backend-port <b> --frontend-port <f>`. It serves the worktree's code on the
+slot's ports: slot 1 is `:8080`/`:5173`, where the sv-chrome sign-in already
+lives. It uses a throwaway vite wrapper config with `envDir` set to the main
+checkout's `frontend/`, and passes the main checkout's backend env to the child
+process (vite has no `--envDir` CLI flag; never symlink or read the env files).
+Then run the script with `BASE_URL=http://localhost:<f>`. The `chat-panel`
 scenario measures the messaging panel's top edge against the app header at several
 viewport heights.
 
@@ -146,18 +155,24 @@ Also test any frontend GraphQL queries (`src/lib/queries/*.ts`) against the live
 
 ## 4. Evidence Capture
 
-Save screenshots to `/Users/jamesjordan/Downloads/screenshots/` with naming convention:
-- **Prefix:** `sv-` (Self-Verify) — supersedes the old `ccsv-` prefix; `ccsv-` may still appear in older screenshots but new captures use `sv-`
-- **Format:** `sv-{plan}-{description}-{width}.png`
-- **Example:** `sv-01-02-mobile-375px.png`, `sv-01-04-ag-grid-desktop-1280px.png`
-- Use `filePath` parameter on `take_screenshot` to save directly
-- Take full-page screenshots (`fullPage: true`) at mobile (375px), tablet (768px), desktop (1280px)
+**Video is the default.** If the change affects anything a user does or sees happen (clicks, typing, navigation, scrolling, hover, toggles, loading more, popovers opening and closing, a button changing with the input, a new tab opening), record a video of it working. A screenshot can't show any of that. If you're unsure whether something counts as behavior, record a video.
 
-**Screenshots vs video:** screenshots are for static layout. **For interactive behavior — hover states, multi-step flows, popovers that open and close, animations — record a video instead**, because a still can't show the interaction itself. Recording, encoding and the GitHub embed recipe (GIF preview linked to the mp4; `<video>` is stripped) are in [tools/video-capture](../tools/video-capture/README.md) and [PR Screenshots](PR_SCREENSHOTS.md#videos). Videos use the same `sv-` prefix, e.g. `sv-bible-video-01-add-psalm-139-1-10-1280px.mp4`.
+- **Record the after only.** A video doesn't need a "before" clip: show the change working on the branch.
+- **Tools:** record with the shared recorder (`~/.claude/tools/video-capture/record-clip.mjs`) or a copy adapted under its `demos/<name>/` folder. Recording, encoding and the GitHub embed recipe (a GIF preview linked to the mp4, because GitHub strips `<video>`) are in [tools/video-capture](../tools/video-capture/README.md) and [PR Screenshots](PR_SCREENSHOTS.md#videos).
+- **Naming:** `sv-{plan}-video-{NN}-{what}-{width}px.mp4`, e.g. `sv-bible-video-01-add-psalm-139-1-10-1280px.mp4`.
+- **Check it before calling it evidence:** pull a few frames (an ffmpeg contact sheet works) and confirm the clip shows the steps, not a loading screen.
+
+**Screenshots are the exception.** Use them only when the change doesn't affect behavior, or the behavior isn't relevant to the change: spacing, colour, typography, alignment, or a layout fix on a fixed screen. For these, take a **before/after pair** at the same width, so the reviewer can see the difference.
+- **Naming:** `sv-{plan}-{description}-{width}.png`, e.g. `sv-01-02-mobile-375px.png`. The `sv-` (Self-Verify) prefix replaces the old `ccsv-`.
+- **Capture:** use the `filePath` parameter on `take_screenshot` to save directly. Prefer viewport-sized shots: a full-page shot of a long feed comes out too tall to read.
+
+**Mobile and desktop: decide for each flow.** For videos and screenshots alike, ask whether the change looks or behaves differently on a phone (375px) than on desktop (1280px; 768px if tablet matters). If it does, capture each width that differs: a layout that stacks on phones, a control that moves or hides, a mobile-only gesture. If it doesn't, one width is enough; say which one you used and why one is enough.
+
+Save everything to `/Users/jamesjordan/Downloads/screenshots/`.
 
 Before creating PR:
-- Screenshots at mobile (375px), tablet (768px), desktop (1280px)
-- For any interactive change: a video of the interaction (see above)
+- A video of every behavior the PR changes (after only), at each width where it differs
+- Before/after screenshots only for changes that don't affect behavior, at each width where they differ
 - Console output showing no errors
 - Verification commands output
-- Upload the `sv-*` screenshots and link them in the PR — see [PR Screenshots](PR_SCREENSHOTS.md)
+- Upload the `sv-*` videos (with GIF previews) and screenshots and link them in the PR — see [PR Screenshots](PR_SCREENSHOTS.md)
