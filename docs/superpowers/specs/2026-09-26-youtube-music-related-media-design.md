@@ -1,6 +1,9 @@
 # YouTube Music Tracks & Related Media — Design
 
 **Status:** Reviewed 2026-10-10 against `main` @ `dfa1fc7` (see **Review against main** below). Phase A is built on PR #440; Phase B of the plan brings it up to `main` and adds the feature flag. · **Date:** 2026-09-26
+
+> **Note, 2026-10-22:** a dark-launch approach for trying new content types without exposing them to many users has been pushed to `main` (see `.docs/RELEASE_APPROACHES.md` and the intent docs under `project-management/intents/`). We are considering using it to try this type (now `AUDIO_TRACK`). Decision 11 below (a `FEATURE_YOUTUBE_MUSIC` flag) was dropped by ADR 0004, so a dark launch would supersede that ADR with a new one. Nothing is decided; the dark-launch docs have not been read through for this yet.
+
 **Builds on:** `tools/content-type-designer/proposals/youtube-music-track-spec.md` (PR #440)
 
 ## Goal
