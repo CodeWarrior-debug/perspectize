@@ -149,7 +149,7 @@ The end goal above covers every content type in the Activity grid. Delivery is s
     - definition CRUD.
   - Existing clients never send the new arguments, so nothing changes for users. These slices can be exercised through backend tests and the GraphQL endpoint. They can also go to `main` and deploy early, which keeps the long-running branch smaller.
   - **Frontend slices stay hidden until ready.** Pages, toggles and editors are released separately from the backend.
-  - **Release approach (decided): dark-launched backend, merge-gated frontend, role-gated later.**
+  - **Release approach (decided): [dark backend, merge-gated frontend](../../.docs/RELEASE_APPROACHES.md#dark-backend-merge-gated-frontend); [role-gated](../../.docs/RELEASE_APPROACHES.md#role-gated-release-planned) later.**
     - *Dark launch:* backend slices deploy to production unused.
     - *Merge-gated release:* there is no feature flag. Frontend PRs stay on the integration branch, are tested from local or preview builds, and reach users only when merged to `main`.
     - *Role-gated release (later):* once RBAC exists, unfinished or premium UI can ship to `main` behind a role or permission check instead of waiting on the branch. That is out of scope for this intent.
