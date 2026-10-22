@@ -48,10 +48,53 @@ A signed-in user can define a named **calculated column** from a formula over a 
   - Sort and filter state still round-trip through the URL.
 - **Very dynamic at the database, but no runtime DDL.** New formulas never need a migration or a deploy. The database does the math, so sort and filter stay correct across all rows, not just the loaded page. Schema changes are limited to a one-time foundation: typed operand columns or a view, plus the definitions table. Those go through the normal migration review.
 - **Built-ins and custom metrics share one path.** Once this ships, `PERCENT_LIKED` and `VS_BUDGET` can be re-expressed as system-owned definitions. That removes the five-place pattern.
+- **One engine, more than one grid.** Each definition names the grid it targets (`plan` or `content`). Each grid registers its own operand catalogue with the same compiler and evaluator. A future grid joins by registering its operands.
+
+## Phasing
+
+The end goal above covers every content type in the Activity grid. Delivery is staged so the engine is proven on the simplest grid first.
+
+**Phase 0 — Plan gets a client vs server sort mode (prerequisite).**
+- Today Plan sorts on the server only. `PlanTable.svelte` maps the first sorted column to `UserTodoSortBy` (5 values) and refetches; sort is single-column, over a page of up to 100 rows.
+- Plan needs the same choice Activity already has:
+  - **client sort/filter** over the loaded rows, using AG Grid's client-side row model;
+  - **server sort/filter** across all of the user's todos.
+- Without that, a calculated column can't be proven client-side on Plan.
+- List mode (a single list ordered by `list_position`, with drag-reorder) keeps its fixed order. Header sorting stays off there, as it is today.
+
+**Phase 1 — Pilot: calculated columns on the Plan view.**
+- Plan is the first target for the full engine:
+  - the expression tree;
+  - the TypeScript evaluator;
+  - the Go → SQL compiler with bound parameters;
+  - parity fixtures;
+  - the `metric_definitions` table;
+  - the formula editor;
+  - column picker, sort and range filter in both sort modes.
+- **Why Plan first:**
+  - `user_todos` has real typed columns: priority (`valid_integer_range`), percent complete, and start/end/due dates. There are no JSONB casts, so open question 2 doesn't block the pilot.
+  - Data is owner-scoped and small, and already indexed on `(user_id, status)`. Unindexed computed sorts are safe, so question 8 can wait.
+  - There is one kind of row, so question 6 doesn't apply yet.
+  - The sort surface is small.
+- **Example pilot metrics:**
+  - urgency, e.g. priority weighted by days until due;
+  - "stalled", e.g. high priority, low % complete, old start date.
+
+**Phase 2 — Activity grid, every content type.**
+- The same engine targets `content`, with shared and type-specific operands, both data modes, and keyset pagination at scale.
+- This phase is where open questions 2, 6 and 8 get answered.
+- `PERCENT_LIKED` and `VS_BUDGET` move onto the engine here.
 
 ## Affected users and systems
 
-- **Users:** anyone browsing the Activity grid, across all content types: YouTube videos, movies, Bible passages, claims, and future types. YouTube is only the motivating example.
+- **Users:**
+  - Phase 1: signed-in users on their own Plan view.
+  - Phase 2: anyone browsing the Activity grid, across all content types (YouTube videos, movies, Bible passages, claims, and future types). YouTube is only the motivating example.
+- **Plan view (phases 0–1):**
+  - `PlanBoard.svelte` (query variables, sort state, page size);
+  - `PlanTable.svelte` (colDefs, `onSortChanged` → `serverSortFor`, a client/server sort mode);
+  - `plan-todo-helpers.ts`;
+  - backend `UserTodoSortBy` / `UserTodoFilter` in `schema.graphql`, plus the user-todo repository, which need a way to name a metric.
 - **Content-type plumbing:** each type's numeric fields are registered as operands, in one catalogue shared by backend and frontend. The [Adding a Content Type](../../.claude/docs/ADDING_CONTENT_TYPE.md) guide gains a step for this.
 - **Frontend:**
   - `ActivityTable.svelte` (colDefs, both data modes);
@@ -87,12 +130,16 @@ A signed-in user can define a named **calculated column** from a formula over a 
 - **Must not break:**
   - existing sort and filter URLs;
   - saved localStorage column layouts (`perspectize:activityColumns:v1` may need a v2 migration);
-  - the Loaded / All Items mode toggle.
+  - the Loaded / All Items mode toggle;
+  - Plan's list mode, with its `list_position` order and drag-reorder.
 - **Planning tool undecided.** Given the size, this may be planned with Wayfinder rather than the default superpowers spec → plan flow. Decide before the spec starts.
 - **Delivery approach: a long-running feature branch.**
   - This work spans a migration, a backend expression compiler, GraphQL changes and frontend UI. It should not land on `main` half-finished.
   - Work happens on a long-lived integration branch (e.g. `feature/calculated-columns`).
-  - Each slice (migration, compiler + tests, GraphQL, client evaluator, editor UI) is its own PR **into that branch**, linked back to this intent.
+  - Each slice is its own PR **into that branch**, linked back to this intent, in phase order:
+    - Phase 0: Plan client/server sort mode. This is useful on its own and could merge to `main` directly if it's ready first.
+    - Phase 1: migration, compiler + tests, GraphQL, client evaluator, editor UI — all on Plan.
+    - Phase 2: content operands and the Activity grid.
   - The integration branch is rebased on `origin/main` regularly so the final merge stays small.
   - It merges to `main` only when the end-to-end outcome above is verified. Built-in metrics such as % Liked keep working unchanged until then.
   - The migration is applied to each environment at rollout, not during development.
@@ -130,6 +177,10 @@ A signed-in user can define a named **calculated column** from a formula over a 
    Separately, should a definition be able to *optionally* narrow itself to chosen types, purely as a display filter?
 7. **Perspective-based operands.** Should formulas be able to use per-content perspective aggregates (count, avg quality) in v1? These are not server-sortable today and would need a JOIN or a denormalised count. That is backlog item "Perspectize Column Sorting & Filtering".
 8. **Scale threshold.** At what content-row count do unindexed computed sorts become too slow on Neon, and does that trigger option 1c? The spec needs a measured number, not a guess.
+9. **When does the long-running branch reach `main`?**
+   - a) After Phase 1, once calculated columns on Plan are verified; Phase 2 then gets a fresh integration branch.
+   - b) Only after Phase 2, with the whole outcome in one merge.
+10. **Plan sort-mode UX.** Should Plan copy Activity's explicit mode toggle (Loaded / All Items)? Or should it pick automatically: client mode when the user has ≤ one page of todos, server mode beyond that?
 
 ## Downstream
 
@@ -137,4 +188,5 @@ A signed-in user can define a named **calculated column** from a formula over a 
 - Plan(s): <!-- link(s) -->
 - Integration branch: <!-- feature/calculated-columns -->
 - PRs (one line each, add as they open; tick on merge):
-  - [ ] Intent: calculated columns — https://github.com/CodeWarrior-debug/perspectize/pull/601 — open
+  - [x] Intent: calculated columns — https://github.com/CodeWarrior-debug/perspectize/pull/601 — merged
+  - [ ] Intent: Plan pilot phasing — <!-- PR link --> — open
