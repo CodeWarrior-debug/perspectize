@@ -26,7 +26,7 @@
 The omp adapter is the first consumer. Jeeves won't run on omp, so it gets a Go port of the same core (hexagonal: port in `internal/core/ports`, adapter in `internal/adapters/jev`). Both implementations must pass the same golden fixtures. That shared test is what stops them drifting.
 
 **Tech Stack:**
-- Phase 1: TypeScript on omp's extension runtime. Built-in `fetch` and the runtime's built-in test runner, with **no new dependencies without owner approval**. The config is JSON unless the runtime has a built-in YAML parser.
+- Phase 1: TypeScript on omp's extension runtime. Built-in `fetch` and the runtime's built-in test runner, with **no third-party packages** (approved by the owner 2026-10-22; any new dependency needs fresh approval). omp runs on Bun, so tests use `bun test`. The config is JSON unless the runtime has a built-in YAML parser.
 - Phase 3: Go, the repo's existing hexagonal layout, `net/http`, testify.
 
 ## Step 0 findings (verified 2026-10-22 against the docs, not from memory)
@@ -36,7 +36,8 @@ The omp adapter is the first consumer. Jeeves won't run on omp, so it gets a Go 
 | Need | Finding | Source |
 |---|---|---|
 | Per-subagent model | Per agent *definition* only. Resolution order: `task.agentModelOverrides[agent]` → agent frontmatter `model` (selector, CSV or array, tried in order) → the parent's model. The `task` call has no per-invocation model field. | `docs/task-agent-discovery.md` |
-| Hook before spawn | `before_subagent_spawn` returns `{ model?: string \| string[]; block?; reason?; note? }`. It fires once per child, *before the child resolves its model*, and the last returned `model` wins. It replaces the spawn's model patterns and keeps the role. It doesn't touch the parent session. | `docs/extensions.md` |
+| Hook before spawn | `before_subagent_spawn` returns `{ model?: string \| string[]; block?; reason?; note? }`. It fires once per child, *before the child resolves its model*, and the last returned `model` wins. It replaces the spawn's model patterns and keeps the role. It doesn't touch the parent session. **The payload has no task text** (source: `BeforeSubagentSpawnEvent` in `extensibility/extensions/types.ts`): only `agent`, `invocationKind`, `modelRole`, `patterns` and `spawnKey`. For `task` spawns, `spawnKey` is the child's agent id, allocated from the task item's `name` and made unique. Handlers time out after 30 s. | `docs/extensions.md`, source |
+| Getting the task text | The `tool_call` hook fires before the `task` tool runs and receives its input (`agent` plus items with `name`, `task`, …). The router decides there and stores the result keyed by item name; `before_subagent_spawn` looks it up by `spawnKey`. If nothing matches, it logs `unmatched` and leaves the model alone. | source: `task/index.ts`, `task/structured-subagent.ts` |
 | Fallback chains | `retry.fallbackChains` maps a role, a model or `provider/*` to an ordered list of fallbacks. `retry.fallbackOn` takes `any`, `usage-limit` or `except-usage-limit`. `retry.fallbackRevertPolicy` takes `cooldown-expiry` or `never`. Project config is `<cwd>/.omp/config.yml` and overrides the global `~/.omp/agent/config.yml`. | `docs/settings.md` |
 | Per-turn model switch | No hook exists. `before_provider_request` rewrites the payload only. That matches the never-switch-mid-conversation rule. | `docs/extensions.md` |
 | Test-failure signal | `tool_result` fires after every tool runs. | `docs/extensions.md` |
@@ -156,7 +157,8 @@ The thresholds are starting guesses, to be tuned from dry-run data in Phase 2.
 ### Task 0: Attach the repo and confirm the runtime
 
 - [ ] Attach the omp/harness config repo to the session (owner to name it) and read its structure and existing `.omp/` config
-- [ ] Confirm from the omp source: the `before_subagent_spawn` payload fields (agent name, task text, cwd?); the outcome events that can be tied to a spawned child; the extension runtime (Bun or Node), its built-in test runner, and built-in YAML support
+- [x] Confirm the `before_subagent_spawn` payload fields from the omp source. Done 2026-10-22: there's no task text, so the router joins on `tool_call` (see the Step 0 table)
+- [ ] Confirm from the omp source: how `allocateUnique` suffixes duplicate names; the outcome events that can be tied to a spawned child; the extension runtime (Bun or Node), its built-in test runner, and built-in YAML support
 - [ ] Record the findings at the top of `router/README.md`. If the payload lacks the task text, stop and re-plan with the owner
 
 ### Task 1: Contract and config
@@ -197,6 +199,8 @@ The thresholds are starting guesses, to be tuned from dry-run data in Phase 2.
 
 - [ ] `log.ts` appends JSONL decision and outcome records and hashes the task text unless configured not to
 - [ ] `extension/index.ts`:
+  - `tool_call` on the `task` tool → for each item, start the decision (Jev calls run in parallel) and store it keyed by the item's name
+  - `before_subagent_spawn` → match `spawnKey` to a stored decision, allowing for the uniqueness suffix omp adds to duplicate names; no match → log `unmatched` and return `undefined`
   - `enabled: false` → no handlers registered
   - `dry-run` → decide, log, return `undefined` so omp's normal resolution stands
   - `live` → return the tier selectors ascending from the chosen tier

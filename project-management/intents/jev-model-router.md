@@ -43,10 +43,9 @@ Jeeves, the planned Perspectize AI assistant ([FEATURE_BACKLOG.md → Jeeves AI 
 
 ## Open questions
 
-- Which repo is the omp/harness config repo? It isn't visible to the cloud session yet.
+- The omp/harness config repo will be `CodeWarrior-debug/oh-my-pi-home`. It doesn't exist yet, and the owner creates it because cloud sessions can't create repos.
 - Where does the shared contract live (question set, config schema, log schema, golden fixtures) so the TypeScript and Go implementations can't drift? Options: the omp config repo, copied into perspectize when the Jeeves work starts; a small standalone repo; or perspectize itself.
 - Tier order and model selectors: is Fable above Opus? Default assumed: Haiku < Sonnet < Opus < Fable, configurable.
-- What does omp's `before_subagent_spawn` payload contain (agent name, task text, working directory)? The docs list the return shape but not the payload. Verify in the omp source.
 - How is a subagent's outcome (retries, test results, tokens) joined back to its routing decision in omp? Candidate events: `tool_result`, `agent_end`, `retry_fallback_applied`.
 - Exact TypeSafe Master Customer Agreement wording on output use, and its data-retention terms for submitted `state`.
 - Dry-run evaluation gate: how many decisions, and what cost and retry thresholds, before live mode is switched on?
