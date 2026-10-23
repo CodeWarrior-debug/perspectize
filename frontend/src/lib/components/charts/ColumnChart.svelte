@@ -7,6 +7,7 @@
 		boxStats,
 		density,
 		pieSlices,
+		coverage,
 		type TopBottom,
 	} from '$lib/utils/columnStats';
 	import { CHART_TYPE_LABELS, type ChartType } from '$lib/utils/columnCharts';
@@ -14,11 +15,14 @@
 	let {
 		type,
 		values,
+		total,
 		ranked,
 		format,
 	}: {
 		type: ChartType;
 		values: number[];
+		/** Count of all loaded rows, including those with no value. */
+		total: number;
 		ranked?: TopBottom;
 		format: (n: number) => string;
 	} = $props();
@@ -30,7 +34,12 @@
 	const PIE_CAP = 6;
 
 	const summary = $derived(summarize(values));
-	const empty = $derived(values.length === 0);
+	const empty = $derived(type === 'coverage' ? total === 0 : values.length === 0);
+	const cover = $derived(coverage(total, values.length));
+	const DONUT_R = 40;
+	const DONUT_C = 2 * Math.PI * DONUT_R;
+	const filledLen = $derived((cover.filled / Math.max(cover.filled + cover.empty, 1)) * DONUT_C);
+	const VALUE_DEPENDENT: ChartType[] = ['histogram', 'line', 'pie', 'box', 'cumulative', 'density', 'strip'];
 	// One value, or every value identical: the shape charts have nothing to show.
 	const degenerate = $derived(summary !== null && summary.min === summary.max);
 	const label = $derived(`${CHART_TYPE_LABELS[type]} chart`);
@@ -120,7 +129,7 @@
 
 {#if empty}
 	<p class="text-sm text-muted-foreground">no values yet</p>
-{:else if degenerate && type !== 'summary'}
+{:else if degenerate && VALUE_DEPENDENT.includes(type)}
 	<div class="space-y-2">
 		{@render summaryList()}
 		<p class="text-xs text-muted-foreground">
@@ -128,10 +137,12 @@
 		</p>
 	</div>
 {:else if type === 'summary'}
-	{@render summaryList()}
+	<div role="group" aria-label="Summary statistics">
+		{@render summaryList()}
+	</div>
 {:else if type === 'topBottom'}
 	{#if ranked && (ranked.top.length > 0 || ranked.bottom.length > 0)}
-		<div class="grid grid-cols-2 gap-4 text-sm">
+		<div role="group" aria-label="Top and bottom values" class="grid grid-cols-2 gap-4 text-sm">
 			{#each [{ name: 'Top', rows: ranked.top }, { name: 'Bottom', rows: ranked.bottom }] as group (group.name)}
 				<div>
 					<h4 class="mb-1 text-xs font-medium text-muted-foreground">{group.name}</h4>
@@ -147,14 +158,27 @@
 			{/each}
 		</div>
 	{:else}
-		<p class="text-sm text-muted-foreground">no rankings yet</p>
+		<p role="group" aria-label="Top and bottom values" class="text-sm text-muted-foreground">no rankings yet</p>
 	{/if}
 {:else if type === 'coverage'}
-	<div class="space-y-1">
-		<div class="h-2 w-full rounded bg-muted">
-			<div class="h-2 w-full rounded bg-primary"></div>
+	<div role="group" aria-label="Coverage" class="flex items-center gap-4">
+		<svg viewBox="0 0 100 100" aria-hidden="true" class="size-20 shrink-0 -rotate-90">
+			<circle cx="50" cy="50" r={DONUT_R} fill="none" stroke="var(--color-muted)" stroke-width="14" />
+			<circle
+				data-filled
+				cx="50"
+				cy="50"
+				r={DONUT_R}
+				fill="none"
+				stroke="var(--color-primary)"
+				stroke-width="14"
+				stroke-dasharray="{filledLen} {DONUT_C}"
+			/>
+		</svg>
+		<div class="text-sm">
+			<p>{cover.filled} with a value</p>
+			<p class="text-muted-foreground">{cover.empty} empty</p>
 		</div>
-		<p class="text-sm">{values.length} with a value</p>
 	</div>
 {:else}
 	<svg viewBox="0 0 {W} {H}" role="img" aria-label={label} class="h-auto w-full">
