@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/perf/querycount"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -344,6 +345,39 @@ func TestGormContentRepository_UpdatePrimaryCategoryID(t *testing.T) {
 		_, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to update primary category")
+		assertAllExpectationsMet(t, mock)
+	})
+}
+
+func TestGormContentRepository_UpdateClaim(t *testing.T) {
+	ctx := context.Background()
+	fields := json.RawMessage(`{"effectiveDate":"2026-10-23"}`)
+
+	t.Run("one owner-scoped UPDATE ... RETURNING statement", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`UPDATE "content" SET .* WHERE id = .* AND added_by_user_id = .* AND content_type = .* RETURNING`).
+			WillReturnRows(contentRows().AddRow(11, "Rates rose", nil, "claim", 7, nil, nil,
+				[]byte(`{"text":"Rates rose","html":"Rates rose"}`), nil, contentRepoTime, contentRepoTime))
+
+		c := querycount.Attach(t, db)
+		got, err := NewGormContentRepository(db).UpdateClaim(ctx, 11, 7, "Rates rose", "Rates rose", fields)
+		require.NoError(t, err)
+		c.AssertExactly(t, 1)
+		assert.Equal(t, 11, got.ID)
+		assert.Equal(t, 7, got.AddedByUserID)
+		assert.Equal(t, domain.ContentTypeClaim, got.ContentType)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("zero rows (missing row or not the owner) is domain.ErrNotFound in one statement", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`UPDATE "content" SET .* WHERE id = .* AND added_by_user_id = .* AND content_type = .* RETURNING`).
+			WillReturnRows(contentRows())
+
+		c := querycount.Attach(t, db)
+		_, err := NewGormContentRepository(db).UpdateClaim(ctx, 11, 8, "Rates rose", "Rates rose", fields)
+		assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
+		c.AssertExactly(t, 1)
 		assertAllExpectationsMet(t, mock)
 	})
 }

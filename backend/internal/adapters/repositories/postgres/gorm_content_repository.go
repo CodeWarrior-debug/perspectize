@@ -498,6 +498,33 @@ func (r *GormContentRepository) UpdatePrimaryCategoryID(ctx context.Context, con
 	return contentModelToDomain(&updated), nil
 }
 
+// UpdateClaim rewrites an owned claim in one owner-scoped UPDATE ... RETURNING.
+// response is merged, not replaced, so response.parentContentId survives. In
+// custom_fields, evaluateBy is dropped before the new object is merged, so an
+// omitted evaluateBy clears it. Zero rows (missing, not a claim, or not the
+// owner) is domain.ErrNotFound, so there is no second read to tell them apart.
+func (r *GormContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text string, html string, customFields json.RawMessage) (*domain.Content, error) {
+	var updated ContentModel
+	result := r.db.WithContext(ctx).
+		Model(&updated).
+		Clauses(clause.Returning{}).
+		Where("id = ? AND added_by_user_id = ? AND content_type = ?",
+			id, ownerID, contentTypeToDBValue(domain.ContentTypeClaim)).
+		Updates(map[string]interface{}{
+			"name":          text,
+			"response":      gorm.Expr("COALESCE(response, '{}'::jsonb) || jsonb_build_object('text', ?::text, 'html', ?::text)", text, html),
+			"custom_fields": gorm.Expr("(COALESCE(custom_fields, '{}'::jsonb) - 'evaluateBy') || ?::jsonb", string(customFields)),
+			"updated_at":    gorm.Expr("NOW()"),
+		})
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to update claim: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return nil, domain.ErrNotFound
+	}
+	return contentModelToDomain(&updated), nil
+}
+
 // SetDisplayTitleIfEmpty implements first-write-wins for a passage's optional
 // title: the write only takes effect if no title exists yet. A losing writer is
 // told the title that won rather than given an error — their intent (this

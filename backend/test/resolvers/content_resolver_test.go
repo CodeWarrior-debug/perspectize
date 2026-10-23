@@ -90,6 +90,10 @@ func (m *mockContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 	return nil
 }
 
+func (m *mockContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
+	return nil, domain.ErrNotFound
+}
+
 // UpdatePrimaryCategoryID emulates UPDATE ... RETURNING against getByIDFn's
 // row: missing content is ErrNotFound, otherwise the row with the new FK.
 func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {

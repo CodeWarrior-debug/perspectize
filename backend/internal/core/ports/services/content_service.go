@@ -7,11 +7,26 @@ import (
 )
 
 // CreateClaimInput holds the input for creating a claim content entry.
-// ParentContentID is optional: a claim may stand alone.
+// ParentContentID is optional: a claim may stand alone. EffectiveDate
+// (YYYY-MM-DD) defaults to today UTC when nil or empty; EvaluateBy
+// (YYYY-MM-DD) is optional and nil or empty means unset.
 type CreateClaimInput struct {
 	Text            string
 	UserID          int
 	ParentContentID *int
+	EffectiveDate   *string
+	EvaluateBy      *string
+}
+
+// UpdateClaimInput holds the input for replacing a claim's text and dates.
+// ActorUserID must own the claim. Nil or empty EffectiveDate means today UTC;
+// nil or empty EvaluateBy clears the evaluate-by date.
+type UpdateClaimInput struct {
+	ContentID     int
+	ActorUserID   int
+	Text          string
+	EffectiveDate *string
+	EvaluateBy    *string
 }
 
 // CreatePassageInput holds the input for creating (or finding) a Bible passage
@@ -63,6 +78,10 @@ type ContentService interface {
 
 	// CreateClaim creates a new claim content entry associated with a parent content item
 	CreateClaim(ctx context.Context, input CreateClaimInput) (*domain.Content, error)
+
+	// UpdateClaim replaces an owned claim's text and dates. A claim the actor
+	// does not own is domain.ErrNotFound.
+	UpdateClaim(ctx context.Context, input UpdateClaimInput) (*domain.Content, error)
 
 	// UpdateSourceData refreshes an existing content item's metadata from its source
 	UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error)

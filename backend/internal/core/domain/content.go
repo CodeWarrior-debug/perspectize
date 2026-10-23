@@ -15,6 +15,9 @@ const (
 	ContentTypeMovie        ContentType = "MOVIE"
 )
 
+// ClaimMaxLength caps a claim's normalised text, in characters (runes).
+const ClaimMaxLength = 300
+
 // ContentSearchField identifies a text column that a ContentFilter.search term
 // may be scoped to via ContentFilter.searchFields. Omitted/empty selects TITLE only
 // (preserves the historical default of matching on name alone).

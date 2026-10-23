@@ -23,6 +23,7 @@ type mockContentRepository struct {
 	getOrCreateByURLFn func(ctx context.Context, content *domain.Content, refreshOnConflict bool) (*domain.Content, bool, error)
 	updateMetadataFn   func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error)
 	listFn             func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)
+	updateClaimFn      func(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error)
 }
 
 func (m *mockContentRepository) Create(ctx context.Context, content *domain.Content) (*domain.Content, error) {
@@ -83,6 +84,13 @@ func (m *mockContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 
 func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
 	return &domain.Content{ID: contentID, PrimaryCategoryID: categoryID}, nil
+}
+
+func (m *mockContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
+	if m.updateClaimFn != nil {
+		return m.updateClaimFn(ctx, id, ownerID, text, html, customFields)
+	}
+	return nil, domain.ErrNotFound
 }
 
 // mockYouTubeClient implements services.YouTubeClient for testing

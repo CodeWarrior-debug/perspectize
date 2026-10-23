@@ -29,6 +29,10 @@ type ContentRepository interface {
 	// record and returns the updated row. A missing content id is
 	// domain.ErrNotFound.
 	UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error)
+	// UpdateClaim rewrites an owned claim's name, response.text/html and custom
+	// fields in one owner-scoped UPDATE (keeping response.parentContentId). A
+	// missing row, or a row the owner does not hold, is domain.ErrNotFound.
+	UpdateClaim(ctx context.Context, id, ownerID int, text string, html string, customFields json.RawMessage) (*domain.Content, error)
 	// SetDisplayTitleIfEmpty sets a passage's optional display_title only if none exists
 	// (first-write-wins). Returns the title that is now stored: the caller's if it won,
 	// the existing one if it lost the race. Losing is not an error.

@@ -66,6 +66,10 @@ func (m *mockContentService) CreateClaim(ctx context.Context, input portservices
 	return nil, nil
 }
 
+func (m *mockContentService) UpdateClaim(ctx context.Context, input portservices.UpdateClaimInput) (*domain.Content, error) {
+	return nil, nil
+}
+
 func (m *mockContentService) CreateFromPassage(ctx context.Context, input portservices.CreatePassageInput) (*domain.Content, error) {
 	return nil, nil
 }

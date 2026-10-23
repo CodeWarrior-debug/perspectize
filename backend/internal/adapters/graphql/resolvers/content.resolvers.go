@@ -391,6 +391,8 @@ func (r *mutationResolver) CreateClaim(ctx context.Context, input model.CreateCl
 		Text:            input.Text,
 		UserID:          authUser.ID,
 		ParentContentID: input.ParentContentID,
+		EffectiveDate:   input.EffectiveDate,
+		EvaluateBy:      input.EvaluateBy,
 	})
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidInput) {
@@ -405,6 +407,42 @@ func (r *mutationResolver) CreateClaim(ctx context.Context, input model.CreateCl
 			"parentContentID", input.ParentContentID,
 		)
 		return nil, fmt.Errorf("failed to create claim")
+	}
+
+	return domainToModel(content), nil
+}
+
+// UpdateClaim is the resolver for the updateClaim field.
+func (r *mutationResolver) UpdateClaim(ctx context.Context, id string, input model.UpdateClaimInput) (*model.Content, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	intID, err := strconv.Atoi(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid content ID: %s", id)
+	}
+
+	content, err := r.ContentService.UpdateClaim(ctx, portservices.UpdateClaimInput{
+		ContentID:     intID,
+		ActorUserID:   authUser.ID,
+		Text:          input.Text,
+		EffectiveDate: input.EffectiveDate,
+		EvaluateBy:    input.EvaluateBy,
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("invalid input: %w", err)
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("content not found")
+		}
+		slog.Error("updating claim failed",
+			"error", err,
+			"userID", authUser.ID,
+			"contentID", intID,
+		)
+		return nil, fmt.Errorf("failed to update claim")
 	}
 
 	return domainToModel(content), nil

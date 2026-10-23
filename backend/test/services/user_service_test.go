@@ -186,6 +186,9 @@ func (m *mockContentRepoForUser) ReassignByUser(ctx context.Context, fromUserID,
 	}
 	return nil
 }
+func (m *mockContentRepoForUser) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
+	return nil, domain.ErrNotFound
+}
 func (m *mockContentRepoForUser) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
 	return &domain.Content{ID: contentID, PrimaryCategoryID: categoryID}, nil
 }

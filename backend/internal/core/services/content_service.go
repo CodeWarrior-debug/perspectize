@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"log/slog"
 	"strings"
+	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
@@ -199,31 +202,48 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID int) (*
 	return updated, nil
 }
 
+// claimDateLayout is the only accepted format for a claim's dates.
+const claimDateLayout = "2006-01-02"
+
 // CreateClaim creates a new claim content entry. Claims are always created
 // PrivacyPrivate (visible only to their owner) until a future public gate
-// promotes them. ParentContentID is optional; when set it must exist.
-// The claim text is stored raw (preserving @this/@here tokens for display-time
-// resolution) in both Name and response.text.
+// promotes them. ParentContentID is optional; when set it must exist and be
+// visible to the author. The claim text is stored raw (preserving @this/@here
+// tokens for display-time resolution) in Name and response.text; response.html
+// is the escaped, sanitised rendering.
 func (s *ContentService) CreateClaim(ctx context.Context, input portservices.CreateClaimInput) (*domain.Content, error) {
-	text := strings.TrimSpace(input.Text)
-	if text == "" {
-		return nil, fmt.Errorf("%w: claim text cannot be empty", domain.ErrInvalidInput)
+	text, err := normalizeClaimText(input.Text)
+	if err != nil {
+		return nil, err
 	}
 	if input.UserID <= 0 {
 		return nil, fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
 	}
+	effective, evaluate, err := claimDates(input.EffectiveDate, input.EvaluateBy)
+	if err != nil {
+		return nil, err
+	}
+	if input.ParentContentID != nil && *input.ParentContentID <= 0 {
+		return nil, fmt.Errorf("%w: parent content id must be a positive integer", domain.ErrInvalidInput)
+	}
 
-	responsePayload := map[string]interface{}{"text": text}
+	responsePayload := map[string]interface{}{
+		"text": text,
+		"html": claimHTML(text),
+	}
 	if input.ParentContentID != nil {
 		parentID := *input.ParentContentID
-		if parentID <= 0 {
-			return nil, fmt.Errorf("%w: parent content id must be a positive integer", domain.ErrInvalidInput)
-		}
-		if _, err := s.repo.GetByID(ctx, parentID); err != nil {
+		parent, err := s.repo.GetByID(ctx, parentID)
+		if err != nil {
 			if errors.Is(err, domain.ErrNotFound) {
 				return nil, fmt.Errorf("%w: parent content not found", domain.ErrNotFound)
 			}
 			return nil, fmt.Errorf("failed to validate parent content: %w", err)
+		}
+		// A private parent is invisible to everyone but its owner, so it
+		// answers exactly like a missing one.
+		if parent.Privacy == domain.PrivacyPrivate && parent.AddedByUserID != input.UserID {
+			return nil, fmt.Errorf("%w: parent content not found", domain.ErrNotFound)
 		}
 		responsePayload["parentContentId"] = parentID
 	}
@@ -232,6 +252,10 @@ func (s *ContentService) CreateClaim(ctx context.Context, input portservices.Cre
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal claim response: %w", err)
 	}
+	customFields, err := claimCustomFields(effective, evaluate)
+	if err != nil {
+		return nil, err
+	}
 
 	created, err := s.repo.Create(ctx, &domain.Content{
 		Name:          text,
@@ -239,12 +263,109 @@ func (s *ContentService) CreateClaim(ctx context.Context, input portservices.Cre
 		AddedByUserID: input.UserID,
 		Response:      responseJSON,
 		Privacy:       domain.PrivacyPrivate,
+		CustomFields:  customFields,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to save claim: %w", err)
 	}
 
 	return created, nil
+}
+
+// UpdateClaim replaces an owned claim's text and dates. The same text and date
+// rules as CreateClaim apply. Ownership is enforced in the repository's
+// owner-scoped UPDATE, so a claim the actor doesn't own is domain.ErrNotFound.
+func (s *ContentService) UpdateClaim(ctx context.Context, input portservices.UpdateClaimInput) (*domain.Content, error) {
+	if input.ContentID <= 0 {
+		return nil, fmt.Errorf("%w: content id must be a positive integer", domain.ErrInvalidInput)
+	}
+	if input.ActorUserID <= 0 {
+		return nil, fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
+	}
+	text, err := normalizeClaimText(input.Text)
+	if err != nil {
+		return nil, err
+	}
+	effective, evaluate, err := claimDates(input.EffectiveDate, input.EvaluateBy)
+	if err != nil {
+		return nil, err
+	}
+	customFields, err := claimCustomFields(effective, evaluate)
+	if err != nil {
+		return nil, err
+	}
+
+	// The repository clears evaluateBy unless the new object carries it.
+	updated, err := s.repo.UpdateClaim(ctx, input.ContentID, input.ActorUserID, text, claimHTML(text), customFields)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update claim: %w", err)
+	}
+	return updated, nil
+}
+
+// normalizeClaimText trims the text, collapses whitespace runs to one space,
+// and enforces the claim rules: at least two words (a word is a whitespace
+// separated token holding a letter or digit) and at most ClaimMaxLength runes.
+func normalizeClaimText(raw string) (string, error) {
+	text := strings.Join(strings.Fields(raw), " ")
+	words := 0
+	for _, tok := range strings.Fields(text) {
+		if strings.IndexFunc(tok, func(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) }) >= 0 {
+			words++
+		}
+	}
+	if words < 2 {
+		return "", fmt.Errorf("%w: claim must contain at least two words", domain.ErrInvalidInput)
+	}
+	if utf8.RuneCountInString(text) > domain.ClaimMaxLength {
+		return "", fmt.Errorf("%w: claim must be at most %d characters", domain.ErrInvalidInput, domain.ClaimMaxLength)
+	}
+	return text, nil
+}
+
+// claimDates resolves a claim's dates. The effective date defaults to today
+// (UTC) when unset; the evaluate-by date is optional and must not precede it.
+func claimDates(effectiveIn, evaluateIn *string) (string, *string, error) {
+	effective := time.Now().UTC().Format(claimDateLayout)
+	if effectiveIn != nil && *effectiveIn != "" {
+		effective = *effectiveIn
+	}
+	effectiveDate, err := time.Parse(claimDateLayout, effective)
+	if err != nil {
+		return "", nil, fmt.Errorf("%w: effective date must be YYYY-MM-DD", domain.ErrInvalidInput)
+	}
+
+	if evaluateIn == nil || *evaluateIn == "" {
+		return effective, nil, nil
+	}
+	evaluate := *evaluateIn
+	evaluateDate, err := time.Parse(claimDateLayout, evaluate)
+	if err != nil {
+		return "", nil, fmt.Errorf("%w: evaluate-by date must be YYYY-MM-DD", domain.ErrInvalidInput)
+	}
+	if evaluateDate.Before(effectiveDate) {
+		return "", nil, fmt.Errorf("%w: evaluate-by date cannot be before the effective date", domain.ErrInvalidInput)
+	}
+	return effective, &evaluate, nil
+}
+
+// claimCustomFields encodes the claim's dates. evaluateBy is present only when set.
+func claimCustomFields(effective string, evaluate *string) (json.RawMessage, error) {
+	fields := map[string]string{"effectiveDate": effective}
+	if evaluate != nil {
+		fields["evaluateBy"] = *evaluate
+	}
+	raw, err := json.Marshal(fields)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal claim fields: %w", err)
+	}
+	return raw, nil
+}
+
+// claimHTML renders claim text as safe HTML: the text is escaped first, so
+// typed markup stays inert, then passed through the review sanitiser.
+func claimHTML(text string) string {
+	return sanitizeReview(html.EscapeString(text))
 }
 
 // ListContent retrieves a paginated list of content

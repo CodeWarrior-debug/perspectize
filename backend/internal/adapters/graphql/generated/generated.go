@@ -252,6 +252,7 @@ type ComplexityRoot struct {
 		SetPassageDisplayTitle          func(childComplexity int, input model.SetPassageDisplayTitleInput) int
 		SetPrimaryCategory              func(childComplexity int, input model.SetPrimaryCategoryInput) int
 		SetTyping                       func(childComplexity int, threadID string, typing bool) int
+		UpdateClaim                     func(childComplexity int, id string, input model.UpdateClaimInput) int
 		UpdateContentSourceData         func(childComplexity int, contentID int) int
 		UpdatePerspective               func(childComplexity int, input model.UpdatePerspectiveInput) int
 		UpdateUser                      func(childComplexity int, input model.UpdateUserInput) int
@@ -516,6 +517,7 @@ type MutationResolver interface {
 	UpdatePerspective(ctx context.Context, input model.UpdatePerspectiveInput) (*model.Perspective, error)
 	DeletePerspective(ctx context.Context, id string) (bool, error)
 	CreateClaim(ctx context.Context, input model.CreateClaimInput) (*model.Content, error)
+	UpdateClaim(ctx context.Context, id string, input model.UpdateClaimInput) (*model.Content, error)
 	SetPrimaryCategory(ctx context.Context, input model.SetPrimaryCategoryInput) (*model.Content, error)
 	CreateUserTodo(ctx context.Context, input model.CreateUserTodoInput) (*model.UserTodo, error)
 	UpdateUserTodo(ctx context.Context, input model.UpdateUserTodoInput) (*model.UserTodo, error)
@@ -1617,6 +1619,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.SetTyping(childComplexity, args["threadId"].(string), args["typing"].(bool)), true
+	case "Mutation.updateClaim":
+		if e.ComplexityRoot.Mutation.UpdateClaim == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateClaim_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdateClaim(childComplexity, args["id"].(string), args["input"].(model.UpdateClaimInput)), true
 	case "Mutation.updateContentSourceData":
 		if e.ComplexityRoot.Mutation.UpdateContentSourceData == nil {
 			break
@@ -2675,6 +2688,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputSendMessageInput,
 		ec.unmarshalInputSetPassageDisplayTitleInput,
 		ec.unmarshalInputSetPrimaryCategoryInput,
+		ec.unmarshalInputUpdateClaimInput,
 		ec.unmarshalInputUpdatePerspectiveInput,
 		ec.unmarshalInputUpdateUserInput,
 		ec.unmarshalInputUpdateUserTodoInput,
@@ -3296,6 +3310,14 @@ input CreateClaimInput {
   text: String!            # The claim text (may contain @this/@here tokens)
   userID: IntID!           # 0 = derive from session; non-zero must match the session user
   parentContentID: IntID   # Optional: the content item this claim is about
+  effectiveDate: String    # Optional YYYY-MM-DD; defaults to today (UTC)
+  evaluateBy: String       # Optional YYYY-MM-DD; must not be before effectiveDate
+}
+
+input UpdateClaimInput {
+  text: String!            # The new claim text; same rules as create
+  effectiveDate: String    # Optional YYYY-MM-DD; nil or empty means today (UTC)
+  evaluateBy: String       # Optional YYYY-MM-DD; nil or empty clears it
 }
 
 type Mutation {
@@ -3332,6 +3354,7 @@ type Mutation {
 
   # Claim mutations
   createClaim(input: CreateClaimInput!): Content! @auth
+  updateClaim(id: ID!, input: UpdateClaimInput!): Content! @auth
 
   # Category mutations
   setPrimaryCategory(input: SetPrimaryCategoryInput!): Content! @auth
@@ -4925,6 +4948,28 @@ func (ec *executionContext) field_Mutation_setTyping_args(ctx context.Context, r
 		return nil, err
 	}
 	args["typing"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateClaim_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.UpdateClaimInput, error) {
+			return ec.unmarshalNUpdateClaimInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUpdateClaimInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg1
 	return args, nil
 }
 
@@ -9242,6 +9287,63 @@ func (ec *executionContext) fieldContext_Mutation_createClaim(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_createClaim_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateClaim(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_updateClaim(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdateClaim(ctx, fc.Args["id"].(string), fc.Args["input"].(model.UpdateClaimInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.Content
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Content) graphql.Marshaler {
+			return ec.marshalNContent2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_updateClaim(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Content(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateClaim_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -15725,7 +15827,7 @@ func (ec *executionContext) unmarshalInputCreateClaimInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"text", "userID", "parentContentID"}
+	fieldsInOrder := [...]string{"text", "userID", "parentContentID", "effectiveDate", "evaluateBy"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -15753,6 +15855,20 @@ func (ec *executionContext) unmarshalInputCreateClaimInput(ctx context.Context, 
 				return it, err
 			}
 			it.ParentContentID = data
+		case "effectiveDate":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("effectiveDate"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EffectiveDate = data
+		case "evaluateBy":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("evaluateBy"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EvaluateBy = data
 		}
 	}
 	return it, nil
@@ -16530,6 +16646,50 @@ func (ec *executionContext) unmarshalInputSetPrimaryCategoryInput(ctx context.Co
 				return it, err
 			}
 			it.EntityType = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputUpdateClaimInput(ctx context.Context, obj any) (model.UpdateClaimInput, error) {
+	var it model.UpdateClaimInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"text", "effectiveDate", "evaluateBy"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "text":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("text"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Text = data
+		case "effectiveDate":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("effectiveDate"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EffectiveDate = data
+		case "evaluateBy":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("evaluateBy"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EvaluateBy = data
 		}
 	}
 	return it, nil
@@ -18822,6 +18982,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "createClaim":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createClaim(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateClaim":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateClaim(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -22349,6 +22516,11 @@ func (ec *executionContext) marshalNTodoAction2ᚖgithubᚗcomᚋCodeWarriorᚑd
 		return graphql.Null
 	}
 	return ec._TodoAction(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNUpdateClaimInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUpdateClaimInput(ctx context.Context, v any) (model.UpdateClaimInput, error) {
+	res, err := ec.unmarshalInputUpdateClaimInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNUpdatePerspectiveInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUpdatePerspectiveInput(ctx context.Context, v any) (model.UpdatePerspectiveInput, error) {

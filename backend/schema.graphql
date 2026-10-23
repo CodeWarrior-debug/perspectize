@@ -522,6 +522,14 @@ input CreateClaimInput {
   text: String!            # The claim text (may contain @this/@here tokens)
   userID: IntID!           # 0 = derive from session; non-zero must match the session user
   parentContentID: IntID   # Optional: the content item this claim is about
+  effectiveDate: String    # Optional YYYY-MM-DD; defaults to today (UTC)
+  evaluateBy: String       # Optional YYYY-MM-DD; must not be before effectiveDate
+}
+
+input UpdateClaimInput {
+  text: String!            # The new claim text; same rules as create
+  effectiveDate: String    # Optional YYYY-MM-DD; nil or empty means today (UTC)
+  evaluateBy: String       # Optional YYYY-MM-DD; nil or empty clears it
 }
 
 type Mutation {
@@ -558,6 +566,7 @@ type Mutation {
 
   # Claim mutations
   createClaim(input: CreateClaimInput!): Content! @auth
+  updateClaim(id: ID!, input: UpdateClaimInput!): Content! @auth
 
   # Category mutations
   setPrimaryCategory(input: SetPrimaryCategoryInput!): Content! @auth
