@@ -359,7 +359,13 @@ func passageTitleError(err error) error {
 
 // UpdateContentSourceData is the resolver for the updateContentSourceData field.
 func (r *mutationResolver) UpdateContentSourceData(ctx context.Context, contentID int) (*model.Content, error) {
-	content, err := r.ContentService.UpdateSourceData(ctx, contentID)
+	// The mutation is @auth, so a viewer is normally present. Viewer 0 is the
+	// anonymous fallback and can only refresh public rows.
+	var viewerID int
+	if viewer, err := auth.RequireAuth(ctx); err == nil {
+		viewerID = viewer.ID
+	}
+	content, err := r.ContentService.UpdateSourceData(ctx, contentID, viewerID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, fmt.Errorf("content not found")

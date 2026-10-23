@@ -311,7 +311,7 @@ func TestGormContentRepository_UpdatePrimaryCategoryID(t *testing.T) {
 		mock.ExpectQuery(`UPDATE "content" SET .* RETURNING \*`).
 			WillReturnRows(contentRows().AddRow(11, "c", "https://x", "youtube_video", 4, nil, nil, nil, 9, contentRepoTime, contentRepoTime))
 
-		got, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9))
+		got, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9), 4)
 		require.NoError(t, err)
 		require.NotNil(t, got.PrimaryCategoryID)
 		assert.Equal(t, 9, *got.PrimaryCategoryID)
@@ -323,7 +323,7 @@ func TestGormContentRepository_UpdatePrimaryCategoryID(t *testing.T) {
 		mock.ExpectQuery(`UPDATE "content" SET`).
 			WillReturnRows(contentRows().AddRow(11, "c", "https://x", "youtube_video", 4, nil, nil, nil, nil, contentRepoTime, contentRepoTime))
 
-		got, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, nil)
+		got, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, nil, 4)
 		require.NoError(t, err)
 		assert.Nil(t, got.PrimaryCategoryID)
 		assertAllExpectationsMet(t, mock)
@@ -333,7 +333,7 @@ func TestGormContentRepository_UpdatePrimaryCategoryID(t *testing.T) {
 		db, mock := newMockDB(t)
 		mock.ExpectQuery(`UPDATE "content" SET`).WillReturnRows(contentRows())
 
-		_, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 404, cInt(9))
+		_, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 404, cInt(9), 4)
 		assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
 		assertAllExpectationsMet(t, mock)
 	})
@@ -342,9 +342,43 @@ func TestGormContentRepository_UpdatePrimaryCategoryID(t *testing.T) {
 		db, mock := newMockDB(t)
 		mock.ExpectQuery(`UPDATE "content" SET`).WillReturnError(errors.New("cat fk boom"))
 
-		_, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9))
+		_, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9), 4)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to update primary category")
+		assertAllExpectationsMet(t, mock)
+	})
+}
+
+// The category UPDATE is scoped to rows the viewer may read: public rows, or
+// rows they own. One statement either way; a miss is domain.ErrNotFound.
+func TestGormContentRepository_UpdatePrimaryCategoryID_ViewerScope(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("one scoped UPDATE ... RETURNING binding the viewer id", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`UPDATE "content" SET .* WHERE id = .* AND \(privacy = 'public' OR added_by_user_id = .*\) RETURNING`).
+			WithArgs(int64(9), sqlmock.AnyArg(), int64(11), int64(7)).
+			WillReturnRows(contentRows().AddRow(11, "claim", nil, "claim", 7, nil, nil, nil, 9, contentRepoTime, contentRepoTime))
+
+		c := querycount.Attach(t, db)
+		got, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9), 7)
+		require.NoError(t, err)
+		require.NotNil(t, got.PrimaryCategoryID)
+		assert.Equal(t, 9, *got.PrimaryCategoryID)
+		c.AssertExactly(t, 1)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("zero rows (missing or another user's private row) is ErrNotFound in one statement", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`UPDATE "content" SET .* WHERE id = .* AND \(privacy = 'public' OR added_by_user_id = .*\) RETURNING`).
+			WithArgs(int64(9), sqlmock.AnyArg(), int64(11), int64(8)).
+			WillReturnRows(contentRows())
+
+		c := querycount.Attach(t, db)
+		_, err := NewGormContentRepository(db).UpdatePrimaryCategoryID(ctx, 11, cInt(9), 8)
+		assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
+		c.AssertExactly(t, 1)
 		assertAllExpectationsMet(t, mock)
 	})
 }

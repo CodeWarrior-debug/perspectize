@@ -90,7 +90,7 @@ func (m *mockContentService) PassageInterlinear(ctx context.Context, startVerseI
 	return nil, nil
 }
 
-func (m *mockContentService) UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error) {
+func (m *mockContentService) UpdateSourceData(ctx context.Context, contentID, viewerID int) (*domain.Content, error) {
 	return nil, nil
 }
 

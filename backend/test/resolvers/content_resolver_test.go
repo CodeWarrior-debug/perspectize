@@ -96,10 +96,13 @@ func (m *mockContentRepository) UpdateClaim(ctx context.Context, id, ownerID int
 
 // UpdatePrimaryCategoryID emulates UPDATE ... RETURNING against getByIDFn's
 // row: missing content is ErrNotFound, otherwise the row with the new FK.
-func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
 	got, err := m.GetByID(ctx, contentID)
 	if err != nil {
 		return nil, err
+	}
+	if !got.VisibleTo(viewerID) {
+		return nil, domain.ErrNotFound
 	}
 	cp := *got
 	cp.PrimaryCategoryID = categoryID

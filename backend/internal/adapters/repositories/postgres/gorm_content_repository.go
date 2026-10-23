@@ -480,14 +480,16 @@ func (r *GormContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 }
 
 // UpdatePrimaryCategoryID sets the primary_category_id FK on a content record
-// and returns the updated row (RETURNING *). Zero rows means the content
-// doesn't exist, so callers need no separate existence check.
-func (r *GormContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+// the viewer may read (public, or owned by viewerID) and returns the updated
+// row (RETURNING *). The visibility rule lives in the WHERE clause, so there is
+// no separate read. Zero rows means the content is missing or not visible to
+// the viewer, and both answer domain.ErrNotFound.
+func (r *GormContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
 	var updated ContentModel
 	result := r.db.WithContext(ctx).
 		Model(&updated).
 		Clauses(clause.Returning{}).
-		Where("id = ?", contentID).
+		Where("id = ? AND (privacy = 'public' OR added_by_user_id = ?)", contentID, viewerID).
 		Update("primary_category_id", categoryID)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to update primary category: %w", result.Error)

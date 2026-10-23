@@ -164,7 +164,9 @@ func (s *ContentService) GetByIDs(ctx context.Context, ids []int) ([]*domain.Con
 // the source (YouTube) and performing a direct UPDATE of the stored row. Unlike
 // CreateFromYouTube's upsert path, this always operates on a known existing row by ID —
 // it never inserts, and it never touches created_at or added_by_user_id.
-func (s *ContentService) UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error) {
+// A row the viewer can't see is domain.ErrNotFound, checked before anything
+// about the row's type is revealed.
+func (s *ContentService) UpdateSourceData(ctx context.Context, contentID, viewerID int) (*domain.Content, error) {
 	if contentID <= 0 {
 		return nil, fmt.Errorf("%w: content id must be a positive integer", domain.ErrInvalidInput)
 	}
@@ -175,6 +177,12 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID int) (*
 			return nil, fmt.Errorf("%w: content not found", domain.ErrNotFound)
 		}
 		return nil, fmt.Errorf("failed to get content: %w", err)
+	}
+	if !existing.VisibleTo(viewerID) {
+		return nil, fmt.Errorf("%w: content not found", domain.ErrNotFound)
+	}
+	if existing.ContentType == domain.ContentTypeClaim {
+		return nil, fmt.Errorf("%w: this content type has no source to refresh", domain.ErrInvalidInput)
 	}
 	if existing.URL == nil {
 		return nil, fmt.Errorf("%w: content has no source URL to refresh", domain.ErrInvalidInput)

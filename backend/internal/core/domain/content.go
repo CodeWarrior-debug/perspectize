@@ -91,3 +91,14 @@ type Content struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+// VisibleTo reports whether viewerID may read this row. A PRIVATE row is visible
+// only to its owner, and viewer 0 (anonymous) never owns one. Any other row
+// (PUBLIC, or unset) is visible to everyone. A caller that gets false should
+// answer exactly as it would for a missing row.
+func (c *Content) VisibleTo(viewerID int) bool {
+	if c.Privacy != PrivacyPrivate {
+		return true
+	}
+	return viewerID > 0 && viewerID == c.AddedByUserID
+}

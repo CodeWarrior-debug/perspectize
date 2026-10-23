@@ -26,9 +26,10 @@ type ContentRepository interface {
 	List(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)
 	ReassignByUser(ctx context.Context, fromUserID, toUserID int) error
 	// UpdatePrimaryCategoryID sets the primary_category_id FK on a content
-	// record and returns the updated row. A missing content id is
+	// record visible to viewerID (public, or owned by viewerID) and returns the
+	// updated row. A missing row, or a private row the viewer doesn't own, is
 	// domain.ErrNotFound.
-	UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error)
+	UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error)
 	// UpdateClaim rewrites an owned claim's name, response.text/html and custom
 	// fields in one owner-scoped UPDATE (keeping response.parentContentId). A
 	// missing row, or a row the owner does not hold, is domain.ErrNotFound.

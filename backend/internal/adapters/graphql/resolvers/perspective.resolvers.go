@@ -44,6 +44,11 @@ func (r *mutationResolver) CreatePerspective(ctx context.Context, input model.Cr
 		if errors.Is(err, domain.ErrInvalidInput) {
 			return nil, fmt.Errorf("invalid input: %w", err)
 		}
+		// Checked first: content not-found is also ErrNotFound, and must not be
+		// reported as a missing user.
+		if errors.Is(err, domain.ErrContentNotFound) {
+			return nil, fmt.Errorf("content not found")
+		}
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, fmt.Errorf("user not found: %w", err)
 		}
@@ -69,6 +74,9 @@ func (r *mutationResolver) UpdatePerspective(ctx context.Context, input model.Up
 	if err != nil {
 		if errors.Is(err, domain.ErrForbidden) {
 			return nil, fmt.Errorf("access denied: you can only modify your own perspectives")
+		}
+		if errors.Is(err, domain.ErrContentNotFound) {
+			return nil, fmt.Errorf("content not found")
 		}
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, fmt.Errorf("perspective not found")
@@ -299,6 +307,11 @@ func (r *perspectiveResolver) Content(ctx context.Context, obj *model.Perspectiv
 	c, err := r.contentByID(ctx, id)
 	if err != nil || c == nil {
 		return nil, err
+	}
+	// Backstop for the write-side check: a perspective never shows content the
+	// viewer can't read, so a private row someone else owns resolves to null.
+	if !canViewContent(ctx, c.Privacy, c.AddedByUserID) {
+		return nil, nil
 	}
 	return domainToModel(c), nil
 }

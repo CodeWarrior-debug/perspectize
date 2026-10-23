@@ -66,7 +66,7 @@ func (m *mockWikidataClient) GetWikipediaURL(ctx context.Context, qid string) (s
 // mockContentRepoForCategory implements repositories.ContentRepository for category tests
 type mockContentRepoForCategory struct {
 	getByIDFn               func(ctx context.Context, id int) (*domain.Content, error)
-	updatePrimaryCategoryFn func(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error)
+	updatePrimaryCategoryFn func(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error)
 }
 
 func (m *mockContentRepoForCategory) Create(ctx context.Context, content *domain.Content) (*domain.Content, error) {
@@ -110,9 +110,9 @@ func (m *mockContentRepoForCategory) UpdateClaim(ctx context.Context, id, ownerI
 
 // UpdatePrimaryCategoryID emulates UPDATE ... RETURNING: the content row
 // (from getByIDFn when set) with the new FK, or ErrNotFound when it's missing.
-func (m *mockContentRepoForCategory) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+func (m *mockContentRepoForCategory) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
 	if m.updatePrimaryCategoryFn != nil {
-		return m.updatePrimaryCategoryFn(ctx, contentID, categoryID)
+		return m.updatePrimaryCategoryFn(ctx, contentID, categoryID, viewerID)
 	}
 	c := &domain.Content{ID: contentID}
 	if m.getByIDFn != nil {
@@ -152,6 +152,7 @@ func TestSetPrimaryCategory_Success(t *testing.T) {
 	svc := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
 
 	input := portservices.SetPrimaryCategoryInput{
+		ActorUserID: 1,
 		ContentID:   1,
 		QID:         "Q12345",
 		Label:       "Science",
@@ -185,9 +186,10 @@ func TestSetPrimaryCategory_PersistsWikipediaURL(t *testing.T) {
 	svc := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
 
 	input := portservices.SetPrimaryCategoryInput{
-		ContentID: 1,
-		QID:       "Q336",
-		Label:     "Science",
+		ActorUserID: 1,
+		ContentID:   1,
+		QID:         "Q336",
+		Label:       "Science",
 	}
 
 	_, err := svc.SetPrimaryCategory(context.Background(), input)
@@ -214,9 +216,10 @@ func TestSetPrimaryCategory_ToleratesWikipediaResolverError(t *testing.T) {
 	svc := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
 
 	input := portservices.SetPrimaryCategoryInput{
-		ContentID: 1,
-		QID:       "Q336",
-		Label:     "Science",
+		ActorUserID: 1,
+		ContentID:   1,
+		QID:         "Q336",
+		Label:       "Science",
 	}
 
 	result, err := svc.SetPrimaryCategory(context.Background(), input)
@@ -234,9 +237,10 @@ func TestSetPrimaryCategory_InvalidContentID(t *testing.T) {
 	)
 
 	input := portservices.SetPrimaryCategoryInput{
-		ContentID: 0,
-		QID:       "Q12345",
-		Label:     "Science",
+		ActorUserID: 1,
+		ContentID:   0,
+		QID:         "Q12345",
+		Label:       "Science",
 	}
 
 	_, err := svc.SetPrimaryCategory(context.Background(), input)
@@ -252,9 +256,10 @@ func TestSetPrimaryCategory_EmptyQID(t *testing.T) {
 	)
 
 	input := portservices.SetPrimaryCategoryInput{
-		ContentID: 1,
-		QID:       "",
-		Label:     "Science",
+		ActorUserID: 1,
+		ContentID:   1,
+		QID:         "",
+		Label:       "Science",
 	}
 
 	_, err := svc.SetPrimaryCategory(context.Background(), input)
@@ -270,9 +275,10 @@ func TestSetPrimaryCategory_EmptyLabel(t *testing.T) {
 	)
 
 	input := portservices.SetPrimaryCategoryInput{
-		ContentID: 1,
-		QID:       "Q12345",
-		Label:     "",
+		ActorUserID: 1,
+		ContentID:   1,
+		QID:         "Q12345",
+		Label:       "",
 	}
 
 	_, err := svc.SetPrimaryCategory(context.Background(), input)
@@ -293,9 +299,10 @@ func TestSetPrimaryCategory_UpsertFails(t *testing.T) {
 	)
 
 	input := portservices.SetPrimaryCategoryInput{
-		ContentID: 1,
-		QID:       "Q12345",
-		Label:     "Science",
+		ActorUserID: 1,
+		ContentID:   1,
+		QID:         "Q12345",
+		Label:       "Science",
 	}
 
 	_, err := svc.SetPrimaryCategory(context.Background(), input)
@@ -313,9 +320,10 @@ func TestSetPrimaryCategory_ContentNotFound(t *testing.T) {
 	svc := services.NewCategoryService(categoryRepo, contentRepo, &mockWikidataClient{})
 
 	input := portservices.SetPrimaryCategoryInput{
-		ContentID: 999,
-		QID:       "Q12345",
-		Label:     "Science",
+		ActorUserID: 1,
+		ContentID:   999,
+		QID:         "Q12345",
+		Label:       "Science",
 	}
 
 	_, err := svc.SetPrimaryCategory(context.Background(), input)
@@ -326,21 +334,86 @@ func TestSetPrimaryCategory_ContentNotFound(t *testing.T) {
 func TestSetPrimaryCategory_UpdateFKFails(t *testing.T) {
 	categoryRepo := &mockCategoryRepository{}
 	contentRepo := &mockContentRepoForCategory{
-		updatePrimaryCategoryFn: func(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+		updatePrimaryCategoryFn: func(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
 			return nil, fmt.Errorf("fk constraint violation")
 		},
 	}
 	svc := services.NewCategoryService(categoryRepo, contentRepo, &mockWikidataClient{})
 
 	input := portservices.SetPrimaryCategoryInput{
-		ContentID: 1,
-		QID:       "Q12345",
-		Label:     "Science",
+		ActorUserID: 1,
+		ContentID:   1,
+		QID:         "Q12345",
+		Label:       "Science",
 	}
 
 	_, err := svc.SetPrimaryCategory(context.Background(), input)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "update content primary category")
+}
+
+// --- SetPrimaryCategory privacy (viewer-scoped UPDATE) Tests ---
+
+func TestSetPrimaryCategory_ActorPassedToRepo(t *testing.T) {
+	var gotViewer int
+	contentRepo := &mockContentRepoForCategory{
+		updatePrimaryCategoryFn: func(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
+			gotViewer = viewerID
+			return &domain.Content{ID: contentID, PrimaryCategoryID: categoryID}, nil
+		},
+	}
+	svc := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})
+
+	_, err := svc.SetPrimaryCategory(context.Background(), portservices.SetPrimaryCategoryInput{
+		ActorUserID: 42,
+		ContentID:   1,
+		QID:         "Q12345",
+		Label:       "Science",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 42, gotViewer, "the acting user must reach the owner-scoped UPDATE")
+}
+
+func TestSetPrimaryCategory_ActorIDRequiredBeforeUpsert(t *testing.T) {
+	upserted := false
+	categoryRepo := &mockCategoryRepository{
+		upsertFn: func(ctx context.Context, category *domain.Category) (*domain.Category, error) {
+			upserted = true
+			return category, nil
+		},
+	}
+	svc := services.NewCategoryService(categoryRepo, &mockContentRepoForCategory{}, &mockWikidataClient{})
+
+	for _, actor := range []int{0, -3} {
+		_, err := svc.SetPrimaryCategory(context.Background(), portservices.SetPrimaryCategoryInput{
+			ActorUserID: actor,
+			ContentID:   1,
+			QID:         "Q12345",
+			Label:       "Science",
+		})
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, domain.ErrInvalidInput), "actor %d", actor)
+	}
+	assert.False(t, upserted, "an unauthenticated actor must be rejected before the category upsert")
+}
+
+func TestSetPrimaryCategory_PrivateToOtherUserIsNotFound(t *testing.T) {
+	contentRepo := &mockContentRepoForCategory{
+		updatePrimaryCategoryFn: func(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
+			// The scoped UPDATE matches no row for a private row the viewer doesn't own.
+			return nil, domain.ErrNotFound
+		},
+	}
+	svc := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})
+
+	_, err := svc.SetPrimaryCategory(context.Background(), portservices.SetPrimaryCategoryInput{
+		ActorUserID: 8,
+		ContentID:   1,
+		QID:         "Q12345",
+		Label:       "Science",
+	})
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrNotFound))
 }
 
 // --- SearchWikidata Tests ---

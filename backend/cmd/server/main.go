@@ -221,7 +221,7 @@ func main() {
 	// Initialize services
 	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient), services.WithMovieSearch(movieSearchClient), services.WithMovieTrending(movieTrendingClient))
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo)
-	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
+	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo, services.WithContentRepository(contentRepo))
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
 	userTodoService := services.NewUserTodoService(todoRepo, todoListRepo, todoActionRepo)
 	buildInfoService := services.NewBuildInfoService(buildInfoRepo)

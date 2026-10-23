@@ -83,8 +83,10 @@ type ContentService interface {
 	// does not own is domain.ErrNotFound.
 	UpdateClaim(ctx context.Context, input UpdateClaimInput) (*domain.Content, error)
 
-	// UpdateSourceData refreshes an existing content item's metadata from its source
-	UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error)
+	// UpdateSourceData refreshes an existing content item's metadata from its source.
+	// viewerID must be able to see the row (0 for anonymous); a row they can't see
+	// is domain.ErrNotFound.
+	UpdateSourceData(ctx context.Context, contentID, viewerID int) (*domain.Content, error)
 
 	// YouTubeTrending returns one page of YouTube's most-popular chart for a
 	// region (ISO 3166-1 alpha-2, e.g. "US"). Served from the backend cache, so
