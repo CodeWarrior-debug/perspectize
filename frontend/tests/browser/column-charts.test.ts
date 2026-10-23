@@ -157,8 +157,8 @@ describe('column charts on the activity grid', () => {
 		it('shows no chart icon in "All Items" mode', async () => {
 			flagsOn('boxOffice');
 			setUrl(new URL('http://localhost/activity?mode=all&f.type=movie'));
-			// A fresh mount in "All Items" mode makes ActivityTable's sort-sync effect call applyColumnState
-			// before the grid finishes starting (pre-existing, unrelated to charts); keep that out of the run.
+			// Pre-existing: applyColumnState from the sort-sync effect throws before the grid's body controller
+			// is ready, ActivityTable ~line 1331 (fresh mount in "All Items" mode). Suppressed here for now.
 			const swallow = (e: ErrorEvent) => {
 				if (String(e.message).includes('setColumnMovingCss')) {
 					e.preventDefault();
@@ -238,6 +238,15 @@ describe('column charts on the activity grid', () => {
 			// The chart follows the filtered rows: 25M, 40M, 90M of the 5.
 			(chartButton() as HTMLElement).click();
 			await expect.element(browserPage.getByText('based on 3 loaded movies')).toBeVisible();
+		});
+
+		it('names each chart button after its column header', async () => {
+			flagsOn('boxOffice', 'duration');
+			render(ActivityTableHarness);
+			await expect.poll(() => chartButton()).not.toBeNull();
+
+			await expect.element(browserPage.getByRole('button', { name: 'Chart Take' })).toBeInTheDocument();
+			await expect.element(browserPage.getByRole('button', { name: 'Chart Duration' })).toBeInTheDocument();
 		});
 
 		it('labels duration charts as h:mm', async () => {

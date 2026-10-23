@@ -262,7 +262,7 @@
 	// The grid's stock header template plus a chart button, placed after the label so a click on it does not sort.
 	const CHART_BUTTON_SVG =
 		'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="18" y1="20" x2="18" y2="9"/></svg>';
-	function chartHeaderParams(colId: string): { template?: string } {
+	function chartHeaderParams(colId: string, label: string): { template?: string } {
 		if (!chartEligibleHere(colId)) return {};
 		const hidden = chartIconVisible(colId) ? '' : ' hidden';
 		return {
@@ -274,7 +274,7 @@
 					<span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
 					<ag-sort-indicator data-ref="eSortIndicator"></ag-sort-indicator>
 				</div>
-				<button type="button" data-chart-col="${colId}" data-testid="column-chart-button-${colId}" aria-label="Chart ${colId}" title="Show chart" class="text-muted-foreground hover:text-foreground ml-1"${hidden}>${CHART_BUTTON_SVG}</button>
+				<button type="button" data-chart-col="${colId}" data-testid="column-chart-button-${colId}" aria-label="Chart ${label.replace(/"/g, '&quot;')}" title="Show chart" class="text-muted-foreground hover:text-foreground ml-1"${hidden}>${CHART_BUTTON_SVG}</button>
 			</div>`,
 		};
 	}
@@ -1162,7 +1162,7 @@
 		// button added to its template (outside the label, so it never sorts). The params are
 		// re-evaluated whenever the header is rebuilt (refreshHeader).
 		...(col.colId && CHART_ELIGIBLE_COLS.has(col.colId)
-			? { headerComponentParams: () => chartHeaderParams(col.colId as string) }
+			? { headerComponentParams: () => chartHeaderParams(col.colId as string, col.headerName ?? (col.colId as string)) }
 			: {}),
 	}));
 
