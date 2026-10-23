@@ -9,7 +9,7 @@
  */
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
-import { page as browserPage } from 'vitest/browser';
+import { page as browserPage, userEvent } from 'vitest/browser';
 
 import ActivityTableHarness from './fixtures/ActivityTableHarness.svelte';
 import { page as routerPage } from '$app/state';
@@ -103,8 +103,11 @@ describe('column charts on the activity grid', () => {
 		expect(localStorage.getItem(CHART_SETTINGS_KEY)).toContain('"boxOffice":true');
 		await expect.poll(() => chartButton()).not.toBeNull();
 
+		const sortBefore = takeHeader()?.getAttribute('aria-sort');
 		(chartButton() as HTMLElement).click();
-		await expect.element(browserPage.getByText('based on 4 loaded movies')).toBeVisible();
+		await expect.element(browserPage.getByText('based on 4 loaded movies · 1 empty')).toBeVisible();
+		// The button sits outside the sortable label: opening the chart must not sort the column.
+		expect(takeHeader()?.getAttribute('aria-sort')).toBe(sortBefore);
 		// 4 values out of the 5 rows the grid shows.
 		expect(rowCount()).toBe(5);
 	});
@@ -129,7 +132,7 @@ describe('column charts on the activity grid', () => {
 		render(ActivityTableHarness);
 
 		await expect.poll(rowCount).toBe(ITEMS.length);
-		expect(document.querySelector('[data-testid^="column-chart-button-"]')).toBeNull();
+		expect(document.querySelector('[data-chart-col]')).toBeNull();
 	});
 
 	it('keeps the header sortable once it carries the chart icon', async () => {
@@ -152,7 +155,8 @@ describe('column charts on the activity grid', () => {
 				JSON.stringify({ version: 1, flags: Object.fromEntries(cols.map((c) => [c, true])) }),
 			);
 		const header = (colId: string) => document.querySelector<HTMLElement>(`.ag-header-cell[col-id="${colId}"]`);
-		const anyChartButton = () => document.querySelector('[data-chart-col]:not([hidden])');
+		// No `:not([hidden])`: outside the movie view the template must not be applied at all.
+		const anyChartButton = () => document.querySelector('[data-chart-col]');
 
 		it('shows no chart icon in "All Items" mode', async () => {
 			flagsOn('boxOffice');
@@ -270,10 +274,31 @@ describe('column charts on the activity grid', () => {
 			(chartButton() as HTMLElement).click();
 			await expect.poll(() => document.querySelector('[data-testid="column-chart-popover"]')).not.toBeNull();
 
-			await browserPage.getByRole('button', { name: 'Choose columns' }).click();
-			await browserPage.getByRole('switch', { name: 'Take chart' }).click();
+			// Programmatic clicks (no pointerdown) so the popover's outside-click dismissal is not what closes it;
+			// only ActivityTable's "icon no longer applies" effect can.
+			(document.querySelector('[aria-label="Choose columns"]') as HTMLElement).click();
+			await expect.poll(() => document.querySelector('[role="switch"][aria-label="Take chart"]')).not.toBeNull();
+			expect(document.querySelector('[data-testid="column-chart-popover"]')).not.toBeNull();
+			(document.querySelector('[role="switch"][aria-label="Take chart"]') as HTMLElement).click();
 
 			await expect.poll(() => document.querySelector('[data-testid="column-chart-popover"]')).toBeNull();
+		});
+
+		it('opens the chart from the keyboard: Tab to the chart button, Enter, and focus lands in the popover', async () => {
+			flagsOn('boxOffice');
+			render(ActivityTableHarness);
+			await expect.poll(() => chartButton()).not.toBeNull();
+
+			(takeHeader() as HTMLElement).focus();
+			await userEvent.tab();
+			expect(document.activeElement).toBe(chartButton());
+
+			await userEvent.keyboard('{Enter}');
+			await expect.poll(() => document.querySelector('[data-testid="column-chart-popover"]')).not.toBeNull();
+			// Enter on the button must not have sorted the column.
+			expect(takeHeader()?.getAttribute('aria-sort')).toBe('none');
+			// Opened from the keyboard: focus moves to the selected chart type.
+			await expect.poll(() => document.activeElement?.getAttribute('aria-pressed')).toBe('true');
 		});
 
 		it('shows no chart icon for a hidden column', async () => {
