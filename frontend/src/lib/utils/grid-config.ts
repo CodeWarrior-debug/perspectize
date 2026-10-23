@@ -238,6 +238,11 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		sortable: true,
 		sortValue: (row) => row.customFields?.evaluateBy ?? null,
 	},
+	// The viewer's own ratings on each row, read from the perspective map (perspectiveRating),
+	// not from the row, so they are never client-sorted.
+	{ colId: 'myQuality', label: 'My overall', picker: 'data', sortable: false },
+	{ colId: 'myImportance', label: 'My importance', picker: 'data', sortable: false },
+	{ colId: 'myAgreement', label: 'My agreement', picker: 'data', sortable: false },
 	// Movie columns (MOVIE rows read their `response` JSON; see formatting.ts). Shown by
 	// default only when the type filter is exactly MOVIE (defaultColumnVisibility below).
 	{
@@ -466,6 +471,22 @@ export function soloTypeFilter(typeFilter: string | undefined): string | null {
 	return types.size === 1 ? [...types][0] : null;
 }
 
+export type PerspectiveRatingField = 'quality' | 'importance' | 'agreement';
+
+/**
+ * The signed-in viewer's rating for one row, from the perspective map the grid
+ * carries in its context (keyed by content id). Null when the viewer has no
+ * perspective on the row, or hasn't rated this field.
+ */
+export function perspectiveRating(
+	byContentId: Map<string, Partial<Record<PerspectiveRatingField, number | null>>> | undefined,
+	contentId: string | number | undefined,
+	field: PerspectiveRatingField,
+): number | null {
+	if (contentId === undefined) return null;
+	return byContentId?.get(String(contentId))?.[field] ?? null;
+}
+
 /** True when the `f.type` URL value names exactly one type and it is MOVIE. */
 export function isMovieOnlyTypeFilter(typeFilter: string | undefined): boolean {
 	return soloTypeFilter(typeFilter) === 'movie';
@@ -498,7 +519,7 @@ export function defaultColumnVisibility(
 		visible = ['perspectize', 'item'];
 		if (sm) visible.push('category');
 		if (md) visible.push('effectiveDate', 'evaluateBy');
-		if (lg) visible.push('createdAt');
+		if (lg) visible.push('createdAt', 'myQuality', 'myImportance', 'myAgreement');
 	} else {
 		visible = view === 'movie' ? ['perspectize', 'item', 'type'] : ['item', 'type', 'perspectize'];
 		if (view === 'movie') {
@@ -526,9 +547,12 @@ export function defaultColumnVisibility(
 		'user',
 		'tags',
 		'description',
-		// Claim date columns and createdAt: forced off outside the claim view (createdAt stays picker-available).
+		// Claim date and rating columns and createdAt: forced off outside the claim view (createdAt stays picker-available).
 		'effectiveDate',
 		'evaluateBy',
+		'myQuality',
+		'myImportance',
+		'myAgreement',
 		'createdAt',
 		...MOVIE_DEFAULT_COLS,
 		...MOVIE_ONLY_PICKER,

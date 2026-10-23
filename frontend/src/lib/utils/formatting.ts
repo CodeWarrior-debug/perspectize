@@ -361,6 +361,15 @@ export function formatClaimDate(value: unknown): string {
 }
 
 /**
+ * A viewer's perspective rating, stored on the 0-10000 scale, shown as a 0-100
+ * score. Empty when the viewer hasn't rated that field.
+ */
+export function formatRatingScore(value: unknown): string {
+	if (typeof value !== 'number') return EMPTY_VALUE;
+	return String(Math.round(value / 100));
+}
+
+/**
  * Format tags array to comma-separated string.
  */
 export function formatTags(tags: string[] | null): string {

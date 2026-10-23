@@ -241,7 +241,8 @@ export function activityItemCellRenderer(params: ActivityItemCellRendererParams)
 		'line-clamp-2 min-w-0 flex-1 whitespace-normal text-left font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
 	title.textContent = name;
 
-	cell.appendChild(thumbSlot(thumbWrap));
+	// A claim has no video to thumbnail, so its title takes the whole cell.
+	if (contentType !== 'CLAIM') cell.appendChild(thumbSlot(thumbWrap));
 	cell.appendChild(title);
 
 	return cell;

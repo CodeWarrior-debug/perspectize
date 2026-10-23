@@ -117,12 +117,15 @@ describe('durationComparator', () => {
 // Column-picker registry
 // ---------------------------------------------------------------------------
 describe('column-picker registry', () => {
-	it('DATA_COLUMNS holds the 27 user-togglable data columns', () => {
+	it('DATA_COLUMNS holds the 30 user-togglable data columns', () => {
 		expect(DATA_COLUMNS.map((c) => c.colId)).toEqual([
 			'type',
 			'category',
 			'effectiveDate',
 			'evaluateBy',
+			'myQuality',
+			'myImportance',
+			'myAgreement',
 			'genre',
 			'rated',
 			'cast',
@@ -173,9 +176,9 @@ describe('column-picker registry', () => {
 		expect(togglableColIds(false)).toEqual(DATA_COLUMNS.map((c) => c.colId));
 	});
 
-	it('togglableColIds(true) returns all 30 columns', () => {
+	it('togglableColIds(true) returns all 33 columns', () => {
 		const ids = togglableColIds(true);
-		expect(ids).toHaveLength(30);
+		expect(ids).toHaveLength(33);
 		expect(ids).toEqual([...DATA_COLUMNS.map((c) => c.colId), ...INTERNAL_COLUMNS.map((c) => c.colId)]);
 	});
 
@@ -499,6 +502,9 @@ describe('Claim column set', () => {
 			'effectiveDate',
 			'evaluateBy',
 			'createdAt',
+			'myQuality',
+			'myImportance',
+			'myAgreement',
 		]);
 	});
 

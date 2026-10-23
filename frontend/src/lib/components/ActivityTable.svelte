@@ -57,6 +57,7 @@
 		formatPercentLiked,
 		formatPublishDate,
 		formatClaimDate,
+		formatRatingScore,
 		formatTags,
 		contentTags,
 		truncateDescription,
@@ -102,6 +103,7 @@
 		PERSON_FILTER_KEY,
 		parsePersonFilter,
 		rowMatchesPerson,
+		perspectiveRating,
 	} from '$lib/utils/grid-config';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
 	import { emptyCellClassRules } from '$lib/utils/grid-empty';
@@ -709,6 +711,41 @@
 				valueGetter: (params) => params.data?.customFields?.evaluateBy ?? null,
 				valueFormatter: (params) => formatClaimDate(params.value),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.evaluateBy },
+				hide: true,
+			},
+			// The viewer's own ratings (0-100). Read from the perspective map in the grid context;
+			// refreshed with the perspectize column when that map changes.
+			{
+				colId: 'myQuality',
+				headerName: 'My overall',
+				headerTooltip: 'Your overall rating of this claim (0-100).',
+				width: 110,
+				sortable: false,
+				filter: false,
+				valueGetter: (params) => perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'quality'),
+				valueFormatter: (params) => formatRatingScore(params.value),
+				hide: true,
+			},
+			{
+				colId: 'myImportance',
+				headerName: 'My importance',
+				headerTooltip: 'Your importance rating of this claim (0-100).',
+				width: 120,
+				sortable: false,
+				filter: false,
+				valueGetter: (params) => perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'importance'),
+				valueFormatter: (params) => formatRatingScore(params.value),
+				hide: true,
+			},
+			{
+				colId: 'myAgreement',
+				headerName: 'My agreement',
+				headerTooltip: 'Your agreement rating with this claim (0-100).',
+				width: 120,
+				sortable: false,
+				filter: false,
+				valueGetter: (params) => perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'agreement'),
+				valueFormatter: (params) => formatRatingScore(params.value),
 				hide: true,
 			},
 			// Movie columns (TMDB). Hidden by default; the responsive effect shows the Movie
@@ -1331,7 +1368,7 @@
 				perspectivesByContentId,
 				onOpenDetails: handleOpenDetails,
 			});
-			gridApi.refreshCells({ columns: ['perspectize'], force: true });
+			gridApi.refreshCells({ columns: ['perspectize', 'myQuality', 'myImportance', 'myAgreement'], force: true });
 		}
 	});
 
