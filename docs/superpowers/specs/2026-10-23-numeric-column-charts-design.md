@@ -57,7 +57,7 @@ Sample standard deviation (n−1) over the loaded rows. It appears only in the s
 - The header has a chart icon on each eligible column. Clicking it opens the popover.
 - The popover has the chart-type picker and the chart. Changing the type re-renders the chart in place.
 - The popover shows the rows the grid currently shows: filters and sort apply, as they do to the grid.
-- The on/off state for each column is saved in the browser with the existing column settings (localStorage). Default is off.
+- The on/off state for each column is saved in the browser under its own versioned localStorage key, separate from the existing column settings object. Default is off.
 - The chart type is not saved. Each open starts from the column's developer-set default.
 
 ## Decisions
@@ -72,7 +72,7 @@ These are my calls. The builder may change them if the reason is clear, and the 
 - **Mobile tiles and cards:** no charts. They have no grid header.
 - **Too little data:** zero non-empty rows shows "no values yet" in place of the chart. One row, or all values identical, shows the summary stats and a short note in place of the other charts.
 - **Top and bottom 10:** with fewer than 20 rows, the two lists are cut to half the rows each, so they don't repeat a movie. Ties break by title.
-- **Saved settings:** the on/off flag joins the existing column settings object in localStorage. It needs a version guard so existing saved settings are read and kept, never wiped. The builder confirms the exact stored shape in `grid-config.ts` before writing this.
+- **Saved settings:** the on/off flags live under their own localStorage key, separate from the existing column settings object, because that object is a per-view visibility map that its loader validates. The flags carry a version field so unknown or malformed data reads as all-off and never wipes anything.
 - **Loaded rows only:** charts and std dev cover the rows loaded on the page (currently the first 100 in loaded mode, `ActivityTable.svelte` line 430). Each popover shows "based on N loaded movies" so the scope is visible. This is my call, pending the user's confirmation.
 - **Zero values:** a zero is a real value everywhere. Missing budget or revenue is NULL, and only NULL counts as empty. Checked in the database (read-only, 28 movie rows with budget or revenue): 0 budget rows, 0 zero-revenue rows, 8 budget NULLs, 6 revenue NULLs. The `vs_budget` calculation (`backend/internal/adapters/repositories/postgres/helpers.go` lines 208–214) still returns NULL for budget 0, which is a separate existing rule and does not change the charts.
 - **Empty values:** excluded from charts, counted in the coverage donut and shown next to each chart.
