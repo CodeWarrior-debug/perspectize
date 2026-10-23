@@ -76,6 +76,33 @@ export const UPDATE_CLAIM = gql`
 	}
 `;
 
+export interface DeleteClaimVariables {
+	id: string;
+	/** True hands the claim to the anonymous user instead of deleting it. */
+	keepAnonymous?: boolean;
+}
+
+export interface DeleteClaimResponse {
+	deleteClaim: boolean;
+}
+
+export const DELETE_CLAIM = gql`
+	mutation DeleteClaim($id: ID!, $keepAnonymous: Boolean) {
+		deleteClaim(id: $id, keepAnonymous: $keepAnonymous)
+	}
+`;
+
+/**
+ * True when the server refused the delete because other users have engaged with
+ * the claim (extensions.code CLAIM_HAS_OTHERS). Reads the graphql-request ClientError
+ * shape (`error.response.errors[0]`), like contentNotAllowedMessage in utils/movie.ts.
+ */
+export function claimHasOthersError(error: unknown): boolean {
+	const first = (error as { response?: { errors?: unknown[] } } | null | undefined)?.response?.errors?.[0] as
+		{ extensions?: { code?: unknown } } | undefined;
+	return first?.extensions?.code === 'CLAIM_HAS_OTHERS';
+}
+
 /** One row of the viewer's own claims (the Declare page list). */
 export interface ClaimRow {
 	id: string;

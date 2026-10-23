@@ -100,7 +100,7 @@ describe('defaultLayout', () => {
 		const layout = defaultLayout('lg', 'claim', 'claim');
 		expect(layout.effectiveDate).toBe(true);
 		expect(layout.evaluateBy).toBe(true);
-		expect(layout.createdAt).toBe(true);
+		expect(layout.createdAt).toBe(false);
 		expect(layout.category).toBe(true);
 		expect(layout.type).toBe(false);
 		expect(layout.channel).toBe(false);

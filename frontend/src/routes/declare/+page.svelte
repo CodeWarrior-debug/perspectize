@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageWrapper from '$lib/components/PageWrapper.svelte';
 	import SignInTrigger from '$lib/components/auth/SignInTrigger.svelte';
+	import ClaimDeleteDialog from '$lib/components/declare/ClaimDeleteDialog.svelte';
 	import ClaimForm from '$lib/components/declare/ClaimForm.svelte';
 	import { Button } from '$lib/components/shadcn';
 	import { useAuthState } from '$lib/auth/useAuthState';
@@ -20,6 +21,9 @@
 	});
 
 	let editingId = $state<string | null>(null);
+	// One delete dialog for the page, aimed at whichever row was clicked.
+	let deletingId = $state<string | null>(null);
+	let deleteOpen = $state(false);
 </script>
 
 <PageWrapper>
@@ -65,12 +69,27 @@
 											<span>Private</span>
 										</p>
 									</div>
-									<Button type="button" variant="outline" size="sm" onclick={() => (editingId = row.id)}>Edit</Button>
+									<div class="flex shrink-0 gap-2">
+										<Button type="button" variant="outline" size="sm" onclick={() => (editingId = row.id)}>Edit</Button>
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											onclick={() => {
+												deletingId = row.id;
+												deleteOpen = true;
+											}}>Delete</Button
+										>
+									</div>
 								</div>
 							{/if}
 						</li>
 					{/each}
 				</ul>
+			{/if}
+
+			{#if deletingId}
+				<ClaimDeleteDialog claimId={deletingId} bind:open={deleteOpen} onDone={() => (deletingId = null)} />
 			{/if}
 		</div>
 	{/if}
