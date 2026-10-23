@@ -8,7 +8,7 @@ import {
 	density,
 	pieSlices,
 	coverage,
-	topBottom
+	topBottom,
 } from '$lib/utils/columnStats';
 
 describe('summarize', () => {
@@ -19,7 +19,7 @@ describe('summarize', () => {
 			median: 4.5,
 			mean: 5,
 			max: 9,
-			stdDev: expect.closeTo(2.138, 3)
+			stdDev: expect.closeTo(2.138, 3),
 		});
 	});
 
@@ -55,7 +55,7 @@ describe('histogram', () => {
 	it('splits into equal-width bins and puts the max in the last bin', () => {
 		expect(histogram([0, 1, 2, 3, 4], 2)).toEqual([
 			{ lo: 0, hi: 2, count: 2 },
-			{ lo: 2, hi: 4, count: 3 }
+			{ lo: 2, hi: 4, count: 3 },
 		]);
 	});
 
@@ -69,11 +69,11 @@ describe('frequencyPoints', () => {
 		expect(
 			frequencyPoints([
 				{ lo: 0, hi: 2, count: 2 },
-				{ lo: 2, hi: 4, count: 3 }
-			])
+				{ lo: 2, hi: 4, count: 3 },
+			]),
 		).toEqual([
 			{ x: 1, y: 2 },
-			{ x: 3, y: 3 }
+			{ x: 3, y: 3 },
 		]);
 	});
 
@@ -87,7 +87,7 @@ describe('cumulative', () => {
 		expect(cumulative([3, 1, 2])).toEqual([
 			{ x: 1, share: 1 / 3 },
 			{ x: 2, share: 2 / 3 },
-			{ x: 3, share: 1 }
+			{ x: 3, share: 1 },
 		]);
 	});
 
@@ -108,7 +108,7 @@ describe('boxStats', () => {
 			median: 3,
 			q3: 4,
 			max: 5,
-			outliers: []
+			outliers: [],
 		});
 	});
 
@@ -153,7 +153,7 @@ describe('pieSlices', () => {
 		{ lo: 0, hi: 1, count: 4 },
 		{ lo: 1, hi: 2, count: 3 },
 		{ lo: 2, hi: 3, count: 2 },
-		{ lo: 3, hi: 4, count: 1 }
+		{ lo: 3, hi: 4, count: 1 },
 	];
 
 	it('returns an empty array for no bins', () => {
@@ -223,18 +223,18 @@ describe('topBottom', () => {
 			{ t: 'n', v: null },
 			{ t: 'u', v: undefined },
 			{ t: 'z', v: 0 },
-			{ t: 'o', v: 1 }
+			{ t: 'o', v: 1 },
 		];
 		expect(topBottom(rows, val, title, 5)).toEqual({
 			top: [{ title: 'o', value: 1 }],
-			bottom: [{ title: 'z', value: 0 }]
+			bottom: [{ title: 'z', value: 0 }],
 		});
 	});
 
 	it('replaces missing titles with Untitled', () => {
 		const rows: Row[] = [
 			{ t: null, v: 9 },
-			{ t: 'x', v: 1 }
+			{ t: 'x', v: 1 },
 		];
 		const { top } = topBottom(rows, val, title, 1);
 		expect(top[0].title).toBe('Untitled');
@@ -245,7 +245,7 @@ describe('topBottom', () => {
 			{ t: 'b', v: 5 },
 			{ t: 'a', v: 5 },
 			{ t: 'c', v: 1 },
-			{ t: 'd', v: 1 }
+			{ t: 'd', v: 1 },
 		];
 		const { top, bottom } = topBottom(rows, val, title, 2);
 		expect(top.map((r) => r.title)).toEqual(['a', 'b']);
