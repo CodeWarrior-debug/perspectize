@@ -70,8 +70,8 @@ func TestSeedClaimsCreatesDemoClaimThroughClaimPath(t *testing.T) {
 	if got.ContentType != domain.ContentTypeClaim {
 		t.Errorf("ContentType = %q, want %q", got.ContentType, domain.ContentTypeClaim)
 	}
-	if got.Privacy != domain.PrivacyPrivate {
-		t.Errorf("Privacy = %q, want %q", got.Privacy, domain.PrivacyPrivate)
+	if got.Privacy != domain.PrivacyPublic {
+		t.Errorf("Privacy = %q, want %q", got.Privacy, domain.PrivacyPublic)
 	}
 	if got.AddedByUserID != 7 {
 		t.Errorf("AddedByUserID = %d, want 7 (alice)", got.AddedByUserID)

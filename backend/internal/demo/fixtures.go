@@ -184,8 +184,8 @@ type SeedClaim struct {
 	EvaluateBy    string // "" = unset
 }
 
-// Claims are private to their owner, like every claim, until the public gate
-// opens. The seeded one gives the claim UI a real row to show.
+// Claims are public unless their owner keeps them private; the seeded one takes
+// the default and gives the claim UI a real row to show.
 var Claims = []SeedClaim{
 	{Persona: "alice", Text: "The glove did not fit O.J. Simpson", EffectiveDate: "1995-10-03"},
 }
