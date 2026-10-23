@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import ColumnChart from '$lib/components/charts/ColumnChart.svelte';
-import { histogram, pieSlices, topBottom } from '$lib/utils/columnStats';
+import { histogram, topBottom } from '$lib/utils/columnStats';
 import { CHART_TYPES, CHART_TYPE_LABELS, type ChartType } from '$lib/utils/columnCharts';
 
 const values = [1, 2, 2, 3, 4, 5, 6, 8, 9, 10, 15, 40];
@@ -23,10 +23,12 @@ describe('ColumnChart', () => {
 		expect(screen.getByRole('img', { name: /line/i })).toBeInTheDocument();
 	});
 
-	it('pie renders one path per slice', () => {
-		const { container } = renderChart('pie');
-		const slices = pieSlices(histogram(values, 10), 6);
-		expect(container.querySelectorAll('svg path').length).toBe(slices.length);
+	it('pie caps at five slices plus an "Other" slice', () => {
+		const many = Array.from({ length: 60 }, (_, i) => i + 1);
+		const { container } = renderChart('pie', many);
+		const paths = [...container.querySelectorAll('svg path')];
+		expect(paths.length).toBeLessThanOrEqual(6);
+		expect(paths.at(-1)?.querySelector('title')?.textContent).toMatch(/^Other:/);
 		expect(screen.getByRole('img', { name: /pie/i })).toBeInTheDocument();
 	});
 
@@ -131,11 +133,14 @@ describe('ColumnChart', () => {
 		expect(screen.queryByText('no values yet')).toBeNull();
 	});
 
-	it.each([
-		['one value', [7]],
-		['identical values', [3, 3, 3, 3]],
-	])('replaces the histogram with summary and a note for %s', (_name, v) => {
-		const { container } = renderChart('histogram', v);
+	const VALUE_DEPENDENT_TYPES = ['histogram', 'line', 'pie', 'box', 'cumulative', 'density', 'strip'] as const;
+	it.each(
+		VALUE_DEPENDENT_TYPES.flatMap((type) => [
+			[type, 'one value', [7]] as const,
+			[type, 'identical values', [3, 3, 3, 3]] as const,
+		]),
+	)('%s is replaced by summary and a note for %s', (type, _name, v) => {
+		const { container } = renderChart(type, [...v]);
 		expect(screen.getByText('Median')).toBeInTheDocument();
 		expect(screen.getByText(/all values are the same|only one value/i)).toBeInTheDocument();
 		expect(container.querySelector('svg')).toBeNull();
