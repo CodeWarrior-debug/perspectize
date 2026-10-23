@@ -3,8 +3,7 @@
 -- created 'private' by ContentService.CreateClaim; a future public gate (TBD)
 -- promotes it. Stored lowercase like perspectives.privacy; see
 -- backend/internal/adapters/repositories/postgres/helpers.go.
--- Numbering note: authored as 000028; main took 000028/000029 and open branch
--- claude/bible-passage-hermeneutic-field-hebiut holds 000030, so this is 000031.
+-- Numbering: 000032 is the next free number after main's 000031_add_user_todos.
 -- Idempotent: safe on a fresh DB or one already patched out of band.
 
 ALTER TABLE public.content ADD COLUMN IF NOT EXISTS privacy text NOT NULL DEFAULT 'public';
