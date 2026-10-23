@@ -29,6 +29,14 @@ type UpdateClaimInput struct {
 	EvaluateBy    *string
 }
 
+// DeleteClaimInput holds the input for deleting a claim. ActorUserID must own it.
+// KeepAnonymous hands the claim to the [deleted] sentinel user instead of deleting it.
+type DeleteClaimInput struct {
+	ContentID     int
+	ActorUserID   int
+	KeepAnonymous bool
+}
+
 // CreatePassageInput holds the input for creating (or finding) a Bible passage
 // content entry. EndChapter/EndVerse equal StartChapter/StartVerse for a single verse.
 type CreatePassageInput struct {
@@ -82,6 +90,10 @@ type ContentService interface {
 	// UpdateClaim replaces an owned claim's text and dates. A claim the actor
 	// does not own is domain.ErrNotFound.
 	UpdateClaim(ctx context.Context, input UpdateClaimInput) (*domain.Content, error)
+	// DeleteClaim deletes an owned claim, or with KeepAnonymous hands it to the
+	// [deleted] sentinel user. A claim another user has a perspective or plan item on
+	// can't be deleted: domain.ErrClaimHasOthers (use KeepAnonymous instead).
+	DeleteClaim(ctx context.Context, input DeleteClaimInput) error
 
 	// UpdateSourceData refreshes an existing content item's metadata from its source.
 	// viewerID must be able to see the row (0 for anonymous); a row they can't see

@@ -418,6 +418,42 @@ func (r *mutationResolver) CreateClaim(ctx context.Context, input model.CreateCl
 	return domainToModel(content), nil
 }
 
+// DeleteClaim is the resolver for the deleteClaim field.
+func (r *mutationResolver) DeleteClaim(ctx context.Context, id string, keepAnonymous *bool) (bool, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return false, fmt.Errorf("access denied: authentication required")
+	}
+	intID, err := strconv.Atoi(id)
+	if err != nil {
+		return false, fmt.Errorf("invalid content ID: %s", id)
+	}
+
+	err = r.ContentService.DeleteClaim(ctx, portservices.DeleteClaimInput{
+		ContentID:     intID,
+		ActorUserID:   authUser.ID,
+		KeepAnonymous: keepAnonymous != nil && *keepAnonymous,
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrClaimHasOthers) {
+			return false, &gqlerror.Error{
+				Message:    "This claim has perspectives or plan items from other users. Keep it as anonymous instead.",
+				Extensions: map[string]any{"code": "CLAIM_HAS_OTHERS"},
+			}
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return false, fmt.Errorf("content not found")
+		}
+		slog.Error("deleting claim failed",
+			"error", err,
+			"userID", authUser.ID,
+			"contentID", intID,
+		)
+		return false, fmt.Errorf("failed to delete claim")
+	}
+	return true, nil
+}
+
 // UpdateClaim is the resolver for the updateClaim field.
 func (r *mutationResolver) UpdateClaim(ctx context.Context, id string, input model.UpdateClaimInput) (*model.Content, error) {
 	authUser, err := auth.RequireAuth(ctx)

@@ -236,6 +236,7 @@ type ComplexityRoot struct {
 		CreateUser                      func(childComplexity int, input model.CreateUserInput) int
 		CreateUserTodo                  func(childComplexity int, input model.CreateUserTodoInput) int
 		CreateUserTodoList              func(childComplexity int, input model.CreateUserTodoListInput) int
+		DeleteClaim                     func(childComplexity int, id string, keepAnonymous *bool) int
 		DeleteMessage                   func(childComplexity int, messageID string) int
 		DeletePerspective               func(childComplexity int, id string) int
 		DeleteUser                      func(childComplexity int, id string) int
@@ -518,6 +519,7 @@ type MutationResolver interface {
 	DeletePerspective(ctx context.Context, id string) (bool, error)
 	CreateClaim(ctx context.Context, input model.CreateClaimInput) (*model.Content, error)
 	UpdateClaim(ctx context.Context, id string, input model.UpdateClaimInput) (*model.Content, error)
+	DeleteClaim(ctx context.Context, id string, keepAnonymous *bool) (bool, error)
 	SetPrimaryCategory(ctx context.Context, input model.SetPrimaryCategoryInput) (*model.Content, error)
 	CreateUserTodo(ctx context.Context, input model.CreateUserTodoInput) (*model.UserTodo, error)
 	UpdateUserTodo(ctx context.Context, input model.UpdateUserTodoInput) (*model.UserTodo, error)
@@ -1443,6 +1445,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateUserTodoList(childComplexity, args["input"].(model.CreateUserTodoListInput)), true
+	case "Mutation.deleteClaim":
+		if e.ComplexityRoot.Mutation.DeleteClaim == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteClaim_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeleteClaim(childComplexity, args["id"].(string), args["keepAnonymous"].(*bool)), true
 	case "Mutation.deleteMessage":
 		if e.ComplexityRoot.Mutation.DeleteMessage == nil {
 			break
@@ -3355,6 +3368,10 @@ type Mutation {
   # Claim mutations
   createClaim(input: CreateClaimInput!): Content! @auth
   updateClaim(id: ID!, input: UpdateClaimInput!): Content! @auth
+  # Deletes an owned claim. If another user has a perspective or plan item on it, the
+  # delete is refused with code CLAIM_HAS_OTHERS; keepAnonymous: true hands the claim to
+  # the [deleted] sentinel user instead, so the others' perspectives keep their target.
+  deleteClaim(id: ID!, keepAnonymous: Boolean): Boolean! @auth
 
   # Category mutations
   setPrimaryCategory(input: SetPrimaryCategoryInput!): Content! @auth
@@ -4684,6 +4701,28 @@ func (ec *executionContext) field_Mutation_createUser_args(ctx context.Context, 
 		return nil, err
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_deleteClaim_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "keepAnonymous",
+		func(ctx context.Context, v any) (*bool, error) {
+			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["keepAnonymous"] = arg1
 	return args, nil
 }
 
@@ -9344,6 +9383,63 @@ func (ec *executionContext) fieldContext_Mutation_updateClaim(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateClaim_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteClaim(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_deleteClaim(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeleteClaim(ctx, fc.Args["id"].(string), fc.Args["keepAnonymous"].(*bool))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_deleteClaim(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteClaim_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -18989,6 +19085,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateClaim":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateClaim(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteClaim":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteClaim(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++

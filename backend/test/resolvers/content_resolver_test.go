@@ -90,6 +90,14 @@ func (m *mockContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 	return nil
 }
 
+func (m *mockContentRepository) DeleteOwnedClaim(ctx context.Context, id, ownerID int) error {
+	return nil
+}
+
+func (m *mockContentRepository) AnonymizeOwnedClaim(ctx context.Context, id, ownerID int) error {
+	return nil
+}
+
 func (m *mockContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
 	return nil, domain.ErrNotFound
 }

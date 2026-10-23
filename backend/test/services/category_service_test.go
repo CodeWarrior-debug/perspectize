@@ -104,6 +104,14 @@ func (m *mockContentRepoForCategory) ReassignByUser(ctx context.Context, fromUse
 	return nil
 }
 
+func (m *mockContentRepoForCategory) DeleteOwnedClaim(ctx context.Context, id, ownerID int) error {
+	return nil
+}
+
+func (m *mockContentRepoForCategory) AnonymizeOwnedClaim(ctx context.Context, id, ownerID int) error {
+	return nil
+}
+
 func (m *mockContentRepoForCategory) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
 	return nil, domain.ErrNotFound
 }

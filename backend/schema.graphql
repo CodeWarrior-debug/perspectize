@@ -567,6 +567,10 @@ type Mutation {
   # Claim mutations
   createClaim(input: CreateClaimInput!): Content! @auth
   updateClaim(id: ID!, input: UpdateClaimInput!): Content! @auth
+  # Deletes an owned claim. If another user has a perspective or plan item on it, the
+  # delete is refused with code CLAIM_HAS_OTHERS; keepAnonymous: true hands the claim to
+  # the [deleted] sentinel user instead, so the others' perspectives keep their target.
+  deleteClaim(id: ID!, keepAnonymous: Boolean): Boolean! @auth
 
   # Category mutations
   setPrimaryCategory(input: SetPrimaryCategoryInput!): Content! @auth

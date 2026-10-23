@@ -318,6 +318,22 @@ func (s *ContentService) UpdateClaim(ctx context.Context, input portservices.Upd
 	return updated, nil
 }
 
+// DeleteClaim deletes an owned claim, or with KeepAnonymous hands it to the
+// [deleted] sentinel user. A claim that another user has a perspective or plan
+// item on can only be kept anonymous: the plain delete returns ErrClaimHasOthers.
+func (s *ContentService) DeleteClaim(ctx context.Context, input portservices.DeleteClaimInput) error {
+	if input.ContentID <= 0 {
+		return fmt.Errorf("%w: content id must be a positive integer", domain.ErrInvalidInput)
+	}
+	if input.ActorUserID <= 0 {
+		return fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
+	}
+	if input.KeepAnonymous {
+		return s.repo.AnonymizeOwnedClaim(ctx, input.ContentID, input.ActorUserID)
+	}
+	return s.repo.DeleteOwnedClaim(ctx, input.ContentID, input.ActorUserID)
+}
+
 // storedEffectiveDate returns the effective date a claim already holds, so an
 // edit that leaves the date empty keeps it. A claim with no stored date returns
 // nil, and claimDates then falls back to today. A missing claim is ErrNotFound.

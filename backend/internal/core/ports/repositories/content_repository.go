@@ -34,6 +34,15 @@ type ContentRepository interface {
 	// fields in one owner-scoped UPDATE (keeping response.parentContentId). A
 	// missing row, or a row the owner does not hold, is domain.ErrNotFound.
 	UpdateClaim(ctx context.Context, id, ownerID int, text string, html string, customFields json.RawMessage) (*domain.Content, error)
+	// DeleteOwnedClaim deletes an owned claim, with the owner's own perspectives
+	// and plan items on it, in one transaction. If another user has a perspective
+	// or plan item on it, nothing is deleted and the error is domain.ErrClaimHasOthers.
+	// A row the owner does not hold is domain.ErrNotFound.
+	DeleteOwnedClaim(ctx context.Context, id, ownerID int) error
+	// AnonymizeOwnedClaim hands an owned claim to the [deleted] sentinel user, so
+	// other users' perspectives on it keep their target. A row the owner does not
+	// hold is domain.ErrNotFound.
+	AnonymizeOwnedClaim(ctx context.Context, id, ownerID int) error
 	// SetDisplayTitleIfEmpty sets a passage's optional display_title only if none exists
 	// (first-write-wins). Returns the title that is now stored: the caller's if it won,
 	// the existing one if it lost the race. Losing is not an error.

@@ -527,6 +527,68 @@ func (r *GormContentRepository) UpdateClaim(ctx context.Context, id, ownerID int
 	return contentModelToDomain(&updated), nil
 }
 
+// DeleteOwnedClaim deletes an owned claim together with the owner's own
+// perspectives and plan items on it. Another user's perspective or plan item on
+// the claim blocks the delete: nothing is removed and domain.ErrClaimHasOthers is
+// returned. Runs in one transaction so the checks and the delete can't disagree.
+func (r *GormContentRepository) DeleteOwnedClaim(ctx context.Context, id, ownerID int) error {
+	claimType := contentTypeToDBValue(domain.ContentTypeClaim)
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var owned int64
+		if err := tx.Model(&ContentModel{}).
+			Where("id = ? AND added_by_user_id = ? AND content_type = ?", id, ownerID, claimType).
+			Count(&owned).Error; err != nil {
+			return fmt.Errorf("failed to find claim: %w", err)
+		}
+		if owned == 0 {
+			return domain.ErrNotFound
+		}
+
+		var otherPerspectives, otherTodos int64
+		if err := tx.Table("perspectives").
+			Where("content_id = ? AND user_id <> ?", id, ownerID).
+			Count(&otherPerspectives).Error; err != nil {
+			return fmt.Errorf("failed to check claim perspectives: %w", err)
+		}
+		if err := tx.Table("user_todos").
+			Where("content_id = ? AND user_id <> ?", id, ownerID).
+			Count(&otherTodos).Error; err != nil {
+			return fmt.Errorf("failed to check claim plan items: %w", err)
+		}
+		if otherPerspectives > 0 || otherTodos > 0 {
+			return domain.ErrClaimHasOthers
+		}
+
+		if err := tx.Exec("DELETE FROM perspectives WHERE content_id = ? AND user_id = ?", id, ownerID).Error; err != nil {
+			return fmt.Errorf("failed to delete claim perspectives: %w", err)
+		}
+		if err := tx.Exec("DELETE FROM user_todos WHERE content_id = ? AND user_id = ?", id, ownerID).Error; err != nil {
+			return fmt.Errorf("failed to delete claim plan items: %w", err)
+		}
+		if err := tx.Exec("DELETE FROM content WHERE id = ? AND added_by_user_id = ? AND content_type = ?",
+			id, ownerID, claimType).Error; err != nil {
+			return fmt.Errorf("failed to delete claim: %w", err)
+		}
+		return nil
+	})
+}
+
+// AnonymizeOwnedClaim hands an owned claim to the [deleted] sentinel user. The row
+// stays, so other users' perspectives and plan items on it keep their target.
+func (r *GormContentRepository) AnonymizeOwnedClaim(ctx context.Context, id, ownerID int) error {
+	result := r.db.WithContext(ctx).Exec(
+		`UPDATE content SET added_by_user_id = (SELECT id FROM users WHERE username = ?), updated_at = NOW()
+		 WHERE id = ? AND added_by_user_id = ? AND content_type = ?`,
+		domain.DeletedUserUsername, id, ownerID, contentTypeToDBValue(domain.ContentTypeClaim))
+	if result.Error != nil {
+		return fmt.Errorf("failed to anonymize claim: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
 // SetDisplayTitleIfEmpty implements first-write-wins for a passage's optional
 // title: the write only takes effect if no title exists yet. A losing writer is
 // told the title that won rather than given an error — their intent (this

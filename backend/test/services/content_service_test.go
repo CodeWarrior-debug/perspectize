@@ -24,6 +24,8 @@ type mockContentRepository struct {
 	updateMetadataFn   func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error)
 	listFn             func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)
 	updateClaimFn      func(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error)
+	deleteClaimFn      func(ctx context.Context, id, ownerID int) error
+	anonymizeClaimFn   func(ctx context.Context, id, ownerID int) error
 }
 
 func (m *mockContentRepository) Create(ctx context.Context, content *domain.Content) (*domain.Content, error) {
@@ -84,6 +86,20 @@ func (m *mockContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 
 func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
 	return &domain.Content{ID: contentID, PrimaryCategoryID: categoryID}, nil
+}
+
+func (m *mockContentRepository) DeleteOwnedClaim(ctx context.Context, id, ownerID int) error {
+	if m.deleteClaimFn != nil {
+		return m.deleteClaimFn(ctx, id, ownerID)
+	}
+	return nil
+}
+
+func (m *mockContentRepository) AnonymizeOwnedClaim(ctx context.Context, id, ownerID int) error {
+	if m.anonymizeClaimFn != nil {
+		return m.anonymizeClaimFn(ctx, id, ownerID)
+	}
+	return nil
 }
 
 func (m *mockContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
