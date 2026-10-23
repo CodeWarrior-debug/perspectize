@@ -14,19 +14,32 @@ profile. The agent registry hands them out one session at a time. **Never start 
 or drive the browser for verification without holding a slot.**
 
 `R=.claude/agent-registry/agent-registry.mjs`. Run everything from **your** checkout (a
-worktree is fine). If a command says the registry isn't initialised, the human hasn't run
-`node $R install` on this machine yet: ask them to, and don't verify until they have.
+worktree is fine). Each Bash call is a fresh shell, so a variable set in one call is gone in the
+next: write the path out in full. If a command says the registry isn't initialised, the human
+hasn't run `node $R install` on this machine yet: ask them to, and don't verify until they have.
+
+**Subagents share their parent's session, so they share its slot.** They cannot queue behind it or
+be refused by it. Take the slot once, in the main session, and check the browser is signed in
+(step 3) before you hand work to anyone.
 
 ## 1. Take the slot
+
+Look first, read-only: `node $R status` shows who holds each slot. Then take it:
 
 ```sh
 node $R verify-acquire
 ```
 
 - **Exit 0 `ACQUIRED`** prints `slot`, `backendPort`, `frontendPort`, `chromeDebugPort`. Use exactly those ports.
-- **Exit 2 `BUSY`** prints who holds it. Do **not** poll in your own turns. Start the waiter
+- **Exit 2 `BUSY`** prints who holds it. If the holder is a live agent working on the same
+  issue, tell the human instead of waiting. Do **not** poll in your own turns. Start the waiter
   in the background (Bash tool, `run_in_background: true`), then end your turn or do other
-  work. You are woken when it exits, already holding the slot:
+  work. You are woken when it exits, already holding the slot.
+
+  **One-shot sessions (`claude -p`) must not start the background waiter.** The session ends when
+  its turn does, so the waiter can acquire the slot after nobody is left to release it and block
+  the next agent. Report BUSY and the holder, then stop. Only wait in the foreground, with a
+  timeout, if the task needs the slot and you will stay until you have released it.
 
   ```sh
   node $R verify-wait
@@ -63,7 +76,15 @@ Attach to the shared Chrome on `:9222` and follow [.docs/VERIFICATION.md](../../
 - Scripted checks: `node .claude/scripts/sv-cdp-verify.cjs [scenario]` with `BASE_URL=http://localhost:<frontendPort>`.
 - Clips: the video-capture recorder.
 - Evidence goes to `~/Downloads/screenshots/` with the `sv-` prefix (video by default; screenshots only for pure layout changes).
-- Signed out? Stop and ask the human to sign in again. Never enter credentials.
+- **Check you are signed in before anything else**, with a tab you opened yourself:
+  load `http://localhost:<frontendPort>/plan` and wait for `.ag-row` (up to ~20 s). "Sign In" text
+  alone proves nothing while the app is still loading, but the landing page with no grid after the wait
+  means the Clerk session has lapsed.
+- Signed out? Stop and ask the human to sign in again. Never enter credentials. You hold the
+  slot while you wait, so release it first if the answer may take a while.
+- Open your own tab (`PUT http://localhost:9222/json/new?<url>`) and close only that tab. The Chrome
+  on :9222 also holds other sessions' tabs: never touch those. Don't use the chrome-devtools MCP while
+  other agents may be verifying: its selected page is shared state.
 
 ## 4. Release, always (also when you give up or fail)
 
@@ -71,8 +92,10 @@ Attach to the shared Chrome on `:9222` and follow [.docs/VERIFICATION.md](../../
 node $R verify-release
 ```
 
-This stops the two servers from step 2 and frees the slot for the next waiter. If you forget,
-the slot is freed when your session ends or its process dies, but the next agent waits until then.
+This stops the two servers from step 2 and frees the slot for the next waiter. It acts only on the
+slot your own session holds, and prints `released: false` and does nothing if you hold none, so it is
+always safe to run. If you forget, the slot is freed when your session ends or its process dies, but
+the next agent waits until then.
 
 ## Rules
 
