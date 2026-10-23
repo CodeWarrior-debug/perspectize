@@ -1,8 +1,9 @@
 name: Neon preview branch
 
-# One Neon database branch per open PR (docs: .docs/NEON_BRANCHING.md).
-# Created from the `production` branch, the PR's migrations are applied to it,
-# and it is deleted when the PR closes. Nothing here touches `production`.
+# One Neon database branch per open PR that changes backend/migrations
+# (docs: .docs/NEON_BRANCHING.md). Created from the `production` branch, the
+# PR's migrations are applied to it, and it is deleted when the PR closes.
+# PRs without a migration create no branch. Nothing here touches `production`.
 
 on:
   pull_request:
@@ -17,10 +18,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    name: Check for migration changes
+    runs-on: ubuntu-latest
+    outputs:
+      has_migrations: ${{ steps.diff.outputs.has_migrations }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Did this PR change backend/migrations?
+        id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$(git diff --name-only "$BASE" "$HEAD" -- backend/migrations)" ]; then
+            echo "has_migrations=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_migrations=false" >> "$GITHUB_OUTPUT"
+          fi
+
   create:
     name: Create branch and apply migrations
+    needs: changes
     # Same-repo PRs only: fork PRs get no secrets, so they would fail here.
-    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    if: |
+      github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.changes.outputs.has_migrations == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -61,10 +89,29 @@ jobs:
 
   delete:
     name: Delete branch
+    # A PR that once had a migration may have a branch even if its last push
+    # didn't, so check the branch exists rather than trusting the diff.
     if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
+      - name: Does pr-<number> exist?
+        id: exists
+        env:
+          API_KEY: ${{ secrets.NEON_API_KEY }}
+          PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          BRANCH: pr-${{ github.event.pull_request.number }}
+        run: |
+          names=$(curl -fsS -H "Authorization: Bearer $API_KEY" \
+            "https://console.neon.tech/api/v2/projects/$PROJECT_ID/branches" \
+            | jq -r '.branches[].name')
+          if grep -qxF "$BRANCH" <<< "$names"; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Delete Neon branch pr-<number>
+        if: steps.exists.outputs.found == 'true'
         uses: neondatabase/delete-branch-action@v3
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}

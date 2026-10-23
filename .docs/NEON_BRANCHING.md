@@ -1,6 +1,8 @@
 # Neon preview branches (per PR)
 
-Each open PR from this repo gets its own Neon database branch, `pr-<number>`, copied from `production`. The PR's migrations are applied to that branch, and the branch is deleted when the PR closes. This lets a PR's migrations run against production-shaped data before anything reaches `production`.
+A PR that changes `backend/migrations` gets its own Neon database branch, `pr-<number>`, copied from `production`. The PR's migrations are applied to that branch, and the branch is deleted when the PR closes. This lets a migration run against production-shaped data before anything reaches `production`.
+
+PRs that don't touch `backend/migrations` create no branch. Neon's branch limit is small, so branches are kept for migrations only.
 
 The workflow is `.github/workflows/neon-preview-branch.yml`. It uses Neon's own actions: `neondatabase/create-branch-action@v6` and `neondatabase/delete-branch-action@v3`.
 
@@ -10,10 +12,10 @@ The workflow is `.github/workflows/neon-preview-branch.yml`. It uses Neon's own 
 
 | PR event | Job | Result |
 |---|---|---|
-| `opened`, `reopened`, `synchronize` | `create` | Creates `pr-<n>` from `production` (or reuses it if it exists). Logs the schema version before and after `migrate up`. |
-| `closed` (merged or not) | `delete` | Deletes `pr-<n>`. |
+| `opened`, `reopened`, `synchronize` | `changes`, then `create` | `changes` diffs the PR against its base for `backend/migrations`. Only if it found a change does `create` make `pr-<n>` from `production` and log the schema version before and after `migrate up`. |
+| `closed` (merged or not) | `delete` | Deletes `pr-<n>` if it exists. A PR with no migration has no branch, so nothing is deleted. |
 
-Forks are skipped: `pull_request` events from a fork get no repository secrets, so both jobs are guarded to same-repo PRs.
+Forks are skipped: `pull_request` events from a fork get no repository secrets, so the create and delete jobs are guarded to same-repo PRs.
 
 The connection string is masked in the logs. Read the version lines in the job log to see what was applied.
 
@@ -42,7 +44,7 @@ Either way, the Neon role `neondb_owner` and database `neondb` must exist on the
 
 ## Checking it works
 
-1. Open or push to a same-repo PR. The **Neon preview branch** workflow runs in the Checks tab.
+1. Open or push to a same-repo PR that changes `backend/migrations`. The **Neon preview branch** workflow runs in the Checks tab. A PR without a migration still runs the workflow, but the `changes` job skips `create`.
 2. In the Neon console (or `neon branches list`), `pr-<n>` appears with state `ready`.
 3. Close the PR. The `delete` job removes the branch.
 
