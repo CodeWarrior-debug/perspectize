@@ -61,6 +61,7 @@ export default defineConfig({
 			'svelte-clerk': new URL('./tests/browser/mocks/svelte-clerk.ts', import.meta.url).pathname,
 			'$app/environment': new URL('./tests/browser/mocks/app-environment.ts', import.meta.url).pathname,
 			'$app/navigation': new URL('./tests/browser/mocks/app-navigation.ts', import.meta.url).pathname,
+			'$app/state': new URL('./tests/browser/mocks/app-state.ts', import.meta.url).pathname,
 			'$app/stores': new URL('./tests/browser/mocks/app-stores.ts', import.meta.url).pathname,
 		},
 	},

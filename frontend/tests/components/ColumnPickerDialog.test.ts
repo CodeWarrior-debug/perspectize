@@ -79,4 +79,33 @@ describe('ColumnPickerDialog', () => {
 		screen.getByRole('button', { name: /reset to default columns/i }).click();
 		expect(onReset).toHaveBeenCalledOnce();
 	});
+
+	describe('chart switch', () => {
+		it("offers a switch only for the chart columns, reflecting each one's state", () => {
+			render(ColumnPickerDialog, {
+				props: { open: true, onToggle: noop, chartColumns: ['views', 'likes'], chartFlags: { views: true } },
+			});
+			expect(screen.getByRole('switch', { name: 'Views chart' }).getAttribute('aria-checked')).toBe('true');
+			expect(screen.getByRole('switch', { name: 'Likes chart' }).getAttribute('aria-checked')).toBe('false');
+			expect(screen.queryByRole('switch', { name: 'Tags chart' })).toBeNull();
+		});
+
+		it('shows no switches when no column offers a chart', () => {
+			render(ColumnPickerDialog, { props: { open: true, onToggle: noop } });
+			expect(screen.queryAllByRole('switch')).toHaveLength(0);
+		});
+
+		it('calls onChartChange with the flipped state, and leaves visibility alone', () => {
+			const onChartChange = vi.fn();
+			const onToggle = vi.fn();
+			render(ColumnPickerDialog, {
+				props: { open: true, onToggle, chartColumns: ['views', 'likes'], chartFlags: { views: true }, onChartChange },
+			});
+			screen.getByRole('switch', { name: 'Views chart' }).click();
+			screen.getByRole('switch', { name: 'Likes chart' }).click();
+			expect(onChartChange).toHaveBeenNthCalledWith(1, 'views', false);
+			expect(onChartChange).toHaveBeenNthCalledWith(2, 'likes', true);
+			expect(onToggle).not.toHaveBeenCalled();
+		});
+	});
 });

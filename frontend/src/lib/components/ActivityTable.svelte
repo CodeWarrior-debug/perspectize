@@ -107,6 +107,11 @@
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import { useUsernames } from '$lib/queries/users/useUsernames.svelte';
 	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
+	import ColumnChartPopover from '$lib/components/charts/ColumnChartPopover.svelte';
+	import { ChartHeaderRenderer } from '$lib/components/charts/ChartHeaderRenderer';
+	import { CHART_ELIGIBLE_COLS, isChartEligible } from '$lib/utils/columnCharts';
+	import { isChartOn, loadChartFlags, setChartFlag } from '$lib/utils/columnChartSettings';
+	import { topBottom, type TopBottom } from '$lib/utils/columnStats';
 	import {
 		COLUMN_VIEW_LABEL,
 		clearLayout,
@@ -245,6 +250,85 @@
 		layoutVersion++;
 	}
 
+	// ---------------------------------------------------------------------------
+	// Column charts (numeric columns in the Movie view, "Loaded" mode, desktop grid)
+	// ---------------------------------------------------------------------------
+
+	/** The header chart icon shows only when every one of these holds. */
+	function chartIconVisible(colId: string): boolean {
+		return (
+			mode === 'loaded' &&
+			!cardMode &&
+			isChartEligible(colId, filters.type) &&
+			gridApi?.getColumn(colId)?.isVisible() === true &&
+			isChartOn(colId)
+		);
+	}
+
+	/**
+	 * The numbers the grid currently shows for a column: post-filter, post-sort,
+	 * read through the column's own valueGetter. `total` counts every shown row,
+	 * including those with no value. Null when the grid isn't available.
+	 */
+	function chartRows(colId: string): { values: number[]; total: number; ranked: TopBottom } | null {
+		const api = gridApi;
+		if (!api || api.isDestroyed()) return null;
+		const column = api.getColumn(colId);
+		const colDef = column?.getColDef();
+		if (!column || !colDef) return null;
+		const rows: { name: string; value: number | null }[] = [];
+		api.forEachNodeAfterFilterAndSort((node) => {
+			if (!node.data) return;
+			let v: unknown = api.getCellValue({ rowNode: node, colKey: column });
+			// Duration displays as text; its numeric (seconds) form is the filter value.
+			if (typeof v !== 'number' && typeof colDef.filterValueGetter === 'function') {
+				v = (colDef.filterValueGetter as (p: unknown) => unknown)({ data: node.data, node, colDef, column, api });
+			}
+			rows.push({ name: node.data.name, value: typeof v === 'number' && Number.isFinite(v) ? v : null });
+		});
+		const values = rows.flatMap((r) => (r.value === null ? [] : [r.value]));
+		return {
+			values,
+			total: rows.length,
+			ranked: topBottom(
+				rows,
+				(r) => r.value,
+				(r) => r.name,
+				10,
+			),
+		};
+	}
+
+	function chartFormat(colId: string): (n: number) => string {
+		if (colId === 'duration') return (n) => formatDurationSeconds(Math.round(n));
+		const fmt = gridApi?.getColumn(colId)?.getColDef().valueFormatter;
+		if (typeof fmt === 'function') return (n) => String((fmt as (p: unknown) => unknown)({ value: n }));
+		return (n) => String(Math.round(n * 100) / 100);
+	}
+
+	let chartTarget = $state<{ colId: string; label: string; anchor: HTMLElement } | null>(null);
+	let chartTick = $state(0); // bumps when the grid's rows change (filter, sort, new data)
+	const chartData = $derived.by(() => {
+		void chartTick;
+		return chartTarget ? chartRows(chartTarget.colId) : null;
+	});
+
+	function openChart(anchor: HTMLElement, colId: string) {
+		const label = gridApi?.getColumn(colId)?.getColDef().headerName ?? colId;
+		chartTarget = { colId, label, anchor };
+	}
+
+	function handleChartChange(colId: string, on: boolean) {
+		setChartFlag(colId, on);
+		layoutVersion++;
+	}
+
+	// Columns the picker offers a chart switch for are derived below (pickerChartColumns), once `mode` exists.
+	const pickerChartFlags = $derived.by(() => {
+		void layoutVersion;
+		return loadChartFlags();
+	});
+
 	function handleColumnsReset() {
 		clearLayout(columnView);
 		layoutVersion++;
@@ -297,6 +381,10 @@
 
 	// Individual derived fields from URL
 	const mode = $derived(gridParams.mode);
+	// Columns the picker offers a chart switch for (see handleChartChange).
+	const pickerChartColumns = $derived(
+		mode === 'loaded' && !cardMode ? [...CHART_ELIGIBLE_COLS].filter((c) => isChartEligible(c, filters.type)) : [],
+	);
 	// Multi-column sort. The GraphQL `sorts` list carries every sorted column in
 	// priority order; `sortBy`/`sortOrder` (the first entry, or the legacy default)
 	// stay populated too since the server still requires them as its single-sort
@@ -1051,6 +1139,17 @@
 	).map((col) => ({
 		...col,
 		minWidth: col.minWidth ?? headerMinWidth(col.headerName ?? '', col.filter !== false),
+		// Numeric columns that can chart get the header with the chart icon (no extra width reserved:
+		// the title truncates instead, so the lg column sets still fit the grid).
+		...(col.colId && CHART_ELIGIBLE_COLS.has(col.colId)
+			? {
+					headerComponent: ChartHeaderRenderer,
+					headerComponentParams: {
+						chartIconVisible: () => chartIconVisible(col.colId as string),
+						onChartClick: openChart,
+					},
+				}
+			: {}),
 	}));
 
 	// ---------------------------------------------------------------------------
@@ -1362,6 +1461,38 @@
 		observer.observe(gridContainer);
 		return () => observer.disconnect();
 	});
+	// Re-draw the headers when something the chart icon depends on changes (the picker
+	// switch, mode, card mode, type filter); the header component re-reads chartIconVisible.
+	$effect(() => {
+		if (!gridApi || !gridReady) return;
+		const api = gridApi;
+		void layoutVersion;
+		void mode;
+		void cardMode;
+		void filters.type;
+		requestAnimationFrame(() => {
+			if (api.isDestroyed()) return; // Grid may have been destroyed before rAF fires
+			api.refreshHeader();
+		});
+	});
+
+	// An open chart closes when its icon no longer applies; it re-reads when the shown rows change.
+	$effect(() => {
+		void layoutVersion;
+		void mode;
+		void cardMode;
+		void filters.type;
+		if (chartTarget && !chartIconVisible(chartTarget.colId)) chartTarget = null;
+	});
+	$effect(() => {
+		const api = gridApi;
+		if (!api || !gridReady) return;
+		const bump = () => chartTick++;
+		api.addEventListener('modelUpdated', bump);
+		return () => {
+			if (!api.isDestroyed()) api.removeEventListener('modelUpdated', bump);
+		};
+	});
 </script>
 
 <div class="flex flex-col h-full gap-0">
@@ -1558,6 +1689,24 @@
 		{customLayout}
 		onToggle={handleColumnToggle}
 		onReset={handleColumnsReset}
+		chartColumns={pickerChartColumns}
+		chartFlags={pickerChartFlags}
+		onChartChange={handleChartChange}
+	/>
+{/if}
+
+<!-- Column chart popover — anchored to the clicked header cell -->
+{#if chartTarget && chartData}
+	<ColumnChartPopover
+		colId={chartTarget.colId}
+		label={chartTarget.label}
+		values={chartData.values}
+		total={chartData.total}
+		ranked={chartData.ranked}
+		format={chartFormat(chartTarget.colId)}
+		open={true}
+		onClose={() => (chartTarget = null)}
+		anchor={chartTarget.anchor}
 	/>
 {/if}
 
