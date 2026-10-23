@@ -13,7 +13,7 @@
 	const meCtx = useMe();
 	const claims = useMyClaims(() => auth.userId !== null);
 
-	// Claims are private, so the server only returns the viewer's own. Filter to `me` anyway.
+	// The list holds public claims and the viewer's own, so filter to `me`.
 	const myClaims = $derived.by(() => {
 		const me = meCtx.me;
 		if (!me || !claims.data) return [];
@@ -32,7 +32,7 @@
 	{:else if auth.userId === null}
 		<div class="flex flex-col items-center gap-4 py-16 text-center">
 			<h1 class="text-2xl font-semibold tracking-tight">Declare</h1>
-			<p class="text-muted-foreground max-w-md">Claims are private. Sign in to see yours.</p>
+			<p class="text-muted-foreground max-w-md">Sign in to see your claims.</p>
 			<SignInTrigger>
 				<Button type="button">Sign in</Button>
 			</SignInTrigger>
@@ -66,7 +66,7 @@
 											{#if row.customFields?.evaluateBy}
 												<span>Evaluate by {row.customFields.evaluateBy}</span>
 											{/if}
-											<span>Private</span>
+											<span>{row.privacy === 'PRIVATE' ? 'Private' : 'Public'}</span>
 										</p>
 									</div>
 									<div class="flex shrink-0 gap-2">

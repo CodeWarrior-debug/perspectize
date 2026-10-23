@@ -90,7 +90,7 @@ describe('ClaimForm', () => {
 
 			expect(mocks.createMutate).toHaveBeenCalledTimes(1);
 			expect(mocks.createMutate).toHaveBeenCalledWith(
-				{ text: 'Water is wet', userID: 0, effectiveDate: '2026-10-23', evaluateBy: undefined },
+				{ text: 'Water is wet', userID: 0, effectiveDate: '2026-10-23', evaluateBy: undefined, privacy: 'PUBLIC' },
 				expect.objectContaining({ onSuccess: expect.any(Function) }),
 			);
 			expect(mocks.updateMutate).not.toHaveBeenCalled();
@@ -129,6 +129,35 @@ describe('ClaimForm', () => {
 		});
 	});
 
+	describe('privacy', () => {
+		it('create: a new claim is public unless the switch is turned on', async () => {
+			render(ClaimForm);
+			expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+			await fireEvent.input(textArea(), { target: { value: 'Water is wet' } });
+			await fireEvent.click(screen.getByRole('switch'));
+			await fireEvent.click(submitButton('Declare'));
+			expect(mocks.createMutate).toHaveBeenCalledWith(
+				expect.objectContaining({ privacy: 'PRIVATE' }),
+				expect.anything(),
+			);
+		});
+
+		it('edit: a private claim shows the switch on, and turning it off alone saves as public', async () => {
+			render(ClaimForm, { props: { claim: CLAIM } });
+			expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+			expect(submitButton('Save')).toBeDisabled();
+
+			await fireEvent.click(screen.getByRole('switch'));
+			expect(submitButton('Save')).toBeEnabled();
+			await fireEvent.click(submitButton('Save'));
+
+			expect(mocks.updateMutate).toHaveBeenCalledWith(
+				expect.objectContaining({ input: expect.objectContaining({ privacy: 'PUBLIC' }) }),
+				expect.anything(),
+			);
+		});
+	});
+
 	describe('edit mode', () => {
 		it('pre-fills the text and both dates from the claim and labels submit "Save"', () => {
 			render(ClaimForm, { props: { claim: CLAIM } });
@@ -162,7 +191,12 @@ describe('ClaimForm', () => {
 			expect(mocks.updateMutate).toHaveBeenCalledWith(
 				{
 					id: '42',
-					input: { text: 'New claim text', effectiveDate: '2026-01-05', evaluateBy: '2027-01-05' },
+					input: {
+						text: 'New claim text',
+						effectiveDate: '2026-01-05',
+						evaluateBy: '2027-01-05',
+						privacy: 'PRIVATE',
+					},
 				},
 				expect.objectContaining({ onSuccess: expect.any(Function) }),
 			);
@@ -194,7 +228,10 @@ describe('ClaimForm', () => {
 			await fireEvent.input(textArea(), { target: { value: 'Legacy claim, reworded' } });
 			await fireEvent.click(submitButton('Save'));
 			expect(mocks.updateMutate).toHaveBeenCalledWith(
-				{ id: '189', input: { text: 'Legacy claim, reworded', effectiveDate: undefined, evaluateBy: null } },
+				{
+					id: '189',
+					input: { text: 'Legacy claim, reworded', effectiveDate: undefined, evaluateBy: null, privacy: 'PRIVATE' },
+				},
 				expect.anything(),
 			);
 		});

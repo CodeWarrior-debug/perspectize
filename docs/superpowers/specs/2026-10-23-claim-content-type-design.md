@@ -364,3 +364,13 @@ Owner pointers after review are added here, dated, each naming the section it ch
 1. **Date storage, now that editing exists:** the form can update claims, so `response` (JSON, set at create) is no longer enough on its own. Choose dedicated columns, or `response` with a defined update path.
 2. **Declare route and name:** confirm the URL and page name.
 3. **Existing claim rows:** the one row on `pr-612` (id 189) and any rows on production, and whether they appear on Declare or stay as Activity-only.
+
+**2026-10-23, owner decision: claims are public by default, and private is a choice.** Supersedes the private-by-default rule in the Summary (point 2), section 4 (visibility, the owner-only rule for new claims), the "private for now" wording in section 2, and section 5 (the public gate).
+
+- **No gate and no one-way publish.** `publishClaim` and the two-stage duplicate check are not built and are not planned for v1. Nothing waits on the relationships table.
+- **Create takes an optional `privacy`.** `CreateClaimInput.privacy` is `PUBLIC` or `PRIVATE`; omitted means `PUBLIC`. Any other value is `ErrInvalidInput`.
+- **Edit takes an optional `privacy`.** `UpdateClaimInput.privacy` is nil to keep the stored value; an explicit value replaces it. The owner can switch either way, at any time.
+- **Declare shows the choice.** The form has a Private switch (off by default). The list shows Public or Private per row, and the copy no longer says claims are private.
+- **Visibility is the normal content rule.** A public claim is readable by everyone and can take perspectives and plan items from other users. A private claim is owner-only, and "not visible" still answers as "does not exist".
+- **Delete (see the delete commit).** The owner can delete a claim only while no other user has a perspective or plan item on it. Otherwise "keep as anonymous" reassigns it to `[deleted]` and keeps its privacy as it is.
+- **Existing rows keep their stored privacy.** Claims created before this change are `private` in the database. Owners can change them from Declare; nothing is rewritten in bulk.

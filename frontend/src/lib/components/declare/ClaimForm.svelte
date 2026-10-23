@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Button, Input, Label } from '$lib/components/shadcn';
+	import { Button, Input, Label, Switch } from '$lib/components/shadcn';
 	import { useCreateClaim } from '$lib/queries/content/useCreateClaim';
 	import { useUpdateClaim } from '$lib/queries/content/useUpdateClaim';
-	import type { ClaimRow } from '$lib/queries/content/claims';
+	import type { ClaimPrivacy, ClaimRow } from '$lib/queries/content/claims';
 
 	// Mirrors the server rules (backend claim validation): trimmed and whitespace-collapsed text,
 	// at least two words, at most 300 characters, and evaluate-by not before effective.
@@ -47,6 +47,9 @@
 	let effectiveDate = $state(claim ? (claim.customFields?.effectiveDate ?? '') : localToday());
 	// svelte-ignore state_referenced_locally
 	let evaluateBy = $state(claim?.customFields?.evaluateBy ?? '');
+	// Claims are public unless the owner keeps them private.
+	// svelte-ignore state_referenced_locally
+	let isPrivate = $state(claim?.privacy === 'PRIVATE');
 
 	const createClaim = useCreateClaim();
 	const updateClaim = useUpdateClaim();
@@ -62,7 +65,8 @@
 		!claim ||
 			normalisedText !== normalise(claim.name) ||
 			effectiveDate !== (claim.customFields?.effectiveDate ?? '') ||
-			evaluateBy !== (claim.customFields?.evaluateBy ?? ''),
+			evaluateBy !== (claim.customFields?.evaluateBy ?? '') ||
+			isPrivate !== (claim.privacy === 'PRIVATE'),
 	);
 
 	const canSubmit = $derived(!tooShort && !tooLong && !dateOrderInvalid && changed && !isPending);
@@ -71,6 +75,11 @@
 		text = '';
 		effectiveDate = localToday();
 		evaluateBy = '';
+		isPrivate = false;
+	}
+
+	function privacy(): ClaimPrivacy {
+		return isPrivate ? 'PRIVATE' : 'PUBLIC';
 	}
 
 	function handleSubmit(event: SubmitEvent) {
@@ -86,6 +95,7 @@
 						text: normalisedText,
 						effectiveDate: effectiveDate || undefined,
 						evaluateBy: evaluateBy || null,
+						privacy: privacy(),
 					},
 				},
 				{ onSuccess: () => onDone?.() },
@@ -97,6 +107,7 @@
 					userID: 0,
 					effectiveDate: effectiveDate || undefined,
 					evaluateBy: evaluateBy || undefined,
+					privacy: privacy(),
 				},
 				{
 					onSuccess: () => {
@@ -154,6 +165,16 @@
 	{#if dateOrderInvalid}
 		<p id="{uid}-date-error" class="text-destructive text-sm">Evaluate-by date cannot be before the effective date.</p>
 	{/if}
+
+	<div class="flex items-center justify-between gap-4">
+		<div class="space-y-0.5">
+			<Label for="{uid}-private">Private</Label>
+			<p class="text-muted-foreground text-sm">
+				{isPrivate ? 'Only you can see this claim.' : 'Anyone can see this claim.'}
+			</p>
+		</div>
+		<Switch id="{uid}-private" bind:checked={isPrivate} disabled={isPending} />
+	</div>
 
 	<div class="flex items-center justify-end gap-2">
 		{#if isEdit}

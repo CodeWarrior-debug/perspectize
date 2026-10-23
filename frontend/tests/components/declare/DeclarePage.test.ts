@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/svelte';
+import { render, screen, fireEvent, within } from '@testing-library/svelte';
 import type { ClaimRow } from '$lib/queries/content/claims';
 
 const mocks = vi.hoisted(() => ({
@@ -78,7 +78,7 @@ describe('DeclarePage', () => {
 	it('signed out: shows the sign-in prompt and never the empty list', () => {
 		render(DeclarePage);
 		expect(screen.getByRole('heading', { name: 'Declare' })).toBeInTheDocument();
-		expect(screen.getByText('Claims are private. Sign in to see yours.')).toBeInTheDocument();
+		expect(screen.getByText('Sign in to see your claims.')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
 		expect(screen.queryByText('No claims yet.')).not.toBeInTheDocument();
 	});
@@ -115,7 +115,13 @@ describe('DeclarePage', () => {
 		expect(screen.getByText('Water is wet')).toBeInTheDocument();
 		expect(screen.getByText('Effective 2026-01-05')).toBeInTheDocument();
 		expect(screen.getByText('Evaluate by 2027-01-05')).toBeInTheDocument();
-		expect(screen.getByText('Private')).toBeInTheDocument();
+		expect(within(screen.getByRole('list')).getByText('Private')).toBeInTheDocument();
+	});
+
+	it('signed in with a public claim: the row says Public', () => {
+		signedIn([claim({ privacy: 'PUBLIC' })]);
+		render(DeclarePage);
+		expect(within(screen.getByRole('list')).getByText('Public')).toBeInTheDocument();
 	});
 
 	it("shows only the signed-in user's own claims", () => {

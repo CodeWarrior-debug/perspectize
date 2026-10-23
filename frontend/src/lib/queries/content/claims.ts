@@ -1,5 +1,8 @@
 import { gql } from 'graphql-request';
 
+/** A claim is PUBLIC unless its owner keeps it PRIVATE. */
+export type ClaimPrivacy = 'PUBLIC' | 'PRIVATE';
+
 export interface CreateClaimInput {
 	text: string;
 	/** 0 = derive from the Clerk session (the server always uses the session user). */
@@ -10,6 +13,8 @@ export interface CreateClaimInput {
 	effectiveDate?: string;
 	/** Optional YYYY-MM-DD; must not be before effectiveDate. */
 	evaluateBy?: string | null;
+	/** Optional; the server defaults to PUBLIC. */
+	privacy?: ClaimPrivacy;
 }
 
 export interface CreateClaimResponse {
@@ -48,6 +53,8 @@ export interface UpdateClaimInput {
 	effectiveDate?: string;
 	/** YYYY-MM-DD; null or empty clears it. */
 	evaluateBy?: string | null;
+	/** Optional; omitted keeps the stored privacy. */
+	privacy?: ClaimPrivacy;
 }
 
 export interface UpdateClaimResponse {
@@ -121,8 +128,8 @@ export interface ListMyClaimsResponse {
 }
 
 /**
- * The viewer's claims. Claims are private, so the server returns only the
- * viewer's own; the caller still filters to `addedByUserID` as a guard.
+ * The claims visible to the viewer: public ones plus their own private ones.
+ * The caller still filters to `addedByUserID` to show only their own.
  */
 export const LIST_MY_CLAIMS = gql`
 	query ListMyClaims {

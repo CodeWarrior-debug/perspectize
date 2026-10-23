@@ -4,9 +4,9 @@ import { LIST_MY_CLAIMS, type ClaimRow, type ListMyClaimsResponse } from './clai
 import { queryKeys } from '../keys';
 
 /**
- * The signed-in viewer's own claims, newest first. Claims are private, so the
- * server returns only the viewer's; the key carries no user id, so callers must
- * still filter to `me.id` before showing rows.
+ * The claims the signed-in viewer can see, newest first: public claims plus
+ * their own private ones. The key carries no user id, so callers must still
+ * filter to `me.id` before showing rows.
  *
  * `enabled` gates the fetch (e.g. only once the user is signed in).
  */
