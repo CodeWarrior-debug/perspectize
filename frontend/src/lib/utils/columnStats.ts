@@ -18,8 +18,7 @@ export type TopBottom = {
 
 type Point = { x: number; y: number };
 
-const finiteSorted = (values: number[]): number[] =>
-	values.filter(Number.isFinite).sort((a, b) => a - b);
+const finiteSorted = (values: number[]): number[] => values.filter(Number.isFinite).sort((a, b) => a - b);
 
 /** Linear-interpolated quantile of an ascending, non-empty array. */
 function quantile(sorted: number[], q: number): number {
@@ -46,7 +45,7 @@ export function summarize(values: number[]): Summary | null {
 		median: quantile(sorted, 0.5),
 		mean,
 		max: sorted[count - 1],
-		stdDev: sampleStdDev(sorted, mean)
+		stdDev: sampleStdDev(sorted, mean),
 	};
 }
 
@@ -61,7 +60,7 @@ export function histogram(values: number[], binCount: number): Bin[] {
 	const bins: Bin[] = Array.from({ length: binCount }, (_, i) => ({
 		lo: min + i * width,
 		hi: i === binCount - 1 ? max : min + (i + 1) * width,
-		count: 0
+		count: 0,
 	}));
 	for (const v of sorted) {
 		const i = Math.min(Math.floor((v - min) / width), binCount - 1);
@@ -102,7 +101,7 @@ export function boxStats(values: number[]): {
 		median: quantile(sorted, 0.5),
 		q3,
 		max: inside[inside.length - 1],
-		outliers: sorted.filter((v) => v < lowFence || v > highFence)
+		outliers: sorted.filter((v) => v < lowFence || v > highFence),
 	};
 }
 
@@ -132,7 +131,7 @@ const formatEdge = (n: number): string => String(Number(n.toPrecision(4)));
 export function pieSlices(bins: Bin[], cap: number): { label: string; count: number }[] {
 	const kept = bins.slice(0, Math.max(cap, 0)).map((b) => ({
 		label: b.lo === b.hi ? formatEdge(b.lo) : `${formatEdge(b.lo)}–${formatEdge(b.hi)}`,
-		count: b.count
+		count: b.count,
 	}));
 	const rest = bins.slice(Math.max(cap, 0));
 	if (rest.length === 0) return kept;
@@ -148,13 +147,11 @@ export function topBottom<T>(
 	rows: T[],
 	value: (row: T) => number | null | undefined,
 	title: (row: T) => string | null | undefined,
-	n: number
+	n: number,
 ): TopBottom {
 	const items = rows.flatMap((row) => {
 		const v = value(row);
-		return v === null || v === undefined || !Number.isFinite(v)
-			? []
-			: [{ title: title(row) ?? 'Untitled', value: v }];
+		return v === null || v === undefined || !Number.isFinite(v) ? [] : [{ title: title(row) ?? 'Untitled', value: v }];
 	});
 	const k = Math.max(Math.min(n, Math.floor(items.length / 2)), 0);
 	const byTitle = (a: { title: string }, b: { title: string }) => a.title.localeCompare(b.title);
