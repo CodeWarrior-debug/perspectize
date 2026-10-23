@@ -19,24 +19,36 @@ function isFlagMap(value: unknown): value is Record<string, boolean> {
 	);
 }
 
-/** colId -> chart on. `{}` when missing, malformed, wrong version or storage is unavailable. */
-export function loadChartFlags(): Record<string, boolean> {
+/**
+ * Reads the stored value. `flags` is the parsed map (empty when the key is
+ * absent); `null` means the value is unreadable or present but not understood,
+ * so callers must not write over it.
+ */
+function readStored(): Record<string, boolean> | null {
 	try {
 		const raw = localStorage.getItem(CHART_SETTINGS_KEY);
-		if (!raw) return {};
+		if (raw === null) return {};
 		const parsed: unknown = JSON.parse(raw);
-		if (typeof parsed !== 'object' || parsed === null) return {};
+		if (typeof parsed !== 'object' || parsed === null) return null;
 		const { version, flags } = parsed as { version?: unknown; flags?: unknown };
-		if (version !== VERSION || !isFlagMap(flags)) return {};
+		if (version !== VERSION || !isFlagMap(flags)) return null;
 		return flags;
 	} catch {
-		return {};
+		return null;
 	}
 }
 
+/** colId -> chart on. `{}` when missing, malformed, wrong version or storage is unavailable. */
+export function loadChartFlags(): Record<string, boolean> {
+	return readStored() ?? {};
+}
+
 export function setChartFlag(colId: string, on: boolean): void {
+	const current = readStored();
+	// Present-but-not-understood (or unreadable) data is left alone.
+	if (current === null) return;
 	try {
-		const flags = { ...loadChartFlags(), [colId]: on };
+		const flags = { ...current, [colId]: on };
 		localStorage.setItem(CHART_SETTINGS_KEY, JSON.stringify({ version: VERSION, flags }));
 	} catch {
 		// localStorage unavailable (private browsing, quota) — the chart still
