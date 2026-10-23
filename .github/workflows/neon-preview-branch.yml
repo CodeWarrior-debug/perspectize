@@ -1,0 +1,72 @@
+name: Neon preview branch
+
+# One Neon database branch per open PR (docs: .docs/NEON_BRANCHING.md).
+# Created from the `production` branch, the PR's migrations are applied to it,
+# and it is deleted when the PR closes. Nothing here touches `production`.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+
+permissions:
+  contents: read
+
+# One run at a time per PR, so a fast push can't race a delete.
+concurrency:
+  group: neon-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  create:
+    name: Create branch and apply migrations
+    # Same-repo PRs only: fork PRs get no secrets, so they would fail here.
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Create Neon branch pr-<number>
+        id: branch
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: pr-${{ github.event.pull_request.number }}
+          parent_branch: production
+          role: neondb_owner
+
+      - name: Keep the connection string out of logs
+        run: echo "::add-mask::${{ steps.branch.outputs.db_url }}"
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Install golang-migrate
+        run: go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+      - name: Apply migrations to the preview branch
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ steps.branch.outputs.db_url }}
+        run: |
+          echo "Version before:"
+          migrate -path migrations -database "$DATABASE_URL" version
+          migrate -path migrations -database "$DATABASE_URL" up
+          echo "Version after:"
+          migrate -path migrations -database "$DATABASE_URL" version
+
+  delete:
+    name: Delete branch
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Neon branch pr-<number>
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: pr-${{ github.event.pull_request.number }}

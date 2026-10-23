@@ -89,6 +89,7 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 - [Go Patterns](.docs/GO_PATTERNS.md) — Error handling and DB query patterns
 - [Security](.docs/SECURITY.md) — Secret management, rotation procedures, incident response
 - [Migration Rollout](.docs/MIGRATION_ROLLOUT.md) — applying a migration to the production Neon DB: one at a time, snapshot first, verify, roll back
+- [Neon Preview Branches](.docs/NEON_BRANCHING.md) — one Neon branch per open PR (created from `production`, migrations applied, deleted on close) via GitHub Actions
 - [Release Approaches](.docs/RELEASE_APPROACHES.md) — named ways to ship multi-PR features unseen; "**dark backend**" (dark backend, merge-gated frontend) is the default, with "role-gated release" planned once RBAC exists
 - [Dependency Security](.docs/DEPENDENCY_SECURITY.md) — Trivy/pnpm-audit scanning, CVE remediation workflow, CI gotchas
 - [Worktrees](.docs/WORKTREES.md) — Location convention and the 5 numbered reusable worktrees for isolated Claude Code work
