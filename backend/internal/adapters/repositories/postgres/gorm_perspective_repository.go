@@ -168,6 +168,17 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 		}
 	}
 
+	// Content privacy dominates perspective privacy: a perspective on a private
+	// content row is listed only to that content's owner. One EXISTS in the same
+	// statement, so no extra query.
+	if params.ViewerID != nil {
+		query = query.Where("EXISTS (SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND (c.privacy = ? OR c.added_by_user_id = ?))",
+			privacyToDBValue(domain.PrivacyPublic), *params.ViewerID)
+	} else {
+		query = query.Where("EXISTS (SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND c.privacy = ?)",
+			privacyToDBValue(domain.PrivacyPublic))
+	}
+
 	// Total count (before cursor/limit — respects filters only)
 	var totalCountInt *int
 	if params.IncludeTotalCount {
