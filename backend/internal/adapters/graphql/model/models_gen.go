@@ -57,11 +57,13 @@ type Content struct {
 	Description   *string               `json:"description,omitempty"`
 	Response      map[string]any        `json:"response,omitempty"`
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
-	Movie              map[string]any `json:"movie,omitempty"`
-	PrimaryCategory    *Category      `json:"primaryCategory,omitempty"`
-	VerseStartID       *int           `json:"verseStartID,omitempty"`
-	VerseEndID         *int           `json:"verseEndID,omitempty"`
-	DisplayTitle       *string        `json:"displayTitle,omitempty"`
+	Movie           map[string]any `json:"movie,omitempty"`
+	PrimaryCategory *Category      `json:"primaryCategory,omitempty"`
+	VerseStartID    *int           `json:"verseStartID,omitempty"`
+	VerseEndID      *int           `json:"verseEndID,omitempty"`
+	DisplayTitle    *string        `json:"displayTitle,omitempty"`
+	// User-set attributes; for CLAIM, effectiveDate and evaluateBy as YYYY-MM-DD. Null when unset.
+	CustomFields       map[string]any `json:"customFields,omitempty"`
 	Privacy            domain.Privacy `json:"privacy"`
 	PerspectiveCount   *int           `json:"perspectiveCount,omitempty"`
 	AverageRating      *float64       `json:"averageRating,omitempty"`

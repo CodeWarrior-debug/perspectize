@@ -96,6 +96,16 @@ func domainToModel(c *domain.Content) *model.Content {
 		Privacy:           contentPrivacy(c.Privacy),
 	}
 
+	// Parse the user-set custom fields JSONB; nil/empty stays null in GraphQL.
+	if len(c.CustomFields) > 0 {
+		var customMap map[string]interface{}
+		if err := json.Unmarshal(c.CustomFields, &customMap); err != nil {
+			slog.Warn("failed to parse content custom fields JSON", "contentID", c.ID, "error", err)
+		} else {
+			m.CustomFields = customMap
+		}
+	}
+
 	// Parse the raw response JSON into a map for GraphQL
 	if len(c.Response) > 0 {
 		var responseMap map[string]interface{}

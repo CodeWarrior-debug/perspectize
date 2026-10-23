@@ -79,6 +79,9 @@ type Content struct {
 	VerseStartID      *int    // BIBLE_PASSAGE only — computed ordinal (see BibleVerseOrdinal), not a table FK
 	VerseEndID        *int    // BIBLE_PASSAGE only
 	DisplayTitle      *string // BIBLE_PASSAGE only — optional, first-write-wins
+	// CustomFields holds user-set attributes. nil means unset. CLAIM stores
+	// effectiveDate and evaluateBy here as ISO YYYY-MM-DD strings.
+	CustomFields json.RawMessage
 	// Privacy controls who can read the row. Empty is treated as PrivacyPublic on
 	// write. CLAIM content is created PrivacyPrivate (owner-only).
 	Privacy   Privacy

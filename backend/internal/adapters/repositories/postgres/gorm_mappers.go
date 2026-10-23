@@ -130,6 +130,15 @@ func lengthDisplayFromJSON(raw json.RawMessage) *domain.LengthDisplay {
 	return &domain.LengthDisplay{Source: j.Source, Precision: domain.LengthPrecision(strings.ToUpper(j.Precision))}
 }
 
+// nonEmptyRawJSON maps an empty JSONB payload to nil so an unset column never
+// reads back as an empty slice (or as `{}`).
+func nonEmptyRawJSON(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return nil
+	}
+	return raw
+}
+
 // lengthDisplayToJSON encodes LengthDisplay for the length_display JSONB column (nil -> NULL).
 func lengthDisplayToJSON(d *domain.LengthDisplay) json.RawMessage {
 	if d == nil {
@@ -161,6 +170,7 @@ func contentModelToDomain(m *ContentModel) *domain.Content {
 		VerseStartID:      m.VerseStartID,
 		VerseEndID:        m.VerseEndID,
 		DisplayTitle:      m.DisplayTitle,
+		CustomFields:      nonEmptyRawJSON(m.CustomFields),
 		Privacy:           contentPrivacyFromDB(m.Privacy),
 		CreatedAt:         m.CreatedAt,
 		UpdatedAt:         m.UpdatedAt,
@@ -202,6 +212,7 @@ func contentDomainToModel(c *domain.Content) *ContentModel {
 		VerseStartID:      c.VerseStartID,
 		VerseEndID:        c.VerseEndID,
 		DisplayTitle:      c.DisplayTitle,
+		CustomFields:      nonEmptyRawJSON(c.CustomFields),
 		Privacy:           contentPrivacyToDB(c.Privacy),
 		// CreatedAt and UpdatedAt are managed by GORM
 	}

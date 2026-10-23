@@ -415,3 +415,33 @@ func TestContentMapper_Privacy(t *testing.T) {
 	}
 	assert.Equal(t, domain.PrivacyPublic, contentModelToDomain(&ContentModel{}).Privacy)
 }
+
+// --- Content custom_fields (JSONB) ---
+
+func TestContentMapper_CustomFields_RoundTrip(t *testing.T) {
+	t.Run("set value survives both directions", func(t *testing.T) {
+		in := &domain.Content{
+			Name:          "Claim",
+			ContentType:   domain.ContentTypeClaim,
+			AddedByUserID: 1,
+			CustomFields:  json.RawMessage(`{"effectiveDate":"2026-10-23"}`),
+		}
+		m := contentDomainToModel(in)
+		assert.JSONEq(t, `{"effectiveDate":"2026-10-23"}`, string(m.CustomFields))
+
+		out := contentModelToDomain(m)
+		require.NotNil(t, out)
+		assert.JSONEq(t, `{"effectiveDate":"2026-10-23"}`, string(out.CustomFields))
+	})
+
+	t.Run("nil stays nil, not {}", func(t *testing.T) {
+		m := contentDomainToModel(&domain.Content{Name: "x"})
+		assert.Nil(t, m.CustomFields)
+		assert.Nil(t, contentModelToDomain(m).CustomFields)
+	})
+
+	t.Run("empty slice maps to nil", func(t *testing.T) {
+		m := contentDomainToModel(&domain.Content{Name: "x", CustomFields: json.RawMessage{}})
+		assert.Nil(t, m.CustomFields)
+	})
+}

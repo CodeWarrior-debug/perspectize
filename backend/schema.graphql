@@ -207,6 +207,8 @@ type Content {
   verseStartID: Int
   verseEndID: Int
   displayTitle: String
+  "User-set attributes; for CLAIM, effectiveDate and evaluateBy as YYYY-MM-DD. Null when unset."
+  customFields: JSON
   # Who can read this row. CLAIM content starts PRIVATE (owner-only); everything
   # else is PUBLIC. Private rows are omitted from lists and contentByID for
   # anyone but their owner.

@@ -73,6 +73,7 @@ type ComplexityRoot struct {
 		CommentCount       func(childComplexity int) int
 		ContentType        func(childComplexity int) int
 		CreatedAt          func(childComplexity int) int
+		CustomFields       func(childComplexity int) int
 		Description        func(childComplexity int) int
 		DisplayTitle       func(childComplexity int) int
 		ID                 func(childComplexity int) int
@@ -708,6 +709,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.CreatedAt(childComplexity), true
+	case "Content.customFields":
+		if e.ComplexityRoot.Content.CustomFields == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.CustomFields(childComplexity), true
 	case "Content.description":
 		if e.ComplexityRoot.Content.Description == nil {
 			break
@@ -2974,6 +2981,8 @@ type Content {
   verseStartID: Int
   verseEndID: Int
   displayTitle: String
+  "User-set attributes; for CLAIM, effectiveDate and evaluateBy as YYYY-MM-DD. Null when unset."
+  customFields: JSON
   # Who can read this row. CLAIM content starts PRIVATE (owner-only); everything
   # else is PUBLIC. Private rows are omitted from lists and contentByID for
   # anyone but their owner.
@@ -3799,6 +3808,8 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_verseEndID(ctx, field)
 	case "displayTitle":
 		return ec.fieldContext_Content_displayTitle(ctx, field)
+	case "customFields":
+		return ec.fieldContext_Content_customFields(ctx, field)
 	case "privacy":
 		return ec.fieldContext_Content_privacy(ctx, field)
 	case "perspectiveCount":
@@ -6404,6 +6415,29 @@ func (ec *executionContext) _Content_displayTitle(ctx context.Context, field gra
 }
 func (ec *executionContext) fieldContext_Content_displayTitle(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Content", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Content_customFields(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_customFields(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CustomFields, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v map[string]any) graphql.Marshaler {
+			return ec.marshalOJSON2map(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_customFields(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, false, false, errors.New("field of type JSON does not have child fields"))
 }
 
 func (ec *executionContext) _Content_privacy(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
@@ -17309,6 +17343,11 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "displayTitle":
 			out.Values[i] = ec._Content_displayTitle(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "customFields":
+			out.Values[i] = ec._Content_customFields(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
