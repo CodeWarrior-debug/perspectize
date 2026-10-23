@@ -376,6 +376,10 @@ func TestUpdateClaim_PassesOwnerScopedWriteToRepo(t *testing.T) {
 func TestUpdateClaim_NilDatesDefaultEffectiveAndClearEvaluateBy(t *testing.T) {
 	var gotFields json.RawMessage
 	repo := &mockContentRepository{
+		// A legacy claim with no stored dates: an empty effective date falls back to today.
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{ID: id, AddedByUserID: 7}, nil
+		},
 		updateClaimFn: func(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
 			gotFields = customFields
 			return &domain.Content{ID: id}, nil
@@ -396,6 +400,79 @@ func TestUpdateClaim_NilDatesDefaultEffectiveAndClearEvaluateBy(t *testing.T) {
 	assert.False(t, present, "nil evaluateBy must be sent as absent so the repo clears it")
 }
 
+func TestUpdateClaim_EmptyEffectiveDateKeepsStoredDate(t *testing.T) {
+	for name, effectiveIn := range map[string]*string{
+		"nil":          nil,
+		"empty string": claimStrPtr(""),
+	} {
+		t.Run(name, func(t *testing.T) {
+			var gotFields json.RawMessage
+			repo := &mockContentRepository{
+				getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+					return &domain.Content{
+						ID:            id,
+						AddedByUserID: 7,
+						CustomFields:  json.RawMessage(`{"effectiveDate":"2026-09-01","evaluateBy":"2026-12-01"}`),
+					}, nil
+				},
+				updateClaimFn: func(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
+					gotFields = customFields
+					return &domain.Content{ID: id}, nil
+				},
+			}
+			svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
+
+			_, err := svc.UpdateClaim(context.Background(), portservices.UpdateClaimInput{
+				ContentID: 5, ActorUserID: 7, Text: "Rates rose", EffectiveDate: effectiveIn,
+			})
+
+			require.NoError(t, err)
+			fields := claimFields(t, gotFields)
+			assert.Equal(t, "2026-09-01", fields["effectiveDate"])
+		})
+	}
+}
+
+func TestUpdateClaim_ExplicitEffectiveDateReplacesStoredDate(t *testing.T) {
+	var gotFields json.RawMessage
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{ID: id, AddedByUserID: 7, CustomFields: json.RawMessage(`{"effectiveDate":"2026-09-01"}`)}, nil
+		},
+		updateClaimFn: func(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
+			gotFields = customFields
+			return &domain.Content{ID: id}, nil
+		},
+	}
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
+
+	_, err := svc.UpdateClaim(context.Background(), portservices.UpdateClaimInput{
+		ContentID: 5, ActorUserID: 7, Text: "Rates rose", EffectiveDate: claimStrPtr("2026-10-01"),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "2026-10-01", claimFields(t, gotFields)["effectiveDate"])
+}
+
+func TestUpdateClaim_EmptyEffectiveDateOnMissingClaimIsNotFound(t *testing.T) {
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return nil, domain.ErrNotFound
+		},
+		updateClaimFn: func(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
+			t.Fatal("repo write must not run for a missing claim")
+			return nil, nil
+		},
+	}
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
+
+	_, err := svc.UpdateClaim(context.Background(), portservices.UpdateClaimInput{
+		ContentID: 5, ActorUserID: 7, Text: "Rates rose",
+	})
+
+	require.ErrorIs(t, err, domain.ErrNotFound)
+}
+
 func TestUpdateClaim_NonOwnerSurfacesAsNotFound(t *testing.T) {
 	repo := &mockContentRepository{
 		updateClaimFn: func(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
@@ -414,6 +491,9 @@ func TestUpdateClaim_NonOwnerSurfacesAsNotFound(t *testing.T) {
 
 func TestUpdateClaim_RepositoryErrorIsWrapped(t *testing.T) {
 	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{ID: id, AddedByUserID: 7}, nil
+		},
 		updateClaimFn: func(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
 			return nil, errors.New("db down")
 		},

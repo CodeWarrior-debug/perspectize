@@ -294,7 +294,14 @@ func (s *ContentService) UpdateClaim(ctx context.Context, input portservices.Upd
 	if err != nil {
 		return nil, err
 	}
-	effective, evaluate, err := claimDates(input.EffectiveDate, input.EvaluateBy)
+	effectiveIn := input.EffectiveDate
+	if effectiveIn == nil || *effectiveIn == "" {
+		effectiveIn, err = s.storedEffectiveDate(ctx, input.ContentID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	effective, evaluate, err := claimDates(effectiveIn, input.EvaluateBy)
 	if err != nil {
 		return nil, err
 	}
@@ -309,6 +316,25 @@ func (s *ContentService) UpdateClaim(ctx context.Context, input portservices.Upd
 		return nil, fmt.Errorf("failed to update claim: %w", err)
 	}
 	return updated, nil
+}
+
+// storedEffectiveDate returns the effective date a claim already holds, so an
+// edit that leaves the date empty keeps it. A claim with no stored date returns
+// nil, and claimDates then falls back to today. A missing claim is ErrNotFound.
+func (s *ContentService) storedEffectiveDate(ctx context.Context, id int) (*string, error) {
+	existing, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load claim: %w", err)
+	}
+	var fields map[string]string
+	if len(existing.CustomFields) == 0 || json.Unmarshal(existing.CustomFields, &fields) != nil {
+		return nil, nil
+	}
+	effective, ok := fields["effectiveDate"]
+	if !ok {
+		return nil, nil
+	}
+	return &effective, nil
 }
 
 // normalizeClaimText trims the text, collapses whitespace runs to one space,
