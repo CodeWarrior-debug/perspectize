@@ -32,11 +32,11 @@ export function capitalizeContentType(contentType: string | undefined): string {
 /**
  * Every content type, in the order the Type column's checkbox filter lists them.
  * Hardcoded on purpose (mirrors the backend ContentType enum) — the Record forces
- * a new ContentType to be given a label here (Partial while CLAIM is commented out).
+ * a new ContentType to be given a label here.
  */
 const CONTENT_TYPE_LABELS: Partial<Record<ContentType, string>> = {
 	YOUTUBE_VIDEO: 'YouTube Video',
-	// CLAIM: 'Claim', // not ready in the UI yet; uncomment to offer it in the filter
+	CLAIM: 'Claim',
 	BIBLE_PASSAGE: 'Bible Passage',
 	MOVIE: 'Movie',
 };
