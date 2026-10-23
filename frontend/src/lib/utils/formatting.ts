@@ -342,6 +342,25 @@ export function formatPublishDate(isoString: string | null): string {
 }
 
 /**
+ * Format a claim's `YYYY-MM-DD` date (Content.customFields) as "Oct 23, 2026". A bare date has no
+ * time, so it is built as a local calendar day: `new Date('2026-10-23')` would read it as UTC
+ * midnight and show the 22nd west of UTC. Anything that is not a real calendar date is the
+ * grid placeholder.
+ */
+export function formatClaimDate(value: unknown): string {
+	if (typeof value !== 'string') return EMPTY_VALUE;
+	const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+	if (!m) return EMPTY_VALUE;
+	const year = Number(m[1]);
+	const month = Number(m[2]);
+	const day = Number(m[3]);
+	const date = new Date(year, month - 1, day);
+	// Rejects overflow such as 2026-02-31, which the Date constructor would roll into March.
+	if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return EMPTY_VALUE;
+	return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+/**
  * Format tags array to comma-separated string.
  */
 export function formatTags(tags: string[] | null): string {

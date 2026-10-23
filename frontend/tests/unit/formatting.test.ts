@@ -14,6 +14,7 @@ import {
 	formatPercentLiked,
 	percentLikedTooltip,
 	formatPublishDate,
+	formatClaimDate,
 	formatTags,
 	truncateDescription,
 	extractVideoIdFromUrl,
@@ -597,6 +598,26 @@ describe('formatDateCompact', () => {
 
 	it('formats date with single-digit year', () => {
 		expect(formatDateCompact('2005-03-15T12:00:00Z')).toBe("Mar '05");
+	});
+});
+
+describe('formatClaimDate', () => {
+	it('formats a YYYY-MM-DD date without shifting it to the previous day', () => {
+		expect(formatClaimDate('2026-10-23')).toMatch(/Oct 23, 2026/);
+		expect(formatClaimDate('2026-01-01')).toMatch(/Jan 1, 2026/);
+		expect(formatClaimDate('2026-12-31')).toMatch(/Dec 31, 2026/);
+	});
+
+	it('returns the grid placeholder for missing or empty values', () => {
+		expect(formatClaimDate(null)).toBe('—');
+		expect(formatClaimDate(undefined)).toBe('—');
+		expect(formatClaimDate('')).toBe('—');
+	});
+
+	it('returns the grid placeholder for values that are not a real calendar date', () => {
+		expect(formatClaimDate('garbage')).toBe('—');
+		expect(formatClaimDate('2026-02-31')).toBe('—');
+		expect(formatClaimDate('2026-10-23T12:00:00Z')).toBe('—');
 	});
 });
 
