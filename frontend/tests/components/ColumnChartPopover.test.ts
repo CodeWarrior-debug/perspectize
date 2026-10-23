@@ -28,8 +28,8 @@ describe('ColumnChartPopover', () => {
 		render(ColumnChartPopover, { props: props() });
 		const def = defaultChartType('views');
 		for (const t of CHART_TYPES) {
-			expect(screen.getByRole('radio', { name: CHART_TYPE_LABELS[t] })).toHaveAttribute(
-				'aria-checked',
+			expect(screen.getByRole('button', { name: CHART_TYPE_LABELS[t] })).toHaveAttribute(
+				'aria-pressed',
 				String(t === def),
 			);
 		}
@@ -39,30 +39,35 @@ describe('ColumnChartPopover', () => {
 	it('choosing pie re-renders the chart in place without touching localStorage', async () => {
 		const setItem = vi.spyOn(Storage.prototype, 'setItem');
 		render(ColumnChartPopover, { props: props() });
-		await fireEvent.click(screen.getByRole('radio', { name: 'Pie' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Pie' }));
 		expect(screen.getByRole('img', { name: /pie/i })).toBeInTheDocument();
 		expect(screen.queryByRole('img', { name: /histogram/i })).toBeNull();
-		expect(screen.getByRole('radio', { name: 'Pie' })).toHaveAttribute('aria-checked', 'true');
+		expect(screen.getByRole('button', { name: 'Pie' })).toHaveAttribute('aria-pressed', 'true');
 		expect(setItem).not.toHaveBeenCalled();
 	});
 
 	it('re-opening after close shows the default type again', async () => {
 		const { rerender } = render(ColumnChartPopover, { props: props() });
-		await fireEvent.click(screen.getByRole('radio', { name: 'Pie' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Pie' }));
 		await rerender(props({ open: false }));
 		await rerender(props({ open: true }));
-		expect(screen.getByRole('radio', { name: 'Histogram' })).toHaveAttribute('aria-checked', 'true');
+		expect(screen.getByRole('button', { name: 'Histogram' })).toHaveAttribute('aria-pressed', 'true');
 		expect(screen.getByRole('img', { name: /histogram/i })).toBeInTheDocument();
 	});
 
-	it('says how many loaded movies the chart is based on', () => {
+	it('says how many loaded movies the chart is based on, and how many rows are empty', () => {
 		render(ColumnChartPopover, { props: props() });
-		expect(screen.getByText(`based on ${values.length} loaded movies`)).toBeInTheDocument();
+		expect(screen.getByText(`based on ${values.length} loaded movies · 3 empty`)).toBeInTheDocument();
+	});
+
+	it('uses the singular for one movie and shows zero empty rows', () => {
+		render(ColumnChartPopover, { props: props({ values: [5], total: 1 }) });
+		expect(screen.getByText('based on 1 loaded movie · 0 empty')).toBeInTheDocument();
 	});
 
 	it('passes total through so coverage counts empty rows', async () => {
 		render(ColumnChartPopover, { props: props() });
-		await fireEvent.click(screen.getByRole('radio', { name: 'Coverage' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Coverage' }));
 		expect(screen.getByText('12 with a value')).toBeInTheDocument();
 		expect(screen.getByText('3 empty')).toBeInTheDocument();
 	});
