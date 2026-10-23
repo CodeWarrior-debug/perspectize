@@ -262,6 +262,22 @@
 	// The grid's stock header template plus a chart button, placed after the label so a click on it does not sort.
 	const CHART_BUTTON_SVG =
 		'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="18" y1="20" x2="18" y2="9"/></svg>';
+	/**
+	 * Lets the keyboard reach the chart button inside a header cell. Keys pressed on the button are left
+	 * to the browser (Enter/Space click it) instead of the grid (where Enter would sort); Tab from the
+	 * header cell itself goes into the button when one is showing. Everything else keeps the grid's behaviour.
+	 */
+	function suppressChartKeyboard(params: { event: KeyboardEvent }): boolean {
+		const { event } = params;
+		const target = event.target as HTMLElement | null;
+		if (!target) return false;
+		if (target.closest('[data-chart-col]')) return true;
+		if (event.key === 'Tab' && !event.shiftKey && target.classList.contains('ag-header-cell')) {
+			return target.querySelector('[data-chart-col]:not([hidden])') !== null;
+		}
+		return false;
+	}
+
 	function chartHeaderParams(colId: string, label: string): { template?: string } {
 		if (!chartEligibleHere(colId)) return {};
 		const hidden = chartIconVisible(colId) ? '' : ' hidden';
@@ -274,7 +290,7 @@
 					<span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
 					<ag-sort-indicator data-ref="eSortIndicator"></ag-sort-indicator>
 				</div>
-				<button type="button" data-chart-col="${colId}" data-testid="column-chart-button-${colId}" aria-label="Chart ${label.replace(/"/g, '&quot;')}" title="Show chart" class="text-muted-foreground hover:text-foreground ml-1"${hidden}>${CHART_BUTTON_SVG}</button>
+				<button type="button" data-chart-col="${colId}" data-testid="column-chart-button-${colId}" aria-label="Chart ${label.replace(/"/g, '&quot;')}" title="Show chart" class="text-muted-foreground hover:text-foreground ml-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"${hidden}>${CHART_BUTTON_SVG}</button>
 			</div>`,
 		};
 	}
@@ -325,16 +341,16 @@
 		return (n) => String(Math.round(n * 100) / 100);
 	}
 
-	let chartTarget = $state<{ colId: string; label: string; anchor: HTMLElement } | null>(null);
+	let chartTarget = $state<{ colId: string; label: string; anchor: HTMLElement; keyboard: boolean } | null>(null);
 	let chartTick = $state(0); // bumps when the grid's rows change (filter, sort, new data)
 	const chartData = $derived.by(() => {
 		void chartTick;
 		return chartTarget ? chartRows(chartTarget.colId) : null;
 	});
 
-	function openChart(anchor: HTMLElement, colId: string) {
+	function openChart(anchor: HTMLElement, colId: string, keyboard = false) {
 		const label = gridApi?.getColumn(colId)?.getColDef().headerName ?? colId;
-		chartTarget = { colId, label, anchor };
+		chartTarget = { colId, label, anchor, keyboard };
 	}
 
 	function handleChartChange(colId: string, on: boolean) {
@@ -1162,7 +1178,10 @@
 		// button added to its template (outside the label, so it never sorts). The params are
 		// re-evaluated whenever the header is rebuilt (refreshHeader).
 		...(col.colId && CHART_ELIGIBLE_COLS.has(col.colId)
-			? { headerComponentParams: () => chartHeaderParams(col.colId as string, col.headerName ?? (col.colId as string)) }
+			? {
+					headerComponentParams: () => chartHeaderParams(col.colId as string, col.headerName ?? (col.colId as string)),
+					suppressHeaderKeyboardEvent: suppressChartKeyboard,
+				}
 			: {}),
 	}));
 
@@ -1502,7 +1521,8 @@
 			const btn = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-chart-col]');
 			if (!btn?.dataset.chartCol) return;
 			e.stopPropagation();
-			openChart(btn.closest<HTMLElement>('.ag-header-cell') ?? btn, btn.dataset.chartCol);
+			// A click from Enter/Space has detail 0; the popover then takes focus.
+			openChart(btn.closest<HTMLElement>('.ag-header-cell') ?? btn, btn.dataset.chartCol, e.detail === 0);
 		};
 		el.addEventListener('click', onClick);
 		return () => el.removeEventListener('click', onClick);
@@ -1740,6 +1760,7 @@
 			open={true}
 			onClose={() => (chartTarget = null)}
 			anchor={chartTarget.anchor}
+			focusOnOpen={chartTarget.keyboard}
 		/>
 	{/key}
 {/if}

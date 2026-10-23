@@ -78,4 +78,15 @@ describe('ColumnChartPopover', () => {
 		await fireEvent.keyDown(document.body, { key: 'Escape' });
 		expect(onClose).toHaveBeenCalled();
 	});
+
+	it('moves focus to the selected chart type when opened for the keyboard', async () => {
+		render(ColumnChartPopover, { props: props({ focusOnOpen: true }) });
+		await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Histogram' })));
+	});
+
+	it('leaves focus alone when opened by the pointer', async () => {
+		render(ColumnChartPopover, { props: props() });
+		await new Promise((r) => setTimeout(r, 50));
+		expect(document.activeElement).toBe(document.body);
+	});
 });

@@ -15,6 +15,7 @@
 		open,
 		onClose,
 		anchor,
+		focusOnOpen = false,
 	}: {
 		colId: string;
 		label: string;
@@ -27,7 +28,11 @@
 		onClose: () => void;
 		/** Element the popover points at; without it the popover floats at its default spot. */
 		anchor?: HTMLElement;
+		/** Move focus to the selected chart-type button on open (keyboard users). */
+		focusOnOpen?: boolean;
 	} = $props();
+
+	let content = $state<HTMLElement | null>(null);
 
 	// The pick is transient: never persisted, and cleared whenever the popover is closed.
 	let picked = $state<ChartType | null>(null);
@@ -47,7 +52,11 @@
 				side="bottom"
 				align="start"
 				trapFocus={false}
-				onOpenAutoFocus={(e) => e.preventDefault()}
+				bind:ref={content}
+				onOpenAutoFocus={(e) => {
+					e.preventDefault();
+					if (focusOnOpen) content?.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus();
+				}}
 				class="w-72"
 				aria-label={`${label} chart`}
 				data-testid="column-chart-popover"
