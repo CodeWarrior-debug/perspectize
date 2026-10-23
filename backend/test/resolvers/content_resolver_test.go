@@ -98,7 +98,7 @@ func (m *mockContentRepository) AnonymizeOwnedClaim(ctx context.Context, id, own
 	return nil
 }
 
-func (m *mockContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
+func (m *mockContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage, privacy *domain.Privacy) (*domain.Content, error) {
 	return nil, domain.ErrNotFound
 }
 

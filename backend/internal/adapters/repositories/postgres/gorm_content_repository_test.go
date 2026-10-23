@@ -394,7 +394,7 @@ func TestGormContentRepository_UpdateClaim(t *testing.T) {
 				[]byte(`{"text":"Rates rose","html":"Rates rose"}`), nil, contentRepoTime, contentRepoTime))
 
 		c := querycount.Attach(t, db)
-		got, err := NewGormContentRepository(db).UpdateClaim(ctx, 11, 7, "Rates rose", "Rates rose", fields)
+		got, err := NewGormContentRepository(db).UpdateClaim(ctx, 11, 7, "Rates rose", "Rates rose", fields, nil)
 		require.NoError(t, err)
 		c.AssertExactly(t, 1)
 		assert.Equal(t, 11, got.ID)
@@ -409,7 +409,7 @@ func TestGormContentRepository_UpdateClaim(t *testing.T) {
 			WillReturnRows(contentRows())
 
 		c := querycount.Attach(t, db)
-		_, err := NewGormContentRepository(db).UpdateClaim(ctx, 11, 8, "Rates rose", "Rates rose", fields)
+		_, err := NewGormContentRepository(db).UpdateClaim(ctx, 11, 8, "Rates rose", "Rates rose", fields, nil)
 		assert.True(t, errors.Is(err, domain.ErrNotFound), "expected domain.ErrNotFound, got %v", err)
 		c.AssertExactly(t, 1)
 		assertAllExpectationsMet(t, mock)

@@ -24,6 +24,8 @@ type mockContentRepository struct {
 	updateMetadataFn   func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error)
 	listFn             func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)
 	updateClaimFn      func(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error)
+	// updateClaimPrivacy records the privacy the service passed to UpdateClaim.
+	updateClaimPrivacy *domain.Privacy
 	deleteClaimFn      func(ctx context.Context, id, ownerID int) error
 	anonymizeClaimFn   func(ctx context.Context, id, ownerID int) error
 }
@@ -102,7 +104,8 @@ func (m *mockContentRepository) AnonymizeOwnedClaim(ctx context.Context, id, own
 	return nil
 }
 
-func (m *mockContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
+func (m *mockContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage, privacy *domain.Privacy) (*domain.Content, error) {
+	m.updateClaimPrivacy = privacy
 	if m.updateClaimFn != nil {
 		return m.updateClaimFn(ctx, id, ownerID, text, html, customFields)
 	}

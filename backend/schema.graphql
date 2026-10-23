@@ -524,12 +524,14 @@ input CreateClaimInput {
   parentContentID: IntID   # Optional: the content item this claim is about
   effectiveDate: String    # Optional YYYY-MM-DD; defaults to today (UTC)
   evaluateBy: String       # Optional YYYY-MM-DD; must not be before effectiveDate
+  privacy: Privacy         # Optional; defaults to PUBLIC. PRIVATE keeps the claim owner-only
 }
 
 input UpdateClaimInput {
   text: String!            # The new claim text; same rules as create
   effectiveDate: String    # Optional YYYY-MM-DD; nil or empty means today (UTC)
   evaluateBy: String       # Optional YYYY-MM-DD; nil or empty clears it
+  privacy: Privacy         # Optional; nil keeps the stored privacy
 }
 
 type Mutation {

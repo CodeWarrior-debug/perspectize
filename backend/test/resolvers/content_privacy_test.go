@@ -120,7 +120,7 @@ func TestContentList_PassesViewerID(t *testing.T) {
 	assert.Equal(t, 1, *got.ViewerID)
 }
 
-func TestCreateClaim_DerivesOwnerAndIsPrivate(t *testing.T) {
+func TestCreateClaim_DerivesOwnerAndDefaultsToPublic(t *testing.T) {
 	var saved *domain.Content
 	repo := &mockContentRepository{
 		createFn: func(ctx context.Context, c *domain.Content) (*domain.Content, error) {
@@ -134,7 +134,7 @@ func TestCreateClaim_DerivesOwnerAndIsPrivate(t *testing.T) {
 
 	result := executeGraphQL(t, server, `mutation { createClaim(input: { text: "Water is wet", userID: 0 }) { id contentType privacy } }`)
 	require.Empty(t, result.Errors)
-	assert.JSONEq(t, `{"createClaim": {"id": "9", "contentType": "CLAIM", "privacy": "PRIVATE"}}`, string(result.Data))
+	assert.JSONEq(t, `{"createClaim": {"id": "9", "contentType": "CLAIM", "privacy": "PUBLIC"}}`, string(result.Data))
 	require.NotNil(t, saved)
 	assert.Equal(t, 1, saved.AddedByUserID)
 }

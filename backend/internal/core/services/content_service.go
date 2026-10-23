@@ -213,10 +213,21 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID, viewer
 // claimDateLayout is the only accepted format for a claim's dates.
 const claimDateLayout = "2006-01-02"
 
-// CreateClaim creates a new claim content entry. Claims are always created
-// PrivacyPrivate (visible only to their owner) until a future public gate
-// promotes them. ParentContentID is optional; when set it must exist and be
-// visible to the author. The claim text is stored raw (preserving @this/@here
+// claimPrivacy resolves a claim's privacy: nil is PUBLIC, and only the two
+// real values are accepted.
+func claimPrivacy(p *domain.Privacy) (domain.Privacy, error) {
+	if p == nil {
+		return domain.PrivacyPublic, nil
+	}
+	if *p != domain.PrivacyPublic && *p != domain.PrivacyPrivate {
+		return "", fmt.Errorf("%w: privacy must be PUBLIC or PRIVATE", domain.ErrInvalidInput)
+	}
+	return *p, nil
+}
+
+// CreateClaim creates a new claim content entry. Claims are PUBLIC unless the
+// author asks for PRIVATE (visible only to their owner). ParentContentID is
+// optional; when set it must exist and be visible to the author. The claim text is stored raw (preserving @this/@here
 // tokens for display-time resolution) in Name and response.text; response.html
 // is the escaped, sanitised rendering.
 func (s *ContentService) CreateClaim(ctx context.Context, input portservices.CreateClaimInput) (*domain.Content, error) {
@@ -228,6 +239,10 @@ func (s *ContentService) CreateClaim(ctx context.Context, input portservices.Cre
 		return nil, fmt.Errorf("%w: user id must be a positive integer", domain.ErrInvalidInput)
 	}
 	effective, evaluate, err := claimDates(input.EffectiveDate, input.EvaluateBy)
+	if err != nil {
+		return nil, err
+	}
+	privacy, err := claimPrivacy(input.Privacy)
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +285,7 @@ func (s *ContentService) CreateClaim(ctx context.Context, input portservices.Cre
 		ContentType:   domain.ContentTypeClaim,
 		AddedByUserID: input.UserID,
 		Response:      responseJSON,
-		Privacy:       domain.PrivacyPrivate,
+		Privacy:       privacy,
 		CustomFields:  customFields,
 	})
 	if err != nil {
@@ -294,6 +309,11 @@ func (s *ContentService) UpdateClaim(ctx context.Context, input portservices.Upd
 	if err != nil {
 		return nil, err
 	}
+	if input.Privacy != nil {
+		if _, err := claimPrivacy(input.Privacy); err != nil {
+			return nil, err
+		}
+	}
 	effectiveIn := input.EffectiveDate
 	if effectiveIn == nil || *effectiveIn == "" {
 		effectiveIn, err = s.storedEffectiveDate(ctx, input.ContentID)
@@ -311,7 +331,7 @@ func (s *ContentService) UpdateClaim(ctx context.Context, input portservices.Upd
 	}
 
 	// The repository clears evaluateBy unless the new object carries it.
-	updated, err := s.repo.UpdateClaim(ctx, input.ContentID, input.ActorUserID, text, claimHTML(text), customFields)
+	updated, err := s.repo.UpdateClaim(ctx, input.ContentID, input.ActorUserID, text, claimHTML(text), customFields, input.Privacy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update claim: %w", err)
 	}

@@ -33,7 +33,7 @@ type ContentRepository interface {
 	// UpdateClaim rewrites an owned claim's name, response.text/html and custom
 	// fields in one owner-scoped UPDATE (keeping response.parentContentId). A
 	// missing row, or a row the owner does not hold, is domain.ErrNotFound.
-	UpdateClaim(ctx context.Context, id, ownerID int, text string, html string, customFields json.RawMessage) (*domain.Content, error)
+	UpdateClaim(ctx context.Context, id, ownerID int, text string, html string, customFields json.RawMessage, privacy *domain.Privacy) (*domain.Content, error)
 	// DeleteOwnedClaim deletes an owned claim, with the owner's own perspectives
 	// and plan items on it, in one transaction. If another user has a perspective
 	// or plan item on it, nothing is deleted and the error is domain.ErrClaimHasOthers.

@@ -3325,12 +3325,14 @@ input CreateClaimInput {
   parentContentID: IntID   # Optional: the content item this claim is about
   effectiveDate: String    # Optional YYYY-MM-DD; defaults to today (UTC)
   evaluateBy: String       # Optional YYYY-MM-DD; must not be before effectiveDate
+  privacy: Privacy         # Optional; defaults to PUBLIC. PRIVATE keeps the claim owner-only
 }
 
 input UpdateClaimInput {
   text: String!            # The new claim text; same rules as create
   effectiveDate: String    # Optional YYYY-MM-DD; nil or empty means today (UTC)
   evaluateBy: String       # Optional YYYY-MM-DD; nil or empty clears it
+  privacy: Privacy         # Optional; nil keeps the stored privacy
 }
 
 type Mutation {
@@ -15923,7 +15925,7 @@ func (ec *executionContext) unmarshalInputCreateClaimInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"text", "userID", "parentContentID", "effectiveDate", "evaluateBy"}
+	fieldsInOrder := [...]string{"text", "userID", "parentContentID", "effectiveDate", "evaluateBy", "privacy"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -15965,6 +15967,13 @@ func (ec *executionContext) unmarshalInputCreateClaimInput(ctx context.Context, 
 				return it, err
 			}
 			it.EvaluateBy = data
+		case "privacy":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("privacy"))
+			data, err := ec.unmarshalOPrivacy2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPrivacy(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Privacy = data
 		}
 	}
 	return it, nil
@@ -16758,7 +16767,7 @@ func (ec *executionContext) unmarshalInputUpdateClaimInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"text", "effectiveDate", "evaluateBy"}
+	fieldsInOrder := [...]string{"text", "effectiveDate", "evaluateBy", "privacy"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -16786,6 +16795,13 @@ func (ec *executionContext) unmarshalInputUpdateClaimInput(ctx context.Context, 
 				return it, err
 			}
 			it.EvaluateBy = data
+		case "privacy":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("privacy"))
+			data, err := ec.unmarshalOPrivacy2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPrivacy(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Privacy = data
 		}
 	}
 	return it, nil

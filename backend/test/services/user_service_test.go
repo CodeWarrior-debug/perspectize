@@ -194,7 +194,7 @@ func (m *mockContentRepoForUser) AnonymizeOwnedClaim(ctx context.Context, id, ow
 	return nil
 }
 
-func (m *mockContentRepoForUser) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
+func (m *mockContentRepoForUser) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage, privacy *domain.Privacy) (*domain.Content, error) {
 	return nil, domain.ErrNotFound
 }
 func (m *mockContentRepoForUser) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {

@@ -113,11 +113,12 @@ type ContentSortInput struct {
 }
 
 type CreateClaimInput struct {
-	Text            string  `json:"text"`
-	UserID          int     `json:"userID"`
-	ParentContentID *int    `json:"parentContentID,omitempty"`
-	EffectiveDate   *string `json:"effectiveDate,omitempty"`
-	EvaluateBy      *string `json:"evaluateBy,omitempty"`
+	Text            string          `json:"text"`
+	UserID          int             `json:"userID"`
+	ParentContentID *int            `json:"parentContentID,omitempty"`
+	EffectiveDate   *string         `json:"effectiveDate,omitempty"`
+	EvaluateBy      *string         `json:"evaluateBy,omitempty"`
+	Privacy         *domain.Privacy `json:"privacy,omitempty"`
 }
 
 type CreateContentFromMovieInput struct {
@@ -461,9 +462,10 @@ type TypingChanged struct {
 func (TypingChanged) IsThreadEvent() {}
 
 type UpdateClaimInput struct {
-	Text          string  `json:"text"`
-	EffectiveDate *string `json:"effectiveDate,omitempty"`
-	EvaluateBy    *string `json:"evaluateBy,omitempty"`
+	Text          string          `json:"text"`
+	EffectiveDate *string         `json:"effectiveDate,omitempty"`
+	EvaluateBy    *string         `json:"evaluateBy,omitempty"`
+	Privacy       *domain.Privacy `json:"privacy,omitempty"`
 }
 
 // Partial update: omit a field to leave it unchanged. For quality, agreement,

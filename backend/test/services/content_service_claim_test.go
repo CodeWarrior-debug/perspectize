@@ -35,7 +35,7 @@ func claimResponseMap(t *testing.T, raw json.RawMessage) map[string]interface{} 
 	return resp
 }
 
-func TestCreateClaim_NoParent_IsPrivateAndOmitsParent(t *testing.T) {
+func TestCreateClaim_NoParent_IsPublicByDefaultAndOmitsParent(t *testing.T) {
 	var saved *domain.Content
 	repo := &mockContentRepository{
 		createFn: func(ctx context.Context, c *domain.Content) (*domain.Content, error) {
@@ -57,7 +57,7 @@ func TestCreateClaim_NoParent_IsPrivateAndOmitsParent(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, domain.ContentTypeClaim, saved.ContentType)
-	assert.Equal(t, domain.PrivacyPrivate, saved.Privacy)
+	assert.Equal(t, domain.PrivacyPublic, saved.Privacy)
 	assert.Equal(t, 7, saved.AddedByUserID)
 	assert.Equal(t, "Water boils at 100C at sea level", saved.Name)
 
@@ -90,7 +90,77 @@ func TestCreateClaim_WithParent_RecordsParent(t *testing.T) {
 	var resp map[string]interface{}
 	require.NoError(t, json.Unmarshal(saved.Response, &resp))
 	assert.EqualValues(t, 3, resp["parentContentId"])
+	assert.Equal(t, domain.PrivacyPublic, saved.Privacy)
+}
+
+func TestCreateClaim_ExplicitPrivate_IsOwnerOnly(t *testing.T) {
+	var saved *domain.Content
+	repo := &mockContentRepository{
+		createFn: func(ctx context.Context, c *domain.Content) (*domain.Content, error) {
+			saved = c
+			return c, nil
+		},
+	}
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
+	private := domain.PrivacyPrivate
+
+	_, err := svc.CreateClaim(context.Background(), portservices.CreateClaimInput{
+		Text: "A private claim", UserID: 7, Privacy: &private,
+	})
+
+	require.NoError(t, err)
 	assert.Equal(t, domain.PrivacyPrivate, saved.Privacy)
+}
+
+func TestCreateClaim_UnknownPrivacy_InvalidAndNeverSaved(t *testing.T) {
+	repo := &mockContentRepository{
+		createFn: func(ctx context.Context, c *domain.Content) (*domain.Content, error) {
+			t.Fatal("repo must not be called for an unknown privacy")
+			return nil, nil
+		},
+	}
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
+	bogus := domain.Privacy("SECRET")
+
+	_, err := svc.CreateClaim(context.Background(), portservices.CreateClaimInput{
+		Text: "A claim", UserID: 7, Privacy: &bogus,
+	})
+
+	require.ErrorIs(t, err, domain.ErrInvalidInput)
+}
+
+func TestUpdateClaim_NilPrivacyKeepsStored(t *testing.T) {
+	repo := &mockContentRepository{
+		updateClaimFn: func(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
+			return &domain.Content{ID: id}, nil
+		},
+	}
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
+
+	_, err := svc.UpdateClaim(context.Background(), portservices.UpdateClaimInput{
+		ContentID: 5, ActorUserID: 7, Text: "Edited claim text", EffectiveDate: claimStrPtr("2026-10-01"),
+	})
+
+	require.NoError(t, err)
+	assert.Nil(t, repo.updateClaimPrivacy, "nil must reach the repo so the stored privacy is kept")
+}
+
+func TestUpdateClaim_ExplicitPrivacyIsPassedThrough(t *testing.T) {
+	repo := &mockContentRepository{
+		updateClaimFn: func(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error) {
+			return &domain.Content{ID: id}, nil
+		},
+	}
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
+	private := domain.PrivacyPrivate
+
+	_, err := svc.UpdateClaim(context.Background(), portservices.UpdateClaimInput{
+		ContentID: 5, ActorUserID: 7, Text: "Edited claim text", EffectiveDate: claimStrPtr("2026-10-01"), Privacy: &private,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, repo.updateClaimPrivacy)
+	assert.Equal(t, domain.PrivacyPrivate, *repo.updateClaimPrivacy)
 }
 
 func TestCreateClaim_MissingParent_NotFound(t *testing.T) {

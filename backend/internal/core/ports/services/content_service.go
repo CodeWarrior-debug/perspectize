@@ -16,6 +16,8 @@ type CreateClaimInput struct {
 	ParentContentID *int
 	EffectiveDate   *string
 	EvaluateBy      *string
+	// Privacy is nil for the default (PUBLIC). PRIVATE keeps the claim owner-only.
+	Privacy *domain.Privacy
 }
 
 // UpdateClaimInput holds the input for replacing a claim's text and dates.
@@ -27,6 +29,8 @@ type UpdateClaimInput struct {
 	Text          string
 	EffectiveDate *string
 	EvaluateBy    *string
+	// Privacy is nil to keep the stored privacy.
+	Privacy *domain.Privacy
 }
 
 // DeleteClaimInput holds the input for deleting a claim. ActorUserID must own it.

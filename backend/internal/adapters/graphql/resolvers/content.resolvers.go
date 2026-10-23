@@ -399,6 +399,7 @@ func (r *mutationResolver) CreateClaim(ctx context.Context, input model.CreateCl
 		ParentContentID: input.ParentContentID,
 		EffectiveDate:   input.EffectiveDate,
 		EvaluateBy:      input.EvaluateBy,
+		Privacy:         input.Privacy,
 	})
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidInput) {
@@ -471,6 +472,7 @@ func (r *mutationResolver) UpdateClaim(ctx context.Context, id string, input mod
 		Text:          input.Text,
 		EffectiveDate: input.EffectiveDate,
 		EvaluateBy:    input.EvaluateBy,
+		Privacy:       input.Privacy,
 	})
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidInput) {

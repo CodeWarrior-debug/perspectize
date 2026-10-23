@@ -505,19 +505,24 @@ func (r *GormContentRepository) UpdatePrimaryCategoryID(ctx context.Context, con
 // custom_fields, evaluateBy is dropped before the new object is merged, so an
 // omitted evaluateBy clears it. Zero rows (missing, not a claim, or not the
 // owner) is domain.ErrNotFound, so there is no second read to tell them apart.
-func (r *GormContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text string, html string, customFields json.RawMessage) (*domain.Content, error) {
+func (r *GormContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text string, html string, customFields json.RawMessage, privacy *domain.Privacy) (*domain.Content, error) {
+	values := map[string]interface{}{
+		"name":          text,
+		"response":      gorm.Expr("COALESCE(response, '{}'::jsonb) || jsonb_build_object('text', ?::text, 'html', ?::text)", text, html),
+		"custom_fields": gorm.Expr("(COALESCE(custom_fields, '{}'::jsonb) - 'evaluateBy') || ?::jsonb", string(customFields)),
+		"updated_at":    gorm.Expr("NOW()"),
+	}
+	// nil keeps the stored privacy; only an explicit value is written.
+	if privacy != nil {
+		values["privacy"] = privacyToDBValue(*privacy)
+	}
 	var updated ContentModel
 	result := r.db.WithContext(ctx).
 		Model(&updated).
 		Clauses(clause.Returning{}).
 		Where("id = ? AND added_by_user_id = ? AND content_type = ?",
 			id, ownerID, contentTypeToDBValue(domain.ContentTypeClaim)).
-		Updates(map[string]interface{}{
-			"name":          text,
-			"response":      gorm.Expr("COALESCE(response, '{}'::jsonb) || jsonb_build_object('text', ?::text, 'html', ?::text)", text, html),
-			"custom_fields": gorm.Expr("(COALESCE(custom_fields, '{}'::jsonb) - 'evaluateBy') || ?::jsonb", string(customFields)),
-			"updated_at":    gorm.Expr("NOW()"),
-		})
+		Updates(values)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to update claim: %w", result.Error)
 	}
