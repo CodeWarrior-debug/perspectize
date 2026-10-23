@@ -157,6 +157,23 @@ func (r *queryResolver) PerspectiveByID(ctx context.Context, id string) (*model.
 		}
 	}
 
+	// Content privacy dominates perspective privacy: a perspective on a private
+	// claim is visible only to that claim's owner, so the same nil as above.
+	if perspective.ContentID != nil {
+		viewerID := 0
+		if viewer, ok := auth.ForContext(ctx); ok {
+			viewerID = viewer.ID
+		}
+		content, err := r.ContentService.GetByID(ctx, *perspective.ContentID)
+		if err != nil && !errors.Is(err, domain.ErrNotFound) {
+			slog.Error("getting perspective content failed", "id", id, "error", err)
+			return nil, fmt.Errorf("failed to get perspective")
+		}
+		if err != nil || !content.VisibleTo(viewerID) {
+			return nil, nil
+		}
+	}
+
 	return perspectiveDomainToModel(perspective), nil
 }
 
