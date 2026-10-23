@@ -7,7 +7,7 @@ import { CHART_TYPES, CHART_TYPE_LABELS, type ChartType } from '$lib/utils/colum
 const values = [1, 2, 2, 3, 4, 5, 6, 8, 9, 10, 15, 40];
 const format = (n: number) => `#${Math.round(n * 100) / 100}`;
 const renderChart = (type: ChartType, v: number[] = values, ranked?: ReturnType<typeof topBottom>) =>
-	render(ColumnChart, { props: { type, values: v, ranked, format } });
+	render(ColumnChart, { props: { type, values: v, total: v.length, ranked, format } });
 
 describe('ColumnChart', () => {
 	it('histogram renders one rect per bin', () => {
@@ -80,9 +80,44 @@ describe('ColumnChart', () => {
 		expect(screen.getByText('no rankings yet')).toBeInTheDocument();
 	});
 
-	it('coverage renders the filled count', () => {
-		renderChart('coverage');
-		expect(screen.getByText(`${values.length} with a value`)).toBeInTheDocument();
+	it('coverage splits filled and empty rows using total', () => {
+		const { container } = render(ColumnChart, { props: { type: 'coverage', values, total: 20, format } });
+		expect(screen.getByText('12 with a value')).toBeInTheDocument();
+		expect(screen.getByText('8 empty')).toBeInTheDocument();
+		const filled = container.querySelector('circle[data-filled]')!;
+		const [len, circ] = filled.getAttribute('stroke-dasharray')!.split(' ').map(Number);
+		expect(len / circ).toBeCloseTo(12 / 20, 3);
+	});
+
+	it('coverage with total 0 shows no values yet', () => {
+		render(ColumnChart, { props: { type: 'coverage', values: [], total: 0, format } });
+		expect(screen.getByText('no values yet')).toBeInTheDocument();
+	});
+
+	it('coverage with all rows empty still renders the donut', () => {
+		render(ColumnChart, { props: { type: 'coverage', values: [], total: 5, format } });
+		expect(screen.getByText('0 with a value')).toBeInTheDocument();
+		expect(screen.getByText('5 empty')).toBeInTheDocument();
+	});
+
+	it.each([
+		['summary', 'Summary statistics'],
+		['topBottom', 'Top and bottom values'],
+		['coverage', 'Coverage'],
+	] as const)('%s is an HTML group labelled %s, not an img', (type, name) => {
+		const ranked = { top: [{ title: 'A', value: 2 }], bottom: [{ title: 'B', value: 1 }] };
+		renderChart(type, values, ranked);
+		expect(screen.getByRole('group', { name })).toBeInTheDocument();
+		expect(screen.queryByRole('img')).toBeNull();
+	});
+
+	it.each(['summary', 'topBottom', 'coverage'] as const)('%s still renders normally for identical values', (type) => {
+		const ranked = { top: [{ title: 'A', value: 3 }], bottom: [{ title: 'B', value: 3 }] };
+		render(ColumnChart, { props: { type, values: [3, 3, 3], total: 4, ranked, format } });
+		expect(screen.queryByText(/all values are the same/i)).toBeNull();
+		if (type === 'summary') expect(screen.getByText('Median')).toBeInTheDocument();
+		if (type === 'topBottom') expect(screen.getByText('A')).toBeInTheDocument();
+		if (type === 'coverage') expect(screen.getByText('1 empty')).toBeInTheDocument();
 	});
 
 	it.each(CHART_TYPES)('%s shows "no values yet" when empty', (type) => {
