@@ -693,7 +693,11 @@
 				headerTooltip: 'The date the claim takes effect.',
 				width: 120,
 				sortable: true,
-				filter: false,
+				filter: 'agDateColumnFilter',
+				filterValueGetter: (params) => {
+					const v = params.data?.customFields?.effectiveDate;
+					return v ? new Date(`${v}T00:00:00`) : null;
+				},
 				comparator: releasedComparator,
 				valueGetter: (params) => params.data?.customFields?.effectiveDate ?? null,
 				valueFormatter: (params) => formatClaimDate(params.value),
@@ -706,7 +710,11 @@
 				headerTooltip: 'The date by which the claim should be evaluated.',
 				width: 120,
 				sortable: true,
-				filter: false,
+				filter: 'agDateColumnFilter',
+				filterValueGetter: (params) => {
+					const v = params.data?.customFields?.evaluateBy;
+					return v ? new Date(`${v}T00:00:00`) : null;
+				},
 				comparator: releasedComparator,
 				valueGetter: (params) => params.data?.customFields?.evaluateBy ?? null,
 				valueFormatter: (params) => formatClaimDate(params.value),
@@ -721,7 +729,7 @@
 				headerTooltip: 'Your overall rating of this claim (0-100).',
 				width: 110,
 				sortable: false,
-				filter: false,
+				filter: 'agNumberColumnFilter',
 				valueGetter: (params) => perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'quality'),
 				valueFormatter: (params) => formatRatingScore(params.value),
 				hide: true,
@@ -732,8 +740,9 @@
 				headerTooltip: 'Your importance rating of this claim (0-100).',
 				width: 120,
 				sortable: false,
-				filter: false,
-				valueGetter: (params) => perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'importance'),
+				filter: 'agNumberColumnFilter',
+				valueGetter: (params) =>
+					perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'importance'),
 				valueFormatter: (params) => formatRatingScore(params.value),
 				hide: true,
 			},
@@ -743,8 +752,9 @@
 				headerTooltip: 'Your agreement rating with this claim (0-100).',
 				width: 120,
 				sortable: false,
-				filter: false,
-				valueGetter: (params) => perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'agreement'),
+				filter: 'agNumberColumnFilter',
+				valueGetter: (params) =>
+					perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'agreement'),
 				valueFormatter: (params) => formatRatingScore(params.value),
 				hide: true,
 			},

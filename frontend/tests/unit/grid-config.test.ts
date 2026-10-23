@@ -501,7 +501,6 @@ describe('Claim column set', () => {
 			'category',
 			'effectiveDate',
 			'evaluateBy',
-			'createdAt',
 			'myQuality',
 			'myImportance',
 			'myAgreement',

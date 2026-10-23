@@ -519,7 +519,7 @@ export function defaultColumnVisibility(
 		visible = ['perspectize', 'item'];
 		if (sm) visible.push('category');
 		if (md) visible.push('effectiveDate', 'evaluateBy');
-		if (lg) visible.push('createdAt', 'myQuality', 'myImportance', 'myAgreement');
+		if (lg) visible.push('myQuality', 'myImportance', 'myAgreement');
 	} else {
 		visible = view === 'movie' ? ['perspectize', 'item', 'type'] : ['item', 'type', 'perspectize'];
 		if (view === 'movie') {
