@@ -31,7 +31,7 @@
 	const H = 120;
 	const PAD = { l: 8, r: 8, t: 8, b: 16 };
 	const BINS = 10;
-	const PIE_CAP = 6;
+	const PIE_CAP = 5;
 
 	const summary = $derived(summarize(values));
 	const empty = $derived(type === 'coverage' ? total === 0 : values.length === 0);
