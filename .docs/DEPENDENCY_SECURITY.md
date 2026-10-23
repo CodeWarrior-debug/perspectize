@@ -218,6 +218,19 @@ version that's already past the age window — check publish dates with
 doing its job. The pin can usually be relaxed (or removed) once a newer,
 now-aged release exists and there's a reason to move off the pinned version.
 
+### 8. A repo-root Trivy scan also walks `.claude/worktrees/`
+
+`trivy fs .` from the repo root walks every checked-out worktree under `.claude/worktrees/` (gitignored, so CI never sees them). Those copies are often stale and report HIGH/CRITICAL findings that CI doesn't gate on. Checked 2026-10-23: the root scan reported findings for dozens of worktree copies, while the real `backend/go.mod` was clean.
+
+Scan the two gated files directly instead:
+
+```bash
+trivy fs backend/go.mod --severity HIGH,CRITICAL --scanners vuln
+trivy fs frontend/pnpm-lock.yaml --severity HIGH,CRITICAL --scanners vuln
+```
+
+Also compare against `origin/main`, not your checkout. The root checkout can be on an older branch whose lockfile differs from `main` by hundreds of lines, and a finding there may already be fixed on `main`.
+
 ## Known unfixable findings
 
 Some advisories have no patched release yet. Document them rather than
