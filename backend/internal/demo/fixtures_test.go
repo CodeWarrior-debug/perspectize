@@ -1,7 +1,10 @@
 package demo
 
 import (
+	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
@@ -49,6 +52,30 @@ func TestFixturesAreConsistent(t *testing.T) {
 	for _, m := range Messages {
 		if !seenKeys[m.From] {
 			t.Errorf("message from unknown persona %q", m.From)
+		}
+	}
+	for _, c := range Claims {
+		if !seenKeys[c.Persona] {
+			t.Errorf("claim %q owned by unknown persona %q", c.Text, c.Persona)
+		}
+		effective, err := time.Parse("2006-01-02", c.EffectiveDate)
+		if err != nil {
+			t.Errorf("claim %q effective date %q: %v", c.Text, c.EffectiveDate, err)
+		}
+		if c.EvaluateBy != "" {
+			evaluate, err := time.Parse("2006-01-02", c.EvaluateBy)
+			switch {
+			case err != nil:
+				t.Errorf("claim %q evaluate-by date %q: %v", c.Text, c.EvaluateBy, err)
+			case err == nil && c.EffectiveDate != "" && effective.After(evaluate):
+				t.Errorf("claim %q evaluate-by %s is before effective %s", c.Text, c.EvaluateBy, c.EffectiveDate)
+			}
+		}
+		if n := len(strings.Fields(c.Text)); n < 2 {
+			t.Errorf("claim %q has %d words, want at least 2", c.Text, n)
+		}
+		if n := utf8.RuneCountInString(c.Text); n > domain.ClaimMaxLength {
+			t.Errorf("claim %q is %d characters, max %d", c.Text, n, domain.ClaimMaxLength)
 		}
 	}
 }

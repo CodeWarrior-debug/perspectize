@@ -1,6 +1,6 @@
 // Package demo holds the canned data behind demo mode: the personas that can
 // sign in without Clerk, the YouTube metadata served by the offline fixture
-// client, and the perspectives/messages `cmd/seed-demo` writes.
+// client, and the perspectives, claims and messages `cmd/seed-demo` writes.
 //
 // It is data only — no I/O — so the seeder, the fixture YouTube client and the
 // tests all read one source of truth. Demo mode is refused in production (see
@@ -174,6 +174,20 @@ var Perspectives = []SeedPerspective{
 		Labels: []string{"ai", "code-along"}},
 	{Persona: "alice", VideoID: "kCc8FmEb1nY", Quality: 8500, Agreement: 8500, Importance: 8500, Confidence: 6000,
 		Privacy: domain.PrivacyPublic, Review: "Watched in three sittings. Worth every minute.", Labels: []string{"ai"}},
+}
+
+// SeedClaim is one pre-written claim owned by a persona. Dates are YYYY-MM-DD.
+type SeedClaim struct {
+	Persona       string
+	Text          string
+	EffectiveDate string
+	EvaluateBy    string // "" = unset
+}
+
+// Claims are private to their owner, like every claim, until the public gate
+// opens. The seeded one gives the claim UI a real row to show.
+var Claims = []SeedClaim{
+	{Persona: "alice", Text: "The glove did not fit O.J. Simpson", EffectiveDate: "1995-10-03"},
 }
 
 // SeedMessage is one message in the seeded Alice/Ben direct thread.
