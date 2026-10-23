@@ -64,10 +64,12 @@ Tailwind v4 uses `--color-*` prefix for theme variables (e.g., `--color-primary`
 
 ```bash
 pnpm run dev          # Dev server (http://localhost:5173)
-pnpm run check        # Type-check (svelte-check + TypeScript)
+pnpm run check        # Type-check: svelte-check --tsgo (TypeScript 7 native checker)
 pnpm run test:run     # Tests once (CI/verification)
 pnpm run test         # Tests in watch mode
 ```
+
+**TypeScript 7 runs as `@typescript/native` (npm alias of `typescript@7`); `typescript` stays on 6.x.** `svelte-check` and `@sveltejs/kit` only declare TypeScript ^5/^6 as peers, and svelte-check refuses TS 7 unless 6.x is also installed and `--tsgo` is passed. Keep both; `pnpm run check` already passes `--tsgo`. Raw `node_modules/@typescript/native/bin/tsc` is the TS 7 compiler, but it reports 16 false errors (`*.svelte` imports); use `pnpm run check` for type-checking, not raw `tsc`.
 
 **`pnpm exec` must run from `frontend/`** — running from repo root fails with `ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE`. Use `cd frontend && pnpm exec ...` or `pnpm --dir frontend exec ...`.
 
