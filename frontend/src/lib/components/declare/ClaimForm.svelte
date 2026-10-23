@@ -168,7 +168,7 @@
 
 	<div class="flex items-center justify-between gap-4">
 		<div class="space-y-0.5">
-			<Label for="{uid}-private">Private</Label>
+			<Label for="{uid}-private">Visibility</Label>
 			<p class="text-muted-foreground text-sm">
 				{isPrivate ? 'Only you can see this claim.' : 'Anyone can see this claim.'}
 			</p>
