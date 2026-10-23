@@ -80,4 +80,34 @@ describe('columnChartSettings', () => {
 		expect(loadChartFlags()).toEqual({});
 		expect(isChartOn('views')).toBe(false);
 	});
+
+	it('does not overwrite a wrong-version value on write', () => {
+		const raw = '{"version":2,"flags":{"views":true}}';
+		localStorage.setItem(CHART_SETTINGS_KEY, raw);
+		setChartFlag('likes', true);
+		expect(localStorage.getItem(CHART_SETTINGS_KEY)).toBe(raw);
+	});
+
+	it('does not overwrite unparseable text on write', () => {
+		const raw = '{not json';
+		localStorage.setItem(CHART_SETTINGS_KEY, raw);
+		setChartFlag('likes', true);
+		expect(localStorage.getItem(CHART_SETTINGS_KEY)).toBe(raw);
+	});
+
+	it('does not overwrite a wrong-shape value on write', () => {
+		const raw = '{"version":1,"flags":{"views":"yes"}}';
+		localStorage.setItem(CHART_SETTINGS_KEY, raw);
+		setChartFlag('likes', true);
+		expect(localStorage.getItem(CHART_SETTINGS_KEY)).toBe(raw);
+	});
+
+	it('skips the write when the read throws', () => {
+		vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+			throw new Error('denied');
+		});
+		const setItem = vi.spyOn(Storage.prototype, 'setItem');
+		setChartFlag('views', true);
+		expect(setItem).not.toHaveBeenCalled();
+	});
 });
