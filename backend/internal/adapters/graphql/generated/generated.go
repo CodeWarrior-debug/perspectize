@@ -80,12 +80,14 @@ type ComplexityRoot struct {
 		LengthDisplay      func(childComplexity int) int
 		LengthUnits        func(childComplexity int) int
 		LikeCount          func(childComplexity int) int
+		Lyrics             func(childComplexity int) int
 		Movie              func(childComplexity int) int
 		Name               func(childComplexity int) int
 		PerspectiveCount   func(childComplexity int) int
 		PrimaryCategory    func(childComplexity int) int
 		PublishedAt        func(childComplexity int) int
 		QualityRatingCount func(childComplexity int) int
+		RelatedMedia       func(childComplexity int) int
 		Response           func(childComplexity int) int
 		Tags               func(childComplexity int) int
 		URL                func(childComplexity int) int
@@ -162,6 +164,13 @@ type ComplexityRoot struct {
 		Source    func(childComplexity int) int
 	}
 
+	LyricsAvailability struct {
+		Available func(childComplexity int) int
+		CheckedAt func(childComplexity int) int
+		HasSynced func(childComplexity int) int
+		LrclibID  func(childComplexity int) int
+	}
+
 	Message struct {
 		Body      func(childComplexity int) int
 		CreatedAt func(childComplexity int) int
@@ -228,6 +237,7 @@ type ComplexityRoot struct {
 		CreateContentFromMovie          func(childComplexity int, input model.CreateContentFromMovieInput) int
 		CreateContentFromPassage        func(childComplexity int, input model.CreateContentFromPassageInput) int
 		CreateContentFromYouTube        func(childComplexity int, input model.CreateContentFromYouTubeInput) int
+		CreateContentFromYouTubeMusic   func(childComplexity int, input model.CreateContentFromYouTubeInput) int
 		CreateMessageThread             func(childComplexity int, input model.CreateMessageThreadInput) int
 		CreatePerspective               func(childComplexity int, input model.CreatePerspectiveInput) int
 		CreateTodoAction                func(childComplexity int, input model.CreateTodoActionInput) int
@@ -242,8 +252,11 @@ type ComplexityRoot struct {
 		EditMessage                     func(childComplexity int, messageID string, body string) int
 		LeaveThread                     func(childComplexity int, threadID string) int
 		MarkOnboardingSeen              func(childComplexity int, version int) int
+		MarkRelatedMediaUnavailable     func(childComplexity int, contentID int, videoID string) int
 		MarkThreadRead                  func(childComplexity int, threadID string, seq int) int
 		MuteThread                      func(childComplexity int, threadID string, muted bool) int
+		PromoteRelatedMedia             func(childComplexity int, contentID int, videoID string) int
+		RefreshLyricsAvailability       func(childComplexity int, contentID int) int
 		ReorderUserTodoList             func(childComplexity int, listID int, todoIds []int) int
 		SendMessage                     func(childComplexity int, input model.SendMessageInput) int
 		SetOnboardingDisplayNextSession func(childComplexity int, displayNextSession bool) int
@@ -368,6 +381,15 @@ type ComplexityRoot struct {
 		LastReadSeq func(childComplexity int) int
 		ThreadID    func(childComplexity int) int
 		UserID      func(childComplexity int) int
+	}
+
+	RelatedMedia struct {
+		ContentID   func(childComplexity int) int
+		Kind        func(childComplexity int) int
+		Provider    func(childComplexity int) int
+		Title       func(childComplexity int) int
+		Unavailable func(childComplexity int) int
+		VideoID     func(childComplexity int) int
 	}
 
 	StreamReset struct {
@@ -501,6 +523,10 @@ type MessageThreadResolver interface {
 type MutationResolver interface {
 	CreateContentFromYouTube(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error)
 	UpdateContentSourceData(ctx context.Context, contentID int) (*model.Content, error)
+	CreateContentFromYouTubeMusic(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error)
+	PromoteRelatedMedia(ctx context.Context, contentID int, videoID string) (*model.Content, error)
+	MarkRelatedMediaUnavailable(ctx context.Context, contentID int, videoID string) (*model.Content, error)
+	RefreshLyricsAvailability(ctx context.Context, contentID int) (*model.Content, error)
 	CreateContentFromMovie(ctx context.Context, input model.CreateContentFromMovieInput) (*model.Content, error)
 	CreateContentFromPassage(ctx context.Context, input model.CreateContentFromPassageInput) (*model.Content, error)
 	SetPassageDisplayTitle(ctx context.Context, input model.SetPassageDisplayTitleInput) (*model.Content, error)
@@ -749,6 +775,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.LikeCount(childComplexity), true
+	case "Content.lyrics":
+		if e.ComplexityRoot.Content.Lyrics == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.Lyrics(childComplexity), true
 	case "Content.movie":
 		if e.ComplexityRoot.Content.Movie == nil {
 			break
@@ -785,6 +817,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.QualityRatingCount(childComplexity), true
+	case "Content.relatedMedia":
+		if e.ComplexityRoot.Content.RelatedMedia == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.RelatedMedia(childComplexity), true
 	case "Content.response":
 		if e.ComplexityRoot.Content.Response == nil {
 			break
@@ -1077,6 +1115,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.LengthDisplay.Source(childComplexity), true
 
+	case "LyricsAvailability.available":
+		if e.ComplexityRoot.LyricsAvailability.Available == nil {
+			break
+		}
+
+		return e.ComplexityRoot.LyricsAvailability.Available(childComplexity), true
+	case "LyricsAvailability.checkedAt":
+		if e.ComplexityRoot.LyricsAvailability.CheckedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.LyricsAvailability.CheckedAt(childComplexity), true
+	case "LyricsAvailability.hasSynced":
+		if e.ComplexityRoot.LyricsAvailability.HasSynced == nil {
+			break
+		}
+
+		return e.ComplexityRoot.LyricsAvailability.HasSynced(childComplexity), true
+	case "LyricsAvailability.lrclibId":
+		if e.ComplexityRoot.LyricsAvailability.LrclibID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.LyricsAvailability.LrclibID(childComplexity), true
+
 	case "Message.body":
 		if e.ComplexityRoot.Message.Body == nil {
 			break
@@ -1361,6 +1424,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateContentFromYouTube(childComplexity, args["input"].(model.CreateContentFromYouTubeInput)), true
+	case "Mutation.createContentFromYouTubeMusic":
+		if e.ComplexityRoot.Mutation.CreateContentFromYouTubeMusic == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createContentFromYouTubeMusic_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateContentFromYouTubeMusic(childComplexity, args["input"].(model.CreateContentFromYouTubeInput)), true
 	case "Mutation.createMessageThread":
 		if e.ComplexityRoot.Mutation.CreateMessageThread == nil {
 			break
@@ -1515,6 +1589,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.MarkOnboardingSeen(childComplexity, args["version"].(int)), true
+	case "Mutation.markRelatedMediaUnavailable":
+		if e.ComplexityRoot.Mutation.MarkRelatedMediaUnavailable == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_markRelatedMediaUnavailable_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.MarkRelatedMediaUnavailable(childComplexity, args["contentId"].(int), args["videoId"].(string)), true
 	case "Mutation.markThreadRead":
 		if e.ComplexityRoot.Mutation.MarkThreadRead == nil {
 			break
@@ -1537,6 +1622,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.MuteThread(childComplexity, args["threadId"].(string), args["muted"].(bool)), true
+	case "Mutation.promoteRelatedMedia":
+		if e.ComplexityRoot.Mutation.PromoteRelatedMedia == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_promoteRelatedMedia_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.PromoteRelatedMedia(childComplexity, args["contentId"].(int), args["videoId"].(string)), true
+	case "Mutation.refreshLyricsAvailability":
+		if e.ComplexityRoot.Mutation.RefreshLyricsAvailability == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_refreshLyricsAvailability_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.RefreshLyricsAvailability(childComplexity, args["contentId"].(int)), true
 	case "Mutation.reorderUserTodoList":
 		if e.ComplexityRoot.Mutation.ReorderUserTodoList == nil {
 			break
@@ -2233,6 +2340,43 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ReadReceiptChanged.UserID(childComplexity), true
+
+	case "RelatedMedia.contentId":
+		if e.ComplexityRoot.RelatedMedia.ContentID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RelatedMedia.ContentID(childComplexity), true
+	case "RelatedMedia.kind":
+		if e.ComplexityRoot.RelatedMedia.Kind == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RelatedMedia.Kind(childComplexity), true
+	case "RelatedMedia.provider":
+		if e.ComplexityRoot.RelatedMedia.Provider == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RelatedMedia.Provider(childComplexity), true
+	case "RelatedMedia.title":
+		if e.ComplexityRoot.RelatedMedia.Title == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RelatedMedia.Title(childComplexity), true
+	case "RelatedMedia.unavailable":
+		if e.ComplexityRoot.RelatedMedia.Unavailable == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RelatedMedia.Unavailable(childComplexity), true
+	case "RelatedMedia.videoId":
+		if e.ComplexityRoot.RelatedMedia.VideoID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RelatedMedia.VideoID(childComplexity), true
 
 	case "StreamReset.threadId":
 		if e.ComplexityRoot.StreamReset.ThreadID == nil {
@@ -2980,8 +3124,32 @@ type Content {
   # less than perspectiveCount since Quality is optional. Meant for a tooltip
   # on the average rating display ("N quality ratings").
   qualityRatingCount: Int
+  # YOUTUBE_MUSIC: other uploads of the same song. References only; they are not
+  # content rows unless a user promotes one (contentId is then set). Empty otherwise.
+  relatedMedia: [RelatedMedia!]!
+  # YOUTUBE_MUSIC: whether LRCLIB has lyrics. Lyrics text is never stored or served.
+  # Null until the first check has run.
+  lyrics: LyricsAvailability
   createdAt: String!
   updatedAt: String!
+}
+
+type RelatedMedia {
+  provider: String!
+  videoId: String!
+  # audio | official_video | lyric_video | live | other
+  kind: String!
+  title: String
+  contentId: ID
+  unavailable: Boolean!
+}
+
+type LyricsAvailability {
+  available: Boolean!
+  # LRCLIB track id; the lyrics page is https://lrclib.net/tracks/<lrclibId>
+  lrclibId: Int
+  hasSynced: Boolean!
+  checkedAt: String!
 }
 
 # Pagination types
@@ -3033,6 +3201,7 @@ enum ContentType {
   YOUTUBE_VIDEO
   CLAIM
   BIBLE_PASSAGE
+  YOUTUBE_MUSIC
   MOVIE
 }
 
@@ -3282,6 +3451,14 @@ type Mutation {
   createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   updateContentSourceData(contentId: IntID!): Content! @auth
 
+  # YouTube Music mutations
+  createContentFromYouTubeMusic(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
+  # Explicit user action: make a related video its own YOUTUBE item. Returns that item.
+  promoteRelatedMedia(contentId: IntID!, videoId: String!): Content! @auth
+  # Called by the player when a related video cannot be embedded. Returns the track.
+  markRelatedMediaUnavailable(contentId: IntID!, videoId: String!): Content! @auth
+  # Re-checks lyrics availability only when the stored result is due. Returns the track.
+  refreshLyricsAvailability(contentId: IntID!): Content! @auth
   # Movie mutations
   createContentFromMovie(input: CreateContentFromMovieInput!): Content! @auth
 
@@ -3794,6 +3971,10 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_averageRating(ctx, field)
 	case "qualityRatingCount":
 		return ec.fieldContext_Content_qualityRatingCount(ctx, field)
+	case "relatedMedia":
+		return ec.fieldContext_Content_relatedMedia(ctx, field)
+	case "lyrics":
+		return ec.fieldContext_Content_lyrics(ctx, field)
 	case "createdAt":
 		return ec.fieldContext_Content_createdAt(ctx, field)
 	case "updatedAt":
@@ -3934,6 +4115,20 @@ func (ec *executionContext) childFields_LengthDisplay(ctx context.Context, field
 		return ec.fieldContext_LengthDisplay_precision(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type LengthDisplay", field.Name)
+}
+
+func (ec *executionContext) childFields_LyricsAvailability(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "available":
+		return ec.fieldContext_LyricsAvailability_available(ctx, field)
+	case "lrclibId":
+		return ec.fieldContext_LyricsAvailability_lrclibId(ctx, field)
+	case "hasSynced":
+		return ec.fieldContext_LyricsAvailability_hasSynced(ctx, field)
+	case "checkedAt":
+		return ec.fieldContext_LyricsAvailability_checkedAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type LyricsAvailability", field.Name)
 }
 
 func (ec *executionContext) childFields_Message(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -4162,6 +4357,24 @@ func (ec *executionContext) childFields_Perspective(ctx context.Context, field g
 		return ec.fieldContext_Perspective_updatedAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Perspective", field.Name)
+}
+
+func (ec *executionContext) childFields_RelatedMedia(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "provider":
+		return ec.fieldContext_RelatedMedia_provider(ctx, field)
+	case "videoId":
+		return ec.fieldContext_RelatedMedia_videoId(ctx, field)
+	case "kind":
+		return ec.fieldContext_RelatedMedia_kind(ctx, field)
+	case "title":
+		return ec.fieldContext_RelatedMedia_title(ctx, field)
+	case "contentId":
+		return ec.fieldContext_RelatedMedia_contentId(ctx, field)
+	case "unavailable":
+		return ec.fieldContext_RelatedMedia_unavailable(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type RelatedMedia", field.Name)
 }
 
 func (ec *executionContext) childFields_ThreadParticipant(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -4542,6 +4755,20 @@ func (ec *executionContext) field_Mutation_createContentFromPassage_args(ctx con
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_createContentFromYouTubeMusic_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.CreateContentFromYouTubeInput, error) {
+			return ec.unmarshalNCreateContentFromYouTubeInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromYouTubeInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createContentFromYouTube_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -4760,6 +4987,28 @@ func (ec *executionContext) field_Mutation_markOnboardingSeen_args(ctx context.C
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_markRelatedMediaUnavailable_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "contentId",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNIntID2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["contentId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "videoId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["videoId"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_markThreadRead_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -4801,6 +5050,42 @@ func (ec *executionContext) field_Mutation_muteThread_args(ctx context.Context, 
 		return nil, err
 	}
 	args["muted"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_promoteRelatedMedia_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "contentId",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNIntID2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["contentId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "videoId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["videoId"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_refreshLyricsAvailability_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "contentId",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNIntID2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["contentId"] = arg0
 	return args, nil
 }
 
@@ -6462,6 +6747,70 @@ func (ec *executionContext) fieldContext_Content_qualityRatingCount(_ context.Co
 	return graphql.NewScalarFieldContext("Content", field, true, true, errors.New("field of type Int does not have child fields"))
 }
 
+func (ec *executionContext) _Content_relatedMedia(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_relatedMedia(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.RelatedMedia, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.RelatedMedia) graphql.Marshaler {
+			return ec.marshalNRelatedMedia2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐRelatedMediaᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Content_relatedMedia(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Content",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_RelatedMedia(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Content_lyrics(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_lyrics(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Lyrics, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.LyricsAvailability) graphql.Marshaler {
+			return ec.marshalOLyricsAvailability2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐLyricsAvailability(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_lyrics(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Content",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_LyricsAvailability(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Content_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -7455,6 +7804,98 @@ func (ec *executionContext) fieldContext_LengthDisplay_precision(_ context.Conte
 	return graphql.NewScalarFieldContext("LengthDisplay", field, false, false, errors.New("field of type LengthPrecision does not have child fields"))
 }
 
+func (ec *executionContext) _LyricsAvailability_available(ctx context.Context, field graphql.CollectedField, obj *model.LyricsAvailability) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_LyricsAvailability_available(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Available, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_LyricsAvailability_available(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("LyricsAvailability", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _LyricsAvailability_lrclibId(ctx context.Context, field graphql.CollectedField, obj *model.LyricsAvailability) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_LyricsAvailability_lrclibId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LrclibID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_LyricsAvailability_lrclibId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("LyricsAvailability", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _LyricsAvailability_hasSynced(ctx context.Context, field graphql.CollectedField, obj *model.LyricsAvailability) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_LyricsAvailability_hasSynced(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.HasSynced, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_LyricsAvailability_hasSynced(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("LyricsAvailability", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _LyricsAvailability_checkedAt(ctx context.Context, field graphql.CollectedField, obj *model.LyricsAvailability) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_LyricsAvailability_checkedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CheckedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_LyricsAvailability_checkedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("LyricsAvailability", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _Message_id(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8431,6 +8872,234 @@ func (ec *executionContext) fieldContext_Mutation_updateContentSourceData(ctx co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateContentSourceData_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createContentFromYouTubeMusic(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_createContentFromYouTubeMusic(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CreateContentFromYouTubeMusic(ctx, fc.Args["input"].(model.CreateContentFromYouTubeInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.CreateContentResult
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.CreateContentResult) graphql.Marshaler {
+			return ec.marshalNCreateContentResult2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_createContentFromYouTubeMusic(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CreateContentResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createContentFromYouTubeMusic_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_promoteRelatedMedia(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_promoteRelatedMedia(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().PromoteRelatedMedia(ctx, fc.Args["contentId"].(int), fc.Args["videoId"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.Content
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Content) graphql.Marshaler {
+			return ec.marshalNContent2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_promoteRelatedMedia(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Content(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_promoteRelatedMedia_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_markRelatedMediaUnavailable(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_markRelatedMediaUnavailable(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().MarkRelatedMediaUnavailable(ctx, fc.Args["contentId"].(int), fc.Args["videoId"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.Content
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Content) graphql.Marshaler {
+			return ec.marshalNContent2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_markRelatedMediaUnavailable(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Content(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_markRelatedMediaUnavailable_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_refreshLyricsAvailability(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_refreshLyricsAvailability(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().RefreshLyricsAvailability(ctx, fc.Args["contentId"].(int))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.Content
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Content) graphql.Marshaler {
+			return ec.marshalNContent2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_refreshLyricsAvailability(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Content(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_refreshLyricsAvailability_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -12669,6 +13338,144 @@ func (ec *executionContext) _ReadReceiptChanged_lastReadSeq(ctx context.Context,
 }
 func (ec *executionContext) fieldContext_ReadReceiptChanged_lastReadSeq(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("ReadReceiptChanged", field, false, false, errors.New("field of type IntID does not have child fields"))
+}
+
+func (ec *executionContext) _RelatedMedia_provider(ctx context.Context, field graphql.CollectedField, obj *model.RelatedMedia) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RelatedMedia_provider(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Provider, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RelatedMedia_provider(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RelatedMedia", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _RelatedMedia_videoId(ctx context.Context, field graphql.CollectedField, obj *model.RelatedMedia) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RelatedMedia_videoId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.VideoID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RelatedMedia_videoId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RelatedMedia", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _RelatedMedia_kind(ctx context.Context, field graphql.CollectedField, obj *model.RelatedMedia) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RelatedMedia_kind(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Kind, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RelatedMedia_kind(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RelatedMedia", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _RelatedMedia_title(ctx context.Context, field graphql.CollectedField, obj *model.RelatedMedia) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RelatedMedia_title(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Title, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_RelatedMedia_title(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RelatedMedia", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _RelatedMedia_contentId(ctx context.Context, field graphql.CollectedField, obj *model.RelatedMedia) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RelatedMedia_contentId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ContentID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOID2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_RelatedMedia_contentId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RelatedMedia", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _RelatedMedia_unavailable(ctx context.Context, field graphql.CollectedField, obj *model.RelatedMedia) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RelatedMedia_unavailable(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Unavailable, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RelatedMedia_unavailable(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RelatedMedia", field, false, false, errors.New("field of type Boolean does not have child fields"))
 }
 
 func (ec *executionContext) _StreamReset_threadId(ctx context.Context, field graphql.CollectedField, obj *model.StreamReset) (ret graphql.Marshaler) {
@@ -17390,6 +18197,16 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "relatedMedia":
+			out.Values[i] = ec._Content_relatedMedia(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "lyrics":
+			out.Values[i] = ec._Content_lyrics(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "createdAt":
 			out.Values[i] = ec._Content_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -17894,6 +18711,59 @@ func (ec *executionContext) _LengthDisplay(ctx context.Context, sel ast.Selectio
 			}
 		case "precision":
 			out.Values[i] = ec._LengthDisplay_precision(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var lyricsAvailabilityImplementors = []string{"LyricsAvailability"}
+
+func (ec *executionContext) _LyricsAvailability(ctx context.Context, sel ast.SelectionSet, obj *model.LyricsAvailability) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, lyricsAvailabilityImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("LyricsAvailability")
+		case "available":
+			out.Values[i] = ec._LyricsAvailability_available(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lrclibId":
+			out.Values[i] = ec._LyricsAvailability_lrclibId(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "hasSynced":
+			out.Values[i] = ec._LyricsAvailability_hasSynced(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "checkedAt":
+			out.Values[i] = ec._LyricsAvailability_checkedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -18651,6 +19521,34 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateContentSourceData":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateContentSourceData(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createContentFromYouTubeMusic":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createContentFromYouTubeMusic(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "promoteRelatedMedia":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_promoteRelatedMedia(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "markRelatedMediaUnavailable":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_markRelatedMediaUnavailable(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "refreshLyricsAvailability":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_refreshLyricsAvailability(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -20129,6 +21027,69 @@ func (ec *executionContext) _ReadReceiptChanged(ctx context.Context, sel ast.Sel
 			}
 		case "lastReadSeq":
 			out.Values[i] = ec._ReadReceiptChanged_lastReadSeq(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var relatedMediaImplementors = []string{"RelatedMedia"}
+
+func (ec *executionContext) _RelatedMedia(ctx context.Context, sel ast.SelectionSet, obj *model.RelatedMedia) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, relatedMediaImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RelatedMedia")
+		case "provider":
+			out.Values[i] = ec._RelatedMedia_provider(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "videoId":
+			out.Values[i] = ec._RelatedMedia_videoId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "kind":
+			out.Values[i] = ec._RelatedMedia_kind(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "title":
+			out.Values[i] = ec._RelatedMedia_title(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "contentId":
+			out.Values[i] = ec._RelatedMedia_contentId(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "unavailable":
+			out.Values[i] = ec._RelatedMedia_unavailable(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -22144,6 +23105,32 @@ func (ec *executionContext) marshalNPrivacy2githubᚗcomᚋCodeWarriorᚑdebug�
 	return res
 }
 
+func (ec *executionContext) marshalNRelatedMedia2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐRelatedMediaᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.RelatedMedia) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNRelatedMedia2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐRelatedMedia(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNRelatedMedia2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐRelatedMedia(ctx context.Context, sel ast.SelectionSet, v *model.RelatedMedia) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._RelatedMedia(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNSendMessageInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSendMessageInput(ctx context.Context, v any) (model.SendMessageInput, error) {
 	res, err := ec.unmarshalInputSendMessageInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -22995,6 +23982,13 @@ func (ec *executionContext) marshalOLengthDisplay2ᚖgithubᚗcomᚋCodeWarrior�
 		return graphql.Null
 	}
 	return ec._LengthDisplay(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOLyricsAvailability2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐLyricsAvailability(ctx context.Context, sel ast.SelectionSet, v *model.LyricsAvailability) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._LyricsAvailability(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOMessageThread2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐMessageThread(ctx context.Context, sel ast.SelectionSet, v *model.MessageThread) graphql.Marshaler {

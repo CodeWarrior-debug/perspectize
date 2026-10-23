@@ -1,0 +1,80 @@
+[
+ {
+  "id": 36902193,
+  "name": "Bohemian rhapsody",
+  "trackName": "Bohemian rhapsody",
+  "artistName": "Queen",
+  "albumName": "The greatest hits",
+  "duration": 351.0,
+  "instrumental": false,
+  "hasWordSync": false,
+  "plainLyrics": "PLAINLYRICS-PLACEHOLDER",
+  "syncedLyrics": "SYNCEDLYRICS-PLACEHOLDER",
+  "lyricsfile": "LYRICSFILE-PLACEHOLDER"
+ },
+ {
+  "id": 36925259,
+  "name": "Bohemian Rhapsody",
+  "trackName": "Bohemian Rhapsody",
+  "artistName": "Queen",
+  "albumName": "Bohemian Rhapsody (The Original Soundtrack)",
+  "duration": 317.0,
+  "instrumental": false,
+  "hasWordSync": false,
+  "plainLyrics": "PLAINLYRICS-PLACEHOLDER",
+  "syncedLyrics": "SYNCEDLYRICS-PLACEHOLDER",
+  "lyricsfile": "LYRICSFILE-PLACEHOLDER"
+ },
+ {
+  "id": 36978827,
+  "name": "Bohemian rhapsody",
+  "trackName": "Bohemian rhapsody",
+  "artistName": "Queen",
+  "albumName": "Varie",
+  "duration": 354.0,
+  "instrumental": false,
+  "hasWordSync": false,
+  "plainLyrics": "PLAINLYRICS-PLACEHOLDER",
+  "syncedLyrics": "SYNCEDLYRICS-PLACEHOLDER",
+  "lyricsfile": "LYRICSFILE-PLACEHOLDER"
+ },
+ {
+  "id": 37008539,
+  "name": "Bohemian Rhapsody",
+  "trackName": "Bohemian Rhapsody",
+  "artistName": "Queen",
+  "albumName": "Greatest Hits I II & III (The Platinum Collection)",
+  "duration": 263.0,
+  "instrumental": false,
+  "hasWordSync": false,
+  "plainLyrics": "PLAINLYRICS-PLACEHOLDER",
+  "syncedLyrics": "SYNCEDLYRICS-PLACEHOLDER",
+  "lyricsfile": "LYRICSFILE-PLACEHOLDER"
+ },
+ {
+  "id": 37482678,
+  "name": "Bohemian Rhapsody",
+  "trackName": "Bohemian Rhapsody",
+  "artistName": "Queen",
+  "albumName": "Bubanee Music",
+  "duration": 358.0,
+  "instrumental": false,
+  "hasWordSync": false,
+  "plainLyrics": "PLAINLYRICS-PLACEHOLDER",
+  "syncedLyrics": "SYNCEDLYRICS-PLACEHOLDER",
+  "lyricsfile": "LYRICSFILE-PLACEHOLDER"
+ },
+ {
+  "id": 37508135,
+  "name": "Bohemian Rhapsody",
+  "trackName": "Bohemian Rhapsody",
+  "artistName": "Queen",
+  "albumName": "[Unknown Album]",
+  "duration": 359.0,
+  "instrumental": false,
+  "hasWordSync": false,
+  "plainLyrics": "PLAINLYRICS-PLACEHOLDER",
+  "syncedLyrics": "SYNCEDLYRICS-PLACEHOLDER",
+  "lyricsfile": "LYRICSFILE-PLACEHOLDER"
+ }
+]

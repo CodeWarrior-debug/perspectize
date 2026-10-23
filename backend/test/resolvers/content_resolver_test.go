@@ -1478,6 +1478,14 @@ func (m *mockContentRepository) ClearDisplayTitle(ctx context.Context, contentID
 	return nil
 }
 
+func (m *mockContentRepository) GetByISRC(ctx context.Context, isrc string) (*domain.Content, error) {
+	return nil, domain.ErrNotFound
+}
+
+func (m *mockContentRepository) SetResponseKey(ctx context.Context, contentID int, key string, value json.RawMessage) error {
+	return nil
+}
+
 func TestPaginatedContentQuery_WithPersonFilter(t *testing.T) {
 	var got domain.ContentListParams
 	repo := &mockContentRepository{

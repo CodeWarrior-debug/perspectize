@@ -5,7 +5,7 @@
 	import { useAddMovie } from '$lib/queries/content/useAddMovie';
 	import { useAddVideo } from '$lib/queries/content/useAddVideo';
 	import { useAddPassage } from '$lib/queries/content/useAddPassage';
-	import { validateYouTubeUrl } from '$lib/utils/youtube';
+	import { validateYouTubeUrl, classifyYouTubeUrl } from '$lib/utils/youtube';
 	import { contentNotAllowedMessage, validateMovieInput } from '$lib/utils/movie';
 	import { detectContentType } from '$lib/utils/detectContentType';
 	import type { PassageRange } from '$lib/utils/bible';
@@ -80,7 +80,9 @@
 		if (!effectiveType) return 'Select a type';
 		const name =
 			effectiveType === 'YOUTUBE_VIDEO'
-				? 'YouTube'
+				? classifyYouTubeUrl(input) === 'musicTrack'
+					? 'YouTube Music'
+					: 'YouTube'
 				: effectiveType === 'BIBLE_PASSAGE'
 					? 'Bible passage'
 					: effectiveType === 'MOVIE'
@@ -88,6 +90,8 @@
 						: 'Claim';
 		return manualType ? `Type: ${name}` : `Detected: ${name}`;
 	});
+
+	const isMusicCollection = $derived(classifyYouTubeUrl(input) === 'musicCollection');
 
 	const isSubmitDisabled = $derived.by(() => {
 		if (effectiveType === 'YOUTUBE_VIDEO' || effectiveType === 'MOVIE') return !input.trim();
@@ -172,7 +176,7 @@
 	{triggerVariant}
 	triggerLabel="Add Content"
 	title="Add Content"
-	description="Paste a YouTube, TMDB or IMDb link, or type a Bible reference like John 3:16-18."
+	description="Paste a YouTube, YouTube Music, TMDB or IMDb link, or type a Bible reference like John 3:16-18."
 	submitLabel="Add"
 	pendingLabel="Adding..."
 	{isPending}
@@ -209,6 +213,10 @@
 			</div>
 			{#if error}
 				<p class="text-sm text-red-600">{error}</p>
+			{:else if isMusicCollection}
+				<p data-testid="music-collection-notice" class="text-sm text-red-600">
+					This is an album, playlist, or artist page. Paste a link to a single song.
+				</p>
 			{/if}
 			{#if effectiveType === 'MOVIE' && movieMutation.isError}
 				<p class="text-sm text-red-600">

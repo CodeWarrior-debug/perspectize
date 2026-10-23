@@ -57,17 +57,19 @@ type Content struct {
 	Description   *string               `json:"description,omitempty"`
 	Response      map[string]any        `json:"response,omitempty"`
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
-	Movie              map[string]any `json:"movie,omitempty"`
-	PrimaryCategory    *Category      `json:"primaryCategory,omitempty"`
-	VerseStartID       *int           `json:"verseStartID,omitempty"`
-	VerseEndID         *int           `json:"verseEndID,omitempty"`
-	DisplayTitle       *string        `json:"displayTitle,omitempty"`
-	PerspectiveCount   *int           `json:"perspectiveCount,omitempty"`
-	AverageRating      *float64       `json:"averageRating,omitempty"`
-	QualityRatingCount *int           `json:"qualityRatingCount,omitempty"`
-	CreatedAt          string         `json:"createdAt"`
-	UpdatedAt          string         `json:"updatedAt"`
-	PrimaryCategoryID  *int           `json:"-"`
+	Movie              map[string]any      `json:"movie,omitempty"`
+	PrimaryCategory    *Category           `json:"primaryCategory,omitempty"`
+	VerseStartID       *int                `json:"verseStartID,omitempty"`
+	VerseEndID         *int                `json:"verseEndID,omitempty"`
+	DisplayTitle       *string             `json:"displayTitle,omitempty"`
+	PerspectiveCount   *int                `json:"perspectiveCount,omitempty"`
+	AverageRating      *float64            `json:"averageRating,omitempty"`
+	QualityRatingCount *int                `json:"qualityRatingCount,omitempty"`
+	RelatedMedia       []*RelatedMedia     `json:"relatedMedia"`
+	Lyrics             *LyricsAvailability `json:"lyrics,omitempty"`
+	CreatedAt          string              `json:"createdAt"`
+	UpdatedAt          string              `json:"updatedAt"`
+	PrimaryCategoryID  *int                `json:"-"`
 }
 
 type ContentFilter struct {
@@ -262,6 +264,13 @@ type InterlinearWord struct {
 	Segment     *int   `json:"segment,omitempty"`
 }
 
+type LyricsAvailability struct {
+	Available bool   `json:"available"`
+	LrclibID  *int   `json:"lrclibId,omitempty"`
+	HasSynced bool   `json:"hasSynced"`
+	CheckedAt string `json:"checkedAt"`
+}
+
 type MessageConnection struct {
 	Items    []*Message `json:"items"`
 	PageInfo *PageInfo  `json:"pageInfo"`
@@ -408,6 +417,15 @@ type ReadReceiptChanged struct {
 }
 
 func (ReadReceiptChanged) IsThreadEvent() {}
+
+type RelatedMedia struct {
+	Provider    string  `json:"provider"`
+	VideoID     string  `json:"videoId"`
+	Kind        string  `json:"kind"`
+	Title       *string `json:"title,omitempty"`
+	ContentID   *string `json:"contentId,omitempty"`
+	Unavailable bool    `json:"unavailable"`
+}
 
 type SendMessageInput struct {
 	ThreadID    string `json:"threadId"`
