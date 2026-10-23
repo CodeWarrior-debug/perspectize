@@ -6,21 +6,19 @@ import AddContentPopover from '$lib/components/AddContentPopover.svelte';
 const mocks = vi.hoisted(() => ({
 	video: { mutate: vi.fn(), isPending: false, isSuccess: false },
 	passage: { mutate: vi.fn(), isPending: false, isSuccess: false },
-		claim: { mutate: vi.fn(), isPending: false, isSuccess: false },
-		movie: {
-			mutate: vi.fn(),
-			reset: vi.fn(),
-			isPending: false,
-			isSuccess: false,
-			isError: false,
-			error: null as unknown,
-		},
+	movie: {
+		mutate: vi.fn(),
+		reset: vi.fn(),
+		isPending: false,
+		isSuccess: false,
+		isError: false,
+		error: null as unknown,
+	},
 }));
 
 vi.mock('$lib/queries/content/useAddVideo', () => ({ useAddVideo: () => mocks.video }));
 vi.mock('$lib/queries/content/useAddMovie', () => ({ useAddMovie: () => mocks.movie }));
 vi.mock('$lib/queries/content/useAddPassage', () => ({ useAddPassage: () => mocks.passage }));
-vi.mock('$lib/queries/content/useCreateClaim', () => ({ useCreateClaim: () => mocks.claim }));
 
 const JOHN = 43;
 const YT = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
@@ -39,7 +37,7 @@ async function openWith(text?: string) {
 }
 
 async function type(text: string) {
-	await fireEvent.input(screen.getByPlaceholderText(/paste a link, type a reference, or write a claim/i), {
+	await fireEvent.input(screen.getByPlaceholderText(/paste a link or type a reference/i), {
 		target: { value: text },
 	});
 	await tick();
@@ -54,7 +52,7 @@ const pick = async (label: RegExp | string, value: string | number) => {
 
 beforeEach(() => {
 	vi.clearAllMocks();
-		for (const m of [mocks.video, mocks.passage, mocks.claim, mocks.movie]) {
+	for (const m of [mocks.video, mocks.passage, mocks.movie]) {
 		m.isPending = false;
 		m.isSuccess = false;
 	}
@@ -117,23 +115,21 @@ describe('AddContentPopover detection states', () => {
 		expect(submit()).toBeDisabled();
 	});
 
-	it('claim-like text: chip says Claim, private note, submits the trimmed text', async () => {
+	it('free text only is no match: chip says Select a type, submit disabled, nothing is saved', async () => {
 		await openWith('  Grace is unearned favor  ');
-		expect(chip()).toHaveTextContent('Detected: Claim');
-		expect(screen.getByText(/claims are private/i)).toBeInTheDocument();
-		expect(submit()).toBeEnabled();
+		expect(chip()).toHaveTextContent('Select a type');
+		expect(submit()).toBeDisabled();
 		await fireEvent.click(submit());
-		expect(mocks.claim.mutate).toHaveBeenCalledWith({ text: 'Grace is unearned favor', userID: 0 });
 		expect(mocks.video.mutate).not.toHaveBeenCalled();
 		expect(mocks.passage.mutate).not.toHaveBeenCalled();
+		expect(mocks.movie.mutate).not.toHaveBeenCalled();
 	});
 
-	it('manually picking Claim on a single word keeps submit disabled with a hint', async () => {
+	it('the type select offers no Claim option', async () => {
 		await openWith('grace');
-		await pick(/change type/i, 'CLAIM');
-		expect(chip()).toHaveTextContent('Type: Claim');
-		expect(screen.getByText(/at least two words/i)).toBeInTheDocument();
-		expect(submit()).toBeDisabled();
+		const select = screen.getByLabelText(/change type/i);
+		expect(select.querySelector('option[value="CLAIM"]')).toBeNull();
+		expect(screen.queryByRole('option', { name: 'Claim' })).toBeNull();
 	});
 });
 
@@ -221,7 +217,7 @@ describe('AddContentPopover clear buttons', () => {
 		await pick('End verse', 20);
 		await fireEvent.click(screen.getByRole('button', { name: /clear all/i }));
 		await tick();
-		expect(screen.getByPlaceholderText(/paste a link, type a reference, or write a claim/i)).toHaveValue('');
+		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toHaveValue('');
 		expect(chip()).toHaveTextContent('Select a type');
 		expect(screen.queryByTestId('passage-picker')).toBeNull();
 	});
@@ -240,7 +236,7 @@ describe('AddContentPopover clear buttons', () => {
 		expect(screen.getByLabelText('Start chapter')).toHaveValue('1');
 		expect(screen.getByLabelText('Start verse')).toHaveValue('1');
 		expect(screen.getByLabelText('End verse')).toHaveValue('1');
-		expect(screen.getByPlaceholderText(/paste a link, type a reference, or write a claim/i)).toHaveValue('');
+		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toHaveValue('');
 	});
 
 	it('Clear type is disabled when no type is selected', async () => {
@@ -299,7 +295,7 @@ describe('AddContentPopover movies', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /clear type/i }));
 		await tick();
 		expect(chip()).toHaveTextContent('Type: Movie');
-		expect(screen.getByPlaceholderText(/paste a link, type a reference, or write a claim/i)).toHaveValue('');
+		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toHaveValue('');
 	});
 
 	it('a generic error shows the generic message', async () => {
@@ -318,14 +314,14 @@ describe('AddContentPopover movies', () => {
 		await openWith(TMDB);
 		expect(screen.getByText(NOT_ALLOWED)).toBeInTheDocument();
 		expect(screen.queryByText(/could not add this movie/i)).toBeNull();
-		expect(screen.getByPlaceholderText(/paste a link, type a reference, or write a claim/i)).toBeEnabled();
+		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toBeEnabled();
 	});
 
 	it('pending disables the form', async () => {
 		mocks.movie.isPending = true;
 		await openWith(TMDB);
 		expect(screen.getByRole('button', { name: 'Adding...' })).toBeDisabled();
-		expect(screen.getByPlaceholderText(/paste a link, type a reference, or write a claim/i)).toBeDisabled();
+		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toBeDisabled();
 	});
 
 	it('opening the popover resets the movie mutation', async () => {

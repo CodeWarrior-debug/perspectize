@@ -19,7 +19,7 @@ vi.mock('svelte-sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } })
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
 const URL_OK = 'https://www.themoviedb.org/movie/949';
-const PLACEHOLDER = /paste a link, type a reference, or write a claim/i;
+const PLACEHOLDER = /paste a link or type a reference/i;
 
 function renderPopover() {
 	const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });

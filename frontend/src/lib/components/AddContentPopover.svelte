@@ -5,7 +5,6 @@
 	import { useAddMovie } from '$lib/queries/content/useAddMovie';
 	import { useAddVideo } from '$lib/queries/content/useAddVideo';
 	import { useAddPassage } from '$lib/queries/content/useAddPassage';
-	import { useCreateClaim } from '$lib/queries/content/useCreateClaim';
 	import { validateYouTubeUrl } from '$lib/utils/youtube';
 	import { contentNotAllowedMessage, validateMovieInput } from '$lib/utils/movie';
 	import { detectContentType } from '$lib/utils/detectContentType';
@@ -17,8 +16,8 @@
 	import EraserIcon from '@lucide/svelte/icons/eraser';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 
-	type ChosenType = 'YOUTUBE_VIDEO' | 'BIBLE_PASSAGE' | 'MOVIE' | 'CLAIM';
-	const CHOSEN_TYPES: ChosenType[] = ['YOUTUBE_VIDEO', 'BIBLE_PASSAGE', 'MOVIE', 'CLAIM'];
+	type ChosenType = 'YOUTUBE_VIDEO' | 'BIBLE_PASSAGE' | 'MOVIE';
+	const CHOSEN_TYPES: ChosenType[] = ['YOUTUBE_VIDEO', 'BIBLE_PASSAGE', 'MOVIE'];
 
 	let {
 		triggerVariant = 'default',
@@ -26,8 +25,6 @@
 		triggerVariant?: 'default' | 'outline' | 'ghost';
 	} = $props();
 
-	// Created first so the YouTube hook stays the last createMutation call (existing tests capture its options).
-	const claimMutation = useCreateClaim();
 	const movieMutation = useAddMovie();
 
 	let open = $state(false);
@@ -60,9 +57,6 @@
 
 	const detected = $derived(detectContentType(input));
 	const effectiveType = $derived<ChosenType | null>(manualType ?? detected.type);
-	// A claim is free text of at least two words (same rule autodetection uses).
-	const claimText = $derived(input.trim());
-	const claimValid = $derived(/\s/.test(claimText));
 	const range = $derived<PassageRange>(
 		rangeOverride ?? (detected.type === 'BIBLE_PASSAGE' ? detected.range : defaultRange(1)),
 	);
@@ -70,17 +64,10 @@
 
 	const passageMutation = useAddPassage();
 	const videoMutation = useAddVideo();
-	const isPending = $derived(
-		videoMutation.isPending || passageMutation.isPending || movieMutation.isPending || claimMutation.isPending,
-	);
+	const isPending = $derived(videoMutation.isPending || passageMutation.isPending || movieMutation.isPending);
 
 	$effect(() => {
-		if (
-			videoMutation.isSuccess ||
-			passageMutation.isSuccess ||
-			movieMutation.isSuccess ||
-			claimMutation.isSuccess
-		) {
+		if (videoMutation.isSuccess || passageMutation.isSuccess || movieMutation.isSuccess) {
 			open = false;
 		}
 	});
@@ -90,20 +77,13 @@
 	const chipLabel = $derived.by(() => {
 		if (!effectiveType) return 'Select a type';
 		const name =
-			effectiveType === 'YOUTUBE_VIDEO'
-				? 'YouTube'
-				: effectiveType === 'BIBLE_PASSAGE'
-					? 'Bible passage'
-					: effectiveType === 'MOVIE'
-						? 'Movie'
-						: 'Claim';
+			effectiveType === 'YOUTUBE_VIDEO' ? 'YouTube' : effectiveType === 'BIBLE_PASSAGE' ? 'Bible passage' : 'Movie';
 		return manualType ? `Type: ${name}` : `Detected: ${name}`;
 	});
 
 	const isSubmitDisabled = $derived.by(() => {
 		if (effectiveType === 'YOUTUBE_VIDEO' || effectiveType === 'MOVIE') return !input.trim();
 		if (effectiveType === 'BIBLE_PASSAGE') return !rangeValid;
-		if (effectiveType === 'CLAIM') return !claimValid;
 		return true;
 	});
 
@@ -166,11 +146,6 @@
 			// Only the numeric range is sent; the server regenerates the canonical
 			// name/url, so a pasted Bible Gateway link is never stored.
 			passageMutation.mutate(range);
-		} else if (effectiveType === 'CLAIM') {
-			if (!claimValid) return;
-			error = '';
-			// userID 0 = derive from the Clerk session. No parent: claims stand alone.
-			claimMutation.mutate({ text: claimText, userID: 0 });
 		}
 	}
 
@@ -189,7 +164,7 @@
 	{triggerVariant}
 	triggerLabel="Add Content"
 	title="Add Content"
-	description="Paste a YouTube, TMDB or IMDb link, type a Bible reference like John 3:16-18, or write a claim."
+	description="Paste a YouTube, TMDB or IMDb link, or type a Bible reference like John 3:16-18."
 	submitLabel="Add"
 	pendingLabel="Adding..."
 	{isPending}
@@ -201,12 +176,12 @@
 	{/snippet}
 	{#snippet formFields()}
 		<div class="space-y-2">
-			<Label for="content-input">Link, reference, or claim</Label>
+			<Label for="content-input">Link or reference</Label>
 			<div class="relative">
 				<Input
 					id="content-input"
 					type="text"
-					placeholder="Paste a link, type a reference, or write a claim"
+					placeholder="Paste a link or type a reference"
 					bind:value={input}
 					oninput={resetOverrides}
 					disabled={isPending}
@@ -246,7 +221,6 @@
 					<option value="YOUTUBE_VIDEO">YouTube</option>
 					<option value="BIBLE_PASSAGE">Bible passage</option>
 					<option value="MOVIE">Movie</option>
-					<option value="CLAIM">Claim</option>
 				</select>
 				<div class="ml-auto flex items-center gap-1">
 					<button
@@ -273,16 +247,6 @@
 					</button>
 				</div>
 			</div>
-
-			{#if effectiveType === 'CLAIM'}
-				<p class="text-sm text-muted-foreground">
-					{#if claimValid}
-						Claims are private — only you can see them for now.
-					{:else}
-						Write the claim as a statement of at least two words.
-					{/if}
-				</p>
-			{/if}
 
 			{#if effectiveType === 'MOVIE'}
 				<p class="text-xs text-muted-foreground">

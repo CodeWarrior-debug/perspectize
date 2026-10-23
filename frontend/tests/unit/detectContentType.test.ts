@@ -25,7 +25,6 @@ describe('detectContentType', () => {
 	const bg = 'https://www.biblegateway.com/passage/?search=Genesis+1%3A1-3&version=NIV';
 	const gw = { type: 'BIBLE_PASSAGE', range: GEN_1_1_3, source: 'biblegateway' };
 	const txt = (range: unknown) => ({ type: 'BIBLE_PASSAGE', range, source: 'text' });
-	const claim = (text: string) => ({ type: 'CLAIM', text });
 	const cases: Array<[string, string, unknown]> = [
 		['youtube watch url', yt, { type: 'YOUTUBE_VIDEO', url: yt }],
 		['youtube url with surrounding whitespace', `  ${yt}  `, { type: 'YOUTUBE_VIDEO', url: yt }],
@@ -57,13 +56,9 @@ describe('detectContentType', () => {
 		['typed reference', 'Genesis 1:1-3', txt(GEN_1_1_3)],
 		['typed reference with padding', '  Genesis 1:1-3 ', txt(GEN_1_1_3)],
 		['chapter-only reference is a valid passage', 'John 3', txt(JOHN_3)],
-		['multi-word free text is a claim', 'Love one another', claim('Love one another')],
-		[
-			'reference embedded in a sentence is a claim',
-			'John 3:16 is my favorite verse',
-			claim('John 3:16 is my favorite verse'),
-		],
-		['claim text is trimmed', '  Grace is unearned ', claim('Grace is unearned')],
+		['multi-word free text is no match', 'Love one another', { type: null }],
+		['reference embedded in a sentence is no match', 'John 3:16 is my favorite verse', { type: null }],
+		['free text is trimmed and still no match', '  Grace is unearned ', { type: null }],
 		['empty', '', { type: null }],
 		['whitespace only', '   ', { type: null }],
 		['single bare word is not guessed', 'grace', { type: null }],
