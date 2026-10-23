@@ -32,6 +32,7 @@
 	// The pick is transient: never persisted, and cleared whenever the popover is closed.
 	let picked = $state<ChartType | null>(null);
 	const type = $derived(picked ?? defaultChartType(colId));
+	const empty = $derived(Math.max(total - values.length, 0));
 
 	$effect(() => {
 		if (!open) picked = null;
@@ -51,21 +52,22 @@
 				aria-label={`${label} chart`}
 				data-testid="column-chart-popover"
 			>
-				<div role="radiogroup" aria-label="Chart type" class="mb-3 flex flex-wrap gap-1">
+				<div role="group" aria-label="Chart type" class="mb-3 flex flex-wrap gap-1">
 					{#each CHART_TYPES as t (t)}
 						<button
 							type="button"
-							role="radio"
-							aria-checked={t === type}
+							aria-pressed={t === type}
 							class="rounded-full border px-2 py-0.5 text-xs {t === type
 								? 'bg-primary text-primary-foreground border-primary'
-								: 'bg-secondary text-secondary-foreground hover:bg-accent'}"
+								: 'border-border bg-secondary text-secondary-foreground hover:bg-accent'}"
 							onclick={() => (picked = t)}>{CHART_TYPE_LABELS[t]}</button
 						>
 					{/each}
 				</div>
 				<ColumnChart {type} {values} {total} {ranked} {format} />
-				<p class="text-muted-foreground mt-2 text-xs">based on {values.length} loaded movies</p>
+				<p class="text-muted-foreground mt-2 text-xs">
+					based on {values.length} loaded {values.length === 1 ? 'movie' : 'movies'} · {empty} empty
+				</p>
 			</PopoverContent>
 		</PopoverPrimitive.Portal>
 	{/if}
