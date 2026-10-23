@@ -23,12 +23,14 @@ The workflow needs two values in the GitHub repo settings:
 
 | Name | Kind | Value |
 |---|---|---|
-| `NEON_API_KEY` | secret | A Neon API key for project `lively-fog-94104513` |
+| `NEON_API_KEY` | secret | A Neon API key. The integration creates one; manual setup should use a key scoped as narrowly as the console allows. |
 | `NEON_PROJECT_ID` | variable | `lively-fog-94104513` |
 
 There are two ways to set them:
 
-1. **Neon GitHub integration (recommended by Neon).** In the Neon console, connect the project to `CodeWarrior-debug/perspectize`. This installs the Neon GitHub app on the repo and sets both values for you. Install it only on this repo.
+1. **Neon GitHub integration (recommended by Neon).** In the Neon console, open the project's **Integrations** page, click **Add** on the GitHub card, install the GitHub App with **Only select repositories** set to `CodeWarrior-debug/perspectize`, then **Connect**. The integration creates `NEON_API_KEY` and `NEON_PROJECT_ID` in the repo.
+   - Trade-off: the key it creates is **account-wide**, so it can call any Neon API method on the account, not just this project. It is named `API key for GitHub (...)` under Neon account Settings → API keys. Removing the integration (Account Settings → Integrations → Remove) or disconnecting the project deletes the key and both repo values.
+   - The integration does not create branches by itself. Branches come only from workflows in this repo, so it doesn't duplicate `neon-preview-branch.yml`. Don't add Neon's sample workflow (it creates `preview/pr-*` branches and would double up).
 2. **Manual.** Create an API key in the Neon console, then:
    ```
    gh secret set NEON_API_KEY        # paste the key when prompted
