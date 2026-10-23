@@ -38,13 +38,19 @@ function readEnvFile(file) {
 	return env;
 }
 
-function listening(port) {
+// Vite binds `localhost`, which is IPv6-only (::1) on macOS, while the Go server binds every
+// interface. Probe both loopback addresses so neither server is reported as not listening.
+function listeningOn(port, host) {
 	return new Promise((resolve) => {
-		const s = net.connect({ port, host: '127.0.0.1' });
+		const s = net.connect({ port, host });
 		s.setTimeout(500, () => (s.destroy(), resolve(false)));
 		s.once('connect', () => (s.destroy(), resolve(true)));
 		s.once('error', () => resolve(false));
 	});
+}
+
+async function listening(port) {
+	return (await listeningOn(port, '127.0.0.1')) || (await listeningOn(port, '::1'));
 }
 
 async function waitForPort(port, child, seconds, label) {
