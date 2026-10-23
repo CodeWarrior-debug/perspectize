@@ -252,12 +252,15 @@ describe('column charts on the activity grid', () => {
 		it('labels duration charts as h:mm', async () => {
 			flagsOn('duration');
 			render(ActivityTableHarness);
-			await expect.poll(() => header('duration')?.querySelector('[data-chart-col]')).not.toBeNull();
+			await expect.poll(() => header('duration')?.querySelector('[data-chart-col]:not([hidden])')).not.toBeNull();
 
 			(document.querySelector('[data-testid="column-chart-button-duration"]') as HTMLElement).click();
-			// Shortest film is 100 minutes, longest 140.
-			await expect.element(browserPage.getByText('1:40').first()).toBeVisible();
-			await expect.element(browserPage.getByText('2:20').first()).toBeVisible();
+			// Shortest film is 100 minutes, longest 140. Read only the popover's own axis labels, exact text.
+			const popover = () => document.querySelector('[data-testid="column-chart-popover"]');
+			const labels = () => [...(popover()?.querySelectorAll('text') ?? [])].map((t) => t.textContent?.trim());
+			await expect.poll(labels).toContain('1:40');
+			expect(labels()).toContain('2:20');
+			expect(popover()?.textContent).not.toContain('1:40:00');
 		});
 
 		it('closes an open chart when its switch is turned off in the picker', async () => {
