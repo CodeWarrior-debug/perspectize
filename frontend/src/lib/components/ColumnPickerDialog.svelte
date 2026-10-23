@@ -67,7 +67,7 @@
 				aria-label="{col.label} chart"
 				class="mr-2 rounded-full border px-2 py-0.5 text-xs {chartFlags[col.colId]
 					? 'border-primary bg-primary text-primary-foreground'
-					: 'bg-secondary text-secondary-foreground hover:bg-accent'}"
+					: 'border-border bg-secondary text-secondary-foreground hover:bg-accent'}"
 				onclick={() => onChartChange?.(col.colId, !(chartFlags[col.colId] ?? false))}
 			>
 				Chart {chartFlags[col.colId] ? 'on' : 'off'}
