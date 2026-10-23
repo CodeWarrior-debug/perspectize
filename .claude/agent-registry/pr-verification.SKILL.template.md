@@ -14,18 +14,31 @@ Browser verification shares one machine's dev-server ports and its signed-in Chr
 agent-registry hands them out one session at a time. **Never start dev servers or drive the
 browser for verification without holding a slot.**
 
-`R=.claude/agent-registry/agent-registry.mjs` (run from your checkout).
+`R=.claude/agent-registry/agent-registry.mjs` (run from your checkout). Each Bash call is a fresh
+shell, so a variable set in one call is gone in the next: write the path out in full.
+
+**Subagents share their parent's session, so they share its slot.** They cannot queue behind it or be
+refused by it. Take the slot once, in the main session, and check the browser is signed in
+before you hand work to anyone.
 
 ## 1. Take the slot
+
+Look first, read-only: `node $R status` shows who holds each slot. Then take it:
 
 ```sh
 node $R verify-acquire
 ```
 
 - **Exit 0 `ACQUIRED`** prints `slot`, `backendPort`, `frontendPort`, `chromeDebugPort`. Use exactly those ports.
-- **Exit 2 `BUSY`** prints who holds it. Do **not** poll in your own turns: start the waiter
+- **Exit 2 `BUSY`** prints who holds it. If the holder is a live agent working on the same change,
+  tell the human instead of waiting. Do **not** poll in your own turns: start the waiter
   in the background (Bash tool, `run_in_background: true`) and end your turn or do other work. You will be
-  woken when it exits, already holding the slot:
+  woken when it exits, already holding the slot.
+
+  **One-shot sessions (`claude -p`) must not start the background waiter.** The session ends when its
+  turn does, so the waiter can acquire the slot after nobody is left to release it and block the next
+  agent. Report BUSY and the holder, then stop. Only wait in the foreground, with a timeout, if the
+  task needs the slot and you will stay until you have released it.
 
   ```sh
   node $R verify-wait
@@ -62,8 +75,10 @@ node $R verify-started frontend
 node $R verify-release
 ```
 
-This stops the servers recorded in step 2 and frees the slot for the next waiter. If you forget, the
-slot is freed when your session ends or its process dies, but the next agent waits until then.
+This stops the servers recorded in step 2 and frees the slot for the next waiter. It acts only on the
+slot your own session holds, and prints `released: false` and does nothing if you hold none, so it is
+always safe to run. If you forget, the slot is freed when your session ends or its process dies, but
+the next agent waits until then.
 
 ## Rules
 

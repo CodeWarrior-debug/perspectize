@@ -256,6 +256,15 @@ test('commandTargets follows a leading cd and absolute paths', () => {
 	assert.deepEqual(commandTargets('git -C /repo/wt add .', '/cwd'), ['/cwd', '/repo/wt']);
 });
 
+test('git worktree add does not claim the checkout that will contain the new worktree', () => {
+	// The destination does not exist yet, so findCheckout would climb to the main checkout.
+	const dest = path.join(os.tmpdir(), 'agent-registry-no-such-dir', '.claude', 'worktrees', 'new');
+	assert.deepEqual(commandTargets(`git worktree add -b topic ${dest} origin/main`, '/cwd'), ['/cwd']);
+	// An existing path named elsewhere in the same command is still a target.
+	const here = os.tmpdir();
+	assert.deepEqual(commandTargets(`git -C ${here} worktree add ${dest}`, '/cwd'), ['/cwd', here]);
+});
+
 test('isClaudeCli spots the Claude CLI, not scripts under a .claude folder', () => {
 	assert.equal(isClaudeCli('node /usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js'), true);
 	assert.equal(isClaudeCli('node /opt/homebrew/bin/claude --resume'), true);

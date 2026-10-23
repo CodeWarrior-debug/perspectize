@@ -736,15 +736,22 @@ export function isWriteCommand(cmd) {
 	return GIT_WRITE.test(cmd) || FILE_WRITE.test(cmd) || TOOL_WRITE.test(cmd) || REDIRECT.test(cmd);
 }
 
+const GIT_WORKTREE_ADD = /\bgit\b(?:\s+(?:-C\s+\S+|-c\s+\S+|--[\w-]+(?:=\S+)?))*\s+worktree\s+add\b/;
+
 /** Paths a command may write into: its working directory (after a leading `cd`) plus absolute paths it names. */
 export function commandTargets(cmd, cwd) {
 	const targets = [];
 	const cd = /^\s*cd\s+("[^"]+"|'[^']+'|\S+)\s*(?:&&|;|$)/.exec(cmd);
 	targets.push(cd ? path.resolve(cwd, expandHome(cd[1].replace(/^["']|["']$/g, ''))) : cwd);
+	// `git worktree add <path>` names a folder that doesn't exist yet. Looking it up would climb to
+	// the checkout around it (usually the main one) and claim that, so a path that isn't there yet is skipped.
+	const addsWorktree = GIT_WORKTREE_ADD.test(cmd);
 	for (const m of cmd.matchAll(/(?:^|[\s='"(])((?:\/|~\/|[A-Za-z]:[\\/])[^\s'";|&)<>]*)/g)) {
 		const p = m[1];
 		if (/^\/dev\//.test(p)) continue;
-		targets.push(expandHome(p));
+		const abs = expandHome(p);
+		if (addsWorktree && !fs.existsSync(abs)) continue;
+		targets.push(abs);
 	}
 	return targets;
 }
