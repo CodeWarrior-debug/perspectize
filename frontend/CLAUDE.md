@@ -64,10 +64,12 @@ Tailwind v4 uses `--color-*` prefix for theme variables (e.g., `--color-primary`
 
 ```bash
 pnpm run dev          # Dev server (http://localhost:5173)
-pnpm run check        # Type-check (svelte-check + TypeScript)
+pnpm run check        # Type-check: svelte-check --tsgo (TypeScript 7 native checker)
 pnpm run test:run     # Tests once (CI/verification)
 pnpm run test         # Tests in watch mode
 ```
+
+**TypeScript 7 runs as `@typescript/native` (npm alias of `typescript@7`); `typescript` stays on 6.x.** `svelte-check` and `@sveltejs/kit` only declare TypeScript ^5/^6 as peers, and svelte-check refuses TS 7 unless 6.x is also installed and `--tsgo` is passed. Keep both; `pnpm run check` already passes `--tsgo`. Raw `node_modules/@typescript/native/bin/tsc` is the TS 7 compiler, but it reports 16 false errors (`*.svelte` imports); use `pnpm run check` for type-checking, not raw `tsc`.
 
 **`pnpm exec` must run from `frontend/`** — running from repo root fails with `ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE`. Use `cd frontend && pnpm exec ...` or `pnpm --dir frontend exec ...`.
 
@@ -156,7 +158,7 @@ Full table: [../.docs/QUERY_BUDGET.md](../.docs/QUERY_BUDGET.md).
 ## UI conventions
 
 - **Nav labels are one word** (`Header.svelte` `navLinks`: Activity, Discover, Compare); name new top-level pages with a one-word verb.
-- **Toasts:** svelte-sonner, default 2s (`<Toaster duration={2000}>` in `+layout.svelte`). A toast that carries an action button uses `toastWithAction` (`lib/utils/toast.ts`, `ACTION_TOAST_DURATION_MS` = 4s) so there's time to click it; its `secondary` option adds a second choice.
+- **Toasts:** svelte-sonner, configured once in `TOASTER_PROPS` (`lib/utils/toast.ts`, spread into both `<Toaster>`s in `+layout.svelte`): default 2s, and `expand: true` so simultaneous toasts sit apart instead of overlapping. A toast that carries an action button uses `toastWithAction` (`lib/utils/toast.ts`, `ACTION_TOAST_DURATION_MS` = 4s) so there's time to click it; its `secondary` option adds a second choice.
 - **User-supplied HTML:** sanitize with `sanitizeHtml` (`lib/utils/sanitize.ts`, DOMPurify) and render through `SafeHtml.svelte`; the backend mirrors the same tag set with bluemonday (`services/sanitize.go`). Change both together. See [.docs/SECURITY.md](../.docs/SECURITY.md#user-supplied-html).
 
 ## Icons (Lucide)
