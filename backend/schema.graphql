@@ -207,6 +207,12 @@ type Content {
   verseStartID: Int
   verseEndID: Int
   displayTitle: String
+  "User-set attributes; for CLAIM, effectiveDate and evaluateBy as YYYY-MM-DD. Null when unset."
+  customFields: JSON
+  # Who can read this row. CLAIM content starts PRIVATE (owner-only); everything
+  # else is PUBLIC. Private rows are omitted from lists and contentByID for
+  # anyone but their owner.
+  privacy: Privacy!
   # Aggregates computed from ALL perspectives on this content — public and
   # private alike (privacy controls readability, not whether a perspective
   # counts here). Resolved on demand (batched per-request via dataloader)
@@ -514,8 +520,18 @@ input SetPrimaryCategoryInput {
 
 input CreateClaimInput {
   text: String!            # The claim text (may contain @this/@here tokens)
-  userID: IntID!           # Who created the claim
-  parentContentID: IntID!  # The content item this claim is about
+  userID: IntID!           # 0 = derive from session; non-zero must match the session user
+  parentContentID: IntID   # Optional: the content item this claim is about
+  effectiveDate: String    # Optional YYYY-MM-DD; defaults to today (UTC)
+  evaluateBy: String       # Optional YYYY-MM-DD; must not be before effectiveDate
+  privacy: Privacy         # Optional; defaults to PUBLIC. PRIVATE keeps the claim owner-only
+}
+
+input UpdateClaimInput {
+  text: String!            # The new claim text; same rules as create
+  effectiveDate: String    # Optional YYYY-MM-DD; nil or empty means today (UTC)
+  evaluateBy: String       # Optional YYYY-MM-DD; nil or empty clears it
+  privacy: Privacy         # Optional; nil keeps the stored privacy
 }
 
 type Mutation {
@@ -552,6 +568,11 @@ type Mutation {
 
   # Claim mutations
   createClaim(input: CreateClaimInput!): Content! @auth
+  updateClaim(id: ID!, input: UpdateClaimInput!): Content! @auth
+  # Deletes an owned claim. If another user has a perspective or plan item on it, the
+  # delete is refused with code CLAIM_HAS_OTHERS; keepAnonymous: true hands the claim to
+  # the [deleted] sentinel user instead, so the others' perspectives keep their target.
+  deleteClaim(id: ID!, keepAnonymous: Boolean): Boolean! @auth
 
   # Category mutations
   setPrimaryCategory(input: SetPrimaryCategoryInput!): Content! @auth

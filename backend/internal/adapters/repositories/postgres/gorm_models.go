@@ -55,6 +55,8 @@ type ContentModel struct {
 	VerseStartID      *int            `gorm:"column:verse_start_id"`
 	VerseEndID        *int            `gorm:"column:verse_end_id"`
 	DisplayTitle      *string         `gorm:"column:display_title"`
+	CustomFields      json.RawMessage `gorm:"type:jsonb;column:custom_fields"`
+	Privacy           string          `gorm:"column:privacy;not null;default:public"`
 
 	// TotalCount is read-only and only present when List selects it: the
 	// filtered total, computed by a scalar subquery in the same statement as
@@ -114,7 +116,7 @@ type PerspectiveModel struct {
 	Feelings              JSONBArray      `gorm:"type:jsonb[];column:feelings"`
 	PrimaryPerspectiveID  *int            `gorm:"column:primary_perspective_id"`
 	RelatedPerspectiveIDs Int64Array      `gorm:"type:integer[];column:related_perspective_ids"`
-	CustomFields          json.RawMessage `gorm:"type:jsonb;column:custom_fields;default:'{}'"`
+	CustomFields          json.RawMessage `gorm:"type:jsonb;column:custom_fields"`
 	Review                *string         `gorm:"column:review"`
 	CreatedAt             time.Time       `gorm:"autoCreateTime"`
 	UpdatedAt             time.Time       `gorm:"autoUpdateTime"`

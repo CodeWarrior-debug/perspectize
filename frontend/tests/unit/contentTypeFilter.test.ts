@@ -17,9 +17,10 @@ const pass = (filter: ContentTypeFilter, contentType: string) =>
 	filter.doesFilterPass({ data: { contentType }, node: {} } as never);
 
 describe('CONTENT_TYPE_OPTIONS', () => {
-	it('lists every enabled content type with a display label (Claim is hidden until the UI is ready)', () => {
+	it('lists every content type with a display label', () => {
 		expect(CONTENT_TYPE_OPTIONS).toEqual([
 			{ value: 'youtube_video', label: 'YouTube Video' },
+			{ value: 'claim', label: 'Claim' },
 			{ value: 'bible_passage', label: 'Bible Passage' },
 			{ value: 'movie', label: 'Movie' },
 		]);
@@ -35,7 +36,7 @@ describe('ContentTypeFilter', () => {
 	it('renders one labelled checkbox per content type', () => {
 		const { filter } = setup();
 		const labels = [...filter.getGui().querySelectorAll('label')].map((l) => l.textContent);
-		expect(labels).toEqual(['YouTube Video', 'Bible Passage', 'Movie']);
+		expect(labels).toEqual(['YouTube Video', 'Claim', 'Bible Passage', 'Movie']);
 	});
 
 	it('is inactive with nothing ticked', () => {

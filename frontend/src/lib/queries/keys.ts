@@ -38,6 +38,9 @@ export const queryKeys = {
 		// and the pressed type chips (ContentType enum values, sorted).
 		itemPicker: (search: string, types: readonly string[]) =>
 			[...queryKeys.content.lists(), 'item-picker', search, types] as const,
+		// The viewer's own claims (Declare page). Under lists() so any content-list
+		// invalidation (create/update of a claim) also marks it stale.
+		claimList: () => [...queryKeys.content.lists(), 'claims'] as const,
 	},
 
 	bible: {

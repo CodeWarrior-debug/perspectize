@@ -23,6 +23,11 @@ type mockContentRepository struct {
 	getOrCreateByURLFn func(ctx context.Context, content *domain.Content, refreshOnConflict bool) (*domain.Content, bool, error)
 	updateMetadataFn   func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error)
 	listFn             func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)
+	updateClaimFn      func(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage) (*domain.Content, error)
+	// updateClaimPrivacy records the privacy the service passed to UpdateClaim.
+	updateClaimPrivacy *domain.Privacy
+	deleteClaimFn      func(ctx context.Context, id, ownerID int) error
+	anonymizeClaimFn   func(ctx context.Context, id, ownerID int) error
 }
 
 func (m *mockContentRepository) Create(ctx context.Context, content *domain.Content) (*domain.Content, error) {
@@ -81,8 +86,30 @@ func (m *mockContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 	return nil
 }
 
-func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
 	return &domain.Content{ID: contentID, PrimaryCategoryID: categoryID}, nil
+}
+
+func (m *mockContentRepository) DeleteOwnedClaim(ctx context.Context, id, ownerID int) error {
+	if m.deleteClaimFn != nil {
+		return m.deleteClaimFn(ctx, id, ownerID)
+	}
+	return nil
+}
+
+func (m *mockContentRepository) AnonymizeOwnedClaim(ctx context.Context, id, ownerID int) error {
+	if m.anonymizeClaimFn != nil {
+		return m.anonymizeClaimFn(ctx, id, ownerID)
+	}
+	return nil
+}
+
+func (m *mockContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage, privacy *domain.Privacy) (*domain.Content, error) {
+	m.updateClaimPrivacy = privacy
+	if m.updateClaimFn != nil {
+		return m.updateClaimFn(ctx, id, ownerID, text, html, customFields)
+	}
+	return nil, domain.ErrNotFound
 }
 
 // mockYouTubeClient implements services.YouTubeClient for testing
@@ -472,7 +499,7 @@ func TestUpdateSourceData_Success(t *testing.T) {
 	}
 
 	svc := services.NewContentService(repo, ytClient, nil)
-	result, err := svc.UpdateSourceData(context.Background(), 1)
+	result, err := svc.UpdateSourceData(context.Background(), 1, 7)
 
 	require.NoError(t, err)
 	assert.Equal(t, "New Title", result.Name)
@@ -490,7 +517,7 @@ func TestUpdateSourceData_InvalidID_Zero(t *testing.T) {
 	repo := &mockContentRepository{}
 	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 
-	result, err := svc.UpdateSourceData(context.Background(), 0)
+	result, err := svc.UpdateSourceData(context.Background(), 0, 7)
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -505,7 +532,7 @@ func TestUpdateSourceData_ContentNotFound(t *testing.T) {
 	}
 	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 
-	result, err := svc.UpdateSourceData(context.Background(), 999)
+	result, err := svc.UpdateSourceData(context.Background(), 999, 7)
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -521,11 +548,91 @@ func TestUpdateSourceData_NoSourceURL(t *testing.T) {
 	}
 	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 
-	result, err := svc.UpdateSourceData(context.Background(), 1)
+	result, err := svc.UpdateSourceData(context.Background(), 1, 7)
 
 	assert.Nil(t, result)
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrInvalidInput))
+}
+
+// A private claim held by someone else answers exactly like a missing row, and
+// the visibility check runs before the claim/no-source check, so the other user
+// learns nothing about the row's type.
+func TestUpdateSourceData_PrivateOtherUserIsNotFound(t *testing.T) {
+	existing := &domain.Content{ID: 1, Name: "Claim", ContentType: domain.ContentTypeClaim, AddedByUserID: 7, Privacy: domain.PrivacyPrivate}
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return existing, nil
+		},
+	}
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
+
+	result, err := svc.UpdateSourceData(context.Background(), 1, 8)
+
+	assert.Nil(t, result)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrNotFound), "got %v", err)
+	assert.False(t, errors.Is(err, domain.ErrInvalidInput))
+}
+
+func TestUpdateSourceData_PrivateAnonymousIsNotFound(t *testing.T) {
+	url := "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+	existing := &domain.Content{ID: 1, Name: "Old", URL: &url, AddedByUserID: 7, Privacy: domain.PrivacyPrivate}
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return existing, nil
+		},
+	}
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
+
+	result, err := svc.UpdateSourceData(context.Background(), 1, 0)
+
+	assert.Nil(t, result)
+	assert.True(t, errors.Is(err, domain.ErrNotFound), "got %v", err)
+}
+
+// The owner's own claim is visible, but a claim has no source to re-fetch.
+func TestUpdateSourceData_OwnClaimIsInvalidInput(t *testing.T) {
+	existing := &domain.Content{ID: 1, Name: "Claim", ContentType: domain.ContentTypeClaim, AddedByUserID: 7, Privacy: domain.PrivacyPrivate}
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return existing, nil
+		},
+	}
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
+
+	result, err := svc.UpdateSourceData(context.Background(), 1, 7)
+
+	assert.Nil(t, result)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrInvalidInput))
+	assert.Contains(t, err.Error(), "this content type has no source to refresh")
+}
+
+// A public YouTube row is refreshable by any signed-in user, not only its author.
+func TestUpdateSourceData_PublicYouTubeOtherUserSucceeds(t *testing.T) {
+	url := "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+	existing := &domain.Content{ID: 1, Name: "Old", URL: &url, ContentType: domain.ContentTypeYouTubeVideo, AddedByUserID: 7, Privacy: domain.PrivacyPublic}
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return existing, nil
+		},
+		updateMetadataFn: func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
+			return &domain.Content{ID: id, Name: name, URL: &url, AddedByUserID: 7}, nil
+		},
+	}
+	ytClient := &mockYouTubeClient{
+		extractVideoIDFn: func(u string) (string, error) { return "dQw4w9WgXcQ", nil },
+		getVideoMetadataFn: func(ctx context.Context, videoID string) (*portservices.VideoMetadata, error) {
+			return &portservices.VideoMetadata{Title: "New", Duration: 1, Response: json.RawMessage(`{}`)}, nil
+		},
+	}
+	svc := services.NewContentService(repo, ytClient, nil)
+
+	result, err := svc.UpdateSourceData(context.Background(), 1, 8)
+
+	require.NoError(t, err)
+	assert.Equal(t, "New", result.Name)
 }
 
 func TestUpdateSourceData_YouTubeAPIError(t *testing.T) {
@@ -546,7 +653,7 @@ func TestUpdateSourceData_YouTubeAPIError(t *testing.T) {
 	}
 	svc := services.NewContentService(repo, ytClient, nil)
 
-	result, err := svc.UpdateSourceData(context.Background(), 1)
+	result, err := svc.UpdateSourceData(context.Background(), 1, 7)
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -574,7 +681,7 @@ func TestUpdateSourceData_RepositoryUpdateError(t *testing.T) {
 	}
 	svc := services.NewContentService(repo, ytClient, nil)
 
-	result, err := svc.UpdateSourceData(context.Background(), 1)
+	result, err := svc.UpdateSourceData(context.Background(), 1, 7)
 
 	assert.Nil(t, result)
 	require.Error(t, err)

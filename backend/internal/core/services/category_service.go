@@ -35,8 +35,14 @@ func NewCategoryService(
 }
 
 // SetPrimaryCategory upserts a category from Wikidata data, then assigns it as the content's primary category.
+// The content must be visible to input.ActorUserID; a private row someone else
+// owns is domain.ErrNotFound, enforced by the owner-scoped UPDATE.
 func (s *CategoryServiceImpl) SetPrimaryCategory(ctx context.Context, input portservices.SetPrimaryCategoryInput) (*domain.Content, error) {
-	// Validate input
+	// Validate input. The actor check runs before the category upsert so an
+	// unauthenticated call writes nothing.
+	if input.ActorUserID <= 0 {
+		return nil, fmt.Errorf("%w: actor user id must be a positive integer", domain.ErrInvalidInput)
+	}
 	if input.ContentID <= 0 {
 		return nil, fmt.Errorf("%w: content id must be a positive integer", domain.ErrInvalidInput)
 	}
@@ -71,9 +77,10 @@ func (s *CategoryServiceImpl) SetPrimaryCategory(ctx context.Context, input port
 		return nil, fmt.Errorf("failed to upsert category: %w", err)
 	}
 
-	// Point the content at it. The UPDATE returns the updated row, and a
-	// missing content id comes back as ErrNotFound — no read before or after.
-	content, err := s.contentRepo.UpdatePrimaryCategoryID(ctx, input.ContentID, &upserted.ID)
+	// Point the content at it. The UPDATE is scoped to rows the actor may see and
+	// returns the updated row, so a missing or not-visible content id comes back
+	// as ErrNotFound with no read before or after.
+	content, err := s.contentRepo.UpdatePrimaryCategoryID(ctx, input.ContentID, &upserted.ID, input.ActorUserID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, fmt.Errorf("failed to get content: %w", err)

@@ -10,7 +10,6 @@ export type DetectionResult =
 	| { type: 'BIBLE_PASSAGE'; range: PassageRange; source: 'text' | 'biblegateway' }
 	/** TMDB or IMDb title link (a bare IMDb id is also accepted, silently). */
 	| { type: 'MOVIE'; url: string }
-	| { type: 'CLAIM'; text: string }
 	| { type: null };
 
 const BIBLE_GATEWAY_HOSTS = new Set(['biblegateway.com', 'www.biblegateway.com']);
@@ -39,9 +38,8 @@ function parseBibleGatewayUrl(url: URL): PassageRange | null {
  * (AN Q21) so this has at most one entry, but the list shape lets a future ambiguous
  * type be added without a signature change.
  *
- * Precedence: YouTube URL > movie link > Bible Gateway URL > typed Bible reference > free-text claim.
- * Any other URL is never a claim and never guessed: empty candidates. A single bare
- * word is also not guessed as a claim.
+ * Precedence: YouTube URL > movie link > Bible Gateway URL > typed Bible reference. Anything else
+ * (any other URL, free text) is no match: empty candidates, never guessed.
  */
 export function detectContentCandidates(input: string): DetectionResult[] {
 	const trimmed = input.trim();
@@ -59,11 +57,6 @@ export function detectContentCandidates(input: string): DetectionResult[] {
 
 	const range = parseReference(trimmed);
 	if (range) return [{ type: 'BIBLE_PASSAGE', range, source: 'text' }];
-
-	// Free text: needs at least two words and must not look like a bare host or URL.
-	if (/\s/.test(trimmed) && !/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
-		return [{ type: 'CLAIM', text: trimmed }];
-	}
 
 	return [];
 }

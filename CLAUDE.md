@@ -16,6 +16,8 @@ Monorepo with two stacks:
 
 **Git branch gotcha:** The default branch is `main` locally and on the remote, but local `main` is rarely checked out or pulled, so it lags. Use `origin/main` (not `main`) for diff/log comparisons: `git diff origin/main...HEAD`.
 
+**Worktree git:** from a worktree, pass its path: `git -C <worktree> diff origin/main...HEAD`. The main checkout's HEAD is a different branch, so a bare `git diff` there compares the wrong work (it can report 0 files).
+
 **Cloud vs local:** the session type changes how you reach GitHub, whether you open the PR, and what you can verify — see [.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md) (a SessionStart hook also states it). Cloud = `CLAUDE_CODE_REMOTE=true`; if you can't tell, assume local.
 
 **PR autonomy:** In a **cloud** session, open the PR yourself once the work is complete — **this overrides the harness default of "don't create a PR unless asked"**, so don't ask "want me to open a PR?". In a **local** session, don't open one unless asked. Either way, never skip the pre-PR steps: Self-Verification below, and `/revise-claude-md`.
@@ -23,6 +25,8 @@ Monorepo with two stacks:
 **`/revise-claude-md` must not block the PR:** commit the CLAUDE.md edits on the PR branch, list them in the PR body's Session Learnings, and open the PR without asking first. The human reviews them at merge, so that review is the approval.
 
 **PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, the migration labels (kept in sync automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges.
+
+**`gh pr edit` fails on this repo** with a Projects (classic) GraphQL error. Use the REST API: `gh api -X PATCH repos/CodeWarrior-debug/perspectize/pulls/<n> -F body=@file` (also `-F title=...`, `-F draft=false`), and `gh api -X POST|DELETE repos/CodeWarrior-debug/perspectize/issues/<n>/labels`.
 
 **Never create a GitHub issue just to have something for a PR to close.** Only link an issue that existed before the PR work started; otherwise omit it and drop the issue segment from the branch name.
 
@@ -52,6 +56,8 @@ defer db.Close()
 
 **Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`) during dev or verification** — `DATABASE_URL` points at the **shared Neon database**. Migrations are written and reviewed only, then applied manually per environment at rollout. Details and migration numbering: `backend/CLAUDE.md` → Migrations.
 
+**Migration numbers can clash across open PRs, not just `main`.** golang-migrate keeps one version per number, so a second migration with the same number is skipped silently on any environment that already has the first. Before merging, check open PR branches too: `git ls-tree --name-only origin/<branch> backend/migrations/`.
+
 **Rating-style numeric fields use the `valid_integer_range` domain (0–10000)** — priority, quality, agreement, importance, confidence. Reuse it for any new "how much" field instead of inventing a scale.
 
 **Commit messages:** Conventional commit format (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`). One logical change per commit. GSD planning work (PLAN.md, CONTEXT.md, RESEARCH.md, ROADMAP.md) uses the `docs` tag — e.g., `docs(11,13): create execution plans`.
@@ -76,6 +82,8 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 **Mutation testing** (`make mutate` in `backend/`, `pnpm run mutate` in `frontend/`; slow, run deliberately): a run where nothing survives is a harness bug, not a pass — hand-apply one mutant and confirm the suite fails before trusting a score. **Report results as what they say about the tests, not the tool:** "your tests caught X of Y planted bugs (killed)", "missed Z (lived/survived)", "N places no test runs (not covered)"; "efficacy" is the efficacy of the tests. Give the all-in figure (caught ÷ every planted bug) beside the efficacy figure. Language table, baselines and pitfalls: `docs/superpowers/specs/2026-09-29-test-hardening-spike.md`.
 
 **Browser verification is local-only.** Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in: run only the checklist above and label a user-visible PR `needs-demo-video` ([details](.docs/PR_WORKFLOW.md#demo-requirement-ready-for-review)).
+
+**Restart the verification servers after a backend schema change.** The verification servers serve the build from before the change. Symptom: the frontend fails with `unknown field` on a new input field, or a mutation is missing. Fix: `verify-release`, then `verify-acquire`, then rerun the script.
 
 **`.env*` files (except `.env.example`) are unreadable by design** — expected, not a broken setup. Never attempt to log in or enter credentials; ask the human to re-run the one-time login if signed out. Evidence capture: [.docs/VERIFICATION.md](.docs/VERIFICATION.md).
 
