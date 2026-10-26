@@ -54,7 +54,7 @@
 		"@vitest/browser-playwright": "^4.1.11",
 		"@vitest/coverage-v8": "^4.1.11",
 		"bits-ui": "^2.19.5",
-		"jscpd": "^5.4.1",
+		"jscpd": "^5.4.2",
 		"jsdom": "^30.1.3",
 		"prettier": "^3.9.10",
 		"prettier-plugin-svelte": "^4.1.1",
