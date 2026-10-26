@@ -18,7 +18,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/svix/svix-webhooks v1.99.1
 	github.com/unrolled/secure v1.17.0
-	github.com/vektah/gqlparser/v2 v2.5.62
+	github.com/vektah/gqlparser/v2 v2.5.64
 	github.com/vikstrous/dataloadgen v0.0.10
 	go.opentelemetry.io/contrib/bridges/otelslog v0.21.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0
@@ -39,7 +39,7 @@ require (
 
 require (
 	dario.cat/mergo v1.0.2 // indirect
-	github.com/agnivade/levenshtein v1.2.1 // indirect
+	github.com/agnivade/levenshtein v1.2.2 // indirect
 	github.com/air-verse/air v1.61.7 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/bep/godartsass/v2 v2.5.0 // indirect
