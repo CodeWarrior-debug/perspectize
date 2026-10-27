@@ -4,8 +4,10 @@
 -- Spec: docs/superpowers/specs/2026-10-27-youtube-channel-import-design.md
 -- Plan: docs/superpowers/plans/2026-10-27-import-staging-plan.md
 --
--- Numbering: 000032 is provisional (other open branches also use it); rename to
--- the next free number on main as the last step before merging.
+-- Numbering: 000036, not the next number on main (000032). Production is already
+-- at version 34 (feature/audio-track-content-type's 000032-000034, applied ahead
+-- of its merge; that branch also holds 000035), so a lower number would be
+-- skipped by `migrate up`. Re-check before merging.
 --
 -- FKs: the creator FK to users blocks (RESTRICT, reassigned on user delete).
 -- Sources and items are children of their job (CASCADE). content_id is an

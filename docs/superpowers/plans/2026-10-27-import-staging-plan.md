@@ -15,7 +15,7 @@
 | Route | `/import` (list) and `/import/[id]` (sheet), not in the main nav | "Preliminary, not primary" |
 | Source types | `YOUTUBE_CHANNEL` → `YOUTUBE_VIDEO`, `TMDB_PERSON` → `MOVIE` | Claims and Bible passages have no external list to import from |
 
-## Data model (migration 000032, provisional number)
+## Data model (migration 000036: production is already at 34, see the migration header)
 
 - `import_jobs`: `id`, `user_id` (creator), `name`, `created_at`, `updated_at`.
 - `import_job_sources`: `id`, `job_id` (CASCADE), `source_type`, `source_ref`, `title`, `url`, `destination_type`, `status` (`listing|ready|failed`), `status_detail`, `item_count`, `fetched_at`.
