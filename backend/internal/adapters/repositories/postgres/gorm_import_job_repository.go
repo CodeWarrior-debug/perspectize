@@ -15,7 +15,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// Constraint names from migration 000032_add_import_staging.
+// Constraint names from migration 000036_add_import_staging.
 const importJobsUserFK = "import_jobs_user_fk"
 
 // importItemListColumns is every item column except details (the detail panel
