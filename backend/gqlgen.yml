@@ -79,6 +79,26 @@ models:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.UserRole
 
   # User todo enums - bind directly to domain types
+  ImportSourceType:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ImportSourceType
+  ImportPersonRole:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ImportPersonRole
+  ImportSourceStatus:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ImportSourceStatus
+  ImportItemKind:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ImportItemKind
+  ImportItemStatus:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ImportItemStatus
+  # Import staging: items load only when selected (one query for the whole job).
+  ImportJob:
+    fields:
+      items:
+        resolver: true
   UserTodoStatus:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.UserTodoStatus

@@ -138,6 +138,17 @@ type CreateContentResult struct {
 	AlreadyExisted bool     `json:"alreadyExisted"`
 }
 
+type CreateImportJobInput struct {
+	Name    string                     `json:"name"`
+	Sources []*CreateImportSourceInput `json:"sources"`
+}
+
+type CreateImportSourceInput struct {
+	SourceType domain.ImportSourceType  `json:"sourceType"`
+	Ref        string                   `json:"ref"`
+	Role       *domain.ImportPersonRole `json:"role,omitempty"`
+}
+
 type CreateMessageThreadInput struct {
 	ParticipantUserIds []string `json:"participantUserIds"`
 	Title              *string  `json:"title,omitempty"`
@@ -227,6 +238,91 @@ type FeelingStats struct {
 	AverageIntensity      *float64 `json:"averageIntensity,omitempty"`
 	StdDevIntensity       *float64 `json:"stdDevIntensity,omitempty"`
 	PercentOfPerspectives *float64 `json:"percentOfPerspectives,omitempty"`
+}
+
+type ImportChapter struct {
+	StartSeconds int    `json:"startSeconds"`
+	Title        string `json:"title"`
+}
+
+type ImportItem struct {
+	ID              string                   `json:"id"`
+	SourceID        string                   `json:"sourceId"`
+	DestinationType domain.ContentType       `json:"destinationType"`
+	Kind            domain.ImportItemKind    `json:"kind"`
+	ExternalID      string                   `json:"externalId"`
+	URL             string                   `json:"url"`
+	Title           string                   `json:"title"`
+	Summary         *string                  `json:"summary,omitempty"`
+	PublishedAt     *string                  `json:"publishedAt,omitempty"`
+	DurationSeconds *int                     `json:"durationSeconds,omitempty"`
+	ViewCount       *float64                 `json:"viewCount,omitempty"`
+	LikeCount       *float64                 `json:"likeCount,omitempty"`
+	CommentCount    *float64                 `json:"commentCount,omitempty"`
+	Rating          *float64                 `json:"rating,omitempty"`
+	RatingCount     *int                     `json:"ratingCount,omitempty"`
+	RatingSource    *string                  `json:"ratingSource,omitempty"`
+	ChapterCount    int                      `json:"chapterCount"`
+	HasCaptions     *bool                    `json:"hasCaptions,omitempty"`
+	ThumbnailURL    *string                  `json:"thumbnailUrl,omitempty"`
+	Position        int                      `json:"position"`
+	StatsFetchedAt  string                   `json:"statsFetchedAt"`
+	InLibrary       bool                     `json:"inLibrary"`
+	ContentID       *string                  `json:"contentId,omitempty"`
+	ImportStatus    *domain.ImportItemStatus `json:"importStatus,omitempty"`
+	ImportError     *string                  `json:"importError,omitempty"`
+	ImportedAt      *string                  `json:"importedAt,omitempty"`
+}
+
+type ImportItemDetails struct {
+	Item        *ImportItem      `json:"item"`
+	Description string           `json:"description"`
+	Tags        []string         `json:"tags"`
+	Chapters    []*ImportChapter `json:"chapters"`
+	Links       []string         `json:"links"`
+	People      []*ImportPerson  `json:"people"`
+	Genres      []string         `json:"genres"`
+	Language    *string          `json:"language,omitempty"`
+}
+
+type ImportItemsInput struct {
+	JobID   int   `json:"jobId"`
+	ItemIds []int `json:"itemIds"`
+}
+
+type ImportItemsResult struct {
+	Queued           int `json:"queued"`
+	AlreadyInLibrary int `json:"alreadyInLibrary"`
+	AlreadyQueued    int `json:"alreadyQueued"`
+	NotFound         int `json:"notFound"`
+}
+
+type ImportJob struct {
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	Sources   []*ImportSource `json:"sources"`
+	CreatedAt string          `json:"createdAt"`
+	UpdatedAt string          `json:"updatedAt"`
+	Items     []*ImportItem   `json:"items"`
+}
+
+type ImportPerson struct {
+	Name string `json:"name"`
+	Role string `json:"role"`
+}
+
+type ImportSource struct {
+	ID              string                    `json:"id"`
+	SourceType      domain.ImportSourceType   `json:"sourceType"`
+	SourceRef       string                    `json:"sourceRef"`
+	Title           *string                   `json:"title,omitempty"`
+	URL             *string                   `json:"url,omitempty"`
+	Role            *domain.ImportPersonRole  `json:"role,omitempty"`
+	DestinationType domain.ContentType        `json:"destinationType"`
+	Status          domain.ImportSourceStatus `json:"status"`
+	StatusDetail    *string                   `json:"statusDetail,omitempty"`
+	ItemCount       int                       `json:"itemCount"`
+	FetchedAt       *string                   `json:"fetchedAt,omitempty"`
 }
 
 type InboxEvent struct {
