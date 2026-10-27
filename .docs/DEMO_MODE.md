@@ -35,7 +35,7 @@ Defined once in `backend/internal/demo/fixtures.go` (mirrored for the picker in 
 | `carmen` | carmen_admin | ADMIN | Admin-only UI |
 | `newbie` | newbie_demo | DEFAULT | Empty account; onboarding coach still active |
 
-Seed also includes 5 YouTube videos, 8 perspectives and an Alice↔Ben message thread (2 unread for each of them: only the other's messages count). "Me at the zoo" (`jNQXAC9IVRw`) is deliberately *not* seeded so tours can add it.
+Seed also includes three staged imports for the `/import` sheet (owned by `carmen`, real sample data from `backend/internal/demo/imports.json`: 107 videos from three Jordan Peterson channels and Grace to You, plus 14 Christopher Nolan films from Wikidata/Wikipedia; importing a row works offline), 5 YouTube videos, 8 perspectives and an Alice↔Ben message thread (2 unread for each of them: only the other's messages count). "Me at the zoo" (`jNQXAC9IVRw`) is deliberately *not* seeded so tours can add it.
 
 ## How it works
 

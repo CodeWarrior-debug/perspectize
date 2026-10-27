@@ -205,6 +205,10 @@ func main() {
 		// Trending is cached (1h, per window + page); search stays uncached.
 		movieTrendingClient = tmdb.NewTrendingCache(tmdbClient, tmdb.DefaultTrendingTTL)
 		importListers[domain.ImportSourceTMDBPerson] = tmdb.NewPersonLister(tmdbClient)
+	} else if demoCfg.Enabled {
+		// Demo mode: staged demo films resolve offline, so importing them works
+		// without a token. Discover's movie search and trending stay unconfigured.
+		movieClient = tmdb.NewDemoClient()
 	} else {
 		slog.Warn("TMDB_API_READ_ACCESS_TOKEN is empty — movie lookups will fail")
 	}

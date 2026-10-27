@@ -144,9 +144,7 @@ func (r *queryResolver) ImportItemDetails(ctx context.Context, id string) (*mode
 // messages are written for users; anything else is logged and hidden.
 func importError(err error) error {
 	switch {
-	case errors.Is(err, domain.ErrForbidden):
-		return fmt.Errorf("access denied: %w", err)
-	case errors.Is(err, domain.ErrInvalidInput), errors.Is(err, domain.ErrNotFound):
+	case errors.Is(err, domain.ErrForbidden), errors.Is(err, domain.ErrInvalidInput), errors.Is(err, domain.ErrNotFound):
 		return err
 	case errors.Is(err, domain.ErrYouTubeAPI):
 		return fmt.Errorf("YouTube refused the request; check the channel and try again later")
