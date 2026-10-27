@@ -16,4 +16,6 @@ Several repo rules depend on where the session runs. The `session-environment.sh
 | Remaining local-only work | Label the PR `needs-local-session-takeover` and list the steps. | Remove that label once done. |
 | Migrations | Written and reviewed only, never applied, in both environments (`DATABASE_URL` is the shared Neon database). | Same. |
 
+**Stopping background processes:** never `pkill -f` / `pgrep -f` with a pattern that appears in the same Bash call. The pattern matches that call's own shell, which is killed (exit 144) along with anything after it. List PIDs first (`ps aux | grep '[v]ite dev'`), then `kill <pid>` in a separate call.
+
 A PR created in a cloud session is still reviewed and merged like any other; see [PR_WORKFLOW.md](PR_WORKFLOW.md) for templates, labels and merge flags.

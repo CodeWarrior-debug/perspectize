@@ -20,7 +20,9 @@ make demo-reset     # put demo-persona data back to the pristine seed
 make demo-down      # stop (data kept)     make demo-wipe  # stop + delete the volume
 ```
 
-Playwright runs on the host: `pnpm install` in `frontend/` once, plus a Chromium (`pnpm --dir frontend exec playwright install chromium`). In the cloud sandbox, use the preinstalled one with `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`.
+Playwright runs on the host: `pnpm install` in `frontend/` once, plus a Chromium (`pnpm --dir frontend exec playwright install chromium`). In the cloud sandbox, use the preinstalled one: `PW_CHROMIUM_PATH=$(ls -d /opt/pw-browsers/chromium-*/chrome-linux*/chrome | head -1)` (the version folder changes between images, e.g. `chromium-1243/chrome-linux64/chrome`).
+
+**Running the pieces by hand** (no Docker): the backend must listen on **:8080**, the only local API port `app.html`'s CSP `connect-src` allows; any other port fails every request from the dev server. After `seed-demo -reset` against a running backend, **restart the backend**: its cached user rows still hold the deleted personas' ids, so every create fails with a `content_added_by_user_fk` violation until it restarts.
 
 **Without Docker** (e.g. against a local Postgres): run migrations, `go run ./cmd/seed-demo` from `backend/`, start the server with `DEMO_MODE=true`, and the frontend with `VITE_DEMO_MODE=true pnpm run dev`. Then `pnpm run demo:test` (defaults: frontend `:5173`, API `:8080`; override with `DEMO_BASE_URL` / `DEMO_GRAPHQL_URL`).
 
