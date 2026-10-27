@@ -14,6 +14,8 @@ Several repo rules depend on where the session runs. The `session-environment.sh
 | Browser verification | Not possible (needs the gitignored `.claude/.env` and `.claude/sv-profile/`; never attempt the Clerk sign-in). Label user-visible PRs `needs-demo-video`. | Available. |
 | graphify | CLI not installed and `graphify-out/` is untracked, so it doesn't exist. Skip `graphify query` / `update .`; use Grep/Glob or an Explore agent. | Available once installed and a graph has been built. |
 | Remaining local-only work | Label the PR `needs-local-session-takeover` and list the steps. | Remove that label once done. |
+| YouTube data | No `YOUTUBE_API_KEY` (googleapis returns 403 "unregistered callers"). For research or preview data only: `python3 -m venv` in the scratchpad, `pip install yt-dlp`; `--flat-playlist -J <channel>/videos\|shorts\|streams` lists a channel, `-j <watch URL>` gives likes/description/upload date. App code still uses the Data API. | Key in `backend/.env` (unreadable to Claude; the human runs scripts that need it). |
+| Library lookups | Neon MCP `run_sql` on project `lively-fog-94104513`, read-only `SELECT`s only (e.g. which YouTube URLs are already content). | Same, or the human's `psql`. |
 | Migrations | Written and reviewed only, never applied, in both environments (`DATABASE_URL` is the shared Neon database). | Same. |
 
 A PR created in a cloud session is still reviewed and merged like any other; see [PR_WORKFLOW.md](PR_WORKFLOW.md) for templates, labels and merge flags.
