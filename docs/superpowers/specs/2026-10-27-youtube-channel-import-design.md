@@ -26,6 +26,8 @@ The staging sheet is not a primary page. It is a working surface someone opens o
 
 ## The decision row: what each candidate must show
 
+This section applies the repo-wide rule in [ADDING_CONTENT_TYPE.md → Decision 8](../../../.claude/docs/ADDING_CONTENT_TYPE.md#decision-8-import-preview--enough-for-an-informed-decision): a preview shows enough about each item to decide without leaving the page. It's the worked example the guide points to.
+
 Each fact is listed with where it comes from, because that decides cost and freshness. The YouTube Data API `videos.list` call with `part=snippet,statistics,contentDetails` returns most of them for 1 quota unit per 50 videos. That is the same call and the same trimmed `YouTubeAPIResponse` shape `GetVideoMetadata` already stores in `content.response`.
 
 | Column | Why it helps decide | Source | Notes |

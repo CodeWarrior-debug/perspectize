@@ -124,6 +124,34 @@ Every type gets an explicit answer, even when the answer is "not on Discover". D
 
 Worked examples live in `tools/content-type-designer` (section 7): YouTube (search hands off to youtube.com; Trending chart served from the backend cache), Bible passage (proposed: Verse of the day only, from Bible Gateway's feed, fetched and cached by the backend), Painting (proposed: Met search + highlights ranked by Wikipedia pageviews).
 
+---
+
+## Decision 8: Import Preview — Enough for an Informed Decision
+
+**Principle:** any view where someone chooses whether to bring an item into Perspectize (an import staging sheet, a bulk-add list, a Discover result, a search picker) shows **enough about each item to decide without leaving the page**. A title and a link are not enough. If the person has to open the source site to judge an item, the preview has failed.
+
+For each type, answer these five questions with real fields and note each one's source:
+
+| Question | YouTube video | Movie (TMDB) | Blog post (WordPress) |
+|---|---|---|---|
+| **What is it?** Title plus a one-line summary that skips source boilerplate | title, description's first non-promo line | title, tagline / overview | title, excerpt |
+| **How big?** The time it asks of the person | length | duration (runtime) | word count / reading time |
+| **How current?** | published date, age | release date | published date |
+| **How well received?** Raw counts plus one rate normalised for reach | views, likes, comments, **like rate**, **views/day** | TMDB score + **vote count** | comment count (`X-WP-Total` from `/wp/v2/comments?post=`; core WordPress has no views or likes) |
+| **What's in it?** Full detail on demand, not in every row | description, chapters, tags | synopsis, cast, keywords | categories, tags, author |
+
+Rules that hold for every type:
+
+- **Missing is not zero.** A hidden or unavailable figure (YouTube likes hidden by the channel, comments turned off) shows as "hidden" or blank, never 0, and sorts last. Derived rates become n/a.
+- **Say what doesn't exist.** If the source can't supply a fact people expect (YouTube dislikes since 2021; WordPress popularity without a plugin), say so once in the view rather than showing an empty column.
+- **Low-sample figures are muted.** A rating from a handful of votes (Movie: `vote_count < 50`) is shown dimmer, so it isn't mistaken for a reliable one.
+- **Show what's already in the library.** Items already imported are visible, marked, and unselectable, with a link to the existing content.
+- **Summary in the row, full detail on click.** Long text (descriptions, synopses) is fetched lazily for the detail panel, never sent with every row ([QUERY_BUDGET.md](../../.docs/QUERY_BUDGET.md)).
+- **Counts are a snapshot.** Store when they were fetched and show "as of". The actual import re-fetches fresh metadata.
+- **Decide vs all columns.** Default to the columns that answer the five questions; bookkeeping columns (IDs, source type, recency index) sit behind an "All columns" set.
+
+Worked example: `docs/superpowers/specs/2026-10-27-youtube-channel-import-design.md` ("The decision row"), which documents each YouTube column with its API source, cost and edge cases. Any spec or preview for a new type's import or picker view includes the same table for that type.
+
 ## Implementation Steps
 
 ### Step A: Backend Domain
@@ -347,6 +375,7 @@ If the type introduces new columns, see [ADDING_AG_GRID_COLUMN.md](./ADDING_AG_G
 | Frontend form | New / Extend / Unified | Component architecture |
 | Table display | Icon, thumbnail, new columns | Renderer updates, see AG Grid guide |
 | Discover page | Search + feed / feed / search / not on Discover — with a reason | Card component, source client or backend feed job, CSP |
+| Import preview | The five decision questions answered with real fields (Decision 8) | Staging columns, detail panel, lazy detail query |
 
 ---
 
