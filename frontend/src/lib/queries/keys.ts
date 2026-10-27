@@ -95,6 +95,16 @@ export const queryKeys = {
 		todoLists: (userId: number | null) => [...queryKeys.userTodos.todoListsAll(), { userId }] as const,
 	},
 
+	// Import staging. `detail(id)` is one import's sheet (job + every row);
+	// `itemDetails(id)` is one row's lazily loaded description/chapters/tags.
+	imports: {
+		all: () => [...queryKeys.all, 'imports'] as const,
+		list: () => [...queryKeys.imports.all(), 'list'] as const,
+		details: () => [...queryKeys.imports.all(), 'detail'] as const,
+		detail: (id: string) => [...queryKeys.imports.details(), id] as const,
+		itemDetails: (itemId: string) => [...queryKeys.imports.all(), 'item', itemId] as const,
+	},
+
 	messaging: {
 		all: () => [...queryKeys.all, 'messaging'] as const,
 		threads: {
