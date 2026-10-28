@@ -70,16 +70,28 @@ func newTestPersonLister(t *testing.T, movieCalls *atomic.Int32) *PersonLister {
 func TestPersonLister_Resolve(t *testing.T) {
 	var calls atomic.Int32
 	l := newTestPersonLister(t, &calls)
-	for _, ref := range []string{"525", " 525 ", "https://www.themoviedb.org/person/525-christopher-nolan"} {
+	for _, ref := range []string{
+		"525", " 525 ",
+		"https://www.themoviedb.org/person/525-christopher-nolan",
+		"themoviedb.org/person/525",
+		"https://www.themoviedb.org/person/525?language=en-US",
+	} {
 		got, err := l.Resolve(context.Background(), ref)
 		require.NoError(t, err, ref)
 		assert.Equal(t, "525", got.ID)
 		assert.Equal(t, "Christopher Nolan", got.Title)
 		assert.Equal(t, "https://www.themoviedb.org/person/525", got.URL)
 	}
-	_, err := l.Resolve(context.Background(), "nolan")
-	assert.ErrorIs(t, err, domain.ErrInvalidInput)
-	_, err = l.Resolve(context.Background(), "999")
+	for _, ref := range []string{
+		"nolan",
+		"https://evil.example/themoviedb.org/person/525",
+		"https://themoviedb.org.evil.example/person/525",
+		"https://www.themoviedb.org/person/525x",
+	} {
+		_, err := l.Resolve(context.Background(), ref)
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, ref)
+	}
+	_, err := l.Resolve(context.Background(), "999")
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 

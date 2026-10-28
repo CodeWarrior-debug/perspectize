@@ -28,7 +28,9 @@ const maxPersonItems = 500
 // posterBase is the TMDB image size the sheet's thumbnail uses.
 const posterBase = "https://image.tmdb.org/t/p/w185"
 
-var personURLRe = regexp.MustCompile(`themoviedb\.org/person/(\d+)`)
+// personURLRe is anchored to the whole ref so another host can't pass as TMDB
+// (e.g. https://evil.example/themoviedb.org/person/525).
+var personURLRe = regexp.MustCompile(`^(?:https?://)?(?:www\.)?themoviedb\.org/person/(\d+)(?:[-/?#].*)?$`)
 
 // PersonLister lists a TMDB person's filmography as import candidates: one
 // call for the credits, then one /movie/{id} call per film for runtime,
