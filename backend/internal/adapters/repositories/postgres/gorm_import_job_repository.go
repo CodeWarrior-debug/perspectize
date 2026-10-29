@@ -22,7 +22,7 @@ const importJobsUserFK = "import_jobs_user_fk"
 // fetches those lazily), plus the id of content with the same URL.
 const importItemListColumns = `i.id, i.job_id, i.source_id, i.external_id, i.destination_type, i.canonical_url,
 	i.kind, i.title, i.summary, i.published_at, i.duration_seconds, i.view_count, i.like_count,
-	i.comment_count, i.rating, i.rating_count, i.rating_source, i.chapter_count, i.has_captions,
+	i.comment_count, i.rating, i.rating_count, i.rating_source, i.chapter_count, i.has_captions, i.genres, i.top_cast,
 	i.thumbnail_url, i.position, i.stats_fetched_at, i.import_status, i.import_error, i.content_id,
 	i.imported_at, i.created_at, i.updated_at, c.id AS library_content_id`
 
@@ -31,7 +31,7 @@ const importItemListColumns = `i.id, i.job_id, i.source_id, i.external_id, i.des
 // what was imported.
 var importItemUpsertColumns = []string{
 	"title", "summary", "published_at", "duration_seconds", "view_count", "like_count",
-	"comment_count", "rating", "rating_count", "rating_source", "chapter_count", "has_captions",
+	"comment_count", "rating", "rating_count", "rating_source", "chapter_count", "has_captions", "genres", "top_cast",
 	"thumbnail_url", "position", "details", "stats_fetched_at", "kind", "updated_at",
 }
 

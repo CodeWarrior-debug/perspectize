@@ -1,6 +1,6 @@
 {
 "fetchedAt":"2026-10-27T00:00:00Z",
-"note":"Real sample data: YouTube rows from the public channels (yt-dlp, 2026-10-27); films from Wikidata + Wikipedia (Metacritic scores via Wikidata P444). Demo mode only.",
+"note":"Real sample data: YouTube rows from the public channels (yt-dlp, 2026-10-27); films from Wikidata + Wikipedia (Metacritic scores and critic review counts via Wikidata P444/P7887; top-billed cast from the Wikipedia infobox). Demo mode only.",
 "imports":[
 {
 "name":"Jordan Peterson channels",
@@ -3193,22 +3193,40 @@
 "rating":8.9,
 "ratingSource":"Metacritic",
 "genres":[
-"epic film",
-"historical film",
-"adventure film",
-"action film",
-"fantasy film"
+"Epic",
+"Historical",
+"Adventure",
+"Action",
+"Fantasy"
 ],
 "people":[
 {
 "name":"Christopher Nolan",
 "role":"Director"
+},
+{
+"name":"Matt Damon",
+"role":"Cast"
+},
+{
+"name":"Tom Holland",
+"role":"Cast"
+},
+{
+"name":"Anne Hathaway",
+"role":"Cast"
 }
 ],
 "links":[
 "en.wikipedia.org"
 ],
-"position":0
+"position":0,
+"topCast":[
+"Matt Damon",
+"Tom Holland",
+"Anne Hathaway"
+],
+"ratingCount":60
 },
 {
 "externalId":"872585",
@@ -3220,22 +3238,40 @@
 "rating":9.0,
 "ratingSource":"Metacritic",
 "genres":[
-"epic film",
-"biographical film",
-"thriller film",
-"historical film",
-"drama film"
+"Epic",
+"Biographical",
+"Thriller",
+"Historical",
+"Drama"
 ],
 "people":[
 {
 "name":"Christopher Nolan",
 "role":"Director"
+},
+{
+"name":"Cillian Murphy",
+"role":"Cast"
+},
+{
+"name":"Emily Blunt",
+"role":"Cast"
+},
+{
+"name":"Matt Damon",
+"role":"Cast"
 }
 ],
 "links":[
 "en.wikipedia.org"
 ],
-"position":1
+"position":1,
+"topCast":[
+"Cillian Murphy",
+"Emily Blunt",
+"Matt Damon"
+],
+"ratingCount":69
 },
 {
 "externalId":"577922",
@@ -3247,22 +3283,40 @@
 "rating":6.9,
 "ratingSource":"Metacritic",
 "genres":[
-"science fiction film",
-"time-travel film",
-"thriller film",
-"spy film",
-"action film"
+"Science fiction",
+"Time-travel",
+"Thriller",
+"Spy",
+"Action"
 ],
 "people":[
 {
 "name":"Christopher Nolan",
 "role":"Director"
+},
+{
+"name":"John David Washington",
+"role":"Cast"
+},
+{
+"name":"Robert Pattinson",
+"role":"Cast"
+},
+{
+"name":"Elizabeth Debicki",
+"role":"Cast"
 }
 ],
 "links":[
 "en.wikipedia.org"
 ],
-"position":2
+"position":2,
+"topCast":[
+"John David Washington",
+"Robert Pattinson",
+"Elizabeth Debicki"
+],
+"ratingCount":50
 },
 {
 "externalId":"374720",
@@ -3274,20 +3328,38 @@
 "rating":9.4,
 "ratingSource":"Metacritic",
 "genres":[
-"war film",
-"historical film",
-"drama film"
+"War",
+"Historical",
+"Drama"
 ],
 "people":[
 {
 "name":"Christopher Nolan",
 "role":"Director"
+},
+{
+"name":"Fionn Whitehead",
+"role":"Cast"
+},
+{
+"name":"Tom Glynn-Carney",
+"role":"Cast"
+},
+{
+"name":"Jack Lowden",
+"role":"Cast"
 }
 ],
 "links":[
 "en.wikipedia.org"
 ],
-"position":3
+"position":3,
+"topCast":[
+"Fionn Whitehead",
+"Tom Glynn-Carney",
+"Jack Lowden"
+],
+"ratingCount":53
 },
 {
 "externalId":"157336",
@@ -3299,22 +3371,40 @@
 "rating":7.4,
 "ratingSource":"Metacritic",
 "genres":[
-"hard science fiction",
-"science fiction film",
-"time-travel film",
-"dystopian film",
-"thriller film"
+"Hard science fiction",
+"Science fiction",
+"Time-travel",
+"Dystopian",
+"Thriller"
 ],
 "people":[
 {
 "name":"Christopher Nolan",
 "role":"Director"
+},
+{
+"name":"Matthew McConaughey",
+"role":"Cast"
+},
+{
+"name":"Anne Hathaway",
+"role":"Cast"
+},
+{
+"name":"Jessica Chastain",
+"role":"Cast"
 }
 ],
 "links":[
 "en.wikipedia.org"
 ],
-"position":4
+"position":4,
+"topCast":[
+"Matthew McConaughey",
+"Anne Hathaway",
+"Jessica Chastain"
+],
+"ratingCount":46
 },
 {
 "externalId":"49026",
@@ -3326,22 +3416,40 @@
 "rating":7.8,
 "ratingSource":"Metacritic",
 "genres":[
-"superhero film",
-"crime thriller film",
-"thriller film",
-"action film",
-"drama film"
+"Superhero",
+"Crime thriller",
+"Thriller",
+"Action",
+"Drama"
 ],
 "people":[
 {
 "name":"Christopher Nolan",
 "role":"Director"
+},
+{
+"name":"Christian Bale",
+"role":"Cast"
+},
+{
+"name":"Michael Caine",
+"role":"Cast"
+},
+{
+"name":"Gary Oldman",
+"role":"Cast"
 }
 ],
 "links":[
 "en.wikipedia.org"
 ],
-"position":5
+"position":5,
+"topCast":[
+"Christian Bale",
+"Michael Caine",
+"Gary Oldman"
+],
+"ratingCount":45
 },
 {
 "externalId":"27205",
@@ -3353,22 +3461,40 @@
 "rating":7.4,
 "ratingSource":"Metacritic",
 "genres":[
-"heist film",
-"science fiction film",
-"science fiction action film",
-"mystery film",
-"thriller film"
+"Heist",
+"Science fiction",
+"Science fiction action",
+"Mystery",
+"Thriller"
 ],
 "people":[
 {
 "name":"Christopher Nolan",
 "role":"Director"
+},
+{
+"name":"Leonardo DiCaprio",
+"role":"Cast"
+},
+{
+"name":"Ken Watanabe",
+"role":"Cast"
+},
+{
+"name":"Joseph Gordon-Levitt",
+"role":"Cast"
 }
 ],
 "links":[
 "en.wikipedia.org"
 ],
-"position":6
+"position":6,
+"topCast":[
+"Leonardo DiCaprio",
+"Ken Watanabe",
+"Joseph Gordon-Levitt"
+],
+"ratingCount":42
 },
 {
 "externalId":"155",
@@ -3380,22 +3506,40 @@
 "rating":8.5,
 "ratingSource":"Metacritic",
 "genres":[
-"superhero film",
-"neo-noir",
-"crime thriller film",
-"thriller film",
-"crime film"
+"Superhero",
+"Neo-noir",
+"Crime thriller",
+"Thriller",
+"Crime"
 ],
 "people":[
 {
 "name":"Christopher Nolan",
 "role":"Director"
+},
+{
+"name":"Christian Bale",
+"role":"Cast"
+},
+{
+"name":"Michael Caine",
+"role":"Cast"
+},
+{
+"name":"Heath Ledger",
+"role":"Cast"
 }
 ],
 "links":[
 "en.wikipedia.org"
 ],
-"position":7
+"position":7,
+"topCast":[
+"Christian Bale",
+"Michael Caine",
+"Heath Ledger"
+],
+"ratingCount":41
 },
 {
 "externalId":"1124",
@@ -3407,22 +3551,40 @@
 "rating":6.6,
 "ratingSource":"Metacritic",
 "genres":[
-"magic realist film",
-"mystery film",
-"thriller film",
-"fantasy film",
-"drama film"
+"Magic realist",
+"Mystery",
+"Thriller",
+"Fantasy",
+"Drama"
 ],
 "people":[
 {
 "name":"Christopher Nolan",
 "role":"Director"
+},
+{
+"name":"Hugh Jackman",
+"role":"Cast"
+},
+{
+"name":"Christian Bale",
+"role":"Cast"
+},
+{
+"name":"Michael Caine",
+"role":"Cast"
 }
 ],
 "links":[
 "en.wikipedia.org"
 ],
-"position":8
+"position":8,
+"topCast":[
+"Hugh Jackman",
+"Christian Bale",
+"Michael Caine"
+],
+"ratingCount":36
 },
 {
 "externalId":"272",
@@ -3434,22 +3596,40 @@
 "rating":7.0,
 "ratingSource":"Metacritic",
 "genres":[
-"superhero film",
-"neo-noir",
-"crime thriller film",
-"ninja film",
-"crime film"
+"Superhero",
+"Neo-noir",
+"Crime thriller",
+"Ninja",
+"Crime"
 ],
 "people":[
 {
 "name":"Christopher Nolan",
 "role":"Director"
+},
+{
+"name":"Christian Bale",
+"role":"Cast"
+},
+{
+"name":"Michael Caine",
+"role":"Cast"
+},
+{
+"name":"Liam Neeson",
+"role":"Cast"
 }
 ],
 "links":[
 "en.wikipedia.org"
 ],
-"position":9
+"position":9,
+"topCast":[
+"Christian Bale",
+"Michael Caine",
+"Liam Neeson"
+],
+"ratingCount":41
 },
 {
 "externalId":"320",
@@ -3461,22 +3641,40 @@
 "rating":7.8,
 "ratingSource":"Metacritic",
 "genres":[
-"neo-noir",
-"mystery film",
-"thriller film",
-"crime film",
-"drama film"
+"Neo-noir",
+"Mystery",
+"Thriller",
+"Crime",
+"Drama"
 ],
 "people":[
 {
 "name":"Christopher Nolan",
 "role":"Director"
+},
+{
+"name":"Al Pacino",
+"role":"Cast"
+},
+{
+"name":"Robin Williams",
+"role":"Cast"
+},
+{
+"name":"Hilary Swank",
+"role":"Cast"
 }
 ],
 "links":[
 "en.wikipedia.org"
 ],
-"position":10
+"position":10,
+"topCast":[
+"Al Pacino",
+"Robin Williams",
+"Hilary Swank"
+],
+"ratingCount":37
 },
 {
 "externalId":"77",
@@ -3488,22 +3686,40 @@
 "rating":8.3,
 "ratingSource":"Metacritic",
 "genres":[
-"neo-noir",
-"film based on a literary work",
-"flashback film",
-"mystery film",
-"thriller film"
+"Neo-noir",
+"Film based on a literary work",
+"Flashback",
+"Mystery",
+"Thriller"
 ],
 "people":[
 {
 "name":"Christopher Nolan",
 "role":"Director"
+},
+{
+"name":"Guy Pearce",
+"role":"Cast"
+},
+{
+"name":"Carrie-Anne Moss",
+"role":"Cast"
+},
+{
+"name":"Joe Pantoliano",
+"role":"Cast"
 }
 ],
 "links":[
 "en.wikipedia.org"
 ],
-"position":11
+"position":11,
+"topCast":[
+"Guy Pearce",
+"Carrie-Anne Moss",
+"Joe Pantoliano"
+],
+"ratingCount":34
 },
 {
 "externalId":"11660",
@@ -3515,21 +3731,39 @@
 "rating":6.0,
 "ratingSource":"Metacritic",
 "genres":[
-"neo-noir",
-"thriller film",
-"crime film",
-"drama film"
+"Neo-noir",
+"Thriller",
+"Crime",
+"Drama"
 ],
 "people":[
 {
 "name":"Christopher Nolan",
 "role":"Director"
+},
+{
+"name":"Jeremy Theobald",
+"role":"Cast"
+},
+{
+"name":"Alex Haw",
+"role":"Cast"
+},
+{
+"name":"Lucy Russell",
+"role":"Cast"
 }
 ],
 "links":[
 "en.wikipedia.org"
 ],
-"position":12
+"position":12,
+"topCast":[
+"Jeremy Theobald",
+"Alex Haw",
+"Lucy Russell"
+],
+"ratingCount":11
 },
 {
 "externalId":"456684",
@@ -3545,12 +3779,29 @@
 {
 "name":"Christopher Nolan",
 "role":"Director"
+},
+{
+"name":"Mark Deighton",
+"role":"Cast"
+},
+{
+"name":"Dave Savva",
+"role":"Cast"
+},
+{
+"name":"Jeremy Theobald",
+"role":"Cast"
 }
 ],
 "links":[
 "en.wikipedia.org"
 ],
-"position":13
+"position":13,
+"topCast":[
+"Mark Deighton",
+"Dave Savva",
+"Jeremy Theobald"
+]
 }
 ]
 }

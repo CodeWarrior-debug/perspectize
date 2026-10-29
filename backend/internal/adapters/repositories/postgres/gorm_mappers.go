@@ -582,6 +582,8 @@ func importItemModelToDomain(m *ImportItemModel) *domain.ImportItem {
 		RatingSource:    m.RatingSource,
 		ChapterCount:    m.ChapterCount,
 		HasCaptions:     m.HasCaptions,
+		Genres:          nonNilStrings(m.Genres),
+		TopCast:         nonNilStrings(m.TopCast),
 		ThumbnailURL:    m.ThumbnailURL,
 		Position:        m.Position,
 		StatsFetchedAt:  m.StatsFetchedAt,
@@ -626,10 +628,21 @@ func importItemDomainToModel(in *domain.ImportItemWithDetails) (*ImportItemModel
 		RatingSource:    it.RatingSource,
 		ChapterCount:    it.ChapterCount,
 		HasCaptions:     it.HasCaptions,
+		Genres:          StringArray(nonNilStrings(it.Genres)),
+		TopCast:         StringArray(nonNilStrings(it.TopCast)),
 		ThumbnailURL:    it.ThumbnailURL,
 		Position:        it.Position,
 		Details:         details,
 		StatsFetchedAt:  it.StatsFetchedAt,
 	}
 	return m, nil
+}
+
+// nonNilStrings returns s, or an empty slice for nil: text[] columns are NOT NULL
+// and GraphQL lists are non-null.
+func nonNilStrings(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }

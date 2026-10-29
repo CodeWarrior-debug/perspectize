@@ -34,7 +34,7 @@ var personURLRe = regexp.MustCompile(`^(?:https?://)?(?:www\.)?themoviedb\.org/p
 
 // PersonLister lists a TMDB person's filmography as import candidates: one
 // call for the credits, then one /movie/{id} call per film for runtime,
-// tagline and genres (the credits list has neither).
+// tagline, genres and top-billed cast (the credits list has none of them).
 type PersonLister struct {
 	c   *Client
 	now func() time.Time
@@ -102,6 +102,32 @@ type movieExtras struct {
 	Genres           []struct {
 		Name string `json:"name"`
 	} `json:"genres"`
+	// Credits comes from append_to_response=credits, in the same request.
+	Credits struct {
+		Cast []struct {
+			Name  string `json:"name"`
+			Order int    `json:"order"`
+		} `json:"cast"`
+	} `json:"credits"`
+}
+
+// topCastSize is how many billed names a sheet row shows.
+const topCastSize = 3
+
+// topCast returns the first topCastSize names by billing order.
+func (e movieExtras) topCast() []string {
+	cast := append(e.Credits.Cast[:0:0], e.Credits.Cast...)
+	sort.SliceStable(cast, func(i, j int) bool { return cast[i].Order < cast[j].Order })
+	names := make([]string, 0, topCastSize)
+	for _, c := range cast {
+		if len(names) == topCastSize {
+			break
+		}
+		if c.Name != "" {
+			names = append(names, c.Name)
+		}
+	}
+	return names
 }
 
 // List emits the person's films newest first, in batches of personBatchSize.
@@ -218,7 +244,7 @@ func (l *PersonLister) enrich(ctx context.Context, films []film) []movieExtras {
 				return
 			}
 			defer func() { <-sem }()
-			body, err := l.c.get(ctx, "/movie/"+strconv.Itoa(films[i].credit.ID), url.Values{"language": {"en-US"}})
+			body, err := l.c.get(ctx, "/movie/"+strconv.Itoa(films[i].credit.ID), url.Values{"language": {"en-US"}, "append_to_response": {"credits"}})
 			if err != nil {
 				return
 			}
@@ -268,6 +294,8 @@ func creditToItem(f film, extra movieExtras, position int, summary string, fetch
 	for i, g := range extra.Genres {
 		genres[i] = g.Name
 	}
+	item.Genres = genres
+	item.TopCast = extra.topCast()
 	return &domain.ImportItemWithDetails{
 		Item: item,
 		Details: domain.ImportItemDetails{

@@ -126,6 +126,8 @@ type ImportItem struct {
 	RatingSource    *string
 	ChapterCount    int
 	HasCaptions     *bool
+	Genres          []string // films only
+	TopCast         []string // films only: up to 3 top-billed names
 	ThumbnailURL    *string
 	Position        int
 	StatsFetchedAt  time.Time

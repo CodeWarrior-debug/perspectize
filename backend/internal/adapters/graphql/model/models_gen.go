@@ -264,6 +264,8 @@ type ImportItem struct {
 	RatingSource    *string                  `json:"ratingSource,omitempty"`
 	ChapterCount    int                      `json:"chapterCount"`
 	HasCaptions     *bool                    `json:"hasCaptions,omitempty"`
+	Genres          []string                 `json:"genres"`
+	TopCast         []string                 `json:"topCast"`
 	ThumbnailURL    *string                  `json:"thumbnailUrl,omitempty"`
 	Position        int                      `json:"position"`
 	StatsFetchedAt  string                   `json:"statsFetchedAt"`
