@@ -1,5 +1,5 @@
 import type { ColDef, IDateFilterParams, ValueFormatterParams } from '@ag-grid-community/core';
-import type { ImportItem, ImportItemKind, ImportSource } from '$lib/queries/imports';
+import type { ImportDestinationType, ImportItem, ImportItemKind, ImportSource } from '$lib/queries/imports';
 import { EMPTY_VALUE, formatCount, formatCountExact, formatDurationSeconds, typeCellRenderer } from './formatting';
 import { contentTypeLabel } from './grid-config';
 
@@ -32,6 +32,21 @@ export const KIND_LABELS: Record<ImportItemKind, string> = {
 
 /** Ratings resting on fewer votes than this are shown muted (Decision 8: low-sample figures). */
 export const LOW_SAMPLE_RATING_COUNT = 50;
+
+/**
+ * Per-source overrides of LOW_SAMPLE_RATING_COUNT. A critic aggregate rests on a few
+ * dozen reviews at most, so 50 would mute nearly every film it scores.
+ */
+const LOW_SAMPLE_BY_SOURCE: Record<string, number> = { Metacritic: 10 };
+
+function lowSampleThreshold(source: string | null): number {
+	return (source && LOW_SAMPLE_BY_SOURCE[source]) || LOW_SAMPLE_RATING_COUNT;
+}
+
+/** What the count under a rating counts: critic reviews for Metacritic, user ratings otherwise. */
+export function ratingCountNoun(source: string | null): string {
+	return source === 'Metacritic' ? 'critic reviews' : 'ratings';
+}
 
 const DAY_MS = 86_400_000;
 
@@ -80,13 +95,16 @@ export function formatRating(item: Pick<ImportItem, 'rating'>): string {
 export function ratingTooltip(item: Pick<ImportItem, 'rating' | 'ratingCount' | 'ratingSource'>): string {
 	if (item.rating === null) return '';
 	const source = item.ratingSource ?? 'Rating';
-	const count = item.ratingCount === null ? '' : ` from ${formatCountExact(item.ratingCount)} ratings`;
-	const low = isLowSampleRating(item) ? ' (few ratings, treat with care)' : '';
+	const count =
+		item.ratingCount === null
+			? ''
+			: ` from ${formatCountExact(item.ratingCount)} ${ratingCountNoun(item.ratingSource)}`;
+	const low = isLowSampleRating(item) ? ` (few ${ratingCountNoun(item.ratingSource)}, treat with care)` : '';
 	return `${source}: ${item.rating.toFixed(1)} / 10${count}${low}`;
 }
 
-export function isLowSampleRating(item: Pick<ImportItem, 'rating' | 'ratingCount'>): boolean {
-	return item.rating !== null && item.ratingCount !== null && item.ratingCount < LOW_SAMPLE_RATING_COUNT;
+export function isLowSampleRating(item: Pick<ImportItem, 'rating' | 'ratingCount' | 'ratingSource'>): boolean {
+	return item.rating !== null && item.ratingCount !== null && item.ratingCount < lowSampleThreshold(item.ratingSource);
 }
 
 /** The row's state in words: library first, then the import outcome. */
@@ -172,12 +190,14 @@ export const DECIDE_COLUMNS: readonly string[] = [
 	'source',
 	'published',
 	'length',
+	'rating',
+	'starring',
+	'genres',
 	'views',
 	'likes',
 	'likeRate',
 	'comments',
 	'viewsPerDay',
-	'rating',
 	'status',
 ];
 
@@ -192,10 +212,71 @@ export const IMPORT_COL_IDS: readonly string[] = [
 	'statsFetchedAt',
 ];
 
-export function columnsForSet(set: ColumnSet): { shown: string[]; hidden: string[] } {
-	if (set === 'all') return { shown: [...IMPORT_COL_IDS], hidden: [] };
-	const decide = new Set(DECIDE_COLUMNS);
-	return { shown: [...DECIDE_COLUMNS], hidden: IMPORT_COL_IDS.filter((id) => !decide.has(id)) };
+/**
+ * The content types a column has data for; a column not listed here applies to every type.
+ * A sheet hides columns that apply to none of its rows, so a filmography isn't a wall of
+ * empty view and like columns (Decision 8: say once what the source can't supply).
+ */
+export const COLUMN_TYPES: Readonly<Record<string, readonly ImportDestinationType[]>> = {
+	// Video / Short / Live; a film's kind would only repeat the Becomes column.
+	kind: ['YOUTUBE_VIDEO'],
+	views: ['YOUTUBE_VIDEO'],
+	likes: ['YOUTUBE_VIDEO'],
+	likeRate: ['YOUTUBE_VIDEO'],
+	comments: ['YOUTUBE_VIDEO'],
+	viewsPerDay: ['YOUTUBE_VIDEO'],
+	chapters: ['YOUTUBE_VIDEO'],
+	captions: ['YOUTUBE_VIDEO'],
+	genres: ['MOVIE'],
+	starring: ['MOVIE'],
+	rating: ['MOVIE'],
+	ratingCount: ['MOVIE'],
+};
+
+function appliesToAny(colId: string, types: ReadonlySet<ImportDestinationType>): boolean {
+	const only = COLUMN_TYPES[colId];
+	return !only || only.some((t) => types.has(t));
+}
+
+/** The destination types present in a sheet's rows. */
+export function sheetTypes(rows: readonly Pick<ImportItem, 'destinationType'>[]): Set<ImportDestinationType> {
+	return new Set(rows.map((r) => r.destinationType));
+}
+
+/**
+ * Columns to show and hide for a column set, given the destination types in the sheet.
+ * With one source the Source column would repeat it on every row, so it hides.
+ */
+export function columnsForSet(
+	set: ColumnSet,
+	types: ReadonlySet<ImportDestinationType>,
+	sourceCount = 2,
+): { shown: string[]; hidden: string[] } {
+	const inSet = set === 'all' ? new Set(IMPORT_COL_IDS) : new Set(DECIDE_COLUMNS);
+	const shown = IMPORT_COL_IDS.filter(
+		(id) => inSet.has(id) && appliesToAny(id, types) && (id !== 'source' || sourceCount > 1),
+	);
+	const showing = new Set(shown);
+	return { shown, hidden: IMPORT_COL_IDS.filter((id) => !showing.has(id)) };
+}
+
+/** What each source can't supply, said once above the sheet instead of in a column of blanks. */
+const UNAVAILABLE: Record<ImportDestinationType, string> = {
+	YOUTUBE_VIDEO: 'YouTube no longer shares dislike counts, and videos carry no rating.',
+	MOVIE: "TMDB doesn't publish views, likes or comments for films.",
+};
+
+/**
+ * One line for the sheet: what its sources don't supply, and where that shows. A sheet of
+ * one type hides those columns; a mixed sheet keeps them and leaves the other type's cells empty.
+ */
+export function unavailableNote(types: ReadonlySet<ImportDestinationType>): string {
+	const parts = (Object.keys(UNAVAILABLE) as ImportDestinationType[])
+		.filter((t) => types.has(t))
+		.map((t) => UNAVAILABLE[t]);
+	if (parts.length === 0) return '';
+	const tail = types.size > 1 ? 'Those cells are empty for the rows they don’t apply to.' : 'Those columns are hidden.';
+	return `${parts.join(' ')} ${tail}`;
 }
 
 /** Date filter comparator for ISO timestamps (AG Grid's date filter compares by local midnight). */
@@ -209,6 +290,11 @@ export const isoDateFilterParams: IDateFilterParams = {
 	},
 	buttons: ['reset'],
 };
+
+/** A short list as "a, b, c", or the empty marker. */
+export function listOrEmpty(values: readonly string[]): string {
+	return values.length ? values.join(', ') : EMPTY_VALUE;
+}
 
 function formatPublished(iso: string | null): string {
 	if (!iso) return EMPTY_VALUE;
@@ -369,6 +455,34 @@ function columnDefs(now: Date): ColDef<ImportRow>[] {
 			...numberFilter,
 		},
 		{
+			colId: 'rating',
+			field: 'rating',
+			headerName: 'Rating',
+			headerTooltip: 'Out of 10, from the source named in the tooltip',
+			width: 100,
+			valueFormatter: (p: ValueFormatterParams<ImportRow>) => (p.data ? formatRating(p.data) : ''),
+			tooltipValueGetter: (p) => (p.data ? ratingTooltip(p.data) : ''),
+			cellClassRules: { 'text-muted-foreground': (p) => !!p.data && isLowSampleRating(p.data) },
+			...numberFilter,
+		},
+		{
+			colId: 'starring',
+			headerName: 'Starring',
+			headerTooltip: 'Top-billed cast',
+			width: 240,
+			valueGetter: (p) => (p.data ? listOrEmpty(p.data.topCast) : ''),
+			tooltipValueGetter: (p) => (p.data ? p.data.topCast.join(', ') : ''),
+			...textFilter,
+		},
+		{
+			colId: 'genres',
+			headerName: 'Genres',
+			width: 200,
+			valueGetter: (p) => (p.data ? listOrEmpty(p.data.genres) : ''),
+			tooltipValueGetter: (p) => (p.data ? p.data.genres.join(', ') : ''),
+			...textFilter,
+		},
+		{
 			colId: 'views',
 			field: 'viewCount',
 			headerName: 'Views',
@@ -418,17 +532,6 @@ function columnDefs(now: Date): ColDef<ImportRow>[] {
 			...numberFilter,
 		},
 		{
-			colId: 'rating',
-			field: 'rating',
-			headerName: 'Rating',
-			headerTooltip: 'Out of 10, from the source named in the tooltip',
-			width: 100,
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) => (p.data ? formatRating(p.data) : ''),
-			tooltipValueGetter: (p) => (p.data ? ratingTooltip(p.data) : ''),
-			cellClassRules: { 'text-muted-foreground': (p) => !!p.data && isLowSampleRating(p.data) },
-			...numberFilter,
-		},
-		{
 			colId: 'status',
 			headerName: 'Status',
 			width: 140,
@@ -440,6 +543,7 @@ function columnDefs(now: Date): ColDef<ImportRow>[] {
 			colId: 'ratingCount',
 			field: 'ratingCount',
 			headerName: 'Ratings',
+			headerTooltip: 'How many ratings (or, for Metacritic, critic reviews) the score rests on',
 			width: 96,
 			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatCount(p.value ?? null),
 			...numberFilter,

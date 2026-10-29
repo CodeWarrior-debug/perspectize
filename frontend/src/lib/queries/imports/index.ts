@@ -73,6 +73,9 @@ export interface ImportItem {
 	ratingSource: string | null;
 	chapterCount: number;
 	hasCaptions: boolean | null;
+	/** Films: genre names and up to 3 top-billed cast; empty for videos. */
+	genres: string[];
+	topCast: string[];
 	thumbnailUrl: string | null;
 	position: number;
 	statsFetchedAt: string;
@@ -179,6 +182,8 @@ const IMPORT_ITEM_FIELDS = gql`
 		ratingSource
 		chapterCount
 		hasCaptions
+		genres
+		topCast
 		thumbnailUrl
 		position
 		statsFetchedAt

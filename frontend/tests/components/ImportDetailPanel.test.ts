@@ -49,6 +49,8 @@ function item(overrides: Partial<ImportItem> = {}): ImportItem {
 		ratingSource: null,
 		chapterCount: 0,
 		hasCaptions: false,
+		genres: [],
+		topCast: [],
 		thumbnailUrl: null,
 		position: 3,
 		statsFetchedAt: '2026-10-27T12:00:00Z',
@@ -133,7 +135,7 @@ describe('ImportDetailPanel', () => {
 			viewCount: null,
 			commentCount: null,
 			rating: 6,
-			ratingCount: 12,
+			ratingCount: 6,
 			ratingSource: 'Metacritic',
 		});
 		mocks.state.data = {
@@ -148,7 +150,9 @@ describe('ImportDetailPanel', () => {
 		render(ImportDetailPanel, { props: { item: film, sourceTitle: 'Christopher Nolan', now } });
 		expect(screen.getByText('Metacritic rating')).toBeInTheDocument();
 		expect(screen.getByText('6.0 / 10')).toHaveClass('text-muted-foreground');
-		expect(screen.getByText(/Few ratings so far/)).toBeInTheDocument();
+		expect(screen.getByText(/Few critic reviews so far/)).toBeInTheDocument();
+		expect(screen.getByText('Critic reviews')).toBeInTheDocument();
+		expect(screen.getByText('6')).toHaveClass('text-muted-foreground');
 		expect(screen.queryByText('Views')).toBeNull();
 		expect(screen.getByText('Christopher Nolan (Director)')).toBeInTheDocument();
 		expect(screen.getByText('Neo-noir, Thriller')).toBeInTheDocument();

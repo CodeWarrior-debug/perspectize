@@ -18,9 +18,12 @@ import {
 	isoDateFilterParams,
 	isSelectable,
 	likeRate,
+	listOrEmpty,
 	passesSheetFilter,
 	ratingTooltip,
 	selectionSummary,
+	sheetTypes,
+	unavailableNote,
 	titleCellRenderer,
 	toImportRows,
 	viewsPerDay,
@@ -47,6 +50,8 @@ function item(overrides: Partial<ImportItem> = {}): ImportItem {
 		ratingSource: null,
 		chapterCount: 3,
 		hasCaptions: true,
+		genres: [],
+		topCast: [],
 		thumbnailUrl: 'https://i.ytimg.com/vi/abc/mqdefault.jpg',
 		position: 0,
 		statsFetchedAt: '2026-10-27T12:00:00Z',
@@ -105,6 +110,15 @@ describe('decision figures', () => {
 		expect(formatRating(item())).toBe(EMPTY_VALUE);
 		expect(ratingTooltip(item())).toBe('');
 		expect(ratingTooltip({ rating: 7.4, ratingCount: null, ratingSource: null })).toBe('Rating: 7.4 / 10');
+	});
+
+	it('a critic aggregate counts reviews, and a few dozen of them is not a small sample', () => {
+		const inception = item({ destinationType: 'MOVIE', rating: 7.4, ratingCount: 42, ratingSource: 'Metacritic' });
+		expect(ratingTooltip(inception)).toBe('Metacritic: 7.4 / 10 from 42 critic reviews');
+		expect(isLowSampleRating(inception), '42 reviews would be muted under the 50-vote user threshold').toBe(false);
+		const thin = { ...inception, ratingCount: 6 };
+		expect(isLowSampleRating(thin)).toBe(true);
+		expect(ratingTooltip(thin)).toContain('few critic reviews');
 	});
 });
 
@@ -176,11 +190,74 @@ describe('columns', () => {
 		expect(byId.get('title')?.pinned).toBe('left');
 	});
 
+	const both = new Set(['YOUTUBE_VIDEO', 'MOVIE'] as const);
+
 	it('Decide hides only the bookkeeping columns; All shows everything', () => {
-		const decide = columnsForSet('decide');
+		const decide = columnsForSet('decide', both);
 		expect(decide.shown).toEqual([...DECIDE_COLUMNS]);
 		expect(decide.hidden).toEqual(['ratingCount', 'chapters', 'captions', 'recency', 'externalId', 'statsFetchedAt']);
-		expect(columnsForSet('all')).toEqual({ shown: [...IMPORT_COL_IDS], hidden: [] });
+		expect(columnsForSet('all', both)).toEqual({ shown: [...IMPORT_COL_IDS], hidden: [] });
+	});
+
+	it('a filmography shows film facts instead of a wall of empty video columns', () => {
+		const films = columnsForSet('decide', new Set(['MOVIE'] as const));
+		expect(films.shown, 'rating and cast first: the film facts that decide it').toEqual([
+			'title',
+			'destination',
+			'source',
+			'published',
+			'length',
+			'rating',
+			'starring',
+			'genres',
+			'status',
+		]);
+		expect(films.hidden, "a film's kind only repeats Becomes").toContain('kind');
+		for (const id of ['views', 'likes', 'likeRate', 'comments', 'viewsPerDay']) expect(films.hidden).toContain(id);
+		expect(columnsForSet('all', new Set(['MOVIE'] as const)).shown).toContain('ratingCount');
+		expect(columnsForSet('all', new Set(['MOVIE'] as const)).hidden).toEqual([
+			'kind',
+			'views',
+			'likes',
+			'likeRate',
+			'comments',
+			'viewsPerDay',
+			'chapters',
+			'captions',
+		]);
+	});
+
+	it('a channel sheet drops the film-only columns', () => {
+		const videos = columnsForSet('decide', new Set(['YOUTUBE_VIDEO'] as const));
+		for (const id of ['genres', 'starring', 'rating']) expect(videos.hidden).toContain(id);
+		expect(videos.shown).toContain('likeRate');
+		expect(videos.shown).toContain('kind');
+	});
+
+	it('one source hides the Source column, which would repeat it on every row', () => {
+		expect(columnsForSet('decide', both, 1).hidden).toContain('source');
+		expect(columnsForSet('decide', both, 2).shown).toContain('source');
+	});
+
+	it('the sheet says once what its sources cannot supply', () => {
+		expect(sheetTypes([item(), item({ destinationType: 'MOVIE' }), item()])).toEqual(both);
+		expect(unavailableNote(new Set(['MOVIE'] as const))).toBe(
+			"TMDB doesn't publish views, likes or comments for films. Those columns are hidden.",
+		);
+		const mixed = unavailableNote(both);
+		expect(mixed).toContain('dislike counts');
+		expect(mixed).toContain('TMDB');
+		expect(mixed).toContain('empty for the rows');
+		expect(unavailableNote(new Set())).toBe('');
+	});
+
+	it('genres and cast read as short lists, and an empty list is the empty marker', () => {
+		expect(listOrEmpty(['Leonardo DiCaprio', 'Ken Watanabe'])).toBe('Leonardo DiCaprio, Ken Watanabe');
+		expect(listOrEmpty([])).toBe(EMPTY_VALUE);
+		const starring = defs.find((d) => d.colId === 'starring')!;
+		const film = item({ destinationType: 'MOVIE', topCast: ['Guy Pearce', 'Carrie-Anne Moss'] });
+		const getter = starring.valueGetter as (p: { data: ImportItem }) => string;
+		expect(getter({ data: film })).toBe('Guy Pearce, Carrie-Anne Moss');
 	});
 
 	it('every column keeps its width as a floor, so the sheet scrolls instead of squeezing', () => {

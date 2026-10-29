@@ -12,6 +12,8 @@
 		formatRate,
 		importStatusLabel,
 		isLowSampleRating,
+		ratingCountNoun,
+		ratingTooltip,
 		KIND_LABELS,
 		likeRate,
 		viewsPerDay,
@@ -86,7 +88,15 @@
 			out.push({
 				label: item.ratingSource ? `${item.ratingSource} rating` : 'Rating',
 				value: item.rating === null ? EMPTY_VALUE : `${item.rating.toFixed(1)} / 10`,
-				title: item.ratingCount === null ? undefined : `${formatCountExact(item.ratingCount)} ratings`,
+				title: ratingTooltip(item) || undefined,
+				muted: isLowSampleRating(item),
+			});
+		}
+		if (!isVideo) {
+			const noun = ratingCountNoun(item.ratingSource);
+			out.push({
+				label: noun.charAt(0).toUpperCase() + noun.slice(1),
+				value: item.ratingCount === null ? EMPTY_VALUE : formatCountExact(item.ratingCount),
 				muted: isLowSampleRating(item),
 			});
 		}
@@ -149,7 +159,9 @@
 					{formatPublished(item.statsFetchedAt)}
 				</p>
 			{:else if isLowSampleRating(item)}
-				<p class="text-muted-foreground col-span-3 text-xs">Few ratings so far; treat the score with care.</p>
+				<p class="text-muted-foreground col-span-3 text-xs">
+					Few {ratingCountNoun(item.ratingSource)} so far; treat the score with care.
+				</p>
 			{/if}
 		</section>
 

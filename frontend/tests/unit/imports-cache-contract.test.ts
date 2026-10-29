@@ -54,6 +54,8 @@ function item(overrides: Partial<ImportItem> = {}): ImportItem {
 		ratingSource: null,
 		chapterCount: 0,
 		hasCaptions: null,
+		genres: [],
+		topCast: [],
 		thumbnailUrl: null,
 		position: 0,
 		statsFetchedAt: '2026-10-27T12:00:00Z',

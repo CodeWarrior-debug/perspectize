@@ -17,7 +17,9 @@
 		isSelectable,
 		passesSheetFilter,
 		selectionSummary,
+		sheetTypes,
 		toImportRows,
+		unavailableNote,
 		type ColumnSet,
 		type ImportRow,
 		type LibraryFilter,
@@ -34,6 +36,9 @@
 
 	const now = new Date();
 	const rows = $derived(toImportRows(job.items, job.sources));
+	// Columns follow the content types in the sheet, so a filmography has no view or like columns.
+	const types = $derived(sheetTypes(rows));
+	const note = $derived(unavailableNote(types));
 	const importItems = useImportItems();
 
 	let gridApi = $state<GridApi<ImportRow> | null>(null);
@@ -108,7 +113,7 @@
 
 	// Column set, a frame after grid ready (column APIs throw straight from onGridReady).
 	$effect(() => {
-		const { shown, hidden } = columnsForSet(columnSet);
+		const { shown, hidden } = columnsForSet(columnSet, types, job.sources.length);
 		const api = gridApi;
 		if (!api || !gridReady) return;
 		const frame = requestAnimationFrame(() => {
@@ -214,7 +219,7 @@
 		<input
 			type="search"
 			bind:value={search}
-			placeholder="Search titles, summaries, sources"
+			placeholder="Search titles, summaries, sources, cast"
 			aria-label="Search every row"
 			class="border-border bg-background text-foreground min-w-56 flex-1 rounded-md border px-2 py-1.5 text-sm"
 		/>
@@ -223,6 +228,10 @@
 			<strong class="text-foreground">{shownCount}</strong> of {rows.length} rows · {libraryCount} in library
 		</span>
 	</div>
+
+	{#if note}
+		<p class="text-muted-foreground text-sm" data-testid="import-unavailable-note">{note}</p>
+	{/if}
 
 	<div class="grid min-h-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_22rem]">
 		<div class="h-[68vh] min-h-96" style="--ag-row-height: 52px; --ag-header-height: 36px;">
