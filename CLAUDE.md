@@ -103,7 +103,7 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 
 **How-to guides:**
 - [Adding a Content Type](.claude/docs/ADDING_CONTENT_TYPE.md) — End-to-end guide for new content types (backend + frontend)
-- [Content Type Designer](tools/content-type-designer/README.md) — Plan a new type's columns, tooltips and details view before coding. `dist/` is committed: after editing `src/` run `npx tsc -p tsconfig.json` in that dir and commit both (don't commit its package-lock.json). ES modules won't load from file:// — serve it (`python3 -m http.server`) to test; Playwright is at /opt/node22/lib/node_modules/playwright in cloud sessions.
+- [Content Type Designer](tools/content-type-designer/README.md) — Plan a new type's columns, tooltips and details view before coding. `dist/` is committed: after editing `src/` run `npx tsc -p tsconfig.json` in that dir and commit both (don't commit its package-lock.json). ES modules won't load from file:// — serve it (`python3 -m http.server`) to test; Playwright is at /opt/node22/lib/node_modules/playwright in cloud sessions. `previews/*.spec.json` were built by a `content-type-preview` skill that is not on main — don't hunt for its `build.mjs`. For sample research, the Met API is keyless and Europeana accepts the public demo key `wskey=api2demo`.
 
 **Planning & backlog:**
 - [Feature Backlog](FEATURE_BACKLOG.md) — Future ideas not tied to any milestone. Capture ideas here during development; evaluate when planning new work.
