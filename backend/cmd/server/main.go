@@ -25,6 +25,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/demo"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/server"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/database"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/logger"
@@ -189,9 +190,12 @@ func main() {
 		slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds, "trendingTTLSeconds", cfg.YouTube.TrendingCacheTTLSeconds)
 	}
 	// Import staging listers: one per source type that has an API key. Demo
-	// mode has neither key, so its imports come only from the seeded data.
+	// mode has neither key, so it lists the sample sources in imports.json.
 	importListers := map[domain.ImportSourceType]portservices.ImportSourceLister{}
-	if !demoCfg.Enabled && cfg.YouTube.APIKey != "" {
+	if demoCfg.Enabled {
+		importListers[domain.ImportSourceYouTubeChannel] = demo.NewImportLister(domain.ImportSourceYouTubeChannel)
+		importListers[domain.ImportSourceTMDBPerson] = demo.NewImportLister(domain.ImportSourceTMDBPerson)
+	} else if cfg.YouTube.APIKey != "" {
 		importListers[domain.ImportSourceYouTubeChannel] = youtube.NewChannelLister(youtube.NewClient(cfg.YouTube.APIKey))
 	}
 	// Movie lookups and Discover's Movies search share one TMDB client.

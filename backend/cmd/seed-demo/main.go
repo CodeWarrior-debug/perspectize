@@ -312,7 +312,7 @@ func (s *seeder) seedImports(ctx context.Context) error {
 		return fmt.Errorf("demo imports fetchedAt: %w", err)
 	}
 	owner := s.userIDs["carmen"]
-	existing, err := s.imports.ListJobs(ctx)
+	existing, err := s.imports.ListJobs(ctx, true)
 	if err != nil {
 		return fmt.Errorf("list imports: %w", err)
 	}

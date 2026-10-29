@@ -536,6 +536,8 @@ enum ImportPersonRole {
 }
 
 enum ImportSourceStatus {
+  # Part of a request nobody has approved yet: nothing is listed.
+  WAITING
   LISTING
   READY
   FAILED
@@ -575,9 +577,25 @@ type ImportSource {
   fetchedAt: String
 }
 
+# An admin's import is APPROVED when created; anyone else's is REQUESTED until
+# an admin approves it (listing starts) or declines it.
+enum ImportRequestStatus {
+  REQUESTED
+  APPROVED
+  DECLINED
+}
+
 type ImportJob {
   id: ID!
   name: String!
+  requestStatus: ImportRequestStatus!
+  # Who created it (the requester, for a request).
+  requestedBy: User
+  # The reviewing admin's reason; always set on a decline.
+  reviewNote: String
+  reviewedAt: String
+  # Set when an admin closed it: hidden from non-admins and read-only.
+  closedAt: String
   sources: [ImportSource!]!
   createdAt: String!
   updatedAt: String!
@@ -613,7 +631,15 @@ type ImportItem {
   # Films: genre names and up to 3 top-billed cast (empty for videos).
   genres: [String!]!
   topCast: [String!]!
+  # Films (TMDB): daily popularity score, user review count, and box office
+  # takings and budget in USD. Null when unknown.
+  popularity: Float
+  reviewCount: Int
+  revenue: Float
+  budget: Float
   thumbnailUrl: String
+  # Marked "don't import" (by anyone, until the import is closed): can't be imported.
+  excluded: Boolean!
   # Position in the source listing; 0 is first (newest for channels).
   position: Int!
   statsFetchedAt: String!
@@ -660,6 +686,45 @@ input CreateImportJobInput {
   sources: [CreateImportSourceInput!]!
 }
 
+# Live progress of an import's running batch(es), pushed at most twice a
+# second while rows import. done = imported + skipped + failed.
+type ImportProgress {
+  jobId: ID!
+  total: Int!
+  done: Int!
+  imported: Int!
+  # Already in the library, so nothing new was created.
+  skipped: Int!
+  failed: Int!
+  running: Boolean!
+  updatedAt: String!
+}
+
+extend type Subscription {
+  # The current count at once, then every change while the import runs.
+  importProgress(jobId: ID!): ImportProgress! @auth
+}
+
+input ReviewImportJobInput {
+  jobId: IntID!
+  approve: Boolean!
+  # Required to decline: it is what the requester reads.
+  note: String
+}
+
+input SetImportItemsExcludedInput {
+  jobId: IntID!
+  itemIds: [IntID!]!
+  # true marks the rows "don't import"; false clears the mark.
+  excluded: Boolean!
+}
+
+input CloseImportJobInput {
+  jobId: IntID!
+  # false reopens it.
+  closed: Boolean!
+}
+
 input ImportItemsInput {
   jobId: IntID!
   itemIds: [IntID!]!
@@ -670,6 +735,8 @@ type ImportItemsResult {
   alreadyInLibrary: Int!
   alreadyQueued: Int!
   notFound: Int!
+  # Marked "don't import", so not queued.
+  excluded: Int!
 }
 
 type Mutation {
@@ -724,7 +791,14 @@ type Mutation {
 
   # Import staging. Creating an import is admin-only (it spends API quota);
   # sources are listed in the background, so the returned sources are LISTING.
+  # Anyone signed in: an admin's import starts listing, anyone else's waits as a request.
   createImportJob(input: CreateImportJobInput!): ImportJob! @auth
+  # Admin only: approve (start listing) or decline a requested import.
+  reviewImportJob(input: ReviewImportJobInput!): ImportJob! @auth
+  # Anyone signed in, until the import is closed. Returns how many rows changed.
+  setImportItemsExcluded(input: SetImportItemsExcludedInput!): Int! @auth
+  # Admin only: close (hide from non-admins, read-only) or reopen an import.
+  closeImportJob(input: CloseImportJobInput!): ImportJob! @auth
   # Queues the picked rows and imports them in the background as the caller.
   importItems(input: ImportItemsInput!): ImportItemsResult! @auth
 }
@@ -830,7 +904,8 @@ type Query {
   todoActions: [TodoAction!]! @auth
 
   # Import staging (preliminary pages; not linked from the main nav).
-  importJobs: [ImportJob!]! @auth
+  # Closed imports are included only for an admin passing includeClosed.
+  importJobs(includeClosed: Boolean = false): [ImportJob!]! @auth
   # Null for an import that doesn't exist.
   importJob(id: ID!): ImportJob @auth
   # Null for a row that doesn't exist.

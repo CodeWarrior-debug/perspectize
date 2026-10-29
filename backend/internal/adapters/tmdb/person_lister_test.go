@@ -40,16 +40,23 @@ func fakeTMDB(t *testing.T, movieCalls *atomic.Int32) http.HandlerFunc {
 			_, _ = w.Write([]byte(`{"id":525,"name":"Christopher Nolan"}`))
 		case r.URL.Path == "/person/525/movie_credits":
 			_, _ = w.Write([]byte(nolanCredits))
+		case r.URL.Path == "/search/person":
+			if r.URL.Query().Get("query") == "Christopher Nolan" {
+				_, _ = w.Write([]byte(`{"results":[{"id":525,"name":"Christopher Nolan"},{"id":1,"name":"Another Nolan"}]}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"results":[]}`))
 		case strings.HasPrefix(r.URL.Path, "/movie/"):
 			movieCalls.Add(1)
 			switch r.URL.Path {
 			case "/movie/27205":
 				// Cast only when asked for, out of billing order, with a blank name.
-				credits := ""
-				if r.URL.Query().Get("append_to_response") == "credits" {
-					credits = `,"credits":{"cast":[{"name":"Elliot Page","order":2},{"name":"Leonardo DiCaprio","order":0},{"name":"","order":1},{"name":"Joseph Gordon-Levitt","order":1},{"name":"Tom Hardy","order":3}]}`
+				appended := ""
+				if r.URL.Query().Get("append_to_response") == "credits,reviews,keywords" {
+					appended = `,"credits":{"cast":[{"name":"Elliot Page","order":2},{"name":"Leonardo DiCaprio","order":0},{"name":"","order":1},{"name":"Joseph Gordon-Levitt","order":1},{"name":"Tom Hardy","order":3}]}` +
+						`,"reviews":{"total_results":12},"keywords":{"keywords":[{"name":"dream"},{"name":"heist"}]}`
 				}
-				_, _ = w.Write([]byte(`{"runtime":148,"tagline":"Your mind is the scene of the crime.","original_language":"en","genres":[{"name":"Action"},{"name":"Science Fiction"}]` + credits + `}`))
+				_, _ = w.Write([]byte(`{"runtime":148,"tagline":"Your mind is the scene of the crime.","original_language":"en","popularity":38.5,"budget":160000000,"revenue":839030630,"genres":[{"name":"Action"},{"name":"Science Fiction"}]` + appended + `}`))
 			case "/movie/872585":
 				_, _ = w.Write([]byte(`{"runtime":181,"tagline":"","genres":[{"name":"Drama"}]}`))
 			case "/movie/1":
@@ -87,8 +94,14 @@ func TestPersonLister_Resolve(t *testing.T) {
 		assert.Equal(t, "Christopher Nolan", got.Title)
 		assert.Equal(t, "https://www.themoviedb.org/person/525", got.URL)
 	}
+	got, err := l.Resolve(context.Background(), " Christopher Nolan ")
+	require.NoError(t, err, "a name resolves to TMDB's top match")
+	assert.Equal(t, "525", got.ID)
+	assert.Equal(t, "Christopher Nolan", got.Title)
+	_, err = l.Resolve(context.Background(), "Nobody At All")
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+
 	for _, ref := range []string{
-		"nolan",
 		"https://evil.example/themoviedb.org/person/525",
 		"https://themoviedb.org.evil.example/person/525",
 		"https://www.themoviedb.org/person/525x",
@@ -96,7 +109,7 @@ func TestPersonLister_Resolve(t *testing.T) {
 		_, err := l.Resolve(context.Background(), ref)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput, ref)
 	}
-	_, err := l.Resolve(context.Background(), "999")
+	_, err = l.Resolve(context.Background(), "999")
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
@@ -137,12 +150,21 @@ func TestPersonLister_ListDirector(t *testing.T) {
 	assert.Equal(t, []string{"Action", "Science Fiction"}, inception.Item.Genres, "genres are a sheet column too")
 	assert.Equal(t, []string{"Leonardo DiCaprio", "Joseph Gordon-Levitt", "Elliot Page"}, inception.Item.TopCast,
 		"top 3 by billing order from the same /movie call, blank names skipped")
+	assert.InDelta(t, 38.5, *inception.Item.Popularity, 0.001)
+	assert.Equal(t, int64(160000000), *inception.Item.Budget)
+	assert.Equal(t, int64(839030630), *inception.Item.Revenue)
+	assert.Equal(t, 12, *inception.Item.ReviewCount)
+	assert.Equal(t, []string{"dream", "heist"}, inception.Details.Tags, "TMDB keywords are the film's tags")
 	assert.Equal(t, "Cobb steals secrets from dreams.", inception.Details.Description)
 	assert.Equal(t, 1, inception.Item.Position)
 
 	oppen := items[0]
 	assert.Equal(t, "The story of J. Robert Oppenheimer.", *oppen.Item.Summary, "no tagline: the overview's first line")
 	assert.Empty(t, oppen.Item.TopCast, "no credits in the response: no cast")
+	assert.Nil(t, oppen.Item.Budget, "TMDB's 0 budget is unknown, not $0")
+	assert.Nil(t, oppen.Item.Revenue)
+	assert.Nil(t, oppen.Item.ReviewCount, "no reviews block: unknown")
+	assert.Nil(t, oppen.Item.Popularity)
 
 	untitled := items[2]
 	assert.Nil(t, untitled.Item.Rating, "zero votes is no rating, not a score of 0")

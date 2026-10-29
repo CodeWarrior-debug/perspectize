@@ -26,7 +26,19 @@ type ImportJobRepository interface {
 	CreateJob(ctx context.Context, job *domain.ImportJob) (*domain.ImportJob, error)
 
 	// ListJobs returns every job, newest first, with its sources (2 queries).
-	ListJobs(ctx context.Context) ([]*domain.ImportJob, error)
+	// Closed jobs are left out unless includeClosed.
+	ListJobs(ctx context.Context, includeClosed bool) ([]*domain.ImportJob, error)
+
+	// GetJobState returns one job without its sources (1 query), or domain.ErrNotFound.
+	GetJobState(ctx context.Context, id int) (*domain.ImportJob, error)
+
+	// SetClosed closes a job (at) or reopens it (nil) (1 statement); domain.ErrNotFound for an unknown id.
+	SetClosed(ctx context.Context, id int, at *time.Time) error
+
+	// SetExcluded marks (true) or unmarks rows of jobID among ids "don't
+	// import", skipping rows queued or imported and rows already in that
+	// state, and returns the ids it changed (1 statement; 0 for empty ids).
+	SetExcluded(ctx context.Context, jobID int, ids []int, excluded bool) ([]int, error)
 
 	// GetJob returns one job with its sources (2 queries), or domain.ErrNotFound.
 	GetJob(ctx context.Context, id int) (*domain.ImportJob, error)
@@ -52,7 +64,7 @@ type ImportJobRepository interface {
 	GetItemWithDetails(ctx context.Context, itemID int) (*domain.ImportItemWithDetails, error)
 
 	// MarkQueued sets import_status to QUEUED on the rows of jobID among ids
-	// that have never been imported or last failed, and returns the ids it
+	// that aren't excluded and have never been imported or last failed, and returns the ids it
 	// changed (1 statement; 0 for empty ids).
 	MarkQueued(ctx context.Context, jobID int, ids []int) ([]int, error)
 
@@ -63,6 +75,15 @@ type ImportJobRepository interface {
 	// failed, for work a restart cut short (2 statements). Returns how many of
 	// each it changed.
 	FailInterrupted(ctx context.Context, detail string) (sources int, items int, err error)
+
+	// CountPendingRequests counts userID's jobs still REQUESTED (1 query).
+	CountPendingRequests(ctx context.Context, userID int) (int, error)
+
+	// ReviewJob sets a REQUESTED job to status (APPROVED or DECLINED) with an
+	// optional note. Approving also moves its WAITING sources to LISTING
+	// (2 statements; 1 for a decline). domain.ErrNotFound when the job isn't
+	// REQUESTED any more, including when another admin reviewed it first.
+	ReviewJob(ctx context.Context, jobID int, status domain.ImportRequestStatus, note *string, at time.Time) error
 
 	// ReassignByUser moves the creator of every job from fromUserID to
 	// toUserID, used when a user is deleted (1 statement).
