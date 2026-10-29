@@ -31,7 +31,7 @@ function listOf(value) {
         return value.items;
     return (cellText(value) ?? '').split(/;\s*/).map((s) => s.trim()).filter(Boolean);
 }
-function media(kind, title, accent, url) {
+function media(kind, title, accent, url, image) {
     if (kind === 'none')
         return null;
     const initials = title
@@ -40,11 +40,8 @@ function media(kind, title, accent, url) {
         .slice(0, 2)
         .map((w) => w[0])
         .join('');
-    const caption = { poster: 'poster · w342', still: 'still · w300', thumb: 'hqdefault', icon: 'icon' }[kind];
-    const tile = el('div', { class: `media media-${kind}` }, [
-        el('span', { class: 'media-initials' }, [initials || '◎']),
-        el('span', { class: 'media-caption' }, [caption])
-    ]);
+    const caption = { poster: 'poster · w342', still: 'still · w300', thumb: 'hqdefault', artwork: 'contain', icon: 'icon' }[kind];
+    const tile = el('div', { class: `media media-${kind}${image ? ' has-image' : ''}` }, image ? [el('img', { src: image, alt: '' })] : [el('span', { class: 'media-initials' }, [initials || '◎']), el('span', { class: 'media-caption' }, [caption])]);
     tile.style.setProperty('--type-accent', accent);
     attachTip(tile, () => ({
         body: [url ? `Opens ${url} in a new tab` : 'Image placeholder — the real app loads it from the source'],
@@ -136,7 +133,7 @@ export function openDetails(input) {
         openDetails(input);
     });
     const hero = el('div', { class: 'modal-hero' });
-    const m = media(layout.media, title, input.accent, url);
+    const m = media(layout.media, title, input.accent, url, input.image);
     if (m)
         hero.append(m);
     const crumbs = (layout.breadcrumb ?? []).map((k) => cellText(row[k])).filter(Boolean);
@@ -183,7 +180,7 @@ export function openDetails(input) {
         ]));
     }
     const attribution = layout.attribution
-        ? [el('div', { class: 'attribution' }, [el('span', { class: 'tmdb-mark' }, ['TMDB']), el('span', {}, [layout.attribution])])]
+        ? [el('div', { class: 'attribution' }, [el('span', { class: 'tmdb-mark' }, [layout.attributionMark ?? 'TMDB']), el('span', {}, [layout.attribution])])]
         : [];
     const notes = layout.notes?.length
         ? [

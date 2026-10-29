@@ -325,7 +325,9 @@ function accentFor(typeId: string): string {
 }
 
 function showDetails(typeId: string, row: SampleRow): void {
+  const img = typeof row.item === 'object' ? row.item.img : undefined;
   openDetails({
+    image: img ? THUMBS[img] ?? img : undefined,
     layout: layoutFor(typeId),
     row,
     typeLabel: typeLabel(typeId, state.draft),
@@ -367,10 +369,11 @@ function headerTip(rc: ResolvedColumn, current: DraftState): TipContent {
   return { title: rc.header || 'Perspectize', body: [rc.tooltip], meta };
 }
 
-/** Tiny media tile in the Item cell: poster (2:3), still/thumb (16:9) or nothing. */
+/** Tiny media tile in the Item cell: poster (2:3), still/thumb (16:9), the artwork itself (contain) or nothing. */
 function miniMedia(typeId: string, row: SampleRow): HTMLElement | null {
   const kind = layoutFor(typeId).media;
   if (kind === 'none' || kind === 'icon') return null;
+  if (kind === 'artwork') return thumbBox(typeId, row.item, 'cell', true);
   const tile = el('span', { class: `media mini media-${kind}` });
   tile.style.setProperty('--type-accent', accentFor(typeId));
   const url = cellText(row.tmdbUrl ?? row.url);

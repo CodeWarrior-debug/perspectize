@@ -249,7 +249,9 @@ function accentFor(typeId) {
     return profileFor(typeId, state.draft)?.accent || '#3B6FD4';
 }
 function showDetails(typeId, row) {
+    const img = typeof row.item === 'object' ? row.item.img : undefined;
     openDetails({
+        image: img ? THUMBS[img] ?? img : undefined,
         layout: layoutFor(typeId),
         row,
         typeLabel: typeLabel(typeId, state.draft),
@@ -295,11 +297,13 @@ function headerTip(rc, current) {
         meta.push(`Gap (${rc.col.gapFallback}) for ${rc.unbound.map((t) => typeLabel(t, current.draft)).join(', ')}`);
     return { title: rc.header || 'Perspectize', body: [rc.tooltip], meta };
 }
-/** Tiny media tile in the Item cell: poster (2:3), still/thumb (16:9) or nothing. */
+/** Tiny media tile in the Item cell: poster (2:3), still/thumb (16:9), the artwork itself (contain) or nothing. */
 function miniMedia(typeId, row) {
     const kind = layoutFor(typeId).media;
     if (kind === 'none' || kind === 'icon')
         return null;
+    if (kind === 'artwork')
+        return thumbBox(typeId, row.item, 'cell', true);
     const tile = el('span', { class: `media mini media-${kind}` });
     tile.style.setProperty('--type-accent', accentFor(typeId));
     const url = cellText(row.tmdbUrl ?? row.url);

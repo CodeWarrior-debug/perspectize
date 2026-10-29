@@ -35,7 +35,8 @@ export interface DetailSection {
 export interface DetailsLayout {
   /** The uppercase label in the header band. */
   heading: string;
-  media: 'poster' | 'still' | 'thumb' | 'icon' | 'none';
+  /** artwork = the image at its own aspect ratio (object-fit: contain), never cropped. */
+  media: 'poster' | 'still' | 'thumb' | 'artwork' | 'icon' | 'none';
   /** Keys joined with " › " above the title (show › season). */
   breadcrumb?: string[];
   /** Detail key rendered in italics under the title. */
@@ -52,6 +53,8 @@ export interface DetailsLayout {
   prevNext?: [string, string];
   actions: string[];
   attribution?: string;
+  /** Badge text beside the attribution; defaults to "TMDB". */
+  attributionMark?: string;
   /** Planner-only notes: why the layout is the way it is. */
   notes?: string[];
 }
@@ -245,6 +248,58 @@ export const DETAILS: Partial<Record<TypeId, DetailsLayout>> = {
       'Overview is blurred until hovered: episode synopses spoil plots.',
       'Prev / next walk the season in order and cross into the next season at a finale.',
       'Breadcrumb opens the season and show rows, which always exist: adding an episode force-adds both.'
+    ]
+  },
+  painting: {
+    heading: 'Painting',
+    media: 'artwork',
+    tagline: 'originalTitle',
+    subtitle: ['creator', 'date', 'genre'],
+    link: 'url',
+    links: [{ label: 'Wikidata', key: 'wikidata', prefix: 'https://www.wikidata.org/wiki/' }],
+    tiles: [
+      PERSPECTIVES,
+      AVG_RATING,
+      { col: 'creator' },
+      { col: 'date' },
+      { col: 'genre' },
+      {
+        key: 'detail:Dimensions',
+        label: 'Dimensions',
+        tooltip: 'Size as the museum records it — free text in the source language; never parsed into numbers.',
+        source: "Met response->>'dimensions' | Europeana dctermsExtent or dcFormat"
+      },
+      { col: 'venue' },
+      { col: 'rights' },
+      { key: 'detail:Inventory no.', label: 'Inventory no.', tooltip: 'The museum\'s own number for the object — the key used to find its Wikidata QID.', source: "Met accessionNumber | Europeana dcIdentifier" },
+      { col: 'releaseStatus' },
+      { col: 'audience', label: 'Wikipedia views' },
+      DATE_ADDED
+    ],
+    sections: [
+      { label: 'About', col: 'description', kind: 'text' },
+      { label: 'Subjects', col: 'tags', kind: 'chips' },
+      { label: 'Artist', key: 'detail:Artist bio', kind: 'text', source: "Met artistDisplayBio | Europeana agents[creator].begin–end" },
+      { label: 'Credit line', key: 'detail:Credit line', kind: 'text', source: "Met creditLine | Europeana: none reliable" },
+      {
+        label: 'Image rights',
+        key: 'detail:Image rights',
+        kind: 'text',
+        tooltip: 'Decides which image Perspectize shows: open → full size; restricted or permission → the Europeana preview and a link out.',
+        source: "Met isPublicDomain | Europeana edmRights"
+      },
+      { label: 'Provided via', key: 'detail:Provided via', kind: 'text', tooltip: 'The Europeana aggregator that delivered the record. Met rows have none.', source: 'Europeana aggregation edmProvider' }
+    ],
+    actions: SOURCE_ACTIONS,
+    attributionMark: 'Sources',
+    attribution:
+      'Met rows: The Metropolitan Museum of Art Open Access (CC0). Europeana rows: data via Europeana (CC0 metadata); each image carries its own rights statement and credits its museum.',
+    notes: [
+      'The image keeps its own aspect ratio on a neutral mat (object-fit: contain) — the hero tile is sized for portrait and landscape alike, never cropped.',
+      'Tagline = the original-language title when it differs from the English one ("Het melkmeisje"); Met rows have none.',
+      'One layout for both sources. Tiles a source cannot fill render "—" (On view for Europeana; About is a section, hidden when empty) rather than a source-specific layout.',
+      'Rights is a tile, not small print: for Europeana it changes what the hero image is allowed to be.',
+      'Europeana asks for attribution of the providing museum next to the image; the attribution footer is the minimum, the image caption should name the museum too.'
     ]
   }
 };

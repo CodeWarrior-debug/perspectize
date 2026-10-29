@@ -148,7 +148,15 @@ identified; with and without duration, audience counts, money, and stance.
 
 A fresh open (or **Reset form**) lands on the Painting seed, the type
 currently being designed (see
-`docs/superpowers/specs/2026-09-26-painting-content-type-design.md`). The
+`docs/superpowers/specs/2026-09-26-painting-content-type-design.md`). It is
+filled to the Movie seed's depth from two real catalogues: five Met records
+and five Europeana records (Rijksmuseum, Mauritshuis, Finnish National
+Gallery, MNAC). Each binding names its path per source ("Met … | Europeana …"),
+and the Europeana rows were picked for their metadata problems: an artist
+name in "Surname, Given" form, a URL-encoded date, unlabelled dimensions, a
+Catalan-only medium, a CC BY-NC image and a record with no Wikidata QID. The
+Reuse rights column exists for this type: on Europeana, the rights statement
+decides which image Perspectize may show. The
 Bible passage seed's bindings mirror `feature/bible-outbound-links`,
 where every passage field is a real `content` column (`name`,
 `display_title`, `verse_start_id`/`verse_end_id`) or a `bible_book` join. Fields

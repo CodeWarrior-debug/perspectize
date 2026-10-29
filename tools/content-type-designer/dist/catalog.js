@@ -256,46 +256,65 @@ export const TYPES = [
         // Art API needs 3 hops per image), Europeana (per-item rights) and AIC
         // (60 req/min, ~2k public-domain paintings) were ruled out as primary.
         // Wikidata (~408k paintings with images) is the phase-2 source.
+        //
+        // 2026-10-29: Europeana added as the second source, so the seed shows two
+        // real catalogues side by side. ~100k open-reuse paintings (what:painting,
+        // TYPE:IMAGE, reusability=open) from Rijksmuseum, Mauritshuis, Finnish
+        // National Gallery, MNAC and others. Every Europeana binding below names
+        // the EDM path it reads; "Met | Europeana" in a path means one path per source.
+        // Findings from the five sample records: the same field lives in different
+        // EDM properties per provider (Rijksmuseum's dctermsMedium is a credit line,
+        // its medium is in dcFormat), dates can arrive URL-encoded ("#1665%2F1665"),
+        // records carry no QID for the painting itself, and what:painting leaks
+        // photographs (a 1931 funeral came back for "Gallen-Kallela").
         id: 'painting',
         label: 'Painting',
         plural: 'Paintings',
         enumValue: 'PAINTING',
         gist: 'A fine-art painting as a work held in a collection — not house, decorative or protective painting.',
         ingestion: 'api',
-        enrichment: 'The Met Collection API — GET collectionapi.metmuseum.org/public/collection/v1/objects/{objectID}; keyless, CC0 open-access images; ~14k hits for search?medium=Paintings&hasImages=true. Accept only objectName = "Painting" (classification is blank for some departments, e.g. The American Wing). Phase 2: Wikidata (P31 = Q3305213) for paintings outside the Met',
+        enrichment: 'Two sources, one per URL. (1) The Met Collection API — GET collectionapi.metmuseum.org/public/collection/v1/objects/{objectID}; keyless, CC0 open-access images; ~14k hits for search?medium=Paintings&hasImages=true. Accept only objectName = "Painting" (classification is blank for some departments, e.g. The American Wing). (2) Europeana Record API v2 — GET api.europeana.eu/record/v2/{datasetId}/{localId}.json?wskey=…; free key, kept on the backend. Accept only when proxy dcType (any language) or dctermsMedium/dcFormat names a painting or Getty AAT 300177435, type = IMAGE, and edmRights is set. Phase 2: Wikidata (P31 = Q3305213) for paintings in neither',
         urlRequired: true,
-        urlPattern: 'metmuseum.org/art/collection/search/<objectID> (phase 2: wikidata.org/wiki/<Q-id>)',
-        identity: 'met:<objectID>; also store the Wikidata QID from objectWikidata_URL as the cross-source dedup key',
+        urlPattern: 'metmuseum.org/art/collection/search/<objectID> | europeana.eu/[<lang>/]item/<datasetId>/<localId> (phase 2: wikidata.org/wiki/<Q-id>). Stored url is the canonical source page: objectURL for the Met, edmLandingPage (www.europeana.eu/item/…) for Europeana — never the provider site, which can change',
+        identity: 'met:<objectID> | europeana:/<datasetId>/<localId>. Also store the painting\'s Wikidata QID as the cross-source dedup key: the Met gives it (objectWikidata_URL); Europeana does not, so resolve it once on ingest from Wikidata P217 (inventory number, dcIdentifier) scoped by P195 (collection) — the inventory number alone is ambiguous ("670" is both Girl with a Pearl Earring at the Mauritshuis and a Holy Family at the Rijksmuseum)',
         icon: 'palette',
         accent: '#8E3B46',
         sharesUrlSpace: false,
-        thumbnail: 'primaryImageSmall (images.metmuseum.org web-large JPEG, CC0). When blank (isPublicDomain = false, e.g. Monet 437127) fall back to Wikidata P18 → commons.wikimedia.org/wiki/Special:FilePath/<file>?width=400 with its Commons attribution, else a palette icon tile. Click opens url (objectURL)',
+        thumbnail: 'Met: primaryImageSmall (images.metmuseum.org web-large JPEG, CC0); when blank (isPublicDomain = false, e.g. Monet 437127) fall back to Wikidata P18 → commons.wikimedia.org/wiki/Special:FilePath/<file>?width=400 with its Commons attribution. Europeana: europeanaAggregation.edmPreview (api.europeana.eu/thumbnail/v2 — Europeana\'s cached copy, so provider hosts are never hotlinked), allowed for every rights statement because Europeana serves it as a preview; the full-size edmIsShownBy is used only when edmRights is open. Else a palette icon tile. Click opens url',
         detect: {
-            hosts: ['metmuseum.org', 'www.metmuseum.org'],
-            path: '^/art/collection/search/(\\d+)/?$',
+            hosts: ['metmuseum.org', 'www.metmuseum.org', 'europeana.eu', 'www.europeana.eu'],
+            // One pattern for both hosts: group 1 is "436535" (Met) or "90402/SK_A_2344" (Europeana).
+            // It does not tie a path shape to its host — the backend re-checks that.
+            path: '^/(?:art/collection/search|(?:[a-z]{2}/)?item)/(\\d+(?:/[^/]+)?)/?$',
             examples: [
                 'https://www.metmuseum.org/art/collection/search/436535',
                 'https://www.metmuseum.org/art/collection/search/437127?ft=monet',
-                'https://www.metmuseum.org/art/collection/search?q=vermeer'
+                'https://www.europeana.eu/en/item/90402/SK_A_2344',
+                'https://www.europeana.eu/item/2021672/resource_document_mauritshuis_670',
+                'https://www.metmuseum.org/art/collection/search?q=vermeer',
+                'https://www.europeana.eu/en/search?query=vermeer'
             ]
         },
         discover: {
             placement: 'search-and-feed',
             status: 'proposed',
-            search: 'Met /search?medium=Paintings&hasImages=true&q=… returns object IDs only; fetch /objects/{id} per card (~24 a page, client-side paging over the ID list). Re-check objectName = "Painting" and a non-blank image (both filters leak: a gold icon and a fan came back for medium=Paintings; hasImages kept Monet 437127), and skip 404s (search returns deleted IDs, e.g. 12765).',
+            search: 'One box, two sources, results interleaved and labelled "The Met" / "Europeana". Met: /search?medium=Paintings&hasImages=true&q=… returns object IDs only; fetch /objects/{id} per card (~24 a page, client-side paging over the ID list). Re-check objectName = "Painting" and a non-blank image (both filters leak: a gold icon and a fan came back for medium=Paintings; hasImages kept Monet 437127), and skip 404s (search returns deleted IDs, e.g. 12765). Europeana: record/v2/search.json?query=…&qf=TYPE:IMAGE&qf=what:painting&reusability=open&profile=standard, 24 rows a page with cursor paging — one call returns everything a card needs. Re-check the painting gate per item (what:painting matched funeral photographs of Gallen-Kallela).',
+            searchMode: 'in-app',
             feedLabel: 'Trending paintings',
             feedKind: 'trending',
-            feedSource: 'The Met has no popularity data. Rank the 421 Met highlights (isHighlight=true&medium=Paintings) by 7-day English Wikipedia pageviews: Met objectWikidata_URL → enwiki sitelink → wikimedia.org/api/rest_v1/metrics/pageviews/per-article. Highlights with no enwiki article (2 of the 6 samples) sort after, by title; label the feed "Featured" if pageviews are unavailable.',
+            feedSource: 'Neither source has popularity data. Rank the 421 Met highlights (isHighlight=true&medium=Paintings) by 7-day English Wikipedia pageviews: Met objectWikidata_URL → enwiki sitelink → wikimedia.org/api/rest_v1/metrics/pageviews/per-article. Highlights with no enwiki article (2 of the 6 samples) sort after, by title; label the feed "Featured" if pageviews are unavailable. Europeana joins the feed only through rows already in Perspectize whose QID resolved — its "featured" galleries are curated stories, not a ranking.',
             refresh: 'daily backend job; the page reads the stored ranking',
             fetchFrom: 'backend',
-            filters: ['Era (dateBegin/dateEnd)', 'Department', 'On view now (isOnView)'],
-            reason: 'Paintings are browsed, not pasted: most users will find one on Discover rather than arrive with a Met URL. Ranking runs on the backend because it takes ~840 lookups; search can stay in the browser (the Met sends Access-Control-Allow-Origin: *, add collectionapi.metmuseum.org to connect-src).'
+            filters: ['Source (The Met / Europeana)', 'Era (dateBegin/dateEnd · Europeana year)', 'Department / providing museum', 'On view now (Met GalleryNumber)', 'Open reuse only (rights)'],
+            reason: 'Paintings are browsed, not pasted: most users will find one on Discover rather than arrive with a URL. Ranking runs on the backend because it takes ~840 lookups. Met search can stay in the browser (Access-Control-Allow-Origin: *, add collectionapi.metmuseum.org to connect-src); Europeana search goes through the backend because it needs the API key.'
         },
         detailOnly: [
-            { label: 'Artist bio', path: "response->>'artistDisplayBio'" },
-            { label: 'Dimensions', path: "response->>'dimensions'" },
-            { label: 'Credit line', path: "response->>'creditLine'" },
-            { label: 'Image rights', path: "response->>'isPublicDomain' (+ Commons attribution when the image is the fallback)" }
+            { label: 'Artist bio', path: "Met response->>'artistDisplayBio' | Europeana agents[creator].begin–end (dates only; no birthplace)" },
+            { label: 'Dimensions', path: "Met response->>'dimensions' | Europeana proxy dctermsExtent or dcFormat (free text, provider language)" },
+            { label: 'Credit line', path: "Met response->>'creditLine' | Europeana: none reliable (Rijksmuseum puts it in dctermsMedium)" },
+            { label: 'Inventory no.', path: "Met response->>'accessionNumber' | Europeana proxy dcIdentifier (the non-URI entry)" },
+            { label: 'Provided via', path: "Europeana only: aggregation edmProvider → organizations[].prefLabel (the aggregator, e.g. Dutch Collections for Europe)" },
+            { label: 'Image rights', path: "Met response->>'isPublicDomain' (+ Commons attribution when the image is the fallback) | Europeana aggregation edmRights (rightsstatements.org / Creative Commons URI)" }
         ]
     },
     {
@@ -415,9 +434,10 @@ export const COLUMNS = [
                 tooltip: 'Your title for the passage if one was set, otherwise the reference (e.g. "Micah 6:8"). Sorts in canonical Bible order, not A–Z.',
                 appearance: 'Icon tile instead of a thumbnail. Serif 13px title, line-clamp-2. When display_title is set, the reference appears as an 11px muted subtitle (line-clamp-1 on the title). Sort comparator: verse_start_id, so Genesis precedes 1 Corinthians.'
             }),
-            painting: b('Painting', 'required', 'api', 'name + image_url (primaryImageSmall, Commons fallback)', true, {
-                tooltip: 'Title and image from The Met collection. Click opens the painting on metmuseum.org.',
-                appearance: 'Thumbnail in the existing slot with object-fit: contain on a neutral mat, not cover — cropping a painting misrepresents it (portraits are tall, Washington Crossing the Delaware is 1.7:1). Palette icon tile when no image. Commons-sourced images carry a small "ⓘ" with the attribution in the tooltip.'
+            painting: b('Painting', 'required', 'api', "name + image_url — Met title + primaryImageSmall (Commons fallback) | Europeana proxy dcTitle (en, else the record's first language) + edmPreview", true, {
+                tooltip: 'Title and image from the museum record (The Met or Europeana). Click the title for details; click the image to open the painting on metmuseum.org or europeana.eu.',
+                cellTip: 'English title, then the original-language title when it differs ("Het melkmeisje"), and the source ("The Met" / "Europeana · Rijksmuseum"). Copy copies the English title.',
+                appearance: 'Thumbnail in the existing slot with object-fit: contain on a neutral mat, not cover — cropping a painting misrepresents it (portraits are tall, Washington Crossing the Delaware is 1.7:1, The Night Watch 1.2:1). Palette icon tile when no image. Title line-clamp-2 — Europeana titles can be a sentence (the Night Watch\'s is 107 characters). Subtitle: source id in 11px muted mono. Commons-sourced images carry a small "ⓘ" with the attribution in the tooltip.'
             })
         }
     },
@@ -548,9 +568,10 @@ export const COLUMNS = [
             book: b('Subject', 'optional', 'api', "response->'subjects'->>0", false),
             music: b('Genre', 'optional', 'api', "response->'tags'->0->>'name'", false),
             podcast: b('Genre', 'optional', 'api', "response->>'primaryGenreName'", false),
-            painting: b('Medium', 'typical', 'api', "response->>'medium'", true, {
-                tooltip: 'Materials as the museum records them, e.g. "Oil on canvas", "Oil on oak", "Tempera and gold on wood".',
-                appearance: 'Plain text, line-clamp-1. Filter is free-text contains, not a set filter — the Met does not use a controlled vocabulary here.'
+            painting: b('Medium', 'typical', 'api', "Met response->>'medium' | Europeana: proxy dcFormat or dctermsMedium or dcDescription, English labels only, normalised to \"<paint> on <support>\"", true, {
+                tooltip: 'Materials as the museum records them, e.g. "Oil on canvas", "Oil on oak", "Tempera and gold on wood". Europeana providers each put this in a different field, so its values are rebuilt from the English labels.',
+                cellTip: 'The medium, then the raw source text when it was rebuilt ("Europeana: canvas; oil paint (paint)"). Copy copies the displayed medium.',
+                appearance: 'Plain text, line-clamp-1. Filter is free-text contains, not a set filter — neither source uses a controlled vocabulary the grid can rely on (Europeana sometimes has Getty AAT URIs, sometimes only "doek").'
             })
         }
     },
@@ -588,6 +609,28 @@ export const COLUMNS = [
         }
     },
     {
+        // Added with Europeana (2026-10-29): rights vary per item there, and the
+        // statement decides whether Perspectize may show the full-size image.
+        id: 'rights',
+        generic: 'Reuse rights',
+        group: 'identity',
+        valueType: 'enum',
+        tooltip: 'The rights statement the source attaches to the item and its image',
+        storage: 'jsonb',
+        sortable: true,
+        filterable: true,
+        gapFallback: 'em-dash',
+        align: 'center',
+        bindings: {
+            painting: b('Rights', 'required', 'api', "Met response->>'isPublicDomain' (true → CC0, false → 'Not open access') | Europeana aggregation edmRights URI", true, {
+                unit: 'open · restricted · permission',
+                tooltip: 'Whether the image may be reused, per the source: open (public domain, CC0, CC BY, CC BY-SA), restricted (NC or ND licences) or permission (in copyright or not evaluated). Open rows show the full-size image; restricted and permission rows show the source preview only and link out.',
+                cellTip: 'The statement\'s full name and URI ("Public Domain Mark 1.0 · creativecommons.org/publicdomain/mark/1.0/"). Copy copies the URI.',
+                appearance: 'Short badge: "PD", "CC0", "CC BY", "BY-NC" or "©". Green for open, amber for restricted, grey for permission. Sort comparator follows Europeana\'s reusability order (open < restricted < permission), not A–Z.'
+            })
+        }
+    },
+    {
         id: 'creator',
         generic: 'Creator',
         group: 'attribution',
@@ -620,9 +663,10 @@ export const COLUMNS = [
             perspective: b('Holder', 'required', 'internal', "response->>'holder'", true, { tooltip: 'The person whose perspective this is' }),
             place: b('Operator', 'optional', 'api', "response->>'operator'", false),
             paper: b('First author', 'required', 'api', "response->'authors'->0->>'name'", true),
-            painting: b('Artist', 'typical', 'api', "response->>'artistDisplayName'", true, {
-                tooltip: 'The artist as the museum attributes the work — may read "Workshop of…", "Attributed to…" or be blank for anonymous works.',
-                appearance: 'Name, with artistDisplayBio (e.g. "Dutch, Leiden 1606–1669 Amsterdam") as an 11px muted subtitle.'
+            painting: b('Artist', 'typical', 'api', "Met response->>'artistDisplayName' | Europeana proxy dcCreator literal, else the first agents[].prefLabel.en — reordered from \"Surname, Given\" to \"Given Surname\"", true, {
+                tooltip: 'The artist as the museum attributes the work — may read "Workshop of…", "Attributed to…" or be blank for anonymous works. Europeana names are flipped to "Given Surname" so the same artist sorts together across sources.',
+                cellTip: 'Name, life dates and the name exactly as the source wrote it ("Rijn, Rembrandt van"). Copy copies the displayed name.',
+                appearance: 'Name, with the life line as an 11px muted subtitle: Met artistDisplayBio ("Dutch, Leiden 1606–1669 Amsterdam"), Europeana agent begin–end years only ("1606–1669"). Never show a URI — MNAC\'s dcCreator is "data.europeana.eu/agent/22714"; resolve it to the agent label. Europeana agents also list sitters (the Night Watch record lists 15); take the first agent only when dcCreator is empty.'
             })
         }
     },
@@ -656,9 +700,10 @@ export const COLUMNS = [
                 tooltip: 'The book of the Bible, and its place among the 66. Already the first word of the reference, so off by default.',
                 appearance: 'Book name with a muted "#23 of 66". Sorts by bible_book.id (canonical order).'
             }),
-            painting: b('Collection', 'typical', 'api', "response->>'repository'", false, {
-                tooltip: 'The museum that holds the painting, and its department. Constant while the Met is the only source, so off by default; turn on once Wikidata paintings arrive.',
-                appearance: 'Museum name with response->>\'department\' as a muted subtitle, e.g. "The Met · European Paintings".'
+            painting: b('Collection', 'required', 'api', "Met 'The Met' + response->>'department' | Europeana aggregation edmDataProvider → organizations[].prefLabel.en", true, {
+                tooltip: 'The museum that holds the painting. On by default now that there are two sources: Europeana rows come from dozens of museums.',
+                cellTip: 'Museum, department (Met) or aggregator (Europeana: "via Dutch Collections for Europe"), and country. Copy copies the museum name.',
+                appearance: 'Museum name with a muted subtitle: the Met department ("European Paintings"), or "via Europeana" for Europeana rows. Set filter over museum names — the list is finite, unlike Medium.'
             })
         }
     },
@@ -770,9 +815,11 @@ export const COLUMNS = [
             perspective: b('Stated', 'typical', 'internal', "response->>'statedAt'", true),
             place: b('Visited', 'required', 'user', "response->>'visitedAt'", true),
             paper: b('Published', 'required', 'api', "response->>'issued'", true),
-            painting: b('Painted', 'typical', 'api', "(response->>'objectBeginDate')::int", true, {
+            painting: b('Painted', 'typical', 'api', "Met (response->>'objectBeginDate')::int | Europeana: first 4-digit year in proxy dctermsCreated, else dcDate, after URL-decoding", true, {
+                unit: 'year',
                 tooltip: 'When the painting was made, as the museum dates it — often approximate ("ca. 1662") or a range ("1884–86").',
-                appearance: 'Display response->>\'objectDate\' verbatim; never reformat to a full date. The value path is the sort key: integer objectBeginDate (negative for BCE) — note the Vermeer sample: shown "ca. 1662", sorted as 1657. Mixed with YouTube publishedAt this column spans centuries vs days — sort by Type first.'
+                cellTip: 'The source\'s own wording plus the sort year ("ca. 1662 · sorted as 1657"). Copy copies the sort year.',
+                appearance: 'Display response->>\'objectDate\' verbatim (Met) or the cleaned Europeana text; never reformat to a full date. The value path is the sort key: an integer year (negative for BCE) — note the Vermeer sample: shown "ca. 1662", sorted as 1657. Europeana text needs cleaning before display: the Mauritshuis sends "#1665%2F1665" and "1665 - 1665" (show "1665"), the Finnish National Gallery "Production 1920" (show "1920"). Mixed with YouTube publishedAt this column spans centuries vs days — sort by Type first.'
             })
         }
     },
@@ -797,6 +844,11 @@ export const COLUMNS = [
             }),
             tvEpisode: b('Episode type', 'optional', 'api', "response->>'episode_type'", false, {
                 tooltip: 'TMDB episode_type: standard, mid_season or finale. Handy for finding finales.'
+            }),
+            painting: b('On view', 'optional', 'api', "Met response->>'GalleryNumber' (non-blank = on view) | Europeana: none", false, {
+                tooltip: 'Whether the Met has the painting on view, and in which gallery. Europeana has no gallery data, so its rows are always blank. Goes stale until "Update source data" runs.',
+                cellTip: '"On view · Gallery 822". Copy copies the gallery number.',
+                appearance: 'Dot + "Gallery 822" for on view; blank (not "Off view") when the source has no data.'
             })
         }
     },
@@ -818,7 +870,13 @@ export const COLUMNS = [
             paper: b('Citations', 'typical', 'api', "response->>'citationCount'", true, { tooltip: 'Citation count from OpenAlex' }),
             movie: b('Votes', 'optional', 'api', "response->>'vote_count'", false, { tooltip: 'Number of TMDB user votes behind the Score.' }),
             tvShow: b('Votes', 'optional', 'api', "response->>'vote_count'", false, { tooltip: 'Number of TMDB user votes behind the Score.' }),
-            tvEpisode: b('Votes', 'optional', 'api', "response->>'vote_count'", false, { tooltip: 'Number of TMDB user votes behind the Score.' })
+            tvEpisode: b('Votes', 'optional', 'api', "response->>'vote_count'", false, { tooltip: 'Number of TMDB user votes behind the Score.' }),
+            painting: b('Pageviews', 'optional', 'derived', "response->>'wikiPageviews7d' (Wikidata QID → enwiki sitelink → Wikimedia pageviews API)", false, {
+                unit: 'views / 7 days',
+                tooltip: 'English Wikipedia views of the painting\'s article over the last 7 days — the same signal the Discover feed ranks by. Neither museum publishes visitor counts. Blank when the painting has no QID or no article.',
+                cellTip: 'Views and the article it counted ("en.wikipedia.org/wiki/The_Night_Watch · 7 days to 2026-10-28"). Copy copies the number.',
+                appearance: 'Right-aligned integer with thousands separator. Values are illustrative in the samples.'
+            })
         }
     },
     {
@@ -972,7 +1030,10 @@ export const COLUMNS = [
             article: b('Read', 'optional', 'user', "response->>'progressStatus'", false),
             paper: b('Read', 'optional', 'user', "response->>'progressStatus'", false),
             claim: b('Verdict', 'typical', 'user', "response->>'verdict'", true, { tooltip: 'PLANNED — not written by CreateClaim today. Unverified / supported / contested / refuted' }),
-            painting: b('Seen', 'optional', 'user', "response->>'progressStatus'", false, { tooltip: 'Want to see / seen in person / seen in reproduction only' })
+            painting: b('Seen', 'optional', 'user', "response->>'progressStatus'", false, {
+                tooltip: 'Want to see / seen in person / seen in reproduction only — yours, never fetched.',
+                appearance: 'Plain label; "Seen in person" gets a small check. Set filter in that order, not A–Z.'
+            })
         }
     },
     {
@@ -1004,9 +1065,10 @@ export const COLUMNS = [
                 tooltip: 'Global verse ordinals (Genesis 1:1 = 1, John 3:16 = 26,137, Revelation 22:21 = 31,102). Duplicates are caught by the canonical url.',
                 appearance: 'Monospace "18710–18724". Debug column — leave in the picker.'
             }),
-            painting: b('Met ID', 'required', 'api', "response->>'objectID'", false, {
-                tooltip: 'The Met object ID; the Wikidata QID beside it (response->>\'wikidataQid\') is the key that will dedupe the same painting across sources.',
-                appearance: 'Monospace "met:436535 · Q18689458". Debug column — leave in the picker.'
+            painting: b('Source ID', 'required', 'api', "response->>'sourceId' ('met:' + objectID | 'europeana:' + record about) + response->>'wikidataQid'", false, {
+                tooltip: 'The record id at its source, prefixed with the source. The Wikidata QID beside it (response->>\'wikidataQid\') is the key that dedupes the same painting across sources: the Met supplies it, Europeana rows get it from a Wikidata lookup on ingest, and some never resolve (MNAC\'s Nonell "Study").',
+                cellTip: 'Both ids as links (metmuseum.org or europeana.eu, and wikidata.org) plus the inventory number. Copy copies the source id.',
+                appearance: 'Monospace "met:436535 · Q18689458" or "europeana:/90402/SK_A_2344 · Q167605"; "· no QID" in muted text when the lookup failed. Debug column — leave in the picker.'
             })
         }
     },
@@ -1030,7 +1092,13 @@ export const COLUMNS = [
                     ? b('Tags', 'optional', 'derived', '[testament, division] → tags', false, {
                         tooltip: 'PLANNED (Q10, answer box unchecked) — e.g. "Old Testament, Major Prophets". Redundant with Genre while that column exists.'
                     })
-                    : b('Tags', 'optional', t.ingestion === 'api' ? 'api' : 'user', "response->'tags'", false)
+                    : t.id === 'painting'
+                        ? b('Subjects', 'optional', 'api', "Met response->'tags'[].term | Europeana proxy dcSubject labels (Iconclass URIs resolved via concepts[].prefLabel.en; unresolved URIs dropped)", false, {
+                            tooltip: 'What the painting depicts. The Met tags every highlight; Europeana subjects are often Iconclass codes with no English label, so many Europeana rows are blank.',
+                            cellTip: 'Multi mode: every subject as a checklist, "Copy selected" / "Copy all".',
+                            appearance: 'First two subjects with a "+N" counter, as for TMDB keywords.'
+                        })
+                        : b('Tags', 'optional', t.ingestion === 'api' ? 'api' : 'user', "response->'tags'", false)
         ]))
     },
     {
@@ -1062,6 +1130,11 @@ export const COLUMNS = [
             perspective: b('The take', 'required', 'internal', "response->>'body'", true),
             place: b('Notes', 'optional', 'user', "response->>'notes'", false),
             paper: b('Abstract', 'typical', 'api', "response->>'abstract'", false),
+            painting: b('About', 'optional', 'api', "Met: none in the API | Europeana proxy dcDescription (en, else the first language, flagged)", false, {
+                tooltip: 'The museum\'s description of the painting. Only Europeana records carry one — the Met API has no description field — and some are only in Dutch or Finnish.',
+                cellTip: 'The full text with its language ("nl" in a muted chip when not English). Copy copies the text.',
+                appearance: 'Muted, line-clamp-1. Off by default: blank for every Met row.'
+            }),
             bible: b('Text (BSB)', 'typical', 'internal', 'passageText(startVerseId, endVerseId) → bible_verse_text', false, {
                 tooltip: 'Opening words of the passage in the Berean Standard Bible (public domain). Full text lives in the details modal.',
                 appearance: 'Serif, muted, line-clamp-1 of the first verse. Off by default: one passageText call per visible row unless the list query is batched.'
@@ -1647,75 +1720,352 @@ export const SAMPLES = {
             createdAt: '2026-09-23'
         }
     ],
-    // Real Met records, fetched 2026-09-26 from /public/collection/v1/objects/{id}.
-    // Chosen to exercise the edge cases: an approximate date (Vermeer, sorted by
-    // objectBeginDate 1657), a blank classification (Leutze, The American Wing —
-    // why the gate is objectName), a non-oil-on-canvas medium (Bruegel), and a
-    // painting with no open-access image (Monet 437127 → Commons fallback).
+    // Real records from both sources. Met: fetched 2026-09-26 and re-checked
+    // 2026-10-29 from /public/collection/v1/objects/{id}. Europeana: fetched
+    // 2026-10-29 from record/v2/{id}.json; QIDs resolved the same day via Wikidata
+    // P217 + P195. Pageviews, perspective counts, ratings and "added" dates are
+    // illustrative. Chosen to exercise the edge cases:
+    //   Met — an approximate date (Vermeer, sorted by objectBeginDate 1657), a
+    //   blank classification (Leutze, The American Wing — why the gate is
+    //   objectName), a non-oil-on-canvas medium (Bruegel), and a painting with no
+    //   open-access image (Monet 437127 → Commons fallback).
+    //   Europeana — the same artist as a Met row under another name form
+    //   ("Vermeer, Johannes"), a 107-character title and 15 agents (Night Watch),
+    //   a URL-encoded date and unlabelled dimensions (Mauritshuis), a date as
+    //   "Production 1920" (Finnish National Gallery), and a CC BY-NC item whose
+    //   creator is a URI, medium is Catalan only and QID never resolves (MNAC).
+    // Extra keys (url, wikidata, provider, originalTitle…) feed the details view only.
     painting: [
         {
-            item: { text: 'Wheat Field with Cypresses', sub: 'met:436535', img: 'https://images.metmuseum.org/CRDImages/ep/web-large/DP-42549-001.jpg', href: 'https://www.metmuseum.org/art/collection/search/436535' },
+            item: {
+                text: 'Wheat Field with Cypresses',
+                sub: 'met:436535',
+                img: 'https://images.metmuseum.org/CRDImages/ep/web-large/DP-42549-001.jpg',
+                href: 'https://www.metmuseum.org/art/collection/search/436535',
+                tip: 'Wheat Field with Cypresses · The Met',
+                copy: 'Wheat Field with Cypresses'
+            },
+            rights: { text: 'CC0', tip: 'Open access at the Met (isPublicDomain = true) · CC0 1.0', copy: 'https://creativecommons.org/publicdomain/zero/1.0/', sort: 0 },
             genre: 'Oil on canvas',
-            creator: 'Vincent van Gogh',
-            venue: 'The Met · European Paintings',
-            date: '1889',
-            identifier: 'met:436535 · Q18689458',
+            creator: { text: 'Vincent van Gogh', sub: 'Dutch, Zundert 1853–1890 Auvers-sur-Oise', copy: 'Vincent van Gogh' },
+            venue: { text: 'The Met', sub: 'European Paintings', tip: 'The Metropolitan Museum of Art, New York · European Paintings', copy: 'The Met' },
+            date: { text: '1889', tip: '1889 · sorted as 1889', copy: '1889', sort: 1889 },
+            releaseStatus: { text: '● Gallery 822', tip: 'On view · Gallery 822', copy: '822' },
+            audience: { text: '9,840', tip: 'Illustrative: en.wikipedia.org/wiki/Wheat_Field_with_Cypresses · 7 days', copy: '9840', sort: 9840 },
+            rating: '5 / 5',
+            status: 'Seen in person',
+            identifier: { text: 'met:436535 · Q18689458', tip: 'metmuseum.org/art/collection/search/436535 · wikidata.org/wiki/Q18689458 · accession 1993.132', copy: 'met:436535' },
+            tags: { text: 'Landscapes, Cypresses +1', items: ['Landscapes', 'Cypresses', 'Summer'] },
+            category: 'Post-Impressionism',
+            createdAt: '2026-09-26',
+            url: 'https://www.metmuseum.org/art/collection/search/436535',
+            wikidata: 'Q18689458',
+            source: 'The Met',
             'detail:Artist bio': 'Dutch, Zundert 1853–1890 Auvers-sur-Oise',
             'detail:Dimensions': '28 13/16 × 36 3/4 in. (73.2 × 93.4 cm)',
             'detail:Credit line': 'Purchase, The Annenberg Foundation Gift, 1993',
+            'detail:Inventory no.': '1993.132',
             'detail:Image rights': 'Public domain (CC0)',
-            tags: 'Landscapes, Cypresses, Summer',
-            category: 'Post-Impressionism',
-            createdAt: '2026-09-26'
+            perspectives: '3',
+            avgRating: '4.7',
+            updatedAt: '2026-10-29'
         },
         {
-            item: { text: 'Young Woman with a Water Pitcher', sub: 'met:437881', img: 'https://images.metmuseum.org/CRDImages/ep/web-large/DP353257.jpg', href: 'https://www.metmuseum.org/art/collection/search/437881' },
+            item: {
+                text: 'Young Woman with a Water Pitcher',
+                sub: 'met:437881',
+                img: 'https://images.metmuseum.org/CRDImages/ep/web-large/DP353257.jpg',
+                href: 'https://www.metmuseum.org/art/collection/search/437881',
+                tip: 'Young Woman with a Water Pitcher · The Met',
+                copy: 'Young Woman with a Water Pitcher'
+            },
+            rights: { text: 'CC0', tip: 'Open access at the Met (isPublicDomain = true) · CC0 1.0', copy: 'https://creativecommons.org/publicdomain/zero/1.0/', sort: 0 },
             genre: 'Oil on canvas',
-            creator: 'Johannes Vermeer',
-            venue: 'The Met · European Paintings',
-            date: 'ca. 1662',
-            identifier: 'met:437881 · Q386453',
+            creator: { text: 'Johannes Vermeer', sub: 'Dutch, Delft 1632–1675 Delft', tip: 'Johannes Vermeer · Dutch, Delft 1632–1675 Delft · same artist as the Europeana rows "Vermeer, Johannes" and "Johannes Vermeer"', copy: 'Johannes Vermeer' },
+            venue: { text: 'The Met', sub: 'European Paintings', copy: 'The Met' },
+            date: { text: 'ca. 1662', tip: 'ca. 1662 · sorted as 1657 (objectBeginDate; objectEndDate 1667)', copy: '1657', sort: 1657 },
+            releaseStatus: { text: '● Gallery 614', tip: 'On view · Gallery 614', copy: '614' },
+            audience: { text: '2,310', tip: 'Illustrative: en.wikipedia.org/wiki/Young_Woman_with_a_Water_Pitcher · 7 days', copy: '2310', sort: 2310 },
+            identifier: { text: 'met:437881 · Q386453', tip: 'metmuseum.org/art/collection/search/437881 · wikidata.org/wiki/Q386453 · accession 89.15.21', copy: 'met:437881' },
+            tags: { text: 'Interiors, Women +2', items: ['Interiors', 'Women', 'Maps', 'Pitchers'] },
+            category: 'Dutch Golden Age',
+            createdAt: '2026-09-26',
+            url: 'https://www.metmuseum.org/art/collection/search/437881',
+            wikidata: 'Q386453',
+            source: 'The Met',
             'detail:Artist bio': 'Dutch, Delft 1632–1675 Delft',
             'detail:Dimensions': '18 x 16 in. (45.7 x 40.6 cm)',
             'detail:Credit line': 'Marquand Collection, Gift of Henry G. Marquand, 1889',
+            'detail:Inventory no.': '89.15.21',
             'detail:Image rights': 'Public domain (CC0)',
-            tags: 'Interiors, Women, Maps, Pitchers',
-            category: 'Dutch Golden Age',
-            createdAt: '2026-09-26'
+            perspectives: '2',
+            avgRating: '4.5',
+            updatedAt: '2026-10-29'
         },
         {
-            item: { text: 'Washington Crossing the Delaware', sub: 'met:11417', img: 'https://images.metmuseum.org/CRDImages/ad/web-large/DP215410.jpg', href: 'https://www.metmuseum.org/art/collection/search/11417' },
+            item: {
+                text: 'Washington Crossing the Delaware',
+                sub: 'met:11417',
+                img: 'https://images.metmuseum.org/CRDImages/ad/web-large/DP215410.jpg',
+                href: 'https://www.metmuseum.org/art/collection/search/11417',
+                tip: 'Washington Crossing the Delaware · The Met · classification is blank (The American Wing), accepted on objectName = "Painting"',
+                copy: 'Washington Crossing the Delaware'
+            },
+            rights: { text: 'CC0', tip: 'Open access at the Met (isPublicDomain = true) · CC0 1.0', copy: 'https://creativecommons.org/publicdomain/zero/1.0/', sort: 0 },
             genre: 'Oil on canvas',
-            creator: 'Emanuel Leutze',
-            venue: 'The Met · The American Wing',
-            date: '1851',
-            identifier: 'met:11417 · Q509806',
-            tags: 'Soldiers, American Revolution, George Washington',
+            creator: { text: 'Emanuel Leutze', sub: 'American, Schwäbisch Gmünd 1816–1868 Washington, D.C.', copy: 'Emanuel Leutze' },
+            venue: { text: 'The Met', sub: 'The American Wing', copy: 'The Met' },
+            date: { text: '1851', copy: '1851', sort: 1851 },
+            releaseStatus: { text: '● Gallery 760', tip: 'On view · Gallery 760', copy: '760' },
+            audience: { text: '14,605', tip: 'Illustrative: en.wikipedia.org/wiki/Washington_Crossing_the_Delaware_(1851_painting) · 7 days', copy: '14605', sort: 14605 },
+            identifier: { text: 'met:11417 · Q509806', tip: 'metmuseum.org/art/collection/search/11417 · wikidata.org/wiki/Q509806 · accession 97.34', copy: 'met:11417' },
+            tags: { text: 'Soldiers, American Revolution +5', items: ['Soldiers', 'American Revolution', 'George Washington', 'Men', 'Horses', 'Flags', 'Boats'] },
             category: 'History painting',
-            createdAt: '2026-09-26'
+            createdAt: '2026-09-26',
+            url: 'https://www.metmuseum.org/art/collection/search/11417',
+            wikidata: 'Q509806',
+            source: 'The Met',
+            'detail:Artist bio': 'American, Schwäbisch Gmünd 1816–1868 Washington, D.C.',
+            'detail:Dimensions': '149 x 255 in. (378.5 x 647.7 cm)',
+            'detail:Credit line': 'Gift of John Stewart Kennedy, 1897',
+            'detail:Inventory no.': '97.34',
+            'detail:Image rights': 'Public domain (CC0)',
+            perspectives: '1',
+            avgRating: '4.0',
+            updatedAt: '2026-09-26'
         },
         {
-            item: { text: 'The Harvesters', sub: 'met:435809', img: 'https://images.metmuseum.org/CRDImages/ep/web-large/DP119115.jpg', href: 'https://www.metmuseum.org/art/collection/search/435809' },
+            item: {
+                text: 'The Harvesters',
+                sub: 'met:435809',
+                img: 'https://images.metmuseum.org/CRDImages/ep/web-large/DP119115.jpg',
+                href: 'https://www.metmuseum.org/art/collection/search/435809',
+                copy: 'The Harvesters'
+            },
+            rights: { text: 'CC0', tip: 'Open access at the Met (isPublicDomain = true) · CC0 1.0', copy: 'https://creativecommons.org/publicdomain/zero/1.0/', sort: 0 },
             genre: 'Oil on oak',
-            creator: 'Pieter Bruegel the Elder',
-            venue: 'The Met · European Paintings',
-            date: '1565',
-            identifier: 'met:435809 · Q776175',
-            tags: 'Food, Landscapes, Working, Eating',
-            createdAt: '2026-09-26'
+            creator: { text: 'Pieter Bruegel the Elder', sub: 'Netherlandish, Breda (?) ca. 1525–1569 Brussels', copy: 'Pieter Bruegel the Elder' },
+            venue: { text: 'The Met', sub: 'European Paintings', copy: 'The Met' },
+            date: { text: '1565', copy: '1565', sort: 1565 },
+            releaseStatus: { text: '● Gallery 638', tip: 'On view · Gallery 638', copy: '638' },
+            audience: { text: '3,075', tip: 'Illustrative: en.wikipedia.org/wiki/The_Harvesters_(Bruegel) · 7 days', copy: '3075', sort: 3075 },
+            identifier: { text: 'met:435809 · Q776175', tip: 'metmuseum.org/art/collection/search/435809 · wikidata.org/wiki/Q776175 · accession 19.164', copy: 'met:435809' },
+            tags: { text: 'Food, Men +4', items: ['Food', 'Men', 'Women', 'Landscapes', 'Working', 'Eating'] },
+            category: 'Northern Renaissance',
+            createdAt: '2026-09-26',
+            url: 'https://www.metmuseum.org/art/collection/search/435809',
+            wikidata: 'Q776175',
+            source: 'The Met',
+            'detail:Artist bio': 'Netherlandish, Breda (?) ca. 1525–1569 Brussels',
+            'detail:Dimensions': 'Overall, including added strips at top, bottom, and right, 46 7/8 x 63 3/4 in. (119 x 162 cm); original painted surface 45 7/8 x 62 7/8 in. (116.5 x 159.5 cm)',
+            'detail:Credit line': 'Rogers Fund, 1919',
+            'detail:Inventory no.': '19.164',
+            'detail:Image rights': 'Public domain (CC0)',
+            perspectives: '1',
+            avgRating: '5.0',
+            updatedAt: '2026-09-26'
         },
         {
-            item: { text: 'Bridge over a Pond of Water Lilies', sub: 'met:437127 · image via Commons', img: 'https://commons.wikimedia.org/wiki/Special:FilePath/Bridge%20Over%20a%20Pond%20of%20Water%20Lilies%2C%20Claude%20Monet%201899.jpg?width=400', href: 'https://www.metmuseum.org/art/collection/search/437127' },
+            item: {
+                text: 'Bridge over a Pond of Water Lilies',
+                sub: 'met:437127 · image via Commons',
+                img: 'https://commons.wikimedia.org/wiki/Special:FilePath/Bridge%20Over%20a%20Pond%20of%20Water%20Lilies%2C%20Claude%20Monet%201899.jpg?width=400',
+                href: 'https://www.metmuseum.org/art/collection/search/437127',
+                tip: 'Bridge over a Pond of Water Lilies · The Met · image from Wikimedia Commons (the Met has no open-access image)',
+                copy: 'Bridge over a Pond of Water Lilies'
+            },
+            rights: { text: 'Not OA', tip: 'Not open access at the Met (isPublicDomain = false). The image shown is Wikimedia Commons\' public-domain copy, with its attribution.', copy: 'met:isPublicDomain=false', sort: 2 },
             genre: 'Oil on canvas',
-            creator: 'Claude Monet',
-            venue: 'The Met · European Paintings',
-            date: '1899',
-            identifier: 'met:437127 · Q19905213',
-            'detail:Dimensions': '36 1/2 x 29 in. (92.7 x 73.7 cm)',
-            'detail:Image rights': 'Not open access at the Met — image from Wikimedia Commons (public domain)',
-            tags: 'Bridges, Ponds, Water Lilies',
+            creator: { text: 'Claude Monet', sub: 'French, Paris 1840–1926 Giverny', copy: 'Claude Monet' },
+            venue: { text: 'The Met', sub: 'European Paintings', copy: 'The Met' },
+            date: { text: '1899', copy: '1899', sort: 1899 },
+            releaseStatus: { text: '● Gallery 819', tip: 'On view · Gallery 819', copy: '819' },
+            identifier: { text: 'met:437127 · Q19905213', tip: 'metmuseum.org/art/collection/search/437127 · wikidata.org/wiki/Q19905213 · accession 29.100.113', copy: 'met:437127' },
+            tags: { text: 'Bridges, Ponds +1', items: ['Bridges', 'Ponds', 'Water Lilies'] },
             category: 'Impressionism',
-            createdAt: '2026-09-26'
+            createdAt: '2026-09-26',
+            url: 'https://www.metmuseum.org/art/collection/search/437127',
+            wikidata: 'Q19905213',
+            source: 'The Met',
+            'detail:Artist bio': 'French, Paris 1840–1926 Giverny',
+            'detail:Dimensions': '36 1/2 x 29 in. (92.7 x 73.7 cm)',
+            'detail:Credit line': 'H. O. Havemeyer Collection, Bequest of Mrs. H. O. Havemeyer, 1929',
+            'detail:Inventory no.': '29.100.113',
+            'detail:Image rights': 'Not open access at the Met — image from Wikimedia Commons (public domain)',
+            perspectives: '0',
+            avgRating: '—',
+            updatedAt: '2026-09-26'
+        },
+        {
+            item: {
+                text: 'The Milkmaid',
+                sub: 'europeana:/90402/SK_A_2344',
+                img: 'https://api.europeana.eu/thumbnail/v2/url.json?uri=https%3A%2F%2Fwww.rijksmuseum.nl%2Fassetimage2.jsp%3Fid%3DSK-A-2344&type=IMAGE',
+                href: 'https://www.europeana.eu/item/90402/SK_A_2344',
+                tip: 'The Milkmaid · original title Het melkmeisje · Europeana · Rijksmuseum',
+                copy: 'The Milkmaid'
+            },
+            rights: { text: 'PD', tip: 'Public Domain Mark 1.0 · open · creativecommons.org/publicdomain/mark/1.0/', copy: 'http://creativecommons.org/publicdomain/mark/1.0/', sort: 0 },
+            genre: { text: 'Oil on canvas', tip: 'Oil on canvas · rebuilt from Europeana dcFormat "canvas; oil paint (paint)" (dctermsMedium holds the credit line for this provider)', copy: 'Oil on canvas' },
+            creator: { text: 'Johannes Vermeer', sub: '1632–1675', tip: 'Johannes Vermeer · 1632–1675 · source wrote "Vermeer, Johannes" (agents[0].prefLabel.en)', copy: 'Johannes Vermeer' },
+            venue: { text: 'Rijksmuseum', sub: 'via Europeana', tip: 'Rijksmuseum, Amsterdam · provided directly to Europeana', copy: 'Rijksmuseum' },
+            date: { text: '1660', tip: '1660 · from dctermsCreated', copy: '1660', sort: 1660 },
+            audience: { text: '11,920', tip: 'Illustrative: en.wikipedia.org/wiki/The_Milkmaid_(Vermeer) · 7 days', copy: '11920', sort: 11920 },
+            rating: '5 / 5',
+            status: 'Seen in person',
+            identifier: { text: 'europeana:/90402/SK_A_2344 · Q167605', tip: 'europeana.eu/item/90402/SK_A_2344 · wikidata.org/wiki/Q167605 (resolved from P217 "SK-A-2344" + P195 Rijksmuseum) · inventory SK-A-2344', copy: 'europeana:/90402/SK_A_2344' },
+            description: 'A maidservant pours milk, entirely absorbed in her work. Except for the stream of milk, everything else is still. Vermeer took this simple everyday activity and made it the subject of an impressive painting – the woman stands like a statue in the brightly lit room. Vermeer also had an eye for how light by means of hundreds of colourful dots plays over the surface of objects.',
+            category: 'Dutch Golden Age',
+            createdAt: '2026-10-29',
+            url: 'https://www.europeana.eu/item/90402/SK_A_2344',
+            wikidata: 'Q167605',
+            source: 'Europeana',
+            originalTitle: 'Het melkmeisje',
+            'detail:Artist bio': '1632–1675 (Europeana agent dates only)',
+            'detail:Dimensions': 'height 45.5 cm · width 41 cm',
+            'detail:Credit line': 'Purchased with the support of the Vereniging Rembrandt (from dctermsMedium)',
+            'detail:Inventory no.': 'SK-A-2344',
+            'detail:Provided via': 'Rijksmuseum (direct)',
+            'detail:Image rights': 'Public Domain Mark 1.0 — open, full-size image allowed',
+            perspectives: '4',
+            avgRating: '4.8',
+            updatedAt: '2026-10-29'
+        },
+        {
+            item: {
+                text: 'Militia Company of District II under the Command of Captain Frans Banninck Cocq, Known as the ‘Night Watch’',
+                sub: 'europeana:/90402/SK_C_5',
+                img: 'https://api.europeana.eu/thumbnail/v2/url.json?uri=https%3A%2F%2Flh3.googleusercontent.com%2FJ-mxAE7CPu-DXIOx4QKBtb0GC4ud37da1QK7CzbTIDswmvZHXhLm4Tv2-1H3iBXJWAW_bHm7dMl3j5wv_XiWAg55VOM%3Ds0&type=IMAGE',
+                href: 'https://www.europeana.eu/item/90402/SK_C_5',
+                tip: 'Full title (107 characters), line-clamped to two lines in the cell · original title Schutters van wijk II onder leiding van kapitein Frans Banninck Cocq, bekend als de ‘Nachtwacht’',
+                copy: 'Militia Company of District II under the Command of Captain Frans Banninck Cocq, Known as the ‘Night Watch’'
+            },
+            rights: { text: 'PD', tip: 'Public Domain Mark 1.0 · open', copy: 'http://creativecommons.org/publicdomain/mark/1.0/', sort: 0 },
+            genre: { text: 'Oil on canvas', tip: 'Oil on canvas · rebuilt from dcFormat "canvas; oil paint (paint)"; dctermsMedium says "On loan from the City of Amsterdam"', copy: 'Oil on canvas' },
+            creator: {
+                text: 'Rembrandt van Rijn',
+                sub: '1606–1669',
+                tip: 'Rembrandt van Rijn · 1606–1669 · source wrote "Rijn, Rembrandt van" · dcCreator is empty, so this is agents[0]; the other 14 agents are sitters (Willem van Ruytenburch, Jan Ockersen, …)',
+                copy: 'Rembrandt van Rijn'
+            },
+            venue: { text: 'Rijksmuseum', sub: 'via Europeana', tip: 'Rijksmuseum, Amsterdam · provided via Europeana 280', copy: 'Rijksmuseum' },
+            date: { text: '1642', copy: '1642', sort: 1642 },
+            audience: { text: '21,486', tip: 'Illustrative: en.wikipedia.org/wiki/The_Night_Watch · 7 days', copy: '21486', sort: 21486 },
+            identifier: { text: 'europeana:/90402/SK_C_5 · Q219831', tip: 'europeana.eu/item/90402/SK_C_5 · wikidata.org/wiki/Q219831 · inventory SK-C-5', copy: 'europeana:/90402/SK_C_5' },
+            category: 'Dutch Golden Age',
+            createdAt: '2026-10-29',
+            url: 'https://www.europeana.eu/item/90402/SK_C_5',
+            wikidata: 'Q219831',
+            source: 'Europeana',
+            originalTitle: 'Schutters van wijk II onder leiding van kapitein Frans Banninck Cocq, bekend als de ‘Nachtwacht’',
+            'detail:Artist bio': '1606–1669 (Europeana agent dates only)',
+            'detail:Dimensions': 'height 379.5 cm · width 453.5 cm · weight 337 kg · weight 170 kg',
+            'detail:Credit line': 'On loan from the City of Amsterdam (from dctermsMedium)',
+            'detail:Inventory no.': 'SK-C-5',
+            'detail:Provided via': 'Europeana 280',
+            'detail:Image rights': 'Public Domain Mark 1.0 — open, full-size image allowed',
+            perspectives: '6',
+            avgRating: '4.9',
+            updatedAt: '2026-10-29'
+        },
+        {
+            item: {
+                text: 'Girl with a Pearl Earring',
+                sub: 'europeana:/2021672/resource_document_mauritshuis_670',
+                img: 'https://api.europeana.eu/thumbnail/v2/url.json?uri=https%3A%2F%2Fwww.mauritshuis.nl%2Fmedia%2Fwlola5to%2F0670_repro_2.jpg&type=IMAGE',
+                href: 'https://www.europeana.eu/item/2021672/resource_document_mauritshuis_670',
+                tip: 'Girl with a Pearl Earring · original title Meisje met de parel · Europeana · Mauritshuis',
+                copy: 'Girl with a Pearl Earring'
+            },
+            rights: { text: 'PD', tip: 'Public Domain Mark 1.0 · open', copy: 'http://creativecommons.org/publicdomain/mark/1.0/', sort: 0 },
+            genre: { text: 'Canvas', tip: 'Only the support is recorded: dctermsMedium "canvas" (nl "doek"). No paint is named, so the medium is not rebuilt to "Oil on canvas".', copy: 'Canvas' },
+            creator: { text: 'Johannes Vermeer', sub: '—', tip: 'Johannes Vermeer · from the dcCreator literal; the record has no agent entity, so no life dates', copy: 'Johannes Vermeer' },
+            venue: { text: 'Mauritshuis', sub: 'via Europeana', tip: 'Mauritshuis, The Hague · provided via Dutch Collections for Europe', copy: 'Mauritshuis' },
+            date: { text: '1665', tip: 'Source sends "#1665%2F1665" and "1665 - 1665"; shown as 1665', copy: '1665', sort: 1665 },
+            audience: { text: '38,204', tip: 'Illustrative: en.wikipedia.org/wiki/Girl_with_a_Pearl_Earring · 7 days', copy: '38204', sort: 38204 },
+            rating: '4 / 5',
+            identifier: {
+                text: 'europeana:/2021672/resource_document_mauritshuis_670 · Q185372',
+                tip: 'wikidata.org/wiki/Q185372, resolved from P217 "670" + P195 Mauritshuis — "670" alone also matches a Holy Family at the Rijksmuseum (Q17347632)',
+                copy: 'europeana:/2021672/resource_document_mauritshuis_670'
+            },
+            description: 'Girl with a Pearl Earring is Vermeer’s most famous painting. It is not a portrait, but a ‘tronie’ – a painting of an imaginary figure. Tronies depict a certain type or character; in this case a girl in exotic dress, wearing an oriental turban and an improbably large pearl in her ear.',
+            category: 'Dutch Golden Age',
+            createdAt: '2026-10-29',
+            url: 'https://www.europeana.eu/item/2021672/resource_document_mauritshuis_670',
+            wikidata: 'Q185372',
+            source: 'Europeana',
+            originalTitle: 'Meisje met de parel',
+            'detail:Dimensions': '65 cm · 39 cm · 44.5 cm · 74 cm (dcFormat, unlabelled — framed and unframed sizes cannot be told apart)',
+            'detail:Inventory no.': '670',
+            'detail:Provided via': 'Dutch Collections for Europe',
+            'detail:Image rights': 'Public Domain Mark 1.0 — open, full-size image allowed',
+            perspectives: '5',
+            avgRating: '4.6',
+            updatedAt: '2026-10-29'
+        },
+        {
+            item: {
+                text: 'Portrait of A. Gallen-Kallela',
+                sub: 'europeana:/2021012/_27D4FC0D781D36E6EEF294654E19A7D7',
+                img: 'https://api.europeana.eu/thumbnail/v2/url.json?uri=https%3A%2F%2Fmpfinlandrepox.zetcom.app%2Fimagehelper%2Fdownload%3Fid%3D1228063%26size%3Dextra_large%26org%3D39091&type=IMAGE',
+                href: 'https://www.europeana.eu/item/2021012/_27D4FC0D781D36E6EEF294654E19A7D7',
+                tip: 'Portrait of A. Gallen-Kallela · fi A. Gallen-Kallelan muotokuva · sv Porträtt av A. Gallen-Kallela · Europeana · Finnish National Gallery',
+                copy: 'Portrait of A. Gallen-Kallela'
+            },
+            rights: { text: 'CC0', tip: 'CC0 1.0 · open', copy: 'http://creativecommons.org/publicdomain/zero/1.0/', sort: 0 },
+            genre: { text: 'Oil on canvas', tip: 'Oil on canvas · rebuilt from dctermsMedium "base material: canvas; material: oil" (dcDescription "technique: oil on canvas" agrees)', copy: 'Oil on canvas' },
+            creator: { text: 'Ilja Repin', sub: '—', tip: 'Ilja Repin · source wrote "Repin, Ilja" (Finnish transliteration; Wikidata has Ilya Repin) · no agent entity, so no life dates', copy: 'Ilja Repin' },
+            venue: { text: 'Finnish National Gallery', sub: 'via Europeana', tip: 'Finnish National Gallery (Ateneum), Helsinki · provided via the National Library of Finland', copy: 'Finnish National Gallery' },
+            date: { text: '1920', tip: 'Source sends "Production 1920"; shown as 1920', copy: '1920', sort: 1920 },
+            identifier: {
+                text: 'europeana:/2021012/_27D4FC0D781D36E6EEF294654E19A7D7 · Q20087079',
+                tip: 'wikidata.org/wiki/Q20087079 (P217 "A II 1403" + P195 Finnish National Gallery) · inventory A II 1403',
+                copy: 'europeana:/2021012/_27D4FC0D781D36E6EEF294654E19A7D7'
+            },
+            category: 'Portrait',
+            createdAt: '2026-10-29',
+            url: 'https://www.europeana.eu/item/2021012/_27D4FC0D781D36E6EEF294654E19A7D7',
+            wikidata: 'Q20087079',
+            source: 'Europeana',
+            'detail:Dimensions': 'teosmitat: 100,0 x 81,0 cm (Finnish only)',
+            'detail:Inventory no.': 'A II 1403',
+            'detail:Provided via': 'National Library of Finland',
+            'detail:Image rights': 'CC0 1.0 — open, full-size image allowed',
+            perspectives: '0',
+            avgRating: '—',
+            updatedAt: '2026-10-29'
+        },
+        {
+            item: {
+                text: 'Study',
+                sub: 'europeana:/1354/https___catalonica_bnc_cat_catalonicahub_lod_H703130_ent0',
+                img: 'https://api.europeana.eu/thumbnail/v2/url.json?uri=https%3A%2F%2Fapp.coeli.cat%2Fcoeli%2FMNAC%2FHeritageObject%2FH703130%2FportraitMedia&type=IMAGE',
+                href: 'https://www.europeana.eu/item/1354/https___catalonica_bnc_cat_catalonicahub_lod_H703130_ent0',
+                tip: 'Study · ca Estudi · es Estudio · Europeana · MNAC · CC BY-NC: Europeana preview only, links out for the full image',
+                copy: 'Study'
+            },
+            rights: { text: 'BY-NC', tip: 'CC BY-NC 4.0 · restricted — preview only; credit Isidre Nonell / MNAC; no full-size image while Perspectize could be commercial', copy: 'http://creativecommons.org/licenses/by-nc/4.0/', sort: 1 },
+            creator: { text: 'Isidre Nonell', sub: '—', tip: 'Isidre Nonell · dcCreator\'s first value is the URI data.europeana.eu/agent/22714, resolved to its label; the record\'s agents give no life dates', copy: 'Isidre Nonell' },
+            venue: { text: 'MNAC', sub: 'via Europeana', tip: 'Museu Nacional d\'Art de Catalunya, Barcelona · provided via Catalònica', copy: 'National Museum of Art of Catalonia' },
+            date: { text: '1906', copy: '1906', sort: 1906 },
+            identifier: {
+                text: 'europeana:/1354/…H703130_ent0 · no QID',
+                tip: 'europeana.eu/item/1354/https___catalonica_bnc_cat_catalonicahub_lod_H703130_ent0 · no Wikidata item for inventory H703130, so this row cannot be deduped across sources',
+                copy: 'europeana:/1354/https___catalonica_bnc_cat_catalonicahub_lod_H703130_ent0'
+            },
+            tags: { text: 'painting', items: ['painting'], tip: 'dcSubject "painting" — the type repeated as a subject; worth filtering out' },
+            createdAt: '2026-10-29',
+            url: 'https://www.europeana.eu/item/1354/https___catalonica_bnc_cat_catalonicahub_lod_H703130_ent0',
+            source: 'Europeana',
+            originalTitle: 'Estudi',
+            'detail:Dimensions': '100.5 x 80.5 cm',
+            'detail:Inventory no.': 'H703130',
+            'detail:Provided via': 'Catalònica',
+            'detail:Image rights': 'CC BY-NC 4.0 — restricted: Europeana preview only, full image at museunacional.cat',
+            perspectives: '0',
+            avgRating: '—',
+            updatedAt: '2026-10-29'
         }
     ]
 };
@@ -1725,29 +2075,46 @@ export const SAMPLES = {
  * placeholders for the missing cells instead.
  */
 export const SAMPLE_FULL = {
+    // The Milkmaid, because a Europeana row is the harder case: every binding is
+    // filled, with the two the Met cannot fill (About) and Europeana cannot fill
+    // (On view) given illustrative values and saying so.
     painting: {
         item: {
-            text: 'Young Woman with a Water Pitcher',
-            sub: 'met:437881',
-            img: 'https://images.metmuseum.org/CRDImages/ep/web-large/DP353257.jpg',
-            href: 'https://www.metmuseum.org/art/collection/search/437881'
+            text: 'The Milkmaid',
+            sub: 'europeana:/90402/SK_A_2344',
+            img: 'https://api.europeana.eu/thumbnail/v2/url.json?uri=https%3A%2F%2Fwww.rijksmuseum.nl%2Fassetimage2.jsp%3Fid%3DSK-A-2344&type=IMAGE',
+            href: 'https://www.europeana.eu/item/90402/SK_A_2344',
+            tip: 'The Milkmaid · original title Het melkmeisje · Europeana · Rijksmuseum',
+            copy: 'The Milkmaid'
         },
+        rights: { text: 'PD', tip: 'Public Domain Mark 1.0 · open', copy: 'http://creativecommons.org/publicdomain/mark/1.0/', sort: 0 },
         genre: 'Oil on canvas',
-        creator: { text: 'Johannes Vermeer', sub: 'Dutch, Delft 1632–1675 Delft' },
-        venue: { text: 'The Met', sub: 'European Paintings' },
-        date: 'ca. 1662',
+        creator: { text: 'Johannes Vermeer', sub: '1632–1675' },
+        venue: { text: 'Rijksmuseum', sub: 'via Europeana' },
+        date: '1660',
+        releaseStatus: { text: '● Gallery 2.12', tip: 'Illustrative — Europeana has no gallery data; this is the Met-only field filled for the Full state' },
+        audience: { text: '11,920', sort: 11920 },
         rating: '★★★★★',
         status: 'Seen in person',
-        identifier: 'met:437881 · Q386453',
-        tags: 'Interiors, Women, Maps, Pitchers',
+        identifier: 'europeana:/90402/SK_A_2344 · Q167605',
+        tags: { text: 'Women, Kitchens +2', items: ['Women', 'Kitchens', 'Milk', 'Bread'], tip: 'Illustrative — the record\'s Iconclass codes, as labels' },
+        description: 'A maidservant pours milk, entirely absorbed in her work. Except for the stream of milk, everything else is still.',
         category: 'Dutch Golden Age',
-        createdAt: '2026-09-26',
-        updatedAt: '2026-09-26',
-        id: '4812',
-        'detail:Artist bio': 'Dutch, Delft 1632–1675 Delft',
-        'detail:Dimensions': '18 x 16 in. (45.7 x 40.6 cm)',
-        'detail:Credit line': 'Marquand Collection, Gift of Henry G. Marquand, 1889',
-        'detail:Image rights': 'Public domain (CC0)'
+        createdAt: '2026-10-29',
+        updatedAt: '2026-10-29',
+        id: '4831',
+        url: 'https://www.europeana.eu/item/90402/SK_A_2344',
+        wikidata: 'Q167605',
+        source: 'Europeana',
+        originalTitle: 'Het melkmeisje',
+        'detail:Artist bio': '1632–1675',
+        'detail:Dimensions': 'height 45.5 cm · width 41 cm',
+        'detail:Credit line': 'Purchased with the support of the Vereniging Rembrandt',
+        'detail:Inventory no.': 'SK-A-2344',
+        'detail:Provided via': 'Rijksmuseum (direct)',
+        'detail:Image rights': 'Public Domain Mark 1.0 — open, full-size image allowed',
+        perspectives: '4',
+        avgRating: '4.8'
     }
 };
 //# sourceMappingURL=catalog.js.map
