@@ -44,7 +44,12 @@ func fakeTMDB(t *testing.T, movieCalls *atomic.Int32) http.HandlerFunc {
 			movieCalls.Add(1)
 			switch r.URL.Path {
 			case "/movie/27205":
-				_, _ = w.Write([]byte(`{"runtime":148,"tagline":"Your mind is the scene of the crime.","original_language":"en","genres":[{"name":"Action"},{"name":"Science Fiction"}]}`))
+				// Cast only when asked for, out of billing order, with a blank name.
+				credits := ""
+				if r.URL.Query().Get("append_to_response") == "credits" {
+					credits = `,"credits":{"cast":[{"name":"Elliot Page","order":2},{"name":"Leonardo DiCaprio","order":0},{"name":"","order":1},{"name":"Joseph Gordon-Levitt","order":1},{"name":"Tom Hardy","order":3}]}`
+				}
+				_, _ = w.Write([]byte(`{"runtime":148,"tagline":"Your mind is the scene of the crime.","original_language":"en","genres":[{"name":"Action"},{"name":"Science Fiction"}]` + credits + `}`))
 			case "/movie/872585":
 				_, _ = w.Write([]byte(`{"runtime":181,"tagline":"","genres":[{"name":"Drama"}]}`))
 			case "/movie/1":
@@ -129,11 +134,15 @@ func TestPersonLister_ListDirector(t *testing.T) {
 	assert.Equal(t, "TMDB", *inception.Item.RatingSource)
 	assert.Equal(t, "https://image.tmdb.org/t/p/w185/inception.jpg", *inception.Item.ThumbnailURL)
 	assert.Equal(t, []string{"Action", "Science Fiction"}, inception.Details.Genres)
+	assert.Equal(t, []string{"Action", "Science Fiction"}, inception.Item.Genres, "genres are a sheet column too")
+	assert.Equal(t, []string{"Leonardo DiCaprio", "Joseph Gordon-Levitt", "Elliot Page"}, inception.Item.TopCast,
+		"top 3 by billing order from the same /movie call, blank names skipped")
 	assert.Equal(t, "Cobb steals secrets from dreams.", inception.Details.Description)
 	assert.Equal(t, 1, inception.Item.Position)
 
 	oppen := items[0]
 	assert.Equal(t, "The story of J. Robert Oppenheimer.", *oppen.Item.Summary, "no tagline: the overview's first line")
+	assert.Empty(t, oppen.Item.TopCast, "no credits in the response: no cast")
 
 	untitled := items[2]
 	assert.Nil(t, untitled.Item.Rating, "zero votes is no rating, not a score of 0")

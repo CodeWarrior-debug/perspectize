@@ -75,6 +75,9 @@ CREATE TABLE IF NOT EXISTS public.import_job_items (
     rating_source varchar(40) NULL,
     chapter_count integer NOT NULL DEFAULT 0,
     has_captions boolean NULL,
+    -- Films: genre names and top-billed cast, shown as sheet columns (empty for videos).
+    genres text[] NOT NULL DEFAULT '{}',
+    top_cast text[] NOT NULL DEFAULT '{}',
     thumbnail_url varchar(500) NULL,
     -- Position in the source listing (0 = first returned, newest for channels).
     position integer NOT NULL DEFAULT 0,

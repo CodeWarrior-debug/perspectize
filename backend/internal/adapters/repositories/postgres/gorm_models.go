@@ -275,6 +275,8 @@ type ImportItemModel struct {
 	RatingSource     *string         `gorm:"column:rating_source"`
 	ChapterCount     int             `gorm:"column:chapter_count;not null"`
 	HasCaptions      *bool           `gorm:"column:has_captions"`
+	Genres           StringArray     `gorm:"column:genres;type:text[];not null"`
+	TopCast          StringArray     `gorm:"column:top_cast;type:text[];not null"`
 	ThumbnailURL     *string         `gorm:"column:thumbnail_url"`
 	Position         int             `gorm:"column:position;not null"`
 	Details          json.RawMessage `gorm:"column:details;type:jsonb"`

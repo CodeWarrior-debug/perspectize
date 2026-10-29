@@ -1,6 +1,7 @@
 package demo
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -73,7 +74,25 @@ func TestImportFixtureRows(t *testing.T) {
 	assert.Equal(t, domain.ContentTypeMovie, movieRows[0].Item.DestinationType)
 	assert.Equal(t, MovieURL(movieRows[0].Item.ExternalID), movieRows[0].Item.CanonicalURL)
 	assert.Equal(t, domain.ImportItemKindMovie, movieRows[0].Item.Kind)
-	assert.Equal(t, []domain.ImportPerson{{Name: "Christopher Nolan", Role: "Director"}}, movieRows[0].Details.People)
+	assert.Equal(t, domain.ImportPerson{Name: "Christopher Nolan", Role: "Director"}, movieRows[0].Details.People[0])
+
+	// Every dated film answers "who's in it" and "what kind of film" in the row itself,
+	// and a rated film says how many reviews its score rests on.
+	for _, r := range movieRows {
+		assert.Nil(t, r.Item.ViewCount, r.Item.Title)
+		assert.Len(t, r.Item.TopCast, 3, r.Item.Title)
+		if r.Item.PublishedAt != nil {
+			assert.NotEmpty(t, r.Item.Genres, r.Item.Title)
+		}
+		if r.Item.Rating != nil {
+			require.NotNil(t, r.Item.RatingCount, r.Item.Title)
+			assert.Positive(t, *r.Item.RatingCount, r.Item.Title)
+		}
+	}
+	inception := movieRows[slices.IndexFunc(movieRows, func(r *domain.ImportItemWithDetails) bool { return r.Item.Title == "Inception" })]
+	assert.Equal(t, []string{"Leonardo DiCaprio", "Ken Watanabe", "Joseph Gordon-Levitt"}, inception.Item.TopCast, "billing order")
+	assert.Equal(t, 42, *inception.Item.RatingCount)
+	assert.Contains(t, inception.Item.Genres, "Science fiction", "tidied from Wikidata's \"science fiction film\"")
 }
 
 func TestImportLookups(t *testing.T) {

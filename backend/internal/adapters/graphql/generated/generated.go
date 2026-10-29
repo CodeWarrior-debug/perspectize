@@ -137,6 +137,7 @@ type ComplexityRoot struct {
 		DestinationType func(childComplexity int) int
 		DurationSeconds func(childComplexity int) int
 		ExternalID      func(childComplexity int) int
+		Genres          func(childComplexity int) int
 		HasCaptions     func(childComplexity int) int
 		ID              func(childComplexity int) int
 		ImportError     func(childComplexity int) int
@@ -155,6 +156,7 @@ type ComplexityRoot struct {
 		Summary         func(childComplexity int) int
 		ThumbnailURL    func(childComplexity int) int
 		Title           func(childComplexity int) int
+		TopCast         func(childComplexity int) int
 		URL             func(childComplexity int) int
 		ViewCount       func(childComplexity int) int
 	}
@@ -1077,6 +1079,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ImportItem.ExternalID(childComplexity), true
+	case "ImportItem.genres":
+		if e.ComplexityRoot.ImportItem.Genres == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportItem.Genres(childComplexity), true
 	case "ImportItem.hasCaptions":
 		if e.ComplexityRoot.ImportItem.HasCaptions == nil {
 			break
@@ -1185,6 +1193,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ImportItem.Title(childComplexity), true
+	case "ImportItem.topCast":
+		if e.ComplexityRoot.ImportItem.TopCast == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportItem.TopCast(childComplexity), true
 	case "ImportItem.url":
 		if e.ComplexityRoot.ImportItem.URL == nil {
 			break
@@ -3878,6 +3892,9 @@ type ImportItem {
   ratingSource: String
   chapterCount: Int!
   hasCaptions: Boolean
+  # Films: genre names and up to 3 top-billed cast (empty for videos).
+  genres: [String!]!
+  topCast: [String!]!
   thumbnailUrl: String
   # Position in the source listing; 0 is first (newest for channels).
   position: Int!
@@ -4580,6 +4597,10 @@ func (ec *executionContext) childFields_ImportItem(ctx context.Context, field gr
 		return ec.fieldContext_ImportItem_chapterCount(ctx, field)
 	case "hasCaptions":
 		return ec.fieldContext_ImportItem_hasCaptions(ctx, field)
+	case "genres":
+		return ec.fieldContext_ImportItem_genres(ctx, field)
+	case "topCast":
+		return ec.fieldContext_ImportItem_topCast(ctx, field)
 	case "thumbnailUrl":
 		return ec.fieldContext_ImportItem_thumbnailUrl(ctx, field)
 	case "position":
@@ -8254,6 +8275,52 @@ func (ec *executionContext) _ImportItem_hasCaptions(ctx context.Context, field g
 }
 func (ec *executionContext) fieldContext_ImportItem_hasCaptions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _ImportItem_genres(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportItem_genres(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Genres, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportItem_genres(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ImportItem_topCast(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportItem_topCast(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TopCast, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportItem_topCast(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _ImportItem_thumbnailUrl(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
@@ -20462,6 +20529,16 @@ func (ec *executionContext) _ImportItem(ctx context.Context, sel ast.SelectionSe
 		case "hasCaptions":
 			out.Values[i] = ec._ImportItem_hasCaptions(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "genres":
+			out.Values[i] = ec._ImportItem_genres(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "topCast":
+			out.Values[i] = ec._ImportItem_topCast(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		case "thumbnailUrl":

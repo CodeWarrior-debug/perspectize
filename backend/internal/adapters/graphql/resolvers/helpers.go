@@ -995,6 +995,8 @@ func importItemToModel(it *domain.ImportItem) *model.ImportItem {
 		RatingSource:    it.RatingSource,
 		ChapterCount:    it.ChapterCount,
 		HasCaptions:     it.HasCaptions,
+		Genres:          stringsOrEmpty(it.Genres),
+		TopCast:         stringsOrEmpty(it.TopCast),
 		ThumbnailURL:    it.ThumbnailURL,
 		Position:        it.Position,
 		StatsFetchedAt:  isoTime(it.StatsFetchedAt),
@@ -1019,20 +1021,14 @@ func importItemDetailsToModel(d *domain.ImportItemWithDetails) *model.ImportItem
 	for i, p := range d.Details.People {
 		people[i] = &model.ImportPerson{Name: p.Name, Role: p.Role}
 	}
-	nonNil := func(s []string) []string {
-		if s == nil {
-			return []string{}
-		}
-		return s
-	}
 	out := &model.ImportItemDetails{
 		Item:        importItemToModel(&d.Item),
 		Description: d.Details.Description,
-		Tags:        nonNil(d.Details.Tags),
+		Tags:        stringsOrEmpty(d.Details.Tags),
 		Chapters:    chapters,
-		Links:       nonNil(d.Details.Links),
+		Links:       stringsOrEmpty(d.Details.Links),
 		People:      people,
-		Genres:      nonNil(d.Details.Genres),
+		Genres:      stringsOrEmpty(d.Details.Genres),
 	}
 	if d.Details.Language != "" {
 		lang := d.Details.Language
@@ -1047,4 +1043,12 @@ func modelToCreateImportJobInput(in model.CreateImportJobInput) domain.CreateImp
 		out.Sources[i] = domain.CreateImportSourceInput{SourceType: s.SourceType, Ref: s.Ref, Role: s.Role}
 	}
 	return out
+}
+
+// stringsOrEmpty returns s, or an empty slice for nil, for non-null GraphQL lists.
+func stringsOrEmpty(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }

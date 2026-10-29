@@ -140,6 +140,8 @@ func TestImportJobIntegration_UpsertListAndInLibrary(t *testing.T) {
 	job := f.newJob(t)
 
 	batch := []*domain.ImportItemWithDetails{f.videoItem(job, 1), f.videoItem(job, 2), f.videoItem(job, 3)}
+	batch[2].Item.Genres = []string{"Science fiction", "Thriller"}
+	batch[2].Item.TopCast = []string{"Leonardo DiCaprio", "Ken Watanabe"}
 	c := querycount.Attach(t, f.db)
 	require.NoError(t, f.repo.UpsertItems(ctx, batch))
 	c.AssertExactly(t, 1)
@@ -165,6 +167,10 @@ func TestImportJobIntegration_UpsertListAndInLibrary(t *testing.T) {
 	assert.Equal(t, contentID, *items[1].ContentID)
 	assert.Equal(t, domain.ImportItemKindVideo, items[2].Kind)
 	assert.Equal(t, int64(300), *items[2].LikeCount)
+	assert.Equal(t, []string{"Science fiction", "Thriller"}, items[2].Genres)
+	assert.Equal(t, []string{"Leonardo DiCaprio", "Ken Watanabe"}, items[2].TopCast)
+	assert.Equal(t, []string{}, items[0].Genres, "no genres reads back as an empty list, not nil")
+	assert.Equal(t, []string{}, items[0].TopCast)
 
 	// Re-staging refreshes stats but keeps the import outcome.
 	require.NoError(t, f.repo.RecordOutcome(ctx, items[0].ID, domain.ImportItemStatusFailed, ptr("quota"), nil))

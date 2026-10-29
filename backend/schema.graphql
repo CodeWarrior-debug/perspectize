@@ -610,6 +610,9 @@ type ImportItem {
   ratingSource: String
   chapterCount: Int!
   hasCaptions: Boolean
+  # Films: genre names and up to 3 top-billed cast (empty for videos).
+  genres: [String!]!
+  topCast: [String!]!
   thumbnailUrl: String
   # Position in the source listing; 0 is first (newest for channels).
   position: Int!
