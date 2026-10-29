@@ -1,6 +1,6 @@
 {
 "fetchedAt":"2026-10-27T00:00:00Z",
-"note":"Real sample data: YouTube rows from the public channels (yt-dlp, 2026-10-27); films from Wikidata + Wikipedia (Metacritic scores and critic review counts via Wikidata P444/P7887; top-billed cast from the Wikipedia infobox). Demo mode only.",
+"note":"Real sample data: YouTube rows from the public channels (yt-dlp, 2026-10-27); films from Wikidata + Wikipedia (Metacritic scores and critic review counts via Wikidata P444/P7887; top-billed cast from the Wikipedia infobox; box office, budget (USD) and main subjects via Wikidata P2142/P2130/P921). Demo mode only.",
 "imports":[
 {
 "name":"Jordan Peterson channels",
@@ -3226,7 +3226,8 @@
 "Tom Holland",
 "Anne Hathaway"
 ],
-"ratingCount":60
+"ratingCount":60,
+"budget":250000000
 },
 {
 "externalId":"872585",
@@ -3271,7 +3272,17 @@
 "Emily Blunt",
 "Matt Damon"
 ],
-"ratingCount":69
+"ratingCount":69,
+"revenue":955300000,
+"budget":100000000,
+"tags":[
+"Oppenheimer security hearing",
+"trial",
+"Manhattan Project",
+"J. Robert Oppenheimer",
+"McCarthyism",
+"nuclear bomb"
+]
 },
 {
 "externalId":"577922",
@@ -3316,7 +3327,15 @@
 "Robert Pattinson",
 "Elizabeth Debicki"
 ],
-"ratingCount":50
+"ratingCount":50,
+"revenue":361300000,
+"budget":200000000,
+"tags":[
+"World War III",
+"time",
+"causality",
+"time travel"
+]
 },
 {
 "externalId":"374720",
@@ -3359,7 +3378,12 @@
 "Tom Glynn-Carney",
 "Jack Lowden"
 ],
-"ratingCount":53
+"ratingCount":53,
+"revenue":526940665,
+"budget":100000000,
+"tags":[
+"Dunkirk evacuation"
+]
 },
 {
 "externalId":"157336",
@@ -3404,7 +3428,16 @@
 "Anne Hathaway",
 "Jessica Chastain"
 ],
-"ratingCount":46
+"ratingCount":46,
+"revenue":701729206,
+"budget":165000000,
+"tags":[
+"love",
+"interstellar travel",
+"global catastrophic risks",
+"parent–child relationship",
+"causal loop"
+]
 },
 {
 "externalId":"49026",
@@ -3449,7 +3482,13 @@
 "Michael Caine",
 "Gary Oldman"
 ],
-"ratingCount":45
+"ratingCount":45,
+"revenue":1081169825,
+"budget":250000000,
+"tags":[
+"terrorism",
+"revenge"
+]
 },
 {
 "externalId":"27205",
@@ -3494,7 +3533,13 @@
 "Ken Watanabe",
 "Joseph Gordon-Levitt"
 ],
-"ratingCount":42
+"ratingCount":42,
+"revenue":836848102,
+"budget":160000000,
+"tags":[
+"dream world",
+"telepresence"
+]
 },
 {
 "externalId":"155",
@@ -3539,7 +3584,12 @@
 "Michael Caine",
 "Heath Ledger"
 ],
-"ratingCount":41
+"ratingCount":41,
+"revenue":1006234167,
+"budget":185000000,
+"tags":[
+"terrorism"
+]
 },
 {
 "externalId":"1124",
@@ -3584,7 +3634,13 @@
 "Christian Bale",
 "Michael Caine"
 ],
-"ratingCount":36
+"ratingCount":36,
+"revenue":109676311,
+"budget":40000000,
+"tags":[
+"revenge",
+"stage magic"
+]
 },
 {
 "externalId":"272",
@@ -3629,7 +3685,14 @@
 "Michael Caine",
 "Liam Neeson"
 ],
-"ratingCount":41
+"ratingCount":41,
+"revenue":374218673,
+"budget":150000000,
+"tags":[
+"terrorism",
+"ninja",
+"fear"
+]
 },
 {
 "externalId":"320",
@@ -3674,7 +3737,9 @@
 "Robin Williams",
 "Hilary Swank"
 ],
-"ratingCount":37
+"ratingCount":37,
+"revenue":113714830,
+"budget":46000000
 },
 {
 "externalId":"77",
@@ -3719,7 +3784,12 @@
 "Carrie-Anne Moss",
 "Joe Pantoliano"
 ],
-"ratingCount":34
+"ratingCount":34,
+"revenue":39665951,
+"budget":9000000,
+"tags":[
+"amnesia"
+]
 },
 {
 "externalId":"11660",
@@ -3763,7 +3833,9 @@
 "Alex Haw",
 "Lucy Russell"
 ],
-"ratingCount":11
+"ratingCount":11,
+"revenue":48500,
+"budget":6000
 },
 {
 "externalId":"456684",

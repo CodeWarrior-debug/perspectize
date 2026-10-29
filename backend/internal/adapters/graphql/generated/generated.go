@@ -131,6 +131,7 @@ type ComplexityRoot struct {
 	}
 
 	ImportItem struct {
+		Budget          func(childComplexity int) int
 		ChapterCount    func(childComplexity int) int
 		CommentCount    func(childComplexity int) int
 		ContentID       func(childComplexity int) int
@@ -146,11 +147,14 @@ type ComplexityRoot struct {
 		InLibrary       func(childComplexity int) int
 		Kind            func(childComplexity int) int
 		LikeCount       func(childComplexity int) int
+		Popularity      func(childComplexity int) int
 		Position        func(childComplexity int) int
 		PublishedAt     func(childComplexity int) int
 		Rating          func(childComplexity int) int
 		RatingCount     func(childComplexity int) int
 		RatingSource    func(childComplexity int) int
+		Revenue         func(childComplexity int) int
+		ReviewCount     func(childComplexity int) int
 		SourceID        func(childComplexity int) int
 		StatsFetchedAt  func(childComplexity int) int
 		Summary         func(childComplexity int) int
@@ -180,17 +184,32 @@ type ComplexityRoot struct {
 	}
 
 	ImportJob struct {
-		CreatedAt func(childComplexity int) int
-		ID        func(childComplexity int) int
-		Items     func(childComplexity int) int
-		Name      func(childComplexity int) int
-		Sources   func(childComplexity int) int
-		UpdatedAt func(childComplexity int) int
+		CreatedAt     func(childComplexity int) int
+		ID            func(childComplexity int) int
+		Items         func(childComplexity int) int
+		Name          func(childComplexity int) int
+		RequestStatus func(childComplexity int) int
+		RequestedBy   func(childComplexity int) int
+		ReviewNote    func(childComplexity int) int
+		ReviewedAt    func(childComplexity int) int
+		Sources       func(childComplexity int) int
+		UpdatedAt     func(childComplexity int) int
 	}
 
 	ImportPerson struct {
 		Name func(childComplexity int) int
 		Role func(childComplexity int) int
+	}
+
+	ImportProgress struct {
+		Done      func(childComplexity int) int
+		Failed    func(childComplexity int) int
+		Imported  func(childComplexity int) int
+		JobID     func(childComplexity int) int
+		Running   func(childComplexity int) int
+		Skipped   func(childComplexity int) int
+		Total     func(childComplexity int) int
+		UpdatedAt func(childComplexity int) int
 	}
 
 	ImportSource struct {
@@ -330,6 +349,7 @@ type ComplexityRoot struct {
 		MarkThreadRead                  func(childComplexity int, threadID string, seq int) int
 		MuteThread                      func(childComplexity int, threadID string, muted bool) int
 		ReorderUserTodoList             func(childComplexity int, listID int, todoIds []int) int
+		ReviewImportJob                 func(childComplexity int, input model.ReviewImportJobInput) int
 		SendMessage                     func(childComplexity int, input model.SendMessageInput) int
 		SetOnboardingDisplayNextSession func(childComplexity int, displayNextSession bool) int
 		SetPassageDisplayTitle          func(childComplexity int, input model.SetPassageDisplayTitleInput) int
@@ -463,8 +483,9 @@ type ComplexityRoot struct {
 	}
 
 	Subscription struct {
-		InboxEvents  func(childComplexity int) int
-		ThreadEvents func(childComplexity int, threadID string, sinceSeq *int) int
+		ImportProgress func(childComplexity int, jobID string) int
+		InboxEvents    func(childComplexity int) int
+		ThreadEvents   func(childComplexity int, threadID string, sinceSeq *int) int
 	}
 
 	ThreadParticipant struct {
@@ -573,6 +594,8 @@ type ContentResolver interface {
 	QualityRatingCount(ctx context.Context, obj *model.Content) (*int, error)
 }
 type ImportJobResolver interface {
+	RequestedBy(ctx context.Context, obj *model.ImportJob) (*model.User, error)
+
 	Items(ctx context.Context, obj *model.ImportJob) ([]*model.ImportItem, error)
 }
 type MessageResolver interface {
@@ -615,6 +638,7 @@ type MutationResolver interface {
 	DeleteUserTodoList(ctx context.Context, id string) (bool, error)
 	ReorderUserTodoList(ctx context.Context, listID int, todoIds []int) ([]*model.UserTodo, error)
 	CreateImportJob(ctx context.Context, input model.CreateImportJobInput) (*model.ImportJob, error)
+	ReviewImportJob(ctx context.Context, input model.ReviewImportJobInput) (*model.ImportJob, error)
 	ImportItems(ctx context.Context, input model.ImportItemsInput) (*model.ImportItemsResult, error)
 	CreateMessageThread(ctx context.Context, input model.CreateMessageThreadInput) (*model.MessageThread, error)
 	SendMessage(ctx context.Context, input model.SendMessageInput) (*model.Message, error)
@@ -662,6 +686,7 @@ type QueryResolver interface {
 type SubscriptionResolver interface {
 	ThreadEvents(ctx context.Context, threadID string, sinceSeq *int) (<-chan model.ThreadEvent, error)
 	InboxEvents(ctx context.Context) (<-chan *model.InboxEvent, error)
+	ImportProgress(ctx context.Context, jobID string) (<-chan *model.ImportProgress, error)
 }
 type ThreadParticipantResolver interface {
 	User(ctx context.Context, obj *model.ThreadParticipant) (*model.User, error)
@@ -1043,6 +1068,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.ImportChapter.Title(childComplexity), true
 
+	case "ImportItem.budget":
+		if e.ComplexityRoot.ImportItem.Budget == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportItem.Budget(childComplexity), true
 	case "ImportItem.chapterCount":
 		if e.ComplexityRoot.ImportItem.ChapterCount == nil {
 			break
@@ -1133,6 +1164,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ImportItem.LikeCount(childComplexity), true
+	case "ImportItem.popularity":
+		if e.ComplexityRoot.ImportItem.Popularity == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportItem.Popularity(childComplexity), true
 	case "ImportItem.position":
 		if e.ComplexityRoot.ImportItem.Position == nil {
 			break
@@ -1163,6 +1200,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ImportItem.RatingSource(childComplexity), true
+	case "ImportItem.revenue":
+		if e.ComplexityRoot.ImportItem.Revenue == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportItem.Revenue(childComplexity), true
+	case "ImportItem.reviewCount":
+		if e.ComplexityRoot.ImportItem.ReviewCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportItem.ReviewCount(childComplexity), true
 	case "ImportItem.sourceId":
 		if e.ComplexityRoot.ImportItem.SourceID == nil {
 			break
@@ -1310,6 +1359,30 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ImportJob.Name(childComplexity), true
+	case "ImportJob.requestStatus":
+		if e.ComplexityRoot.ImportJob.RequestStatus == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportJob.RequestStatus(childComplexity), true
+	case "ImportJob.requestedBy":
+		if e.ComplexityRoot.ImportJob.RequestedBy == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportJob.RequestedBy(childComplexity), true
+	case "ImportJob.reviewNote":
+		if e.ComplexityRoot.ImportJob.ReviewNote == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportJob.ReviewNote(childComplexity), true
+	case "ImportJob.reviewedAt":
+		if e.ComplexityRoot.ImportJob.ReviewedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportJob.ReviewedAt(childComplexity), true
 	case "ImportJob.sources":
 		if e.ComplexityRoot.ImportJob.Sources == nil {
 			break
@@ -1335,6 +1408,55 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ImportPerson.Role(childComplexity), true
+
+	case "ImportProgress.done":
+		if e.ComplexityRoot.ImportProgress.Done == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportProgress.Done(childComplexity), true
+	case "ImportProgress.failed":
+		if e.ComplexityRoot.ImportProgress.Failed == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportProgress.Failed(childComplexity), true
+	case "ImportProgress.imported":
+		if e.ComplexityRoot.ImportProgress.Imported == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportProgress.Imported(childComplexity), true
+	case "ImportProgress.jobId":
+		if e.ComplexityRoot.ImportProgress.JobID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportProgress.JobID(childComplexity), true
+	case "ImportProgress.running":
+		if e.ComplexityRoot.ImportProgress.Running == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportProgress.Running(childComplexity), true
+	case "ImportProgress.skipped":
+		if e.ComplexityRoot.ImportProgress.Skipped == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportProgress.Skipped(childComplexity), true
+	case "ImportProgress.total":
+		if e.ComplexityRoot.ImportProgress.Total == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportProgress.Total(childComplexity), true
+	case "ImportProgress.updatedAt":
+		if e.ComplexityRoot.ImportProgress.UpdatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportProgress.UpdatedAt(childComplexity), true
 
 	case "ImportSource.destinationType":
 		if e.ComplexityRoot.ImportSource.DestinationType == nil {
@@ -2039,6 +2161,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.ReorderUserTodoList(childComplexity, args["listId"].(int), args["todoIds"].([]int)), true
+	case "Mutation.reviewImportJob":
+		if e.ComplexityRoot.Mutation.ReviewImportJob == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_reviewImportJob_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ReviewImportJob(childComplexity, args["input"].(model.ReviewImportJobInput)), true
 	case "Mutation.sendMessage":
 		if e.ComplexityRoot.Mutation.SendMessage == nil {
 			break
@@ -2760,6 +2893,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.StreamReset.ThreadID(childComplexity), true
 
+	case "Subscription.importProgress":
+		if e.ComplexityRoot.Subscription.ImportProgress == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_importProgress_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Subscription.ImportProgress(childComplexity, args["jobId"].(string)), true
 	case "Subscription.inboxEvents":
 		if e.ComplexityRoot.Subscription.InboxEvents == nil {
 			break
@@ -3180,6 +3324,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputFeelingInput,
 		ec.unmarshalInputImportItemsInput,
 		ec.unmarshalInputPerspectiveFilter,
+		ec.unmarshalInputReviewImportJobInput,
 		ec.unmarshalInputSendMessageInput,
 		ec.unmarshalInputSetPassageDisplayTitleInput,
 		ec.unmarshalInputSetPrimaryCategoryInput,
@@ -3818,6 +3963,8 @@ enum ImportPersonRole {
 }
 
 enum ImportSourceStatus {
+  # Part of a request nobody has approved yet: nothing is listed.
+  WAITING
   LISTING
   READY
   FAILED
@@ -3857,9 +4004,23 @@ type ImportSource {
   fetchedAt: String
 }
 
+# An admin's import is APPROVED when created; anyone else's is REQUESTED until
+# an admin approves it (listing starts) or declines it.
+enum ImportRequestStatus {
+  REQUESTED
+  APPROVED
+  DECLINED
+}
+
 type ImportJob {
   id: ID!
   name: String!
+  requestStatus: ImportRequestStatus!
+  # Who created it (the requester, for a request).
+  requestedBy: User
+  # The reviewing admin's reason; always set on a decline.
+  reviewNote: String
+  reviewedAt: String
   sources: [ImportSource!]!
   createdAt: String!
   updatedAt: String!
@@ -3895,6 +4056,12 @@ type ImportItem {
   # Films: genre names and up to 3 top-billed cast (empty for videos).
   genres: [String!]!
   topCast: [String!]!
+  # Films (TMDB): daily popularity score, user review count, and box office
+  # takings and budget in USD. Null when unknown.
+  popularity: Float
+  reviewCount: Int
+  revenue: Float
+  budget: Float
   thumbnailUrl: String
   # Position in the source listing; 0 is first (newest for channels).
   position: Int!
@@ -3940,6 +4107,32 @@ input CreateImportSourceInput {
 input CreateImportJobInput {
   name: String!
   sources: [CreateImportSourceInput!]!
+}
+
+# Live progress of an import's running batch(es), pushed at most twice a
+# second while rows import. done = imported + skipped + failed.
+type ImportProgress {
+  jobId: ID!
+  total: Int!
+  done: Int!
+  imported: Int!
+  # Already in the library, so nothing new was created.
+  skipped: Int!
+  failed: Int!
+  running: Boolean!
+  updatedAt: String!
+}
+
+extend type Subscription {
+  # The current count at once, then every change while the import runs.
+  importProgress(jobId: ID!): ImportProgress! @auth
+}
+
+input ReviewImportJobInput {
+  jobId: IntID!
+  approve: Boolean!
+  # Required to decline: it is what the requester reads.
+  note: String
 }
 
 input ImportItemsInput {
@@ -4006,7 +4199,10 @@ type Mutation {
 
   # Import staging. Creating an import is admin-only (it spends API quota);
   # sources are listed in the background, so the returned sources are LISTING.
+  # Anyone signed in: an admin's import starts listing, anyone else's waits as a request.
   createImportJob(input: CreateImportJobInput!): ImportJob! @auth
+  # Admin only: approve (start listing) or decline a requested import.
+  reviewImportJob(input: ReviewImportJobInput!): ImportJob! @auth
   # Queues the picked rows and imports them in the background as the caller.
   importItems(input: ImportItemsInput!): ImportItemsResult! @auth
 }
@@ -4601,6 +4797,14 @@ func (ec *executionContext) childFields_ImportItem(ctx context.Context, field gr
 		return ec.fieldContext_ImportItem_genres(ctx, field)
 	case "topCast":
 		return ec.fieldContext_ImportItem_topCast(ctx, field)
+	case "popularity":
+		return ec.fieldContext_ImportItem_popularity(ctx, field)
+	case "reviewCount":
+		return ec.fieldContext_ImportItem_reviewCount(ctx, field)
+	case "revenue":
+		return ec.fieldContext_ImportItem_revenue(ctx, field)
+	case "budget":
+		return ec.fieldContext_ImportItem_budget(ctx, field)
 	case "thumbnailUrl":
 		return ec.fieldContext_ImportItem_thumbnailUrl(ctx, field)
 	case "position":
@@ -4663,6 +4867,14 @@ func (ec *executionContext) childFields_ImportJob(ctx context.Context, field gra
 		return ec.fieldContext_ImportJob_id(ctx, field)
 	case "name":
 		return ec.fieldContext_ImportJob_name(ctx, field)
+	case "requestStatus":
+		return ec.fieldContext_ImportJob_requestStatus(ctx, field)
+	case "requestedBy":
+		return ec.fieldContext_ImportJob_requestedBy(ctx, field)
+	case "reviewNote":
+		return ec.fieldContext_ImportJob_reviewNote(ctx, field)
+	case "reviewedAt":
+		return ec.fieldContext_ImportJob_reviewedAt(ctx, field)
 	case "sources":
 		return ec.fieldContext_ImportJob_sources(ctx, field)
 	case "createdAt":
@@ -4683,6 +4895,28 @@ func (ec *executionContext) childFields_ImportPerson(ctx context.Context, field 
 		return ec.fieldContext_ImportPerson_role(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type ImportPerson", field.Name)
+}
+
+func (ec *executionContext) childFields_ImportProgress(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "jobId":
+		return ec.fieldContext_ImportProgress_jobId(ctx, field)
+	case "total":
+		return ec.fieldContext_ImportProgress_total(ctx, field)
+	case "done":
+		return ec.fieldContext_ImportProgress_done(ctx, field)
+	case "imported":
+		return ec.fieldContext_ImportProgress_imported(ctx, field)
+	case "skipped":
+		return ec.fieldContext_ImportProgress_skipped(ctx, field)
+	case "failed":
+		return ec.fieldContext_ImportProgress_failed(ctx, field)
+	case "running":
+		return ec.fieldContext_ImportProgress_running(ctx, field)
+	case "updatedAt":
+		return ec.fieldContext_ImportProgress_updatedAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ImportProgress", field.Name)
 }
 
 func (ec *executionContext) childFields_ImportSource(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -5707,6 +5941,20 @@ func (ec *executionContext) field_Mutation_reorderUserTodoList_args(ctx context.
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_reviewImportJob_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.ReviewImportJobInput, error) {
+			return ec.unmarshalNReviewImportJobInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐReviewImportJobInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_sendMessage_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -6454,6 +6702,20 @@ func (ec *executionContext) field_Query_youtubeTrending_args(ctx context.Context
 		return nil, err
 	}
 	args["pageToken"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Subscription_importProgress_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "jobId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["jobId"] = arg0
 	return args, nil
 }
 
@@ -8323,6 +8585,98 @@ func (ec *executionContext) fieldContext_ImportItem_topCast(_ context.Context, f
 	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _ImportItem_popularity(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportItem_popularity(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Popularity, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImportItem_popularity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _ImportItem_reviewCount(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportItem_reviewCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ReviewCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImportItem_reviewCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ImportItem_revenue(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportItem_revenue(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Revenue, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImportItem_revenue(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _ImportItem_budget(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportItem_budget(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Budget, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImportItem_budget(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
 func (ec *executionContext) _ImportItem_thumbnailUrl(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8856,6 +9210,107 @@ func (ec *executionContext) fieldContext_ImportJob_name(_ context.Context, field
 	return graphql.NewScalarFieldContext("ImportJob", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _ImportJob_requestStatus(ctx context.Context, field graphql.CollectedField, obj *model.ImportJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportJob_requestStatus(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.RequestStatus, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v domain.ImportRequestStatus) graphql.Marshaler {
+			return ec.marshalNImportRequestStatus2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐImportRequestStatus(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportJob_requestStatus(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportJob", field, false, false, errors.New("field of type ImportRequestStatus does not have child fields"))
+}
+
+func (ec *executionContext) _ImportJob_requestedBy(ctx context.Context, field graphql.CollectedField, obj *model.ImportJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportJob_requestedBy(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.ImportJob().RequestedBy(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.User) graphql.Marshaler {
+			return ec.marshalOUser2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUser(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImportJob_requestedBy(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ImportJob",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_User(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ImportJob_reviewNote(ctx context.Context, field graphql.CollectedField, obj *model.ImportJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportJob_reviewNote(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ReviewNote, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImportJob_reviewNote(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportJob", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ImportJob_reviewedAt(ctx context.Context, field graphql.CollectedField, obj *model.ImportJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportJob_reviewedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ReviewedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImportJob_reviewedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportJob", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _ImportJob_sources(ctx context.Context, field graphql.CollectedField, obj *model.ImportJob) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9010,6 +9465,190 @@ func (ec *executionContext) _ImportPerson_role(ctx context.Context, field graphq
 }
 func (ec *executionContext) fieldContext_ImportPerson_role(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("ImportPerson", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ImportProgress_jobId(ctx context.Context, field graphql.CollectedField, obj *model.ImportProgress) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportProgress_jobId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.JobID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportProgress_jobId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportProgress", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _ImportProgress_total(ctx context.Context, field graphql.CollectedField, obj *model.ImportProgress) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportProgress_total(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Total, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportProgress_total(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportProgress", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ImportProgress_done(ctx context.Context, field graphql.CollectedField, obj *model.ImportProgress) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportProgress_done(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Done, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportProgress_done(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportProgress", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ImportProgress_imported(ctx context.Context, field graphql.CollectedField, obj *model.ImportProgress) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportProgress_imported(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Imported, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportProgress_imported(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportProgress", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ImportProgress_skipped(ctx context.Context, field graphql.CollectedField, obj *model.ImportProgress) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportProgress_skipped(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Skipped, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportProgress_skipped(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportProgress", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ImportProgress_failed(ctx context.Context, field graphql.CollectedField, obj *model.ImportProgress) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportProgress_failed(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Failed, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportProgress_failed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportProgress", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ImportProgress_running(ctx context.Context, field graphql.CollectedField, obj *model.ImportProgress) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportProgress_running(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Running, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportProgress_running(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportProgress", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _ImportProgress_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.ImportProgress) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportProgress_updatedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportProgress_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportProgress", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _ImportSource_id(ctx context.Context, field graphql.CollectedField, obj *model.ImportSource) (ret graphql.Marshaler) {
@@ -12099,6 +12738,63 @@ func (ec *executionContext) fieldContext_Mutation_createImportJob(ctx context.Co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_createImportJob_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_reviewImportJob(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_reviewImportJob(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ReviewImportJob(ctx, fc.Args["input"].(model.ReviewImportJobInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.ImportJob
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ImportJob) graphql.Marshaler {
+			return ec.marshalNImportJob2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐImportJob(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_reviewImportJob(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ImportJob(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_reviewImportJob_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -15422,6 +16118,63 @@ func (ec *executionContext) fieldContext_Subscription_inboxEvents(_ context.Cont
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_InboxEvent(ctx, field)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_importProgress(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Subscription_importProgress(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Subscription().ImportProgress(ctx, fc.Args["jobId"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.ImportProgress
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ImportProgress) graphql.Marshaler {
+			return ec.marshalNImportProgress2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐImportProgress(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Subscription_importProgress(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ImportProgress(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_importProgress_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -19074,6 +19827,50 @@ func (ec *executionContext) unmarshalInputPerspectiveFilter(ctx context.Context,
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputReviewImportJobInput(ctx context.Context, obj any) (model.ReviewImportJobInput, error) {
+	var it model.ReviewImportJobInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"jobId", "approve", "note"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "jobId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("jobId"))
+			data, err := ec.unmarshalNIntID2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.JobID = data
+		case "approve":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("approve"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Approve = data
+		case "note":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("note"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Note = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputSendMessageInput(ctx context.Context, obj any) (model.SendMessageInput, error) {
 	var it model.SendMessageInput
 	if obj == nil {
@@ -20541,6 +21338,26 @@ func (ec *executionContext) _ImportItem(ctx context.Context, sel ast.SelectionSe
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "popularity":
+			out.Values[i] = ec._ImportItem_popularity(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "reviewCount":
+			out.Values[i] = ec._ImportItem_reviewCount(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "revenue":
+			out.Values[i] = ec._ImportItem_revenue(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "budget":
+			out.Values[i] = ec._ImportItem_budget(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		case "thumbnailUrl":
 			out.Values[i] = ec._ImportItem_thumbnailUrl(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
@@ -20750,6 +21567,59 @@ func (ec *executionContext) _ImportJob(ctx context.Context, sel ast.SelectionSet
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "requestStatus":
+			out.Values[i] = ec._ImportJob_requestStatus(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "requestedBy":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ImportJob_requestedBy(ctx, field, obj)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "reviewNote":
+			out.Values[i] = ec._ImportJob_reviewNote(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "reviewedAt":
+			out.Values[i] = ec._ImportJob_reviewedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "sources":
 			out.Values[i] = ec._ImportJob_sources(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -20843,6 +21713,79 @@ func (ec *executionContext) _ImportPerson(ctx context.Context, sel ast.Selection
 			}
 		case "role":
 			out.Values[i] = ec._ImportPerson_role(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var importProgressImplementors = []string{"ImportProgress"}
+
+func (ec *executionContext) _ImportProgress(ctx context.Context, sel ast.SelectionSet, obj *model.ImportProgress) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, importProgressImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ImportProgress")
+		case "jobId":
+			out.Values[i] = ec._ImportProgress_jobId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "total":
+			out.Values[i] = ec._ImportProgress_total(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "done":
+			out.Values[i] = ec._ImportProgress_done(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "imported":
+			out.Values[i] = ec._ImportProgress_imported(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "skipped":
+			out.Values[i] = ec._ImportProgress_skipped(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "failed":
+			out.Values[i] = ec._ImportProgress_failed(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "running":
+			out.Values[i] = ec._ImportProgress_running(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._ImportProgress_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -22129,6 +23072,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "createImportJob":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createImportJob(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "reviewImportJob":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_reviewImportJob(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -23605,6 +24555,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		return ec._Subscription_threadEvents(ctx, fields[0])
 	case "inboxEvents":
 		return ec._Subscription_inboxEvents(ctx, fields[0])
+	case "importProgress":
+		return ec._Subscription_importProgress(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
@@ -25281,6 +26233,33 @@ func (ec *executionContext) marshalNImportPerson2ᚖgithubᚗcomᚋCodeWarrior�
 	return ec._ImportPerson(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNImportProgress2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐImportProgress(ctx context.Context, sel ast.SelectionSet, v *model.ImportProgress) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ImportProgress(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNImportRequestStatus2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐImportRequestStatus(ctx context.Context, v any) (domain.ImportRequestStatus, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.ImportRequestStatus(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNImportRequestStatus2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐImportRequestStatus(ctx context.Context, sel ast.SelectionSet, v domain.ImportRequestStatus) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) marshalNImportSource2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐImportSourceᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ImportSource) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -25759,6 +26738,11 @@ func (ec *executionContext) marshalNPrivacy2githubᚗcomᚋCodeWarriorᚑdebug�
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNReviewImportJobInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐReviewImportJobInput(ctx context.Context, v any) (model.ReviewImportJobInput, error) {
+	res, err := ec.unmarshalInputReviewImportJobInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNSendMessageInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSendMessageInput(ctx context.Context, v any) (model.SendMessageInput, error) {

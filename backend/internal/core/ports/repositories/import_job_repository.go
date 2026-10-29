@@ -64,6 +64,15 @@ type ImportJobRepository interface {
 	// each it changed.
 	FailInterrupted(ctx context.Context, detail string) (sources int, items int, err error)
 
+	// CountPendingRequests counts userID's jobs still REQUESTED (1 query).
+	CountPendingRequests(ctx context.Context, userID int) (int, error)
+
+	// ReviewJob sets a REQUESTED job to status (APPROVED or DECLINED) with an
+	// optional note. Approving also moves its WAITING sources to LISTING
+	// (2 statements; 1 for a decline). domain.ErrNotFound when the job isn't
+	// REQUESTED any more, including when another admin reviewed it first.
+	ReviewJob(ctx context.Context, jobID int, status domain.ImportRequestStatus, note *string, at time.Time) error
+
 	// ReassignByUser moves the creator of every job from fromUserID to
 	// toUserID, used when a user is deleted (1 statement).
 	ReassignByUser(ctx context.Context, fromUserID, toUserID int) error

@@ -536,6 +536,8 @@ enum ImportPersonRole {
 }
 
 enum ImportSourceStatus {
+  # Part of a request nobody has approved yet: nothing is listed.
+  WAITING
   LISTING
   READY
   FAILED
@@ -575,9 +577,23 @@ type ImportSource {
   fetchedAt: String
 }
 
+# An admin's import is APPROVED when created; anyone else's is REQUESTED until
+# an admin approves it (listing starts) or declines it.
+enum ImportRequestStatus {
+  REQUESTED
+  APPROVED
+  DECLINED
+}
+
 type ImportJob {
   id: ID!
   name: String!
+  requestStatus: ImportRequestStatus!
+  # Who created it (the requester, for a request).
+  requestedBy: User
+  # The reviewing admin's reason; always set on a decline.
+  reviewNote: String
+  reviewedAt: String
   sources: [ImportSource!]!
   createdAt: String!
   updatedAt: String!
@@ -613,6 +629,12 @@ type ImportItem {
   # Films: genre names and up to 3 top-billed cast (empty for videos).
   genres: [String!]!
   topCast: [String!]!
+  # Films (TMDB): daily popularity score, user review count, and box office
+  # takings and budget in USD. Null when unknown.
+  popularity: Float
+  reviewCount: Int
+  revenue: Float
+  budget: Float
   thumbnailUrl: String
   # Position in the source listing; 0 is first (newest for channels).
   position: Int!
@@ -658,6 +680,32 @@ input CreateImportSourceInput {
 input CreateImportJobInput {
   name: String!
   sources: [CreateImportSourceInput!]!
+}
+
+# Live progress of an import's running batch(es), pushed at most twice a
+# second while rows import. done = imported + skipped + failed.
+type ImportProgress {
+  jobId: ID!
+  total: Int!
+  done: Int!
+  imported: Int!
+  # Already in the library, so nothing new was created.
+  skipped: Int!
+  failed: Int!
+  running: Boolean!
+  updatedAt: String!
+}
+
+extend type Subscription {
+  # The current count at once, then every change while the import runs.
+  importProgress(jobId: ID!): ImportProgress! @auth
+}
+
+input ReviewImportJobInput {
+  jobId: IntID!
+  approve: Boolean!
+  # Required to decline: it is what the requester reads.
+  note: String
 }
 
 input ImportItemsInput {
@@ -724,7 +772,10 @@ type Mutation {
 
   # Import staging. Creating an import is admin-only (it spends API quota);
   # sources are listed in the background, so the returned sources are LISTING.
+  # Anyone signed in: an admin's import starts listing, anyone else's waits as a request.
   createImportJob(input: CreateImportJobInput!): ImportJob! @auth
+  # Admin only: approve (start listing) or decline a requested import.
+  reviewImportJob(input: ReviewImportJobInput!): ImportJob! @auth
   # Queues the picked rows and imports them in the background as the caller.
   importItems(input: ImportItemsInput!): ImportItemsResult! @auth
 }

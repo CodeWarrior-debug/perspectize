@@ -120,13 +120,91 @@ func TestCreateImportJobRoundTrips(t *testing.T) {
 	require.Len(t, h.background, 1, "listing was started in the background")
 }
 
-func TestCreateImportJobRequiresAdmin(t *testing.T) {
+const createRequestMutation = `mutation($input: CreateImportJobInput!) {
+  createImportJob(input: $input) { id requestStatus sources { status } }
+}`
+
+const reviewImportJobMutation = `mutation($input: ReviewImportJobInput!) {
+  reviewImportJob(input: $input) { id requestStatus reviewNote reviewedAt sources { status } }
+}`
+
+const importJobsQuery = `{ importJobs { id name requestStatus requestedBy { username } sources { id status } } }`
+
+type rtRequest struct {
+	ID            string  `json:"id"`
+	RequestStatus string  `json:"requestStatus"`
+	ReviewNote    *string `json:"reviewNote"`
+	ReviewedAt    *string `json:"reviewedAt"`
+	Sources       []struct {
+		Status string `json:"status"`
+	} `json:"sources"`
+}
+
+// TestImportRequestRoundTrips pins a non-admin's request (count their open
+// requests, insert the job, insert its sources: 3 statements, nothing listed)
+// and an admin approving it (load the job and sources, review the job, start
+// its sources: 4), after which listing runs in the background.
+func TestImportRequestRoundTrips(t *testing.T) {
 	h := newHarness(t)
-	_, token := h.user("imp-na")
-	msg := h.gqlError(token, createImportJobMutation, map[string]any{"input": map[string]any{
-		"name": "x", "sources": []map[string]any{{"sourceType": "YOUTUBE_CHANNEL", "ref": "@x"}},
+	_, adminToken := adminUser(t, h, "imp-ra")
+	_, token := h.user("imp-ru")
+	h.warm(token)
+
+	data := h.roundTrips(3, token, createRequestMutation, map[string]any{"input": map[string]any{
+		"name": "Gaither", "sources": []map[string]any{{"sourceType": "YOUTUBE_CHANNEL", "ref": "@GaitherMusic"}},
 	}})
-	assert.Contains(t, msg, "access denied")
+	req := decode[rtRequest](t, data, "createImportJob")
+	assert.Equal(t, "REQUESTED", req.RequestStatus)
+	assert.Equal(t, "WAITING", req.Sources[0].Status)
+	assert.Empty(t, h.background, "a request lists nothing until approved")
+
+	msg := h.gqlError(token, reviewImportJobMutation, map[string]any{"input": map[string]any{"jobId": req.ID, "approve": true}})
+	assert.Contains(t, msg, "only an admin may review")
+
+	h.warm(adminToken)
+	data = h.roundTrips(4, adminToken, reviewImportJobMutation, map[string]any{"input": map[string]any{"jobId": req.ID, "approve": true}})
+	approved := decode[rtRequest](t, data, "reviewImportJob")
+	assert.Equal(t, "APPROVED", approved.RequestStatus)
+	assert.NotNil(t, approved.ReviewedAt)
+	assert.Equal(t, "LISTING", approved.Sources[0].Status)
+	require.Len(t, h.background, 1, "approval started listing")
+	h.runBackground()
+
+	jobs := h.gql(token, importJobQuery, map[string]any{"id": req.ID})
+	assert.Equal(t, "READY", decode[rtImportJob](t, jobs, "importJob").Sources[0].Status)
+}
+
+// TestImportJobsRoundTrips pins the import list: jobs, all their sources, and
+// one batched lookup of every requester, whatever the number of jobs.
+func TestImportJobsRoundTrips(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "imp-la")
+	_, token := h.user("imp-lu")
+	createRoundTripImport(t, h, adminToken)
+	h.gql(token, createRequestMutation, map[string]any{"input": map[string]any{
+		"name": "Request", "sources": []map[string]any{{"sourceType": "YOUTUBE_CHANNEL", "ref": "@r"}},
+	}})
+	h.warm(token)
+
+	data := h.roundTrips(3, token, importJobsQuery, nil)
+	type listed struct {
+		Name          string `json:"name"`
+		RequestStatus string `json:"requestStatus"`
+		RequestedBy   *struct {
+			Username string `json:"username"`
+		} `json:"requestedBy"`
+	}
+	var mine []listed
+	for _, j := range decode[[]listed](t, data, "importJobs") {
+		if j.Name == "Round trip" || j.Name == "Request" {
+			mine = append(mine, j)
+		}
+	}
+	require.Len(t, mine, 2)
+	for _, j := range mine {
+		require.NotNil(t, j.RequestedBy, j.Name)
+		assert.NotEmpty(t, j.RequestedBy.Username)
+	}
 }
 
 // TestImportJobRoundTrips pins one sheet load: the job, its sources and every

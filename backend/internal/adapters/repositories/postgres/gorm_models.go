@@ -221,11 +221,14 @@ func (UserTodoModel) TableName() string { return "user_todos" }
 
 // ImportJobModel is the GORM persistence model for the import_jobs table
 type ImportJobModel struct {
-	ID        int       `gorm:"primaryKey;autoIncrement"`
-	UserID    int       `gorm:"column:user_id;not null"`
-	Name      string    `gorm:"column:name;not null"`
-	CreatedAt time.Time `gorm:"autoCreateTime"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime"`
+	ID            int        `gorm:"primaryKey;autoIncrement"`
+	UserID        int        `gorm:"column:user_id;not null"`
+	Name          string     `gorm:"column:name;not null"`
+	RequestStatus string     `gorm:"column:request_status;not null"`
+	ReviewNote    *string    `gorm:"column:review_note"`
+	ReviewedAt    *time.Time `gorm:"column:reviewed_at"`
+	CreatedAt     time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt     time.Time  `gorm:"autoUpdateTime"`
 }
 
 // TableName returns the table name for ImportJobModel
@@ -277,6 +280,10 @@ type ImportItemModel struct {
 	HasCaptions      *bool           `gorm:"column:has_captions"`
 	Genres           StringArray     `gorm:"column:genres;type:text[];not null"`
 	TopCast          StringArray     `gorm:"column:top_cast;type:text[];not null"`
+	Popularity       *float64        `gorm:"column:popularity"`
+	ReviewCount      *int            `gorm:"column:review_count"`
+	Revenue          *int64          `gorm:"column:revenue"`
+	Budget           *int64          `gorm:"column:budget"`
 	ThumbnailURL     *string         `gorm:"column:thumbnail_url"`
 	Position         int             `gorm:"column:position;not null"`
 	Details          json.RawMessage `gorm:"column:details;type:jsonb"`

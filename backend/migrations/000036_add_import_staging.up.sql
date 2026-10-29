@@ -9,6 +9,10 @@
 -- of its merge; that branch also holds 000035), so a lower number would be
 -- skipped by `migrate up`. Re-check before merging.
 --
+-- Requests: anyone signed in can create an import, but only an admin's starts
+-- listing straight away (it spends YouTube/TMDB quota). Anyone else's is
+-- 'requested', its sources 'waiting', until an admin approves or declines it.
+--
 -- FKs: the creator FK to users blocks (RESTRICT, reassigned on user delete).
 -- Sources and items are children of their job (CASCADE). content_id is an
 -- optional pointer to what an item became (SET NULL).
@@ -19,17 +23,22 @@ CREATE TABLE IF NOT EXISTS public.import_jobs (
     id serial NOT NULL,
     user_id integer NOT NULL,
     name varchar(120) NOT NULL,
+    request_status text NOT NULL DEFAULT 'approved',
+    -- The reviewing admin's reason (shown to the requester when declined).
+    review_note varchar(500) NULL,
+    reviewed_at timestamptz NULL,
     created_at timestamptz NOT NULL DEFAULT NOW(),
     updated_at timestamptz NOT NULL DEFAULT NOW(),
     CONSTRAINT import_jobs_pk PRIMARY KEY (id),
-    CONSTRAINT import_jobs_user_fk FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT
+    CONSTRAINT import_jobs_user_fk FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT,
+    CONSTRAINT import_jobs_request_status_check CHECK (request_status IN ('requested', 'approved', 'declined'))
 );
 
 CREATE TABLE IF NOT EXISTS public.import_job_sources (
     id serial NOT NULL,
     job_id integer NOT NULL,
     source_type text NOT NULL,
-    -- What the admin entered: a channel id/handle, or a TMDB person id.
+    -- What was entered: a channel id/handle/URL, or a TMDB person id, URL or name.
     source_ref varchar(200) NOT NULL,
     -- Resolved display name and link (channel title, person name); NULL until resolved.
     title varchar(300) NULL,
@@ -46,7 +55,7 @@ CREATE TABLE IF NOT EXISTS public.import_job_sources (
     CONSTRAINT import_job_sources_pk PRIMARY KEY (id),
     CONSTRAINT import_job_sources_job_fk FOREIGN KEY (job_id) REFERENCES public.import_jobs(id) ON DELETE CASCADE,
     CONSTRAINT import_job_sources_type_check CHECK (source_type IN ('youtube_channel', 'tmdb_person')),
-    CONSTRAINT import_job_sources_status_check CHECK (status IN ('listing', 'ready', 'failed')),
+    CONSTRAINT import_job_sources_status_check CHECK (status IN ('waiting', 'listing', 'ready', 'failed')),
     CONSTRAINT import_job_sources_role_check CHECK (role IS NULL OR role IN ('director', 'cast')),
     CONSTRAINT import_job_sources_destination_check CHECK (destination_type IN ('youtube_video', 'movie'))
 );
@@ -78,6 +87,12 @@ CREATE TABLE IF NOT EXISTS public.import_job_items (
     -- Films: genre names and top-billed cast, shown as sheet columns (empty for videos).
     genres text[] NOT NULL DEFAULT '{}',
     top_cast text[] NOT NULL DEFAULT '{}',
+    -- Films (TMDB): its daily popularity score, user review count, and box
+    -- office takings and budget in USD. NULL when unknown (TMDB reports 0).
+    popularity numeric(10, 3) NULL,
+    review_count integer NULL,
+    revenue bigint NULL,
+    budget bigint NULL,
     thumbnail_url varchar(500) NULL,
     -- Position in the source listing (0 = first returned, newest for channels).
     position integer NOT NULL DEFAULT 0,

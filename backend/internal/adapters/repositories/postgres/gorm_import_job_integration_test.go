@@ -142,6 +142,8 @@ func TestImportJobIntegration_UpsertListAndInLibrary(t *testing.T) {
 	batch := []*domain.ImportItemWithDetails{f.videoItem(job, 1), f.videoItem(job, 2), f.videoItem(job, 3)}
 	batch[2].Item.Genres = []string{"Science fiction", "Thriller"}
 	batch[2].Item.TopCast = []string{"Leonardo DiCaprio", "Ken Watanabe"}
+	pop, reviews, revenue, budget := 38.5, 12, int64(836848102), int64(160000000)
+	batch[2].Item.Popularity, batch[2].Item.ReviewCount, batch[2].Item.Revenue, batch[2].Item.Budget = &pop, &reviews, &revenue, &budget
 	c := querycount.Attach(t, f.db)
 	require.NoError(t, f.repo.UpsertItems(ctx, batch))
 	c.AssertExactly(t, 1)
@@ -169,6 +171,11 @@ func TestImportJobIntegration_UpsertListAndInLibrary(t *testing.T) {
 	assert.Equal(t, int64(300), *items[2].LikeCount)
 	assert.Equal(t, []string{"Science fiction", "Thriller"}, items[2].Genres)
 	assert.Equal(t, []string{"Leonardo DiCaprio", "Ken Watanabe"}, items[2].TopCast)
+	assert.InDelta(t, 38.5, *items[2].Popularity, 0.001)
+	assert.Equal(t, 12, *items[2].ReviewCount)
+	assert.Equal(t, revenue, *items[2].Revenue)
+	assert.Equal(t, budget, *items[2].Budget)
+	assert.Nil(t, items[0].Revenue)
 	assert.Equal(t, []string{}, items[0].Genres, "no genres reads back as an empty list, not nil")
 	assert.Equal(t, []string{}, items[0].TopCast)
 
@@ -294,3 +301,55 @@ func TestImportJobIntegration_UpdateSourceAndReassign(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func TestImportJobIntegration_RequestsAndReview(t *testing.T) {
+	f := newImportJobFixture(t)
+	ctx := context.Background()
+	request := func() *domain.ImportJob {
+		job, err := f.repo.CreateJob(ctx, &domain.ImportJob{
+			UserID: f.other, Name: "Gaither", RequestStatus: domain.ImportRequestStatusRequested,
+			Sources: []*domain.ImportSource{{SourceType: domain.ImportSourceYouTubeChannel, SourceRef: "@GaitherMusic",
+				DestinationType: domain.ContentTypeYouTubeVideo, Status: domain.ImportSourceStatusWaiting}},
+		})
+		require.NoError(t, err)
+		return job
+	}
+	first, second := request(), request()
+	assert.Equal(t, domain.ImportRequestStatusRequested, first.RequestStatus)
+	assert.Equal(t, domain.ImportSourceStatusWaiting, first.Sources[0].Status)
+	assert.Equal(t, domain.ImportRequestStatusApproved, f.newJob(t).RequestStatus, "an unset status is stored as approved")
+
+	c := querycount.Attach(t, f.db)
+	n, err := f.repo.CountPendingRequests(ctx, f.other)
+	require.NoError(t, err)
+	c.AssertExactly(t, 1)
+	assert.Equal(t, 2, n)
+
+	at := time.Now().UTC().Truncate(time.Second)
+	c.Reset()
+	require.NoError(t, f.repo.ReviewJob(ctx, first.ID, domain.ImportRequestStatusApproved, nil, at))
+	c.AssertExactly(t, 2) // the job, then its waiting sources
+	got, err := f.repo.GetJob(ctx, first.ID)
+	require.NoError(t, err)
+	assert.Equal(t, domain.ImportRequestStatusApproved, got.RequestStatus)
+	require.NotNil(t, got.ReviewedAt)
+	assert.True(t, at.Equal(*got.ReviewedAt))
+	assert.Equal(t, domain.ImportSourceStatusListing, got.Sources[0].Status)
+
+	// A second review of the same request loses: it isn't requested any more.
+	err = f.repo.ReviewJob(ctx, first.ID, domain.ImportRequestStatusDeclined, ptr("late"), at)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+
+	c.Reset()
+	require.NoError(t, f.repo.ReviewJob(ctx, second.ID, domain.ImportRequestStatusDeclined, ptr("Already imported"), at))
+	c.AssertExactly(t, 1) // a decline leaves the sources alone
+	got, err = f.repo.GetJob(ctx, second.ID)
+	require.NoError(t, err)
+	assert.Equal(t, domain.ImportRequestStatusDeclined, got.RequestStatus)
+	assert.Equal(t, "Already imported", *got.ReviewNote)
+	assert.Equal(t, domain.ImportSourceStatusWaiting, got.Sources[0].Status)
+
+	n, err = f.repo.CountPendingRequests(ctx, f.other)
+	require.NoError(t, err)
+	assert.Equal(t, 0, n)
+}

@@ -61,6 +61,39 @@ func (r *mutationResolver) CreateImportJob(ctx context.Context, input model.Crea
 	return importJobToModel(job), nil
 }
 
+// ReviewImportJob is the resolver for the reviewImportJob field.
+func (r *mutationResolver) ReviewImportJob(ctx context.Context, input model.ReviewImportJobInput) (*model.ImportJob, error) {
+	svc, err := r.imports()
+	if err != nil {
+		return nil, err
+	}
+	actor, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	note := ""
+	if input.Note != nil {
+		note = *input.Note
+	}
+	job, err := svc.ReviewImportJob(ctx, actor, int(input.JobID), input.Approve, note)
+	if err != nil {
+		return nil, importError(err)
+	}
+	return importJobToModel(job), nil
+}
+
+// RequestedBy is the resolver for the requestedBy field (users are a cached lookup).
+func (r *importJobResolver) RequestedBy(ctx context.Context, obj *model.ImportJob) (*model.User, error) {
+	u, err := r.userByID(ctx, obj.RequesterUserID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return userDomainToModel(u), nil
+}
+
 // ImportItems is the resolver for the importItems field.
 func (r *mutationResolver) ImportItems(ctx context.Context, input model.ImportItemsInput) (*model.ImportItemsResult, error) {
 	svc, err := r.imports()
@@ -151,4 +184,38 @@ func importError(err error) error {
 	}
 	slog.Error("import operation failed", "error", err)
 	return fmt.Errorf("failed to process import")
+}
+
+// ImportProgress is the resolver for the importProgress subscription. The
+// service's channel already throttles (at most two messages a second) and
+// keeps only the latest snapshot, so this only maps and forwards.
+func (r *subscriptionResolver) ImportProgress(ctx context.Context, jobID string) (<-chan *model.ImportProgress, error) {
+	svc, err := r.imports()
+	if err != nil {
+		return nil, err
+	}
+	actor, ok := auth.ForContext(ctx)
+	if !ok {
+		return nil, domain.ErrForbidden
+	}
+	id, err := strconv.Atoi(jobID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: invalid import id", domain.ErrInvalidInput)
+	}
+	in, err := svc.SubscribeImportProgress(ctx, actor, id)
+	if err != nil {
+		return nil, importError(err)
+	}
+	out := make(chan *model.ImportProgress, 1)
+	go func() {
+		defer close(out)
+		for p := range in {
+			select {
+			case out <- importProgressToModel(p):
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out, nil
 }

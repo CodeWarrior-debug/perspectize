@@ -63,6 +63,8 @@ type ImportFixtureItem struct {
 	RatingSource    *string  `json:"ratingSource"`
 	Genres          []string `json:"genres"`
 	TopCast         []string `json:"topCast"`
+	Revenue         *int64   `json:"revenue"`
+	Budget          *int64   `json:"budget"`
 	People          []struct {
 		Name string `json:"name"`
 		Role string `json:"role"`
@@ -177,6 +179,8 @@ func (s ImportFixtureSource) Rows(fetched time.Time) []*domain.ImportItemWithDet
 			HasCaptions:     it.HasCaptions,
 			Genres:          it.Genres,
 			TopCast:         it.TopCast,
+			Revenue:         it.Revenue,
+			Budget:          it.Budget,
 			ThumbnailURL:    it.Thumbnail,
 			Position:        it.Position,
 			StatsFetchedAt:  fetched,

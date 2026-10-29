@@ -266,6 +266,10 @@ type ImportItem struct {
 	HasCaptions     *bool                    `json:"hasCaptions,omitempty"`
 	Genres          []string                 `json:"genres"`
 	TopCast         []string                 `json:"topCast"`
+	Popularity      *float64                 `json:"popularity,omitempty"`
+	ReviewCount     *int                     `json:"reviewCount,omitempty"`
+	Revenue         *float64                 `json:"revenue,omitempty"`
+	Budget          *float64                 `json:"budget,omitempty"`
 	ThumbnailURL    *string                  `json:"thumbnailUrl,omitempty"`
 	Position        int                      `json:"position"`
 	StatsFetchedAt  string                   `json:"statsFetchedAt"`
@@ -300,17 +304,33 @@ type ImportItemsResult struct {
 }
 
 type ImportJob struct {
-	ID        string          `json:"id"`
-	Name      string          `json:"name"`
-	Sources   []*ImportSource `json:"sources"`
-	CreatedAt string          `json:"createdAt"`
-	UpdatedAt string          `json:"updatedAt"`
-	Items     []*ImportItem   `json:"items"`
+	ID              string                     `json:"id"`
+	Name            string                     `json:"name"`
+	RequestStatus   domain.ImportRequestStatus `json:"requestStatus"`
+	RequestedBy     *User                      `json:"requestedBy,omitempty"`
+	ReviewNote      *string                    `json:"reviewNote,omitempty"`
+	ReviewedAt      *string                    `json:"reviewedAt,omitempty"`
+	Sources         []*ImportSource            `json:"sources"`
+	CreatedAt       string                     `json:"createdAt"`
+	UpdatedAt       string                     `json:"updatedAt"`
+	Items           []*ImportItem              `json:"items"`
+	RequesterUserID int                        `json:"-"`
 }
 
 type ImportPerson struct {
 	Name string `json:"name"`
 	Role string `json:"role"`
+}
+
+type ImportProgress struct {
+	JobID     string `json:"jobId"`
+	Total     int    `json:"total"`
+	Done      int    `json:"done"`
+	Imported  int    `json:"imported"`
+	Skipped   int    `json:"skipped"`
+	Failed    int    `json:"failed"`
+	Running   bool   `json:"running"`
+	UpdatedAt string `json:"updatedAt"`
 }
 
 type ImportSource struct {
@@ -506,6 +526,12 @@ type ReadReceiptChanged struct {
 }
 
 func (ReadReceiptChanged) IsThreadEvent() {}
+
+type ReviewImportJobInput struct {
+	JobID   int     `json:"jobId"`
+	Approve bool    `json:"approve"`
+	Note    *string `json:"note,omitempty"`
+}
 
 type SendMessageInput struct {
 	ThreadID    string `json:"threadId"`

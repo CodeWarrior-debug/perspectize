@@ -967,11 +967,15 @@ func importJobToModel(j *domain.ImportJob) *model.ImportJob {
 		}
 	}
 	return &model.ImportJob{
-		ID:        strconv.Itoa(j.ID),
-		Name:      j.Name,
-		Sources:   sources,
-		CreatedAt: isoTime(j.CreatedAt),
-		UpdatedAt: isoTime(j.UpdatedAt),
+		ID:              strconv.Itoa(j.ID),
+		Name:            j.Name,
+		RequestStatus:   j.RequestStatus,
+		ReviewNote:      j.ReviewNote,
+		ReviewedAt:      isoTimePtr(j.ReviewedAt),
+		Sources:         sources,
+		CreatedAt:       isoTime(j.CreatedAt),
+		UpdatedAt:       isoTime(j.UpdatedAt),
+		RequesterUserID: j.UserID,
 	}
 }
 
@@ -997,6 +1001,10 @@ func importItemToModel(it *domain.ImportItem) *model.ImportItem {
 		HasCaptions:     it.HasCaptions,
 		Genres:          stringsOrEmpty(it.Genres),
 		TopCast:         stringsOrEmpty(it.TopCast),
+		Popularity:      it.Popularity,
+		ReviewCount:     it.ReviewCount,
+		Revenue:         int64ToFloatPtr(it.Revenue),
+		Budget:          int64ToFloatPtr(it.Budget),
 		ThumbnailURL:    it.ThumbnailURL,
 		Position:        it.Position,
 		StatsFetchedAt:  isoTime(it.StatsFetchedAt),
@@ -1051,4 +1059,17 @@ func stringsOrEmpty(s []string) []string {
 		return []string{}
 	}
 	return s
+}
+
+func importProgressToModel(p domain.ImportProgress) *model.ImportProgress {
+	return &model.ImportProgress{
+		JobID:     strconv.Itoa(p.JobID),
+		Total:     p.Total,
+		Done:      p.Done,
+		Imported:  p.Imported,
+		Skipped:   p.Skipped,
+		Failed:    p.Failed,
+		Running:   p.Running,
+		UpdatedAt: isoTime(p.UpdatedAt),
+	}
 }

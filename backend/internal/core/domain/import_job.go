@@ -42,9 +42,21 @@ const (
 type ImportSourceStatus string
 
 const (
+	// ImportSourceStatusWaiting is a source of a request nobody has approved yet: nothing is listed.
+	ImportSourceStatusWaiting ImportSourceStatus = "WAITING"
 	ImportSourceStatusListing ImportSourceStatus = "LISTING"
 	ImportSourceStatusReady   ImportSourceStatus = "READY"
 	ImportSourceStatusFailed  ImportSourceStatus = "FAILED"
+)
+
+// ImportRequestStatus is whether an import may spend API quota. An admin's
+// import is approved when created; anyone else's waits for an admin.
+type ImportRequestStatus string
+
+const (
+	ImportRequestStatusRequested ImportRequestStatus = "REQUESTED"
+	ImportRequestStatusApproved  ImportRequestStatus = "APPROVED"
+	ImportRequestStatusDeclined  ImportRequestStatus = "DECLINED"
 )
 
 // ImportItemKind tells a channel's long-form videos, Shorts and livestreams
@@ -73,17 +85,30 @@ const (
 // MaxImportSourcesPerJob bounds how many sources one import can list at once.
 const MaxImportSourcesPerJob = 10
 
-// MaxImportItemsPerRequest bounds how many rows one importItems call may queue.
-const MaxImportItemsPerRequest = 500
+// MaxImportItemsPerRequest bounds how many rows a non-admin may import in one
+// importItems call ("select up to 1,000 at a time").
+const MaxImportItemsPerRequest = 1000
+
+// MaxAdminImportItemsPerRequest is an admin's bound: a whole channel listing
+// (the YouTube lister stops at 5,000 videos).
+const MaxAdminImportItemsPerRequest = 5000
+
+// MaxPendingImportRequests bounds how many unreviewed requests one person may
+// have open. Resolving a request's sources costs a little API quota, and an
+// admin has to read each one.
+const MaxPendingImportRequests = 3
 
 // ImportJob is a named import: one or more sources whose candidates share one staging sheet.
 type ImportJob struct {
-	ID        int
-	UserID    int // creator
-	Name      string
-	Sources   []*ImportSource
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID            int
+	UserID        int // creator (the requester, for a request)
+	Name          string
+	RequestStatus ImportRequestStatus
+	ReviewNote    *string // the admin's reason, when declined (optional on approve)
+	ReviewedAt    *time.Time
+	Sources       []*ImportSource
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 // ImportSource is one channel or filmography inside an import.
@@ -128,6 +153,10 @@ type ImportItem struct {
 	HasCaptions     *bool
 	Genres          []string // films only
 	TopCast         []string // films only: up to 3 top-billed names
+	Popularity      *float64 // films (TMDB): daily popularity score
+	ReviewCount     *int     // films (TMDB): user reviews
+	Revenue         *int64   // films: box office takings, USD
+	Budget          *int64   // films: production budget, USD
 	ThumbnailURL    *string
 	Position        int
 	StatsFetchedAt  time.Time
@@ -196,4 +225,19 @@ type ImportBatchResult struct {
 	AlreadyQueued int
 	// NotFound ids were not rows of this import.
 	NotFound int
+}
+
+// ImportProgress is a live count of an import's running batch(es), kept in
+// memory while rows import and pushed to subscribers. Done counts every
+// finished row (imported + skipped + failed).
+type ImportProgress struct {
+	JobID    int
+	Total    int
+	Done     int
+	Imported int
+	Skipped  int
+	Failed   int
+	// Running is true while any batch of this import is still importing.
+	Running   bool
+	UpdatedAt time.Time
 }

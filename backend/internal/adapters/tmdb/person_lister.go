@@ -34,7 +34,8 @@ var personURLRe = regexp.MustCompile(`^(?:https?://)?(?:www\.)?themoviedb\.org/p
 
 // PersonLister lists a TMDB person's filmography as import candidates: one
 // call for the credits, then one /movie/{id} call per film for runtime,
-// tagline, genres and top-billed cast (the credits list has none of them).
+// tagline, genres, budget and box office, plus (appended to the same call)
+// the top-billed cast, the user review count and the keywords.
 type PersonLister struct {
 	c   *Client
 	now func() time.Time
@@ -47,11 +48,16 @@ func NewPersonLister(c *Client) *PersonLister {
 	return &PersonLister{c: c, now: time.Now}
 }
 
-// Resolve accepts a TMDB person id or a themoviedb.org/person/… URL.
+// Resolve accepts a TMDB person id, a themoviedb.org/person/… URL, or a name.
+// A name is looked up with /search/person and the most popular match wins;
+// the resolved name goes on the source, so whoever approves it sees who it is.
 func (l *PersonLister) Resolve(ctx context.Context, ref string) (*services.ResolvedImportSource, error) {
 	id, ok := parsePersonRef(ref)
 	if !ok {
-		return nil, fmt.Errorf("%w: not a TMDB person id or URL", domain.ErrInvalidInput)
+		if strings.Contains(ref, "/") {
+			return nil, fmt.Errorf("%w: not a TMDB person id, URL or name", domain.ErrInvalidInput)
+		}
+		return l.searchPerson(ctx, strings.TrimSpace(ref))
 	}
 	body, err := l.c.get(ctx, "/person/"+strconv.Itoa(id), nil)
 	if err != nil {
@@ -64,11 +70,36 @@ func (l *PersonLister) Resolve(ctx context.Context, ref string) (*services.Resol
 	if err := json.Unmarshal(body, &p); err != nil {
 		return nil, fmt.Errorf("%w: failed to parse person", ErrTMDBAPI)
 	}
+	return resolvedPerson(id, p.Name), nil
+}
+
+func resolvedPerson(id int, name string) *services.ResolvedImportSource {
 	return &services.ResolvedImportSource{
 		ID:    strconv.Itoa(id),
-		Title: p.Name,
+		Title: name,
 		URL:   fmt.Sprintf("https://www.themoviedb.org/person/%d", id),
-	}, nil
+	}
+}
+
+// searchPerson resolves a name to TMDB's top match (results come most popular first).
+func (l *PersonLister) searchPerson(ctx context.Context, name string) (*services.ResolvedImportSource, error) {
+	body, err := l.c.get(ctx, "/search/person", url.Values{"query": {name}, "include_adult": {"false"}, "language": {"en-US"}})
+	if err != nil {
+		return nil, err
+	}
+	var res struct {
+		Results []struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(body, &res); err != nil {
+		return nil, fmt.Errorf("%w: failed to parse person search", ErrTMDBAPI)
+	}
+	if len(res.Results) == 0 {
+		return nil, fmt.Errorf("%w: no TMDB person matches %q", domain.ErrNotFound, name)
+	}
+	return resolvedPerson(res.Results[0].ID, res.Results[0].Name), nil
 }
 
 func parsePersonRef(ref string) (int, bool) {
@@ -96,20 +127,34 @@ type personCredit struct {
 
 // movieExtras is the slice of /movie/{id} the credits list lacks.
 type movieExtras struct {
-	Runtime          int    `json:"runtime"`
-	Tagline          string `json:"tagline"`
-	OriginalLanguage string `json:"original_language"`
+	Runtime          int     `json:"runtime"`
+	Tagline          string  `json:"tagline"`
+	OriginalLanguage string  `json:"original_language"`
+	Popularity       float64 `json:"popularity"`
+	Budget           int64   `json:"budget"`
+	Revenue          int64   `json:"revenue"`
 	Genres           []struct {
 		Name string `json:"name"`
 	} `json:"genres"`
-	// Credits comes from append_to_response=credits, in the same request.
+	// Credits, Reviews and Keywords come from append_to_response, in the same request.
 	Credits struct {
 		Cast []struct {
 			Name  string `json:"name"`
 			Order int    `json:"order"`
 		} `json:"cast"`
 	} `json:"credits"`
+	Reviews *struct {
+		TotalResults int `json:"total_results"`
+	} `json:"reviews"`
+	Keywords struct {
+		Keywords []struct {
+			Name string `json:"name"`
+		} `json:"keywords"`
+	} `json:"keywords"`
 }
+
+// movieAppend is everything appended to each /movie/{id} call.
+const movieAppend = "credits,reviews,keywords"
 
 // topCastSize is how many billed names a sheet row shows.
 const topCastSize = 3
@@ -244,7 +289,7 @@ func (l *PersonLister) enrich(ctx context.Context, films []film) []movieExtras {
 				return
 			}
 			defer func() { <-sem }()
-			body, err := l.c.get(ctx, "/movie/"+strconv.Itoa(films[i].credit.ID), url.Values{"language": {"en-US"}, "append_to_response": {"credits"}})
+			body, err := l.c.get(ctx, "/movie/"+strconv.Itoa(films[i].credit.ID), url.Values{"language": {"en-US"}, "append_to_response": {movieAppend}})
 			if err != nil {
 				return
 			}
@@ -296,10 +341,32 @@ func creditToItem(f film, extra movieExtras, position int, summary string, fetch
 	}
 	item.Genres = genres
 	item.TopCast = extra.topCast()
+	// TMDB reports 0 for an unknown budget or box office; that is unknown, not $0.
+	if extra.Popularity > 0 {
+		p := extra.Popularity
+		item.Popularity = &p
+	}
+	if extra.Budget > 0 {
+		b := extra.Budget
+		item.Budget = &b
+	}
+	if extra.Revenue > 0 {
+		r := extra.Revenue
+		item.Revenue = &r
+	}
+	if extra.Reviews != nil {
+		n := extra.Reviews.TotalResults
+		item.ReviewCount = &n
+	}
+	keywords := make([]string, 0, len(extra.Keywords.Keywords))
+	for _, k := range extra.Keywords.Keywords {
+		keywords = append(keywords, k.Name)
+	}
 	return &domain.ImportItemWithDetails{
 		Item: item,
 		Details: domain.ImportItemDetails{
 			Description: c.Overview,
+			Tags:        keywords,
 			Genres:      genres,
 			People:      f.roles,
 			Language:    extra.OriginalLanguage,

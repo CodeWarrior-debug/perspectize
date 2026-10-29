@@ -94,11 +94,19 @@ models:
   ImportItemStatus:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ImportItemStatus
+  ImportRequestStatus:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ImportRequestStatus
   # Import staging: items load only when selected (one query for the whole job).
   ImportJob:
     fields:
       items:
         resolver: true
+      requestedBy:
+        resolver: true
+    extraFields:
+      RequesterUserID:
+        type: int
   UserTodoStatus:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.UserTodoStatus

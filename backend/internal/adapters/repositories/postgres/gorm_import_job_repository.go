@@ -23,6 +23,7 @@ const importJobsUserFK = "import_jobs_user_fk"
 const importItemListColumns = `i.id, i.job_id, i.source_id, i.external_id, i.destination_type, i.canonical_url,
 	i.kind, i.title, i.summary, i.published_at, i.duration_seconds, i.view_count, i.like_count,
 	i.comment_count, i.rating, i.rating_count, i.rating_source, i.chapter_count, i.has_captions, i.genres, i.top_cast,
+	i.popularity, i.review_count, i.revenue, i.budget,
 	i.thumbnail_url, i.position, i.stats_fetched_at, i.import_status, i.import_error, i.content_id,
 	i.imported_at, i.created_at, i.updated_at, c.id AS library_content_id`
 
@@ -32,6 +33,7 @@ const importItemListColumns = `i.id, i.job_id, i.source_id, i.external_id, i.des
 var importItemUpsertColumns = []string{
 	"title", "summary", "published_at", "duration_seconds", "view_count", "like_count",
 	"comment_count", "rating", "rating_count", "rating_source", "chapter_count", "has_captions", "genres", "top_cast",
+	"popularity", "review_count", "revenue", "budget",
 	"thumbnail_url", "position", "details", "stats_fetched_at", "kind", "updated_at",
 }
 
@@ -50,7 +52,7 @@ func NewGormImportJobRepository(db *gorm.DB) *GormImportJobRepository {
 
 // CreateJob inserts the job, then all its sources in one multi-row INSERT.
 func (r *GormImportJobRepository) CreateJob(ctx context.Context, job *domain.ImportJob) (*domain.ImportJob, error) {
-	jm := &ImportJobModel{UserID: job.UserID, Name: job.Name}
+	jm := &ImportJobModel{UserID: job.UserID, Name: job.Name, RequestStatus: importRequestStatusToDB(job.RequestStatus)}
 	if err := r.db.WithContext(ctx).Clauses(clause.Returning{}).Create(jm).Error; err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolation && pgErr.ConstraintName == importJobsUserFK {
@@ -301,6 +303,41 @@ func (r *GormImportJobRepository) FailInterrupted(ctx context.Context, detail st
 		return 0, 0, fmt.Errorf("failed to fail interrupted import items: %w", items.Error)
 	}
 	return int(src.RowsAffected), int(items.RowsAffected), nil
+}
+
+// CountPendingRequests counts the user's imports still waiting for an admin.
+func (r *GormImportJobRepository) CountPendingRequests(ctx context.Context, userID int) (int, error) {
+	var n int64
+	if err := r.db.WithContext(ctx).Model(&ImportJobModel{}).
+		Where("user_id = ? AND request_status = 'requested'", userID).
+		Count(&n).Error; err != nil {
+		return 0, fmt.Errorf("failed to count import requests: %w", err)
+	}
+	return int(n), nil
+}
+
+// ReviewJob approves or declines a request. The UPDATE only matches a job still
+// requested, so two admins reviewing at once can't both win: the loser gets
+// ErrNotFound. Approving also moves the job's waiting sources to listing.
+func (r *GormImportJobRepository) ReviewJob(ctx context.Context, jobID int, status domain.ImportRequestStatus, note *string, at time.Time) error {
+	result := r.db.WithContext(ctx).Model(&ImportJobModel{}).
+		Where("id = ? AND request_status = 'requested'", jobID).
+		Updates(map[string]any{"request_status": importRequestStatusToDB(status), "review_note": note, "reviewed_at": at})
+	if result.Error != nil {
+		return fmt.Errorf("failed to review import job: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("%w: no pending request %d", domain.ErrNotFound, jobID)
+	}
+	if status != domain.ImportRequestStatusApproved {
+		return nil
+	}
+	if err := r.db.WithContext(ctx).Model(&ImportSourceModel{}).
+		Where("job_id = ? AND status = 'waiting'", jobID).
+		Update("status", "listing").Error; err != nil {
+		return fmt.Errorf("failed to start approved import sources: %w", err)
+	}
+	return nil
 }
 
 // ReassignByUser moves job creation credit from one user to another.

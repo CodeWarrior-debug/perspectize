@@ -500,13 +500,24 @@ func userTodoDomainToModel(t *domain.UserTodo) *UserTodoModel {
 // importJobModelToDomain converts a GORM ImportJobModel (without sources) to domain.ImportJob
 func importJobModelToDomain(m *ImportJobModel) *domain.ImportJob {
 	return &domain.ImportJob{
-		ID:        m.ID,
-		UserID:    m.UserID,
-		Name:      m.Name,
-		Sources:   []*domain.ImportSource{},
-		CreatedAt: m.CreatedAt,
-		UpdatedAt: m.UpdatedAt,
+		ID:            m.ID,
+		UserID:        m.UserID,
+		Name:          m.Name,
+		RequestStatus: domain.ImportRequestStatus(strings.ToUpper(m.RequestStatus)),
+		ReviewNote:    m.ReviewNote,
+		ReviewedAt:    m.ReviewedAt,
+		Sources:       []*domain.ImportSource{},
+		CreatedAt:     m.CreatedAt,
+		UpdatedAt:     m.UpdatedAt,
 	}
+}
+
+// importRequestStatusToDB is the stored (lowercase) form; an unset status means approved.
+func importRequestStatusToDB(st domain.ImportRequestStatus) string {
+	if st == "" {
+		st = domain.ImportRequestStatusApproved
+	}
+	return strings.ToLower(string(st))
 }
 
 // importSourceModelToDomain converts a GORM ImportSourceModel to domain.ImportSource
@@ -584,6 +595,10 @@ func importItemModelToDomain(m *ImportItemModel) *domain.ImportItem {
 		HasCaptions:     m.HasCaptions,
 		Genres:          nonNilStrings(m.Genres),
 		TopCast:         nonNilStrings(m.TopCast),
+		Popularity:      m.Popularity,
+		ReviewCount:     m.ReviewCount,
+		Revenue:         m.Revenue,
+		Budget:          m.Budget,
 		ThumbnailURL:    m.ThumbnailURL,
 		Position:        m.Position,
 		StatsFetchedAt:  m.StatsFetchedAt,
@@ -630,6 +645,10 @@ func importItemDomainToModel(in *domain.ImportItemWithDetails) (*ImportItemModel
 		HasCaptions:     it.HasCaptions,
 		Genres:          StringArray(nonNilStrings(it.Genres)),
 		TopCast:         StringArray(nonNilStrings(it.TopCast)),
+		Popularity:      it.Popularity,
+		ReviewCount:     it.ReviewCount,
+		Revenue:         it.Revenue,
+		Budget:          it.Budget,
 		ThumbnailURL:    it.ThumbnailURL,
 		Position:        it.Position,
 		Details:         details,
