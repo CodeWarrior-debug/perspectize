@@ -62,7 +62,8 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 		input.Confidence != nil ||
 		input.Like != nil ||
 		input.Review != nil ||
-		input.Description != nil
+		input.Description != nil ||
+		len(input.Feelings) > 0
 	if !hasContent {
 		return nil, fmt.Errorf("%w: at least one field must be provided", domain.ErrInvalidInput)
 	}

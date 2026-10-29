@@ -183,6 +183,25 @@ func TestPerspectiveCreate_Success(t *testing.T) {
 	assert.Equal(t, domain.PrivacyPublic, result.Privacy)
 }
 
+func TestPerspectiveCreate_FeelingsAlone(t *testing.T) {
+	perspectiveRepo := &mockPerspectiveRepository{
+		createFn: func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
+			p.ID = 1
+			return p, nil
+		},
+	}
+	svc := services.NewPerspectiveService(perspectiveRepo, &mockUserRepoForPerspective{})
+	input := portservices.CreatePerspectiveInput{
+		UserID:   1,
+		Feelings: []domain.FeelingEntry{{Emoji: "🥰", Label: "Love", Intensity: 5000}},
+	}
+
+	result, err := svc.Create(context.Background(), input)
+
+	require.NoError(t, err)
+	assert.Len(t, result.Feelings, 1)
+}
+
 func TestPerspectiveCreate_WithRatings(t *testing.T) {
 	perspectiveRepo := &mockPerspectiveRepository{
 		createFn: func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {

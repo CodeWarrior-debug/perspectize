@@ -42,11 +42,18 @@
 		value = [...value, { emoji, label, intensity: 5000, note: null }];
 	}
 
+	// A newly picked feeling is stored at the neutral 5000, but its stepper must
+	// look unset (grey 5.000, like every other untouched rating) until the user
+	// actually sets an intensity. Feelings that arrive already saved count as set.
+	let touched = $state<string[]>(value.map((f) => f.emoji));
+
 	function removeFeeling(emoji: string) {
 		value = value.filter((f) => f.emoji !== emoji);
+		touched = touched.filter((e) => e !== emoji);
 	}
 
 	function updateIntensity(emoji: string, intensity: number | null) {
+		touched = intensity === null ? touched.filter((e) => e !== emoji) : [...new Set([...touched, emoji])];
 		value = value.map((f) => (f.emoji === emoji ? { ...f, intensity: intensity ?? 5000 } : f));
 	}
 
@@ -164,7 +171,7 @@
 					<RatingInput
 						label="Intensity"
 						name="feeling-{f.emoji}-intensity"
-						bind:value={() => f.intensity, (v) => updateIntensity(f.emoji, v)}
+						bind:value={() => (touched.includes(f.emoji) ? f.intensity : null), (v) => updateIntensity(f.emoji, v)}
 						compact
 						trackWidth={110}
 					/>
