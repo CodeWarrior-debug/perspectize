@@ -1,4 +1,4 @@
-import { TYPES } from './catalog.js';
+import { SAMPLES, TYPES } from './catalog.js';
 const APP_FILE = 'detectContentType.ts';
 const BIBLE_GATEWAY_HOSTS = new Set(['biblegateway.com', 'www.biblegateway.com']);
 const BIBLE_REF = /^([1-3]\s?)?[A-Za-z][A-Za-z .]*?\s+\d+(:\d+)?([-–]\d+(:\d+)?)?$/;
@@ -30,18 +30,59 @@ function parseUrl(input) {
         return null;
     }
 }
-/** The draft's rule, plus any seeded type with a rule other than the one the draft was copied from. */
+/**
+ * The draft's rule, plus any seeded type with a rule other than the one the
+ * draft was copied from. Types sharing one rule (the museum family) appear
+ * once, labelled with every type it can route to.
+ */
 export function detectRules(state) {
     const rules = [];
     const d = state.draft;
     if (d.detect && d.detect.hosts.length && d.detect.path) {
-        rules.push({ enumValue: d.enumValue || 'NEW_TYPE', label: `${d.label || 'New type'} (draft)`, rule: d.detect });
+        const draftLabel = `${d.label || 'New type'} (draft)`;
+        const family = d.detect.routedBy
+            ? TYPES.filter((o) => o.detect && o.id !== state.seed && sameRule(o.detect, d.detect)).map((o) => o.label)
+            : [];
+        rules.push({ enumValue: d.enumValue || 'NEW_TYPE', label: [draftLabel, ...family].join(' / '), rule: d.detect });
     }
     for (const t of TYPES) {
-        if (t.detect && t.id !== state.seed)
+        if (!t.detect || t.id === state.seed)
+            continue;
+        if (t.detect.routedBy && rules.some((r) => sameRule(r.rule, t.detect)))
+            continue;
+        if (t.detect.routedBy) {
+            const family = TYPES.filter((o) => o.detect && sameRule(o.detect, t.detect)).map((o) => o.label);
+            rules.push({ enumValue: t.enumValue, label: family.join(' / '), rule: t.detect });
+        }
+        else {
             rules.push({ enumValue: t.enumValue, label: t.label, rule: t.detect });
+        }
     }
     return rules;
+}
+function sameRule(a, b) {
+    return a.path === b.path && a.hosts.join() === b.hosts.join();
+}
+function textOf(cell) {
+    return cell === undefined ? '' : typeof cell === 'string' ? cell : cell.text;
+}
+/**
+ * Stand-in for the backend's after-fetch routing: the planner has no API, so
+ * it finds the record among the sample rows of the types sharing the rule.
+ */
+function routeAfterFetch(rule, id, state) {
+    for (const t of TYPES) {
+        if (!t.detect || !sameRule(t.detect, rule))
+            continue;
+        const rows = SAMPLES[t.id] ?? [];
+        const hit = rows.some((row) => {
+            const sourceId = textOf(row.identifier).split(' ')[0];
+            return sourceId === `met:${id}` || sourceId === `europeana:/${id}`;
+        });
+        if (hit)
+            return t.id === state.seed ? { enumValue: state.draft.enumValue || t.enumValue, label: state.draft.label || t.label } : { enumValue: t.enumValue, label: t.label };
+    }
+    return null;
 }
 function matchRule(url, rule) {
     const host = url.hostname.toLowerCase();
@@ -80,6 +121,20 @@ export function detect(input, state) {
         for (const r of detectRules(state)) {
             const m = matchRule(url, r.rule);
             steps.push({ rule: `${r.label} link`, source: 'NEW — proposed by this tool', outcome: m.ok ? 'match' : 'no-match', note: m.note });
+            if (m.ok && r.rule.routedBy && m.id) {
+                const routed = routeAfterFetch(r.rule, m.id, state);
+                steps.push({
+                    rule: 'Route after fetch',
+                    source: 'NEW — backend, after fetching the record',
+                    outcome: routed ? 'match' : 'no-match',
+                    note: routed
+                        ? `${routed.label} — by ${r.rule.routedBy.split(';')[0]} (simulated here from the sample rows)`
+                        : `not a sample row; the backend would route by ${r.rule.routedBy}`
+                });
+                if (routed)
+                    return done(routed.enumValue, routed.label, m.id);
+                return done(r.enumValue, `${r.label} (set after fetch)`, m.id);
+            }
             if (m.ok)
                 return done(r.enumValue, r.label.replace(/ \(draft\)$/, ''), m.id);
         }
