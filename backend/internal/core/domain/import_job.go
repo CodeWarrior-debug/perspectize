@@ -106,9 +106,11 @@ type ImportJob struct {
 	RequestStatus ImportRequestStatus
 	ReviewNote    *string // the admin's reason, when declined (optional on approve)
 	ReviewedAt    *time.Time
-	Sources       []*ImportSource
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	// ClosedAt is set when an admin closes the import: hidden from non-admins, read-only.
+	ClosedAt  *time.Time
+	Sources   []*ImportSource
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // ImportSource is one channel or filmography inside an import.
@@ -159,10 +161,12 @@ type ImportItem struct {
 	Budget          *int64   // films: production budget, USD
 	ThumbnailURL    *string
 	Position        int
-	StatsFetchedAt  time.Time
-	ImportStatus    *ImportItemStatus
-	ImportError     *string
-	ImportedAt      *time.Time
+	// Excluded is the shared "don't import" mark: such a row can't be queued.
+	Excluded       bool
+	StatsFetchedAt time.Time
+	ImportStatus   *ImportItemStatus
+	ImportError    *string
+	ImportedAt     *time.Time
 	// ContentID is the content the item became, or the existing content with
 	// the same URL (so already-imported rows link to it even if added by hand).
 	ContentID *int
@@ -225,6 +229,8 @@ type ImportBatchResult struct {
 	AlreadyQueued int
 	// NotFound ids were not rows of this import.
 	NotFound int
+	// Excluded rows are marked "don't import", so they were not queued.
+	Excluded int
 }
 
 // ImportProgress is a live count of an import's running batch(es), kept in

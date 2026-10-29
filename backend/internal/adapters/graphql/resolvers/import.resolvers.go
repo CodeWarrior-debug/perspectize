@@ -82,6 +82,44 @@ func (r *mutationResolver) ReviewImportJob(ctx context.Context, input model.Revi
 	return importJobToModel(job), nil
 }
 
+// SetImportItemsExcluded is the resolver for the setImportItemsExcluded field.
+func (r *mutationResolver) SetImportItemsExcluded(ctx context.Context, input model.SetImportItemsExcludedInput) (int, error) {
+	svc, err := r.imports()
+	if err != nil {
+		return 0, err
+	}
+	actor, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("access denied: authentication required")
+	}
+	ids := make([]int, len(input.ItemIds))
+	for i, id := range input.ItemIds {
+		ids[i] = int(id)
+	}
+	n, err := svc.SetItemsExcluded(ctx, actor, int(input.JobID), ids, input.Excluded)
+	if err != nil {
+		return 0, importError(err)
+	}
+	return n, nil
+}
+
+// CloseImportJob is the resolver for the closeImportJob field.
+func (r *mutationResolver) CloseImportJob(ctx context.Context, input model.CloseImportJobInput) (*model.ImportJob, error) {
+	svc, err := r.imports()
+	if err != nil {
+		return nil, err
+	}
+	actor, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	job, err := svc.CloseImportJob(ctx, actor, int(input.JobID), input.Closed)
+	if err != nil {
+		return nil, importError(err)
+	}
+	return importJobToModel(job), nil
+}
+
 // RequestedBy is the resolver for the requestedBy field (users are a cached lookup).
 func (r *importJobResolver) RequestedBy(ctx context.Context, obj *model.ImportJob) (*model.User, error) {
 	u, err := r.userByID(ctx, obj.RequesterUserID)
@@ -112,17 +150,19 @@ func (r *mutationResolver) ImportItems(ctx context.Context, input model.ImportIt
 		Queued:           res.Queued,
 		AlreadyInLibrary: res.AlreadyInLibrary,
 		AlreadyQueued:    res.AlreadyQueued,
+		Excluded:         res.Excluded,
 		NotFound:         res.NotFound,
 	}, nil
 }
 
 // ImportJobs is the resolver for the importJobs field.
-func (r *queryResolver) ImportJobs(ctx context.Context) ([]*model.ImportJob, error) {
+func (r *queryResolver) ImportJobs(ctx context.Context, includeClosed *bool) ([]*model.ImportJob, error) {
 	svc, err := r.imports()
 	if err != nil {
 		return nil, err
 	}
-	jobs, err := svc.ListImportJobs(ctx)
+	viewer, _ := auth.ForContext(ctx)
+	jobs, err := svc.ListImportJobs(ctx, viewer, includeClosed != nil && *includeClosed)
 	if err != nil {
 		return nil, importError(err)
 	}
@@ -143,7 +183,8 @@ func (r *queryResolver) ImportJob(ctx context.Context, id string) (*model.Import
 	if err != nil {
 		return nil, nil
 	}
-	job, err := svc.GetImportJob(ctx, jobID)
+	viewer, _ := auth.ForContext(ctx)
+	job, err := svc.GetImportJob(ctx, viewer, jobID)
 	if err != nil {
 		return nil, importError(err)
 	}

@@ -54,12 +54,53 @@ func (r *fakeImportRepo) CreateJob(_ context.Context, job *domain.ImportJob) (*d
 	return &cp, nil
 }
 
-func (r *fakeImportRepo) ListJobs(context.Context) ([]*domain.ImportJob, error) {
+func (r *fakeImportRepo) ListJobs(_ context.Context, includeClosed bool) ([]*domain.ImportJob, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	out := []*domain.ImportJob{}
 	for _, j := range r.jobs {
-		out = append(out, j)
+		if j.ClosedAt == nil || includeClosed {
+			out = append(out, j)
+		}
+	}
+	return out, nil
+}
+
+func (r *fakeImportRepo) GetJobState(ctx context.Context, id int) (*domain.ImportJob, error) {
+	j, err := r.GetJob(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	cp := *j
+	cp.Sources = nil
+	return &cp, nil
+}
+
+func (r *fakeImportRepo) SetClosed(_ context.Context, id int, at *time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	j, ok := r.jobs[id]
+	if !ok {
+		return domain.ErrNotFound
+	}
+	j.ClosedAt = at
+	return nil
+}
+
+func (r *fakeImportRepo) SetExcluded(_ context.Context, jobID int, ids []int, excluded bool) ([]int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := []int{}
+	for _, id := range ids {
+		it, ok := r.items[id]
+		if !ok || it.Item.JobID != jobID || it.Item.Excluded == excluded {
+			continue
+		}
+		if st := it.Item.ImportStatus; st != nil && *st != domain.ImportItemStatusFailed {
+			continue
+		}
+		it.Item.Excluded = excluded
+		out = append(out, id)
 	}
 	return out, nil
 }
@@ -196,7 +237,7 @@ func (r *fakeImportRepo) MarkQueued(_ context.Context, jobID int, ids []int) ([]
 	out := []int{}
 	for _, id := range ids {
 		it, ok := r.items[id]
-		if !ok || it.Item.JobID != jobID {
+		if !ok || it.Item.JobID != jobID || it.Item.Excluded {
 			continue
 		}
 		if st := it.Item.ImportStatus; st == nil || *st == domain.ImportItemStatusFailed {
@@ -335,7 +376,7 @@ func TestImportService_CreateImportJob_ListsEverySource(t *testing.T) {
 	assert.Equal(t, domain.ContentTypeMovie, job.Sources[1].DestinationType)
 	assert.Equal(t, &director, tmdb.gotRole)
 
-	stored, err := svc.GetImportJob(context.Background(), job.ID)
+	stored, err := svc.GetImportJob(context.Background(), importUser, job.ID)
 	require.NoError(t, err)
 	assert.Equal(t, domain.ImportSourceStatusReady, stored.Sources[0].Status)
 	assert.Equal(t, 3, stored.Sources[0].ItemCount)
@@ -516,9 +557,8 @@ func TestImportService_ImportItemsValidation(t *testing.T) {
 	assert.Contains(t, err.Error(), "select up to 1,000 rows at a time (you picked 1,001)")
 
 	// An admin's cap is a whole channel listing.
-	res, err := svc.ImportItems(ctx, importAdmin, 1, tooMany)
-	require.NoError(t, err, "1,001 is within an admin's limit")
-	assert.Equal(t, 1001, res.NotFound)
+	_, err = svc.ImportItems(ctx, importAdmin, 1, tooMany)
+	assert.ErrorIs(t, err, domain.ErrNotFound, "1,001 is within an admin's limit, so it gets as far as looking up the import")
 	tooManyForAdmin := make([]int, domain.MaxAdminImportItemsPerRequest+1)
 	for i := range tooManyForAdmin {
 		tooManyForAdmin[i] = i + 1
@@ -618,14 +658,14 @@ func TestImportService_Reads(t *testing.T) {
 	svc, job, ids := stageJob(t, repo, &fakeCreator{})
 	ctx := context.Background()
 
-	jobs, err := svc.ListImportJobs(ctx)
+	jobs, err := svc.ListImportJobs(ctx, importUser, false)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
 
-	got, err := svc.GetImportJob(ctx, 424242)
+	got, err := svc.GetImportJob(ctx, importUser, 424242)
 	require.NoError(t, err)
 	assert.Nil(t, got, "unknown import is (nil, nil)")
-	got, err = svc.GetImportJob(ctx, 0)
+	got, err = svc.GetImportJob(ctx, importUser, 0)
 	require.NoError(t, err)
 	assert.Nil(t, got)
 
@@ -784,7 +824,7 @@ func TestImportService_ReviewImportJob(t *testing.T) {
 		assert.Nil(t, got.ReviewNote)
 		assert.Equal(t, resolvedAtRequest+2, yt.resolves, "each source is resolved again when approved")
 		assert.Equal(t, 2, yt.lists)
-		stored, err := svc.GetImportJob(ctx, job.ID)
+		stored, err := svc.GetImportJob(ctx, importUser, job.ID)
 		require.NoError(t, err)
 		for _, src := range stored.Sources {
 			assert.Equal(t, domain.ImportSourceStatusReady, src.Status)
@@ -805,4 +845,91 @@ func TestImportService_ReviewImportJob(t *testing.T) {
 		assert.Contains(t, *got.Sources[0].StatusDetail, "could not be found")
 		assert.Equal(t, 0, yt.lists)
 	})
+}
+
+func TestImportService_DontImportAndClose(t *testing.T) {
+	ctx := context.Background()
+	repo := newFakeImportRepo()
+	yt := &fakeLister{batches: [][]*domain.ImportItemWithDetails{{
+		candidate("a", domain.ContentTypeYouTubeVideo), candidate("b", domain.ContentTypeYouTubeVideo), candidate("c", domain.ContentTypeYouTubeVideo),
+	}}}
+	creator := &fakeCreator{}
+	svc := newImportService(repo, yt, nil, creator)
+	job, err := svc.CreateImportJob(ctx, importAdmin, domain.CreateImportJobInput{
+		Name: "x", Sources: []domain.CreateImportSourceInput{{SourceType: domain.ImportSourceYouTubeChannel, Ref: "@x"}},
+	})
+	require.NoError(t, err)
+	items, err := svc.ListImportItems(ctx, job.ID)
+	require.NoError(t, err)
+	a, b, c := items[0].ID, items[1].ID, items[2].ID
+
+	_, err = svc.SetItemsExcluded(ctx, nil, job.ID, []int{a}, true)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+
+	// Anyone marks a row "don't import", and anyone can clear it.
+	n, err := svc.SetItemsExcluded(ctx, importUser, job.ID, []int{a, b}, true)
+	require.NoError(t, err)
+	assert.Equal(t, 2, n)
+	other := &domain.AuthenticatedUser{ID: 3, Role: domain.UserRoleDefault}
+	n, err = svc.SetItemsExcluded(ctx, other, job.ID, []int{b}, false)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+	n, err = svc.SetItemsExcluded(ctx, other, job.ID, []int{b}, false)
+	require.NoError(t, err)
+	assert.Equal(t, 0, n, "already unmarked: nothing changes")
+
+	// An excluded row is counted, not imported.
+	res, err := svc.ImportItems(ctx, importUser, job.ID, []int{a, b})
+	require.NoError(t, err)
+	assert.Equal(t, domain.ImportBatchResult{Queued: 1, Excluded: 1}, *res)
+	assert.Len(t, creator.youtube, 1)
+	n, err = svc.SetItemsExcluded(ctx, importUser, job.ID, []int{b}, true)
+	require.NoError(t, err)
+	assert.Equal(t, 0, n, "an imported row can't be marked")
+
+	// Only an admin closes; a closed import is hidden from everyone else and read-only.
+	_, err = svc.CloseImportJob(ctx, importUser, job.ID, true)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+	closed, err := svc.CloseImportJob(ctx, importAdmin, job.ID, true)
+	require.NoError(t, err)
+	require.NotNil(t, closed.ClosedAt)
+
+	got, err := svc.GetImportJob(ctx, importUser, job.ID)
+	require.NoError(t, err)
+	assert.Nil(t, got, "hidden from a non-admin")
+	got, err = svc.GetImportJob(ctx, importAdmin, job.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, got, "an admin still opens it")
+	jobs, err := svc.ListImportJobs(ctx, importUser, true)
+	require.NoError(t, err)
+	assert.Empty(t, jobs, "includeClosed is ignored for a non-admin")
+	jobs, err = svc.ListImportJobs(ctx, importAdmin, false)
+	require.NoError(t, err)
+	assert.Empty(t, jobs)
+	jobs, err = svc.ListImportJobs(ctx, importAdmin, true)
+	require.NoError(t, err)
+	assert.Len(t, jobs, 1)
+
+	_, err = svc.SetItemsExcluded(ctx, importUser, job.ID, []int{c}, true)
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	_, err = svc.ImportItems(ctx, importAdmin, job.ID, []int{c})
+	assert.ErrorIs(t, err, domain.ErrInvalidInput, "a closed import imports nothing, even for an admin")
+
+	reopened, err := svc.CloseImportJob(ctx, importAdmin, job.ID, false)
+	require.NoError(t, err)
+	assert.Nil(t, reopened.ClosedAt)
+	_, err = svc.ImportItems(ctx, importUser, job.ID, []int{c})
+	assert.NoError(t, err)
+}
+
+func TestImportService_ARequestCannotBeImportedFrom(t *testing.T) {
+	svc := newImportService(newFakeImportRepo(), &fakeLister{}, nil, &fakeCreator{})
+	job, err := svc.CreateImportJob(context.Background(), importUser, domain.CreateImportJobInput{
+		Name: "x", Sources: []domain.CreateImportSourceInput{{SourceType: domain.ImportSourceYouTubeChannel, Ref: "@x"}},
+	})
+	require.NoError(t, err)
+	_, err = svc.ImportItems(context.Background(), importUser, job.ID, []int{1})
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	_, err = svc.SetItemsExcluded(context.Background(), importUser, job.ID, []int{1}, true)
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }

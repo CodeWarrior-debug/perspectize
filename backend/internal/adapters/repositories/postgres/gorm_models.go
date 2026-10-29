@@ -227,6 +227,7 @@ type ImportJobModel struct {
 	RequestStatus string     `gorm:"column:request_status;not null"`
 	ReviewNote    *string    `gorm:"column:review_note"`
 	ReviewedAt    *time.Time `gorm:"column:reviewed_at"`
+	ClosedAt      *time.Time `gorm:"column:closed_at"`
 	CreatedAt     time.Time  `gorm:"autoCreateTime"`
 	UpdatedAt     time.Time  `gorm:"autoUpdateTime"`
 }
@@ -286,6 +287,7 @@ type ImportItemModel struct {
 	Budget           *int64          `gorm:"column:budget"`
 	ThumbnailURL     *string         `gorm:"column:thumbnail_url"`
 	Position         int             `gorm:"column:position;not null"`
+	Excluded         bool            `gorm:"column:excluded;not null"`
 	Details          json.RawMessage `gorm:"column:details;type:jsonb"`
 	StatsFetchedAt   time.Time       `gorm:"column:stats_fetched_at;not null"`
 	ImportStatus     *string         `gorm:"column:import_status"`

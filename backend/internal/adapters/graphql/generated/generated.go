@@ -137,6 +137,7 @@ type ComplexityRoot struct {
 		ContentID       func(childComplexity int) int
 		DestinationType func(childComplexity int) int
 		DurationSeconds func(childComplexity int) int
+		Excluded        func(childComplexity int) int
 		ExternalID      func(childComplexity int) int
 		Genres          func(childComplexity int) int
 		HasCaptions     func(childComplexity int) int
@@ -179,11 +180,13 @@ type ComplexityRoot struct {
 	ImportItemsResult struct {
 		AlreadyInLibrary func(childComplexity int) int
 		AlreadyQueued    func(childComplexity int) int
+		Excluded         func(childComplexity int) int
 		NotFound         func(childComplexity int) int
 		Queued           func(childComplexity int) int
 	}
 
 	ImportJob struct {
+		ClosedAt      func(childComplexity int) int
 		CreatedAt     func(childComplexity int) int
 		ID            func(childComplexity int) int
 		Items         func(childComplexity int) int
@@ -326,6 +329,7 @@ type ComplexityRoot struct {
 	Mutation struct {
 		AddThreadParticipants           func(childComplexity int, threadID string, userIds []string) int
 		ClearPassageDisplayTitle        func(childComplexity int, contentID int) int
+		CloseImportJob                  func(childComplexity int, input model.CloseImportJobInput) int
 		CreateClaim                     func(childComplexity int, input model.CreateClaimInput) int
 		CreateContentFromMovie          func(childComplexity int, input model.CreateContentFromMovieInput) int
 		CreateContentFromPassage        func(childComplexity int, input model.CreateContentFromPassageInput) int
@@ -351,6 +355,7 @@ type ComplexityRoot struct {
 		ReorderUserTodoList             func(childComplexity int, listID int, todoIds []int) int
 		ReviewImportJob                 func(childComplexity int, input model.ReviewImportJobInput) int
 		SendMessage                     func(childComplexity int, input model.SendMessageInput) int
+		SetImportItemsExcluded          func(childComplexity int, input model.SetImportItemsExcludedInput) int
 		SetOnboardingDisplayNextSession func(childComplexity int, displayNextSession bool) int
 		SetPassageDisplayTitle          func(childComplexity int, input model.SetPassageDisplayTitleInput) int
 		SetPrimaryCategory              func(childComplexity int, input model.SetPrimaryCategoryInput) int
@@ -450,7 +455,7 @@ type ComplexityRoot struct {
 		FeelingStats       func(childComplexity int, contentID *int, emoji string, label *string) int
 		ImportItemDetails  func(childComplexity int, id string) int
 		ImportJob          func(childComplexity int, id string) int
-		ImportJobs         func(childComplexity int) int
+		ImportJobs         func(childComplexity int, includeClosed *bool) int
 		Me                 func(childComplexity int) int
 		MessageThread      func(childComplexity int, id string) int
 		MessageThreads     func(childComplexity int, first *int, before *string) int
@@ -639,6 +644,8 @@ type MutationResolver interface {
 	ReorderUserTodoList(ctx context.Context, listID int, todoIds []int) ([]*model.UserTodo, error)
 	CreateImportJob(ctx context.Context, input model.CreateImportJobInput) (*model.ImportJob, error)
 	ReviewImportJob(ctx context.Context, input model.ReviewImportJobInput) (*model.ImportJob, error)
+	SetImportItemsExcluded(ctx context.Context, input model.SetImportItemsExcludedInput) (int, error)
+	CloseImportJob(ctx context.Context, input model.CloseImportJobInput) (*model.ImportJob, error)
 	ImportItems(ctx context.Context, input model.ImportItemsInput) (*model.ImportItemsResult, error)
 	CreateMessageThread(ctx context.Context, input model.CreateMessageThreadInput) (*model.MessageThread, error)
 	SendMessage(ctx context.Context, input model.SendMessageInput) (*model.Message, error)
@@ -676,7 +683,7 @@ type QueryResolver interface {
 	UserTodoByID(ctx context.Context, id string) (*model.UserTodo, error)
 	UserTodoLists(ctx context.Context, userID int) ([]*model.UserTodoList, error)
 	TodoActions(ctx context.Context) ([]*model.TodoAction, error)
-	ImportJobs(ctx context.Context) ([]*model.ImportJob, error)
+	ImportJobs(ctx context.Context, includeClosed *bool) ([]*model.ImportJob, error)
 	ImportJob(ctx context.Context, id string) (*model.ImportJob, error)
 	ImportItemDetails(ctx context.Context, id string) (*model.ImportItemDetails, error)
 	MessageThreads(ctx context.Context, first *int, before *string) ([]*model.MessageThread, error)
@@ -1104,6 +1111,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ImportItem.DurationSeconds(childComplexity), true
+	case "ImportItem.excluded":
+		if e.ComplexityRoot.ImportItem.Excluded == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportItem.Excluded(childComplexity), true
 	case "ImportItem.externalId":
 		if e.ComplexityRoot.ImportItem.ExternalID == nil {
 			break
@@ -1322,6 +1335,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ImportItemsResult.AlreadyQueued(childComplexity), true
+	case "ImportItemsResult.excluded":
+		if e.ComplexityRoot.ImportItemsResult.Excluded == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportItemsResult.Excluded(childComplexity), true
 	case "ImportItemsResult.notFound":
 		if e.ComplexityRoot.ImportItemsResult.NotFound == nil {
 			break
@@ -1335,6 +1354,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.ImportItemsResult.Queued(childComplexity), true
 
+	case "ImportJob.closedAt":
+		if e.ComplexityRoot.ImportJob.ClosedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportJob.ClosedAt(childComplexity), true
 	case "ImportJob.createdAt":
 		if e.ComplexityRoot.ImportJob.CreatedAt == nil {
 			break
@@ -1908,6 +1933,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.ClearPassageDisplayTitle(childComplexity, args["contentId"].(int)), true
+	case "Mutation.closeImportJob":
+		if e.ComplexityRoot.Mutation.CloseImportJob == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_closeImportJob_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CloseImportJob(childComplexity, args["input"].(model.CloseImportJobInput)), true
 	case "Mutation.createClaim":
 		if e.ComplexityRoot.Mutation.CreateClaim == nil {
 			break
@@ -2183,6 +2219,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.SendMessage(childComplexity, args["input"].(model.SendMessageInput)), true
+	case "Mutation.setImportItemsExcluded":
+		if e.ComplexityRoot.Mutation.SetImportItemsExcluded == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setImportItemsExcluded_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.SetImportItemsExcluded(childComplexity, args["input"].(model.SetImportItemsExcludedInput)), true
 	case "Mutation.setOnboardingDisplayNextSession":
 		if e.ComplexityRoot.Mutation.SetOnboardingDisplayNextSession == nil {
 			break
@@ -2670,7 +2717,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			break
 		}
 
-		return e.ComplexityRoot.Query.ImportJobs(childComplexity), true
+		args, err := ec.field_Query_importJobs_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ImportJobs(childComplexity, args["includeClosed"].(*bool)), true
 
 	case "Query.me":
 		if e.ComplexityRoot.Query.Me == nil {
@@ -3307,6 +3359,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	ec := newExecutionContext(opCtx, e, make(chan graphql.DeferredResult))
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		ec.unmarshalInputCategorizedRatingInput,
+		ec.unmarshalInputCloseImportJobInput,
 		ec.unmarshalInputContentFilter,
 		ec.unmarshalInputContentSortInput,
 		ec.unmarshalInputCreateClaimInput,
@@ -3326,6 +3379,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputPerspectiveFilter,
 		ec.unmarshalInputReviewImportJobInput,
 		ec.unmarshalInputSendMessageInput,
+		ec.unmarshalInputSetImportItemsExcludedInput,
 		ec.unmarshalInputSetPassageDisplayTitleInput,
 		ec.unmarshalInputSetPrimaryCategoryInput,
 		ec.unmarshalInputUpdatePerspectiveInput,
@@ -4021,6 +4075,8 @@ type ImportJob {
   # The reviewing admin's reason; always set on a decline.
   reviewNote: String
   reviewedAt: String
+  # Set when an admin closed it: hidden from non-admins and read-only.
+  closedAt: String
   sources: [ImportSource!]!
   createdAt: String!
   updatedAt: String!
@@ -4063,6 +4119,8 @@ type ImportItem {
   revenue: Float
   budget: Float
   thumbnailUrl: String
+  # Marked "don't import" (by anyone, until the import is closed): can't be imported.
+  excluded: Boolean!
   # Position in the source listing; 0 is first (newest for channels).
   position: Int!
   statsFetchedAt: String!
@@ -4135,6 +4193,19 @@ input ReviewImportJobInput {
   note: String
 }
 
+input SetImportItemsExcludedInput {
+  jobId: IntID!
+  itemIds: [IntID!]!
+  # true marks the rows "don't import"; false clears the mark.
+  excluded: Boolean!
+}
+
+input CloseImportJobInput {
+  jobId: IntID!
+  # false reopens it.
+  closed: Boolean!
+}
+
 input ImportItemsInput {
   jobId: IntID!
   itemIds: [IntID!]!
@@ -4145,6 +4216,8 @@ type ImportItemsResult {
   alreadyInLibrary: Int!
   alreadyQueued: Int!
   notFound: Int!
+  # Marked "don't import", so not queued.
+  excluded: Int!
 }
 
 type Mutation {
@@ -4203,6 +4276,10 @@ type Mutation {
   createImportJob(input: CreateImportJobInput!): ImportJob! @auth
   # Admin only: approve (start listing) or decline a requested import.
   reviewImportJob(input: ReviewImportJobInput!): ImportJob! @auth
+  # Anyone signed in, until the import is closed. Returns how many rows changed.
+  setImportItemsExcluded(input: SetImportItemsExcludedInput!): Int! @auth
+  # Admin only: close (hide from non-admins, read-only) or reopen an import.
+  closeImportJob(input: CloseImportJobInput!): ImportJob! @auth
   # Queues the picked rows and imports them in the background as the caller.
   importItems(input: ImportItemsInput!): ImportItemsResult! @auth
 }
@@ -4308,7 +4385,8 @@ type Query {
   todoActions: [TodoAction!]! @auth
 
   # Import staging (preliminary pages; not linked from the main nav).
-  importJobs: [ImportJob!]! @auth
+  # Closed imports are included only for an admin passing includeClosed.
+  importJobs(includeClosed: Boolean = false): [ImportJob!]! @auth
   # Null for an import that doesn't exist.
   importJob(id: ID!): ImportJob @auth
   # Null for a row that doesn't exist.
@@ -4807,6 +4885,8 @@ func (ec *executionContext) childFields_ImportItem(ctx context.Context, field gr
 		return ec.fieldContext_ImportItem_budget(ctx, field)
 	case "thumbnailUrl":
 		return ec.fieldContext_ImportItem_thumbnailUrl(ctx, field)
+	case "excluded":
+		return ec.fieldContext_ImportItem_excluded(ctx, field)
 	case "position":
 		return ec.fieldContext_ImportItem_position(ctx, field)
 	case "statsFetchedAt":
@@ -4857,6 +4937,8 @@ func (ec *executionContext) childFields_ImportItemsResult(ctx context.Context, f
 		return ec.fieldContext_ImportItemsResult_alreadyQueued(ctx, field)
 	case "notFound":
 		return ec.fieldContext_ImportItemsResult_notFound(ctx, field)
+	case "excluded":
+		return ec.fieldContext_ImportItemsResult_excluded(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type ImportItemsResult", field.Name)
 }
@@ -4875,6 +4957,8 @@ func (ec *executionContext) childFields_ImportJob(ctx context.Context, field gra
 		return ec.fieldContext_ImportJob_reviewNote(ctx, field)
 	case "reviewedAt":
 		return ec.fieldContext_ImportJob_reviewedAt(ctx, field)
+	case "closedAt":
+		return ec.fieldContext_ImportJob_closedAt(ctx, field)
 	case "sources":
 		return ec.fieldContext_ImportJob_sources(ctx, field)
 	case "createdAt":
@@ -5587,6 +5671,20 @@ func (ec *executionContext) field_Mutation_clearPassageDisplayTitle_args(ctx con
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_closeImportJob_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.CloseImportJobInput, error) {
+			return ec.unmarshalNCloseImportJobInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCloseImportJobInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createClaim_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -5969,6 +6067,20 @@ func (ec *executionContext) field_Mutation_sendMessage_args(ctx context.Context,
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_setImportItemsExcluded_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.SetImportItemsExcludedInput, error) {
+			return ec.unmarshalNSetImportItemsExcludedInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSetImportItemsExcludedInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_setOnboardingDisplayNextSession_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -6286,6 +6398,20 @@ func (ec *executionContext) field_Query_importJob_args(ctx context.Context, rawA
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_importJobs_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "includeClosed",
+		func(ctx context.Context, v any) (*bool, error) {
+			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["includeClosed"] = arg0
 	return args, nil
 }
 
@@ -8700,6 +8826,29 @@ func (ec *executionContext) fieldContext_ImportItem_thumbnailUrl(_ context.Conte
 	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _ImportItem_excluded(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportItem_excluded(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Excluded, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportItem_excluded(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
 func (ec *executionContext) _ImportItem_position(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9164,6 +9313,29 @@ func (ec *executionContext) fieldContext_ImportItemsResult_notFound(_ context.Co
 	return graphql.NewScalarFieldContext("ImportItemsResult", field, false, false, errors.New("field of type Int does not have child fields"))
 }
 
+func (ec *executionContext) _ImportItemsResult_excluded(ctx context.Context, field graphql.CollectedField, obj *model.ImportItemsResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportItemsResult_excluded(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Excluded, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportItemsResult_excluded(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportItemsResult", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
 func (ec *executionContext) _ImportJob_id(ctx context.Context, field graphql.CollectedField, obj *model.ImportJob) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9308,6 +9480,29 @@ func (ec *executionContext) _ImportJob_reviewedAt(ctx context.Context, field gra
 	)
 }
 func (ec *executionContext) fieldContext_ImportJob_reviewedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportJob", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ImportJob_closedAt(ctx context.Context, field graphql.CollectedField, obj *model.ImportJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportJob_closedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ClosedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImportJob_closedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("ImportJob", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
@@ -12801,6 +12996,120 @@ func (ec *executionContext) fieldContext_Mutation_reviewImportJob(ctx context.Co
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_setImportItemsExcluded(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_setImportItemsExcluded(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().SetImportItemsExcluded(ctx, fc.Args["input"].(model.SetImportItemsExcludedInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal int
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_setImportItemsExcluded(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_setImportItemsExcluded_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_closeImportJob(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_closeImportJob(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CloseImportJob(ctx, fc.Args["input"].(model.CloseImportJobInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.ImportJob
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ImportJob) graphql.Marshaler {
+			return ec.marshalNImportJob2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐImportJob(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_closeImportJob(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ImportJob(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_closeImportJob_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_importItems(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -15531,7 +15840,8 @@ func (ec *executionContext) _Query_importJobs(ctx context.Context, field graphql
 			return ec.fieldContext_Query_importJobs(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Query().ImportJobs(ctx)
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ImportJobs(ctx, fc.Args["includeClosed"].(*bool))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
@@ -15554,7 +15864,7 @@ func (ec *executionContext) _Query_importJobs(ctx context.Context, field graphql
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_Query_importJobs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_importJobs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -15563,6 +15873,17 @@ func (ec *executionContext) fieldContext_Query_importJobs(_ context.Context, fie
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_ImportJob(ctx, field)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_importJobs_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -18750,6 +19071,43 @@ func (ec *executionContext) unmarshalInputCategorizedRatingInput(ctx context.Con
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCloseImportJobInput(ctx context.Context, obj any) (model.CloseImportJobInput, error) {
+	var it model.CloseImportJobInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"jobId", "closed"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "jobId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("jobId"))
+			data, err := ec.unmarshalNIntID2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.JobID = data
+		case "closed":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("closed"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Closed = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj any) (model.ContentFilter, error) {
 	var it model.ContentFilter
 	if obj == nil {
@@ -19910,6 +20268,50 @@ func (ec *executionContext) unmarshalInputSendMessageInput(ctx context.Context, 
 				return it, err
 			}
 			it.ClientNonce = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputSetImportItemsExcludedInput(ctx context.Context, obj any) (model.SetImportItemsExcludedInput, error) {
+	var it model.SetImportItemsExcludedInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"jobId", "itemIds", "excluded"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "jobId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("jobId"))
+			data, err := ec.unmarshalNIntID2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.JobID = data
+		case "itemIds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("itemIds"))
+			data, err := ec.unmarshalNIntID2ᚕintᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ItemIds = data
+		case "excluded":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("excluded"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Excluded = data
 		}
 	}
 	return it, nil
@@ -21363,6 +21765,11 @@ func (ec *executionContext) _ImportItem(ctx context.Context, sel ast.SelectionSe
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
+		case "excluded":
+			out.Values[i] = ec._ImportItem_excluded(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "position":
 			out.Values[i] = ec._ImportItem_position(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -21524,6 +21931,11 @@ func (ec *executionContext) _ImportItemsResult(ctx context.Context, sel ast.Sele
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "excluded":
+			out.Values[i] = ec._ImportItemsResult_excluded(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -21617,6 +22029,11 @@ func (ec *executionContext) _ImportJob(ctx context.Context, sel ast.SelectionSet
 			}
 		case "reviewedAt":
 			out.Values[i] = ec._ImportJob_reviewedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "closedAt":
+			out.Values[i] = ec._ImportJob_closedAt(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
@@ -23079,6 +23496,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "reviewImportJob":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_reviewImportJob(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "setImportItemsExcluded":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_setImportItemsExcluded(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "closeImportJob":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_closeImportJob(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -25851,6 +26282,11 @@ func (ec *executionContext) unmarshalNCategorizedRatingInput2ᚖgithubᚗcomᚋC
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCloseImportJobInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCloseImportJobInput(ctx context.Context, v any) (model.CloseImportJobInput, error) {
+	res, err := ec.unmarshalInputCloseImportJobInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNContent2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContentᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Content) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -26747,6 +27183,11 @@ func (ec *executionContext) unmarshalNReviewImportJobInput2githubᚗcomᚋCodeWa
 
 func (ec *executionContext) unmarshalNSendMessageInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSendMessageInput(ctx context.Context, v any) (model.SendMessageInput, error) {
 	res, err := ec.unmarshalInputSendMessageInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNSetImportItemsExcludedInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐSetImportItemsExcludedInput(ctx context.Context, v any) (model.SetImportItemsExcludedInput, error) {
+	res, err := ec.unmarshalInputSetImportItemsExcludedInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 

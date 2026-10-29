@@ -55,7 +55,7 @@ const importJobQuery = `query($id: ID!) {
 }`
 
 const importItemsMutation = `mutation($input: ImportItemsInput!) {
-  importItems(input: $input) { queued alreadyInLibrary alreadyQueued notFound }
+  importItems(input: $input) { queued alreadyInLibrary alreadyQueued notFound excluded }
 }`
 
 type rtImportJob struct {
@@ -227,8 +227,9 @@ func TestImportJobRoundTrips(t *testing.T) {
 	assert.False(t, got.Items[0].InLibrary)
 }
 
-// TestImportItemsRoundTrips pins importItems on the request (read the picked
-// rows, queue them: two statements), then checks the background import.
+// TestImportItemsRoundTrips pins importItems on the request (check the import
+// is open, read the picked rows, queue them: three statements), then checks
+// the background import.
 func TestImportItemsRoundTrips(t *testing.T) {
 	h := newHarness(t)
 	_, adminToken := adminUser(t, h, "imp-ia")
@@ -238,9 +239,9 @@ func TestImportItemsRoundTrips(t *testing.T) {
 	h.warm(token)
 
 	ids := []string{sheet.Items[0].ID, sheet.Items[1].ID, sheet.Items[2].ID}
-	data := h.roundTrips(2, token, importItemsMutation, map[string]any{"input": map[string]any{"jobId": job.ID, "itemIds": ids}})
+	data := h.roundTrips(3, token, importItemsMutation, map[string]any{"input": map[string]any{"jobId": job.ID, "itemIds": ids}})
 	type result struct {
-		Queued, AlreadyInLibrary, AlreadyQueued, NotFound int
+		Queued, AlreadyInLibrary, AlreadyQueued, NotFound, Excluded int
 	}
 	assert.Equal(t, result{Queued: 3}, decode[result](t, data, "importItems"))
 
@@ -257,4 +258,37 @@ func TestImportItemsRoundTrips(t *testing.T) {
 
 	again := decode[result](t, h.gql(token, importItemsMutation, map[string]any{"input": map[string]any{"jobId": job.ID, "itemIds": ids}}), "importItems")
 	assert.Equal(t, result{AlreadyInLibrary: 3}, again)
+}
+
+const setExcludedMutation = `mutation($input: SetImportItemsExcludedInput!) { setImportItemsExcluded(input: $input) }`
+
+const closeImportJobMutation = `mutation($input: CloseImportJobInput!) { closeImportJob(input: $input) { id closedAt } }`
+
+// TestImportExcludeAndCloseRoundTrips pins marking rows "don't import" (check
+// the import is open, update the rows: 2) and closing an import (update it,
+// reload it with its sources: 3), and that a closed import is hidden from a
+// non-admin and refuses marks.
+func TestImportExcludeAndCloseRoundTrips(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "imp-xa")
+	job := createRoundTripImport(t, h, adminToken)
+	_, token := h.user("imp-xu")
+	sheet := decode[rtImportJob](t, h.gql(token, importJobQuery, map[string]any{"id": job.ID}), "importJob")
+	h.warm(token)
+
+	ids := []string{sheet.Items[0].ID, sheet.Items[1].ID}
+	data := h.roundTrips(2, token, setExcludedMutation, map[string]any{"input": map[string]any{"jobId": job.ID, "itemIds": ids, "excluded": true}})
+	assert.Equal(t, 2, decode[int](t, data, "setImportItemsExcluded"))
+
+	h.warm(adminToken)
+	data = h.roundTrips(3, adminToken, closeImportJobMutation, map[string]any{"input": map[string]any{"jobId": job.ID, "closed": true}})
+	type closed struct {
+		ClosedAt *string `json:"closedAt"`
+	}
+	assert.NotNil(t, decode[closed](t, data, "closeImportJob").ClosedAt)
+
+	hidden := h.gql(token, importJobQuery, map[string]any{"id": job.ID})
+	assert.Equal(t, "null", string(hidden["importJob"]), "a closed import is hidden from a non-admin")
+	msg := h.gqlError(token, setExcludedMutation, map[string]any{"input": map[string]any{"jobId": job.ID, "itemIds": ids, "excluded": false}})
+	assert.Contains(t, msg, "closed")
 }

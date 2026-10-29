@@ -594,6 +594,8 @@ type ImportJob {
   # The reviewing admin's reason; always set on a decline.
   reviewNote: String
   reviewedAt: String
+  # Set when an admin closed it: hidden from non-admins and read-only.
+  closedAt: String
   sources: [ImportSource!]!
   createdAt: String!
   updatedAt: String!
@@ -636,6 +638,8 @@ type ImportItem {
   revenue: Float
   budget: Float
   thumbnailUrl: String
+  # Marked "don't import" (by anyone, until the import is closed): can't be imported.
+  excluded: Boolean!
   # Position in the source listing; 0 is first (newest for channels).
   position: Int!
   statsFetchedAt: String!
@@ -708,6 +712,19 @@ input ReviewImportJobInput {
   note: String
 }
 
+input SetImportItemsExcludedInput {
+  jobId: IntID!
+  itemIds: [IntID!]!
+  # true marks the rows "don't import"; false clears the mark.
+  excluded: Boolean!
+}
+
+input CloseImportJobInput {
+  jobId: IntID!
+  # false reopens it.
+  closed: Boolean!
+}
+
 input ImportItemsInput {
   jobId: IntID!
   itemIds: [IntID!]!
@@ -718,6 +735,8 @@ type ImportItemsResult {
   alreadyInLibrary: Int!
   alreadyQueued: Int!
   notFound: Int!
+  # Marked "don't import", so not queued.
+  excluded: Int!
 }
 
 type Mutation {
@@ -776,6 +795,10 @@ type Mutation {
   createImportJob(input: CreateImportJobInput!): ImportJob! @auth
   # Admin only: approve (start listing) or decline a requested import.
   reviewImportJob(input: ReviewImportJobInput!): ImportJob! @auth
+  # Anyone signed in, until the import is closed. Returns how many rows changed.
+  setImportItemsExcluded(input: SetImportItemsExcludedInput!): Int! @auth
+  # Admin only: close (hide from non-admins, read-only) or reopen an import.
+  closeImportJob(input: CloseImportJobInput!): ImportJob! @auth
   # Queues the picked rows and imports them in the background as the caller.
   importItems(input: ImportItemsInput!): ImportItemsResult! @auth
 }
@@ -881,7 +904,8 @@ type Query {
   todoActions: [TodoAction!]! @auth
 
   # Import staging (preliminary pages; not linked from the main nav).
-  importJobs: [ImportJob!]! @auth
+  # Closed imports are included only for an admin passing includeClosed.
+  importJobs(includeClosed: Boolean = false): [ImportJob!]! @auth
   # Null for an import that doesn't exist.
   importJob(id: ID!): ImportJob @auth
   # Null for a row that doesn't exist.

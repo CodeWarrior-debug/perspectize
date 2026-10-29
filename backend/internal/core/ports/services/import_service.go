@@ -12,10 +12,21 @@ import (
 // from it to import as content.
 type ImportService interface {
 	// ListImportJobs returns every import with its sources, newest first.
-	ListImportJobs(ctx context.Context) ([]*domain.ImportJob, error)
+	// Closed imports are included only for an admin who asks for them.
+	ListImportJobs(ctx context.Context, viewer *domain.AuthenticatedUser, includeClosed bool) ([]*domain.ImportJob, error)
 
-	// GetImportJob returns one import with its sources, or (nil, nil) when it doesn't exist.
-	GetImportJob(ctx context.Context, id int) (*domain.ImportJob, error)
+	// GetImportJob returns one import with its sources, or (nil, nil) when it
+	// doesn't exist or is closed and viewer isn't an admin.
+	GetImportJob(ctx context.Context, viewer *domain.AuthenticatedUser, id int) (*domain.ImportJob, error)
+
+	// SetItemsExcluded marks rows "don't import" or clears the mark, for anyone
+	// signed in, while the import is approved and open (domain.ErrInvalidInput
+	// otherwise). Queued or imported rows are unchanged. Returns rows changed.
+	SetItemsExcluded(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, itemIDs []int, excluded bool) (int, error)
+
+	// CloseImportJob closes (hides from non-admins, read-only) or reopens an
+	// import. Admin only (domain.ErrForbidden).
+	CloseImportJob(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, closed bool) (*domain.ImportJob, error)
 
 	// ListImportItems returns every staged row of an import, with library
 	// status resolved, in listing order (1 query). Empty for an unknown import.
@@ -39,8 +50,9 @@ type ImportService interface {
 	ReviewImportJob(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, approve bool, note string) (*domain.ImportJob, error)
 
 	// ImportItems queues the picked rows of an import and imports them in the
-	// background as actor. Rows already in the library, queued or imported are
-	// counted, not queued. At most domain.MaxImportItemsPerRequest ids
+	// background as actor. Rows already in the library, queued, imported or
+	// marked "don't import" are counted, not queued. The import must be
+	// approved and open. At most domain.MaxImportItemsPerRequest ids
 	// (domain.MaxAdminImportItemsPerRequest for an admin).
 	ImportItems(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, itemIDs []int) (*domain.ImportBatchResult, error)
 

@@ -24,7 +24,7 @@ const importItemListColumns = `i.id, i.job_id, i.source_id, i.external_id, i.des
 	i.kind, i.title, i.summary, i.published_at, i.duration_seconds, i.view_count, i.like_count,
 	i.comment_count, i.rating, i.rating_count, i.rating_source, i.chapter_count, i.has_captions, i.genres, i.top_cast,
 	i.popularity, i.review_count, i.revenue, i.budget,
-	i.thumbnail_url, i.position, i.stats_fetched_at, i.import_status, i.import_error, i.content_id,
+	i.thumbnail_url, i.position, i.excluded, i.stats_fetched_at, i.import_status, i.import_error, i.content_id,
 	i.imported_at, i.created_at, i.updated_at, c.id AS library_content_id`
 
 // importItemUpsertColumns are refreshed when a candidate is staged again. The
@@ -79,10 +79,15 @@ func (r *GormImportJobRepository) CreateJob(ctx context.Context, job *domain.Imp
 	return out, nil
 }
 
-// ListJobs returns every job newest first, then loads all their sources in one query.
-func (r *GormImportJobRepository) ListJobs(ctx context.Context) ([]*domain.ImportJob, error) {
+// ListJobs returns every job newest first (closed ones only when asked), then
+// loads all their sources in one query.
+func (r *GormImportJobRepository) ListJobs(ctx context.Context, includeClosed bool) ([]*domain.ImportJob, error) {
 	var models []ImportJobModel
-	if err := r.db.WithContext(ctx).Order("created_at DESC, id DESC").Find(&models).Error; err != nil {
+	q := r.db.WithContext(ctx).Order("created_at DESC, id DESC")
+	if !includeClosed {
+		q = q.Where("closed_at IS NULL")
+	}
+	if err := q.Find(&models).Error; err != nil {
 		return nil, fmt.Errorf("failed to list import jobs: %w", err)
 	}
 	jobs := make([]*domain.ImportJob, len(models))
@@ -111,6 +116,54 @@ func (r *GormImportJobRepository) GetJob(ctx context.Context, id int) (*domain.I
 		return nil, err
 	}
 	return job, nil
+}
+
+// GetJobState returns one job without its sources (1 query), or ErrNotFound:
+// enough to check it is approved and open before writing to its rows.
+func (r *GormImportJobRepository) GetJobState(ctx context.Context, id int) (*domain.ImportJob, error) {
+	var m ImportJobModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).Take(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: import job %d", domain.ErrNotFound, id)
+		}
+		return nil, fmt.Errorf("failed to get import job: %w", err)
+	}
+	return importJobModelToDomain(&m), nil
+}
+
+// SetClosed closes (at) or reopens (nil) a job.
+func (r *GormImportJobRepository) SetClosed(ctx context.Context, id int, at *time.Time) error {
+	result := r.db.WithContext(ctx).Model(&ImportJobModel{}).Where("id = ?", id).Update("closed_at", at)
+	if result.Error != nil {
+		return fmt.Errorf("failed to close import job: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("%w: import job %d", domain.ErrNotFound, id)
+	}
+	return nil
+}
+
+// SetExcluded marks or unmarks rows of a job "don't import" and returns the
+// ids it changed. Rows queued or already imported are left alone.
+func (r *GormImportJobRepository) SetExcluded(ctx context.Context, jobID int, ids []int, excluded bool) ([]int, error) {
+	if len(ids) == 0 {
+		return []int{}, nil
+	}
+	var changed []ImportItemModel
+	result := r.db.WithContext(ctx).
+		Model(&changed).
+		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).
+		Where("job_id = ? AND id = ANY(CAST(? AS bigint[])) AND excluded <> ? AND (import_status IS NULL OR import_status = 'failed')",
+			jobID, intsToArray(ids), excluded).
+		Update("excluded", excluded)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to mark import items: %w", result.Error)
+	}
+	out := make([]int, len(changed))
+	for i := range changed {
+		out[i] = changed[i].ID
+	}
+	return out, nil
 }
 
 // attachSources loads the sources of every job in ids in one query (none for no ids).
@@ -257,7 +310,7 @@ func (r *GormImportJobRepository) MarkQueued(ctx context.Context, jobID int, ids
 	result := r.db.WithContext(ctx).
 		Model(&changed).
 		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).
-		Where("job_id = ? AND id = ANY(CAST(? AS bigint[])) AND (import_status IS NULL OR import_status = 'failed')",
+		Where("job_id = ? AND id = ANY(CAST(? AS bigint[])) AND NOT excluded AND (import_status IS NULL OR import_status = 'failed')",
 			jobID, intsToArray(ids)).
 		Updates(map[string]any{"import_status": "queued", "import_error": nil})
 	if result.Error != nil {

@@ -37,6 +37,11 @@ type Category struct {
 	UpdatedAt    string  `json:"updatedAt"`
 }
 
+type CloseImportJobInput struct {
+	JobID  int  `json:"jobId"`
+	Closed bool `json:"closed"`
+}
+
 type Content struct {
 	ID            string  `json:"id"`
 	Name          string  `json:"name"`
@@ -271,6 +276,7 @@ type ImportItem struct {
 	Revenue         *float64                 `json:"revenue,omitempty"`
 	Budget          *float64                 `json:"budget,omitempty"`
 	ThumbnailURL    *string                  `json:"thumbnailUrl,omitempty"`
+	Excluded        bool                     `json:"excluded"`
 	Position        int                      `json:"position"`
 	StatsFetchedAt  string                   `json:"statsFetchedAt"`
 	InLibrary       bool                     `json:"inLibrary"`
@@ -301,6 +307,7 @@ type ImportItemsResult struct {
 	AlreadyInLibrary int `json:"alreadyInLibrary"`
 	AlreadyQueued    int `json:"alreadyQueued"`
 	NotFound         int `json:"notFound"`
+	Excluded         int `json:"excluded"`
 }
 
 type ImportJob struct {
@@ -310,6 +317,7 @@ type ImportJob struct {
 	RequestedBy     *User                      `json:"requestedBy,omitempty"`
 	ReviewNote      *string                    `json:"reviewNote,omitempty"`
 	ReviewedAt      *string                    `json:"reviewedAt,omitempty"`
+	ClosedAt        *string                    `json:"closedAt,omitempty"`
 	Sources         []*ImportSource            `json:"sources"`
 	CreatedAt       string                     `json:"createdAt"`
 	UpdatedAt       string                     `json:"updatedAt"`
@@ -537,6 +545,12 @@ type SendMessageInput struct {
 	ThreadID    string `json:"threadId"`
 	Body        string `json:"body"`
 	ClientNonce string `json:"clientNonce"`
+}
+
+type SetImportItemsExcludedInput struct {
+	JobID    int   `json:"jobId"`
+	ItemIds  []int `json:"itemIds"`
+	Excluded bool  `json:"excluded"`
 }
 
 type SetPassageDisplayTitleInput struct {

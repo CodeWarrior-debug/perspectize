@@ -13,6 +13,10 @@
 -- listing straight away (it spends YouTube/TMDB quota). Anyone else's is
 -- 'requested', its sources 'waiting', until an admin approves or declines it.
 --
+-- Closing: an admin closes an import when it's done with (closed_at). A closed
+-- import is hidden from non-admins and read-only. Until then anyone can mark a
+-- row "don't import" (excluded) or unmark it; an excluded row can't be queued.
+--
 -- FKs: the creator FK to users blocks (RESTRICT, reassigned on user delete).
 -- Sources and items are children of their job (CASCADE). content_id is an
 -- optional pointer to what an item became (SET NULL).
@@ -27,6 +31,7 @@ CREATE TABLE IF NOT EXISTS public.import_jobs (
     -- The reviewing admin's reason (shown to the requester when declined).
     review_note varchar(500) NULL,
     reviewed_at timestamptz NULL,
+    closed_at timestamptz NULL,
     created_at timestamptz NOT NULL DEFAULT NOW(),
     updated_at timestamptz NOT NULL DEFAULT NOW(),
     CONSTRAINT import_jobs_pk PRIMARY KEY (id),
@@ -96,6 +101,8 @@ CREATE TABLE IF NOT EXISTS public.import_job_items (
     thumbnail_url varchar(500) NULL,
     -- Position in the source listing (0 = first returned, newest for channels).
     position integer NOT NULL DEFAULT 0,
+    -- "Don't import": shared, set and cleared by anyone until the import is closed.
+    excluded boolean NOT NULL DEFAULT false,
     -- Detail-panel data only (description, tags, chapters, people, links): never sent in list rows.
     details jsonb NOT NULL DEFAULT '{}'::jsonb,
     stats_fetched_at timestamptz NOT NULL DEFAULT NOW(),

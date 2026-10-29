@@ -105,13 +105,15 @@ func NewImportService(
 	return s
 }
 
-// ListImportJobs returns every import with its sources.
-func (s *ImportService) ListImportJobs(ctx context.Context) ([]*domain.ImportJob, error) {
-	return s.repo.ListJobs(ctx)
+// ListImportJobs returns every import with its sources. Closed imports are
+// for admins only, and only when asked for.
+func (s *ImportService) ListImportJobs(ctx context.Context, viewer *domain.AuthenticatedUser, includeClosed bool) ([]*domain.ImportJob, error) {
+	return s.repo.ListJobs(ctx, includeClosed && isImportAdmin(viewer))
 }
 
-// GetImportJob returns one import, or (nil, nil) when it doesn't exist.
-func (s *ImportService) GetImportJob(ctx context.Context, id int) (*domain.ImportJob, error) {
+// GetImportJob returns one import, or (nil, nil) when it doesn't exist or is
+// closed and the viewer isn't an admin (a closed import is hidden from them).
+func (s *ImportService) GetImportJob(ctx context.Context, viewer *domain.AuthenticatedUser, id int) (*domain.ImportJob, error) {
 	if id <= 0 {
 		return nil, nil
 	}
@@ -119,7 +121,71 @@ func (s *ImportService) GetImportJob(ctx context.Context, id int) (*domain.Impor
 	if errors.Is(err, domain.ErrNotFound) {
 		return nil, nil
 	}
+	if err == nil && job.ClosedAt != nil && !isImportAdmin(viewer) {
+		return nil, nil
+	}
 	return job, err
+}
+
+func isImportAdmin(u *domain.AuthenticatedUser) bool {
+	return u != nil && u.Role == domain.UserRoleAdmin
+}
+
+// openJob returns the job when its rows may change: it exists, was approved
+// and isn't closed (1 query).
+func (s *ImportService) openJob(ctx context.Context, jobID int) (*domain.ImportJob, error) {
+	job, err := s.repo.GetJobState(ctx, jobID)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case job.ClosedAt != nil:
+		return nil, fmt.Errorf("%w: this import is closed", domain.ErrInvalidInput)
+	case job.RequestStatus != domain.ImportRequestStatusApproved:
+		return nil, fmt.Errorf("%w: this import hasn't been approved", domain.ErrInvalidInput)
+	}
+	return job, nil
+}
+
+// SetItemsExcluded marks rows "don't import" (excluded) or clears the mark.
+// Anyone signed in may do either, until an admin closes the import. Rows
+// queued or imported keep their state. Returns how many rows changed.
+func (s *ImportService) SetItemsExcluded(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, itemIDs []int, excluded bool) (int, error) {
+	if actor == nil {
+		return 0, fmt.Errorf("%w: sign in to mark rows", domain.ErrForbidden)
+	}
+	ids := uniquePositive(itemIDs)
+	if len(ids) == 0 {
+		return 0, fmt.Errorf("%w: pick at least one row", domain.ErrInvalidInput)
+	}
+	if len(ids) > domain.MaxAdminImportItemsPerRequest {
+		return 0, fmt.Errorf("%w: mark up to %s rows at a time", domain.ErrInvalidInput, formatThousands(domain.MaxAdminImportItemsPerRequest))
+	}
+	if _, err := s.openJob(ctx, jobID); err != nil {
+		return 0, err
+	}
+	changed, err := s.repo.SetExcluded(ctx, jobID, ids, excluded)
+	if err != nil {
+		return 0, err
+	}
+	return len(changed), nil
+}
+
+// CloseImportJob closes an import (hidden from non-admins, read-only) or
+// reopens it. Admin only. Rows already importing finish.
+func (s *ImportService) CloseImportJob(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, closed bool) (*domain.ImportJob, error) {
+	if !isImportAdmin(actor) {
+		return nil, fmt.Errorf("%w: only an admin may close or reopen an import", domain.ErrForbidden)
+	}
+	var at *time.Time
+	if closed {
+		t := s.now().UTC()
+		at = &t
+	}
+	if err := s.repo.SetClosed(ctx, jobID, at); err != nil {
+		return nil, err
+	}
+	return s.repo.GetJob(ctx, jobID)
 }
 
 // ListImportItems returns every staged row of an import.
@@ -389,7 +455,7 @@ func listingFailureDetail(err error, staged int) string {
 	return fmt.Sprintf("Listing failed: %s.", reason)
 }
 
-// ImportItems queues the eligible picked rows (2 statements on the request)
+// ImportItems queues the eligible picked rows (3 statements on the request)
 // and imports them in the background.
 func (s *ImportService) ImportItems(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, itemIDs []int) (*domain.ImportBatchResult, error) {
 	if actor == nil {
@@ -408,6 +474,9 @@ func (s *ImportService) ImportItems(ctx context.Context, actor *domain.Authentic
 			domain.ErrInvalidInput, formatThousands(limit), formatThousands(len(ids)))
 	}
 
+	if _, err := s.openJob(ctx, jobID); err != nil {
+		return nil, err
+	}
 	rows, err := s.repo.GetItemsByIDs(ctx, jobID, ids)
 	if err != nil {
 		return nil, err
@@ -421,6 +490,8 @@ func (s *ImportService) ImportItems(ctx context.Context, actor *domain.Authentic
 			result.AlreadyInLibrary++
 		case r.ImportStatus != nil && *r.ImportStatus != domain.ImportItemStatusFailed:
 			result.AlreadyQueued++
+		case r.Excluded:
+			result.Excluded++
 		default:
 			byID[r.ID] = r
 			eligible = append(eligible, r.ID)

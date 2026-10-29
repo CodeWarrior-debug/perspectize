@@ -26,7 +26,19 @@ type ImportJobRepository interface {
 	CreateJob(ctx context.Context, job *domain.ImportJob) (*domain.ImportJob, error)
 
 	// ListJobs returns every job, newest first, with its sources (2 queries).
-	ListJobs(ctx context.Context) ([]*domain.ImportJob, error)
+	// Closed jobs are left out unless includeClosed.
+	ListJobs(ctx context.Context, includeClosed bool) ([]*domain.ImportJob, error)
+
+	// GetJobState returns one job without its sources (1 query), or domain.ErrNotFound.
+	GetJobState(ctx context.Context, id int) (*domain.ImportJob, error)
+
+	// SetClosed closes a job (at) or reopens it (nil) (1 statement); domain.ErrNotFound for an unknown id.
+	SetClosed(ctx context.Context, id int, at *time.Time) error
+
+	// SetExcluded marks (true) or unmarks rows of jobID among ids "don't
+	// import", skipping rows queued or imported and rows already in that
+	// state, and returns the ids it changed (1 statement; 0 for empty ids).
+	SetExcluded(ctx context.Context, jobID int, ids []int, excluded bool) ([]int, error)
 
 	// GetJob returns one job with its sources (2 queries), or domain.ErrNotFound.
 	GetJob(ctx context.Context, id int) (*domain.ImportJob, error)
@@ -52,7 +64,7 @@ type ImportJobRepository interface {
 	GetItemWithDetails(ctx context.Context, itemID int) (*domain.ImportItemWithDetails, error)
 
 	// MarkQueued sets import_status to QUEUED on the rows of jobID among ids
-	// that have never been imported or last failed, and returns the ids it
+	// that aren't excluded and have never been imported or last failed, and returns the ids it
 	// changed (1 statement; 0 for empty ids).
 	MarkQueued(ctx context.Context, jobID int, ids []int) ([]int, error)
 

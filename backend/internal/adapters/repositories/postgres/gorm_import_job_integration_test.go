@@ -112,7 +112,7 @@ func TestImportJobIntegration_CreateGetAndList(t *testing.T) {
 
 	f.newJob(t)
 	c.Reset()
-	jobs, err := f.repo.ListJobs(ctx)
+	jobs, err := f.repo.ListJobs(ctx, true)
 	require.NoError(t, err)
 	c.AssertExactly(t, 2) // jobs + all their sources, whatever the number of jobs
 	mine := 0
@@ -352,4 +352,68 @@ func TestImportJobIntegration_RequestsAndReview(t *testing.T) {
 	n, err = f.repo.CountPendingRequests(ctx, f.other)
 	require.NoError(t, err)
 	assert.Equal(t, 0, n)
+}
+
+func TestImportJobIntegration_CloseAndExclude(t *testing.T) {
+	f := newImportJobFixture(t)
+	ctx := context.Background()
+	job := f.newJob(t)
+	batch := []*domain.ImportItemWithDetails{f.videoItem(job, 1), f.videoItem(job, 2), f.videoItem(job, 3)}
+	require.NoError(t, f.repo.UpsertItems(ctx, batch))
+	items, err := f.repo.ListItems(ctx, job.ID)
+	require.NoError(t, err)
+	ids := []int{items[0].ID, items[1].ID}
+
+	c := querycount.Attach(t, f.db)
+	changed, err := f.repo.SetExcluded(ctx, job.ID, ids, true)
+	require.NoError(t, err)
+	c.AssertExactly(t, 1)
+	assert.ElementsMatch(t, ids, changed)
+	changed, err = f.repo.SetExcluded(ctx, job.ID, ids, true)
+	require.NoError(t, err)
+	assert.Empty(t, changed, "already marked")
+
+	// Re-listing keeps the mark; queueing skips marked rows.
+	require.NoError(t, f.repo.UpsertItems(ctx, []*domain.ImportItemWithDetails{f.videoItem(job, 1)}))
+	items, err = f.repo.ListItems(ctx, job.ID)
+	require.NoError(t, err)
+	assert.True(t, items[0].Excluded, "a re-list never clears \"don't import\"")
+	assert.False(t, items[2].Excluded)
+	queued, err := f.repo.MarkQueued(ctx, job.ID, []int{items[0].ID, items[2].ID})
+	require.NoError(t, err)
+	assert.Equal(t, []int{items[2].ID}, queued)
+	changed, err = f.repo.SetExcluded(ctx, job.ID, []int{items[2].ID}, true)
+	require.NoError(t, err)
+	assert.Empty(t, changed, "a queued row can't be marked")
+
+	c.Reset()
+	state, err := f.repo.GetJobState(ctx, job.ID)
+	require.NoError(t, err)
+	c.AssertExactly(t, 1)
+	assert.Nil(t, state.ClosedAt)
+	assert.Empty(t, state.Sources)
+
+	at := time.Now().UTC().Truncate(time.Second)
+	c.Reset()
+	require.NoError(t, f.repo.SetClosed(ctx, job.ID, &at))
+	c.AssertExactly(t, 1)
+	open, err := f.repo.ListJobs(ctx, false)
+	require.NoError(t, err)
+	for _, j := range open {
+		assert.NotEqual(t, job.ID, j.ID, "a closed job is left out")
+	}
+	all, err := f.repo.ListJobs(ctx, true)
+	require.NoError(t, err)
+	found := false
+	for _, j := range all {
+		if j.ID == job.ID {
+			found = true
+			require.NotNil(t, j.ClosedAt)
+		}
+	}
+	assert.True(t, found)
+	require.NoError(t, f.repo.SetClosed(ctx, job.ID, nil))
+	assert.ErrorIs(t, f.repo.SetClosed(ctx, -1, nil), domain.ErrNotFound)
+	_, err = f.repo.GetJobState(ctx, -1)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
