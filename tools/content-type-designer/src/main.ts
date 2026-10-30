@@ -1,6 +1,7 @@
 import {
   COLUMNS,
   GROUP_LABELS,
+  MUSEUM_TYPES,
   TMDB_TYPES,
   TYPES,
   type Applicability,
@@ -325,7 +326,9 @@ function accentFor(typeId: string): string {
 }
 
 function showDetails(typeId: string, row: SampleRow): void {
+  const img = typeof row.item === 'object' ? row.item.img : undefined;
   openDetails({
+    image: img ? THUMBS[img] ?? img : undefined,
     layout: layoutFor(typeId),
     row,
     typeLabel: typeLabel(typeId, state.draft),
@@ -367,10 +370,11 @@ function headerTip(rc: ResolvedColumn, current: DraftState): TipContent {
   return { title: rc.header || 'Perspectize', body: [rc.tooltip], meta };
 }
 
-/** Tiny media tile in the Item cell: poster (2:3), still/thumb (16:9) or nothing. */
+/** Tiny media tile in the Item cell: poster (2:3), still/thumb (16:9), the artwork itself (contain) or nothing. */
 function miniMedia(typeId: string, row: SampleRow): HTMLElement | null {
   const kind = layoutFor(typeId).media;
   if (kind === 'none' || kind === 'icon') return null;
+  if (kind === 'artwork') return thumbBox(typeId, row.item, 'cell', true);
   const tile = el('span', { class: `media mini media-${kind}` });
   tile.style.setProperty('--type-accent', accentFor(typeId));
   const url = cellText(row.tmdbUrl ?? row.url);
@@ -461,8 +465,9 @@ function renderSolo(): HTMLElement {
   const tabs = el('div', { class: 'solo-tabs' });
   const groups: [string, string[]][] = [
     ['TMDB', TMDB_TYPES],
+    ['Museum', MUSEUM_TYPES],
     ['Draft', [state.draft.id]],
-    ['Other types', TYPES.map((t) => t.id).filter((id) => !TMDB_TYPES.includes(id as TypeId))]
+    ['Other types', TYPES.map((t) => t.id).filter((id) => !TMDB_TYPES.includes(id as TypeId) && !MUSEUM_TYPES.includes(id as TypeId))]
   ];
   for (const [name, ids] of groups) {
     const group = el('div', { class: 'tab-group' }, [el('span', { class: 'tab-group-label' }, [name])]);
@@ -607,6 +612,13 @@ function renderPreview(): HTMLElement {
     save();
     render();
   });
+  const museum = el('button', { type: 'button' }, ['Select the museum family']);
+  museum.addEventListener('click', () => {
+    state.selected = [...MUSEUM_TYPES];
+    state.sort = [];
+    save();
+    render();
+  });
   const mixed = el('button', { type: 'button' }, ['TMDB + YouTube + Bible']);
   mixed.addEventListener('click', () => {
     state.selected = [...TMDB_TYPES, 'youtube', 'bible'];
@@ -646,7 +658,7 @@ function renderPreview(): HTMLElement {
     'Select the types a user might have in view at once and check the header row still reads as one table.',
     [
       picks,
-      el('div', { class: 'row' }, [family, mixed]),
+      el('div', { class: 'row' }, [family, museum, mixed]),
       field(
         'Default-visibility rule',
         select<VisibilityRule>(state.rule, ['any', 'majority', 'all'], (v) => (state.rule = v), {
@@ -838,6 +850,10 @@ const ICONS: Record<string, string> = {
   'play-badge': '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="7 4 20 12 7 20"/></svg>',
   'book-cross': '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M12 8v6M9.5 10.5h5"/></svg>',
   palette: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-1.9-.5-1.2.3-2.3 1.6-2.3H17a4 4 0 0 0 4-4c0-5.2-4-9.8-9-9.8z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10" cy="7" r="1.2" fill="currentColor"/><circle cx="15" cy="7.5" r="1.2" fill="currentColor"/></svg>',
+  statue: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="5" r="2.2"/><path d="M9.5 21V11.5a2.5 2.5 0 0 1 5 0V21M7 21h10M8.5 13.5 6.5 10M15.5 13.5l2-3.5"/></svg>',
+  pencil: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20l1.2-4.5L16 4.7a2 2 0 0 1 2.8 0l.5.5a2 2 0 0 1 0 2.8L8.5 18.8z"/><path d="M14 6.5l3.5 3.5"/></svg>',
+  print: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
+  camera: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
   default: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>'
 };
 

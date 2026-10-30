@@ -134,13 +134,13 @@ change.
 
 ## Seeded types
 
-Seventeen deliberately dissimilar types ship as seed data, so the catalog is not
+Twenty-one deliberately dissimilar types ship as seed data, so the catalog is not
 quietly YouTube-shaped:
 
 YouTube video · Movie · Book · Blog article · Podcast episode · Music track ·
 Propositional truth claim · Joke · Purchase · Another person's perspective ·
 Place visit · Research paper · Bible passage · TV show · TV season · TV episode ·
-Painting
+Painting · Sculpture · Drawing · Print · Photograph
 
 They differ on every axis that matters: API-enriched vs scraped vs manual vs
 internal-reference; URL-identified vs ISBN/DOI/GUID-identified vs text-hash
@@ -148,7 +148,29 @@ identified; with and without duration, audience counts, money, and stance.
 
 A fresh open (or **Reset form**) lands on the Painting seed, the type
 currently being designed (see
-`docs/superpowers/specs/2026-09-26-painting-content-type-design.md`). The
+`docs/superpowers/specs/2026-09-26-painting-content-type-design.md`). It is
+filled to the Movie seed's depth from two real catalogues: five Met records
+and five Europeana records (Rijksmuseum, Mauritshuis, Finnish National
+Gallery, MNAC). Each binding names its path per source ("Met … | Europeana …"),
+and the Europeana rows were picked for their metadata problems: an artist
+name in "Surname, Given" form, a URL-encoded date, unlabelled dimensions, a
+Catalan-only medium, a CC BY-NC image and a record with no Wikidata QID. The
+Reuse rights column exists for this type: on Europeana, the rights statement
+decides which image Perspectize may show.
+
+Painting is one of five independent **museum types**: Painting, Sculpture,
+Drawing, Print and Photograph, grouped under "Museum" in the single-type view
+(`MUSEUM_TYPES`). They share sources, the rights column and a details layout
+(`museumLayout` in `src/details.ts`). A Met or Europeana URL doesn't say which
+type it is, so the five share one link rule (`MUSEUM_DETECT`). The Add Content
+tester simulates the backend's after-fetch routing (`routedBy`) by looking the
+id up in the sample rows. Each new type has 3 Met and 2 Europeana sample rows,
+generated from the API JSON. Its bindings come from the `ART` table in
+`src/catalog.ts`, which says what Medium, Artist and Date mean for that type.
+Prints and photographs are multiples: the row is the impression, and the
+Wikidata QID names the work, so it groups rows and never merges them.
+
+The
 Bible passage seed's bindings mirror `feature/bible-outbound-links`,
 where every passage field is a real `content` column (`name`,
 `display_title`, `verse_start_id`/`verse_end_id`) or a `bible_book` join. Fields
@@ -181,7 +203,7 @@ Two deterministic documents, copyable or downloadable:
 
 | File | Purpose |
 |---|---|
-| `src/catalog.ts` | The 17 seeded type profiles, the generic column catalog with per-type bindings (tooltip, cell popover, appearance), and sample rows |
+| `src/catalog.ts` | The 21 seeded type profiles, the generic column catalog with per-type bindings (tooltip, cell popover, appearance), and sample rows |
 | `src/details.ts` | Details-view layouts per type, with a generic fallback |
 | `src/model.ts` | State shape, visibility resolution (incl. what-if overrides), row fill states, gap analysis |
 | `src/emit.ts` | Deterministic markdown generation (spec, matrix, single-type views) |

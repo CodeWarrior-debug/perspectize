@@ -1,4 +1,4 @@
-import { TYPES, type DetectRule } from './catalog.js';
+import { SAMPLES, TYPES, type DetectRule, type SampleCell, type TypeId } from './catalog.js';
 import type { DraftState } from './model.js';
 
 /**
@@ -64,17 +64,57 @@ interface NamedRule {
   rule: DetectRule;
 }
 
-/** The draft's rule, plus any seeded type with a rule other than the one the draft was copied from. */
+/**
+ * The draft's rule, plus any seeded type with a rule other than the one the
+ * draft was copied from. Types sharing one rule (the museum family) appear
+ * once, labelled with every type it can route to.
+ */
 export function detectRules(state: DraftState): NamedRule[] {
   const rules: NamedRule[] = [];
   const d = state.draft;
   if (d.detect && d.detect.hosts.length && d.detect.path) {
-    rules.push({ enumValue: d.enumValue || 'NEW_TYPE', label: `${d.label || 'New type'} (draft)`, rule: d.detect });
+    const draftLabel = `${d.label || 'New type'} (draft)`;
+    const family = d.detect.routedBy
+      ? TYPES.filter((o) => o.detect && o.id !== state.seed && sameRule(o.detect, d.detect!)).map((o) => o.label)
+      : [];
+    rules.push({ enumValue: d.enumValue || 'NEW_TYPE', label: [draftLabel, ...family].join(' / '), rule: d.detect });
   }
   for (const t of TYPES) {
-    if (t.detect && t.id !== state.seed) rules.push({ enumValue: t.enumValue, label: t.label, rule: t.detect });
+    if (!t.detect || t.id === state.seed) continue;
+    if (t.detect.routedBy && rules.some((r) => sameRule(r.rule, t.detect!))) continue;
+    if (t.detect.routedBy) {
+      const family = TYPES.filter((o) => o.detect && sameRule(o.detect, t.detect!)).map((o) => o.label);
+      rules.push({ enumValue: t.enumValue, label: family.join(' / '), rule: t.detect });
+    } else {
+      rules.push({ enumValue: t.enumValue, label: t.label, rule: t.detect });
+    }
   }
   return rules;
+}
+
+function sameRule(a: DetectRule, b: DetectRule): boolean {
+  return a.path === b.path && a.hosts.join() === b.hosts.join();
+}
+
+function textOf(cell: SampleCell | undefined): string {
+  return cell === undefined ? '' : typeof cell === 'string' ? cell : cell.text;
+}
+
+/**
+ * Stand-in for the backend's after-fetch routing: the planner has no API, so
+ * it finds the record among the sample rows of the types sharing the rule.
+ */
+function routeAfterFetch(rule: DetectRule, id: string, state: DraftState): { enumValue: string; label: string } | null {
+  for (const t of TYPES) {
+    if (!t.detect || !sameRule(t.detect, rule)) continue;
+    const rows = SAMPLES[t.id as TypeId] ?? [];
+    const hit = rows.some((row) => {
+      const sourceId = textOf(row.identifier).split(' ')[0];
+      return sourceId === `met:${id}` || sourceId === `europeana:/${id}`;
+    });
+    if (hit) return t.id === state.seed ? { enumValue: state.draft.enumValue || t.enumValue, label: state.draft.label || t.label } : { enumValue: t.enumValue, label: t.label };
+  }
+  return null;
 }
 
 function matchRule(url: URL, rule: DetectRule): { ok: boolean; id?: string; note: string } {
@@ -114,6 +154,19 @@ export function detect(input: string, state: DraftState): DetectResult {
     for (const r of detectRules(state)) {
       const m = matchRule(url, r.rule);
       steps.push({ rule: `${r.label} link`, source: 'NEW — proposed by this tool', outcome: m.ok ? 'match' : 'no-match', note: m.note });
+      if (m.ok && r.rule.routedBy && m.id) {
+        const routed = routeAfterFetch(r.rule, m.id, state);
+        steps.push({
+          rule: 'Route after fetch',
+          source: 'NEW — backend, after fetching the record',
+          outcome: routed ? 'match' : 'no-match',
+          note: routed
+            ? `${routed.label} — by ${r.rule.routedBy.split(';')[0]} (simulated here from the sample rows)`
+            : `not a sample row; the backend would route by ${r.rule.routedBy}`
+        });
+        if (routed) return done(routed.enumValue, routed.label, m.id);
+        return done(r.enumValue, `${r.label} (set after fetch)`, m.id);
+      }
       if (m.ok) return done(r.enumValue, r.label.replace(/ \(draft\)$/, ''), m.id);
     }
     steps.push({ rule: 'Any other link', source: APP_FILE, outcome: 'match', note: 'never guessed — the user must pick a type' });

@@ -35,7 +35,8 @@ export interface DetailSection {
 export interface DetailsLayout {
   /** The uppercase label in the header band. */
   heading: string;
-  media: 'poster' | 'still' | 'thumb' | 'icon' | 'none';
+  /** artwork = the image at its own aspect ratio (object-fit: contain), never cropped. */
+  media: 'poster' | 'still' | 'thumb' | 'artwork' | 'icon' | 'none';
   /** Keys joined with " › " above the title (show › season). */
   breadcrumb?: string[];
   /** Detail key rendered in italics under the title. */
@@ -52,6 +53,8 @@ export interface DetailsLayout {
   prevNext?: [string, string];
   actions: string[];
   attribution?: string;
+  /** Badge text beside the attribution; defaults to "TMDB". */
+  attributionMark?: string;
   /** Planner-only notes: why the layout is the way it is. */
   notes?: string[];
 }
@@ -71,6 +74,71 @@ const AVG_RATING: DetailTile = {
 const DATE_ADDED: DetailTile = { col: 'createdAt' };
 const TMDB_ATTRIBUTION = 'This product uses the TMDB API but is not endorsed or certified by TMDB.';
 const SOURCE_ACTIONS = ['Compare', 'Update source data'];
+
+/**
+ * The museum family's shared layout: Painting, Sculpture, Drawing, Print and
+ * Photograph read the same sources, so they share tiles and sections; each type
+ * adds what is specific to it.
+ */
+function museumLayout(
+  heading: string,
+  extra: { tilesAfterDate?: DetailTile[]; sections?: DetailSection[]; notes?: string[] } = {}
+): DetailsLayout {
+  return {
+    heading,
+    media: 'artwork',
+    tagline: 'originalTitle',
+    subtitle: ['creator', 'date', 'genre'],
+    link: 'url',
+    links: [{ label: 'Wikidata', key: 'wikidata', prefix: 'https://www.wikidata.org/wiki/' }],
+    tiles: [
+      PERSPECTIVES,
+      AVG_RATING,
+      { col: 'creator' },
+      { col: 'date' },
+      ...(extra.tilesAfterDate ?? []),
+      { col: 'genre' },
+      {
+        key: 'detail:Dimensions',
+        label: 'Dimensions',
+        tooltip: 'Size as the museum records it — free text in the source language; never parsed into numbers.',
+        source: "Met response->>'dimensions' | Europeana dctermsExtent or dcFormat"
+      },
+      { col: 'venue' },
+      { col: 'rights' },
+      { key: 'detail:Inventory no.', label: 'Inventory no.', tooltip: "The museum's own number for the object — the key used to find its Wikidata QID.", source: 'Met accessionNumber | Europeana dcIdentifier' },
+      { col: 'releaseStatus' },
+      { col: 'audience', label: 'Wikipedia views' },
+      DATE_ADDED
+    ],
+    sections: [
+      { label: 'About', col: 'description', kind: 'text' },
+      { label: 'Subjects', col: 'tags', kind: 'chips' },
+      ...(extra.sections ?? []),
+      { label: 'Artist', key: 'detail:Artist bio', kind: 'text', source: 'Met artistDisplayBio | Europeana agents[creator].begin–end' },
+      { label: 'Credit line', key: 'detail:Credit line', kind: 'text', source: 'Met creditLine | Europeana: none reliable' },
+      {
+        label: 'Image rights',
+        key: 'detail:Image rights',
+        kind: 'text',
+        tooltip: 'Decides which image Perspectize shows: open → full size; restricted or permission → the Europeana preview and a link out.',
+        source: 'Met isPublicDomain | Europeana edmRights'
+      },
+      { label: 'Provided via', key: 'detail:Provided via', kind: 'text', tooltip: 'The Europeana aggregator that delivered the record. Met rows have none.', source: 'Europeana aggregation edmProvider' }
+    ],
+    actions: SOURCE_ACTIONS,
+    attributionMark: 'Sources',
+    attribution:
+      'Met rows: The Metropolitan Museum of Art Open Access (CC0). Europeana rows: data via Europeana (CC0 metadata); each image carries its own rights statement and credits its museum.',
+    notes: [
+      'The image keeps its own aspect ratio on a neutral mat (object-fit: contain) — never cropped.',
+      'Tagline = the original-language title when it differs from the one shown ("Het melkmeisje"); Met rows have none.',
+      'One layout for both sources. Tiles a source cannot fill render "—" (On view for Europeana); empty sections are hidden.',
+      ...(extra.notes ?? []),
+      'Europeana asks for attribution of the providing museum next to the image; the attribution footer is the minimum, the image caption should name the museum too.'
+    ]
+  };
+}
 
 export const DETAILS: Partial<Record<TypeId, DetailsLayout>> = {
   youtube: {
@@ -246,7 +314,39 @@ export const DETAILS: Partial<Record<TypeId, DetailsLayout>> = {
       'Prev / next walk the season in order and cross into the next season at a finale.',
       'Breadcrumb opens the season and show rows, which always exist: adding an episode force-adds both.'
     ]
-  }
+  },
+  painting: museumLayout('Painting', {
+    notes: ['Rights is a tile, not small print: for Europeana it changes what the hero image is allowed to be.']
+  }),
+  sculpture: museumLayout('Sculpture', {
+    tilesAfterDate: [
+      { key: 'detail:Culture', label: 'Culture', tooltip: 'Met culture and period — the maker\'s stand-in for anonymous ancient works.', source: "Met response->>'culture' + response->>'period'" }
+    ],
+    notes: [
+      'One photograph of a 3D object: link the Met additionalImages ("More views") under the hero rather than a carousel in the modal.',
+      'Casts: when the QID names several collections, add an "Other casts" list like Print\'s "Other impressions".'
+    ]
+  }),
+  drawing: museumLayout('Drawing', {
+    notes: ['Recto/verso: the hero is the recto; Met titles name both sides ("… (recto); Slight Doodles (verso)") — keep the full title in the popover, clamp it in the hero.']
+  }),
+  print: museumLayout('Print', {
+    tilesAfterDate: [{ key: 'detail:Series', label: 'Series', tooltip: 'The series or portfolio the print belongs to, when the source names one.', source: "Met portfolio / title | Europeana dctermsIsPartOf" }],
+    sections: [
+      {
+        label: 'Other impressions',
+        key: 'detail:Other impressions',
+        kind: 'list',
+        tooltip: 'Rows sharing this work\'s QID. ✓ = in Perspectize (opens its details); others come from Wikidata P195 and offer "+ Add" when the holding museum is a supported source.',
+        source: 'rows with the same workQid; Wikidata P195 of the work'
+      }
+    ],
+    notes: ['Each impression is its own row with its own perspectives; the work ties them together. Never merge impressions — condition, state and colour differ.']
+  }),
+  photograph: museumLayout('Photograph', {
+    sections: [{ label: 'Other prints', key: 'detail:Other prints', kind: 'list', tooltip: 'Rows sharing this work\'s QID, as for Print.', source: 'rows with the same workQid' }],
+    notes: ['Many photographs after ~1925 are in copyright with no image at either source: the hero falls back to the type icon and the source link does the work.']
+  })
 };
 
 /** Layout for a type, falling back to one built from its default-visible bindings. */
