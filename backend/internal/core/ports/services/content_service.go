@@ -25,12 +25,47 @@ type CreatePassageInput struct {
 }
 
 // ContentService defines the contract for content business logic
+// CreateAudioTrackInput is one add-track request (ADR 0005).
+type CreateAudioTrackInput struct {
+	URL             string
+	Title           string // required for Spotify/Apple/Amazon (no lookup is made); ignored for YouTube Music
+	Artist          string
+	GenreID         *int
+	SameAsContentID *int // the user confirmed "same song": attach the link to this track
+	CreateNew       bool // the user said "different song": skip the same-song check
+	UserID          int
+}
+
+// CreateAudioTrackResult: Content is nil exactly when Candidates is non-empty.
+type CreateAudioTrackResult struct {
+	Content        *domain.Content
+	AlreadyExisted bool
+	Candidates     []*domain.Content
+}
+
 type ContentService interface {
 	// CreateFromYouTube creates content from a YouTube URL, attributed to the given user
 	CreateFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error)
 	// CreateFromMovie creates MOVIE content from a TMDB or IMDb movie URL (or bare IMDb id), attributed to the given user.
 	// If the movie already exists, returns the existing content along with ErrAlreadyExists.
 	CreateFromMovie(ctx context.Context, rawURL string, userID int) (*domain.Content, error)
+
+	// AUDIO_TRACK (ADRs 0001, 0005, 0006).
+	CreateAudioTrack(ctx context.Context, in CreateAudioTrackInput) (*CreateAudioTrackResult, error)
+	MusicGenres(ctx context.Context) ([]domain.MusicGenre, error)
+	SetTrackGenre(ctx context.Context, contentID, genreID, userID int) (*domain.Content, error)
+	TrackLinksByContentIDs(ctx context.Context, ids []int) (map[int][]domain.TrackLink, error)
+	MarkTrackLinkUnavailable(ctx context.Context, linkID int) (*domain.TrackLink, error)
+
+	// PromoteRelatedMedia makes a related video its own YOUTUBE row (or finds it) and links both ways.
+	PromoteRelatedMedia(ctx context.Context, contentID int, videoID string, userID int) (*domain.Content, error)
+
+	// MarkRelatedMediaUnavailable records that a related video failed to play.
+	MarkRelatedMediaUnavailable(ctx context.Context, contentID int, videoID string) error
+
+	// CheckLyrics refreshes and stores lyrics availability (never lyrics text). Without force,
+	// a stored result is reused until it is due for a re-check.
+	CheckLyrics(ctx context.Context, contentID int, force bool) (*domain.LyricsAvailability, error)
 
 	// CreateFromPassage finds or creates the BIBLE_PASSAGE content row for a verse range.
 	// If the range already exists, returns the existing content along with ErrAlreadyExists.

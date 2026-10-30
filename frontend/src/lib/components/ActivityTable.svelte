@@ -61,6 +61,8 @@
 		truncateDescription,
 		contentRowId,
 		headerMinWidth,
+		channelValueGetter,
+		listenCellRenderer,
 		castCellRenderer,
 		genreValueGetter,
 		ratedValueGetter,
@@ -90,6 +92,7 @@
 		unknownLastComparator,
 		releasedComparator,
 		itemColumnHeader,
+		channelColumnHeader,
 		ratedComparator,
 		CLIENT_ONLY_SORT_COLS,
 		sortableColumnsFor,
@@ -687,6 +690,14 @@
 			// + cast 125 + duration 111 + released 105 + box office 138 + vs. budget 118
 			// + TMDB score 121 + tags 90 = 1207. Box office keeps room for its sort arrow.
 			{
+				colId: 'listen',
+				headerName: 'Listen',
+				cellRenderer: listenCellRenderer,
+				sortable: false,
+				hide: true,
+				minWidth: 90,
+			},
+			{
 				colId: 'genre',
 				headerName: 'Genre',
 				flex: 1,
@@ -872,7 +883,7 @@
 			},
 			{
 				colId: 'channel',
-				field: 'channelTitle',
+				valueGetter: channelValueGetter,
 				headerName: 'Channel',
 				flex: 1.2,
 				maxWidth: 200,
@@ -1244,6 +1255,13 @@
 		const headerName = itemColumnHeader(filters.type);
 		if (!gridApi || !gridReady) return;
 		syncItemHeader(gridApi, headerName);
+	});
+
+	// The Channel column reads "Artist" in the Audio track view (it carries the artist there).
+	$effect(() => {
+		const headerName = channelColumnHeader(filters.type);
+		if (!gridApi || !gridReady) return;
+		syncItemHeader(gridApi, headerName, 'channel');
 	});
 
 	// Restore AG Grid filter state from URL on mount and mode changes

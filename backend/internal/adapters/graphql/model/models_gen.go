@@ -57,17 +57,26 @@ type Content struct {
 	Description   *string               `json:"description,omitempty"`
 	Response      map[string]any        `json:"response,omitempty"`
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
-	Movie              map[string]any `json:"movie,omitempty"`
-	PrimaryCategory    *Category      `json:"primaryCategory,omitempty"`
-	VerseStartID       *int           `json:"verseStartID,omitempty"`
-	VerseEndID         *int           `json:"verseEndID,omitempty"`
-	DisplayTitle       *string        `json:"displayTitle,omitempty"`
-	PerspectiveCount   *int           `json:"perspectiveCount,omitempty"`
-	AverageRating      *float64       `json:"averageRating,omitempty"`
-	QualityRatingCount *int           `json:"qualityRatingCount,omitempty"`
-	CreatedAt          string         `json:"createdAt"`
-	UpdatedAt          string         `json:"updatedAt"`
-	PrimaryCategoryID  *int           `json:"-"`
+	Movie map[string]any `json:"movie,omitempty"`
+	// AUDIO_TRACK metadata (response.music: provider, artist, album, isrc, explicit, suggestedGenreId…); null for other content types.
+	AudioTrack map[string]any `json:"audioTrack,omitempty"`
+	// AUDIO_TRACK genre (music_genres id); null when unset.
+	GenreID *string     `json:"genreId,omitempty"`
+	Genre   *MusicGenre `json:"genre,omitempty"`
+	// AUDIO_TRACK links (batched per request); empty for other content types.
+	TrackLinks         []*TrackLink        `json:"trackLinks"`
+	PrimaryCategory    *Category           `json:"primaryCategory,omitempty"`
+	VerseStartID       *int                `json:"verseStartID,omitempty"`
+	VerseEndID         *int                `json:"verseEndID,omitempty"`
+	DisplayTitle       *string             `json:"displayTitle,omitempty"`
+	PerspectiveCount   *int                `json:"perspectiveCount,omitempty"`
+	AverageRating      *float64            `json:"averageRating,omitempty"`
+	QualityRatingCount *int                `json:"qualityRatingCount,omitempty"`
+	RelatedMedia       []*RelatedMedia     `json:"relatedMedia"`
+	Lyrics             *LyricsAvailability `json:"lyrics,omitempty"`
+	CreatedAt          string              `json:"createdAt"`
+	UpdatedAt          string              `json:"updatedAt"`
+	PrimaryCategoryID  *int                `json:"-"`
 }
 
 type ContentFilter struct {
@@ -107,6 +116,25 @@ type ContentFilter struct {
 type ContentSortInput struct {
 	Field domain.ContentSortBy `json:"field"`
 	Order domain.SortOrder     `json:"order"`
+}
+
+type CreateAudioTrackInput struct {
+	URL string `json:"url"`
+	// Required for Spotify, Apple Music and Amazon Music links: no provider lookup is made.
+	Title   *string `json:"title,omitempty"`
+	Artist  *string `json:"artist,omitempty"`
+	GenreID *int    `json:"genreId,omitempty"`
+	// The user confirmed this is the same song as an existing track: attach the link there.
+	SameAsContentID *int `json:"sameAsContentId,omitempty"`
+	// The user said it is a different song: skip the same-song check.
+	CreateNew *bool `json:"createNew,omitempty"`
+}
+
+type CreateAudioTrackResult struct {
+	// Null when sameSongCandidates is non-empty: nothing was created, ask the user.
+	Content            *Content   `json:"content,omitempty"`
+	AlreadyExisted     bool       `json:"alreadyExisted"`
+	SameSongCandidates []*Content `json:"sameSongCandidates"`
 }
 
 type CreateClaimInput struct {
@@ -262,6 +290,13 @@ type InterlinearWord struct {
 	Segment     *int   `json:"segment,omitempty"`
 }
 
+type LyricsAvailability struct {
+	Available bool   `json:"available"`
+	LrclibID  *int   `json:"lrclibId,omitempty"`
+	HasSynced bool   `json:"hasSynced"`
+	CheckedAt string `json:"checkedAt"`
+}
+
 type MessageConnection struct {
 	Items    []*Message `json:"items"`
 	PageInfo *PageInfo  `json:"pageInfo"`
@@ -302,6 +337,13 @@ type MovieSearchResult struct {
 	PosterPath  *string  `json:"posterPath,omitempty"`
 	VoteAverage *float64 `json:"voteAverage,omitempty"`
 	URL         string   `json:"url"`
+}
+
+// A node of the seeded Apple genre tree (ADR 0006, Option C).
+type MusicGenre struct {
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	ParentID *string `json:"parentId,omitempty"`
 }
 
 type Mutation struct {
@@ -409,6 +451,15 @@ type ReadReceiptChanged struct {
 
 func (ReadReceiptChanged) IsThreadEvent() {}
 
+type RelatedMedia struct {
+	Provider    string  `json:"provider"`
+	VideoID     string  `json:"videoId"`
+	Kind        string  `json:"kind"`
+	Title       *string `json:"title,omitempty"`
+	ContentID   *string `json:"contentId,omitempty"`
+	Unavailable bool    `json:"unavailable"`
+}
+
 type SendMessageInput struct {
 	ThreadID    string `json:"threadId"`
 	Body        string `json:"body"`
@@ -445,6 +496,19 @@ type TodoAction struct {
 	// Picker order for presets; null for actions the user entered.
 	TypicalSequence *int `json:"typicalSequence,omitempty"`
 	IsPreset        bool `json:"isPreset"`
+}
+
+// One link to an AUDIO_TRACK recording (ADR 0005). The first pasted link is also Content.url.
+type TrackLink struct {
+	ID string `json:"id"`
+	// youtube | spotify | apple_music | amazon_music
+	Provider        string                 `json:"provider"`
+	ProviderTrackID string                 `json:"providerTrackId"`
+	URL             string                 `json:"url"`
+	Kind            domain.TrackLinkKind   `json:"kind"`
+	Source          domain.TrackLinkSource `json:"source"`
+	// Set when the embed reported error 101 or 150; the link is shown as unavailable here.
+	UnavailableAt *string `json:"unavailableAt,omitempty"`
 }
 
 type TypingChanged struct {

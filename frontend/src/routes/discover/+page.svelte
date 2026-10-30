@@ -8,12 +8,7 @@
 	import VideoResultsGrid from '$lib/components/discover/VideoResultsGrid.svelte';
 	import { Button } from '$lib/components/shadcn';
 	import { graphqlRequest } from '$lib/queries/client';
-	import {
-		LIST_CONTENT,
-		type ContentResponse,
-		type ContentItem,
-		type CreateContentResponse,
-	} from '$lib/queries/content';
+	import { LIST_CONTENT, type ContentResponse, type ContentItem } from '$lib/queries/content';
 	import { queryKeys } from '$lib/queries/keys';
 	import { useAddVideo } from '$lib/queries/content/useAddVideo';
 	import { useAddMovie } from '$lib/queries/content/useAddMovie';
@@ -134,7 +129,7 @@
 	function handleAdd(videoId: string) {
 		pendingId = videoId;
 		addVideo.mutate(toWatchUrl(videoId), {
-			onSuccess: (data: CreateContentResponse) => {
+			onSuccess: (data) => {
 				const content = data?.createContentFromYouTube?.content;
 				if (content) {
 					addedContentByVideoId = new Map(addedContentByVideoId).set(videoId, content);

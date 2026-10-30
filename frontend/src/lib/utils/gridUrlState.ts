@@ -219,6 +219,20 @@ export function serializeGridParams(state: GridParams): string {
 	return params.toString();
 }
 
+/** True when the grid's Type filter would hide rows of `type` (no Type filter shows everything). */
+export function typeFilterExcludes(filters: Record<string, string>, type: string): boolean {
+	const t = filters.type;
+	if (!t) return false;
+	return !parseSetValue(t).includes(type.toLowerCase());
+}
+
+/** Grid URL (on the Activity page) with the Type filter set to exactly `type`; other grid state is kept, page resets. */
+export function showTypeHref(search: URLSearchParams, type: string): string {
+	const current = parseGridParams(search);
+	const next = serializeGridParams({ ...current, page: 1, filters: { ...current.filters, type: type.toLowerCase() } });
+	return next ? `/?${next}` : '/';
+}
+
 function sameScopes(a: SearchScopeKey[], b: SearchScopeKey[]): boolean {
 	return a.length === b.length && a.every((s) => b.includes(s));
 }

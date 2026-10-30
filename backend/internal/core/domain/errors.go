@@ -14,6 +14,10 @@ var (
 	ErrDeleteSentinel = errors.New("cannot delete the system sentinel user")
 	ErrForbidden      = errors.New("access denied")
 	ErrRateLimited    = errors.New("rate limit exceeded")
+	ErrNotATrack      = errors.New("link is an album, playlist, or artist, not a single track")
+	// ErrGenreLocked: the genre is set and the caller is not the adder inside the
+	// 30-day window (ADR 0006). The message is shown to users as-is.
+	ErrGenreLocked = errors.New("genre can only be changed by the person who added this track, within 30 days of adding it")
 	// ErrContentNotAllowed is returned when content is refused by policy (e.g. NC-17 movies).
 	// The message is user-facing and surfaced verbatim by the resolver.
 	ErrContentNotAllowed = errors.New("While Perspectize does not intend to act as censor, adding NSFW content is not enabled until traffic necessitates a long-term decision about content access policies.")

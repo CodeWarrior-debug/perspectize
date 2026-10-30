@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/svelte';
+import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import AddContentPopover from '$lib/components/AddContentPopover.svelte';
 import { tick } from 'svelte';
 
@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@tanstack/svelte-query', () => ({
+	createQuery: vi.fn(() => ({ data: [] })),
 	createMutation: vi.fn((optionsFn: () => any) => {
 		mocks.capturedMutationOptions = optionsFn();
 		mocks.mockMutationState.mutate = mocks.mockMutate;
@@ -39,7 +40,11 @@ vi.mock('svelte-sonner', () => ({
 }));
 
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
-vi.mock('$lib/utils/youtube', () => ({ validateYouTubeUrl: (url: string) => mocks.mockValidate(url) }));
+vi.mock('$lib/utils/youtube', async (importOriginal) => ({
+	// Real classifier: routing between the video and music mutations is under test too.
+	classifyYouTubeUrl: (await importOriginal<typeof import('$lib/utils/youtube')>()).classifyYouTubeUrl,
+	validateYouTubeUrl: (url: string) => mocks.mockValidate(url),
+}));
 
 function reset() {
 	vi.clearAllMocks();
@@ -149,5 +154,120 @@ describe('AddContentPopover mutation setup', () => {
 		expect(graphqlRequest).toHaveBeenCalledWith(expect.anything(), {
 			input: { url: 'https://youtube.com/watch?v=abc123', userId: 0 },
 		});
+	});
+});
+
+describe('AddContentPopover audio tracks', () => {
+	beforeEach(reset);
+
+	async function openWith(value: string) {
+		render(AddContentPopover);
+		await fireEvent.click(screen.getByRole('button', { name: /add content/i }));
+		await tick();
+		await fireEvent.input(screen.getByLabelText('Link or reference'), { target: { value } });
+		await tick();
+	}
+
+	it('keeps the long audio chip from overflowing and leaves the clear buttons reachable', async () => {
+		await openWith('https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC');
+		const chip = screen.getByTestId('type-chip');
+		expect(chip).toHaveClass('truncate', 'whitespace-nowrap');
+		expect(chip.parentElement).toHaveClass('flex-wrap');
+		const clearAll = screen.getByRole('button', { name: 'Clear all' });
+		expect(clearAll.parentElement).toHaveClass('shrink-0');
+		await fireEvent.click(clearAll);
+		expect(screen.getByLabelText('Link or reference')).toHaveValue('');
+	});
+
+	it('detects a Spotify song and requires a title', async () => {
+		await openWith('https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=x');
+		expect(screen.getByTestId('type-chip')).toHaveTextContent('Detected: Audio track (Spotify)');
+		expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+		await fireEvent.input(screen.getByLabelText('Song title'), { target: { value: 'Bohemian Rhapsody' } });
+		await fireEvent.input(screen.getByLabelText('Artist'), { target: { value: 'Queen' } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+		expect(mocks.mockMutate).toHaveBeenCalledWith(
+			{ url: 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC', title: 'Bohemian Rhapsody', artist: 'Queen' },
+			expect.objectContaining({ onSuccess: expect.any(Function) }),
+		);
+	});
+
+	it('prefills the title from an Apple Music slug', async () => {
+		await openWith('https://music.apple.com/us/song/bohemian-rhapsody/1440650711');
+		expect(screen.getByLabelText('Song title')).toHaveValue('Bohemian Rhapsody');
+	});
+
+	it('sends a YouTube Music song as an audio track, not a video', async () => {
+		await openWith('https://music.youtube.com/watch?v=dQw4w9WgXcQ');
+		await fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+		expect(mocks.mockMutate).toHaveBeenCalledWith(
+			{ url: 'https://music.youtube.com/watch?v=dQw4w9WgXcQ' },
+			expect.anything(),
+		);
+		expect(mocks.mockValidate).not.toHaveBeenCalled();
+	});
+
+	it('refuses album links', async () => {
+		await openWith('https://open.spotify.com/album/1GbtB4zTqAsyfZEsm1RZfx');
+		expect(screen.getByTestId('music-collection-notice')).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+	});
+
+	it('sends the picked genre with the request', async () => {
+		const { createQuery } = await import('@tanstack/svelte-query');
+		(createQuery as any).mockReturnValue({ data: [{ id: '21', name: 'Rock', parentId: null }] });
+		await openWith('https://music.youtube.com/watch?v=dQw4w9WgXcQ');
+		await fireEvent.click(screen.getByRole('button', { name: 'Choose a genre' }));
+		await tick();
+		await fireEvent.click(screen.getByText('Rock'));
+		await tick();
+		await fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+		expect(mocks.mockMutate).toHaveBeenCalledWith(
+			{ url: 'https://music.youtube.com/watch?v=dQw4w9WgXcQ', genreId: 21 },
+			expect.anything(),
+		);
+		(createQuery as any).mockReturnValue({ data: [] });
+	});
+
+	it('closes on success', async () => {
+		await openWith('https://music.youtube.com/watch?v=dQw4w9WgXcQ');
+		await fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+		const [, opts] = mocks.mockMutate.mock.calls[0];
+		opts.onSuccess({ content: { id: '1' }, alreadyExisted: false, sameSongCandidates: [] });
+		await waitFor(() => expect(screen.queryByLabelText('Link or reference')).not.toBeInTheDocument());
+	});
+
+	it('stays open on a same-song prompt and re-submits the answer', async () => {
+		await openWith('https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC');
+		await fireEvent.input(screen.getByLabelText('Song title'), { target: { value: 'Bohemian Rhapsody' } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+		const [, opts] = mocks.mockMutate.mock.calls[0];
+		opts.onSuccess({
+			content: null,
+			alreadyExisted: false,
+			sameSongCandidates: [{ id: '9', name: 'Bohemian Rhapsody', url: null, audioTrack: null }],
+		});
+		await tick();
+		await fireEvent.click(screen.getByRole('button', { name: 'Same song' }));
+		expect(mocks.mockMutate).toHaveBeenLastCalledWith(
+			expect.objectContaining({ url: 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC', sameAsContentId: 9 }),
+			expect.anything(),
+		);
+		expect(screen.getByLabelText('Song title')).toBeInTheDocument(); // still open
+	});
+
+	it('"different song" re-submits with createNew', async () => {
+		await openWith('https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC');
+		await fireEvent.input(screen.getByLabelText('Song title'), { target: { value: 'Bohemian Rhapsody' } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+		const [, opts] = mocks.mockMutate.mock.calls[0];
+		opts.onSuccess({
+			content: null,
+			alreadyExisted: false,
+			sameSongCandidates: [{ id: '9', name: 'Bohemian Rhapsody', url: null, audioTrack: null }],
+		});
+		await tick();
+		await fireEvent.click(screen.getByRole('button', { name: "No, it's a different song" }));
+		expect(mocks.mockMutate).toHaveBeenLastCalledWith(expect.objectContaining({ createNew: true }), expect.anything());
 	});
 });

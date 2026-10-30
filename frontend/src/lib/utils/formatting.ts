@@ -1,4 +1,5 @@
-import { BIBLE_PASSAGE_ICON_SVG } from './icons';
+import { BIBLE_PASSAGE_ICON_SVG, MUSIC_TRACK_ICON_SVG } from './icons';
+import { PROVIDER_LABEL, providerOfUrl } from './audioLinks';
 import type { LengthDisplay } from '$lib/queries/content';
 
 /** The one "no value" glyph for grid cells; keep new formatters on it. */
@@ -399,17 +400,20 @@ export function headerMinWidth(name: string, hasFilter = true): number {
 /**
  * AG Grid cell renderer for item column with thumbnail and clickable title.
  */
-export function itemCellRenderer(params: { data?: { name: string; url: string | null } }): HTMLElement | string {
+export function itemCellRenderer(params: {
+	data?: { name: string; url: string | null; audioTrack?: { explicit?: boolean; coverImageUrl?: string } | null };
+}): HTMLElement | string {
 	if (!params.data) return '';
 
 	const container = document.createElement('div');
 	container.className = 'flex items-center gap-2';
 
 	// Thumbnail
-	const videoId = extractVideoIdFromUrl(params.data.url);
-	if (videoId) {
+	const cover = params.data.audioTrack?.coverImageUrl;
+	const videoId = cover ? null : extractVideoIdFromUrl(params.data.url);
+	if (cover || videoId) {
 		const img = document.createElement('img');
-		img.src = `https://i.ytimg.com/vi/${videoId}/default.jpg`;
+		img.src = cover ?? `https://i.ytimg.com/vi/${videoId}/default.jpg`;
 		img.alt = '';
 		img.className = 'w-10 h-8 object-cover rounded thumbnail-mobile-hide';
 		container.appendChild(img);
@@ -430,7 +434,38 @@ export function itemCellRenderer(params: { data?: { name: string; url: string | 
 		container.appendChild(span);
 	}
 
+	if (params.data.audioTrack?.explicit) {
+		const e = document.createElement('span');
+		e.setAttribute('aria-label', 'Explicit');
+		e.title = 'Explicit';
+		e.className = 'rounded-sm bg-muted px-1 text-[10px] font-bold text-foreground';
+		e.textContent = 'E';
+		container.appendChild(e);
+	}
+
 	return container;
+}
+
+/** AUDIO_TRACK rows carry the artist in `audioTrack`; other rows use the YouTube channel. */
+export function channelValueGetter(params: {
+	data?: { channelTitle?: string | null; audioTrack?: { artist?: string } | null };
+}): string | null {
+	return params.data?.channelTitle || params.data?.audioTrack?.artist || null;
+}
+
+/** "Listen" column: the stored link of an AUDIO_TRACK row, labelled with its provider. */
+export function listenCellRenderer(params: {
+	data?: { url: string | null; contentType?: string };
+}): HTMLElement | string {
+	const provider = params.data?.contentType === 'AUDIO_TRACK' ? providerOfUrl(params.data.url) : null;
+	if (!provider || !params.data?.url) return '';
+	const a = document.createElement('a');
+	a.href = params.data.url;
+	a.target = '_blank';
+	a.rel = 'noopener noreferrer';
+	a.className = 'text-primary hover:underline';
+	a.textContent = PROVIDER_LABEL[provider];
+	return a;
 }
 
 /**
@@ -454,12 +489,17 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 	const container = document.createElement('div');
 	container.className = 'flex items-center justify-center h-full w-full';
 
-	if (params.data.contentType === 'BIBLE_PASSAGE') {
+	const iconTypes: Record<string, { svg: string; label: string }> = {
+		BIBLE_PASSAGE: { svg: BIBLE_PASSAGE_ICON_SVG, label: 'Bible Passage' },
+		AUDIO_TRACK: { svg: MUSIC_TRACK_ICON_SVG, label: 'Audio Track' },
+	};
+	const iconType = iconTypes[params.data.contentType];
+	if (iconType) {
 		container.classList.add('text-primary');
-		container.innerHTML = BIBLE_PASSAGE_ICON_SVG;
+		container.innerHTML = iconType.svg;
 		const label = document.createElement('span');
 		label.className = 'sr-only';
-		label.textContent = 'Bible Passage';
+		label.textContent = iconType.label;
 		container.appendChild(label);
 		return container;
 	}
@@ -692,6 +732,7 @@ export interface MovieRow {
 	movie?: unknown;
 	response?: unknown;
 	tags?: string[] | null;
+	genre?: { name: string } | null;
 }
 
 /** The parsed Movie payload, or null when the row isn't a Movie or has no usable `movie`/`response`. */
@@ -911,6 +952,7 @@ export function ageRatingRank(certification: string | null | undefined): number 
 }
 
 export function genreValueGetter(params: { data?: MovieRow }): string | null {
+	if (params.data?.genre?.name) return params.data.genre.name;
 	const genres = movieResponse(params.data)?.genres;
 	return genres && genres.length > 0 ? genres.join(', ') : null;
 }

@@ -340,3 +340,31 @@ func TestOwner_ResourceNotFound(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "resource not found")
 }
+
+func (m *mockContentService) PromoteRelatedMedia(ctx context.Context, contentID int, videoID string, userID int) (*domain.Content, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) MarkRelatedMediaUnavailable(ctx context.Context, contentID int, videoID string) error {
+	return nil
+}
+
+func (m *mockContentService) CheckLyrics(ctx context.Context, contentID int, force bool) (*domain.LyricsAvailability, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) CreateAudioTrack(context.Context, portservices.CreateAudioTrackInput) (*portservices.CreateAudioTrackResult, error) {
+	return nil, nil
+}
+func (m *mockContentService) MusicGenres(context.Context) ([]domain.MusicGenre, error) {
+	return nil, nil
+}
+func (m *mockContentService) SetTrackGenre(context.Context, int, int, int) (*domain.Content, error) {
+	return nil, nil
+}
+func (m *mockContentService) TrackLinksByContentIDs(context.Context, []int) (map[int][]domain.TrackLink, error) {
+	return nil, nil
+}
+func (m *mockContentService) MarkTrackLinkUnavailable(context.Context, int) (*domain.TrackLink, error) {
+	return nil, nil
+}

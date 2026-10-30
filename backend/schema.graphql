@@ -201,6 +201,13 @@ type Content {
   response: JSON
   "Movie-specific metadata (the shaped TMDB payload); null for other content types."
   movie: JSON
+  "AUDIO_TRACK metadata (response.music: provider, artist, album, isrc, explicit, suggestedGenreId…); null for other content types."
+  audioTrack: JSON
+  "AUDIO_TRACK genre (music_genres id); null when unset."
+  genreId: ID
+  genre: MusicGenre
+  "AUDIO_TRACK links (batched per request); empty for other content types."
+  trackLinks: [TrackLink!]!
   primaryCategory: Category
   # BIBLE_PASSAGE only: computed verse ordinals (see bible_book.verses_per_chapter)
   # and the optional, first-write-wins display title. Null for other content types.
@@ -220,8 +227,83 @@ type Content {
   # less than perspectiveCount since Quality is optional. Meant for a tooltip
   # on the average rating display ("N quality ratings").
   qualityRatingCount: Int
+  # AUDIO_TRACK: other uploads of the same song. References only; they are not
+  # content rows unless a user promotes one (contentId is then set). Empty otherwise.
+  relatedMedia: [RelatedMedia!]!
+  # AUDIO_TRACK: whether LRCLIB has lyrics. Lyrics text is never stored or served.
+  # Null until the first check has run.
+  lyrics: LyricsAvailability
   createdAt: String!
   updatedAt: String!
+}
+
+"How a track link is used: EMBED plays inside Perspectize (YouTube), LISTEN opens the provider."
+enum TrackLinkKind {
+  LISTEN
+  EMBED
+}
+
+"How a link got onto the track. MATCHED is reserved for the matcher (not built)."
+enum TrackLinkSource {
+  PASTED
+  MATCHED
+}
+
+"One link to an AUDIO_TRACK recording (ADR 0005). The first pasted link is also Content.url."
+type TrackLink {
+  id: ID!
+  "youtube | spotify | apple_music | amazon_music"
+  provider: String!
+  providerTrackId: String!
+  url: String!
+  kind: TrackLinkKind!
+  source: TrackLinkSource!
+  "Set when the embed reported error 101 or 150; the link is shown as unavailable here."
+  unavailableAt: String
+}
+
+"A node of the seeded Apple genre tree (ADR 0006, Option C)."
+type MusicGenre {
+  id: ID!
+  name: String!
+  parentId: ID
+}
+
+input CreateAudioTrackInput {
+  url: String!
+  "Required for Spotify, Apple Music and Amazon Music links: no provider lookup is made."
+  title: String
+  artist: String
+  genreId: IntID
+  "The user confirmed this is the same song as an existing track: attach the link there."
+  sameAsContentId: IntID
+  "The user said it is a different song: skip the same-song check."
+  createNew: Boolean
+}
+
+type CreateAudioTrackResult {
+  "Null when sameSongCandidates is non-empty: nothing was created, ask the user."
+  content: Content
+  alreadyExisted: Boolean!
+  sameSongCandidates: [Content!]!
+}
+
+type RelatedMedia {
+  provider: String!
+  videoId: String!
+  # audio | official_video | lyric_video | live | other
+  kind: String!
+  title: String
+  contentId: ID
+  unavailable: Boolean!
+}
+
+type LyricsAvailability {
+  available: Boolean!
+  # LRCLIB track id; the lyrics page is https://lrclib.net/tracks/<lrclibId>
+  lrclibId: Int
+  hasSynced: Boolean!
+  checkedAt: String!
 }
 
 # Pagination types
@@ -273,6 +355,7 @@ enum ContentType {
   YOUTUBE_VIDEO
   CLAIM
   BIBLE_PASSAGE
+  AUDIO_TRACK
   MOVIE
 }
 
@@ -522,6 +605,19 @@ type Mutation {
   createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   updateContentSourceData(contentId: IntID!): Content! @auth
 
+  # YouTube Music mutations
+  "Adds an AUDIO_TRACK from a music.youtube.com song link. Returns the existing row when it is already stored."
+  createAudioTrack(input: CreateAudioTrackInput!): CreateAudioTrackResult! @auth
+  "Anyone may set an empty genre; the adder may change it within 30 days (ADR 0006)."
+  setTrackGenre(contentId: IntID!, genreId: IntID!): Content! @auth
+  "Records embed error 101/150 for one EMBED link (ticket 03)."
+  markTrackLinkUnavailable(linkId: IntID!): TrackLink! @auth
+  # Explicit user action: make a related video its own YOUTUBE item. Returns that item.
+  promoteRelatedMedia(contentId: IntID!, videoId: String!): Content! @auth
+  # Called by the player when a related video cannot be embedded. Returns the track.
+  markRelatedMediaUnavailable(contentId: IntID!, videoId: String!): Content! @auth
+  # Re-checks lyrics availability only when the stored result is due. Returns the track.
+  refreshLyricsAvailability(contentId: IntID!): Content! @auth
   # Movie mutations
   createContentFromMovie(input: CreateContentFromMovieInput!): Content! @auth
 
@@ -570,6 +666,8 @@ type Mutation {
 }
 
 type Query {
+  "The seeded music genre tree, flat; build the tree from parentId."
+  musicGenres: [MusicGenre!]!
   # Current authenticated user, derived from the Clerk session
   me: User @auth
 

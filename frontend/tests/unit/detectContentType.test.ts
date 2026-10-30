@@ -105,3 +105,30 @@ describe('detectContentCandidates', () => {
 		expect(detectContentCandidates('grace')).toEqual([]);
 	});
 });
+
+describe('audio track detection', () => {
+	it('detects Spotify, Apple Music, Amazon Music and YouTube Music song links', () => {
+		for (const url of [
+			'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC',
+			'https://music.apple.com/us/song/bohemian-rhapsody/1440650711',
+			'https://music.amazon.com/tracks/B07D5J5QX3',
+			'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
+		]) {
+			const r = detectContentType(url);
+			expect(r.type).toBe('AUDIO_TRACK');
+		}
+	});
+
+	it('marks album/playlist links as audio with no track', () => {
+		const r = detectContentType('https://open.spotify.com/album/1GbtB4zTqAsyfZEsm1RZfx');
+		expect(r).toEqual({
+			type: 'AUDIO_TRACK',
+			url: 'https://open.spotify.com/album/1GbtB4zTqAsyfZEsm1RZfx',
+			link: null,
+		});
+	});
+
+	it('keeps plain YouTube links as videos', () => {
+		expect(detectContentType('https://www.youtube.com/watch?v=dQw4w9WgXcQ').type).toBe('YOUTUBE_VIDEO');
+	});
+});

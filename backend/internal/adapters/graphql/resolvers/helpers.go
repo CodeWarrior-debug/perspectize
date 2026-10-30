@@ -15,6 +15,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 // movieSearchPageToModel maps one TMDB search page to the GraphQL shape. The
@@ -92,6 +93,12 @@ func domainToModel(c *domain.Content) *model.Content {
 		VerseStartID:      c.VerseStartID,
 		VerseEndID:        c.VerseEndID,
 		DisplayTitle:      c.DisplayTitle,
+		RelatedMedia:      relatedMediaToModel(c),
+		Lyrics:            lyricsToModel(domain.ReadLyricsAvailability(c.Response)),
+	}
+	if c.GenreID != nil {
+		g := strconv.Itoa(*c.GenreID)
+		m.GenreID = &g
 	}
 
 	// Parse the raw response JSON into a map for GraphQL
@@ -103,6 +110,11 @@ func domainToModel(c *domain.Content) *model.Content {
 			m.Response = responseMap
 			if c.ContentType == domain.ContentTypeMovie {
 				m.Movie = responseMap
+			}
+			if c.ContentType == domain.ContentTypeAudioTrack {
+				if music, ok := responseMap[domain.ResponseKeyMusic].(map[string]interface{}); ok {
+					m.AudioTrack = music
+				}
 			}
 		}
 
@@ -632,6 +644,28 @@ func nilIfEmpty(s string) *string {
 	return &s
 }
 
+// relatedMediaToModel never returns nil: the schema field is a non-null list.
+func relatedMediaToModel(c *domain.Content) []*model.RelatedMedia {
+	refs, err := domain.ReadRelatedMedia(c.Response)
+	if err != nil {
+		slog.Warn("failed to read related media", "contentID", c.ID, "error", err)
+	}
+	out := make([]*model.RelatedMedia, 0, len(refs))
+	for _, r := range refs {
+		m := &model.RelatedMedia{Provider: r.Provider, VideoID: r.VideoID, Kind: string(r.Kind), Unavailable: r.Unavailable}
+		if r.Title != "" {
+			title := r.Title
+			m.Title = &title
+		}
+		if r.ContentID != nil {
+			id := strconv.Itoa(*r.ContentID)
+			m.ContentID = &id
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
 // contentFieldsFromID are the Content fields that resolve from its id alone.
 var contentFieldsFromID = map[string]bool{
 	"__typename":         true,
@@ -728,6 +762,18 @@ func userTodosToModel(todos []*domain.UserTodo) []*model.UserTodo {
 		out[i] = userTodoDomainToModel(t)
 	}
 	return out
+}
+
+func lyricsToModel(l *domain.LyricsAvailability) *model.LyricsAvailability {
+	if l == nil {
+		return nil
+	}
+	return &model.LyricsAvailability{
+		Available: l.Available,
+		LrclibID:  l.LRCLibID,
+		HasSynced: l.HasSynced,
+		CheckedAt: l.CheckedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
+	}
 }
 
 // todoActionDomainToModel converts a domain action to its GraphQL model.
@@ -927,4 +973,43 @@ func (r *Resolver) userTodoListByKey(ctx context.Context, key dataloader.UserTod
 		}
 	}
 	return nil, nil
+}
+
+// audioTrackError maps CreateAudioTrack failures to user-facing messages.
+func audioTrackError(err error) error {
+	switch {
+	case errors.Is(err, domain.ErrNotATrack):
+		return fmt.Errorf("paste a song link, not an album, playlist, or artist")
+	case errors.Is(err, domain.ErrInvalidURL):
+		return fmt.Errorf("unsupported music link: paste a YouTube Music, Spotify, Apple Music or Amazon Music song link")
+	case errors.Is(err, domain.ErrInvalidInput):
+		return err
+	case errors.Is(err, domain.ErrNotFound):
+		return fmt.Errorf("track not found")
+	case errors.Is(err, domain.ErrContentNotAllowed):
+		return &gqlerror.Error{Message: domain.ErrContentNotAllowed.Error(), Extensions: map[string]any{"code": "CONTENT_NOT_ALLOWED"}}
+	}
+	slog.Error("creating audio track failed", "error", err)
+	return fmt.Errorf("failed to add track")
+}
+
+func musicGenreToModel(g domain.MusicGenre) *model.MusicGenre {
+	out := &model.MusicGenre{ID: strconv.Itoa(g.ID), Name: g.Name}
+	if g.ParentID != nil {
+		p := strconv.Itoa(*g.ParentID)
+		out.ParentID = &p
+	}
+	return out
+}
+
+func trackLinkToModel(l domain.TrackLink) *model.TrackLink {
+	out := &model.TrackLink{
+		ID: strconv.Itoa(l.ID), Provider: string(l.Provider), ProviderTrackID: l.ProviderTrackID, URL: l.URL,
+		Kind: l.Kind, Source: l.Source,
+	}
+	if l.UnavailableAt != nil {
+		s := l.UnavailableAt.UTC().Format(time.RFC3339)
+		out.UnavailableAt = &s
+	}
+	return out
 }

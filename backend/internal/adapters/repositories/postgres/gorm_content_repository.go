@@ -205,7 +205,10 @@ func applyPersonFilter(query *gorm.DB, personID *int, role *domain.PersonRole) *
 // always bound; releaseDate is an ISO string so lexical comparison is date order.
 func applyMovieColumnFilters(query *gorm.DB, f *domain.ContentFilter) *gorm.DB {
 	if f.GenreContains != nil && *f.GenreContains != "" {
-		query = query.Where("(response->'genres')::text ILIKE ?", "%"+*f.GenreContains+"%")
+		// Movies keep their TMDB genre list in response; AUDIO_TRACK rows point at
+		// the seeded genre tree (ADR 0006). One filter box covers both.
+		pattern := "%" + *f.GenreContains + "%"
+		query = query.Where("((response->'genres')::text ILIKE ? OR genre_id IN (SELECT id FROM music_genres WHERE name ILIKE ?))", pattern, pattern)
 	}
 	if f.CastContains != nil && *f.CastContains != "" {
 		// The Cast cell lists directors and cast, so match a name in either.
@@ -520,6 +523,42 @@ func (r *GormContentRepository) ClearDisplayTitle(ctx context.Context, contentID
 	result := r.db.WithContext(ctx).Exec(`UPDATE content SET display_title = NULL WHERE id = ?`, contentID)
 	if result.Error != nil {
 		return fmt.Errorf("failed to clear display title: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+// GetByISRC returns the AUDIO_TRACK row whose response.music carries this ISRC.
+// Backed by the partial expression index idx_content_music_isrc (000032).
+func (r *GormContentRepository) GetByISRC(ctx context.Context, isrc string) (*domain.Content, error) {
+	var model ContentModel
+	err := r.db.WithContext(ctx).
+		Where("content_type = ? AND response->'music'->>'isrc' = ?", "audio_track", isrc).
+		Order("id").
+		First(&model).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get content by isrc: %w", err)
+	}
+	return contentModelToDomain(&model), nil
+}
+
+// SetResponseKey sets one top-level response key with jsonb_set, so concurrent
+// writers of different keys (lyrics, relatedMedia) never clobber each other.
+func (r *GormContentRepository) SetResponseKey(ctx context.Context, contentID int, key string, value json.RawMessage) error {
+	result := r.db.WithContext(ctx).Exec(
+		`UPDATE content
+		    SET response = jsonb_set(COALESCE(response, '{}'::jsonb), ARRAY[?]::text[], ?::jsonb, true),
+		        updated_at = ?
+		  WHERE id = ?`,
+		key, string(value), time.Now(), contentID,
+	)
+	if result.Error != nil {
+		return fmt.Errorf("failed to set response key %q: %w", key, result.Error)
 	}
 	if result.RowsAffected == 0 {
 		return domain.ErrNotFound

@@ -97,3 +97,7 @@ func TestMovieConstants(t *testing.T) {
 	assert.Equal(t, domain.PersonRole("CAST"), domain.PersonRoleCast)
 	assert.Equal(t, domain.PersonRole("DIRECTOR"), domain.PersonRoleDirector)
 }
+
+func TestContentType_AudioTrack(t *testing.T) {
+	assert.Equal(t, domain.ContentType("AUDIO_TRACK"), domain.ContentTypeAudioTrack)
+}
