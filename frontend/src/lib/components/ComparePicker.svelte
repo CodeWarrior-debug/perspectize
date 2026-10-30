@@ -5,9 +5,10 @@
 	 * page being a dead end that only explains "open it from Activity"
 	 * (compare-page-enhancements #1).
 	 *
-	 * Only surfaces content with 2+ perspectives (comparison needs two takes)
-	 * — see LIST_COMPARABLE_CONTENT's comment for why perspectiveCount isn't
-	 * just added to the main Activity list query.
+	 * Only surfaces content with 2+ perspectives visible to the viewer
+	 * (comparison needs two takes), filtered server-side via
+	 * minPerspectiveCount. See LIST_COMPARABLE_CONTENT's comment for why
+	 * perspectiveCount isn't just added to the main Activity list query.
 	 */
 	import { createQuery } from '@tanstack/svelte-query';
 	import { goto } from '$app/navigation';
@@ -26,16 +27,15 @@
 		queryFn: () =>
 			graphqlRequest<ListComparableContentResponse>(LIST_COMPARABLE_CONTENT, {
 				first: 40,
-				filter: debouncedQuery ? { search: debouncedQuery } : undefined,
+				// 2+ perspectives is the minimum for a comparison to mean anything.
+				// Filtered server-side, before the page limit, so older content
+				// with several perspectives isn't pushed out by newer rows with none.
+				filter: debouncedQuery ? { search: debouncedQuery, minPerspectiveCount: 2 } : { minPerspectiveCount: 2 },
 			}),
 		staleTime: 30 * 1000,
 	}));
 
-	// 2+ perspectives is the minimum for a comparison to mean anything — see
-	// module comment above.
-	const comparableItems = $derived(
-		(query.data?.content.items ?? []).filter((item) => (item.perspectiveCount ?? 0) >= 2),
-	);
+	const comparableItems = $derived(query.data?.content.items ?? []);
 
 	function openComparison(contentId: string) {
 		goto(`/compare?contentId=${contentId}`);

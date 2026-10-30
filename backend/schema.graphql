@@ -408,6 +408,9 @@ input ContentFilter {
   descriptionSearch: String  # ILIKE search on description
   # ILIKE search on the username of the user who added the content
   addedByUsername: String
+  # Only content with at least this many perspectives visible to the caller
+  # (public ones, plus their own private ones). Applied before pagination.
+  minPerspectiveCount: Int
   # Record date filters
   createdAfter: String
   createdBefore: String

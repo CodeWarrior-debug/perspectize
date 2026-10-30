@@ -27,14 +27,6 @@ function renderPicker() {
 
 const items = [
 	{
-		id: '10',
-		name: 'One Perspective Video',
-		contentType: 'YOUTUBE_VIDEO',
-		channelTitle: 'Chan',
-		url: null,
-		perspectiveCount: 1,
-	},
-	{
 		id: '11',
 		name: 'Two Perspective Video',
 		contentType: 'YOUTUBE_VIDEO',
@@ -42,7 +34,6 @@ const items = [
 		url: null,
 		perspectiveCount: 2,
 	},
-	{ id: '12', name: 'No Perspectives', contentType: 'YOUTUBE_VIDEO', channelTitle: 'Chan', url: null, perspectiveCount: 0 },
 ];
 
 describe('ComparePicker', () => {
@@ -51,15 +42,30 @@ describe('ComparePicker', () => {
 		mockRequest.mockResolvedValue({ content: { items } });
 	});
 
-	it('only shows content with 2+ perspectives', async () => {
+	it('asks the server for content with 2+ perspectives and lists what comes back', async () => {
 		renderPicker();
 
 		await waitFor(() => {
 			expect(screen.getByText('Two Perspective Video')).toBeInTheDocument();
 		});
-		expect(screen.queryByText('One Perspective Video')).not.toBeInTheDocument();
-		expect(screen.queryByText('No Perspectives')).not.toBeInTheDocument();
 		expect(screen.getAllByTestId('picker-result')).toHaveLength(1);
+		// The filter must ride the request so it applies before the page limit,
+		// not after the 40 newest rows are already picked.
+		expect(mockRequest.mock.calls[0][1]).toMatchObject({ filter: { minPerspectiveCount: 2 } });
+	});
+
+	it('keeps the 2+ perspectives filter when searching', async () => {
+		renderPicker();
+		await waitFor(() => expect(screen.getByTestId('picker-result')).toBeInTheDocument());
+
+		await fireEvent.input(screen.getByPlaceholderText(/search content/i), { target: { value: 'two' } });
+
+		await waitFor(() =>
+			expect(mockRequest).toHaveBeenLastCalledWith(
+				expect.anything(),
+				expect.objectContaining({ filter: { search: 'two', minPerspectiveCount: 2 } }),
+			),
+		);
 	});
 
 	it('navigates to the comparison on click', async () => {
@@ -72,7 +78,7 @@ describe('ComparePicker', () => {
 	});
 
 	it('shows an empty state and a way back to Activity when nothing qualifies', async () => {
-		mockRequest.mockResolvedValue({ content: { items: [items[0], items[2]] } });
+		mockRequest.mockResolvedValue({ content: { items: [] } });
 		renderPicker();
 
 		await waitFor(() => expect(screen.getByTestId('picker-empty')).toBeInTheDocument());
