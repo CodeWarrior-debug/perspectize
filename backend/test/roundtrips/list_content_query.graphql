@@ -1,0 +1,55 @@
+query ListContent(
+		$first: Int
+		$after: String
+		$sortBy: ContentSortBy = UPDATED_AT
+		$sortOrder: SortOrder = DESC
+		$sorts: [ContentSortInput!]
+		$filter: ContentFilter
+		$includeTotalCount: Boolean = true
+	) {
+		content(
+			first: $first
+			after: $after
+			sortBy: $sortBy
+			sortOrder: $sortOrder
+			sorts: $sorts
+			filter: $filter
+			includeTotalCount: $includeTotalCount
+		) {
+			items {
+				id
+				name
+				addedByUserID
+				url
+				contentType
+				verseStartID
+				verseEndID
+				displayTitle
+				length
+				lengthUnits
+				viewCount
+				likeCount
+				channelTitle
+				publishedAt
+				tags
+				description
+				primaryCategory {
+					id
+					wikidataQid
+					label
+					description
+					entityType
+					wikipediaUrl
+				}
+				createdAt
+				updatedAt
+			}
+			pageInfo {
+				hasNextPage
+				hasPreviousPage
+				startCursor
+				endCursor
+			}
+			totalCount
+		}
+	}

@@ -155,6 +155,17 @@ describe('Header component', () => {
 		expect(link).toHaveAttribute('href', '/discover');
 	});
 
+	it('renders a Plan navigation link pointing to /plan, after Compare', () => {
+		render(Header);
+		const link = screen.getByRole('link', { name: 'Plan' });
+		expect(link).toHaveAttribute('href', '/plan');
+		const labels = screen
+			.getAllByRole('link')
+			.map((a) => a.textContent?.trim())
+			.filter((t) => ['Activity', 'Discover', 'Compare', 'Plan'].includes(t ?? ''));
+		expect(labels).toEqual(['Activity', 'Discover', 'Compare', 'Plan']);
+	});
+
 	it('renders an Activity navigation link pointing to /', () => {
 		render(Header);
 		const link = screen.getByRole('link', { name: 'Activity' });

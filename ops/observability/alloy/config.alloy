@@ -1,0 +1,52 @@
+// Local Faro collector for the observability tracer stack
+// (docker-compose.observability.yml). Grafana Cloud's Frontend Observability
+// app replaces this in production; this file is local-only.
+//
+// Browser (Faro Web SDK, VITE_FARO_URL=http://localhost:12347/collect)
+//   -> faro.receiver
+//        traces -> otelcol.exporter.otlphttp -> lgtm's OTel Collector (:4318) -> Tempo
+//        logs   -> loki.write                -> lgtm's Loki (:3100)
+//
+// Component names/arguments checked against the Alloy v1.20.1 reference docs:
+//   docs/sources/reference/components/faro/faro.receiver.md
+//   docs/sources/reference/components/otelcol/otelcol.exporter.otlphttp.md
+
+faro.receiver "web" {
+  server {
+    // 0.0.0.0 inside the container; compose publishes it on 127.0.0.1 only.
+    listen_address       = "0.0.0.0"
+    listen_port          = 12347
+    cors_allowed_origins = ["http://localhost:4173"]
+  }
+
+  // faro.receiver attaches no Loki labels by default. A fixed value sets the
+  // label; an empty value copies that key from the Faro payload
+  // (internal/component/faro/receiver/exporters.go labelSet).
+  extra_log_labels = {
+    service_name = "perspectize-web",
+    app_name     = "",
+    kind         = "",
+  }
+
+  // Source maps aren't emitted by the demo build; don't try to fetch them.
+  sourcemaps {
+    download = false
+  }
+
+  output {
+    logs   = [loki.write.lgtm.receiver]
+    traces = [otelcol.exporter.otlphttp.lgtm.input]
+  }
+}
+
+otelcol.exporter.otlphttp "lgtm" {
+  client {
+    endpoint = "http://lgtm:4318"
+  }
+}
+
+loki.write "lgtm" {
+  endpoint {
+    url = "http://lgtm:3100/loki/api/v1/push"
+  }
+}

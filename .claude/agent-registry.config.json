@@ -1,0 +1,15 @@
+{
+  "$comment": "Perspectize's settings for .claude/agent-registry (see its README). Slot 1 is the proven pair: `make start` uses it and the Clerk sign-in persists on :5173. Before enabling slot 2 or 3: sign in once at that frontend origin in the sv-chrome profile, and add the origin to the backend's CORS_ORIGINS if it is restricted.",
+  "chromeDebugPort": 9222,
+  "maxConcurrentVerifications": 1,
+  "slots": [
+    { "id": 1, "backendPort": 8080, "frontendPort": 5173, "enabled": true },
+    { "id": 2, "backendPort": 8090, "frontendPort": 5174, "enabled": false },
+    { "id": 3, "backendPort": 8091, "frontendPort": 5175, "enabled": false }
+  ],
+  "waitPollSeconds": 300,
+  "waitMaxMinutes": 120,
+  "humanReplyMinutes": 10,
+  "staleClaimHours": 24,
+  "devServerProcessPatterns": ["vite", "\\bair\\b", "backend/tmp/main", "tmp/verify-server", "pnpm", "go tool air"]
+}

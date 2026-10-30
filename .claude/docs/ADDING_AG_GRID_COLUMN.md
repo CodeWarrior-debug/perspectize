@@ -294,7 +294,7 @@ The effect uses **four** tiers, not two — `xs` (<445px), `sm` (445–639px),
 const alwaysVisible = ['item', 'type', 'perspectize']; // every tier
 const smCols = ['category', 'channel'];                // sm and wider
 const mdCols = ['duration', 'publishDate'];             // md and wider
-const lgCols = ['views', 'likes', 'percentLiked', 'tags']; // lg only
+const lgCols = ['views', 'likes', 'percentLiked', 'user', 'tags']; // lg only
 const alwaysHidden = ['description'];                   // never shown by the tier system
 // createdAt/updatedAt/id/addedByUserID/url stay hidden via their colDef
 // `hide: true` until the user (or, for the admin-only ones, an admin)

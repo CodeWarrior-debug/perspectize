@@ -19,7 +19,7 @@
 
 <!-- Manual actions needed after merge, in order if sequence matters. Delete section if none. -->
 
-- [ ] DB migration: `migrate up` against `<!-- environment(s) -->` (manual per .docs — never automated)
+- [ ] DB migration: `migrate up` against `<!-- environment(s) -->` (manual per .docs/MIGRATION_ROLLOUT.md — never automated)
 - [ ] Task/script: <!-- e.g. backfill script, one-off command -->
 - [ ] <!-- Additional step -->
 

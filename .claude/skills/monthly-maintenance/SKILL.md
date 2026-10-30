@@ -33,7 +33,9 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
 
 6. **Check dependency freshness.**
    - Frontend: `npx npm-check-updates` in `frontend/`, refresh [FRONTEND_DEPENDENCY_ANALYSIS.md](FRONTEND_DEPENDENCY_ANALYSIS.md) with current findings.
-   - Backend: `go list -m -u -versions` against the direct (non-indirect) requires in `backend/go.mod`, refresh [BACKEND_DEPENDENCY_ANALYSIS.md](BACKEND_DEPENDENCY_ANALYSIS.md).
+   - Backend: `go list -m -u -f '{{if not .Indirect}}{{if .Update}}{{.Path}} {{.Version}} -> {{.Update.Version}}{{end}}{{end}}' all` in `backend/` (empty output = all direct deps current; an `and .Indirect .Update` template silently prints nothing), refresh [BACKEND_DEPENDENCY_ANALYSIS.md](BACKEND_DEPENDENCY_ANALYSIS.md).
+   - Frontend CVE overrides live only in `frontend/pnpm-workspace.yaml` (never `package.json` `pnpm.overrides`); run `pnpm audit` (full tree) to find them.
+   - Root `README.md`: check its Tech Stack and Prerequisites version claims (Go, Node, pnpm, PostgreSQL) against `backend/go.mod`, `.github/workflows/ci.yml` (Node, Postgres, pnpm) and the Dockerfiles, and fix any that drifted.
    - Patch/minor bumps with no known breaking changes can be applied directly (verify with `go build`/`go test` or `pnpm run test:run` per `CLAUDE.md`'s self-verification checklist). Majors — especially interdependent ones (e.g. Vite + its Svelte plugin + Vitest) — get flagged in the doc for a follow-up PR rather than bundled into this routine's commit.
 
 7. **Measure app bundle size and speed.**
@@ -43,6 +45,8 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
    - Compare against the previous month's row in [ROUTINES.md](../../../ROUTINES.md) (Bundle column); flag any >10% growth in total or gzipped JS for the user.
    - Optional backend: size of the compiled server binary (`go build -o /tmp/server ./cmd/server` in `backend/`, then `ls -l`), recorded but not compared unless it jumps notably.
    - **Speed (Lighthouse):** with the build in place, run `pnpm run perf:lighthouse` in `frontend/` (3 runs per route, config in `lighthouserc.cjs`). Report the median performance score, FCP, LCP, TBT, and CLS for `/` and `/discover`, pulled from `frontend/perf/lighthouse/results/*-report.json`. Flag a performance score drop of 5+ points or LCP growth of 15%+ against last month. `/messages` is auth-gated, so it only measures the logged-out view. In a cloud/root container Chrome refuses to start without `--no-sandbox`: run `CHROME_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome pnpm exec lhci autorun --collect.settings.chromeFlags="--no-sandbox --headless=new" --collect.url=http://localhost:4173/ --collect.url=http://localhost:4173/discover` instead. Numbers from a cloud container are only comparable to other cloud-container runs.
+   - Cloud Lighthouse shortcut: `pnpm exec vite preview --port 4173` in the background, then `lhci collect --url=... --settings.chromeFlags="--no-sandbox --headless=new"`. Don't `pkill -f "vite preview"` in the same Bash call (it kills the shell); delete `frontend/.lighthouseci` afterward.
+   - Cloud limitation: `git push origin --delete` returns 403 through the proxy, so remote merged-branch deletion (step 2) must be deferred to a local session.
    - Backend latency (k6, `backend/perf/k6/`) needs a running server plus database, so it is local-only; note it as skipped in a cloud run.
 
 8. **Count files, lines of code and tokens.**

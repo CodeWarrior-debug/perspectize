@@ -12,6 +12,7 @@ const (
 	ContentTypeYouTubeVideo ContentType = "YOUTUBE_VIDEO"
 	ContentTypeClaim        ContentType = "CLAIM"
 	ContentTypeBiblePassage ContentType = "BIBLE_PASSAGE"
+	ContentTypeMovie        ContentType = "MOVIE"
 )
 
 // ContentSearchField identifies a text column that a ContentFilter.search term
@@ -24,7 +25,44 @@ const (
 	ContentSearchFieldDescription  ContentSearchField = "DESCRIPTION"
 	ContentSearchFieldChannelTitle ContentSearchField = "CHANNEL_TITLE"
 	ContentSearchFieldTags         ContentSearchField = "TAGS"
+	ContentSearchFieldCast         ContentSearchField = "CAST"
+	ContentSearchFieldDirector     ContentSearchField = "DIRECTOR"
 )
+
+// LengthPrecision is the smallest unit a source reports a length in. Stored
+// lowercase in content.length_display; converted in the repository mappers.
+type LengthPrecision string
+
+const (
+	LengthPrecisionSeconds LengthPrecision = "SECONDS"
+	LengthPrecisionMinutes LengthPrecision = "MINUTES"
+)
+
+// Length sources. Migration 000030's backfill writes the same strings.
+const (
+	LengthSourceYouTube = "youtube"
+	LengthSourceTMDB    = "tmdb"
+)
+
+// LengthDisplay records where Content.Length came from and the smallest unit
+// that source reports. Length is always stored in seconds so it sorts and
+// filters across types; clients format it to Precision (a TMDB runtime is whole
+// minutes, so it shows as h:mm, not h:mm:00). Stored as JSONB so new sources
+// and precisions need no migration.
+type LengthDisplay struct {
+	Source    string
+	Precision LengthPrecision
+}
+
+// YouTubeLengthDisplay is a YouTube video's length: seconds from the Data API.
+func YouTubeLengthDisplay() *LengthDisplay {
+	return &LengthDisplay{Source: LengthSourceYouTube, Precision: LengthPrecisionSeconds}
+}
+
+// TMDBLengthDisplay is a movie runtime: TMDB reports whole minutes.
+func TMDBLengthDisplay() *LengthDisplay {
+	return &LengthDisplay{Source: LengthSourceTMDB, Precision: LengthPrecisionMinutes}
+}
 
 // Content represents a media item that users create perspectives on
 type Content struct {
@@ -35,6 +73,7 @@ type Content struct {
 	AddedByUserID     int
 	Length            *int
 	LengthUnits       *string
+	LengthDisplay     *LengthDisplay
 	Response          json.RawMessage
 	PrimaryCategoryID *int
 	VerseStartID      *int    // BIBLE_PASSAGE only — computed ordinal (see BibleVerseOrdinal), not a table FK

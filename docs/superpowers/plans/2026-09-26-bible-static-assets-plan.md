@@ -10,7 +10,7 @@
 - A loader (`bibleText.ts`) turns a verse-ordinal range into the same shape `PassageText.svelte` already consumes, and falls back to the GraphQL `passageText` query if a chunk fails to load.
 - The backend is unchanged. No migration.
 
-**Tech stack:** SvelteKit (adapter-static), Svelte 5 runes, TanStack Svelte Query, Vite `import.meta.glob`, Vitest, Node script run with `tsx`. Existing telemetry: `frontend/src/lib/vitals.ts` (web-vitals) and the Phase 7.4 gqlgen operation-timing slog lines.
+**Tech stack:** SvelteKit (adapter-static), Svelte 5 runes, TanStack Svelte Query, Vite `import.meta.glob`, Vitest, Node script run with `tsx`. Existing telemetry: `frontend/src/lib/telemetry.ts` (Grafana Faro — web vitals, errors, traces; replaced `vitals.ts` in Phase 25-03) and the backend `graphql.server.operation.duration` histogram / `graphql` slog lines (Phase 25-02).
 
 **Research / roadmap:** `.planning/phases/20-bible-static-assets/20-RESEARCH.md`; `.planning/ROADMAP.md` → Phase 20.
 
@@ -44,7 +44,7 @@
 - Create: `frontend/src/lib/utils/passagePerf.ts`
 - Create: `frontend/tests/unit/utils/passagePerf.test.ts`
 - Modify: `frontend/src/lib/components/PassageText.svelte`
-- Modify: `frontend/src/lib/vitals.ts` (report the new measure through the same sink as web-vitals)
+- Modify: `frontend/src/lib/telemetry.ts` (add a `reportMeasure(name, value, attrs)` helper that forwards to Faro's `pushMeasurement` when Faro is initialised — `vitals.ts` was removed in Phase 25-03)
 - Create: `frontend/tests/perf/passage-render.bench.ts` (Playwright lab script; local only)
 
 **Interfaces:**
@@ -53,7 +53,7 @@
 
 - [ ] **Step 1:** Write a failing test: the timer reports exactly one measure, with the right `source` and verse count, and a second call is a no-op.
 - [ ] **Step 2:** Implement `passagePerf.ts`. In `PassageText.svelte`, start the timer when the query becomes enabled and stop it the first time `query.data` is set. Set `source` from `query.isFetchedAfterMount` (`network`, otherwise `memory`).
-- [ ] **Step 3:** Route the report through `vitals.ts` so it goes wherever LCP/INP go today. If that's console only, also append it to `window.__perf` so the lab script can read it.
+- [ ] **Step 3:** Route the report through `telemetry.ts`'s `reportMeasure` so it lands in Faro next to LCP/INP. Always also append it to `window.__perf` so the lab script can read it (Faro is off locally unless `VITE_FARO_URL` is set).
 - [ ] **Step 4 (lab, local only):** In `passage-render.bench.ts`, open a public passage in the Activity details modal under these conditions:
   - **cold** (fresh browser context), **reload** (same context, page reloaded) and **warm** (open, close, reopen);
   - network unthrottled and throttled to "Fast 4G" (CDP `Network.emulateNetworkConditions`);
@@ -64,7 +64,7 @@
 - [ ] **Step 6 (baseline, 7 days after deploy):** Record these in `.planning/phases/20-bible-static-assets/20-01-BASELINE.md`:
   - **API load:** from Sevalla app logs (use the `sevalla-mcp-ops` agent), the count, p50/p95 `duration_ms` and response bytes of the gqlgen operations `PassageText` and `PassageInterlinear`, and their share of all GraphQL operations.
   - **DB load:** `pg_stat_statements` calls and total time for the `bible_verse_text` select, if the extension is available. Read-only query, no migration.
-  - **Field latency:** p50/p95 of `passage-render` split by `source`, from the vitals sink.
+  - **Field latency:** p50/p95 of `passage-render` split by `source`, from Faro measurements.
   - **Lab latency:** the Step 4 table.
   - **Cost:** the current monthly Sevalla bill split into app, static site, DB and bandwidth; app CPU/RAM utilisation; DB plan. If the Neon migration has landed, also DB compute-hours and the share of active time attributable to Bible queries.
 

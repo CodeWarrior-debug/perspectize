@@ -39,7 +39,7 @@ func (s *countingCategoryService) GetCategoriesByIDs(_ context.Context, ids []in
 
 func TestCategoryLoader_BatchesConcurrentLoadsIntoOneServiceCall(t *testing.T) {
 	svc := &countingCategoryService{}
-	loaders := NewLoaders(svc, nil)
+	loaders := NewLoaders(Services{Category: svc})
 
 	const n = 50
 	var wg sync.WaitGroup
@@ -62,7 +62,7 @@ func TestCategoryLoader_BatchesConcurrentLoadsIntoOneServiceCall(t *testing.T) {
 
 func TestCategoryLoader_RepeatedKeyIsFetchedOnce(t *testing.T) {
 	svc := &countingCategoryService{}
-	loaders := NewLoaders(svc, nil)
+	loaders := NewLoaders(Services{Category: svc})
 	ctx := context.Background()
 
 	for i := 0; i < 5; i++ {

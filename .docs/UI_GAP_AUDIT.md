@@ -537,7 +537,7 @@ Then delete the dead exports and their tests from `grid-config.ts`. `capitalizeC
 ## 20. Unused components ✅
 
 **Context.** These are not imported anywhere under `frontend/src`:
-- `CommentEditor.svelte`: replaced by `PerspectiveEditor` in #405, but has a different sanitizer allowlist, so it's risky if reused by mistake.
+- `CommentEditor.svelte`: replaced by `PerspectiveEditor` in #405 (since renamed `CommentsEditor`, not to be confused with this older singular one), but has a different sanitizer allowlist, so it's risky if reused by mistake.
 - `AGGridTest.svelte`
 - `UserSelector.svelte`
 

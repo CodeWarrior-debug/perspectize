@@ -15,6 +15,10 @@ vi.mock('$lib/queries/client', () => ({
 	getAuthToken: mockGetAuthToken,
 }));
 
+vi.mock('@capacitor/core', () => ({
+	Capacitor: { getPlatform: () => 'ios' },
+}));
+
 // browser flag is already mocked true in tests/setup.ts
 
 let capturedOptions: any;
@@ -54,18 +58,22 @@ describe('getWsClient', () => {
 		expect(capturedOptions.retryAttempts).toBe(Infinity);
 	});
 
-	it('connectionParams resolves the Clerk token under authToken', async () => {
+	it('connectionParams resolves the Clerk token under authToken plus client info', async () => {
 		const mod = await import('$lib/messaging/ws-client.svelte');
+		const { APP_VERSION } = await import('$lib/buildInfo');
 		mod.getWsClient();
 		const params = await capturedOptions.connectionParams();
-		expect(params).toEqual({ authToken: 'jwt-abc' });
+		expect(params).toEqual({ authToken: 'jwt-abc', clientVersion: APP_VERSION, clientPlatform: 'ios' });
+		expect(params.clientVersion.length).toBeGreaterThan(0);
 	});
 
 	it('connectionParams sends an empty string when there is no token', async () => {
 		mockGetAuthToken.mockResolvedValue(null);
 		const mod = await import('$lib/messaging/ws-client.svelte');
 		mod.getWsClient();
-		expect(await capturedOptions.connectionParams()).toEqual({ authToken: '' });
+		expect(await capturedOptions.connectionParams()).toEqual(
+			expect.objectContaining({ authToken: '', clientPlatform: 'ios' }),
+		);
 	});
 
 	it('on.connected / on.closed drive wsStatus', async () => {

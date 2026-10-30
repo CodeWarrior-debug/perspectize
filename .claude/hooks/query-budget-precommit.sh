@@ -29,10 +29,12 @@ frontend_hits=$(echo "$staged" | grep -E '^frontend/src/(lib/queries/.*\.(ts|sve
 # Component/route files only matter when they actually fetch.
 if [ -n "$frontend_hits" ]; then
   frontend_hits=$(echo "$frontend_hits" | while read -r f; do
-    case "$f" in
-      frontend/src/lib/queries/*) echo "$f" ;;
-      *) [ -f "$f" ] && grep -qE 'createQuery|createInfiniteQuery|invalidateQueries' "$f" && echo "$f" ;;
-    esac
+    # if/elif, not `case`: bash 3.2 (macOS /bin/bash) can't parse a case pattern's `)` inside $( ).
+    if [[ "$f" == frontend/src/lib/queries/* ]]; then
+      echo "$f"
+    elif [ -f "$f" ] && grep -qE 'createQuery|createInfiniteQuery|invalidateQueries' "$f"; then
+      echo "$f"
+    fi
   done)
 fi
 

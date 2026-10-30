@@ -66,11 +66,9 @@ func TestGormCategoryRepository_Upsert(t *testing.T) {
 	ctx := context.Background()
 	input := &domain.Category{WikidataQID: "Q42", Label: "Douglas Adams", Description: "English author", EntityType: "human"}
 
-	t.Run("upserts on wikidata_qid conflict then re-reads the fresh row", func(t *testing.T) {
+	t.Run("upserts on wikidata_qid conflict and returns the RETURNING row", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`INSERT INTO "categories" .* ON CONFLICT`).
-			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(3))
-		mock.ExpectQuery(`SELECT \* FROM "categories" WHERE wikidata_qid`).
+		mock.ExpectQuery(`INSERT INTO "categories" .* ON CONFLICT .* RETURNING \*`).
 			WillReturnRows(categoryRows().AddRow(3, "Q42", "Douglas Adams", "English author", "human", catRepoTime, catRepoTime))
 
 		got, err := NewGormCategoryRepository(db).Upsert(ctx, input)
@@ -79,6 +77,16 @@ func TestGormCategoryRepository_Upsert(t *testing.T) {
 		assert.Equal(t, 3, got.ID)
 		assert.Equal(t, "Q42", got.WikidataQID)
 		assert.Equal(t, catRepoTime, got.UpdatedAt)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("refreshes wikipedia_url but never blanks a stored one", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`DO UPDATE SET .*"wikipedia_url"=COALESCE\(NULLIF\(EXCLUDED\.wikipedia_url, ''\), categories\.wikipedia_url\)`).
+			WillReturnRows(categoryRows().AddRow(3, "Q42", "Douglas Adams", "English author", "human", catRepoTime, catRepoTime))
+
+		_, err := NewGormCategoryRepository(db).Upsert(ctx, input)
+		require.NoError(t, err)
 		assertAllExpectationsMet(t, mock)
 	})
 
@@ -94,17 +102,4 @@ func TestGormCategoryRepository_Upsert(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("wraps re-read errors distinctly", func(t *testing.T) {
-		db, mock := newMockDB(t)
-		mock.ExpectQuery(`INSERT INTO "categories"`).
-			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(3))
-		mock.ExpectQuery(`SELECT \* FROM "categories"`).WillReturnError(errors.New("refetch boom"))
-
-		got, err := NewGormCategoryRepository(db).Upsert(ctx, input)
-		assert.Nil(t, got)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to fetch upserted category")
-		assert.Contains(t, err.Error(), "refetch boom")
-		assertAllExpectationsMet(t, mock)
-	})
 }

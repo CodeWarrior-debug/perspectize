@@ -70,16 +70,12 @@ export function useUpdatePerspective() {
 	const queryClient = useQueryClient();
 	// PerspectiveItem-shaped branches only — patching by id never inserts a row, so a
 	// list that doesn't contain this perspective is untouched by the loop below.
-	// activityFeeds() is deliberately excluded: it caches a different row shape
-	// (ActivityPerspectiveItem, nested `content`, no rating fields) and is
-	// privacy-filtered server-side, so a PUBLIC<->PRIVATE toggle needs a real refetch
-	// to be re-filtered correctly, not a same-shape patch.
 	const rowListFilters: { queryKey: readonly unknown[] }[] = [
 		{ queryKey: queryKeys.perspectives.byUserLists() },
 		{ queryKey: queryKeys.perspectives.byContentLists() },
 	];
 
-	return createMutation(() => ({
+	const mutation = createMutation(() => ({
 		mutationFn: async (input: UpdatePerspectiveInput) => {
 			return graphqlRequest<UpdatePerspectiveResponse>(UPDATE_PERSPECTIVE, { input });
 		},
@@ -95,7 +91,7 @@ export function useUpdatePerspective() {
 			}
 			return { previous };
 		},
-		onError: (err: Error, _input: UpdatePerspectiveInput, context?: UpdateContext) => {
+		onError: (err: Error, input: UpdatePerspectiveInput, context?: UpdateContext) => {
 			context?.previous?.forEach(([key, data]) => queryClient.setQueryData(key, data));
 
 			const message = err.message.toLowerCase();
@@ -106,7 +102,11 @@ export function useUpdatePerspective() {
 			} else if (message.includes('at least one field')) {
 				toast.error('Please fill in at least one field');
 			} else {
-				toast.error('Failed to update perspective. Please try again.');
+				// The popover has already closed (it doesn't wait for the server), so
+				// offer the retry here rather than making the user re-enter everything.
+				toast.error('Failed to update perspective.', {
+					action: { label: 'Retry', onClick: () => mutation.mutate(input) },
+				});
 			}
 		},
 		onSuccess: (data: UpdatePerspectiveResponse) => {
@@ -124,12 +124,6 @@ export function useUpdatePerspective() {
 				queryClient.setQueriesData<ListPerspectivesByUserResponse>(f, swap);
 				queryClient.invalidateQueries({ ...f, refetchType: 'none' });
 			}
-			// Activity rows carry nested `content` and are privacy-filtered — refetch
-			// rather than patch, so e.g. a PUBLIC->PRIVATE toggle drops the row out of
-			// activityFeed(false) instead of leaving it there until something else
-			// happens to refetch it.
-			queryClient.invalidateQueries({ queryKey: queryKeys.perspectives.activityFeeds() });
-
 			// Editing a perspective — including toggling its Privacy — changes this
 			// content's perspectiveCount/averageRating (see useContentAggregates,
 			// which now counts private perspectives too). Evict the cached aggregate
@@ -141,4 +135,5 @@ export function useUpdatePerspective() {
 			}
 		},
 	}));
+	return mutation;
 }

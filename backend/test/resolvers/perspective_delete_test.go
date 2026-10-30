@@ -49,18 +49,22 @@ func TestDeletePerspective_NonOwnerCannotDelete(t *testing.T) {
 	}{
 		{domain.PrivacyPublic, "access denied"},
 		// Someone else's non-public perspective is indistinguishable from a missing one.
-		{domain.PrivacyPrivate, "resource not found"},
-		{domain.Privacy("SHARED"), "resource not found"},
+		{domain.PrivacyPrivate, "perspective not found"},
+		{domain.Privacy("SHARED"), "perspective not found"},
 	}
 	for _, tc := range tests {
 		t.Run(string(tc.privacy), func(t *testing.T) {
-			deleteCalled := false
+			var gotOwner int
 			repo := &mockPerspectiveRepository{
 				getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
 					return &domain.Perspective{ID: 100, UserID: 2, Privacy: tc.privacy}, nil
 				},
+				// Emulates the owner-scoped DELETE: another user's row never matches.
 				deleteFn: func(ctx context.Context, id int, ownerUserID int) error {
-					deleteCalled = true
+					gotOwner = ownerUserID
+					if ownerUserID != 2 {
+						return domain.ErrNotFound
+					}
 					return nil
 				},
 			}
@@ -70,7 +74,7 @@ func TestDeletePerspective_NonOwnerCannotDelete(t *testing.T) {
 			result := executeGraphQL(t, server, deletePerspectiveMutation)
 			require.NotEmpty(t, result.Errors)
 			assert.Contains(t, result.Errors[0].Message, tc.wantMsg)
-			assert.False(t, deleteCalled, "repository Delete must never run for a non-owner")
+			assert.Equal(t, 1, gotOwner, "the DELETE must be scoped to the session user, never the row's owner")
 		})
 	}
 }
@@ -98,7 +102,9 @@ func TestDeletePerspective_UnauthenticatedRejected(t *testing.T) {
 }
 
 func TestDeletePerspective_NotFound(t *testing.T) {
-	repo := &mockPerspectiveRepository{} // getByIDFn nil => ErrNotFound
+	repo := &mockPerspectiveRepository{ // getByIDFn nil => ErrNotFound
+		deleteFn: func(ctx context.Context, id int, ownerUserID int) error { return domain.ErrNotFound },
+	}
 	server := setupPerspectiveVisibilityServer(repo, true)
 	defer server.Close()
 

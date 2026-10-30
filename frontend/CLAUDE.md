@@ -64,14 +64,16 @@ Tailwind v4 uses `--color-*` prefix for theme variables (e.g., `--color-primary`
 
 ```bash
 pnpm run dev          # Dev server (http://localhost:5173)
-pnpm run check        # Type-check (svelte-check + TypeScript)
+pnpm run check        # Type-check: svelte-check --tsgo (TypeScript 7 native checker)
 pnpm run test:run     # Tests once (CI/verification)
 pnpm run test         # Tests in watch mode
 ```
 
+**TypeScript 7 runs as `@typescript/native` (npm alias of `typescript@7`); `typescript` stays on 6.x.** `svelte-check` and `@sveltejs/kit` only declare TypeScript ^5/^6 as peers, and svelte-check refuses TS 7 unless 6.x is also installed and `--tsgo` is passed. Keep both; `pnpm run check` already passes `--tsgo`. Raw `node_modules/@typescript/native/bin/tsc` is the TS 7 compiler, but it reports 16 false errors (`*.svelte` imports); use `pnpm run check` for type-checking, not raw `tsc`.
+
 **`pnpm exec` must run from `frontend/`** — running from repo root fails with `ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE`. Use `cd frontend && pnpm exec ...` or `pnpm --dir frontend exec ...`.
 
-**Cloud/CI sandbox sessions start with no `frontend/node_modules`** (a fresh container/checkout, unlike a local dev machine). `pnpm run check`, `test:run`, etc. fail with confusing module-resolution errors — not an "install first" message — until `pnpm install` is run once in `frontend/`.
+**Cloud/CI sandbox sessions start with no `frontend/node_modules`** (a fresh container/checkout, unlike a local dev machine). `pnpm run check`, `test:run`, etc. fail with confusing module-resolution errors — not an "install first" message — until `pnpm install` is run once in `frontend/`. Cloud containers ship Node 22.22.0 while jsdom requires ^22.22.2, so `pnpm install --frozen-lockfile` fails the engine check (easy to miss when output is redirected); use `pnpm install --frozen-lockfile --config.engine-strict=false`.
 
 **`pnpm-lock.yaml` merge conflicts:** accept either side (`git checkout --theirs frontend/pnpm-lock.yaml`), then regenerate with `pnpm install --dir frontend`. Use `--dir` instead of `cd` to avoid hook/shell side effects that can switch branches mid-operation.
 
@@ -94,7 +96,7 @@ This project uses **Svelte 5 runes** exclusively. Do not use Svelte 4 syntax.
 
 **Runes in a plain `.ts` module require the `.svelte.ts` extension.** `$state`/`$derived`/etc. only compile in `.svelte` files or files named `*.svelte.ts` — a rune used in a bare `.ts` file fails at build/type-check time with no Svelte-specific error pointing at the cause. Any non-component module that needs reactive state (e.g. a shared store) must be named `foo.svelte.ts`, not `foo.ts` — see `frontend/src/lib/theme/store.svelte.ts`.
 
-**`$effect` only tracks state read _synchronously_ in the effect body.** A value read solely inside a `setTimeout`/`Promise`/`await` callback is NOT a tracked dependency, so the effect runs once on mount and never re-runs. For a debounce, copy the reactive value into a local const at the top of the effect first (`const term = searchTerm;`), then use the local inside the timer — see `discover/SearchBar.svelte`. (Bug history: `CategoryTypeahead.svelte`'s Wikidata search read `searchTerm` only inside its `setTimeout`, so the debounced term never updated and the search query never fired.)
+**`$effect` only tracks state read _synchronously_ in the effect body.** A value read solely inside a `setTimeout`/`Promise`/`await` callback is NOT a tracked dependency, so the effect runs once on mount and never re-runs. For a debounce, copy the reactive value into a local const at the top of the effect first (`const term = searchTerm;`), then use the local inside the timer — see `CategoryTypeahead.svelte`. (Bug history: its Wikidata search once read `searchTerm` only inside its `setTimeout`, so the debounced term never updated and the search query never fired.)
 
 **An `$effect` that writes a `$state` var and then reads that same var back (even just-assigned) loops.** Svelte 5 flags this as `effect_update_depth_exceeded` — assigning `foo = x` then reading `foo.length` later in the same effect re-triggers the effect indefinitely, even though the value is unchanged. Fix: read from a local `const` derived off the source (prop) instead of reading the `$state` var back. See `PerspectivePopover.svelte`'s `existingPerspective` reset effect.
 
@@ -153,6 +155,12 @@ The aim is one network call per distinct piece of data, deliberate freshness, an
 
 Full table: [../.docs/QUERY_BUDGET.md](../.docs/QUERY_BUDGET.md).
 
+## UI conventions
+
+- **Nav labels are one word** (`Header.svelte` `navLinks`: Activity, Discover, Compare); name new top-level pages with a one-word verb.
+- **Toasts:** svelte-sonner, configured once in `TOASTER_PROPS` (`lib/utils/toast.ts`, spread into both `<Toaster>`s in `+layout.svelte`): default 2s, and `expand: true` so simultaneous toasts sit apart instead of overlapping. A toast that carries an action button uses `toastWithAction` (`lib/utils/toast.ts`, `ACTION_TOAST_DURATION_MS` = 4s) so there's time to click it; its `secondary` option adds a second choice.
+- **User-supplied HTML:** sanitize with `sanitizeHtml` (`lib/utils/sanitize.ts`, DOMPurify) and render through `SafeHtml.svelte`; the backend mirrors the same tag set with bluemonday (`services/sanitize.go`). Change both together. See [.docs/SECURITY.md](../.docs/SECURITY.md#user-supplied-html).
+
 ## Icons (Lucide)
 
 Per-icon imports from `@lucide/svelte` for tree-shaking:
@@ -192,6 +200,8 @@ Full setup and examples: [docs/AG_GRID.md](docs/AG_GRID.md)
 **Column metadata lives in one place:** `src/lib/utils/grid-config.ts`'s `COLUMNS: readonly ColumnMeta[]` is the single source of truth for the column picker, sort picker, server/client sort maps, URL filter keys, and filter-chip labels — all derived from one `ColumnMeta` entry per column via `.filter()`/`.map()`/`Object.fromEntries()`, not five separately hand-maintained lists. Adding a column means adding one `COLUMNS` entry, not editing `DATA_COLUMNS`/`SORTABLE_COLUMNS`/`COL_TO_SORT`/`COL_TO_FILTER_KEY`/`COLUMN_LABELS` individually. See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md).
 
 **Grid remount gotcha:** the `cardMode` breakpoint (<860px) and the error state unmount `AgGridSvelte5Component` entirely — a new Grid API is created on the way back, so any imperative column state (`setColumnsVisible`, `applyColumnState`, the session column-picker override) MUST be re-applied from an `$effect` that reruns on `gridReady`, not just at the moment the user changes it.
+
+**Grid column APIs can't run from `onGridReady`:** calling `setColumnsVisible` or `applyColumnState` straight from `onGridReady` (or from an effect triggered by it) throws `Cannot read properties of undefined (reading 'setColumnMovingCss')`, because the body controller isn't ready yet. Defer one frame with `requestAnimationFrame` and check `isDestroyed()` first, as `ActivityTable` does. The throw also kills the Plan grid's `onRowDragEnd`, so drag-reorder silently stops saving.
 
 **Grid colours come from theme tokens, not hex.** `src/lib/utils/grid-theme.ts` (`GRID_THEME_PARAMS`, unit-tested to contain no raw colours) feeds `themeQuartz.withParams`, so the grid follows the theme picker. Zebra/hover come from `--color-row-alt` / `--color-row-hover` / `--color-row-accent`, derived in `src/lib/theme/derive.ts` (so custom themes get them too). Adding a derived token means: `DerivedTokens` + `toCssVarMap` + `clearInlineThemeVars` in `store.svelte.ts`, the default `@theme` block in `app.css`, and the four `[data-theme]` blocks (regenerate with `npx tsx gen-preset-css.mjs`; for a new token `git diff` must show only additions). Changing how an existing token is _derived_ changes every preset's generated block and the default block's matching values; `tests/unit/theme/css-agreement.test.ts` fails until `app.css` is regenerated. Row hover is a foreground wash (not primary-driven) so dimming the primary never erodes hover-vs-zebra; an authored neutral with chroma >= 0.004 keeps its own hue.
 

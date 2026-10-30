@@ -160,14 +160,60 @@ describe('ActivityTable', () => {
 			expect(mockRequest).toHaveBeenCalledWith(
 				expect.anything(),
 				expect.objectContaining({
-					filter: { search: 'sowell', searchFields: ['TITLE', 'DESCRIPTION', 'CHANNEL_TITLE', 'TAGS'] },
+					filter: {
+						search: 'sowell',
+						searchFields: ['TITLE', 'DESCRIPTION', 'CHANNEL_TITLE', 'TAGS'],
+						contentTypes: ['YOUTUBE_VIDEO'], // default Type filter is also server-side in Loaded mode
+					},
 				}),
 			);
 		});
 		unmount();
 
 		mockRequest.mockClear();
-		mockPageState.url = new URL('http://localhost/');
+		mockPageState.url = new URL('http://localhost/?f=none');
+		renderWithQuery(queryClient);
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ filter: undefined }));
+		});
+	});
+
+	it('sends the Type filter to the server in Loaded mode (first 100 rows are already that type)', async () => {
+		mockPageState.url = new URL('http://localhost/?f.type=movie');
+		renderWithQuery();
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.objectContaining({ first: 100, filter: { contentTypes: ['MOVIE'] } }),
+			);
+		});
+	});
+
+	it('sends the Type filter together with search, but not other column filters, in Loaded mode', async () => {
+		mockPageState.url = new URL('http://localhost/?f.type=movie&q=heat&f.views=100..');
+		renderWithQuery();
+		await waitFor(() => {
+			expect(mockRequest).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.objectContaining({
+					filter: expect.objectContaining({ contentTypes: ['MOVIE'], search: 'heat' }),
+				}),
+			);
+		});
+		const filter = mockRequest.mock.calls[0][1].filter;
+		expect(filter).not.toHaveProperty('minViewCount');
+	});
+
+	it('refetches in Loaded mode when the Type filter changes (query key mirrors the request)', async () => {
+		const queryClient = new QueryClient({
+			defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 }, mutations: { retry: false } },
+		});
+		mockPageState.url = new URL('http://localhost/?f.type=movie');
+		const { unmount } = renderWithQuery(queryClient);
+		await waitFor(() => expect(mockRequest).toHaveBeenCalled());
+		unmount();
+		mockRequest.mockClear();
+		mockPageState.url = new URL('http://localhost/?f=none');
 		renderWithQuery(queryClient);
 		await waitFor(() => {
 			expect(mockRequest).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ filter: undefined }));

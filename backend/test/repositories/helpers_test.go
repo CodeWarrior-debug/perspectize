@@ -70,7 +70,7 @@ func cleanupUsers(t *testing.T, db *gorm.DB, ids ...int) {
 }
 
 // mustCreateThread is a thin wrapper used by the thread-repository tests.
-func mustCreateThread(t *testing.T, repo *postgres.GormThreadRepository, createdBy int, participantIDs []int) int {
+func mustCreateThread(t *testing.T, repo *postgres.GormMessageThreadRepository, createdBy int, participantIDs []int) int {
 	t.Helper()
 	thread, err := repo.CreateThread(context.Background(), createdBy, nil, participantIDs)
 	require.NoError(t, err)

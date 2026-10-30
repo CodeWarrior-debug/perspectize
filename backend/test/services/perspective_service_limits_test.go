@@ -55,7 +55,7 @@ func newUpdateSvc(existing *domain.Perspective) (*services.PerspectiveService, *
 			cp := *existing
 			return &cp, nil
 		},
-		updateFn: func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
+		updateFn: func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
 			saved = *p
 			return p, nil
 		},
@@ -66,7 +66,7 @@ func newUpdateSvc(existing *domain.Perspective) (*services.PerspectiveService, *
 func TestPerspectiveUpdate_IDMustBePositive(t *testing.T) {
 	svc, _ := newUpdateSvc(&domain.Perspective{ID: 1, UserID: 1})
 
-	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 0})
+	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 0}, 1)
 
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }
@@ -74,11 +74,11 @@ func TestPerspectiveUpdate_IDMustBePositive(t *testing.T) {
 func TestPerspectiveUpdate_FeelingsCapBoundary(t *testing.T) {
 	svc, saved := newUpdateSvc(&domain.Perspective{ID: 1, UserID: 1})
 
-	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Feelings: validFeelings(domain.MaxFeelings)})
+	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Feelings: validFeelings(domain.MaxFeelings)}, 1)
 	require.NoError(t, err)
 	assert.Len(t, saved.Feelings, domain.MaxFeelings)
 
-	_, err = svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Feelings: validFeelings(domain.MaxFeelings + 1)})
+	_, err = svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Feelings: validFeelings(domain.MaxFeelings + 1)}, 1)
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }
 
@@ -94,7 +94,7 @@ func TestPerspectiveUpdate_OmittedFieldsAreLeftUntouched(t *testing.T) {
 	svc, saved := newUpdateSvc(existing)
 	like := "up"
 
-	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Like: &like})
+	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{ID: 1, Like: &like}, 1)
 
 	require.NoError(t, err)
 	require.NotNil(t, saved.ContentID)
@@ -115,7 +115,7 @@ func TestPerspectiveUpdate_ProvidedFieldsAreApplied(t *testing.T) {
 
 	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{
 		ID: 1, ContentID: &newContent, Description: &newDesc, CategorizedRatings: ratings,
-	})
+	}, 1)
 
 	require.NoError(t, err)
 	require.NotNil(t, saved.ContentID)
@@ -130,7 +130,7 @@ func TestPerspectiveUpdate_InvalidCategorizedRatingRejected(t *testing.T) {
 
 	_, err := svc.Update(context.Background(), portservices.UpdatePerspectiveInput{
 		ID: 1, CategorizedRatings: []domain.CategorizedRating{{Category: "style", Rating: 10001}},
-	})
+	}, 1)
 
 	assert.ErrorIs(t, err, domain.ErrInvalidRating)
 }

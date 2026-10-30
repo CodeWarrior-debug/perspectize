@@ -17,13 +17,22 @@
 		isAdmin?: boolean;
 		/** colId → currently-visible, seeded from the live grid when the dialog opens. */
 		visibility?: Record<string, boolean>;
-		/** True once the user has taken manual control this session. */
-		overrideActive?: boolean;
+		/** True when the current view has a saved custom column setup (see columnLayouts.ts). */
+		customLayout?: boolean;
 		/** Called with (colId, nextVisible) on each checkbox change. */
 		onToggle: (colId: string, next: boolean) => void;
+		/** Drops the current view's custom setup, back to its default columns. */
+		onReset?: () => void;
 	}
 
-	let { open = $bindable(false), isAdmin = false, visibility = {}, overrideActive = false, onToggle }: Props = $props();
+	let {
+		open = $bindable(false),
+		isAdmin = false,
+		visibility = {},
+		customLayout = false,
+		onToggle,
+		onReset,
+	}: Props = $props();
 
 	function handleChange(col: TogglableColumn, e: Event) {
 		onToggle(col.colId, (e.currentTarget as HTMLInputElement).checked);
@@ -34,7 +43,7 @@
 	<DialogContent class="max-w-lg">
 		<DialogHeader>
 			<DialogTitle>Columns</DialogTitle>
-			<DialogDescription>Choose which columns appear in the table for this session.</DialogDescription>
+			<DialogDescription>Choose which columns appear in the table.</DialogDescription>
 		</DialogHeader>
 
 		<div class="max-h-[60vh] space-y-6 overflow-y-auto py-2">
@@ -71,18 +80,22 @@
 			{/if}
 		</div>
 
-		<p
-			class="rounded-md px-3 py-2 text-xs {overrideActive
+		<div
+			class="flex items-center justify-between gap-3 rounded-md px-3 py-2 text-xs {customLayout
 				? 'bg-muted font-medium text-foreground'
 				: 'text-muted-foreground'}"
-			data-testid="session-hint"
 		>
-			{#if overrideActive}
-				Columns are set manually for this session — refresh the page to return to the standard columns.
-			{:else}
-				Column choices apply for this session only. Refresh the page to return to the standard columns.
+			<p data-testid="layout-hint">
+				{#if customLayout}
+					Your custom columns for this view are saved.
+				{:else}
+					Showing the default columns for this view. Changes are saved for next time.
+				{/if}
+			</p>
+			{#if customLayout && onReset}
+				<Button type="button" variant="outline" size="sm" onclick={onReset}>Reset to default columns</Button>
 			{/if}
-		</p>
+		</div>
 
 		<DialogFooter>
 			<Button type="button" onclick={() => (open = false)}>Done</Button>

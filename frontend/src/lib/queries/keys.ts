@@ -1,3 +1,5 @@
+import type { UserTodosArgs } from './userTodos';
+
 /**
  * Centralized query key factory for type-safe, hierarchical cache invalidation.
  */
@@ -32,6 +34,10 @@ export const queryKeys = {
 		// from `list` above (adds perspectiveCount, no pagination), keyed by
 		// the debounced search term.
 		comparePicker: (search: string) => [...queryKeys.content.lists(), 'compare-picker', search] as const,
+		// ListContentPicker (plan/ItemPicker.svelte): keyed by the debounced search
+		// and the pressed type chips (ContentType enum values, sorted).
+		itemPicker: (search: string, types: readonly string[]) =>
+			[...queryKeys.content.lists(), 'item-picker', search, types] as const,
 	},
 
 	bible: {
@@ -71,14 +77,22 @@ export const queryKeys = {
 		// ListPerspectivesByContentResponse -- also PerspectiveItem rows.
 		byContentLists: () => [...queryKeys.perspectives.lists(), 'byContent'] as const,
 		listByContent: (contentId: number) => [...queryKeys.perspectives.byContentLists(), { contentId }] as const,
-		// ListActivityPerspectivesResponse -- ActivityPerspectiveItem rows (nested
-		// `content`, no rating fields: a DIFFERENT shape) and privacy-filtered by the
-		// server (includePrivate). Never patch this with a PerspectiveItem -- refetch
-		// it instead, so privacy scoping and the nested content stay correct.
-		activityFeeds: () => [...queryKeys.perspectives.lists(), 'activityFeed'] as const,
-		activityFeed: (includePrivate: boolean) => [...queryKeys.perspectives.activityFeeds(), { includePrivate }] as const,
 		details: () => [...queryKeys.perspectives.all(), 'detail'] as const,
 		detail: (id: string) => [...queryKeys.perspectives.details(), id] as const,
+	},
+
+	// User todos ("Plan"). `list(filters)` takes the exact variables useUserTodos
+	// sends, so every variable changes the key. `todoLists(userId)` is one
+	// owner's todo lists; `todoListsAll()` is the prefix over every owner.
+	userTodos: {
+		all: () => [...queryKeys.all, 'userTodos'] as const,
+		lists: () => [...queryKeys.userTodos.all(), 'list'] as const,
+		list: (filters: UserTodosArgs) => [...queryKeys.userTodos.lists(), filters] as const,
+		details: () => [...queryKeys.userTodos.all(), 'detail'] as const,
+		detail: (id: string) => [...queryKeys.userTodos.details(), id] as const,
+		actions: () => [...queryKeys.userTodos.all(), 'actions'] as const,
+		todoListsAll: () => [...queryKeys.userTodos.all(), 'todoLists'] as const,
+		todoLists: (userId: number | null) => [...queryKeys.userTodos.todoListsAll(), { userId }] as const,
 	},
 
 	messaging: {

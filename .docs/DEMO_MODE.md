@@ -35,7 +35,7 @@ Defined once in `backend/internal/demo/fixtures.go` (mirrored for the picker in 
 | `carmen` | carmen_admin | ADMIN | Admin-only UI |
 | `newbie` | newbie_demo | DEFAULT | Empty account; onboarding coach still active |
 
-Seed also includes 5 YouTube videos, 8 perspectives and an Alice↔Ben message thread (4 unread). "Me at the zoo" (`jNQXAC9IVRw`) is deliberately *not* seeded so tours can add it.
+Seed also includes 5 YouTube videos, 8 perspectives and an Alice↔Ben message thread (2 unread for each of them: only the other's messages count). "Me at the zoo" (`jNQXAC9IVRw`) is deliberately *not* seeded so tours can add it.
 
 ## How it works
 
@@ -44,7 +44,7 @@ Seed also includes 5 YouTube videos, 8 perspectives and an Alice↔Ben message t
 | Config gate | `backend/internal/config/demo.go` | `DEMO_MODE=true` enables demo mode; **fatal with `APP_ENV=production`** |
 | Demo auth | `backend/internal/adapters/auth/demo_token_verifier.go` | Wraps the Clerk verifier: `Bearer demo.<persona>` → `clerk_user_id = demo_<persona>`; anything else goes to Clerk. Unseeded personas are never created on demand |
 | Offline YouTube | `backend/internal/adapters/youtube/fixture_client.go` | Canned metadata for fixture IDs, a placeholder for any other ID — the add-video flow works with no API key |
-| Seeder | `backend/cmd/seed-demo` | Idempotent; `-reset` deletes only demo-persona rows first. Refuses non-local DB hosts without `-allow-remote` (protects the shared Sevalla DB) |
+| Seeder | `backend/cmd/seed-demo` | Idempotent; `-reset` deletes only demo-persona rows first. Refuses non-local DB hosts without `-allow-remote` (protects the shared Neon DB) |
 | Frontend auth facade | `frontend/src/lib/auth/`, `src/lib/components/auth/` | `VITE_DEMO_MODE=true` drops `ClerkProvider`; `AuthShow` / `SignInTrigger` / `UserMenu` / `useAuthState` / `getAuthToken` pick Clerk or the demo session. `?demo_as=<key>` selects a persona (`?demo_as=` signs out) |
 | Stack | `docker-compose.demo.yml` | postgres (volume `demo_pgdata`) → migrate → seed → backend (**production image**, `DEMO_MODE=true`) → frontend (`frontend/Dockerfile.demo`, nginx) |
 | Tours / flows | `frontend/demo/` | Playwright; `e2e` + `record` projects |
@@ -89,7 +89,7 @@ Host the files as release assets (same flow as [PR_SCREENSHOTS.md](PR_SCREENSHOT
 
 ## Not covered yet / next steps
 
-- **Discover page** calls the YouTube API from the browser (`VITE_YOUTUBE_API_KEY`); it is empty in demo mode. A fixture-backed search would need a backend proxy.
+- **Discover page:** Trending comes from the backend's `youtubeTrending` query, and demo mode has no Trending fixture, so the feed shows "Trending is unavailable right now." Search hands off to youtube.com, so it needs no fixture. A fixture-backed Trending client would fill the feed.
 - **Clerk UI itself** (sign-up, profile modal, webhook sync) is out of scope — demo mode replaces it rather than exercising it.
 - **A hosted public demo** (e.g. a Sevalla app with its own database, reset nightly) is feasible with `seed-demo -reset -allow-remote` on a schedule, but needs an explicit decision: anyone could post content as the personas.
 - **Captions/voice-over**: captions are burned in; a narration track or chaptering could be layered on the same scripts.

@@ -6,13 +6,27 @@ import AddContentPopover from '$lib/components/AddContentPopover.svelte';
 const mocks = vi.hoisted(() => ({
 	video: { mutate: vi.fn(), isPending: false, isSuccess: false },
 	passage: { mutate: vi.fn(), isPending: false, isSuccess: false },
+	movie: {
+		mutate: vi.fn(),
+		reset: vi.fn(),
+		isPending: false,
+		isSuccess: false,
+		isError: false,
+		error: null as unknown,
+	},
 }));
 
 vi.mock('$lib/queries/content/useAddVideo', () => ({ useAddVideo: () => mocks.video }));
+vi.mock('$lib/queries/content/useAddMovie', () => ({ useAddMovie: () => mocks.movie }));
 vi.mock('$lib/queries/content/useAddPassage', () => ({ useAddPassage: () => mocks.passage }));
 
 const JOHN = 43;
 const YT = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+const TMDB = 'https://www.themoviedb.org/movie/603-the-matrix';
+const IMDB = 'https://www.imdb.com/title/tt0133093/';
+const NOT_ALLOWED =
+	'While Perspectize does not intend to act as censor, adding NSFW content is not enabled until traffic necessitates a long-term decision about content access policies.';
+const ATTRIBUTION = 'This product uses the TMDB API but is not endorsed or certified by TMDB.';
 const BG = 'https://www.biblegateway.com/passage/?search=John+3%3A16-18&version=NIV';
 
 async function openWith(text?: string) {
@@ -36,10 +50,12 @@ const pick = async (label: RegExp | string, value: string | number) => {
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	for (const m of [mocks.video, mocks.passage]) {
+	for (const m of [mocks.video, mocks.passage, mocks.movie]) {
 		m.isPending = false;
 		m.isSuccess = false;
 	}
+	mocks.movie.isError = false;
+	mocks.movie.error = null;
 });
 
 describe('AddContentPopover detection states', () => {
@@ -223,5 +239,81 @@ describe('AddContentPopover mutation states', () => {
 		await openWith('John 3:16-18');
 		expect(screen.getByRole('button', { name: 'Adding...' })).toBeDisabled();
 		expect(screen.getByLabelText('Book')).toBeDisabled();
+	});
+});
+
+describe('AddContentPopover movies', () => {
+	it('a TMDB link autodetects Movie, shows the TMDB notice and submits the trimmed input', async () => {
+		await openWith(`  ${TMDB}  `);
+		expect(chip()).toHaveTextContent('Detected: Movie');
+		expect(screen.getByText(ATTRIBUTION)).toBeInTheDocument();
+		expect(screen.queryByTestId('passage-picker')).toBeNull();
+		await fireEvent.click(submit());
+		expect(mocks.movie.mutate).toHaveBeenCalledWith(TMDB);
+		expect(mocks.video.mutate).not.toHaveBeenCalled();
+	});
+
+	it('an IMDb title link autodetects Movie', async () => {
+		await openWith(IMDB);
+		expect(chip()).toHaveTextContent('Detected: Movie');
+		expect(submit()).toBeEnabled();
+	});
+
+	it('Movie can be chosen manually and the TMDB notice shows only for Movie', async () => {
+		await openWith('grace');
+		expect(screen.queryByText(ATTRIBUTION)).toBeNull();
+		await pick('Change type', 'MOVIE');
+		expect(chip()).toHaveTextContent('Type: Movie');
+		expect(screen.getByText(ATTRIBUTION)).toBeInTheDocument();
+		await type(YT);
+		expect(chip()).toHaveTextContent('Detected: YouTube');
+		expect(screen.queryByText(ATTRIBUTION)).toBeNull();
+	});
+
+	it('a manual Movie type with a non-movie string shows an inline error and does not submit', async () => {
+		await openWith('grace');
+		await pick('Change type', 'MOVIE');
+		await fireEvent.click(submit());
+		expect(screen.getByText('Please enter a valid TMDB or IMDb movie link')).toBeInTheDocument();
+		expect(mocks.movie.mutate).not.toHaveBeenCalled();
+	});
+
+	it('Clear type keeps Movie selected and empties the text', async () => {
+		await openWith(TMDB);
+		await fireEvent.click(screen.getByRole('button', { name: /clear type/i }));
+		await tick();
+		expect(chip()).toHaveTextContent('Type: Movie');
+		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toHaveValue('');
+	});
+
+	it('a generic error shows the generic message', async () => {
+		mocks.movie.isError = true;
+		mocks.movie.error = { response: { errors: [{ message: 'boom', extensions: { code: 'INTERNAL' } }] } };
+		await openWith(TMDB);
+		expect(screen.getByText('Could not add this movie. Check the link and try again.')).toBeInTheDocument();
+		expect(screen.queryByText('boom')).toBeNull();
+	});
+
+	it('CONTENT_NOT_ALLOWED shows the exact server text and stays open', async () => {
+		mocks.movie.isError = true;
+		mocks.movie.error = {
+			response: { errors: [{ message: NOT_ALLOWED, extensions: { code: 'CONTENT_NOT_ALLOWED' } }] },
+		};
+		await openWith(TMDB);
+		expect(screen.getByText(NOT_ALLOWED)).toBeInTheDocument();
+		expect(screen.queryByText(/could not add this movie/i)).toBeNull();
+		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toBeEnabled();
+	});
+
+	it('pending disables the form', async () => {
+		mocks.movie.isPending = true;
+		await openWith(TMDB);
+		expect(screen.getByRole('button', { name: 'Adding...' })).toBeDisabled();
+		expect(screen.getByPlaceholderText(/paste a link or type a reference/i)).toBeDisabled();
+	});
+
+	it('opening the popover resets the movie mutation', async () => {
+		await openWith();
+		expect(mocks.movie.reset).toHaveBeenCalled();
 	});
 });

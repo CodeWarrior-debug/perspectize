@@ -12,8 +12,9 @@ func TestDefaultPoolConfig_Values(t *testing.T) {
 	cfg := database.DefaultPoolConfig()
 
 	assert.Equal(t, 25, cfg.MaxOpenConns)
-	assert.Equal(t, 5, cfg.MaxIdleConns)
-	assert.Equal(t, 5*time.Minute, cfg.ConnMaxLifetime)
+	assert.Equal(t, 15, cfg.MaxIdleConns)
+	assert.Equal(t, 30*time.Minute, cfg.ConnMaxLifetime)
+	assert.Equal(t, 10*time.Minute, cfg.ConnMaxIdleTime)
 }
 
 func TestPoolConfigFromEnv_UnsetUsesDefaults(t *testing.T) {
@@ -22,5 +23,5 @@ func TestPoolConfigFromEnv_UnsetUsesDefaults(t *testing.T) {
 	t.Setenv("DB_CONN_MAX_LIFETIME", "")
 
 	assert.Equal(t, database.DefaultPoolConfig(), database.PoolConfigFromEnv())
-	assert.Equal(t, 5*time.Minute, database.PoolConfigFromEnv().ConnMaxLifetime)
+	assert.Equal(t, 30*time.Minute, database.PoolConfigFromEnv().ConnMaxLifetime)
 }

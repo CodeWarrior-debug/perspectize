@@ -52,18 +52,31 @@ describe('ColumnPickerDialog', () => {
 		expect(onToggle).toHaveBeenCalledWith('tags', false);
 	});
 
-	it('always shows the "refresh to return to standard columns" hint', () => {
-		render(ColumnPickerDialog, { props: { open: true, overrideActive: false, onToggle: noop } });
-		const hint = screen.getByTestId('session-hint');
-		expect(hint.textContent).toMatch(/refresh the page to return to the standard columns/i);
+	it('default view: says changes are saved and offers no reset', () => {
+		render(ColumnPickerDialog, { props: { open: true, customLayout: false, onToggle: noop, onReset: noop } });
+		expect(screen.getByTestId('layout-hint').textContent).toMatch(/default columns.*saved for next time/i);
+		expect(screen.queryByRole('button', { name: /reset to default columns/i })).toBeNull();
 	});
 
-	it('escalates the hint wording once overrideActive', async () => {
+	it('custom view: says the setup is saved and offers a reset', () => {
+		render(ColumnPickerDialog, { props: { open: true, customLayout: true, onToggle: noop, onReset: noop } });
+		expect(screen.getByTestId('layout-hint').textContent).toMatch(/custom columns.*saved/i);
+		expect(screen.getByRole('button', { name: /reset to default columns/i })).toBeTruthy();
+	});
+
+	it('switches between the two states when customLayout changes', async () => {
 		const { rerender } = render(ColumnPickerDialog, {
-			props: { open: true, overrideActive: false, onToggle: noop },
+			props: { open: true, customLayout: false, onToggle: noop, onReset: noop },
 		});
-		expect(screen.getByTestId('session-hint').textContent).toMatch(/apply for this session only/i);
-		await rerender({ open: true, overrideActive: true, onToggle: noop });
-		expect(screen.getByTestId('session-hint').textContent).toMatch(/set manually for this session/i);
+		expect(screen.queryByRole('button', { name: /reset to default columns/i })).toBeNull();
+		await rerender({ open: true, customLayout: true, onToggle: noop, onReset: noop });
+		expect(screen.getByRole('button', { name: /reset to default columns/i })).toBeTruthy();
+	});
+
+	it('calls onReset when Reset to default columns is clicked', () => {
+		const onReset = vi.fn();
+		render(ColumnPickerDialog, { props: { open: true, customLayout: true, onToggle: noop, onReset } });
+		screen.getByRole('button', { name: /reset to default columns/i }).click();
+		expect(onReset).toHaveBeenCalledOnce();
 	});
 });

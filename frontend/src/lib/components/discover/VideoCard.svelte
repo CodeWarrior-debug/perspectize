@@ -232,7 +232,7 @@
 
 {#if popoverOpen && contentIdNumber !== null}
 	<!-- Dynamically imported: PerspectivePopover pulls in the Tiptap-based
-	     PerspectiveEditor, which shouldn't load eagerly for every Discover page
+	     CommentsEditor, which shouldn't load eagerly for every Discover page
 	     visit — see ActivityTable.svelte's identical lazy-import pattern. -->
 	{#await import('$lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
 		<PerspectivePopover

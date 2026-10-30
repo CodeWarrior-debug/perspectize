@@ -1,0 +1,902 @@
+{
+  "type": {
+    "label": "Movie",
+    "enumValue": "MOVIE",
+    "icon": "film",
+    "accent": "#0F9D8C",
+    "serifTitles": false,
+    "serifText": false
+  },
+  "meta": {
+    "date": "2026-10-07",
+    "sources": [
+      "docs/superpowers/specs/2026-10-07-movie-content-type-design.md",
+      "frontend/src/lib/components/ActivityTable.svelte",
+      "backend/schema.graphql",
+      "tools/content-type-designer/src/catalog.ts"
+    ],
+    "note": "Rebuilt from the amended spec and the implemented columns; the details view is planned (the app modal has no Movie fields yet). The app also has a Tags column (TMDB keywords, 11 columns in total); this preview tool caps at 10, so keywords show in the details view instead. Film facts and scores are illustrative and not re-checked against TMDB."
+  },
+  "columns": [
+    {
+      "id": "pz",
+      "kind": "perspectize",
+      "status": "shipped",
+      "header": {
+        "body": "Add or edit your perspective on this film. Filled when you already have one.",
+        "src": "derived: perspectives WHERE content_id AND user_id"
+      }
+    },
+    {
+      "id": "item",
+      "kind": "item",
+      "label": "Film",
+      "status": "shipped",
+      "header": {
+        "body": "Film title with its TMDB poster and release year. Sorts by title A to Z. The shipped grid header still reads Item for every type; a per-type Film label is planned, not built.",
+        "src": "content.name + response.poster_path + response.release_date year"
+      }
+    },
+    {
+      "id": "genre",
+      "kind": "pill",
+      "label": "Genre",
+      "status": "shipped",
+      "header": {
+        "body": "TMDB genre names; the first genre is shown. Not sortable and has no value-list filter yet; TMDB uses Science Fiction for movies where TV uses Sci-Fi and Fantasy.",
+        "src": "response.genres[]"
+      },
+      "cell": {
+        "src": "response.genres[0]",
+        "whenEmpty": "TMDB lists no genre for this film."
+      }
+    },
+    {
+      "id": "rated",
+      "kind": "text",
+      "label": "Rated",
+      "status": "shipped",
+      "header": {
+        "body": "US age rating (G, PG, PG-13, R, NC-17) stored as a string. Sorts by rating rather than A to Z with unrated last. There is no value-list filter yet, so it is sort-only.",
+        "src": "response.certification",
+        "extra": "Illustrative: certification values here are what TMDB usually holds, not re-checked per film."
+      },
+      "cell": {
+        "src": "response.certification",
+        "whenEmpty": "TMDB has no US certification for this film; blank is not Unrated."
+      }
+    },
+    {
+      "id": "cast",
+      "kind": "tags",
+      "label": "Cast",
+      "status": "shipped",
+      "header": {
+        "body": "Directors lead, marked dir., then the top cast in billing order; the cell shows three and a count. Only the top 15 cast are searchable, and search can be scoped to Cast or Director. Not sortable.",
+        "src": "response.directors[] then response.cast[] (top 15)",
+        "extra": "personId filter exists in the backend but has no UI yet."
+      },
+      "cell": {
+        "src": "response.directors[].name + response.cast[].name",
+        "whenEmpty": "TMDB lists neither director nor cast for this film."
+      }
+    },
+    {
+      "id": "duration",
+      "kind": "text",
+      "label": "Duration",
+      "status": "shipped",
+      "header": {
+        "body": "Runtime to the minute; TMDB gives no seconds, so the seconds are always :00. Shown h:mm:ss from one hour up (2:22:00) and m:ss below (45:00). Sorts with YouTube videos by length; numeric filter.",
+        "src": "content.length (seconds) = response.runtimeMinutes x 60"
+      },
+      "cell": {
+        "src": "content.length",
+        "whenEmpty": "TMDB has no runtime for this film."
+      }
+    },
+    {
+      "id": "released",
+      "kind": "date",
+      "label": "Released",
+      "status": "shipped",
+      "header": {
+        "body": "Release date from TMDB, shown as the date string. Not sortable and not filterable yet.",
+        "src": "response.release_date"
+      },
+      "cell": {
+        "src": "response.release_date",
+        "whenEmpty": "TMDB has no release date for this film."
+      }
+    },
+    {
+      "id": "box",
+      "kind": "text",
+      "label": "Box office",
+      "status": "shipped",
+      "header": {
+        "body": "Worldwide gross in compact dollars, with the exact figure in the tooltip. TMDB reports 0 for unknown, which is stored as null and shown as a dash. Sorts with unknown last.",
+        "src": "response.revenue (0 -> null)"
+      },
+      "cell": {
+        "src": "response.revenue",
+        "whenEmpty": "TMDB reports 0 revenue, meaning unknown, not a flop."
+      }
+    },
+    {
+      "id": "vs",
+      "kind": "text",
+      "label": "Vs. budget",
+      "status": "shipped",
+      "header": {
+        "body": "Revenue divided by budget as a percent, the multiple of the budget it grossed (3,455%). The tooltip shows the net as well. It ignores marketing and studio share, so under 100% is not necessarily a loss. Sorts with unknown last.",
+        "src": "response.revenue / response.budget"
+      },
+      "cell": {
+        "src": "response.revenue / response.budget",
+        "whenEmpty": "Needs both budget and revenue; TMDB reports 0 for unknown."
+      }
+    },
+    {
+      "id": "score",
+      "kind": "text",
+      "label": "TMDB Score",
+      "status": "shipped",
+      "header": {
+        "body": "TMDB community average out of 10, one decimal (8.2), not a percent. Muted under 50 votes. Not sortable yet.",
+        "src": "response.vote_average (vote_count)",
+        "extra": "Illustrative: scores drift as TMDB users vote."
+      },
+      "cell": {
+        "src": "response.vote_average",
+        "whenEmpty": "TMDB has no votes for this film."
+      }
+    }
+  ],
+  "rows": [
+    {
+      "id": 1,
+      "fill": "full",
+      "hasPerspective": true,
+      "cells": {
+        "item": {
+          "title": "The Dark Knight",
+          "sub": "2008",
+          "thumb": null,
+          "thumbShape": "poster"
+        },
+        "genre": {
+          "value": "Action",
+          "tip": {
+            "src": "response.genres[0].name"
+          }
+        },
+        "rated": {
+          "value": "PG-13",
+          "tip": {
+            "src": "response.certification"
+          }
+        },
+        "cast": {
+          "value": [
+            "Christopher Nolan dir.",
+            "Christian Bale",
+            "Heath Ledger",
+            "+13"
+          ],
+          "tip": {
+            "src": "response.directors[] + response.cast[] (top 15)",
+            "extra": "Directors first with dir.; each person carries a TMDB person id, so two actors with the same name stay distinct."
+          }
+        },
+        "duration": {
+          "value": "2:32:00",
+          "tip": {
+            "v": "2:32:00 (runtime to the minute; TMDB gives no seconds)",
+            "src": "content.length"
+          }
+        },
+        "released": "2008-07-18",
+        "box": {
+          "value": "$1.0B",
+          "tip": {
+            "v": "$1,004,558,444 (illustrative; TMDB figure may differ slightly)",
+            "src": "response.revenue"
+          }
+        },
+        "vs": {
+          "value": "543%",
+          "tip": {
+            "v": "543% = revenue / budget, a multiple of the budget. Ignores marketing, so under 100% is not necessarily a loss.",
+            "src": "response.revenue / response.budget"
+          }
+        },
+        "score": {
+          "value": "8.5",
+          "tip": {
+            "src": "response.vote_average (out of 10)"
+          }
+        }
+      },
+      "details": {
+        "title": "The Dark Knight",
+        "subtitle": "2008 · 2:32:00",
+        "textLabel": "Synopsis",
+        "textStatus": "planned",
+        "text": [
+          [
+            null,
+            "Tagline: Why so serious?"
+          ],
+          [
+            null,
+            "When the menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman must accept one of the greatest psychological and physical tests of his ability to fight injustice."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Elsewhere",
+            "status": "planned",
+            "items": [
+              "TMDB: themoviedb.org/movie/155",
+              "IMDb title page (via imdb_id)"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Budget",
+            "v": "$185M",
+            "status": "planned",
+            "tip": "response.budget (0 -> null) from TMDB"
+          },
+          {
+            "k": "Box office",
+            "v": "$1.0B",
+            "status": "planned",
+            "tip": "response.revenue (0 -> null) from TMDB",
+            "sub": "$1,004,558,444"
+          },
+          {
+            "k": "Vs. budget",
+            "v": "543%",
+            "status": "planned",
+            "tip": "response.revenue / response.budget from TMDB",
+            "sub": "net +$819M"
+          },
+          {
+            "k": "Duration",
+            "v": "2:32:00",
+            "status": "planned",
+            "tip": "content.length seconds; response.runtimeMinutes from TMDB",
+            "sub": "152 min"
+          },
+          {
+            "k": "Released",
+            "v": "2008-07-18",
+            "status": "planned",
+            "tip": "response.release_date from TMDB"
+          },
+          {
+            "k": "Rated",
+            "v": "PG-13",
+            "status": "planned",
+            "tip": "response.certification (US) from TMDB"
+          },
+          {
+            "k": "Director(s)",
+            "v": "Christopher Nolan",
+            "status": "planned",
+            "tip": "response.directors[].name from TMDB"
+          },
+          {
+            "k": "Genre",
+            "v": "Action, Crime, Drama",
+            "status": "planned",
+            "tip": "response.genres[].name from TMDB"
+          },
+          {
+            "k": "Collection",
+            "v": "The Dark Knight Collection",
+            "status": "planned",
+            "tip": "response.belongs_to_collection.name from TMDB"
+          }
+        ],
+        "tags": [
+          "dc comics",
+          "crime fighter",
+          "superhero",
+          "joker"
+        ],
+        "tagsStatus": "planned",
+        "otherPerspectives": 2,
+        "footer": "This product uses the TMDB API but is not endorsed or certified by TMDB."
+      }
+    },
+    {
+      "id": 2,
+      "fill": "full",
+      "hasPerspective": true,
+      "cells": {
+        "item": {
+          "title": "The Shawshank Redemption",
+          "sub": "1994",
+          "thumb": null,
+          "thumbShape": "poster"
+        },
+        "genre": {
+          "value": "Drama",
+          "tip": {
+            "src": "response.genres[0].name"
+          }
+        },
+        "rated": {
+          "value": "R",
+          "tip": {
+            "src": "response.certification"
+          }
+        },
+        "cast": {
+          "value": [
+            "Frank Darabont dir.",
+            "Tim Robbins",
+            "Morgan Freeman",
+            "+13"
+          ],
+          "tip": {
+            "src": "response.directors[] + response.cast[] (top 15)",
+            "extra": "Directors first with dir.; each person carries a TMDB person id, so two actors with the same name stay distinct."
+          }
+        },
+        "duration": {
+          "value": "2:22:00",
+          "tip": {
+            "v": "2:22:00 (runtime to the minute; TMDB gives no seconds)",
+            "src": "content.length"
+          }
+        },
+        "released": "1994-09-23",
+        "box": {
+          "value": "$28M",
+          "tip": {
+            "v": "$28,341,469 (illustrative)",
+            "src": "response.revenue"
+          }
+        },
+        "vs": {
+          "value": "113%",
+          "tip": {
+            "v": "113% = revenue / budget, a multiple of the budget. Ignores marketing, so under 100% is not necessarily a loss.",
+            "src": "response.revenue / response.budget"
+          }
+        },
+        "score": {
+          "value": "8.7",
+          "tip": {
+            "src": "response.vote_average (out of 10)"
+          }
+        }
+      },
+      "details": {
+        "title": "The Shawshank Redemption",
+        "subtitle": "1994 · 2:22:00",
+        "textLabel": "Synopsis",
+        "textStatus": "planned",
+        "text": [
+          [
+            null,
+            "Tagline: Fear can hold you prisoner. Hope can set you free."
+          ],
+          [
+            null,
+            "Imprisoned in the 1940s for the double murder of his wife and her lover, upstanding banker Andy Dufresne begins a new life at the Shawshank prison, where he puts his accounting skills to work for an amoral warden."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Elsewhere",
+            "status": "planned",
+            "items": [
+              "TMDB: themoviedb.org/movie/278",
+              "IMDb title page (via imdb_id)"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Budget",
+            "v": "$25M",
+            "status": "planned",
+            "tip": "response.budget (0 -> null) from TMDB"
+          },
+          {
+            "k": "Box office",
+            "v": "$28M",
+            "status": "planned",
+            "tip": "response.revenue (0 -> null) from TMDB",
+            "sub": "$28,341,469"
+          },
+          {
+            "k": "Vs. budget",
+            "v": "113%",
+            "status": "planned",
+            "tip": "response.revenue / response.budget from TMDB",
+            "sub": "net +$3M"
+          },
+          {
+            "k": "Duration",
+            "v": "2:22:00",
+            "status": "planned",
+            "tip": "content.length seconds; response.runtimeMinutes from TMDB",
+            "sub": "142 min"
+          },
+          {
+            "k": "Released",
+            "v": "1994-09-23",
+            "status": "planned",
+            "tip": "response.release_date from TMDB"
+          },
+          {
+            "k": "Rated",
+            "v": "R",
+            "status": "planned",
+            "tip": "response.certification (US) from TMDB"
+          },
+          {
+            "k": "Director(s)",
+            "v": "Frank Darabont",
+            "status": "planned",
+            "tip": "response.directors[].name from TMDB"
+          },
+          {
+            "k": "Genre",
+            "v": "Drama, Crime",
+            "status": "planned",
+            "tip": "response.genres[].name from TMDB"
+          }
+        ],
+        "tags": [
+          "prison",
+          "friendship",
+          "wrongful imprisonment",
+          "based on novella"
+        ],
+        "tagsStatus": "planned",
+        "otherPerspectives": 2,
+        "footer": "This product uses the TMDB API but is not endorsed or certified by TMDB."
+      }
+    },
+    {
+      "id": 3,
+      "fill": "full",
+      "hasPerspective": false,
+      "cells": {
+        "item": {
+          "title": "Primer",
+          "sub": "2004",
+          "thumb": null,
+          "thumbShape": "poster"
+        },
+        "genre": {
+          "value": "Science Fiction",
+          "tip": {
+            "src": "response.genres[0].name"
+          }
+        },
+        "rated": {
+          "value": "PG-13",
+          "tip": {
+            "src": "response.certification"
+          }
+        },
+        "cast": {
+          "value": [
+            "Shane Carruth dir.",
+            "David Sullivan",
+            "Casey Gooden",
+            "+2"
+          ],
+          "tip": {
+            "src": "response.directors[] + response.cast[] (top 15)",
+            "extra": "Directors first with dir.; each person carries a TMDB person id, so two actors with the same name stay distinct."
+          }
+        },
+        "duration": {
+          "value": "1:17:00",
+          "tip": {
+            "v": "1:17:00 (runtime to the minute; TMDB gives no seconds)",
+            "src": "content.length"
+          }
+        },
+        "released": "2004-10-08",
+        "box": {
+          "value": "$842K",
+          "tip": {
+            "v": "$841,926 (illustrative)",
+            "src": "response.revenue"
+          }
+        },
+        "vs": {
+          "value": "12,027%",
+          "tip": {
+            "v": "12,027% = revenue / budget, a multiple of the budget. Ignores marketing, so under 100% is not necessarily a loss.",
+            "src": "response.revenue / response.budget"
+          }
+        },
+        "score": {
+          "value": "6.9",
+          "tip": {
+            "src": "response.vote_average (out of 10)"
+          }
+        }
+      },
+      "details": {
+        "title": "Primer",
+        "subtitle": "2004 · 1:17:00",
+        "textLabel": "Synopsis",
+        "textStatus": "planned",
+        "text": [
+          [
+            null,
+            "Tagline: What happens if it actually works?"
+          ],
+          [
+            null,
+            "Friends and fledgling entrepreneurs invent a device in their garage that reduces the apparent mass of any object placed inside it, then discover it also bends time."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Elsewhere",
+            "status": "planned",
+            "items": [
+              "TMDB: themoviedb.org/movie/14337",
+              "IMDb title page (via imdb_id)"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Budget",
+            "v": "$7K",
+            "status": "planned",
+            "tip": "response.budget (0 -> null) from TMDB",
+            "sub": "illustrative"
+          },
+          {
+            "k": "Box office",
+            "v": "$842K",
+            "status": "planned",
+            "tip": "response.revenue (0 -> null) from TMDB",
+            "sub": "$841,926"
+          },
+          {
+            "k": "Vs. budget",
+            "v": "12,027%",
+            "status": "planned",
+            "tip": "response.revenue / response.budget from TMDB",
+            "sub": "net +$835K"
+          },
+          {
+            "k": "Duration",
+            "v": "1:17:00",
+            "status": "planned",
+            "tip": "content.length seconds; response.runtimeMinutes from TMDB",
+            "sub": "77 min"
+          },
+          {
+            "k": "Released",
+            "v": "2004-10-08",
+            "status": "planned",
+            "tip": "response.release_date from TMDB"
+          },
+          {
+            "k": "Rated",
+            "v": "PG-13",
+            "status": "planned",
+            "tip": "response.certification (US) from TMDB"
+          },
+          {
+            "k": "Director(s)",
+            "v": "Shane Carruth",
+            "status": "planned",
+            "tip": "response.directors[].name from TMDB"
+          },
+          {
+            "k": "Genre",
+            "v": "Science Fiction, Drama",
+            "status": "planned",
+            "tip": "response.genres[].name from TMDB"
+          }
+        ],
+        "tags": [
+          "time travel",
+          "garage",
+          "engineer",
+          "independent film"
+        ],
+        "tagsStatus": "planned",
+        "otherPerspectives": 2,
+        "footer": "This product uses the TMDB API but is not endorsed or certified by TMDB."
+      }
+    },
+    {
+      "id": 4,
+      "fill": "partial",
+      "hasPerspective": false,
+      "cells": {
+        "item": {
+          "title": "Koyaanisqatsi",
+          "sub": "1982",
+          "thumb": null,
+          "thumbShape": "poster"
+        },
+        "genre": {
+          "value": "Documentary",
+          "tip": {
+            "src": "response.genres[0].name"
+          }
+        },
+        "rated": {
+          "value": "G",
+          "tip": {
+            "src": "response.certification"
+          }
+        },
+        "cast": {
+          "value": [
+            "Godfrey Reggio dir."
+          ],
+          "tip": {
+            "src": "response.directors[] + response.cast[] (top 15)",
+            "extra": "No actors are credited on TMDB; the director still leads the Cast cell."
+          }
+        },
+        "duration": {
+          "value": "1:26:00",
+          "tip": {
+            "v": "1:26:00 (runtime to the minute; TMDB gives no seconds)",
+            "src": "content.length"
+          }
+        },
+        "released": "1982-09-06",
+        "box": null,
+        "vs": null,
+        "score": {
+          "value": "7.9",
+          "tip": {
+            "src": "response.vote_average (out of 10)"
+          }
+        }
+      },
+      "details": {
+        "title": "Koyaanisqatsi",
+        "subtitle": "1982 · 1:26:00",
+        "textLabel": "Synopsis",
+        "textStatus": "planned",
+        "text": [
+          [
+            null,
+            "A wordless meditation on the collision of nature and modern technology, set to a Philip Glass score. No cast is credited, so the Cast cell holds the director only."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Elsewhere",
+            "status": "planned",
+            "items": [
+              "TMDB: themoviedb.org/movie/2005",
+              "IMDb title page (via imdb_id)"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Budget",
+            "v": null,
+            "status": "planned",
+            "tip": "response.budget (0 -> null) from TMDB",
+            "empty": "TMDB reports 0"
+          },
+          {
+            "k": "Box office",
+            "v": null,
+            "status": "planned",
+            "tip": "response.revenue (0 -> null) from TMDB",
+            "empty": "TMDB reports 0"
+          },
+          {
+            "k": "Vs. budget",
+            "v": null,
+            "status": "planned",
+            "tip": "response.revenue / response.budget from TMDB",
+            "empty": "needs both"
+          },
+          {
+            "k": "Duration",
+            "v": "1:26:00",
+            "status": "planned",
+            "tip": "content.length seconds; response.runtimeMinutes from TMDB",
+            "sub": "86 min"
+          },
+          {
+            "k": "Released",
+            "v": "1982-09-06",
+            "status": "planned",
+            "tip": "response.release_date from TMDB",
+            "sub": "illustrative"
+          },
+          {
+            "k": "Rated",
+            "v": "G",
+            "status": "planned",
+            "tip": "response.certification (US) from TMDB"
+          },
+          {
+            "k": "Director(s)",
+            "v": "Godfrey Reggio",
+            "status": "planned",
+            "tip": "response.directors[].name from TMDB"
+          },
+          {
+            "k": "Genre",
+            "v": "Documentary",
+            "status": "planned",
+            "tip": "response.genres[].name from TMDB"
+          }
+        ],
+        "tags": [
+          "time-lapse",
+          "experimental film",
+          "nature",
+          "urbanization"
+        ],
+        "tagsStatus": "planned",
+        "otherPerspectives": 2,
+        "footer": "This product uses the TMDB API but is not endorsed or certified by TMDB."
+      }
+    },
+    {
+      "id": 5,
+      "fill": "sparse",
+      "hasPerspective": false,
+      "cells": {
+        "item": {
+          "title": "Stalker",
+          "sub": "1979",
+          "thumb": null,
+          "thumbShape": "poster"
+        },
+        "genre": {
+          "value": "Science Fiction",
+          "tip": {
+            "src": "response.genres[0].name"
+          }
+        },
+        "rated": null,
+        "cast": {
+          "value": [
+            "Andrei Tarkovsky dir.",
+            "Alexander Kaidanovsky",
+            "Alisa Freindlich",
+            "+4"
+          ],
+          "tip": {
+            "src": "response.directors[] + response.cast[] (top 15)",
+            "extra": "Directors first with dir.; each person carries a TMDB person id, so two actors with the same name stay distinct."
+          }
+        },
+        "duration": {
+          "value": "2:42:00",
+          "tip": {
+            "v": "2:42:00 (runtime to the minute; TMDB gives no seconds)",
+            "src": "content.length"
+          }
+        },
+        "released": "1979-05-25",
+        "box": null,
+        "vs": null,
+        "score": {
+          "value": "8.0",
+          "tip": {
+            "src": "response.vote_average (out of 10)"
+          }
+        }
+      },
+      "details": {
+        "title": "Stalker",
+        "subtitle": "1979 · 2:42:00",
+        "textLabel": "Synopsis",
+        "textStatus": "planned",
+        "text": [
+          [
+            null,
+            "A guide leads a writer and a professor into a restricted area called the Zone, where a room is said to grant a person's deepest wish."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Elsewhere",
+            "status": "planned",
+            "items": [
+              "TMDB: themoviedb.org/movie/1398",
+              "IMDb title page (via imdb_id)"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Budget",
+            "v": null,
+            "status": "planned",
+            "tip": "response.budget (0 -> null) from TMDB",
+            "empty": "TMDB reports 0"
+          },
+          {
+            "k": "Box office",
+            "v": null,
+            "status": "planned",
+            "tip": "response.revenue (0 -> null) from TMDB",
+            "empty": "TMDB reports 0"
+          },
+          {
+            "k": "Vs. budget",
+            "v": null,
+            "status": "planned",
+            "tip": "response.revenue / response.budget from TMDB",
+            "empty": "needs both"
+          },
+          {
+            "k": "Duration",
+            "v": "2:42:00",
+            "status": "planned",
+            "tip": "content.length seconds; response.runtimeMinutes from TMDB",
+            "sub": "162 min"
+          },
+          {
+            "k": "Released",
+            "v": "1979-05-25",
+            "status": "planned",
+            "tip": "response.release_date from TMDB"
+          },
+          {
+            "k": "Rated",
+            "v": null,
+            "status": "planned",
+            "tip": "response.certification (US) from TMDB",
+            "empty": "no US certification"
+          },
+          {
+            "k": "Director(s)",
+            "v": "Andrei Tarkovsky",
+            "status": "planned",
+            "tip": "response.directors[].name from TMDB"
+          },
+          {
+            "k": "Genre",
+            "v": "Science Fiction, Drama",
+            "status": "planned",
+            "tip": "response.genres[].name from TMDB"
+          }
+        ],
+        "tags": [
+          "the zone",
+          "philosophy",
+          "soviet union"
+        ],
+        "tagsStatus": "planned",
+        "otherPerspectives": 2,
+        "footer": "This product uses the TMDB API but is not endorsed or certified by TMDB."
+      }
+    }
+  ],
+  "perspective": {
+    "ratings": [
+      "Quality",
+      "Agreement",
+      "Importance",
+      "Confidence"
+    ],
+    "addFieldHint": "pacing"
+  }
+}

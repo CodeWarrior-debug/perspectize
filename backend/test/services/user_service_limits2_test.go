@@ -68,18 +68,37 @@ func TestUserUpdate_UsernameLengthBoundary(t *testing.T) {
 	}
 }
 
-func TestUserUpdate_UsernameLookupUnexpectedError(t *testing.T) {
-	dbErr := errors.New("connection reset")
+// Uniqueness is enforced by the users_unique_username constraint (the repository maps a clash to
+// domain.ErrAlreadyExists), so a username change must not pre-check with a SELECT.
+func TestUserUpdate_UsernameChangeDoesNotPreCheck(t *testing.T) {
 	repo := &mockUserRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.User, error) {
 			return &domain.User{ID: id, Username: "olduser", Role: domain.UserRoleDefault}, nil
 		},
 		getByUsernameFn: func(ctx context.Context, username string) (*domain.User, error) {
-			return nil, dbErr
+			t.Fatal("a username change must not look the name up first")
+			return nil, nil
+		},
+		// An explicit updateFn bypasses the mock's default Update, which emulates the unique constraint via getByUsernameFn.
+		updateFn: func(ctx context.Context, user *domain.User) (*domain.User, error) { return user, nil },
+	}
+	svc := newTestUserService(repo)
+	name := "newname"
+
+	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{ID: 2, Username: &name})
+
+	require.NoError(t, err)
+	assert.Equal(t, "newname", result.Username)
+}
+
+func TestUserUpdate_RepoUpdateUnexpectedError(t *testing.T) {
+	dbErr := errors.New("connection reset")
+	repo := &mockUserRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.User, error) {
+			return &domain.User{ID: id, Username: "olduser", Role: domain.UserRoleDefault}, nil
 		},
 		updateFn: func(ctx context.Context, user *domain.User) (*domain.User, error) {
-			t.Fatal("Update must not be reached when the uniqueness check failed")
-			return nil, nil
+			return nil, dbErr
 		},
 	}
 	svc := newTestUserService(repo)
@@ -90,25 +109,7 @@ func TestUserUpdate_UsernameLookupUnexpectedError(t *testing.T) {
 	assert.Nil(t, result)
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, dbErr))
-	assert.Contains(t, err.Error(), "failed to check username")
-}
-
-func TestUserUpdate_UsernameLookupNotFoundProceeds(t *testing.T) {
-	repo := &mockUserRepository{
-		getByIDFn: func(ctx context.Context, id int) (*domain.User, error) {
-			return &domain.User{ID: id, Username: "olduser", Role: domain.UserRoleDefault}, nil
-		},
-		getByUsernameFn: func(ctx context.Context, username string) (*domain.User, error) {
-			return nil, domain.ErrNotFound
-		},
-	}
-	svc := newTestUserService(repo)
-	name := "newname"
-
-	result, err := svc.Update(context.Background(), testAdmin, portservices.UpdateUserInput{ID: 2, Username: &name})
-
-	require.NoError(t, err)
-	assert.Equal(t, "newname", result.Username)
+	assert.Contains(t, err.Error(), "failed to update user")
 }
 
 func TestMarkOnboardingSeen_VersionZeroAccepted(t *testing.T) {

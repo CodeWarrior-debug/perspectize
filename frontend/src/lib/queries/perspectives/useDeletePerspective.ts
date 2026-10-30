@@ -19,8 +19,7 @@ interface DeleteContext {
 export function useDeletePerspective() {
 	const queryClient = useQueryClient();
 	// Same PerspectiveItem-shaped branches useUpdatePerspective patches — removing a
-	// row by id is shape-safe there. activityFeeds() caches a different shape and is
-	// simply refetched on success.
+	// row by id is shape-safe there.
 	const rowListFilters: { queryKey: readonly unknown[] }[] = [
 		{ queryKey: queryKeys.perspectives.byUserLists() },
 		{ queryKey: queryKeys.perspectives.byContentLists() },
@@ -69,7 +68,6 @@ export function useDeletePerspective() {
 			for (const f of rowListFilters) {
 				queryClient.invalidateQueries({ ...f, refetchType: 'none' });
 			}
-			queryClient.invalidateQueries({ queryKey: queryKeys.perspectives.activityFeeds() });
 			queryClient.invalidateQueries({ queryKey: queryKeys.perspectives.detail(input.id) });
 			// perspectiveCount / averageRating on the content just changed.
 			if (input.contentID) {

@@ -41,6 +41,16 @@ func (m *mockUserRepository) GetByID(ctx context.Context, id int) (*domain.User,
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockUserRepository) GetByIDs(ctx context.Context, ids []int) ([]*domain.User, error) {
+	out := []*domain.User{}
+	for _, id := range ids {
+		if u, err := m.GetByID(ctx, id); err == nil && u != nil {
+			out = append(out, u)
+		}
+	}
+	return out, nil
+}
+
 func (m *mockUserRepository) GetByClerkID(ctx context.Context, clerkID string) (*domain.User, error) {
 	return nil, domain.ErrNotFound
 }
@@ -70,6 +80,18 @@ func (m *mockUserRepository) Update(ctx context.Context, user *domain.User) (*do
 	if m.updateFn != nil {
 		return m.updateFn(ctx, user)
 	}
+	// Emulate the users_unique_username / users_unique_email constraints the
+	// real UPDATE relies on: another user already holding the value is a clash.
+	if m.getByUsernameFn != nil {
+		if other, err := m.getByUsernameFn(ctx, user.Username); err == nil && other != nil && other.ID != user.ID {
+			return nil, fmt.Errorf("%w: username already taken", domain.ErrAlreadyExists)
+		}
+	}
+	if m.getByEmailFn != nil && user.Email != "" {
+		if other, err := m.getByEmailFn(ctx, user.Email); err == nil && other != nil && other.ID != user.ID {
+			return nil, fmt.Errorf("%w: email already registered", domain.ErrAlreadyExists)
+		}
+	}
 	return user, nil
 }
 
@@ -96,7 +118,33 @@ func (m *mockUserRepository) UpdateOnboarding(ctx context.Context, userID int, o
 	if m.updateOnboardingFn != nil {
 		return m.updateOnboardingFn(ctx, userID, onboarding)
 	}
+	if _, err := m.writableUser(ctx, userID); err != nil {
+		return nil, err
+	}
 	return &domain.User{ID: userID, Onboarding: onboarding}, nil
+}
+
+func (m *mockUserRepository) SetOnboardingDisplayNextSession(ctx context.Context, userID int, display bool) (*domain.User, error) {
+	u, err := m.writableUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	u.Onboarding.DisplayNextSession = display
+	return u, nil
+}
+
+// writableUser emulates the real repository's onboarding UPDATE predicate
+// (WHERE id = ? AND role <> 'sentinel'): a missing user or the sentinel is a
+// zero-row update, i.e. domain.ErrNotFound.
+func (m *mockUserRepository) writableUser(ctx context.Context, userID int) (*domain.User, error) {
+	if m.getByIDFn == nil {
+		return &domain.User{ID: userID}, nil
+	}
+	u, err := m.getByIDFn(ctx, userID)
+	if err != nil || u == nil || u.IsSentinel() {
+		return nil, domain.ErrNotFound
+	}
+	return u, nil
 }
 
 // mockContentRepoForUser implements repositories.ContentRepository for user tests
@@ -109,6 +157,16 @@ func (m *mockContentRepoForUser) Create(ctx context.Context, content *domain.Con
 }
 func (m *mockContentRepoForUser) GetByID(ctx context.Context, id int) (*domain.Content, error) {
 	return nil, domain.ErrNotFound
+}
+
+func (m *mockContentRepoForUser) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	out := []*domain.Content{}
+	for _, id := range ids {
+		if c, err := m.GetByID(ctx, id); err == nil && c != nil {
+			out = append(out, c)
+		}
+	}
+	return out, nil
 }
 func (m *mockContentRepoForUser) GetByURL(ctx context.Context, url string) (*domain.Content, error) {
 	return nil, domain.ErrNotFound
@@ -128,8 +186,8 @@ func (m *mockContentRepoForUser) ReassignByUser(ctx context.Context, fromUserID,
 	}
 	return nil
 }
-func (m *mockContentRepoForUser) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) error {
-	return nil
+func (m *mockContentRepoForUser) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+	return &domain.Content{ID: contentID, PrimaryCategoryID: categoryID}, nil
 }
 
 // mockPerspectiveRepoForUser implements repositories.PerspectiveRepository for user tests
@@ -143,7 +201,7 @@ func (m *mockPerspectiveRepoForUser) Create(ctx context.Context, p *domain.Persp
 func (m *mockPerspectiveRepoForUser) GetByID(ctx context.Context, id int) (*domain.Perspective, error) {
 	return nil, domain.ErrNotFound
 }
-func (m *mockPerspectiveRepoForUser) Update(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
+func (m *mockPerspectiveRepoForUser) Update(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error) {
 	return p, nil
 }
 func (m *mockPerspectiveRepoForUser) Delete(ctx context.Context, id int, ownerUserID int) error {
@@ -168,14 +226,21 @@ func (m *mockPerspectiveRepoForUser) CustomFieldStats(ctx context.Context, conte
 	return &domain.CustomFieldStats{Key: key}, nil
 }
 
-// newTestUserService creates a UserService with default mocks for content/perspective repos
+// newTestUserService creates a UserService with default mocks for content/perspective and todo repos
 func newTestUserService(repo *mockUserRepository) *services.UserService {
-	return services.NewUserService(repo, &mockContentRepoForUser{}, &mockPerspectiveRepoForUser{})
+	return services.NewUserService(repo, &mockContentRepoForUser{}, &mockPerspectiveRepoForUser{},
+		&mockUserTodoRepo{}, &mockUserTodoListRepo{}, &mockTodoActionRepo{})
 }
 
 // newTestUserServiceFull creates a UserService with explicit content/perspective repo mocks
 func newTestUserServiceFull(repo *mockUserRepository, contentRepo *mockContentRepoForUser, perspectiveRepo *mockPerspectiveRepoForUser) *services.UserService {
-	return services.NewUserService(repo, contentRepo, perspectiveRepo)
+	return services.NewUserService(repo, contentRepo, perspectiveRepo,
+		&mockUserTodoRepo{}, &mockUserTodoListRepo{}, &mockTodoActionRepo{})
+}
+
+// newTestUserServiceWithTodos creates a UserService with explicit todo, list and action repo mocks
+func newTestUserServiceWithTodos(repo *mockUserRepository, contentRepo *mockContentRepoForUser, perspectiveRepo *mockPerspectiveRepoForUser, todos *mockUserTodoRepo, lists *mockUserTodoListRepo, actions *mockTodoActionRepo) *services.UserService {
+	return services.NewUserService(repo, contentRepo, perspectiveRepo, todos, lists, actions)
 }
 
 // testAdmin is the actor for tests of behaviour other than authorization.
@@ -710,6 +775,115 @@ func TestDelete_ReassignPerspectivesFails(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to reassign perspectives")
+}
+
+// Delete reassigns content, perspectives, then todos, lists and custom actions,
+// and only then removes the user row. The order matters: the list FK and the
+// todo FKs must not be left pointing at a deleted user.
+func TestDelete_ReassignsEverythingInOrder(t *testing.T) {
+	var calls []string
+	sentinelUser := &domain.User{ID: 1, Username: domain.DeletedUserUsername, Role: domain.UserRoleSentinel}
+	repo := &mockUserRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.User, error) {
+			return &domain.User{ID: 2, Username: "testuser", Role: domain.UserRoleDefault}, nil
+		},
+		getByUsernameFn: func(ctx context.Context, username string) (*domain.User, error) {
+			return sentinelUser, nil
+		},
+		deleteFn: func(ctx context.Context, id int) error {
+			calls = append(calls, "user.delete")
+			return nil
+		},
+	}
+	contentRepo := &mockContentRepoForUser{reassignByUserFn: func(ctx context.Context, from, to int) error {
+		assert.Equal(t, 2, from)
+		assert.Equal(t, 1, to, "reassigned to the sentinel")
+		calls = append(calls, "content")
+		return nil
+	}}
+	perspectiveRepo := &mockPerspectiveRepoForUser{reassignByUserFn: func(ctx context.Context, from, to int) error {
+		calls = append(calls, "perspectives")
+		return nil
+	}}
+	todos := &mockUserTodoRepo{calls: &calls, reassignByUserFn: func(ctx context.Context, from, to int) error {
+		assert.Equal(t, 2, from)
+		assert.Equal(t, 1, to)
+		return nil
+	}}
+	lists := &mockUserTodoListRepo{calls: &calls, reassignByUserFn: func(ctx context.Context, from, to int) error {
+		assert.Equal(t, 2, from)
+		assert.Equal(t, 1, to)
+		return nil
+	}}
+	actions := &mockTodoActionRepo{calls: &calls, reassignByUserFn: func(ctx context.Context, from, to int) error {
+		assert.Equal(t, 2, from)
+		assert.Equal(t, 1, to)
+		return nil
+	}}
+	svc := newTestUserServiceWithTodos(repo, contentRepo, perspectiveRepo, todos, lists, actions)
+
+	require.NoError(t, svc.Delete(context.Background(), testAdmin, 2))
+	assert.Equal(t, []string{
+		"content", "perspectives",
+		"todos.reassign", "lists.reassign", "actions.reassign",
+		"user.delete",
+	}, calls)
+}
+
+func TestDelete_TodoReassignFailureStopsBeforeUserDelete(t *testing.T) {
+	cases := []struct {
+		name        string
+		todos       *mockUserTodoRepo
+		lists       *mockUserTodoListRepo
+		actions     *mockTodoActionRepo
+		wantMessage string
+	}{
+		{
+			name:        "todos fail",
+			todos:       &mockUserTodoRepo{reassignByUserFn: func(ctx context.Context, from, to int) error { return errors.New("todo boom") }},
+			lists:       &mockUserTodoListRepo{},
+			actions:     &mockTodoActionRepo{},
+			wantMessage: "failed to reassign todos",
+		},
+		{
+			name:        "lists fail",
+			todos:       &mockUserTodoRepo{},
+			lists:       &mockUserTodoListRepo{reassignByUserFn: func(ctx context.Context, from, to int) error { return errors.New("list boom") }},
+			actions:     &mockTodoActionRepo{},
+			wantMessage: "failed to reassign todo lists",
+		},
+		{
+			name:        "actions fail",
+			todos:       &mockUserTodoRepo{},
+			lists:       &mockUserTodoListRepo{},
+			actions:     &mockTodoActionRepo{reassignByUserFn: func(ctx context.Context, from, to int) error { return errors.New("action boom") }},
+			wantMessage: "failed to reassign todo actions",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			deleted := false
+			sentinelUser := &domain.User{ID: 1, Username: domain.DeletedUserUsername, Role: domain.UserRoleSentinel}
+			repo := &mockUserRepository{
+				getByIDFn: func(ctx context.Context, id int) (*domain.User, error) {
+					return &domain.User{ID: 2, Username: "testuser", Role: domain.UserRoleDefault}, nil
+				},
+				getByUsernameFn: func(ctx context.Context, username string) (*domain.User, error) {
+					return sentinelUser, nil
+				},
+				deleteFn: func(ctx context.Context, id int) error {
+					deleted = true
+					return nil
+				},
+			}
+			svc := newTestUserServiceWithTodos(repo, &mockContentRepoForUser{}, &mockPerspectiveRepoForUser{}, tc.todos, tc.lists, tc.actions)
+
+			err := svc.Delete(context.Background(), testAdmin, 2)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantMessage)
+			assert.False(t, deleted, "the user row must not be deleted when reassignment fails")
+		})
+	}
 }
 
 // --- Reserved Username Tests ---

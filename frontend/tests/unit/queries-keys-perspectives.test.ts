@@ -53,30 +53,6 @@ describe('queryKeys.perspectives namespace', () => {
 		});
 	});
 
-	describe('activityFeed(includePrivate)', () => {
-		it('keeps its existing key shape (unchanged by the byUser/byContent split)', () => {
-			expect(queryKeys.perspectives.activityFeed(false)).toEqual([
-				'app',
-				'perspectives',
-				'list',
-				'activityFeed',
-				{ includePrivate: false },
-			]);
-			expect(queryKeys.perspectives.activityFeed(true)).toEqual([
-				'app',
-				'perspectives',
-				'list',
-				'activityFeed',
-				{ includePrivate: true },
-			]);
-		});
-
-		it('builds on perspectives.activityFeeds()', () => {
-			const branchKey = queryKeys.perspectives.activityFeeds();
-			expect(queryKeys.perspectives.activityFeed(true)).toEqual([...branchKey, { includePrivate: true }]);
-		});
-	});
-
 	describe('details()', () => {
 		it('returns perspectives detail prefix', () => {
 			expect(queryKeys.perspectives.details()).toEqual(['app', 'perspectives', 'detail']);
@@ -132,20 +108,16 @@ describe('queryKeys.perspectives namespace', () => {
 	describe('branch non-overlap (regression guard for gap #3 — the prefix-match cache-corruption bug)', () => {
 		// Two keys "overlap" if one is a prefix of the other — that's exactly what
 		// TanStack Query's default (non-exact) queryKey matching treats as "the same
-		// cache entry (or a match under this filter)". Before the fix, listByUser,
-		// listByContent and activityFeed all sat directly under lists() with nothing
-		// distinguishing their branches, so a filter scoped to one matched all three.
+		// cache entry (or a match under this filter)". Before the fix, listByUser and
+		// listByContent sat directly under lists() with nothing distinguishing their
+		// branches, so a filter scoped to one matched both.
 		function isPrefixOf(prefix: readonly unknown[], key: readonly unknown[]): boolean {
 			if (prefix.length > key.length) return false;
 			return prefix.every((part, i) => JSON.stringify(part) === JSON.stringify(key[i]));
 		}
 
-		it('byUserLists(), byContentLists() and activityFeeds() are mutually non-overlapping branches', () => {
-			const branches = [
-				queryKeys.perspectives.byUserLists(),
-				queryKeys.perspectives.byContentLists(),
-				queryKeys.perspectives.activityFeeds(),
-			];
+		it('byUserLists() and byContentLists() are mutually non-overlapping branches', () => {
+			const branches = [queryKeys.perspectives.byUserLists(), queryKeys.perspectives.byContentLists()];
 			for (let i = 0; i < branches.length; i++) {
 				for (let j = 0; j < branches.length; j++) {
 					if (i === j) continue;
@@ -154,29 +126,20 @@ describe('queryKeys.perspectives namespace', () => {
 			}
 		});
 
-		it('a listByUser key does not fall under byContentLists() or activityFeeds()', () => {
+		it('a listByUser key does not fall under byContentLists()', () => {
 			const userKey = queryKeys.perspectives.listByUser(1);
 			expect(isPrefixOf(queryKeys.perspectives.byContentLists(), userKey)).toBe(false);
-			expect(isPrefixOf(queryKeys.perspectives.activityFeeds(), userKey)).toBe(false);
 		});
 
-		it('a listByContent key does not fall under byUserLists() or activityFeeds()', () => {
+		it('a listByContent key does not fall under byUserLists()', () => {
 			const contentKey = queryKeys.perspectives.listByContent(1);
 			expect(isPrefixOf(queryKeys.perspectives.byUserLists(), contentKey)).toBe(false);
-			expect(isPrefixOf(queryKeys.perspectives.activityFeeds(), contentKey)).toBe(false);
-		});
-
-		it('an activityFeed key does not fall under byUserLists() or byContentLists()', () => {
-			const feedKey = queryKeys.perspectives.activityFeed(true);
-			expect(isPrefixOf(queryKeys.perspectives.byUserLists(), feedKey)).toBe(false);
-			expect(isPrefixOf(queryKeys.perspectives.byContentLists(), feedKey)).toBe(false);
 		});
 
 		it('every branch still starts with the lists() umbrella (kept for shape-agnostic invalidation)', () => {
 			const listsPrefix = queryKeys.perspectives.lists();
 			expect(isPrefixOf(listsPrefix, queryKeys.perspectives.listByUser(1))).toBe(true);
 			expect(isPrefixOf(listsPrefix, queryKeys.perspectives.listByContent(1))).toBe(true);
-			expect(isPrefixOf(listsPrefix, queryKeys.perspectives.activityFeed(true))).toBe(true);
 		});
 	});
 

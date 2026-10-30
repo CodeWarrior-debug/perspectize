@@ -1,14 +1,11 @@
 <script lang="ts">
 	import SearchBar from '$lib/components/discover/SearchBar.svelte';
 
-	// Host wrapper for testing SearchBar's $bindable props. A plain render()
-	// can't observe two-way bound prop writes without a component that
-	// actually owns the bound state and re-renders on change — this does
-	// that, and surfaces `debouncedQuery` in the DOM so tests can assert on
-	// it via testing-library queries instead of reaching into internals.
+	// Host wrapper for testing SearchBar's $bindable value: it owns the bound
+	// state and surfaces it in the DOM so tests can assert on two-way writes.
+	let { onAddUrl }: { onAddUrl?: (url: string) => void } = $props();
 	let value = $state('');
-	let debouncedQuery = $state('');
 </script>
 
-<SearchBar bind:value bind:debouncedQuery />
-<p data-testid="debounced-query">{debouncedQuery}</p>
+<SearchBar bind:value {onAddUrl} />
+<p data-testid="bound-value">{value}</p>

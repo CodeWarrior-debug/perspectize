@@ -154,13 +154,12 @@ describe('useUpdatePerspective hook', () => {
 			expect(ctx.previous).toHaveLength(1);
 		});
 
-		it('patches both the byUser and byContent branches (a row can be cached under either), never activityFeed', async () => {
+		it('patches both the byUser and byContent branches (a row can be cached under either)', async () => {
 			await capturedMutationOptions.onMutate({ id: 5, quality: 6000 });
 
 			const patchedFilters = mockSetQueriesData.mock.calls.map((call: any[]) => call[0].queryKey);
 			expect(patchedFilters).toContainEqual(['app', 'perspectives', 'list', 'byUser']);
 			expect(patchedFilters).toContainEqual(['app', 'perspectives', 'list', 'byContent']);
-			expect(patchedFilters).not.toContainEqual(expect.arrayContaining(['activityFeed']));
 		});
 	});
 
@@ -312,17 +311,6 @@ describe('useUpdatePerspective hook', () => {
 			);
 		});
 
-		it('invalidates the activity feeds instead of patching them (different row shape, privacy-filtered)', () => {
-			capturedMutationOptions.onSuccess({ updatePerspective: updatedRow });
-			expect(mockInvalidateQueries).toHaveBeenCalledWith({
-				queryKey: ['app', 'perspectives', 'list', 'activityFeed'],
-			});
-			for (const call of mockSetQueriesData.mock.calls) {
-				const key = call[0]?.queryKey ?? call[0];
-				expect(key).not.toContain('activityFeed');
-			}
-		});
-
 		it("invalidates the edited content's aggregate cache (perspectiveCount/averageRating can change)", () => {
 			capturedMutationOptions.onSuccess({ updatePerspective: updatedRow });
 			expect(mockInvalidateQueries).toHaveBeenCalledWith(
@@ -350,9 +338,30 @@ describe('useUpdatePerspective hook', () => {
 			expect(mockToastError).toHaveBeenCalledWith('Please fill in at least one field');
 		});
 
-		it('shows generic message for unknown errors', () => {
-			capturedMutationOptions.onError(new Error('network failure'));
-			expect(mockToastError).toHaveBeenCalledWith('Failed to update perspective. Please try again.');
+		it('shows generic message with a Retry action for unknown errors', () => {
+			capturedMutationOptions.onError(new Error('connection timeout'), { id: 5, quality: 7500 });
+			expect(mockToastError).toHaveBeenCalledWith('Failed to update perspective.', {
+				action: { label: 'Retry', onClick: expect.any(Function) },
+			});
+		});
+
+		it('Retry re-runs the same mutation with the same input', () => {
+			const input = { id: 5, quality: 7500 };
+			capturedMutationOptions.onError(new Error('connection timeout'), input);
+			const opts = mockToastError.mock.calls.at(-1)![1];
+			expect(mockMutate).not.toHaveBeenCalled();
+			opts.action.onClick();
+			expect(mockMutate).toHaveBeenCalledTimes(1);
+			expect(mockMutate).toHaveBeenCalledWith(input);
+		});
+
+		it('validation errors carry no Retry action', () => {
+			for (const m of ['user not found', 'invalid rating: quality 99999', 'at least one field must be provided']) {
+				mockToastError.mockClear();
+				capturedMutationOptions.onError(new Error(m), { id: 5, quality: 7500 });
+				expect(mockToastError).toHaveBeenCalledTimes(1);
+				expect(mockToastError.mock.calls[0]).toHaveLength(1);
+			}
 		});
 
 		it('shows "No user selected" for user-related errors', () => {

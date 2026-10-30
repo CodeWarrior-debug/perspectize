@@ -1,7 +1,7 @@
 ---
 name: vitest-writer
 description: Vitest test author for frontend/ (unit, component via @testing-library/svelte, and Vitest Browser Mode). Use when a Svelte component, query hook or frontend utility needs tests, when a UI bug needs a failing regression test first, when a frontend coverage gap is identified, or when a plan task is tagged vitest-writer. Not for Go tests (test-writer) or Playwright demo tours. See "When to invoke" in the agent body.
-model: sonnet
+model: haiku
 color: green
 tools:
   - Read

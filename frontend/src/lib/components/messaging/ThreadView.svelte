@@ -9,8 +9,15 @@
 	import { useSetTyping } from '$lib/queries/messaging/useSetTyping';
 	import { useMarkThreadRead } from '$lib/queries/messaging/useMarkThreadRead';
 	import { createThreadStream } from '$lib/messaging/useThreadStream.svelte';
+	import { streamIdle } from '$lib/messaging/streamIdle.svelte';
 	import { otherParticipants } from '$lib/messaging/format';
-	import { showSenderForIndex, lastKnownSeq, typingUsernames, shouldMarkRead } from './threadView.helpers';
+	import {
+		showSenderForIndex,
+		lastKnownSeq,
+		typingUsernames,
+		shouldMarkRead,
+		firstUnreadFromOthers,
+	} from './threadView.helpers';
 	import MessageBubble from './MessageBubble.svelte';
 	import MessageComposer from './MessageComposer.svelte';
 	import TypingIndicator from './TypingIndicator.svelte';
@@ -65,7 +72,7 @@
 
 	$effect(() => {
 		const id = threadId;
-		if (!myUserId) return;
+		if (!myUserId || streamIdle.paused) return;
 		currentStream?.stop();
 		const nextStream = createThreadStream({ queryClient, getThreadId: () => id, myUserId });
 		nextStream.start();
@@ -78,6 +85,27 @@
 		const seq = currentSeq;
 		if (thread && shouldMarkRead(thread) && seq > thread.myLastReadSeq) {
 			markRead.mutate({ threadId, seq });
+		}
+	});
+
+	// Opening a thread lands on the first unread message from the other party
+	// (or the bottom when nothing is unread). Runs once per opened thread, off the
+	// read pointer as it was when the thread first loaded: markRead moves that
+	// pointer to the end a moment later.
+	let positionedThreadId: string | null = null;
+	$effect(() => {
+		const id = threadId;
+		const el = scrollEl;
+		const t = thread;
+		const list = items;
+		if (!el || !t || !myUserId || t.id !== id || list.length === 0 || positionedThreadId === id) return;
+		positionedThreadId = id;
+		lastItemCount = list.length;
+		const firstUnread = firstUnreadFromOthers(list, t.myLastReadSeq, myUserId);
+		if (firstUnread) {
+			el.querySelector(`[data-seq="${firstUnread.seq}"]`)?.scrollIntoView({ block: 'start' });
+		} else {
+			el.scrollTop = el.scrollHeight;
 		}
 	});
 

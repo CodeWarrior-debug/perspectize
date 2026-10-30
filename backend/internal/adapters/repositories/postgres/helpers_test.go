@@ -215,6 +215,18 @@ func TestBuildContentSortRules(t *testing.T) {
 			wantTieOrder: paginator.DESC,
 		},
 		{
+			name:   "added by sorts on the lowercased adder username via subquery",
+			sortBy: domain.ContentSortByAddedBy,
+			order:  domain.SortOrderAsc,
+			wantPrimary: paginator.Rule{
+				Key:             "AddedBy",
+				Order:           paginator.ASC,
+				SQLRepr:         "LOWER((SELECT u.username FROM users u WHERE u.id = content.added_by_user_id))",
+				NULLReplacement: "",
+			},
+			wantTieOrder: paginator.ASC,
+		},
+		{
 			name:         "length has no SQLRepr but has int64 null replacement",
 			sortBy:       domain.ContentSortByLength,
 			order:        domain.SortOrderAsc,

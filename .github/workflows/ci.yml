@@ -108,11 +108,56 @@ jobs:
         working-directory: .
         run: node --test .github/scripts/migration-labels.test.js
 
+  demo-changes:
+    # Decides whether demo-e2e runs: only when a demo file changed. A push with
+    # no usable base commit (new branch) runs it, so nothing is skipped by mistake.
+    name: Demo changes
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check for demo file changes
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          demo_paths=(
+            frontend/demo
+            backend/cmd/seed-demo
+            backend/internal/config/demo.go
+            backend/Dockerfile.demo
+            .github/workflows/ci.yml
+          )
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            changed=$(git diff --name-only "origin/$BASE_REF...HEAD" -- "${demo_paths[@]}")
+          elif [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            changed="(new branch: no base commit)"
+          else
+            changed=$(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA" -- "${demo_paths[@]}")
+          fi
+          echo "Demo files changed:"
+          echo "${changed:-  (none)}"
+          if [ -n "$changed" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   demo-e2e:
     # Runs the demo tours + flows (frontend/demo/) as Playwright E2E against a
     # freshly seeded DEMO_MODE stack — multi-user auth, privacy and the add-video
     # flow with no Clerk or YouTube credentials.
     name: Demo E2E
+    needs: demo-changes
+    if: needs.demo-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
 
     services:

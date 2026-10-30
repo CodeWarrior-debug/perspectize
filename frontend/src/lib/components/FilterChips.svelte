@@ -2,8 +2,8 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import ListXIcon from '@lucide/svelte/icons/list-x';
 	import type { GridApi } from '@ag-grid-community/core';
-	import { formatDurationSeconds } from '$lib/utils/formatting';
-	import { COLUMN_LABELS, contentTypeLabel } from '$lib/utils/grid-config';
+	import { formatDurationSeconds, formatBoxOffice } from '$lib/utils/formatting';
+	import { COLUMN_LABELS, setFilterValueLabel } from '$lib/utils/grid-config';
 
 	interface FilterChip {
 		colId: string;
@@ -49,7 +49,9 @@
 
 	function formatShortDate(d: string): string {
 		if (!d) return '';
-		const date = new Date(d);
+		// A bare YYYY-MM-DD parses as UTC midnight, which displays as the previous day west of UTC.
+		const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+		const date = day ? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3])) : new Date(d);
 		if (isNaN(date.getTime())) return d;
 		return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 	}
@@ -59,6 +61,8 @@
 			case 'duration':
 				// YouTube videos store length in seconds — display as m:ss
 				return formatDurationSeconds(value);
+			case 'boxOffice':
+				return formatBoxOffice(value);
 			default:
 				return String(value);
 		}
@@ -100,7 +104,7 @@
 
 	function formatFilterValue(filter: any, colId?: string): string {
 		if (filter.filterType === 'set') {
-			return (filter.values ?? []).map(contentTypeLabel).join(' or ');
+			return (filter.values ?? []).map((v: string) => setFilterValueLabel(colId ?? '', v)).join(' or ');
 		}
 		if (filter.operator && filter.conditions) {
 			const parts = filter.conditions.map((c: any) => formatSingleCondition(c, colId));
@@ -118,20 +122,21 @@
 	const chips: FilterChip[] = $derived(
 		Object.entries(filterModel).map(([colId, filter]) => ({
 			colId,
-			label: COLUMN_LABELS[colId] ?? colId,
+			label: COLUMN_LABELS[colId] ?? (colId === 'person' ? 'Person' : colId),
 			value: formatFilterValue(filter, colId),
 		})),
 	);
 
 	function removeFilter(colId: string) {
-		if (!gridApi) return onRemove?.(colId);
+		// The person filter has no grid column, so the grid can't remove it.
+		if (!gridApi || colId === 'person') return onRemove?.(colId);
 		const model = { ...gridApi.getFilterModel() };
 		delete model[colId];
 		gridApi.setFilterModel(model);
 	}
 
 	function removeAllFilters() {
-		if (!gridApi) return onClearAll?.();
+		if (!gridApi || 'person' in filterModel) return onClearAll?.();
 		gridApi.setFilterModel(null);
 	}
 

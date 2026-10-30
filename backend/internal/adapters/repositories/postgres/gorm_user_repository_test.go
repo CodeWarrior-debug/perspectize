@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"github.com/jackc/pgx/v5/pgconn"
 	"testing"
 	"time"
 
@@ -244,10 +245,9 @@ func TestGormUserRepository_CreateFromClerk(t *testing.T) {
 func TestGormUserRepository_Update(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("updates then re-reads the row for fresh timestamps", func(t *testing.T) {
+	t.Run("returns the updated row from RETURNING", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "users" SET`).WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectQuery(`SELECT \* FROM "users"`).
+		mock.ExpectQuery(`UPDATE "users" SET .* RETURNING \*`).
 			WillReturnRows(userRows().AddRow(7, "user_abc", "alice2", "alice2@example.com", "admin", true, userRepoTime, userRepoTime))
 
 		got, err := NewGormUserRepository(db).Update(ctx, &domain.User{ID: 7, Username: "alice2", Email: "alice2@example.com", ClerkUserID: "user_abc", Role: domain.UserRoleAdmin})
@@ -259,9 +259,9 @@ func TestGormUserRepository_Update(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("zero rows affected means domain.ErrNotFound and no re-read", func(t *testing.T) {
+	t.Run("zero rows affected means domain.ErrNotFound", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "users" SET`).WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(`UPDATE "users" SET`).WillReturnRows(userRows())
 
 		got, err := NewGormUserRepository(db).Update(ctx, &domain.User{ID: 404, Username: "ghost"})
 		assert.Nil(t, got)
@@ -269,26 +269,30 @@ func TestGormUserRepository_Update(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
+	t.Run("unique violations map to domain.ErrAlreadyExists", func(t *testing.T) {
+		for constraint, want := range map[string]string{
+			"users_unique_username": "username already taken",
+			"users_unique_email":    "email already registered",
+		} {
+			db, mock := newMockDB(t)
+			mock.ExpectQuery(`UPDATE "users" SET`).WillReturnError(&pgconn.PgError{Code: "23505", ConstraintName: constraint})
+
+			got, err := NewGormUserRepository(db).Update(ctx, &domain.User{ID: 7, Username: "alice"})
+			assert.Nil(t, got)
+			assert.True(t, errors.Is(err, domain.ErrAlreadyExists), "%s: got %v", constraint, err)
+			assert.Contains(t, err.Error(), want)
+			assertAllExpectationsMet(t, mock)
+		}
+	})
+
 	t.Run("propagates update errors", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "users" SET`).WillReturnError(errors.New("update boom"))
+		mock.ExpectQuery(`UPDATE "users" SET`).WillReturnError(errors.New("update boom"))
 
 		got, err := NewGormUserRepository(db).Update(ctx, &domain.User{ID: 7, Username: "alice"})
 		assert.Nil(t, got)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "update boom")
-		assertAllExpectationsMet(t, mock)
-	})
-
-	t.Run("propagates errors from the re-read", func(t *testing.T) {
-		db, mock := newMockDB(t)
-		mock.ExpectExec(`UPDATE "users" SET`).WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectQuery(`SELECT \* FROM "users"`).WillReturnError(errors.New("reread boom"))
-
-		got, err := NewGormUserRepository(db).Update(ctx, &domain.User{ID: 7, Username: "alice"})
-		assert.Nil(t, got)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "reread boom")
 		assertAllExpectationsMet(t, mock)
 	})
 }

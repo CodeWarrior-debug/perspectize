@@ -11,7 +11,14 @@ const mocks = vi.hoisted(() => ({
 	mockToastSuccess: vi.fn(),
 	mockToastError: vi.fn(),
 	mockValidate: vi.fn(),
-	mockMutationState: { mutate: null as any, isPending: false, isSuccess: false },
+	mockMutationState: {
+		mutate: null as any,
+		reset: vi.fn(),
+		error: null as unknown,
+		isError: false,
+		isPending: false,
+		isSuccess: false,
+	},
 	capturedMutationOptions: undefined as any,
 }));
 

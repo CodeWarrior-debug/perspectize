@@ -156,7 +156,7 @@ func newAuthHandler(userRepo repositories.UserRepository, verifier portservices.
 			Email:    user.Email,
 			Role:     user.Role,
 		}
-		ctx := withUser(r.Context(), authUser)
+		ctx := withUserRow(withUser(r.Context(), authUser), user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

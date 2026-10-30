@@ -63,7 +63,7 @@ if result.RowsAffected == 0 {
 }
 
 // Multi-step writes: Transaction commits on nil, rolls back on any error
-// (gorm_thread_repository.go CreateThread)
+// (gorm_message_thread_repository.go CreateThread)
 err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
     if err := tx.Create(thread).Error; err != nil {
         return fmt.Errorf("failed to create thread: %w", err)

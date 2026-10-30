@@ -20,7 +20,7 @@
 	} from '$lib/components/shadcn';
 	import RatingInput from '$lib/components/RatingInput.svelte';
 	import Thumbs from '$lib/components/Thumbs.svelte';
-	import PerspectiveEditor from '$lib/components/PerspectiveEditor.svelte';
+	import CommentsEditor from '$lib/components/CommentsEditor.svelte';
 	import AddFieldSearch from '$lib/components/AddFieldSearch.svelte';
 	import { sanitizeHtml } from '$lib/utils/sanitize';
 	import { hasReviewContent, reviewPreviewText } from '$lib/utils/reviewContent';
@@ -29,7 +29,11 @@
 	import { useCreatePerspective } from '$lib/queries/perspectives/useCreatePerspective';
 	import { useUpdatePerspective } from '$lib/queries/perspectives/useUpdatePerspective';
 	import { useDeletePerspective } from '$lib/queries/perspectives/useDeletePerspective';
-	import type { PerspectiveItem } from '$lib/queries/perspectives';
+	import { useFetchUserTodos } from '$lib/queries/userTodos/useFetchUserTodos';
+	import { useUpdateUserTodo } from '$lib/queries/userTodos/useUpdateUserTodo';
+	import { completedTodoInput, openConsumeOrReviewTodos } from '$lib/utils/plan-todo-helpers';
+	import { toastWithAction } from '$lib/utils/toast';
+	import { isOptimisticId, type PerspectiveItem } from '$lib/queries/perspectives';
 	import FeelWheel, { type Feeling } from '$lib/components/FeelWheel.svelte';
 
 	/**
@@ -227,6 +231,35 @@
 	const createMutation = useCreatePerspective();
 	const updateMutation = useUpdatePerspective();
 	const deleteMutation = useDeletePerspective();
+	const fetchTodos = useFetchUserTodos();
+	const updateTodo = useUpdateUserTodo();
+
+	/**
+	 * After a save succeeds: if the user has an open consume or review todo for this
+	 * content, offer to mark it done. Looked up here, on save, so opening the
+	 * popover costs no request. A failed lookup just skips the prompt.
+	 */
+	async function offerMarkTodosDone(saved: number) {
+		const items = await fetchTodos({
+			first: 50,
+			filter: { userId, contentId: saved, status: ['NOT_STARTED', 'IN_PROGRESS'] },
+		}).catch(() => null);
+		if (items === null) return;
+		const open = openConsumeOrReviewTodos(items);
+		if (open.length === 0) return;
+		const complete = (fullPercent: boolean) => {
+			for (const todo of open) {
+				updateTodo.mutateAsync(completedTodoInput(todo, fullPercent)).catch((err: unknown) => {
+					toast.error(err instanceof Error ? err.message : 'Could not update the Todo');
+				});
+			}
+		};
+		toastWithAction(
+			'Mark this Todo done?',
+			{ label: 'Done + 100%', onClick: () => complete(true) },
+			{ secondary: { label: 'Done, keep %', onClick: () => complete(false) } },
+		);
+	}
 	const isPending = $derived(createMutation.isPending || updateMutation.isPending || deleteMutation.isPending);
 
 	const hasComment = $derived(hasReviewContent(comment));
@@ -281,6 +314,10 @@
 	function handleDelete() {
 		// Re-check at the moment of action, not just when the button rendered.
 		if (!canDelete || !existingPerspective) return;
+		if (isStillSaving) {
+			toast.info('Still saving your perspective — try again in a moment');
+			return;
+		}
 		deleteMutation.mutate(
 			{ id: existingPerspective.id, contentID: existingPerspective.contentID },
 			{
@@ -295,8 +332,18 @@
 		);
 	}
 
+	// A perspective created a moment ago carries a temporary id until the
+	// server replies (see useCreatePerspective); it can't be edited or
+	// deleted by id yet.
+	const isStillSaving = $derived(isOptimisticId(existingPerspective?.id));
+
 	function handleSubmit(e: Event) {
 		e.preventDefault();
+
+		if (isStillSaving) {
+			toast.info('Still saving your perspective — try again in a moment');
+			return;
+		}
 
 		const hasAnyRating = quality !== null || agreement !== null || importance !== null || confidence !== null;
 		const hasLike = likeValue !== null;
@@ -317,9 +364,24 @@
 				}))
 			: undefined;
 
+		// Close immediately instead of waiting for the server: the mutation hooks
+		// patch the cached lists optimistically, so the change is already on
+		// screen, and a slow network (mobile) no longer holds the sheet open for
+		// the full round trip. mutateAsync settles even after this component
+		// unmounts. On failure the hook rolls the optimistic patch back and
+		// offers Retry, and the review text survives as a draft (flushed below,
+		// cleared only once the save succeeds).
+		flushPendingDraft();
+		const key = draftKey(contentId, userId);
+		const afterSave = () => {
+			clearDraft(key);
+			onSuccess?.();
+			if (userId > 0) void offerMarkTodosDone(contentId);
+		};
+
 		if (isEditMode && existingPerspective) {
-			updateMutation.mutate(
-				{
+			updateMutation
+				.mutateAsync({
 					id: parseInt(existingPerspective.id, 10),
 					// Edit mode sends the full form state, not just what changed: a field
 					// the user emptied is sent as null so the server clears it -- unlike
@@ -334,21 +396,13 @@
 					customFields: buildCustomFields() ?? null,
 					feelings: feelingsPayload ?? null,
 					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
-				},
-				{
-					onSuccess: () => {
-						// Cancel first: a debounced save still in flight would re-create the
-						// draft we are about to delete.
-						cancelPendingDraft();
-						clearDraft(draftKey(contentId, userId));
-						onSuccess?.();
-						onClose();
-					},
-				},
-			);
+				})
+				.then(afterSave, () => {
+					// Error toast + Retry come from useUpdatePerspective's onError.
+				});
 		} else {
-			createMutation.mutate(
-				{
+			createMutation
+				.mutateAsync({
 					userID: userId,
 					contentID: contentId,
 					quality: quality ?? undefined,
@@ -360,19 +414,12 @@
 					customFields: buildCustomFields(),
 					feelings: feelingsPayload,
 					privacy: isPrivate ? 'PRIVATE' : 'PUBLIC',
-				},
-				{
-					onSuccess: () => {
-						// Cancel first: a debounced save still in flight would re-create the
-						// draft we are about to delete.
-						cancelPendingDraft();
-						clearDraft(draftKey(contentId, userId));
-						onSuccess?.();
-						onClose();
-					},
-				},
-			);
+				})
+				.then(afterSave, () => {
+					// Error toast + Retry come from useCreatePerspective's onError.
+				});
 		}
+		onClose();
 	}
 </script>
 
@@ -449,7 +496,7 @@
 			</button>
 		{:else}
 			<div class="flex-1 min-w-0 relative">
-				<PerspectiveEditor
+				<CommentsEditor
 					value={comment}
 					onChange={handleCommentChange}
 					minHeight={68}

@@ -100,7 +100,8 @@ test.describe('messaging', () => {
 			await tour.start({ persona });
 			const launcher = page.getByRole('button', { name: 'Open messages' });
 			await expect(launcher).toBeVisible();
-			await expect(launcher).toContainText('4');
+			// 4 seeded messages, 2 from each persona; a viewer's own messages are never unread.
+			await expect(launcher).toContainText('2');
 		}
 	});
 });

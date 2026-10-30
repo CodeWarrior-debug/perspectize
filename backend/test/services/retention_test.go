@@ -42,7 +42,7 @@ func seedThreadWithMessages(t *testing.T, db *gorm.DB, n int) (threadID int, sen
 	ctx := context.Background()
 
 	userRepo := postgres.NewGormUserRepository(db)
-	threadRepo := postgres.NewGormThreadRepository(db)
+	threadRepo := postgres.NewGormMessageThreadRepository(db)
 	msgRepo := postgres.NewGormMessageRepository(db)
 
 	salt := time.Now().UnixNano()

@@ -84,13 +84,6 @@ describe('useDeletePerspective hook', () => {
 			expect(updater(undefined)).toBeUndefined();
 			expect(ctx.previous).toHaveLength(2);
 		});
-
-		it('never patches the activity feed (different row shape)', async () => {
-			const { queryKeys } = await import('$lib/queries/keys');
-			await capturedMutationOptions.onMutate({ id: '7', contentID: null });
-			const keys = mockSetQueriesData.mock.calls.map((c: any[]) => c[0].queryKey);
-			expect(keys).not.toContainEqual(queryKeys.perspectives.activityFeeds());
-		});
 	});
 
 	describe('onError', () => {
@@ -118,13 +111,12 @@ describe('useDeletePerspective hook', () => {
 	});
 
 	describe('onSuccess', () => {
-		it('toasts and invalidates activity feed, detail and the content aggregate', async () => {
+		it('toasts and invalidates detail and the content aggregate', async () => {
 			const { queryKeys } = await import('$lib/queries/keys');
 			capturedMutationOptions.onSuccess({ deletePerspective: true }, { id: '7', contentID: '3' });
 
 			expect(mockToastSuccess).toHaveBeenCalledWith('Perspective deleted');
 			const keys = mockInvalidateQueries.mock.calls.map((c: any[]) => c[0].queryKey);
-			expect(keys).toContainEqual(queryKeys.perspectives.activityFeeds());
 			expect(keys).toContainEqual(queryKeys.perspectives.detail('7'));
 			expect(keys).toContainEqual(queryKeys.content.detail('3'));
 		});

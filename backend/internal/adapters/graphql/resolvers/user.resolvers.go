@@ -171,6 +171,13 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 		return nil, fmt.Errorf("access denied: authentication required")
 	}
 
+	// The auth middleware already resolved this user's row (through the user
+	// cache, which this instance's onboarding writes refresh in place) — reuse
+	// it rather than reading it again.
+	if row, ok := auth.UserRowForContext(ctx); ok && row.ID == authUser.ID {
+		return userDomainToModel(row), nil
+	}
+
 	user, err := r.UserService.GetByID(ctx, authUser.ID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {

@@ -17,6 +17,7 @@ import (
 	"strconv"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/generated"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
@@ -54,9 +55,21 @@ func (r *mutationResolver) CreatePerspective(ctx context.Context, input model.Cr
 }
 
 // UpdatePerspective is the resolver for the updatePerspective field.
+// Ownership is enforced by PerspectiveService.Update (against the row it
+// already reads) and by the owner-scoped UPDATE beneath it, not by an @owner
+// directive -- the directive's own GetByID was a duplicate database round trip
+// on every save. The actor comes from the session, never from client input.
 func (r *mutationResolver) UpdatePerspective(ctx context.Context, input model.UpdatePerspectiveInput) (*model.Perspective, error) {
-	perspective, err := r.PerspectiveService.Update(ctx, modelToUpdatePerspectiveInput(input))
+	authUser, err := auth.RequireAuth(ctx)
 	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+
+	perspective, err := r.PerspectiveService.Update(ctx, modelToUpdatePerspectiveInput(input), authUser.ID)
+	if err != nil {
+		if errors.Is(err, domain.ErrForbidden) {
+			return nil, fmt.Errorf("access denied: you can only modify your own perspectives")
+		}
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, fmt.Errorf("perspective not found")
 		}
@@ -74,10 +87,10 @@ func (r *mutationResolver) UpdatePerspective(ctx context.Context, input model.Up
 }
 
 // DeletePerspective is the resolver for the deletePerspective field.
-// The @owner directive has already checked ownership by the time this runs;
-// the actor is still re-derived from the session (never from client input) and
-// handed to the service, which re-checks it, so deletion stays owner-only even
-// if the directive were ever removed from the schema.
+// The actor is derived from the session (never from client input) and handed
+// to the service, which enforces ownership with an owner-scoped DELETE -- see
+// PerspectiveService.Delete. (No @owner directive: its lookup was a separate
+// round trip in front of a DELETE that already can't touch another user's row.)
 func (r *mutationResolver) DeletePerspective(ctx context.Context, id string) (bool, error) {
 	authUser, err := auth.RequireAuth(ctx)
 	if err != nil {
@@ -255,3 +268,42 @@ func (r *queryResolver) CustomFieldStats(ctx context.Context, contentID *int, ke
 		PercentOfPerspectives: stats.PercentOfPerspectives(),
 	}, nil
 }
+
+// User is the resolver for the user field: batched through the per-request
+// user loader, so a list of perspectives costs one users query in total.
+func (r *perspectiveResolver) User(ctx context.Context, obj *model.Perspective) (*model.User, error) {
+	id, err := strconv.Atoi(obj.UserID)
+	if err != nil {
+		return nil, nil
+	}
+	u, err := r.userByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return userDomainToModel(u), nil
+}
+
+// Content is the resolver for the content field: batched through the
+// per-request content loader.
+func (r *perspectiveResolver) Content(ctx context.Context, obj *model.Perspective) (*model.Content, error) {
+	if obj.ContentID == nil {
+		return nil, nil
+	}
+	id, err := strconv.Atoi(*obj.ContentID)
+	if err != nil {
+		return nil, nil
+	}
+	c, err := r.contentByID(ctx, id)
+	if err != nil || c == nil {
+		return nil, err
+	}
+	return domainToModel(c), nil
+}
+
+// Perspective returns generated.PerspectiveResolver implementation.
+func (r *Resolver) Perspective() generated.PerspectiveResolver { return &perspectiveResolver{r} }
+
+type perspectiveResolver struct{ *Resolver }

@@ -1,0 +1,83 @@
+{
+  "adult": false,
+  "backdrop_path": "/fNG7i7RqMErkcqhohV2a6cV1Ehy.jpg",
+  "belongs_to_collection": {
+    "id": 2344,
+    "name": "The Matrix Collection",
+    "poster_path": "/bV9qTVHTVf0gkZb73PJwLjSmRQA.jpg",
+    "backdrop_path": "/gNLjaXCbRDXzBRdEd7SLKxL4rNb.jpg"
+  },
+  "budget": 63000000,
+  "genres": [
+    { "id": 28, "name": "Action" },
+    { "id": 878, "name": "Science Fiction" }
+  ],
+  "homepage": "http://www.warnerbros.com/matrix",
+  "id": 603,
+  "imdb_id": "tt0133093",
+  "original_language": "en",
+  "original_title": "The Matrix",
+  "overview": "Set in the 22nd century, The Matrix tells the story of a computer hacker who joins a group of underground insurgents fighting the vast and powerful computers who now rule the earth.",
+  "popularity": 80.1,
+  "poster_path": "/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg",
+  "release_date": "1999-03-30",
+  "revenue": 463517383,
+  "runtime": 136,
+  "status": "Released",
+  "tagline": "Welcome to the Real World.",
+  "title": "The Matrix",
+  "video": false,
+  "vote_average": 8.2,
+  "vote_count": 25000,
+  "credits": {
+    "cast": [
+      { "id": 6001, "name": "Actor Six", "character": "Role 6", "order": 5, "credit_id": "c6" },
+      { "id": 6000, "name": "Actor Five", "character": "Role 5", "order": 4, "credit_id": "c5" },
+      { "id": 6016, "name": "Actor Seventeen", "character": "Role 17", "order": 16, "credit_id": "c17" },
+      { "id": 6017, "name": "Actor Eighteen", "character": "Role 18", "order": 17, "credit_id": "c18" },
+      { "id": 6015, "name": "Actor Sixteen", "character": "Role 16", "order": 15, "credit_id": "c16" },
+      { "id": 6014, "name": "Actor Fifteen", "character": "Role 15", "order": 14, "credit_id": "c15" },
+      { "id": 6013, "name": "Actor Fourteen", "character": "Role 14", "order": 13, "credit_id": "c14" },
+      { "id": 6012, "name": "Actor Thirteen", "character": "Role 13", "order": 12, "credit_id": "c13" },
+      { "id": 6011, "name": "Actor Twelve", "character": "Role 12", "order": 11, "credit_id": "c12" },
+      { "id": 6010, "name": "Actor Eleven", "character": "Role 11", "order": 10, "credit_id": "c11" },
+      { "id": 6009, "name": "Actor Ten", "character": "Role 10", "order": 9, "credit_id": "c10" },
+      { "id": 6008, "name": "Actor Nine", "character": "Role 9", "order": 8, "credit_id": "c9" },
+      { "id": 6007, "name": "Actor Eight", "character": "Role 8", "order": 7, "credit_id": "c8" },
+      { "id": 6006, "name": "Actor Seven", "character": "Role 7", "order": 6, "credit_id": "c7" },
+      { "id": 6005, "name": "Hugo Weaving", "character": "Agent Smith", "order": 3, "credit_id": "c4" },
+      { "id": 530, "name": "Carrie-Anne Moss", "character": "Trinity", "order": 2, "credit_id": "c3" },
+      { "id": 2975, "name": "Laurence Fishburne", "character": "Morpheus", "order": 1, "credit_id": "c2" },
+      { "id": 6384, "name": "Keanu Reeves", "character": "Thomas A. Anderson / Neo", "order": 0, "credit_id": "c1" }
+    ],
+    "crew": [
+      { "id": 9340, "name": "Lana Wachowski", "job": "Director", "department": "Directing" },
+      { "id": 9339, "name": "Lilly Wachowski", "job": "Director", "department": "Directing" },
+      { "id": 9341, "name": "Joel Silver", "job": "Producer", "department": "Production" },
+      { "id": 9342, "name": "Bill Pope", "job": "Director of Photography", "department": "Camera" }
+    ]
+  },
+  "release_dates": {
+    "results": [
+      {
+        "iso_3166_1": "DE",
+        "release_dates": [{ "certification": "16", "iso_639_1": "", "release_date": "1999-06-17T00:00:00.000Z", "type": 3 }]
+      },
+      {
+        "iso_3166_1": "US",
+        "release_dates": [
+          { "certification": "", "iso_639_1": "", "release_date": "1999-03-30T00:00:00.000Z", "type": 1 },
+          { "certification": "R", "iso_639_1": "", "release_date": "1999-03-31T00:00:00.000Z", "type": 3 }
+        ]
+      }
+    ]
+  },
+  "external_ids": { "imdb_id": "tt0133093", "wikidata_id": "Q83495" },
+  "keywords": {
+    "keywords": [
+      { "id": 310, "name": "artificial intelligence (a.i.)" },
+      { "id": 1721, "name": "dystopia" },
+      { "id": 4563, "name": "simulated reality" }
+    ]
+  }
+}

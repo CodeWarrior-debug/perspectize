@@ -178,10 +178,25 @@ on:
 
 ### 7. pnpm's `minimumReleaseAge` blocks freshly-published transitive deps
 
-pnpm (10.16+) refuses to install a lockfile entry published within a rolling
-age window (default 24h) as a supply-chain guard against just-published
+pnpm's `minimumReleaseAge` (in **minutes**) refuses package versions published
+within a rolling age window, as a supply-chain guard against just-published
 (potentially compromised) packages. This isn't a CVE — it's a **timing**
-check — and it fires on transitive deps you never touched directly:
+check — and it fires on transitive deps you never touched directly.
+
+**Where it's enforced:** Sevalla's frontend build enforces a 24h window. pnpm
+10.33 (local + CI) has **no** window by default, so `frontend/pnpm-workspace.yaml`
+sets `minimumReleaseAge: 1440` (24h) to match. Before that line existed, a
+`pnpm install` that re-resolved the lockfile (e.g. after a `--theirs` merge
+resolution) could pick a release hours old, pass CI, and then fail only the
+Sevalla deploy (PR #463: `@opentelemetry/*@2.12.0`). On 10.33 the setting
+applies when pnpm **resolves** versions (`install` after a lockfile change,
+`add`, `update`); `install --frozen-lockfile` does not re-check entries already
+in the lockfile, so CI can't catch a too-new entry that's already committed.
+Check suspects with `npm view <pkg> time --json`. Dependabot's pnpm helper also
+reads `pnpm-workspace.yaml`, so a Dependabot bump to a release under 24h old
+may fail to resolve; it succeeds on the next run once the release has aged.
+
+The failure looks like:
 
 ```
 ✗ Lockfile failed supply-chain policy check
@@ -194,11 +209,27 @@ direct pin) and got resolved to the newest release, which happened to be
 hours old. Same failure mode as `8939867` (`@sveltejs/kit` pinned to `~2.63.1`
 for this exact reason).
 
-**Fix:** add an exact-pin override (see the exception under #5) to the last
+**Fix:** first try re-resolving: restore the lockfile from `origin/main` and
+run `pnpm install` in `frontend/` (the workspace setting keeps new resolutions
+out of the window). That's how #463 was fixed. If a range still forces the
+too-new version, add an exact-pin override (see the exception under #5) to the last
 version that's already past the age window — check publish dates with
 `npm view <pkg> time --json`. Don't disable or loosen the policy itself; it's
 doing its job. The pin can usually be relaxed (or removed) once a newer,
 now-aged release exists and there's a reason to move off the pinned version.
+
+### 8. A repo-root Trivy scan also walks `.claude/worktrees/`
+
+`trivy fs .` from the repo root walks every checked-out worktree under `.claude/worktrees/` (gitignored, so CI never sees them). Those copies are often stale and report HIGH/CRITICAL findings that CI doesn't gate on. Checked 2026-10-23: the root scan reported findings for dozens of worktree copies, while the real `backend/go.mod` was clean.
+
+Scan the two gated files directly instead:
+
+```bash
+trivy fs backend/go.mod --severity HIGH,CRITICAL --scanners vuln
+trivy fs frontend/pnpm-lock.yaml --severity HIGH,CRITICAL --scanners vuln
+```
+
+Also compare against `origin/main`, not your checkout. The root checkout can be on an older branch whose lockfile differs from `main` by hundreds of lines, and a finding there may already be fixed on `main`.
 
 ## Known unfixable findings
 

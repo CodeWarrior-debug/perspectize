@@ -22,11 +22,11 @@ import (
 func setupPerspectiveVisibilityServer(perspectiveRepo *mockPerspectiveRepository, withAuth bool) *httptest.Server {
 	userRepo := &mockUserRepository{}
 	contentRepo := &mockContentRepository{}
-	contentService := services.NewContentService(contentRepo, &mockYouTubeClient{})
-	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo)
+	contentService := services.NewContentService(contentRepo, &mockYouTubeClient{}, nil)
+	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, nil, nil, nil)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)
+	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil, nil)
 	directiveRoot := directives.NewDirectiveRoot(contentService, perspectiveService)
 	gqlConfig := generated.Config{
 		Resolvers: resolver,

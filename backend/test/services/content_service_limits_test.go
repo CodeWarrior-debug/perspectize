@@ -37,7 +37,7 @@ func TestListContent_PageSizeBoundaries(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{})
+			svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil)
 
 			_, err := svc.ListContent(context.Background(), domain.ContentListParams{First: tt.first, Last: tt.last})
 
@@ -56,7 +56,7 @@ func TestSetPassageDisplayTitle_LengthBoundary(t *testing.T) {
 			return &domain.Content{ID: id, ContentType: domain.ContentTypeBiblePassage}, nil
 		},
 	}
-	svc := services.NewContentService(repo, &mockYouTubeClient{})
+	svc := services.NewContentService(repo, &mockYouTubeClient{}, nil)
 
 	t.Run("exactly the max in characters is accepted", func(t *testing.T) {
 		// Multi-byte runes: the limit counts characters, not bytes.
@@ -84,7 +84,7 @@ func TestPassageText_RangeBoundaries(t *testing.T) {
 	for i := range texts {
 		texts[i] = domain.BibleVerseText{VerseID: i + 1, Text: "v"}
 	}
-	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{},
+	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil,
 		services.WithBibleReference(&mockBibleReferenceRepo{books: bigBibleBooks(), texts: texts}))
 
 	t.Run("first verse ordinal is valid", func(t *testing.T) {
@@ -113,7 +113,7 @@ func TestPassageText_RangeBoundaries(t *testing.T) {
 
 func TestPassageInterlinear_RangeBoundaries(t *testing.T) {
 	ctx := context.Background()
-	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{},
+	svc := services.NewContentService(&mockContentRepository{}, &mockYouTubeClient{}, nil,
 		services.WithBibleReference(&mockBibleReferenceRepo{books: bigBibleBooks()}))
 
 	tests := []struct {

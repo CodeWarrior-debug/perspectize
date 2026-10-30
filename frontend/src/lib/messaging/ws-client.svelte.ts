@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import { createClient, type Client } from 'graphql-ws';
 import { getAuthToken } from '$lib/queries/client';
+import { APP_VERSION, clientPlatform } from '$lib/buildInfo';
 
 export const wsStatus = $state({ value: 'closed' as 'connecting' | 'connected' | 'closed' });
 
@@ -24,7 +25,11 @@ export function getWsClient(): Client {
 		url: wsEndpoint(),
 		lazy: true,
 		retryAttempts: Infinity,
-		connectionParams: async () => ({ authToken: (await getAuthToken()) ?? '' }),
+		connectionParams: async () => ({
+			authToken: (await getAuthToken()) ?? '',
+			clientVersion: APP_VERSION,
+			clientPlatform: clientPlatform(),
+		}),
 		on: {
 			connecting: () => {
 				wsStatus.value = 'connecting';
