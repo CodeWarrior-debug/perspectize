@@ -249,7 +249,12 @@ func main() {
 	// marked failed here. Assumes one server instance (Sevalla runs one).
 	importCtx, stopImports := context.WithCancel(context.Background())
 	defer stopImports()
-	importService := services.NewImportService(importRepo, importListers, contentService, services.WithImportBackground(importCtx))
+	var importCreator importContentCreator = contentService
+	if d := demoImportDelay(demoCfg.Enabled); d > 0 {
+		importCreator = slowImportCreator{inner: contentService, delay: d}
+		slog.Info("demo imports simulate API latency", "delayPerRow", d)
+	}
+	importService := services.NewImportService(importRepo, importListers, importCreator, services.WithImportBackground(importCtx))
 	if err := importService.RecoverInterrupted(context.Background()); err != nil {
 		slog.Warn("could not recover interrupted imports", "error", err)
 	}
