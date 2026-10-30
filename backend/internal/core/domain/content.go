@@ -15,6 +15,9 @@ const (
 	ContentTypeMovie        ContentType = "MOVIE"
 )
 
+// ClaimMaxLength caps a claim's normalised text, in characters (runes).
+const ClaimMaxLength = 300
+
 // ContentSearchField identifies a text column that a ContentFilter.search term
 // may be scoped to via ContentFilter.searchFields. Omitted/empty selects TITLE only
 // (preserves the historical default of matching on name alone).
@@ -79,6 +82,23 @@ type Content struct {
 	VerseStartID      *int    // BIBLE_PASSAGE only — computed ordinal (see BibleVerseOrdinal), not a table FK
 	VerseEndID        *int    // BIBLE_PASSAGE only
 	DisplayTitle      *string // BIBLE_PASSAGE only — optional, first-write-wins
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	// CustomFields holds user-set attributes. nil means unset. CLAIM stores
+	// effectiveDate and evaluateBy here as ISO YYYY-MM-DD strings.
+	CustomFields json.RawMessage
+	// Privacy controls who can read the row. Empty is treated as PrivacyPublic on
+	// write. CLAIM content is created PrivacyPrivate (owner-only).
+	Privacy   Privacy
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// VisibleTo reports whether viewerID may read this row. A PRIVATE row is visible
+// only to its owner, and viewer 0 (anonymous) never owns one. Any other row
+// (PUBLIC, or unset) is visible to everyone. A caller that gets false should
+// answer exactly as it would for a missing row.
+func (c *Content) VisibleTo(viewerID int) bool {
+	if c.Privacy != PrivacyPrivate {
+		return true
+	}
+	return viewerID > 0 && viewerID == c.AddedByUserID
 }

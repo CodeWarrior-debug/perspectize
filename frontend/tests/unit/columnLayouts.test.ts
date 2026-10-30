@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
 	COLUMN_LAYOUTS_KEY,
+	COLUMN_VIEW_LABEL,
 	columnViewFor,
 	loadLayout,
 	saveLayout,
@@ -14,6 +15,16 @@ describe('columnViewFor', () => {
 	it('is movie only when the type filter is exactly MOVIE', () => {
 		expect(columnViewFor('movie')).toBe('movie');
 		expect(columnViewFor(' MOVIE ')).toBe('movie');
+	});
+
+	it('is claim only when the type filter is exactly CLAIM', () => {
+		expect(columnViewFor('claim')).toBe('claim');
+		expect(columnViewFor(' Claim ')).toBe('claim');
+		expect(columnViewFor('claim,youtube')).toBe('general');
+	});
+
+	it('labels the claim view for the switch toast', () => {
+		expect(COLUMN_VIEW_LABEL.claim).toBe('Claim columns');
 	});
 
 	it('is general for no filter, another single type, or several types', () => {
@@ -77,12 +88,28 @@ describe('defaultLayout', () => {
 		for (const colId of togglableColIds(true)) expect(layout).toHaveProperty(colId);
 	});
 
-	it('shows the Movie set (with Type) in the movie view and hides YouTube-only columns', () => {
-		const layout = defaultLayout('lg', 'movie');
-		expect(layout.type).toBe(true);
+	it('shows the Movie set in the movie view and hides Type, which the filter already names', () => {
+		const layout = defaultLayout('lg', 'movie', 'movie');
+		expect(layout.type).toBe(false);
 		expect(layout.cast).toBe(true);
 		expect(layout.boxOffice).toBe(true);
 		expect(layout.channel).toBe(false);
+	});
+
+	it('shows the claim date columns in the claim view and hides the YouTube and Movie columns', () => {
+		const layout = defaultLayout('lg', 'claim', 'claim');
+		expect(layout.effectiveDate).toBe(true);
+		expect(layout.evaluateBy).toBe(true);
+		expect(layout.createdAt).toBe(false);
+		expect(layout.category).toBe(true);
+		expect(layout.type).toBe(false);
+		expect(layout.channel).toBe(false);
+		expect(layout.cast).toBe(false);
+	});
+
+	it('hides Type in the general view when a single non-movie type is filtered', () => {
+		expect(defaultLayout('lg', 'general', 'youtube_video').type).toBe(false);
+		expect(defaultLayout('lg', 'general').type).toBe(true);
 	});
 
 	it('hides picker-only columns such as Date Added', () => {

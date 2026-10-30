@@ -45,8 +45,8 @@ func TestCreatePerspective(t *testing.T) {
 	contentID := h.content(userID, "create")
 	h.warm(token)
 
-	// INSERT ... RETURNING
-	data := h.roundTrips(1, token, createPerspectiveMutation, map[string]any{
+	// SELECT content (visibility check, only when contentID is set), INSERT ... RETURNING
+	data := h.roundTrips(2, token, createPerspectiveMutation, map[string]any{
 		"input": map[string]any{"userID": 0, "contentID": contentID, "quality": 5, "review": "<p>hi</p>"},
 	})
 	got := decode[perspectiveResult](t, data, "createPerspective")

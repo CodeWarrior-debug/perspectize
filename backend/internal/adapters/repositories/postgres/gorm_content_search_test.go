@@ -63,8 +63,9 @@ func TestApplyContentSearch_CommaPhrases(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			db, mock := newMockDB(t)
-			args := make([]driver.Value, len(tc.wantArgs)+1)
-			args[len(tc.wantArgs)] = int64(11) // LIMIT = default 10 + 1
+			args := make([]driver.Value, len(tc.wantArgs)+2)
+			args[len(tc.wantArgs)] = "public"    // visibility predicate (anonymous viewer)
+			args[len(tc.wantArgs)+1] = int64(11) // LIMIT = default 10 + 1
 			for i, a := range tc.wantArgs {
 				args[i] = a
 			}
@@ -82,7 +83,7 @@ func TestApplyContentSearch_CommaPhrases(t *testing.T) {
 
 	t.Run("only commas applies no search filter", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`SELECT \* FROM "content" ORDER BY`).WillReturnRows(contentRows())
+		mock.ExpectQuery(`SELECT \* FROM "content" WHERE content\.privacy = \$1 ORDER BY`).WillReturnRows(contentRows())
 		_, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{
 			SortBy:    domain.ContentSortByCreatedAt,
 			SortOrder: domain.SortOrderDesc,

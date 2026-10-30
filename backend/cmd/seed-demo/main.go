@@ -26,6 +26,8 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/demo"
 	gormpg "gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -54,10 +56,13 @@ func main() {
 		log.Fatalf("connect: %v", err)
 	}
 
+	contentRepo := postgres.NewGormContentRepository(db)
 	s := &seeder{
 		db:           db,
 		users:        postgres.NewGormUserRepository(db),
-		content:      postgres.NewGormContentRepository(db),
+		content:      contentRepo,
+		claims:       services.NewContentService(contentRepo, nil, nil),
+		claimExists:  claimExistsIn(db),
 		perspectives: postgres.NewGormPerspectiveRepository(db),
 		threads:      postgres.NewGormMessageThreadRepository(db),
 		messages:     postgres.NewGormMessageRepository(db),
@@ -121,17 +126,26 @@ func resetDemoData(ctx context.Context, db *gorm.DB) error {
 	})
 }
 
+// claimCreator is the claim create path, satisfied by *services.ContentService.
+// Seeding goes through it so demo claims get the same text, date and privacy
+// rules as a claim made in the UI.
+type claimCreator interface {
+	CreateClaim(ctx context.Context, input portservices.CreateClaimInput) (*domain.Content, error)
+}
+
 type seeder struct {
 	db           *gorm.DB
 	users        *postgres.GormUserRepository
 	content      *postgres.GormContentRepository
+	claims       claimCreator
+	claimExists  func(ctx context.Context, userID int, text string) (bool, error)
 	perspectives *postgres.GormPerspectiveRepository
 	threads      *postgres.GormMessageThreadRepository
 	messages     *postgres.GormMessageRepository
 
 	userIDs    map[string]int // persona key -> users.id
 	contentIDs map[string]int // video ID -> content.id
-	created    [4]int         // users, content, perspectives, messages
+	created    [5]int         // users, content, claims, perspectives, messages
 }
 
 func (s *seeder) run(ctx context.Context) error {
@@ -141,6 +155,9 @@ func (s *seeder) run(ctx context.Context) error {
 	if err := s.seedContent(ctx); err != nil {
 		return err
 	}
+	if err := s.seedClaims(ctx); err != nil {
+		return err
+	}
 	if err := s.seedPerspectives(ctx); err != nil {
 		return err
 	}
@@ -148,8 +165,47 @@ func (s *seeder) run(ctx context.Context) error {
 }
 
 func (s *seeder) summary() string {
-	return fmt.Sprintf("seed-demo: created %d users, %d content, %d perspectives, %d messages (existing rows left untouched)",
-		s.created[0], s.created[1], s.created[2], s.created[3])
+	return fmt.Sprintf("seed-demo: created %d users, %d content, %d claims, %d perspectives, %d messages (existing rows left untouched)",
+		s.created[0], s.created[1], s.created[2], s.created[3], s.created[4])
+}
+
+// claimExistsIn looks up whether a user already owns a claim with this exact text.
+func claimExistsIn(db *gorm.DB) func(ctx context.Context, userID int, text string) (bool, error) {
+	return func(ctx context.Context, userID int, text string) (bool, error) {
+		var n int64
+		err := db.WithContext(ctx).Table("content").
+			Where("added_by_user_id = ? AND content_type = 'claim' AND name = ?", userID, text).
+			Count(&n).Error
+		if err != nil {
+			return false, fmt.Errorf("count claims: %w", err)
+		}
+		return n > 0, nil
+	}
+}
+
+func (s *seeder) seedClaims(ctx context.Context) error {
+	for _, c := range demo.Claims {
+		userID := s.userIDs[c.Persona]
+		if userID == 0 {
+			return fmt.Errorf("claim %q references unknown persona %q", c.Text, c.Persona)
+		}
+		exists, err := s.claimExists(ctx, userID, c.Text)
+		if err != nil {
+			return fmt.Errorf("lookup claim %q: %w", c.Text, err)
+		}
+		if exists {
+			continue
+		}
+		input := portservices.CreateClaimInput{Text: c.Text, UserID: userID, EffectiveDate: &c.EffectiveDate}
+		if c.EvaluateBy != "" {
+			input.EvaluateBy = &c.EvaluateBy
+		}
+		if _, err := s.claims.CreateClaim(ctx, input); err != nil {
+			return fmt.Errorf("create claim %q: %w", c.Text, err)
+		}
+		s.created[2]++
+	}
+	return nil
 }
 
 func (s *seeder) seedUsers(ctx context.Context) error {
@@ -253,7 +309,7 @@ func (s *seeder) seedPerspectives(ctx context.Context) error {
 		if _, err := s.perspectives.Create(ctx, p); err != nil {
 			return fmt.Errorf("create perspective %s/%s: %w", sp.Persona, sp.VideoID, err)
 		}
-		s.created[2]++
+		s.created[3]++
 	}
 	return nil
 }
@@ -287,7 +343,7 @@ func (s *seeder) seedMessages(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("message seq: %w", err)
 	}
-	s.created[3] += int(after - before)
+	s.created[4] += int(after - before)
 	return nil
 }
 

@@ -441,7 +441,7 @@ func TestGormPerspectiveRepository_List(t *testing.T) {
 
 	t.Run("RestrictToPublicOrOwner with no viewer restricts to public only", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`WHERE user_id = \$1 AND privacy = \$2 ORDER BY`).
+		mock.ExpectQuery(`WHERE user_id = \$1 AND privacy = \$2 AND \(EXISTS \(SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND c.privacy = \$3\)\) ORDER BY`).
 			WillReturnRows(perspectiveRows())
 
 		got, err := NewGormPerspectiveRepository(db).List(ctx, domain.PerspectiveListParams{
@@ -454,14 +454,28 @@ func TestGormPerspectiveRepository_List(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
-	t.Run("RestrictToPublicOrOwner false leaves the query unrestricted", func(t *testing.T) {
+	t.Run("RestrictToPublicOrOwner false still requires public content for an anonymous caller", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		// No privacy predicate expected — a plain user_id filter only.
-		mock.ExpectQuery(`SELECT \* FROM "perspectives" WHERE user_id = \$1 ORDER BY`).
+		// The perspective's own privacy is not restricted, but its content is.
+		mock.ExpectQuery(`SELECT \* FROM "perspectives" WHERE user_id = \$1 AND \(EXISTS \(SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND c.privacy = \$2\)\) ORDER BY`).
 			WillReturnRows(perspectiveRows())
 
 		_, err := NewGormPerspectiveRepository(db).List(ctx, domain.PerspectiveListParams{
 			Filter:                  &domain.PerspectiveFilter{UserID: pInt(7)},
+			RestrictToPublicOrOwner: false,
+		})
+		require.NoError(t, err)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("content privacy: a viewer sees public content or content they own", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`EXISTS \(SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND \(c.privacy = \$1 OR c.added_by_user_id = \$2\)\)`).
+			WillReturnRows(perspectiveRows())
+
+		viewer := 7
+		_, err := NewGormPerspectiveRepository(db).List(ctx, domain.PerspectiveListParams{
+			ViewerID:                &viewer,
 			RestrictToPublicOrOwner: false,
 		})
 		require.NoError(t, err)
@@ -479,7 +493,7 @@ func TestGormPerspectiveRepository_AggregateByContentIDs(t *testing.T) {
 		// COUNT(quality)/the Quality column at all.
 		rows := sqlmock.NewRows([]string{"content_id", "count", "quality_count", "avg_quality"}).
 			AddRow(11, 1, 0, nil)
-		mock.ExpectQuery(`SELECT c.id AS content_id, COUNT\(p.id\) AS count, COUNT\(p.quality\) AS quality_count, AVG\(p.quality\) AS avg_quality FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id WHERE c.id = ANY\(CAST\(\$1 AS bigint\[\]\)\) GROUP BY "c"."id"`).
+		mock.ExpectQuery(`SELECT c.id AS content_id, COUNT\(p.id\) AS count, COUNT\(p.quality\) AS quality_count, AVG\(p.quality\) AS avg_quality, c.privacy AS privacy, c.added_by_user_id AS owner_id FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id WHERE c.id = ANY\(CAST\(\$1 AS bigint\[\]\)\) GROUP BY "c"."id"`).
 			WithArgs("{11}"). // one bigint[] parameter, not one placeholder per id
 			WillReturnRows(rows)
 

@@ -101,8 +101,8 @@ func TestList_ComputedSortKeyCursor(t *testing.T) {
 
 			// Page 2: the keyset comparison binds that value, then the id, then limit+1.
 			params.After = page1.EndCursor
-			mock.ExpectQuery(`SELECT content\.\*, \(.+\) AS `+tt.alias+`.*WHERE .*COALESCE`).
-				WithArgs(derefArg{tt.wantArg}, derefArg{int64(161)}, 2).
+			mock.ExpectQuery(`SELECT content\.\*, \(.+\) AS `+tt.alias+`.*WHERE content\.privacy = \$1 AND .*COALESCE`).
+				WithArgs("public", derefArg{tt.wantArg}, derefArg{int64(161)}, 2).
 				WillReturnRows(computedRows(tt.alias, tt.dbVal))
 			_, err = repo.List(ctx, params)
 			require.NoError(t, err)

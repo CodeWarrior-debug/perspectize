@@ -73,6 +73,7 @@ type ComplexityRoot struct {
 		CommentCount       func(childComplexity int) int
 		ContentType        func(childComplexity int) int
 		CreatedAt          func(childComplexity int) int
+		CustomFields       func(childComplexity int) int
 		Description        func(childComplexity int) int
 		DisplayTitle       func(childComplexity int) int
 		ID                 func(childComplexity int) int
@@ -84,6 +85,7 @@ type ComplexityRoot struct {
 		Name               func(childComplexity int) int
 		PerspectiveCount   func(childComplexity int) int
 		PrimaryCategory    func(childComplexity int) int
+		Privacy            func(childComplexity int) int
 		PublishedAt        func(childComplexity int) int
 		QualityRatingCount func(childComplexity int) int
 		Response           func(childComplexity int) int
@@ -234,6 +236,7 @@ type ComplexityRoot struct {
 		CreateUser                      func(childComplexity int, input model.CreateUserInput) int
 		CreateUserTodo                  func(childComplexity int, input model.CreateUserTodoInput) int
 		CreateUserTodoList              func(childComplexity int, input model.CreateUserTodoListInput) int
+		DeleteClaim                     func(childComplexity int, id string, keepAnonymous *bool) int
 		DeleteMessage                   func(childComplexity int, messageID string) int
 		DeletePerspective               func(childComplexity int, id string) int
 		DeleteUser                      func(childComplexity int, id string) int
@@ -250,6 +253,7 @@ type ComplexityRoot struct {
 		SetPassageDisplayTitle          func(childComplexity int, input model.SetPassageDisplayTitleInput) int
 		SetPrimaryCategory              func(childComplexity int, input model.SetPrimaryCategoryInput) int
 		SetTyping                       func(childComplexity int, threadID string, typing bool) int
+		UpdateClaim                     func(childComplexity int, id string, input model.UpdateClaimInput) int
 		UpdateContentSourceData         func(childComplexity int, contentID int) int
 		UpdatePerspective               func(childComplexity int, input model.UpdatePerspectiveInput) int
 		UpdateUser                      func(childComplexity int, input model.UpdateUserInput) int
@@ -514,6 +518,8 @@ type MutationResolver interface {
 	UpdatePerspective(ctx context.Context, input model.UpdatePerspectiveInput) (*model.Perspective, error)
 	DeletePerspective(ctx context.Context, id string) (bool, error)
 	CreateClaim(ctx context.Context, input model.CreateClaimInput) (*model.Content, error)
+	UpdateClaim(ctx context.Context, id string, input model.UpdateClaimInput) (*model.Content, error)
+	DeleteClaim(ctx context.Context, id string, keepAnonymous *bool) (bool, error)
 	SetPrimaryCategory(ctx context.Context, input model.SetPrimaryCategoryInput) (*model.Content, error)
 	CreateUserTodo(ctx context.Context, input model.CreateUserTodoInput) (*model.UserTodo, error)
 	UpdateUserTodo(ctx context.Context, input model.UpdateUserTodoInput) (*model.UserTodo, error)
@@ -707,6 +713,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.CreatedAt(childComplexity), true
+	case "Content.customFields":
+		if e.ComplexityRoot.Content.CustomFields == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.CustomFields(childComplexity), true
 	case "Content.description":
 		if e.ComplexityRoot.Content.Description == nil {
 			break
@@ -773,6 +785,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.PrimaryCategory(childComplexity), true
+	case "Content.privacy":
+		if e.ComplexityRoot.Content.Privacy == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.Privacy(childComplexity), true
 	case "Content.publishedAt":
 		if e.ComplexityRoot.Content.PublishedAt == nil {
 			break
@@ -1427,6 +1445,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateUserTodoList(childComplexity, args["input"].(model.CreateUserTodoListInput)), true
+	case "Mutation.deleteClaim":
+		if e.ComplexityRoot.Mutation.DeleteClaim == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteClaim_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeleteClaim(childComplexity, args["id"].(string), args["keepAnonymous"].(*bool)), true
 	case "Mutation.deleteMessage":
 		if e.ComplexityRoot.Mutation.DeleteMessage == nil {
 			break
@@ -1603,6 +1632,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.SetTyping(childComplexity, args["threadId"].(string), args["typing"].(bool)), true
+	case "Mutation.updateClaim":
+		if e.ComplexityRoot.Mutation.UpdateClaim == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateClaim_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdateClaim(childComplexity, args["id"].(string), args["input"].(model.UpdateClaimInput)), true
 	case "Mutation.updateContentSourceData":
 		if e.ComplexityRoot.Mutation.UpdateContentSourceData == nil {
 			break
@@ -2661,6 +2701,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputSendMessageInput,
 		ec.unmarshalInputSetPassageDisplayTitleInput,
 		ec.unmarshalInputSetPrimaryCategoryInput,
+		ec.unmarshalInputUpdateClaimInput,
 		ec.unmarshalInputUpdatePerspectiveInput,
 		ec.unmarshalInputUpdateUserInput,
 		ec.unmarshalInputUpdateUserTodoInput,
@@ -2967,6 +3008,12 @@ type Content {
   verseStartID: Int
   verseEndID: Int
   displayTitle: String
+  "User-set attributes; for CLAIM, effectiveDate and evaluateBy as YYYY-MM-DD. Null when unset."
+  customFields: JSON
+  # Who can read this row. CLAIM content starts PRIVATE (owner-only); everything
+  # else is PUBLIC. Private rows are omitted from lists and contentByID for
+  # anyone but their owner.
+  privacy: Privacy!
   # Aggregates computed from ALL perspectives on this content — public and
   # private alike (privacy controls readability, not whether a perspective
   # counts here). Resolved on demand (batched per-request via dataloader)
@@ -3274,8 +3321,18 @@ input SetPrimaryCategoryInput {
 
 input CreateClaimInput {
   text: String!            # The claim text (may contain @this/@here tokens)
-  userID: IntID!           # Who created the claim
-  parentContentID: IntID!  # The content item this claim is about
+  userID: IntID!           # 0 = derive from session; non-zero must match the session user
+  parentContentID: IntID   # Optional: the content item this claim is about
+  effectiveDate: String    # Optional YYYY-MM-DD; defaults to today (UTC)
+  evaluateBy: String       # Optional YYYY-MM-DD; must not be before effectiveDate
+  privacy: Privacy         # Optional; defaults to PUBLIC. PRIVATE keeps the claim owner-only
+}
+
+input UpdateClaimInput {
+  text: String!            # The new claim text; same rules as create
+  effectiveDate: String    # Optional YYYY-MM-DD; nil or empty means today (UTC)
+  evaluateBy: String       # Optional YYYY-MM-DD; nil or empty clears it
+  privacy: Privacy         # Optional; nil keeps the stored privacy
 }
 
 type Mutation {
@@ -3312,6 +3369,11 @@ type Mutation {
 
   # Claim mutations
   createClaim(input: CreateClaimInput!): Content! @auth
+  updateClaim(id: ID!, input: UpdateClaimInput!): Content! @auth
+  # Deletes an owned claim. If another user has a perspective or plan item on it, the
+  # delete is refused with code CLAIM_HAS_OTHERS; keepAnonymous: true hands the claim to
+  # the [deleted] sentinel user instead, so the others' perspectives keep their target.
+  deleteClaim(id: ID!, keepAnonymous: Boolean): Boolean! @auth
 
   # Category mutations
   setPrimaryCategory(input: SetPrimaryCategoryInput!): Content! @auth
@@ -3788,6 +3850,10 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_verseEndID(ctx, field)
 	case "displayTitle":
 		return ec.fieldContext_Content_displayTitle(ctx, field)
+	case "customFields":
+		return ec.fieldContext_Content_customFields(ctx, field)
+	case "privacy":
+		return ec.fieldContext_Content_privacy(ctx, field)
 	case "perspectiveCount":
 		return ec.fieldContext_Content_perspectiveCount(ctx, field)
 	case "averageRating":
@@ -4640,6 +4706,28 @@ func (ec *executionContext) field_Mutation_createUser_args(ctx context.Context, 
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_deleteClaim_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "keepAnonymous",
+		func(ctx context.Context, v any) (*bool, error) {
+			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["keepAnonymous"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_deleteMessage_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -4901,6 +4989,28 @@ func (ec *executionContext) field_Mutation_setTyping_args(ctx context.Context, r
 		return nil, err
 	}
 	args["typing"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateClaim_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.UpdateClaimInput, error) {
+			return ec.unmarshalNUpdateClaimInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUpdateClaimInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg1
 	return args, nil
 }
 
@@ -6391,6 +6501,52 @@ func (ec *executionContext) _Content_displayTitle(ctx context.Context, field gra
 }
 func (ec *executionContext) fieldContext_Content_displayTitle(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Content", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Content_customFields(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_customFields(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CustomFields, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v map[string]any) graphql.Marshaler {
+			return ec.marshalOJSON2map(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_customFields(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, false, false, errors.New("field of type JSON does not have child fields"))
+}
+
+func (ec *executionContext) _Content_privacy(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_privacy(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Privacy, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v domain.Privacy) graphql.Marshaler {
+			return ec.marshalNPrivacy2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPrivacy(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Content_privacy(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, false, false, errors.New("field of type Privacy does not have child fields"))
 }
 
 func (ec *executionContext) _Content_perspectiveCount(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
@@ -9172,6 +9328,120 @@ func (ec *executionContext) fieldContext_Mutation_createClaim(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_createClaim_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateClaim(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_updateClaim(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdateClaim(ctx, fc.Args["id"].(string), fc.Args["input"].(model.UpdateClaimInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.Content
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Content) graphql.Marshaler {
+			return ec.marshalNContent2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_updateClaim(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Content(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateClaim_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteClaim(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_deleteClaim(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeleteClaim(ctx, fc.Args["id"].(string), fc.Args["keepAnonymous"].(*bool))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_deleteClaim(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteClaim_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -15655,7 +15925,7 @@ func (ec *executionContext) unmarshalInputCreateClaimInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"text", "userID", "parentContentID"}
+	fieldsInOrder := [...]string{"text", "userID", "parentContentID", "effectiveDate", "evaluateBy", "privacy"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -15678,11 +15948,32 @@ func (ec *executionContext) unmarshalInputCreateClaimInput(ctx context.Context, 
 			it.UserID = data
 		case "parentContentID":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("parentContentID"))
-			data, err := ec.unmarshalNIntID2int(ctx, v)
+			data, err := ec.unmarshalOIntID2ᚖint(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.ParentContentID = data
+		case "effectiveDate":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("effectiveDate"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EffectiveDate = data
+		case "evaluateBy":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("evaluateBy"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EvaluateBy = data
+		case "privacy":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("privacy"))
+			data, err := ec.unmarshalOPrivacy2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPrivacy(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Privacy = data
 		}
 	}
 	return it, nil
@@ -16460,6 +16751,57 @@ func (ec *executionContext) unmarshalInputSetPrimaryCategoryInput(ctx context.Co
 				return it, err
 			}
 			it.EntityType = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputUpdateClaimInput(ctx context.Context, obj any) (model.UpdateClaimInput, error) {
+	var it model.UpdateClaimInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"text", "effectiveDate", "evaluateBy", "privacy"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "text":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("text"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Text = data
+		case "effectiveDate":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("effectiveDate"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EffectiveDate = data
+		case "evaluateBy":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("evaluateBy"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EvaluateBy = data
+		case "privacy":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("privacy"))
+			data, err := ec.unmarshalOPrivacy2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐPrivacy(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Privacy = data
 		}
 	}
 	return it, nil
@@ -17274,6 +17616,16 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 		case "displayTitle":
 			out.Values[i] = ec._Content_displayTitle(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "customFields":
+			out.Values[i] = ec._Content_customFields(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "privacy":
+			out.Values[i] = ec._Content_privacy(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "perspectiveCount":
@@ -18742,6 +19094,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "createClaim":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createClaim(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateClaim":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateClaim(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteClaim":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteClaim(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -22269,6 +22635,11 @@ func (ec *executionContext) marshalNTodoAction2ᚖgithubᚗcomᚋCodeWarriorᚑd
 		return graphql.Null
 	}
 	return ec._TodoAction(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNUpdateClaimInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUpdateClaimInput(ctx context.Context, v any) (model.UpdateClaimInput, error) {
+	res, err := ec.unmarshalInputUpdateClaimInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNUpdatePerspectiveInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUpdatePerspectiveInput(ctx context.Context, v any) (model.UpdatePerspectiveInput, error) {

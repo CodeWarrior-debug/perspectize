@@ -37,7 +37,9 @@ async function openWith(text?: string) {
 }
 
 async function type(text: string) {
-	await fireEvent.input(screen.getByPlaceholderText(/paste a link or type a reference/i), { target: { value: text } });
+	await fireEvent.input(screen.getByPlaceholderText(/paste a link or type a reference/i), {
+		target: { value: text },
+	});
 	await tick();
 }
 
@@ -113,11 +115,21 @@ describe('AddContentPopover detection states', () => {
 		expect(submit()).toBeDisabled();
 	});
 
-	it('claim-like text: chip says Claim, explained, submit disabled', async () => {
-		await openWith('Grace is unearned favor');
-		expect(chip()).toHaveTextContent('Detected: Claim');
-		expect(screen.getByText(/claims can't be added from here yet/i)).toBeInTheDocument();
+	it('free text only is no match: chip says Select a type, submit disabled, nothing is saved', async () => {
+		await openWith('  Grace is unearned favor  ');
+		expect(chip()).toHaveTextContent('Select a type');
 		expect(submit()).toBeDisabled();
+		await fireEvent.click(submit());
+		expect(mocks.video.mutate).not.toHaveBeenCalled();
+		expect(mocks.passage.mutate).not.toHaveBeenCalled();
+		expect(mocks.movie.mutate).not.toHaveBeenCalled();
+	});
+
+	it('the type select offers no Claim option', async () => {
+		await openWith('grace');
+		const select = screen.getByLabelText(/change type/i);
+		expect(select.querySelector('option[value="CLAIM"]')).toBeNull();
+		expect(screen.queryByRole('option', { name: 'Claim' })).toBeNull();
 	});
 });
 

@@ -292,6 +292,15 @@ func applyContentSearch(query *gorm.DB, term string, fields []domain.ContentSear
 	return query
 }
 
+// applyContentVisibility restricts a content query to rows the viewer may read.
+func applyContentVisibility(query *gorm.DB, viewerID *int) *gorm.DB {
+	public := privacyToDBValue(domain.PrivacyPublic)
+	if viewerID == nil {
+		return query.Where("content.privacy = ?", public)
+	}
+	return query.Where("(content.privacy = ? OR content.added_by_user_id = ?)", public, *viewerID)
+}
+
 func (r *GormContentRepository) List(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
 	limit := 10
 	if params.First != nil {
@@ -400,6 +409,11 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		}
 	}
 
+	// Visibility: public rows, plus the viewer's own private rows. Applied after
+	// the filters (so their placeholders keep their positions) and before the
+	// count, so the page and total agree.
+	query = applyContentVisibility(query, params.ViewerID)
+
 	// Total count (before cursor/limit — respects filters only). It rides
 	// along in the page query as an uncorrelated scalar subquery, which
 	// Postgres evaluates once: one round trip for page + count, not two.
@@ -466,14 +480,16 @@ func (r *GormContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 }
 
 // UpdatePrimaryCategoryID sets the primary_category_id FK on a content record
-// and returns the updated row (RETURNING *). Zero rows means the content
-// doesn't exist, so callers need no separate existence check.
-func (r *GormContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+// the viewer may read (public, or owned by viewerID) and returns the updated
+// row (RETURNING *). The visibility rule lives in the WHERE clause, so there is
+// no separate read. Zero rows means the content is missing or not visible to
+// the viewer, and both answer domain.ErrNotFound.
+func (r *GormContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
 	var updated ContentModel
 	result := r.db.WithContext(ctx).
 		Model(&updated).
 		Clauses(clause.Returning{}).
-		Where("id = ?", contentID).
+		Where("id = ? AND (privacy = 'public' OR added_by_user_id = ?)", contentID, viewerID).
 		Update("primary_category_id", categoryID)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to update primary category: %w", result.Error)
@@ -482,6 +498,100 @@ func (r *GormContentRepository) UpdatePrimaryCategoryID(ctx context.Context, con
 		return nil, domain.ErrNotFound
 	}
 	return contentModelToDomain(&updated), nil
+}
+
+// UpdateClaim rewrites an owned claim in one owner-scoped UPDATE ... RETURNING.
+// response is merged, not replaced, so response.parentContentId survives. In
+// custom_fields, evaluateBy is dropped before the new object is merged, so an
+// omitted evaluateBy clears it. Zero rows (missing, not a claim, or not the
+// owner) is domain.ErrNotFound, so there is no second read to tell them apart.
+func (r *GormContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text string, html string, customFields json.RawMessage, privacy *domain.Privacy) (*domain.Content, error) {
+	values := map[string]interface{}{
+		"name":          text,
+		"response":      gorm.Expr("COALESCE(response, '{}'::jsonb) || jsonb_build_object('text', ?::text, 'html', ?::text)", text, html),
+		"custom_fields": gorm.Expr("(COALESCE(custom_fields, '{}'::jsonb) - 'evaluateBy') || ?::jsonb", string(customFields)),
+		"updated_at":    gorm.Expr("NOW()"),
+	}
+	// nil keeps the stored privacy; only an explicit value is written.
+	if privacy != nil {
+		values["privacy"] = privacyToDBValue(*privacy)
+	}
+	var updated ContentModel
+	result := r.db.WithContext(ctx).
+		Model(&updated).
+		Clauses(clause.Returning{}).
+		Where("id = ? AND added_by_user_id = ? AND content_type = ?",
+			id, ownerID, contentTypeToDBValue(domain.ContentTypeClaim)).
+		Updates(values)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to update claim: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return nil, domain.ErrNotFound
+	}
+	return contentModelToDomain(&updated), nil
+}
+
+// DeleteOwnedClaim deletes an owned claim together with the owner's own
+// perspectives and plan items on it. Another user's perspective or plan item on
+// the claim blocks the delete: nothing is removed and domain.ErrClaimHasOthers is
+// returned. Runs in one transaction so the checks and the delete can't disagree.
+func (r *GormContentRepository) DeleteOwnedClaim(ctx context.Context, id, ownerID int) error {
+	claimType := contentTypeToDBValue(domain.ContentTypeClaim)
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var owned int64
+		if err := tx.Model(&ContentModel{}).
+			Where("id = ? AND added_by_user_id = ? AND content_type = ?", id, ownerID, claimType).
+			Count(&owned).Error; err != nil {
+			return fmt.Errorf("failed to find claim: %w", err)
+		}
+		if owned == 0 {
+			return domain.ErrNotFound
+		}
+
+		var otherPerspectives, otherTodos int64
+		if err := tx.Table("perspectives").
+			Where("content_id = ? AND user_id <> ?", id, ownerID).
+			Count(&otherPerspectives).Error; err != nil {
+			return fmt.Errorf("failed to check claim perspectives: %w", err)
+		}
+		if err := tx.Table("user_todos").
+			Where("content_id = ? AND user_id <> ?", id, ownerID).
+			Count(&otherTodos).Error; err != nil {
+			return fmt.Errorf("failed to check claim plan items: %w", err)
+		}
+		if otherPerspectives > 0 || otherTodos > 0 {
+			return domain.ErrClaimHasOthers
+		}
+
+		if err := tx.Exec("DELETE FROM perspectives WHERE content_id = ? AND user_id = ?", id, ownerID).Error; err != nil {
+			return fmt.Errorf("failed to delete claim perspectives: %w", err)
+		}
+		if err := tx.Exec("DELETE FROM user_todos WHERE content_id = ? AND user_id = ?", id, ownerID).Error; err != nil {
+			return fmt.Errorf("failed to delete claim plan items: %w", err)
+		}
+		if err := tx.Exec("DELETE FROM content WHERE id = ? AND added_by_user_id = ? AND content_type = ?",
+			id, ownerID, claimType).Error; err != nil {
+			return fmt.Errorf("failed to delete claim: %w", err)
+		}
+		return nil
+	})
+}
+
+// AnonymizeOwnedClaim hands an owned claim to the [deleted] sentinel user. The row
+// stays, so other users' perspectives and plan items on it keep their target.
+func (r *GormContentRepository) AnonymizeOwnedClaim(ctx context.Context, id, ownerID int) error {
+	result := r.db.WithContext(ctx).Exec(
+		`UPDATE content SET added_by_user_id = (SELECT id FROM users WHERE username = ?), updated_at = NOW()
+		 WHERE id = ? AND added_by_user_id = ? AND content_type = ?`,
+		domain.DeletedUserUsername, id, ownerID, contentTypeToDBValue(domain.ContentTypeClaim))
+	if result.Error != nil {
+		return fmt.Errorf("failed to anonymize claim: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
 }
 
 // SetDisplayTitleIfEmpty implements first-write-wins for a passage's optional

@@ -6,11 +6,39 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
 
-// CreateClaimInput holds the input for creating a claim content entry
+// CreateClaimInput holds the input for creating a claim content entry.
+// ParentContentID is optional: a claim may stand alone. EffectiveDate
+// (YYYY-MM-DD) defaults to today UTC when nil or empty; EvaluateBy
+// (YYYY-MM-DD) is optional and nil or empty means unset.
 type CreateClaimInput struct {
 	Text            string
 	UserID          int
-	ParentContentID int
+	ParentContentID *int
+	EffectiveDate   *string
+	EvaluateBy      *string
+	// Privacy is nil for the default (PUBLIC). PRIVATE keeps the claim owner-only.
+	Privacy *domain.Privacy
+}
+
+// UpdateClaimInput holds the input for replacing a claim's text and dates.
+// ActorUserID must own the claim. Nil or empty EffectiveDate means today UTC;
+// nil or empty EvaluateBy clears the evaluate-by date.
+type UpdateClaimInput struct {
+	ContentID     int
+	ActorUserID   int
+	Text          string
+	EffectiveDate *string
+	EvaluateBy    *string
+	// Privacy is nil to keep the stored privacy.
+	Privacy *domain.Privacy
+}
+
+// DeleteClaimInput holds the input for deleting a claim. ActorUserID must own it.
+// KeepAnonymous hands the claim to the [deleted] sentinel user instead of deleting it.
+type DeleteClaimInput struct {
+	ContentID     int
+	ActorUserID   int
+	KeepAnonymous bool
 }
 
 // CreatePassageInput holds the input for creating (or finding) a Bible passage
@@ -63,8 +91,18 @@ type ContentService interface {
 	// CreateClaim creates a new claim content entry associated with a parent content item
 	CreateClaim(ctx context.Context, input CreateClaimInput) (*domain.Content, error)
 
-	// UpdateSourceData refreshes an existing content item's metadata from its source
-	UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error)
+	// UpdateClaim replaces an owned claim's text and dates. A claim the actor
+	// does not own is domain.ErrNotFound.
+	UpdateClaim(ctx context.Context, input UpdateClaimInput) (*domain.Content, error)
+	// DeleteClaim deletes an owned claim, or with KeepAnonymous hands it to the
+	// [deleted] sentinel user. A claim another user has a perspective or plan item on
+	// can't be deleted: domain.ErrClaimHasOthers (use KeepAnonymous instead).
+	DeleteClaim(ctx context.Context, input DeleteClaimInput) error
+
+	// UpdateSourceData refreshes an existing content item's metadata from its source.
+	// viewerID must be able to see the row (0 for anonymous); a row they can't see
+	// is domain.ErrNotFound.
+	UpdateSourceData(ctx context.Context, contentID, viewerID int) (*domain.Content, error)
 
 	// YouTubeTrending returns one page of YouTube's most-popular chart for a
 	// region (ISO 3166-1 alpha-2, e.g. "US"). Served from the backend cache, so

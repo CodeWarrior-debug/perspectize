@@ -44,6 +44,11 @@ func (r *mutationResolver) CreatePerspective(ctx context.Context, input model.Cr
 		if errors.Is(err, domain.ErrInvalidInput) {
 			return nil, fmt.Errorf("invalid input: %w", err)
 		}
+		// Checked first: content not-found is also ErrNotFound, and must not be
+		// reported as a missing user.
+		if errors.Is(err, domain.ErrContentNotFound) {
+			return nil, fmt.Errorf("content not found")
+		}
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, fmt.Errorf("user not found: %w", err)
 		}
@@ -69,6 +74,9 @@ func (r *mutationResolver) UpdatePerspective(ctx context.Context, input model.Up
 	if err != nil {
 		if errors.Is(err, domain.ErrForbidden) {
 			return nil, fmt.Errorf("access denied: you can only modify your own perspectives")
+		}
+		if errors.Is(err, domain.ErrContentNotFound) {
+			return nil, fmt.Errorf("content not found")
 		}
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, fmt.Errorf("perspective not found")
@@ -145,6 +153,23 @@ func (r *queryResolver) PerspectiveByID(ctx context.Context, id string) (*model.
 	if perspective.Privacy == domain.PrivacyPrivate {
 		viewer, ok := auth.ForContext(ctx)
 		if !ok || viewer.ID != perspective.UserID {
+			return nil, nil
+		}
+	}
+
+	// Content privacy dominates perspective privacy: a perspective on a private
+	// claim is visible only to that claim's owner, so the same nil as above.
+	if perspective.ContentID != nil {
+		viewerID := 0
+		if viewer, ok := auth.ForContext(ctx); ok {
+			viewerID = viewer.ID
+		}
+		content, err := r.ContentService.GetByID(ctx, *perspective.ContentID)
+		if err != nil && !errors.Is(err, domain.ErrNotFound) {
+			slog.Error("getting perspective content failed", "id", id, "error", err)
+			return nil, fmt.Errorf("failed to get perspective")
+		}
+		if err != nil || !content.VisibleTo(viewerID) {
 			return nil, nil
 		}
 	}
@@ -299,6 +324,11 @@ func (r *perspectiveResolver) Content(ctx context.Context, obj *model.Perspectiv
 	c, err := r.contentByID(ctx, id)
 	if err != nil || c == nil {
 		return nil, err
+	}
+	// Backstop for the write-side check: a perspective never shows content the
+	// viewer can't read, so a private row someone else owns resolves to null.
+	if !canViewContent(ctx, c.Privacy, c.AddedByUserID) {
+		return nil, nil
 	}
 	return domainToModel(c), nil
 }

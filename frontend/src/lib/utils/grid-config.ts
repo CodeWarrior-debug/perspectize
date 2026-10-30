@@ -32,11 +32,11 @@ export function capitalizeContentType(contentType: string | undefined): string {
 /**
  * Every content type, in the order the Type column's checkbox filter lists them.
  * Hardcoded on purpose (mirrors the backend ContentType enum) — the Record forces
- * a new ContentType to be given a label here (Partial while CLAIM is commented out).
+ * a new ContentType to be given a label here.
  */
 const CONTENT_TYPE_LABELS: Partial<Record<ContentType, string>> = {
 	YOUTUBE_VIDEO: 'YouTube Video',
-	// CLAIM: 'Claim', // not ready in the UI yet; uncomment to offer it in the filter
+	CLAIM: 'Claim',
 	BIBLE_PASSAGE: 'Bible Passage',
 	MOVIE: 'Movie',
 };
@@ -222,6 +222,27 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		filterSet: true,
 	},
 	{ colId: 'category', label: 'Category', picker: 'data', sortable: false },
+	// Claim date columns (customFields JSON, see Content.customFields). Client-side sort only:
+	// the backend has no sort on custom fields, so in "All Items" mode they are not sortable.
+	{
+		colId: 'effectiveDate',
+		label: 'Effective',
+		picker: 'data',
+		sortable: true,
+		sortValue: (row) => row.customFields?.effectiveDate ?? null,
+	},
+	{
+		colId: 'evaluateBy',
+		label: 'Evaluate by',
+		picker: 'data',
+		sortable: true,
+		sortValue: (row) => row.customFields?.evaluateBy ?? null,
+	},
+	// The viewer's own ratings on each row, read from the perspective map (perspectiveRating),
+	// not from the row, so they are never client-sorted.
+	{ colId: 'myQuality', label: 'My overall', picker: 'data', sortable: false },
+	{ colId: 'myImportance', label: 'My importance', picker: 'data', sortable: false },
+	{ colId: 'myAgreement', label: 'My agreement', picker: 'data', sortable: false },
 	// Movie columns (MOVIE rows read their `response` JSON; see formatting.ts). Shown by
 	// default only when the type filter is exactly MOVIE (defaultColumnVisibility below).
 	{
@@ -435,14 +456,40 @@ export const COLUMNS: readonly ColumnMeta[] = [
 
 export type ResponsiveTier = 'xs' | 'sm' | 'md' | 'lg';
 
+/**
+ * The single lowercase type the `f.type` URL value names, or null when it names none or
+ * several different types. Repeats of one type (`movie,movie`) still name exactly one.
+ */
+export function soloTypeFilter(typeFilter: string | undefined): string | null {
+	if (!typeFilter) return null;
+	const types = new Set(
+		typeFilter
+			.split(',')
+			.map((t) => t.trim().toLowerCase())
+			.filter(Boolean),
+	);
+	return types.size === 1 ? [...types][0] : null;
+}
+
+export type PerspectiveRatingField = 'quality' | 'importance' | 'agreement';
+
+/**
+ * The signed-in viewer's rating for one row, from the perspective map the grid
+ * carries in its context (keyed by content id). Null when the viewer has no
+ * perspective on the row, or hasn't rated this field.
+ */
+export function perspectiveRating(
+	byContentId: Map<string, Partial<Record<PerspectiveRatingField, number | null>>> | undefined,
+	contentId: string | number | undefined,
+	field: PerspectiveRatingField,
+): number | null {
+	if (contentId === undefined) return null;
+	return byContentId?.get(String(contentId))?.[field] ?? null;
+}
+
 /** True when the `f.type` URL value names exactly one type and it is MOVIE. */
 export function isMovieOnlyTypeFilter(typeFilter: string | undefined): boolean {
-	if (!typeFilter) return false;
-	const types = typeFilter
-		.split(',')
-		.map((t) => t.trim().toLowerCase())
-		.filter(Boolean);
-	return types.length === 1 && types[0] === 'movie';
+	return soloTypeFilter(typeFilter) === 'movie';
 }
 
 /** Per-tier column lists. Columns in `hidden` are forced off; createdAt/updatedAt and the admin columns are in neither list (colDef `hide: true`, picker only). */
@@ -459,21 +506,34 @@ const MOVIE_DEFAULT_COLS = ['genre', 'rated', 'cast', 'released', 'boxOffice', '
  */
 export function defaultColumnVisibility(
 	tier: ResponsiveTier,
-	movieOnly: boolean,
+	view: 'movie' | 'claim' | 'general',
+	soloType: string | null = null,
 ): { visible: string[]; hidden: string[] } {
 	const sm = tier !== 'xs';
 	const md = tier === 'md' || tier === 'lg';
 	const lg = tier === 'lg';
-	const visible: string[] = movieOnly ? ['perspectize', 'item', 'type'] : ['item', 'type', 'perspectize'];
-	if (movieOnly) {
-		if (sm) visible.push('genre', 'rated');
-		if (md) visible.push('cast', 'duration', 'released');
-		if (lg) visible.push('boxOffice', 'vsBudget', 'tmdbScore', 'tags');
+	// A movie or claim view implies its solo type, so Type is hidden even when the caller passes none.
+	const solo = soloType ?? (view === 'general' ? null : view);
+	let visible: string[];
+	if (view === 'claim') {
+		visible = ['perspectize', 'item'];
+		if (sm) visible.push('category');
+		if (md) visible.push('effectiveDate', 'evaluateBy');
+		if (lg) visible.push('myQuality', 'myImportance', 'myAgreement');
 	} else {
-		if (sm) visible.push('category', 'channel');
-		if (md) visible.push('duration', 'publishDate');
-		if (lg) visible.push('views', 'likes', 'percentLiked', 'tags');
+		visible = view === 'movie' ? ['perspectize', 'item', 'type'] : ['item', 'type', 'perspectize'];
+		if (view === 'movie') {
+			if (sm) visible.push('genre', 'rated');
+			if (md) visible.push('cast', 'duration', 'released');
+			if (lg) visible.push('boxOffice', 'vsBudget', 'tmdbScore', 'tags');
+		} else {
+			if (sm) visible.push('category', 'channel');
+			if (md) visible.push('duration', 'publishDate');
+			if (lg) visible.push('views', 'likes', 'percentLiked', 'tags');
+		}
 	}
+	// Type is redundant once the filter names one type (any type), so it is hidden then.
+	if (solo !== null) visible = visible.filter((c) => c !== 'type');
 	const managed = [
 		'type',
 		'category',
@@ -487,6 +547,13 @@ export function defaultColumnVisibility(
 		'user',
 		'tags',
 		'description',
+		// Claim date and rating columns and createdAt: forced off outside the claim view (createdAt stays picker-available).
+		'effectiveDate',
+		'evaluateBy',
+		'myQuality',
+		'myImportance',
+		'myAgreement',
+		'createdAt',
 		...MOVIE_DEFAULT_COLS,
 		...MOVIE_ONLY_PICKER,
 	];
@@ -789,7 +856,10 @@ export function syncItemHeader(api: HeaderApi, name: string): boolean {
 	return true;
 }
 
-/** Item column header: "Film" when the type filter is exactly MOVIE, otherwise "Item". */
+/** Item column header: "Claim" for exactly CLAIM, "Film" for exactly MOVIE, otherwise "Item". */
 export function itemColumnHeader(typeFilter: string | undefined): string {
-	return isMovieOnlyTypeFilter(typeFilter) ? 'Film' : 'Item';
+	const solo = soloTypeFilter(typeFilter);
+	if (solo === 'claim') return 'Claim';
+	if (solo === 'movie') return 'Film';
+	return 'Item';
 }

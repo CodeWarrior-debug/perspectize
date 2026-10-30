@@ -14,6 +14,9 @@ import {
 	sortableColumnsFor,
 	releasedComparator,
 	itemColumnHeader,
+	soloTypeFilter,
+	defaultColumnVisibility,
+	COLUMNS,
 } from '$lib/utils/grid-config';
 import type { ContentItem } from '$lib/queries/content';
 
@@ -114,10 +117,15 @@ describe('durationComparator', () => {
 // Column-picker registry
 // ---------------------------------------------------------------------------
 describe('column-picker registry', () => {
-	it('DATA_COLUMNS holds the 25 user-togglable data columns', () => {
+	it('DATA_COLUMNS holds the 30 user-togglable data columns', () => {
 		expect(DATA_COLUMNS.map((c) => c.colId)).toEqual([
 			'type',
 			'category',
+			'effectiveDate',
+			'evaluateBy',
+			'myQuality',
+			'myImportance',
+			'myAgreement',
 			'genre',
 			'rated',
 			'cast',
@@ -164,13 +172,13 @@ describe('column-picker registry', () => {
 		}
 	});
 
-	it('togglableColIds(false) returns only the 25 data columns', () => {
+	it('togglableColIds(false) returns only the 27 data columns', () => {
 		expect(togglableColIds(false)).toEqual(DATA_COLUMNS.map((c) => c.colId));
 	});
 
-	it('togglableColIds(true) returns all 28 columns', () => {
+	it('togglableColIds(true) returns all 33 columns', () => {
 		const ids = togglableColIds(true);
-		expect(ids).toHaveLength(28);
+		expect(ids).toHaveLength(33);
 		expect(ids).toEqual([...DATA_COLUMNS.map((c) => c.colId), ...INTERNAL_COLUMNS.map((c) => c.colId)]);
 	});
 
@@ -449,10 +457,131 @@ describe('itemColumnHeader', () => {
 	it('is "Film" when the type filter is exactly MOVIE', () => {
 		expect(itemColumnHeader('movie')).toBe('Film');
 	});
+	it('is "Claim" when the type filter is exactly CLAIM', () => {
+		expect(itemColumnHeader('claim')).toBe('Claim');
+		expect(itemColumnHeader(' Claim ')).toBe('Claim');
+	});
 	it('is "Item" for other filters, multiple types, or none', () => {
 		expect(itemColumnHeader('youtube_video')).toBe('Item');
 		expect(itemColumnHeader('movie,youtube_video')).toBe('Item');
+		expect(itemColumnHeader('claim,youtube_video')).toBe('Item');
 		expect(itemColumnHeader(undefined)).toBe('Item');
+	});
+});
+
+describe('soloTypeFilter', () => {
+	it('returns the lowercased type when the filter names exactly one type', () => {
+		expect(soloTypeFilter('movie')).toBe('movie');
+		expect(soloTypeFilter(' Claim ')).toBe('claim');
+		expect(soloTypeFilter('youtube_video')).toBe('youtube_video');
+		expect(soloTypeFilter('bible_passage')).toBe('bible_passage');
+		expect(soloTypeFilter('movie,movie')).toBe('movie');
+	});
+	it('returns null when no type or several different types are named', () => {
+		expect(soloTypeFilter(undefined)).toBeNull();
+		expect(soloTypeFilter('')).toBeNull();
+		expect(soloTypeFilter('claim,youtube_video')).toBeNull();
+	});
+});
+
+describe('Claim column set', () => {
+	it('shows the claim columns at each tier', () => {
+		expect(defaultColumnVisibility('xs', 'claim').visible).toEqual(['perspectize', 'item']);
+		expect(defaultColumnVisibility('sm', 'claim').visible).toEqual(['perspectize', 'item', 'category']);
+		expect(defaultColumnVisibility('md', 'claim').visible).toEqual([
+			'perspectize',
+			'item',
+			'category',
+			'effectiveDate',
+			'evaluateBy',
+		]);
+		expect(defaultColumnVisibility('lg', 'claim').visible).toEqual([
+			'perspectize',
+			'item',
+			'category',
+			'effectiveDate',
+			'evaluateBy',
+			'myQuality',
+			'myImportance',
+			'myAgreement',
+		]);
+	});
+
+	it('hides every YouTube and Movie column in the claim view', () => {
+		const { visible, hidden } = defaultColumnVisibility('lg', 'claim');
+		for (const id of [
+			'type',
+			'channel',
+			'duration',
+			'publishDate',
+			'views',
+			'likes',
+			'percentLiked',
+			'tags',
+			'user',
+			'description',
+			'genre',
+			'rated',
+			'cast',
+			'released',
+			'boxOffice',
+			'vsBudget',
+			'tmdbScore',
+			'budget',
+		]) {
+			expect(visible, id).not.toContain(id);
+			expect(hidden, id).toContain(id);
+		}
+	});
+
+	it('forces the claim date columns off in the general and movie views', () => {
+		for (const view of ['general', 'movie'] as const) {
+			const { visible, hidden } = defaultColumnVisibility('lg', view);
+			for (const id of ['effectiveDate', 'evaluateBy', 'createdAt']) {
+				expect(visible, `${view}:${id}`).not.toContain(id);
+				expect(hidden, `${view}:${id}`).toContain(id);
+			}
+		}
+	});
+
+	it('sorts claims by their date with missing dates last in both directions', () => {
+		const withDate = (d: string | null) =>
+			row({ contentType: 'CLAIM', customFields: { effectiveDate: d ?? undefined } });
+		const dated = [withDate('2026-11-01'), withDate(null), withDate('2026-10-23')];
+		const asc = [...dated].sort((a, b) => compareContentBySorts(a, b, [{ col: 'effectiveDate', dir: 'asc' }]));
+		expect(asc.map((r) => r.customFields?.effectiveDate ?? null)).toEqual(['2026-10-23', '2026-11-01', null]);
+		const desc = [...dated].sort((a, b) => compareContentBySorts(a, b, [{ col: 'effectiveDate', dir: 'desc' }]));
+		expect(desc.map((r) => r.customFields?.effectiveDate ?? null)).toEqual(['2026-11-01', '2026-10-23', null]);
+	});
+
+	it('registers the claim date columns as picker data columns sorted client-side only', () => {
+		for (const id of ['effectiveDate', 'evaluateBy']) {
+			const meta = COLUMNS.find((c) => c.colId === id);
+			expect(meta, id).toBeDefined();
+			expect(meta?.picker).toBe('data');
+			expect(meta?.sortable).toBe(true);
+			expect(meta?.serverSort, id).toBeUndefined();
+			expect(meta?.filterKey, id).toBeUndefined();
+		}
+	});
+});
+
+describe('Type column visibility', () => {
+	it.each([
+		['general', 'youtube_video'],
+		['general', 'bible_passage'],
+		['movie', 'movie'],
+		['claim', 'claim'],
+	] as const)('is hidden in the %s view when exactly %s is filtered', (view, solo) => {
+		const { visible, hidden } = defaultColumnVisibility('lg', view, solo);
+		expect(visible).not.toContain('type');
+		expect(hidden).toContain('type');
+	});
+
+	it('stays visible with no type filter or several types', () => {
+		expect(defaultColumnVisibility('lg', 'general', null).visible).toContain('type');
+		expect(defaultColumnVisibility('lg', 'general').visible).toContain('type');
+		expect(defaultColumnVisibility('xs', 'general').visible).toContain('type');
 	});
 });
 

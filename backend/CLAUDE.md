@@ -247,6 +247,10 @@ models:
 
 **Migration numbering:** Always check existing migration files before creating new ones. Plan-specified numbers may be stale — use `ls migrations/ | tail -5` to find the next available number. Numbers on open PRs are **provisional**: don't renumber around other in-flight branches. Finalize the number as the last step before merging (rename to the next free number on `main`). It can't wait until after merge, because golang-migrate won't run with two files sharing a version on `main`. `check-migration-number-before-apply` still on a PR means that rename is due. Prefer idempotent DDL (`DROP CONSTRAINT IF EXISTS` before `ADD`, `UPDATE ... WHERE col IS NULL` before `SET NOT NULL`) so a migration is safe on a fresh DB or one already patched out of band.
 
+**Run `migrate` from the branch that holds the migration.** The main checkout stops at 31, so `make -s migrate-up-n N=1` there fails with `error: file does not exist` when the next file (32) is missing. Run it from the PR worktree's `backend/` instead, and check the version before and after each step.
+
+**JSONB convention:** optional JSONB columns are **nullable with no default**. NULL means unset, and a row that never uses the column stores nothing. Don't write `DEFAULT '{}'` (or `'[]'`) on a new column. Go reads NULL as empty, and an explicit clear writes NULL (see `ClearCustomFields`). Structural columns that must always hold a value (e.g. `user_onboarding`) are the exception and keep `NOT NULL DEFAULT`.
+
 **FK delete behavior depends on the FK's kind** (verified across all migrations; the "All FKs use ON DELETE RESTRICT" comment in `000006` predates the exceptions):
 - Ownership FKs to `users` and FKs to `content` **block** (explicit `ON DELETE RESTRICT` for new ones). `UserService.Delete` reassigns owned rows to the `[deleted]` sentinel before deleting the user, so a new user-owned table needs a `ReassignByUser` call there (messaging isn't covered yet: #574).
 - Optional pointers use **`SET NULL`** (`primary_category_id`, `primary_perspective_id`).

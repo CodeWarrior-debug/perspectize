@@ -17,6 +17,7 @@
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 
 	type ChosenType = 'YOUTUBE_VIDEO' | 'BIBLE_PASSAGE' | 'MOVIE';
+	const CHOSEN_TYPES: ChosenType[] = ['YOUTUBE_VIDEO', 'BIBLE_PASSAGE', 'MOVIE'];
 
 	let {
 		triggerVariant = 'default',
@@ -24,7 +25,6 @@
 		triggerVariant?: 'default' | 'outline' | 'ghost';
 	} = $props();
 
-	// Created first so the YouTube hook stays the last createMutation call (existing tests capture its options).
 	const movieMutation = useAddMovie();
 
 	let open = $state(false);
@@ -56,14 +56,12 @@
 	});
 
 	const detected = $derived(detectContentType(input));
-	const effectiveType = $derived<ChosenType | 'CLAIM' | null>(manualType ?? detected.type);
+	const effectiveType = $derived<ChosenType | null>(manualType ?? detected.type);
 	const range = $derived<PassageRange>(
 		rangeOverride ?? (detected.type === 'BIBLE_PASSAGE' ? detected.range : defaultRange(1)),
 	);
 	const rangeValid = $derived(isRangeOrdered(range) && isRangeInBounds(range));
 
-	// useAddVideo stays the last createMutation call, keeping the existing YouTube-path
-	// tests' captured options unchanged.
 	const passageMutation = useAddPassage();
 	const videoMutation = useAddVideo();
 	const isPending = $derived(videoMutation.isPending || passageMutation.isPending || movieMutation.isPending);
@@ -79,13 +77,7 @@
 	const chipLabel = $derived.by(() => {
 		if (!effectiveType) return 'Select a type';
 		const name =
-			effectiveType === 'YOUTUBE_VIDEO'
-				? 'YouTube'
-				: effectiveType === 'BIBLE_PASSAGE'
-					? 'Bible passage'
-					: effectiveType === 'MOVIE'
-						? 'Movie'
-						: 'Claim';
+			effectiveType === 'YOUTUBE_VIDEO' ? 'YouTube' : effectiveType === 'BIBLE_PASSAGE' ? 'Bible passage' : 'Movie';
 		return manualType ? `Type: ${name}` : `Detected: ${name}`;
 	});
 
@@ -112,7 +104,7 @@
 	// chosen type itself so the user doesn't lose their place (e.g. re-typing a
 	// passage reference after a typo shouldn't require re-selecting the type).
 	function clearType() {
-		if (effectiveType === 'YOUTUBE_VIDEO' || effectiveType === 'BIBLE_PASSAGE' || effectiveType === 'MOVIE') {
+		if (effectiveType) {
 			// Clearing the text would otherwise make autodetection fall back to "no
 			// type" — pin the type explicitly so the user stays on the same type.
 			manualType = effectiveType;
@@ -127,7 +119,7 @@
 
 	function handleTypeChange(e: Event) {
 		const value = (e.currentTarget as HTMLSelectElement).value;
-		manualType = value === 'YOUTUBE_VIDEO' || value === 'BIBLE_PASSAGE' || value === 'MOVIE' ? value : null;
+		manualType = CHOSEN_TYPES.includes(value as ChosenType) ? (value as ChosenType) : null;
 		error = '';
 	}
 
@@ -221,9 +213,7 @@
 				<select
 					aria-label="Change type"
 					class="border-input bg-background h-8 rounded-md border px-2 text-sm"
-					value={effectiveType === 'YOUTUBE_VIDEO' || effectiveType === 'BIBLE_PASSAGE' || effectiveType === 'MOVIE'
-						? effectiveType
-						: ''}
+					value={effectiveType ?? ''}
 					onchange={handleTypeChange}
 					disabled={isPending}
 				>
@@ -236,8 +226,7 @@
 					<button
 						type="button"
 						onclick={clearType}
-						disabled={isPending ||
-							(effectiveType !== 'YOUTUBE_VIDEO' && effectiveType !== 'BIBLE_PASSAGE' && effectiveType !== 'MOVIE')}
+						disabled={isPending || !effectiveType}
 						aria-label="Clear type"
 						title="Clear this type's fields"
 						class="text-muted-foreground hover:text-foreground flex items-center gap-1 rounded-md px-1.5 py-1 transition-colors disabled:pointer-events-none disabled:opacity-40"
@@ -258,10 +247,6 @@
 					</button>
 				</div>
 			</div>
-
-			{#if effectiveType === 'CLAIM'}
-				<p class="text-sm text-muted-foreground">Claims can't be added from here yet. Pick a type above to continue.</p>
-			{/if}
 
 			{#if effectiveType === 'MOVIE'}
 				<p class="text-xs text-muted-foreground">

@@ -57,11 +57,14 @@ type Content struct {
 	Description   *string               `json:"description,omitempty"`
 	Response      map[string]any        `json:"response,omitempty"`
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
-	Movie              map[string]any `json:"movie,omitempty"`
-	PrimaryCategory    *Category      `json:"primaryCategory,omitempty"`
-	VerseStartID       *int           `json:"verseStartID,omitempty"`
-	VerseEndID         *int           `json:"verseEndID,omitempty"`
-	DisplayTitle       *string        `json:"displayTitle,omitempty"`
+	Movie           map[string]any `json:"movie,omitempty"`
+	PrimaryCategory *Category      `json:"primaryCategory,omitempty"`
+	VerseStartID    *int           `json:"verseStartID,omitempty"`
+	VerseEndID      *int           `json:"verseEndID,omitempty"`
+	DisplayTitle    *string        `json:"displayTitle,omitempty"`
+	// User-set attributes; for CLAIM, effectiveDate and evaluateBy as YYYY-MM-DD. Null when unset.
+	CustomFields       map[string]any `json:"customFields,omitempty"`
+	Privacy            domain.Privacy `json:"privacy"`
 	PerspectiveCount   *int           `json:"perspectiveCount,omitempty"`
 	AverageRating      *float64       `json:"averageRating,omitempty"`
 	QualityRatingCount *int           `json:"qualityRatingCount,omitempty"`
@@ -110,9 +113,12 @@ type ContentSortInput struct {
 }
 
 type CreateClaimInput struct {
-	Text            string `json:"text"`
-	UserID          int    `json:"userID"`
-	ParentContentID int    `json:"parentContentID"`
+	Text            string          `json:"text"`
+	UserID          int             `json:"userID"`
+	ParentContentID *int            `json:"parentContentID,omitempty"`
+	EffectiveDate   *string         `json:"effectiveDate,omitempty"`
+	EvaluateBy      *string         `json:"evaluateBy,omitempty"`
+	Privacy         *domain.Privacy `json:"privacy,omitempty"`
 }
 
 type CreateContentFromMovieInput struct {
@@ -454,6 +460,13 @@ type TypingChanged struct {
 }
 
 func (TypingChanged) IsThreadEvent() {}
+
+type UpdateClaimInput struct {
+	Text          string          `json:"text"`
+	EffectiveDate *string         `json:"effectiveDate,omitempty"`
+	EvaluateBy    *string         `json:"evaluateBy,omitempty"`
+	Privacy       *domain.Privacy `json:"privacy,omitempty"`
+}
 
 // Partial update: omit a field to leave it unchanged. For quality, agreement,
 // importance, confidence, like, review, customFields and feelings, sending an

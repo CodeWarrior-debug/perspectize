@@ -168,6 +168,17 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 		}
 	}
 
+	// Content privacy dominates perspective privacy: a perspective on a private
+	// content row is listed only to that content's owner. One EXISTS in the same
+	// statement, so no extra query.
+	if params.ViewerID != nil {
+		query = query.Where("EXISTS (SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND (c.privacy = ? OR c.added_by_user_id = ?))",
+			privacyToDBValue(domain.PrivacyPublic), *params.ViewerID)
+	} else {
+		query = query.Where("EXISTS (SELECT 1 FROM content c WHERE c.id = perspectives.content_id AND c.privacy = ?)",
+			privacyToDBValue(domain.PrivacyPublic))
+	}
+
 	// Total count (before cursor/limit — respects filters only)
 	var totalCountInt *int
 	if params.IncludeTotalCount {
@@ -217,6 +228,8 @@ type aggregateRow struct {
 	Count        int
 	QualityCount int
 	AvgQuality   *float64
+	Privacy      string
+	OwnerID      int
 }
 
 // AggregateByContentIDs computes, per content ID, the count of ALL
@@ -242,7 +255,7 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 	var rows []aggregateRow
 	err := r.db.WithContext(ctx).
 		Table("content AS c").
-		Select("c.id AS content_id, COUNT(p.id) AS count, COUNT(p.quality) AS quality_count, AVG(p.quality) AS avg_quality").
+		Select("c.id AS content_id, COUNT(p.id) AS count, COUNT(p.quality) AS quality_count, AVG(p.quality) AS avg_quality, c.privacy AS privacy, c.added_by_user_id AS owner_id").
 		Joins("LEFT JOIN perspectives p ON p.content_id = c.id").
 		Where("c.id = ANY(CAST(? AS bigint[]))", intsToArray(contentIDs)).
 		Group("c.id").
@@ -258,6 +271,8 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 			Count:          row.Count,
 			QualityCount:   row.QualityCount,
 			AverageQuality: row.AvgQuality,
+			ContentPrivacy: contentPrivacyFromDB(row.Privacy),
+			ContentOwnerID: row.OwnerID,
 		}
 	}
 	return out, nil

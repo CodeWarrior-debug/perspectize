@@ -23,11 +23,11 @@ describe('detectContentType with the real parser', () => {
 		);
 	});
 
-	it('out-of-range reference falls back to a claim, not a passage', () => {
-		expect(detectContentType('Genesis 200:1').type).toBe('CLAIM');
+	it('out-of-range reference is no match, not a passage', () => {
+		expect(detectContentType('Genesis 200:1').type).toBeNull();
 	});
 
-	it('a plain sentence is a claim', () => {
-		expect(detectContentType('Grace is unearned favor').type).toBe('CLAIM');
+	it('a plain sentence is no match', () => {
+		expect(detectContentType('Grace is unearned favor').type).toBeNull();
 	});
 });

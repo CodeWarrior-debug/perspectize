@@ -56,6 +56,8 @@
 		percentLikedValueGetter,
 		formatPercentLiked,
 		formatPublishDate,
+		formatClaimDate,
+		formatRatingScore,
 		formatTags,
 		contentTags,
 		truncateDescription,
@@ -90,6 +92,7 @@
 		unknownLastComparator,
 		releasedComparator,
 		itemColumnHeader,
+		soloTypeFilter,
 		ratedComparator,
 		CLIENT_ONLY_SORT_COLS,
 		sortableColumnsFor,
@@ -100,6 +103,7 @@
 		PERSON_FILTER_KEY,
 		parsePersonFilter,
 		rowMatchesPerson,
+		perspectiveRating,
 	} from '$lib/utils/grid-config';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
 	import { emptyCellClassRules } from '$lib/utils/grid-empty';
@@ -679,6 +683,79 @@
 				filter: false,
 				cellRenderer: categoryCellRenderer,
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.category },
+				hide: true,
+			},
+			// Claim date columns (Content.customFields). Hidden by default; the responsive effect
+			// shows them in the claim view. Sorted client-side (the backend cannot sort on custom fields).
+			{
+				colId: 'effectiveDate',
+				headerName: 'Effective',
+				headerTooltip: 'The date the claim takes effect.',
+				width: 120,
+				sortable: true,
+				filter: 'agDateColumnFilter',
+				filterValueGetter: (params) => {
+					const v = params.data?.customFields?.effectiveDate;
+					return v ? new Date(`${v}T00:00:00`) : null;
+				},
+				comparator: releasedComparator,
+				valueGetter: (params) => params.data?.customFields?.effectiveDate ?? null,
+				valueFormatter: (params) => formatClaimDate(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.effectiveDate },
+				hide: true,
+			},
+			{
+				colId: 'evaluateBy',
+				headerName: 'Evaluate by',
+				headerTooltip: 'The date by which the claim should be evaluated.',
+				width: 120,
+				sortable: true,
+				filter: 'agDateColumnFilter',
+				filterValueGetter: (params) => {
+					const v = params.data?.customFields?.evaluateBy;
+					return v ? new Date(`${v}T00:00:00`) : null;
+				},
+				comparator: releasedComparator,
+				valueGetter: (params) => params.data?.customFields?.evaluateBy ?? null,
+				valueFormatter: (params) => formatClaimDate(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.evaluateBy },
+				hide: true,
+			},
+			// The viewer's own ratings (0-100). Read from the perspective map in the grid context;
+			// refreshed with the perspectize column when that map changes.
+			{
+				colId: 'myQuality',
+				headerName: 'My overall',
+				headerTooltip: 'Your overall rating of this claim (0-100).',
+				width: 110,
+				sortable: false,
+				filter: 'agNumberColumnFilter',
+				valueGetter: (params) => perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'quality'),
+				valueFormatter: (params) => formatRatingScore(params.value),
+				hide: true,
+			},
+			{
+				colId: 'myImportance',
+				headerName: 'My importance',
+				headerTooltip: 'Your importance rating of this claim (0-100).',
+				width: 120,
+				sortable: false,
+				filter: 'agNumberColumnFilter',
+				valueGetter: (params) =>
+					perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'importance'),
+				valueFormatter: (params) => formatRatingScore(params.value),
+				hide: true,
+			},
+			{
+				colId: 'myAgreement',
+				headerName: 'My agreement',
+				headerTooltip: 'Your agreement rating with this claim (0-100).',
+				width: 120,
+				sortable: false,
+				filter: 'agNumberColumnFilter',
+				valueGetter: (params) =>
+					perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'agreement'),
+				valueFormatter: (params) => formatRatingScore(params.value),
 				hide: true,
 			},
 			// Movie columns (TMDB). Hidden by default; the responsive effect shows the Movie
@@ -1301,7 +1378,7 @@
 				perspectivesByContentId,
 				onOpenDetails: handleOpenDetails,
 			});
-			gridApi.refreshCells({ columns: ['perspectize'], force: true });
+			gridApi.refreshCells({ columns: ['perspectize', 'myQuality', 'myImportance', 'myAgreement'], force: true });
 		}
 	});
 
@@ -1310,7 +1387,7 @@
 	// sm (445-639): Perspectize, Item, Type, Category, Channel
 	// md (640-899): Perspectize, Item, Type, Category, Channel, Duration, Date
 	// lg (900+):    Perspectize, Item, Type, Category, Channel, Duration, Date, Views, Likes, Tags
-	// With the type filter exactly MOVIE, the Movie set applies instead (defaultColumnVisibility).
+	// With the type filter exactly MOVIE (or CLAIM), that view's set applies instead (defaultColumnVisibility).
 	// A view with a saved setup (column picker) shows that instead of its defaults, which
 	// also re-applies it after a grid remount (cardMode toggle, error recovery).
 	// Switching view (e.g. to exactly MOVIE) shows a toast offering the previous columns back.
@@ -1326,6 +1403,9 @@
 		// Read synchronously, before the rAF, so this effect re-runs when they change.
 		const tier = responsiveTier;
 		const view = columnView;
+		// Read synchronously too: a change of the one type named (youtube -> bible_passage) keeps the
+		// view but moves Type's visibility, so the effect must re-run on it.
+		const solo = soloTypeFilter(filters.type);
 		const prevView = lastColumnView;
 		lastColumnView = view;
 		const current = prevView !== null && prevView !== view ? currentVisibility() : {};
@@ -1334,7 +1414,7 @@
 			view,
 			current,
 			saved: loadLayout(view),
-			defaults: defaultLayout(tier, view),
+			defaults: defaultLayout(tier, view, solo),
 		});
 		requestAnimationFrame(() => {
 			if (!gridApi) return; // Grid may have been destroyed before rAF fires
