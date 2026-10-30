@@ -152,6 +152,21 @@ Rules that hold for every type:
 
 Worked example: `docs/superpowers/specs/2026-10-27-youtube-channel-import-design.md` ("The decision row"), which documents each YouTube column with its API source, cost and edge cases. Any spec or preview for a new type's import or picker view includes the same table for that type.
 
+---
+
+## Decision 9: Source Terms and Liability
+
+Before Decision 1, check what the source's terms let you **store**, not just fetch. A working API may still forbid it: Meta's oEmbed is "front-end views only", and its `robots.txt` and Automated Data Collection Terms ban scraping. In that case the fields are user-entered and the type has no thumbnail. Also check:
+
+- Does the source license embedding? YouTube does; Meta doesn't.
+- Does the player need a click-to-load consent gate? Any social-plugin player does.
+- Which CSP hosts does the player need?
+
+Worked example: `docs/superpowers/specs/2026-10-19-facebook-video-content-type-design.md` §2 and §6.
+
+**A new enum value needs no migration:** `content.content_type` has no CHECK constraint.
+>>>>>>> 66f3d5c4 (docs(content-types): add source-terms decision to the guide)
+
 ## Implementation Steps
 
 ### Step A: Backend Domain
@@ -376,6 +391,7 @@ If the type introduces new columns, see [ADDING_AG_GRID_COLUMN.md](./ADDING_AG_G
 | Table display | Icon, thumbnail, new columns | Renderer updates, see AG Grid guide |
 | Discover page | Search + feed / feed / search / not on Discover — with a reason | Card component, source client or backend feed job, CSP |
 | Import preview | The five decision questions answered with real fields (Decision 8) | Staging columns, detail panel, lazy detail query |
+| Source terms | May store / front-end only / no access (Decision 9) | Whether fields are fetched or user-entered; consent gate; launch prerequisites |
 
 ---
 
