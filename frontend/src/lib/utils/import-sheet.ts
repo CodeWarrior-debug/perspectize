@@ -107,8 +107,18 @@ export function isLowSampleRating(item: Pick<ImportItem, 'rating' | 'ratingCount
 	return item.rating !== null && item.ratingCount !== null && item.ratingCount < lowSampleThreshold(item.ratingSource);
 }
 
-/** The row's state in words: library first, then the import outcome. */
-export function importStatusLabel(item: Pick<ImportItem, 'inLibrary' | 'importStatus'>): string {
+/** A non-admin imports at most this many rows at once ("select up to 1,000 at a time"). */
+export const SELECTION_LIMIT = 1000;
+
+/** An admin's limit: a whole channel listing. */
+export const ADMIN_SELECTION_LIMIT = 5000;
+
+export function selectionLimit(isAdmin: boolean): number {
+	return isAdmin ? ADMIN_SELECTION_LIMIT : SELECTION_LIMIT;
+}
+
+/** The row's state in words: library first, then the import outcome, then "won't import". */
+export function importStatusLabel(item: Pick<ImportItem, 'inLibrary' | 'importStatus' | 'excluded'>): string {
 	switch (item.importStatus) {
 		case 'QUEUED':
 			return 'Importing…';
@@ -117,18 +127,30 @@ export function importStatusLabel(item: Pick<ImportItem, 'inLibrary' | 'importSt
 		case 'SKIPPED':
 			return 'Already in library';
 		case 'FAILED':
-			return item.inLibrary ? 'In library' : 'Failed';
+			if (item.inLibrary) return 'In library';
+			return item.excluded ? "Won't import" : 'Failed';
 	}
-	return item.inLibrary ? 'In library' : 'Not imported';
+	if (item.inLibrary) return 'In library';
+	return item.excluded ? "Won't import" : 'Not imported';
 }
 
-/** A row can be picked when it isn't in the library and isn't queued or done. Failed rows can be retried. */
+/**
+ * A row can be ticked when it isn't in the library and isn't queued or done
+ * (failed rows can be retried). Rows marked "don't import" can be ticked too,
+ * so the mark can be cleared; they just aren't imported.
+ */
 export function isSelectable(item: Pick<ImportItem, 'inLibrary' | 'importStatus'>): boolean {
 	if (item.inLibrary) return false;
 	return item.importStatus === null || item.importStatus === 'FAILED';
 }
 
-export type LibraryFilter = 'all' | 'new' | 'lib';
+/** A ticked row that Import would actually import. */
+export function isImportable(item: Pick<ImportItem, 'inLibrary' | 'importStatus' | 'excluded'>): boolean {
+	return isSelectable(item) && !item.excluded;
+}
+
+/** all · Not imported (still to decide) · In library · Won't import (marked "don't import"). */
+export type LibraryFilter = 'all' | 'new' | 'lib' | 'excluded';
 
 /** The toolbar's filters, applied outside AG Grid's column filters. */
 export interface SheetFilter {
@@ -139,13 +161,18 @@ export interface SheetFilter {
 
 export function passesSheetFilter(row: ImportRow, f: SheetFilter): boolean {
 	if (f.sourceId && row.sourceId !== f.sourceId) return false;
-	if (f.library === 'new') return isSelectable(row);
+	if (f.library === 'new') return isImportable(row);
 	if (f.library === 'lib') return row.inLibrary;
+	if (f.library === 'excluded') return row.excluded && !row.inLibrary;
 	return true;
 }
 
 export interface SelectionSummary {
 	count: number;
+	/** Ticked rows Import would import (not marked "don't import"). */
+	importable: number;
+	/** Ticked rows marked "don't import". */
+	excluded: number;
 	totalSeconds: number;
 	bySource: { title: string; count: number }[];
 	byDestination: { label: string; count: number }[];
@@ -155,7 +182,11 @@ export function selectionSummary(rows: readonly ImportRow[]): SelectionSummary {
 	const bySource = new Map<string, number>();
 	const byDest = new Map<string, number>();
 	let totalSeconds = 0;
+	let importable = 0;
+	let excluded = 0;
 	for (const r of rows) {
+		if (r.excluded) excluded++;
+		else importable++;
 		bySource.set(r.sourceTitle, (bySource.get(r.sourceTitle) ?? 0) + 1);
 		const label = contentTypeLabel(r.destinationType.toLowerCase());
 		byDest.set(label, (byDest.get(label) ?? 0) + 1);
@@ -163,6 +194,8 @@ export function selectionSummary(rows: readonly ImportRow[]): SelectionSummary {
 	}
 	return {
 		count: rows.length,
+		importable,
+		excluded,
 		totalSeconds,
 		bySource: [...bySource].map(([title, count]) => ({ title, count })),
 		byDestination: [...byDest].map(([label, count]) => ({ label, count })),
@@ -193,6 +226,7 @@ export const DECIDE_COLUMNS: readonly string[] = [
 	'rating',
 	'starring',
 	'genres',
+	'boxOffice',
 	'views',
 	'likes',
 	'likeRate',
@@ -205,6 +239,9 @@ export const DECIDE_COLUMNS: readonly string[] = [
 export const IMPORT_COL_IDS: readonly string[] = [
 	...DECIDE_COLUMNS,
 	'ratingCount',
+	'reviewCount',
+	'popularity',
+	'budget',
 	'chapters',
 	'captions',
 	'recency',
@@ -231,7 +268,37 @@ export const COLUMN_TYPES: Readonly<Record<string, readonly ImportDestinationTyp
 	starring: ['MOVIE'],
 	rating: ['MOVIE'],
 	ratingCount: ['MOVIE'],
+	reviewCount: ['MOVIE'],
+	popularity: ['MOVIE'],
+	boxOffice: ['MOVIE'],
+	budget: ['MOVIE'],
 };
+
+/**
+ * Optional film figures: a column of these hides when no row in the sheet has
+ * a value (the demo's films have no TMDB popularity or review counts, and a
+ * new release has no box office yet), and the note says which are missing.
+ */
+const OPTIONAL_COLUMNS: Readonly<Record<string, { label: string; has: (r: ImportItem) => boolean }>> = {
+	rating: { label: 'ratings', has: (r) => r.rating !== null },
+	ratingCount: { label: 'rating counts', has: (r) => r.ratingCount !== null },
+	reviewCount: { label: 'review counts', has: (r) => r.reviewCount !== null },
+	popularity: { label: 'popularity', has: (r) => r.popularity !== null },
+	boxOffice: { label: 'box office', has: (r) => r.revenue !== null },
+	budget: { label: 'budgets', has: (r) => r.budget !== null },
+	starring: { label: 'cast', has: (r) => r.topCast.length > 0 },
+	genres: { label: 'genres', has: (r) => r.genres.length > 0 },
+};
+
+/** Optional columns that apply to the sheet's types but no row has a value for. */
+export function emptyOptionalColumns(rows: readonly ImportItem[]): Set<string> {
+	const types = sheetTypes(rows);
+	const out = new Set<string>();
+	for (const [id, col] of Object.entries(OPTIONAL_COLUMNS)) {
+		if (appliesToAny(id, types) && rows.length > 0 && !rows.some(col.has)) out.add(id);
+	}
+	return out;
+}
 
 function appliesToAny(colId: string, types: ReadonlySet<ImportDestinationType>): boolean {
 	const only = COLUMN_TYPES[colId];
@@ -251,10 +318,11 @@ export function columnsForSet(
 	set: ColumnSet,
 	types: ReadonlySet<ImportDestinationType>,
 	sourceCount = 2,
+	empty: ReadonlySet<string> = new Set(),
 ): { shown: string[]; hidden: string[] } {
 	const inSet = set === 'all' ? new Set(IMPORT_COL_IDS) : new Set(DECIDE_COLUMNS);
 	const shown = IMPORT_COL_IDS.filter(
-		(id) => inSet.has(id) && appliesToAny(id, types) && (id !== 'source' || sourceCount > 1),
+		(id) => inSet.has(id) && appliesToAny(id, types) && !empty.has(id) && (id !== 'source' || sourceCount > 1),
 	);
 	const showing = new Set(shown);
 	return { shown, hidden: IMPORT_COL_IDS.filter((id) => !showing.has(id)) };
@@ -270,13 +338,35 @@ const UNAVAILABLE: Record<ImportDestinationType, string> = {
  * One line for the sheet: what its sources don't supply, and where that shows. A sheet of
  * one type hides those columns; a mixed sheet keeps them and leaves the other type's cells empty.
  */
-export function unavailableNote(types: ReadonlySet<ImportDestinationType>): string {
+export function unavailableNote(
+	types: ReadonlySet<ImportDestinationType>,
+	empty: ReadonlySet<string> = new Set(),
+): string {
 	const parts = (Object.keys(UNAVAILABLE) as ImportDestinationType[])
 		.filter((t) => types.has(t))
 		.map((t) => UNAVAILABLE[t]);
 	if (parts.length === 0) return '';
 	const tail = types.size > 1 ? 'Those cells are empty for the rows they don’t apply to.' : 'Those columns are hidden.';
-	return `${parts.join(' ')} ${tail}`;
+	const missing = Object.keys(OPTIONAL_COLUMNS)
+		.filter((id) => empty.has(id))
+		.map((id) => OPTIONAL_COLUMNS[id].label);
+	const none = missing.length
+		? ` No row here has ${joinWords(missing)} yet, so ${missing.length === 1 ? 'that column is' : 'those columns are'} hidden too.`
+		: '';
+	return `${parts.join(' ')} ${tail}${none}`;
+}
+
+function joinWords(words: string[]): string {
+	if (words.length <= 2) return words.join(' or ');
+	return `${words.slice(0, -1).join(', ')} or ${words[words.length - 1]}`;
+}
+
+/** "$836.8M" / "$6,000": box office and budgets, in USD. */
+export function formatUsd(n: number | null): string {
+	if (n === null) return EMPTY_VALUE;
+	if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
+	if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+	return `$${formatCountExact(n)}`;
 }
 
 /** Date filter comparator for ISO timestamps (AG Grid's date filter compares by local midnight). */
@@ -483,6 +573,21 @@ function columnDefs(now: Date): ColDef<ImportRow>[] {
 			...textFilter,
 		},
 		{
+			colId: 'boxOffice',
+			field: 'revenue',
+			headerName: 'Box office',
+			headerTooltip: 'Worldwide takings, USD. Filter in dollars.',
+			width: 116,
+			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatUsd(p.value ?? null),
+			tooltipValueGetter: (p) => {
+				const r = p.data;
+				if (!r || r.revenue === null) return '';
+				const budget = r.budget === null ? '' : ` on a ${formatUsd(r.budget)} budget`;
+				return `${formatUsd(r.revenue)} worldwide${budget}`;
+			},
+			...numberFilter,
+		},
+		{
 			colId: 'views',
 			field: 'viewCount',
 			headerName: 'Views',
@@ -548,6 +653,34 @@ function columnDefs(now: Date): ColDef<ImportRow>[] {
 			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatCount(p.value ?? null),
 			...numberFilter,
 		},
+		{
+			colId: 'reviewCount',
+			field: 'reviewCount',
+			headerName: 'Reviews',
+			headerTooltip: 'User reviews on TMDB',
+			width: 96,
+			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatCount(p.value ?? null),
+			...numberFilter,
+		},
+		{
+			colId: 'popularity',
+			field: 'popularity',
+			headerName: 'Popularity',
+			headerTooltip: "TMDB's daily popularity score: interest right now, like views per day",
+			width: 108,
+			valueFormatter: (p: ValueFormatterParams<ImportRow>) =>
+				p.value === null || p.value === undefined ? EMPTY_VALUE : Number(p.value).toFixed(1),
+			...numberFilter,
+		},
+		{
+			colId: 'budget',
+			field: 'budget',
+			headerName: 'Budget',
+			headerTooltip: 'Production budget, USD',
+			width: 104,
+			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatUsd(p.value ?? null),
+			...numberFilter,
+		},
 		{ colId: 'chapters', field: 'chapterCount', headerName: 'Chapters', width: 100, ...numberFilter },
 		{
 			colId: 'captions',
@@ -574,4 +707,35 @@ function columnDefs(now: Date): ColDef<ImportRow>[] {
 			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatPublished(p.value ?? null),
 		},
 	];
+}
+
+/**
+ * The server's reason, for a toast or an inline error: the first GraphQL
+ * error's message (graphql-request's ClientError) without the sentinel prefix
+ * ("invalid input: ", "access denied: "), capitalised.
+ */
+export function importErrorMessage(err: unknown, fallback = 'Something went wrong. Try again.'): string {
+	const first = (err as { response?: { errors?: { message?: string }[] } } | null | undefined)?.response?.errors?.[0];
+	let msg = first?.message ?? (err instanceof Error ? err.message : '');
+	msg = msg.replace(/^(invalid input|access denied|resource not found): /, '').trim();
+	return msg ? msg.charAt(0).toUpperCase() + msg.slice(1) : fallback;
+}
+
+/** "Importing 340 of 1,000" / "Imported 985 of 1,000 · 12 already in library · 3 failed". */
+export function progressLabel(p: {
+	total: number;
+	done: number;
+	imported: number;
+	skipped: number;
+	failed: number;
+	running: boolean;
+}): string {
+	const head = p.running
+		? `Importing ${formatCountExact(p.done)} of ${formatCountExact(p.total)}`
+		: `Imported ${formatCountExact(p.imported)} of ${formatCountExact(p.total)}`;
+	const parts = [head];
+	if (p.running && p.imported) parts.push(`${formatCountExact(p.imported)} added`);
+	if (p.skipped) parts.push(`${formatCountExact(p.skipped)} already in library`);
+	if (p.failed) parts.push(`${formatCountExact(p.failed)} failed`);
+	return parts.join(' · ');
 }

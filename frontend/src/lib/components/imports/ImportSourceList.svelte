@@ -7,6 +7,7 @@
 	let { sources }: { sources: ImportSource[] } = $props();
 
 	const STATUS: Record<ImportSource['status'], string> = {
+		WAITING: 'Waiting for approval',
 		LISTING: 'Listing…',
 		READY: 'Ready',
 		FAILED: 'Failed',
@@ -41,7 +42,7 @@
 						: s.role === 'CAST'
 							? 'Films acted in'
 							: 'Filmography'}
-				→ {contentTypeLabel(s.destinationType.toLowerCase())} · {s.itemCount} rows ·
+				→ {contentTypeLabel(s.destinationType.toLowerCase())} · {#if s.status !== 'WAITING'}{s.itemCount} rows ·{/if}
 				<span class:text-destructive={s.status === 'FAILED'}>{STATUS[s.status]}</span>
 				{#if s.fetchedAt && s.status !== 'LISTING'}· stats as of {asOf(s.fetchedAt)}{/if}
 			</span>

@@ -15,7 +15,14 @@ import {
 	IMPORT_COL_IDS,
 	importStatusLabel,
 	isLowSampleRating,
+	emptyOptionalColumns,
+	formatUsd,
+	importErrorMessage,
+	isImportable,
 	isoDateFilterParams,
+	progressLabel,
+	SELECTION_LIMIT,
+	selectionLimit,
 	isSelectable,
 	likeRate,
 	listOrEmpty,
@@ -52,8 +59,13 @@ function item(overrides: Partial<ImportItem> = {}): ImportItem {
 		hasCaptions: true,
 		genres: [],
 		topCast: [],
+		popularity: null,
+		reviewCount: null,
+		revenue: null,
+		budget: null,
 		thumbnailUrl: 'https://i.ytimg.com/vi/abc/mqdefault.jpg',
 		position: 0,
+		excluded: false,
 		statsFetchedAt: '2026-10-27T12:00:00Z',
 		inLibrary: false,
 		contentId: null,
@@ -195,7 +207,17 @@ describe('columns', () => {
 	it('Decide hides only the bookkeeping columns; All shows everything', () => {
 		const decide = columnsForSet('decide', both);
 		expect(decide.shown).toEqual([...DECIDE_COLUMNS]);
-		expect(decide.hidden).toEqual(['ratingCount', 'chapters', 'captions', 'recency', 'externalId', 'statsFetchedAt']);
+		expect(decide.hidden).toEqual([
+			'ratingCount',
+			'reviewCount',
+			'popularity',
+			'budget',
+			'chapters',
+			'captions',
+			'recency',
+			'externalId',
+			'statsFetchedAt',
+		]);
 		expect(columnsForSet('all', both)).toEqual({ shown: [...IMPORT_COL_IDS], hidden: [] });
 	});
 
@@ -210,6 +232,7 @@ describe('columns', () => {
 			'rating',
 			'starring',
 			'genres',
+			'boxOffice',
 			'status',
 		]);
 		expect(films.hidden, "a film's kind only repeats Becomes").toContain('kind');
@@ -310,5 +333,103 @@ describe('cell renderers', () => {
 		const movie = destinationCellRenderer({ data: row({ destinationType: 'MOVIE' }) }) as HTMLElement;
 		expect(movie.textContent).toContain('Movie');
 		expect(destinationCellRenderer({})).toBe('');
+	});
+});
+
+describe('requests, limits and "don\'t import"', () => {
+	it('non-admins select up to 1,000 at a time; admins a whole channel', () => {
+		expect(SELECTION_LIMIT).toBe(1000);
+		expect(selectionLimit(false)).toBe(1000);
+		expect(selectionLimit(true)).toBe(5000);
+	});
+
+	it('a row marked "don\'t import" can be ticked (to clear it) but is not imported', () => {
+		const marked = item({ excluded: true });
+		expect(isSelectable(marked)).toBe(true);
+		expect(isImportable(marked)).toBe(false);
+		expect(isImportable(item())).toBe(true);
+		expect(importStatusLabel(marked)).toBe("Won't import");
+		expect(importStatusLabel({ ...marked, inLibrary: true })).toBe('In library');
+		expect(importStatusLabel({ ...marked, importStatus: 'FAILED' })).toBe("Won't import");
+	});
+
+	it("the Won't import filter holds marked rows, and Not imported leaves them out", () => {
+		const rows = toImportRows(
+			[item({ id: '1' }), item({ id: '2', excluded: true }), item({ id: '3', inLibrary: true })],
+			[],
+		);
+		const pick = (library: 'new' | 'excluded') =>
+			rows.filter((r) => passesSheetFilter(r, { sourceId: '', library })).map((r) => r.id);
+		expect(pick('new')).toEqual(['1']);
+		expect(pick('excluded')).toEqual(['2']);
+	});
+
+	it('the selection splits what Import would import from what is marked', () => {
+		const rows = toImportRows([item({ id: '1' }), item({ id: '2', excluded: true }), item({ id: '3' })], []);
+		const s = selectionSummary(rows);
+		expect(s.count).toBe(3);
+		expect(s.importable).toBe(2);
+		expect(s.excluded).toBe(1);
+	});
+});
+
+describe('optional film columns', () => {
+	const defs = buildImportColumnDefs(new Date('2026-10-27T12:00:00Z'));
+	const film = (o: Partial<ImportItem> = {}) => item({ destinationType: 'MOVIE', kind: 'MOVIE', ...o });
+
+	it('hide when no row has a value, and the note says which', () => {
+		const rows = [
+			film({ revenue: 836_848_102, budget: 160_000_000, rating: 7.4, topCast: ['A'], genres: ['Heist'] }),
+			film(),
+		];
+		const empty = emptyOptionalColumns(rows);
+		expect([...empty].sort()).toEqual(['popularity', 'ratingCount', 'reviewCount']);
+		const cols = columnsForSet('all', new Set(['MOVIE'] as const), 1, empty);
+		expect(cols.shown).toContain('boxOffice');
+		expect(cols.shown).not.toContain('popularity');
+		expect(cols.shown).not.toContain('reviewCount');
+		const note = unavailableNote(new Set(['MOVIE'] as const), empty);
+		expect(note).toContain(
+			'No row here has rating counts, review counts or popularity yet, so those columns are hidden too.',
+		);
+	});
+
+	it("don't apply to a channel sheet at all", () => {
+		expect(emptyOptionalColumns([item()]).size).toBe(0);
+		expect(emptyOptionalColumns([]).size).toBe(0);
+	});
+
+	it('money reads in dollars, and missing is the empty marker', () => {
+		expect(formatUsd(836_848_102)).toBe('$836.8M');
+		expect(formatUsd(1_081_169_825)).toBe('$1.08B');
+		expect(formatUsd(48_500)).toBe('$48,500');
+		expect(formatUsd(null)).toBe(EMPTY_VALUE);
+		const box = defs.find((d) => d.colId === 'boxOffice')!;
+		const tip = box.tooltipValueGetter as (p: { data: ImportItem }) => string;
+		expect(tip({ data: film({ revenue: 836_848_102, budget: 160_000_000 }) })).toBe(
+			'$836.8M worldwide on a $160.0M budget',
+		);
+	});
+});
+
+describe('messages', () => {
+	it("shows the server's reason without the sentinel prefix", () => {
+		const err = {
+			response: { errors: [{ message: 'invalid input: select up to 1,000 rows at a time (you picked 1,001)' }] },
+		};
+		expect(importErrorMessage(err)).toBe('Select up to 1,000 rows at a time (you picked 1,001)');
+		expect(importErrorMessage(new Error('access denied: only an admin may review import requests'))).toBe(
+			'Only an admin may review import requests',
+		);
+		expect(importErrorMessage(null, 'Fallback')).toBe('Fallback');
+	});
+
+	it('progress reads as counts while running and as the outcome after', () => {
+		expect(progressLabel({ total: 1000, done: 340, imported: 330, skipped: 8, failed: 2, running: true })).toBe(
+			'Importing 340 of 1,000 · 330 added · 8 already in library · 2 failed',
+		);
+		expect(progressLabel({ total: 4, done: 4, imported: 4, skipped: 0, failed: 0, running: false })).toBe(
+			'Imported 4 of 4',
+		);
 	});
 });

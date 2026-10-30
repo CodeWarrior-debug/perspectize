@@ -1,7 +1,8 @@
 import { test, expect } from '../fixtures';
 
 // The import staging sheet against the seeded demo imports (backend/internal/demo/imports.json):
-// list, open a sheet, pick a row, import it, and see the outcome land. e2e project only (no video).
+// list, open a sheet, pick a row, import it and watch the progress bar, request an
+// import and approve it, and mark a row "don't import". e2e project only (no video).
 
 const GRAPHQL_URL = process.env.DEMO_GRAPHQL_URL ?? 'http://localhost:8080/graphql';
 
@@ -39,7 +40,8 @@ test.describe('import staging', () => {
 		await bar.getByRole('button', { name: 'Import 1' }).click();
 		await bar.getByRole('button', { name: 'Start import' }).click();
 
-		// Polling picks up the background import.
+		// The live progress bar follows the import, then the sheet refetches once.
+		await expect(page.getByTestId('import-progress-label')).toContainText('of 1', { timeout: 15_000 });
 		await expect(status).toHaveText('Imported', { timeout: 15_000 });
 		await expect(page.getByRole('link', { name: 'View in Activity' })).toBeVisible();
 
@@ -70,15 +72,51 @@ test.describe('import staging', () => {
 		expect((await again.json()).data.importItems).toEqual({ queued: 0, alreadyInLibrary: 1 });
 	});
 
-	test('only admins can create imports', async ({ request }) => {
-		const res = await request.post(GRAPHQL_URL, {
-			headers: { Authorization: 'Bearer demo.ben' },
-			data: {
-				query:
-					'mutation { createImportJob(input: {name: "x", sources: [{sourceType: YOUTUBE_CHANNEL, ref: "@x"}]}) { id } }',
-			},
-		});
-		const body = await res.json();
-		expect(body.errors?.[0]?.message).toContain('only an admin may create imports');
+	test("a member's import waits as a request until an admin approves it", async ({ page, tour }) => {
+		await tour.start({ persona: 'ben', path: '/import' });
+		await page.getByRole('tab', { name: 'Request an import' }).click();
+		const form = page.getByTestId('import-request-form');
+		await expect(form).toContainText('An admin reviews each request');
+		const name = `Peterson Academy ${Date.now()}`;
+		await form.getByLabel('Name').fill(name);
+		await form.getByLabel('Source 1', { exact: true }).fill('@PetersonAcademy');
+		await form.getByRole('button', { name: 'Send request' }).click();
+
+		const list = page.getByTestId('import-job-list');
+		const card = list.locator(':scope > li').filter({ hasText: name });
+		await expect(card).toContainText('Requested');
+		await expect(card).toContainText('Waiting for approval');
+		await expect(card.getByRole('link', { name })).toHaveCount(0); // no sheet until approved
+		await expect(card.getByRole('button', { name: 'Approve' })).toHaveCount(0); // members can't review
+
+		await tour.start({ persona: 'carmen', path: '/import' });
+		const adminCard = page.getByTestId('import-job-list').locator(':scope > li').filter({ hasText: name });
+		await adminCard.getByRole('button', { name: 'Approve' }).click();
+		await expect(adminCard.getByRole('link', { name })).toBeVisible();
+		await expect(adminCard).toContainText('Ready', { timeout: 15_000 });
+		await expect(adminCard).toContainText('rows');
+	});
+
+	test('anyone can mark a row "don\'t import" and anyone can clear it', async ({ page, tour }) => {
+		await tour.start({ persona: 'ben', path: '/import' });
+		await page.getByRole('link', { name: 'Christopher Nolan films' }).click();
+		const titleCell = page.locator('.ag-pinned-left-cols-container .ag-row').filter({ hasText: 'Following' });
+		await titleCell.getByText('Following', { exact: true }).click();
+		await titleCell.locator('.ag-selection-checkbox input').check();
+		const bar = page.getByTestId('import-selection-bar');
+		await expect(bar).toContainText('Select up to 1,000 at a time.');
+		await bar.getByRole('button', { name: "Don't import" }).click();
+		await expect(page.getByTestId('import-detail-status')).toHaveText("Won't import");
+
+		await page.getByRole('button', { name: "Won't import" }).click();
+		await expect(page.getByTestId('import-counts')).toContainText('1 of');
+
+		await tour.start({ persona: 'alice', path: '/import' });
+		await page.getByRole('link', { name: 'Christopher Nolan films' }).click();
+		const row = page.locator('.ag-pinned-left-cols-container .ag-row').filter({ hasText: 'Following' });
+		await row.locator('.ag-selection-checkbox input').check();
+		await page.getByTestId('import-selection-bar').getByRole('button', { name: 'Clear "don\'t import"' }).click();
+		await row.getByText('Following', { exact: true }).click();
+		await expect(page.getByTestId('import-detail-status')).toHaveText('Not imported');
 	});
 });

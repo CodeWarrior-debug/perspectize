@@ -107,7 +107,7 @@
 </script>
 
 <aside
-	class="border-border bg-card text-card-foreground flex min-h-0 flex-col overflow-y-auto rounded-lg border"
+	class="border-border bg-card text-card-foreground flex h-full min-h-0 flex-col overflow-y-auto rounded-lg border"
 	aria-label="Row details"
 	data-testid="import-detail-panel"
 >

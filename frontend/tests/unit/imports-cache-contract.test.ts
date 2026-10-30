@@ -14,6 +14,9 @@ import {
 } from '$lib/queries/imports';
 import { importJobIsBusy, useImportJob } from '$lib/queries/imports/useImportJob';
 import { importItemsOnSuccess } from '$lib/queries/imports/useImportItems';
+import { useImportJobs } from '$lib/queries/imports/useImportJobs';
+import { createImportJobOnSuccess, importJobChangedOnSuccess } from '$lib/queries/imports/useImportJobMutations';
+import { patchExcluded } from '$lib/queries/imports/useSetImportItemsExcluded';
 import { useImportItemDetails } from '$lib/queries/imports/useImportItemDetails';
 import { graphqlRequest } from '$lib/queries/client';
 import { invalidationOutcome, makeClient, mountConsumers, seed } from '../helpers/queryBudget';
@@ -56,8 +59,13 @@ function item(overrides: Partial<ImportItem> = {}): ImportItem {
 		hasCaptions: null,
 		genres: [],
 		topCast: [],
+		popularity: null,
+		reviewCount: null,
+		revenue: null,
+		budget: null,
 		thumbnailUrl: null,
 		position: 0,
+		excluded: false,
 		statsFetchedAt: '2026-10-27T12:00:00Z',
 		inLibrary: false,
 		contentId: null,
@@ -72,6 +80,11 @@ function job(overrides: Partial<ImportJob> = {}): ImportJob {
 	return {
 		id: '7',
 		name: 'Peterson',
+		requestStatus: 'APPROVED',
+		requestedBy: { id: '1', username: 'carmen' },
+		reviewNote: null,
+		reviewedAt: null,
+		closedAt: null,
 		createdAt: '2026-10-27T12:00:00Z',
 		updatedAt: '2026-10-27T12:00:00Z',
 		sources: [
@@ -142,6 +155,14 @@ describe('useImportJob', () => {
 		expect(interval({ state: {} })).toBe(false);
 		expect(importJobIsBusy(null)).toBe(false);
 	});
+
+	it('leaves importing rows to the live progress feed when it is connected', () => {
+		const queued = job({ items: [item({ importStatus: 'QUEUED' })] });
+		const listing = job({ sources: [{ ...job().sources[0], status: 'LISTING' }] });
+		expect(importJobIsBusy(queued, true), 'importProgress reports the end').toBe(false);
+		expect(importJobIsBusy(queued, false), 'fallback polling when the socket is down').toBe(true);
+		expect(importJobIsBusy(listing, true), 'listing has no live feed, so it still polls').toBe(true);
+	});
 });
 
 describe('useImportItemDetails', () => {
@@ -171,5 +192,75 @@ describe('eviction: importItemsOnSuccess', () => {
 		const outcome = invalidationOutcome(client, [...affected, ...untouched]);
 		expect(outcome.invalidated).toEqual(affected);
 		expect(outcome.untouched).toEqual(untouched);
+	});
+});
+
+describe('useImportJobs', () => {
+	it('keys the list by includeClosed and sends it', () => {
+		useImportJobs(
+			() => true,
+			() => true,
+		);
+		expect(captured().queryKey).toEqual(queryKeys.imports.list(true));
+		useImportJobs();
+		expect(captured().queryKey).toEqual(queryKeys.imports.list(false));
+		expect(hashKey(queryKeys.imports.list(true))).not.toBe(hashKey(queryKeys.imports.list(false)));
+	});
+});
+
+describe('eviction: requests, reviews and closing', () => {
+	it('a new import or request evicts every imports list variant, nothing else', async () => {
+		const affected = [queryKeys.imports.list(false), queryKeys.imports.list(true)];
+		const untouched = [
+			queryKeys.imports.detail('7'),
+			queryKeys.imports.itemDetails('1'),
+			queryKeys.content.list({ first: 50 }),
+		];
+		for (const k of [...affected, ...untouched]) seed(client, k);
+		await createImportJobOnSuccess(client);
+		const outcome = invalidationOutcome(client, [...affected, ...untouched]);
+		expect(outcome.invalidated).toEqual(affected);
+		expect(outcome.untouched).toEqual(untouched);
+	});
+
+	it("reviewing or closing evicts the lists and that import's sheet only", async () => {
+		const affected = [queryKeys.imports.list(false), queryKeys.imports.list(true), queryKeys.imports.detail('7')];
+		const untouched = [
+			queryKeys.imports.detail('8'),
+			queryKeys.imports.itemDetails('1'),
+			queryKeys.content.list({ first: 50 }),
+		];
+		for (const k of [...affected, ...untouched]) seed(client, k);
+		await importJobChangedOnSuccess(client, '7');
+		const outcome = invalidationOutcome(client, [...affected, ...untouched]);
+		expect(outcome.invalidated).toEqual(affected);
+		expect(outcome.untouched).toEqual(untouched);
+	});
+});
+
+describe('"don\'t import" patches the sheet in place', () => {
+	it('marks only rows the server would change, without a refetch, and returns the old sheet', () => {
+		const sheet = job({
+			items: [
+				item({ id: '1' }),
+				item({ id: '2', importStatus: 'FAILED' }),
+				item({ id: '3', importStatus: 'IMPORTED', inLibrary: true }),
+				item({ id: '4' }),
+			],
+		});
+		client.setQueryData(queryKeys.imports.detail('7'), { importJob: sheet });
+		const before = client.getQueryState(queryKeys.imports.detail('7'))?.dataUpdateCount;
+
+		const previous = patchExcluded(client, { jobId: '7', itemIds: ['1', '2', '3'], excluded: true });
+
+		const after = client.getQueryData<ImportJobResponse>(queryKeys.imports.detail('7'))!.importJob!;
+		expect(after.items.map((i) => i.excluded)).toEqual([true, true, false, false]);
+		expect(previous?.importJob?.items.every((i) => !i.excluded)).toBe(true);
+		expect(client.getQueryState(queryKeys.imports.detail('7'))?.isInvalidated).toBe(false);
+		expect(client.getQueryState(queryKeys.imports.detail('7'))?.dataUpdateCount).toBe((before ?? 0) + 1);
+	});
+
+	it('does nothing for a sheet that is not cached', () => {
+		expect(patchExcluded(client, { jobId: '99', itemIds: ['1'], excluded: true })).toBeUndefined();
 	});
 });

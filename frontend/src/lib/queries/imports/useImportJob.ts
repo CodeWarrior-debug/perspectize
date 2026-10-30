@@ -8,14 +8,17 @@ import {
 	type ImportJobResponse,
 } from './index';
 import { queryKeys } from '../keys';
+import { wsStatus } from '$lib/messaging/ws-client.svelte';
 
 /**
- * True while background work can still change the sheet: a source is listing
- * (rows are arriving) or a row is queued (its outcome is pending).
+ * True while background work can still change the sheet without telling us:
+ * a source is listing (rows are arriving), or rows are queued and the live
+ * progress connection is down (otherwise importProgress reports the end).
  */
-export function importJobIsBusy(job: ImportJob | null | undefined): boolean {
+export function importJobIsBusy(job: ImportJob | null | undefined, liveProgress = false): boolean {
 	if (!job) return false;
-	return job.sources.some((s) => s.status === 'LISTING') || job.items.some((i) => i.importStatus === 'QUEUED');
+	if (job.sources.some((s) => s.status === 'LISTING')) return true;
+	return !liveProgress && job.items.some((i) => i.importStatus === 'QUEUED');
 }
 
 /**
@@ -29,6 +32,6 @@ export function useImportJob(id: () => string, enabled: () => boolean = () => tr
 		staleTime: IMPORT_JOB_STALE_TIME_MS,
 		enabled: enabled() && id() !== '',
 		refetchInterval: (query: { state: { data?: ImportJobResponse } }) =>
-			importJobIsBusy(query.state.data?.importJob) ? IMPORT_JOB_POLL_MS : false,
+			importJobIsBusy(query.state.data?.importJob, wsStatus.value === 'connected') ? IMPORT_JOB_POLL_MS : false,
 	}));
 }

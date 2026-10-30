@@ -6,15 +6,21 @@
 	import { toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/shadcn';
 	import ImportDetailPanel from './ImportDetailPanel.svelte';
+	import ImportProgressBar from './ImportProgressBar.svelte';
 	import type { ImportJob } from '$lib/queries/imports';
 	import { useImportItems } from '$lib/queries/imports/useImportItems';
+	import { useSetImportItemsExcluded } from '$lib/queries/imports/useSetImportItemsExcluded';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
 	import { emptyCellClassRules } from '$lib/utils/grid-empty';
 	import {
 		buildImportColumnDefs,
 		columnsForSet,
+		emptyOptionalColumns,
 		formatTotalTime,
+		importErrorMessage,
+		isImportable,
 		isSelectable,
+		selectionLimit,
 		passesSheetFilter,
 		selectionSummary,
 		sheetTypes,
@@ -28,18 +34,23 @@
 
 	/**
 	 * ImportSheet: one import's staging sheet. A spreadsheet of every candidate
-	 * row with a filter on each column, a detail panel for the focused row, and
-	 * a selection bar that imports the picked rows. Rows already in the library
-	 * are shown but can't be picked.
+	 * row with a filter on each column, a detail panel for the focused row, a
+	 * live progress bar while rows import, and a selection bar that imports the
+	 * picked rows or marks them "don't import". Rows already in the library are
+	 * shown but can't be picked. A closed import is read-only.
 	 */
-	let { job }: { job: ImportJob } = $props();
+	let { job, isAdmin = false }: { job: ImportJob; isAdmin?: boolean } = $props();
 
 	const now = new Date();
 	const rows = $derived(toImportRows(job.items, job.sources));
 	// Columns follow the content types in the sheet, so a filmography has no view or like columns.
 	const types = $derived(sheetTypes(rows));
-	const note = $derived(unavailableNote(types));
+	const empty = $derived(emptyOptionalColumns(rows));
+	const note = $derived(unavailableNote(types, empty));
+	const readOnly = $derived(!!job.closedAt);
+	const limit = $derived(selectionLimit(isAdmin));
 	const importItems = useImportItems();
+	const setExcluded = useSetImportItemsExcluded();
 
 	let gridApi = $state<GridApi<ImportRow> | null>(null);
 	let gridReady = $state(false);
@@ -56,8 +67,14 @@
 	const filter: SheetFilter = { sourceId: '', library: 'all' };
 
 	const focused = $derived(rows.find((r) => r.id === focusedId) ?? null);
-	const summary = $derived(selectionSummary(selected));
+	// The grid hands back the row objects it had when they were ticked; read the
+	// current version by id, so a mark or an import that lands later is reflected.
+	const rowsById = $derived(new Map(rows.map((r) => [r.id, r])));
+	const selectedRows = $derived(selected.map((r) => rowsById.get(r.id) ?? r));
+	const summary = $derived(selectionSummary(selectedRows));
 	const libraryCount = $derived(rows.filter((r) => r.inLibrary).length);
+	const excludedCount = $derived(rows.filter((r) => r.excluded && !r.inLibrary).length);
+	const overLimit = $derived(summary.importable > limit);
 
 	const modules = [ClientSideRowModelModule];
 	const theme = themeQuartz.withParams(GRID_THEME_PARAMS);
@@ -74,10 +91,10 @@
 		getRowId: (p) => p.data.id,
 		rowSelection: 'multiple',
 		suppressRowClickSelection: true,
-		isRowSelectable: (node: IRowNode<ImportRow>) => !!node.data && isSelectable(node.data),
+		isRowSelectable: (node: IRowNode<ImportRow>) => !job.closedAt && !!node.data && isSelectable(node.data),
 		isExternalFilterPresent: () => filter.sourceId !== '' || filter.library !== 'all',
 		doesExternalFilterPass: (node: IRowNode<ImportRow>) => !!node.data && passesSheetFilter(node.data, filter),
-		rowClassRules: { 'opacity-60': (p) => !!p.data?.inLibrary },
+		rowClassRules: { 'opacity-60': (p) => !!p.data && (p.data.inLibrary || p.data.excluded) },
 		tooltipShowDelay: 400,
 		enableCellTextSelection: true,
 		animateRows: false,
@@ -113,7 +130,7 @@
 
 	// Column set, a frame after grid ready (column APIs throw straight from onGridReady).
 	$effect(() => {
-		const { shown, hidden } = columnsForSet(columnSet, types, job.sources.length);
+		const { shown, hidden } = columnsForSet(columnSet, types, job.sources.length, empty);
 		const api = gridApi;
 		if (!api || !gridReady) return;
 		const frame = requestAnimationFrame(() => {
@@ -142,22 +159,40 @@
 	}
 
 	async function runImport() {
-		const ids = selected.map((r) => r.id);
+		const ids = selectedRows.filter(isImportable).map((r) => r.id);
 		try {
 			const res = await importItems.mutateAsync({ jobId: job.id, itemIds: ids });
 			const r = res.importItems;
 			const extra = [
 				r.alreadyInLibrary ? `${r.alreadyInLibrary} already in the library` : '',
 				r.alreadyQueued ? `${r.alreadyQueued} already importing or imported` : '',
+				r.excluded ? `${r.excluded} marked don't import` : '',
 			]
 				.filter(Boolean)
 				.join(', ');
 			toast.success(
-				`Importing ${r.queued} item${r.queued === 1 ? '' : 's'}${extra ? ` (${extra})` : ''}. Rows update as each one lands.`,
+				`Importing ${r.queued} item${r.queued === 1 ? '' : 's'}${extra ? ` (${extra})` : ''}. Progress shows below the sheet.`,
 			);
 			clearSelection();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Import failed. Try again.');
+			toast.error(importErrorMessage(err, 'Import failed. Try again.'));
+		}
+	}
+
+	async function markExcluded(excluded: boolean) {
+		const ids = selectedRows.filter((r) => r.excluded !== excluded).map((r) => r.id);
+		if (ids.length === 0) return;
+		try {
+			const res = await setExcluded.mutateAsync({ jobId: job.id, itemIds: ids, excluded });
+			const n = res.setImportItemsExcluded;
+			toast.success(
+				excluded
+					? `Marked ${n} row${n === 1 ? '' : 's'} "don't import". Anyone can undo this until the import is closed.`
+					: `Cleared "don't import" on ${n} row${n === 1 ? '' : 's'}.`,
+			);
+			clearSelection();
+		} catch (err) {
+			toast.error(importErrorMessage(err));
 		}
 	}
 
@@ -165,6 +200,7 @@
 		{ value: 'all', label: 'All' },
 		{ value: 'new', label: 'Not imported' },
 		{ value: 'lib', label: 'In library' },
+		{ value: 'excluded', label: "Won't import" },
 	];
 </script>
 
@@ -225,7 +261,8 @@
 		/>
 		<Button type="button" variant="outline" size="sm" onclick={clearFilters}>Clear filters</Button>
 		<span class="text-muted-foreground ml-auto text-sm tabular-nums" aria-live="polite" data-testid="import-counts">
-			<strong class="text-foreground">{shownCount}</strong> of {rows.length} rows · {libraryCount} in library
+			<strong class="text-foreground">{shownCount}</strong> of {rows.length} rows · {libraryCount} in library{#if excludedCount}
+				· {excludedCount} won't import{/if}
 		</span>
 	</div>
 
@@ -242,14 +279,21 @@
 		</div>
 	</div>
 
+	<!-- Next to the Import button, where the eye is when an import starts (the grid can push a bar above it off screen). -->
+	<ImportProgressBar jobId={job.id} />
+
 	<div
 		class="border-border bg-card flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
 		data-testid="import-selection-bar"
 	>
-		{#if confirming && summary.count > 0}
+		{#if readOnly}
+			<p class="text-muted-foreground text-sm">
+				This import is closed, so nothing on it can change. An admin can reopen it.
+			</p>
+		{:else if confirming && summary.importable > 0 && !overLimit}
 			<p class="flex-1 text-sm">
-				Import {summary.count} item{summary.count === 1 ? '' : 's'}? Each one is added to the library with its full
-				details and attributed to you. Anything already added is skipped, not duplicated.
+				Import {summary.importable} item{summary.importable === 1 ? '' : 's'}? Each one is added to the library with its
+				full details and attributed to you. Anything already added is skipped, not duplicated.
 			</p>
 			<div class="flex gap-2">
 				<Button type="button" onclick={runImport} disabled={importItems.isPending}>
@@ -258,23 +302,63 @@
 				<Button type="button" variant="outline" onclick={() => (confirming = false)}>Keep choosing</Button>
 			</div>
 		{:else}
-			<div class="text-sm">
-				<strong class="tabular-nums">{summary.count}</strong> selected
-				{#if summary.count > 0}
-					<span class="text-muted-foreground">
-						· {summary.byDestination.map((d) => `${d.count} ${d.label}`).join(', ')}
-						{#if formatTotalTime(summary.totalSeconds)}· {formatTotalTime(summary.totalSeconds)}{/if}
-					</span>
+			<div class="flex flex-col gap-0.5 text-sm">
+				<div>
+					<strong class="tabular-nums">{summary.count}</strong> selected
+					{#if summary.count > 0}
+						<span class="text-muted-foreground">
+							· {summary.byDestination.map((d) => `${d.count} ${d.label}`).join(', ')}
+							{#if formatTotalTime(summary.totalSeconds)}· {formatTotalTime(summary.totalSeconds)}{/if}
+							{#if summary.excluded}· {summary.excluded} marked don't import{/if}
+						</span>
+					{:else}
+						<span class="text-muted-foreground">· tick rows, or use the header box to take every filtered row</span>
+					{/if}
+				</div>
+				{#if overLimit}
+					<p class="text-destructive" role="alert" data-testid="import-selection-limit">
+						Select up to {limit.toLocaleString('en-US')} at a time: you have {summary.importable.toLocaleString(
+							'en-US',
+						)} to import. Untick some, or narrow the filters first.
+					</p>
 				{:else}
-					<span class="text-muted-foreground">· tick rows, or use the header box to take every filtered row</span>
+					<p class="text-muted-foreground text-xs" data-testid="import-selection-hint">
+						Select up to {limit.toLocaleString('en-US')} at a time.
+					</p>
 				{/if}
 			</div>
-			<div class="flex gap-2">
+			<div class="flex flex-wrap gap-2">
 				<Button type="button" variant="outline" size="sm" disabled={summary.count === 0} onclick={clearSelection}>
 					Clear selection
 				</Button>
-				<Button type="button" size="sm" disabled={summary.count === 0} onclick={() => (confirming = true)}>
-					{summary.count === 0 ? 'Import' : `Import ${summary.count}`}
+				{#if summary.excluded > 0}
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						disabled={setExcluded.isPending}
+						onclick={() => markExcluded(false)}
+					>
+						Clear "don't import"
+					</Button>
+				{/if}
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					disabled={summary.importable === 0 || setExcluded.isPending}
+					title="Hide these rows from Not imported for everyone; anyone can undo it until the import is closed"
+					onclick={() => markExcluded(true)}
+				>
+					Don't import
+				</Button>
+				<Button
+					type="button"
+					size="sm"
+					disabled={summary.importable === 0 || overLimit}
+					onclick={() => (confirming = true)}
+				>
+					{summary.importable === 0 ? 'Import' : `Import ${summary.importable.toLocaleString('en-US')}`}
 				</Button>
 			</div>
 		{/if}
