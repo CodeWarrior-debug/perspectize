@@ -23,6 +23,7 @@
 	import PassageText from '$lib/components/PassageText.svelte';
 	import PassagePositionBar from '$lib/components/PassagePositionBar.svelte';
 	import PassageLinks from '$lib/components/PassageLinks.svelte';
+	import MusicTrackPanel from '$lib/components/MusicTrackPanel.svelte';
 	import { useSetPassageDisplayTitle } from '$lib/queries/bible/useSetPassageDisplayTitle';
 	import AddToPlanButton from '$lib/components/plan/AddToPlanButton.svelte';
 
@@ -65,6 +66,7 @@
 
 	const isMovie = $derived(content?.contentType === 'MOVIE');
 	const isPassage = $derived(content?.contentType === 'BIBLE_PASSAGE');
+	const isMusic = $derived(content?.contentType === 'YOUTUBE_MUSIC');
 	const hasVerseRange = $derived(isPassage && content?.verseStartID != null && content?.verseEndID != null);
 	const setPassageTitle = useSetPassageDisplayTitle();
 	let titleDraft = $state('');
@@ -133,9 +135,11 @@
 						? 'Claim'
 						: isPassage
 							? 'Bible Passage'
-							: isMovie
-								? 'Movie'
-								: 'YouTube Video'}
+							: isMusic
+								? 'YouTube Music Track'
+								: isMovie
+									? 'Movie'
+									: 'YouTube Video'}
 				</DialogTitle>
 				<DialogClose class="text-primary-foreground/80 hover:text-primary-foreground">
 					<XIcon class="size-[18px]" />
@@ -228,6 +232,10 @@
 							{/if}
 						</div>
 					</div>
+				{/if}
+
+				{#if isMusic}
+					<MusicTrackPanel contentId={content.id} name={content.name} url={content.url} {open} />
 				{/if}
 
 				<!-- A passage's stored url is its version-less dedupe key; PassageLinks shows versioned links instead. -->

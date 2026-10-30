@@ -14,6 +14,8 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/lrclib"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/musicbrainz"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/realtime"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/cached"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
@@ -21,6 +23,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/handlers"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/wikidata"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/ytmusic"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/config"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
@@ -219,7 +222,13 @@ func main() {
 	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
 
 	// Initialize services
-	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient), services.WithMovieSearch(movieSearchClient), services.WithMovieTrending(movieTrendingClient))
+	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient,
+		services.WithBibleReference(bibleReferenceRepo),
+		services.WithYouTubeTrending(trendingClient),
+		services.WithMovieSearch(movieSearchClient),
+		services.WithMovieTrending(movieTrendingClient),
+		services.WithMusicEnrichment(ytmusic.NewClient(), musicbrainz.NewClient(), lrclib.NewClient()),
+	)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)

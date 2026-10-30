@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateYouTubeUrl } from '$lib/utils/youtube';
+import { validateYouTubeUrl, classifyYouTubeUrl } from '$lib/utils/youtube';
 
 describe('validateYouTubeUrl', () => {
 	describe('valid URLs', () => {
@@ -118,5 +118,24 @@ describe('validateYouTubeUrl', () => {
 		it('handles URLs with unusual but valid characters', () => {
 			expect(validateYouTubeUrl('https://www.youtube.com/watch?v=abc_-123')).toBe(true);
 		});
+	});
+});
+
+describe('classifyYouTubeUrl', () => {
+	const id = 'dQw4w9WgXcQ';
+	it.each([
+		[`https://music.youtube.com/watch?v=${id}`, 'musicTrack'],
+		[`https://music.youtube.com/watch?v=${id}&list=RDAMVM${id}`, 'musicTrack'],
+		['https://music.youtube.com/playlist?list=OLAK5uy_abc', 'musicCollection'],
+		['https://music.youtube.com/browse/MPREb_abc', 'musicCollection'],
+		['https://music.youtube.com/channel/UCabc', 'musicCollection'],
+		[`https://www.youtube.com/watch?v=${id}`, 'video'],
+		[`https://youtu.be/${id}`, 'video'],
+		['https://music.youtube.com/watch', null],
+		['https://music.youtube.com/', null],
+		['https://example.com/watch?v=' + id, null],
+		['not a url', null],
+	])('%s -> %s', (url, expected) => {
+		expect(classifyYouTubeUrl(url)).toBe(expected);
 	});
 });

@@ -1,0 +1,461 @@
+[
+ {
+  "cat": "mainstream",
+  "expectArtist": "Taylor Swift",
+  "expectTitle": "Anti-Hero",
+  "id": "b1kbLwvqugk",
+  "found": "Anti-Hero (Official Music Video)",
+  "byline": "Video \u2022 Taylor Swift \u2022 247M views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "mainstream",
+  "expectArtist": "Ed Sheeran",
+  "expectTitle": "Shape of You",
+  "id": "DWFyvWa-Cfg",
+  "found": "Ed Sheeran - Shape Of You (Live Loop Pedal)",
+  "byline": "Video \u2022 Rafael Borgert \u2022 402K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "mainstream",
+  "expectArtist": "Billie Eilish",
+  "expectTitle": "bad guy",
+  "id": "VPTr9kNPSaQ",
+  "found": "Billie Eilish - bad guy (Acapella Lyric Video) \u0645\u062a\u0631\u062c\u0645\u0629 | \u0628\u062f\u0648\u0646 \u0645\u0648\u0633\u064a\u0642\u0649",
+  "byline": "Video \u2022 Singers WITHOUT MUSIC \u2022 21K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "mainstream",
+  "expectArtist": "The Weeknd",
+  "expectTitle": "Blinding Lights",
+  "id": "JWAaSX5he-g",
+  "found": "The Weeknd - Blinding Lights [4K] [60FPS]",
+  "byline": "Video \u2022 4KD \u2022 30K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "mainstream",
+  "expectArtist": "Dua Lipa",
+  "expectTitle": "Levitating",
+  "id": "57bNHupO3MU",
+  "found": "\u2018Levitating\u2019 at the AMAs 2020\u2019",
+  "byline": "Video \u2022 Dua Lipa \u2022 36M views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "mainstream",
+  "expectArtist": "Bad Bunny",
+  "expectTitle": "Tit\u00ed Me Pregunt\u00f3",
+  "id": "qBUKfQRbzuk",
+  "found": "Bad Bunny - Tit\u00ed Me Pregunt\u00f3 (La Letra / Lyrics)",
+  "byline": "Video \u2022 BagOnly \u2022 23M views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "mainstream",
+  "expectArtist": "Adele",
+  "expectTitle": "Hello",
+  "id": "8fIUkINS1uo",
+  "found": "Adele - Hello (Lyrics)",
+  "byline": "Video \u2022 Rare Vibes \u2022 3.6M views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "oldies",
+  "expectArtist": "The Beatles",
+  "expectTitle": "Hey Jude",
+  "id": "E5nFPKQ1d4I",
+  "found": "The Beatles- Hey Jude (lyrics)",
+  "byline": "Video \u2022 Zing and Bow Lyrics \u2022 11M views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "oldies",
+  "expectArtist": "Led Zeppelin",
+  "expectTitle": "Stairway to Heaven",
+  "id": "Ly6ZhQVnVow",
+  "found": "Stairway to Heaven",
+  "byline": "Video \u2022 Led Zeppelin \u2022 82M views",
+  "type": "MUSIC_VIDEO_TYPE_OFFICIAL_SOURCE_MUSIC"
+ },
+ {
+  "cat": "oldies",
+  "expectArtist": "Fleetwood Mac",
+  "expectTitle": "Dreams",
+  "id": "RKexvwfhQLU",
+  "found": "Fleetwood Mac - Dreams 1977 Extended Version",
+  "byline": "Video \u2022 Martin Martorell \u2022 11M views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "oldies",
+  "expectArtist": "Michael Jackson",
+  "expectTitle": "Billie Jean",
+  "id": "Jg4oHkfM_t4",
+  "found": "Billie Jean [4K] 30th Anniversary, 2001 - Michael Jackson",
+  "byline": "Video \u2022 Meta \u2022 9.9M views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "oldies",
+  "expectArtist": "ABBA",
+  "expectTitle": "Dancing Queen",
+  "id": "3qiMJt-JBb4",
+  "found": "ABBA - Dancing Queen (Lyrics)",
+  "byline": "Video \u2022 Young Pilgrim Music \u2022 41M views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "oldies",
+  "expectArtist": "Stevie Wonder",
+  "expectTitle": "Superstition",
+  "id": "lwvlBZE2wt8",
+  "found": "Stevie Wonder - Superstition (Live 8 2005)",
+  "byline": "Video \u2022 Live 8 \u2022 700K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "oldies",
+  "expectArtist": "Bob Marley",
+  "expectTitle": "Redemption Song",
+  "id": "sVPMYf64k4Y",
+  "found": "Bob Marley - Redemption Song (Lirik Video dan Terjemahan)",
+  "byline": "Video \u2022 Wine Lyrics \u2022 123K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "90s-2010s",
+  "expectArtist": "Nirvana",
+  "expectTitle": "Smells Like Teen Spirit",
+  "id": "OwSZN9czOhQ",
+  "found": "Nirvana - Smells Like Teen Spirit on iPhone (GarageBand)",
+  "byline": "Video \u2022 iSongs \u2022 4.2M views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "90s-2010s",
+  "expectArtist": "Radiohead",
+  "expectTitle": "Creep",
+  "id": "SrMFDei9iE4",
+  "found": "\ub0b4\uac00 \ud2b9\ubcc4\ud588\uc73c\uba74 \uc88b\uaca0\uc5b4 | Radiohead - Creep [\uac00\uc0ac/\ud574\uc11d/lyrics]",
+  "byline": "Video \u2022 L Record \u2022 1.8M views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "90s-2010s",
+  "expectArtist": "Daft Punk",
+  "expectTitle": "Get Lucky",
+  "id": "RG63kLb_Hqo",
+  "found": "Daft Punk - Get Lucky ft. Pharrell Williams - LOWER Key Slowed Down (Piano Karaoke Instrumental)",
+  "byline": "Video \u2022 PianoNest \u2022 9.4K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "90s-2010s",
+  "expectArtist": "Arctic Monkeys",
+  "expectTitle": "Do I Wanna Know?",
+  "id": "h7dEw-yaM9c",
+  "found": "\"Do I Wanna Know?\" - Arctic Monkeys Music Video",
+  "byline": "Video \u2022 mattiek312 \u2022 137K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "90s-2010s",
+  "expectArtist": "Rick Astley",
+  "expectTitle": "Never Gonna Give You Up",
+  "id": "dQw4w9WgXcQ",
+  "found": "Never Gonna Give You Up",
+  "byline": "Video \u2022 Rick Astley \u2022 1.8B views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "very old",
+  "expectArtist": "Louis Armstrong",
+  "expectTitle": "West End Blues",
+  "id": "9RC8-JnT4go",
+  "found": "Louis Armstrong - West End Blues (1928)",
+  "byline": "Video \u2022 Solo musica \u2022 1.3K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "very old",
+  "expectArtist": "Robert Johnson",
+  "expectTitle": "Cross Road Blues",
+  "id": "JpqIr_Z1_dM",
+  "found": "Robert Johnson - Cross Road Blues (alternate take #5)",
+  "byline": "Video \u2022 \u03bd\u03c4\u03b1\u03bb\u03b9\u03ba\u03ad\u03c1\u03b7\u03c2 \u2022 6.6K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "very old",
+  "expectArtist": "Enrico Caruso",
+  "expectTitle": "Vesti la giubba",
+  "id": "mRg7jtp8WP0",
+  "found": "Enrico Caruso - Vesti la giubba (with synchronized film)",
+  "byline": "Video \u2022 Dead Tenors' Society \u2022 57K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "very old",
+  "expectArtist": "Billie Holiday",
+  "expectTitle": "Strange Fruit",
+  "id": "Web007rzSOI",
+  "found": "Billie Holiday-Strange fruit- HD",
+  "byline": "Video \u2022 prokoman1 \u2022 11M views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "very old",
+  "expectArtist": "Glenn Miller",
+  "expectTitle": "In the Mood",
+  "id": "ygIcyOSITgo",
+  "found": "Jive Bunny And The MasterMixers - Swing The Mood (12\" Version)",
+  "byline": "Video \u2022 Gasper LML \u2022 35M views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "very old",
+  "expectArtist": "Bessie Smith",
+  "expectTitle": "St. Louis Blues",
+  "id": "h_HNB_-boTk",
+  "found": "Bessie Smith, St.  Louis Blues (1925)",
+  "byline": "Video \u2022 78rps \u2022 1.2K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "classical",
+  "expectArtist": "Beethoven",
+  "expectTitle": "Moonlight Sonata",
+  "id": "4Tr0otuiQuU",
+  "found": "Beethoven - Moonlight Sonata (FULL)",
+  "byline": "Video \u2022 andrea romano \u2022 231M views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "classical",
+  "expectArtist": "Vivaldi",
+  "expectTitle": "Spring Four Seasons",
+  "id": "3XusT8av1LA",
+  "found": "Vivaldi (The Four Seasons) - Spring, 1st movement",
+  "byline": "Video \u2022 Piano Adventures \u2022 21K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "non-English",
+  "expectArtist": "BTS",
+  "expectTitle": "Dynamite",
+  "id": "c4V0FNZfEv0",
+  "found": "BTS (\ubc29\ud0c4\uc18c\ub144\ub2e8) 'Dynamite' @ Good Morning America",
+  "byline": "Video \u2022 BTS \u2022 133M views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "non-English",
+  "expectArtist": "Fairuz",
+  "expectTitle": "Habaitak",
+  "id": "b4QwrVfu-58",
+  "found": "Fayrouz - Habaitak Wel Shawq Enqal / \u0641\u064a\u0631\u0648\u0632 - \u062d\u0628\u064a\u062a\u0643 \u0648 \u0627\u0644\u0634\u0648\u0642 \u0625\u0646\u0642\u0627\u0644",
+  "byline": "Video \u2022 arabicmusicroots \u2022 1.7M views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "non-English",
+  "expectArtist": "Rosal\u00eda",
+  "expectTitle": "Malamente",
+  "id": "Apspivl5XYU",
+  "found": "ROSAL\u00cdA - MALAMENTE (Letra/Lyrics)",
+  "byline": "Video \u2022 sunday \u2022 4.1M views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "non-English",
+  "expectArtist": "Burna Boy",
+  "expectTitle": "Last Last",
+  "id": "421w1j87fEM",
+  "found": "Last Last",
+  "byline": "Video \u2022 Burna Boy \u2022 366M views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "non-English",
+  "expectArtist": "Stromae",
+  "expectTitle": "Alors on danse",
+  "id": "GPoPKwXybY4",
+  "found": "Stromae - Alors On Danse (Radio Edit) [Audio HQ]",
+  "byline": "Video \u2022 GoldenMusic \u2022 144K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "indie/obscure",
+  "expectArtist": "Khruangbin",
+  "expectTitle": "Maria Tambi\u00e9n",
+  "id": "7hlGqj3ImQI",
+  "found": "Maria Tambi\u00e9n",
+  "byline": "Video \u2022 Khruangbin \u2022 4.1M views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "indie/obscure",
+  "expectArtist": "Men I Trust",
+  "expectTitle": "Show Me How",
+  "id": "P6_EozGdhLY",
+  "found": "Men I Trust - Show Me How (Lyrics)",
+  "byline": "Video \u2022 Lyric Studios  \u2022 533 views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "indie/obscure",
+  "expectArtist": "Beabadoobee",
+  "expectTitle": "Coffee",
+  "id": "nHlQVvmKgZU",
+  "found": "Beabadoobee - coffee lirik dan terjemahan",
+  "byline": "Video \u2022 Asian Muslim \u2022 3K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "indie/obscure",
+  "expectArtist": "Mac DeMarco",
+  "expectTitle": "Chamber of Reflection",
+  "id": "MXSDDqr5v4w",
+  "found": "Chamber Of Reflection | Mac Demarco - Live Argentina - 21/04/2026",
+  "byline": "Video \u2022 Lucas Baglione \u2022 1.1K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "indie/obscure",
+  "expectArtist": "Japanese Breakfast",
+  "expectTitle": "Paprika",
+  "id": "dEsqLTogYAA",
+  "found": "Japanese Breakfast - Paprika (Lyrics)",
+  "byline": "Video \u2022 Beat Cafe \u2022 64 views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "indie/obscure",
+  "expectArtist": "Hiatus Kaiyote",
+  "expectTitle": "Nakamarra",
+  "id": "OmNMxE2VI-w",
+  "found": "Hiatus Kaiyote Nakamarra Reharmonization Live at Red Rocks 10/2023",
+  "byline": "Video \u2022 Best Concert Clips  \u2022 289 views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "weird",
+  "expectArtist": "lofi hip hop radio",
+  "expectTitle": "beats to relax study to",
+  "id": "XinVOkSAagU",
+  "found": "lofi hip hop radio \ud83d\udcda beats to relax/study to #24",
+  "byline": "Video \u2022 Lofi Flow State \u2022 1 view",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "weird",
+  "expectArtist": "Rick Astley",
+  "expectTitle": "Never Gonna Give You Up 10 hours",
+  "id": "PK834-_cdLs",
+  "found": "Never Gonna Give You Up 1 hour version",
+  "byline": "Video \u2022 Antonyo \u2022 169 views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "new-release",
+  "expectArtist": null,
+  "expectTitle": null,
+  "id": "8Ed479ExmIs",
+  "found": "\u0e44\u0e21\u0e48\u0e2a\u0e21\u0e28\u0e31\u0e01\u0e14\u0e34\u0e4c\u0e28\u0e23\u0e35",
+  "byline": "Genierock \u2022 2.1M views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "new-release",
+  "expectArtist": null,
+  "expectTitle": null,
+  "id": "u3KpLtIFAxk",
+  "found": "Ethno House \u2013 Bouzouki Minoan",
+  "byline": "SVL-Records \u2022 161K views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "new-release",
+  "expectArtist": null,
+  "expectTitle": null,
+  "id": "WDgiZpKJBHQ",
+  "found": "Amor Factura",
+  "byline": "Ricardo Arjona & Grupo Firme \u2022 9.1M views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "new-release",
+  "expectArtist": null,
+  "expectTitle": null,
+  "id": "QFpKbpTs1DE",
+  "found": "\u0e16\u0e32\u0e21\u0e43\u0e08",
+  "byline": "genie records & Lek Ratchamet \u2022 472K views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "new-release",
+  "expectArtist": null,
+  "expectTitle": null,
+  "id": "2VnjtzJ4dbQ",
+  "found": "\u0e1b\u0e2d\u0e14\u0e41\u0e2b\u0e01",
+  "byline": "BOVINI & genie records \u2022 357K views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "new-release",
+  "expectArtist": null,
+  "expectTitle": null,
+  "id": "w-3UQ7zf3aI",
+  "found": "Ethno House \u2013 Bouzouki Mirage",
+  "byline": "SVL-Records \u2022 184K views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "new-release",
+  "expectArtist": null,
+  "expectTitle": null,
+  "id": "tTV8r2y8wv8",
+  "found": "\u0e40\u0e07\u0e32\u0e30\u0e1b\u0e48\u0e32\u0e25\u0e32\u0e2e\u0e31\u0e01",
+  "byline": "\u0e15\u0e4b\u0e2d\u0e07 \u0e1e\u0e34\u0e17\u0e31\u0e01\u0e29\u0e4c\u0e1e\u0e07\u0e28\u0e4c \u2022 488K views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "new-release",
+  "expectArtist": null,
+  "expectTitle": null,
+  "id": "DrNcwD4Brmo",
+  "found": "ESO NO ES NA - OSCAR GAMARRA & ROLANDO OCHOA",
+  "byline": "Oscar Gamarra \u2022 59K views",
+  "type": "MUSIC_VIDEO_TYPE_OMV"
+ },
+ {
+  "cat": "oldies",
+  "expectArtist": "David Bowie",
+  "expectTitle": "Heroes",
+  "id": "8HtQYhZ-olg",
+  "found": "David Bowie - Heroes",
+  "byline": "Video \u2022 TheFireflyGuy \u2022 1.8K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "90s-2010s",
+  "expectArtist": "Kendrick Lamar",
+  "expectTitle": "HUMBLE.",
+  "id": "qb1BxDy1ack",
+  "found": "Kendrick Lamar - HUMBLE. [\uac00\uc0ac/\ud574\uc11d/\ubc88\uc5ed] (Official Music Video)",
+  "byline": "Video \u2022 HipopMedia \u2022 6.2K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ },
+ {
+  "cat": "90s-2010s",
+  "expectArtist": "Beyonc\u00e9",
+  "expectTitle": "Formation",
+  "id": "bHY9PieTxf8",
+  "found": "Beyonc\u00e9 coachella formation legendado/part1",
+  "byline": "Video \u2022 Hive in Formation \u2022 5.3K views",
+  "type": "MUSIC_VIDEO_TYPE_UGC"
+ }
+]

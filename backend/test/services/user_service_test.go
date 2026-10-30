@@ -1147,6 +1147,14 @@ func (m *mockContentRepoForUser) ClearDisplayTitle(ctx context.Context, contentI
 	return nil
 }
 
+func (m *mockContentRepoForUser) GetByISRC(ctx context.Context, isrc string) (*domain.Content, error) {
+	return nil, domain.ErrNotFound
+}
+
+func (m *mockContentRepoForUser) SetResponseKey(ctx context.Context, contentID int, key string, value json.RawMessage) error {
+	return nil
+}
+
 // --- Authorization ---
 
 func TestUserMutations_Authorization(t *testing.T) {
