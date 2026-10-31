@@ -7,8 +7,54 @@ on:
     branches: [main]
 
 jobs:
+  code-changes:
+    # Decides whether test and build run: skipped when a change touches only docs
+    # and other non-code files. Gated per job (not with workflow-level
+    # paths-ignore) so a skipped job still reports as passed, which keeps any
+    # required status check satisfied. A push with no usable base commit (new
+    # branch) runs everything, so nothing is skipped by mistake.
+    name: Code changes
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check for code file changes
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          code_paths=(
+            backend
+            frontend
+            .github
+          )
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            changed=$(git diff --name-only "origin/$BASE_REF...HEAD" -- "${code_paths[@]}")
+          elif [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            changed="(new branch: no base commit)"
+          else
+            changed=$(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA" -- "${code_paths[@]}" 2>/dev/null || echo "(base commit unavailable)")
+          fi
+          echo "Code files changed:"
+          echo "${changed:-  (none)}"
+          if [ -n "$changed" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   test:
     name: Test & Lint
+    needs: code-changes
+    if: needs.code-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -71,6 +117,8 @@ jobs:
 
   build:
     name: Build
+    needs: code-changes
+    if: needs.code-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
