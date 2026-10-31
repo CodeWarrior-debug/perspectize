@@ -140,7 +140,7 @@ func Load(configPath string) (*Config, error) {
 	// Message retention: 0 / unset / invalid => unbounded (no application-side
 	// sweep). Only a positive value enables pruning.
 	if v := os.Getenv("MESSAGE_RETENTION_MAX"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 { // only a positive value enables pruning
 			cfg.MessageRetentionMax = n
 		}
 	}
