@@ -117,6 +117,8 @@ Run the relevant subset (e.g., backend-only changes skip step 4). Report results
 
 **Hooks:** Claude Code PreToolUse hooks guard `.env` reads and block `gh pr create` until `/revise-claude-md` has run (then create the PR with `gh api`). The real git pre-commit hook (gofmt + prettier auto-fix) is off until `make install-hooks` (run in `backend/`; fresh cloud/CI checkouts start without it — see [.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md)). Full list: [.docs/HOOKS.md](.docs/HOOKS.md).
 
+**Docs-only PRs must not burn CI or deploys:** `ci.yml` gates `test`/`build` on a `code-changes` job (job-level, so skipped = passed for required checks; don't use workflow-level `paths-ignore`), CodeQL/Trivy/mutation/frontend-test use `paths:`, and Sevalla deploys are path-filtered via `allow_deploy_paths` (backend `backend/**`, frontend `frontend/**`; the frontend site also builds PR previews). A new workflow or Sevalla service needs the same gating. GitHub Actions YAML anchors are not safe to rely on; repeat path lists.
+
 **Cowork session cleanup:** Claude cowork (claude.ai web) sessions leave `_tmp_*` files and conversation transcript `.txt` files in the repo root and `frontend/`. Delete these before committing.
 
 ## graphify
