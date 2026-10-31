@@ -93,6 +93,27 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # A run that mutates nothing looks exactly like a clean run ("Skipped: N", green). That is how
+      # the diff-path mismatch (see mutate-diff in backend/Makefile) went unnoticed for weeks. If the PR
+      # changed non-test Go source but not one mutant was executed, say so loudly. Warning only: this
+      # job stays report-only, and a PR that only touches lines Gremlins can't mutate (imports,
+      # constants, struct tags, excluded paths) legitimately has none.
+      - name: Warn if nothing was mutated
+        if: always() && steps.changes.outputs.changed == 'true'
+        working-directory: .
+        run: |
+          src=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- 'backend/**/*.go' \
+            | grep -v -E '_test\.go$|/test/|generated|^backend/cmd/|^backend/internal/perf/' || true)
+          [ -z "$src" ] && exit 0
+          [ -f "$RUNNER_TEMP/gremlins.log" ] || exit 0
+          executed=$(grep -E '^(Killed|Timed out):' "$RUNNER_TEMP/gremlins.log" \
+            | grep -oE '(Killed|Lived|Not covered|Timed out): [0-9]+' | awk -F': ' '{s+=$2} END{print s+0}')
+          if [ "$executed" -eq 0 ]; then
+            msg="Gremlins ran 0 mutants although this PR changes non-test Go source. Check the diff-path handling in make mutate-diff before trusting this green job."
+            echo "::warning title=Gremlins mutated nothing::$msg"
+            { echo; echo "> **Warning:** $msg"; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Upload Gremlins report
         if: always() && steps.changes.outputs.changed == 'true'
         uses: actions/upload-artifact@v6
