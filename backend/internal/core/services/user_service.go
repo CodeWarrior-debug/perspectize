@@ -21,6 +21,15 @@ type UserService struct {
 	todoRepo        repositories.UserTodoRepository
 	listRepo        repositories.UserTodoListRepository
 	actionRepo      repositories.TodoActionRepository
+	importRepo      repositories.ImportJobRepository
+}
+
+// UserServiceOption configures optional UserService dependencies.
+type UserServiceOption func(*UserService)
+
+// WithImportJobRepository lets Delete reassign the imports a user created.
+func WithImportJobRepository(repo repositories.ImportJobRepository) UserServiceOption {
+	return func(s *UserService) { s.importRepo = repo }
 }
 
 // NewUserService creates a new user service
@@ -31,8 +40,9 @@ func NewUserService(
 	todoRepo repositories.UserTodoRepository,
 	listRepo repositories.UserTodoListRepository,
 	actionRepo repositories.TodoActionRepository,
+	opts ...UserServiceOption,
 ) *UserService {
-	return &UserService{
+	s := &UserService{
 		repo:            repo,
 		contentRepo:     contentRepo,
 		perspectiveRepo: perspectiveRepo,
@@ -40,6 +50,10 @@ func NewUserService(
 		listRepo:        listRepo,
 		actionRepo:      actionRepo,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // emailRegex validates email format
@@ -262,6 +276,11 @@ func (s *UserService) Delete(ctx context.Context, actor *domain.AuthenticatedUse
 	}
 	if err := s.actionRepo.ReassignByUser(ctx, id, sentinel.ID); err != nil {
 		return fmt.Errorf("failed to reassign todo actions: %w", err)
+	}
+	if s.importRepo != nil {
+		if err := s.importRepo.ReassignByUser(ctx, id, sentinel.ID); err != nil {
+			return fmt.Errorf("failed to reassign imports: %w", err)
+		}
 	}
 
 	// Now safe to delete — no FKs reference this user

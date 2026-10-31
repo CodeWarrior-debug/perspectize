@@ -22,8 +22,10 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/wikidata"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/config"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/demo"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/server"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/database"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/logger"
@@ -187,6 +189,15 @@ func main() {
 		trendingClient = cachingClient
 		slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds, "trendingTTLSeconds", cfg.YouTube.TrendingCacheTTLSeconds)
 	}
+	// Import staging listers: one per source type that has an API key. Demo
+	// mode has neither key, so it lists the sample sources in imports.json.
+	importListers := map[domain.ImportSourceType]portservices.ImportSourceLister{}
+	if demoCfg.Enabled {
+		importListers[domain.ImportSourceYouTubeChannel] = demo.NewImportLister(domain.ImportSourceYouTubeChannel)
+		importListers[domain.ImportSourceTMDBPerson] = demo.NewImportLister(domain.ImportSourceTMDBPerson)
+	} else if cfg.YouTube.APIKey != "" {
+		importListers[domain.ImportSourceYouTubeChannel] = youtube.NewChannelLister(youtube.NewClient(cfg.YouTube.APIKey))
+	}
 	// Movie lookups and Discover's Movies search share one TMDB client.
 	var movieClient portservices.MovieClient = tmdb.UnconfiguredClient{}
 	var movieSearchClient portservices.MovieSearchClient = tmdb.UnconfiguredClient{}
@@ -197,6 +208,11 @@ func main() {
 		movieSearchClient = tmdbClient
 		// Trending is cached (1h, per window + page); search stays uncached.
 		movieTrendingClient = tmdb.NewTrendingCache(tmdbClient, tmdb.DefaultTrendingTTL)
+		importListers[domain.ImportSourceTMDBPerson] = tmdb.NewPersonLister(tmdbClient)
+	} else if demoCfg.Enabled {
+		// Demo mode: staged demo films resolve offline, so importing them works
+		// without a token. Discover's movie search and trending stay unconfigured.
+		movieClient = tmdb.NewDemoClient()
 	} else {
 		slog.Warn("TMDB_API_READ_ACCESS_TOKEN is empty — movie lookups will fail")
 	}
@@ -217,14 +233,31 @@ func main() {
 	messageRepo := postgres.NewGormMessageRepository(db)
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
 	buildInfoRepo := postgres.NewGormBuildInfoRepository(db)
+	importRepo := postgres.NewGormImportJobRepository(db)
 
 	// Initialize services
 	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient), services.WithMovieSearch(movieSearchClient), services.WithMovieTrending(movieTrendingClient))
-	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo)
+	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo,
+		services.WithImportJobRepository(importRepo))
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
 	categoryService := services.NewCategoryService(categoryRepo, contentRepo, wikidataClient)
 	userTodoService := services.NewUserTodoService(todoRepo, todoListRepo, todoActionRepo)
 	buildInfoService := services.NewBuildInfoService(buildInfoRepo)
+
+	// Import staging runs listing and imports in background goroutines tied to
+	// this context, so shutdown cancels them; work a restart cut short is
+	// marked failed here. Assumes one server instance (Sevalla runs one).
+	importCtx, stopImports := context.WithCancel(context.Background())
+	defer stopImports()
+	var importCreator importContentCreator = contentService
+	if d := demoImportDelay(demoCfg.Enabled); d > 0 {
+		importCreator = slowImportCreator{inner: contentService, delay: d}
+		slog.Info("demo imports simulate API latency", "delayPerRow", d)
+	}
+	importService := services.NewImportService(importRepo, importListers, importCreator, services.WithImportBackground(importCtx))
+	if err := importService.RecoverInterrupted(context.Background()); err != nil {
+		slog.Warn("could not recover interrupted imports", "error", err)
+	}
 
 	// Messaging realtime plumbing: the hub fans events out in-process, the
 	// listener feeds it from Postgres NOTIFY, the presence tracker records who
@@ -277,6 +310,7 @@ func main() {
 		CategoryService:     categoryService,
 		UserTodoService:     userTodoService,
 		MessagingService:    messagingService,
+		ImportService:       importService,
 		UserRepo:            userRepo,
 		ThreadRepo:          threadRepo,
 		Hub:                 hub,

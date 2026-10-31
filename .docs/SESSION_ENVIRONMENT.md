@@ -18,4 +18,6 @@ Several repo rules depend on where the session runs. The `session-environment.sh
 | Library lookups | Neon MCP `run_sql` on project `lively-fog-94104513`, read-only `SELECT`s only (e.g. which YouTube URLs are already content). | Same, or the human's `psql`. |
 | Migrations | Written and reviewed only, never applied, in both environments (`DATABASE_URL` is the shared Neon database). | Same. |
 
+**Stopping background processes:** never `pkill -f` / `pgrep -f` with a pattern that appears in the same Bash call. The pattern matches that call's own shell, which is killed (exit 144) along with anything after it. List PIDs first (`ps aux | grep '[v]ite dev'`), then `kill <pid>` in a separate call.
+
 A PR created in a cloud session is still reviewed and merged like any other; see [PR_WORKFLOW.md](PR_WORKFLOW.md) for templates, labels and merge flags.

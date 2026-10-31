@@ -928,3 +928,150 @@ func (r *Resolver) userTodoListByKey(ctx context.Context, key dataloader.UserTod
 	}
 	return nil, nil
 }
+
+// --- Import staging mapping -------------------------------------------------
+
+func isoTime(t time.Time) string { return t.UTC().Format(time.RFC3339) }
+
+func isoTimePtr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := isoTime(*t)
+	return &s
+}
+
+func int64ToFloatPtr(n *int64) *float64 {
+	if n == nil {
+		return nil
+	}
+	f := float64(*n)
+	return &f
+}
+
+func importJobToModel(j *domain.ImportJob) *model.ImportJob {
+	sources := make([]*model.ImportSource, len(j.Sources))
+	for i, s := range j.Sources {
+		sources[i] = &model.ImportSource{
+			ID:              strconv.Itoa(s.ID),
+			SourceType:      s.SourceType,
+			SourceRef:       s.SourceRef,
+			Title:           s.Title,
+			URL:             s.URL,
+			Role:            s.Role,
+			DestinationType: s.DestinationType,
+			Status:          s.Status,
+			StatusDetail:    s.StatusDetail,
+			ItemCount:       s.ItemCount,
+			FetchedAt:       isoTimePtr(s.FetchedAt),
+		}
+	}
+	return &model.ImportJob{
+		ID:              strconv.Itoa(j.ID),
+		Name:            j.Name,
+		RequestStatus:   j.RequestStatus,
+		ReviewNote:      j.ReviewNote,
+		ReviewedAt:      isoTimePtr(j.ReviewedAt),
+		ClosedAt:        isoTimePtr(j.ClosedAt),
+		Sources:         sources,
+		CreatedAt:       isoTime(j.CreatedAt),
+		UpdatedAt:       isoTime(j.UpdatedAt),
+		RequesterUserID: j.UserID,
+	}
+}
+
+func importItemToModel(it *domain.ImportItem) *model.ImportItem {
+	m := &model.ImportItem{
+		ID:              strconv.Itoa(it.ID),
+		SourceID:        strconv.Itoa(it.SourceID),
+		DestinationType: it.DestinationType,
+		Kind:            it.Kind,
+		ExternalID:      it.ExternalID,
+		URL:             it.CanonicalURL,
+		Title:           it.Title,
+		Summary:         it.Summary,
+		PublishedAt:     isoTimePtr(it.PublishedAt),
+		DurationSeconds: it.DurationSeconds,
+		ViewCount:       int64ToFloatPtr(it.ViewCount),
+		LikeCount:       int64ToFloatPtr(it.LikeCount),
+		CommentCount:    int64ToFloatPtr(it.CommentCount),
+		Rating:          it.Rating,
+		RatingCount:     it.RatingCount,
+		RatingSource:    it.RatingSource,
+		ChapterCount:    it.ChapterCount,
+		HasCaptions:     it.HasCaptions,
+		Genres:          stringsOrEmpty(it.Genres),
+		TopCast:         stringsOrEmpty(it.TopCast),
+		Popularity:      it.Popularity,
+		ReviewCount:     it.ReviewCount,
+		Revenue:         int64ToFloatPtr(it.Revenue),
+		Budget:          int64ToFloatPtr(it.Budget),
+		ThumbnailURL:    it.ThumbnailURL,
+		Position:        it.Position,
+		Excluded:        it.Excluded,
+		StatsFetchedAt:  isoTime(it.StatsFetchedAt),
+		InLibrary:       it.InLibrary,
+		ImportStatus:    it.ImportStatus,
+		ImportError:     it.ImportError,
+		ImportedAt:      isoTimePtr(it.ImportedAt),
+	}
+	if it.ContentID != nil {
+		id := strconv.Itoa(*it.ContentID)
+		m.ContentID = &id
+	}
+	return m
+}
+
+func importItemDetailsToModel(d *domain.ImportItemWithDetails) *model.ImportItemDetails {
+	chapters := make([]*model.ImportChapter, len(d.Details.Chapters))
+	for i, c := range d.Details.Chapters {
+		chapters[i] = &model.ImportChapter{StartSeconds: c.StartSeconds, Title: c.Title}
+	}
+	people := make([]*model.ImportPerson, len(d.Details.People))
+	for i, p := range d.Details.People {
+		people[i] = &model.ImportPerson{Name: p.Name, Role: p.Role}
+	}
+	out := &model.ImportItemDetails{
+		Item:        importItemToModel(&d.Item),
+		Description: d.Details.Description,
+		Tags:        stringsOrEmpty(d.Details.Tags),
+		Chapters:    chapters,
+		Links:       stringsOrEmpty(d.Details.Links),
+		People:      people,
+		Genres:      stringsOrEmpty(d.Details.Genres),
+	}
+	if d.Details.Language != "" {
+		lang := d.Details.Language
+		out.Language = &lang
+	}
+	return out
+}
+
+func modelToCreateImportJobInput(in model.CreateImportJobInput) domain.CreateImportJobInput {
+	out := domain.CreateImportJobInput{Name: in.Name, Sources: make([]domain.CreateImportSourceInput, len(in.Sources))}
+	for i, s := range in.Sources {
+		out.Sources[i] = domain.CreateImportSourceInput{SourceType: s.SourceType, Ref: s.Ref, Role: s.Role}
+	}
+	return out
+}
+
+// stringsOrEmpty returns s, or an empty slice for nil, for non-null GraphQL lists.
+func stringsOrEmpty(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
+}
+
+func importProgressToModel(p domain.ImportProgress) *model.ImportProgress {
+	return &model.ImportProgress{
+		JobID:     strconv.Itoa(p.JobID),
+		Total:     p.Total,
+		Done:      p.Done,
+		Imported:  p.Imported,
+		Skipped:   p.Skipped,
+		Failed:    p.Failed,
+		Running:   p.Running,
+		UpdatedAt: isoTime(p.UpdatedAt),
+	}
+}

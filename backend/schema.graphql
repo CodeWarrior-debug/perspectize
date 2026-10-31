@@ -526,6 +526,227 @@ input CreateClaimInput {
   parentContentID: IntID!  # The content item this claim is about
 }
 
+# --- Import staging (bulk import from channels and filmographies) ---
+# Admins create an import of one or more sources; each is listed in the
+# background into candidate rows that signed-in users pick and import.
+# Spec: docs/superpowers/specs/2026-10-27-youtube-channel-import-design.md
+
+enum ImportSourceType {
+  # A YouTube channel's uploads; rows become YOUTUBE_VIDEO content.
+  YOUTUBE_CHANNEL
+  # A TMDB person's filmography; rows become MOVIE content.
+  TMDB_PERSON
+}
+
+enum ImportPersonRole {
+  DIRECTOR
+  CAST
+}
+
+enum ImportSourceStatus {
+  # Part of a request nobody has approved yet: nothing is listed.
+  WAITING
+  LISTING
+  READY
+  FAILED
+}
+
+enum ImportItemKind {
+  VIDEO
+  SHORT
+  LIVE
+  MOVIE
+}
+
+enum ImportItemStatus {
+  QUEUED
+  IMPORTED
+  # The content already existed, so nothing new was created.
+  SKIPPED
+  FAILED
+}
+
+type ImportSource {
+  id: ID!
+  sourceType: ImportSourceType!
+  # As entered: a channel id, handle or URL; a TMDB person id or URL.
+  sourceRef: String!
+  title: String
+  url: String
+  role: ImportPersonRole
+  # The content type every row of this source becomes.
+  destinationType: ContentType!
+  status: ImportSourceStatus!
+  # Why listing failed or stopped early; null while listing or when ready.
+  statusDetail: String
+  # Rows staged so far.
+  itemCount: Int!
+  # When listing finished (ISO); the row stats are a snapshot from then.
+  fetchedAt: String
+}
+
+# An admin's import is APPROVED when created; anyone else's is REQUESTED until
+# an admin approves it (listing starts) or declines it.
+enum ImportRequestStatus {
+  REQUESTED
+  APPROVED
+  DECLINED
+}
+
+type ImportJob {
+  id: ID!
+  name: String!
+  requestStatus: ImportRequestStatus!
+  # Who created it (the requester, for a request).
+  requestedBy: User
+  # The reviewing admin's reason; always set on a decline.
+  reviewNote: String
+  reviewedAt: String
+  # Set when an admin closed it: hidden from non-admins and read-only.
+  closedAt: String
+  sources: [ImportSource!]!
+  createdAt: String!
+  updatedAt: String!
+  # Every staged row, in listing order. One query, whatever the count.
+  items: [ImportItem!]!
+}
+
+# One candidate row: what it is, how big, how current, how well received.
+# Long text (description, chapters, tags) is on importItemDetails.
+type ImportItem {
+  id: ID!
+  sourceId: ID!
+  destinationType: ContentType!
+  kind: ImportItemKind!
+  # YouTube video id or TMDB movie id.
+  externalId: String!
+  url: String!
+  title: String!
+  # First meaningful description line, with channel boilerplate removed.
+  summary: String
+  publishedAt: String
+  durationSeconds: Int
+  viewCount: Float
+  # Null when the channel hides likes (never 0 for unknown).
+  likeCount: Float
+  commentCount: Float
+  # 0-10, how many ratings it rests on, and whose (e.g. "TMDB").
+  rating: Float
+  ratingCount: Int
+  ratingSource: String
+  chapterCount: Int!
+  hasCaptions: Boolean
+  # Films: genre names and up to 3 top-billed cast (empty for videos).
+  genres: [String!]!
+  topCast: [String!]!
+  # Films (TMDB): daily popularity score, user review count, and box office
+  # takings and budget in USD. Null when unknown.
+  popularity: Float
+  reviewCount: Int
+  revenue: Float
+  budget: Float
+  thumbnailUrl: String
+  # Marked "don't import" (by anyone, until the import is closed): can't be imported.
+  excluded: Boolean!
+  # Position in the source listing; 0 is first (newest for channels).
+  position: Int!
+  statsFetchedAt: String!
+  # True when content with this URL is already in the library.
+  inLibrary: Boolean!
+  # The content this row became, or the existing content with the same URL.
+  contentId: ID
+  # Null until someone imports it.
+  importStatus: ImportItemStatus
+  importError: String
+  importedAt: String
+}
+
+type ImportChapter {
+  startSeconds: Int!
+  title: String!
+}
+
+type ImportPerson {
+  name: String!
+  role: String!
+}
+
+type ImportItemDetails {
+  item: ImportItem!
+  description: String!
+  tags: [String!]!
+  chapters: [ImportChapter!]!
+  # Outbound link domains, e.g. "gty.org".
+  links: [String!]!
+  people: [ImportPerson!]!
+  genres: [String!]!
+  language: String
+}
+
+input CreateImportSourceInput {
+  sourceType: ImportSourceType!
+  ref: String!
+  role: ImportPersonRole
+}
+
+input CreateImportJobInput {
+  name: String!
+  sources: [CreateImportSourceInput!]!
+}
+
+# Live progress of an import's running batch(es), pushed at most twice a
+# second while rows import. done = imported + skipped + failed.
+type ImportProgress {
+  jobId: ID!
+  total: Int!
+  done: Int!
+  imported: Int!
+  # Already in the library, so nothing new was created.
+  skipped: Int!
+  failed: Int!
+  running: Boolean!
+  updatedAt: String!
+}
+
+extend type Subscription {
+  # The current count at once, then every change while the import runs.
+  importProgress(jobId: ID!): ImportProgress! @auth
+}
+
+input ReviewImportJobInput {
+  jobId: IntID!
+  approve: Boolean!
+  # Required to decline: it is what the requester reads.
+  note: String
+}
+
+input SetImportItemsExcludedInput {
+  jobId: IntID!
+  itemIds: [IntID!]!
+  # true marks the rows "don't import"; false clears the mark.
+  excluded: Boolean!
+}
+
+input CloseImportJobInput {
+  jobId: IntID!
+  # false reopens it.
+  closed: Boolean!
+}
+
+input ImportItemsInput {
+  jobId: IntID!
+  itemIds: [IntID!]!
+}
+
+type ImportItemsResult {
+  queued: Int!
+  alreadyInLibrary: Int!
+  alreadyQueued: Int!
+  notFound: Int!
+  # Marked "don't import", so not queued.
+  excluded: Int!
+}
+
 type Mutation {
   createContentFromYouTube(input: CreateContentFromYouTubeInput!): CreateContentResult! @auth
   updateContentSourceData(contentId: IntID!): Content! @auth
@@ -575,6 +796,19 @@ type Mutation {
   deleteUserTodoList(id: ID!): Boolean! @auth
   # Rewrites the list's positions to 1..N in the order of todoIds.
   reorderUserTodoList(listId: IntID!, todoIds: [IntID!]!): [UserTodo!]! @auth
+
+  # Import staging. Creating an import is admin-only (it spends API quota);
+  # sources are listed in the background, so the returned sources are LISTING.
+  # Anyone signed in: an admin's import starts listing, anyone else's waits as a request.
+  createImportJob(input: CreateImportJobInput!): ImportJob! @auth
+  # Admin only: approve (start listing) or decline a requested import.
+  reviewImportJob(input: ReviewImportJobInput!): ImportJob! @auth
+  # Anyone signed in, until the import is closed. Returns how many rows changed.
+  setImportItemsExcluded(input: SetImportItemsExcludedInput!): Int! @auth
+  # Admin only: close (hide from non-admins, read-only) or reopen an import.
+  closeImportJob(input: CloseImportJobInput!): ImportJob! @auth
+  # Queues the picked rows and imports them in the background as the caller.
+  importItems(input: ImportItemsInput!): ImportItemsResult! @auth
 }
 
 type Query {
@@ -676,6 +910,14 @@ type Query {
 
   # Presets plus the caller's own actions, in picker order.
   todoActions: [TodoAction!]! @auth
+
+  # Import staging (preliminary pages; not linked from the main nav).
+  # Closed imports are included only for an admin passing includeClosed.
+  importJobs(includeClosed: Boolean = false): [ImportJob!]! @auth
+  # Null for an import that doesn't exist.
+  importJob(id: ID!): ImportJob @auth
+  # Null for a row that doesn't exist.
+  importItemDetails(id: ID!): ImportItemDetails @auth
 }
 
 # See Query.feelingStats. averageIntensity/stdDevIntensity are null when
