@@ -389,15 +389,10 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		// their own), the same scope as the perspectives list, so a row that
 		// passes here has that many perspectives to compare.
 		if params.Filter.MinPerspectiveCount != nil && *params.Filter.MinPerspectiveCount > 0 {
-			visible := "privacy = ?"
-			args := []any{privacyToDBValue(domain.PrivacyPublic)}
-			if params.ViewerID != nil {
-				visible = "(privacy = ? OR user_id = ?)"
-				args = append(args, *params.ViewerID)
-			}
+			visible, args := visiblePerspectivePredicate(params.ViewerID)
 			args = append(args, *params.Filter.MinPerspectiveCount)
 			query = query.Where(
-				"(SELECT COUNT(*) FROM perspectives WHERE perspectives.content_id = content.id AND "+visible+") >= ?",
+				"(SELECT COUNT(*) FROM perspectives WHERE perspectives.content_id = content.id AND ("+visible+")) >= ?",
 				args...)
 		}
 		// Created/Updated date filters (direct columns)

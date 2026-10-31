@@ -160,12 +160,8 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 	// WHERE shape chosen over UNION: benchmark 2026-09-10 (plan Task 6) — WHERE
 	// ~8.9ms vs UNION ~9.3ms unindexed, 0.02ms vs 0.29ms with a (user_id,created_at) index.
 	if params.RestrictToPublicOrOwner {
-		if params.ViewerID != nil {
-			query = query.Where("privacy = ? OR user_id = ?",
-				privacyToDBValue(domain.PrivacyPublic), *params.ViewerID)
-		} else {
-			query = query.Where("privacy = ?", privacyToDBValue(domain.PrivacyPublic))
-		}
+		visible, args := visiblePerspectivePredicate(params.ViewerID)
+		query = query.Where(visible, args...)
 	}
 
 	// Total count (before cursor/limit — respects filters only)
@@ -277,15 +273,12 @@ func (r *GormPerspectiveRepository) CountVisibleByContentIDs(ctx context.Context
 		return map[int]int{}, nil
 	}
 
+	visible, args := visiblePerspectivePredicate(viewerID)
 	query := r.db.WithContext(ctx).
 		Table("perspectives").
 		Select("content_id, COUNT(*) AS count").
-		Where("content_id = ANY(CAST(? AS bigint[]))", intsToArray(contentIDs))
-	if viewerID != nil {
-		query = query.Where("privacy = ? OR user_id = ?", privacyToDBValue(domain.PrivacyPublic), *viewerID)
-	} else {
-		query = query.Where("privacy = ?", privacyToDBValue(domain.PrivacyPublic))
-	}
+		Where("content_id = ANY(CAST(? AS bigint[]))", intsToArray(contentIDs)).
+		Where(visible, args...)
 
 	var rows []visibleCountRow
 	if err := query.Group("content_id").Find(&rows).Error; err != nil {

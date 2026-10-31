@@ -489,7 +489,7 @@ func TestGormContentRepository_List(t *testing.T) {
 		wantSQLRe string
 	}{
 		{"anonymous counts public only", nil, 2,
-			`WHERE \(SELECT COUNT\(\*\) FROM perspectives WHERE perspectives.content_id = content.id AND privacy = \$1\) >= \$2`},
+			`WHERE \(SELECT COUNT\(\*\) FROM perspectives WHERE perspectives.content_id = content.id AND \(privacy = \$1\)\) >= \$2`},
 		{"signed in counts public or own", cInt(7), 2,
 			`WHERE \(SELECT COUNT\(\*\) FROM perspectives WHERE perspectives.content_id = content.id AND \(privacy = \$1 OR user_id = \$2\)\) >= \$3`},
 		{"zero is no filter", nil, 0, `SELECT \* FROM "content"`},
