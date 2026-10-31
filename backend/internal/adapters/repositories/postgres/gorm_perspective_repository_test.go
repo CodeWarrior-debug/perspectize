@@ -519,6 +519,53 @@ func TestGormPerspectiveRepository_AggregateByContentIDs(t *testing.T) {
 	})
 }
 
+func TestGormPerspectiveRepository_CountVisibleByContentIDs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("signed in counts public or own, one bigint[] parameter", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`SELECT content_id, COUNT\(\*\) AS count FROM "perspectives" WHERE content_id = ANY\(CAST\(\$1 AS bigint\[\]\)\) AND \(privacy = \$2 OR user_id = \$3\) GROUP BY "content_id"`).
+			WithArgs("{11,12}", "public", 7).
+			WillReturnRows(sqlmock.NewRows([]string{"content_id", "count"}).AddRow(11, 3))
+
+		got, err := NewGormPerspectiveRepository(db).CountVisibleByContentIDs(ctx, []int{11, 12}, cInt(7))
+		require.NoError(t, err)
+		assert.Equal(t, map[int]int{11: 3}, got, "content with none visible is absent")
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("anonymous counts public only", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`AND privacy = \$2 GROUP BY "content_id"`).
+			WithArgs("{11}", "public").
+			WillReturnRows(sqlmock.NewRows([]string{"content_id", "count"}).AddRow(11, 1))
+
+		got, err := NewGormPerspectiveRepository(db).CountVisibleByContentIDs(ctx, []int{11}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, map[int]int{11: 1}, got)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("empty contentIDs short-circuits without a query", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		got, err := NewGormPerspectiveRepository(db).CountVisibleByContentIDs(ctx, []int{}, nil)
+		require.NoError(t, err)
+		assert.Empty(t, got)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("wraps a database error", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`FROM "perspectives"`).WillReturnError(errors.New("boom"))
+
+		got, err := NewGormPerspectiveRepository(db).CountVisibleByContentIDs(ctx, []int{1}, nil)
+		assert.Nil(t, got)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to count visible perspectives by content")
+		assertAllExpectationsMet(t, mock)
+	})
+}
+
 func TestGormPerspectiveRepository_FeelingStats(t *testing.T) {
 	ctx := context.Background()
 

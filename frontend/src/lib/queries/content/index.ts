@@ -145,19 +145,22 @@ export const LIST_CONTENT = gql`
 	}
 `;
 
-// Compare page's "choose something to compare" picker: needs perspectiveCount
-// per row to filter down to content that actually has 2+ perspectives to
-// compare, which is why this is a separate query from LIST_CONTENT (see the
-// cost comment on GET_CONTENT_AGGREGATES below) — capped at a modest `first`
-// so the added per-row dataloader cost stays bounded to this one picker
-// fetch, not every Activity grid page load.
+// Compare page's "choose something to compare" picker: filters server-side to
+// content with 2+ perspectives the viewer can read (minPerspectiveCount) and
+// shows each row's visiblePerspectiveCount. A separate query from LIST_CONTENT
+// (see the cost comment on GET_CONTENT_AGGREGATES below) — capped at a modest
+// `first` so the added per-row dataloader cost stays bounded to this one
+// picker fetch, not every Activity grid page load.
 export interface ComparePickerContentItem {
 	id: string;
 	name: string;
 	contentType: string;
 	channelTitle: string | null;
 	url: string | null;
-	perspectiveCount: number | null;
+	// Perspectives the viewer can read (public + their own). perspectiveCount
+	// also counts other people's private ones, so it can read higher than the
+	// Compare page can show.
+	visiblePerspectiveCount: number | null;
 }
 
 export interface ListComparableContentResponse {
@@ -175,7 +178,7 @@ export const LIST_COMPARABLE_CONTENT = gql`
 				contentType
 				channelTitle
 				url
-				perspectiveCount
+				visiblePerspectiveCount
 			}
 		}
 	}

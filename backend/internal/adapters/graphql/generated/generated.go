@@ -66,33 +66,34 @@ type ComplexityRoot struct {
 	}
 
 	Content struct {
-		AddedBy            func(childComplexity int) int
-		AddedByUserID      func(childComplexity int) int
-		AverageRating      func(childComplexity int) int
-		ChannelTitle       func(childComplexity int) int
-		CommentCount       func(childComplexity int) int
-		ContentType        func(childComplexity int) int
-		CreatedAt          func(childComplexity int) int
-		Description        func(childComplexity int) int
-		DisplayTitle       func(childComplexity int) int
-		ID                 func(childComplexity int) int
-		Length             func(childComplexity int) int
-		LengthDisplay      func(childComplexity int) int
-		LengthUnits        func(childComplexity int) int
-		LikeCount          func(childComplexity int) int
-		Movie              func(childComplexity int) int
-		Name               func(childComplexity int) int
-		PerspectiveCount   func(childComplexity int) int
-		PrimaryCategory    func(childComplexity int) int
-		PublishedAt        func(childComplexity int) int
-		QualityRatingCount func(childComplexity int) int
-		Response           func(childComplexity int) int
-		Tags               func(childComplexity int) int
-		URL                func(childComplexity int) int
-		UpdatedAt          func(childComplexity int) int
-		VerseEndID         func(childComplexity int) int
-		VerseStartID       func(childComplexity int) int
-		ViewCount          func(childComplexity int) int
+		AddedBy                 func(childComplexity int) int
+		AddedByUserID           func(childComplexity int) int
+		AverageRating           func(childComplexity int) int
+		ChannelTitle            func(childComplexity int) int
+		CommentCount            func(childComplexity int) int
+		ContentType             func(childComplexity int) int
+		CreatedAt               func(childComplexity int) int
+		Description             func(childComplexity int) int
+		DisplayTitle            func(childComplexity int) int
+		ID                      func(childComplexity int) int
+		Length                  func(childComplexity int) int
+		LengthDisplay           func(childComplexity int) int
+		LengthUnits             func(childComplexity int) int
+		LikeCount               func(childComplexity int) int
+		Movie                   func(childComplexity int) int
+		Name                    func(childComplexity int) int
+		PerspectiveCount        func(childComplexity int) int
+		PrimaryCategory         func(childComplexity int) int
+		PublishedAt             func(childComplexity int) int
+		QualityRatingCount      func(childComplexity int) int
+		Response                func(childComplexity int) int
+		Tags                    func(childComplexity int) int
+		URL                     func(childComplexity int) int
+		UpdatedAt               func(childComplexity int) int
+		VerseEndID              func(childComplexity int) int
+		VerseStartID            func(childComplexity int) int
+		ViewCount               func(childComplexity int) int
+		VisiblePerspectiveCount func(childComplexity int) int
 	}
 
 	CreateContentResult struct {
@@ -481,6 +482,7 @@ type ContentResolver interface {
 	PrimaryCategory(ctx context.Context, obj *model.Content) (*model.Category, error)
 
 	PerspectiveCount(ctx context.Context, obj *model.Content) (*int, error)
+	VisiblePerspectiveCount(ctx context.Context, obj *model.Content) (*int, error)
 	AverageRating(ctx context.Context, obj *model.Content) (*float64, error)
 	QualityRatingCount(ctx context.Context, obj *model.Content) (*int, error)
 }
@@ -827,6 +829,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.ViewCount(childComplexity), true
+	case "Content.visiblePerspectiveCount":
+		if e.ComplexityRoot.Content.VisiblePerspectiveCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.VisiblePerspectiveCount(childComplexity), true
 
 	case "CreateContentResult.alreadyExisted":
 		if e.ComplexityRoot.CreateContentResult.AlreadyExisted == nil {
@@ -2974,6 +2982,11 @@ type Content {
   # when it actually selects them, e.g. the details modal, not the main
   # content list.
   perspectiveCount: Int
+  # Like perspectiveCount, but only perspectives the caller may read: public
+  # ones plus their own private ones. This is the number the Compare page can
+  # actually show; perspectiveCount can be higher because it includes other
+  # people's private perspectives. Always an Int (0 when none visible).
+  visiblePerspectiveCount: Int
   averageRating: Float
   # How many of this content's perspectives set a Quality rating — i.e.
   # how many values averageRating was actually computed over. Can be
@@ -3168,6 +3181,9 @@ input ContentFilter {
   descriptionSearch: String  # ILIKE search on description
   # ILIKE search on the username of the user who added the content
   addedByUsername: String
+  # Only content with at least this many perspectives visible to the caller
+  # (public ones, plus their own private ones). Applied before pagination.
+  minPerspectiveCount: Int
   # Record date filters
   createdAfter: String
   createdBefore: String
@@ -3790,6 +3806,8 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_displayTitle(ctx, field)
 	case "perspectiveCount":
 		return ec.fieldContext_Content_perspectiveCount(ctx, field)
+	case "visiblePerspectiveCount":
+		return ec.fieldContext_Content_visiblePerspectiveCount(ctx, field)
 	case "averageRating":
 		return ec.fieldContext_Content_averageRating(ctx, field)
 	case "qualityRatingCount":
@@ -6413,6 +6431,29 @@ func (ec *executionContext) _Content_perspectiveCount(ctx context.Context, field
 	)
 }
 func (ec *executionContext) fieldContext_Content_perspectiveCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, true, true, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _Content_visiblePerspectiveCount(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_visiblePerspectiveCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Content().VisiblePerspectiveCount(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_visiblePerspectiveCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Content", field, true, true, errors.New("field of type Int does not have child fields"))
 }
 
@@ -15378,7 +15419,7 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
+	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -15574,6 +15615,13 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.AddedByUsername = data
+		case "minPerspectiveCount":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minPerspectiveCount"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MinPerspectiveCount = data
 		case "createdAfter":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("createdAfter"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -17286,6 +17334,44 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 					}
 				}()
 				res = ec._Content_perspectiveCount(ctx, field, obj)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "visiblePerspectiveCount":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Content_visiblePerspectiveCount(ctx, field, obj)
 				if res == graphql.RequiredNull {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}

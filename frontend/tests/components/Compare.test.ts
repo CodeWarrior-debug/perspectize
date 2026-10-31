@@ -77,6 +77,21 @@ describe('Compare', () => {
 		expect(queries.some((q: string) => q.includes('ListUsers'))).toBe(false);
 	});
 
+	it('shows the loading state, not an empty state, while perspectives are still in flight', async () => {
+		mockRequest.mockImplementation((query: string) => {
+			if (query.includes('ListPerspectivesByContent')) return new Promise(() => {});
+			if (query.includes('GetContent')) return Promise.resolve(contentResponse);
+			if (query.includes('query Me')) return Promise.resolve(meResponse);
+			return Promise.resolve({});
+		});
+
+		renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+		expect(await screen.findByText(/loading comparison/i)).toBeInTheDocument();
+		expect(screen.queryByText(/no one has shared a perspective/i)).not.toBeInTheDocument();
+		expect(screen.queryByText(/no other perspectives/i)).not.toBeInTheDocument();
+	});
+
 	it('shows an empty state when only one perspective exists on the content', async () => {
 		mockRequest.mockImplementation((query: string) => {
 			if (query.includes('ListUsers')) return Promise.resolve({ users: [{ id: '1', username: 'me' }] });
