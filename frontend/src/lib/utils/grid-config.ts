@@ -435,14 +435,30 @@ export const COLUMNS: readonly ColumnMeta[] = [
 
 export type ResponsiveTier = 'xs' | 'sm' | 'md' | 'lg';
 
-/** True when the `f.type` URL value names exactly one type and it is MOVIE. */
-export function isMovieOnlyTypeFilter(typeFilter: string | undefined): boolean {
-	if (!typeFilter) return false;
+/** Distinct, lowercased types named by the `f.type` URL value (empty when unset). */
+function selectedTypes(typeFilter: string | undefined): string[] {
+	if (!typeFilter) return [];
 	const types = typeFilter
 		.split(',')
 		.map((t) => t.trim().toLowerCase())
 		.filter(Boolean);
+	return [...new Set(types)];
+}
+
+/** True when the `f.type` URL value names exactly one type and it is MOVIE. */
+export function isMovieOnlyTypeFilter(typeFilter: string | undefined): boolean {
+	const types = selectedTypes(typeFilter);
 	return types.length === 1 && types[0] === 'movie';
+}
+
+/**
+ * True when the type filter is empty or names two or more types: the single
+ * column set can't suit every row (Budget is blank for videos, Views for
+ * movies), so the Activity page nudges the user to narrow to one type or
+ * choose their own columns.
+ */
+export function showColumnRelevanceCallout(typeFilter: string | undefined): boolean {
+	return selectedTypes(typeFilter).length !== 1;
 }
 
 /** Per-tier column lists. Columns in `hidden` are forced off; createdAt/updatedAt and the admin columns are in neither list (colDef `hide: true`, picker only). */

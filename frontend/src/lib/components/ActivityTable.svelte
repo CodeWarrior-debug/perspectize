@@ -100,6 +100,7 @@
 		PERSON_FILTER_KEY,
 		parsePersonFilter,
 		rowMatchesPerson,
+		showColumnRelevanceCallout,
 	} from '$lib/utils/grid-config';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
 	import { emptyCellClassRules } from '$lib/utils/grid-empty';
@@ -129,6 +130,7 @@
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
+	import ColumnRelevanceCallout from '$lib/components/ColumnRelevanceCallout.svelte';
 	import { ContentTypeFilter, AgeRatingFilter } from '$lib/utils/contentTypeFilter';
 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
@@ -1380,6 +1382,16 @@
 			updateUrl({ filters: {}, page: 1 });
 		}}
 	/>
+
+	<!-- Mixed/unfiltered types share one column set, so many cells are blank. The card list
+	     has no filter popup or Columns button to point at, so it skips the callout. -->
+	{#if !cardMode && showColumnRelevanceCallout(filters.type)}
+		<ColumnRelevanceCallout
+			disabled={!gridReady}
+			onPickType={() => gridApi?.showColumnFilter('type')}
+			onChooseColumns={() => (columnPickerOpen = true)}
+		/>
+	{/if}
 
 	<!-- Error State -->
 	{#if contentQuery.isError}
