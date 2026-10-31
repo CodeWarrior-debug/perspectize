@@ -7,8 +7,10 @@
 	 *
 	 * Only surfaces content with 2+ perspectives visible to the viewer
 	 * (comparison needs two takes), filtered server-side via
-	 * minPerspectiveCount. See LIST_COMPARABLE_CONTENT's comment for why
-	 * perspectiveCount isn't just added to the main Activity list query.
+	 * minPerspectiveCount, and each row shows the same viewer-scoped count
+	 * (visiblePerspectiveCount), so the label matches what Compare can show.
+	 * See LIST_COMPARABLE_CONTENT's comment for why it isn't just added to the
+	 * main Activity list query.
 	 */
 	import { createQuery } from '@tanstack/svelte-query';
 	import { goto } from '$app/navigation';
@@ -89,7 +91,7 @@
 							<span class="truncate text-[12px] text-muted-foreground">{item.channelTitle}</span>
 						{/if}
 					</div>
-					<span class="flex-none text-[12px] text-muted-foreground">{item.perspectiveCount} perspectives</span>
+					<span class="flex-none text-[12px] text-muted-foreground">{item.visiblePerspectiveCount} perspectives</span>
 				</button>
 			{/each}
 		{/if}

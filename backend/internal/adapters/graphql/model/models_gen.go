@@ -57,17 +57,18 @@ type Content struct {
 	Description   *string               `json:"description,omitempty"`
 	Response      map[string]any        `json:"response,omitempty"`
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
-	Movie              map[string]any `json:"movie,omitempty"`
-	PrimaryCategory    *Category      `json:"primaryCategory,omitempty"`
-	VerseStartID       *int           `json:"verseStartID,omitempty"`
-	VerseEndID         *int           `json:"verseEndID,omitempty"`
-	DisplayTitle       *string        `json:"displayTitle,omitempty"`
-	PerspectiveCount   *int           `json:"perspectiveCount,omitempty"`
-	AverageRating      *float64       `json:"averageRating,omitempty"`
-	QualityRatingCount *int           `json:"qualityRatingCount,omitempty"`
-	CreatedAt          string         `json:"createdAt"`
-	UpdatedAt          string         `json:"updatedAt"`
-	PrimaryCategoryID  *int           `json:"-"`
+	Movie                   map[string]any `json:"movie,omitempty"`
+	PrimaryCategory         *Category      `json:"primaryCategory,omitempty"`
+	VerseStartID            *int           `json:"verseStartID,omitempty"`
+	VerseEndID              *int           `json:"verseEndID,omitempty"`
+	DisplayTitle            *string        `json:"displayTitle,omitempty"`
+	PerspectiveCount        *int           `json:"perspectiveCount,omitempty"`
+	VisiblePerspectiveCount *int           `json:"visiblePerspectiveCount,omitempty"`
+	AverageRating           *float64       `json:"averageRating,omitempty"`
+	QualityRatingCount      *int           `json:"qualityRatingCount,omitempty"`
+	CreatedAt               string         `json:"createdAt"`
+	UpdatedAt               string         `json:"updatedAt"`
+	PrimaryCategoryID       *int           `json:"-"`
 }
 
 type ContentFilter struct {

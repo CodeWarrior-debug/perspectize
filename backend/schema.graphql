@@ -214,6 +214,11 @@ type Content {
   # when it actually selects them, e.g. the details modal, not the main
   # content list.
   perspectiveCount: Int
+  # Like perspectiveCount, but only perspectives the caller may read: public
+  # ones plus their own private ones. This is the number the Compare page can
+  # actually show; perspectiveCount can be higher because it includes other
+  # people's private perspectives. Always an Int (0 when none visible).
+  visiblePerspectiveCount: Int
   averageRating: Float
   # How many of this content's perspectives set a Quality rating — i.e.
   # how many values averageRating was actually computed over. Can be
