@@ -174,7 +174,10 @@
 		return `${leftLabel} and ${rightLabel} rated different dimensions — nothing to compare directly.`;
 	});
 
-	const loading = $derived(perspectivesQuery.isLoading);
+	// isPending, not isLoading: isLoading is false until the first fetch is in
+	// flight (and while paused offline), which let the empty state flash before
+	// the perspectives arrived.
+	const loading = $derived(perspectivesQuery.isPending);
 	const hasComparison = $derived(perspectives.length >= 2 && !!leftPerspective && !!rightPerspective);
 	const hasNoPerspectives = $derived(!loading && perspectives.length === 0);
 

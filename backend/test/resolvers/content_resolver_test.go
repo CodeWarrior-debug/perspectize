@@ -217,12 +217,13 @@ func (m *mockUserRepository) SetOnboardingDisplayNextSession(ctx context.Context
 
 // mockPerspectiveRepository implements repositories.PerspectiveRepository for testing
 type mockPerspectiveRepository struct {
-	createFn    func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
-	getByIDFn   func(ctx context.Context, id int) (*domain.Perspective, error)
-	updateFn    func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
-	deleteFn    func(ctx context.Context, id int, ownerUserID int) error
-	listFn      func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
-	aggregateFn func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
+	createFn       func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
+	getByIDFn      func(ctx context.Context, id int) (*domain.Perspective, error)
+	updateFn       func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
+	deleteFn       func(ctx context.Context, id int, ownerUserID int) error
+	listFn         func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
+	aggregateFn    func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
+	visibleCountFn func(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error)
 }
 
 func (m *mockPerspectiveRepository) Create(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
@@ -270,6 +271,13 @@ func (m *mockPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 		return m.aggregateFn(ctx, contentIDs)
 	}
 	return map[int]*domain.PerspectiveAggregate{}, nil
+}
+
+func (m *mockPerspectiveRepository) CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
+	if m.visibleCountFn != nil {
+		return m.visibleCountFn(ctx, contentIDs, viewerID)
+	}
+	return map[int]int{}, nil
 }
 
 func (m *mockPerspectiveRepository) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
@@ -471,6 +479,46 @@ func TestContentByID_AggregatesOnly_KnownIDWithoutPerspectivesResolvesNull(t *te
 	assert.Equal(t, "1", data.ContentByID.ID)
 	assert.Nil(t, data.ContentByID.PerspectiveCount)
 	assert.Nil(t, data.ContentByID.AverageRating)
+}
+
+// visiblePerspectiveCount is viewer-scoped (public + the caller's own), unlike
+// perspectiveCount which counts every row.
+func TestContentByID_VisiblePerspectiveCount_UsesTheViewerAndDefaultsToZero(t *testing.T) {
+	var gotViewer *int
+	perspectiveRepo := &mockPerspectiveRepository{
+		aggregateFn: func(ctx context.Context, ids []int) (map[int]*domain.PerspectiveAggregate, error) {
+			// 5 perspectives exist in total, 3 of them private to others.
+			return map[int]*domain.PerspectiveAggregate{1: {ContentID: 1, Count: 5}}, nil
+		},
+		visibleCountFn: func(ctx context.Context, ids []int, viewerID *int) (map[int]int, error) {
+			gotViewer = viewerID
+			return map[int]int{1: 2}, nil
+		},
+	}
+	contentRepo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{ID: 1, Name: "Test Video"}, nil
+		},
+	}
+	server := setupTestServerWithRepos(contentRepo, &mockYouTubeClient{}, perspectiveRepo, &mockUserRepository{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ contentByID(id: "1") { id perspectiveCount visiblePerspectiveCount } }`)
+
+	assert.Empty(t, result.Errors)
+	var data struct {
+		ContentByID struct {
+			PerspectiveCount        *int `json:"perspectiveCount"`
+			VisiblePerspectiveCount *int `json:"visiblePerspectiveCount"`
+		} `json:"contentByID"`
+	}
+	require.NoError(t, json.Unmarshal(result.Data, &data))
+	require.NotNil(t, data.ContentByID.PerspectiveCount)
+	assert.Equal(t, 5, *data.ContentByID.PerspectiveCount)
+	require.NotNil(t, data.ContentByID.VisiblePerspectiveCount)
+	assert.Equal(t, 2, *data.ContentByID.VisiblePerspectiveCount)
+	require.NotNil(t, gotViewer, "the signed-in viewer must reach the repository")
+	assert.Equal(t, 1, *gotViewer)
 }
 
 func TestContentQuery_NotFound_ReturnsError(t *testing.T) {
@@ -1135,6 +1183,28 @@ func TestPaginatedContentQuery_WithAddedByUsernameFilter(t *testing.T) {
 	defer server.Close()
 
 	result := executeGraphQL(t, server, `{ content(filter: { addedByUsername: "ann" }) { items { id } } }`)
+
+	assert.Empty(t, result.Errors)
+}
+
+func TestPaginatedContentQuery_WithMinPerspectiveCountFilter(t *testing.T) {
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			require.NotNil(t, params.Filter)
+			require.NotNil(t, params.Filter.MinPerspectiveCount)
+			assert.Equal(t, 2, *params.Filter.MinPerspectiveCount)
+			// The test server signs every request in as user 1; the resolver must
+			// hand that viewer to the repository so private rows count for them.
+			require.NotNil(t, params.ViewerID)
+			assert.Equal(t, 1, *params.ViewerID)
+			return &domain.PaginatedContent{Items: []*domain.Content{}}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: { minPerspectiveCount: 2 }) { items { id } } }`)
 
 	assert.Empty(t, result.Errors)
 }
