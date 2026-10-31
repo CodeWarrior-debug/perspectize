@@ -263,6 +263,42 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 	return out, nil
 }
 
+type visibleCountRow struct {
+	ContentID int
+	Count     int
+}
+
+// CountVisibleByContentIDs counts, per content ID, the perspectives the viewer
+// may read: public rows, plus their own when viewerID is set. This is the same
+// predicate List applies (RestrictToPublicOrOwner), so the count matches what
+// the perspectives list returns. Content with none visible has no row.
+func (r *GormPerspectiveRepository) CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
+	if len(contentIDs) == 0 {
+		return map[int]int{}, nil
+	}
+
+	query := r.db.WithContext(ctx).
+		Table("perspectives").
+		Select("content_id, COUNT(*) AS count").
+		Where("content_id = ANY(CAST(? AS bigint[]))", intsToArray(contentIDs))
+	if viewerID != nil {
+		query = query.Where("privacy = ? OR user_id = ?", privacyToDBValue(domain.PrivacyPublic), *viewerID)
+	} else {
+		query = query.Where("privacy = ?", privacyToDBValue(domain.PrivacyPublic))
+	}
+
+	var rows []visibleCountRow
+	if err := query.Group("content_id").Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("failed to count visible perspectives by content: %w", err)
+	}
+
+	out := make(map[int]int, len(rows))
+	for _, row := range rows {
+		out[row.ContentID] = row.Count
+	}
+	return out, nil
+}
+
 // feelingStatsRow is the scan target for FeelingStats' grouped query below.
 type feelingStatsRow struct {
 	Count           int

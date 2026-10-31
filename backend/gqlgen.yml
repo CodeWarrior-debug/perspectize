@@ -139,6 +139,8 @@ models:
         resolver: true
       perspectiveCount:
         resolver: true
+      visiblePerspectiveCount:
+        resolver: true
       averageRating:
         resolver: true
       qualityRatingCount:

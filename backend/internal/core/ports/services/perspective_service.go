@@ -93,6 +93,11 @@ type PerspectiveService interface {
 	// Quality rating for each given content ID, batched into a single query.
 	AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
 
+	// CountVisibleByContentIDs counts, per content ID, the perspectives viewerID
+	// may read (public plus their own), batched into a single query. Absent
+	// IDs have none visible.
+	CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error)
+
 	// FeelingStats computes count/average/stddev for perspectives carrying the
 	// given feeling (see domain.FeelingStats), scoped to one content ID or,
 	// when contentID is nil, every perspective.

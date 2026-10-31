@@ -32,7 +32,7 @@ const items = [
 		contentType: 'YOUTUBE_VIDEO',
 		channelTitle: 'Chan',
 		url: null,
-		perspectiveCount: 2,
+		visiblePerspectiveCount: 2,
 	},
 ];
 
@@ -49,6 +49,8 @@ describe('ComparePicker', () => {
 			expect(screen.getByText('Two Perspective Video')).toBeInTheDocument();
 		});
 		expect(screen.getAllByTestId('picker-result')).toHaveLength(1);
+		expect(screen.getByText('2 perspectives')).toBeInTheDocument();
+		expect(String(mockRequest.mock.calls[0][0])).toContain('visiblePerspectiveCount');
 		// The filter must ride the request so it applies before the page limit,
 		// not after the 40 newest rows are already picked.
 		expect(mockRequest.mock.calls[0][1]).toMatchObject({ filter: { minPerspectiveCount: 2 } });

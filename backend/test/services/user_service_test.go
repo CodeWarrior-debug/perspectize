@@ -219,6 +219,9 @@ func (m *mockPerspectiveRepoForUser) ReassignByUser(ctx context.Context, fromUse
 func (m *mockPerspectiveRepoForUser) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 	return map[int]*domain.PerspectiveAggregate{}, nil
 }
+func (m *mockPerspectiveRepoForUser) CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
+	return map[int]int{}, nil
+}
 func (m *mockPerspectiveRepoForUser) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
 	return &domain.FeelingStats{Emoji: emoji, Label: label}, nil
 }

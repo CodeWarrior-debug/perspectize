@@ -122,6 +122,10 @@ func (m *mockPerspectiveService) AggregateByContentIDs(ctx context.Context, cont
 	return map[int]*domain.PerspectiveAggregate{}, nil
 }
 
+func (m *mockPerspectiveService) CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
+	return map[int]int{}, nil
+}
+
 func (m *mockPerspectiveService) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
 	return &domain.FeelingStats{Emoji: emoji, Label: label}, nil
 }

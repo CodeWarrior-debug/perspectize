@@ -85,6 +85,42 @@ func (r *contentResolver) PerspectiveCount(ctx context.Context, obj *model.Conte
 	return &count, nil
 }
 
+// VisiblePerspectiveCount is the resolver for the visiblePerspectiveCount field.
+//
+// How many of the content's perspectives the caller may read (public, plus
+// their own) — the number the Compare page can show. Batched per request via
+// the VisiblePerspectiveCount dataloader, keyed by viewer; falls back to a
+// single-row service call when the middleware isn't installed.
+func (r *contentResolver) VisiblePerspectiveCount(ctx context.Context, obj *model.Content) (*int, error) {
+	contentID, err := strconv.Atoi(obj.ID)
+	if err != nil {
+		slog.Error("resolving visible perspective count: invalid content ID", "id", obj.ID, "error", err)
+		return nil, nil
+	}
+
+	viewer := callerID(ctx)
+	var count int
+	if loaders := dataloader.For(ctx); loaders != nil {
+		count, err = loaders.VisiblePerspectiveCount.Load(ctx, dataloader.VisiblePerspectiveKey{ViewerID: viewer, ContentID: contentID})
+		if err != nil && !dataloader.IsNotFound(err) {
+			slog.Error("resolving visible perspective count failed", "contentID", contentID, "error", err)
+			return nil, nil
+		}
+	} else {
+		var viewerID *int
+		if viewer != 0 {
+			viewerID = &viewer
+		}
+		counts, serr := r.PerspectiveService.CountVisibleByContentIDs(ctx, []int{contentID}, viewerID)
+		if serr != nil {
+			slog.Error("resolving visible perspective count failed", "contentID", contentID, "error", serr)
+			return nil, nil
+		}
+		count = counts[contentID]
+	}
+	return &count, nil
+}
+
 // AverageRating is the resolver for the averageRating field.
 //
 // "Rating" here is the perspective's Quality dimension — the first/primary
