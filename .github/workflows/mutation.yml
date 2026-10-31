@@ -86,11 +86,22 @@ jobs:
           {
             echo '### Gremlins — mutants on changed lines'
             echo
-            echo '```'
-            grep -E 'LIVED|TIMED OUT' "$RUNNER_TEMP/gremlins.log" || echo 'No LIVED or TIMED OUT mutants.'
-            echo
-            tail -7 "$RUNNER_TEMP/gremlins.log"
-            echo '```'
+            # `make mutate-preflight` runs the UNMUTATED suite first and stops if it is red. That is
+            # a broken test on this PR, not a mutation result: say so instead of printing a clean-looking summary.
+            if grep -q 'mutate-preflight\] Error' "$RUNNER_TEMP/gremlins.log"; then
+              echo '> **No mutants were run.** The unmutated test suite failed first (`make mutate-preflight`).'
+              echo '> Fix the failing test(s) below, then re-run; this is not a mutation-testing problem.'
+              echo
+              echo '```'
+              grep -E '^(--- FAIL|FAIL\s|\s+\S+_test\.go:[0-9]+:)' "$RUNNER_TEMP/gremlins.log" || tail -20 "$RUNNER_TEMP/gremlins.log"
+              echo '```'
+            else
+              echo '```'
+              grep -E 'LIVED|TIMED OUT' "$RUNNER_TEMP/gremlins.log" || echo 'No LIVED or TIMED OUT mutants.'
+              echo
+              tail -7 "$RUNNER_TEMP/gremlins.log"
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       # A run that mutates nothing looks exactly like a clean run ("Skipped: N", green). That is how
@@ -106,6 +117,8 @@ jobs:
             | grep -v -E '_test\.go$|/test/|generated|^backend/cmd/|^backend/internal/perf/' || true)
           [ -z "$src" ] && exit 0
           [ -f "$RUNNER_TEMP/gremlins.log" ] || exit 0
+          # A red unmutated suite is reported by the Summarize step; don't also claim "mutated nothing".
+          grep -q 'mutate-preflight\] Error' "$RUNNER_TEMP/gremlins.log" && exit 0
           executed=$(grep -E '^(Killed|Timed out):' "$RUNNER_TEMP/gremlins.log" \
             | grep -oE '(Killed|Lived|Not covered|Timed out): [0-9]+' | awk -F': ' '{s+=$2} END{print s+0}')
           if [ "$executed" -eq 0 ]; then
