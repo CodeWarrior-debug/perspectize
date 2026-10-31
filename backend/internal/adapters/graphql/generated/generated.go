@@ -3168,6 +3168,9 @@ input ContentFilter {
   descriptionSearch: String  # ILIKE search on description
   # ILIKE search on the username of the user who added the content
   addedByUsername: String
+  # Only content with at least this many perspectives visible to the caller
+  # (public ones, plus their own private ones). Applied before pagination.
+  minPerspectiveCount: Int
   # Record date filters
   createdAfter: String
   createdBefore: String
@@ -15378,7 +15381,7 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
+	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -15574,6 +15577,13 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.AddedByUsername = data
+		case "minPerspectiveCount":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minPerspectiveCount"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MinPerspectiveCount = data
 		case "createdAfter":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("createdAfter"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)

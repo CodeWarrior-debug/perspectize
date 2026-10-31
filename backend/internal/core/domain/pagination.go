@@ -68,6 +68,9 @@ type ContentFilter struct {
 	DescriptionSearch *string
 	// AddedByUsername matches the adder's username (ILIKE, via the users table)
 	AddedByUsername *string
+	// MinPerspectiveCount keeps content with at least this many perspectives
+	// visible to ContentListParams.ViewerID (public, plus the viewer's own).
+	MinPerspectiveCount *int
 	// Record date filters (direct columns)
 	CreatedAfter  *string
 	CreatedBefore *string
@@ -101,6 +104,9 @@ type ContentListParams struct {
 	Sorts             []ContentSortRule
 	IncludeTotalCount bool
 	Filter            *ContentFilter
+	// ViewerID is the signed-in caller, nil when anonymous. Only
+	// Filter.MinPerspectiveCount reads it.
+	ViewerID *int
 }
 
 // PaginatedContent represents a paginated list of content

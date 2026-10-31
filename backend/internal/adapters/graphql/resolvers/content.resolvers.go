@@ -511,10 +511,16 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		params.Filter.TagContains = filter.TagContains
 		params.Filter.DescriptionSearch = filter.DescriptionSearch
 		params.Filter.AddedByUsername = filter.AddedByUsername
+		params.Filter.MinPerspectiveCount = filter.MinPerspectiveCount
 		params.Filter.CreatedAfter = filter.CreatedAfter
 		params.Filter.CreatedBefore = filter.CreatedBefore
 		params.Filter.UpdatedAfter = filter.UpdatedAfter
 		params.Filter.UpdatedBefore = filter.UpdatedBefore
+	}
+
+	if viewer, ok := auth.ForContext(ctx); ok {
+		id := viewer.ID
+		params.ViewerID = &id
 	}
 
 	result, err := r.ContentService.ListContent(ctx, params)

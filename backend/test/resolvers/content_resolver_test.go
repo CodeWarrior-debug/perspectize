@@ -1139,6 +1139,28 @@ func TestPaginatedContentQuery_WithAddedByUsernameFilter(t *testing.T) {
 	assert.Empty(t, result.Errors)
 }
 
+func TestPaginatedContentQuery_WithMinPerspectiveCountFilter(t *testing.T) {
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			require.NotNil(t, params.Filter)
+			require.NotNil(t, params.Filter.MinPerspectiveCount)
+			assert.Equal(t, 2, *params.Filter.MinPerspectiveCount)
+			// The test server signs every request in as user 1; the resolver must
+			// hand that viewer to the repository so private rows count for them.
+			require.NotNil(t, params.ViewerID)
+			assert.Equal(t, 1, *params.ViewerID)
+			return &domain.PaginatedContent{Items: []*domain.Content{}}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: { minPerspectiveCount: 2 }) { items { id } } }`)
+
+	assert.Empty(t, result.Errors)
+}
+
 func TestPaginatedContentQuery_SortByAddedBy(t *testing.T) {
 	repo := &mockContentRepository{
 		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
