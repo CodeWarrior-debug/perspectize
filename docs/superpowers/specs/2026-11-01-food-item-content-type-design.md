@@ -171,7 +171,7 @@ Serving sizes are set by manufacturers and are not comparable (a 30 g cereal ser
 
 That is ten, the designer's crowding cap. Kind rides in the Item subtitle, not its own column. Sodium and Tags are in the column picker and the details view.
 
-Preview: [`tools/content-type-designer/previews/food-item-activity.html`](../../../tools/content-type-designer/previews/food-item-activity.html), built from `food-item-activity.spec.json` with `node tools/content-type-designer/scripts/build_preview.mjs <spec> <out>`.
+Preview: [`tools/content-type-designer/previews/food-item-activity.html`](../../../tools/content-type-designer/previews/food-item-activity.html), built by the `content-type-preview` skill from `.claude/skills/content-type-preview/examples/food-item.spec.json`. Food & drink is also a seed in the designer form (`tools/content-type-designer`), with real Open Food Facts sample rows.
 
 - **Item:** OFF front image (40 px). With no image, a food or drink glyph by `kind`.
 - **Serving:** "37 g (2 tbsp)". Blank when unknown, with the tooltip "No serving size on record; nutrients shown per 100 g".

@@ -134,21 +134,24 @@ change.
 
 ## Seeded types
 
-Seventeen deliberately dissimilar types ship as seed data, so the catalog is not
+Eighteen deliberately dissimilar types ship as seed data, so the catalog is not
 quietly YouTube-shaped:
 
 YouTube video · Movie · Book · Blog article · Podcast episode · Music track ·
 Propositional truth claim · Joke · Purchase · Another person's perspective ·
 Place visit · Research paper · Bible passage · TV show · TV season · TV episode ·
-Painting
+Painting · Food & drink
 
 They differ on every axis that matters: API-enriched vs scraped vs manual vs
 internal-reference; URL-identified vs ISBN/DOI/GUID-identified vs text-hash
 identified; with and without duration, audience counts, money, and stance.
 
-A fresh open (or **Reset form**) lands on the Painting seed, the type
+A fresh open (or **Reset form**) lands on the Food & drink seed, the type
 currently being designed (see
-`docs/superpowers/specs/2026-09-26-painting-content-type-design.md`). The
+`docs/superpowers/specs/2026-11-01-food-item-content-type-design.md`). Its sample rows
+are real Open Food Facts records (fetched 2026-11-01) plus two USDA generics, and it
+adds a **Nutrition** column group (Calories, Protein, Carbs, Fat, Sugars, Sodium,
+Nutri-Score, NOVA, Allergens) that no other type binds. The
 Bible passage seed's bindings mirror `feature/bible-outbound-links`,
 where every passage field is a real `content` column (`name`,
 `display_title`, `verse_start_id`/`verse_end_id`) or a `bible_book` join. Fields
@@ -181,7 +184,7 @@ Two deterministic documents, copyable or downloadable:
 
 | File | Purpose |
 |---|---|
-| `src/catalog.ts` | The 17 seeded type profiles, the generic column catalog with per-type bindings (tooltip, cell popover, appearance), and sample rows |
+| `src/catalog.ts` | The 18 seeded type profiles, the generic column catalog with per-type bindings (tooltip, cell popover, appearance), and sample rows |
 | `src/details.ts` | Details-view layouts per type, with a generic fallback |
 | `src/model.ts` | State shape, visibility resolution (incl. what-if overrides), row fill states, gap analysis |
 | `src/emit.ts` | Deterministic markdown generation (spec, matrix, single-type views) |
@@ -190,4 +193,4 @@ Two deterministic documents, copyable or downloadable:
 | `src/detect.ts` | Mirror of the app's Add Content link detection, plus the draft's rule |
 | `src/thumbs.ts` | Generated inline thumbnails (`scripts/build_thumbs.py`) |
 | `src/main.ts` | Form rendering and localStorage persistence |
-| `scripts/build_preview.mjs` | Builds a single-type Activity preview (`previews/<type>-activity.html`) from a spec JSON by re-embedding it in the Movie preview's renderer: `node scripts/build_preview.mjs previews/<type>-activity.spec.json previews/<type>-activity.html`. Stand-in until the `content-type-preview` skill lands on main |
+| `previews/<type>-activity.html` | Throwaway single-type previews, built by the `content-type-preview` skill (`.claude/skills/content-type-preview/`) from its `examples/<type>.spec.json`. Never hand-edit; rebuild |
