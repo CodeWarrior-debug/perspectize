@@ -647,3 +647,9 @@ Paste a public Facebook video or Reel link; it plays inline behind a click-to-lo
 **Blocks public launch (not the build):** the app has no privacy policy, terms, DMCA agent or report flow yet; the spec's §6.2 lists them. Seven decisions to confirm are in its §9.
 
 **Priority:** Deferred by [ADR 0001](docs/adr/0001-defer-facebook-video-content-type.md): storing metadata needs a Meta App Review and Business Verification we probably wouldn't pass. Revisit conditions are in the ADR.
+
+## Food & Drink Content Type
+
+**Spec:** [docs/superpowers/specs/2026-11-01-food-item-content-type-design.md](docs/superpowers/specs/2026-11-01-food-item-content-type-design.md) (proposal, unscheduled, written without superpowers). **Intent:** [project-management/intents/food-item-content-type.md](project-management/intents/food-item-content-type.md) (draft).
+
+One `FOOD_ITEM` type for packaged foods, generic foods and beverages, added by barcode, USDA/Open Food Facts URL or Discover search. Nutrition comes from USDA FoodData Central (CC0, free key, 1,000 req/h) with Open Food Facts (ODbL, no key, 15 reads/min per IP) for images, Nutri-Score, NOVA and allergens. It is normalised to per-serving and per-100 g/ml so items sort side by side. No migration. Nine decisions to confirm are in its §14.
