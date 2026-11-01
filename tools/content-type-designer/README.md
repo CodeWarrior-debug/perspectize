@@ -190,3 +190,4 @@ Two deterministic documents, copyable or downloadable:
 | `src/detect.ts` | Mirror of the app's Add Content link detection, plus the draft's rule |
 | `src/thumbs.ts` | Generated inline thumbnails (`scripts/build_thumbs.py`) |
 | `src/main.ts` | Form rendering and localStorage persistence |
+| `scripts/build_preview.mjs` | Builds a single-type Activity preview (`previews/<type>-activity.html`) from a spec JSON by re-embedding it in the Movie preview's renderer: `node scripts/build_preview.mjs previews/<type>-activity.spec.json previews/<type>-activity.html`. Stand-in until the `content-type-preview` skill lands on main |

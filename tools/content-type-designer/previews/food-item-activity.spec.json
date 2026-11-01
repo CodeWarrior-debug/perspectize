@@ -1,0 +1,1173 @@
+{
+  "type": {
+    "label": "Food & drink",
+    "enumValue": "FOOD_ITEM",
+    "icon": "food",
+    "accent": "#C2410C",
+    "serifTitles": false,
+    "serifText": false
+  },
+  "meta": {
+    "date": "2026-11-01",
+    "sources": [
+      "docs/superpowers/specs/2026-11-01-food-item-content-type-design.md",
+      "tools/content-type-designer/previews/movie-activity.html (renderer)"
+    ],
+    "note": "Proposed type; nothing is built. Ten default columns (the preview tool's crowding cap); Sodium and Tags move to the column picker and details view. Nutella's per-100 g figures, Nutri-Score and allergen tag come from a live Open Food Facts call on 2026-11-01; every other figure is illustrative and not re-checked against USDA or Open Food Facts. Images are glyphs because artifacts block remote images."
+  },
+  "columns": [
+    {
+      "id": "pz",
+      "kind": "perspectize",
+      "status": "shipped",
+      "header": {
+        "body": "Add or edit your perspective on this food or drink. Filled when you already have one.",
+        "src": "derived: perspectives WHERE content_id AND user_id"
+      }
+    },
+    {
+      "id": "item",
+      "kind": "item",
+      "label": "Item",
+      "status": "proposed",
+      "header": {
+        "body": "Name with the Open Food Facts front image, brand and Food/Drink under it. Generic foods (USDA) have no brand or image and show the type glyph. Sorts A to Z.",
+        "src": "content.name + response.brand + response.kind + response.imageUrl"
+      }
+    },
+    {
+      "id": "serving",
+      "kind": "text",
+      "label": "Serving",
+      "status": "proposed",
+      "header": {
+        "body": "Serving size as on the label, gram/ml weight first, household measure in brackets. Blank when the source has none; nutrients then fall back to per 100 g/ml and say so.",
+        "src": "response.serving {amount, unit, label}"
+      },
+      "cell": {
+        "src": "response.serving",
+        "whenEmpty": "No serving size on record; nutrients shown per 100 g."
+      }
+    },
+    {
+      "id": "kcal",
+      "kind": "text",
+      "label": "Calories",
+      "status": "proposed",
+      "header": {
+        "body": "Energy per serving, the number on the label. The header toggle switches every nutrient column to per 100 g/ml for a fair comparison. When there is no serving, the cell shows per-100 with a /100g suffix, never silently a different basis. Sorts with unknown last.",
+        "src": "response.perServing.energyKcal | response.per100.energyKcal",
+        "extra": "Basis toggle: Per serving ⇄ Per 100 g/ml (grid state nutritionBasis). Mixing solids and liquids on per-100 raises the mixed-units alert."
+      },
+      "cell": {
+        "src": "response.perServing.energyKcal",
+        "whenEmpty": "Neither source reports energy for this item."
+      }
+    },
+    {
+      "id": "protein",
+      "kind": "text",
+      "label": "Protein",
+      "status": "proposed",
+      "header": {
+        "body": "Grams per serving (or per 100 on the toggle). Protein per 100 kcal is in the column picker for comparing protein density.",
+        "src": "response.perServing.protein (FDC 203 / OFF proteins_100g)"
+      },
+      "cell": {
+        "src": "response.perServing.protein",
+        "whenEmpty": "Not reported by the source. Unknown, not 0."
+      }
+    },
+    {
+      "id": "carbs",
+      "kind": "text",
+      "label": "Carbs",
+      "status": "proposed",
+      "header": {
+        "body": "Total carbohydrate in grams. US labels include fiber; EU labels do not. Open Food Facts keeps whatever the label says, so the tooltip names the likely convention.",
+        "src": "response.perServing.carbohydrate (FDC 205 / OFF carbohydrates_100g)"
+      },
+      "cell": {
+        "src": "response.perServing.carbohydrate",
+        "whenEmpty": "Not reported by the source."
+      }
+    },
+    {
+      "id": "fat",
+      "kind": "text",
+      "label": "Fat",
+      "status": "proposed",
+      "header": {
+        "body": "Total fat in grams; saturated and trans fat are in the column picker and the tooltip.",
+        "src": "response.perServing.fat (FDC 204 / OFF fat_100g)"
+      },
+      "cell": {
+        "src": "response.perServing.fat",
+        "whenEmpty": "Not reported by the source."
+      }
+    },
+    {
+      "id": "sugars",
+      "kind": "text",
+      "label": "Sugars",
+      "status": "proposed",
+      "header": {
+        "body": "Total sugars in grams; added sugars (often missing outside the US) are in the tooltip and the picker. Sugar % of calories is in the picker.",
+        "src": "response.perServing.sugars (FDC 269 / OFF sugars_100g)"
+      },
+      "cell": {
+        "src": "response.perServing.sugars",
+        "whenEmpty": "Not reported by the source."
+      }
+    },
+    {
+      "id": "nutri",
+      "kind": "pill",
+      "label": "Nutri-Score",
+      "status": "proposed",
+      "header": {
+        "body": "Open Food Facts' A–E front-of-pack score (EU method, not a USDA rating). Sorts A first, unknown last. Not computed for generic foods, alcoholic drinks or items with too little data.",
+        "src": "response.nutriScore (OFF nutriscore_grade)",
+        "extra": "Decision to confirm: default column vs column-picker only for a US-first audience."
+      },
+      "cell": {
+        "src": "response.nutriScore",
+        "whenEmpty": "No Nutri-Score: not computed for this item."
+      }
+    },
+    {
+      "id": "allergens",
+      "kind": "tags",
+      "label": "Allergens",
+      "status": "proposed",
+      "header": {
+        "body": "Allergens listed on the label, as chips; 'may contain' traces are listed separately in the tooltip. The filter is 'Hide items listing…', never 'Safe for…', and it also hides rows with no allergen data, because unknown is not none.",
+        "src": "response.allergens[] (OFF allergens_tags, en: stripped)",
+        "extra": "From the product label and public databases. May be incomplete or out of date. Always check the package if you have an allergy."
+      },
+      "cell": {
+        "src": "response.allergens[]",
+        "whenEmpty": "No allergen data on record. Unknown, not allergen-free."
+      }
+    }
+  ],
+  "rows": [
+    {
+      "id": 1,
+      "fill": "full",
+      "hasPerspective": true,
+      "cells": {
+        "item": {
+          "title": "Nutella",
+          "sub": "Ferrero · Food",
+          "thumb": null
+        },
+        "serving": {
+          "value": "37 g (2 tbsp)",
+          "tip": {
+            "src": "response.serving (FDC labelNutrients)",
+            "extra": "OFF has no serving size for this barcode (live call 2026-11-01); the US label serving comes from FDC Branded."
+          }
+        },
+        "kcal": {
+          "value": "200 kcal",
+          "tip": {
+            "src": "response.perServing.energyKcal",
+            "v": "200 kcal per 37 g serving · 539 kcal per 100 g",
+            "extra": "Per-serving: FDC label (illustrative). Per-100: Open Food Facts, live 2026-11-01."
+          }
+        },
+        "protein": {
+          "value": "2 g",
+          "tip": {
+            "src": "response.perServing.protein",
+            "v": "2 g per serving · 6.3 g per 100 g"
+          }
+        },
+        "carbs": {
+          "value": "22 g",
+          "tip": {
+            "src": "response.perServing.carbohydrate",
+            "v": "22 g per serving · 57.5 g per 100 g",
+            "extra": "US label: includes fiber."
+          }
+        },
+        "fat": {
+          "value": "12 g",
+          "tip": {
+            "src": "response.perServing.fat",
+            "v": "12 g · saturated 4 g · trans 0 g"
+          }
+        },
+        "sugars": {
+          "value": "21 g",
+          "tip": {
+            "src": "response.perServing.sugars",
+            "v": "21 g total · added 20 g (illustrative)"
+          }
+        },
+        "nutri": {
+          "value": "E",
+          "tip": {
+            "src": "response.nutriScore",
+            "v": "E — least favourable (OFF, live 2026-11-01)"
+          }
+        },
+        "allergens": {
+          "value": [
+            "nuts",
+            "milk"
+          ],
+          "tip": {
+            "src": "response.allergens[]",
+            "extra": "OFF lists nuts for EAN 3017624010701; milk is on the US label (illustrative). From the product label and public databases. May be incomplete or out of date. Always check the package if you have an allergy."
+          }
+        }
+      },
+      "details": {
+        "title": "Nutella",
+        "subtitle": "Ferrero · Hazelnut spread · 400 g jar",
+        "textLabel": "Ingredients",
+        "textStatus": "proposed",
+        "text": [
+          [
+            null,
+            "Sugar, palm oil, hazelnuts (13%), skimmed milk powder (8.7%), fat-reduced cocoa (7.4%), emulsifier: lecithins (soy), vanillin."
+          ],
+          [
+            null,
+            "Per 100 g: 539 kcal · fat 30.9 g (sat. 10.6 g) · carbs 57.5 g · sugars 56.3 g · protein 6.3 g · salt 0.11 g. Full nutrient panel (vitamins, minerals) loads here on open, never with the list."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Sources",
+            "status": "proposed",
+            "items": [
+              "Open Food Facts: world.openfoodfacts.org/product/3017624010701",
+              "USDA FoodData Central (Branded, matched by GTIN)"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Calories / 100",
+            "v": "539",
+            "status": "proposed",
+            "tip": "response.per100.energyKcal (OFF)"
+          },
+          {
+            "k": "Protein / 100 kcal",
+            "v": "1.2 g",
+            "status": "proposed",
+            "tip": "derived: protein ÷ energyKcal × 100; n/a when kcal is 0 or unknown",
+            "empty": "n/a"
+          },
+          {
+            "k": "Sugar % of kcal",
+            "v": "42%",
+            "status": "proposed",
+            "tip": "derived: sugars × 4 ÷ energyKcal",
+            "empty": "n/a"
+          },
+          {
+            "k": "Serving",
+            "v": "37 g (2 tbsp)",
+            "status": "proposed",
+            "tip": "response.serving (FDC labelNutrients / foodPortions; OFF serving_size)",
+            "empty": "none on record"
+          },
+          {
+            "k": "Sodium",
+            "v": "15 mg",
+            "status": "proposed",
+            "tip": "response.perServing.sodium (mg; FDC 307 / OFF sodium_100g × 1000). In the column picker, not a default column.",
+            "sub": "43 mg / 100 g"
+          },
+          {
+            "k": "NOVA",
+            "v": "4",
+            "status": "proposed",
+            "tip": "response.novaGroup from Open Food Facts: 1 unprocessed … 4 ultra-processed",
+            "empty": "not computed"
+          },
+          {
+            "k": "Data quality",
+            "v": "Manufacturer label (USDA) + crowdsourced 76%",
+            "status": "proposed",
+            "tip": "response.nutritionSource (+ OFF completeness)"
+          },
+          {
+            "k": "Data as of",
+            "v": "OFF updated 2026-09 · FDC label 2025-04",
+            "status": "proposed",
+            "tip": "response.sourceModifiedAt; fetchedAt is shown on hover in the app"
+          }
+        ],
+        "tags": [
+          "spreads",
+          "sweet spreads",
+          "hazelnut spreads",
+          "breakfasts"
+        ],
+        "tagsStatus": "proposed",
+        "otherPerspectives": 3,
+        "footer": "Nutrition data: USDA FoodData Central (public domain). Data: Open Food Facts (ODbL). Image: Open Food Facts contributors, CC BY-SA. Check the package if you have an allergy: label and database data may be incomplete or out of date."
+      }
+    },
+    {
+      "id": 2,
+      "fill": "partial",
+      "hasPerspective": true,
+      "cells": {
+        "item": {
+          "title": "Banana, raw",
+          "sub": "Generic (USDA) · Food",
+          "thumb": null
+        },
+        "serving": {
+          "value": "118 g (1 medium)",
+          "tip": {
+            "src": "response.serving (FDC foodPortions)"
+          }
+        },
+        "kcal": {
+          "value": "105 kcal",
+          "tip": {
+            "src": "response.perServing.energyKcal",
+            "v": "105 kcal per medium banana · 89 kcal per 100 g",
+            "extra": "Derived from per-100 g lab data × 118 g portion (nutritionDerived = true)."
+          }
+        },
+        "protein": {
+          "value": "1.3 g"
+        },
+        "carbs": {
+          "value": "27 g"
+        },
+        "fat": {
+          "value": "0.4 g"
+        },
+        "sugars": {
+          "value": "14 g",
+          "tip": {
+            "src": "response.perServing.sugars",
+            "v": "14.4 g total · added sugars 0 g"
+          }
+        },
+        "nutri": {
+          "value": null,
+          "tip": {
+            "empty": "Not computed: generic foods have no Open Food Facts record."
+          }
+        },
+        "allergens": {
+          "value": null,
+          "tip": {
+            "empty": "USDA generic foods carry no allergen list. Unknown, not allergen-free."
+          }
+        }
+      },
+      "details": {
+        "title": "Banana, raw",
+        "subtitle": "USDA generic food · no barcode, brand or image",
+        "textLabel": "About this data",
+        "textStatus": "proposed",
+        "text": [
+          [
+            null,
+            "Lab-analysed generic food (FDC SR Legacy / Foundation). Nutrients are per 100 g; the per-serving figures are calculated from the '1 medium (118 g)' portion and say so."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Sources",
+            "status": "proposed",
+            "items": [
+              "USDA FoodData Central: fdc.nal.usda.gov/food-details/<fdcId>/nutrients"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Calories / 100",
+            "v": "89",
+            "status": "proposed",
+            "tip": "response.per100.energyKcal (FDC)"
+          },
+          {
+            "k": "Protein / 100 kcal",
+            "v": "1.2 g",
+            "status": "proposed",
+            "tip": "derived: protein ÷ energyKcal × 100; n/a when kcal is 0 or unknown",
+            "empty": "n/a"
+          },
+          {
+            "k": "Sugar % of kcal",
+            "v": "54%",
+            "status": "proposed",
+            "tip": "derived: sugars × 4 ÷ energyKcal",
+            "empty": "n/a"
+          },
+          {
+            "k": "Serving",
+            "v": "118 g (1 medium)",
+            "status": "proposed",
+            "tip": "response.serving (FDC labelNutrients / foodPortions; OFF serving_size)",
+            "empty": "none on record"
+          },
+          {
+            "k": "Sodium",
+            "v": "1 mg",
+            "status": "proposed",
+            "tip": "response.perServing.sodium (mg; FDC 307 / OFF sodium_100g × 1000). In the column picker, not a default column."
+          },
+          {
+            "k": "NOVA",
+            "v": null,
+            "status": "proposed",
+            "tip": "response.novaGroup from Open Food Facts: 1 unprocessed … 4 ultra-processed",
+            "empty": "not computed"
+          },
+          {
+            "k": "Data quality",
+            "v": "USDA lab data",
+            "status": "proposed",
+            "tip": "response.nutritionSource (+ OFF completeness)"
+          },
+          {
+            "k": "Data as of",
+            "v": "FDC 2019 release (illustrative)",
+            "status": "proposed",
+            "tip": "response.sourceModifiedAt; fetchedAt is shown on hover in the app"
+          }
+        ],
+        "otherPerspectives": 1,
+        "footer": "Nutrition data: USDA FoodData Central (public domain). Check the package if you have an allergy: label and database data may be incomplete or out of date."
+      }
+    },
+    {
+      "id": 3,
+      "fill": "full",
+      "hasPerspective": false,
+      "cells": {
+        "item": {
+          "title": "Coca-Cola Classic",
+          "sub": "Coca-Cola · Drink",
+          "thumb": null
+        },
+        "serving": {
+          "value": "355 ml (1 can)"
+        },
+        "kcal": {
+          "value": "140 kcal",
+          "tip": {
+            "src": "response.perServing.energyKcal",
+            "v": "140 kcal per can · 39 kcal per 100 ml"
+          }
+        },
+        "protein": {
+          "value": "0 g",
+          "tip": {
+            "src": "response.perServing.protein",
+            "v": "0 g: a real zero from the label, not unknown"
+          }
+        },
+        "carbs": {
+          "value": "39 g"
+        },
+        "fat": {
+          "value": "0 g"
+        },
+        "sugars": {
+          "value": "39 g",
+          "tip": {
+            "src": "response.perServing.sugars",
+            "v": "39 g total · added 39 g"
+          }
+        },
+        "nutri": {
+          "value": "E"
+        },
+        "allergens": {
+          "value": [],
+          "tip": {
+            "empty": "Label lists no allergens (an empty list is known-none; missing data would read 'unknown')."
+          }
+        }
+      },
+      "details": {
+        "title": "Coca-Cola Classic",
+        "subtitle": "Coca-Cola · Soft drink · 355 ml can",
+        "textLabel": "Ingredients",
+        "textStatus": "proposed",
+        "text": [
+          [
+            null,
+            "Carbonated water, high fructose corn syrup, caramel color, phosphoric acid, natural flavors, caffeine."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Sources",
+            "status": "proposed",
+            "items": [
+              "Open Food Facts product page (by UPC)",
+              "USDA FoodData Central (Branded)"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Calories / 100",
+            "v": "39",
+            "status": "proposed",
+            "tip": "response.per100.energyKcal (FDC)"
+          },
+          {
+            "k": "Protein / 100 kcal",
+            "v": "0 g",
+            "status": "proposed",
+            "tip": "derived: protein ÷ energyKcal × 100; n/a when kcal is 0 or unknown",
+            "empty": "n/a"
+          },
+          {
+            "k": "Sugar % of kcal",
+            "v": "100%",
+            "status": "proposed",
+            "tip": "derived: sugars × 4 ÷ energyKcal",
+            "empty": "n/a"
+          },
+          {
+            "k": "Serving",
+            "v": "355 ml (1 can)",
+            "status": "proposed",
+            "tip": "response.serving (FDC labelNutrients / foodPortions; OFF serving_size)",
+            "empty": "none on record"
+          },
+          {
+            "k": "Sodium",
+            "v": "45 mg",
+            "status": "proposed",
+            "tip": "response.perServing.sodium (mg; FDC 307 / OFF sodium_100g × 1000). In the column picker, not a default column."
+          },
+          {
+            "k": "NOVA",
+            "v": "4",
+            "status": "proposed",
+            "tip": "response.novaGroup from Open Food Facts: 1 unprocessed … 4 ultra-processed",
+            "empty": "not computed"
+          },
+          {
+            "k": "Caffeine",
+            "v": "34 mg",
+            "status": "proposed",
+            "tip": "response.perServing.caffeine (mg). Blank = unknown, not caffeine-free",
+            "empty": "unknown"
+          },
+          {
+            "k": "ABV",
+            "v": null,
+            "status": "proposed",
+            "tip": "response.per100.alcoholAbv (% vol)",
+            "empty": "—"
+          },
+          {
+            "k": "Data quality",
+            "v": "Manufacturer label (USDA)",
+            "status": "proposed",
+            "tip": "response.nutritionSource (+ OFF completeness)"
+          },
+          {
+            "k": "Data as of",
+            "v": "FDC label 2024 (illustrative)",
+            "status": "proposed",
+            "tip": "response.sourceModifiedAt; fetchedAt is shown on hover in the app"
+          }
+        ],
+        "tags": [
+          "beverages",
+          "sodas",
+          "colas"
+        ],
+        "tagsStatus": "proposed",
+        "otherPerspectives": 4,
+        "footer": "Nutrition data: USDA FoodData Central (public domain). Data: Open Food Facts (ODbL). Image: Open Food Facts contributors, CC BY-SA. Check the package if you have an allergy: label and database data may be incomplete or out of date."
+      }
+    },
+    {
+      "id": 4,
+      "fill": "partial",
+      "hasPerspective": false,
+      "cells": {
+        "item": {
+          "title": "Coffee, brewed, black",
+          "sub": "Generic (USDA) · Drink",
+          "thumb": null
+        },
+        "serving": {
+          "value": "237 ml (1 cup)"
+        },
+        "kcal": {
+          "value": "2 kcal",
+          "tip": {
+            "src": "response.perServing.energyKcal",
+            "v": "2 kcal per cup",
+            "extra": "Near-zero energy: Protein / 100 kcal and Sugar % of kcal read n/a and sort last."
+          }
+        },
+        "protein": {
+          "value": "0.3 g"
+        },
+        "carbs": {
+          "value": "0 g"
+        },
+        "fat": {
+          "value": "0 g"
+        },
+        "sugars": {
+          "value": "0 g"
+        },
+        "nutri": {
+          "value": null,
+          "tip": {
+            "empty": "Not computed: generic food."
+          }
+        },
+        "allergens": {
+          "value": null,
+          "tip": {
+            "empty": "No allergen list for USDA generic foods. Unknown, not none."
+          }
+        }
+      },
+      "details": {
+        "title": "Coffee, brewed, black",
+        "subtitle": "USDA generic food · beverage",
+        "textLabel": "About this data",
+        "textStatus": "proposed",
+        "text": [
+          [
+            null,
+            "Shows the zero-calorie edge case: derived rates are n/a rather than infinite, and caffeine is a beverage tile."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Sources",
+            "status": "proposed",
+            "items": [
+              "USDA FoodData Central (SR Legacy)"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Calories / 100",
+            "v": "1",
+            "status": "proposed",
+            "tip": "response.per100.energyKcal (FDC)"
+          },
+          {
+            "k": "Protein / 100 kcal",
+            "v": "n/a",
+            "status": "proposed",
+            "tip": "derived: protein ÷ energyKcal × 100; n/a when kcal is 0 or unknown",
+            "empty": "n/a"
+          },
+          {
+            "k": "Sugar % of kcal",
+            "v": null,
+            "status": "proposed",
+            "tip": "derived: sugars × 4 ÷ energyKcal",
+            "empty": "n/a"
+          },
+          {
+            "k": "Serving",
+            "v": "237 ml (1 cup)",
+            "status": "proposed",
+            "tip": "response.serving (FDC labelNutrients / foodPortions; OFF serving_size)",
+            "empty": "none on record"
+          },
+          {
+            "k": "Sodium",
+            "v": "5 mg",
+            "status": "proposed",
+            "tip": "response.perServing.sodium (mg; FDC 307 / OFF sodium_100g × 1000). In the column picker, not a default column."
+          },
+          {
+            "k": "NOVA",
+            "v": null,
+            "status": "proposed",
+            "tip": "response.novaGroup from Open Food Facts: 1 unprocessed … 4 ultra-processed",
+            "empty": "not computed"
+          },
+          {
+            "k": "Caffeine",
+            "v": "95 mg",
+            "status": "proposed",
+            "tip": "response.perServing.caffeine (mg). Blank = unknown, not caffeine-free",
+            "empty": "unknown"
+          },
+          {
+            "k": "ABV",
+            "v": null,
+            "status": "proposed",
+            "tip": "response.per100.alcoholAbv (% vol)",
+            "empty": "—"
+          },
+          {
+            "k": "Data quality",
+            "v": "USDA lab data",
+            "status": "proposed",
+            "tip": "response.nutritionSource (+ OFF completeness)"
+          },
+          {
+            "k": "Data as of",
+            "v": "FDC 2019 release (illustrative)",
+            "status": "proposed",
+            "tip": "response.sourceModifiedAt; fetchedAt is shown on hover in the app"
+          }
+        ],
+        "otherPerspectives": 0,
+        "footer": "Nutrition data: USDA FoodData Central (public domain). Check the package if you have an allergy: label and database data may be incomplete or out of date."
+      }
+    },
+    {
+      "id": 5,
+      "fill": "full",
+      "hasPerspective": true,
+      "cells": {
+        "item": {
+          "title": "Total 0% Greek Yogurt",
+          "sub": "Fage · Food",
+          "thumb": null
+        },
+        "serving": {
+          "value": "170 g (1 container)"
+        },
+        "kcal": {
+          "value": "90 kcal",
+          "tip": {
+            "src": "response.perServing.energyKcal",
+            "v": "90 kcal per container · 53 kcal per 100 g"
+          }
+        },
+        "protein": {
+          "value": "18 g",
+          "tip": {
+            "src": "response.perServing.protein",
+            "v": "18 g · 20 g per 100 kcal: the highest protein density in this view"
+          }
+        },
+        "carbs": {
+          "value": "5 g"
+        },
+        "fat": {
+          "value": "0 g"
+        },
+        "sugars": {
+          "value": "5 g",
+          "tip": {
+            "src": "response.perServing.sugars",
+            "v": "5 g total · added 0 g"
+          }
+        },
+        "nutri": {
+          "value": "A"
+        },
+        "allergens": {
+          "value": [
+            "milk"
+          ]
+        }
+      },
+      "details": {
+        "title": "Total 0% Greek Yogurt",
+        "subtitle": "Fage · Plain nonfat · 170 g",
+        "textLabel": "Ingredients",
+        "textStatus": "proposed",
+        "text": [
+          [
+            null,
+            "Grade A pasteurized skimmed milk, live active yogurt cultures."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Sources",
+            "status": "proposed",
+            "items": [
+              "Open Food Facts product page",
+              "USDA FoodData Central (Branded)"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Calories / 100",
+            "v": "53",
+            "status": "proposed",
+            "tip": "response.per100.energyKcal (FDC)"
+          },
+          {
+            "k": "Protein / 100 kcal",
+            "v": "20 g",
+            "status": "proposed",
+            "tip": "derived: protein ÷ energyKcal × 100; n/a when kcal is 0 or unknown",
+            "empty": "n/a"
+          },
+          {
+            "k": "Sugar % of kcal",
+            "v": "22%",
+            "status": "proposed",
+            "tip": "derived: sugars × 4 ÷ energyKcal",
+            "empty": "n/a"
+          },
+          {
+            "k": "Serving",
+            "v": "170 g (1 container)",
+            "status": "proposed",
+            "tip": "response.serving (FDC labelNutrients / foodPortions; OFF serving_size)",
+            "empty": "none on record"
+          },
+          {
+            "k": "Sodium",
+            "v": "65 mg",
+            "status": "proposed",
+            "tip": "response.perServing.sodium (mg; FDC 307 / OFF sodium_100g × 1000). In the column picker, not a default column."
+          },
+          {
+            "k": "NOVA",
+            "v": "1",
+            "status": "proposed",
+            "tip": "response.novaGroup from Open Food Facts: 1 unprocessed … 4 ultra-processed",
+            "empty": "not computed"
+          },
+          {
+            "k": "Data quality",
+            "v": "Manufacturer label (USDA) + crowdsourced 88%",
+            "status": "proposed",
+            "tip": "response.nutritionSource (+ OFF completeness)"
+          },
+          {
+            "k": "Data as of",
+            "v": "FDC label 2025 (illustrative)",
+            "status": "proposed",
+            "tip": "response.sourceModifiedAt; fetchedAt is shown on hover in the app"
+          }
+        ],
+        "tags": [
+          "dairies",
+          "yogurts",
+          "greek yogurts"
+        ],
+        "tagsStatus": "proposed",
+        "otherPerspectives": 2,
+        "footer": "Nutrition data: USDA FoodData Central (public domain). Data: Open Food Facts (ODbL). Image: Open Food Facts contributors, CC BY-SA. Check the package if you have an allergy: label and database data may be incomplete or out of date."
+      }
+    },
+    {
+      "id": 6,
+      "fill": "partial",
+      "hasPerspective": false,
+      "cells": {
+        "item": {
+          "title": "Guinness Draught",
+          "sub": "Guinness · Drink",
+          "thumb": null
+        },
+        "serving": {
+          "value": "440 ml (1 can)"
+        },
+        "kcal": {
+          "value": "154 kcal",
+          "tip": {
+            "src": "response.perServing.energyKcal",
+            "v": "154 kcal per can · 35 kcal per 100 ml",
+            "extra": "Derived from the per-100 ml EU label × 440 ml (nutritionDerived = true)."
+          }
+        },
+        "protein": {
+          "value": "1.3 g"
+        },
+        "carbs": {
+          "value": "16 g",
+          "tip": {
+            "src": "response.perServing.carbohydrate",
+            "v": "16 g",
+            "extra": "EU label: carbohydrate excludes fiber."
+          }
+        },
+        "fat": {
+          "value": "0 g"
+        },
+        "sugars": {
+          "value": null,
+          "tip": {
+            "empty": "Not on the label. Unknown, not 0."
+          }
+        },
+        "nutri": {
+          "value": null,
+          "tip": {
+            "empty": "Nutri-Score is not computed for alcoholic drinks."
+          }
+        },
+        "allergens": {
+          "value": [
+            "gluten"
+          ],
+          "tip": {
+            "src": "response.allergens[]",
+            "extra": "Barley. From the product label and public databases. May be incomplete or out of date. Always check the package if you have an allergy."
+          }
+        }
+      },
+      "details": {
+        "title": "Guinness Draught",
+        "subtitle": "Guinness · Stout · 440 ml can · 4.2% ABV",
+        "textLabel": "Ingredients",
+        "textStatus": "proposed",
+        "text": [
+          [
+            null,
+            "Water, barley, malted barley, roasted barley, hops, nitrogen."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Sources",
+            "status": "proposed",
+            "items": [
+              "Open Food Facts product page (EU barcode)"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Calories / 100",
+            "v": "35",
+            "status": "proposed",
+            "tip": "response.per100.energyKcal (OFF)"
+          },
+          {
+            "k": "Protein / 100 kcal",
+            "v": "3.7 g",
+            "status": "proposed",
+            "tip": "derived: protein ÷ energyKcal × 100; n/a when kcal is 0 or unknown",
+            "empty": "n/a"
+          },
+          {
+            "k": "Sugar % of kcal",
+            "v": null,
+            "status": "proposed",
+            "tip": "derived: sugars × 4 ÷ energyKcal",
+            "empty": "n/a"
+          },
+          {
+            "k": "Serving",
+            "v": "440 ml (1 can)",
+            "status": "proposed",
+            "tip": "response.serving (FDC labelNutrients / foodPortions; OFF serving_size)",
+            "empty": "none on record"
+          },
+          {
+            "k": "Sodium",
+            "v": null,
+            "status": "proposed",
+            "tip": "response.perServing.sodium (mg; FDC 307 / OFF sodium_100g × 1000). In the column picker, not a default column.",
+            "empty": "not on label"
+          },
+          {
+            "k": "NOVA",
+            "v": "3",
+            "status": "proposed",
+            "tip": "response.novaGroup from Open Food Facts: 1 unprocessed … 4 ultra-processed",
+            "empty": "not computed"
+          },
+          {
+            "k": "Caffeine",
+            "v": null,
+            "status": "proposed",
+            "tip": "response.perServing.caffeine (mg). Blank = unknown, not caffeine-free",
+            "empty": "unknown"
+          },
+          {
+            "k": "ABV",
+            "v": "4.2%",
+            "status": "proposed",
+            "tip": "response.per100.alcoholAbv (% vol)",
+            "empty": "—"
+          },
+          {
+            "k": "Data quality",
+            "v": "Crowdsourced 64%",
+            "status": "proposed",
+            "tip": "response.nutritionSource (+ OFF completeness)"
+          },
+          {
+            "k": "Data as of",
+            "v": "OFF updated 2025 (illustrative)",
+            "status": "proposed",
+            "tip": "response.sourceModifiedAt; fetchedAt is shown on hover in the app"
+          }
+        ],
+        "tags": [
+          "beverages",
+          "alcoholic beverages",
+          "beers",
+          "stouts"
+        ],
+        "tagsStatus": "proposed",
+        "otherPerspectives": 1,
+        "footer": "Data: Open Food Facts (ODbL). Image: Open Food Facts contributors, CC BY-SA. Check the package if you have an allergy: label and database data may be incomplete or out of date."
+      }
+    },
+    {
+      "id": 7,
+      "fill": "sparse",
+      "hasPerspective": false,
+      "cells": {
+        "item": {
+          "title": "Marzipan Chocolate Bar",
+          "sub": "Ritter Sport · Food",
+          "thumb": null
+        },
+        "serving": {
+          "value": null,
+          "tip": {
+            "empty": "No serving size on record; nutrients shown per 100 g."
+          }
+        },
+        "kcal": {
+          "value": "496 kcal /100g",
+          "tip": {
+            "src": "response.per100.energyKcal",
+            "v": "496 kcal per 100 g (no serving on record)",
+            "extra": "Per-100 fallback, marked with the /100g suffix. Row is muted: OFF completeness 41%."
+          },
+          "flag": "low data"
+        },
+        "protein": {
+          "value": null,
+          "tip": {
+            "empty": "Not reported. Unknown, not 0."
+          }
+        },
+        "carbs": {
+          "value": "49 g /100g"
+        },
+        "fat": {
+          "value": "29 g /100g"
+        },
+        "sugars": {
+          "value": "44 g /100g"
+        },
+        "nutri": {
+          "value": "E"
+        },
+        "allergens": {
+          "value": null,
+          "tip": {
+            "empty": "No allergen data on record. Hidden by the allergen filter, because unknown is not none."
+          }
+        }
+      },
+      "details": {
+        "title": "Marzipan Chocolate Bar",
+        "subtitle": "Ritter Sport · 100 g bar · crowdsourced, 41% complete",
+        "textLabel": "About this data",
+        "textStatus": "proposed",
+        "text": [
+          [
+            null,
+            "Open Food Facts entry with no serving size, protein or ingredients yet. Shown muted in the Discover picker; the grid falls back to per 100 g and marks it."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Sources",
+            "status": "proposed",
+            "items": [
+              "Open Food Facts product page (EU barcode)",
+              "Help complete this product on Open Food Facts"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Calories / 100",
+            "v": "496",
+            "status": "proposed",
+            "tip": "response.per100.energyKcal (OFF)"
+          },
+          {
+            "k": "Protein / 100 kcal",
+            "v": null,
+            "status": "proposed",
+            "tip": "derived: protein ÷ energyKcal × 100; n/a when kcal is 0 or unknown",
+            "empty": "n/a"
+          },
+          {
+            "k": "Sugar % of kcal",
+            "v": "35%",
+            "status": "proposed",
+            "tip": "derived: sugars × 4 ÷ energyKcal",
+            "empty": "n/a"
+          },
+          {
+            "k": "Serving",
+            "v": null,
+            "status": "proposed",
+            "tip": "response.serving (FDC labelNutrients / foodPortions; OFF serving_size)",
+            "empty": "none on record"
+          },
+          {
+            "k": "Sodium",
+            "v": null,
+            "status": "proposed",
+            "tip": "response.perServing.sodium (mg; FDC 307 / OFF sodium_100g × 1000). In the column picker, not a default column.",
+            "empty": "not reported"
+          },
+          {
+            "k": "NOVA",
+            "v": null,
+            "status": "proposed",
+            "tip": "response.novaGroup from Open Food Facts: 1 unprocessed … 4 ultra-processed",
+            "empty": "not computed"
+          },
+          {
+            "k": "Data quality",
+            "v": "Crowdsourced 41%",
+            "status": "proposed",
+            "tip": "response.nutritionSource (+ OFF completeness)"
+          },
+          {
+            "k": "Data as of",
+            "v": "OFF updated 2023 (illustrative)",
+            "status": "proposed",
+            "tip": "response.sourceModifiedAt; fetchedAt is shown on hover in the app"
+          }
+        ],
+        "tags": [
+          "snacks",
+          "chocolates",
+          "marzipan"
+        ],
+        "tagsStatus": "proposed",
+        "otherPerspectives": 0,
+        "footer": "Data: Open Food Facts (ODbL). Image: Open Food Facts contributors, CC BY-SA. Check the package if you have an allergy: label and database data may be incomplete or out of date."
+      }
+    }
+  ],
+  "perspective": {
+    "ratings": [
+      "Quality",
+      "Agreement",
+      "Importance",
+      "Confidence"
+    ],
+    "addFieldHint": "taste"
+  }
+}

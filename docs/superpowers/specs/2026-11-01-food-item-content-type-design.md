@@ -167,16 +167,20 @@ Serving sizes are set by manufacturers and are not comparable (a 30 g cereal ser
 
 ## 7. Activity table: default columns (Food & drink filtered solo; Type hidden)
 
-◎ · **Item** (thumbnail + name, brand under it) · **Kind** · **Serving** · **Calories** · **Protein** · **Carbs** · **Fat** · **Sugars** · **Sodium** · **Nutri-Score** · **Allergens** · **Tags**
+◎ · **Item** (thumbnail + name; brand and Food/Drink under it) · **Serving** · **Calories** · **Protein** · **Carbs** · **Fat** · **Sugars** · **Nutri-Score** · **Allergens**
+
+That is ten, the designer's crowding cap. Kind rides in the Item subtitle, not its own column. Sodium and Tags are in the column picker and the details view.
+
+Preview: [`tools/content-type-designer/previews/food-item-activity.html`](../../../tools/content-type-designer/previews/food-item-activity.html), built from `food-item-activity.spec.json` with `node tools/content-type-designer/scripts/build_preview.mjs <spec> <out>`.
 
 - **Item:** OFF front image (40 px). With no image, a food or drink glyph by `kind`.
 - **Serving:** "37 g (2 tbsp)". Blank when unknown, with the tooltip "No serving size on record; nutrients shown per 100 g".
 - **Calories:** per serving by default. The tooltip shows both bases and the source. When `perServing` is null the cell shows the per-100 value with a small "/100g" suffix, so it is never silently a different basis.
 - **Nutri-Score:** the A–E letter badge (OFF's colours). Blank when absent. The tooltip explains that it is an EU front-of-pack score, not a USDA one, and how it is computed.
 - **Allergens:** chips (multi-mode tooltip: checklist + copy). Traces are listed separately as "may contain".
-- **Tags:** OFF categories (the external-source set). This intersects issue #560 (separating source tags from user tags) the same way Movie keywords do, and must not block it.
-- **Column picker extras:** NOVA group, Saturated fat, Trans fat, Cholesterol, Fiber, Added sugars, Caffeine, ABV, Protein / 100 kcal, Sugar % of kcal, Package size, Brand, Barcode, FDC ID, Nutrition source, Data as of, Date Added.
-- **Beverage-only rows in view** (`kind = BEVERAGE` filter) swap Fat and Sodium out of the defaults for **Caffeine** and **ABV**.
+- **Tags** (picker + details): OFF categories (the external-source set). This intersects issue #560 (separating source tags from user tags) the same way Movie keywords do, and must not block it.
+- **Column picker extras:** Sodium, Kind, Tags, NOVA group, Saturated fat, Trans fat, Cholesterol, Fiber, Added sugars, Caffeine, ABV, Protein / 100 kcal, Sugar % of kcal, Package size, Brand, Barcode, FDC ID, Nutrition source, Data as of, Date Added.
+- **Beverage-only rows in view** (`kind = BEVERAGE` filter) swap **Fat** and **Protein** out of the defaults for **Caffeine** and **ABV**.
 
 **Sort rules** (`helpers.go`, all `NUMERIC` casts over JSONB with `NULLS LAST`): calories, protein, carbs, fat, sugars, sodium, fiber, caffeine, ABV (each on the active basis, i.e. `response->'perServing'->>'energyKcal'` or `response->'per100'->>...`), the two derived rates as `CASE` expressions (null-safe, like `PercentLiked`), Nutri-Score (`a < b < … < e`, null last), and NOVA (1–4).
 
