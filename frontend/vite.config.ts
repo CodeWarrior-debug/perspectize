@@ -7,17 +7,19 @@ import tailwindcss from '@tailwindcss/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { faroSourcemapConfig } from './scripts/faro-sourcemaps';
 import { computeTag } from './src/lib/utils/buildTag';
-import { clerkFrontendApiOrigin, clerkScriptUrl } from './src/lib/utils/clerkScript';
+import { clerkPreloadValues } from './src/lib/utils/clerkScript';
 
 // app.html preloads clerk-js via %sveltekit.env.PUBLIC_CLERK_*% placeholders, which read
-// the public env at build time. Derive them here from the publishable key (process.env
-// wins over .env files, as in Vite). Empty when no key is set, so the placeholders render "".
-const clerkEnv = loadEnv(process.env.NODE_ENV ?? 'production', fileURLToPath(new URL('.', import.meta.url)), 'VITE_');
-const clerkOrigin = clerkFrontendApiOrigin(
-	process.env.VITE_CLERK_PUBLISHABLE_KEY ?? clerkEnv.VITE_CLERK_PUBLISHABLE_KEY,
-);
-process.env.PUBLIC_CLERK_ORIGIN = clerkOrigin;
-process.env.PUBLIC_CLERK_SCRIPT_URL = clerkScriptUrl(clerkOrigin);
+// the public env at build time. Derive them here from the build env (process.env wins over
+// .env files, as in Vite). Sevalla defines PUBLIC_CLERK_PUBLISHABLE_KEY, not the VITE_ name,
+// so both prefixes are loaded. Empty when there is no key, so the placeholders render "".
+const clerkBuildEnv = loadEnv(process.env.NODE_ENV ?? 'production', fileURLToPath(new URL('.', import.meta.url)), [
+	'VITE_',
+	'PUBLIC_',
+]);
+const clerkPreload = clerkPreloadValues(clerkBuildEnv);
+process.env.PUBLIC_CLERK_ORIGIN = clerkPreload.origin;
+process.env.PUBLIC_CLERK_SCRIPT_URL = clerkPreload.scriptUrl;
 
 // Opt-in Faro source-map upload: empty (no sourcemaps, no plugin) unless
 // FARO_SOURCEMAP_API_KEY is set; throws if the key is set without its companion vars.

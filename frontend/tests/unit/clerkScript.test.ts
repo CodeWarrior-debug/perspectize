@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 import { realpathSync } from 'node:fs';
-import { clerkFrontendApiOrigin, clerkScriptUrl } from '$lib/utils/clerkScript';
+import { clerkFrontendApiOrigin, clerkPreloadValues, clerkScriptUrl } from '$lib/utils/clerkScript';
 
 // The same @clerk/shared svelte-clerk resolves (it isn't hoisted, so resolve from its real path).
 const svelteClerkEntry = realpathSync(createRequire(import.meta.url).resolve('svelte-clerk'));
@@ -49,4 +49,42 @@ describe('clerkScriptUrl', () => {
 			expect(clerkScriptUrl(clerkFrontendApiOrigin(key))).toBe(clerkShared.clerkJSScriptUrl({ publishableKey: key }));
 		}
 	});
+});
+
+describe('clerkPreloadValues', () => {
+	const DEV_ORIGIN = 'https://fake-frontend.clerk.accounts.dev';
+
+	it('uses VITE_CLERK_PUBLISHABLE_KEY when set', () => {
+		expect(clerkPreloadValues({ VITE_CLERK_PUBLISHABLE_KEY: DEV_KEY })).toEqual({
+			origin: DEV_ORIGIN,
+			scriptUrl: clerkScriptUrl(DEV_ORIGIN),
+		});
+	});
+
+	it('falls back to PUBLIC_CLERK_PUBLISHABLE_KEY, the name Sevalla defines', () => {
+		expect(clerkPreloadValues({ PUBLIC_CLERK_PUBLISHABLE_KEY: DEV_KEY }).origin).toBe(DEV_ORIGIN);
+	});
+
+	it('prefers the VITE_ key, as the layout prop does', () => {
+		expect(
+			clerkPreloadValues({
+				VITE_CLERK_PUBLISHABLE_KEY: LIVE_KEY,
+				PUBLIC_CLERK_PUBLISHABLE_KEY: DEV_KEY,
+			}).origin,
+		).toBe('https://clerk.example.test');
+	});
+
+	it('returns empty values when no key is set', () => {
+		expect(clerkPreloadValues({})).toEqual({ origin: '', scriptUrl: '' });
+	});
+
+	it.each(['PUBLIC_CLERK_JS_URL', 'PUBLIC_CLERK_JS_VERSION', 'PUBLIC_CLERK_DOMAIN', 'PUBLIC_CLERK_PROXY_URL'])(
+		'emits no preload when %s changes where clerk-js is fetched from',
+		(name) => {
+			expect(clerkPreloadValues({ PUBLIC_CLERK_PUBLISHABLE_KEY: DEV_KEY, [name]: 'x' })).toEqual({
+				origin: '',
+				scriptUrl: '',
+			});
+		},
+	);
 });
