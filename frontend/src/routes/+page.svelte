@@ -146,6 +146,13 @@
 		</div>
 	</div>
 
+	<!-- ColumnRelevanceCallout (rendered by ActivityTable) moves itself here: above the card's top-right
+	     corner, outside the table frame. Collapses to nothing when empty. -->
+	<div
+		id="activity-callout-slot"
+		class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 flex justify-end empty:hidden"
+	></div>
+
 	<!-- Content Card -->
 	<!-- pb-4 (not pb-20: that reserved an ~80px dead strip that cost a grid row). The fixed Messages
 	     button is cleared by the pagination bar's own right padding instead (ActivityTable).
