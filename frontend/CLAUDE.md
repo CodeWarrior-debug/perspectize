@@ -128,11 +128,11 @@ Uses `ag-grid-svelte5` (bundles AG Grid v32.x). **Do NOT install `ag-grid-commun
 
 ## Testing Gotchas
 
-**`tests/helpers/TestWrapper.svelte`: render the component as `<wrapped.Comp {...props} />`** (a dotted member expression). Svelte 5 treats only dotted-member tags as dynamic components: `<component …/>` renders a literal `<component>` element, and `<component.default …/>` is wrong because the prop is already the default export. Either silently renders nothing, so assertions can pass vacuously (see `tests/components/ActivityTable.test.ts` history).
+**In `tests/helpers/TestWrapper.svelte`, render the component as `<wrapped.Comp {...props} />`** (dotted member). Svelte 5 treats only dotted-member tags as dynamic; `<component …/>` and `<component.default …/>` render nothing, so assertions pass vacuously.
 
 **AG Grid custom cell renderers inherit `white-space: nowrap`** from `.ag-cell`. A wrapping or `line-clamp-*` title in a renderer needs explicit `whitespace-normal`, or it stays on one line and overflows.
 
-**A tight AG Grid `rowHeight` clips descenders on a `line-clamp-2` title.** The row's own `overflow: hidden` clips g/y/p/q/j on the last line when the content height (lines × line-height + cell padding) is only marginally under `rowHeight`. For a 2-line `text-[13px] leading-[1.5]` title (~39px), use ~64px, not 45-50px. Verify visually (zoom into a rendered row) after changing `rowHeight` or the title's font-size/line-height/clamp count.
+**A tight AG Grid `rowHeight` clips descenders** (g/y/p/q/j) on a `line-clamp-2` title: the row's `overflow: hidden` cuts the last line when content height is marginally under `rowHeight`. A 2-line `text-[13px] leading-[1.5]` title (~39px) needs ~64px, not 45-50px. After changing `rowHeight` or the title's font-size/line-height/clamp count, zoom into a rendered row to verify.
 
 **Date formatting timezone:** `formatDate`/`formatDateCompact` use local time (`toLocaleDateString`). Test with midday UTC (`T12:00:00Z`), not midnight, or dates shift a day in US timezones.
 
@@ -142,10 +142,10 @@ Uses `ag-grid-svelte5` (bundles AG Grid v32.x). **Do NOT install `ag-grid-commun
 
 **No Set Filter in AG Grid Community.** For a small fixed value set, use a custom checkbox filter like `ContentTypeFilter` (`$lib/utils/contentTypeFilter.ts`, `{ filterType: 'set', values }` model) plus `filterSet: true` on its `ColumnMeta` (ADDING_AG_GRID_COLUMN.md Decision 6).
 
-**A test with heavy render work gets its own timeout, not a rerun.** E.g. `SettingsDialog.test.ts`'s theme-section test mounts `ThemeCustomizePanel` (28 presets) and legitimately exceeds Vitest's 5s default under full-suite load: `it(name, fn, 15000)`.
+**A test with heavy render work gets its own timeout, not a rerun** (e.g. `SettingsDialog.test.ts` theme section, 28 presets): `it(name, fn, 15000)`.
 
 **Vitest Browser Mode (`tests/browser/`, `vitest.config.browser.ts`) runs in CI** (`frontend-test.yml`, Playwright Chromium); a red browser step is a real failure. Run it locally first with `pnpm run test:browser --browser.headless=true` (flags go directly, no `--`: after `--` they parse as a file-name filter). Tests needing demo mode (no Clerk) call `vi.hoisted(() => vi.stubEnv('VITE_DEMO_MODE', 'true'))` at the top of the file; a config-level `define` leaks into the unit project and breaks every Clerk-auth unit test. `svelte-clerk` is aliased to a stub in the browser config (the real package needs SvelteKit virtual modules). macOS needs no Playwright download: the config drives the installed Google Chrome (override with `PW_CHROMIUM_EXECUTABLE`).
 
 **Browser tests: wait for cells, not rows.** AG Grid creates `.ag-row` before cell renderers draw, so a count right after `waitForGridReady()` can see 0 cells. Poll: `await expect.poll(() => document.querySelectorAll(sel).length).toBe(n)`.
 
-**Mutation testing (Stryker):** `pnpm run mutate:chunked` runs `src/lib` in size-balanced chunks with one report each; `pnpm run mutate` writes its report only at the end. Both use `vitest.config.stryker.ts`, a unit-only copy of the `unit` project; keep them in sync. Exclude tests that read outside `frontend/` (they fail the sandbox dry run). No TypeScript checker on purpose (it can't resolve `.svelte` exports). To fix survivors: `pnpm exec stryker run --mutate <file>,<file> --reporters json,clear-text` (~1-2 min per small file), list `Survived`/`NoCoverage` from `reports/mutation/mutation.json`, write tests, rerun. Ignore equivalent survivors (`x > undefined` is always false; a guard a callee like `applyMessageEdited` repeats) and say why in the PR.
+**Mutation testing (Stryker):** `pnpm run mutate:chunked` runs `src/lib` in size-balanced chunks, one report each; `pnpm run mutate` reports only at the end. Both use `vitest.config.stryker.ts`, a unit-only copy of the `unit` project: keep them in sync. Exclude tests that read outside `frontend/` (they fail the sandbox dry run). No TypeScript checker, on purpose (it can't resolve `.svelte` exports). Fix survivors: `pnpm exec stryker run --mutate <file>,<file> --reporters json,clear-text`, list `Survived`/`NoCoverage` from `reports/mutation/mutation.json`, add tests, rerun. Ignore equivalent survivors (`x > undefined` is always false; a guard a callee repeats) and say why in the PR.

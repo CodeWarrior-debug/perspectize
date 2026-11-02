@@ -4,6 +4,13 @@
 
 **Where rules go:** this root file loads every session, so it holds only repo-wide rules. Stack rules live in `backend/CLAUDE.md` / `frontend/CLAUDE.md` (loaded once you touch files there); long procedures live in `.docs/`, linked below. A safety rule that must hold before a stack file is read keeps a one-line stub here.
 
+## Hard rules
+
+- **No chained bash commands:** run each shell command as its own Bash tool call, never joined with `&&`. Chained commands don't match permission allow-list patterns and block on approval prompts. Applies to all agents and subagents.
+- **Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`)** during dev or verification — `DATABASE_URL` is the **shared Neon database**. Migrations are written and reviewed only, then applied manually per environment at rollout. Details and numbering: `backend/CLAUDE.md` → Migrations.
+- **Never attempt to log in or enter credentials.** `.env*` files (except `.env.example`) are unreadable by design; ask the human to re-run the one-time login if signed out.
+- **Never commit `.planning/phases/bugs/` files** (gitignored; see Bug logging).
+
 ## GitHub & Repository Management
 
 **Compare against `origin/main`, not `main`** (local `main` is rarely pulled and lags): `git diff origin/main...HEAD`.
@@ -30,10 +37,6 @@
 
 **Learning comments:** mark temporary explanatory comments with `*TEMP*` (e.g. `// *TEMP* - defer runs after function returns`) for easy grep/removal.
 
-**No chained bash commands:** run each shell command as its own Bash tool call, never joined with `&&`. Chained commands don't match permission allow-list patterns and block on approval prompts. Applies to all agents and subagents.
-
-**Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`) during dev or verification** — `DATABASE_URL` is the **shared Neon database**. Migrations are written and reviewed only, then applied manually per environment at rollout. Details and numbering: `backend/CLAUDE.md` → Migrations.
-
 **Import and picker previews must show enough to decide without leaving the page** (what it is, how big, how current, how well received, full detail on click; missing ≠ 0). Applies to every content type and to throwaway artifact previews: [ADDING_CONTENT_TYPE.md → Decision 8](.claude/docs/ADDING_CONTENT_TYPE.md#decision-8-import-preview--enough-for-an-informed-decision).
 
 **Rating-style numeric fields use the `valid_integer_range` domain (0–10000)** — priority, quality, agreement, importance, confidence. Reuse it for any new "how much" field.
@@ -59,7 +62,7 @@
 
 **Browser verification is local-only.** Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in: run only the checklist above and label a user-visible PR `needs-demo-video` ([details](.docs/PR_WORKFLOW.md#demo-requirement-ready-for-review)).
 
-**`.env*` files (except `.env.example`) are unreadable by design** — expected, not a broken setup. Never attempt to log in or enter credentials; ask the human to re-run the one-time login if signed out. Evidence capture: [.docs/VERIFICATION.md](.docs/VERIFICATION.md).
+Unreadable `.env*` files are expected, not a broken setup. Evidence capture: [.docs/VERIFICATION.md](.docs/VERIFICATION.md).
 
 ## Resources
 
@@ -67,18 +70,18 @@
 - [Architecture](.docs/ARCHITECTURE.md) — system design, hexagonal architecture (deep-modules rules live in each stack CLAUDE.md)
 - [Local Development](.docs/LOCAL_DEVELOPMENT.md) · [Agent Routing](.docs/AGENTS.md) · [Domain Guide](.docs/DOMAIN_GUIDE.md) · [Go Patterns](.docs/GO_PATTERNS.md) (error handling, DB queries)
 - [Security](.docs/SECURITY.md) — secret management, rotation, incident response
-- [Migration Rollout](.docs/MIGRATION_ROLLOUT.md) — applying a migration to production Neon: one at a time, snapshot first, verify, roll back
-- [Neon Preview Branches](.docs/NEON_BRANCHING.md) — one Neon branch per open PR via GitHub Actions
-- [Release Approaches](.docs/RELEASE_APPROACHES.md) — shipping multi-PR features unseen; "**dark backend**" (dark backend, merge-gated frontend) is the default, "role-gated release" planned once RBAC exists
-- [Dependency Security](.docs/DEPENDENCY_SECURITY.md) — Trivy/pnpm-audit scanning, CVE remediation, CI gotchas
-- [Worktrees](.docs/WORKTREES.md) — location convention and the 5 numbered reusable worktrees
-- [Agent registry](.claude/agent-registry/README.md) — per-machine claims (`LOCAL_AGENT_CHECKOUTS.md`) and the one-at-a-time verification slot (`LOCAL_AGENT_VERIFICATION.md`). One-time setup per machine: `node .claude/agent-registry/agent-registry.mjs install`
-- [Demo Mode](.docs/DEMO_MODE.md) — Docker demo stack (persistent Postgres + seeded personas, no Clerk/YouTube), Playwright tours as E2E (`make demo-test`) or videos (`make demo-record`)
-- [Observability](.docs/OBSERVABILITY.md) — OTel/Faro → Grafana runbook (`make obs-up` / `make obs-smoke`), prod env vars, cardinality/sampling, metric names
+- [Migration Rollout](.docs/MIGRATION_ROLLOUT.md) — applying a migration to production Neon
+- [Neon Preview Branches](.docs/NEON_BRANCHING.md) — one Neon branch per open PR
+- [Release Approaches](.docs/RELEASE_APPROACHES.md) — shipping multi-PR features unseen; default is "**dark backend**"
+- [Dependency Security](.docs/DEPENDENCY_SECURITY.md) — Trivy/pnpm-audit, CVE remediation
+- [Worktrees](.docs/WORKTREES.md) — location convention, 5 numbered reusable worktrees
+- [Agent registry](.claude/agent-registry/README.md) — per-machine checkout claims and the verification slot. Setup once per machine: `node .claude/agent-registry/agent-registry.mjs install`
+- [Demo Mode](.docs/DEMO_MODE.md) — Docker demo stack, Playwright tours (`make demo-test`, `make demo-record`)
+- [Observability](.docs/OBSERVABILITY.md) — OTel/Faro → Grafana runbook (`make obs-up` / `make obs-smoke`)
 - [Query Budget](.docs/QUERY_BUDGET.md) — query-count tests, dataloaders, TanStack caching/eviction
-- [Project Management](project-management/README.md) — intent → spec → plan → PRs. Intents live in `project-management/intents/` (copy `_template.md`); one intent → many PRs, each linking back. Link to specs/plans/PRs rather than moving them.
+- [Project Management](project-management/README.md) — intent → spec → plan → PRs; intents in `project-management/intents/` (copy `_template.md`), one intent → many PRs. Link to specs/plans/PRs; don't move them.
 - [PR Workflow](.docs/PR_WORKFLOW.md) · [Planning](.docs/PLANNING.md) · [Hooks](.docs/HOOKS.md) · [Session Environment](.docs/SESSION_ENVIRONMENT.md)
-- [claude-md-audit eval](evals/claude-md-audit/README.md) — `claude plugin eval` suite for the `claude-md-improver` skill; rerun after changing CLAUDE.md tooling or before trusting a cheaper model with audits
+- [claude-md-audit eval](evals/claude-md-audit/README.md) — scores the `claude-md-improver` skill; rerun after changing CLAUDE.md tooling
 
 **How-to guides:**
 - [Adding a Content Type](.claude/docs/ADDING_CONTENT_TYPE.md) — end-to-end, backend + frontend
@@ -88,9 +91,9 @@
 - [Feature Backlog](FEATURE_BACKLOG.md) — capture future ideas here during development
 - [ADRs](docs/adr/README.md) — recorded decisions, including deliberately deferred features; check before proposing one
 - [Bug Tracking](.docs/BUG_TRACKING.md) — private (gitignored) bug tracking
-- **Jeeves ("jeevesbot")** — the planned AI assistant: [FEATURE_BACKLOG.md](FEATURE_BACKLOG.md#jeeves-ai-assistant), research in `.planning/v1.1-research/AI-ASSISTANT.md`, model-tier routing in [intents/jev-model-router.md](project-management/intents/jev-model-router.md). It will not run on oh-my-pi; harness-specific work lives in the owner's omp config repo.
+- **Jeeves ("jeevesbot")** — planned AI assistant: [FEATURE_BACKLOG.md](FEATURE_BACKLOG.md#jeeves-ai-assistant), research `.planning/v1.1-research/AI-ASSISTANT.md`, model routing [intents/jev-model-router.md](project-management/intents/jev-model-router.md). Not for oh-my-pi; harness-specific work lives in the owner's omp config repo.
 
-**Bug logging (MANDATORY):** log every bug you discover in `.planning/phases/bugs/BACKLOG.md` with severity and location, and open a GitHub issue from the bug report template (sensitive details — exact paths, line numbers, security specifics — stay in the backlog only). When fixed, move it to `.planning/phases/bugs/CLOSED.md` with the PR reference. These files are gitignored — never commit them.
+**Bug logging (MANDATORY):** log every bug you discover in `.planning/phases/bugs/BACKLOG.md` with severity and location, and open a GitHub issue from the bug report template (sensitive details — exact paths, line numbers, security specifics — stay in the backlog only). When fixed, move it to `.planning/phases/bugs/CLOSED.md` with the PR reference. These files are gitignored.
 
 **Hooks:** Claude Code PreToolUse hooks guard `.env` reads and block `gh pr create` until `/revise-claude-md` has run (then create the PR with `gh api`). The git pre-commit hook (gofmt + prettier auto-fix) is off until `make install-hooks` (in `backend/`; fresh cloud/CI checkouts lack it). Full list: [.docs/HOOKS.md](.docs/HOOKS.md).
 

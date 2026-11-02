@@ -24,7 +24,7 @@ Small interface, lots of work hidden behind it (Ousterhout). Hexagonal decides w
 
 ## Configuration
 
-Env vars override `config/config.json`. `.env.example` names every variable (values blank on purpose); a human fills `backend/.env` ([../.docs/SECURITY.md](../.docs/SECURITY.md)).
+Env vars override `config/config.json` (local, gitignored; copy `config/config.example.json`). `.env.example` names every variable (values blank on purpose); a human fills `backend/.env` ([../.docs/SECURITY.md](../.docs/SECURITY.md)).
 
 **Database is remote and shared (Neon, us-east-1).** No local DB or `make docker-up` is needed for dev; never run migrations against it (see Migrations). `DATABASE_URL` is a Neon **direct** string (no `-pooler`) with `sslmode=require`: the realtime listener uses LISTEN/NOTIFY, which Neon's pooler doesn't support.
 
@@ -111,7 +111,7 @@ Order: domain model (`core/domain/`) → repository port (`core/ports/repositori
 
 ## Go Version Management
 
-- `go.mod` pins the exact patch (`go 1.27.2`, no `toolchain` line); CI's setup-go reads it via `go-version-file`, so bumping the patch here moves CI. **Never hardcode Go versions in CI or deployment configs**; reference `go.mod`.
+- `go.mod` pins the exact patch (no `toolchain` line); CI's setup-go reads it via `go-version-file`, so bumping the patch there moves CI. **Never hardcode Go versions in CI or deployment configs**; reference `go.mod`.
 - Dockerfiles pin the base image (`golang:1.27-alpine`).
 - **Upgrading Go:** `go mod edit -go=<ver>` → `go mod tidy` → bump both Dockerfiles (`Dockerfile`, `Dockerfile.demo`) → README prerequisites.
 - Cloud containers ship an older Go; `GOTOOLCHAIN=auto` downloads the go.mod version on first use. Prefix `GOTOOLCHAIN=go1.X.Y` to run a specific one.
