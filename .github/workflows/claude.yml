@@ -30,9 +30,29 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Dependencies are installed here, before Claude starts, so Claude never
+      # needs permission to run `pnpm install` (install scripts run arbitrary code).
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
+        env:
+          # Same values ci.yml uses for `pnpm run build`
+          VITE_DEMO_MODE: 'true'
+          VITE_GRAPHQL_URL: http://localhost:8080/graphql
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
@@ -46,5 +66,9 @@ jobs:
           # Optional: Add claude_args to customize behavior and configuration
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr *)'
+          # Narrow allowlist: frontend tests, type-check and build only. Claude
+          # starts at the repo root (no working-directory input), so every
+          # command uses `pnpm --dir frontend`. No install, curl, gh api or interpreters.
+          claude_args: |
+            --allowed-tools "Bash(pnpm --dir frontend run test:run:*),Bash(pnpm --dir frontend run check:*),Bash(pnpm --dir frontend run build:*)"
 
