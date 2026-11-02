@@ -14,10 +14,10 @@ Today the only handling is `columnViewFor` (`columnLayouts.ts`), which picks the
 
 When the type filter is empty or has two or more types selected, a callout sits above the Activity table:
 
-> Pick one type or choose custom columns for the most relevant info.
+> Select one type or custom columns for the most relevant info.
 
-- "Pick one type" links to (or opens) the content-type filter.
-- "choose custom columns" opens the column picker (`ColumnPickerDialog`).
+- "one type" links to (or opens) the content-type filter.
+- "custom columns" opens the column picker (`ColumnPickerDialog`).
 - It does not show when exactly one type is selected.
 - This is a first step. It points users at the existing fixes; it does not change which columns appear. Smarter defaults for mixed views are a later piece of work.
 
@@ -47,7 +47,7 @@ When the type filter is empty or has two or more types selected, a callout sits 
 - **"Select custom columns" link:** opens `ColumnPickerDialog`.
 - **Mobile card list (<860px):** callout hidden, since the filter popup and Columns button don't exist there. Revisit with inline type chips later.
 - **Dismissal:** none. Always shown while the condition holds, even if a custom layout is saved (so no localStorage).
-- **Copy (short):** "Pick one type or choose custom columns for the most relevant info." "Pick one type" opens the Type filter popup; "choose custom columns" opens the column picker. Muted info banner with an info icon, one line on desktop.
+- **Copy (short):** "Select one type or custom columns for the most relevant info." "one type" opens the Type filter popup; "custom columns" opens the column picker. Muted info banner with an info icon, one line on desktop.
 - **Placement:** directly between `FilterChips` and the grid, so it reads as part of the table's header area and never competes with the chips that move into the page header on desktop.
 - **Saved custom layout:** the advice still shows (no dismissal); revisit if it reads as nagging.
 

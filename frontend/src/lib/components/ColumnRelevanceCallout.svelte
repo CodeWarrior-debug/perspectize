@@ -15,7 +15,7 @@
 	} = $props();
 
 	const linkClass =
-		'underline underline-offset-2 font-medium text-foreground hover:text-primary disabled:no-underline disabled:opacity-60 disabled:cursor-not-allowed';
+		'underline underline-offset-2 font-bold text-foreground hover:text-primary disabled:no-underline disabled:opacity-60 disabled:cursor-not-allowed';
 </script>
 
 <div
@@ -25,9 +25,10 @@
 >
 	<InfoIcon class="size-4 shrink-0" aria-hidden="true" />
 	<p>
-		<button type="button" class={linkClass} {disabled} onclick={onPickType}>Pick one type</button>
+		Select
+		<button type="button" class={linkClass} {disabled} onclick={onPickType}>one type</button>
 		or
-		<button type="button" class={linkClass} {disabled} onclick={onChooseColumns}>choose custom columns</button>
+		<button type="button" class={linkClass} {disabled} onclick={onChooseColumns}>custom columns</button>
 		for the most relevant info.
 	</p>
 </div>

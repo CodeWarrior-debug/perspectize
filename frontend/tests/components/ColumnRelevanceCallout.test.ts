@@ -6,7 +6,7 @@ describe('ColumnRelevanceCallout', () => {
 	it('renders the short copy', () => {
 		render(ColumnRelevanceCallout, { props: { onPickType: vi.fn(), onChooseColumns: vi.fn() } });
 		expect(screen.getByTestId('column-relevance-callout').textContent?.replace(/\s+/g, ' ').trim()).toBe(
-			'Pick one type or choose custom columns for the most relevant info.',
+			'Select one type or custom columns for the most relevant info.',
 		);
 	});
 
@@ -15,17 +15,17 @@ describe('ColumnRelevanceCallout', () => {
 		const onChooseColumns = vi.fn();
 		render(ColumnRelevanceCallout, { props: { onPickType, onChooseColumns } });
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Pick one type' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'one type' }));
 		expect(onPickType).toHaveBeenCalledOnce();
 		expect(onChooseColumns).not.toHaveBeenCalled();
 
-		await fireEvent.click(screen.getByRole('button', { name: 'choose custom columns' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'custom columns' }));
 		expect(onChooseColumns).toHaveBeenCalledOnce();
 	});
 
 	it('disables both links until the grid is ready', () => {
 		render(ColumnRelevanceCallout, { props: { onPickType: vi.fn(), onChooseColumns: vi.fn(), disabled: true } });
-		expect(screen.getByRole('button', { name: 'Pick one type' })).toBeDisabled();
-		expect(screen.getByRole('button', { name: 'choose custom columns' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'one type' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'custom columns' })).toBeDisabled();
 	});
 });
