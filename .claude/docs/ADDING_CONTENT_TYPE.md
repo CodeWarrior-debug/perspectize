@@ -165,7 +165,8 @@ Before Decision 1, check what the source's terms let you **store**, not just fet
 Worked example: `docs/superpowers/specs/2026-10-19-facebook-video-content-type-design.md` §2 and §6.
 
 **A new enum value needs no migration:** `content.content_type` has no CHECK constraint.
->>>>>>> 66f3d5c4 (docs(content-types): add source-terms decision to the guide)
+
+**Probing a source from a cloud session:** shared public keys (e.g. data.gov `DEMO_KEY`) are usually already rate-limited from the cloud IP. Verify field paths with a keyless endpoint or a recorded fixture, and mark anything unprobed as "to verify" in the spec.
 
 ## Implementation Steps
 

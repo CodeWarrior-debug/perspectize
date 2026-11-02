@@ -41,6 +41,8 @@
   .tile svg{width:20px;height:20px}
   .tile img{width:100%;height:100%;object-fit:cover}
   .tile.poster{width:24px;height:36px}
+  .tile.contain{background:#fff;border:1px solid var(--border)}.tile.contain img{object-fit:contain}
+  .media.contain{object-fit:contain;background:#fff;border:1px solid var(--border)}
   .item .t{font-family:ui-serif,Georgia,serif;font-size:13px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
   .item .t.sans{font-family:inherit}
   .item .t:hover{text-decoration:underline;color:var(--primary)}
@@ -142,6 +144,7 @@
 <script>
 const S = SPEC;
 const ICONS = {
+  food:'<path d="M12 7c-1.5-2-5-2.5-6.5 0S4 14 6 17.5 10 21 12 20c2 1 4 1 6-2.5S20.5 9.5 18.5 7 13.5 5 12 7z"/><path d="M12 7c0-2 1-3.5 3-4"/>',
   book:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M12 6v8M9 9h6"/>',
   film:'<rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 7h5M17 17h5"/>',
   music:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
@@ -164,7 +167,7 @@ document.getElementById('note').innerHTML = `<b>What you are looking at.</b> The
 // ---- cell renderers by column.kind ----
 const R = {
   perspectize: (c,row) => `<span class="pz ${row.hasPerspective?'has':''}" data-open="${row.id}" data-view="persp">✎</span>`,
-  item: (c,row) => { const v=c||{}; const th = v.thumb ? `<span class="tile ${v.thumbShape==='poster'?'poster':''}"><img src="${esc(v.thumb)}" alt=""></span>` : `<span class="tile">${icon(S.type.icon)}</span>`;
+  item: (c,row) => { const v=c||{}; const th = v.thumb ? `<span class="tile ${v.thumbShape==='poster'?'poster':v.thumbShape==='contain'?'contain':''}"><img src="${esc(v.thumb)}" alt=""></span>` : `<span class="tile">${icon(S.type.icon)}</span>`;
     const t = v.title ?? '—', sub = v.sub || null;
     return `<div class="item">${th}<div><div class="t ${S.type.serifTitles===false?'sans':''}" data-open="${row.id}">${esc(t)}</div>${sub?`<div class="s">${esc(sub)}</div>`:''}</div></div>`; },
   pill: c => isEmpty(c) ? DASH : `<span class="pill">${esc(val(c))}</span>${c.suffix?`<span class="suffix">${esc(c.suffix)}</span>`:''}`,
@@ -216,7 +219,7 @@ function render(){
   const textHtml = (d.text||[]).map(([n,t])=> n==null ? `<div class="empty">${esc(t)}</div>` : `<div><sup>${esc(n)}</sup>${esc(t)}</div>`).join('');
   const pos = d.position;
   const details = `<div class="mb"><div>
-    ${d.media?`<img class="media" src="${esc(d.media)}" alt="">`:''}
+    ${d.media?`<img class="media ${d.mediaFit==='contain'?'contain':''}" src="${esc(d.media)}" alt="">`:''}
     ${textHtml?`<div class="sec"><h4>${esc(d.textLabel||'Text')} ${d.textStatus?`<span class="badge ${d.textStatus}">${d.textStatus}</span>`:''}</h4><div class="text ${S.type.serifText===false?'sans':''}">${textHtml}</div></div>`:''}
     ${pos?`<div class="sec"><h4>${esc(pos.label)} ${pos.status?`<span class="badge ${pos.status}">${pos.status}</span>`:''}</h4><div class="bar" data-tip="${tipRef(esc(pos.tip||''))}">${(pos.markers||[]).map(m=>`<span class="mk" style="left:${m}%"></span>`).join('')}<span class="seg" style="left:${pos.left}%;width:${pos.width}%"></span></div><div class="bar-lbl">${(pos.labels||[]).map(l=>`<span>${esc(l)}</span>`).join('')}</div></div>`:''}
     ${(d.links||[]).map(g=>`<div class="sec links"><h4>${esc(g.label)} ${g.status?`<span class="badge ${g.status}">${g.status}</span>`:''}</h4>${g.picker?`<div>${esc(g.picker.label)}: <select>${g.picker.options.map(o=>`<option>${esc(o)}</option>`).join('')}</select> <a href="#" onclick="return false">${esc(g.picker.link)} ↗</a> ${g.picker.note?`<span style="color:var(--muted-fg);font-size:11px">(${esc(g.picker.note)})</span>`:''}</div>`:''}${g.items?`<ul>${g.items.map(x=>`<li><a href="#" onclick="return false">${esc(x)}</a></li>`).join('')}</ul>`:''}</div>`).join('')}
