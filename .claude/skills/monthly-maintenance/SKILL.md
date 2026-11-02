@@ -1,6 +1,7 @@
 ---
 name: monthly-maintenance
 description: Run the monthly repo maintenance routine (merged-branch cleanup, dependabot/security PR merges, graphify update, gsd map-codebase refresh, bundle size + lines-of-code measurement, video-capture demo tool compaction). Use when prompted by the SessionStart monthly-routine check, or when the user asks to "run the monthly routine" / "run monthly maintenance".
+model: sonnet
 ---
 
 # Monthly Maintenance Routine

@@ -1,217 +1,114 @@
 # Frontend: Perspectize SvelteKit
 
-SvelteKit web app with Svelte 5, TanStack Query, AG Grid, shadcn-svelte, and Tailwind v4.
+SvelteKit SPA (`ssr = false`, `prerender = false`), Svelte 5 runes only.
 
-## Architecture
+## Deep Modules
 
-```
-frontend/src/
-├── routes/              # SvelteKit file-based routing
-│   ├── +layout.svelte   # Root layout (QueryClientProvider, Header, Toaster)
-│   ├── +layout.ts       # Layout config (SPA: prerender = false, ssr = false)
-│   └── +page.svelte     # Home page
-├── lib/
-│   ├── components/      # Svelte 5 components
-│   │   ├── shadcn/      # shadcn-svelte primitives (button/)
-│   │   ├── Header.svelte
-│   │   ├── PageWrapper.svelte
-│   │   └── …                # ActivityTable, feature folders (auth/, discover/, interlinear/, …)
-│   ├── queries/         # TanStack Query + graphql-request
-│   │   ├── client.ts    # GraphQLClient (VITE_GRAPHQL_URL)
-│   │   ├── keys.ts      # Cross-domain query keys
-│   │   └── content/     # One folder per domain: index.ts (gql defs) + its hooks
-│   ├── assets/          # Static assets (favicon)
-│   └── utils/           # Utility functions
-├── app.css              # Global styles (Tailwind v4)
-└── app.html             # HTML shell
-```
-
-### Deep Modules
-
-Small interface, lots of work hidden behind it (Ousterhout). Test: _how little must a caller know vs. how much does it handle?_
-
-**Independent of hexagonal.** The frontend isn't hexagonal (no ports/adapters — components call hooks directly), and doesn't need to be to have deep modules. Hexagonal is about dependency direction (backend); deep modules is about boundary quality (both stacks).
+Small interface, lots of work hidden behind it (Ousterhout). The frontend isn't hexagonal; deep modules is about boundary quality, not dependency direction.
 
 - **One folder per domain** — `lib/queries/{content,perspectives,users,categories,…}/` holds the `gql` defs (`index.ts`) _and_ that domain's hooks (`useCreatePerspective.ts`). Only `client.ts`/`keys.ts` are top-level.
 - **Import the domain, not its guts** — `import { LIST_CONTENT } from '$lib/queries/content'`; components call a hook, never `graphqlClient.request` + cache invalidation inline.
-- **Hide cache wiring in the hook** — query keys, `invalidateQueries`, optimistic updates live inside `useX`, so callers get `{ mutate, isPending }` and nothing else.
-- **No pass-through components** — a wrapper that only forwards props/snippets to one child adds surface without hiding anything; inline it or give it state/logic.
-
-Refs: Ousterhout, _A Philosophy of Software Design_; Matt Pocock, [How To Make Codebases AI Agents Love](https://www.aihero.dev/how-to-make-codebases-ai-agents-love) (why deep modules help agents navigate). Origin: PR #339.
+- **Hide cache wiring in the hook** — query keys, `invalidateQueries`, optimistic updates live inside `useX`; callers get `{ mutate, isPending }` and nothing else.
+- **No pass-through components** — a wrapper that only forwards props/snippets to one child: inline it or give it state/logic.
 
 ## Docs
 
 - [Design Spec](docs/DESIGN_SPEC.md) — Figma design system, color tokens, typography, component specs
 - [Adding an AG Grid Column](../.claude/docs/ADDING_AG_GRID_COLUMN.md) — decision checklist for ActivityTable columns
+- [AG Grid setup](docs/AG_GRID.md)
 - Figma: see [Figma Design Workflow](#figma-design-workflow) below
+- [Frontend deployment](../.docs/FRONTEND_DEPLOYMENT.md) — read before editing `static/_headers`, `static/_redirects`, stale-chunk recovery (`app.html`, `versionWatch.ts`, `kit.version`) or PWA/service-worker config, or when a deployed page fails to load a JS chunk
+- [Vitest Browser Mode capture](../.docs/VITEST_BROWSER_CAPTURE.md) — read before taking screenshots or recording video from `tests/browser/`
 
 ## shadcn-svelte Components
 
-Components live in `src/lib/components/shadcn/` (not `ui/`). The `components.json` alias is configured correctly, but the CLI sometimes ignores it. After installing a new component, verify it landed in `shadcn/` — if it went to `ui/`, move it and remove the empty `ui/` directory. Always add new components to the barrel export in `shadcn/index.ts`.
+Components live in `src/lib/components/shadcn/` (not `ui/`). Install from `frontend/` with `npx shadcn-svelte@latest add <component> --yes`; the CLI sometimes ignores the `components.json` alias, so if it lands in `ui/`, move it to `shadcn/` and delete the empty `ui/`. Add every new component to the barrel `shadcn/index.ts`.
 
-```bash
-# Install from frontend/ directory
-npx shadcn-svelte@latest add <component> --yes
-# Verify location
-ls src/lib/components/shadcn/<component>/
-```
+## Tooling gotchas
 
-## Tailwind v4
+**TypeScript 7 runs as `@typescript/native` (npm alias of `typescript@7`); `typescript` stays on 6.x.** `svelte-check` and `@sveltejs/kit` only declare TS ^5/^6 peers, and svelte-check refuses TS 7 unless 6.x is installed and `--tsgo` is passed. Keep both. Type-check with `pnpm run check` (passes `--tsgo`), not raw `node_modules/@typescript/native/bin/tsc` (16 false errors on `*.svelte` imports).
 
-Tailwind v4 uses `--color-*` prefix for theme variables (e.g., `--color-primary`), not bare `--primary` from v3/shadcn conventions.
+**`pnpm exec` must run from `frontend/`** (repo root fails with `ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE`). Use `pnpm --dir frontend exec ...`.
 
-## Commands
+**Cloud/CI sandboxes start with no `frontend/node_modules`**, and `check`/`test:run` then fail with confusing module-resolution errors. Run `pnpm install --frozen-lockfile --config.engine-strict=false` once in `frontend/` (cloud Node 22.22.0 fails jsdom's ^22.22.2 engine check otherwise; easy to miss when output is redirected).
 
-```bash
-pnpm run dev          # Dev server (http://localhost:5173)
-pnpm run check        # Type-check: svelte-check --tsgo (TypeScript 7 native checker)
-pnpm run test:run     # Tests once (CI/verification)
-pnpm run test         # Tests in watch mode
-```
+**Run `pnpm install` right after checking out a branch with dependency changes**, before trusting any baseline. Stale `node_modules` makes a missing package look like "pre-existing" `check` errors and test failures (one effort carried a wrong 7-errors/8-failures baseline that was entirely a missing `graphql-ws`).
 
-**TypeScript 7 runs as `@typescript/native` (npm alias of `typescript@7`); `typescript` stays on 6.x.** `svelte-check` and `@sveltejs/kit` only declare TypeScript ^5/^6 as peers, and svelte-check refuses TS 7 unless 6.x is also installed and `--tsgo` is passed. Keep both; `pnpm run check` already passes `--tsgo`. Raw `node_modules/@typescript/native/bin/tsc` is the TS 7 compiler, but it reports 16 false errors (`*.svelte` imports); use `pnpm run check` for type-checking, not raw `tsc`.
-
-**`pnpm exec` must run from `frontend/`** — running from repo root fails with `ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE`. Use `cd frontend && pnpm exec ...` or `pnpm --dir frontend exec ...`.
-
-**Cloud/CI sandbox sessions start with no `frontend/node_modules`** (a fresh container/checkout, unlike a local dev machine). `pnpm run check`, `test:run`, etc. fail with confusing module-resolution errors — not an "install first" message — until `pnpm install` is run once in `frontend/`. Cloud containers ship Node 22.22.0 while jsdom requires ^22.22.2, so `pnpm install --frozen-lockfile` fails the engine check (easy to miss when output is redirected); use `pnpm install --frozen-lockfile --config.engine-strict=false`.
-
-**`pnpm-lock.yaml` merge conflicts:** accept either side (`git checkout --theirs frontend/pnpm-lock.yaml`), then regenerate with `pnpm install --dir frontend`. Use `--dir` instead of `cd` to avoid hook/shell side effects that can switch branches mid-operation.
-
-**Env vars:** `.env.example` lists every `VITE_*` variable by name (values blank on purpose). Copy it to `frontend/.env` and fill in real values by hand — the agent cannot read `.env` (see [../.docs/SECURITY.md](../.docs/SECURITY.md)).
+**`pnpm-lock.yaml` merge conflicts:** take either side (`git checkout --theirs frontend/pnpm-lock.yaml`), then `pnpm install --dir frontend`. Use `--dir`, not `cd`, to avoid hook/shell side effects that can switch branches mid-operation.
 
 ## Svelte 5 Patterns
 
-This project uses **Svelte 5 runes** exclusively. Do not use Svelte 4 syntax.
+Runes only: `$state`, `$derived`, `$props` (`let { data, children } = $props()`), `$effect`, `{@render children()}`, `onclick={…}`. No Svelte 4 syntax (`$:`, `export let`, `<slot />`, `on:click`). Derive with `$derived`, never in `$effect`.
 
-| Svelte 5 (use this)                 | Svelte 4 (do NOT use)         |
-| ----------------------------------- | ----------------------------- |
-| `let count = $state(0)`             | `let count = 0` with `$:`     |
-| `let doubled = $derived(count * 2)` | `$: doubled = count * 2`      |
-| `let { data, children } = $props()` | `export let data`             |
-| `$effect(() => { ... })`            | `onMount` / `$:` side effects |
-| `{@render children()}`              | `<slot />`                    |
-| `onclick={handler}`                 | `on:click={handler}`          |
+**Runes in a plain module need the `.svelte.ts` extension.** A rune in a bare `.ts` file fails at build/type-check with no error pointing at the cause. Name shared reactive modules `foo.svelte.ts` (see `lib/theme/store.svelte.ts`).
 
-**Additional rules:** Never use `$effect` for derivation (use `$derived`). Render children via `{@render children()}` with `let { children } = $props()`.
+**`$effect` tracks only state read _synchronously_ in its body.** A value read solely inside a `setTimeout`/`Promise`/`await` callback is not a dependency, so the effect never re-runs. For a debounce, copy the value to a local first (`const term = searchTerm;`) and use the local in the timer (see `CategoryTypeahead.svelte`).
 
-**Runes in a plain `.ts` module require the `.svelte.ts` extension.** `$state`/`$derived`/etc. only compile in `.svelte` files or files named `*.svelte.ts` — a rune used in a bare `.ts` file fails at build/type-check time with no Svelte-specific error pointing at the cause. Any non-component module that needs reactive state (e.g. a shared store) must be named `foo.svelte.ts`, not `foo.ts` — see `frontend/src/lib/theme/store.svelte.ts`.
+**An `$effect` that writes a `$state` var and then reads it back loops** (`effect_update_depth_exceeded`), even when the value is unchanged. Read from a local `const` derived off the source prop instead (see `PerspectivePopover.svelte`'s `existingPerspective` reset effect).
 
-**`$effect` only tracks state read _synchronously_ in the effect body.** A value read solely inside a `setTimeout`/`Promise`/`await` callback is NOT a tracked dependency, so the effect runs once on mount and never re-runs. For a debounce, copy the reactive value into a local const at the top of the effect first (`const term = searchTerm;`), then use the local inside the timer — see `CategoryTypeahead.svelte`. (Bug history: its Wikidata search once read `searchTerm` only inside its `setTimeout`, so the debounced term never updated and the search query never fired.)
-
-**An `$effect` that writes a `$state` var and then reads that same var back (even just-assigned) loops.** Svelte 5 flags this as `effect_update_depth_exceeded` — assigning `foo = x` then reading `foo.length` later in the same effect re-triggers the effect indefinitely, even though the value is unchanged. Fix: read from a local `const` derived off the source (prop) instead of reading the `$state` var back. See `PerspectivePopover.svelte`'s `existingPerspective` reset effect.
-
-**An Escape handler inside a bits-ui dialog must run in the capture phase, or the dialog closes on the same keypress.** bits-ui's escape layer listens for `keydown` on `document` in the bubble phase and the dialog registered first, so a bubble-phase listener (including `<svelte:document onkeydown>`) runs too late for `stopPropagation` to help, and its `onEscapeKeydown` gets a cloned event so `defaultPrevented` is lost. Register `document.addEventListener('keydown', h, { capture: true })` in an `$effect` (with cleanup) and call `stopPropagation()` only while your inner element (popover, pin) is actually showing, so a second Escape still closes the dialog. See `interlinear/InterlinearPassage.svelte`; its test uses a bubble-phase `document` spy to prove the dialog never sees the first Escape.
+**An Escape handler inside a bits-ui dialog must run in the capture phase, or the dialog closes on the same keypress.** bits-ui listens on `document` in the bubble phase and registered first, so a bubble-phase listener (including `<svelte:document onkeydown>`) is too late for `stopPropagation`, and `onEscapeKeydown` gets a cloned event (`defaultPrevented` lost). Register `document.addEventListener('keydown', h, { capture: true })` in an `$effect` with cleanup, and `stopPropagation()` only while your inner element (popover, pin) is showing, so a second Escape still closes the dialog. See `interlinear/InterlinearPassage.svelte` and its bubble-phase `document` spy test.
 
 ## Auth (Clerk + demo mode)
 
-**Don't import `svelte-clerk` in new components.** Use the facade: `useAuthState()` (`$lib/auth/useAuthState`), `getAuthToken()` (`$lib/auth`), and `components/auth/{AuthShow,SignInTrigger,UserMenu}.svelte`. With `VITE_DEMO_MODE=true` there is no `ClerkProvider` in the tree, so a direct `useClerkContext()`/`<Show>` crashes demo mode (and the `demo-e2e` CI job). `$lib/auth` itself must stay free of `svelte-clerk` imports — importing the real package into a plain module breaks unit tests that load it (`$env/dynamic/public` is undefined under Vitest). See [../.docs/DEMO_MODE.md](../.docs/DEMO_MODE.md).
+**Use the auth facade, not `svelte-clerk`, in components:** `useAuthState()` (`$lib/auth/useAuthState`), `getAuthToken()` (`$lib/auth`), and `components/auth/{AuthShow,SignInTrigger,UserMenu}.svelte`. With `VITE_DEMO_MODE=true` there is no `ClerkProvider`, so a direct `useClerkContext()`/`<Show>` crashes demo mode (and the `demo-e2e` CI job). Keep `$lib/auth` free of `svelte-clerk` imports: under Vitest `$env/dynamic/public` is undefined and unit tests that load it break. See [../.docs/DEMO_MODE.md](../.docs/DEMO_MODE.md).
 
 ## TanStack Query + GraphQL
 
-Queries use `graphql-request` with TanStack Svelte Query.
+**Svelte 5 API (CRITICAL):** pass a function to `createQuery(() => ({ queryKey, queryFn }))`, never an options object, and read results as reactive properties (`query.data`, `query.isPending`), never store syntax (`$query.data`).
 
-1. Define queries in `lib/queries/` using `gql` tagged templates
-2. Client in `lib/queries/client.ts` — uses `VITE_GRAPHQL_URL` (defaults to `http://localhost:8080/graphql`)
-3. QueryClientProvider wraps app in `+layout.svelte` with `enabled: browser` to prevent SSR queries
+**Adding a `useX` hook to a component means mocking it in that component's tests.** Component tests (e.g. `tests/components/PerspectivePopover.test.ts`) `vi.mock` each mutation hook and render without a QueryClient provider; an unmocked hook calls the real `useQueryClient()` and throws.
 
-**Svelte 5 API (CRITICAL):** TanStack Query v5+ with Svelte 5 uses a **function wrapper** pattern. Query results are reactive objects, NOT stores (no `$` prefix).
+**`queryKey` must mirror every variable `queryFn` actually sends, including conditionals.** If `queryFn` sends `mode === 'all' ? filter : undefined`, the key needs the same conditional. A key field that doesn't change when the request variable does means TanStack never refetches and silently serves stale data (bug: `ActivityTable.svelte`'s search hardcoded `search: ''` in the "Loaded" key, so typing or clearing never refetched).
 
-```svelte
-<script lang="ts">
-	import { createQuery } from '@tanstack/svelte-query';
-	import { graphqlClient } from '$lib/queries/client';
-	import { LIST_CONTENT } from '$lib/queries/content';
-
-	// Function wrapper pattern — pass a function returning options
-	const query = createQuery(() => ({
-		queryKey: ['content'],
-		queryFn: () => graphqlClient.request(LIST_CONTENT),
-	}));
-</script>
-
-<!-- Access as reactive object properties (NO $ prefix) -->
-{#if query.isLoading}Loading...{/if}
-{#if query.data}{JSON.stringify(query.data)}{/if}
-```
-
-**Do NOT:** Use `$query.data` (stores syntax) · Pass options object directly to `createQuery({...})` (must be function wrapper)
-
-**Adding a `useX` hook to a component means mocking it in that component's tests.** Component tests (e.g. `tests/components/PerspectivePopover.test.ts`) `vi.mock` each mutation hook individually and render without a QueryClient provider. A newly imported hook left unmocked calls the real `useQueryClient()` and throws.
-
-**`queryKey` must mirror every variable `queryFn` actually sends.** If `queryFn` conditionally builds request variables (e.g. `mode === 'all' ? filter : undefined`), the `queryKey` object needs the _same_ conditional — not a shortcut that hardcodes a fixed value for one branch. A `queryKey` field that doesn't change when the real request variable does means TanStack Query never sees a reason to refetch: the UI silently keeps serving stale cached data for that branch, no matter how the input changes (including back to empty/cleared). Caught in `ActivityTable.svelte`'s search box, which hardcoded `search: ''`/`filter: undefined` in the key for "Loaded" mode while `queryFn` unconditionally sent the real filter — so typing or clearing the search input never refetched.
-
-**`isLoading` is `false` for a paused (offline) query — branch on `isPending` for the loading state.** TanStack v5 defines `isLoading = isPending && isFetching`; while the network is offline a first fetch is paused (`isPending: true`, `isFetching: false`, no data, no error). A `{#if isLoading}…{:else if isError}…{:else if data}` chain then renders nothing at all. `interlinear/OriginalLanguage.svelte` uses `isPending`; its test covers `{ isPending: true, isLoading: false, isError: false, data: undefined }`.
+**Branch on `isPending`, not `isLoading`, for the loading state.** `isLoading = isPending && isFetching`; an offline first fetch is paused (`isPending: true`, `isFetching: false`), so an `isLoading`/`isError`/`data` chain renders nothing. See `interlinear/OriginalLanguage.svelte` and its test.
 
 ## Query caching & call budget (REQUIRED for data-fetching changes)
 
-The aim is one network call per distinct piece of data, deliberate freshness, and exact cache eviction. Test with a **real** `QueryClient` via `tests/helpers/queryBudget.ts` (worked examples: `tests/unit/query-cache-contract.test.ts`).
+Target: one network call per distinct piece of data, deliberate freshness, exact eviction. Test with a **real** `QueryClient` via `tests/helpers/queryBudget.ts` (examples: `tests/unit/query-cache-contract.test.ts`).
 
-- **One hook, one key per piece of data.** Two components needing the same data call the same `useX` (same `queryKey`); never a second hand-rolled `createQuery`. Test: `mountConsumers(client, opts, 3)` → `fetches() === 1`.
-- **Choose `staleTime` on purpose.** Default `0` refetches on every mount. Immutable data → `Infinity`; user-scoped → minutes; lists → ~30–60s. Test: a second mount inside `staleTime` costs 0 calls.
-- **Keys come from `queryKeys` (`lib/queries/keys.ts`)** and mirror every variable `queryFn` sends (see the `queryKey` rule above). Test: `hashKey` changes when each variable changes.
-- **Mutations evict exactly what changed** — affected lists/details/aggregates, never a root key (`queryKeys.all`, `content.all()`) "to be safe". Patch optimistically only caches of the *same row shape*, and roll back in `onError`. Test: `seed` affected + unrelated keys, run `onSuccess`, then assert both `invalidationOutcome(...).invalidated` and `.untouched`.
-- **Mocked `invalidateQueries` assertions are not enough** — they pass even when the key matches no cache entry. Keep them for branch coverage, add a real-client eviction test.
-- No fetch from an `$effect` that can loop, or per keystroke without a debounce.
+- **One hook, one key per piece of data.** Components needing the same data call the same `useX`, never a second hand-rolled `createQuery`. Test: `mountConsumers(client, opts, 3)` → `fetches() === 1`.
+- **Choose `staleTime` on purpose** (default `0` refetches every mount). Immutable → `Infinity`; user-scoped → minutes; lists → ~30–60s. Test: a second mount inside `staleTime` costs 0 calls.
+- **Keys come from `queryKeys` (`lib/queries/keys.ts`)** and follow the `queryKey` rule above. Test: `hashKey` changes when each variable changes.
+- **Mutations evict exactly what changed** — affected lists/details/aggregates, never a root key (`queryKeys.all`, `content.all()`) "to be safe". Patch optimistically only caches of the _same row shape_, and roll back in `onError`. Test: `seed` affected + unrelated keys, run `onSuccess`, assert both `invalidationOutcome(...).invalidated` and `.untouched`.
+- **Mocked `invalidateQueries` assertions pass even when the key matches no cache entry.** Keep them for branch coverage; add a real-client eviction test.
+- Debounce fetches driven by keystrokes, and keep fetches out of `$effect`s that can loop.
 
 Full table: [../.docs/QUERY_BUDGET.md](../.docs/QUERY_BUDGET.md).
 
 ## UI conventions
 
 - **Nav labels are one word** (`Header.svelte` `navLinks`: Activity, Discover, Compare); name new top-level pages with a one-word verb.
-- **Toasts:** svelte-sonner, configured once in `TOASTER_PROPS` (`lib/utils/toast.ts`, spread into both `<Toaster>`s in `+layout.svelte`): default 2s, and `expand: true` so simultaneous toasts sit apart instead of overlapping. A toast that carries an action button uses `toastWithAction` (`lib/utils/toast.ts`, `ACTION_TOAST_DURATION_MS` = 4s) so there's time to click it; its `secondary` option adds a second choice.
+- **Toasts:** svelte-sonner, configured once in `TOASTER_PROPS` (`lib/utils/toast.ts`, spread into both `<Toaster>`s in `+layout.svelte`): 2s default, `expand: true` so simultaneous toasts don't overlap. A toast with an action button uses `toastWithAction` (`ACTION_TOAST_DURATION_MS` = 4s); its `secondary` option adds a second choice.
 - **User-supplied HTML:** sanitize with `sanitizeHtml` (`lib/utils/sanitize.ts`, DOMPurify) and render through `SafeHtml.svelte`; the backend mirrors the same tag set with bluemonday (`services/sanitize.go`). Change both together. See [.docs/SECURITY.md](../.docs/SECURITY.md#user-supplied-html).
+- **Icons:** per-icon imports, `import XIcon from '@lucide/svelte/icons/x'` (kebab-case name). Buttons size icons `size-4`; override with an explicit `size-*`.
 
-## Icons (Lucide)
+## Theme tokens and colour
 
-Per-icon imports from `@lucide/svelte` for tree-shaking:
+Tokens live in `src/app.css` under `@theme` (no external pipeline), consumed via Tailwind utilities. Tailwind v4 names them `--color-*` (e.g. `--color-primary`), not bare `--primary` (v3/shadcn).
 
-```svelte
-<script lang="ts">
-	import XIcon from '@lucide/svelte/icons/x';
-	import PlusIcon from '@lucide/svelte/icons/plus';
-</script>
+**Pre-commit colour guard:** the git pre-commit hook (`make install-hooks`; [.docs/HOOKS.md](../.docs/HOOKS.md)) blocks new raw hex/rgb literals in `src/lib/components/**` and `formatting.ts`. Use theme tokens (`.docs/UI_THOROUGHNESS_CHECKLIST.md` §3.3); allowlist an intentional literal inline with a `hex-ok: <reason>` comment.
 
-<XIcon class="size-4" />
-```
+**A bare `border` class is `currentColor` under Tailwind v4.** Pair it with `border-border` (or `border-b border-border` etc.), or the frame renders in the text colour.
 
-- Import path: `@lucide/svelte/icons/{kebab-case-name}`
-- Default size in buttons: `size-4` (applied via button base). Override with explicit `size-*` class.
-
-## Pre-commit colour guard
-
-The shared git pre-commit hook (`make install-hooks`; see [.docs/HOOKS.md](../.docs/HOOKS.md)) **blocks** new raw hex/rgb colour literals added to `src/lib/components/**` or `formatting.ts` — use theme tokens (see `.docs/UI_THOROUGHNESS_CHECKLIST.md` §3.3). Allowlist an intentional literal inline with a `hex-ok: <reason>` comment.
-
-## Design Tokens
-
-All tokens defined in `src/app.css` under `@theme`. Full set: primary, secondary, muted, accent, destructive, card, popover, border, input, ring, rating colors, brand.
-
-- **Fonts:** Geist (UI/headings) + Charter (body/reading text)
-- **Colors:** Hex values in `--color-*` custom properties (Tailwind v4 convention)
-- **No external token pipeline** — tokens defined directly in CSS, consumed via Tailwind utilities
+**Theme preset names must be unique across all of `THEME_PRESETS`, not just ids** (`tests/components/theme-customize-panel.test.ts` uses `getByText` per name). After editing `presets.ts`, regenerate `app.css`'s `[data-theme]` blocks with `npx tsx gen-preset-css.mjs` and splice its output in place of the existing preset blocks (between the `Reading Room (default) needs no block` comment and the next unrelated CSS section); never hand-edit hex values.
 
 ## AG Grid Svelte 5 Setup (CRITICAL)
 
-Uses `ag-grid-svelte5` wrapper (bundles AG Grid v32.x). **Do NOT install `ag-grid-community` separately.** Import from `@ag-grid-community/*`, use `AgGridSvelte5Component`, style via `themeQuartz.withParams()`.
+Uses `ag-grid-svelte5` (bundles AG Grid v32.x). **Do NOT install `ag-grid-community` separately.** Import from `@ag-grid-community/*`, use `AgGridSvelte5Component`, style via `themeQuartz.withParams()`. Setup: [docs/AG_GRID.md](docs/AG_GRID.md).
 
-Full setup and examples: [docs/AG_GRID.md](docs/AG_GRID.md)
+**Column visibility gotcha:** `ActivityTable.svelte` sets visibility in TWO places; update BOTH: `hide: true` in the colDef (initial default) and the `$effect` with `setColumnsVisible()` (responsive override, runs on gridReady, always wins). Tiers: xs (<445px), sm (445-639px), md (640-899px), lg (900px+); choose which show the new column. See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) Decision 7.
 
-**Column visibility gotcha:** `ActivityTable.svelte` controls visibility in TWO places that must stay in sync: `hide: true` in colDef (initial default) and `$effect` with `setColumnsVisible()` (responsive override — runs on gridReady, always wins). When adding/changing columns, update BOTH. The responsive system uses 4 tiers: xs (<445px), sm (445-639px), md (640-899px), lg (900px+) — decide which tier(s) should show the new column. See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) Decision 7.
+**Column metadata lives in one place:** `src/lib/utils/grid-config.ts`'s `COLUMNS: readonly ColumnMeta[]` derives the column picker, sort picker, server/client sort maps, URL filter keys and filter-chip labels. Add a column as one `COLUMNS` entry; never edit `DATA_COLUMNS`/`SORTABLE_COLUMNS`/`COL_TO_SORT`/`COL_TO_FILTER_KEY`/`COLUMN_LABELS` individually.
 
-**Column metadata lives in one place:** `src/lib/utils/grid-config.ts`'s `COLUMNS: readonly ColumnMeta[]` is the single source of truth for the column picker, sort picker, server/client sort maps, URL filter keys, and filter-chip labels — all derived from one `ColumnMeta` entry per column via `.filter()`/`.map()`/`Object.fromEntries()`, not five separately hand-maintained lists. Adding a column means adding one `COLUMNS` entry, not editing `DATA_COLUMNS`/`SORTABLE_COLUMNS`/`COL_TO_SORT`/`COL_TO_FILTER_KEY`/`COLUMN_LABELS` individually. See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md).
+**Grid remount gotcha:** the `cardMode` breakpoint (<860px) and the error state unmount `AgGridSvelte5Component`, creating a new Grid API on return. Re-apply imperative column state (`setColumnsVisible`, `applyColumnState`, the session column-picker override) from an `$effect` that reruns on `gridReady`, not only when the user changes it.
 
-**Grid remount gotcha:** the `cardMode` breakpoint (<860px) and the error state unmount `AgGridSvelte5Component` entirely — a new Grid API is created on the way back, so any imperative column state (`setColumnsVisible`, `applyColumnState`, the session column-picker override) MUST be re-applied from an `$effect` that reruns on `gridReady`, not just at the moment the user changes it.
+**Grid column APIs can't run from `onGridReady`:** `setColumnsVisible`/`applyColumnState` called from `onGridReady` (or an effect it triggers) throws `Cannot read properties of undefined (reading 'setColumnMovingCss')` (body controller not ready). Defer one frame with `requestAnimationFrame` and check `isDestroyed()` first, as `ActivityTable` does. The throw also kills the Plan grid's `onRowDragEnd`, so drag-reorder silently stops saving.
 
-**Grid column APIs can't run from `onGridReady`:** calling `setColumnsVisible` or `applyColumnState` straight from `onGridReady` (or from an effect triggered by it) throws `Cannot read properties of undefined (reading 'setColumnMovingCss')`, because the body controller isn't ready yet. Defer one frame with `requestAnimationFrame` and check `isDestroyed()` first, as `ActivityTable` does. The throw also kills the Plan grid's `onRowDragEnd`, so drag-reorder silently stops saving.
+**Grid colours come from theme tokens, not hex.** `src/lib/utils/grid-theme.ts` (`GRID_THEME_PARAMS`, unit-tested to contain no raw colours) feeds `themeQuartz.withParams`, so the grid follows the theme picker. Zebra/hover use `--color-row-alt` / `--color-row-hover` / `--color-row-accent`, derived in `src/lib/theme/derive.ts` (so custom themes get them too). Adding a derived token means: `DerivedTokens` + `toCssVarMap` + `clearInlineThemeVars` in `store.svelte.ts`, the default `@theme` block in `app.css`, and the four `[data-theme]` blocks (regenerate with `npx tsx gen-preset-css.mjs`; for a new token `git diff` must show only additions). Changing how an existing token is _derived_ changes every preset block and the default block's values; `tests/unit/theme/css-agreement.test.ts` fails until `app.css` is regenerated. Row hover is a foreground wash (not primary-driven) so dimming the primary never erodes hover-vs-zebra; an authored neutral with chroma >= 0.004 keeps its own hue.
 
-**Grid colours come from theme tokens, not hex.** `src/lib/utils/grid-theme.ts` (`GRID_THEME_PARAMS`, unit-tested to contain no raw colours) feeds `themeQuartz.withParams`, so the grid follows the theme picker. Zebra/hover come from `--color-row-alt` / `--color-row-hover` / `--color-row-accent`, derived in `src/lib/theme/derive.ts` (so custom themes get them too). Adding a derived token means: `DerivedTokens` + `toCssVarMap` + `clearInlineThemeVars` in `store.svelte.ts`, the default `@theme` block in `app.css`, and the four `[data-theme]` blocks (regenerate with `npx tsx gen-preset-css.mjs`; for a new token `git diff` must show only additions). Changing how an existing token is _derived_ changes every preset's generated block and the default block's matching values; `tests/unit/theme/css-agreement.test.ts` fails until `app.css` is regenerated. Row hover is a foreground wash (not primary-driven) so dimming the primary never erodes hover-vs-zebra; an authored neutral with chroma >= 0.004 keeps its own hue.
+**AG Grid paints row hover on `.ag-row-hover::before`**, above the row background and below cell content. So an opaque hover colour is safe and keeps hover identical on odd and even rows (an alpha hover composites differently over the zebra). The left hover bar is an `inset` box-shadow on that same `::before` (`app.css`).
 
-**Theme preset names must be unique across all of `THEME_PRESETS`, not just ids.** `tests/components/theme-customize-panel.test.ts` renders every preset name with `getByText`, so two presets sharing a display `name` (even with distinct `id`s, e.g. from merging palettes proposed by different design-system branches) fails with a "multiple elements found" error. Always regenerate `app.css`'s `[data-theme]` blocks with `npx tsx gen-preset-css.mjs` after editing `presets.ts` — splice its output in place of the existing preset blocks (between the `Reading Room (default) needs no block` comment and the next unrelated CSS section), not by hand-editing hex values.
-
-**A bare `border` class is `currentColor` under Tailwind v4, not the theme's border token.** Pair it with `border-border` (or `border-b border-border` etc.) or the frame renders in the text colour: near-black on light themes, near-white on dark. Caught on the Activity grid card.
-
-**AG Grid paints row hover on `.ag-row-hover::before`, above the row background and below the cell content.** An opaque hover colour is therefore safe (text stays visible) and is what makes hover identical on odd and even rows — an alpha hover composites differently over the zebra. The left hover bar is an `inset` box-shadow on that same `::before` (`app.css`).
-
-**Column minimum widths must fit the page container.** The Activity page is capped at `max-w-screen-xl` (1280px), leaving a 1212px grid; `headerMinWidth` (`formatting.ts`) sums to just under that. Reserving extra header room (an icon slot, a divider) silently overflows the grid and clips the last column on every wide screen. The `?f.type=youtube` URL filter is applied through the grid's filter model, so the mobile card list (grid unmounted) ignores it.
+**Column minimum widths must fit the page container.** The Activity page is capped at `max-w-screen-xl` (1280px), leaving a 1212px grid; `headerMinWidth` (`formatting.ts`) sums to just under that. Extra header room (an icon slot, a divider) silently overflows and clips the last column on wide screens. The `?f.type=youtube` URL filter goes through the grid's filter model, so the mobile card list (grid unmounted) ignores it.
 
 ## Figma Design Workflow
 
@@ -225,72 +122,30 @@ Full setup and examples: [docs/AG_GRID.md](docs/AG_GRID.md)
 - AG Grid canvas-rendered cells (thumbnails) don't serialize into Figma captures
 - SPA hash navigation may not re-trigger auto-capture — reload or click "Send to Figma" manually
 
-## Deployment (Sevalla / Cloudflare edge)
-
-**`static/_headers` and `static/_redirects` are load-bearing, not cosmetic.** adapter-static builds a pure static site with content-hashed `_app/immutable/*` chunks; Sevalla serves it behind Cloudflare. Two gotchas compound if either file is missing or edited carelessly:
-
-- **`_redirects`** (`/* /index.html 200`) makes client-side routing survive a hard refresh — but it also means _any_ missing path, including a previous deploy's now-deleted hashed chunk, resolves to a 200 `text/html` response instead of a 404.
-- **`_headers`** caps `index.html`/the SPA fallback at `Cache-Control: ... s-maxage=0` (always revalidate), while `_app/immutable/*` keeps a long, immutable cache. Without the `s-maxage=0` override, Cloudflare's edge can keep serving a deploy-old `index.html` for up to 30 days — that stale HTML references the _previous_ deploy's chunk filenames, which the new deploy no longer has, and the missing-chunk request then hits the `_redirects` catch-all and comes back as `text/html` instead of JS.
-
-Symptom in the browser: `Failed to load module script: Expected a JavaScript-or-Wasm module script but the server responded with a MIME type of "text/html"` on the deployed site (not reproducible locally, since there's no CDN layer). **This is a caching/hosting-config issue, not a service worker issue** — check for it (`curl -I` the failing chunk URL, or a live `fetch()` from the deployed page) before assuming a PWA/SW root cause; a registered SW isn't even required to hit it. Verify after touching either file: `pnpm run build` then confirm both `build/_headers` and `build/_redirects` exist.
-
-**`_headers` block overlap MERGES `Cache-Control`, it doesn't override.** Cloudflare Pages/Sevalla applies every `_headers` block whose path pattern matches a request — if two blocks both match (e.g. `/_app/immutable/*` and a `/*` catch-all, for any chunk that currently exists), their `Cache-Control` values are concatenated with a comma into one nonsensical header, not resolved by specificity. Confirmed live against the deployed site. Only one splat (`*`) is allowed per rule and there's no exclusion/negation syntax, so a broad catch-all can never be scoped to exclude a narrower pattern underneath it. Design around this by making the catch-all's value safe to merge: include a bare `no-cache` token (forces revalidation unconditionally, regardless of what other directives — like a long `max-age` — end up concatenated alongside it) rather than relying on directive order or assuming the more specific rule wins.
-
-**Fresh cache headers don't cover a page that is already running.** Any tab that outlives a deploy is still on the old build when the user comes back to it. This isn't mobile-specific: it covers a phone tab or home-screen app resumed from memory, a pinned or session-restored desktop tab, and back-forward-cache restores. Its next lazy import asks for a chunk the new deploy deleted, gets the `_redirects` HTML, and the page goes blank until a manual refresh. `_headers` can't fix this, and `_redirects` can't answer 404 for `/_app/*` (Cloudflare-style `_redirects` only supports 200/3xx). Recovery happens on the client in three layers. Keep all three:
-
-- `app.html` `#stale-chunk-recovery` (inline, above SvelteKit's bootstrap): on `vite:preloadError`, a chunk-load `unhandledrejection`, or a failed `/_app/` `<script>`/`<link>`, it reloads once. A 30s `sessionStorage` guard stops reload loops by showing a "Reload" banner instead. It never auto-reloads when offline or when storage is unavailable.
-- `lib/utils/versionWatch.ts` (mounted in `+layout.svelte`): checks `_app/version.json` when the tab becomes visible, is restored from bfcache, or the window regains focus (at most once a minute; a desktop window left on screen never fires `visibilitychange`), and reloads if a newer build exists. It skips the reload while an input or contenteditable has focus.
-- `kit.version.pollInterval` (`svelte.config.js`) plus the layout's `beforeNavigate`: once `updated.current` is true, the next in-app navigation becomes a full page load.
-
-**The PWA service worker is built but never registered.** Nothing injects `registerSW.js`, so production has no SW, and #312's `skipWaiting`/`clientsClaim` never took effect. Before wiring registration up, note that `sw.js` routes navigations to a non-precached `/`, which fails install. A precaching SW that activates mid-session also deletes the old build's chunks, which brings back the version-skew problem above.
-
-**`@vite-pwa/sveltekit` appends `prerendered/**/*.{html,json}` to `workbox.globPatterns`** (via `push()`, unless one starting `prerendered/` exists). This SPA has `prerender = false`, so the dir is empty when workbox runs and Sevalla surfaces "One of the glob patterns doesn't match any files" as a deploy error. Adding your own `prerendered/` pattern doesn't help (still empty); `vite.config.ts`'s `withoutPrerenderedGlob()` drops it. Verify: `pnpm run build`, then check the `PWA v…` block has no `warnings`.
-
 ## Self-Verification (Chrome DevTools MCP)
 
-| Step       | Tool                                          | Purpose                        |
-| ---------- | --------------------------------------------- | ------------------------------ |
-| Navigate   | `mcp__chrome-devtools__navigate_page`         | Load frontend URL              |
-| Screenshot | `mcp__chrome-devtools__take_screenshot`       | Visual verification            |
-| Snapshot   | `mcp__chrome-devtools__take_snapshot`         | DOM structure                  |
-| Resize     | `mcp__chrome-devtools__resize_page`           | Desktop breakpoints (768+)     |
-| Emulate    | `mcp__chrome-devtools__emulate`               | Mobile/tablet device emulation |
-| Console    | `mcp__chrome-devtools__list_console_messages` | JS errors                      |
-| Interact   | `mcp__chrome-devtools__click`                 | Buttons, navigation            |
-
-**Mobile screenshots:** Use `emulate` (NOT `resize_page`) for mobile/tablet. AG Grid and CSS media queries only respond to viewport changes when `isMobile: true` is set. `resize_page` alone doesn't trigger responsive column hiding. Example: `emulate({ viewport: { width: 375, height: 812, deviceScaleFactor: 3, isMobile: true, hasTouch: true } })`. Reset with `emulate({ viewport: null, userAgent: null })` after. Use `resize_page` for desktop breakpoint comparisons (768px+).
+**Mobile/tablet screenshots: use `emulate`, not `resize_page`.** AG Grid and CSS media queries respond only with `isMobile: true`, so `resize_page` alone doesn't trigger responsive column hiding. Example: `emulate({ viewport: { width: 375, height: 812, deviceScaleFactor: 3, isMobile: true, hasTouch: true } })`; reset with `emulate({ viewport: null, userAgent: null })`. Use `resize_page` for desktop breakpoints (768px+).
 
 ## Testing Gotchas
 
-**`tests/helpers/TestWrapper.svelte` dynamic-component syntax:** Pass the component as `<wrapped.Comp {...props} />` (a dotted member expression), not `<component {...props} />` or `<component.default {...props} />`. Svelte 5 only treats dotted-member tags as dynamic components — a bare lowercase identifier renders as a literal `<component>` HTML element, and `.default` is wrong because the `component` prop passed in is already the `.svelte` file's default export, not a module namespace object. Either mistake silently renders nothing (empty comment placeholders), which can make a whole test file's assertions pass vacuously (see `tests/components/ActivityTable.test.ts` history) without ever exercising real component output.
+**In `tests/helpers/TestWrapper.svelte`, render the component as `<wrapped.Comp {...props} />`** (dotted member). Svelte 5 treats only dotted-member tags as dynamic; `<component …/>` and `<component.default …/>` render nothing, so assertions pass vacuously.
 
-**AG Grid custom cell renderers inherit `white-space: nowrap`:** AG Grid's `.ag-cell` sets `white-space: nowrap`, which is inherited by any child elements a custom `cellRenderer` builds. A `line-clamp-*`/wrapping title inside a cell renderer needs an explicit `whitespace-normal` (or equivalent) to override it, or the text silently stays on one line and overflows instead of wrapping/clamping.
+**AG Grid custom cell renderers inherit `white-space: nowrap`** from `.ag-cell`. A wrapping or `line-clamp-*` title in a renderer needs explicit `whitespace-normal`, or it stays on one line and overflows.
 
-**AG Grid `rowHeight` too tight clips descenders on a `line-clamp-2` cell title, even though line-clamp itself only ever cuts whole lines, not glyphs.** The row's own `overflow: hidden` — not the title element's — clips letters like g/y/p/q/j on the last visible line when the vertically-centered content's natural height (line-count × line-height, plus the cell's own padding) is only marginally smaller than `rowHeight`. Give real margin: for a 2-line `text-[13px] leading-[1.5]` title that's roughly 39px of text, a 64px `rowHeight` (not something closer to 45-50px) leaves enough slack. Verify visually (zoom into a rendered row) after changing `rowHeight` or the title's font-size/line-height/line-clamp count — this doesn't show up from reading the CSS alone.
+**A tight AG Grid `rowHeight` clips descenders** (g/y/p/q/j) on a `line-clamp-2` title: the row's `overflow: hidden` cuts the last line when content height is marginally under `rowHeight`. A 2-line `text-[13px] leading-[1.5]` title (~39px) needs ~64px, not 45-50px. After changing `rowHeight` or the title's font-size/line-height/clamp count, zoom into a rendered row to verify.
 
-**Date formatting timezone:** `formatDate`/`formatDateCompact` use `toLocaleDateString` (local timezone). In tests, use midday UTC times (`T12:00:00Z`) not midnight (`T00:00:00Z`) to avoid dates shifting to previous day in US timezones.
+**Date formatting timezone:** `formatDate`/`formatDateCompact` use local time (`toLocaleDateString`). Test with midday UTC (`T12:00:00Z`), not midnight, or dates shift a day in US timezones.
 
-**AG Grid testing strategy:** AG Grid doesn't render in jsdom — no lifecycle hooks, no Grid API, no cell rendering. Test AG Grid logic by extracting pure functions into `$lib/utils/grid-config.ts` (sort mapping, pagination bounds, responsive tiers, comparators, column metadata). Test renderers/formatters via `$lib/utils/formatting.ts`. For grid integration (filter UI, sort clicks, responsive `$effect` blocks), use Playwright E2E or Vitest Browser Mode (`tests/browser/`, see below). See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) testing section.
+**AG Grid doesn't render in jsdom** (no lifecycle, Grid API or cells). Extract grid logic into pure functions in `$lib/utils/grid-config.ts` (sort mapping, pagination bounds, responsive tiers, comparators, column metadata) and renderers/formatters into `$lib/utils/formatting.ts`, and unit-test those. Test grid integration (filter UI, sort clicks, responsive `$effect`s) with Playwright E2E or Vitest Browser Mode. See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) testing section.
 
-**Custom AG Grid filter/cell components (vanilla `IFilterComp` classes) *are* jsdom-testable** — instantiate, call `init()` with a stub `filterChangedCallback`, and assert on `getGui()`. Mount the GUI first (`document.body.replaceChildren(filter.getGui())`): `.click()` on a detached checkbox fires no `change` event (see `tests/unit/contentTypeFilter.test.ts`).
+**Custom AG Grid filter/cell components (vanilla `IFilterComp` classes) _are_ jsdom-testable:** instantiate, call `init()` with a stub `filterChangedCallback`, assert on `getGui()`. Mount the GUI first (`document.body.replaceChildren(filter.getGui())`): `.click()` on a detached checkbox fires no `change` event (see `tests/unit/contentTypeFilter.test.ts`).
 
-**A test with more render work than usual needs its own timeout, not just a rerun.** `SettingsDialog.test.ts`'s theme-section test mounts `ThemeCustomizePanel` (28 presets) on click; under full-suite CPU contention that legitimately exceeds Vitest's default 5s per-test budget even though nothing is stuck — it flaked intermittently until given an explicit longer timeout (`it(name, fn, 15000)`).
+**No Set Filter in AG Grid Community.** For a small fixed value set, use a custom checkbox filter like `ContentTypeFilter` (`$lib/utils/contentTypeFilter.ts`, `{ filterType: 'set', values }` model) plus `filterSet: true` on its `ColumnMeta` (ADDING_AG_GRID_COLUMN.md Decision 6).
 
-**No Set Filter in AG Grid Community.** For a column with a small fixed set of values, use a custom checkbox filter like `ContentTypeFilter` (`$lib/utils/contentTypeFilter.ts`, `{ filterType: 'set', values }` model) plus `filterSet: true` on its `ColumnMeta` — see ADDING_AG_GRID_COLUMN.md Decision 6.
+**A test with heavy render work gets its own timeout, not a rerun** (e.g. `SettingsDialog.test.ts` theme section, 28 presets): `it(name, fn, 15000)`.
 
-**Vitest Browser Mode (`tests/browser/`, config in `vitest.config.browser.ts`) runs in CI** (`frontend-test.yml`, after the unit coverage step, on Playwright's Chromium). It used to be local-only, which let assertions be wrong from day one (`ag-grid-integration.test.ts` had stale `formatCount` expectations that never once passed) — a red browser step is now a real failure. Run `pnpm run test:browser --browser.headless=true` locally first. Browser tests that need demo mode (no Clerk) must call `vi.hoisted(() => vi.stubEnv('VITE_DEMO_MODE', 'true'))` at the top of the file; a config-level `define` leaks into the unit project and breaks every Clerk-auth unit test. `svelte-clerk` is aliased to a stub in the browser config because the real package needs SvelteKit virtual modules. No Playwright download is needed on macOS: the config drives the installed Google Chrome (override with `PW_CHROMIUM_EXECUTABLE`).
+**Vitest Browser Mode (`tests/browser/`, `vitest.config.browser.ts`) runs in CI** (`frontend-test.yml`, Playwright Chromium); a red browser step is a real failure. Run it locally first with `pnpm run test:browser --browser.headless=true` (flags go directly, no `--`: after `--` they parse as a file-name filter). Tests needing demo mode (no Clerk) call `vi.hoisted(() => vi.stubEnv('VITE_DEMO_MODE', 'true'))` at the top of the file; a config-level `define` leaks into the unit project and breaks every Clerk-auth unit test. `svelte-clerk` is aliased to a stub in the browser config (the real package needs SvelteKit virtual modules). macOS needs no Playwright download: the config drives the installed Google Chrome (override with `PW_CHROMIUM_EXECUTABLE`).
 
-**Browser tests: wait for cells, not rows.** AG Grid creates `.ag-row` elements before their cell renderers draw, so a count taken right after `waitForGridReady()` can see 0 cells. Poll the assertion instead: `await expect.poll(() => document.querySelectorAll(sel).length).toBe(n)`. (The thumbnail test flaked about 1 in 5 runs until it did this.)
+**Browser tests: wait for cells, not rows.** AG Grid creates `.ag-row` before cell renderers draw, so a count right after `waitForGridReady()` can see 0 cells. Poll: `await expect.poll(() => document.querySelectorAll(sel).length).toBe(n)`.
 
-**Vitest Browser Mode capture gotchas:**
-
-- `page.screenshot({ path })` resolves the path **relative to the test file**, not against `browser.instances[].screenshotDirectory` — only an absolute path escapes `tests/browser/`.
-- `screenshotDirectory` and `attachmentsDir` (failure screenshots, `context.annotate`) are two separate config options — set both or `attachmentsDir` defaults to a stray `frontend/.vitest-attachments/`.
-- Writing outside the project root (e.g. into a shared screenshots folder) needs `server.fs.allow` widened — Vite's default `server.fs.strict` refuses it.
-- Default browser viewport is 414x896 — clips a wide test harness (e.g. the 1200px AG Grid fixture) out of every screenshot/video. Set `browser.instances[].viewport` explicitly for anything wider.
-- `pnpm run test:browser -- --browser.headless` is parsed as a file-name filter, not a flag — pass provider flags directly (`pnpm run test:browser --browser.headless=true`), no `--`.
-- Playwright's `recordVideo` records per browser **context**, not per test — a `-t` filter is needed to scope a recording to one case, otherwise every test in the run shares one video.
-
-**Mutation testing (Stryker):** `pnpm run mutate:chunked` runs `src/lib` in size-balanced chunks with one report each; `pnpm run mutate` writes its report only at the very end. Both use `vitest.config.stryker.ts`, a unit-only copy of the `unit` project, so keep them in sync. Tests that read outside `frontend/` fail its sandbox dry run and must be excluded there. There is no TypeScript checker on purpose: it can't resolve `.svelte` exports. To fix survivors, run a few files (`pnpm exec stryker run --mutate <file>,<file> --reporters json,clear-text`, ~1-2 min per small file), list `Survived`/`NoCoverage` mutants from `reports/mutation/mutation.json`, write tests, rerun. Ignore survivors that are equivalent (`x > undefined` is always false; a guard that a callee like `applyMessageEdited` already repeats) and say why in the PR.
-
-**Stale `node_modules` after switching branches silently inflates `pnpm run check`/`pnpm run test:run` baselines.** Checking out a branch whose `package.json` added a dependency (e.g. `graphql-ws`) without running `pnpm install` leaves the new import unresolved — `svelte-check` reports it as a type error, and any test importing that module fails, both looking exactly like "pre-existing" noise unrelated to current work. A multi-session SDD effort on `feature/messaging-frontend` carried a wrong "7 errors / 8 failing tests" baseline across ten task dispatches before a fresh `pnpm install` revealed the true baseline (3 errors, 0 failures) — the extra 4 errors and 8 failures were 100% the missing package, not real defects. Always `pnpm install` immediately after checking out a branch with dependency changes, before trusting any "baseline" error/failure count.
+**Mutation testing (Stryker):** `pnpm run mutate:chunked` runs `src/lib` in size-balanced chunks, one report each; `pnpm run mutate` reports only at the end. Both use `vitest.config.stryker.ts`, a unit-only copy of the `unit` project: keep them in sync. Exclude tests that read outside `frontend/` (they fail the sandbox dry run). No TypeScript checker, on purpose (it can't resolve `.svelte` exports). Fix survivors: `pnpm exec stryker run --mutate <file>,<file> --reporters json,clear-text`, list `Survived`/`NoCoverage` from `reports/mutation/mutation.json`, add tests, rerun. Ignore equivalent survivors (`x > undefined` is always false; a guard a callee repeats) and say why in the PR.
