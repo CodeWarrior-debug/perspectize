@@ -14,6 +14,15 @@
 		disabled?: boolean;
 	} = $props();
 
+	/**
+	 * Float the note above the grid card, top right (#activity-callout-slot in the page),
+	 * so it reads as a hint about the table rather than a row inside it. Without the
+	 * slot (tests, other pages) it simply stays where it was rendered.
+	 */
+	function moveToCalloutSlot(node: HTMLElement) {
+		document.getElementById('activity-callout-slot')?.appendChild(node);
+	}
+
 	const linkClass =
 		'underline underline-offset-2 font-bold text-foreground hover:text-primary disabled:no-underline disabled:opacity-60 disabled:cursor-not-allowed';
 </script>
@@ -21,7 +30,8 @@
 <div
 	role="note"
 	data-testid="column-relevance-callout"
-	class="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-border bg-muted/50 text-xs md:text-sm text-muted-foreground"
+	use:moveToCalloutSlot
+	class="flex items-center gap-1.5 pb-1.5 text-xs md:text-sm text-muted-foreground"
 >
 	<InfoIcon class="size-4 shrink-0" aria-hidden="true" />
 	<p>

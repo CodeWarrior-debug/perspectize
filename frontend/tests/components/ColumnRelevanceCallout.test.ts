@@ -28,4 +28,16 @@ describe('ColumnRelevanceCallout', () => {
 		expect(screen.getByRole('button', { name: 'one type' })).toBeDisabled();
 		expect(screen.getByRole('button', { name: 'custom columns' })).toBeDisabled();
 	});
+
+	it('moves itself into the page slot above the table when one exists', () => {
+		const slot = document.createElement('div');
+		slot.id = 'activity-callout-slot';
+		document.body.appendChild(slot);
+		try {
+			render(ColumnRelevanceCallout, { props: { onPickType: vi.fn(), onChooseColumns: vi.fn() } });
+			expect(slot.contains(screen.getByTestId('column-relevance-callout'))).toBe(true);
+		} finally {
+			slot.remove();
+		}
+	});
 });
