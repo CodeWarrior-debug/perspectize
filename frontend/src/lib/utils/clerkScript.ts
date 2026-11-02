@@ -39,3 +39,30 @@ export function clerkScriptUrl(origin: string): string {
 	if (!origin) return '';
 	return `${origin}/npm/@clerk/clerk-js@${CLERK_JS_MAJOR_VERSION}/dist/clerk.browser.js`;
 }
+
+/**
+ * Env vars svelte-clerk's ClerkProvider reads (mergeWithPublicEnvVariables) that change
+ * which URL clerk-js is fetched from. If any is set the default URL above is wrong, so
+ * we emit no preload rather than a mismatched one (which would download clerk-js twice).
+ */
+const SCRIPT_URL_OVERRIDES = [
+	'PUBLIC_CLERK_JS_URL',
+	'PUBLIC_CLERK_JS_VERSION',
+	'PUBLIC_CLERK_DOMAIN',
+	'PUBLIC_CLERK_PROXY_URL',
+] as const;
+
+/**
+ * Values for the app.html preconnect/preload, from the build env. The publishable key is
+ * resolved the way the app does: layout prop (`VITE_CLERK_PUBLISHABLE_KEY`), else the
+ * `PUBLIC_CLERK_PUBLISHABLE_KEY` svelte-clerk falls back to (what Sevalla defines).
+ * Both fields are '' when there is no usable key or a URL override is set.
+ */
+export function clerkPreloadValues(env: Record<string, string | undefined>): {
+	origin: string;
+	scriptUrl: string;
+} {
+	if (SCRIPT_URL_OVERRIDES.some((name) => env[name])) return { origin: '', scriptUrl: '' };
+	const origin = clerkFrontendApiOrigin(env.VITE_CLERK_PUBLISHABLE_KEY || env.PUBLIC_CLERK_PUBLISHABLE_KEY);
+	return { origin, scriptUrl: clerkScriptUrl(origin) };
+}
