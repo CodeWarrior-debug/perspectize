@@ -8,6 +8,7 @@ export interface LengthDisplay {
 }
 
 export type { ContentFilterInput } from '$lib/utils/gridUrlState';
+export { activityListRequest, cursorsAfterPage, ACTIVITY_LIST_STALE_TIME_MS, LOADED_MODE_FIRST } from './activityList';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
 export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE';

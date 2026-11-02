@@ -15,6 +15,9 @@
 			     lib/utils/clerkScript.ts), or the script is downloaded twice. -->
 		<link rel="preconnect" href="%sveltekit.env.PUBLIC_CLERK_ORIGIN%" crossorigin />
 		<link rel="preload" href="%sveltekit.env.PUBLIC_CLERK_SCRIPT_URL%" as="script" crossorigin="anonymous" />
+		<!-- GraphQL backend: open its connection during the Clerk wait, not after it. Origin is
+			     derived in vite.config.ts (lib/utils/graphqlOrigin.ts); empty when relative/unset. -->
+		<link rel="preconnect" href="%sveltekit.env.PUBLIC_GRAPHQL_ORIGIN%" crossorigin />
 		<style>
 			/* Static pre-hydration loading state: paints before any JS runs, so the
 			   LCP element isn't stuck waiting on the full CSR bundle (incl. Clerk)

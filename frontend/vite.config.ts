@@ -8,6 +8,7 @@ import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { faroSourcemapConfig } from './scripts/faro-sourcemaps';
 import { computeTag } from './src/lib/utils/buildTag';
 import { clerkPreloadValues } from './src/lib/utils/clerkScript';
+import { graphqlPreconnectOrigin } from './src/lib/utils/graphqlOrigin';
 
 // app.html preloads clerk-js via %sveltekit.env.PUBLIC_CLERK_*% placeholders, which read
 // the public env at build time. Derive them here from the build env (process.env wins over
@@ -20,6 +21,9 @@ const clerkBuildEnv = loadEnv(process.env.NODE_ENV ?? 'production', fileURLToPat
 const clerkPreload = clerkPreloadValues(clerkBuildEnv);
 process.env.PUBLIC_CLERK_ORIGIN = clerkPreload.origin;
 process.env.PUBLIC_CLERK_SCRIPT_URL = clerkPreload.scriptUrl;
+// app.html preconnects to the GraphQL backend origin (%sveltekit.env.PUBLIC_GRAPHQL_ORIGIN%),
+// so the connection opens during the Clerk wait. Empty when the endpoint is unset or relative.
+process.env.PUBLIC_GRAPHQL_ORIGIN = graphqlPreconnectOrigin(clerkBuildEnv);
 
 // Opt-in Faro source-map upload: empty (no sourcemaps, no plugin) unless
 // FARO_SOURCEMAP_API_KEY is set; throws if the key is set without its companion vars.

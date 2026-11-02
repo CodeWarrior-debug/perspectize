@@ -17,8 +17,11 @@
 	import { goto } from '$app/navigation';
 	import { graphqlRequest } from '$lib/queries/client';
 	import {
+		ACTIVITY_LIST_STALE_TIME_MS,
 		GET_CONTENT_DETAILS,
+		cursorsAfterPage,
 		LIST_CONTENT,
+		activityListRequest,
 		type ContentDetailsResponse,
 		type ContentItem,
 		type ContentResponse,
@@ -34,8 +37,6 @@
 	import {
 		parseGridParams,
 		serializeGridParams,
-		sortsToGraphQL,
-		urlParamsToGraphQLFilter,
 		urlParamsToFilter,
 		filterToUrlParams,
 		filtersEqual,
@@ -125,7 +126,7 @@
 	import CellPopover, { type PopoverState } from '$lib/components/CellPopover.svelte';
 	import { buildPopoverState, createHoverController } from '$lib/utils/tooltipHover';
 	import { ACTIVITY_TOOLTIP_SPECS } from '$lib/utils/activityTooltipSpecs';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
@@ -296,21 +297,11 @@
 	const gridParams = $derived(parseGridParams(page.url.searchParams));
 
 	// Individual derived fields from URL
-	// Rows fetched on first load in Loaded mode. Was 100; 50 halves the GraphQL payload and thumbnail traffic (#636).
-	const LOADED_MODE_FIRST = 50;
 	const mode = $derived(gridParams.mode);
-	// Multi-column sort. The GraphQL `sorts` list carries every sorted column in
-	// priority order; `sortBy`/`sortOrder` (the first entry, or the legacy default)
-	// stay populated too since the server still requires them as its single-sort
-	// fallback for anything that predates multi-sort.
 	const sorts = $derived(gridParams.sorts);
-	const graphqlSorts = $derived(sortsToGraphQL(sorts));
-	const sortBy = $derived(graphqlSorts?.[0]?.field ?? 'UPDATED_AT');
-	const sortOrder = $derived(graphqlSorts?.[0]?.order ?? 'DESC');
 	const pageNum = $derived(gridParams.page); // 1-indexed
 	const pageSize = $derived(gridParams.pageSize);
 	const searchText = $derived(gridParams.q);
-	const searchFields = $derived(gridParams.qFields);
 	const filters = $derived(gridParams.filters);
 	/** Which saved/default column set applies (columnLayouts.ts): Movie, or the general set. */
 	const columnView = $derived(columnViewFor(filters.type));
@@ -401,55 +392,37 @@
 	// Data fetching (mode-conditional)
 	// ---------------------------------------------------------------------------
 
-	// In server-side mode, build GraphQL filter from URL params + search.
-	// In client-side mode, pass search plus the Type filter only (other column filters stay
-	// client-side). Type must go to the server too: "Loaded" fetches just the 100 most recent
-	// rows, so filtering by type only in the grid hides every older row of that type.
-	const graphqlFilter = $derived(
-		mode === 'all'
-			? urlParamsToGraphQLFilter(filters, searchText, searchFields)
-			: urlParamsToGraphQLFilter(filters.type ? { type: filters.type } : {}, searchText, searchFields),
-	);
+	// Key and LIST_CONTENT variables come from one builder (lib/queries/content/activityList.ts),
+	// so the cache key cannot drift from the request. Captured in the options getter so queryFn
+	// sends the variables its key was built from.
+	const activityRequest = $derived(activityListRequest(gridParams, currentCursor));
 
-	const contentQuery = createQuery(() => ({
-		queryKey: queryKeys.content.list({
-			sortBy: mode === 'all' ? sortBy : 'UPDATED_AT',
-			sortOrder: mode === 'all' ? sortOrder : 'DESC',
-			sorts: mode === 'all' ? graphqlSorts : undefined,
-			// Search/filter must always reflect what queryFn actually sends (graphqlFilter is used
-			// unconditionally below, regardless of mode) — hardcoding these to '' / undefined for
-			// 'loaded' mode desyncs the cache key from the real request, so typing or clearing the
-			// search box never invalidates the cache and the grid keeps showing stale results.
-			search: searchText,
-			searchFields,
-			first: pageSize,
-			after: currentCursor,
-			filter: graphqlFilter as Record<string, unknown> | undefined,
-			mode,
-		}),
-		queryFn: async () => {
-			const response = await graphqlRequest<ContentResponse>(LIST_CONTENT, {
-				first: mode === 'all' ? pageSize : LOADED_MODE_FIRST, // Loaded mode sorts/filters client-side; "All" mode pages server-side for the rest
-				after: mode === 'all' ? currentCursor : null,
-				sortBy: mode === 'all' ? sortBy : 'UPDATED_AT',
-				sortOrder: mode === 'all' ? sortOrder : 'DESC',
-				sorts: mode === 'all' ? graphqlSorts : undefined,
-				filter: graphqlFilter,
-				includeTotalCount: true,
-			});
+	const contentQuery = createQuery(() => {
+		const request = activityRequest;
+		return {
+			queryKey: request.queryKey,
+			queryFn: async () => {
+				return graphqlRequest<ContentResponse>(LIST_CONTENT, request.variables);
+			},
+			placeholderData: keepPreviousData,
+			staleTime: ACTIVITY_LIST_STALE_TIME_MS,
+		};
+	});
 
-			// Update cursor stack for page navigation (server-side mode only)
-			if (mode === 'all' && response.content.pageInfo.hasNextPage && response.content.pageInfo.endCursor) {
-				if (cursors.length === pageNum) {
-					cursors = [...cursors, response.content.pageInfo.endCursor];
-				}
-			}
-
-			return response;
-		},
-		placeholderData: keepPreviousData,
-		staleTime: 60 * 1000,
-	}));
+	// Advance the cursor stack from the loaded page, not from inside queryFn: a cache hit (the route
+	// prefetch, or a remount inside staleTime) never runs queryFn, so Next would stall on page 1.
+	// Placeholder data (keepPreviousData: the previous page while this one loads) is skipped.
+	$effect(() => {
+		const data = contentQuery.data;
+		const placeholder = contentQuery.isPlaceholderData;
+		const isAll = mode === 'all';
+		const page = pageNum;
+		if (!data || placeholder || !isAll) return;
+		const pageInfo = data.content.pageInfo;
+		untrack(() => {
+			cursors = cursorsAfterPage(cursors, page, pageInfo);
+		});
+	});
 
 	// Derived values from query
 	// Rows get their adder's username from the cached users list (see useUsernames).
