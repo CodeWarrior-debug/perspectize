@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	castCellRenderer,
 	castTooltipItems,
+	castTooltipCopyValues,
 	movieResponse,
 	boxOfficeValueGetter,
 	vsBudgetValueGetter,
@@ -161,6 +162,18 @@ describe('castTooltipItems', () => {
 			}),
 		);
 		expect(items).toEqual(['Chris Evans · as Steve · TMDB #111', 'Chris Evans · as Lance · TMDB #222']);
+	});
+});
+
+describe('castTooltipCopyValues', () => {
+	it('is the bare name per row, parallel to castTooltipItems', () => {
+		const row = movie({ directors: DIRECTORS, cast: CAST.slice(0, 1) });
+		expect(castTooltipCopyValues(row)).toEqual(['Christopher Nolan', 'Leonardo DiCaprio']);
+		expect(castTooltipCopyValues(row)).toHaveLength(castTooltipItems(row).length);
+	});
+
+	it('is empty for a null response', () => {
+		expect(castTooltipCopyValues(movie(null))).toEqual([]);
 	});
 });
 
