@@ -49,6 +49,10 @@ jobs:
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
+        env:
+          # Same values ci.yml uses for `pnpm run build`
+          VITE_DEMO_MODE: 'true'
+          VITE_GRAPHQL_URL: http://localhost:8080/graphql
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
@@ -62,8 +66,9 @@ jobs:
           # Optional: Add claude_args to customize behavior and configuration
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-          # Narrow allowlist: frontend tests, type-check and build only. No install,
-          # curl, gh api or interpreters.
+          # Narrow allowlist: frontend tests, type-check and build only. Claude
+          # starts at the repo root (no working-directory input), so every
+          # command uses `pnpm --dir frontend`. No install, curl, gh api or interpreters.
           claude_args: |
-            --allowed-tools "Bash(pnpm run test:run:*),Bash(pnpm run check:*),Bash(pnpm run build:*),Bash(pnpm exec vitest:*)"
+            --allowed-tools "Bash(pnpm --dir frontend run test:run:*),Bash(pnpm --dir frontend run check:*),Bash(pnpm --dir frontend run build:*)"
 
