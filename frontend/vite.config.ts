@@ -1,10 +1,23 @@
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { loadEnv } from 'vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { faroSourcemapConfig } from './scripts/faro-sourcemaps';
 import { computeTag } from './src/lib/utils/buildTag';
+import { clerkFrontendApiOrigin, clerkScriptUrl } from './src/lib/utils/clerkScript';
+
+// app.html preloads clerk-js via %sveltekit.env.PUBLIC_CLERK_*% placeholders, which read
+// the public env at build time. Derive them here from the publishable key (process.env
+// wins over .env files, as in Vite). Empty when no key is set, so the placeholders render "".
+const clerkEnv = loadEnv(process.env.NODE_ENV ?? 'production', fileURLToPath(new URL('.', import.meta.url)), 'VITE_');
+const clerkOrigin = clerkFrontendApiOrigin(
+	process.env.VITE_CLERK_PUBLISHABLE_KEY ?? clerkEnv.VITE_CLERK_PUBLISHABLE_KEY,
+);
+process.env.PUBLIC_CLERK_ORIGIN = clerkOrigin;
+process.env.PUBLIC_CLERK_SCRIPT_URL = clerkScriptUrl(clerkOrigin);
 
 // Opt-in Faro source-map upload: empty (no sourcemaps, no plugin) unless
 // FARO_SOURCEMAP_API_KEY is set; throws if the key is set without its companion vars.
