@@ -59,6 +59,7 @@ Runes only: `$state`, `$derived`, `$props` (`let { data, children } = $props()`)
 - **The ~244KB-gzipped AG Grid chunk is "needed", not waste.** Lighthouse's ~81% unused figure is how little of its code the page calls; don't chase it. The lever is *when* it loads.
 - **Check request order locally without a Clerk key:** a build with no `VITE_CLERK_PUBLISHABLE_KEY` stays at "Loading..." (the Clerk gate), so a chunk requested in that state is loading in parallel with Clerk. Serve `build/` with an SPA-fallback static server and log `/_app/immutable/*.js` request times from Playwright (`channel: 'chrome'`).
 - **Local Lighthouse is signed out**, so it renders `GuestLanding`, not the Activity grid: it can't measure Activity changes. Use a signed-in session or the demo stack.
+- **clerk-js is preloaded from `app.html`.** `vite.config.ts` derives `PUBLIC_CLERK_ORIGIN` / `PUBLIC_CLERK_SCRIPT_URL` from `VITE_CLERK_PUBLISHABLE_KEY` (`lib/utils/clerkScript.ts`), and `app.html` renders them via `%sveltekit.env.*%`. The URL must match svelte-clerk's request exactly (same host, `crossorigin="anonymous"`, `@6` major): if you add `domain`, `proxyUrl` or `__internal_clerkJSVersion` to `ClerkProvider`, update the derivation too. `tests/unit/clerkScript.test.ts` fails if `@clerk/shared` changes the URL.
 
 ## TanStack Query + GraphQL
 
