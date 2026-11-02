@@ -2,6 +2,8 @@
 
 Decision guide for adding a new content type (e.g., Article, Podcast, Book) to Perspectize end-to-end.
 
+**PR label:** label the spec PR and every PR of the first implementation `new-content-type` ([PR_WORKFLOW.md](../../.docs/PR_WORKFLOW.md#new-content-type-label)).
+
 ## Architecture Context
 
 Content types use a **discriminator pattern** — a single `Content` table/type with a `contentType` field. Type-specific metadata is stored in a `response` JSONB column. This means **no new tables are needed** for most content types.
