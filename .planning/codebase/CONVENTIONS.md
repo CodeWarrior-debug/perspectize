@@ -1,117 +1,105 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-10-01
+**Analysis Date:** 2026-11-01
 
-Two stacks: Go backend (`backend/`) and SvelteKit/Svelte 5 + TypeScript frontend (`frontend/`). Repo-wide rules are in `/CLAUDE.md`, `backend/CLAUDE.md`, `frontend/CLAUDE.md`.
-
-## Repo-wide Rules
-
-- **No chained bash commands** (`&&`): run each shell command as its own call.
-- **Conventional commits**: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`; one logical change per commit.
-- **Branch names**: `type/INI-<issue>-kebab-description`; omit `INI-<n>` when no pre-existing issue.
-- **Temporary explanatory comments** are marked `*TEMP*` so they can be grepped and removed.
-- **Never run `make migrate-up/down`** in dev (shared Sevalla DB).
-- **Deep modules**: one folder/file per domain, no pass-through wrappers/methods, hide wiring behind a small interface.
-- **Verification before PR**: `go build ./...`, `gofmt -l .` (must be empty), `go test ./...` in `backend/`; `pnpm run test:run` in `frontend/`.
+Two stacks: Go backend (`backend/`) and SvelteKit/Svelte 5 frontend (`frontend/`). Stack rules are in `backend/CLAUDE.md` and `frontend/CLAUDE.md`; Go error/DB patterns in `.docs/GO_PATTERNS.md`.
 
 ## Naming Patterns
 
-**Go files** (`backend/`):
-- snake_case: `content_service.go`, `gorm_content_repository.go`, `gorm_mappers.go`
-- Resolvers per domain: `internal/adapters/graphql/resolvers/{content,perspective,user,category,messaging}.resolvers.go`
-- Tests: `<subject>_test.go` in `backend/test/<area>/`
+**Files (backend):**
+- Go snake_case; one file per domain/entity: `perspective_service.go`, `gorm_perspective_repository.go`, `gorm_mappers.go`.
+- Resolvers: one file per domain, `internal/adapters/graphql/resolvers/{content,perspective,user,category,messaging}.resolvers.go`. Stubs generated into `schema.resolvers.go` by `make graphql-gen` get moved to the matching domain file.
+- Tests: `<name>_test.go`; variants split by topic suffix (`perspective_service_update_test.go`, `content_service_limits_test.go`, `*_bench_test.go`).
+- Migrations: `backend/migrations/0000NN_description.{up,down}.sql`; check `ls migrations | tail -5` for the next number.
 
-**Go identifiers:**
-- Exported PascalCase, unexported camelCase; constructors `NewContentService`, functional options `WithBibleReference` (type `ContentServiceOption func(*ContentService)`)
-- Sentinel errors `ErrXxx` in `internal/core/domain/errors.go`
-- Test mocks: `mockContentRepository` with `xxxFn` func fields (`getByIDFn`)
-- Test funcs: `TestSubject_Scenario` (`TestPerspectiveCreate_LimitBoundaries`, `TestUserMutations_NonOwnerDenied`)
+**Files (frontend):**
+- Svelte components PascalCase: `src/lib/components/FilterChips.svelte`; feature folders lowercase (`auth/`, `discover/`, `messaging/`, `shadcn/`).
+- Utilities camelCase `.ts` (`src/lib/utils/gridUrlState.ts`); hyphenated for a few (`grid-config.ts`, `grid-empty.ts`).
+- Hooks: `useX.ts` inside the domain folder, e.g. `src/lib/queries/perspectives/useCreatePerspective.ts`; gql defs in that folder's `index.ts`.
+- Modules that use runes outside a component MUST be `*.svelte.ts` (`src/lib/theme/store.svelte.ts`).
+- Tests: `tests/components/<Component>.test.ts`, `tests/unit/<topic>.test.ts` (hooks: `hooks-<name>.test.ts`).
 
-**Frontend files** (`frontend/src/lib/`):
-- Svelte components PascalCase: `RatingInput.svelte`, `PerspectivePopover.svelte`; feature folders lowercase (`auth/`, `discover/`, `interlinear/`, `theme/`)
-- Query hooks camelCase `useXxx.ts`: `src/lib/queries/content/useCreateClaim.ts`
-- Rune-using non-component modules use `.svelte.ts`: `src/lib/theme/store.svelte.ts`
-- Utilities camelCase: `src/lib/utils/ratings.ts`, `buildTag.ts`
-- Tests: `tests/unit/<area>-<subject>.test.ts` (kebab/dash, e.g. `hooks-useSendMessage.test.ts`), `tests/components/<Component>.test.ts`
+**Go identifiers:** exported PascalCase, unexported camelCase; receivers short (`r *GormCategoryRepository`); mock fn fields `xxxFn` (`getByIDFn`). Domain enums are UPPERCASE string constants (`SortOrderAsc SortOrder = "ASC"`); DB-stored enums are lowercase text with repository converters.
 
-**Frontend identifiers:** camelCase functions/variables, PascalCase types/interfaces, UPPER_SNAKE for GraphQL documents and constants (`CREATE_CLAIM`, `RATING_STEP`).
+**TS identifiers:** camelCase functions/variables, PascalCase types/interfaces, SCREAMING_SNAKE for gql documents and constants (`CREATE_PERSPECTIVE`, `LIST_CONTENT`, `OPTIMISTIC_PREFIX`).
+
+**DB:** owning user column is always `user_id` (FK `users(id)`). User-owned visible rows carry `privacy` (`PUBLIC`/`PRIVATE`). Rating-style numerics use the `valid_integer_range` domain (0-10000).
+
+**GraphQL schema:** timestamps are `String` (ISO); lists return `Paginated<X> { items, pageInfo, totalCount }`; writes are `create<X>`/`update<X>` with `@auth`, `delete<X>(id: ID!): Boolean! @auth`. Use the `IntID` scalar (`backend/pkg/graphql/intid.go`) for input/filter IDs.
 
 ## Code Style
 
-**Go formatting:** `gofmt` (CI `Build` job fails otherwise; `make install-hooks` auto-fixes on commit). Tabs.
+**Go formatting/linting:**
+- `gofmt` mandatory (CI Build job fails on `gofmt -l .` output); `make install-hooks` auto-fixes on commit.
+- `golangci-lint` v2, config `backend/.golangci.yml`: `default: standard` plus gocritic, revive (blank-imports, context-as-argument, dot-imports, error-return, error-strings, exported, increment-decrement, receiver-naming, unexported-return, var-naming), misspell (US), prealloc, unconvert, nilerr. gocritic and revive dot-imports are excluded in `_test.go`.
+- Run: `make fmt && make lint` in `backend/`.
 
-**Go linting** (`backend/.golangci.yml`, golangci-lint v2, `default: standard`): plus `gocritic`, `revive` (exported, error-strings, context-as-argument, receiver-naming, var-naming, etc.), `misspell` (US), `prealloc`, `unconvert`, `nilerr`. Test files are exempt from `gocritic` and dot-imports. Run `make fmt && make lint`.
+**Frontend formatting (`frontend/.prettierrc`):** tabs, single quotes, trailing commas `all`, `printWidth: 120`, `prettier-plugin-svelte`. Run `pnpm run format` / `format:check`. No ESLint; type-check with `pnpm run check` (`svelte-check --tsgo`, TypeScript 7 native alongside 6.x).
 
-**Frontend formatting** (`frontend/.prettierrc`): Prettier 3 + `prettier-plugin-svelte`; tabs, single quotes, trailing commas `all`, `printWidth: 120`. Commands: `pnpm run format`, `pnpm run format:check`. Pre-commit hook auto-fixes.
+**Colours:** pre-commit hook blocks raw hex/rgb literals in `src/lib/components/**` and `formatting.ts`; use theme tokens (`src/app.css` `@theme`, Tailwind v4 `--color-*`). Allowlist with an inline `hex-ok: <reason>` comment.
 
-**Frontend typing:** `tsconfig.json` is `strict: true`, `checkJs: true`; type-check with `pnpm run check` (svelte-check). No ESLint configured.
+## Svelte 5 Rules
+
+Runes only (no Svelte 4 syntax):
+```svelte
+<script lang="ts">
+	let { data, children } = $props();
+	let count = $state(0);
+	let doubled = $derived(count * 2);
+</script>
+<button onclick={handler}>{@render children()}</button>
+```
+- Never use `$effect` for derivation. In an effect, copy reactive values into a local `const` before using them in timers/awaits (see `CategoryTypeahead.svelte`). Do not write then read-back the same `$state` in an effect (`effect_update_depth_exceeded`).
+- Icons: per-icon imports `import XIcon from '@lucide/svelte/icons/x'`.
+- shadcn primitives live in `src/lib/components/shadcn/` (not `ui/`); add to barrel `shadcn/index.ts`.
+- Auth: never import `svelte-clerk` in new components; use the facade `useAuthState()` / `getAuthToken()` / `components/auth/*` so demo mode works.
+- User HTML: `sanitizeHtml` (`src/lib/utils/sanitize.ts`) rendered through `SafeHtml.svelte`; mirrored by backend bluemonday in `internal/core/services/sanitize.go` (change both).
 
 ## Import Organization
 
-**Go** (gofmt-sorted groups): stdlib, blank line, then third-party and module imports (`github.com/CodeWarrior-debug/perspectize/backend/...`). Services import ports (`internal/core/ports/...`), never adapters, except where wired in (see `internal/core/services/content_service.go`). Module aliases for disambiguation: `portservices`.
+**Go:** stdlib, blank line, then third-party and module imports (gofmt-sorted; module path `github.com/CodeWarrior-debug/perspectize/backend/...`). Import ports (`core/ports/...`), not repository structs, in services.
 
-**Frontend:**
-1. External packages (`@tanstack/svelte-query`, `svelte-sonner`, `@lucide/svelte/icons/...`)
-2. `$lib/...` aliases (`$lib/queries/content`, `$lib/utils/ratings`)
-3. Relative imports within the same folder (`../client`, `./claims`)
+**TypeScript order (observed):** framework/library packages (`@tanstack/svelte-query`, `svelte-sonner`), then local relative (`../client`, `./index`), with `$lib/...` for cross-folder imports.
 
-Import a domain barrel (`$lib/queries/content`), not its internals. shadcn primitives go through the barrel `src/lib/components/shadcn/index.ts`. Icons are imported per-icon (`@lucide/svelte/icons/chevron-down`).
-
-## Svelte 5 Patterns (runes only)
-
-Use `$state`, `$derived`, `$props`, `$bindable`, `$effect`, `{@render children()}`, `onclick={...}`. Never use Svelte 4 syntax (`export let`, `$:`, `<slot />`, `on:click`).
-
-```svelte
-let { label, value = $bindable<number | null>(null), name, compact = false }: {
-	label: string; value: number | null; name: string; compact?: boolean;
-} = $props();
-```
-
-Gotchas encoded in `frontend/CLAUDE.md`: `$effect` tracks only synchronously-read state (copy to a local const before `setTimeout`); never write then read the same `$state` in one `$effect`; use `$derived` for derivation; Escape handlers inside bits-ui dialogs use capture phase.
-
-## Data Fetching (TanStack Query v5 + graphql-request)
-
-- Function-wrapper API, no `$` store prefix: `createQuery(() => ({ queryKey, queryFn }))`.
-- One folder per domain in `src/lib/queries/<domain>/` with `index.ts` (gql documents) plus `useXxx.ts` hooks.
-- Query keys come from `queryKeys` in `src/lib/queries/keys.ts` and must mirror every variable `queryFn` sends.
-- Mutation hooks use the authenticated `graphqlRequest()` from `src/lib/queries/client.ts`, not the bare `graphqlClient`.
-- Cache invalidation lives inside the hook (`onSuccess`), targeted (`queryKeys.content.lists()`), never a root key.
-- Branch loading UI on `isPending` (not `isLoading`) so offline-paused queries render.
-- Auth: use the facade (`useAuthState`, `getAuthToken`, `components/auth/*`), never import `svelte-clerk` directly in new code.
+**Aliases:** `$lib` -> `frontend/src/lib`; `$app/*` SvelteKit modules (mocked in tests). Import the domain, not its guts: `import { LIST_CONTENT } from '$lib/queries/content'`.
 
 ## Error Handling
 
-**Go** (details in `.docs/GO_PATTERNS.md`):
-- Domain sentinels in `internal/core/domain/errors.go`, matched with `errors.Is`.
-- Repositories translate `gorm.ErrRecordNotFound` to `domain.ErrNotFound`, wrap others with context: `fmt.Errorf("failed to get category by id: %w", err)`.
-- Write paths: `RowsAffected == 0` means not found/not owned.
-- Multi-step writes use `db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {...})`; use `tx`, not `r.db`, inside.
-- `gorm-cursor-paginator`: check both returned `err` and `pageResult.Error`.
-- Resolvers map sentinels to client-safe messages, `slog.Error(...)` the rest and return a generic wrapped error.
-- Owner-only mutations guard at every layer: `@owner` directive, `auth.RequireAuth(ctx)` in resolver, actor ID passed into service returning `domain.ErrForbidden`, SQL scoped by `user_id`.
+**Backend:**
+- Sentinels in `backend/internal/core/domain/errors.go` (`ErrNotFound`, `ErrForbidden`, `ErrInvalidInput`, ...); match with `errors.Is`.
+- Wrap with context using `%w`: `fmt.Errorf("%w: user_id must be a positive integer", domain.ErrInvalidInput)`.
+- Repositories translate `gorm.ErrRecordNotFound` to `domain.ErrNotFound`, wrap everything else: `fmt.Errorf("failed to get category by id: %w", err)`.
+- Resolvers map sentinels to client messages; log and hide the rest with `slog.Error(...)` then `fmt.Errorf("failed to update perspective: %v", err)`.
+- `Paginate()` (gorm-cursor-paginator): check both the returned `err` and `pageResult.Error`.
+- Owner-only mutations: guard at every layer (`auth.RequireAuth(ctx)` in resolver, actor passed into service returning `ErrForbidden`, SQL scoped `WHERE user_id = ? AND id = ?`).
+- Writes: use `clause.Returning{}`; never `Save()` behind a scoped WHERE.
 
-**Frontend:** mutation hooks handle errors in `onError` with `toast.error(...)` (svelte-sonner), mapping known server messages to friendly text (`src/lib/queries/content/useCreateClaim.ts`); rollback optimistic cache entries in `onError`.
+**Frontend:** mutation hooks use `graphqlRequest()` (authenticated wrapper in `src/lib/queries/client.ts`), never bare `graphqlClient`; surface failures via `toast.error` from `svelte-sonner` (see `useCreatePerspective.ts`); optimistic updates roll back in `onError`. Branch on `isPending` (not `isLoading`) for loading state.
 
 ## Logging
 
-- Go: structured `log/slog` (`slog.Error("updating perspective failed", "error", err)`); key/value pairs, lowercase message. Package `pkg/logger/`.
-- Frontend: `svelte-sonner` toasts for user-facing feedback; avoid stray `console.log`.
+- Backend: `log/slog` with key/value pairs and context variant where a ctx exists: `slog.WarnContext(ctx, "failed to resolve wikipedia url for category", "qid", input.QID, "error", err)`. Logger setup in `backend/pkg/logger/`. Metric attributes from request input go through `telemetry.BoundedSet` (`pkg/telemetry/bounded.go`).
+- Frontend: telemetry via Faro/OTel (`src/lib/telemetry.ts`); avoid stray `console.*`.
 
 ## Comments
 
-- Go: doc comments on exported identifiers starting with the identifier name (revive `exported`). Numbered step comments inside long service methods.
-- Comments explain *why* (bug history, issue numbers like `#327`, `#311`), especially in config files (`frontend/vite.config.ts`).
-- Svelte/TS: JSDoc block above components/helpers describing units and semantics (e.g. `RatingInput` "storage units 0-10000").
+- Comments explain why, often with issue/PR references (e.g. "issue #311"). Go doc comments on exported identifiers (revive `exported`).
+- Temporary learning comments are marked `*TEMP*` for grep removal.
+- TS: JSDoc `/** */` on helpers and test helpers.
 
-## Function and Module Design
+## Function Design
 
-- Go services take port interfaces, return domain models and domain errors; DI via constructors and functional options; wiring in `backend/cmd/server/main.go`.
-- GraphQL model <-> domain mapping lives once in `internal/adapters/graphql/resolvers/helpers.go`; GORM mapping in `internal/adapters/repositories/postgres/gorm_mappers.go`. Domain models have no GORM imports.
-- Use gqlgen model binding for enums (UPPERCASE domain values bound in `backend/gqlgen.yml`), never hand-written switches; use the `IntID` scalar (`pkg/graphql/intid.go`) for filter/input IDs.
-- Cursor pagination: opaque base64 keyset, fetch `limit+1`, whitelist sort columns.
-- Frontend: hooks return `{ mutate, isPending }`; components never call `graphqlClient.request` plus invalidation inline; no pass-through wrapper components.
-- DB-touching code carries a query budget test (see `TESTING.md`).
+- Deep modules: small interface, work hidden behind it. No pass-through service methods or wrapper components. Pull GraphQL <-> domain mapping into `resolvers/helpers.go`, not inline.
+- Go: `ctx context.Context` first param; services take input structs; cursor pagination is keyset with `limit+1` and whitelisted sort columns (`adapters/repositories/postgres/helpers.go`).
+- Hooks hide cache wiring: callers get `{ mutate, isPending }`; keys come from `queryKeys` (`src/lib/queries/keys.ts`) and mirror every variable `queryFn` sends. TanStack Query uses the function-wrapper form `createQuery(() => ({...}))`, results accessed without `$`.
+
+## Module Design
+
+- Go: hexagonal. `core/domain` (no GORM/adapters), `core/ports` interfaces, `core/services`, `adapters/*`; wiring only in `backend/cmd/server/main.go`. GORM models are separate from domain models with mappers (`gorm_models.go`, `gorm_mappers.go`).
+- Enums/IDs: bind via gqlgen model binding in `backend/gqlgen.yml`; never hand-write enum switch conversions.
+- Frontend: one folder per domain in `src/lib/queries/` (`index.ts` + hooks); barrel exports for shadcn only. Column metadata single-sourced in `src/lib/utils/grid-config.ts` `COLUMNS`.
+- New repo port methods require updating every test mock implementing that interface (`backend/test/**`).
 
 ---
 
-*Convention analysis: 2026-10-01*
+*Convention analysis: 2026-11-01*
