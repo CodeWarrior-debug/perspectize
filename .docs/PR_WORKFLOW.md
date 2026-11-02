@@ -75,6 +75,16 @@ Marks a PR opened from a **cloud** session whose remaining work needs the user's
 - **Cloud sessions:** apply the label (and list the local-only steps) instead of claiming unverified work is done.
 - **Local sessions:** remove the label once every checklist item under "Local session takeover" is done.
 
+## `new-content-type` label
+
+Marks a PR that carries the **spec or first implementation of a new content type**: the design/spec/brainstorm docs for a type that doesn't exist yet (including designer-tool seeds), and the PRs that first land the type in the app (backend type, ingest, first frontend slices).
+
+- **Put it on:** at creation time, on every PR whose main purpose is introducing a new type (e.g. `MOVIE`, `AUDIO_TRACK`, `BIBLE_PASSAGE`, a Food & Drink spec). Apply it to each PR of a multi-PR first implementation (backend slice, frontend slice, integration/re-land).
+- **Don't put it on:** later changes to an existing type (new columns, sorts, filters, polish), or generic work that only touches content types (e.g. a rename, `content-type-designer` tooling with no new type). Judge by the diff, not the title.
+- **Independent of the other labels.** It describes what the PR is, not its review state, so it can sit beside `needs-demo-video` / `ready for review` and the migration labels. Keep it when the other labels are swapped.
+- **Find them:** `gh pr list --state all --label new-content-type`.
+- **Cloud sessions:** set it with the GitHub MCP `issue_write` tool; its `labels` field replaces the whole set, so pass the existing labels too.
+
 ## CI
 
 - **Trigger:** `ci.yml` runs only on PRs and pushes to `main`. Pushing a feature branch with no PR runs nothing, so a PR is the way to get CI's verdict.
