@@ -24,7 +24,7 @@ Monorepo with two stacks:
 
 **PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, the migration labels (kept in sync automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges.
 
-**`@claude` GitHub workflow (`.github/workflows/claude.yml`):** comment-triggered runs use the file from `main`, not the branch the comment is on, so workflow edits only take effect once merged (ship them as their own `chore` PR). Deps are installed in workflow steps before Claude starts; `--allowed-tools` in `claude_args` is a narrow allowlist, never add `pnpm install`/`curl`/`gh api`. Claude starts at the repo root, so allowlisted commands use `pnpm --dir frontend run ...`.
+**`@claude` GitHub workflow (`.github/workflows/claude.yml`):** comment-triggered runs use the file from `main`, not the branch the comment is on, so workflow edits only take effect once merged (ship them as their own `chore` PR). Deps are installed in workflow steps before Claude starts; `--allowed-tools` in `claude_args` is a narrow allowlist, never add `pnpm install`/`curl`/`gh api`. Claude starts at the repo root, so allowlisted commands use `pnpm --dir frontend run ...` / `go -C backend ...`. Never give it `DATABASE_URL` (DB tests skip without it).
 
 **Never create a GitHub issue just to have something for a PR to close.** Only link an issue that existed before the PR work started; otherwise omit it and drop the issue segment from the branch name.
 
