@@ -37,7 +37,7 @@
 		"@grafana/faro-rollup-plugin": "0.13.2",
 		"@internationalized/date": "^3.12.4",
 		"@lhci/cli": "^0.15.1",
-		"@lucide/svelte": "^1.66.0",
+		"@lucide/svelte": "^1.65.0",
 		"@playwright/test": "1.64.1",
 		"@stryker-mutator/core": "^10.1.1",
 		"@stryker-mutator/vitest-runner": "^10.1.1",
