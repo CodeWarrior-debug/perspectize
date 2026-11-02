@@ -10,6 +10,11 @@
 		<link rel="preload" href="/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin />
 		<link rel="preload" href="/fonts/Charter-Bold.woff2" as="font" type="font/woff2" crossorigin />
 		<link rel="preconnect" href="https://i.ytimg.com" />
+		<!-- Clerk: start the clerk-js download from the HTML shell, not after the app boots.
+			     URL and crossorigin mode must match svelte-clerk's request exactly (see
+			     lib/utils/clerkScript.ts), or the script is downloaded twice. -->
+		<link rel="preconnect" href="%sveltekit.env.PUBLIC_CLERK_ORIGIN%" crossorigin />
+		<link rel="preload" href="%sveltekit.env.PUBLIC_CLERK_SCRIPT_URL%" as="script" crossorigin="anonymous" />
 		<style>
 			/* Static pre-hydration loading state: paints before any JS runs, so the
 			   LCP element isn't stuck waiting on the full CSR bundle (incl. Clerk)
