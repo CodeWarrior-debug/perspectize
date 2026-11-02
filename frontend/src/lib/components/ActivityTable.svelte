@@ -19,6 +19,7 @@
 	import {
 		ACTIVITY_LIST_STALE_TIME_MS,
 		GET_CONTENT_DETAILS,
+		cursorsAfterPage,
 		LIST_CONTENT,
 		activityListRequest,
 		type ContentDetailsResponse,
@@ -125,7 +126,7 @@
 	import CellPopover, { type PopoverState } from '$lib/components/CellPopover.svelte';
 	import { buildPopoverState, createHoverController } from '$lib/utils/tooltipHover';
 	import { ACTIVITY_TOOLTIP_SPECS } from '$lib/utils/activityTooltipSpecs';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
@@ -401,20 +402,26 @@
 		return {
 			queryKey: request.queryKey,
 			queryFn: async () => {
-				const response = await graphqlRequest<ContentResponse>(LIST_CONTENT, request.variables);
-
-				// Update cursor stack for page navigation (server-side mode only)
-				if (mode === 'all' && response.content.pageInfo.hasNextPage && response.content.pageInfo.endCursor) {
-					if (cursors.length === pageNum) {
-						cursors = [...cursors, response.content.pageInfo.endCursor];
-					}
-				}
-
-				return response;
+				return graphqlRequest<ContentResponse>(LIST_CONTENT, request.variables);
 			},
 			placeholderData: keepPreviousData,
 			staleTime: ACTIVITY_LIST_STALE_TIME_MS,
 		};
+	});
+
+	// Advance the cursor stack from the loaded page, not from inside queryFn: a cache hit (the route
+	// prefetch, or a remount inside staleTime) never runs queryFn, so Next would stall on page 1.
+	// Placeholder data (keepPreviousData: the previous page while this one loads) is skipped.
+	$effect(() => {
+		const data = contentQuery.data;
+		const placeholder = contentQuery.isPlaceholderData;
+		const isAll = mode === 'all';
+		const page = pageNum;
+		if (!data || placeholder || !isAll) return;
+		const pageInfo = data.content.pageInfo;
+		untrack(() => {
+			cursors = cursorsAfterPage(cursors, page, pageInfo);
+		});
 	});
 
 	// Derived values from query

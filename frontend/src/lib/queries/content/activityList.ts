@@ -14,6 +14,22 @@ export const LOADED_MODE_FIRST = 50;
 /** Freshness window for the Activity list. A prefetch inside it is reused without a second request. */
 export const ACTIVITY_LIST_STALE_TIME_MS = 60 * 1000;
 
+/**
+ * Cursor stack after a loaded "All"-mode page. `cursors[n]` is the cursor for page n + 1, so the
+ * stack grows only when `pageNum` is the furthest page known. Returns the same array when nothing
+ * changes. ActivityTable calls this from an effect on the data, not from queryFn, so a cache hit
+ * (the route prefetch, or a remount inside staleTime) still advances the stack.
+ */
+export function cursorsAfterPage(
+	cursors: (string | null)[],
+	pageNum: number,
+	pageInfo: { hasNextPage: boolean; endCursor: string | null },
+): (string | null)[] {
+	if (!pageInfo.hasNextPage || !pageInfo.endCursor) return cursors;
+	if (cursors.length !== pageNum) return cursors;
+	return [...cursors, pageInfo.endCursor];
+}
+
 /** Builds the Activity list key and request for `params` at cursor `after` (null = first page). */
 export function activityListRequest(params: GridParams, after: string | null) {
 	const isAll = params.mode === 'all';

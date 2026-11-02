@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { hashKey } from '@tanstack/svelte-query';
-import { activityListRequest, LOADED_MODE_FIRST } from '$lib/queries/content';
+import { activityListRequest, cursorsAfterPage, LOADED_MODE_FIRST } from '$lib/queries/content';
 import { queryKeys } from '$lib/queries/keys';
 import {
 	ALL_SEARCH_SCOPES,
@@ -123,5 +123,33 @@ describe('activityListRequest: every variable the request sends is in the key', 
 		const b = activityListRequest(params('mode=all&pageSize=25'), null);
 		expect(hashKey(a.queryKey)).not.toBe(hashKey(b.queryKey));
 		expect(b.variables.first).toBe(25);
+	});
+});
+
+describe('cursorsAfterPage: the cursor stack advances from loaded data (cache hits included)', () => {
+	const more = { hasNextPage: true, endCursor: 'c2' };
+	const none = { hasNextPage: false, endCursor: null };
+
+	it('page 1 with a next page pushes its endCursor as the page 2 cursor', () => {
+		expect(cursorsAfterPage([null], 1, more)).toEqual([null, 'c2']);
+	});
+
+	it('is a no-op when the stack already reaches this page (no repeat push)', () => {
+		const stack = [null, 'c2'];
+		expect(cursorsAfterPage(stack, 1, more)).toBe(stack);
+	});
+
+	it('pushes the next cursor when the furthest page is the one loaded', () => {
+		expect(cursorsAfterPage([null, 'c2'], 2, { hasNextPage: true, endCursor: 'c3' })).toEqual([null, 'c2', 'c3']);
+	});
+
+	it('does not push for a page behind the furthest one (Previous, or a revisit)', () => {
+		const stack = [null, 'c2', 'c3'];
+		expect(cursorsAfterPage(stack, 2, { hasNextPage: true, endCursor: 'c3' })).toBe(stack);
+	});
+
+	it('does not push at the last page', () => {
+		const stack = [null];
+		expect(cursorsAfterPage(stack, 1, none)).toBe(stack);
 	});
 });
