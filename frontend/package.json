@@ -78,7 +78,7 @@
 		"@grafana/faro-web-tracing": "2.13.0",
 		"@jaames/iro": "^5.5.2",
 		"@tanstack/svelte-form": "^1.33.5",
-		"@tanstack/svelte-query": "^6.3.5",
+		"@tanstack/svelte-query": "^6.3.6",
 		"@tiptap/core": "^3.32.2",
 		"@tiptap/extension-image": "^3.32.2",
 		"@tiptap/extension-link": "^3.32.2",
