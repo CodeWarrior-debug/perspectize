@@ -296,6 +296,8 @@
 	const gridParams = $derived(parseGridParams(page.url.searchParams));
 
 	// Individual derived fields from URL
+	// Rows fetched on first load in Loaded mode. Was 100; 50 halves the GraphQL payload and thumbnail traffic (#636).
+	const LOADED_MODE_FIRST = 50;
 	const mode = $derived(gridParams.mode);
 	// Multi-column sort. The GraphQL `sorts` list carries every sorted column in
 	// priority order; `sortBy`/`sortOrder` (the first entry, or the legacy default)
@@ -427,7 +429,7 @@
 		}),
 		queryFn: async () => {
 			const response = await graphqlRequest<ContentResponse>(LIST_CONTENT, {
-				first: mode === 'all' ? pageSize : 100, // Load more in client mode for client-side filtering
+				first: mode === 'all' ? pageSize : LOADED_MODE_FIRST, // Loaded mode sorts/filters client-side; "All" mode pages server-side for the rest
 				after: mode === 'all' ? currentCursor : null,
 				sortBy: mode === 'all' ? sortBy : 'UPDATED_AT',
 				sortOrder: mode === 'all' ? sortOrder : 'DESC',

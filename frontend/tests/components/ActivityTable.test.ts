@@ -178,13 +178,13 @@ describe('ActivityTable', () => {
 		});
 	});
 
-	it('sends the Type filter to the server in Loaded mode (first 100 rows are already that type)', async () => {
+	it('sends the Type filter to the server in Loaded mode (first 50 rows are already that type)', async () => {
 		mockPageState.url = new URL('http://localhost/?f.type=movie');
 		renderWithQuery();
 		await waitFor(() => {
 			expect(mockRequest).toHaveBeenCalledWith(
 				expect.anything(),
-				expect.objectContaining({ first: 100, filter: { contentTypes: ['MOVIE'] } }),
+				expect.objectContaining({ first: 50, filter: { contentTypes: ['MOVIE'] } }),
 			);
 		});
 	});
