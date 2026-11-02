@@ -14,8 +14,30 @@ import {
 	sortableColumnsFor,
 	releasedComparator,
 	itemColumnHeader,
+	liveGridApi,
 } from '$lib/utils/grid-config';
 import type { ContentItem } from '$lib/queries/content';
+
+describe('liveGridApi', () => {
+	it('returns the api while the grid is alive', () => {
+		const api = { isDestroyed: () => false };
+		expect(liveGridApi(api)).toBe(api);
+	});
+
+	it('returns null once the grid is destroyed, so callers skip setFilterModel/sizeColumnsToFit', () => {
+		const setFilterModel = vi.fn();
+		const api = { isDestroyed: () => true, setFilterModel };
+		const live = liveGridApi(api);
+		live?.setFilterModel(null);
+		expect(live).toBeNull();
+		expect(setFilterModel).not.toHaveBeenCalled();
+	});
+
+	it('returns null for a missing api (no grid mounted)', () => {
+		expect(liveGridApi(null)).toBeNull();
+		expect(liveGridApi(undefined)).toBeNull();
+	});
+});
 
 function row(overrides: Partial<ContentItem>): ContentItem {
 	return {

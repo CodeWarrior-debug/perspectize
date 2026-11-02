@@ -102,6 +102,7 @@
 		parsePersonFilter,
 		rowMatchesPerson,
 		showColumnRelevanceCallout,
+		liveGridApi,
 	} from '$lib/utils/grid-config';
 	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
 	import { emptyCellClassRules } from '$lib/utils/grid-empty';
@@ -1108,6 +1109,12 @@
 			gridApi = params.api;
 			gridReady = true;
 		},
+		// Fires synchronously before any grid teardown (cardMode, error state, navigation), so
+		// effects flushed afterwards see no grid instead of calling a destroyed Grid API.
+		onGridPreDestroyed: () => {
+			gridApi = null;
+			gridReady = false;
+		},
 		onSortChanged: (event: SortChangedEvent) => {
 			hover.close();
 			// In "Loaded" mode, AG Grid handles client-side sort (including multi-column
@@ -1225,9 +1232,10 @@
 
 	// Restore AG Grid filter state from URL on mount and mode changes
 	$effect(() => {
-		if (!gridApi || !gridReady) return;
+		const api = liveGridApi(gridApi);
+		if (!api || !gridReady) return;
 		const filterModel = urlParamsToFilter(gridParams.filters);
-		gridApi.setFilterModel(Object.keys(filterModel).length > 0 ? filterModel : null);
+		api.setFilterModel(Object.keys(filterModel).length > 0 ? filterModel : null);
 	});
 
 	// Re-run the grid's filters when the person filter changes (external filters aren't tracked by the model).
@@ -1314,7 +1322,7 @@
 			defaults: defaultLayout(tier, view),
 		});
 		requestAnimationFrame(() => {
-			if (!gridApi) return; // Grid may have been destroyed before rAF fires
+			if (api.isDestroyed()) return; // Grid may have been destroyed before rAF fires
 			applyLayout(api, plan.apply);
 			if (plan.toast) showColumnSwitchToast(view, current);
 		});
@@ -1333,7 +1341,7 @@
 		if (!gridContainer || !gridApi || !gridReady) return;
 		const api = gridApi;
 		const observer = new ResizeObserver(() => {
-			if (!gridApi) return; // Grid may have been destroyed before observer fires
+			if (api.isDestroyed()) return; // Grid may have been destroyed before observer fires
 			api.sizeColumnsToFit();
 		});
 		observer.observe(gridContainer);
