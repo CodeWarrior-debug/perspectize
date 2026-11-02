@@ -52,6 +52,14 @@ Runes only: `$state`, `$derived`, `$props` (`let { data, children } = $props()`)
 
 **Use the auth facade, not `svelte-clerk`, in components:** `useAuthState()` (`$lib/auth/useAuthState`), `getAuthToken()` (`$lib/auth`), and `components/auth/{AuthShow,SignInTrigger,UserMenu}.svelte`. With `VITE_DEMO_MODE=true` there is no `ClerkProvider`, so a direct `useClerkContext()`/`<Show>` crashes demo mode (and the `demo-e2e` CI job). Keep `$lib/auth` free of `svelte-clerk` imports: under Vitest `$env/dynamic/public` is undefined and unit tests that load it break. See [../.docs/DEMO_MODE.md](../.docs/DEMO_MODE.md).
 
+## First-load performance (Clerk gate)
+
+**Outside demo mode the root layout renders nothing until `ClerkLoaded`**, so anything a page lazy-loads from its template (e.g. `ActivityTable`/AG Grid) only starts after Clerk's ~370KB script finishes: a serial chain on the LCP path. Start such imports from a `<script module>` (see `routes/+page.svelte`) so they run alongside Clerk. Trade-off: signed-out visitors also download the chunk (tracked in #642).
+
+- **The ~244KB-gzipped AG Grid chunk is "needed", not waste.** Lighthouse's ~81% unused figure is how little of its code the page calls; don't chase it. The lever is *when* it loads.
+- **Check request order locally without a Clerk key:** a build with no `VITE_CLERK_PUBLISHABLE_KEY` stays at "Loading..." (the Clerk gate), so a chunk requested in that state is loading in parallel with Clerk. Serve `build/` with an SPA-fallback static server and log `/_app/immutable/*.js` request times from Playwright (`channel: 'chrome'`).
+- **Local Lighthouse is signed out**, so it renders `GuestLanding`, not the Activity grid: it can't measure Activity changes. Use a signed-in session or the demo stack.
+
 ## TanStack Query + GraphQL
 
 **Svelte 5 API (CRITICAL):** pass a function to `createQuery(() => ({ queryKey, queryFn }))`, never an options object, and read results as reactive properties (`query.data`, `query.isPending`), never store syntax (`$query.data`).
