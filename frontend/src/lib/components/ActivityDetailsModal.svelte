@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { LengthDisplay } from '$lib/queries/content';
+	import type { ImportJobRef, LengthDisplay } from '$lib/queries/content';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import XIcon from '@lucide/svelte/icons/x';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
@@ -38,6 +38,8 @@
 		length: number | null;
 		lengthUnits: string | null;
 		lengthDisplay?: LengthDisplay | null;
+		// The import that created this row; the link is shown only when set.
+		importedFrom?: ImportJobRef | null;
 		publishedAt: string | null;
 		createdAt?: string;
 		updatedAt: string;
@@ -241,6 +243,18 @@
 						<ExternalLinkIcon class="size-3.5 flex-none" />
 						<span>{content.url}</span>
 					</a>
+				{/if}
+
+				{#if content.importedFrom}
+					<div class="mt-3.5 text-[13px] text-muted-foreground">
+						<span>Imported from</span>
+						<a
+							href={`/import/${content.importedFrom.id}`}
+							class="font-medium text-primary underline-offset-2 hover:underline"
+						>
+							{content.importedFrom.name}
+						</a>
+					</div>
 				{/if}
 
 				<div class="mt-4.5 grid grid-cols-2 gap-2.5">

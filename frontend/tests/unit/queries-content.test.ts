@@ -84,6 +84,10 @@ describe('GraphQL query definitions', () => {
 			expect(LIST_CONTENT).not.toMatch(/\bresponse\b/);
 		});
 
+		it('selects importedFrom { id name } so the row can link to its import', () => {
+			expect(LIST_CONTENT).toMatch(/importedFrom\s*\{\s*id\s+name\s*\}/);
+		});
+
 		it('is defined and is a string', () => {
 			expect(LIST_CONTENT).toBeDefined();
 			expect(typeof LIST_CONTENT).toBe('string');
@@ -164,6 +168,10 @@ describe('GraphQL query definitions', () => {
 		it('selects both `response` and `movie`', () => {
 			expect(GET_CONTENT_DETAILS).toMatch(/\bresponse\b/);
 			expect(GET_CONTENT_DETAILS).toMatch(/\bmovie\b/);
+		});
+
+		it('selects importedFrom { id name } for the "Imported from" link', () => {
+			expect(GET_CONTENT_DETAILS).toMatch(/importedFrom\s*\{\s*id\s+name\s*\}/);
 		});
 	});
 

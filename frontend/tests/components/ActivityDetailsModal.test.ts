@@ -527,6 +527,31 @@ describe('ActivityDetailsModal', () => {
 		});
 	});
 
+	describe('Imported from', () => {
+		it('links the row to the import it was created by when importedFrom is set', () => {
+			render(ActivityDetailsModal, {
+				props: {
+					content: { ...content, importedFrom: { id: '12', name: 'Spring 2026 watchlist' } },
+					open: true,
+					onClose: vi.fn(),
+				},
+			});
+
+			expect(screen.getByText('Imported from')).toBeInTheDocument();
+			const link = screen.getByRole('link', { name: 'Spring 2026 watchlist' });
+			expect(link).toHaveAttribute('href', '/import/12');
+		});
+
+		it('is absent when importedFrom is null (hand-added content)', () => {
+			render(ActivityDetailsModal, {
+				props: { content: { ...content, importedFrom: null }, open: true, onClose: vi.fn() },
+			});
+
+			expect(screen.queryByText('Imported from')).not.toBeInTheDocument();
+			expect(screen.queryByRole('link', { name: /spring/i })).not.toBeInTheDocument();
+		});
+	});
+
 	describe('add to plan', () => {
 		beforeEach(() => {
 			authState.userId = null;

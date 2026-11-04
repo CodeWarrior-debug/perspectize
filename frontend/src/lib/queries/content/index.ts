@@ -13,6 +13,12 @@ export { activityListRequest, cursorsAfterPage, ACTIVITY_LIST_STALE_TIME_MS, LOA
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
 export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE';
 
+/** The import job that created a content row. Mirrors the backend `ImportJobRef`. */
+export interface ImportJobRef {
+	id: string;
+	name: string;
+}
+
 export interface ContentItem {
 	id: string;
 	name: string;
@@ -50,6 +56,9 @@ export interface ContentItem {
 		entityType: string | null;
 		wikipediaUrl: string | null;
 	} | null;
+	// The import that created this row. Null for hand-added content, and for a closed
+	// import when the viewer isn't an admin (the backend decides; the UI just shows it when set).
+	importedFrom?: ImportJobRef | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -131,6 +140,10 @@ export const LIST_CONTENT = gql`
 					description
 					entityType
 					wikipediaUrl
+				}
+				importedFrom {
+					id
+					name
 				}
 				createdAt
 				updatedAt
@@ -272,6 +285,10 @@ export const GET_CONTENT_DETAILS = gql`
 				description
 				entityType
 				wikipediaUrl
+			}
+			importedFrom {
+				id
+				name
 			}
 			createdAt
 			updatedAt
