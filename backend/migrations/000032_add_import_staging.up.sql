@@ -4,10 +4,11 @@
 -- Spec: docs/superpowers/specs/2026-10-27-youtube-channel-import-design.md
 -- Plan: docs/superpowers/plans/2026-10-27-import-staging-plan.md
 --
--- Numbering: 000036, not the next number on main (000032). Production is already
--- at version 34 (feature/audio-track-content-type's 000032-000034, applied ahead
--- of its merge; that branch also holds 000035), so a lower number would be
--- skipped by `migrate up`. Re-check before merging.
+-- Numbering: 000032, the next free number on main. feature/audio-track-content-type
+-- (#603, draft) also holds 000032 to 000035 and production is already at version 34
+-- from applying those ahead of their merge, so one of the two gets renumbered when
+-- the other lands (the check-migration-number-before-apply label tracks it). Apply
+-- by hand per environment; `migrate up` from version 34 will not pick up a lower number.
 --
 -- Requests: anyone signed in can create an import, but only an admin's starts
 -- listing straight away (it spends YouTube/TMDB quota). Anyone else's is
