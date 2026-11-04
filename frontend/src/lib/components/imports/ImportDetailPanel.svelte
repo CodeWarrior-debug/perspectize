@@ -2,21 +2,21 @@
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import type { ImportItem } from '$lib/queries/imports';
 	import { useImportItemDetails } from '$lib/queries/imports/useImportItemDetails';
-	import { formatCount, formatCountExact, formatDurationSeconds, EMPTY_VALUE } from '$lib/utils/formatting';
+	import { EMPTY_VALUE, formatDurationSeconds } from '$lib/utils/formatting';
 	import { contentTypeLabel } from '$lib/utils/grid-config';
 	import { activityContentHref } from '$lib/utils/contentLinks';
 	import {
 		ageDays,
 		commentRate,
-		formatLikes,
+		factColumnKeys,
+		factTooltip,
+		formatFact,
 		formatRate,
 		importStatusLabel,
 		isLowSampleRating,
-		ratingCountNoun,
-		ratingTooltip,
-		KIND_LABELS,
 		likeRate,
-		viewsPerDay,
+		prettifyFactKey,
+		ratingCountNoun,
 	} from '$lib/utils/import-sheet';
 
 	/**
@@ -62,46 +62,47 @@
 		});
 	}
 
+	/** As the sheet's header, except the rating says whose it is and its count what it counts. */
+	function statLabel(key: string, facts: Record<string, unknown>): string {
+		const source = typeof facts.rating_source === 'string' ? facts.rating_source : null;
+		if (key === 'rating' && source) return `${source} rating`;
+		if (key === 'rating_count') {
+			const noun = ratingCountNoun(source);
+			return noun.charAt(0).toUpperCase() + noun.slice(1);
+		}
+		return prettifyFactKey(key);
+	}
+
+	// Every fact the row has, labelled and formatted as in the sheet (derived
+	// rates are spelled out under the grid instead).
 	const stats = $derived.by(() => {
 		if (!item) return [];
-		const isVideo = item.destinationType === 'YOUTUBE_VIDEO';
-		const out: { label: string; value: string; title?: string; muted?: boolean }[] = [
-			{
-				label: 'Length',
-				value: item.durationSeconds === null ? EMPTY_VALUE : formatDurationSeconds(item.durationSeconds),
-			},
-		];
-		if (isVideo) {
-			const perDay = viewsPerDay(item, now);
-			out.push(
-				{ label: 'Views', value: formatCount(item.viewCount), title: formatCountExact(item.viewCount) },
-				{ label: 'Likes', value: formatLikes(item), title: formatCountExact(item.likeCount) },
-				{ label: 'Comments', value: formatCount(item.commentCount), title: formatCountExact(item.commentCount) },
-				{ label: 'Views/day', value: perDay === null ? EMPTY_VALUE : formatCount(Math.round(perDay)) },
-				{
-					label: 'Captions',
-					value: item.hasCaptions === null ? EMPTY_VALUE : item.hasCaptions ? 'Yes' : 'No',
-				},
-			);
-		}
-		if (item.rating !== null || !isVideo) {
-			out.push({
-				label: item.ratingSource ? `${item.ratingSource} rating` : 'Rating',
-				value: item.rating === null ? EMPTY_VALUE : `${item.rating.toFixed(1)} / 10`,
-				title: ratingTooltip(item) || undefined,
-				muted: isLowSampleRating(item),
-			});
-		}
-		if (!isVideo) {
-			const noun = ratingCountNoun(item.ratingSource);
-			out.push({
-				label: noun.charAt(0).toUpperCase() + noun.slice(1),
-				value: item.ratingCount === null ? EMPTY_VALUE : formatCountExact(item.ratingCount),
-				muted: isLowSampleRating(item),
-			});
-		}
-		return out;
+		const facts = item.facts;
+		return factColumnKeys([item])
+			.filter((k) => !['kind', 'published_at', 'like_rate', 'views_per_day', 'top_cast', 'genres'].includes(k))
+			.map((k) => ({
+				key: k,
+				label: statLabel(k, facts),
+				value: formatFact(k, facts),
+				title: factTooltip(k, facts) || undefined,
+				muted: (k === 'rating' || k === 'rating_count') && isLowSampleRating(facts),
+			}));
 	});
+	const ratingSource = $derived(typeof item?.facts.rating_source === 'string' ? item.facts.rating_source : null);
+	const published = $derived(typeof item?.facts.published_at === 'string' ? item.facts.published_at : null);
+	const thumbnail = $derived(typeof item?.facts.thumbnail_url === 'string' ? item.facts.thumbnail_url : null);
+	// "Grace to You · Video · becomes YouTube Video" (kind only when the source gave one).
+	const subtitle = $derived(
+		item
+			? [
+					sourceTitle,
+					item.facts.kind ? formatFact('kind', item.facts) : '',
+					`becomes ${contentTypeLabel(item.destinationType.toLowerCase())}`,
+				]
+					.filter(Boolean)
+					.join(' · ')
+			: '',
+	);
 
 	const longDescription = $derived((d?.description.length ?? 0) > 600);
 </script>
@@ -117,20 +118,20 @@
 		</p>
 	{:else}
 		<section class="border-border flex flex-col gap-2 border-b p-4">
-			{#if item.thumbnailUrl}
+			{#if thumbnail}
 				<img
-					src={item.thumbnailUrl}
+					src={thumbnail}
 					alt=""
 					class={item.destinationType === 'MOVIE' ? 'w-24 rounded' : 'aspect-video w-full rounded object-cover'}
 				/>
 			{/if}
 			<h2 class="text-base leading-snug font-semibold text-balance">{item.title}</h2>
 			<p class="text-muted-foreground text-xs">
-				{sourceTitle} · {KIND_LABELS[item.kind]} · becomes {contentTypeLabel(item.destinationType.toLowerCase())}
+				{subtitle}
 			</p>
 			<p class="text-muted-foreground text-xs">
-				{formatPublished(item.publishedAt)}{#if ageDays(item, now) !== null}
-					({formatAge(ageDays(item, now))}){/if}
+				{formatPublished(published)}{#if ageDays(item.facts, now) !== null}
+					({formatAge(ageDays(item.facts, now))}){/if}
 			</p>
 			<div class="flex flex-wrap items-center gap-3 text-sm">
 				<span data-testid="import-detail-status">{importStatusLabel(item)}</span>
@@ -147,20 +148,20 @@
 		</section>
 
 		<section class="border-border grid grid-cols-3 gap-x-3 gap-y-2 border-b p-4" aria-label="Numbers">
-			{#each stats as s (s.label)}
+			{#each stats as s (s.key)}
 				<div title={s.title}>
 					<div class="font-mono text-sm tabular-nums" class:text-muted-foreground={s.muted}>{s.value}</div>
 					<div class="text-muted-foreground text-xs">{s.label}</div>
 				</div>
 			{/each}
-			{#if item.destinationType === 'YOUTUBE_VIDEO'}
+			{#if likeRate(item.facts) !== null || commentRate(item.facts) !== null}
 				<p class="text-muted-foreground col-span-3 text-xs">
-					Like rate {formatRate(likeRate(item), 2)} · comment rate {formatRate(commentRate(item), 2)} · stats as of
-					{formatPublished(item.statsFetchedAt)}
+					Like rate {formatRate(likeRate(item.facts), 2)} · comment rate {formatRate(commentRate(item.facts), 2)} · stats
+					as of {formatPublished(item.statsFetchedAt)}
 				</p>
-			{:else if isLowSampleRating(item)}
+			{:else if isLowSampleRating(item.facts)}
 				<p class="text-muted-foreground col-span-3 text-xs">
-					Few {ratingCountNoun(item.ratingSource)} so far; treat the score with care.
+					Few {ratingCountNoun(ratingSource)} so far; treat the score with care.
 				</p>
 			{/if}
 		</section>

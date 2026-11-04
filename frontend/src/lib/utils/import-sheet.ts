@@ -1,5 +1,5 @@
-import type { ColDef, IDateFilterParams, ValueFormatterParams } from '@ag-grid-community/core';
-import type { ImportDestinationType, ImportItem, ImportItemKind, ImportSource } from '$lib/queries/imports';
+import type { ColDef, IDateFilterParams, ValueFormatterParams, ValueGetterParams } from '@ag-grid-community/core';
+import type { ImportDestinationType, ImportFacts, ImportItem, ImportSource } from '$lib/queries/imports';
 import { EMPTY_VALUE, formatCount, formatCountExact, formatDurationSeconds, typeCellRenderer } from './formatting';
 import { contentTypeLabel } from './grid-config';
 
@@ -8,9 +8,12 @@ import { contentTypeLabel } from './grid-config';
  * ImportSheet.svelte so it can be unit tested (AG Grid doesn't render in jsdom).
  *
  * Every row shows enough to decide without leaving the page (ADDING_CONTENT_TYPE.md,
- * Decision 8): what it is, how big, how current, how well received; the detail
- * panel has the rest. Missing is never 0: hidden likes say "hidden", and a
- * figure a content type doesn't have shows the empty marker.
+ * Decision 8). The decision data is one facts object per row whose snake_case
+ * keys are shared across content types (backend domain.ImportFacts). The sheet
+ * makes a column of every key present in any row, labels it by prettifying
+ * the key, and formats it by the key's suffix (_seconds, _count, _usd, _at).
+ * A key no row has never becomes a column, so a filmography has no view
+ * columns and a channel no box office, without a table of which type has what.
  */
 
 /** A row's row-data shape: the item plus its source's title, for the Source column and search. */
@@ -23,12 +26,77 @@ export function toImportRows(items: readonly ImportItem[], sources: readonly Imp
 	return items.map((it) => ({ ...it, sourceTitle: titles.get(it.sourceId) ?? '' }));
 }
 
-export const KIND_LABELS: Record<ImportItemKind, string> = {
-	VIDEO: 'Video',
-	SHORT: 'Short',
-	LIVE: 'Live',
-	MOVIE: 'Movie',
-};
+// ---------------------------------------------------------------------------
+// Facts
+// ---------------------------------------------------------------------------
+
+function num(f: ImportFacts, key: string): number | null {
+	const v = f[key];
+	return typeof v === 'number' ? v : null;
+}
+
+function str(f: ImportFacts, key: string): string | null {
+	const v = f[key];
+	return typeof v === 'string' && v !== '' ? v : null;
+}
+
+/** Facts shown somewhere other than their own column. */
+const NOT_COLUMNS = new Set([
+	'summary', // under the title
+	'thumbnail_url', // beside the title
+	'likes_hidden', // qualifies like_count
+	'rating_source', // in the rating tooltip
+]);
+
+/** Columns lead with these, in this order; any other key follows, alphabetically. */
+const KEY_ORDER = [
+	'kind',
+	'published_at',
+	'duration_seconds',
+	'rating',
+	'top_cast',
+	'genres',
+	'box_office_usd',
+	'view_count',
+	'like_count',
+	'like_rate',
+	'comment_count',
+	'views_per_day',
+];
+
+/** Shown under All columns only: secondary to the decision. */
+export const SECONDARY_KEYS: ReadonlySet<string> = new Set([
+	'rating_count',
+	'review_count',
+	'popularity',
+	'budget_usd',
+	'chapter_count',
+	'has_captions',
+]);
+
+/**
+ * A column label from a fact key, with no table of names: snake_case becomes
+ * words, and the suffix becomes the unit ("box_office_usd" → "Box office (USD)",
+ * "view_count" → "Views", "duration_seconds" → "Duration", "published_at" →
+ * "Published", "has_captions" → "Captions").
+ */
+export function prettifyFactKey(key: string): string {
+	let words = key;
+	let unit = '';
+	if (words.endsWith('_usd')) {
+		words = words.slice(0, -4);
+		unit = ' (USD)';
+	} else if (words.endsWith('_seconds')) {
+		words = words.slice(0, -8);
+	} else if (words.endsWith('_at')) {
+		words = words.slice(0, -3);
+	} else if (words.endsWith('_count')) {
+		words = `${words.slice(0, -6)}s`;
+	}
+	if (words.startsWith('has_')) words = words.slice(4);
+	const text = words.replace(/_/g, ' ');
+	return text.charAt(0).toUpperCase() + text.slice(1) + unit;
+}
 
 /** Ratings resting on fewer votes than this are shown muted (Decision 8: low-sample figures). */
 export const LOW_SAMPLE_RATING_COUNT = 50;
@@ -39,73 +107,176 @@ export const LOW_SAMPLE_RATING_COUNT = 50;
  */
 const LOW_SAMPLE_BY_SOURCE: Record<string, number> = { Metacritic: 10 };
 
-function lowSampleThreshold(source: string | null): number {
-	return (source && LOW_SAMPLE_BY_SOURCE[source]) || LOW_SAMPLE_RATING_COUNT;
-}
-
 /** What the count under a rating counts: critic reviews for Metacritic, user ratings otherwise. */
 export function ratingCountNoun(source: string | null): string {
 	return source === 'Metacritic' ? 'critic reviews' : 'ratings';
 }
 
+export function isLowSampleRating(f: ImportFacts): boolean {
+	const rating = num(f, 'rating');
+	const count = num(f, 'rating_count');
+	if (rating === null || count === null) return false;
+	const source = str(f, 'rating_source');
+	return count < ((source && LOW_SAMPLE_BY_SOURCE[source]) || LOW_SAMPLE_RATING_COUNT);
+}
+
+/** "TMDB: 8.4 / 10 from 38,000 ratings" for the rating tooltip and panel. */
+export function ratingTooltip(f: ImportFacts): string {
+	const rating = num(f, 'rating');
+	if (rating === null) return '';
+	const source = str(f, 'rating_source');
+	const count = num(f, 'rating_count');
+	const counted = count === null ? '' : ` from ${formatCountExact(count)} ${ratingCountNoun(source)}`;
+	const low = isLowSampleRating(f) ? ` (few ${ratingCountNoun(source)}, treat with care)` : '';
+	return `${source ?? 'Rating'}: ${rating.toFixed(1)} / 10${counted}${low}`;
+}
+
 const DAY_MS = 86_400_000;
 
 /** Days since publishing, at least 1, or null when the date is unknown. */
-export function ageDays(item: Pick<ImportItem, 'publishedAt'>, now: Date): number | null {
-	if (!item.publishedAt) return null;
-	const t = Date.parse(item.publishedAt);
+export function ageDays(f: ImportFacts, now: Date): number | null {
+	const iso = str(f, 'published_at');
+	if (!iso) return null;
+	const t = Date.parse(iso);
 	if (Number.isNaN(t)) return null;
 	return Math.max(1, (now.getTime() - t) / DAY_MS);
 }
 
 /** Likes ÷ views, or null when either is unknown (hidden likes are unknown, not 0). */
-export function likeRate(item: Pick<ImportItem, 'likeCount' | 'viewCount'>): number | null {
-	if (item.likeCount === null || !item.viewCount) return null;
-	return item.likeCount / item.viewCount;
+export function likeRate(f: ImportFacts): number | null {
+	const likes = num(f, 'like_count');
+	const views = num(f, 'view_count');
+	return likes === null || !views ? null : likes / views;
 }
 
 /** Comments ÷ views, or null when either is unknown. */
-export function commentRate(item: Pick<ImportItem, 'commentCount' | 'viewCount'>): number | null {
-	if (item.commentCount === null || !item.viewCount) return null;
-	return item.commentCount / item.viewCount;
+export function commentRate(f: ImportFacts): number | null {
+	const comments = num(f, 'comment_count');
+	const views = num(f, 'view_count');
+	return comments === null || !views ? null : comments / views;
 }
 
 /** Views per day since publishing: momentum, so a new upload isn't judged on raw views. */
-export function viewsPerDay(item: Pick<ImportItem, 'viewCount' | 'publishedAt'>, now: Date): number | null {
-	const days = ageDays(item, now);
-	if (days === null || item.viewCount === null) return null;
-	return item.viewCount / days;
+export function viewsPerDay(f: ImportFacts, now: Date): number | null {
+	const days = ageDays(f, now);
+	const views = num(f, 'view_count');
+	return days === null || views === null ? null : views / days;
 }
 
 export function formatRate(rate: number | null, digits = 1): string {
 	return rate === null ? EMPTY_VALUE : `${(rate * 100).toFixed(digits)}%`;
 }
 
-/** Likes cell text: "hidden" when a YouTube channel hides them; the empty marker when the type has no likes. */
-export function formatLikes(item: Pick<ImportItem, 'likeCount' | 'destinationType'>): string {
-	if (item.likeCount !== null) return formatCount(item.likeCount);
-	return item.destinationType === 'YOUTUBE_VIDEO' ? 'hidden' : EMPTY_VALUE;
+/** "$836.8M" / "$6,000": money, in USD. */
+export function formatUsd(n: number | null): string {
+	if (n === null) return EMPTY_VALUE;
+	if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
+	if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+	return `$${formatCountExact(n)}`;
 }
 
-/** "8.4 / 10" — the rating's source and count go in the tooltip and the detail panel. */
-export function formatRating(item: Pick<ImportItem, 'rating'>): string {
-	return item.rating === null ? EMPTY_VALUE : `${item.rating.toFixed(1)} / 10`;
+/** A short list as "a, b, c", or the empty marker. */
+export function listOrEmpty(values: readonly string[]): string {
+	return values.length ? values.join(', ') : EMPTY_VALUE;
 }
 
-export function ratingTooltip(item: Pick<ImportItem, 'rating' | 'ratingCount' | 'ratingSource'>): string {
-	if (item.rating === null) return '';
-	const source = item.ratingSource ?? 'Rating';
-	const count =
-		item.ratingCount === null
-			? ''
-			: ` from ${formatCountExact(item.ratingCount)} ${ratingCountNoun(item.ratingSource)}`;
-	const low = isLowSampleRating(item) ? ` (few ${ratingCountNoun(item.ratingSource)}, treat with care)` : '';
-	return `${source}: ${item.rating.toFixed(1)} / 10${count}${low}`;
+function formatDate(iso: string | null): string {
+	if (!iso) return EMPTY_VALUE;
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return EMPTY_VALUE;
+	return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
-export function isLowSampleRating(item: Pick<ImportItem, 'rating' | 'ratingCount' | 'ratingSource'>): boolean {
-	return item.rating !== null && item.ratingCount !== null && item.ratingCount < lowSampleThreshold(item.ratingSource);
+/** How a fact's value sorts and filters: the number, the date, or text. */
+export type FactKind = 'number' | 'date' | 'text';
+
+export function factKind(key: string): FactKind {
+	if (key.endsWith('_at')) return 'date';
+	if (
+		key.endsWith('_count') ||
+		key.endsWith('_seconds') ||
+		key.endsWith('_usd') ||
+		['rating', 'popularity', 'like_rate', 'views_per_day'].includes(key)
+	)
+		return 'number';
+	return 'text';
 }
+
+/**
+ * A fact's cell text, chosen by its key: durations, counts, money, dates,
+ * a 0-10 rating, yes/no, lists. Missing is the empty marker, and a video whose
+ * channel hides likes says "hidden" rather than showing a blank like a 0.
+ */
+export function formatFact(key: string, f: ImportFacts): string {
+	if (key === 'like_count' && f.likes_hidden === true && num(f, 'like_count') === null) return 'hidden';
+	const v = f[key];
+	if (v === undefined || v === null || v === '') return EMPTY_VALUE;
+	if (Array.isArray(v)) return listOrEmpty(v.map(String));
+	if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+	if (typeof v === 'number') {
+		if (key === 'rating') return `${v.toFixed(1)} / 10`;
+		if (key.endsWith('_seconds')) return formatDurationSeconds(v);
+		if (key.endsWith('_usd')) return formatUsd(v);
+		if (key.endsWith('_count')) return formatCount(v);
+		return Number.isInteger(v) ? formatCountExact(v) : v.toFixed(1);
+	}
+	if (typeof v === 'string') {
+		if (key.endsWith('_at')) return formatDate(v);
+		return v.charAt(0).toUpperCase() + v.slice(1);
+	}
+	return String(v);
+}
+
+/** A fact's tooltip: the exact figure behind a rounded one, or the rating's source and count. */
+export function factTooltip(key: string, f: ImportFacts): string {
+	if (key === 'rating') return ratingTooltip(f);
+	if (key === 'like_count' && f.likes_hidden === true) return 'The channel hides likes on this video';
+	if (key === 'box_office_usd' && num(f, 'budget_usd') !== null) {
+		return `${formatUsd(num(f, 'box_office_usd'))} worldwide on a ${formatUsd(num(f, 'budget_usd'))} budget`;
+	}
+	const v = num(f, key);
+	if (v !== null && (key.endsWith('_count') || key.endsWith('_usd'))) return formatCountExact(v);
+	const list = f[key];
+	if (Array.isArray(list)) return list.join(', ');
+	return '';
+}
+
+/**
+ * Derived columns, computed in the sheet when the facts they need exist:
+ * reception and momentum adjusted for reach.
+ */
+const DERIVED: Record<string, { needs: string[]; value: (f: ImportFacts, now: Date) => number | null; tip: string }> = {
+	like_rate: {
+		needs: ['like_count', 'view_count'],
+		value: (f) => likeRate(f),
+		tip: 'Likes ÷ views: reception, adjusted for reach. Filter as a decimal (0.03 = 3%).',
+	},
+	views_per_day: {
+		needs: ['view_count', 'published_at'],
+		value: (f, now) => viewsPerDay(f, now),
+		tip: 'Views ÷ days since publishing: momentum, so new uploads are not judged on raw views',
+	},
+};
+
+/** The fact keys that become columns for these rows, in column order (derived ones included). */
+export function factColumnKeys(rows: readonly Pick<ImportItem, 'facts'>[]): string[] {
+	const present = new Set<string>();
+	for (const r of rows) {
+		for (const k of Object.keys(r.facts)) if (!NOT_COLUMNS.has(k)) present.add(k);
+		// Hidden likes have no like_count key, but the Likes column is where "hidden" is said.
+		if (r.facts.likes_hidden === true) present.add('like_count');
+	}
+	for (const [k, d] of Object.entries(DERIVED)) if (d.needs.every((n) => present.has(n))) present.add(k);
+	const rank = (k: string) => {
+		const i = KEY_ORDER.indexOf(k);
+		return i === -1 ? KEY_ORDER.length : i;
+	};
+	return [...present].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+}
+
+// ---------------------------------------------------------------------------
+// Rows: status, selection, filters
+// ---------------------------------------------------------------------------
 
 /** A non-admin imports at most this many rows at once ("select up to 1,000 at a time"). */
 export const SELECTION_LIMIT = 1000;
@@ -190,7 +361,7 @@ export function selectionSummary(rows: readonly ImportRow[]): SelectionSummary {
 		bySource.set(r.sourceTitle, (bySource.get(r.sourceTitle) ?? 0) + 1);
 		const label = contentTypeLabel(r.destinationType.toLowerCase());
 		byDest.set(label, (byDest.get(label) ?? 0) + 1);
-		totalSeconds += r.durationSeconds ?? 0;
+		totalSeconds += num(r.facts, 'duration_seconds') ?? 0;
 	}
 	return {
 		count: rows.length,
@@ -209,164 +380,46 @@ export function formatTotalTime(seconds: number): string {
 	return `about ${Math.round(seconds / 3600)} h`;
 }
 
+/** What each source can't supply, said once above the sheet (the columns simply aren't there). */
+const UNAVAILABLE: Record<ImportDestinationType, string> = {
+	YOUTUBE_VIDEO: 'YouTube no longer shares dislike counts, and videos carry no rating.',
+	MOVIE: "TMDB doesn't publish views, likes or comments for films.",
+};
+
+export function sheetTypes(rows: readonly Pick<ImportItem, 'destinationType'>[]): Set<ImportDestinationType> {
+	return new Set(rows.map((r) => r.destinationType));
+}
+
+export function unavailableNote(types: ReadonlySet<ImportDestinationType>): string {
+	return (Object.keys(UNAVAILABLE) as ImportDestinationType[])
+		.filter((t) => types.has(t))
+		.map((t) => UNAVAILABLE[t])
+		.join(' ');
+}
+
 // ---------------------------------------------------------------------------
 // Columns
 // ---------------------------------------------------------------------------
 
 export type ColumnSet = 'decide' | 'all';
 
-/** Column ids shown in the default "Decide" set: the ones that answer "is this worth importing?". */
-export const DECIDE_COLUMNS: readonly string[] = [
-	'title',
-	'destination',
-	'kind',
-	'source',
-	'published',
-	'length',
-	'rating',
-	'starring',
-	'genres',
-	'boxOffice',
-	'views',
-	'likes',
-	'likeRate',
-	'comments',
-	'viewsPerDay',
-	'status',
-];
-
-/** Every column id that the column set toggles (the pinned checkbox column is always shown). */
-export const IMPORT_COL_IDS: readonly string[] = [
-	...DECIDE_COLUMNS,
-	'ratingCount',
-	'reviewCount',
-	'popularity',
-	'budget',
-	'chapters',
-	'captions',
-	'recency',
-	'externalId',
-	'statsFetchedAt',
-];
+/** Columns that aren't facts: shown under All columns only. */
+const BOOKKEEPING_COLUMNS = ['recency', 'externalId', 'statsFetchedAt'];
 
 /**
- * The content types a column has data for; a column not listed here applies to every type.
- * A sheet hides columns that apply to none of its rows, so a filmography isn't a wall of
- * empty view and like columns (Decision 8: say once what the source can't supply).
- */
-export const COLUMN_TYPES: Readonly<Record<string, readonly ImportDestinationType[]>> = {
-	// Video / Short / Live; a film's kind would only repeat the Becomes column.
-	kind: ['YOUTUBE_VIDEO'],
-	views: ['YOUTUBE_VIDEO'],
-	likes: ['YOUTUBE_VIDEO'],
-	likeRate: ['YOUTUBE_VIDEO'],
-	comments: ['YOUTUBE_VIDEO'],
-	viewsPerDay: ['YOUTUBE_VIDEO'],
-	chapters: ['YOUTUBE_VIDEO'],
-	captions: ['YOUTUBE_VIDEO'],
-	genres: ['MOVIE'],
-	starring: ['MOVIE'],
-	rating: ['MOVIE'],
-	ratingCount: ['MOVIE'],
-	reviewCount: ['MOVIE'],
-	popularity: ['MOVIE'],
-	boxOffice: ['MOVIE'],
-	budget: ['MOVIE'],
-};
-
-/**
- * Optional film figures: a column of these hides when no row in the sheet has
- * a value (the demo's films have no TMDB popularity or review counts, and a
- * new release has no box office yet), and the note says which are missing.
- */
-const OPTIONAL_COLUMNS: Readonly<Record<string, { label: string; has: (r: ImportItem) => boolean }>> = {
-	rating: { label: 'ratings', has: (r) => r.rating !== null },
-	ratingCount: { label: 'rating counts', has: (r) => r.ratingCount !== null },
-	reviewCount: { label: 'review counts', has: (r) => r.reviewCount !== null },
-	popularity: { label: 'popularity', has: (r) => r.popularity !== null },
-	boxOffice: { label: 'box office', has: (r) => r.revenue !== null },
-	budget: { label: 'budgets', has: (r) => r.budget !== null },
-	starring: { label: 'cast', has: (r) => r.topCast.length > 0 },
-	genres: { label: 'genres', has: (r) => r.genres.length > 0 },
-};
-
-/** Optional columns that apply to the sheet's types but no row has a value for. */
-export function emptyOptionalColumns(rows: readonly ImportItem[]): Set<string> {
-	const types = sheetTypes(rows);
-	const out = new Set<string>();
-	for (const [id, col] of Object.entries(OPTIONAL_COLUMNS)) {
-		if (appliesToAny(id, types) && rows.length > 0 && !rows.some(col.has)) out.add(id);
-	}
-	return out;
-}
-
-function appliesToAny(colId: string, types: ReadonlySet<ImportDestinationType>): boolean {
-	const only = COLUMN_TYPES[colId];
-	return !only || only.some((t) => types.has(t));
-}
-
-/** The destination types present in a sheet's rows. */
-export function sheetTypes(rows: readonly Pick<ImportItem, 'destinationType'>[]): Set<ImportDestinationType> {
-	return new Set(rows.map((r) => r.destinationType));
-}
-
-/**
- * Columns to show and hide for a column set, given the destination types in the sheet.
- * With one source the Source column would repeat it on every row, so it hides.
+ * Which of the sheet's columns to show and hide. Decide leaves out the
+ * secondary facts and the bookkeeping columns; one source hides the Source
+ * column, which would only repeat it.
  */
 export function columnsForSet(
 	set: ColumnSet,
-	types: ReadonlySet<ImportDestinationType>,
+	colIds: readonly string[],
 	sourceCount = 2,
-	empty: ReadonlySet<string> = new Set(),
 ): { shown: string[]; hidden: string[] } {
-	const inSet = set === 'all' ? new Set(IMPORT_COL_IDS) : new Set(DECIDE_COLUMNS);
-	const shown = IMPORT_COL_IDS.filter(
-		(id) => inSet.has(id) && appliesToAny(id, types) && !empty.has(id) && (id !== 'source' || sourceCount > 1),
-	);
-	const showing = new Set(shown);
-	return { shown, hidden: IMPORT_COL_IDS.filter((id) => !showing.has(id)) };
-}
-
-/** What each source can't supply, said once above the sheet instead of in a column of blanks. */
-const UNAVAILABLE: Record<ImportDestinationType, string> = {
-	YOUTUBE_VIDEO: 'YouTube no longer shares dislike counts, and videos carry no rating.',
-	MOVIE: "TMDB doesn't publish views, likes or comments for films.",
-};
-
-/**
- * One line for the sheet: what its sources don't supply, and where that shows. A sheet of
- * one type hides those columns; a mixed sheet keeps them and leaves the other type's cells empty.
- */
-export function unavailableNote(
-	types: ReadonlySet<ImportDestinationType>,
-	empty: ReadonlySet<string> = new Set(),
-): string {
-	const parts = (Object.keys(UNAVAILABLE) as ImportDestinationType[])
-		.filter((t) => types.has(t))
-		.map((t) => UNAVAILABLE[t]);
-	if (parts.length === 0) return '';
-	const tail = types.size > 1 ? 'Those cells are empty for the rows they don’t apply to.' : 'Those columns are hidden.';
-	const missing = Object.keys(OPTIONAL_COLUMNS)
-		.filter((id) => empty.has(id))
-		.map((id) => OPTIONAL_COLUMNS[id].label);
-	const none = missing.length
-		? ` No row here has ${joinWords(missing)} yet, so ${missing.length === 1 ? 'that column is' : 'those columns are'} hidden too.`
-		: '';
-	return `${parts.join(' ')} ${tail}${none}`;
-}
-
-function joinWords(words: string[]): string {
-	if (words.length <= 2) return words.join(' or ');
-	return `${words.slice(0, -1).join(', ')} or ${words[words.length - 1]}`;
-}
-
-/** "$836.8M" / "$6,000": box office and budgets, in USD. */
-export function formatUsd(n: number | null): string {
-	if (n === null) return EMPTY_VALUE;
-	if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
-	if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-	return `$${formatCountExact(n)}`;
+	const hide = (id: string) =>
+		(id === 'source' && sourceCount < 2) ||
+		(set === 'decide' && (SECONDARY_KEYS.has(id.replace(/^fact:/, '')) || BOOKKEEPING_COLUMNS.includes(id)));
+	return { shown: colIds.filter((id) => !hide(id)), hidden: colIds.filter(hide) };
 }
 
 /** Date filter comparator for ISO timestamps (AG Grid's date filter compares by local midnight). */
@@ -381,27 +434,16 @@ export const isoDateFilterParams: IDateFilterParams = {
 	buttons: ['reset'],
 };
 
-/** A short list as "a, b, c", or the empty marker. */
-export function listOrEmpty(values: readonly string[]): string {
-	return values.length ? values.join(', ') : EMPTY_VALUE;
-}
-
-function formatPublished(iso: string | null): string {
-	if (!iso) return EMPTY_VALUE;
-	const d = new Date(iso);
-	if (Number.isNaN(d.getTime())) return EMPTY_VALUE;
-	return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
-}
-
 /** Title cell: thumbnail, title, and the one-line summary under it. */
 export function titleCellRenderer(params: { data?: ImportRow }): HTMLElement | string {
 	const row = params.data;
 	if (!row) return '';
 	const wrap = document.createElement('div');
 	wrap.className = 'flex h-full items-center gap-2';
-	if (row.thumbnailUrl) {
+	const thumb = str(row.facts, 'thumbnail_url');
+	if (thumb) {
 		const img = document.createElement('img');
-		img.src = row.thumbnailUrl;
+		img.src = thumb;
 		img.alt = '';
 		img.loading = 'lazy';
 		img.className =
@@ -417,7 +459,7 @@ export function titleCellRenderer(params: { data?: ImportRow }): HTMLElement | s
 	title.textContent = row.title;
 	const summary = document.createElement('span');
 	summary.className = 'text-muted-foreground truncate text-xs';
-	summary.textContent = row.summary ?? 'No summary: open the row for the full description';
+	summary.textContent = str(row.facts, 'summary') ?? 'No summary: open the row for the full description';
 	text.append(title, summary);
 	wrap.appendChild(text);
 	return wrap;
@@ -465,18 +507,59 @@ const numberFilter = {
 	cellClass: 'tabular-nums',
 };
 
-/**
- * Column definitions for the sheet. `now` fixes "today" for age-based columns.
- * Every column's width is also its minWidth (as on the Plan grid): the grid
- * would otherwise squeeze 20 columns into the container, and a spreadsheet
- * should scroll sideways instead.
- */
-export function buildImportColumnDefs(now: Date): ColDef<ImportRow>[] {
-	return columnDefs(now).map((d) => (d.width ? { ...d, minWidth: d.width } : d));
+/** A width that fits the label and a typical value. */
+function factWidth(key: string): number {
+	if (key === 'top_cast') return 240;
+	if (key === 'genres') return 200;
+	if (factKind(key) === 'date') return 140;
+	return Math.max(96, prettifyFactKey(key).length * 9 + 40);
 }
 
-function columnDefs(now: Date): ColDef<ImportRow>[] {
-	return [
+/** One fact's column: label from the key, value, text and filter by the key's kind. */
+function factColumn(key: string, now: Date): ColDef<ImportRow> {
+	const derived = DERIVED[key];
+	const kind = factKind(key);
+	const raw = (p: ValueGetterParams<ImportRow>) => {
+		if (!p.data) return null;
+		if (derived) return derived.value(p.data.facts, now);
+		const v = p.data.facts[key];
+		if (Array.isArray(v)) return v.join(', ');
+		return v ?? null;
+	};
+	const label = derived ? (key === 'like_rate' ? 'Like rate' : 'Views/day') : prettifyFactKey(key);
+	return {
+		colId: `fact:${key}`,
+		headerName: label,
+		headerTooltip: derived?.tip,
+		width: factWidth(key),
+		valueGetter: raw,
+		valueFormatter: (p: ValueFormatterParams<ImportRow>) => {
+			if (!p.data) return '';
+			if (key === 'like_rate') return formatRate(p.value ?? null);
+			if (key === 'views_per_day') return p.value == null ? EMPTY_VALUE : formatCount(Math.round(p.value));
+			return formatFact(key, p.data.facts);
+		},
+		tooltipValueGetter: (p) => (p.data && !derived ? factTooltip(key, p.data.facts) : ''),
+		cellClassRules:
+			key === 'rating' ? { 'text-muted-foreground': (p) => !!p.data && isLowSampleRating(p.data.facts) } : undefined,
+		...(kind === 'number'
+			? numberFilter
+			: kind === 'date'
+				? { filter: 'agDateColumnFilter', floatingFilter: true, filterParams: isoDateFilterParams }
+				: textFilter),
+		...(key === 'published_at' ? { sort: 'desc' as const } : {}),
+	};
+}
+
+/**
+ * Column definitions for these rows: the fixed columns, then one per fact key
+ * present (see factColumnKeys), then status and the bookkeeping columns.
+ * `now` fixes "today" for age-based columns. Every column's width is also its
+ * minWidth (as on the Plan grid): a spreadsheet should scroll sideways rather
+ * than squeeze its columns.
+ */
+export function buildImportColumnDefs(rows: readonly ImportRow[], now: Date): ColDef<ImportRow>[] {
+	const defs: ColDef<ImportRow>[] = [
 		{
 			colId: 'select',
 			headerName: '',
@@ -497,9 +580,10 @@ function columnDefs(now: Date): ColDef<ImportRow>[] {
 			pinned: 'left',
 			width: 360,
 			cellRenderer: titleCellRenderer,
-			tooltipValueGetter: (p) => p.data?.summary ?? p.data?.title ?? '',
+			tooltipValueGetter: (p) => str(p.data?.facts ?? {}, 'summary') ?? p.data?.title ?? '',
 			// Search the summary too, so a word from the description's first line finds the row.
-			getQuickFilterText: (p) => `${p.data?.title ?? ''} ${p.data?.summary ?? ''} ${p.data?.sourceTitle ?? ''}`,
+			getQuickFilterText: (p) =>
+				`${p.data?.title ?? ''} ${str(p.data?.facts ?? {}, 'summary') ?? ''} ${p.data?.sourceTitle ?? ''}`,
 			...textFilter,
 		},
 		{
@@ -513,180 +597,14 @@ function columnDefs(now: Date): ColDef<ImportRow>[] {
 			filterValueGetter: (p) => contentTypeLabel((p.data?.destinationType ?? '').toLowerCase()),
 			...textFilter,
 		},
-		{
-			colId: 'kind',
-			field: 'kind',
-			headerName: 'Kind',
-			width: 96,
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) => KIND_LABELS[p.value as ImportItemKind] ?? '',
-			filterValueGetter: (p) => (p.data ? KIND_LABELS[p.data.kind] : ''),
-			...textFilter,
-		},
 		{ colId: 'source', field: 'sourceTitle', headerName: 'Source', width: 170, ...textFilter },
-		{
-			colId: 'published',
-			field: 'publishedAt',
-			headerName: 'Published',
-			width: 140,
-			sort: 'desc',
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatPublished(p.value ?? null),
-			filter: 'agDateColumnFilter',
-			floatingFilter: true,
-			filterParams: isoDateFilterParams,
-		},
-		{
-			colId: 'length',
-			field: 'durationSeconds',
-			headerName: 'Length',
-			headerTooltip: 'Running time. Filter in seconds.',
-			width: 100,
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) =>
-				p.value === null || p.value === undefined ? EMPTY_VALUE : formatDurationSeconds(p.value),
-			...numberFilter,
-		},
-		{
-			colId: 'rating',
-			field: 'rating',
-			headerName: 'Rating',
-			headerTooltip: 'Out of 10, from the source named in the tooltip',
-			width: 100,
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) => (p.data ? formatRating(p.data) : ''),
-			tooltipValueGetter: (p) => (p.data ? ratingTooltip(p.data) : ''),
-			cellClassRules: { 'text-muted-foreground': (p) => !!p.data && isLowSampleRating(p.data) },
-			...numberFilter,
-		},
-		{
-			colId: 'starring',
-			headerName: 'Starring',
-			headerTooltip: 'Top-billed cast',
-			width: 240,
-			valueGetter: (p) => (p.data ? listOrEmpty(p.data.topCast) : ''),
-			tooltipValueGetter: (p) => (p.data ? p.data.topCast.join(', ') : ''),
-			...textFilter,
-		},
-		{
-			colId: 'genres',
-			headerName: 'Genres',
-			width: 200,
-			valueGetter: (p) => (p.data ? listOrEmpty(p.data.genres) : ''),
-			tooltipValueGetter: (p) => (p.data ? p.data.genres.join(', ') : ''),
-			...textFilter,
-		},
-		{
-			colId: 'boxOffice',
-			field: 'revenue',
-			headerName: 'Box office',
-			headerTooltip: 'Worldwide takings, USD. Filter in dollars.',
-			width: 116,
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatUsd(p.value ?? null),
-			tooltipValueGetter: (p) => {
-				const r = p.data;
-				if (!r || r.revenue === null) return '';
-				const budget = r.budget === null ? '' : ` on a ${formatUsd(r.budget)} budget`;
-				return `${formatUsd(r.revenue)} worldwide${budget}`;
-			},
-			...numberFilter,
-		},
-		{
-			colId: 'views',
-			field: 'viewCount',
-			headerName: 'Views',
-			width: 96,
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatCount(p.value ?? null),
-			tooltipValueGetter: (p) => formatCountExact(p.data?.viewCount ?? null),
-			...numberFilter,
-		},
-		{
-			colId: 'likes',
-			field: 'likeCount',
-			headerName: 'Likes',
-			width: 92,
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) => (p.data ? formatLikes(p.data) : ''),
-			tooltipValueGetter: (p) =>
-				p.data && p.data.likeCount === null && p.data.destinationType === 'YOUTUBE_VIDEO'
-					? 'The channel hides likes on this video'
-					: formatCountExact(p.data?.likeCount ?? null),
-			...numberFilter,
-		},
-		{
-			colId: 'likeRate',
-			headerName: 'Like rate',
-			headerTooltip: 'Likes ÷ views: reception, adjusted for reach. Filter as a decimal (0.03 = 3%).',
-			width: 104,
-			valueGetter: (p) => (p.data ? likeRate(p.data) : null),
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatRate(p.value ?? null),
-			...numberFilter,
-		},
-		{
-			colId: 'comments',
-			field: 'commentCount',
-			headerName: 'Comments',
-			width: 108,
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatCount(p.value ?? null),
-			tooltipValueGetter: (p) => formatCountExact(p.data?.commentCount ?? null),
-			...numberFilter,
-		},
-		{
-			colId: 'viewsPerDay',
-			headerName: 'Views/day',
-			headerTooltip: 'Views ÷ days since publishing: momentum, so new uploads are not judged on raw views',
-			width: 108,
-			valueGetter: (p) => (p.data ? viewsPerDay(p.data, now) : null),
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) =>
-				p.value === null || p.value === undefined ? EMPTY_VALUE : formatCount(Math.round(p.value)),
-			...numberFilter,
-		},
+		...factColumnKeys(rows).map((k) => factColumn(k, now)),
 		{
 			colId: 'status',
 			headerName: 'Status',
 			width: 140,
 			valueGetter: (p) => (p.data ? importStatusLabel(p.data) : ''),
 			cellRenderer: statusCellRenderer,
-			...textFilter,
-		},
-		{
-			colId: 'ratingCount',
-			field: 'ratingCount',
-			headerName: 'Ratings',
-			headerTooltip: 'How many ratings (or, for Metacritic, critic reviews) the score rests on',
-			width: 96,
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatCount(p.value ?? null),
-			...numberFilter,
-		},
-		{
-			colId: 'reviewCount',
-			field: 'reviewCount',
-			headerName: 'Reviews',
-			headerTooltip: 'User reviews on TMDB',
-			width: 96,
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatCount(p.value ?? null),
-			...numberFilter,
-		},
-		{
-			colId: 'popularity',
-			field: 'popularity',
-			headerName: 'Popularity',
-			headerTooltip: "TMDB's daily popularity score: interest right now, like views per day",
-			width: 108,
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) =>
-				p.value === null || p.value === undefined ? EMPTY_VALUE : Number(p.value).toFixed(1),
-			...numberFilter,
-		},
-		{
-			colId: 'budget',
-			field: 'budget',
-			headerName: 'Budget',
-			headerTooltip: 'Production budget, USD',
-			width: 104,
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatUsd(p.value ?? null),
-			...numberFilter,
-		},
-		{ colId: 'chapters', field: 'chapterCount', headerName: 'Chapters', width: 100, ...numberFilter },
-		{
-			colId: 'captions',
-			headerName: 'Captions',
-			width: 100,
-			valueGetter: (p) => (!p.data || p.data.hasCaptions === null ? EMPTY_VALUE : p.data.hasCaptions ? 'Yes' : 'No'),
 			...textFilter,
 		},
 		{
@@ -704,9 +622,10 @@ function columnDefs(now: Date): ColDef<ImportRow>[] {
 			field: 'statsFetchedAt',
 			headerName: 'Stats as of',
 			width: 120,
-			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatPublished(p.value ?? null),
+			valueFormatter: (p: ValueFormatterParams<ImportRow>) => formatDate(p.value ?? null),
 		},
 	];
+	return defs.map((d) => (d.width ? { ...d, minWidth: d.width } : d));
 }
 
 /**

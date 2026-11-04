@@ -42,28 +42,14 @@ function item(overrides: Partial<ImportItem> = {}): ImportItem {
 		id: '1',
 		sourceId: '10',
 		destinationType: 'YOUTUBE_VIDEO',
-		kind: 'VIDEO',
 		externalId: 'abc',
 		url: 'https://www.youtube.com/watch?v=abc',
 		title: 'A video',
-		summary: null,
-		publishedAt: null,
-		durationSeconds: null,
-		viewCount: null,
-		likeCount: null,
-		commentCount: null,
-		rating: null,
-		ratingCount: null,
-		ratingSource: null,
-		chapterCount: 0,
-		hasCaptions: null,
-		genres: [],
-		topCast: [],
-		popularity: null,
-		reviewCount: null,
-		revenue: null,
-		budget: null,
-		thumbnailUrl: null,
+		facts: {
+			kind: 'video',
+			chapter_count: 0,
+			likes_hidden: true,
+		},
 		position: 0,
 		excluded: false,
 		statsFetchedAt: '2026-10-27T12:00:00Z',
@@ -205,6 +191,15 @@ describe('useImportJobs', () => {
 		useImportJobs();
 		expect(captured().queryKey).toEqual(queryKeys.imports.list(false));
 		expect(hashKey(queryKeys.imports.list(true))).not.toBe(hashKey(queryKeys.imports.list(false)));
+	});
+
+	it('polls while a source is listing (an approval just started it), then stops', () => {
+		useImportJobs();
+		const interval = captured().refetchInterval as (q: { state: { data?: unknown } }) => number | false;
+		const listing = { importJobs: [{ ...job(), sources: [{ ...job().sources[0], status: 'LISTING' }] }] };
+		expect(interval({ state: { data: listing } })).toBe(IMPORT_JOB_POLL_MS);
+		expect(interval({ state: { data: { importJobs: [job()] } } })).toBe(false);
+		expect(interval({ state: {} })).toBe(false);
 	});
 });
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import AgGridSvelte5Component from 'ag-grid-svelte5';
 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
 	import { themeQuartz } from '@ag-grid-community/theming';
@@ -15,7 +16,7 @@
 	import {
 		buildImportColumnDefs,
 		columnsForSet,
-		emptyOptionalColumns,
+		factColumnKeys,
 		formatTotalTime,
 		importErrorMessage,
 		isImportable,
@@ -43,10 +44,18 @@
 
 	const now = new Date();
 	const rows = $derived(toImportRows(job.items, job.sources));
-	// Columns follow the content types in the sheet, so a filmography has no view or like columns.
-	const types = $derived(sheetTypes(rows));
-	const empty = $derived(emptyOptionalColumns(rows));
-	const note = $derived(unavailableNote(types, empty));
+	// One column per fact key some row has, so a filmography has no view or like
+	// columns and a channel no box office. The defs are rebuilt only when that key
+	// set changes (a refetch with the same keys keeps the grid's columns as they are).
+	const factKeys = $derived(factColumnKeys(rows).join(','));
+	const columnDefs = $derived.by(() => {
+		void factKeys;
+		return buildImportColumnDefs(
+			untrack(() => rows),
+			now,
+		);
+	});
+	const note = $derived(unavailableNote(sheetTypes(rows)));
 	const readOnly = $derived(!!job.closedAt);
 	const limit = $derived(selectionLimit(isAdmin));
 	const importItems = useImportItems();
@@ -86,7 +95,7 @@
 	}
 
 	const gridOptions: GridOptions<ImportRow> = {
-		columnDefs: buildImportColumnDefs(now),
+		columnDefs: untrack(() => columnDefs),
 		defaultColDef: { sortable: true, resizable: true, cellClassRules: emptyCellClassRules },
 		getRowId: (p) => p.data.id,
 		rowSelection: 'multiple',
@@ -128,13 +137,16 @@
 		if (api && gridReady && !api.isDestroyed()) api.setGridOption('quickFilterText', text);
 	});
 
-	// Column set, a frame after grid ready (column APIs throw straight from onGridReady).
+	// Columns and the column set, a frame after grid ready (column APIs throw straight from onGridReady).
 	$effect(() => {
-		const { shown, hidden } = columnsForSet(columnSet, types, job.sources.length, empty);
+		const defs = columnDefs;
+		const colIds = defs.map((d) => d.colId ?? '').filter((id) => id && id !== 'select');
+		const { shown, hidden } = columnsForSet(columnSet, colIds, job.sources.length);
 		const api = gridApi;
 		if (!api || !gridReady) return;
 		const frame = requestAnimationFrame(() => {
 			if (api.isDestroyed()) return;
+			api.setGridOption('columnDefs', defs);
 			api.setColumnsVisible(shown, true);
 			api.setColumnsVisible(hidden, false);
 		});

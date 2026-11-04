@@ -16,7 +16,7 @@
 	const by = $derived(job.requestedBy?.username ?? 'someone');
 </script>
 
-{#if job.requestStatus === 'REQUESTED'}
+{#if job.requestStatus === 'PENDING'}
 	<p class="text-sm" data-testid="import-job-status">
 		<span class="bg-accent rounded px-1.5 py-0.5 text-xs font-medium">Requested</span>
 		<span class="text-muted-foreground">by {by} on {day(job.createdAt)} · waiting for an admin to approve it</span>
