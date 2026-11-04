@@ -1,127 +1,106 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+**Perspectize** — platform for storing, refining, and sharing perspectives on content (initially YouTube videos). Monorepo: `backend/` (Go GraphQL API, see `backend/CLAUDE.md`) and `frontend/` (SvelteKit, see `frontend/CLAUDE.md`).
 
-## Project Overview
+**Where rules go:** this root file loads every session, so it holds only repo-wide rules. Stack rules live in `backend/CLAUDE.md` / `frontend/CLAUDE.md` (loaded once you touch files there); long procedures live in `.docs/`, linked below. A safety rule that must hold before a stack file is read keeps a one-line stub here.
 
-**Perspectize** — Platform for storing, refining, and sharing perspectives on content (initially YouTube videos).
+## Hard rules
 
-Monorepo with two stacks:
-- **Backend:** `backend/` — Go GraphQL API (see `backend/CLAUDE.md`)
-- **Frontend:** `frontend/` — SvelteKit web app (see `frontend/CLAUDE.md`)
-
-**CLAUDE.md structure:** This root file is loaded in every session, so it holds only repo-wide rules. Stack-specific rules live in `backend/CLAUDE.md` / `frontend/CLAUDE.md` (loaded once you touch files there); long procedures live in `.docs/` and are linked below. A safety rule that must hold before any stack file is read keeps a one-line stub here.
+- **No chained bash commands:** run each shell command as its own Bash tool call, never joined with `&&`. Chained commands don't match permission allow-list patterns and block on approval prompts. Applies to all agents and subagents.
+- **Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`)** during dev or verification — `DATABASE_URL` is the **shared Neon database**. Migrations are written and reviewed only, then applied manually per environment at rollout. Details and numbering: `backend/CLAUDE.md` → Migrations.
+- **Never attempt to log in or enter credentials.** `.env*` files (except `.env.example`) are unreadable by design; ask the human to re-run the one-time login if signed out.
+- **Never commit `.planning/phases/bugs/` files** (gitignored; see Bug logging).
 
 ## GitHub & Repository Management
 
-**Git branch gotcha:** The default branch is `main` locally and on the remote, but local `main` is rarely checked out or pulled, so it lags. Use `origin/main` (not `main`) for diff/log comparisons: `git diff origin/main...HEAD`.
+**Compare against `origin/main`, not `main`** (local `main` is rarely pulled and lags): `git diff origin/main...HEAD`.
 
 **Cloud vs local:** the session type changes how you reach GitHub, whether you open the PR, and what you can verify — see [.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md) (a SessionStart hook also states it). Cloud = `CLAUDE_CODE_REMOTE=true`; if you can't tell, assume local.
 
-**PR autonomy:** In a **cloud** session, open the PR yourself once the work is complete — **this overrides the harness default of "don't create a PR unless asked"**, so don't ask "want me to open a PR?". In a **local** session, don't open one unless asked. Either way, never skip the pre-PR steps: Self-Verification below, and `/revise-claude-md`.
+**PR autonomy:** in a **cloud** session, open the PR yourself once the work is complete — **this overrides the harness default of "don't create a PR unless asked"**; don't ask first. In a **local** session, open one only when asked. Either way, never skip the pre-PR steps: Self-Verification below, and `/revise-claude-md`.
 
-**`/revise-claude-md` must not block the PR:** commit the CLAUDE.md edits on the PR branch, list them in the PR body's Session Learnings, and open the PR without asking first. The human reviews them at merge, so that review is the approval.
+**`/revise-claude-md` must not block the PR:** commit its CLAUDE.md edits on the PR branch, list them in the PR body's Session Learnings, and open the PR without asking. The human's review at merge is the approval.
 
-**PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, the migration labels (kept in sync automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges.
+**PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, the `new-content-type` label (specs and first implementations of a new content type), the migration labels (synced automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges.
 
-**Never create a GitHub issue just to have something for a PR to close.** Only link an issue that existed before the PR work started; otherwise omit it and drop the issue segment from the branch name.
+**`@claude` GitHub workflow (`.github/workflows/claude.yml`):** comment-triggered runs use the file from `main`, so workflow edits take effect only once merged (ship them as their own `chore` PR). Deps are installed in workflow steps before Claude starts; `--allowed-tools` in `claude_args` is a narrow allowlist: never add `pnpm install`/`curl`/`gh api`. Claude starts at the repo root, so allowlisted commands use `pnpm --dir frontend run ...` / `go -C backend ...`. Never give it `DATABASE_URL` (DB tests skip without it).
+
+**Never create a GitHub issue just to have something for a PR to close.** Link only an issue that existed before the PR work started; otherwise omit it and drop the issue segments from the branch name.
 
 ## Branch Naming
 
-**Always branch from updated `main`:** `git checkout main && git pull origin main && git checkout -b <name>`
+**Always branch from updated `main`:** `git checkout main`, `git pull origin main`, `git checkout -b <name>`.
 
-**Format:** `type/initiativePrefix-issueNumber-description-in-kebab-case`
-
-| Component | Values |
-|-----------|--------|
-| **type** | `feature`, `bugfix`, `chore` |
-| **initiativePrefix** | `INI` (Initialization Phase) — **omit along with issueNumber if no issue already exists** (initiativePrefix and issueNumber are a pair; both or neither) |
-| **issueNumber** | GitHub issue number — **omit this segment entirely if no issue already exists.** Do not create one just to fill it in. |
-
-Example: `feature/INI-16-youtube-post-graphql` (with a pre-existing issue) or `feature/youtube-post-graphql` (no issue — both `INI` and the number drop)
+**Format:** `type/initiativePrefix-issueNumber-description-in-kebab-case`. `type` is `feature`, `bugfix` or `chore`; `initiativePrefix` is `INI` (Initialization Phase). `initiativePrefix` and `issueNumber` are a pair: both, or neither when no issue already exists. Examples: `feature/INI-16-youtube-post-graphql`, `feature/youtube-post-graphql`.
 
 ## Coding Conventions
 
-**Learning comments:** Mark temporary explanatory comments with `*TEMP*` for easy grep/removal:
-```go
-// *TEMP* - defer runs after function returns, ensures cleanup
-defer db.Close()
-```
+**Learning comments:** mark temporary explanatory comments with `*TEMP*` (e.g. `// *TEMP* - defer runs after function returns`) for easy grep/removal.
 
-**No chained bash commands:** Do not use `&&` to chain shell commands. Run each command as a separate Bash tool call. Chained commands don't match permission allow-list patterns and block on approval prompts. This applies to all agents and subagents.
+**Import and picker previews must show enough to decide without leaving the page** (what it is, how big, how current, how well received, full detail on click; missing ≠ 0). Applies to every content type and to throwaway artifact previews: [ADDING_CONTENT_TYPE.md → Decision 8](.claude/docs/ADDING_CONTENT_TYPE.md#decision-8-import-preview--enough-for-an-informed-decision).
 
-**Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`) during dev or verification** — `DATABASE_URL` points at the **shared Neon database**. Migrations are written and reviewed only, then applied manually per environment at rollout. Details and migration numbering: `backend/CLAUDE.md` → Migrations.
+**Rating-style numeric fields use the `valid_integer_range` domain (0–10000)** — priority, quality, agreement, importance, confidence. Reuse it for any new "how much" field.
 
-**Rating-style numeric fields use the `valid_integer_range` domain (0–10000)** — priority, quality, agreement, importance, confidence. Reuse it for any new "how much" field instead of inventing a scale.
-
-**Commit messages:** Conventional commit format (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`). One logical change per commit. GSD planning work (PLAN.md, CONTEXT.md, RESEARCH.md, ROADMAP.md) uses the `docs` tag — e.g., `docs(11,13): create execution plans`.
+**Commit messages:** Conventional Commits (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`), one logical change per commit. GSD planning files (PLAN.md, CONTEXT.md, RESEARCH.md, ROADMAP.md) use `docs`, e.g. `docs(11,13): create execution plans`.
 
 ## Planning & Execution Workflow
 
-**New work uses obra/superpowers** (`superpowers:writing-plans` → `superpowers:executing-plans` / `superpowers:subagent-driven-development`; plans/specs in `docs/superpowers/`). **GSD is legacy** — only finish in-flight `.planning/phases/` work with its existing plan files; never start new work with it. If no `superpowers:*` skill is listed this session, any plan/spec you write must carry the "written without superpowers" banner. Details, spike-doc format, and which GSD commands remain: [.docs/PLANNING.md](.docs/PLANNING.md).
+**New work uses obra/superpowers** (`superpowers:writing-plans` → `superpowers:executing-plans` / `superpowers:subagent-driven-development`; plans/specs in `docs/superpowers/`). **GSD is legacy** — only finish in-flight `.planning/phases/` work with its existing plan files; never start new work with it. If no `superpowers:*` skill is listed this session, any plan/spec you write carries the "written without superpowers" banner. Details, spike-doc format, remaining GSD commands: [.docs/PLANNING.md](.docs/PLANNING.md).
 
 ## Self-Verification (MANDATORY)
 
-**Before claiming work is complete, pushing, or creating a PR**, you MUST run verification. No exceptions.
+**Before claiming work is complete, pushing, or creating a PR**, run the relevant subset and report the output summary, not just "tests pass":
 
-1. **Build**: `go build ./...` in `backend/` — must compile with zero errors
-2. **Format**: `gofmt -l .` in `backend/` — must return empty (CI's `Build` job fails otherwise). `make install-hooks` (once per checkout, run in `backend/`; there is no root target) auto-fixes this on every commit.
-3. **Backend tests**: `go test ./...` in `backend/` — all must pass
-4. **Frontend tests**: `pnpm run test:run` in `frontend/` — all must pass
-5. **Query budget**: if the change touches DB access or data fetching, it carries a query-count test (backend) / cache-contract test (frontend) — [.docs/QUERY_BUDGET.md](.docs/QUERY_BUDGET.md).
-6. **Stale references**: If renaming/moving files or paths, grep the entire repo for old names
+1. **Build**: `go build ./...` in `backend/` — zero errors
+2. **Format**: `gofmt -l .` in `backend/` — empty (CI's `Build` job fails otherwise). `make install-hooks` (once per checkout, in `backend/`; no root target) auto-fixes on every commit.
+3. **Backend tests**: `go test ./...` in `backend/` — all pass
+4. **Frontend tests**: `pnpm run test:run` in `frontend/` — all pass
+5. **Query budget**: a change touching DB access or data fetching carries a query-count test (backend) / cache-contract test (frontend) — [.docs/QUERY_BUDGET.md](.docs/QUERY_BUDGET.md)
+6. **Stale references**: after renaming/moving files or paths, grep the whole repo for old names
 
-Run the relevant subset (e.g., backend-only changes skip step 4). Report results explicitly — don't just say "tests pass", show the output summary.
-
-**Mutation testing** (`make mutate` in `backend/`, `pnpm run mutate` in `frontend/`; slow, run deliberately): a run where nothing survives is a harness bug, not a pass — hand-apply one mutant and confirm the suite fails before trusting a score. **Report results as what they say about the tests, not the tool:** "your tests caught X of Y planted bugs (killed)", "missed Z (lived/survived)", "N places no test runs (not covered)"; "efficacy" is the efficacy of the tests. Give the all-in figure (caught ÷ every planted bug) beside the efficacy figure. Language table, baselines and pitfalls: `docs/superpowers/specs/2026-09-29-test-hardening-spike.md`.
+**Mutation testing** (`make mutate` in `backend/`, `pnpm run mutate` in `frontend/`; slow, run deliberately): a run where nothing survives is a harness bug, not a pass — hand-apply one mutant and confirm the suite fails before trusting a score. **Report what it says about the tests:** "your tests caught X of Y planted bugs (killed)", "missed Z (lived/survived)", "N places no test runs (not covered)"; "efficacy" is the tests' efficacy. Give the all-in figure (caught ÷ every planted bug) beside efficacy. Language table, baselines, pitfalls: `docs/superpowers/specs/2026-09-29-test-hardening-spike.md`.
 
 **Browser verification is local-only.** Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in: run only the checklist above and label a user-visible PR `needs-demo-video` ([details](.docs/PR_WORKFLOW.md#demo-requirement-ready-for-review)).
 
-**`.env*` files (except `.env.example`) are unreadable by design** — expected, not a broken setup. Never attempt to log in or enter credentials; ask the human to re-run the one-time login if signed out. Evidence capture: [.docs/VERIFICATION.md](.docs/VERIFICATION.md).
+Unreadable `.env*` files are expected, not a broken setup. Evidence capture: [.docs/VERIFICATION.md](.docs/VERIFICATION.md).
 
 ## Resources
 
 **Monorepo docs:**
-- [Architecture](.docs/ARCHITECTURE.md) — System design and hexagonal architecture (deep-modules rules live in each package CLAUDE.md)
-- [Local Development](.docs/LOCAL_DEVELOPMENT.md) — Setup guide
-- [Agent Routing](.docs/AGENTS.md) — AI agent navigation guide
-- [Domain Guide](.docs/DOMAIN_GUIDE.md) — Domain layer rules and patterns
-- [Go Patterns](.docs/GO_PATTERNS.md) — Error handling and DB query patterns
-- [Security](.docs/SECURITY.md) — Secret management, rotation procedures, incident response
-- [Migration Rollout](.docs/MIGRATION_ROLLOUT.md) — applying a migration to the production Neon DB: one at a time, snapshot first, verify, roll back
-- [Neon Preview Branches](.docs/NEON_BRANCHING.md) — one Neon branch per open PR (created from `production`, migrations applied, deleted on close) via GitHub Actions
-- [Release Approaches](.docs/RELEASE_APPROACHES.md) — named ways to ship multi-PR features unseen; "**dark backend**" (dark backend, merge-gated frontend) is the default, with "role-gated release" planned once RBAC exists
-- [Dependency Security](.docs/DEPENDENCY_SECURITY.md) — Trivy/pnpm-audit scanning, CVE remediation workflow, CI gotchas
-- [Worktrees](.docs/WORKTREES.md) — Location convention and the 5 numbered reusable worktrees for isolated Claude Code work
-- [Agent registry](.claude/agent-registry/README.md) — per-machine claims (`LOCAL_AGENT_CHECKOUTS.md`) and the one-at-a-time verification slot (`LOCAL_AGENT_VERIFICATION.md`). One-time setup per machine: `node .claude/agent-registry/agent-registry.mjs install`
-- [Demo Mode](.docs/DEMO_MODE.md) — Docker demo stack (persistent Postgres + seeded personas, no Clerk/YouTube), Playwright tours that run as E2E (`make demo-test`) or record videos (`make demo-record`)
-- [Observability](.docs/OBSERVABILITY.md) — OTel/Faro → Grafana runbook: local tracer stack (`make obs-up` / `make obs-smoke`, otel-lgtm + Alloy on the demo stack), prod env vars, versioning, cardinality/sampling, OTel→Prometheus metric names
-- [Query Budget](.docs/QUERY_BUDGET.md) — query-count tests, dataloaders, TanStack caching/eviction rules
-- [Project Management](project-management/README.md) — Anthropic AI-native SDLC flow (intent → spec → plan → PRs). Intents live in `project-management/intents/` (copy `_template.md`); one intent → many PRs, each linking back to it. Link to specs/plans/PRs rather than moving them.
-- [PR Workflow](.docs/PR_WORKFLOW.md) · [Planning](.docs/PLANNING.md) · [Hooks](.docs/HOOKS.md) · [Session Environment](.docs/SESSION_ENVIRONMENT.md) (cloud vs local differences; injected at session start)
-- [claude-md-audit eval](evals/claude-md-audit/README.md) — `claude plugin eval` suite scoring the `claude-md-improver` skill; rerun after changing CLAUDE.md tooling or before trusting a cheaper model with audits
+- [Architecture](.docs/ARCHITECTURE.md) — system design, hexagonal architecture (deep-modules rules live in each stack CLAUDE.md)
+- [Local Development](.docs/LOCAL_DEVELOPMENT.md) · [Agent Routing](.docs/AGENTS.md) · [Domain Guide](.docs/DOMAIN_GUIDE.md) · [Go Patterns](.docs/GO_PATTERNS.md) (error handling, DB queries)
+- [Security](.docs/SECURITY.md) — secret management, rotation, incident response
+- [Migration Rollout](.docs/MIGRATION_ROLLOUT.md) — applying a migration to production Neon
+- [Neon Preview Branches](.docs/NEON_BRANCHING.md) — one Neon branch per open PR
+- [Release Approaches](.docs/RELEASE_APPROACHES.md) — shipping multi-PR features unseen; default is "**dark backend**"
+- [Dependency Security](.docs/DEPENDENCY_SECURITY.md) — Trivy/pnpm-audit, CVE remediation
+- [Worktrees](.docs/WORKTREES.md) — location convention, 5 numbered reusable worktrees
+- [Agent registry](.claude/agent-registry/README.md) — per-machine checkout claims and the verification slot. Setup once per machine: `node .claude/agent-registry/agent-registry.mjs install`
+- [Demo Mode](.docs/DEMO_MODE.md) — Docker demo stack, Playwright tours (`make demo-test`, `make demo-record`)
+- [Observability](.docs/OBSERVABILITY.md) — OTel/Faro → Grafana runbook (`make obs-up` / `make obs-smoke`)
+- [Query Budget](.docs/QUERY_BUDGET.md) — query-count tests, dataloaders, TanStack caching/eviction
+- [Project Management](project-management/README.md) — intent → spec → plan → PRs; intents in `project-management/intents/` (copy `_template.md`), one intent → many PRs. Link to specs/plans/PRs; don't move them.
+- [PR Workflow](.docs/PR_WORKFLOW.md) · [Planning](.docs/PLANNING.md) · [Hooks](.docs/HOOKS.md) · [Session Environment](.docs/SESSION_ENVIRONMENT.md)
+- [claude-md-audit eval](evals/claude-md-audit/README.md) — scores the `claude-md-improver` skill; rerun after changing CLAUDE.md tooling
 
 **How-to guides:**
-- [Adding a Content Type](.claude/docs/ADDING_CONTENT_TYPE.md) — End-to-end guide for new content types (backend + frontend)
-- [Content Type Designer](tools/content-type-designer/README.md) — Plan a new type's columns, tooltips and details view before coding. `dist/` is committed: after editing `src/` run `npx tsc -p tsconfig.json` in that dir and commit both (don't commit its package-lock.json). ES modules won't load from file:// — serve it (`python3 -m http.server`) to test; Playwright is at /opt/node22/lib/node_modules/playwright in cloud sessions.
+- [Adding a Content Type](.claude/docs/ADDING_CONTENT_TYPE.md) — end-to-end, backend + frontend
+- [Content Type Designer](tools/content-type-designer/README.md) — plan a new type's columns, tooltips and details view before coding. `dist/` is committed: after editing `src/`, run `npx tsc -p tsconfig.json` in that dir and commit both (not its package-lock.json). Serve it (`python3 -m http.server`) to test; ES modules won't load from file://. Cloud sessions have Playwright at /opt/node22/lib/node_modules/playwright.
 
 **Planning & backlog:**
-- [Feature Backlog](FEATURE_BACKLOG.md) — Future ideas not tied to any milestone. Capture ideas here during development; evaluate when planning new work.
-- [Bug Tracking](.docs/BUG_TRACKING.md) — How known bugs are tracked privately (gitignored files, persistent bugs phase)
-- **Jeeves ("jeevesbot")** — the planned AI assistant: [FEATURE_BACKLOG.md](FEATURE_BACKLOG.md#jeeves-ai-assistant), research in `.planning/v1.1-research/AI-ASSISTANT.md`, model-tier routing in [intents/jev-model-router.md](project-management/intents/jev-model-router.md). It will not run on oh-my-pi; harness-specific work lives in the owner's omp config repo.
+- [Feature Backlog](FEATURE_BACKLOG.md) — capture future ideas here during development
+- [ADRs](docs/adr/README.md) — recorded decisions, including deliberately deferred features; check before proposing one
+- [Bug Tracking](.docs/BUG_TRACKING.md) — private (gitignored) bug tracking
+- **Jeeves ("jeevesbot")** — planned AI assistant: [FEATURE_BACKLOG.md](FEATURE_BACKLOG.md#jeeves-ai-assistant), research `.planning/v1.1-research/AI-ASSISTANT.md`, model routing [intents/jev-model-router.md](project-management/intents/jev-model-router.md). Not for oh-my-pi; harness-specific work lives in the owner's omp config repo.
 
-**Bug logging (MANDATORY):** When you discover a bug during development, review, or testing, log it in `.planning/phases/bugs/BACKLOG.md` with severity and location. Also create a GitHub issue using the bug report template — keep sensitive details (exact paths, line numbers, security specifics) in the backlog only. When a bug is fixed, move it to `.planning/phases/bugs/CLOSED.md` with the PR reference. These files are gitignored — never commit them.
+**Bug logging (MANDATORY):** log every bug you discover in `.planning/phases/bugs/BACKLOG.md` with severity and location, and open a GitHub issue from the bug report template (sensitive details — exact paths, line numbers, security specifics — stay in the backlog only). When fixed, move it to `.planning/phases/bugs/CLOSED.md` with the PR reference. These files are gitignored.
 
-**Hooks:** Claude Code PreToolUse hooks guard `.env` reads and block `gh pr create` until `/revise-claude-md` has run (then create the PR with `gh api`). The real git pre-commit hook (gofmt + prettier auto-fix) is off until `make install-hooks` (run in `backend/`; fresh cloud/CI checkouts start without it — see [.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md)). Full list: [.docs/HOOKS.md](.docs/HOOKS.md).
+**Hooks:** Claude Code PreToolUse hooks guard `.env` reads and block `gh pr create` until `/revise-claude-md` has run (then create the PR with `gh api`). The git pre-commit hook (gofmt + prettier auto-fix) is off until `make install-hooks` (in `backend/`; fresh cloud/CI checkouts lack it). Full list: [.docs/HOOKS.md](.docs/HOOKS.md).
 
-**Cowork session cleanup:** Claude cowork (claude.ai web) sessions leave `_tmp_*` files and conversation transcript `.txt` files in the repo root and `frontend/`. Delete these before committing.
+**Docs-only PRs must not burn CI or deploys:** `ci.yml` gates `test`/`build` on a `code-changes` job (job-level, so skipped = passed for required checks; never workflow-level `paths-ignore`); CodeQL/Trivy/mutation/frontend-test use `paths:`; Sevalla deploys are path-filtered via `allow_deploy_paths` (backend `backend/**`, frontend `frontend/**`; the frontend site also builds PR previews). Give a new workflow or Sevalla service the same gating. Repeat path lists; don't rely on GitHub Actions YAML anchors.
+
+**Cowork session cleanup:** delete `_tmp_*` files and conversation transcript `.txt` files that claude.ai cowork sessions leave in the repo root and `frontend/` before committing.
 
 ## graphify
 
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
-
-Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost) — only if the `graphify` CLI is installed. Cloud sessions usually don't have it or the graph: use Grep/Glob instead, and say in the PR that the update was skipped ([.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md)).
+The knowledge graph lives in `graphify-out/`. When `graphify-out/graph.json` exists, answer codebase questions with `graphify query "<question>"` first, `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for one concept (much smaller than GRAPH_REPORT.md or raw grep). Use `graphify-out/wiki/index.md`, if present, for broad navigation; read `graphify-out/GRAPH_REPORT.md` only for broad architecture review or when query/path/explain fall short. After modifying code, run `graphify update .` if the CLI is installed. Cloud sessions usually lack it and the graph: use Grep/Glob and say in the PR that the update was skipped ([.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md)).

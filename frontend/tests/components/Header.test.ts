@@ -32,6 +32,8 @@ vi.mock('svelte-clerk', () => ({
 // that this test file doesn't otherwise provide — mock the primitives instead of
 // wrapping every render() call site in a QueryClientProvider.
 vi.mock('@tanstack/svelte-query', () => ({
+	// $lib/queries/client builds the shared app QueryClient at import time.
+	QueryClient: class {},
 	createQuery: vi.fn(() => ({ data: undefined, isSuccess: false, isError: false })),
 	createMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 	useQueryClient: vi.fn(() => ({
