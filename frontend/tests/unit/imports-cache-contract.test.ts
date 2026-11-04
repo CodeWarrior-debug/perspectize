@@ -115,6 +115,7 @@ beforeEach(() => {
 	captured = undefined;
 	vi.mocked(graphqlRequest).mockReset();
 	ws.subscribe.mockClear();
+	ws.dispose.mockClear();
 	ws.status.value = 'closed'; // the real wsStatus starts closed
 });
 
@@ -354,5 +355,19 @@ describe('useImportListingProgress', () => {
 		ws.handlers.next(listing(false));
 		await vi.waitFor(() => expect(client.isFetching()).toBe(0));
 		expect(sheet.fetches()).toBe(1);
+	});
+
+	it('changing the job or unmounting disposes the subscription', () => {
+		const { rerender, unmount } = render(ImportListingProbe, { props: { jobId: '7', enabled: true } });
+		flushSync();
+		expect(ws.dispose).not.toHaveBeenCalled();
+
+		rerender({ jobId: '8', enabled: true });
+		flushSync();
+		expect(ws.dispose, 'the job-7 subscription is closed when the job changes').toHaveBeenCalledTimes(1);
+		expect(ws.subscribe).toHaveBeenLastCalledWith({ query: IMPORT_LISTING_PROGRESS, variables: { jobId: '8' } });
+
+		unmount();
+		expect(ws.dispose, 'the job-8 subscription is closed on unmount').toHaveBeenCalledTimes(2);
 	});
 });

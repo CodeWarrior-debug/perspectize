@@ -13,12 +13,29 @@
 	 */
 	let { jobId, sources }: { jobId: string; sources: ImportSource[] } = $props();
 
+	let armed = $state(false);
+	let dismissedAt = $state<string | null>(null);
+
+	// A panel belongs to one import: nothing latched or dismissed for one job carries to another.
+	// Declared before the hook so these run first in the same flush.
+	$effect(() => {
+		void jobId;
+		armed = false;
+		dismissedAt = null;
+	});
+	// Latch: once any source is listing, stay armed. The end-of-run refetch flips the sources to
+	// READY, which must not drop the subscription or unmount the "Built N rows" panel.
+	$effect(() => {
+		void jobId;
+		if (sources.some((s) => s.status === 'LISTING')) armed = true;
+	});
+
+	// Admins only, and only for an import that has listed: an idle import opens no subscription.
 	const me = useMe();
 	const live = useImportListingProgress(
 		() => jobId,
-		() => me.isAdmin,
+		() => me.isAdmin && armed,
 	);
-	let dismissedAt = $state<string | null>(null);
 
 	const p = $derived(live.progress);
 	const visible = $derived(
@@ -89,8 +106,10 @@
 						{#if r.reason}
 							<span class="text-destructive text-xs">{r.reason}</span>
 						{/if}
-					{:else}
+					{:else if r.status === 'WAITING'}
 						<span class="text-muted-foreground">Waiting for approval</span>
+					{:else}
+						<span class="text-muted-foreground">{r.status}</span>
 					{/if}
 				</li>
 			{/each}
