@@ -92,7 +92,7 @@ func TestImportFixtureRows(t *testing.T) {
 	inception := movieRows[slices.IndexFunc(movieRows, func(r *domain.ImportItemWithDetails) bool { return r.Item.Title == "Inception" })]
 	assert.Equal(t, []string{"Leonardo DiCaprio", "Ken Watanabe", "Joseph Gordon-Levitt"}, inception.Item.Facts.TopCast, "billing order")
 	assert.Equal(t, 42, *inception.Item.Facts.RatingCount)
-	assert.Equal(t, int64(836848102), *inception.Item.Facts.RevenueUSD, "worldwide box office, USD")
+	assert.Equal(t, int64(836848102), *inception.Item.Facts.BoxOfficeUSD, "worldwide box office, USD")
 	assert.Equal(t, int64(160000000), *inception.Item.Facts.BudgetUSD)
 	assert.Contains(t, inception.Details.Tags, "dream world")
 	assert.Contains(t, inception.Item.Facts.Genres, "Science fiction", "tidied from Wikidata's \"science fiction film\"")

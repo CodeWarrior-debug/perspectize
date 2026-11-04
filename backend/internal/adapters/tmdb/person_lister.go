@@ -338,7 +338,7 @@ func creditToItem(f film, extra movieExtras, position int, summary string, fetch
 	}
 	if extra.Revenue > 0 {
 		r := extra.Revenue
-		facts.RevenueUSD = &r
+		facts.BoxOfficeUSD = &r
 	}
 	if extra.Reviews != nil {
 		n := extra.Reviews.TotalResults

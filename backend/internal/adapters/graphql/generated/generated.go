@@ -3963,7 +3963,7 @@ type ImportItem {
   title: String!
   # The decision facts shown as sheet columns: one object whose snake_case
   # keys are shared across content types (duration_seconds, view_count,
-  # rating, genres, revenue_usd...; see domain.ImportFacts). A key a source
+  # rating, genres, box_office_usd...; see domain.ImportFacts). A key a source
   # can't supply is absent, never 0.
   facts: JSON!
   # Position in the source listing; 0 is first (newest for channels).

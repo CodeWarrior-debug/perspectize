@@ -152,7 +152,7 @@ func TestPersonLister_ListDirector(t *testing.T) {
 		"top 3 by billing order from the same /movie call, blank names skipped")
 	assert.InDelta(t, 38.5, *inception.Item.Facts.Popularity, 0.001)
 	assert.Equal(t, int64(160000000), *inception.Item.Facts.BudgetUSD)
-	assert.Equal(t, int64(839030630), *inception.Item.Facts.RevenueUSD)
+	assert.Equal(t, int64(839030630), *inception.Item.Facts.BoxOfficeUSD)
 	assert.Equal(t, 12, *inception.Item.Facts.ReviewCount)
 	assert.Equal(t, []string{"dream", "heist"}, inception.Details.Tags, "TMDB keywords are the film's tags")
 	assert.Equal(t, "Cobb steals secrets from dreams.", inception.Details.Description)
@@ -162,7 +162,7 @@ func TestPersonLister_ListDirector(t *testing.T) {
 	assert.Equal(t, "The story of J. Robert Oppenheimer.", oppen.Item.Facts.Summary, "no tagline: the overview's first line")
 	assert.Empty(t, oppen.Item.Facts.TopCast, "no credits in the response: no cast")
 	assert.Nil(t, oppen.Item.Facts.BudgetUSD, "TMDB's 0 budget is unknown, not $0")
-	assert.Nil(t, oppen.Item.Facts.RevenueUSD)
+	assert.Nil(t, oppen.Item.Facts.BoxOfficeUSD)
 	assert.Nil(t, oppen.Item.Facts.ReviewCount, "no reviews block: unknown")
 	assert.Nil(t, oppen.Item.Facts.Popularity)
 
