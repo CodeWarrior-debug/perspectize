@@ -162,6 +162,7 @@ func contentModelToDomain(m *ContentModel) *domain.Content {
 		VerseStartID:      m.VerseStartID,
 		VerseEndID:        m.VerseEndID,
 		DisplayTitle:      m.DisplayTitle,
+		ImportJobID:       m.ImportJobID,
 		CreatedAt:         m.CreatedAt,
 		UpdatedAt:         m.UpdatedAt,
 	}
@@ -186,6 +187,7 @@ func contentDomainToModel(c *domain.Content) *ContentModel {
 		VerseStartID:      c.VerseStartID,
 		VerseEndID:        c.VerseEndID,
 		DisplayTitle:      c.DisplayTitle,
+		ImportJobID:       c.ImportJobID,
 		// CreatedAt and UpdatedAt are managed by GORM
 	}
 }

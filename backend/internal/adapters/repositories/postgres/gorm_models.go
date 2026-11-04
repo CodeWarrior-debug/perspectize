@@ -55,6 +55,7 @@ type ContentModel struct {
 	VerseStartID      *int            `gorm:"column:verse_start_id"`
 	VerseEndID        *int            `gorm:"column:verse_end_id"`
 	DisplayTitle      *string         `gorm:"column:display_title"`
+	ImportJobID       *int            `gorm:"column:import_job_id"`
 
 	// TotalCount is read-only and only present when List selects it: the
 	// filtered total, computed by a scalar subquery in the same statement as

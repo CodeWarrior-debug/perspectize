@@ -114,6 +114,20 @@ func (r *fakeImportRepo) GetJob(_ context.Context, id int) (*domain.ImportJob, e
 	return nil, domain.ErrNotFound
 }
 
+func (r *fakeImportRepo) GetJobsByIDs(_ context.Context, ids []int) (map[int]*domain.ImportJob, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make(map[int]*domain.ImportJob, len(ids))
+	for _, id := range ids {
+		if j, ok := r.jobs[id]; ok {
+			cp := *j
+			cp.Sources = nil
+			out[id] = &cp
+		}
+	}
+	return out, nil
+}
+
 func (r *fakeImportRepo) CountPendingRequests(_ context.Context, userID int) (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

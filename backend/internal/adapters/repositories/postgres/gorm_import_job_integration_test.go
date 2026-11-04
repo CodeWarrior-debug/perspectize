@@ -131,6 +131,39 @@ func TestImportJobIntegration_CreateGetAndList(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
+// GetJobsByIDs is one statement for any number of ids and none for empty input.
+func TestImportJobIntegration_GetJobsByIDsOneStatementForAnyCount(t *testing.T) {
+	f := newImportJobFixture(t)
+	ctx := context.Background()
+	c := querycount.Attach(t, f.db)
+
+	one := f.newJob(t)
+	c.Reset()
+	got, err := f.repo.GetJobsByIDs(ctx, []int{one.ID, -1})
+	require.NoError(t, err)
+	c.AssertExactly(t, 1)
+	require.Len(t, got, 1, "an unknown id is absent, not an error")
+	require.Contains(t, got, one.ID)
+	assert.Equal(t, "Peterson and Nolan", got[one.ID].Name)
+	assert.Empty(t, got[one.ID].Sources, "the batch loads jobs without their sources")
+
+	ids := []int{one.ID}
+	for i := 1; i < 50; i++ {
+		ids = append(ids, f.newJob(t).ID)
+	}
+	c.Reset()
+	got, err = f.repo.GetJobsByIDs(ctx, ids)
+	require.NoError(t, err)
+	c.AssertExactly(t, 1)
+	assert.Len(t, got, 50)
+
+	c.Reset()
+	got, err = f.repo.GetJobsByIDs(ctx, nil)
+	require.NoError(t, err)
+	c.AssertExactly(t, 0)
+	assert.Empty(t, got)
+}
+
 func TestImportJobIntegration_CreateJobUnknownUser(t *testing.T) {
 	f := newImportJobFixture(t)
 	_, err := f.repo.CreateJob(context.Background(), &domain.ImportJob{UserID: -5, Name: "x"})

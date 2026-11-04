@@ -77,6 +77,7 @@ type ComplexityRoot struct {
 		Description             func(childComplexity int) int
 		DisplayTitle            func(childComplexity int) int
 		ID                      func(childComplexity int) int
+		ImportedFrom            func(childComplexity int) int
 		Length                  func(childComplexity int) int
 		LengthDisplay           func(childComplexity int) int
 		LengthUnits             func(childComplexity int) int
@@ -180,6 +181,11 @@ type ComplexityRoot struct {
 		ReviewedAt    func(childComplexity int) int
 		Sources       func(childComplexity int) int
 		UpdatedAt     func(childComplexity int) int
+	}
+
+	ImportJobRef struct {
+		ID   func(childComplexity int) int
+		Name func(childComplexity int) int
 	}
 
 	ImportListingProgress struct {
@@ -591,6 +597,7 @@ type ContentResolver interface {
 	AddedBy(ctx context.Context, obj *model.Content) (*model.User, error)
 
 	PrimaryCategory(ctx context.Context, obj *model.Content) (*model.Category, error)
+	ImportedFrom(ctx context.Context, obj *model.Content) (*model.ImportJobRef, error)
 
 	PerspectiveCount(ctx context.Context, obj *model.Content) (*int, error)
 	VisiblePerspectiveCount(ctx context.Context, obj *model.Content) (*int, error)
@@ -853,6 +860,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.ID(childComplexity), true
+	case "Content.importedFrom":
+		if e.ComplexityRoot.Content.ImportedFrom == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.ImportedFrom(childComplexity), true
 	case "Content.length":
 		if e.ComplexityRoot.Content.Length == nil {
 			break
@@ -1318,6 +1331,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ImportJob.UpdatedAt(childComplexity), true
+
+	case "ImportJobRef.id":
+		if e.ComplexityRoot.ImportJobRef.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportJobRef.ID(childComplexity), true
+	case "ImportJobRef.name":
+		if e.ComplexityRoot.ImportJobRef.Name == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportJobRef.Name(childComplexity), true
 
 	case "ImportListingProgress.jobId":
 		if e.ComplexityRoot.ImportListingProgress.JobID == nil {
@@ -3644,6 +3670,9 @@ type Content {
   "Movie-specific metadata (the shaped TMDB payload); null for other content types."
   movie: JSON
   primaryCategory: Category
+  # The import that created this row. Null for hand-added content, and when that
+  # import is closed and the viewer isn't an admin.
+  importedFrom: ImportJobRef
   # BIBLE_PASSAGE only: computed verse ordinals (see bible_book.verses_per_chapter)
   # and the optional, first-write-wins display title. Null for other content types.
   verseStartID: Int
@@ -4026,6 +4055,12 @@ enum ImportRequestStatus {
   REQUESTED
   APPROVED
   DECLINED
+}
+
+# The import a content row came from, as far as a viewer may see it.
+type ImportJobRef {
+  id: ID!
+  name: String!
 }
 
 type ImportJob {
@@ -4708,6 +4743,8 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_movie(ctx, field)
 	case "primaryCategory":
 		return ec.fieldContext_Content_primaryCategory(ctx, field)
+	case "importedFrom":
+		return ec.fieldContext_Content_importedFrom(ctx, field)
 	case "verseStartID":
 		return ec.fieldContext_Content_verseStartID(ctx, field)
 	case "verseEndID":
@@ -4898,6 +4935,16 @@ func (ec *executionContext) childFields_ImportJob(ctx context.Context, field gra
 		return ec.fieldContext_ImportJob_items(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type ImportJob", field.Name)
+}
+
+func (ec *executionContext) childFields_ImportJobRef(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_ImportJobRef_id(ctx, field)
+	case "name":
+		return ec.fieldContext_ImportJobRef_name(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ImportJobRef", field.Name)
 }
 
 func (ec *executionContext) childFields_ImportListingProgress(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -7606,6 +7653,38 @@ func (ec *executionContext) fieldContext_Content_primaryCategory(_ context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Content_importedFrom(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_importedFrom(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Content().ImportedFrom(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ImportJobRef) graphql.Marshaler {
+			return ec.marshalOImportJobRef2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐImportJobRef(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_importedFrom(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Content",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ImportJobRef(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Content_verseStartID(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9208,6 +9287,52 @@ func (ec *executionContext) fieldContext_ImportJob_items(_ context.Context, fiel
 		},
 	}
 	return fc, nil
+}
+
+func (ec *executionContext) _ImportJobRef_id(ctx context.Context, field graphql.CollectedField, obj *model.ImportJobRef) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportJobRef_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportJobRef_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportJobRef", field, false, false, "ID")
+}
+
+func (ec *executionContext) _ImportJobRef_name(ctx context.Context, field graphql.CollectedField, obj *model.ImportJobRef) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportJobRef_name(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportJobRef_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportJobRef", field, false, false, "String")
 }
 
 func (ec *executionContext) _ImportListingProgress_jobId(ctx context.Context, field graphql.CollectedField, obj *model.ImportListingProgress) (ret graphql.Marshaler) {
@@ -21346,6 +21471,12 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 				func(ctx context.Context) graphql.Marshaler {
 					return ec._Content_primaryCategory(ctx, field, obj)
 				})
+		case "importedFrom":
+			out.ResolveConcurrently(ec.OperationContext, &deferred, i,
+				true, false,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Content_importedFrom(ctx, field, obj)
+				})
 		case "verseStartID":
 			out.Values[i] = ec._Content_verseStartID(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
@@ -21939,6 +22070,44 @@ func (ec *executionContext) _ImportJob(ctx context.Context, sel ast.SelectionSet
 				func(ctx context.Context) graphql.Marshaler {
 					return ec._ImportJob_items(ctx, field, obj)
 				})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var importJobRefImplementors = []string{"ImportJobRef"}
+
+func (ec *executionContext) _ImportJobRef(ctx context.Context, sel ast.SelectionSet, obj *model.ImportJobRef) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, importJobRefImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ImportJobRef")
+		case "id":
+			out.Values[i] = ec._ImportJobRef_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._ImportJobRef_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -26675,6 +26844,13 @@ func (ec *executionContext) marshalOImportJob2ᚖgithubᚗcomᚋCodeWarriorᚑde
 		return graphql.Null
 	}
 	return ec._ImportJob(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOImportJobRef2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐImportJobRef(ctx context.Context, sel ast.SelectionSet, v *model.ImportJobRef) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ImportJobRef(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOImportPersonRole2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐImportPersonRole(ctx context.Context, v any) (*domain.ImportPersonRole, error) {

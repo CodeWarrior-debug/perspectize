@@ -202,6 +202,9 @@ type Content {
   "Movie-specific metadata (the shaped TMDB payload); null for other content types."
   movie: JSON
   primaryCategory: Category
+  # The import that created this row. Null for hand-added content, and when that
+  # import is closed and the viewer isn't an admin.
+  importedFrom: ImportJobRef
   # BIBLE_PASSAGE only: computed verse ordinals (see bible_book.verses_per_chapter)
   # and the optional, first-write-wins display title. Null for other content types.
   verseStartID: Int
@@ -584,6 +587,12 @@ enum ImportRequestStatus {
   REQUESTED
   APPROVED
   DECLINED
+}
+
+# The import a content row came from, as far as a viewer may see it.
+type ImportJobRef {
+  id: ID!
+  name: String!
 }
 
 type ImportJob {

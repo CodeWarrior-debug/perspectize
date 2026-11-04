@@ -89,9 +89,11 @@ func domainToModel(c *domain.Content) *model.Content {
 		// Non-schema field — lets contentResolver.PrimaryCategory batch-load the
 		// category by FK via dataloader instead of re-fetching the content row.
 		PrimaryCategoryID: c.PrimaryCategoryID,
-		VerseStartID:      c.VerseStartID,
-		VerseEndID:        c.VerseEndID,
-		DisplayTitle:      c.DisplayTitle,
+		// Non-schema field — lets contentResolver.ImportedFrom batch-load the import.
+		ImportJobID:  c.ImportJobID,
+		VerseStartID: c.VerseStartID,
+		VerseEndID:   c.VerseEndID,
+		DisplayTitle: c.DisplayTitle,
 	}
 
 	// Parse the raw response JSON into a map for GraphQL
@@ -947,6 +949,11 @@ func int64ToFloatPtr(n *int64) *float64 {
 	}
 	f := float64(*n)
 	return &f
+}
+
+// importJobRefToModel is the short form of an import, as Content.importedFrom shows it.
+func importJobRefToModel(j *domain.ImportJob) *model.ImportJobRef {
+	return &model.ImportJobRef{ID: strconv.Itoa(j.ID), Name: j.Name}
 }
 
 func importJobToModel(j *domain.ImportJob) *model.ImportJob {

@@ -70,6 +70,50 @@ func (r *contentResolver) PrimaryCategory(ctx context.Context, obj *model.Conten
 	return categoryDomainToModel(category), nil
 }
 
+// ImportedFrom is the resolver for the importedFrom field. The import comes from
+// the per-request import job loader (one batched query per request). It is null
+// for hand-added content, for an import that no longer exists, and for a closed
+// import unless the viewer is an admin.
+func (r *contentResolver) ImportedFrom(ctx context.Context, obj *model.Content) (*model.ImportJobRef, error) {
+	if obj.ImportJobID == nil {
+		return nil, nil
+	}
+	jobID := *obj.ImportJobID
+
+	var job *domain.ImportJob
+	if loaders := dataloader.For(ctx); loaders != nil {
+		loaded, err := loaders.ImportJobByID.Load(ctx, jobID)
+		if err != nil {
+			if dataloader.IsNotFound(err) {
+				return nil, nil
+			}
+			return nil, fmt.Errorf("failed to load import for content %s: %w", obj.ID, err)
+		}
+		job = loaded
+	} else {
+		// No dataloader middleware (direct resolver tests): one single-row lookup.
+		if r.ImportService == nil {
+			return nil, nil
+		}
+		jobs, err := r.ImportService.GetImportJobsByIDs(ctx, []int{jobID})
+		if err != nil {
+			return nil, fmt.Errorf("failed to load import for content %s: %w", obj.ID, err)
+		}
+		job = jobs[jobID]
+	}
+	if job == nil {
+		return nil, nil
+	}
+
+	if job.ClosedAt != nil {
+		viewer, _ := auth.ForContext(ctx)
+		if viewer == nil || viewer.Role != domain.UserRoleAdmin {
+			return nil, nil
+		}
+	}
+	return importJobRefToModel(job), nil
+}
+
 // PerspectiveCount is the resolver for the perspectiveCount field.
 //
 // Batched per-request via the PerspectiveAggregateByContentID dataloader

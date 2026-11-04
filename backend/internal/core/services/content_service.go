@@ -114,6 +114,10 @@ func (s *ContentService) CreateFromYouTube(ctx context.Context, url string, user
 		Response:      metadata.Response,
 	}
 
+	if jobID, ok := importJobIDFrom(ctx); ok {
+		content.ImportJobID = &jobID
+	}
+
 	// 6. Atomic upsert — handles concurrent race condition
 	// refreshOnConflict=true: update response/updated_at if URL already exists (refreshes metadata)
 	created, alreadyExisted, err := s.repo.GetOrCreateByURL(ctx, content, true)
@@ -581,6 +585,9 @@ func (s *ContentService) CreateFromMovie(ctx context.Context, rawURL string, use
 		content.LengthUnits = &lengthUnits
 		// TMDB reports runtime in whole minutes; Length holds them as seconds.
 		content.LengthDisplay = domain.TMDBLengthDisplay()
+	}
+	if jobID, ok := importJobIDFrom(ctx); ok {
+		content.ImportJobID = &jobID
 	}
 
 	created, alreadyExisted, err := s.repo.GetOrCreateByURL(ctx, content, true)

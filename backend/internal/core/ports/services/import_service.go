@@ -19,6 +19,11 @@ type ImportService interface {
 	// doesn't exist or is closed and viewer isn't an admin.
 	GetImportJob(ctx context.Context, viewer *domain.AuthenticatedUser, id int) (*domain.ImportJob, error)
 
+	// GetImportJobsByIDs returns the imports among ids without their sources
+	// (1 query for any number of ids). Unknown ids are absent. Closed imports are
+	// included: the caller applies visibility. Backs the content dataloader.
+	GetImportJobsByIDs(ctx context.Context, ids []int) (map[int]*domain.ImportJob, error)
+
 	// SetItemsExcluded marks rows "don't import" or clears the mark, for anyone
 	// signed in, while the import is approved and open (domain.ErrInvalidInput
 	// otherwise). Queued or imported rows are unchanged. Returns rows changed.

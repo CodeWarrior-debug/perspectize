@@ -64,6 +64,7 @@ type Content struct {
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
 	Movie                   map[string]any `json:"movie,omitempty"`
 	PrimaryCategory         *Category      `json:"primaryCategory,omitempty"`
+	ImportedFrom            *ImportJobRef  `json:"importedFrom,omitempty"`
 	VerseStartID            *int           `json:"verseStartID,omitempty"`
 	VerseEndID              *int           `json:"verseEndID,omitempty"`
 	DisplayTitle            *string        `json:"displayTitle,omitempty"`
@@ -73,6 +74,7 @@ type Content struct {
 	QualityRatingCount      *int           `json:"qualityRatingCount,omitempty"`
 	CreatedAt               string         `json:"createdAt"`
 	UpdatedAt               string         `json:"updatedAt"`
+	ImportJobID             *int           `json:"-"`
 	PrimaryCategoryID       *int           `json:"-"`
 }
 
@@ -307,6 +309,11 @@ type ImportJob struct {
 	UpdatedAt       string                     `json:"updatedAt"`
 	Items           []*ImportItem              `json:"items"`
 	RequesterUserID int                        `json:"-"`
+}
+
+type ImportJobRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type ImportListingProgress struct {

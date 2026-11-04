@@ -323,3 +323,113 @@ func TestImportListingProgressRoundTrips(t *testing.T) {
 	assert.Equal(t, domain.ImportSourceStatusReady, first.Sources[0].Status)
 	assert.Equal(t, 30, first.Sources[0].Staged)
 }
+
+const contentOriginQuery = `query($id: ID!) { contentByID(id: $id) { id importedFrom { id name } } }`
+
+const contentsOriginQuery = `query($first: Int) { content(first: $first) { items { id importedFrom { id name } } } }`
+
+// importedFromRef and contentOrigin decode Content.importedFrom.
+type importedFromRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type contentOrigin struct {
+	ID           string           `json:"id"`
+	ImportedFrom *importedFromRef `json:"importedFrom"`
+}
+
+// importRowsAsAdmin creates an admin's import, imports its first n rows and
+// returns the import and the content each row became.
+func importRowsAsAdmin(t *testing.T, h *harness, adminToken string, n int) (rtImportJob, []string) {
+	t.Helper()
+	job := createRoundTripImport(t, h, adminToken)
+	sheet := decode[rtImportJob](t, h.gql(adminToken, importJobQuery, map[string]any{"id": job.ID}), "importJob")
+	ids := make([]string, n)
+	for i := range ids {
+		ids[i] = sheet.Items[i].ID
+	}
+	h.gql(adminToken, importItemsMutation, map[string]any{"input": map[string]any{"jobId": job.ID, "itemIds": ids}})
+	h.runBackground()
+
+	after := decode[rtImportJob](t, h.gql(adminToken, importJobQuery, map[string]any{"id": job.ID}), "importJob")
+	contentIDs := make([]string, n)
+	for i := range contentIDs {
+		require.NotNil(t, after.Items[i].ContentID, after.Items[i].Title)
+		contentIDs[i] = *after.Items[i].ContentID
+		h.trackContent(contentIDs[i])
+	}
+	return job, contentIDs
+}
+
+// TestContentImportedFrom_NullWhenClosedAndViewerNotAdmin: an open import is
+// named to everyone; once an admin closes it, a non-admin sees the content
+// but not the import.
+func TestContentImportedFrom_NullWhenClosedAndViewerNotAdmin(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "imp-vca")
+	_, userToken := h.user("imp-vcu")
+	job, contentIDs := importRowsAsAdmin(t, h, adminToken, 1)
+	vars := map[string]any{"id": contentIDs[0]}
+
+	h.warm(userToken)
+	open := decode[contentOrigin](t, h.gql(userToken, contentOriginQuery, vars), "contentByID")
+	require.NotNil(t, open.ImportedFrom, "an open import is visible to everyone")
+	assert.Equal(t, job.ID, open.ImportedFrom.ID)
+	assert.Equal(t, job.Name, open.ImportedFrom.Name)
+
+	h.gql(adminToken, closeImportJobMutation, map[string]any{"input": map[string]any{"jobId": job.ID, "closed": true}})
+
+	closed := decode[contentOrigin](t, h.gql(userToken, contentOriginQuery, vars), "contentByID")
+	assert.Equal(t, contentIDs[0], closed.ID, "the content itself stays visible")
+	assert.Nil(t, closed.ImportedFrom, "a closed import is hidden from a non-admin")
+}
+
+// TestContentImportedFrom_AdminSeesClosedImport: an admin still sees the
+// import of a row once it is closed.
+func TestContentImportedFrom_AdminSeesClosedImport(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "imp-vaa")
+	job, contentIDs := importRowsAsAdmin(t, h, adminToken, 1)
+	h.gql(adminToken, closeImportJobMutation, map[string]any{"input": map[string]any{"jobId": job.ID, "closed": true}})
+
+	h.warm(adminToken)
+	got := decode[contentOrigin](t, h.gql(adminToken, contentOriginQuery, map[string]any{"id": contentIDs[0]}), "contentByID")
+	require.NotNil(t, got.ImportedFrom, "an admin sees a closed import")
+	assert.Equal(t, job.ID, got.ImportedFrom.ID)
+}
+
+// TestContentImportedFrom_NullForHandAddedContent: content added by hand was
+// never part of an import.
+func TestContentImportedFrom_NullForHandAddedContent(t *testing.T) {
+	h := newHarness(t)
+	userID, token := h.user("imp-hand")
+	contentID := h.content(userID, "hand-added")
+	h.warm(token)
+
+	got := decode[contentOrigin](t, h.gql(token, contentOriginQuery, map[string]any{"id": strconv.Itoa(contentID)}), "contentByID")
+	assert.Nil(t, got.ImportedFrom)
+}
+
+// TestContentsImportedFromRoundTrips pins a content list that selects
+// importedFrom: the page is one statement whatever its size, and the imports
+// it names come from one batched lookup. Five rows cost the same as one.
+func TestContentsImportedFromRoundTrips(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "imp-cr")
+	importRowsAsAdmin(t, h, adminToken, 5)
+	h.warm(adminToken)
+
+	type page struct {
+		Items []contentOrigin `json:"items"`
+	}
+	one := h.roundTrips(2, adminToken, contentsOriginQuery, map[string]any{"first": 1})
+	require.Len(t, decode[page](t, one, "content").Items, 1)
+
+	many := h.roundTrips(2, adminToken, contentsOriginQuery, map[string]any{"first": 5})
+	items := decode[page](t, many, "content").Items
+	require.Len(t, items, 5)
+	for _, it := range items {
+		assert.NotNil(t, it.ImportedFrom, it.ID)
+	}
+}

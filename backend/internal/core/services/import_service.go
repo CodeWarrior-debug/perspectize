@@ -130,6 +130,23 @@ func (s *ImportService) GetImportJob(ctx context.Context, viewer *domain.Authent
 	return job, err
 }
 
+// GetImportJobsByIDs returns the imports among ids, without their sources (1
+// query for any number of ids, none for empty). Unknown and non-positive ids
+// are absent. Closed imports are included: the caller decides who may see them.
+func (s *ImportService) GetImportJobsByIDs(ctx context.Context, ids []int) (map[int]*domain.ImportJob, error) {
+	valid := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if id > 0 {
+			valid = append(valid, id)
+		}
+	}
+	jobs, err := s.repo.GetJobsByIDs(ctx, valid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get import jobs: %w", err)
+	}
+	return jobs, nil
+}
+
 func isImportAdmin(u *domain.AuthenticatedUser) bool {
 	return u != nil && u.Role == domain.UserRoleAdmin
 }
@@ -586,21 +603,37 @@ feed:
 	close(outcomes)
 }
 
+// importJobIDKey is the context key carrying the import a content create belongs to.
+type importJobIDKey struct{}
+
+// WithImportJobID returns ctx carrying the import job a content create is part
+// of, so the row it creates records that import (Content.ImportJobID).
+func WithImportJobID(ctx context.Context, jobID int) context.Context {
+	return context.WithValue(ctx, importJobIDKey{}, jobID)
+}
+
+// importJobIDFrom returns the import job ctx carries, if any.
+func importJobIDFrom(ctx context.Context) (int, bool) {
+	jobID, ok := ctx.Value(importJobIDKey{}).(int)
+	return jobID, ok
+}
+
 // importOne imports one row and records its outcome; ok is false when it
 // was left queued because the import is shutting down.
 func (s *ImportService) importOne(ctx context.Context, actorID int, it *domain.ImportItem) (domain.ImportItemStatus, bool) {
 	if ctx.Err() != nil {
 		return "", false // left queued; RecoverInterrupted fails it at the next start
 	}
+	createCtx := WithImportJobID(ctx, it.JobID)
 	var (
 		content *domain.Content
 		err     error
 	)
 	switch it.DestinationType {
 	case domain.ContentTypeYouTubeVideo:
-		content, err = s.content.CreateFromYouTube(ctx, it.CanonicalURL, actorID)
+		content, err = s.content.CreateFromYouTube(createCtx, it.CanonicalURL, actorID)
 	case domain.ContentTypeMovie:
-		content, err = s.content.CreateFromMovie(ctx, it.CanonicalURL, actorID)
+		content, err = s.content.CreateFromMovie(createCtx, it.CanonicalURL, actorID)
 	default:
 		err = fmt.Errorf("%w: cannot import %s", domain.ErrInvalidInput, it.DestinationType)
 	}

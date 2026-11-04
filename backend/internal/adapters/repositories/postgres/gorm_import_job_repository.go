@@ -112,6 +112,25 @@ func (r *GormImportJobRepository) GetJob(ctx context.Context, id int) (*domain.I
 	return job, nil
 }
 
+// GetJobsByIDs returns the jobs among ids without their sources, in one query.
+func (r *GormImportJobRepository) GetJobsByIDs(ctx context.Context, ids []int) (map[int]*domain.ImportJob, error) {
+	out := make(map[int]*domain.ImportJob, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	var models []ImportJobModel
+	if err := r.db.WithContext(ctx).
+		Where("id = ANY(CAST(? AS bigint[]))", intsToArray(ids)).
+		Find(&models).Error; err != nil {
+		return nil, fmt.Errorf("failed to get import jobs: %w", err)
+	}
+	for i := range models {
+		job := importJobModelToDomain(&models[i])
+		out[job.ID] = job
+	}
+	return out, nil
+}
+
 // GetJobState returns one job without its sources (1 query), or ErrNotFound:
 // enough to check it is approved and open before writing to its rows.
 func (r *GormImportJobRepository) GetJobState(ctx context.Context, id int) (*domain.ImportJob, error) {
