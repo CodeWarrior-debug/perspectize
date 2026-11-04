@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import AgGridSvelte5Component from 'ag-grid-svelte5';
 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
 	import { themeQuartz } from '@ag-grid-community/theming';
@@ -14,8 +15,7 @@
 	import { emptyCellClassRules } from '$lib/utils/grid-empty';
 	import {
 		buildImportColumnDefs,
-		columnsForSet,
-		emptyOptionalColumns,
+		factKeys,
 		formatTotalTime,
 		importErrorMessage,
 		isImportable,
@@ -26,7 +26,6 @@
 		sheetTypes,
 		toImportRows,
 		unavailableNote,
-		type ColumnSet,
 		type ImportRow,
 		type LibraryFilter,
 		type SheetFilter,
@@ -41,12 +40,10 @@
 	 */
 	let { job, isAdmin = false }: { job: ImportJob; isAdmin?: boolean } = $props();
 
-	const now = new Date();
 	const rows = $derived(toImportRows(job.items, job.sources));
-	// Columns follow the content types in the sheet, so a filmography has no view or like columns.
-	const types = $derived(sheetTypes(rows));
-	const empty = $derived(emptyOptionalColumns(rows));
-	const note = $derived(unavailableNote(types, empty));
+	// One column per facts key some row has, so a filmography has no view or like columns.
+	const columnsKey = $derived(`${job.sources.length > 1}|${factKeys(rows).join(',')}`);
+	const note = $derived(unavailableNote(sheetTypes(rows)));
 	const readOnly = $derived(!!job.closedAt);
 	const limit = $derived(selectionLimit(isAdmin));
 	const importItems = useImportItems();
@@ -56,7 +53,6 @@
 	let gridReady = $state(false);
 	let sourceId = $state('');
 	let library = $state<LibraryFilter>('all');
-	let columnSet = $state<ColumnSet>('decide');
 	let search = $state('');
 	let selected = $state<ImportRow[]>([]);
 	let focusedId = $state<string | null>(null);
@@ -86,7 +82,7 @@
 	}
 
 	const gridOptions: GridOptions<ImportRow> = {
-		columnDefs: buildImportColumnDefs(now),
+		columnDefs: untrack(() => buildImportColumnDefs(rows, job.sources.length)),
 		defaultColDef: { sortable: true, resizable: true, cellClassRules: emptyCellClassRules },
 		getRowId: (p) => p.data.id,
 		rowSelection: 'multiple',
@@ -128,15 +124,18 @@
 		if (api && gridReady && !api.isDestroyed()) api.setGridOption('quickFilterText', text);
 	});
 
-	// Column set, a frame after grid ready (column APIs throw straight from onGridReady).
+	// Rebuild the columns when a listing brings a new facts key (or a second
+	// source), a frame after grid ready (column APIs throw straight from onGridReady).
 	$effect(() => {
-		const { shown, hidden } = columnsForSet(columnSet, types, job.sources.length, empty);
+		void columnsKey;
+		const defs = buildImportColumnDefs(
+			untrack(() => rows),
+			job.sources.length,
+		);
 		const api = gridApi;
 		if (!api || !gridReady) return;
 		const frame = requestAnimationFrame(() => {
-			if (api.isDestroyed()) return;
-			api.setColumnsVisible(shown, true);
-			api.setColumnsVisible(hidden, false);
+			if (!api.isDestroyed()) api.setGridOption('columnDefs', defs);
 		});
 		return () => cancelAnimationFrame(frame);
 	});
@@ -234,24 +233,6 @@
 				</button>
 			{/each}
 		</div>
-		<div class="border-border inline-flex overflow-hidden rounded-md border" role="group" aria-label="Columns">
-			{#each [{ value: 'decide', label: 'Decide' }, { value: 'all', label: 'All columns' }] as opt (opt.value)}
-				<button
-					type="button"
-					class="border-border px-3 py-1.5 text-sm not-first:border-l"
-					class:bg-accent={columnSet === opt.value}
-					class:font-medium={columnSet === opt.value}
-					class:text-muted-foreground={columnSet !== opt.value}
-					aria-pressed={columnSet === opt.value}
-					title={opt.value === 'decide'
-						? 'The columns that help you decide'
-						: 'Every column, including IDs and captions'}
-					onclick={() => (columnSet = opt.value as ColumnSet)}
-				>
-					{opt.label}
-				</button>
-			{/each}
-		</div>
 		<input
 			type="search"
 			bind:value={search}
@@ -275,7 +256,7 @@
 			<AgGridSvelte5Component {gridOptions} rowData={rows} {theme} {modules} />
 		</div>
 		<div class="lg:h-[68vh]">
-			<ImportDetailPanel item={focused} sourceTitle={focused?.sourceTitle ?? ''} {now} />
+			<ImportDetailPanel item={focused} sourceTitle={focused?.sourceTitle ?? ''} />
 		</div>
 	</div>
 

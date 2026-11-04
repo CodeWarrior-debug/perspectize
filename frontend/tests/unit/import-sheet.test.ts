@@ -1,69 +1,66 @@
 import { describe, it, expect } from 'vitest';
-import type { ImportItem, ImportSource } from '$lib/queries/imports';
+import type { ImportFacts, ImportItem, ImportSource } from '$lib/queries/imports';
 import { EMPTY_VALUE } from '$lib/utils/formatting';
 import {
-	ageDays,
 	buildImportColumnDefs,
-	columnsForSet,
-	commentRate,
-	DECIDE_COLUMNS,
 	destinationCellRenderer,
-	formatLikes,
-	formatRate,
-	formatRating,
+	factColumnDef,
+	factKeys,
+	factTooltip,
+	formatFact,
 	formatTotalTime,
-	IMPORT_COL_IDS,
-	importStatusLabel,
-	isLowSampleRating,
-	emptyOptionalColumns,
-	formatUsd,
 	importErrorMessage,
+	importStatusLabel,
 	isImportable,
 	isoDateFilterParams,
+	isSelectable,
+	passesSheetFilter,
+	prettifyKey,
 	progressLabel,
 	SELECTION_LIMIT,
 	selectionLimit,
-	isSelectable,
-	likeRate,
-	listOrEmpty,
-	passesSheetFilter,
-	ratingTooltip,
 	selectionSummary,
 	sheetTypes,
-	unavailableNote,
 	titleCellRenderer,
 	toImportRows,
-	viewsPerDay,
+	unavailableNote,
 	type ImportRow,
 } from '$lib/utils/import-sheet';
+
+const videoFacts: ImportFacts = {
+	kind: 'VIDEO',
+	summary: 'Lecture one of the 2017 course.',
+	publishedAt: '2026-10-17T12:00:00Z',
+	durationSeconds: 8756,
+	viewCount: 10_000,
+	likeCount: 300,
+	commentCount: 50,
+	chapterCount: 3,
+	hasCaptions: true,
+	thumbnailUrl: 'https://i.ytimg.com/vi/abc/mqdefault.jpg',
+};
+
+const filmFacts: ImportFacts = {
+	kind: 'MOVIE',
+	publishedAt: '2010-07-16T00:00:00Z',
+	durationSeconds: 8880,
+	rating: 8.4,
+	ratingCount: 38_000,
+	ratingSource: 'TMDB',
+	genres: ['Action', 'Science Fiction'],
+	topCast: ['Leonardo DiCaprio', 'Joseph Gordon-Levitt', 'Elliot Page'],
+	revenue: 839_030_630,
+};
 
 function item(overrides: Partial<ImportItem> = {}): ImportItem {
 	return {
 		id: '1',
 		sourceId: '10',
 		destinationType: 'YOUTUBE_VIDEO',
-		kind: 'VIDEO',
 		externalId: 'abc',
 		url: 'https://www.youtube.com/watch?v=abc',
 		title: 'Maps of Meaning 1',
-		summary: 'Lecture one of the 2017 course.',
-		publishedAt: '2026-10-17T12:00:00Z',
-		durationSeconds: 8756,
-		viewCount: 10_000,
-		likeCount: 300,
-		commentCount: 50,
-		rating: null,
-		ratingCount: null,
-		ratingSource: null,
-		chapterCount: 3,
-		hasCaptions: true,
-		genres: [],
-		topCast: [],
-		popularity: null,
-		reviewCount: null,
-		revenue: null,
-		budget: null,
-		thumbnailUrl: 'https://i.ytimg.com/vi/abc/mqdefault.jpg',
+		facts: videoFacts,
 		position: 0,
 		excluded: false,
 		statsFetchedAt: '2026-10-27T12:00:00Z',
@@ -76,7 +73,6 @@ function item(overrides: Partial<ImportItem> = {}): ImportItem {
 	};
 }
 
-const now = new Date('2026-10-27T12:00:00Z');
 const sources = [
 	{ id: '10', title: 'Jordan B Peterson', sourceRef: '@JordanBPeterson' },
 	{ id: '11', title: null, sourceRef: '525' },
@@ -86,51 +82,120 @@ function row(overrides: Partial<ImportItem> = {}): ImportRow {
 	return toImportRows([item(overrides)], sources)[0];
 }
 
-describe('decision figures', () => {
-	it('rates and momentum', () => {
-		expect(likeRate(item())).toBeCloseTo(0.03);
-		expect(commentRate(item())).toBeCloseTo(0.005);
-		expect(ageDays(item(), now)).toBeCloseTo(10);
-		expect(viewsPerDay(item(), now)).toBeCloseTo(1000);
-		expect(formatRate(0.0312)).toBe('3.1%');
-		expect(formatRate(null)).toBe(EMPTY_VALUE);
+const film = () => row({ id: '2', sourceId: '11', destinationType: 'MOVIE', facts: filmFacts });
+
+describe('facts', () => {
+	it('column headers are prettified keys', () => {
+		expect(prettifyKey('viewCount')).toBe('View count');
+		expect(prettifyKey('durationSeconds')).toBe('Duration seconds');
+		expect(prettifyKey('thumbnailUrl')).toBe('Thumbnail URL');
+		expect(prettifyKey('kind')).toBe('Kind');
 	});
 
-	it('hidden likes are unknown, never 0, and a movie has no likes at all', () => {
-		const hidden = item({ likeCount: null });
-		expect(likeRate(hidden)).toBeNull();
-		expect(formatLikes(hidden)).toBe('hidden');
-		expect(formatLikes(item({ likeCount: null, destinationType: 'MOVIE' }))).toBe(EMPTY_VALUE);
-		expect(likeRate(item({ viewCount: 0 }))).toBeNull();
+	it('one column per key any row has: the shared ones first, then A to Z, never the title-cell facts', () => {
+		expect(factKeys([row(), film()])).toEqual([
+			'kind',
+			'publishedAt',
+			'durationSeconds',
+			'chapterCount',
+			'commentCount',
+			'genres',
+			'hasCaptions',
+			'likeCount',
+			'rating',
+			'ratingCount',
+			'ratingSource',
+			'revenue',
+			'topCast',
+			'viewCount',
+		]);
+		expect(factKeys([film()]), 'a filmography has no view or like columns').not.toContain('viewCount');
+		expect(factKeys([])).toEqual([]);
 	});
 
-	it('unknown dates and views give no age-based figures', () => {
-		expect(ageDays(item({ publishedAt: null }), now)).toBeNull();
-		expect(ageDays(item({ publishedAt: 'not a date' }), now)).toBeNull();
-		expect(viewsPerDay(item({ viewCount: null }), now)).toBeNull();
-		expect(ageDays(item({ publishedAt: '2026-10-27T11:00:00Z' }), now)).toBe(1);
+	it.each([
+		['viewCount', 1_234_567, '1.2 M'],
+		['rating', 8.4, '8.4'],
+		['durationSeconds', 8756, '2:25:56'],
+		['publishedAt', '2026-10-17T12:00:00Z', 'Oct 17, 2026'],
+		['hasCaptions', true, 'Yes'],
+		['hasCaptions', false, 'No'],
+		['topCast', ['A', 'B'], 'A, B'],
+		['genres', [], EMPTY_VALUE],
+		['kind', 'VIDEO', 'Video'],
+		['ratingSource', 'TMDB', 'TMDB'],
+		['likeCount', undefined, EMPTY_VALUE],
+		['likeCount', null, EMPTY_VALUE],
+	] as const)('%s %o reads as %s', (key, value, text) => {
+		expect(formatFact(key, value as never)).toBe(text);
 	});
 
-	it('ratings name their source and mute small samples', () => {
-		const film = item({ destinationType: 'MOVIE', rating: 8.4, ratingCount: 38000, ratingSource: 'TMDB' });
-		expect(formatRating(film)).toBe('8.4 / 10');
-		expect(ratingTooltip(film)).toBe('TMDB: 8.4 / 10 from 38,000 ratings');
-		expect(isLowSampleRating(film)).toBe(false);
-		const few = { ...film, ratingCount: 12 };
-		expect(isLowSampleRating(few)).toBe(true);
-		expect(ratingTooltip(few)).toContain('few ratings');
-		expect(formatRating(item())).toBe(EMPTY_VALUE);
-		expect(ratingTooltip(item())).toBe('');
-		expect(ratingTooltip({ rating: 7.4, ratingCount: null, ratingSource: null })).toBe('Rating: 7.4 / 10');
+	it('a missing fact is unknown, never 0', () => {
+		// A channel that hides likes sends no likeCount key at all.
+		const hidden = row({ facts: Object.fromEntries(Object.entries(videoFacts).filter(([k]) => k !== 'likeCount')) });
+		const likes = factColumnDef('likeCount', [hidden]);
+		const shown = (likes.valueFormatter as (p: { value: unknown }) => string)({
+			value: (likes.valueGetter as (p: { data: ImportRow }) => unknown)({ data: hidden }),
+		});
+		expect(shown).toBe(EMPTY_VALUE);
 	});
 
-	it('a critic aggregate counts reviews, and a few dozen of them is not a small sample', () => {
-		const inception = item({ destinationType: 'MOVIE', rating: 7.4, ratingCount: 42, ratingSource: 'Metacritic' });
-		expect(ratingTooltip(inception)).toBe('Metacritic: 7.4 / 10 from 42 critic reviews');
-		expect(isLowSampleRating(inception), '42 reviews would be muted under the 50-vote user threshold').toBe(false);
-		const thin = { ...inception, ratingCount: 6 };
-		expect(isLowSampleRating(thin)).toBe(true);
-		expect(ratingTooltip(thin)).toContain('few critic reviews');
+	it('compact numbers carry the exact figure in the tooltip', () => {
+		expect(factTooltip('viewCount', 1_234_567)).toBe('1,234,567');
+		expect(factTooltip('durationSeconds', 8756)).toBe('');
+		expect(factTooltip('topCast', ['A', 'B'])).toBe('A, B');
+		expect(factTooltip('summary', 'text')).toBe('');
+	});
+});
+
+describe('columns', () => {
+	const ids = (defs: { colId?: string }[]) => defs.map((d) => d.colId);
+
+	it('fixed columns around one column per fact, newest first', () => {
+		const defs = buildImportColumnDefs([row(), film()], 2);
+		expect(ids(defs).slice(0, 4)).toEqual(['select', 'title', 'destination', 'source']);
+		expect(ids(defs).at(-1)).toBe('status');
+		expect(ids(defs)).toContain('fact:viewCount');
+		expect(ids(defs)).toContain('fact:topCast');
+		expect(defs.find((d) => d.colId === 'fact:publishedAt')?.sort).toBe('desc');
+		const select = defs[0];
+		expect(select.pinned).toBe('left');
+		expect(select.headerCheckboxSelectionFilteredOnly).toBe(true);
+	});
+
+	it('one source hides the Source column, which would repeat it on every row', () => {
+		expect(ids(buildImportColumnDefs([row()], 1))).not.toContain('source');
+	});
+
+	it('every column keeps its width as a floor, so the sheet scrolls instead of squeezing', () => {
+		for (const d of buildImportColumnDefs([row(), film()])) if (d.width) expect(d.minWidth).toBe(d.width);
+	});
+
+	it('the filter follows the values: numbers, dates and text', () => {
+		const rows = [row(), film()];
+		expect(factColumnDef('viewCount', rows).filter).toBe('agNumberColumnFilter');
+		expect(factColumnDef('publishedAt', rows).filter).toBe('agDateColumnFilter');
+		expect(factColumnDef('ratingSource', rows).filter).toBe('agTextColumnFilter');
+		const cast = factColumnDef('topCast', rows);
+		expect(cast.filter).toBe('agTextColumnFilter');
+		expect((cast.filterValueGetter as (p: { data: ImportRow }) => string)({ data: film() })).toBe(
+			'Leonardo DiCaprio, Joseph Gordon-Levitt, Elliot Page',
+		);
+	});
+
+	it('the sheet says once what its sources cannot supply', () => {
+		expect(unavailableNote(sheetTypes([film()]))).toContain("TMDB doesn't publish views");
+		expect(unavailableNote(sheetTypes([row()]))).toContain('dislike counts');
+		expect(unavailableNote(new Set())).toBe('');
+	});
+
+	it('the date filter compares ISO timestamps by UTC day', () => {
+		const cmp = isoDateFilterParams.comparator!;
+		const day = new Date(2026, 9, 17);
+		expect(cmp(day, '2026-10-17T23:00:00Z')).toBe(0);
+		expect(cmp(day, '2026-10-16T12:00:00Z')).toBe(-1);
+		expect(cmp(day, '2026-10-18T00:00:00Z')).toBe(1);
+		expect(cmp(day, null as unknown as string)).toBe(-1);
 	});
 });
 
@@ -165,8 +230,8 @@ describe('status and selection', () => {
 	it('summarises a selection by destination type, source and time', () => {
 		const s = selectionSummary([
 			row(),
-			row({ id: '2', durationSeconds: 3600 }),
-			row({ id: '3', destinationType: 'MOVIE', sourceId: '11', durationSeconds: null }),
+			row({ id: '2', facts: { ...videoFacts, durationSeconds: 3600 } }),
+			row({ id: '3', destinationType: 'MOVIE', sourceId: '11', facts: {} }),
 		]);
 		expect(s.count).toBe(3);
 		expect(s.totalSeconds).toBe(8756 + 3600);
@@ -184,143 +249,13 @@ describe('status and selection', () => {
 	});
 });
 
-describe('columns', () => {
-	const defs = buildImportColumnDefs(now);
-	const byId = new Map(defs.map((d) => [d.colId, d]));
-
-	it('has the destination content type column in the Decide set', () => {
-		expect(byId.get('destination')?.headerName).toBe('Becomes');
-		expect(DECIDE_COLUMNS).toContain('destination');
-	});
-
-	it('every toggled column exists, and the selection column is pinned with select-all-filtered', () => {
-		for (const id of IMPORT_COL_IDS) expect(byId.has(id), id).toBe(true);
-		const select = byId.get('select')!;
-		expect(select.checkboxSelection).toBe(true);
-		expect(select.headerCheckboxSelectionFilteredOnly).toBe(true);
-		expect(select.pinned).toBe('left');
-		expect(byId.get('title')?.pinned).toBe('left');
-	});
-
-	const both = new Set(['YOUTUBE_VIDEO', 'MOVIE'] as const);
-
-	it('Decide hides only the bookkeeping columns; All shows everything', () => {
-		const decide = columnsForSet('decide', both);
-		expect(decide.shown).toEqual([...DECIDE_COLUMNS]);
-		expect(decide.hidden).toEqual([
-			'ratingCount',
-			'reviewCount',
-			'popularity',
-			'budget',
-			'chapters',
-			'captions',
-			'recency',
-			'externalId',
-			'statsFetchedAt',
-		]);
-		expect(columnsForSet('all', both)).toEqual({ shown: [...IMPORT_COL_IDS], hidden: [] });
-	});
-
-	it('a filmography shows film facts instead of a wall of empty video columns', () => {
-		const films = columnsForSet('decide', new Set(['MOVIE'] as const));
-		expect(films.shown, 'rating and cast first: the film facts that decide it').toEqual([
-			'title',
-			'destination',
-			'source',
-			'published',
-			'length',
-			'rating',
-			'starring',
-			'genres',
-			'boxOffice',
-			'status',
-		]);
-		expect(films.hidden, "a film's kind only repeats Becomes").toContain('kind');
-		for (const id of ['views', 'likes', 'likeRate', 'comments', 'viewsPerDay']) expect(films.hidden).toContain(id);
-		expect(columnsForSet('all', new Set(['MOVIE'] as const)).shown).toContain('ratingCount');
-		expect(columnsForSet('all', new Set(['MOVIE'] as const)).hidden).toEqual([
-			'kind',
-			'views',
-			'likes',
-			'likeRate',
-			'comments',
-			'viewsPerDay',
-			'chapters',
-			'captions',
-		]);
-	});
-
-	it('a channel sheet drops the film-only columns', () => {
-		const videos = columnsForSet('decide', new Set(['YOUTUBE_VIDEO'] as const));
-		for (const id of ['genres', 'starring', 'rating']) expect(videos.hidden).toContain(id);
-		expect(videos.shown).toContain('likeRate');
-		expect(videos.shown).toContain('kind');
-	});
-
-	it('one source hides the Source column, which would repeat it on every row', () => {
-		expect(columnsForSet('decide', both, 1).hidden).toContain('source');
-		expect(columnsForSet('decide', both, 2).shown).toContain('source');
-	});
-
-	it('the sheet says once what its sources cannot supply', () => {
-		expect(sheetTypes([item(), item({ destinationType: 'MOVIE' }), item()])).toEqual(both);
-		expect(unavailableNote(new Set(['MOVIE'] as const))).toBe(
-			"TMDB doesn't publish views, likes or comments for films. Those columns are hidden.",
-		);
-		const mixed = unavailableNote(both);
-		expect(mixed).toContain('dislike counts');
-		expect(mixed).toContain('TMDB');
-		expect(mixed).toContain('empty for the rows');
-		expect(unavailableNote(new Set())).toBe('');
-	});
-
-	it('genres and cast read as short lists, and an empty list is the empty marker', () => {
-		expect(listOrEmpty(['Leonardo DiCaprio', 'Ken Watanabe'])).toBe('Leonardo DiCaprio, Ken Watanabe');
-		expect(listOrEmpty([])).toBe(EMPTY_VALUE);
-		const starring = defs.find((d) => d.colId === 'starring')!;
-		const film = item({ destinationType: 'MOVIE', topCast: ['Guy Pearce', 'Carrie-Anne Moss'] });
-		const getter = starring.valueGetter as (p: { data: ImportItem }) => string;
-		expect(getter({ data: film })).toBe('Guy Pearce, Carrie-Anne Moss');
-	});
-
-	it('every column keeps its width as a floor, so the sheet scrolls instead of squeezing', () => {
-		for (const d of defs) expect(d.minWidth, d.colId).toBe(d.width);
-	});
-
-	it('every data column can be filtered from the floating filter row', () => {
-		for (const d of defs) {
-			if (d.colId === 'select' || d.colId === 'statsFetchedAt') continue;
-			expect(d.floatingFilter, d.colId).toBe(true);
-		}
-	});
-
-	it('value getters compute the derived columns', () => {
-		const r = row();
-		const get = (id: string) => (byId.get(id)!.valueGetter as (p: { data: ImportRow }) => unknown)({ data: r });
-		expect(get('likeRate')).toBeCloseTo(0.03);
-		expect(get('viewsPerDay')).toBeCloseTo(1000);
-		expect(get('status')).toBe('Not imported');
-		expect(get('recency')).toBe(1);
-		expect(get('captions')).toBe('Yes');
-	});
-
-	it('the date filter compares ISO timestamps by UTC day', () => {
-		const cmp = isoDateFilterParams.comparator!;
-		const day = new Date(2026, 9, 17);
-		expect(cmp(day, '2026-10-17T23:00:00Z')).toBe(0);
-		expect(cmp(day, '2026-10-16T12:00:00Z')).toBe(-1);
-		expect(cmp(day, '2026-10-18T00:00:00Z')).toBe(1);
-		expect(cmp(day, null as unknown as string)).toBe(-1);
-	});
-});
-
 describe('cell renderers', () => {
 	it('title shows the thumbnail, title and summary', () => {
 		const el = titleCellRenderer({ data: row() }) as HTMLElement;
 		expect(el.querySelector('img')?.getAttribute('src')).toBe('https://i.ytimg.com/vi/abc/mqdefault.jpg');
 		expect(el.textContent).toContain('Maps of Meaning 1');
 		expect(el.textContent).toContain('Lecture one of the 2017 course.');
-		const bare = titleCellRenderer({ data: row({ summary: null, thumbnailUrl: null }) }) as HTMLElement;
+		const bare = titleCellRenderer({ data: row({ facts: { kind: 'VIDEO' } }) }) as HTMLElement;
 		expect(bare.querySelector('img')).toBeNull();
 		expect(bare.textContent).toContain('open the row for the full description');
 		expect(titleCellRenderer({})).toBe('');
@@ -370,45 +305,6 @@ describe('requests, limits and "don\'t import"', () => {
 		expect(s.count).toBe(3);
 		expect(s.importable).toBe(2);
 		expect(s.excluded).toBe(1);
-	});
-});
-
-describe('optional film columns', () => {
-	const defs = buildImportColumnDefs(new Date('2026-10-27T12:00:00Z'));
-	const film = (o: Partial<ImportItem> = {}) => item({ destinationType: 'MOVIE', kind: 'MOVIE', ...o });
-
-	it('hide when no row has a value, and the note says which', () => {
-		const rows = [
-			film({ revenue: 836_848_102, budget: 160_000_000, rating: 7.4, topCast: ['A'], genres: ['Heist'] }),
-			film(),
-		];
-		const empty = emptyOptionalColumns(rows);
-		expect([...empty].sort()).toEqual(['popularity', 'ratingCount', 'reviewCount']);
-		const cols = columnsForSet('all', new Set(['MOVIE'] as const), 1, empty);
-		expect(cols.shown).toContain('boxOffice');
-		expect(cols.shown).not.toContain('popularity');
-		expect(cols.shown).not.toContain('reviewCount');
-		const note = unavailableNote(new Set(['MOVIE'] as const), empty);
-		expect(note).toContain(
-			'No row here has rating counts, review counts or popularity yet, so those columns are hidden too.',
-		);
-	});
-
-	it("don't apply to a channel sheet at all", () => {
-		expect(emptyOptionalColumns([item()]).size).toBe(0);
-		expect(emptyOptionalColumns([]).size).toBe(0);
-	});
-
-	it('money reads in dollars, and missing is the empty marker', () => {
-		expect(formatUsd(836_848_102)).toBe('$836.8M');
-		expect(formatUsd(1_081_169_825)).toBe('$1.08B');
-		expect(formatUsd(48_500)).toBe('$48,500');
-		expect(formatUsd(null)).toBe(EMPTY_VALUE);
-		const box = defs.find((d) => d.colId === 'boxOffice')!;
-		const tip = box.tooltipValueGetter as (p: { data: ImportItem }) => string;
-		expect(tip({ data: film({ revenue: 836_848_102, budget: 160_000_000 }) })).toBe(
-			'$836.8M worldwide on a $160.0M budget',
-		);
 	});
 });
 

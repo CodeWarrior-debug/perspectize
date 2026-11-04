@@ -36,7 +36,6 @@ export type ImportSourceType = 'YOUTUBE_CHANNEL' | 'TMDB_PERSON';
 export type ImportPersonRole = 'DIRECTOR' | 'CAST';
 export type ImportSourceStatus = 'WAITING' | 'LISTING' | 'READY' | 'FAILED';
 export type ImportRequestStatus = 'REQUESTED' | 'APPROVED' | 'DECLINED';
-export type ImportItemKind = 'VIDEO' | 'SHORT' | 'LIVE' | 'MOVIE';
 export type ImportItemStatus = 'QUEUED' | 'IMPORTED' | 'SKIPPED' | 'FAILED';
 /** Destination content types an import can produce (a subset of ContentType). */
 export type ImportDestinationType = 'YOUTUBE_VIDEO' | 'MOVIE';
@@ -63,32 +62,16 @@ export interface ImportItem {
 	id: string;
 	sourceId: string;
 	destinationType: ImportDestinationType;
-	kind: ImportItemKind;
 	externalId: string;
 	url: string;
 	title: string;
-	summary: string | null;
-	publishedAt: string | null;
-	durationSeconds: number | null;
-	viewCount: number | null;
-	/** Null when the channel hides likes: never treat as 0. */
-	likeCount: number | null;
-	commentCount: number | null;
-	/** 0-10 */
-	rating: number | null;
-	ratingCount: number | null;
-	ratingSource: string | null;
-	chapterCount: number;
-	hasCaptions: boolean | null;
-	/** Films: genre names and up to 3 top-billed cast; empty for videos. */
-	genres: string[];
-	topCast: string[];
-	/** Films (TMDB): daily popularity score, user reviews, box office and budget in USD. */
-	popularity: number | null;
-	reviewCount: number | null;
-	revenue: number | null;
-	budget: number | null;
-	thumbnailUrl: string | null;
+	/**
+	 * Decision facts, shown as sheet columns named after their keys. A key means
+	 * the same thing for every content type (durationSeconds, viewCount, rating,
+	 * genres, …); a missing key is unknown, never 0. The backend's
+	 * domain.ImportFacts lists the keys.
+	 */
+	facts: ImportFacts;
 	position: number;
 	/** Marked "don't import" by someone: can't be imported until unmarked. */
 	excluded: boolean;
@@ -99,6 +82,11 @@ export interface ImportItem {
 	importError: string | null;
 	importedAt: string | null;
 }
+
+/** A fact value: a number, text, yes/no, an ISO time (keys ending in "At") or a list of names. */
+export type ImportFactValue = string | number | boolean | string[];
+
+export type ImportFacts = Record<string, ImportFactValue>;
 
 export interface ImportJobSummary {
 	id: string;
@@ -207,28 +195,10 @@ const IMPORT_ITEM_FIELDS = gql`
 		id
 		sourceId
 		destinationType
-		kind
 		externalId
 		url
 		title
-		summary
-		publishedAt
-		durationSeconds
-		viewCount
-		likeCount
-		commentCount
-		rating
-		ratingCount
-		ratingSource
-		chapterCount
-		hasCaptions
-		genres
-		topCast
-		popularity
-		reviewCount
-		revenue
-		budget
-		thumbnailUrl
+		facts
 		position
 		excluded
 		statsFetchedAt

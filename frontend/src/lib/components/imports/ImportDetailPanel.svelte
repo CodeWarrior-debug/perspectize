@@ -2,37 +2,24 @@
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import type { ImportItem } from '$lib/queries/imports';
 	import { useImportItemDetails } from '$lib/queries/imports/useImportItemDetails';
-	import { formatCount, formatCountExact, formatDurationSeconds, EMPTY_VALUE } from '$lib/utils/formatting';
+	import { formatDurationSeconds, EMPTY_VALUE } from '$lib/utils/formatting';
 	import { contentTypeLabel } from '$lib/utils/grid-config';
 	import { activityContentHref } from '$lib/utils/contentLinks';
-	import {
-		ageDays,
-		commentRate,
-		formatLikes,
-		formatRate,
-		importStatusLabel,
-		isLowSampleRating,
-		ratingCountNoun,
-		ratingTooltip,
-		KIND_LABELS,
-		likeRate,
-		viewsPerDay,
-	} from '$lib/utils/import-sheet';
+	import { factKeys, factText, factTooltip, formatFact, importStatusLabel, prettifyKey } from '$lib/utils/import-sheet';
 
 	/**
 	 * ImportDetailPanel: everything about one candidate row, so the decision can
-	 * be made without opening the source site. The row's numbers come from the
-	 * sheet; the long text (description, chapters, tags) loads when it opens.
+	 * be made without opening the source site. The row's facts come from the
+	 * sheet, one entry per key; the long text (description, chapters, tags)
+	 * loads when it opens.
 	 */
 	let {
 		item,
 		sourceTitle,
-		now,
 	}: {
 		/** The focused row, or null when nothing is focused. */
 		item: ImportItem | null;
 		sourceTitle: string;
-		now: Date;
 	} = $props();
 
 	const details = useImportItemDetails(() => item?.id ?? '');
@@ -45,13 +32,6 @@
 		expanded = false;
 	});
 
-	function formatAge(days: number | null): string {
-		if (days === null) return '';
-		if (days < 31) return `${Math.round(days)} days ago`;
-		if (days < 365) return `${Math.round(days / 30.4)} months ago`;
-		return `${(days / 365.25).toFixed(1).replace(/\.0$/, '')} years ago`;
-	}
-
 	function formatPublished(iso: string | null): string {
 		if (!iso) return EMPTY_VALUE;
 		return new Date(iso).toLocaleDateString('en-US', {
@@ -62,46 +42,18 @@
 		});
 	}
 
-	const stats = $derived.by(() => {
-		if (!item) return [];
-		const isVideo = item.destinationType === 'YOUTUBE_VIDEO';
-		const out: { label: string; value: string; title?: string; muted?: boolean }[] = [
-			{
-				label: 'Length',
-				value: item.durationSeconds === null ? EMPTY_VALUE : formatDurationSeconds(item.durationSeconds),
-			},
-		];
-		if (isVideo) {
-			const perDay = viewsPerDay(item, now);
-			out.push(
-				{ label: 'Views', value: formatCount(item.viewCount), title: formatCountExact(item.viewCount) },
-				{ label: 'Likes', value: formatLikes(item), title: formatCountExact(item.likeCount) },
-				{ label: 'Comments', value: formatCount(item.commentCount), title: formatCountExact(item.commentCount) },
-				{ label: 'Views/day', value: perDay === null ? EMPTY_VALUE : formatCount(Math.round(perDay)) },
-				{
-					label: 'Captions',
-					value: item.hasCaptions === null ? EMPTY_VALUE : item.hasCaptions ? 'Yes' : 'No',
-				},
-			);
-		}
-		if (item.rating !== null || !isVideo) {
-			out.push({
-				label: item.ratingSource ? `${item.ratingSource} rating` : 'Rating',
-				value: item.rating === null ? EMPTY_VALUE : `${item.rating.toFixed(1)} / 10`,
-				title: ratingTooltip(item) || undefined,
-				muted: isLowSampleRating(item),
-			});
-		}
-		if (!isVideo) {
-			const noun = ratingCountNoun(item.ratingSource);
-			out.push({
-				label: noun.charAt(0).toUpperCase() + noun.slice(1),
-				value: item.ratingCount === null ? EMPTY_VALUE : formatCountExact(item.ratingCount),
-				muted: isLowSampleRating(item),
-			});
-		}
-		return out;
-	});
+	// Every fact the row has, titled from its key, as in the sheet's columns.
+	const facts = $derived(
+		item
+			? factKeys([item]).map((key) => ({
+					key,
+					label: prettifyKey(key),
+					value: formatFact(key, item.facts[key]),
+					title: factTooltip(key, item.facts[key]) || undefined,
+				}))
+			: [],
+	);
+	const thumbnail = $derived(item ? factText(item, 'thumbnailUrl') : null);
 
 	const longDescription = $derived((d?.description.length ?? 0) > 600);
 </script>
@@ -117,21 +69,20 @@
 		</p>
 	{:else}
 		<section class="border-border flex flex-col gap-2 border-b p-4">
-			{#if item.thumbnailUrl}
+			{#if thumbnail}
 				<img
-					src={item.thumbnailUrl}
+					src={thumbnail}
 					alt=""
 					class={item.destinationType === 'MOVIE' ? 'w-24 rounded' : 'aspect-video w-full rounded object-cover'}
 				/>
 			{/if}
 			<h2 class="text-base leading-snug font-semibold text-balance">{item.title}</h2>
 			<p class="text-muted-foreground text-xs">
-				{sourceTitle} · {KIND_LABELS[item.kind]} · becomes {contentTypeLabel(item.destinationType.toLowerCase())}
+				{sourceTitle} · becomes {contentTypeLabel(item.destinationType.toLowerCase())}
 			</p>
-			<p class="text-muted-foreground text-xs">
-				{formatPublished(item.publishedAt)}{#if ageDays(item, now) !== null}
-					({formatAge(ageDays(item, now))}){/if}
-			</p>
+			{#if factText(item, 'summary')}
+				<p class="text-sm">{factText(item, 'summary')}</p>
+			{/if}
 			<div class="flex flex-wrap items-center gap-3 text-sm">
 				<span data-testid="import-detail-status">{importStatusLabel(item)}</span>
 				<a class="text-primary inline-flex items-center gap-1 underline" href={item.url} target="_blank" rel="noopener">
@@ -146,23 +97,16 @@
 			{/if}
 		</section>
 
-		<section class="border-border grid grid-cols-3 gap-x-3 gap-y-2 border-b p-4" aria-label="Numbers">
-			{#each stats as s (s.label)}
-				<div title={s.title}>
-					<div class="font-mono text-sm tabular-nums" class:text-muted-foreground={s.muted}>{s.value}</div>
-					<div class="text-muted-foreground text-xs">{s.label}</div>
+		<section class="border-border grid grid-cols-2 gap-x-3 gap-y-2 border-b p-4" aria-label="Facts">
+			{#each facts as f (f.key)}
+				<div title={f.title}>
+					<div class="text-sm break-words tabular-nums">{f.value}</div>
+					<div class="text-muted-foreground text-xs">{f.label}</div>
 				</div>
+			{:else}
+				<p class="text-muted-foreground col-span-2 text-sm">No facts listed for this row.</p>
 			{/each}
-			{#if item.destinationType === 'YOUTUBE_VIDEO'}
-				<p class="text-muted-foreground col-span-3 text-xs">
-					Like rate {formatRate(likeRate(item), 2)} · comment rate {formatRate(commentRate(item), 2)} · stats as of
-					{formatPublished(item.statsFetchedAt)}
-				</p>
-			{:else if isLowSampleRating(item)}
-				<p class="text-muted-foreground col-span-3 text-xs">
-					Few {ratingCountNoun(item.ratingSource)} so far; treat the score with care.
-				</p>
-			{/if}
+			<p class="text-muted-foreground col-span-2 text-xs">Facts as of {formatPublished(item.statsFetchedAt)}</p>
 		</section>
 
 		<section class="flex flex-col gap-2 p-4">
