@@ -3,6 +3,7 @@
 	import SignInTrigger from '$lib/components/auth/SignInTrigger.svelte';
 	import ImportJobActions from '$lib/components/imports/ImportJobActions.svelte';
 	import ImportJobStatus from '$lib/components/imports/ImportJobStatus.svelte';
+	import ImportListingProgress from '$lib/components/imports/ImportListingProgress.svelte';
 	import ImportSheet from '$lib/components/imports/ImportSheet.svelte';
 	import ImportSourceList from '$lib/components/imports/ImportSourceList.svelte';
 	import { Button } from '$lib/components/shadcn';
@@ -48,6 +49,7 @@
 			<ImportJobActions {job} isAdmin={me.isAdmin} />
 		</header>
 		{#if job.requestStatus === 'APPROVED'}
+			<ImportListingProgress jobId={job.id} sources={job.sources} />
 			{#key job.id}
 				<ImportSheet {job} isAdmin={me.isAdmin} />
 			{/key}

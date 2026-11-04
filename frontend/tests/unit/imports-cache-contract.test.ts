@@ -3,14 +3,18 @@
  * caching & call budget"), against a real QueryClient.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render } from '@testing-library/svelte';
+import { flushSync } from 'svelte';
 import { hashKey, type QueryClient } from '@tanstack/svelte-query';
 import { queryKeys } from '$lib/queries/keys';
 import {
 	IMPORT_JOB_POLL_MS,
 	IMPORT_JOB_STALE_TIME_MS,
+	IMPORT_LISTING_PROGRESS,
 	type ImportItem,
 	type ImportJob,
 	type ImportJobResponse,
+	type ImportListingProgress,
 } from '$lib/queries/imports';
 import { importJobIsBusy, useImportJob } from '$lib/queries/imports/useImportJob';
 import { importItemsOnSuccess } from '$lib/queries/imports/useImportItems';
@@ -19,10 +23,27 @@ import { createImportJobOnSuccess, importJobChangedOnSuccess } from '$lib/querie
 import { patchExcluded } from '$lib/queries/imports/useSetImportItemsExcluded';
 import { useImportItemDetails } from '$lib/queries/imports/useImportItemDetails';
 import { graphqlRequest } from '$lib/queries/client';
-import { invalidationOutcome, makeClient, mountConsumers, seed } from '../helpers/queryBudget';
+import ImportListingProbe from '../helpers/ImportListingProbe.svelte';
+import { countingFetch, invalidationOutcome, makeClient, mountConsumers, seed } from '../helpers/queryBudget';
 
 let client: QueryClient;
 let captured: any;
+
+const ws = vi.hoisted(() => ({
+	subscribe: vi.fn(),
+	handlers: undefined as any,
+	dispose: vi.fn(),
+	status: { value: 'connected' as 'connecting' | 'connected' | 'closed' },
+}));
+
+vi.mock('$lib/messaging/ws-client.svelte', () => ({
+	subscribeGraphql: (payload: unknown, handlers: unknown) => {
+		ws.subscribe(payload);
+		ws.handlers = handlers;
+		return ws.dispose;
+	},
+	wsStatus: ws.status,
+}));
 
 vi.mock('@tanstack/svelte-query', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('@tanstack/svelte-query')>();
@@ -93,7 +114,23 @@ beforeEach(() => {
 	client = makeClient();
 	captured = undefined;
 	vi.mocked(graphqlRequest).mockReset();
+	ws.subscribe.mockClear();
+	ws.status.value = 'closed'; // the real wsStatus starts closed
 });
+
+function listing(
+	listingNow: boolean,
+	updatedAt = '2026-11-04T12:00:00Z',
+): { importListingProgress: ImportListingProgress } {
+	return {
+		importListingProgress: {
+			jobId: '7',
+			listing: listingNow,
+			sources: [{ sourceId: '10', staged: 12, batches: 1, status: listingNow ? 'LISTING' : 'READY' }],
+			updatedAt,
+		},
+	};
+}
 
 describe('useImportJob', () => {
 	it('keys each import separately and sends the id it is keyed on', () => {
@@ -244,5 +281,78 @@ describe('"don\'t import" patches the sheet in place', () => {
 
 	it('does nothing for a sheet that is not cached', () => {
 		expect(patchExcluded(client, { jobId: '99', itemIds: ['1'], excluded: true })).toBeUndefined();
+	});
+});
+
+describe('useImportListingProgress', () => {
+	it('the subscription is not opened for a non-admin (enabled false), and is opened for an admin', () => {
+		render(ImportListingProbe, { props: { jobId: '7', enabled: false } });
+		flushSync();
+		expect(ws.subscribe, 'a non-admin would get Forbidden').not.toHaveBeenCalled();
+
+		render(ImportListingProbe, { props: { jobId: '7', enabled: true } });
+		flushSync();
+		expect(ws.subscribe).toHaveBeenCalledWith({ query: IMPORT_LISTING_PROGRESS, variables: { jobId: '7' } });
+	});
+
+	it('a finished snapshot seen on open is not live (nothing to show), while a listing one is', () => {
+		const { getByTestId, unmount } = render(ImportListingProbe, { props: { jobId: '7', enabled: true } });
+		flushSync();
+		ws.handlers.next(listing(false));
+		flushSync();
+		expect(getByTestId('probe-progress').textContent).toBe('idle');
+		unmount();
+
+		const again = render(ImportListingProbe, { props: { jobId: '7', enabled: true } });
+		flushSync();
+		ws.handlers.next(listing(true));
+		flushSync();
+		expect(again.getByTestId('probe-progress').textContent).toBe('live');
+	});
+
+	it('a run ending refetches the sheet and the imports lists exactly once, and no other key', async () => {
+		const sheet = countingFetch({ importJob: job() });
+		const openList = countingFetch({ importJobs: [] });
+		const closedList = countingFetch({ importJobs: [] });
+		const content = countingFetch({});
+		await mountConsumers(client, { queryKey: queryKeys.imports.detail('7'), queryFn: sheet, staleTime: Infinity }, 1);
+		await mountConsumers(
+			client,
+			{ queryKey: queryKeys.imports.list(false), queryFn: openList, staleTime: Infinity },
+			1,
+		);
+		await mountConsumers(
+			client,
+			{ queryKey: queryKeys.imports.list(true), queryFn: closedList, staleTime: Infinity },
+			1,
+		);
+		await mountConsumers(
+			client,
+			{ queryKey: queryKeys.content.list({ first: 50 }), queryFn: content, staleTime: Infinity },
+			1,
+		);
+		expect([sheet.fetches(), openList.fetches(), closedList.fetches(), content.fetches()]).toEqual([1, 1, 1, 1]);
+
+		render(ImportListingProbe, { props: { jobId: '7', enabled: true } });
+		flushSync();
+		ws.handlers.next(listing(true, '2026-11-04T12:00:00Z'));
+		ws.handlers.next(listing(true, '2026-11-04T12:00:01Z'));
+		expect(sheet.fetches(), 'no refetch while the run is still going').toBe(1);
+
+		ws.handlers.next(listing(false, '2026-11-04T12:00:02Z'));
+		await vi.waitFor(() => expect(client.isFetching()).toBe(0));
+
+		expect([sheet.fetches(), openList.fetches(), closedList.fetches()]).toEqual([2, 2, 2]);
+		expect(content.fetches(), 'Activity content is not touched by a listing').toBe(1);
+	});
+
+	it('a finished run that was already over when the page opened refetches nothing', async () => {
+		const sheet = countingFetch({ importJob: job() });
+		await mountConsumers(client, { queryKey: queryKeys.imports.detail('7'), queryFn: sheet, staleTime: Infinity }, 1);
+		render(ImportListingProbe, { props: { jobId: '7', enabled: true } });
+		flushSync();
+		ws.handlers.next(listing(false));
+		await vi.waitFor(() => expect(client.isFetching()).toBe(0));
+		expect(sheet.fetches()).toBe(1);
 	});
 });

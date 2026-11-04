@@ -148,6 +148,28 @@ export interface ImportProgress {
 	updatedAt: string;
 }
 
+/**
+ * Listing progress of one source (admins only). `staged` is the rows listed so
+ * far and `batches` the listing batches written for it.
+ */
+export interface ImportSourceListingProgress {
+	sourceId: string;
+	staged: number;
+	batches: number;
+	status: ImportSourceStatus;
+}
+
+/**
+ * Listing progress of an import's sources (admins only). `listing` is true while
+ * any source is still listing; the last snapshot has it false.
+ */
+export interface ImportListingProgress {
+	jobId: string;
+	listing: boolean;
+	sources: ImportSourceListingProgress[];
+	updatedAt: string;
+}
+
 export interface CreateImportSourceInput {
 	sourceType: ImportSourceType;
 	ref: string;
@@ -337,6 +359,32 @@ export const IMPORT_PROGRESS = `
 		}
 	}
 `;
+
+/**
+ * Admin only (the server refuses anyone else). Pushed on subscribe with the
+ * current snapshot, then at most twice a second while a source lists, and once
+ * more with listing false when the last source finishes. After a server restart
+ * the snapshot can be empty until a new listing starts.
+ */
+export const IMPORT_LISTING_PROGRESS = `
+	subscription ImportListingProgress($jobId: ID!) {
+		importListingProgress(jobId: $jobId) {
+			jobId
+			listing
+			sources {
+				sourceId
+				staged
+				batches
+				status
+			}
+			updatedAt
+		}
+	}
+`;
+
+export interface ImportListingProgressResponse {
+	importListingProgress: ImportListingProgress;
+}
 
 export interface CreateImportJobResponse {
 	createImportJob: ImportJobSummary;
