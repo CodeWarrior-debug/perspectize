@@ -54,20 +54,23 @@ const (
 type ImportRequestStatus string
 
 const (
-	ImportRequestStatusRequested ImportRequestStatus = "REQUESTED"
-	ImportRequestStatusApproved  ImportRequestStatus = "APPROVED"
-	ImportRequestStatusDeclined  ImportRequestStatus = "DECLINED"
+	// ImportRequestStatusPending is a request no admin has reviewed yet (the
+	// stored default, so a row written without a status never spends quota).
+	ImportRequestStatusPending  ImportRequestStatus = "PENDING"
+	ImportRequestStatusApproved ImportRequestStatus = "APPROVED"
+	ImportRequestStatusDeclined ImportRequestStatus = "DECLINED"
 )
 
 // ImportItemKind tells a channel's long-form videos, Shorts and livestreams
-// apart (people include or exclude them as a group), and marks movies.
+// apart (people include or exclude them as a group), and marks movies. It is
+// the "kind" fact.
 type ImportItemKind string
 
 const (
-	ImportItemKindVideo ImportItemKind = "VIDEO"
-	ImportItemKindShort ImportItemKind = "SHORT"
-	ImportItemKindLive  ImportItemKind = "LIVE"
-	ImportItemKindMovie ImportItemKind = "MOVIE"
+	ImportItemKindVideo ImportItemKind = "video"
+	ImportItemKindShort ImportItemKind = "short"
+	ImportItemKindLive  ImportItemKind = "live"
+	ImportItemKindMovie ImportItemKind = "movie"
 )
 
 // ImportItemStatus is the outcome of importing one candidate. A nil status on
@@ -140,27 +143,10 @@ type ImportItem struct {
 	ExternalID      string
 	DestinationType ContentType
 	CanonicalURL    string
-	Kind            ImportItemKind
 	Title           string
-	Summary         *string
-	PublishedAt     *time.Time
-	DurationSeconds *int
-	ViewCount       *int64
-	LikeCount       *int64 // nil when the channel hides likes, never 0 for "unknown"
-	CommentCount    *int64
-	Rating          *float64 // 0-10
-	RatingCount     *int
-	RatingSource    *string
-	ChapterCount    int
-	HasCaptions     *bool
-	Genres          []string // films only
-	TopCast         []string // films only: up to 3 top-billed names
-	Popularity      *float64 // films (TMDB): daily popularity score
-	ReviewCount     *int     // films (TMDB): user reviews
-	Revenue         *int64   // films: box office takings, USD
-	Budget          *int64   // films: production budget, USD
-	ThumbnailURL    *string
-	Position        int
+	// Facts is what the row shows to help decide (stored as one jsonb object).
+	Facts    ImportFacts
+	Position int
 	// Excluded is the shared "don't import" mark: such a row can't be queued.
 	Excluded       bool
 	StatsFetchedAt time.Time
@@ -172,6 +158,50 @@ type ImportItem struct {
 	ContentID *int
 	// InLibrary is true when content with CanonicalURL exists. Computed at read time.
 	InLibrary bool
+}
+
+// ImportFacts is enough about a candidate to decide whether it is worth
+// importing: not everything needed to import it (the import fetches that
+// again). It is stored as one jsonb object, so a new source or content type
+// adds keys here rather than columns, and the sheet makes a column of every
+// key present, labelled from the key name.
+//
+// Key names are shared across content types, so the same idea is one column
+// whatever the source: a video's and a film's length are both
+// duration_seconds. A key a source can't supply is left out, never 0. The
+// suffix says how to show it: _seconds a duration, _count a count, _usd
+// money, _at a date.
+type ImportFacts struct {
+	Kind         ImportItemKind `json:"kind,omitempty"` // video, short, live, movie
+	Summary      string         `json:"summary,omitempty"`
+	ThumbnailURL string         `json:"thumbnail_url,omitempty"`
+	PublishedAt  *time.Time     `json:"published_at,omitempty"`
+
+	DurationSeconds *int `json:"duration_seconds,omitempty"`
+
+	// Reach and reception (YouTube). LikesHidden marks a channel that hides
+	// likes: like_count is then absent, and the sheet says "hidden".
+	ViewCount    *int64 `json:"view_count,omitempty"`
+	LikeCount    *int64 `json:"like_count,omitempty"`
+	LikesHidden  bool   `json:"likes_hidden,omitempty"`
+	CommentCount *int64 `json:"comment_count,omitempty"`
+
+	// Ratings: a 0-10 score, how many ratings (or critic reviews) it rests on, and whose.
+	Rating       *float64 `json:"rating,omitempty"`
+	RatingCount  *int     `json:"rating_count,omitempty"`
+	RatingSource string   `json:"rating_source,omitempty"`
+
+	// Films (TMDB, or Wikidata for the demo).
+	ReviewCount *int     `json:"review_count,omitempty"`
+	Popularity  *float64 `json:"popularity,omitempty"`
+	RevenueUSD  *int64   `json:"revenue_usd,omitempty"`
+	BudgetUSD   *int64   `json:"budget_usd,omitempty"`
+	Genres      []string `json:"genres,omitempty"`
+	TopCast     []string `json:"top_cast,omitempty"`
+
+	// Videos.
+	ChapterCount *int  `json:"chapter_count,omitempty"`
+	HasCaptions  *bool `json:"has_captions,omitempty"`
 }
 
 // ImportItemDetails is the detail-panel payload, stored as JSONB and fetched lazily.

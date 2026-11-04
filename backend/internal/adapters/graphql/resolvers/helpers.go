@@ -985,28 +985,10 @@ func importItemToModel(it *domain.ImportItem) *model.ImportItem {
 		ID:              strconv.Itoa(it.ID),
 		SourceID:        strconv.Itoa(it.SourceID),
 		DestinationType: it.DestinationType,
-		Kind:            it.Kind,
 		ExternalID:      it.ExternalID,
 		URL:             it.CanonicalURL,
 		Title:           it.Title,
-		Summary:         it.Summary,
-		PublishedAt:     isoTimePtr(it.PublishedAt),
-		DurationSeconds: it.DurationSeconds,
-		ViewCount:       int64ToFloatPtr(it.ViewCount),
-		LikeCount:       int64ToFloatPtr(it.LikeCount),
-		CommentCount:    int64ToFloatPtr(it.CommentCount),
-		Rating:          it.Rating,
-		RatingCount:     it.RatingCount,
-		RatingSource:    it.RatingSource,
-		ChapterCount:    it.ChapterCount,
-		HasCaptions:     it.HasCaptions,
-		Genres:          stringsOrEmpty(it.Genres),
-		TopCast:         stringsOrEmpty(it.TopCast),
-		Popularity:      it.Popularity,
-		ReviewCount:     it.ReviewCount,
-		Revenue:         int64ToFloatPtr(it.Revenue),
-		Budget:          int64ToFloatPtr(it.Budget),
-		ThumbnailURL:    it.ThumbnailURL,
+		Facts:           importFactsToMap(it.Facts),
 		Position:        it.Position,
 		Excluded:        it.Excluded,
 		StatsFetchedAt:  isoTime(it.StatsFetchedAt),
@@ -1020,6 +1002,18 @@ func importItemToModel(it *domain.ImportItem) *model.ImportItem {
 		m.ContentID = &id
 	}
 	return m
+}
+
+// importFactsToMap is the facts object as the client sees it: exactly the
+// jsonb keys (omitted keys stay absent), so the sheet can make a column per key.
+func importFactsToMap(f domain.ImportFacts) map[string]any {
+	out := map[string]any{}
+	b, err := json.Marshal(f)
+	if err != nil {
+		return out
+	}
+	_ = json.Unmarshal(b, &out)
+	return out
 }
 
 func importItemDetailsToModel(d *domain.ImportItemWithDetails) *model.ImportItemDetails {

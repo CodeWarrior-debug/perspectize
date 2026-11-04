@@ -11,7 +11,13 @@
 --
 -- Requests: anyone signed in can create an import, but only an admin's starts
 -- listing straight away (it spends YouTube/TMDB quota). Anyone else's is
--- 'requested', its sources 'waiting', until an admin approves or declines it.
+-- 'pending', its sources 'waiting', until an admin approves or declines it.
+-- 'pending' is the default, so a row written without a status never lists.
+--
+-- Items: one row per candidate. Columns are only what the code queries, joins
+-- or updates (identity, the in-library join, workflow state). Everything shown
+-- to help decide is one jsonb object, facts, whose key names are shared across
+-- content types (see domain.ImportFacts): a new source adds keys, not columns.
 --
 -- Closing: an admin closes an import when it's done with (closed_at). A closed
 -- import is hidden from non-admins and read-only. Until then anyone can mark a
@@ -27,7 +33,7 @@ CREATE TABLE IF NOT EXISTS public.import_jobs (
     id serial NOT NULL,
     user_id integer NOT NULL,
     name varchar(120) NOT NULL,
-    request_status text NOT NULL DEFAULT 'approved',
+    request_status text NOT NULL DEFAULT 'pending',
     -- The reviewing admin's reason (shown to the requester when declined).
     review_note varchar(500) NULL,
     reviewed_at timestamptz NULL,
@@ -36,7 +42,7 @@ CREATE TABLE IF NOT EXISTS public.import_jobs (
     updated_at timestamptz NOT NULL DEFAULT NOW(),
     CONSTRAINT import_jobs_pk PRIMARY KEY (id),
     CONSTRAINT import_jobs_user_fk FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT,
-    CONSTRAINT import_jobs_request_status_check CHECK (request_status IN ('requested', 'approved', 'declined'))
+    CONSTRAINT import_jobs_request_status_check CHECK (request_status IN ('pending', 'approved', 'declined'))
 );
 
 CREATE TABLE IF NOT EXISTS public.import_job_sources (
@@ -69,43 +75,21 @@ CREATE TABLE IF NOT EXISTS public.import_job_items (
     id serial NOT NULL,
     job_id integer NOT NULL,
     source_id integer NOT NULL,
-    -- YouTube video id or TMDB movie id, as text.
+    -- YouTube video id or TMDB movie id, as text: with source_id, what re-listing dedupes on.
     external_id varchar(64) NOT NULL,
     destination_type varchar NOT NULL,
     -- Exactly the URL the content row would store (content.url), so "in library" is a join.
     canonical_url varchar NOT NULL,
-    kind text NOT NULL,
     title varchar NOT NULL,
-    -- First meaningful description line, boilerplate removed (computed at staging).
-    summary text NULL,
-    published_at timestamptz NULL,
-    duration_seconds integer NULL,
-    view_count bigint NULL,
-    like_count bigint NULL,
-    comment_count bigint NULL,
-    -- Normalised 0-10 score, how many ratings it rests on, and whose it is (e.g. 'TMDB').
-    rating numeric(4, 2) NULL,
-    rating_count integer NULL,
-    rating_source varchar(40) NULL,
-    chapter_count integer NOT NULL DEFAULT 0,
-    has_captions boolean NULL,
-    -- Films: genre names and top-billed cast, shown as sheet columns (empty for videos).
-    genres text[] NOT NULL DEFAULT '{}',
-    top_cast text[] NOT NULL DEFAULT '{}',
-    -- Films (TMDB): its daily popularity score, user review count, and box
-    -- office takings and budget in USD. NULL when unknown (TMDB reports 0).
-    popularity numeric(10, 3) NULL,
-    review_count integer NULL,
-    revenue bigint NULL,
-    budget bigint NULL,
-    thumbnail_url varchar(500) NULL,
     -- Position in the source listing (0 = first returned, newest for channels).
     position integer NOT NULL DEFAULT 0,
-    -- "Don't import": shared, set and cleared by anyone until the import is closed.
-    excluded boolean NOT NULL DEFAULT false,
+    -- The decision facts shown as sheet columns (domain.ImportFacts keys).
+    facts jsonb NOT NULL DEFAULT '{}'::jsonb,
     -- Detail-panel data only (description, tags, chapters, people, links): never sent in list rows.
     details jsonb NOT NULL DEFAULT '{}'::jsonb,
     stats_fetched_at timestamptz NOT NULL DEFAULT NOW(),
+    -- "Don't import": shared, set and cleared by anyone until the import is closed.
+    excluded boolean NOT NULL DEFAULT false,
     import_status text NULL,
     import_error text NULL,
     content_id integer NULL,
@@ -117,10 +101,8 @@ CREATE TABLE IF NOT EXISTS public.import_job_items (
     CONSTRAINT import_job_items_job_fk FOREIGN KEY (job_id) REFERENCES public.import_jobs(id) ON DELETE CASCADE,
     CONSTRAINT import_job_items_source_fk FOREIGN KEY (source_id) REFERENCES public.import_job_sources(id) ON DELETE CASCADE,
     CONSTRAINT import_job_items_content_fk FOREIGN KEY (content_id) REFERENCES public.content(id) ON DELETE SET NULL,
-    CONSTRAINT import_job_items_kind_check CHECK (kind IN ('video', 'short', 'live', 'movie')),
     CONSTRAINT import_job_items_destination_check CHECK (destination_type IN ('youtube_video', 'movie')),
-    CONSTRAINT import_job_items_status_check CHECK (import_status IS NULL OR import_status IN ('queued', 'imported', 'skipped', 'failed')),
-    CONSTRAINT import_job_items_rating_check CHECK (rating IS NULL OR (rating >= 0 AND rating <= 10))
+    CONSTRAINT import_job_items_status_check CHECK (import_status IS NULL OR import_status IN ('queued', 'imported', 'skipped', 'failed'))
 );
 
 -- (job_id, position) serves the sheet's one list query; source_id and content_id are FK indexes.

@@ -163,39 +163,48 @@ func (s ImportFixtureSource) Rows(fetched time.Time) []*domain.ImportItemWithDet
 		if s.Type == "tmdb_person" {
 			dest, url = domain.ContentTypeMovie, MovieURL(it.ExternalID)
 		}
-		row := domain.ImportItem{
-			ExternalID:      it.ExternalID,
-			DestinationType: dest,
-			CanonicalURL:    url,
-			Kind:            domain.ImportItemKind(strings.ToUpper(it.Kind)),
-			Title:           it.Title,
+		facts := domain.ImportFacts{
+			Kind:            domain.ImportItemKind(strings.ToLower(it.Kind)),
+			Summary:         summaries[i],
 			DurationSeconds: it.DurationSeconds,
 			ViewCount:       it.Views,
 			LikeCount:       it.Likes,
 			CommentCount:    it.Comments,
 			Rating:          it.Rating,
 			RatingCount:     it.RatingCount,
-			RatingSource:    it.RatingSource,
 			HasCaptions:     it.HasCaptions,
 			Genres:          it.Genres,
 			TopCast:         it.TopCast,
-			Revenue:         it.Revenue,
-			Budget:          it.Budget,
-			ThumbnailURL:    it.Thumbnail,
-			Position:        it.Position,
-			StatsFetchedAt:  fetched,
+			RevenueUSD:      it.Revenue,
+			BudgetUSD:       it.Budget,
 		}
-		if summaries[i] != "" {
-			summary := summaries[i]
-			row.Summary = &summary
+		if it.RatingSource != nil {
+			facts.RatingSource = *it.RatingSource
+		}
+		if it.Thumbnail != nil {
+			facts.ThumbnailURL = *it.Thumbnail
 		}
 		if it.PublishedAt != nil {
 			if t, err := time.Parse(time.RFC3339, *it.PublishedAt); err == nil {
-				row.PublishedAt = &t
+				facts.PublishedAt = &t
 			}
 		}
 		chapters := domain.ParseChapters(it.Description)
-		row.ChapterCount = len(chapters)
+		if dest == domain.ContentTypeYouTubeVideo {
+			n := len(chapters)
+			facts.ChapterCount = &n
+			// A channel that hides likes: say so, rather than leave a blank that reads as "no likes".
+			facts.LikesHidden = it.Likes == nil
+		}
+		row := domain.ImportItem{
+			ExternalID:      it.ExternalID,
+			DestinationType: dest,
+			CanonicalURL:    url,
+			Title:           it.Title,
+			Facts:           facts,
+			Position:        it.Position,
+			StatsFetchedAt:  fetched,
+		}
 		links := it.Links
 		if len(links) == 0 {
 			links = domain.LinkDomains(it.Description)

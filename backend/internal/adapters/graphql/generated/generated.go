@@ -131,39 +131,21 @@ type ComplexityRoot struct {
 	}
 
 	ImportItem struct {
-		Budget          func(childComplexity int) int
-		ChapterCount    func(childComplexity int) int
-		CommentCount    func(childComplexity int) int
 		ContentID       func(childComplexity int) int
 		DestinationType func(childComplexity int) int
-		DurationSeconds func(childComplexity int) int
 		Excluded        func(childComplexity int) int
 		ExternalID      func(childComplexity int) int
-		Genres          func(childComplexity int) int
-		HasCaptions     func(childComplexity int) int
+		Facts           func(childComplexity int) int
 		ID              func(childComplexity int) int
 		ImportError     func(childComplexity int) int
 		ImportStatus    func(childComplexity int) int
 		ImportedAt      func(childComplexity int) int
 		InLibrary       func(childComplexity int) int
-		Kind            func(childComplexity int) int
-		LikeCount       func(childComplexity int) int
-		Popularity      func(childComplexity int) int
 		Position        func(childComplexity int) int
-		PublishedAt     func(childComplexity int) int
-		Rating          func(childComplexity int) int
-		RatingCount     func(childComplexity int) int
-		RatingSource    func(childComplexity int) int
-		Revenue         func(childComplexity int) int
-		ReviewCount     func(childComplexity int) int
 		SourceID        func(childComplexity int) int
 		StatsFetchedAt  func(childComplexity int) int
-		Summary         func(childComplexity int) int
-		ThumbnailURL    func(childComplexity int) int
 		Title           func(childComplexity int) int
-		TopCast         func(childComplexity int) int
 		URL             func(childComplexity int) int
-		ViewCount       func(childComplexity int) int
 	}
 
 	ImportItemDetails struct {
@@ -1075,24 +1057,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.ImportChapter.Title(childComplexity), true
 
-	case "ImportItem.budget":
-		if e.ComplexityRoot.ImportItem.Budget == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.Budget(childComplexity), true
-	case "ImportItem.chapterCount":
-		if e.ComplexityRoot.ImportItem.ChapterCount == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.ChapterCount(childComplexity), true
-	case "ImportItem.commentCount":
-		if e.ComplexityRoot.ImportItem.CommentCount == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.CommentCount(childComplexity), true
 	case "ImportItem.contentId":
 		if e.ComplexityRoot.ImportItem.ContentID == nil {
 			break
@@ -1105,12 +1069,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ImportItem.DestinationType(childComplexity), true
-	case "ImportItem.durationSeconds":
-		if e.ComplexityRoot.ImportItem.DurationSeconds == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.DurationSeconds(childComplexity), true
 	case "ImportItem.excluded":
 		if e.ComplexityRoot.ImportItem.Excluded == nil {
 			break
@@ -1123,18 +1081,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ImportItem.ExternalID(childComplexity), true
-	case "ImportItem.genres":
-		if e.ComplexityRoot.ImportItem.Genres == nil {
+	case "ImportItem.facts":
+		if e.ComplexityRoot.ImportItem.Facts == nil {
 			break
 		}
 
-		return e.ComplexityRoot.ImportItem.Genres(childComplexity), true
-	case "ImportItem.hasCaptions":
-		if e.ComplexityRoot.ImportItem.HasCaptions == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.HasCaptions(childComplexity), true
+		return e.ComplexityRoot.ImportItem.Facts(childComplexity), true
 	case "ImportItem.id":
 		if e.ComplexityRoot.ImportItem.ID == nil {
 			break
@@ -1165,66 +1117,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ImportItem.InLibrary(childComplexity), true
-	case "ImportItem.kind":
-		if e.ComplexityRoot.ImportItem.Kind == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.Kind(childComplexity), true
-	case "ImportItem.likeCount":
-		if e.ComplexityRoot.ImportItem.LikeCount == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.LikeCount(childComplexity), true
-	case "ImportItem.popularity":
-		if e.ComplexityRoot.ImportItem.Popularity == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.Popularity(childComplexity), true
 	case "ImportItem.position":
 		if e.ComplexityRoot.ImportItem.Position == nil {
 			break
 		}
 
 		return e.ComplexityRoot.ImportItem.Position(childComplexity), true
-	case "ImportItem.publishedAt":
-		if e.ComplexityRoot.ImportItem.PublishedAt == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.PublishedAt(childComplexity), true
-	case "ImportItem.rating":
-		if e.ComplexityRoot.ImportItem.Rating == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.Rating(childComplexity), true
-	case "ImportItem.ratingCount":
-		if e.ComplexityRoot.ImportItem.RatingCount == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.RatingCount(childComplexity), true
-	case "ImportItem.ratingSource":
-		if e.ComplexityRoot.ImportItem.RatingSource == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.RatingSource(childComplexity), true
-	case "ImportItem.revenue":
-		if e.ComplexityRoot.ImportItem.Revenue == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.Revenue(childComplexity), true
-	case "ImportItem.reviewCount":
-		if e.ComplexityRoot.ImportItem.ReviewCount == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.ReviewCount(childComplexity), true
 	case "ImportItem.sourceId":
 		if e.ComplexityRoot.ImportItem.SourceID == nil {
 			break
@@ -1237,42 +1135,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ImportItem.StatsFetchedAt(childComplexity), true
-	case "ImportItem.summary":
-		if e.ComplexityRoot.ImportItem.Summary == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.Summary(childComplexity), true
-	case "ImportItem.thumbnailUrl":
-		if e.ComplexityRoot.ImportItem.ThumbnailURL == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.ThumbnailURL(childComplexity), true
 	case "ImportItem.title":
 		if e.ComplexityRoot.ImportItem.Title == nil {
 			break
 		}
 
 		return e.ComplexityRoot.ImportItem.Title(childComplexity), true
-	case "ImportItem.topCast":
-		if e.ComplexityRoot.ImportItem.TopCast == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.TopCast(childComplexity), true
 	case "ImportItem.url":
 		if e.ComplexityRoot.ImportItem.URL == nil {
 			break
 		}
 
 		return e.ComplexityRoot.ImportItem.URL(childComplexity), true
-	case "ImportItem.viewCount":
-		if e.ComplexityRoot.ImportItem.ViewCount == nil {
-			break
-		}
-
-		return e.ComplexityRoot.ImportItem.ViewCount(childComplexity), true
 
 	case "ImportItemDetails.chapters":
 		if e.ComplexityRoot.ImportItemDetails.Chapters == nil {
@@ -4024,13 +3898,6 @@ enum ImportSourceStatus {
   FAILED
 }
 
-enum ImportItemKind {
-  VIDEO
-  SHORT
-  LIVE
-  MOVIE
-}
-
 enum ImportItemStatus {
   QUEUED
   IMPORTED
@@ -4058,10 +3925,10 @@ type ImportSource {
   fetchedAt: String
 }
 
-# An admin's import is APPROVED when created; anyone else's is REQUESTED until
+# An admin's import is APPROVED when created; anyone else's is PENDING until
 # an admin approves it (listing starts) or declines it.
 enum ImportRequestStatus {
-  REQUESTED
+  PENDING
   APPROVED
   DECLINED
 }
@@ -4090,39 +3957,19 @@ type ImportItem {
   id: ID!
   sourceId: ID!
   destinationType: ContentType!
-  kind: ImportItemKind!
   # YouTube video id or TMDB movie id.
   externalId: String!
   url: String!
   title: String!
-  # First meaningful description line, with channel boilerplate removed.
-  summary: String
-  publishedAt: String
-  durationSeconds: Int
-  viewCount: Float
-  # Null when the channel hides likes (never 0 for unknown).
-  likeCount: Float
-  commentCount: Float
-  # 0-10, how many ratings it rests on, and whose (e.g. "TMDB").
-  rating: Float
-  ratingCount: Int
-  ratingSource: String
-  chapterCount: Int!
-  hasCaptions: Boolean
-  # Films: genre names and up to 3 top-billed cast (empty for videos).
-  genres: [String!]!
-  topCast: [String!]!
-  # Films (TMDB): daily popularity score, user review count, and box office
-  # takings and budget in USD. Null when unknown.
-  popularity: Float
-  reviewCount: Int
-  revenue: Float
-  budget: Float
-  thumbnailUrl: String
-  # Marked "don't import" (by anyone, until the import is closed): can't be imported.
-  excluded: Boolean!
+  # The decision facts shown as sheet columns: one object whose snake_case
+  # keys are shared across content types (duration_seconds, view_count,
+  # rating, genres, revenue_usd...; see domain.ImportFacts). A key a source
+  # can't supply is absent, never 0.
+  facts: JSON!
   # Position in the source listing; 0 is first (newest for channels).
   position: Int!
+  # Marked "don't import" (by anyone, until the import is closed): can't be imported.
+  excluded: Boolean!
   statsFetchedAt: String!
   # True when content with this URL is already in the library.
   inLibrary: Boolean!
@@ -4841,54 +4688,18 @@ func (ec *executionContext) childFields_ImportItem(ctx context.Context, field gr
 		return ec.fieldContext_ImportItem_sourceId(ctx, field)
 	case "destinationType":
 		return ec.fieldContext_ImportItem_destinationType(ctx, field)
-	case "kind":
-		return ec.fieldContext_ImportItem_kind(ctx, field)
 	case "externalId":
 		return ec.fieldContext_ImportItem_externalId(ctx, field)
 	case "url":
 		return ec.fieldContext_ImportItem_url(ctx, field)
 	case "title":
 		return ec.fieldContext_ImportItem_title(ctx, field)
-	case "summary":
-		return ec.fieldContext_ImportItem_summary(ctx, field)
-	case "publishedAt":
-		return ec.fieldContext_ImportItem_publishedAt(ctx, field)
-	case "durationSeconds":
-		return ec.fieldContext_ImportItem_durationSeconds(ctx, field)
-	case "viewCount":
-		return ec.fieldContext_ImportItem_viewCount(ctx, field)
-	case "likeCount":
-		return ec.fieldContext_ImportItem_likeCount(ctx, field)
-	case "commentCount":
-		return ec.fieldContext_ImportItem_commentCount(ctx, field)
-	case "rating":
-		return ec.fieldContext_ImportItem_rating(ctx, field)
-	case "ratingCount":
-		return ec.fieldContext_ImportItem_ratingCount(ctx, field)
-	case "ratingSource":
-		return ec.fieldContext_ImportItem_ratingSource(ctx, field)
-	case "chapterCount":
-		return ec.fieldContext_ImportItem_chapterCount(ctx, field)
-	case "hasCaptions":
-		return ec.fieldContext_ImportItem_hasCaptions(ctx, field)
-	case "genres":
-		return ec.fieldContext_ImportItem_genres(ctx, field)
-	case "topCast":
-		return ec.fieldContext_ImportItem_topCast(ctx, field)
-	case "popularity":
-		return ec.fieldContext_ImportItem_popularity(ctx, field)
-	case "reviewCount":
-		return ec.fieldContext_ImportItem_reviewCount(ctx, field)
-	case "revenue":
-		return ec.fieldContext_ImportItem_revenue(ctx, field)
-	case "budget":
-		return ec.fieldContext_ImportItem_budget(ctx, field)
-	case "thumbnailUrl":
-		return ec.fieldContext_ImportItem_thumbnailUrl(ctx, field)
-	case "excluded":
-		return ec.fieldContext_ImportItem_excluded(ctx, field)
+	case "facts":
+		return ec.fieldContext_ImportItem_facts(ctx, field)
 	case "position":
 		return ec.fieldContext_ImportItem_position(ctx, field)
+	case "excluded":
+		return ec.fieldContext_ImportItem_excluded(ctx, field)
 	case "statsFetchedAt":
 		return ec.fieldContext_ImportItem_statsFetchedAt(ctx, field)
 	case "inLibrary":
@@ -8320,29 +8131,6 @@ func (ec *executionContext) fieldContext_ImportItem_destinationType(_ context.Co
 	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type ContentType does not have child fields"))
 }
 
-func (ec *executionContext) _ImportItem_kind(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_kind(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.Kind, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v domain.ImportItemKind) graphql.Marshaler {
-			return ec.marshalNImportItemKind2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐImportItemKind(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_kind(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type ImportItemKind does not have child fields"))
-}
-
 func (ec *executionContext) _ImportItem_externalId(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8412,441 +8200,27 @@ func (ec *executionContext) fieldContext_ImportItem_title(_ context.Context, fie
 	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
-func (ec *executionContext) _ImportItem_summary(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
+func (ec *executionContext) _ImportItem_facts(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_summary(ctx, field)
+			return ec.fieldContext_ImportItem_facts(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.Summary, nil
+			return obj.Facts, nil
 		},
 		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
-			return ec.marshalOString2ᚖstring(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_summary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type String does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_publishedAt(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_publishedAt(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.PublishedAt, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
-			return ec.marshalOString2ᚖstring(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_publishedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type String does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_durationSeconds(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_durationSeconds(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.DurationSeconds, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
-			return ec.marshalOInt2ᚖint(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_durationSeconds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Int does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_viewCount(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_viewCount(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.ViewCount, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
-			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_viewCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Float does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_likeCount(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_likeCount(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.LikeCount, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
-			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_likeCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Float does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_commentCount(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_commentCount(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.CommentCount, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
-			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_commentCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Float does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_rating(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_rating(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.Rating, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
-			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_rating(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Float does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_ratingCount(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_ratingCount(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.RatingCount, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
-			return ec.marshalOInt2ᚖint(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_ratingCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Int does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_ratingSource(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_ratingSource(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.RatingSource, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
-			return ec.marshalOString2ᚖstring(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_ratingSource(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type String does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_chapterCount(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_chapterCount(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.ChapterCount, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
-			return ec.marshalNInt2int(ctx, selections, v)
+		func(ctx context.Context, selections ast.SelectionSet, v map[string]any) graphql.Marshaler {
+			return ec.marshalNJSON2map(ctx, selections, v)
 		},
 		true,
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_ImportItem_chapterCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Int does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_hasCaptions(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_hasCaptions(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.HasCaptions, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *bool) graphql.Marshaler {
-			return ec.marshalOBoolean2ᚖbool(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_hasCaptions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Boolean does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_genres(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_genres(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.Genres, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
-			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_genres(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type String does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_topCast(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_topCast(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.TopCast, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
-			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_topCast(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type String does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_popularity(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_popularity(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.Popularity, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
-			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_popularity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Float does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_reviewCount(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_reviewCount(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.ReviewCount, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
-			return ec.marshalOInt2ᚖint(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_reviewCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Int does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_revenue(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_revenue(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.Revenue, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
-			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_revenue(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Float does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_budget(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_budget(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.Budget, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
-			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_budget(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Float does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_thumbnailUrl(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_thumbnailUrl(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.ThumbnailURL, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
-			return ec.marshalOString2ᚖstring(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_thumbnailUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type String does not have child fields"))
-}
-
-func (ec *executionContext) _ImportItem_excluded(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_excluded(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.Excluded, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
-			return ec.marshalNBoolean2bool(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_excluded(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Boolean does not have child fields"))
+func (ec *executionContext) fieldContext_ImportItem_facts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type JSON does not have child fields"))
 }
 
 func (ec *executionContext) _ImportItem_position(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
@@ -8870,6 +8244,29 @@ func (ec *executionContext) _ImportItem_position(ctx context.Context, field grap
 }
 func (ec *executionContext) fieldContext_ImportItem_position(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ImportItem_excluded(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportItem_excluded(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Excluded, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportItem_excluded(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Boolean does not have child fields"))
 }
 
 func (ec *executionContext) _ImportItem_statsFetchedAt(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
@@ -21655,11 +21052,6 @@ func (ec *executionContext) _ImportItem(ctx context.Context, sel ast.SelectionSe
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "kind":
-			out.Values[i] = ec._ImportItem_kind(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "externalId":
 			out.Values[i] = ec._ImportItem_externalId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -21675,103 +21067,18 @@ func (ec *executionContext) _ImportItem(ctx context.Context, sel ast.SelectionSe
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "summary":
-			out.Values[i] = ec._ImportItem_summary(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "publishedAt":
-			out.Values[i] = ec._ImportItem_publishedAt(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "durationSeconds":
-			out.Values[i] = ec._ImportItem_durationSeconds(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "viewCount":
-			out.Values[i] = ec._ImportItem_viewCount(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "likeCount":
-			out.Values[i] = ec._ImportItem_likeCount(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "commentCount":
-			out.Values[i] = ec._ImportItem_commentCount(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "rating":
-			out.Values[i] = ec._ImportItem_rating(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "ratingCount":
-			out.Values[i] = ec._ImportItem_ratingCount(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "ratingSource":
-			out.Values[i] = ec._ImportItem_ratingSource(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "chapterCount":
-			out.Values[i] = ec._ImportItem_chapterCount(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "hasCaptions":
-			out.Values[i] = ec._ImportItem_hasCaptions(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "genres":
-			out.Values[i] = ec._ImportItem_genres(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "topCast":
-			out.Values[i] = ec._ImportItem_topCast(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "popularity":
-			out.Values[i] = ec._ImportItem_popularity(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "reviewCount":
-			out.Values[i] = ec._ImportItem_reviewCount(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "revenue":
-			out.Values[i] = ec._ImportItem_revenue(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "budget":
-			out.Values[i] = ec._ImportItem_budget(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "thumbnailUrl":
-			out.Values[i] = ec._ImportItem_thumbnailUrl(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "excluded":
-			out.Values[i] = ec._ImportItem_excluded(ctx, field, obj)
+		case "facts":
+			out.Values[i] = ec._ImportItem_facts(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		case "position":
 			out.Values[i] = ec._ImportItem_position(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "excluded":
+			out.Values[i] = ec._ImportItem_excluded(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -26585,23 +25892,6 @@ func (ec *executionContext) marshalNImportItem2ᚖgithubᚗcomᚋCodeWarriorᚑd
 	return ec._ImportItem(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalNImportItemKind2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐImportItemKind(ctx context.Context, v any) (domain.ImportItemKind, error) {
-	tmp, err := graphql.UnmarshalString(v)
-	res := domain.ImportItemKind(tmp)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNImportItemKind2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐImportItemKind(ctx context.Context, sel ast.SelectionSet, v domain.ImportItemKind) graphql.Marshaler {
-	_ = sel
-	res := graphql.MarshalString(string(v))
-	if res == graphql.Null {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
-		}
-	}
-	return res
-}
-
 func (ec *executionContext) unmarshalNImportItemsInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐImportItemsInput(ctx context.Context, v any) (model.ImportItemsInput, error) {
 	res, err := ec.unmarshalInputImportItemsInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -26903,6 +26193,28 @@ func (ec *executionContext) marshalNInterlinearWord2ᚖgithubᚗcomᚋCodeWarrio
 		return graphql.Null
 	}
 	return ec._InterlinearWord(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNJSON2map(ctx context.Context, v any) (map[string]any, error) {
+	res, err := graphql.UnmarshalMap(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNJSON2map(ctx context.Context, sel ast.SelectionSet, v map[string]any) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	_ = sel
+	res := graphql.MarshalMap(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) unmarshalNLengthPrecision2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐLengthPrecision(ctx context.Context, v any) (domain.LengthPrecision, error) {
