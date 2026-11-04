@@ -433,3 +433,86 @@ func TestContentsImportedFromRoundTrips(t *testing.T) {
 		assert.NotNil(t, it.ImportedFrom, it.ID)
 	}
 }
+
+const createDescribedRequestMutation = `mutation($input: CreateImportJobInput!) {
+  createImportJob(input: $input) { id name description requestStatus sources { status } }
+}`
+
+const updateImportJobDescriptionMutation = `mutation($input: UpdateImportJobDescriptionInput!) {
+  updateImportJobDescription(input: $input) { id description sources { id } }
+}`
+
+type rtDescribedRequest struct {
+	ID            string  `json:"id"`
+	Description   *string `json:"description"`
+	RequestStatus string  `json:"requestStatus"`
+	Sources       []struct {
+		Status string `json:"status"`
+	} `json:"sources"`
+}
+
+// TestCreateImportJobDescriptionOnlyRoundTrips pins a request with a
+// description and no sources: the pending-request count and the job INSERT, and
+// nothing for sources (2 statements). An admin's is the job INSERT alone (1).
+func TestCreateImportJobDescriptionOnlyRoundTrips(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "imp-dc-a")
+	_, token := h.user("imp-dc-u")
+	h.warm(token)
+
+	data := h.roundTrips(2, token, createDescribedRequestMutation, map[string]any{"input": map[string]any{
+		"name": "Sermons", "description": "<p>The sermons <strong>from</strong> the 1990s.</p>", "sources": []map[string]any{},
+	}})
+	req := decode[rtDescribedRequest](t, data, "createImportJob")
+	assert.Equal(t, "REQUESTED", req.RequestStatus)
+	require.NotNil(t, req.Description)
+	assert.Equal(t, "<p>The sermons <strong>from</strong> the 1990s.</p>", *req.Description)
+	assert.Empty(t, req.Sources)
+
+	h.warm(adminToken)
+	data = h.roundTrips(1, adminToken, createDescribedRequestMutation, map[string]any{"input": map[string]any{
+		"name": "Sermons", "description": "Admin's own", "sources": []map[string]any{},
+	}})
+	own := decode[rtDescribedRequest](t, data, "createImportJob")
+	assert.Equal(t, "APPROVED", own.RequestStatus)
+	assert.Empty(t, h.background, "an admin's import with no sources lists nothing")
+}
+
+// TestUpdateImportJobDescriptionRoundTrips pins the requester's edit: one
+// statement (a scoped UPDATE with RETURNING). A refused edit costs two: the
+// UPDATE that matched nothing, then the read that says whether the import is
+// someone else's or closed.
+func TestUpdateImportJobDescriptionRoundTrips(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "imp-ud-a")
+	_, token := h.user("imp-ud-u")
+	created := decode[rtDescribedRequest](t, h.gql(token, createDescribedRequestMutation, map[string]any{"input": map[string]any{
+		"name": "Sermons", "description": "first", "sources": []map[string]any{},
+	}}), "createImportJob")
+	h.warm(token)
+
+	data := h.roundTrips(1, token, updateImportJobDescriptionMutation, map[string]any{"input": map[string]any{
+		"jobId": created.ID, "description": "<p>second</p>",
+	}})
+	updated := decode[rtDescribedRequest](t, data, "updateImportJobDescription")
+	require.NotNil(t, updated.Description)
+	assert.Equal(t, "<p>second</p>", *updated.Description)
+	assert.Empty(t, updated.Sources, "the edit returns the import without its sources")
+
+	h.warm(adminToken)
+	h.counter.Reset()
+	msg := h.gqlError(adminToken, updateImportJobDescriptionMutation, map[string]any{"input": map[string]any{
+		"jobId": created.ID, "description": "admin edit",
+	}})
+	assert.Contains(t, msg, "only the person who requested")
+	assert.Len(t, h.counter.Statements(), 2, "a miss: the scoped UPDATE, then the read that says why")
+
+	h.gql(adminToken, closeImportJobMutation, map[string]any{"input": map[string]any{"jobId": created.ID, "closed": true}})
+	h.warm(token)
+	h.counter.Reset()
+	msg = h.gqlError(token, updateImportJobDescriptionMutation, map[string]any{"input": map[string]any{
+		"jobId": created.ID, "description": "after close",
+	}})
+	assert.Contains(t, msg, "closed")
+	assert.Len(t, h.counter.Statements(), 2, "a miss on a closed import costs the same two statements")
+}

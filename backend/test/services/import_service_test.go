@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -138,6 +139,20 @@ func (r *fakeImportRepo) CountPendingRequests(_ context.Context, userID int) (in
 		}
 	}
 	return n, nil
+}
+
+// UpdateJobDescription mirrors the SQL: the row matches only for its owner and while open.
+func (r *fakeImportRepo) UpdateJobDescription(_ context.Context, jobID, userID int, description string) (*domain.ImportJob, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	j, ok := r.jobs[jobID]
+	if !ok || j.UserID != userID || j.ClosedAt != nil {
+		return nil, domain.ErrNotFound
+	}
+	j.Description = &description
+	cp := *j
+	cp.Sources = nil
+	return &cp, nil
 }
 
 func (r *fakeImportRepo) ReviewJob(_ context.Context, jobID int, status domain.ImportRequestStatus, note *string, at time.Time) error {
@@ -432,7 +447,7 @@ func TestImportService_CreateImportJob_Validation(t *testing.T) {
 	}{
 		{"anonymous", nil, domain.CreateImportJobInput{Name: "x", Sources: yt}, domain.ErrForbidden},
 		{"blank name", importAdmin, domain.CreateImportJobInput{Name: "  ", Sources: yt}, domain.ErrInvalidInput},
-		{"no sources", importAdmin, domain.CreateImportJobInput{Name: "x"}, domain.ErrInvalidInput},
+		{"no sources and no description", importAdmin, domain.CreateImportJobInput{Name: "x"}, domain.ErrInvalidInput},
 		{"too many sources", importAdmin, domain.CreateImportJobInput{Name: "x", Sources: tooMany}, domain.ErrInvalidInput},
 		{"unknown type", importAdmin, domain.CreateImportJobInput{Name: "x", Sources: []domain.CreateImportSourceInput{{SourceType: "RSS", Ref: "x"}}}, domain.ErrInvalidInput},
 		{"type not configured", importAdmin, domain.CreateImportJobInput{Name: "x", Sources: []domain.CreateImportSourceInput{{SourceType: domain.ImportSourceTMDBPerson, Ref: "525"}}}, domain.ErrInvalidInput},
@@ -1060,4 +1075,157 @@ func TestListSource_FailurePublishesFailed(t *testing.T) {
 	assert.Equal(t, []domain.ImportSourceListingProgress{
 		{SourceID: job.Sources[0].ID, Staged: 1, Batches: 1, Status: domain.ImportSourceStatusFailed},
 	}, p.Sources)
+}
+
+// --- request description (#655) ------------------------------------------------
+
+func TestCreateImportJob_DescriptionOnlyIsAccepted(t *testing.T) {
+	repo := newFakeImportRepo()
+	yt := &fakeLister{}
+	svc := newImportService(repo, yt, nil, &fakeCreator{})
+	desc := "The Gaither Vocal Band Christmas specials, the ones with the choir."
+
+	job, err := svc.CreateImportJob(context.Background(), importUser, domain.CreateImportJobInput{Name: "Gaither", Description: &desc})
+	require.NoError(t, err)
+	assert.Empty(t, job.Sources)
+	assert.Equal(t, domain.ImportRequestStatusRequested, job.RequestStatus, "a request from someone else waits for an admin")
+	require.NotNil(t, job.Description)
+	assert.Equal(t, desc, *job.Description)
+	assert.Equal(t, 0, yt.resolves, "no source to resolve")
+	assert.Equal(t, 0, yt.lists)
+
+	own, err := svc.CreateImportJob(context.Background(), importAdmin, domain.CreateImportJobInput{Name: "Gaither", Description: &desc})
+	require.NoError(t, err)
+	assert.Equal(t, domain.ImportRequestStatusApproved, own.RequestStatus)
+	assert.Empty(t, own.Sources)
+	assert.Equal(t, 0, yt.lists, "an admin's import with no sources lists nothing")
+}
+
+func TestCreateImportJob_NeitherNameDescriptionNorSourcesRejected(t *testing.T) {
+	repo := newFakeImportRepo()
+	svc := newImportService(repo, &fakeLister{}, nil, &fakeCreator{})
+	blank, markupOnly := "   ", "<script>alert(1)</script>"
+
+	for name, input := range map[string]domain.CreateImportJobInput{
+		"name only":                       {Name: "x"},
+		"blank description, no sources":   {Name: "x", Description: &blank},
+		"description that sanitizes away": {Name: "x", Description: &markupOnly},
+		"no name, description only":       {Name: " ", Description: &blank},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := svc.CreateImportJob(context.Background(), importUser, input)
+			assert.ErrorIs(t, err, domain.ErrInvalidInput)
+		})
+	}
+	assert.Empty(t, repo.jobs, "nothing is saved when the request is rejected")
+}
+
+func TestCreateImportJob_DescriptionSanitized(t *testing.T) {
+	repo := newFakeImportRepo()
+	svc := newImportService(repo, &fakeLister{}, nil, &fakeCreator{})
+	raw := `  <p><strong>Trusted</strong></p><script>alert(1)</script>` +
+		`<p onclick="steal()">Hi <a href="javascript:steal()">link</a></p>  `
+
+	job, err := svc.CreateImportJob(context.Background(), importAdmin, domain.CreateImportJobInput{Name: "x", Description: &raw})
+	require.NoError(t, err)
+	require.NotNil(t, job.Description)
+	got := *job.Description
+	assert.Contains(t, got, "<p><strong>Trusted</strong></p>", "supported tags are kept")
+	assert.NotContains(t, got, "<script", "script is stripped")
+	assert.NotContains(t, got, "onclick", "event handlers are stripped")
+	assert.NotContains(t, got, "javascript:", "unsafe link schemes are stripped")
+	assert.Equal(t, got, strings.TrimSpace(got), "stored description is trimmed")
+}
+
+func TestCreateImportJob_DescriptionTooLong(t *testing.T) {
+	repo := newFakeImportRepo()
+	svc := newImportService(repo, &fakeLister{}, nil, &fakeCreator{})
+	ctx := context.Background()
+
+	atLimit := strings.Repeat("a", domain.MaxImportJobDescriptionChars)
+	job, err := svc.CreateImportJob(ctx, importUser, domain.CreateImportJobInput{Name: "x", Description: &atLimit})
+	require.NoError(t, err, "exactly the limit is accepted")
+	require.NotNil(t, job.Description)
+
+	over := strings.Repeat("a", domain.MaxImportJobDescriptionChars+1)
+	_, err = svc.CreateImportJob(ctx, importUser, domain.CreateImportJobInput{Name: "x", Description: &over})
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	assert.Len(t, repo.jobs, 1, "the over-long request is not saved")
+}
+
+func TestUpdateImportJobDescription_OwnerOnly(t *testing.T) {
+	repo := newFakeImportRepo()
+	svc := newImportService(repo, &fakeLister{}, nil, &fakeCreator{})
+	ctx := context.Background()
+	first := "first"
+	job, err := svc.CreateImportJob(ctx, importUser, domain.CreateImportJobInput{Name: "Request", Description: &first})
+	require.NoError(t, err)
+	other := &domain.AuthenticatedUser{ID: 3, Role: domain.UserRoleDefault}
+
+	_, err = svc.UpdateImportJobDescription(ctx, importAdmin, job.ID, "admin edit")
+	assert.ErrorIs(t, err, domain.ErrForbidden, "an admin who did not request the import may not edit its description")
+	_, err = svc.UpdateImportJobDescription(ctx, other, job.ID, "other edit")
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+	_, err = svc.UpdateImportJobDescription(ctx, nil, job.ID, "anonymous edit")
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+	require.NotNil(t, repo.jobs[job.ID].Description)
+	assert.Equal(t, "first", *repo.jobs[job.ID].Description, "a refused edit changes nothing")
+
+	got, err := svc.UpdateImportJobDescription(ctx, importUser, job.ID, "  <p>second</p>  ")
+	require.NoError(t, err)
+	require.NotNil(t, got.Description)
+	assert.Equal(t, "<p>second</p>", *got.Description)
+}
+
+func TestUpdateImportJobDescription_BlankRejected(t *testing.T) {
+	repo := newFakeImportRepo()
+	svc := newImportService(repo, &fakeLister{}, nil, &fakeCreator{})
+	ctx := context.Background()
+	first := "first"
+	job, err := svc.CreateImportJob(ctx, importUser, domain.CreateImportJobInput{Name: "Request", Description: &first})
+	require.NoError(t, err)
+
+	_, err = svc.UpdateImportJobDescription(ctx, importUser, job.ID, "   ")
+	assert.ErrorIs(t, err, domain.ErrInvalidInput, "clearing the description would leave a request with nothing to read")
+	assert.Equal(t, "first", *repo.jobs[job.ID].Description)
+}
+
+func TestUpdateImportJobDescription_ClosedImportRejected(t *testing.T) {
+	repo := newFakeImportRepo()
+	svc := newImportService(repo, &fakeLister{}, nil, &fakeCreator{})
+	ctx := context.Background()
+	first := "first"
+	job, err := svc.CreateImportJob(ctx, importUser, domain.CreateImportJobInput{Name: "Request", Description: &first})
+	require.NoError(t, err)
+	_, err = svc.CloseImportJob(ctx, importAdmin, job.ID, true)
+	require.NoError(t, err)
+
+	_, err = svc.UpdateImportJobDescription(ctx, importUser, job.ID, "second")
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	assert.Equal(t, "first", *repo.jobs[job.ID].Description, "a closed import is read-only")
+}
+
+func TestUpdateImportJobDescription_UnknownJobNotFound(t *testing.T) {
+	svc := newImportService(newFakeImportRepo(), &fakeLister{}, nil, &fakeCreator{})
+	_, err := svc.UpdateImportJobDescription(context.Background(), importUser, 999, "x")
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func TestReviewImportJob_ApproveWithNoSourcesStartsNothing(t *testing.T) {
+	ctx := context.Background()
+	repo := newFakeImportRepo()
+	yt := &fakeLister{}
+	svc := newImportService(repo, yt, nil, &fakeCreator{})
+	desc := "Describe what you want; an admin picks the sources later."
+	job, err := svc.CreateImportJob(ctx, importUser, domain.CreateImportJobInput{Name: "Describe", Description: &desc})
+	require.NoError(t, err)
+
+	got, err := svc.ReviewImportJob(ctx, importAdmin, job.ID, true, "")
+	require.NoError(t, err)
+	assert.Equal(t, domain.ImportRequestStatusApproved, got.RequestStatus)
+	assert.Empty(t, got.Sources)
+	require.NotNil(t, got.Description)
+	assert.Equal(t, desc, *got.Description)
+	assert.Equal(t, 0, yt.resolves, "nothing to resolve")
+	assert.Equal(t, 0, yt.lists, "nothing to list")
 }

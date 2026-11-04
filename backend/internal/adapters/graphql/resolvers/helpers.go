@@ -976,6 +976,7 @@ func importJobToModel(j *domain.ImportJob) *model.ImportJob {
 	return &model.ImportJob{
 		ID:              strconv.Itoa(j.ID),
 		Name:            j.Name,
+		Description:     j.Description,
 		RequestStatus:   j.RequestStatus,
 		ReviewNote:      j.ReviewNote,
 		ReviewedAt:      isoTimePtr(j.ReviewedAt),
@@ -1054,7 +1055,7 @@ func importItemDetailsToModel(d *domain.ImportItemWithDetails) *model.ImportItem
 }
 
 func modelToCreateImportJobInput(in model.CreateImportJobInput) domain.CreateImportJobInput {
-	out := domain.CreateImportJobInput{Name: in.Name, Sources: make([]domain.CreateImportSourceInput, len(in.Sources))}
+	out := domain.CreateImportJobInput{Name: in.Name, Description: in.Description, Sources: make([]domain.CreateImportSourceInput, len(in.Sources))}
 	for i, s := range in.Sources {
 		out.Sources[i] = domain.CreateImportSourceInput{SourceType: s.SourceType, Ref: s.Ref, Role: s.Role}
 	}

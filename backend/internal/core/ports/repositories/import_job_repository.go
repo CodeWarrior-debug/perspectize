@@ -47,6 +47,12 @@ type ImportJobRepository interface {
 	// for any number of ids; 0 for empty ids). Unknown ids are absent.
 	GetJobsByIDs(ctx context.Context, ids []int) (map[int]*domain.ImportJob, error)
 
+	// UpdateJobDescription sets the description of jobID when userID created it
+	// and it isn't closed, and returns the job without its sources (1 statement).
+	// domain.ErrNotFound when no row matched: the caller reads the job to tell
+	// not-found, someone else's, and closed apart.
+	UpdateJobDescription(ctx context.Context, jobID, userID int, description string) (*domain.ImportJob, error)
+
 	// UpdateSource writes listing progress onto a source (1 statement).
 	UpdateSource(ctx context.Context, sourceID int, update ImportSourceUpdate) error
 

@@ -506,6 +506,7 @@ func importJobModelToDomain(m *ImportJobModel) *domain.ImportJob {
 		ID:            m.ID,
 		UserID:        m.UserID,
 		Name:          m.Name,
+		Description:   m.Description,
 		RequestStatus: domain.ImportRequestStatus(strings.ToUpper(m.RequestStatus)),
 		ReviewNote:    m.ReviewNote,
 		ReviewedAt:    m.ReviewedAt,

@@ -225,6 +225,7 @@ type ImportJobModel struct {
 	ID            int        `gorm:"primaryKey;autoIncrement"`
 	UserID        int        `gorm:"column:user_id;not null"`
 	Name          string     `gorm:"column:name;not null"`
+	Description   *string    `gorm:"column:description"`
 	RequestStatus string     `gorm:"column:request_status;not null"`
 	ReviewNote    *string    `gorm:"column:review_note"`
 	ReviewedAt    *time.Time `gorm:"column:reviewed_at"`

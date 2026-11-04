@@ -172,6 +172,7 @@ type ComplexityRoot struct {
 	ImportJob struct {
 		ClosedAt      func(childComplexity int) int
 		CreatedAt     func(childComplexity int) int
+		Description   func(childComplexity int) int
 		ID            func(childComplexity int) int
 		Items         func(childComplexity int) int
 		Name          func(childComplexity int) int
@@ -364,6 +365,7 @@ type ComplexityRoot struct {
 		SetPrimaryCategory              func(childComplexity int, input model.SetPrimaryCategoryInput) int
 		SetTyping                       func(childComplexity int, threadID string, typing bool) int
 		UpdateContentSourceData         func(childComplexity int, contentID int) int
+		UpdateImportJobDescription      func(childComplexity int, input model.UpdateImportJobDescriptionInput) int
 		UpdatePerspective               func(childComplexity int, input model.UpdatePerspectiveInput) int
 		UpdateUser                      func(childComplexity int, input model.UpdateUserInput) int
 		UpdateUserTodo                  func(childComplexity int, input model.UpdateUserTodoInput) int
@@ -649,6 +651,7 @@ type MutationResolver interface {
 	DeleteUserTodoList(ctx context.Context, id string) (bool, error)
 	ReorderUserTodoList(ctx context.Context, listID int, todoIds []int) ([]*model.UserTodo, error)
 	CreateImportJob(ctx context.Context, input model.CreateImportJobInput) (*model.ImportJob, error)
+	UpdateImportJobDescription(ctx context.Context, input model.UpdateImportJobDescriptionInput) (*model.ImportJob, error)
 	ReviewImportJob(ctx context.Context, input model.ReviewImportJobInput) (*model.ImportJob, error)
 	SetImportItemsExcluded(ctx context.Context, input model.SetImportItemsExcludedInput) (int, error)
 	CloseImportJob(ctx context.Context, input model.CloseImportJobInput) (*model.ImportJob, error)
@@ -1277,6 +1280,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ImportJob.CreatedAt(childComplexity), true
+	case "ImportJob.description":
+		if e.ComplexityRoot.ImportJob.Description == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImportJob.Description(childComplexity), true
 	case "ImportJob.id":
 		if e.ComplexityRoot.ImportJob.ID == nil {
 			break
@@ -2259,6 +2268,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.UpdateContentSourceData(childComplexity, args["contentId"].(int)), true
+	case "Mutation.updateImportJobDescription":
+		if e.ComplexityRoot.Mutation.UpdateImportJobDescription == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateImportJobDescription_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdateImportJobDescription(childComplexity, args["input"].(model.UpdateImportJobDescriptionInput)), true
 	case "Mutation.updatePerspective":
 		if e.ComplexityRoot.Mutation.UpdatePerspective == nil {
 			break
@@ -3368,6 +3388,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("SetImportItemsExcludedInput", ec.unmarshalInputSetImportItemsExcludedInput),
 			graphql.NewInputUnmarshaler("SetPassageDisplayTitleInput", ec.unmarshalInputSetPassageDisplayTitleInput),
 			graphql.NewInputUnmarshaler("SetPrimaryCategoryInput", ec.unmarshalInputSetPrimaryCategoryInput),
+			graphql.NewInputUnmarshaler("UpdateImportJobDescriptionInput", ec.unmarshalInputUpdateImportJobDescriptionInput),
 			graphql.NewInputUnmarshaler("UpdatePerspectiveInput", ec.unmarshalInputUpdatePerspectiveInput),
 			graphql.NewInputUnmarshaler("UpdateUserInput", ec.unmarshalInputUpdateUserInput),
 			graphql.NewInputUnmarshaler("UpdateUserTodoInput", ec.unmarshalInputUpdateUserTodoInput),
@@ -4066,6 +4087,8 @@ type ImportJobRef {
 type ImportJob {
   id: ID!
   name: String!
+  # What the request is for, written by the requester (sanitized HTML). Not a comment thread.
+  description: String
   requestStatus: ImportRequestStatus!
   # Who created it (the requester, for a request).
   requestedBy: User
@@ -4144,7 +4167,16 @@ input CreateImportSourceInput {
 
 input CreateImportJobInput {
   name: String!
+  # Required with no sources: what the import is for. Sanitized, at most 20,000 characters.
+  description: String
+  # May be empty when a description is given.
   sources: [CreateImportSourceInput!]!
+}
+
+input UpdateImportJobDescriptionInput {
+  jobId: IntID!
+  # Replaces the description. Sanitized, at most 20,000 characters; blank is refused.
+  description: String!
 }
 
 # Live progress of an import's running batch(es), pushed at most twice a
@@ -4271,7 +4303,11 @@ type Mutation {
   # Import staging. Creating an import is admin-only (it spends API quota);
   # sources are listed in the background, so the returned sources are LISTING.
   # Anyone signed in: an admin's import starts listing, anyone else's waits as a request.
+  # A request needs a name and a description or at least one source.
   createImportJob(input: CreateImportJobInput!): ImportJob! @auth
+  # Only the requester may edit the description, and not once the import is closed.
+  # Returns the import without its sources; query importJob for those.
+  updateImportJobDescription(input: UpdateImportJobDescriptionInput!): ImportJob! @auth
   # Admin only: approve (start listing) or decline a requested import.
   reviewImportJob(input: ReviewImportJobInput!): ImportJob! @auth
   # Anyone signed in, until the import is closed. Returns how many rows changed.
@@ -4915,6 +4951,8 @@ func (ec *executionContext) childFields_ImportJob(ctx context.Context, field gra
 		return ec.fieldContext_ImportJob_id(ctx, field)
 	case "name":
 		return ec.fieldContext_ImportJob_name(ctx, field)
+	case "description":
+		return ec.fieldContext_ImportJob_description(ctx, field)
 	case "requestStatus":
 		return ec.fieldContext_ImportJob_requestStatus(ctx, field)
 	case "requestedBy":
@@ -6160,6 +6198,20 @@ func (ec *executionContext) field_Mutation_updateContentSourceData_args(ctx cont
 		return nil, err
 	}
 	args["contentId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateImportJobDescription_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.UpdateImportJobDescriptionInput, error) {
+			return ec.unmarshalNUpdateImportJobDescriptionInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUpdateImportJobDescriptionInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -9052,6 +9104,29 @@ func (ec *executionContext) _ImportJob_name(ctx context.Context, field graphql.C
 	)
 }
 func (ec *executionContext) fieldContext_ImportJob_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportJob", field, false, false, "String")
+}
+
+func (ec *executionContext) _ImportJob_description(ctx context.Context, field graphql.CollectedField, obj *model.ImportJob) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportJob_description(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Description, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImportJob_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("ImportJob", field, false, false, "String")
 }
 
@@ -12845,6 +12920,63 @@ func (ec *executionContext) fieldContext_Mutation_createImportJob(ctx context.Co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_createImportJob_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateImportJobDescription(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_updateImportJobDescription(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdateImportJobDescription(ctx, fc.Args["input"].(model.UpdateImportJobDescriptionInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.ImportJob
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ImportJob) graphql.Marshaler {
+			return ec.marshalNImportJob2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐImportJob(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_updateImportJobDescription(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ImportJob(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateImportJobDescription_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -19658,7 +19790,7 @@ func (ec *executionContext) unmarshalInputCreateImportJobInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"name", "sources"}
+	fieldsInOrder := [...]string{"name", "description", "sources"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -19672,6 +19804,13 @@ func (ec *executionContext) unmarshalInputCreateImportJobInput(ctx context.Conte
 				return it, err
 			}
 			it.Name = data
+		case "description":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Description = data
 		case "sources":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sources"))
 			data, err := ec.unmarshalNCreateImportSourceInput2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateImportSourceInputᚄ(ctx, v)
@@ -20687,6 +20826,55 @@ func (ec *executionContext) unmarshalInputSetPrimaryCategoryInput(ctx context.Co
 func UnmarshalSetPrimaryCategoryInput(ctx context.Context, raw any) (model.SetPrimaryCategoryInput, error) {
 	var out model.SetPrimaryCategoryInput
 	err := graphql.UnmarshalNamedInputFromContext(ctx, "SetPrimaryCategoryInput", raw, &out)
+	return out, err
+}
+
+func (ec *executionContext) unmarshalInputUpdateImportJobDescriptionInput(ctx context.Context, obj any) (model.UpdateImportJobDescriptionInput, error) {
+	var it model.UpdateImportJobDescriptionInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"jobId", "description"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "jobId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("jobId"))
+			data, err := ec.unmarshalNIntID2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.JobID = data
+		case "description":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Description = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalUpdateImportJobDescriptionInput unmarshals raw into the UpdateImportJobDescriptionInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalUpdateImportJobDescriptionInput(ctx context.Context, raw any) (model.UpdateImportJobDescriptionInput, error) {
+	var out model.UpdateImportJobDescriptionInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "UpdateImportJobDescriptionInput", raw, &out)
 	return out, err
 }
 
@@ -22023,6 +22211,11 @@ func (ec *executionContext) _ImportJob(ctx context.Context, sel ast.SelectionSet
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "description":
+			out.Values[i] = ec._ImportJob_description(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "requestStatus":
 			out.Values[i] = ec._ImportJob_requestStatus(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -23262,6 +23455,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "createImportJob":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createImportJob(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateImportJobDescription":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateImportJobDescription(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -26197,6 +26397,11 @@ func (ec *executionContext) marshalNTodoAction2ᚖgithubᚗcomᚋCodeWarriorᚑd
 		return graphql.Null
 	}
 	return ec._TodoAction(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNUpdateImportJobDescriptionInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUpdateImportJobDescriptionInput(ctx context.Context, v any) (model.UpdateImportJobDescriptionInput, error) {
+	res, err := ec.unmarshalInputUpdateImportJobDescriptionInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNUpdatePerspectiveInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐUpdatePerspectiveInput(ctx context.Context, v any) (model.UpdatePerspectiveInput, error) {

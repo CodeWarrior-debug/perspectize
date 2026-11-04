@@ -148,8 +148,9 @@ type CreateContentResult struct {
 }
 
 type CreateImportJobInput struct {
-	Name    string                     `json:"name"`
-	Sources []*CreateImportSourceInput `json:"sources"`
+	Name        string                     `json:"name"`
+	Description *string                    `json:"description,omitempty"`
+	Sources     []*CreateImportSourceInput `json:"sources"`
 }
 
 type CreateImportSourceInput struct {
@@ -299,6 +300,7 @@ type ImportItemsResult struct {
 type ImportJob struct {
 	ID              string                     `json:"id"`
 	Name            string                     `json:"name"`
+	Description     *string                    `json:"description,omitempty"`
 	RequestStatus   domain.ImportRequestStatus `json:"requestStatus"`
 	RequestedBy     *User                      `json:"requestedBy,omitempty"`
 	ReviewNote      *string                    `json:"reviewNote,omitempty"`
@@ -597,6 +599,11 @@ type TypingChanged struct {
 }
 
 func (TypingChanged) IsThreadEvent() {}
+
+type UpdateImportJobDescriptionInput struct {
+	JobID       int    `json:"jobId"`
+	Description string `json:"description"`
+}
 
 // Partial update: omit a field to leave it unchanged. For quality, agreement,
 // importance, confidence, like, review, customFields and feelings, sending an

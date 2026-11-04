@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
@@ -234,10 +235,23 @@ type resolvedSource struct {
 	resolved portservices.ResolvedImportSource
 }
 
+// cleanImportDescription trims and sanitizes a description with the same
+// policy as perspective reviews. An empty result means no description; a
+// result over domain.MaxImportJobDescriptionChars is ErrInvalidInput.
+func cleanImportDescription(raw string) (string, error) {
+	clean := strings.TrimSpace(sanitizeReview(strings.TrimSpace(raw)))
+	if utf8.RuneCountInString(clean) > domain.MaxImportJobDescriptionChars {
+		return "", fmt.Errorf("%w: the description is at most %s characters", domain.ErrInvalidInput, formatThousands(domain.MaxImportJobDescriptionChars))
+	}
+	return clean, nil
+}
+
 // CreateImportJob validates and resolves every source before saving anything,
 // so a typo in the third channel doesn't leave a half-made import behind.
-// An admin's import starts listing at once. Anyone else's is a request: saved
-// with its sources WAITING, spending no listing quota until an admin approves it.
+// A request needs a name and either a description or at least one source; it
+// may have up to domain.MaxImportSourcesPerJob. An admin's import starts
+// listing at once. Anyone else's is a request: saved with its sources WAITING,
+// spending no listing quota until an admin approves it.
 func (s *ImportService) CreateImportJob(ctx context.Context, actor *domain.AuthenticatedUser, input domain.CreateImportJobInput) (*domain.ImportJob, error) {
 	if actor == nil {
 		return nil, fmt.Errorf("%w: sign in to request an import", domain.ErrForbidden)
@@ -247,8 +261,19 @@ func (s *ImportService) CreateImportJob(ctx context.Context, actor *domain.Authe
 	if name == "" || len([]rune(name)) > 120 {
 		return nil, fmt.Errorf("%w: import name must be 1-120 characters", domain.ErrInvalidInput)
 	}
-	if len(input.Sources) == 0 || len(input.Sources) > domain.MaxImportSourcesPerJob {
-		return nil, fmt.Errorf("%w: an import needs 1-%d sources", domain.ErrInvalidInput, domain.MaxImportSourcesPerJob)
+	if len(input.Sources) > domain.MaxImportSourcesPerJob {
+		return nil, fmt.Errorf("%w: an import takes at most %d sources", domain.ErrInvalidInput, domain.MaxImportSourcesPerJob)
+	}
+	var description string
+	if input.Description != nil {
+		clean, err := cleanImportDescription(*input.Description)
+		if err != nil {
+			return nil, err
+		}
+		description = clean
+	}
+	if description == "" && len(input.Sources) == 0 {
+		return nil, fmt.Errorf("%w: say what the import is for, or add at least one source", domain.ErrInvalidInput)
 	}
 
 	if !isAdmin {
@@ -265,6 +290,9 @@ func (s *ImportService) CreateImportJob(ctx context.Context, actor *domain.Authe
 	// An admin's import spends quota at once; anyone else's waits for review.
 	// Decided here, from the actor's role: the column has no default to fall back on.
 	job := &domain.ImportJob{UserID: actor.ID, Name: name}
+	if description != "" {
+		job.Description = &description
+	}
 	var sourceStatus domain.ImportSourceStatus
 	if isAdmin {
 		job.RequestStatus, sourceStatus = domain.ImportRequestStatusApproved, domain.ImportSourceStatusListing
@@ -318,6 +346,42 @@ func (s *ImportService) startListing(sources []*domain.ImportSource, resolved []
 	for i, src := range sources {
 		src, rs := src, resolved[i]
 		s.spawn(func() { s.listSource(src, rs) })
+	}
+}
+
+// UpdateImportJobDescription replaces the description of an import the actor
+// requested. The UPDATE is scoped to the requester and to an open import; on
+// a miss the job is read once to say why (not found, someone else's, closed).
+func (s *ImportService) UpdateImportJobDescription(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, description string) (*domain.ImportJob, error) {
+	if actor == nil {
+		return nil, fmt.Errorf("%w: sign in to edit an import", domain.ErrForbidden)
+	}
+	clean, err := cleanImportDescription(description)
+	if err != nil {
+		return nil, err
+	}
+	if clean == "" {
+		return nil, fmt.Errorf("%w: write a description, or leave it as it was", domain.ErrInvalidInput)
+	}
+	job, err := s.repo.UpdateJobDescription(ctx, jobID, actor.ID, clean)
+	if err == nil {
+		return job, nil
+	}
+	if !errors.Is(err, domain.ErrNotFound) {
+		return nil, err
+	}
+	current, err := s.repo.GetJobState(ctx, jobID)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case current.UserID != actor.ID:
+		return nil, fmt.Errorf("%w: only the person who requested this import may edit its description", domain.ErrForbidden)
+	case current.ClosedAt != nil:
+		return nil, fmt.Errorf("%w: this import is closed", domain.ErrInvalidInput)
+	default:
+		// Open and theirs now, so it changed between the UPDATE and this read.
+		return nil, fmt.Errorf("%w: this import changed while you were editing it; try again", domain.ErrInvalidInput)
 	}
 }
 

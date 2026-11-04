@@ -46,7 +46,7 @@ func NewGormImportJobRepository(db *gorm.DB) *GormImportJobRepository {
 
 // CreateJob inserts the job, then all its sources in one multi-row INSERT.
 func (r *GormImportJobRepository) CreateJob(ctx context.Context, job *domain.ImportJob) (*domain.ImportJob, error) {
-	jm := &ImportJobModel{UserID: job.UserID, Name: job.Name, RequestStatus: importRequestStatusToDB(job.RequestStatus)}
+	jm := &ImportJobModel{UserID: job.UserID, Name: job.Name, Description: job.Description, RequestStatus: importRequestStatusToDB(job.RequestStatus)}
 	if err := r.db.WithContext(ctx).Clauses(clause.Returning{}).Create(jm).Error; err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolation && pgErr.ConstraintName == importJobsUserFK {
@@ -140,6 +140,24 @@ func (r *GormImportJobRepository) GetJobState(ctx context.Context, id int) (*dom
 			return nil, fmt.Errorf("%w: import job %d", domain.ErrNotFound, id)
 		}
 		return nil, fmt.Errorf("failed to get import job: %w", err)
+	}
+	return importJobModelToDomain(&m), nil
+}
+
+// UpdateJobDescription sets the description in one UPDATE scoped to the owner
+// and to an open job. RETURNING gives the updated row back, so a hit costs one
+// statement; a miss (no row) is domain.ErrNotFound for the caller to explain.
+func (r *GormImportJobRepository) UpdateJobDescription(ctx context.Context, jobID, userID int, description string) (*domain.ImportJob, error) {
+	var m ImportJobModel
+	result := r.db.WithContext(ctx).Model(&m).
+		Clauses(clause.Returning{}).
+		Where("id = ? AND user_id = ? AND closed_at IS NULL", jobID, userID).
+		Update("description", description)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to update import description: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return nil, fmt.Errorf("%w: import job %d", domain.ErrNotFound, jobID)
 	}
 	return importJobModelToDomain(&m), nil
 }

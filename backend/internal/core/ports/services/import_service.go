@@ -42,12 +42,21 @@ type ImportService interface {
 	GetImportItemDetails(ctx context.Context, itemID int) (*domain.ImportItemWithDetails, error)
 
 	// CreateImportJob checks every source against its API and saves the import.
-	// An admin's is APPROVED and starts listing each source in the background;
+	// It needs a name and either a description or at least one source. An
+	// admin's is APPROVED and starts listing each source in the background;
 	// anyone else's is REQUESTED with WAITING sources, and a person may have at
 	// most domain.MaxPendingImportRequests open. domain.ErrInvalidInput for a
-	// bad name or source, too many open requests, or a source type this server
-	// has no API key for; domain.ErrNotFound when a source doesn't exist.
+	// bad name, description or source, too many open requests, or a source type
+	// this server has no API key for; domain.ErrNotFound when a source doesn't exist.
 	CreateImportJob(ctx context.Context, actor *domain.AuthenticatedUser, input domain.CreateImportJobInput) (*domain.ImportJob, error)
+
+	// UpdateImportJobDescription replaces the description of an import the actor
+	// requested, sanitized and at most domain.MaxImportJobDescriptionChars.
+	// Only the requester may edit it (domain.ErrForbidden, even for an admin),
+	// and not once the import is closed (domain.ErrInvalidInput). A blank
+	// description is refused. domain.ErrNotFound for an unknown import. The
+	// returned job has no sources.
+	UpdateImportJobDescription(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, description string) (*domain.ImportJob, error)
 
 	// ReviewImportJob approves (starting listing) or declines a REQUESTED
 	// import. Admin only (domain.ErrForbidden). A decline needs a note.

@@ -61,6 +61,24 @@ func (r *mutationResolver) CreateImportJob(ctx context.Context, input model.Crea
 	return importJobToModel(job), nil
 }
 
+// UpdateImportJobDescription is the resolver for the updateImportJobDescription
+// field. Only the requester may edit it; the service enforces that.
+func (r *mutationResolver) UpdateImportJobDescription(ctx context.Context, input model.UpdateImportJobDescriptionInput) (*model.ImportJob, error) {
+	svc, err := r.imports()
+	if err != nil {
+		return nil, err
+	}
+	actor, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	job, err := svc.UpdateImportJobDescription(ctx, actor, input.JobID, input.Description)
+	if err != nil {
+		return nil, importError(err)
+	}
+	return importJobToModel(job), nil
+}
+
 // ReviewImportJob is the resolver for the reviewImportJob field.
 func (r *mutationResolver) ReviewImportJob(ctx context.Context, input model.ReviewImportJobInput) (*model.ImportJob, error) {
 	svc, err := r.imports()

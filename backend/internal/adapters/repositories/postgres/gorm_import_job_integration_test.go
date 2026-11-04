@@ -454,3 +454,67 @@ func TestImportJobIntegration_CloseAndExclude(t *testing.T) {
 	_, err = f.repo.GetJobState(ctx, -1)
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
+
+// A request with a description and no sources is one INSERT, and the
+// description comes back from the database.
+func TestImportJobIntegration_CreateStoresDescriptionWithoutSources(t *testing.T) {
+	f := newImportJobFixture(t)
+	ctx := context.Background()
+	desc := "Describe the sermons I mean, not the channel."
+
+	c := querycount.Attach(t, f.db)
+	job, err := f.repo.CreateJob(ctx, &domain.ImportJob{UserID: f.other, Name: "Sermons", Description: &desc})
+	require.NoError(t, err)
+	c.AssertExactly(t, 1) // the job row only: no sources to insert
+
+	require.NotNil(t, job.Description)
+	assert.Equal(t, desc, *job.Description)
+	assert.Empty(t, job.Sources)
+
+	c.Reset()
+	got, err := f.repo.GetJobState(ctx, job.ID)
+	require.NoError(t, err)
+	c.AssertExactly(t, 1)
+	require.NotNil(t, got.Description)
+	assert.Equal(t, desc, *got.Description)
+}
+
+// UpdateJobDescription is one statement whether it hits or misses; the
+// service reads the job on a miss to say why. A non-owner and a closed import
+// both miss, and the stored text is unchanged.
+func TestImportJobIntegration_UpdateJobDescription(t *testing.T) {
+	f := newImportJobFixture(t)
+	ctx := context.Background()
+	first := "first"
+	job, err := f.repo.CreateJob(ctx, &domain.ImportJob{UserID: f.other, Name: "Request", Description: &first})
+	require.NoError(t, err)
+
+	c := querycount.Attach(t, f.db)
+	updated, err := f.repo.UpdateJobDescription(ctx, job.ID, f.other, "second")
+	require.NoError(t, err)
+	c.AssertExactly(t, 1)
+	assert.Equal(t, job.ID, updated.ID)
+	require.NotNil(t, updated.Description)
+	assert.Equal(t, "second", *updated.Description)
+	assert.Empty(t, updated.Sources, "RETURNING carries the job row only")
+
+	c.Reset()
+	_, err = f.repo.UpdateJobDescription(ctx, job.ID, f.admin, "not the requester")
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	c.AssertExactly(t, 1)
+
+	closedAt := time.Now().UTC()
+	require.NoError(t, f.repo.SetClosed(ctx, job.ID, &closedAt))
+	c.Reset()
+	_, err = f.repo.UpdateJobDescription(ctx, job.ID, f.other, "after close")
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	c.AssertExactly(t, 1)
+
+	_, err = f.repo.UpdateJobDescription(ctx, -1, f.other, "unknown")
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+
+	stored, err := f.repo.GetJobState(ctx, job.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stored.Description)
+	assert.Equal(t, "second", *stored.Description, "misses change nothing")
+}
