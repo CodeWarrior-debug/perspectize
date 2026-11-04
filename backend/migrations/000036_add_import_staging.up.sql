@@ -27,7 +27,9 @@ CREATE TABLE IF NOT EXISTS public.import_jobs (
     id serial NOT NULL,
     user_id integer NOT NULL,
     name varchar(120) NOT NULL,
-    request_status text NOT NULL DEFAULT 'approved',
+    -- No default, unlike other stored enums: the service sets it from the
+    -- creator's role, and an INSERT that forgot it should fail, not approve.
+    request_status text NOT NULL,
     -- The reviewing admin's reason (shown to the requester when declined).
     review_note varchar(500) NULL,
     reviewed_at timestamptz NULL,
