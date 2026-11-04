@@ -33,8 +33,9 @@ func (staticLister) List(_ context.Context, _ portservices.ResolvedImportSource,
 		batch[i] = &domain.ImportItemWithDetails{
 			Item: domain.ImportItem{
 				ExternalID: id, DestinationType: domain.ContentTypeYouTubeVideo,
-				CanonicalURL: "https://www.youtube.com/watch?v=" + id, Kind: domain.ImportItemKindVideo,
-				Title: fmt.Sprintf("Video %02d", i), Summary: &summary, ViewCount: &views, Position: i, StatsFetchedAt: time.Now().UTC(),
+				CanonicalURL: "https://www.youtube.com/watch?v=" + id, Title: fmt.Sprintf("Video %02d", i),
+				Facts:    domain.ImportFacts{Kind: domain.ImportItemKindVideo, Summary: &summary, ViewCount: &views},
+				Position: i, StatsFetchedAt: time.Now().UTC(),
 			},
 			Details: domain.ImportItemDetails{Description: "Full description", Tags: []string{"t"}},
 		}
@@ -50,7 +51,7 @@ const importJobQuery = `query($id: ID!) {
   importJob(id: $id) {
     id name
     sources { id title status itemCount fetchedAt destinationType }
-    items { id title destinationType kind viewCount likeCount inLibrary contentId importStatus summary }
+    items { id title destinationType facts inLibrary contentId importStatus }
   }
 }`
 
@@ -70,16 +71,13 @@ type rtImportJob struct {
 		DestinationType string  `json:"destinationType"`
 	} `json:"sources"`
 	Items []struct {
-		ID              string   `json:"id"`
-		Title           string   `json:"title"`
-		DestinationType string   `json:"destinationType"`
-		Kind            string   `json:"kind"`
-		ViewCount       *float64 `json:"viewCount"`
-		LikeCount       *float64 `json:"likeCount"`
-		InLibrary       bool     `json:"inLibrary"`
-		ContentID       *string  `json:"contentId"`
-		ImportStatus    *string  `json:"importStatus"`
-		Summary         *string  `json:"summary"`
+		ID              string         `json:"id"`
+		Title           string         `json:"title"`
+		DestinationType string         `json:"destinationType"`
+		Facts           map[string]any `json:"facts"`
+		InLibrary       bool           `json:"inLibrary"`
+		ContentID       *string        `json:"contentId"`
+		ImportStatus    *string        `json:"importStatus"`
 	} `json:"items"`
 }
 
@@ -223,7 +221,8 @@ func TestImportJobRoundTrips(t *testing.T) {
 	assert.NotNil(t, got.Sources[0].FetchedAt)
 	assert.Equal(t, "Video 00", got.Items[0].Title)
 	assert.Equal(t, "YOUTUBE_VIDEO", got.Items[0].DestinationType)
-	assert.Nil(t, got.Items[0].LikeCount)
+	assert.Equal(t, map[string]any{"kind": "VIDEO", "summary": "Summary", "viewCount": float64(1000)}, got.Items[0].Facts,
+		"facts carry only known keys: no likeCount when likes are unknown")
 	assert.False(t, got.Items[0].InLibrary)
 }
 

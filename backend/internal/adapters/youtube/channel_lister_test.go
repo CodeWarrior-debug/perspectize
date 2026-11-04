@@ -124,28 +124,28 @@ func TestChannelLister_List(t *testing.T) {
 	assert.Equal(t, []string{"v1", "v2", "v3", "live1"}, ids, "deleted video dropped, duplicate v1 listed once")
 
 	v1 := all[0]
-	assert.Equal(t, domain.ImportItemKindVideo, v1.Item.Kind)
+	assert.Equal(t, domain.ImportItemKindVideo, v1.Item.Facts.Kind)
 	assert.Equal(t, domain.ContentTypeYouTubeVideo, v1.Item.DestinationType)
 	assert.Equal(t, "https://www.youtube.com/watch?v=v1", v1.Item.CanonicalURL)
-	assert.Equal(t, 8756, *v1.Item.DurationSeconds)
-	assert.Equal(t, int64(12000), *v1.Item.LikeCount)
-	assert.True(t, *v1.Item.HasCaptions)
-	assert.Equal(t, 3, v1.Item.ChapterCount)
-	assert.Equal(t, "Lecture one of the 2017 course.", *v1.Item.Summary)
-	assert.Equal(t, "https://i.ytimg.com/vi/v1/mqdefault.jpg", *v1.Item.ThumbnailURL)
+	assert.Equal(t, 8756, *v1.Item.Facts.DurationSeconds)
+	assert.Equal(t, int64(12000), *v1.Item.Facts.LikeCount)
+	assert.True(t, *v1.Item.Facts.HasCaptions)
+	assert.Equal(t, 3, *v1.Item.Facts.ChapterCount)
+	assert.Equal(t, "Lecture one of the 2017 course.", *v1.Item.Facts.Summary)
+	assert.Equal(t, "https://i.ytimg.com/vi/v1/mqdefault.jpg", *v1.Item.Facts.ThumbnailURL)
 	assert.Equal(t, fixed, v1.Item.StatsFetchedAt)
 	assert.Equal(t, []string{"jordanbpeterson.com"}, v1.Details.Links)
 	assert.Equal(t, "27", v1.Details.Category)
 	assert.Equal(t, 0, v1.Item.Position)
 
 	v2 := all[1]
-	assert.Nil(t, v2.Item.LikeCount, "hidden likes stay nil, not 0")
-	assert.Nil(t, v2.Item.CommentCount)
-	assert.False(t, *v2.Item.HasCaptions)
+	assert.Nil(t, v2.Item.Facts.LikeCount, "hidden likes stay nil, not 0")
+	assert.Nil(t, v2.Item.Facts.CommentCount)
+	assert.False(t, *v2.Item.Facts.HasCaptions)
 	assert.Equal(t, 2, v2.Item.Position, "position counts the deleted video's slot")
 
 	live := all[3]
-	assert.Equal(t, domain.ImportItemKindLive, live.Item.Kind)
+	assert.Equal(t, domain.ImportItemKindLive, live.Item.Facts.Kind)
 
 	videoCalls := 0
 	for _, c := range calls {

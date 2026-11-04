@@ -167,35 +167,40 @@ func (s ImportFixtureSource) Rows(fetched time.Time) []*domain.ImportItemWithDet
 			ExternalID:      it.ExternalID,
 			DestinationType: dest,
 			CanonicalURL:    url,
-			Kind:            domain.ImportItemKind(strings.ToUpper(it.Kind)),
 			Title:           it.Title,
-			DurationSeconds: it.DurationSeconds,
-			ViewCount:       it.Views,
-			LikeCount:       it.Likes,
-			CommentCount:    it.Comments,
-			Rating:          it.Rating,
-			RatingCount:     it.RatingCount,
-			RatingSource:    it.RatingSource,
-			HasCaptions:     it.HasCaptions,
-			Genres:          it.Genres,
-			TopCast:         it.TopCast,
-			Revenue:         it.Revenue,
-			Budget:          it.Budget,
-			ThumbnailURL:    it.Thumbnail,
-			Position:        it.Position,
-			StatsFetchedAt:  fetched,
+			Facts: domain.ImportFacts{
+				Kind:            domain.ImportItemKind(strings.ToUpper(it.Kind)),
+				DurationSeconds: it.DurationSeconds,
+				ViewCount:       it.Views,
+				LikeCount:       it.Likes,
+				CommentCount:    it.Comments,
+				Rating:          it.Rating,
+				RatingCount:     it.RatingCount,
+				RatingSource:    it.RatingSource,
+				HasCaptions:     it.HasCaptions,
+				Genres:          it.Genres,
+				TopCast:         it.TopCast,
+				Revenue:         it.Revenue,
+				Budget:          it.Budget,
+				ThumbnailURL:    it.Thumbnail,
+			},
+			Position:       it.Position,
+			StatsFetchedAt: fetched,
 		}
 		if summaries[i] != "" {
 			summary := summaries[i]
-			row.Summary = &summary
+			row.Facts.Summary = &summary
 		}
 		if it.PublishedAt != nil {
 			if t, err := time.Parse(time.RFC3339, *it.PublishedAt); err == nil {
-				row.PublishedAt = &t
+				row.Facts.PublishedAt = &t
 			}
 		}
 		chapters := domain.ParseChapters(it.Description)
-		row.ChapterCount = len(chapters)
+		if dest == domain.ContentTypeYouTubeVideo {
+			chapterCount := len(chapters)
+			row.Facts.ChapterCount = &chapterCount
+		}
 		links := it.Links
 		if len(links) == 0 {
 			links = domain.LinkDomains(it.Description)

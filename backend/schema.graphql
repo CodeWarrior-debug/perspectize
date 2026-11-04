@@ -543,13 +543,6 @@ enum ImportSourceStatus {
   FAILED
 }
 
-enum ImportItemKind {
-  VIDEO
-  SHORT
-  LIVE
-  MOVIE
-}
-
 enum ImportItemStatus {
   QUEUED
   IMPORTED
@@ -609,35 +602,18 @@ type ImportItem {
   id: ID!
   sourceId: ID!
   destinationType: ContentType!
-  kind: ImportItemKind!
   # YouTube video id or TMDB movie id.
   externalId: String!
   url: String!
   title: String!
-  # First meaningful description line, with channel boilerplate removed.
-  summary: String
-  publishedAt: String
-  durationSeconds: Int
-  viewCount: Float
-  # Null when the channel hides likes (never 0 for unknown).
-  likeCount: Float
-  commentCount: Float
-  # 0-10, how many ratings it rests on, and whose (e.g. "TMDB").
-  rating: Float
-  ratingCount: Int
-  ratingSource: String
-  chapterCount: Int!
-  hasCaptions: Boolean
-  # Films: genre names and up to 3 top-billed cast (empty for videos).
-  genres: [String!]!
-  topCast: [String!]!
-  # Films (TMDB): daily popularity score, user review count, and box office
-  # takings and budget in USD. Null when unknown.
-  popularity: Float
-  reviewCount: Int
-  revenue: Float
-  budget: Float
-  thumbnailUrl: String
+  # Decision facts, shown as sheet columns named after the keys. Keys mean the
+  # same thing for every content type; a missing key is unknown, never 0.
+  # kind ("VIDEO" | "SHORT" | "LIVE" | "MOVIE"), summary, publishedAt,
+  # durationSeconds, viewCount, likeCount (absent when the channel hides likes),
+  # commentCount, rating (0-10), ratingCount, ratingSource (e.g. "TMDB"),
+  # chapterCount, hasCaptions, genres, topCast (up to 3 top-billed),
+  # popularity (TMDB), reviewCount, revenue and budget (USD), thumbnailUrl.
+  facts: JSON!
   # Marked "don't import" (by anyone, until the import is closed): can't be imported.
   excluded: Boolean!
   # Position in the source listing; 0 is first (newest for channels).

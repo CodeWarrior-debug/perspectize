@@ -266,26 +266,8 @@ type ImportItemModel struct {
 	ExternalID       string          `gorm:"column:external_id;not null"`
 	DestinationType  string          `gorm:"column:destination_type;not null"`
 	CanonicalURL     string          `gorm:"column:canonical_url;not null"`
-	Kind             string          `gorm:"column:kind;not null"`
 	Title            string          `gorm:"column:title;not null"`
-	Summary          *string         `gorm:"column:summary"`
-	PublishedAt      *time.Time      `gorm:"column:published_at"`
-	DurationSeconds  *int            `gorm:"column:duration_seconds"`
-	ViewCount        *int64          `gorm:"column:view_count"`
-	LikeCount        *int64          `gorm:"column:like_count"`
-	CommentCount     *int64          `gorm:"column:comment_count"`
-	Rating           *float64        `gorm:"column:rating"`
-	RatingCount      *int            `gorm:"column:rating_count"`
-	RatingSource     *string         `gorm:"column:rating_source"`
-	ChapterCount     int             `gorm:"column:chapter_count;not null"`
-	HasCaptions      *bool           `gorm:"column:has_captions"`
-	Genres           StringArray     `gorm:"column:genres;type:text[];not null"`
-	TopCast          StringArray     `gorm:"column:top_cast;type:text[];not null"`
-	Popularity       *float64        `gorm:"column:popularity"`
-	ReviewCount      *int            `gorm:"column:review_count"`
-	Revenue          *int64          `gorm:"column:revenue"`
-	Budget           *int64          `gorm:"column:budget"`
-	ThumbnailURL     *string         `gorm:"column:thumbnail_url"`
+	Facts            json.RawMessage `gorm:"column:facts;type:jsonb"`
 	Position         int             `gorm:"column:position;not null"`
 	Excluded         bool            `gorm:"column:excluded;not null"`
 	Details          json.RawMessage `gorm:"column:details;type:jsonb"`

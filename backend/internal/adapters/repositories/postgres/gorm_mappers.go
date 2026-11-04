@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
@@ -573,7 +574,7 @@ func importSourceDomainToModel(s *domain.ImportSource) *ImportSourceModel {
 // importItemModelToDomain converts a GORM ImportItemModel to domain.ImportItem.
 // ContentID prefers the content the import created, then any content with the
 // same URL (LibraryContentID), so a row added by hand still links to it.
-func importItemModelToDomain(m *ImportItemModel) *domain.ImportItem {
+func importItemModelToDomain(m *ImportItemModel) (*domain.ImportItem, error) {
 	it := &domain.ImportItem{
 		ID:              m.ID,
 		JobID:           m.JobID,
@@ -581,26 +582,7 @@ func importItemModelToDomain(m *ImportItemModel) *domain.ImportItem {
 		ExternalID:      m.ExternalID,
 		DestinationType: contentTypeFromDBValue(m.DestinationType),
 		CanonicalURL:    m.CanonicalURL,
-		Kind:            domain.ImportItemKind(strings.ToUpper(m.Kind)),
 		Title:           m.Title,
-		Summary:         m.Summary,
-		PublishedAt:     m.PublishedAt,
-		DurationSeconds: m.DurationSeconds,
-		ViewCount:       m.ViewCount,
-		LikeCount:       m.LikeCount,
-		CommentCount:    m.CommentCount,
-		Rating:          m.Rating,
-		RatingCount:     m.RatingCount,
-		RatingSource:    m.RatingSource,
-		ChapterCount:    m.ChapterCount,
-		HasCaptions:     m.HasCaptions,
-		Genres:          nonNilStrings(m.Genres),
-		TopCast:         nonNilStrings(m.TopCast),
-		Popularity:      m.Popularity,
-		ReviewCount:     m.ReviewCount,
-		Revenue:         m.Revenue,
-		Budget:          m.Budget,
-		ThumbnailURL:    m.ThumbnailURL,
 		Position:        m.Position,
 		Excluded:        m.Excluded,
 		StatsFetchedAt:  m.StatsFetchedAt,
@@ -609,6 +591,11 @@ func importItemModelToDomain(m *ImportItemModel) *domain.ImportItem {
 		ContentID:       m.ContentID,
 		InLibrary:       m.LibraryContentID != nil,
 	}
+	if len(m.Facts) > 0 {
+		if err := json.Unmarshal(m.Facts, &it.Facts); err != nil {
+			return nil, fmt.Errorf("failed to decode facts of import item %d: %w", m.ID, err)
+		}
+	}
 	if it.ContentID == nil {
 		it.ContentID = m.LibraryContentID
 	}
@@ -616,11 +603,15 @@ func importItemModelToDomain(m *ImportItemModel) *domain.ImportItem {
 		st := domain.ImportItemStatus(strings.ToUpper(*m.ImportStatus))
 		it.ImportStatus = &st
 	}
-	return it
+	return it, nil
 }
 
 // importItemDomainToModel converts a staged candidate (row + details) to its GORM model
 func importItemDomainToModel(in *domain.ImportItemWithDetails) (*ImportItemModel, error) {
+	facts, err := json.Marshal(in.Item.Facts)
+	if err != nil {
+		return nil, err
+	}
 	details, err := json.Marshal(in.Details)
 	if err != nil {
 		return nil, err
@@ -632,38 +623,11 @@ func importItemDomainToModel(in *domain.ImportItemWithDetails) (*ImportItemModel
 		ExternalID:      it.ExternalID,
 		DestinationType: contentTypeToDBValue(it.DestinationType),
 		CanonicalURL:    it.CanonicalURL,
-		Kind:            strings.ToLower(string(it.Kind)),
 		Title:           it.Title,
-		Summary:         it.Summary,
-		PublishedAt:     it.PublishedAt,
-		DurationSeconds: it.DurationSeconds,
-		ViewCount:       it.ViewCount,
-		LikeCount:       it.LikeCount,
-		CommentCount:    it.CommentCount,
-		Rating:          it.Rating,
-		RatingCount:     it.RatingCount,
-		RatingSource:    it.RatingSource,
-		ChapterCount:    it.ChapterCount,
-		HasCaptions:     it.HasCaptions,
-		Genres:          StringArray(nonNilStrings(it.Genres)),
-		TopCast:         StringArray(nonNilStrings(it.TopCast)),
-		Popularity:      it.Popularity,
-		ReviewCount:     it.ReviewCount,
-		Revenue:         it.Revenue,
-		Budget:          it.Budget,
-		ThumbnailURL:    it.ThumbnailURL,
+		Facts:           facts,
 		Position:        it.Position,
 		Details:         details,
 		StatsFetchedAt:  it.StatsFetchedAt,
 	}
 	return m, nil
-}
-
-// nonNilStrings returns s, or an empty slice for nil: text[] columns are NOT NULL
-// and GraphQL lists are non-null.
-func nonNilStrings(s []string) []string {
-	if s == nil {
-		return []string{}
-	}
-	return s
 }
