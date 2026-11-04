@@ -269,32 +269,36 @@ func channelVideoToItem(v channelVideo, kind domain.ImportItemKind, position int
 		ExternalID:      v.ID,
 		DestinationType: domain.ContentTypeYouTubeVideo,
 		CanonicalURL:    NormalizeYouTubeURL(v.ID),
-		Kind:            kind,
 		Title:           v.Snippet.Title,
-		ViewCount:       parseCount(v.Statistics.ViewCount),
-		LikeCount:       parseCount(v.Statistics.LikeCount),
-		CommentCount:    parseCount(v.Statistics.CommentCount),
-		Position:        position,
-		StatsFetchedAt:  fetched,
+		Facts: domain.ImportFacts{
+			Kind:         kind,
+			ViewCount:    parseCount(v.Statistics.ViewCount),
+			LikeCount:    parseCount(v.Statistics.LikeCount),
+			CommentCount: parseCount(v.Statistics.CommentCount),
+		},
+		Position:       position,
+		StatsFetchedAt: fetched,
 	}
+	facts := &item.Facts
 	if summary != "" {
-		item.Summary = &summary
+		facts.Summary = &summary
 	}
 	if t, err := time.Parse(time.RFC3339, v.Snippet.PublishedAt); err == nil {
-		item.PublishedAt = &t
+		facts.PublishedAt = &t
 	}
 	if secs, err := ParseISO8601Duration(v.ContentDetails.Duration); err == nil && secs > 0 {
-		item.DurationSeconds = &secs
+		facts.DurationSeconds = &secs
 	}
 	if v.ContentDetails.Caption != "" {
 		has := v.ContentDetails.Caption == "true"
-		item.HasCaptions = &has
+		facts.HasCaptions = &has
 	}
 	if thumb := bestThumbnail(v.Snippet.Thumbnails); thumb != "" {
-		item.ThumbnailURL = &thumb
+		facts.ThumbnailURL = &thumb
 	}
 	chapters := domain.ParseChapters(v.Snippet.Description)
-	item.ChapterCount = len(chapters)
+	chapterCount := len(chapters)
+	facts.ChapterCount = &chapterCount
 
 	return &domain.ImportItemWithDetails{
 		Item: item,

@@ -19,7 +19,7 @@
 
 - `import_jobs`: `id`, `user_id` (creator), `name`, `created_at`, `updated_at`.
 - `import_job_sources`: `id`, `job_id` (CASCADE), `source_type`, `source_ref`, `title`, `url`, `destination_type`, `status` (`listing|ready|failed`), `status_detail`, `item_count`, `fetched_at`.
-- `import_job_items`: one row per candidate, `UNIQUE (source_id, external_id)`. Promoted columns for sort/filter (`kind`, `title`, `summary`, `published_at`, `duration_seconds`, views/likes/comments, `rating`/`rating_count`/`rating_source`, `chapter_count`, `has_captions`, `position`), `details jsonb` (description, tags, chapters, people, links, thumbnail) loaded only by the detail query, and the import outcome (`import_status`, `import_error`, `content_id` SET NULL).
+- `import_job_items`: one row per candidate, `UNIQUE (source_id, external_id)`. Columns only for what the code queries or updates (`title`, `canonical_url`, `position`, `excluded`); the decision facts (kind, summary, published date, length, views/likes/comments, rating with its count and source, chapters, captions, genres, top cast, popularity, reviews, box office, budget, thumbnail) in one `facts jsonb` keyed alike across content types (a missing key is unknown, never 0), `details jsonb` (description, tags, chapters, people, links, thumbnail) loaded only by the detail query, and the import outcome (`import_status`, `import_error`, `content_id` SET NULL).
 - "In library" is computed in the list query by `LEFT JOIN content ON content.url = item.canonical_url`, so it is always current and costs no extra query.
 
 ## Pipelines (goroutines + channels)

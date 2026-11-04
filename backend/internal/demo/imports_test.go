@@ -64,8 +64,8 @@ func TestImportFixtureRows(t *testing.T) {
 	for _, r := range rows {
 		assert.Equal(t, domain.ContentTypeYouTubeVideo, r.Item.DestinationType)
 		assert.Equal(t, WatchURL(r.Item.ExternalID), r.Item.CanonicalURL)
-		if r.Item.Summary != nil {
-			assert.NotContains(t, *r.Item.Summary, "click here", "channel boilerplate is never the summary")
+		if r.Item.Facts.Summary != nil {
+			assert.NotContains(t, *r.Item.Facts.Summary, "click here", "channel boilerplate is never the summary")
 		}
 	}
 
@@ -73,29 +73,29 @@ func TestImportFixtureRows(t *testing.T) {
 	require.NotEmpty(t, movieRows)
 	assert.Equal(t, domain.ContentTypeMovie, movieRows[0].Item.DestinationType)
 	assert.Equal(t, MovieURL(movieRows[0].Item.ExternalID), movieRows[0].Item.CanonicalURL)
-	assert.Equal(t, domain.ImportItemKindMovie, movieRows[0].Item.Kind)
+	assert.Equal(t, domain.ImportItemKindMovie, movieRows[0].Item.Facts.Kind)
 	assert.Equal(t, domain.ImportPerson{Name: "Christopher Nolan", Role: "Director"}, movieRows[0].Details.People[0])
 
 	// Every dated film answers "who's in it" and "what kind of film" in the row itself,
 	// and a rated film says how many reviews its score rests on.
 	for _, r := range movieRows {
-		assert.Nil(t, r.Item.ViewCount, r.Item.Title)
-		assert.Len(t, r.Item.TopCast, 3, r.Item.Title)
-		if r.Item.PublishedAt != nil {
-			assert.NotEmpty(t, r.Item.Genres, r.Item.Title)
+		assert.Nil(t, r.Item.Facts.ViewCount, r.Item.Title)
+		assert.Len(t, r.Item.Facts.TopCast, 3, r.Item.Title)
+		if r.Item.Facts.PublishedAt != nil {
+			assert.NotEmpty(t, r.Item.Facts.Genres, r.Item.Title)
 		}
-		if r.Item.Rating != nil {
-			require.NotNil(t, r.Item.RatingCount, r.Item.Title)
-			assert.Positive(t, *r.Item.RatingCount, r.Item.Title)
+		if r.Item.Facts.Rating != nil {
+			require.NotNil(t, r.Item.Facts.RatingCount, r.Item.Title)
+			assert.Positive(t, *r.Item.Facts.RatingCount, r.Item.Title)
 		}
 	}
 	inception := movieRows[slices.IndexFunc(movieRows, func(r *domain.ImportItemWithDetails) bool { return r.Item.Title == "Inception" })]
-	assert.Equal(t, []string{"Leonardo DiCaprio", "Ken Watanabe", "Joseph Gordon-Levitt"}, inception.Item.TopCast, "billing order")
-	assert.Equal(t, 42, *inception.Item.RatingCount)
-	assert.Equal(t, int64(836848102), *inception.Item.Revenue, "worldwide box office, USD")
-	assert.Equal(t, int64(160000000), *inception.Item.Budget)
+	assert.Equal(t, []string{"Leonardo DiCaprio", "Ken Watanabe", "Joseph Gordon-Levitt"}, inception.Item.Facts.TopCast, "billing order")
+	assert.Equal(t, 42, *inception.Item.Facts.RatingCount)
+	assert.Equal(t, int64(836848102), *inception.Item.Facts.Revenue, "worldwide box office, USD")
+	assert.Equal(t, int64(160000000), *inception.Item.Facts.Budget)
 	assert.Contains(t, inception.Details.Tags, "dream world")
-	assert.Contains(t, inception.Item.Genres, "Science fiction", "tidied from Wikidata's \"science fiction film\"")
+	assert.Contains(t, inception.Item.Facts.Genres, "Science fiction", "tidied from Wikidata's \"science fiction film\"")
 }
 
 func TestImportLookups(t *testing.T) {

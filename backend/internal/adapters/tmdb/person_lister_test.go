@@ -138,38 +138,38 @@ func TestPersonLister_ListDirector(t *testing.T) {
 
 	inception := items[1]
 	assert.Equal(t, domain.ContentTypeMovie, inception.Item.DestinationType)
-	assert.Equal(t, domain.ImportItemKindMovie, inception.Item.Kind)
+	assert.Equal(t, domain.ImportItemKindMovie, inception.Item.Facts.Kind)
 	assert.Equal(t, "https://www.themoviedb.org/movie/27205", inception.Item.CanonicalURL)
-	assert.Equal(t, 148*60, *inception.Item.DurationSeconds)
-	assert.Equal(t, "Your mind is the scene of the crime.", *inception.Item.Summary, "tagline wins over the overview")
-	assert.InDelta(t, 8.4, *inception.Item.Rating, 0.001)
-	assert.Equal(t, 38000, *inception.Item.RatingCount)
-	assert.Equal(t, "TMDB", *inception.Item.RatingSource)
-	assert.Equal(t, "https://image.tmdb.org/t/p/w185/inception.jpg", *inception.Item.ThumbnailURL)
+	assert.Equal(t, 148*60, *inception.Item.Facts.DurationSeconds)
+	assert.Equal(t, "Your mind is the scene of the crime.", *inception.Item.Facts.Summary, "tagline wins over the overview")
+	assert.InDelta(t, 8.4, *inception.Item.Facts.Rating, 0.001)
+	assert.Equal(t, 38000, *inception.Item.Facts.RatingCount)
+	assert.Equal(t, "TMDB", *inception.Item.Facts.RatingSource)
+	assert.Equal(t, "https://image.tmdb.org/t/p/w185/inception.jpg", *inception.Item.Facts.ThumbnailURL)
 	assert.Equal(t, []string{"Action", "Science Fiction"}, inception.Details.Genres)
-	assert.Equal(t, []string{"Action", "Science Fiction"}, inception.Item.Genres, "genres are a sheet column too")
-	assert.Equal(t, []string{"Leonardo DiCaprio", "Joseph Gordon-Levitt", "Elliot Page"}, inception.Item.TopCast,
+	assert.Equal(t, []string{"Action", "Science Fiction"}, inception.Item.Facts.Genres, "genres are a sheet column too")
+	assert.Equal(t, []string{"Leonardo DiCaprio", "Joseph Gordon-Levitt", "Elliot Page"}, inception.Item.Facts.TopCast,
 		"top 3 by billing order from the same /movie call, blank names skipped")
-	assert.InDelta(t, 38.5, *inception.Item.Popularity, 0.001)
-	assert.Equal(t, int64(160000000), *inception.Item.Budget)
-	assert.Equal(t, int64(839030630), *inception.Item.Revenue)
-	assert.Equal(t, 12, *inception.Item.ReviewCount)
+	assert.InDelta(t, 38.5, *inception.Item.Facts.Popularity, 0.001)
+	assert.Equal(t, int64(160000000), *inception.Item.Facts.Budget)
+	assert.Equal(t, int64(839030630), *inception.Item.Facts.Revenue)
+	assert.Equal(t, 12, *inception.Item.Facts.ReviewCount)
 	assert.Equal(t, []string{"dream", "heist"}, inception.Details.Tags, "TMDB keywords are the film's tags")
 	assert.Equal(t, "Cobb steals secrets from dreams.", inception.Details.Description)
 	assert.Equal(t, 1, inception.Item.Position)
 
 	oppen := items[0]
-	assert.Equal(t, "The story of J. Robert Oppenheimer.", *oppen.Item.Summary, "no tagline: the overview's first line")
-	assert.Empty(t, oppen.Item.TopCast, "no credits in the response: no cast")
-	assert.Nil(t, oppen.Item.Budget, "TMDB's 0 budget is unknown, not $0")
-	assert.Nil(t, oppen.Item.Revenue)
-	assert.Nil(t, oppen.Item.ReviewCount, "no reviews block: unknown")
-	assert.Nil(t, oppen.Item.Popularity)
+	assert.Equal(t, "The story of J. Robert Oppenheimer.", *oppen.Item.Facts.Summary, "no tagline: the overview's first line")
+	assert.Empty(t, oppen.Item.Facts.TopCast, "no credits in the response: no cast")
+	assert.Nil(t, oppen.Item.Facts.Budget, "TMDB's 0 budget is unknown, not $0")
+	assert.Nil(t, oppen.Item.Facts.Revenue)
+	assert.Nil(t, oppen.Item.Facts.ReviewCount, "no reviews block: unknown")
+	assert.Nil(t, oppen.Item.Facts.Popularity)
 
 	untitled := items[2]
-	assert.Nil(t, untitled.Item.Rating, "zero votes is no rating, not a score of 0")
-	assert.Nil(t, untitled.Item.DurationSeconds, "failed lookup leaves runtime unknown")
-	assert.Nil(t, untitled.Item.PublishedAt)
+	assert.Nil(t, untitled.Item.Facts.Rating, "zero votes is no rating, not a score of 0")
+	assert.Nil(t, untitled.Item.Facts.DurationSeconds, "failed lookup leaves runtime unknown")
+	assert.Nil(t, untitled.Item.Facts.PublishedAt)
 }
 
 func TestPersonLister_ListAllRolesMergesCredits(t *testing.T) {

@@ -131,8 +131,8 @@ type ImportSource struct {
 	UpdatedAt       time.Time
 }
 
-// ImportItem is one candidate row of the staging sheet: everything needed to
-// decide whether to import it, minus the long detail-panel fields.
+// ImportItem is one candidate row of the staging sheet: its workflow state
+// as fields, and what someone needs to decide whether to import it as Facts.
 type ImportItem struct {
 	ID              int
 	JobID           int
@@ -140,26 +140,8 @@ type ImportItem struct {
 	ExternalID      string
 	DestinationType ContentType
 	CanonicalURL    string
-	Kind            ImportItemKind
 	Title           string
-	Summary         *string
-	PublishedAt     *time.Time
-	DurationSeconds *int
-	ViewCount       *int64
-	LikeCount       *int64 // nil when the channel hides likes, never 0 for "unknown"
-	CommentCount    *int64
-	Rating          *float64 // 0-10
-	RatingCount     *int
-	RatingSource    *string
-	ChapterCount    int
-	HasCaptions     *bool
-	Genres          []string // films only
-	TopCast         []string // films only: up to 3 top-billed names
-	Popularity      *float64 // films (TMDB): daily popularity score
-	ReviewCount     *int     // films (TMDB): user reviews
-	Revenue         *int64   // films: box office takings, USD
-	Budget          *int64   // films: production budget, USD
-	ThumbnailURL    *string
+	Facts           ImportFacts
 	Position        int
 	// Excluded is the shared "don't import" mark: such a row can't be queued.
 	Excluded       bool
@@ -172,6 +154,33 @@ type ImportItem struct {
 	ContentID *int
 	// InLibrary is true when content with CanonicalURL exists. Computed at read time.
 	InLibrary bool
+}
+
+// ImportFacts are a row's decision facts, stored as one JSONB object and
+// shown as sheet columns named after the keys. A key means the same thing for
+// every content type (a video's and a film's length are both durationSeconds),
+// so a new type reuses keys before adding any. A missing key is unknown, never
+// 0: a nil field is omitted, never sent as zero.
+type ImportFacts struct {
+	Kind            ImportItemKind `json:"kind,omitempty"`
+	Summary         *string        `json:"summary,omitempty"` // first meaningful description line
+	PublishedAt     *time.Time     `json:"publishedAt,omitempty"`
+	DurationSeconds *int           `json:"durationSeconds,omitempty"`
+	ViewCount       *int64         `json:"viewCount,omitempty"`
+	LikeCount       *int64         `json:"likeCount,omitempty"` // nil when the channel hides likes
+	CommentCount    *int64         `json:"commentCount,omitempty"`
+	Rating          *float64       `json:"rating,omitempty"` // 0-10
+	RatingCount     *int           `json:"ratingCount,omitempty"`
+	RatingSource    *string        `json:"ratingSource,omitempty"` // whose rating, e.g. "TMDB"
+	ChapterCount    *int           `json:"chapterCount,omitempty"`
+	HasCaptions     *bool          `json:"hasCaptions,omitempty"`
+	Genres          []string       `json:"genres,omitempty"`
+	TopCast         []string       `json:"topCast,omitempty"`    // up to 3 top-billed names
+	Popularity      *float64       `json:"popularity,omitempty"` // TMDB's daily popularity score
+	ReviewCount     *int           `json:"reviewCount,omitempty"`
+	Revenue         *int64         `json:"revenue,omitempty"` // box office takings, USD
+	Budget          *int64         `json:"budget,omitempty"`  // production budget, USD
+	ThumbnailURL    *string        `json:"thumbnailUrl,omitempty"`
 }
 
 // ImportItemDetails is the detail-panel payload, stored as JSONB and fetched lazily.

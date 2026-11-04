@@ -306,57 +306,58 @@ func creditToItem(f film, extra movieExtras, position int, summary string, fetch
 		ExternalID:      strconv.Itoa(c.ID),
 		DestinationType: domain.ContentTypeMovie,
 		CanonicalURL:    CanonicalMovieURL(c.ID),
-		Kind:            domain.ImportItemKindMovie,
 		Title:           c.Title,
+		Facts:           domain.ImportFacts{Kind: domain.ImportItemKindMovie},
 		Position:        position,
 		StatsFetchedAt:  fetched,
 	}
+	facts := &item.Facts
 	if extra.Tagline != "" {
 		tagline := extra.Tagline
-		item.Summary = &tagline
+		facts.Summary = &tagline
 	} else if summary != "" {
-		item.Summary = &summary
+		facts.Summary = &summary
 	}
 	if t, err := time.Parse("2006-01-02", c.ReleaseDate); err == nil {
-		item.PublishedAt = &t
+		facts.PublishedAt = &t
 	}
 	if extra.Runtime > 0 {
 		secs := extra.Runtime * 60
-		item.DurationSeconds = &secs
+		facts.DurationSeconds = &secs
 	}
 	// TMDB reports 0 for a film nobody has rated; that is "no rating", not a score of 0.
 	if c.VoteCount > 0 {
 		rating := c.VoteAverage
 		count := c.VoteCount
 		source := "TMDB"
-		item.Rating, item.RatingCount, item.RatingSource = &rating, &count, &source
+		facts.Rating, facts.RatingCount, facts.RatingSource = &rating, &count, &source
 	}
 	if c.PosterPath != "" {
 		poster := posterBase + c.PosterPath
-		item.ThumbnailURL = &poster
+		facts.ThumbnailURL = &poster
 	}
 	genres := make([]string, len(extra.Genres))
 	for i, g := range extra.Genres {
 		genres[i] = g.Name
 	}
-	item.Genres = genres
-	item.TopCast = extra.topCast()
+	facts.Genres = genres
+	facts.TopCast = extra.topCast()
 	// TMDB reports 0 for an unknown budget or box office; that is unknown, not $0.
 	if extra.Popularity > 0 {
 		p := extra.Popularity
-		item.Popularity = &p
+		facts.Popularity = &p
 	}
 	if extra.Budget > 0 {
 		b := extra.Budget
-		item.Budget = &b
+		facts.Budget = &b
 	}
 	if extra.Revenue > 0 {
 		r := extra.Revenue
-		item.Revenue = &r
+		facts.Revenue = &r
 	}
 	if extra.Reviews != nil {
 		n := extra.Reviews.TotalResults
-		item.ReviewCount = &n
+		facts.ReviewCount = &n
 	}
 	keywords := make([]string, 0, len(extra.Keywords.Keywords))
 	for _, k := range extra.Keywords.Keywords {

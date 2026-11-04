@@ -21,20 +21,14 @@ const importJobsUserFK = "import_jobs_user_fk"
 // importItemListColumns is every item column except details (the detail panel
 // fetches those lazily), plus the id of content with the same URL.
 const importItemListColumns = `i.id, i.job_id, i.source_id, i.external_id, i.destination_type, i.canonical_url,
-	i.kind, i.title, i.summary, i.published_at, i.duration_seconds, i.view_count, i.like_count,
-	i.comment_count, i.rating, i.rating_count, i.rating_source, i.chapter_count, i.has_captions, i.genres, i.top_cast,
-	i.popularity, i.review_count, i.revenue, i.budget,
-	i.thumbnail_url, i.position, i.excluded, i.stats_fetched_at, i.import_status, i.import_error, i.content_id,
+	i.title, i.facts, i.position, i.excluded, i.stats_fetched_at, i.import_status, i.import_error, i.content_id,
 	i.imported_at, i.created_at, i.updated_at, c.id AS library_content_id`
 
 // importItemUpsertColumns are refreshed when a candidate is staged again. The
 // import outcome columns are deliberately absent so a re-list never forgets
 // what was imported.
 var importItemUpsertColumns = []string{
-	"title", "summary", "published_at", "duration_seconds", "view_count", "like_count",
-	"comment_count", "rating", "rating_count", "rating_source", "chapter_count", "has_captions", "genres", "top_cast",
-	"popularity", "review_count", "revenue", "budget",
-	"thumbnail_url", "position", "details", "stats_fetched_at", "kind", "updated_at",
+	"title", "facts", "position", "details", "stats_fetched_at", "updated_at",
 }
 
 // GormImportJobRepository implements repositories.ImportJobRepository using GORM
@@ -261,7 +255,7 @@ func (r *GormImportJobRepository) ListItems(ctx context.Context, jobID int) ([]*
 		Scan(&models).Error; err != nil {
 		return nil, fmt.Errorf("failed to list import items: %w", err)
 	}
-	return importItemModelsToDomain(models), nil
+	return importItemModelsToDomain(models)
 }
 
 // GetItemsByIDs returns the rows of jobID among ids.
@@ -276,7 +270,7 @@ func (r *GormImportJobRepository) GetItemsByIDs(ctx context.Context, jobID int, 
 		Scan(&models).Error; err != nil {
 		return nil, fmt.Errorf("failed to get import items: %w", err)
 	}
-	return importItemModelsToDomain(models), nil
+	return importItemModelsToDomain(models)
 }
 
 // GetItemWithDetails returns one row and decodes its details payload.
@@ -292,7 +286,11 @@ func (r *GormImportJobRepository) GetItemWithDetails(ctx context.Context, itemID
 	if len(models) == 0 {
 		return nil, fmt.Errorf("%w: import item %d", domain.ErrNotFound, itemID)
 	}
-	out := &domain.ImportItemWithDetails{Item: *importItemModelToDomain(&models[0])}
+	item, err := importItemModelToDomain(&models[0])
+	if err != nil {
+		return nil, err
+	}
+	out := &domain.ImportItemWithDetails{Item: *item}
 	if len(models[0].Details) > 0 {
 		if err := json.Unmarshal(models[0].Details, &out.Details); err != nil {
 			return nil, fmt.Errorf("failed to decode import item details: %w", err)
@@ -403,10 +401,14 @@ func (r *GormImportJobRepository) ReassignByUser(ctx context.Context, fromUserID
 	return nil
 }
 
-func importItemModelsToDomain(models []ImportItemModel) []*domain.ImportItem {
+func importItemModelsToDomain(models []ImportItemModel) ([]*domain.ImportItem, error) {
 	out := make([]*domain.ImportItem, len(models))
 	for i := range models {
-		out[i] = importItemModelToDomain(&models[i])
+		it, err := importItemModelToDomain(&models[i])
+		if err != nil {
+			return nil, err
+		}
+		out[i] = it
 	}
-	return out
+	return out, nil
 }

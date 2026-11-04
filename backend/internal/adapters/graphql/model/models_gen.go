@@ -254,28 +254,10 @@ type ImportItem struct {
 	ID              string                   `json:"id"`
 	SourceID        string                   `json:"sourceId"`
 	DestinationType domain.ContentType       `json:"destinationType"`
-	Kind            domain.ImportItemKind    `json:"kind"`
 	ExternalID      string                   `json:"externalId"`
 	URL             string                   `json:"url"`
 	Title           string                   `json:"title"`
-	Summary         *string                  `json:"summary,omitempty"`
-	PublishedAt     *string                  `json:"publishedAt,omitempty"`
-	DurationSeconds *int                     `json:"durationSeconds,omitempty"`
-	ViewCount       *float64                 `json:"viewCount,omitempty"`
-	LikeCount       *float64                 `json:"likeCount,omitempty"`
-	CommentCount    *float64                 `json:"commentCount,omitempty"`
-	Rating          *float64                 `json:"rating,omitempty"`
-	RatingCount     *int                     `json:"ratingCount,omitempty"`
-	RatingSource    *string                  `json:"ratingSource,omitempty"`
-	ChapterCount    int                      `json:"chapterCount"`
-	HasCaptions     *bool                    `json:"hasCaptions,omitempty"`
-	Genres          []string                 `json:"genres"`
-	TopCast         []string                 `json:"topCast"`
-	Popularity      *float64                 `json:"popularity,omitempty"`
-	ReviewCount     *int                     `json:"reviewCount,omitempty"`
-	Revenue         *float64                 `json:"revenue,omitempty"`
-	Budget          *float64                 `json:"budget,omitempty"`
-	ThumbnailURL    *string                  `json:"thumbnailUrl,omitempty"`
+	Facts           map[string]any           `json:"facts"`
 	Excluded        bool                     `json:"excluded"`
 	Position        int                      `json:"position"`
 	StatsFetchedAt  string                   `json:"statsFetchedAt"`

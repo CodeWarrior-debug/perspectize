@@ -297,7 +297,7 @@ func candidate(ext string, dest domain.ContentType) *domain.ImportItemWithDetail
 	if dest == domain.ContentTypeMovie {
 		url = "https://www.themoviedb.org/movie/" + ext
 	}
-	return &domain.ImportItemWithDetails{Item: domain.ImportItem{ExternalID: ext, DestinationType: dest, CanonicalURL: url, Kind: domain.ImportItemKindVideo, Title: ext}}
+	return &domain.ImportItemWithDetails{Item: domain.ImportItem{ExternalID: ext, DestinationType: dest, CanonicalURL: url, Title: ext, Facts: domain.ImportFacts{Kind: domain.ImportItemKindVideo}}}
 }
 
 // fakeCreator records content creation; urls in exists report ErrAlreadyExists, in fail fail.
