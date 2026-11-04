@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import SignInTrigger from '$lib/components/auth/SignInTrigger.svelte';
+	import ImportDescription from '$lib/components/imports/ImportDescription.svelte';
 	import ImportJobActions from '$lib/components/imports/ImportJobActions.svelte';
 	import ImportJobStatus from '$lib/components/imports/ImportJobStatus.svelte';
 	import ImportListingProgress from '$lib/components/imports/ImportListingProgress.svelte';
@@ -45,6 +46,7 @@
 			<a class="text-muted-foreground text-sm hover:underline" href="/import">← Imports</a>
 			<h1 class="text-2xl font-semibold tracking-tight">{job.name}</h1>
 			<ImportJobStatus {job} />
+			<ImportDescription {job} />
 			<ImportSourceList sources={job.sources} />
 			<ImportJobActions {job} isAdmin={me.isAdmin} />
 		</header>

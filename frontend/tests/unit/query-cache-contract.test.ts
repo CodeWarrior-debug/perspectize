@@ -163,7 +163,7 @@ describe('eviction: useSetPassageDisplayTitle.onSuccess patches in place, evicts
 	it('updates only that passage in cached lists/rows and invalidates no entry', async () => {
 		const listKey = queryKeys.content.list({ first: 50 });
 		const rowKey = queryKeys.content.row('3');
-		const aggregatesKey = queryKeys.content.detail('3');
+		const aggregatesKey = queryKeys.content.aggregates('3', null);
 		const otherRowKey = queryKeys.content.row('4');
 		const unrelated = [
 			queryKeys.perspectives.listByContent(3),
