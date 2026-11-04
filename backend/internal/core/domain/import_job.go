@@ -256,3 +256,23 @@ type ImportProgress struct {
 	Running   bool
 	UpdatedAt time.Time
 }
+
+// ImportSourceListingProgress is how far one source's listing has got. Staged
+// counts rows upserted so far; Batches counts the batches they came in.
+type ImportSourceListingProgress struct {
+	SourceID int
+	Staged   int
+	Batches  int
+	Status   ImportSourceStatus
+}
+
+// ImportListingProgress is a live view of an import's sources being listed,
+// kept in memory and pushed to admins while the sheet is still filling.
+type ImportListingProgress struct {
+	JobID int
+	// Sources are ordered by SourceID.
+	Sources []ImportSourceListingProgress
+	// Listing is true while any source is still LISTING.
+	Listing   bool
+	UpdatedAt time.Time
+}

@@ -84,6 +84,9 @@ type harness struct {
 
 	// contentService is the harness's ContentService, shared with the import service.
 	contentService func() *services.ContentService
+	// importService is the harness's ImportService, for subscriptions (which
+	// don't go through the HTTP handler).
+	importService *services.ImportService
 	// background holds import work (listing, imports) collected instead of run.
 	background []func()
 }
@@ -153,6 +156,7 @@ func newHarnessWithPool(t *testing.T, pool database.PoolConfig) *harness {
 		map[domain.ImportSourceType]portservices.ImportSourceLister{domain.ImportSourceYouTubeChannel: staticLister{}},
 		h.contentService(),
 		services.WithImportSpawn(func(f func()) { h.background = append(h.background, f) }))
+	h.importService = importService
 
 	deps := server.Deps{
 		ContentService:     h.contentService(),

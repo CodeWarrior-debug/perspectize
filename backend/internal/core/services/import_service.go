@@ -49,6 +49,8 @@ type ImportService struct {
 	workers  int
 	now      func() time.Time
 	progress *importProgressTracker
+	// listing is the source-listing progress admins watch while sheets fill.
+	listing *listingTracker
 	// progressInterval is how often live progress is pushed (tests shorten it).
 	progressInterval time.Duration
 }
@@ -102,6 +104,7 @@ func NewImportService(
 		opt(s)
 	}
 	s.progress = newImportProgressTracker(s.progressInterval, s.now)
+	s.listing = newListingTracker(s.progressInterval, s.now)
 	return s
 }
 
@@ -385,6 +388,7 @@ func (s *ImportService) resolveForListing(ctx context.Context, src *domain.Impor
 func (s *ImportService) listSource(src *domain.ImportSource, rs resolvedSource) {
 	ctx, cancel := context.WithTimeout(s.bg, listingTimeout)
 	defer cancel()
+	s.listing.begin(src.JobID, src.ID)
 
 	batches := make(chan []*domain.ImportItemWithDetails, 2)
 	listErr := make(chan error, 1)
@@ -415,6 +419,7 @@ func (s *ImportService) listSource(src *domain.ImportSource, rs resolvedSource) 
 			continue
 		}
 		count += len(batch)
+		s.listing.staged(src.JobID, src.ID, len(batch))
 		progress := count
 		if err := s.repo.UpdateSource(ctx, src.ID, repositories.ImportSourceUpdate{Status: domain.ImportSourceStatusListing, ItemCount: &progress}); err != nil {
 			slog.Warn("import listing progress not saved", "sourceID", src.ID, "error", err)
@@ -438,6 +443,7 @@ func (s *ImportService) listSource(src *domain.ImportSource, rs resolvedSource) 
 	if werr := s.repo.UpdateSource(writeCtx, src.ID, final); werr != nil {
 		slog.Error("import listing result not saved", "sourceID", src.ID, "error", werr)
 	}
+	s.listing.finish(src.JobID, src.ID, final.Status)
 }
 
 // listingFailureDetail is the user-facing reason a listing stopped.
@@ -633,6 +639,19 @@ func (s *ImportService) SubscribeImportProgress(ctx context.Context, actor *doma
 		return nil, err
 	}
 	return s.progress.subscribe(ctx, jobID), nil
+}
+
+// SubscribeListingProgress streams an import's source listing progress: the
+// current state at once, then changes while sources list, until ctx ends.
+// Admin only: the listing is staff's view of a sheet that is still filling.
+func (s *ImportService) SubscribeListingProgress(ctx context.Context, actor *domain.AuthenticatedUser, jobID int) (<-chan domain.ImportListingProgress, error) {
+	if !isImportAdmin(actor) {
+		return nil, fmt.Errorf("%w: only an admin may watch listing progress", domain.ErrForbidden)
+	}
+	if _, err := s.repo.GetJob(ctx, jobID); err != nil {
+		return nil, err
+	}
+	return s.listing.subscribe(ctx, jobID), nil
 }
 
 // formatThousands writes n with comma separators ("1,000").

@@ -61,6 +61,12 @@ type ImportService interface {
 	// rows import. domain.ErrNotFound for an unknown import.
 	SubscribeImportProgress(ctx context.Context, actor *domain.AuthenticatedUser, jobID int) (<-chan domain.ImportProgress, error)
 
+	// SubscribeListingProgress streams an import's source listing progress
+	// until ctx ends: the current state at once, then changes while sources
+	// list. Admin only (domain.ErrForbidden); domain.ErrNotFound for an
+	// unknown import.
+	SubscribeListingProgress(ctx context.Context, actor *domain.AuthenticatedUser, jobID int) (<-chan domain.ImportListingProgress, error)
+
 	// RecoverInterrupted fails work a restart cut short (sources still
 	// listing, rows still queued). Called once at startup.
 	RecoverInterrupted(ctx context.Context) error

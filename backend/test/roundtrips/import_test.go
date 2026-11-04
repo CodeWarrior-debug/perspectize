@@ -3,6 +3,7 @@ package roundtrips
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -290,4 +291,35 @@ func TestImportExcludeAndCloseRoundTrips(t *testing.T) {
 	assert.Equal(t, "null", string(hidden["importJob"]), "a closed import is hidden from a non-admin")
 	msg := h.gqlError(token, setExcludedMutation, map[string]any{"input": map[string]any{"jobId": job.ID, "itemIds": ids, "excluded": false}})
 	assert.Contains(t, msg, "closed")
+}
+
+// TestImportListingProgressRoundTrips pins the admin's listing-progress
+// subscription: opening it costs one statement (the import's existence check),
+// and a non-admin is refused before any statement runs. The subscription
+// doesn't go through the HTTP handler, so the count is taken on the service.
+func TestImportListingProgressRoundTrips(t *testing.T) {
+	h := newHarness(t)
+	adminID, adminToken := adminUser(t, h, "imp-lp")
+	job := createRoundTripImport(t, h, adminToken)
+	userID, _ := h.user("imp-lpu")
+	jobID, err := strconv.Atoi(job.ID)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	h.counter.Reset()
+	_, err = h.importService.SubscribeListingProgress(ctx, &domain.AuthenticatedUser{ID: userID, Role: domain.UserRoleDefault}, jobID)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+	assert.Empty(t, h.counter.Statements(), "a non-admin is refused before the database is asked")
+
+	h.counter.Reset()
+	ch, err := h.importService.SubscribeListingProgress(ctx, &domain.AuthenticatedUser{ID: adminID, Role: domain.UserRoleAdmin}, jobID)
+	require.NoError(t, err)
+	assert.Len(t, h.counter.Statements(), 1, "one statement: the import's existence check")
+	first := <-ch
+	assert.Equal(t, jobID, first.JobID)
+	require.Len(t, first.Sources, 1, "the listing ran inline: its source is already known")
+	assert.Equal(t, domain.ImportSourceStatusReady, first.Sources[0].Status)
+	assert.Equal(t, 30, first.Sources[0].Staged)
 }

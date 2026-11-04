@@ -1074,3 +1074,21 @@ func importProgressToModel(p domain.ImportProgress) *model.ImportProgress {
 		UpdatedAt: isoTime(p.UpdatedAt),
 	}
 }
+
+func importListingProgressToModel(p domain.ImportListingProgress) *model.ImportListingProgress {
+	sources := make([]*model.ImportSourceListingProgress, len(p.Sources))
+	for i, src := range p.Sources {
+		sources[i] = &model.ImportSourceListingProgress{
+			SourceID: strconv.Itoa(src.SourceID),
+			Staged:   src.Staged,
+			Batches:  src.Batches,
+			Status:   src.Status,
+		}
+	}
+	return &model.ImportListingProgress{
+		JobID:     strconv.Itoa(p.JobID),
+		Listing:   p.Listing,
+		Sources:   sources,
+		UpdatedAt: isoTime(p.UpdatedAt),
+	}
+}

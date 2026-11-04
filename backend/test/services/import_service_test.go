@@ -933,3 +933,117 @@ func TestImportService_ARequestCannotBeImportedFrom(t *testing.T) {
 	_, err = svc.SetItemsExcluded(context.Background(), importUser, job.ID, []int{1}, true)
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }
+
+// gatedLister emits its first batch, then waits on gate before the rest, so a
+// test can watch a source part-way through its listing.
+type gatedLister struct {
+	fakeLister
+	gate chan struct{}
+}
+
+func (l *gatedLister) List(_ context.Context, _ portservices.ResolvedImportSource, _ *domain.ImportPersonRole, emit portservices.ImportBatchFunc) error {
+	for i, b := range l.batches {
+		if i == 1 {
+			<-l.gate
+		}
+		if err := emit(b); err != nil {
+			return err
+		}
+	}
+	return l.listErr
+}
+
+// listingUntil receives listing snapshots until one satisfies done.
+func listingUntil(t *testing.T, ch <-chan domain.ImportListingProgress, done func(domain.ImportListingProgress) bool) domain.ImportListingProgress {
+	t.Helper()
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case p, ok := <-ch:
+			require.True(t, ok, "closed before the wanted snapshot")
+			if done(p) {
+				return p
+			}
+		case <-deadline:
+			t.Fatal("wanted listing snapshot never published")
+			return domain.ImportListingProgress{}
+		}
+	}
+}
+
+func TestSubscribeListingProgress_NonAdminForbidden(t *testing.T) {
+	svc := newImportService(newFakeImportRepo(), &fakeLister{}, nil, &fakeCreator{})
+	_, err := svc.SubscribeListingProgress(context.Background(), importUser, 1)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+	_, err = svc.SubscribeListingProgress(context.Background(), nil, 1)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+func TestSubscribeListingProgress_UnknownJobNotFound(t *testing.T) {
+	svc := newImportService(newFakeImportRepo(), &fakeLister{}, nil, &fakeCreator{})
+	_, err := svc.SubscribeListingProgress(context.Background(), importAdmin, 999)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func TestListSource_PublishesStagedCountsThenReady(t *testing.T) {
+	repo := newFakeImportRepo()
+	gate := make(chan struct{})
+	yt := &gatedLister{
+		fakeLister: fakeLister{batches: [][]*domain.ImportItemWithDetails{
+			{candidate("a", domain.ContentTypeYouTubeVideo), candidate("b", domain.ContentTypeYouTubeVideo)},
+			{candidate("c", domain.ContentTypeYouTubeVideo)},
+		}},
+		gate: gate,
+	}
+	listers := map[domain.ImportSourceType]portservices.ImportSourceLister{domain.ImportSourceYouTubeChannel: yt}
+	// Spawned work runs in a goroutine, as in production, so the listing is
+	// still in progress when the admin subscribes.
+	svc := services.NewImportService(repo, listers, &fakeCreator{},
+		services.WithImportSpawn(func(f func()) { go f() }), fixedNow, services.WithImportProgressInterval(5*time.Millisecond))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	job, err := svc.CreateImportJob(ctx, importAdmin, domain.CreateImportJobInput{
+		Name: "x", Sources: []domain.CreateImportSourceInput{{SourceType: domain.ImportSourceYouTubeChannel, Ref: "@x"}},
+	})
+	require.NoError(t, err)
+	srcID := job.Sources[0].ID
+
+	ch, err := svc.SubscribeListingProgress(ctx, importAdmin, job.ID)
+	require.NoError(t, err)
+	// The first batch is staged; the gate holds the second back until we've seen that.
+	mid := listingUntil(t, ch, func(p domain.ImportListingProgress) bool {
+		return len(p.Sources) == 1 && p.Sources[0].Staged == 2
+	})
+	assert.True(t, mid.Listing)
+	assert.Equal(t, 1, mid.Sources[0].Batches)
+	assert.Equal(t, domain.ImportSourceStatusListing, mid.Sources[0].Status)
+
+	close(gate)
+	end := listingUntil(t, ch, func(p domain.ImportListingProgress) bool { return !p.Listing })
+	assert.Equal(t, []domain.ImportSourceListingProgress{
+		{SourceID: srcID, Staged: 3, Batches: 2, Status: domain.ImportSourceStatusReady},
+	}, end.Sources)
+}
+
+func TestListSource_FailurePublishesFailed(t *testing.T) {
+	repo := newFakeImportRepo()
+	yt := &fakeLister{
+		batches: [][]*domain.ImportItemWithDetails{{candidate("a", domain.ContentTypeYouTubeVideo)}},
+		listErr: fmt.Errorf("%w: status 403", domain.ErrYouTubeAPI),
+	}
+	svc := newImportService(repo, yt, nil, &fakeCreator{}) // listing runs inline, so it has finished by subscribe time
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	job, err := svc.CreateImportJob(ctx, importAdmin, domain.CreateImportJobInput{
+		Name: "x", Sources: []domain.CreateImportSourceInput{{SourceType: domain.ImportSourceYouTubeChannel, Ref: "@x"}},
+	})
+	require.NoError(t, err)
+	ch, err := svc.SubscribeListingProgress(ctx, importAdmin, job.ID)
+	require.NoError(t, err)
+	p := listingUntil(t, ch, func(p domain.ImportListingProgress) bool { return !p.Listing && len(p.Sources) == 1 })
+	assert.Equal(t, []domain.ImportSourceListingProgress{
+		{SourceID: job.Sources[0].ID, Staged: 1, Batches: 1, Status: domain.ImportSourceStatusFailed},
+	}, p.Sources)
+}

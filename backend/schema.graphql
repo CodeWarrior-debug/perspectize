@@ -684,9 +684,27 @@ type ImportProgress {
   updatedAt: String!
 }
 
+# Admin-only: how far each source's listing has got, pushed while sheets fill.
+type ImportSourceListingProgress {
+  sourceId: ID!
+  staged: Int!
+  batches: Int!
+  status: ImportSourceStatus!
+}
+
+# Admin-only live view of an import's sources being listed.
+type ImportListingProgress {
+  jobId: ID!
+  listing: Boolean!
+  sources: [ImportSourceListingProgress!]!
+  updatedAt: String!
+}
+
 extend type Subscription {
   # The current count at once, then every change while the import runs.
   importProgress(jobId: ID!): ImportProgress! @auth
+  # Admin only. The current state at once, then every change while sources list.
+  importListingProgress(jobId: ID!): ImportListingProgress! @auth
 }
 
 input ReviewImportJobInput {

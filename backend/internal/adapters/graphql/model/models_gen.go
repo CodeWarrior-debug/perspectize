@@ -309,6 +309,13 @@ type ImportJob struct {
 	RequesterUserID int                        `json:"-"`
 }
 
+type ImportListingProgress struct {
+	JobID     string                         `json:"jobId"`
+	Listing   bool                           `json:"listing"`
+	Sources   []*ImportSourceListingProgress `json:"sources"`
+	UpdatedAt string                         `json:"updatedAt"`
+}
+
 type ImportPerson struct {
 	Name string `json:"name"`
 	Role string `json:"role"`
@@ -337,6 +344,13 @@ type ImportSource struct {
 	StatusDetail    *string                   `json:"statusDetail,omitempty"`
 	ItemCount       int                       `json:"itemCount"`
 	FetchedAt       *string                   `json:"fetchedAt,omitempty"`
+}
+
+type ImportSourceListingProgress struct {
+	SourceID string                    `json:"sourceId"`
+	Staged   int                       `json:"staged"`
+	Batches  int                       `json:"batches"`
+	Status   domain.ImportSourceStatus `json:"status"`
 }
 
 type InboxEvent struct {
