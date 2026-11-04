@@ -294,7 +294,7 @@ func TestImportExcludeAndCloseRoundTrips(t *testing.T) {
 }
 
 // TestImportListingProgressRoundTrips pins the admin's listing-progress
-// subscription: opening it costs one statement (the import's existence check),
+// subscription: opening it costs two statements (the import row, then its sources),
 // and a non-admin is refused before any statement runs. The subscription
 // doesn't go through the HTTP handler, so the count is taken on the service.
 func TestImportListingProgressRoundTrips(t *testing.T) {
@@ -316,7 +316,7 @@ func TestImportListingProgressRoundTrips(t *testing.T) {
 	h.counter.Reset()
 	ch, err := h.importService.SubscribeListingProgress(ctx, &domain.AuthenticatedUser{ID: adminID, Role: domain.UserRoleAdmin}, jobID)
 	require.NoError(t, err)
-	assert.Len(t, h.counter.Statements(), 1, "one statement: the import's existence check")
+	assert.Len(t, h.counter.Statements(), 2, "two statements: the import row and its sources (GetJob)")
 	first := <-ch
 	assert.Equal(t, jobID, first.JobID)
 	require.Len(t, first.Sources, 1, "the listing ran inline: its source is already known")
