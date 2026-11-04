@@ -2,6 +2,7 @@ import type { ColDef, IDateFilterParams, ValueFormatterParams } from '@ag-grid-c
 import type { ImportDestinationType, ImportFactValue, ImportItem, ImportSource } from '$lib/queries/imports';
 import { EMPTY_VALUE, formatCount, formatCountExact, formatDurationSeconds, typeCellRenderer } from './formatting';
 import { contentTypeLabel } from './grid-config';
+import { sanitizeHtml } from './sanitize';
 
 /**
  * Import staging sheet: pure column, filter and selection logic, kept out of
@@ -203,6 +204,43 @@ export function formatTotalTime(seconds: number): string {
 	if (seconds <= 0) return '';
 	if (seconds < 3600) return `about ${Math.max(1, Math.round(seconds / 60))} min`;
 	return `about ${Math.round(seconds / 3600)} h`;
+}
+
+// ---------------------------------------------------------------------------
+// Request description
+// ---------------------------------------------------------------------------
+
+/**
+ * The visible text of a request description, counted the way the server counts
+ * it: sanitized (scripts and their text are dropped), tags removed, entities
+ * decoded, NBSP and spaces trimmed. "<p></p>" and "<p>&nbsp;</p>" have none.
+ */
+export function descriptionText(html: string | null | undefined): string {
+	if (!html) return '';
+	const doc = new DOMParser().parseFromString(sanitizeHtml(html), 'text/html');
+	return (doc.body.textContent ?? '').replace(/\s+/g, ' ').trim();
+}
+
+/** Does the description have any visible text? An empty editor does not. */
+export function hasDescriptionText(html: string | null | undefined): boolean {
+	return descriptionText(html).length > 0;
+}
+
+/**
+ * A source row is filled when its reference has visible characters. A blank row
+ * is dropped on submit and never blocks it; a filled row is always sent.
+ */
+export function isSourceFilled(ref: string): boolean {
+	return ref.trim() !== '';
+}
+
+/** Only the requester can edit the description, and never once the import is closed. */
+export function canEditImportDescription(
+	job: { requestedBy: { id: string } | null; closedAt: string | null },
+	meId: string | null | undefined,
+): boolean {
+	if (job.closedAt || !meId || !job.requestedBy) return false;
+	return String(job.requestedBy.id) === String(meId);
 }
 
 // ---------------------------------------------------------------------------

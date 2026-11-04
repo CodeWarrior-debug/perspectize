@@ -19,7 +19,11 @@ import {
 import { importJobIsBusy, useImportJob } from '$lib/queries/imports/useImportJob';
 import { importItemsOnSuccess } from '$lib/queries/imports/useImportItems';
 import { useImportJobs } from '$lib/queries/imports/useImportJobs';
-import { createImportJobOnSuccess, importJobChangedOnSuccess } from '$lib/queries/imports/useImportJobMutations';
+import {
+	createImportJobOnSuccess,
+	importJobChangedOnSuccess,
+	updateImportJobDescriptionOnSuccess,
+} from '$lib/queries/imports/useImportJobMutations';
 import { patchExcluded } from '$lib/queries/imports/useSetImportItemsExcluded';
 import { useImportItemDetails } from '$lib/queries/imports/useImportItemDetails';
 import { graphqlRequest } from '$lib/queries/client';
@@ -88,6 +92,7 @@ function job(overrides: Partial<ImportJob> = {}): ImportJob {
 		reviewNote: null,
 		reviewedAt: null,
 		closedAt: null,
+		description: null,
 		createdAt: '2026-10-27T12:00:00Z',
 		updatedAt: '2026-10-27T12:00:00Z',
 		sources: [
@@ -369,5 +374,36 @@ describe('useImportListingProgress', () => {
 
 		unmount();
 		expect(ws.dispose, 'the job-8 subscription is closed on unmount').toHaveBeenCalledTimes(2);
+	});
+});
+
+describe('eviction: editing a request description', () => {
+	it("evicts every imports list and that import's sheet, nothing else", async () => {
+		const affected = [queryKeys.imports.list(false), queryKeys.imports.list(true), queryKeys.imports.detail('7')];
+		const untouched = [
+			queryKeys.imports.detail('8'),
+			queryKeys.imports.itemDetails('1'),
+			queryKeys.content.list({ first: 50 }),
+		];
+		for (const k of [...affected, ...untouched]) seed(client, k);
+
+		await updateImportJobDescriptionOnSuccess(client, '7');
+
+		const outcome = invalidationOutcome(client, [...affected, ...untouched]);
+		expect(outcome.invalidated).toEqual(affected);
+		expect(outcome.untouched).toEqual(untouched);
+	});
+
+	it("keeps the cached sheet's sources and rows: the mutation's own result (sources: []) is never written over it", async () => {
+		const sheet = job({ items: [item({ id: '1' })] });
+		client.setQueryData(queryKeys.imports.detail('7'), { importJob: sheet });
+		const before = client.getQueryData<ImportJobResponse>(queryKeys.imports.detail('7'));
+
+		await updateImportJobDescriptionOnSuccess(client, '7');
+
+		const after = client.getQueryData<ImportJobResponse>(queryKeys.imports.detail('7'));
+		expect(after).toBe(before);
+		expect(after?.importJob?.sources).toHaveLength(1);
+		expect(after?.importJob?.items).toHaveLength(1);
 	});
 });

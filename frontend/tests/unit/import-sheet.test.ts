@@ -3,7 +3,11 @@ import type { ImportFacts, ImportItem, ImportSource } from '$lib/queries/imports
 import { EMPTY_VALUE } from '$lib/utils/formatting';
 import {
 	buildImportColumnDefs,
+	canEditImportDescription,
+	descriptionText,
 	destinationCellRenderer,
+	hasDescriptionText,
+	isSourceFilled,
 	factColumnDef,
 	factKeys,
 	factTooltip,
@@ -26,6 +30,40 @@ import {
 	unavailableNote,
 	type ImportRow,
 } from '$lib/utils/import-sheet';
+
+describe('import request description', () => {
+	it('counts only visible text: tags, empty paragraphs, NBSP and scripts do not count', () => {
+		expect(descriptionText('<p></p>')).toBe('');
+		expect(descriptionText('<p><br></p>')).toBe('');
+		expect(descriptionText('<p>&nbsp;</p>')).toBe('');
+		expect(descriptionText('<p>&nbsp; &nbsp;</p>')).toBe('');
+		expect(descriptionText('<p><img src="https://example.com/a.png"></p>')).toBe('');
+		expect(descriptionText('<script>alert(1)</script><p> </p>')).toBe('');
+		expect(descriptionText(null)).toBe('');
+		expect(descriptionText('<p> Hello &amp; bye </p>')).toBe('Hello & bye');
+	});
+
+	it('has description text only when the visible text is non-empty', () => {
+		expect(hasDescriptionText('<p></p>')).toBe(false);
+		expect(hasDescriptionText('<p>&nbsp;</p>')).toBe(false);
+		expect(hasDescriptionText('<p>Gaither channels</p>')).toBe(true);
+	});
+
+	it('a source is filled when its reference has visible characters; blank rows are not', () => {
+		expect(isSourceFilled('@GaitherMusic')).toBe(true);
+		expect(isSourceFilled('   ')).toBe(false);
+		expect(isSourceFilled('')).toBe(false);
+	});
+
+	it('only the requester can edit, and never a closed import', () => {
+		const job = { requestedBy: { id: '2' }, closedAt: null };
+		expect(canEditImportDescription(job, '2')).toBe(true);
+		expect(canEditImportDescription(job, '3'), 'an admin who is not the requester').toBe(false);
+		expect(canEditImportDescription(job, null), 'signed out or me not loaded').toBe(false);
+		expect(canEditImportDescription({ requestedBy: null, closedAt: null }, '2')).toBe(false);
+		expect(canEditImportDescription({ requestedBy: { id: '2' }, closedAt: '2026-11-01T00:00:00Z' }, '2')).toBe(false);
+	});
+});
 
 const videoFacts: ImportFacts = {
 	kind: 'VIDEO',

@@ -2,6 +2,7 @@
 	import PageWrapper from '$lib/components/PageWrapper.svelte';
 	import SignInTrigger from '$lib/components/auth/SignInTrigger.svelte';
 	import ImportJobActions from '$lib/components/imports/ImportJobActions.svelte';
+	import ImportDescription from '$lib/components/imports/ImportDescription.svelte';
 	import ImportJobStatus from '$lib/components/imports/ImportJobStatus.svelte';
 	import ImportListingProgress from '$lib/components/imports/ImportListingProgress.svelte';
 	import ImportRequestForm from '$lib/components/imports/ImportRequestForm.svelte';
@@ -104,6 +105,7 @@
 								<span class="text-lg font-semibold">{job.name}</span>
 							{/if}
 							<ImportJobStatus {job} />
+							<ImportDescription {job} />
 							{#if job.requestStatus === 'APPROVED'}
 								<p class="text-muted-foreground text-sm">
 									{job.sources.reduce((n, s) => n + s.itemCount, 0)} rows from {job.sources.length}

@@ -98,6 +98,11 @@ export interface ImportJobSummary {
 	reviewedAt: string | null;
 	/** Set when an admin closed it (hidden from non-admins, read-only). */
 	closedAt: string | null;
+	/**
+	 * The requester's description of the request (sanitized HTML, or null): the
+	 * nuance the source names don't carry. Only the requester can edit it.
+	 */
+	description: string | null;
 	createdAt: string;
 	updatedAt: string;
 	sources: ImportSource[];
@@ -245,6 +250,7 @@ const IMPORT_JOB_FIELDS = gql`
 		reviewNote
 		reviewedAt
 		closedAt
+		description
 		createdAt
 		updatedAt
 		sources {
@@ -338,6 +344,21 @@ export const CLOSE_IMPORT_JOB = gql`
 	}
 `;
 
+/**
+ * Requester only, and not once the import is closed. Returns the import's id,
+ * description and updatedAt only: its sources come back empty, so the result is
+ * never written over a cached sheet (the cache evicts instead).
+ */
+export const UPDATE_IMPORT_JOB_DESCRIPTION = gql`
+	mutation UpdateImportJobDescription($input: UpdateImportJobDescriptionInput!) {
+		updateImportJobDescription(input: $input) {
+			id
+			description
+			updatedAt
+		}
+	}
+`;
+
 export const SET_IMPORT_ITEMS_EXCLUDED = gql`
 	mutation SetImportItemsExcluded($input: SetImportItemsExcludedInput!) {
 		setImportItemsExcluded(input: $input)
@@ -396,6 +417,10 @@ export interface ReviewImportJobResponse {
 
 export interface CloseImportJobResponse {
 	closeImportJob: ImportJobSummary;
+}
+
+export interface UpdateImportJobDescriptionResponse {
+	updateImportJobDescription: { id: string; description: string | null; updatedAt: string };
 }
 
 export interface SetImportItemsExcludedResponse {

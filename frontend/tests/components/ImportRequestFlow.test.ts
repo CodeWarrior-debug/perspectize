@@ -14,6 +14,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('svelte-sonner', () => ({ toast: mocks.toast }));
+vi.mock('$lib/components/CommentsEditor.svelte', async () => {
+	const mod = await import('../helpers/FakeCommentsEditor.svelte');
+	return { default: mod.default };
+});
 vi.mock('$lib/queries/imports/useImportJobMutations', () => ({
 	useCreateImportJob: () => ({ mutateAsync: mocks.create, isPending: false }),
 	useReviewImportJob: () => ({ mutateAsync: mocks.review, isPending: false }),
@@ -36,6 +40,7 @@ function job(overrides: Partial<ImportJobSummary> = {}): ImportJobSummary {
 		reviewNote: null,
 		reviewedAt: null,
 		closedAt: null,
+		description: null,
 		createdAt: '2026-10-29T12:00:00Z',
 		updatedAt: '2026-10-29T12:00:00Z',
 		sources: [],
@@ -65,6 +70,7 @@ describe('ImportRequestForm', () => {
 
 		expect(mocks.create).toHaveBeenCalledWith({
 			name: 'Gaither',
+			description: null,
 			sources: [
 				{ sourceType: 'YOUTUBE_CHANNEL', ref: '@GaitherMusic', role: null },
 				{ sourceType: 'TMDB_PERSON', ref: 'Bill Gaither', role: null },
@@ -96,6 +102,71 @@ describe('ImportRequestForm', () => {
 		expect(start).toBeDisabled();
 		await fireEvent.input(screen.getByLabelText('Source 1'), { target: { value: '@x' } });
 		expect(start).toBeEnabled();
+	});
+
+	it('a description alone enables Submit, and the request goes with no sources', async () => {
+		mocks.create.mockResolvedValue({ createImportJob: job({ requestStatus: 'REQUESTED' }) });
+		render(ImportRequestForm, { props: { isAdmin: false } });
+		await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Peterson' } });
+		const send = screen.getByRole('button', { name: 'Send request' });
+		expect(send).toBeDisabled();
+		await fireEvent.input(screen.getByLabelText('Comment'), {
+			target: { value: '<p>Lectures from the 2017 course</p>' },
+		});
+		expect(send).toBeEnabled();
+		await fireEvent.click(send);
+		expect(mocks.create).toHaveBeenCalledWith({
+			name: 'Peterson',
+			description: '<p>Lectures from the 2017 course</p>',
+			sources: [],
+		});
+	});
+
+	it('an empty editor (<p></p>) is no description: Submit stays disabled with only a name', async () => {
+		render(ImportRequestForm, { props: { isAdmin: true } });
+		await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Nolan' } });
+		await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p></p>' } });
+		expect(screen.getByRole('button', { name: 'Start import' })).toBeDisabled();
+		await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>&nbsp;</p>' } });
+		expect(screen.getByRole('button', { name: 'Start import' })).toBeDisabled();
+	});
+
+	it('a description with no visible text is sent as null, and a blank source row is dropped, not sent', async () => {
+		mocks.create.mockResolvedValue({ createImportJob: job({ requestStatus: 'REQUESTED' }) });
+		render(ImportRequestForm, { props: { isAdmin: false } });
+		await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Gaither' } });
+		await fireEvent.input(screen.getByLabelText('Source 1'), { target: { value: '@GaitherMusic' } });
+		await fireEvent.click(screen.getByRole('button', { name: /Add a source/ }));
+		await fireEvent.input(screen.getByLabelText('Comment'), { target: { value: '<p>&nbsp;</p>' } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
+		expect(mocks.create).toHaveBeenCalledWith({
+			name: 'Gaither',
+			description: null,
+			sources: [{ sourceType: 'YOUTUBE_CHANNEL', ref: '@GaitherMusic', role: null }],
+		});
+	});
+
+	it('a blank source row never blocks Submit: a filled row is sent and the blank one is dropped', async () => {
+		mocks.create.mockResolvedValue({ createImportJob: job({ requestStatus: 'REQUESTED' }) });
+		render(ImportRequestForm, { props: { isAdmin: false } });
+		await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Gaither' } });
+		await fireEvent.click(screen.getByRole('button', { name: /Add a source/ }));
+		await fireEvent.input(screen.getByLabelText('Source 2'), { target: { value: '@GaitherMusic' } });
+		const send = screen.getByRole('button', { name: 'Send request' });
+		expect(send).toBeEnabled();
+		await fireEvent.click(send);
+		expect(mocks.create).toHaveBeenCalledWith({
+			name: 'Gaither',
+			description: null,
+			sources: [{ sourceType: 'YOUTUBE_CHANNEL', ref: '@GaitherMusic', role: null }],
+		});
+	});
+
+	it('a blank source row alone, with no description, keeps Submit disabled', async () => {
+		render(ImportRequestForm, { props: { isAdmin: false } });
+		await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Gaither' } });
+		await fireEvent.input(screen.getByLabelText('Source 1'), { target: { value: '   ' } });
+		expect(screen.getByRole('button', { name: 'Send request' })).toBeDisabled();
 	});
 });
 

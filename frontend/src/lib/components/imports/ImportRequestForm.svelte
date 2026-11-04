@@ -3,14 +3,16 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/shadcn';
+	import CommentsEditor from '$lib/components/CommentsEditor.svelte';
 	import { DEMO_MODE } from '$lib/auth/demo.svelte';
 	import type { ImportPersonRole, ImportSourceType } from '$lib/queries/imports';
 	import { useCreateImportJob } from '$lib/queries/imports/useImportJobMutations';
-	import { importErrorMessage } from '$lib/utils/import-sheet';
+	import { hasDescriptionText, importErrorMessage, isSourceFilled } from '$lib/utils/import-sheet';
 
 	/**
-	 * Request an import: a name and one or more sources (a YouTube channel, or
-	 * a person's films on TMDB). An admin's import starts listing at once;
+	 * Request an import: a name, and a description and/or one or more sources (a
+	 * YouTube channel, or a person's films on TMDB). The description is the
+	 * nuance the names don't carry. An admin's import starts listing at once;
 	 * anyone else's waits for an admin to approve it.
 	 */
 	let { isAdmin, onCreated }: { isAdmin: boolean; onCreated?: () => void } = $props();
@@ -27,11 +29,16 @@
 	let nextKey = 1;
 	const blank = (): SourceRow => ({ key: nextKey++, sourceType: 'YOUTUBE_CHANNEL', ref: '', role: 'DIRECTOR' });
 	let name = $state('');
+	/** Sanitized HTML from the editor; "<p></p>" and other empty markup count as no description. */
+	let description = $state('');
 	let sources = $state<SourceRow[]>([blank()]);
 	let error = $state('');
 	const create = useCreateImportJob();
 
-	const canSubmit = $derived(name.trim() !== '' && sources.every((s) => s.ref.trim() !== '') && !create.isPending);
+	const hasDescription = $derived(hasDescriptionText(description));
+	const canSubmit = $derived(
+		name.trim() !== '' && (hasDescription || sources.some((s) => isSourceFilled(s.ref))) && !create.isPending,
+	);
 
 	const PLACEHOLDER: Record<ImportSourceType, string> = {
 		YOUTUBE_CHANNEL: '@JordanBPeterson, or a channel URL',
@@ -44,11 +51,15 @@
 		try {
 			const res = await create.mutateAsync({
 				name: name.trim(),
-				sources: sources.map((s) => ({
-					sourceType: s.sourceType,
-					ref: s.ref.trim(),
-					role: s.sourceType === 'TMDB_PERSON' && s.role !== 'BOTH' ? s.role : null,
-				})),
+				description: hasDescription ? description : null,
+				// Blank rows are dropped here; a filled row is always sent, so the server judges it.
+				sources: sources
+					.filter((s) => isSourceFilled(s.ref))
+					.map((s) => ({
+						sourceType: s.sourceType,
+						ref: s.ref.trim(),
+						role: s.sourceType === 'TMDB_PERSON' && s.role !== 'BOTH' ? s.role : null,
+					})),
 			});
 			const job = res.createImportJob;
 			toast.success(
@@ -57,6 +68,7 @@
 					: `Request sent. "${job.name}" waits for an admin to approve it.`,
 			);
 			name = '';
+			description = '';
 			sources = [blank()];
 			onCreated?.();
 		} catch (err) {
@@ -86,8 +98,23 @@
 		/>
 	</label>
 
+	<div class="flex flex-col gap-1.5">
+		<span class="text-sm font-medium">
+			Description <span class="text-muted-foreground font-normal">(optional)</span>
+		</span>
+		<CommentsEditor
+			value={description}
+			onChange={(html) => (description = html)}
+			toolbar="basic"
+			minHeight={120}
+			placeholder="Who or what is this about? Say what the source names don't."
+		/>
+	</div>
+
 	<fieldset class="flex flex-col gap-3">
-		<legend class="mb-1.5 text-sm font-medium">Sources</legend>
+		<legend class="mb-1.5 text-sm font-medium">
+			Sources <span class="text-muted-foreground font-normal">(optional with a description)</span>
+		</legend>
 		{#each sources as src, i (src.key)}
 			<div class="flex flex-wrap items-center gap-2" data-testid="import-request-source">
 				<select
