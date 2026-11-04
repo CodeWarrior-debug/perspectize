@@ -21,20 +21,14 @@ const importJobsUserFK = "import_jobs_user_fk"
 // importItemListColumns is every item column except details (the detail panel
 // fetches those lazily), plus the id of content with the same URL.
 const importItemListColumns = `i.id, i.job_id, i.source_id, i.external_id, i.destination_type, i.canonical_url,
-	i.kind, i.title, i.summary, i.published_at, i.duration_seconds, i.view_count, i.like_count,
-	i.comment_count, i.rating, i.rating_count, i.rating_source, i.chapter_count, i.has_captions, i.genres, i.top_cast,
-	i.popularity, i.review_count, i.revenue, i.budget,
-	i.thumbnail_url, i.position, i.excluded, i.stats_fetched_at, i.import_status, i.import_error, i.content_id,
-	i.imported_at, i.created_at, i.updated_at, c.id AS library_content_id`
+	i.title, i.position, i.facts, i.stats_fetched_at, i.excluded, i.import_status, i.import_error,
+	i.content_id, i.imported_at, i.created_at, i.updated_at, c.id AS library_content_id`
 
 // importItemUpsertColumns are refreshed when a candidate is staged again. The
 // import outcome columns are deliberately absent so a re-list never forgets
 // what was imported.
 var importItemUpsertColumns = []string{
-	"title", "summary", "published_at", "duration_seconds", "view_count", "like_count",
-	"comment_count", "rating", "rating_count", "rating_source", "chapter_count", "has_captions", "genres", "top_cast",
-	"popularity", "review_count", "revenue", "budget",
-	"thumbnail_url", "position", "details", "stats_fetched_at", "kind", "updated_at",
+	"title", "position", "facts", "details", "stats_fetched_at", "destination_type", "updated_at",
 }
 
 // GormImportJobRepository implements repositories.ImportJobRepository using GORM
@@ -362,7 +356,7 @@ func (r *GormImportJobRepository) FailInterrupted(ctx context.Context, detail st
 func (r *GormImportJobRepository) CountPendingRequests(ctx context.Context, userID int) (int, error) {
 	var n int64
 	if err := r.db.WithContext(ctx).Model(&ImportJobModel{}).
-		Where("user_id = ? AND request_status = 'requested'", userID).
+		Where("user_id = ? AND request_status = 'pending'", userID).
 		Count(&n).Error; err != nil {
 		return 0, fmt.Errorf("failed to count import requests: %w", err)
 	}
@@ -374,7 +368,7 @@ func (r *GormImportJobRepository) CountPendingRequests(ctx context.Context, user
 // ErrNotFound. Approving also moves the job's waiting sources to listing.
 func (r *GormImportJobRepository) ReviewJob(ctx context.Context, jobID int, status domain.ImportRequestStatus, note *string, at time.Time) error {
 	result := r.db.WithContext(ctx).Model(&ImportJobModel{}).
-		Where("id = ? AND request_status = 'requested'", jobID).
+		Where("id = ? AND request_status = 'pending'", jobID).
 		Updates(map[string]any{"request_status": importRequestStatusToDB(status), "review_note": note, "reviewed_at": at})
 	if result.Error != nil {
 		return fmt.Errorf("failed to review import job: %w", result.Error)

@@ -245,7 +245,7 @@ func (s *ImportService) CreateImportJob(ctx context.Context, actor *domain.Authe
 	job := &domain.ImportJob{UserID: actor.ID, Name: name, RequestStatus: domain.ImportRequestStatusApproved}
 	sourceStatus := domain.ImportSourceStatusListing
 	if !isAdmin {
-		job.RequestStatus, sourceStatus = domain.ImportRequestStatusRequested, domain.ImportSourceStatusWaiting
+		job.RequestStatus, sourceStatus = domain.ImportRequestStatusPending, domain.ImportSourceStatusWaiting
 	}
 	resolved := make([]resolvedSource, len(input.Sources))
 	for i, in := range input.Sources {
@@ -316,7 +316,7 @@ func (s *ImportService) ReviewImportJob(ctx context.Context, actor *domain.Authe
 	if err != nil {
 		return nil, err
 	}
-	if job.RequestStatus != domain.ImportRequestStatusRequested {
+	if job.RequestStatus != domain.ImportRequestStatusPending {
 		return nil, fmt.Errorf("%w: this import is already %s", domain.ErrInvalidInput, strings.ToLower(string(job.RequestStatus)))
 	}
 

@@ -581,26 +581,7 @@ func importItemModelToDomain(m *ImportItemModel) *domain.ImportItem {
 		ExternalID:      m.ExternalID,
 		DestinationType: contentTypeFromDBValue(m.DestinationType),
 		CanonicalURL:    m.CanonicalURL,
-		Kind:            domain.ImportItemKind(strings.ToUpper(m.Kind)),
 		Title:           m.Title,
-		Summary:         m.Summary,
-		PublishedAt:     m.PublishedAt,
-		DurationSeconds: m.DurationSeconds,
-		ViewCount:       m.ViewCount,
-		LikeCount:       m.LikeCount,
-		CommentCount:    m.CommentCount,
-		Rating:          m.Rating,
-		RatingCount:     m.RatingCount,
-		RatingSource:    m.RatingSource,
-		ChapterCount:    m.ChapterCount,
-		HasCaptions:     m.HasCaptions,
-		Genres:          nonNilStrings(m.Genres),
-		TopCast:         nonNilStrings(m.TopCast),
-		Popularity:      m.Popularity,
-		ReviewCount:     m.ReviewCount,
-		Revenue:         m.Revenue,
-		Budget:          m.Budget,
-		ThumbnailURL:    m.ThumbnailURL,
 		Position:        m.Position,
 		Excluded:        m.Excluded,
 		StatsFetchedAt:  m.StatsFetchedAt,
@@ -608,6 +589,11 @@ func importItemModelToDomain(m *ImportItemModel) *domain.ImportItem {
 		ImportedAt:      m.ImportedAt,
 		ContentID:       m.ContentID,
 		InLibrary:       m.LibraryContentID != nil,
+	}
+	// facts is only ever written from domain.ImportFacts, so it always decodes;
+	// an unknown key from a newer server is ignored rather than failing the sheet.
+	if len(m.Facts) > 0 {
+		_ = json.Unmarshal(m.Facts, &it.Facts)
 	}
 	if it.ContentID == nil {
 		it.ContentID = m.LibraryContentID
@@ -625,45 +611,21 @@ func importItemDomainToModel(in *domain.ImportItemWithDetails) (*ImportItemModel
 	if err != nil {
 		return nil, err
 	}
+	facts, err := json.Marshal(in.Item.Facts)
+	if err != nil {
+		return nil, err
+	}
 	it := in.Item
-	m := &ImportItemModel{
+	return &ImportItemModel{
 		JobID:           it.JobID,
 		SourceID:        it.SourceID,
 		ExternalID:      it.ExternalID,
 		DestinationType: contentTypeToDBValue(it.DestinationType),
 		CanonicalURL:    it.CanonicalURL,
-		Kind:            strings.ToLower(string(it.Kind)),
 		Title:           it.Title,
-		Summary:         it.Summary,
-		PublishedAt:     it.PublishedAt,
-		DurationSeconds: it.DurationSeconds,
-		ViewCount:       it.ViewCount,
-		LikeCount:       it.LikeCount,
-		CommentCount:    it.CommentCount,
-		Rating:          it.Rating,
-		RatingCount:     it.RatingCount,
-		RatingSource:    it.RatingSource,
-		ChapterCount:    it.ChapterCount,
-		HasCaptions:     it.HasCaptions,
-		Genres:          StringArray(nonNilStrings(it.Genres)),
-		TopCast:         StringArray(nonNilStrings(it.TopCast)),
-		Popularity:      it.Popularity,
-		ReviewCount:     it.ReviewCount,
-		Revenue:         it.Revenue,
-		Budget:          it.Budget,
-		ThumbnailURL:    it.ThumbnailURL,
 		Position:        it.Position,
+		Facts:           facts,
 		Details:         details,
 		StatsFetchedAt:  it.StatsFetchedAt,
-	}
-	return m, nil
-}
-
-// nonNilStrings returns s, or an empty slice for nil: text[] columns are NOT NULL
-// and GraphQL lists are non-null.
-func nonNilStrings(s []string) []string {
-	if s == nil {
-		return []string{}
-	}
-	return s
+	}, nil
 }

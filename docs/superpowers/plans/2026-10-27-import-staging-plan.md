@@ -19,7 +19,7 @@
 
 - `import_jobs`: `id`, `user_id` (creator), `name`, `created_at`, `updated_at`.
 - `import_job_sources`: `id`, `job_id` (CASCADE), `source_type`, `source_ref`, `title`, `url`, `destination_type`, `status` (`listing|ready|failed`), `status_detail`, `item_count`, `fetched_at`.
-- `import_job_items`: one row per candidate, `UNIQUE (source_id, external_id)`. Promoted columns for sort/filter (`kind`, `title`, `summary`, `published_at`, `duration_seconds`, views/likes/comments, `rating`/`rating_count`/`rating_source`, `chapter_count`, `has_captions`, `position`), `details jsonb` (description, tags, chapters, people, links, thumbnail) loaded only by the detail query, and the import outcome (`import_status`, `import_error`, `content_id` SET NULL).
+- `import_job_items`: one row per candidate, `UNIQUE (source_id, external_id)`. Columns only for what the code queries, joins or updates (`external_id`, `canonical_url`, `title`, `position`, `excluded`, the import outcome `import_status` / `import_error` / `content_id` SET NULL). Everything shown to help decide is one `facts jsonb` object with key names shared across content types (`duration_seconds`, `view_count`, `rating`, `genres`, `revenue_usd`…; `domain.ImportFacts`), so a new source adds keys rather than columns, and the sheet builds its columns from the keys present. `details jsonb` (description, tags, chapters, people, links) is loaded only by the detail query. The goal is enough to decide, not everything the import needs: importing a row fetches its full metadata again.
 - "In library" is computed in the list query by `LEFT JOIN content ON content.url = item.canonical_url`, so it is always current and costs no extra query.
 
 ## Pipelines (goroutines + channels)

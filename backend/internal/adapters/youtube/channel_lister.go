@@ -265,36 +265,39 @@ func (l *ChannelLister) videos(ctx context.Context, ids []string, kind domain.Im
 }
 
 func channelVideoToItem(v channelVideo, kind domain.ImportItemKind, position int, summary string, fetched time.Time) *domain.ImportItemWithDetails {
+	facts := domain.ImportFacts{
+		Kind:         kind,
+		Summary:      summary,
+		ThumbnailURL: bestThumbnail(v.Snippet.Thumbnails),
+		ViewCount:    parseCount(v.Statistics.ViewCount),
+		LikeCount:    parseCount(v.Statistics.LikeCount),
+		CommentCount: parseCount(v.Statistics.CommentCount),
+	}
+	// YouTube omits likeCount when the channel hides likes: say so, rather than
+	// leave a blank that reads as "no likes".
+	facts.LikesHidden = facts.LikeCount == nil
+	if t, err := time.Parse(time.RFC3339, v.Snippet.PublishedAt); err == nil {
+		facts.PublishedAt = &t
+	}
+	if secs, err := ParseISO8601Duration(v.ContentDetails.Duration); err == nil && secs > 0 {
+		facts.DurationSeconds = &secs
+	}
+	if v.ContentDetails.Caption != "" {
+		has := v.ContentDetails.Caption == "true"
+		facts.HasCaptions = &has
+	}
+	chapters := domain.ParseChapters(v.Snippet.Description)
+	n := len(chapters)
+	facts.ChapterCount = &n
 	item := domain.ImportItem{
 		ExternalID:      v.ID,
 		DestinationType: domain.ContentTypeYouTubeVideo,
 		CanonicalURL:    NormalizeYouTubeURL(v.ID),
-		Kind:            kind,
 		Title:           v.Snippet.Title,
-		ViewCount:       parseCount(v.Statistics.ViewCount),
-		LikeCount:       parseCount(v.Statistics.LikeCount),
-		CommentCount:    parseCount(v.Statistics.CommentCount),
+		Facts:           facts,
 		Position:        position,
 		StatsFetchedAt:  fetched,
 	}
-	if summary != "" {
-		item.Summary = &summary
-	}
-	if t, err := time.Parse(time.RFC3339, v.Snippet.PublishedAt); err == nil {
-		item.PublishedAt = &t
-	}
-	if secs, err := ParseISO8601Duration(v.ContentDetails.Duration); err == nil && secs > 0 {
-		item.DurationSeconds = &secs
-	}
-	if v.ContentDetails.Caption != "" {
-		has := v.ContentDetails.Caption == "true"
-		item.HasCaptions = &has
-	}
-	if thumb := bestThumbnail(v.Snippet.Thumbnails); thumb != "" {
-		item.ThumbnailURL = &thumb
-	}
-	chapters := domain.ParseChapters(v.Snippet.Description)
-	item.ChapterCount = len(chapters)
 
 	return &domain.ImportItemWithDetails{
 		Item: item,

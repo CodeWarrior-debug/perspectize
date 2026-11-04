@@ -38,15 +38,15 @@ type ImportService interface {
 
 	// CreateImportJob checks every source against its API and saves the import.
 	// An admin's is APPROVED and starts listing each source in the background;
-	// anyone else's is REQUESTED with WAITING sources, and a person may have at
+	// anyone else's is PENDING with WAITING sources, and a person may have at
 	// most domain.MaxPendingImportRequests open. domain.ErrInvalidInput for a
 	// bad name or source, too many open requests, or a source type this server
 	// has no API key for; domain.ErrNotFound when a source doesn't exist.
 	CreateImportJob(ctx context.Context, actor *domain.AuthenticatedUser, input domain.CreateImportJobInput) (*domain.ImportJob, error)
 
-	// ReviewImportJob approves (starting listing) or declines a REQUESTED
+	// ReviewImportJob approves (starting listing) or declines a PENDING
 	// import. Admin only (domain.ErrForbidden). A decline needs a note.
-	// domain.ErrInvalidInput when the import isn't REQUESTED any more.
+	// domain.ErrInvalidInput when the import isn't PENDING any more.
 	ReviewImportJob(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, approve bool, note string) (*domain.ImportJob, error)
 
 	// ImportItems queues the picked rows of an import and imports them in the

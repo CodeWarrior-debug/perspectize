@@ -543,13 +543,6 @@ enum ImportSourceStatus {
   FAILED
 }
 
-enum ImportItemKind {
-  VIDEO
-  SHORT
-  LIVE
-  MOVIE
-}
-
 enum ImportItemStatus {
   QUEUED
   IMPORTED
@@ -577,10 +570,10 @@ type ImportSource {
   fetchedAt: String
 }
 
-# An admin's import is APPROVED when created; anyone else's is REQUESTED until
+# An admin's import is APPROVED when created; anyone else's is PENDING until
 # an admin approves it (listing starts) or declines it.
 enum ImportRequestStatus {
-  REQUESTED
+  PENDING
   APPROVED
   DECLINED
 }
@@ -609,39 +602,19 @@ type ImportItem {
   id: ID!
   sourceId: ID!
   destinationType: ContentType!
-  kind: ImportItemKind!
   # YouTube video id or TMDB movie id.
   externalId: String!
   url: String!
   title: String!
-  # First meaningful description line, with channel boilerplate removed.
-  summary: String
-  publishedAt: String
-  durationSeconds: Int
-  viewCount: Float
-  # Null when the channel hides likes (never 0 for unknown).
-  likeCount: Float
-  commentCount: Float
-  # 0-10, how many ratings it rests on, and whose (e.g. "TMDB").
-  rating: Float
-  ratingCount: Int
-  ratingSource: String
-  chapterCount: Int!
-  hasCaptions: Boolean
-  # Films: genre names and up to 3 top-billed cast (empty for videos).
-  genres: [String!]!
-  topCast: [String!]!
-  # Films (TMDB): daily popularity score, user review count, and box office
-  # takings and budget in USD. Null when unknown.
-  popularity: Float
-  reviewCount: Int
-  revenue: Float
-  budget: Float
-  thumbnailUrl: String
-  # Marked "don't import" (by anyone, until the import is closed): can't be imported.
-  excluded: Boolean!
+  # The decision facts shown as sheet columns: one object whose snake_case
+  # keys are shared across content types (duration_seconds, view_count,
+  # rating, genres, revenue_usd...; see domain.ImportFacts). A key a source
+  # can't supply is absent, never 0.
+  facts: JSON!
   # Position in the source listing; 0 is first (newest for channels).
   position: Int!
+  # Marked "don't import" (by anyone, until the import is closed): can't be imported.
+  excluded: Boolean!
   statsFetchedAt: String!
   # True when content with this URL is already in the library.
   inLibrary: Boolean!

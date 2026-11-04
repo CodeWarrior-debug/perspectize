@@ -88,9 +88,6 @@ models:
   ImportSourceStatus:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ImportSourceStatus
-  ImportItemKind:
-    model:
-      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ImportItemKind
   ImportItemStatus:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ImportItemStatus
