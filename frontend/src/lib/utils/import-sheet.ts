@@ -8,10 +8,11 @@ import { contentTypeLabel } from './grid-config';
  * ImportSheet.svelte so it can be unit tested (AG Grid doesn't render in jsdom).
  *
  * Every row shows enough to decide without leaving the page (ADDING_CONTENT_TYPE.md,
- * Decision 8). The decision data is one facts object per row whose snake_case
+ * Decision 8). The decision data is one facts object per row whose camelCase
  * keys are shared across content types (backend domain.ImportFacts). The sheet
  * makes a column of every key present in any row, labels it by prettifying
- * the key, and formats it by the key's suffix (_seconds, _count, _usd, _at).
+ * the key, and formats it by the key's suffix (…Seconds, …Count, …At) or, for
+ * money, by name (revenue, budget).
  * A key no row has never becomes a column, so a filmography has no view
  * columns and a channel no box office, without a table of which type has what.
  */
@@ -43,59 +44,62 @@ function str(f: ImportFacts, key: string): string | null {
 /** Facts shown somewhere other than their own column. */
 const NOT_COLUMNS = new Set([
 	'summary', // under the title
-	'thumbnail_url', // beside the title
-	'likes_hidden', // qualifies like_count
-	'rating_source', // in the rating tooltip
+	'thumbnailUrl', // beside the title
+	'ratingSource', // in the rating tooltip
 ]);
+
+/** Money facts, in USD (the one unit a key's name doesn't carry). */
+const MONEY_KEYS = new Set(['revenue', 'budget']);
 
 /** Columns lead with these, in this order; any other key follows, alphabetically. */
 const KEY_ORDER = [
 	'kind',
-	'published_at',
-	'duration_seconds',
+	'publishedAt',
+	'durationSeconds',
 	'rating',
-	'top_cast',
+	'topCast',
 	'genres',
-	'box_office_usd',
-	'view_count',
-	'like_count',
-	'like_rate',
-	'comment_count',
-	'views_per_day',
+	'revenue',
+	'viewCount',
+	'likeCount',
+	'likeRate',
+	'commentCount',
+	'viewsPerDay',
 ];
 
 /** Shown under All columns only: secondary to the decision. */
 export const SECONDARY_KEYS: ReadonlySet<string> = new Set([
-	'rating_count',
-	'review_count',
+	'ratingCount',
+	'reviewCount',
 	'popularity',
-	'budget_usd',
-	'chapter_count',
-	'has_captions',
+	'budget',
+	'chapterCount',
+	'hasCaptions',
 ]);
 
 /**
- * A column label from a fact key, with no table of names: snake_case becomes
- * words, and the suffix becomes the unit ("box_office_usd" → "Box office (USD)",
- * "view_count" → "Views", "duration_seconds" → "Duration", "published_at" →
- * "Published", "has_captions" → "Captions").
+ * A YouTube video with a view count but no like count: the channel hides
+ * likes, so the sheet says "hidden" rather than a blank that reads as none.
+ */
+export function likesHidden(row: Pick<ImportItem, 'facts' | 'destinationType'>): boolean {
+	return row.destinationType === 'YOUTUBE_VIDEO' && row.facts.likeCount == null && row.facts.viewCount != null;
+}
+
+/**
+ * A column label from a fact key, with no table of names: camelCase becomes
+ * words, the suffix becomes the unit, and money says its currency
+ * ("viewCount" → "Views", "durationSeconds" → "Duration", "publishedAt" →
+ * "Published", "hasCaptions" → "Captions", "topCast" → "Top cast",
+ * "revenue" → "Revenue (USD)").
  */
 export function prettifyFactKey(key: string): string {
 	let words = key;
-	let unit = '';
-	if (words.endsWith('_usd')) {
-		words = words.slice(0, -4);
-		unit = ' (USD)';
-	} else if (words.endsWith('_seconds')) {
-		words = words.slice(0, -8);
-	} else if (words.endsWith('_at')) {
-		words = words.slice(0, -3);
-	} else if (words.endsWith('_count')) {
-		words = `${words.slice(0, -6)}s`;
-	}
-	if (words.startsWith('has_')) words = words.slice(4);
-	const text = words.replace(/_/g, ' ');
-	return text.charAt(0).toUpperCase() + text.slice(1) + unit;
+	if (words.endsWith('Seconds')) words = words.slice(0, -7);
+	else if (words.endsWith('At')) words = words.slice(0, -2);
+	else if (words.endsWith('Count')) words = `${words.slice(0, -5)}s`;
+	if (/^has[A-Z]/.test(words)) words = words.slice(3);
+	const text = words.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+	return text.charAt(0).toUpperCase() + text.slice(1) + (MONEY_KEYS.has(key) ? ' (USD)' : '');
 }
 
 /** Ratings resting on fewer votes than this are shown muted (Decision 8: low-sample figures). */
@@ -114,9 +118,9 @@ export function ratingCountNoun(source: string | null): string {
 
 export function isLowSampleRating(f: ImportFacts): boolean {
 	const rating = num(f, 'rating');
-	const count = num(f, 'rating_count');
+	const count = num(f, 'ratingCount');
 	if (rating === null || count === null) return false;
-	const source = str(f, 'rating_source');
+	const source = str(f, 'ratingSource');
 	return count < ((source && LOW_SAMPLE_BY_SOURCE[source]) || LOW_SAMPLE_RATING_COUNT);
 }
 
@@ -124,8 +128,8 @@ export function isLowSampleRating(f: ImportFacts): boolean {
 export function ratingTooltip(f: ImportFacts): string {
 	const rating = num(f, 'rating');
 	if (rating === null) return '';
-	const source = str(f, 'rating_source');
-	const count = num(f, 'rating_count');
+	const source = str(f, 'ratingSource');
+	const count = num(f, 'ratingCount');
 	const counted = count === null ? '' : ` from ${formatCountExact(count)} ${ratingCountNoun(source)}`;
 	const low = isLowSampleRating(f) ? ` (few ${ratingCountNoun(source)}, treat with care)` : '';
 	return `${source ?? 'Rating'}: ${rating.toFixed(1)} / 10${counted}${low}`;
@@ -135,7 +139,7 @@ const DAY_MS = 86_400_000;
 
 /** Days since publishing, at least 1, or null when the date is unknown. */
 export function ageDays(f: ImportFacts, now: Date): number | null {
-	const iso = str(f, 'published_at');
+	const iso = str(f, 'publishedAt');
 	if (!iso) return null;
 	const t = Date.parse(iso);
 	if (Number.isNaN(t)) return null;
@@ -144,22 +148,22 @@ export function ageDays(f: ImportFacts, now: Date): number | null {
 
 /** Likes ÷ views, or null when either is unknown (hidden likes are unknown, not 0). */
 export function likeRate(f: ImportFacts): number | null {
-	const likes = num(f, 'like_count');
-	const views = num(f, 'view_count');
+	const likes = num(f, 'likeCount');
+	const views = num(f, 'viewCount');
 	return likes === null || !views ? null : likes / views;
 }
 
 /** Comments ÷ views, or null when either is unknown. */
 export function commentRate(f: ImportFacts): number | null {
-	const comments = num(f, 'comment_count');
-	const views = num(f, 'view_count');
+	const comments = num(f, 'commentCount');
+	const views = num(f, 'viewCount');
 	return comments === null || !views ? null : comments / views;
 }
 
 /** Views per day since publishing: momentum, so a new upload isn't judged on raw views. */
 export function viewsPerDay(f: ImportFacts, now: Date): number | null {
 	const days = ageDays(f, now);
-	const views = num(f, 'view_count');
+	const views = num(f, 'viewCount');
 	return days === null || views === null ? null : views / days;
 }
 
@@ -191,12 +195,12 @@ function formatDate(iso: string | null): string {
 export type FactKind = 'number' | 'date' | 'text';
 
 export function factKind(key: string): FactKind {
-	if (key.endsWith('_at')) return 'date';
+	if (key.endsWith('At')) return 'date';
 	if (
-		key.endsWith('_count') ||
-		key.endsWith('_seconds') ||
-		key.endsWith('_usd') ||
-		['rating', 'popularity', 'like_rate', 'views_per_day'].includes(key)
+		key.endsWith('Count') ||
+		key.endsWith('Seconds') ||
+		MONEY_KEYS.has(key) ||
+		['rating', 'popularity', 'likeRate', 'viewsPerDay'].includes(key)
 	)
 		return 'number';
 	return 'text';
@@ -204,38 +208,41 @@ export function factKind(key: string): FactKind {
 
 /**
  * A fact's cell text, chosen by its key: durations, counts, money, dates,
- * a 0-10 rating, yes/no, lists. Missing is the empty marker, and a video whose
- * channel hides likes says "hidden" rather than showing a blank like a 0.
+ * a 0-10 rating, yes/no, lists. Missing is the empty marker; a video whose
+ * channel hides likes says "hidden" (see likesHidden).
  */
-export function formatFact(key: string, f: ImportFacts): string {
-	if (key === 'like_count' && f.likes_hidden === true && num(f, 'like_count') === null) return 'hidden';
-	const v = f[key];
+export function formatFact(key: string, row: Pick<ImportItem, 'facts' | 'destinationType'>): string {
+	if (key === 'likeCount' && likesHidden(row)) return 'hidden';
+	const v = row.facts[key];
 	if (v === undefined || v === null || v === '') return EMPTY_VALUE;
 	if (Array.isArray(v)) return listOrEmpty(v.map(String));
 	if (typeof v === 'boolean') return v ? 'Yes' : 'No';
 	if (typeof v === 'number') {
 		if (key === 'rating') return `${v.toFixed(1)} / 10`;
-		if (key.endsWith('_seconds')) return formatDurationSeconds(v);
-		if (key.endsWith('_usd')) return formatUsd(v);
-		if (key.endsWith('_count')) return formatCount(v);
+		if (key.endsWith('Seconds')) return formatDurationSeconds(v);
+		if (MONEY_KEYS.has(key)) return formatUsd(v);
+		if (key.endsWith('Count')) return formatCount(v);
 		return Number.isInteger(v) ? formatCountExact(v) : v.toFixed(1);
 	}
 	if (typeof v === 'string') {
-		if (key.endsWith('_at')) return formatDate(v);
-		return v.charAt(0).toUpperCase() + v.slice(1);
+		if (key.endsWith('At')) return formatDate(v);
+		// Enum-like values arrive upper case ("MOVIE", "LIVE"): show them as words.
+		const text = /^[A-Z0-9_]+$/.test(v) ? v.toLowerCase().replace(/_/g, ' ') : v;
+		return text.charAt(0).toUpperCase() + text.slice(1);
 	}
 	return String(v);
 }
 
 /** A fact's tooltip: the exact figure behind a rounded one, or the rating's source and count. */
-export function factTooltip(key: string, f: ImportFacts): string {
+export function factTooltip(key: string, row: Pick<ImportItem, 'facts' | 'destinationType'>): string {
+	const f = row.facts;
 	if (key === 'rating') return ratingTooltip(f);
-	if (key === 'like_count' && f.likes_hidden === true) return 'The channel hides likes on this video';
-	if (key === 'box_office_usd' && num(f, 'budget_usd') !== null) {
-		return `${formatUsd(num(f, 'box_office_usd'))} worldwide on a ${formatUsd(num(f, 'budget_usd'))} budget`;
+	if (key === 'likeCount' && likesHidden(row)) return 'The channel hides likes on this video';
+	if (key === 'revenue' && num(f, 'budget') !== null) {
+		return `${formatUsd(num(f, 'revenue'))} worldwide on a ${formatUsd(num(f, 'budget'))} budget`;
 	}
 	const v = num(f, key);
-	if (v !== null && (key.endsWith('_count') || key.endsWith('_usd'))) return formatCountExact(v);
+	if (v !== null && (key.endsWith('Count') || MONEY_KEYS.has(key))) return formatCountExact(v);
 	const list = f[key];
 	if (Array.isArray(list)) return list.join(', ');
 	return '';
@@ -246,25 +253,25 @@ export function factTooltip(key: string, f: ImportFacts): string {
  * reception and momentum adjusted for reach.
  */
 const DERIVED: Record<string, { needs: string[]; value: (f: ImportFacts, now: Date) => number | null; tip: string }> = {
-	like_rate: {
-		needs: ['like_count', 'view_count'],
+	likeRate: {
+		needs: ['likeCount', 'viewCount'],
 		value: (f) => likeRate(f),
 		tip: 'Likes ÷ views: reception, adjusted for reach. Filter as a decimal (0.03 = 3%).',
 	},
-	views_per_day: {
-		needs: ['view_count', 'published_at'],
+	viewsPerDay: {
+		needs: ['viewCount', 'publishedAt'],
 		value: (f, now) => viewsPerDay(f, now),
 		tip: 'Views ÷ days since publishing: momentum, so new uploads are not judged on raw views',
 	},
 };
 
 /** The fact keys that become columns for these rows, in column order (derived ones included). */
-export function factColumnKeys(rows: readonly Pick<ImportItem, 'facts'>[]): string[] {
+export function factColumnKeys(rows: readonly Pick<ImportItem, 'facts' | 'destinationType'>[]): string[] {
 	const present = new Set<string>();
 	for (const r of rows) {
 		for (const k of Object.keys(r.facts)) if (!NOT_COLUMNS.has(k)) present.add(k);
-		// Hidden likes have no like_count key, but the Likes column is where "hidden" is said.
-		if (r.facts.likes_hidden === true) present.add('like_count');
+		// Hidden likes have no likeCount key, but the Likes column is where "hidden" is said.
+		if (likesHidden(r)) present.add('likeCount');
 	}
 	for (const [k, d] of Object.entries(DERIVED)) if (d.needs.every((n) => present.has(n))) present.add(k);
 	const rank = (k: string) => {
@@ -361,7 +368,7 @@ export function selectionSummary(rows: readonly ImportRow[]): SelectionSummary {
 		bySource.set(r.sourceTitle, (bySource.get(r.sourceTitle) ?? 0) + 1);
 		const label = contentTypeLabel(r.destinationType.toLowerCase());
 		byDest.set(label, (byDest.get(label) ?? 0) + 1);
-		totalSeconds += num(r.facts, 'duration_seconds') ?? 0;
+		totalSeconds += num(r.facts, 'durationSeconds') ?? 0;
 	}
 	return {
 		count: rows.length,
@@ -440,7 +447,7 @@ export function titleCellRenderer(params: { data?: ImportRow }): HTMLElement | s
 	if (!row) return '';
 	const wrap = document.createElement('div');
 	wrap.className = 'flex h-full items-center gap-2';
-	const thumb = str(row.facts, 'thumbnail_url');
+	const thumb = str(row.facts, 'thumbnailUrl');
 	if (thumb) {
 		const img = document.createElement('img');
 		img.src = thumb;
@@ -509,7 +516,7 @@ const numberFilter = {
 
 /** A width that fits the label and a typical value. */
 function factWidth(key: string): number {
-	if (key === 'top_cast') return 240;
+	if (key === 'topCast') return 240;
 	if (key === 'genres') return 200;
 	if (factKind(key) === 'date') return 140;
 	return Math.max(96, prettifyFactKey(key).length * 9 + 40);
@@ -526,7 +533,7 @@ function factColumn(key: string, now: Date): ColDef<ImportRow> {
 		if (Array.isArray(v)) return v.join(', ');
 		return v ?? null;
 	};
-	const label = derived ? (key === 'like_rate' ? 'Like rate' : 'Views/day') : prettifyFactKey(key);
+	const label = derived ? (key === 'likeRate' ? 'Like rate' : 'Views/day') : prettifyFactKey(key);
 	return {
 		colId: `fact:${key}`,
 		headerName: label,
@@ -535,11 +542,11 @@ function factColumn(key: string, now: Date): ColDef<ImportRow> {
 		valueGetter: raw,
 		valueFormatter: (p: ValueFormatterParams<ImportRow>) => {
 			if (!p.data) return '';
-			if (key === 'like_rate') return formatRate(p.value ?? null);
-			if (key === 'views_per_day') return p.value == null ? EMPTY_VALUE : formatCount(Math.round(p.value));
-			return formatFact(key, p.data.facts);
+			if (key === 'likeRate') return formatRate(p.value ?? null);
+			if (key === 'viewsPerDay') return p.value == null ? EMPTY_VALUE : formatCount(Math.round(p.value));
+			return formatFact(key, p.data);
 		},
-		tooltipValueGetter: (p) => (p.data && !derived ? factTooltip(key, p.data.facts) : ''),
+		tooltipValueGetter: (p) => (p.data && !derived ? factTooltip(key, p.data) : ''),
 		cellClassRules:
 			key === 'rating' ? { 'text-muted-foreground': (p) => !!p.data && isLowSampleRating(p.data.facts) } : undefined,
 		...(kind === 'number'
@@ -547,7 +554,7 @@ function factColumn(key: string, now: Date): ColDef<ImportRow> {
 			: kind === 'date'
 				? { filter: 'agDateColumnFilter', floatingFilter: true, filterParams: isoDateFilterParams }
 				: textFilter),
-		...(key === 'published_at' ? { sort: 'desc' as const } : {}),
+		...(key === 'publishedAt' ? { sort: 'desc' as const } : {}),
 	};
 }
 

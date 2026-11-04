@@ -51,7 +51,7 @@
 
 {#if isAdmin}
 	<div class="flex flex-wrap items-center gap-2" data-testid="import-job-actions">
-		{#if job.requestStatus === 'PENDING'}
+		{#if job.requestStatus === 'REQUESTED'}
 			{#if declining}
 				<input
 					type="text"

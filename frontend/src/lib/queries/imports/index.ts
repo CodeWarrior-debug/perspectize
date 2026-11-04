@@ -35,7 +35,7 @@ export const IMPORT_ITEM_DETAILS_STALE_TIME_MS = 30 * 60_000;
 export type ImportSourceType = 'YOUTUBE_CHANNEL' | 'TMDB_PERSON';
 export type ImportPersonRole = 'DIRECTOR' | 'CAST';
 export type ImportSourceStatus = 'WAITING' | 'LISTING' | 'READY' | 'FAILED';
-export type ImportRequestStatus = 'PENDING' | 'APPROVED' | 'DECLINED';
+export type ImportRequestStatus = 'REQUESTED' | 'APPROVED' | 'DECLINED';
 export type ImportItemStatus = 'QUEUED' | 'IMPORTED' | 'SKIPPED' | 'FAILED';
 /** Destination content types an import can produce (a subset of ContentType). */
 export type ImportDestinationType = 'YOUTUBE_VIDEO' | 'MOVIE';
@@ -59,10 +59,10 @@ export interface ImportSource {
 }
 
 /**
- * The decision facts of one row: snake_case keys shared across content types
- * (backend domain.ImportFacts), e.g. kind, published_at, duration_seconds,
- * view_count, like_count, likes_hidden, rating, rating_count, rating_source,
- * genres, top_cast, box_office_usd. A key a source can't supply is absent,
+ * The decision facts of one row: camelCase keys shared across content types
+ * (backend domain.ImportFacts), e.g. kind, publishedAt, durationSeconds,
+ * viewCount, likeCount (absent when the channel hides likes), rating, ratingCount, ratingSource,
+ * genres, topCast, revenue. A key a source can't supply is absent,
  * never 0, so the sheet makes a column only of keys some row has.
  */
 export type ImportFacts = Record<string, unknown>;

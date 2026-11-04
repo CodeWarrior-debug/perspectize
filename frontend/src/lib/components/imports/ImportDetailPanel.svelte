@@ -64,9 +64,9 @@
 
 	/** As the sheet's header, except the rating says whose it is and its count what it counts. */
 	function statLabel(key: string, facts: Record<string, unknown>): string {
-		const source = typeof facts.rating_source === 'string' ? facts.rating_source : null;
+		const source = typeof facts.ratingSource === 'string' ? facts.ratingSource : null;
 		if (key === 'rating' && source) return `${source} rating`;
-		if (key === 'rating_count') {
+		if (key === 'ratingCount') {
 			const noun = ratingCountNoun(source);
 			return noun.charAt(0).toUpperCase() + noun.slice(1);
 		}
@@ -79,24 +79,24 @@
 		if (!item) return [];
 		const facts = item.facts;
 		return factColumnKeys([item])
-			.filter((k) => !['kind', 'published_at', 'like_rate', 'views_per_day', 'top_cast', 'genres'].includes(k))
+			.filter((k) => !['kind', 'publishedAt', 'likeRate', 'viewsPerDay', 'topCast', 'genres'].includes(k))
 			.map((k) => ({
 				key: k,
 				label: statLabel(k, facts),
-				value: formatFact(k, facts),
-				title: factTooltip(k, facts) || undefined,
-				muted: (k === 'rating' || k === 'rating_count') && isLowSampleRating(facts),
+				value: formatFact(k, item),
+				title: factTooltip(k, item) || undefined,
+				muted: (k === 'rating' || k === 'ratingCount') && isLowSampleRating(facts),
 			}));
 	});
-	const ratingSource = $derived(typeof item?.facts.rating_source === 'string' ? item.facts.rating_source : null);
-	const published = $derived(typeof item?.facts.published_at === 'string' ? item.facts.published_at : null);
-	const thumbnail = $derived(typeof item?.facts.thumbnail_url === 'string' ? item.facts.thumbnail_url : null);
+	const ratingSource = $derived(typeof item?.facts.ratingSource === 'string' ? item.facts.ratingSource : null);
+	const published = $derived(typeof item?.facts.publishedAt === 'string' ? item.facts.publishedAt : null);
+	const thumbnail = $derived(typeof item?.facts.thumbnailUrl === 'string' ? item.facts.thumbnailUrl : null);
 	// "Grace to You · Video · becomes YouTube Video" (kind only when the source gave one).
 	const subtitle = $derived(
 		item
 			? [
 					sourceTitle,
-					item.facts.kind ? formatFact('kind', item.facts) : '',
+					item.facts.kind ? formatFact('kind', item) : '',
 					`becomes ${contentTypeLabel(item.destinationType.toLowerCase())}`,
 				]
 					.filter(Boolean)

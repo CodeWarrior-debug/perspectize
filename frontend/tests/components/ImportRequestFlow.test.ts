@@ -31,7 +31,7 @@ function job(overrides: Partial<ImportJobSummary> = {}): ImportJobSummary {
 	return {
 		id: '7',
 		name: 'Gaither',
-		requestStatus: 'PENDING',
+		requestStatus: 'REQUESTED',
 		requestedBy: { id: '2', username: 'ben' },
 		reviewNote: null,
 		reviewedAt: null,

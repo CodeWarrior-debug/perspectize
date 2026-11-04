@@ -21,7 +21,7 @@
 		() => signedIn,
 		() => showClosed && me.isAdmin,
 	);
-	const requestedCount = $derived(jobs.data?.importJobs.filter((j) => j.requestStatus === 'PENDING').length ?? 0);
+	const requestedCount = $derived(jobs.data?.importJobs.filter((j) => j.requestStatus === 'REQUESTED').length ?? 0);
 
 	const tabs: { value: Tab; label: string }[] = [
 		{ value: 'imports', label: 'Imports' },

@@ -11,6 +11,7 @@ import {
 	factKind,
 	factTooltip,
 	formatFact,
+	likesHidden,
 	formatRate,
 	formatTotalTime,
 	formatUsd,
@@ -48,14 +49,14 @@ function item(overrides: Partial<ImportItem> = {}): ImportItem {
 		facts: {
 			kind: 'video',
 			summary: 'Lecture one of the 2017 course.',
-			published_at: '2026-10-17T12:00:00Z',
-			duration_seconds: 8756,
-			view_count: 10_000,
-			like_count: 300,
-			comment_count: 50,
-			chapter_count: 3,
-			has_captions: true,
-			thumbnail_url: 'https://i.ytimg.com/vi/abc/mqdefault.jpg',
+			publishedAt: '2026-10-17T12:00:00Z',
+			durationSeconds: 8756,
+			viewCount: 10_000,
+			likeCount: 300,
+			commentCount: 50,
+			chapterCount: 3,
+			hasCaptions: true,
+			thumbnailUrl: 'https://i.ytimg.com/vi/abc/mqdefault.jpg',
 		},
 		position: 0,
 		excluded: false,
@@ -82,15 +83,15 @@ function row(overrides: Partial<ImportItem> = {}): ImportRow {
 const filmFacts = {
 	kind: 'movie',
 	summary: 'Your mind is the scene of the crime.',
-	published_at: '2010-07-08T00:00:00Z',
-	duration_seconds: 8880,
+	publishedAt: '2010-07-08T00:00:00Z',
+	durationSeconds: 8880,
 	rating: 7.4,
-	rating_count: 42,
-	rating_source: 'Metacritic',
+	ratingCount: 42,
+	ratingSource: 'Metacritic',
 	genres: ['Heist', 'Science fiction'],
-	top_cast: ['Leonardo DiCaprio', 'Ken Watanabe'],
-	box_office_usd: 836_848_102,
-	budget_usd: 160_000_000,
+	topCast: ['Leonardo DiCaprio', 'Ken Watanabe'],
+	revenue: 836_848_102,
+	budget: 160_000_000,
 };
 
 function film(overrides: Partial<ImportItem> = {}): ImportItem {
@@ -99,43 +100,46 @@ function film(overrides: Partial<ImportItem> = {}): ImportItem {
 
 describe('facts', () => {
 	it('labels come from the key name, with the suffix as the unit', () => {
-		expect(prettifyFactKey('box_office_usd')).toBe('Box office (USD)');
-		expect(prettifyFactKey('view_count')).toBe('Views');
-		expect(prettifyFactKey('rating_count')).toBe('Ratings');
-		expect(prettifyFactKey('duration_seconds')).toBe('Duration');
-		expect(prettifyFactKey('published_at')).toBe('Published');
-		expect(prettifyFactKey('has_captions')).toBe('Captions');
-		expect(prettifyFactKey('top_cast')).toBe('Top cast');
-		expect(prettifyFactKey('some_new_key'), 'a key nobody planned for still reads').toBe('Some new key');
+		expect(prettifyFactKey('revenue')).toBe('Revenue (USD)');
+		expect(prettifyFactKey('budget')).toBe('Budget (USD)');
+		expect(prettifyFactKey('viewCount')).toBe('Views');
+		expect(prettifyFactKey('ratingCount')).toBe('Ratings');
+		expect(prettifyFactKey('durationSeconds')).toBe('Duration');
+		expect(prettifyFactKey('publishedAt')).toBe('Published');
+		expect(prettifyFactKey('hasCaptions')).toBe('Captions');
+		expect(prettifyFactKey('topCast')).toBe('Top cast');
+		expect(prettifyFactKey('someNewKey'), 'a key nobody planned for still reads').toBe('Some new key');
 	});
 
 	it('values are formatted by key, and missing is the empty marker, never 0', () => {
-		const v = item().facts;
-		expect(formatFact('duration_seconds', v)).toBe('2:25:56');
-		expect(formatFact('view_count', v)).toBe('10.0 K');
-		expect(formatFact('published_at', v)).toBe('Oct 17, 2026');
-		expect(formatFact('has_captions', v)).toBe('Yes');
+		const v = item();
+		expect(formatFact('durationSeconds', v)).toBe('2:25:56');
+		expect(formatFact('viewCount', v)).toBe('10.0 K');
+		expect(formatFact('publishedAt', v)).toBe('Oct 17, 2026');
+		expect(formatFact('hasCaptions', v)).toBe('Yes');
 		expect(formatFact('kind', v)).toBe('Video');
-		const f = film().facts;
+		expect(formatFact('kind', item({ facts: { kind: 'MOVIE' } }))).toBe('Movie');
+		const f = film();
 		expect(formatFact('rating', f)).toBe('7.4 / 10');
-		expect(formatFact('box_office_usd', f)).toBe('$836.8M');
+		expect(formatFact('revenue', f)).toBe('$836.8M');
 		expect(formatFact('genres', f)).toBe('Heist, Science fiction');
-		expect(formatFact('view_count', f)).toBe(EMPTY_VALUE);
-		expect(factTooltip('box_office_usd', f)).toBe('$836.8M worldwide on a $160.0M budget');
-		expect(factTooltip('view_count', v)).toBe('10,000');
-		expect(factKind('budget_usd')).toBe('number');
-		expect(factKind('published_at')).toBe('date');
+		expect(formatFact('viewCount', f)).toBe(EMPTY_VALUE);
+		expect(factTooltip('revenue', f)).toBe('$836.8M worldwide on a $160.0M budget');
+		expect(factTooltip('viewCount', v)).toBe('10,000');
+		expect(factKind('budget')).toBe('number');
+		expect(factKind('publishedAt')).toBe('date');
 		expect(factKind('genres')).toBe('text');
 	});
 
 	it('a channel that hides likes says so, rather than a blank that reads as none', () => {
-		const hidden = { view_count: 500, likes_hidden: true };
-		expect(formatFact('like_count', hidden)).toBe('hidden');
-		expect(factTooltip('like_count', hidden)).toBe('The channel hides likes on this video');
-		expect(likeRate(hidden), 'hidden likes are unknown, not 0').toBeNull();
-		expect(factColumnKeys([item({ facts: hidden })]), 'the Likes column is where "hidden" is said').toContain(
-			'like_count',
-		);
+		const hidden = item({ facts: { viewCount: 500 } });
+		expect(likesHidden(hidden)).toBe(true);
+		expect(formatFact('likeCount', hidden)).toBe('hidden');
+		expect(factTooltip('likeCount', hidden)).toBe('The channel hides likes on this video');
+		expect(likeRate(hidden.facts), 'hidden likes are unknown, not 0').toBeNull();
+		expect(factColumnKeys([hidden]), 'the Likes column is where "hidden" is said').toContain('likeCount');
+		expect(likesHidden(film()), 'films have no likes to hide').toBe(false);
+		expect(formatFact('likeCount', film())).toBe(EMPTY_VALUE);
 	});
 
 	it('rates and momentum', () => {
@@ -145,15 +149,15 @@ describe('facts', () => {
 		expect(formatRate(0.0312)).toBe('3.1%');
 		expect(formatRate(null)).toBe(EMPTY_VALUE);
 		expect(ageDays({}, now)).toBeNull();
-		expect(ageDays({ published_at: 'not a date' }, now)).toBeNull();
-		expect(ageDays({ published_at: '2026-10-27T11:00:00Z' }, now)).toBe(1);
+		expect(ageDays({ publishedAt: 'not a date' }, now)).toBeNull();
+		expect(ageDays({ publishedAt: '2026-10-27T11:00:00Z' }, now)).toBe(1);
 	});
 
 	it('ratings name their source, and a critic aggregate rests on reviews, not votes', () => {
 		expect(ratingTooltip(film().facts)).toBe('Metacritic: 7.4 / 10 from 42 critic reviews');
 		expect(isLowSampleRating(film().facts), '42 reviews would be muted under the 50-vote user threshold').toBe(false);
-		expect(isLowSampleRating({ ...filmFacts, rating_count: 6 })).toBe(true);
-		expect(ratingTooltip({ rating: 8.4, rating_count: 12, rating_source: 'TMDB' })).toContain('few ratings');
+		expect(isLowSampleRating({ ...filmFacts, ratingCount: 6 })).toBe(true);
+		expect(ratingTooltip({ rating: 8.4, ratingCount: 12, ratingSource: 'TMDB' })).toContain('few ratings');
 		expect(ratingTooltip({ rating: 7.4 })).toBe('Rating: 7.4 / 10');
 		expect(ratingTooltip({})).toBe('');
 	});
@@ -171,36 +175,36 @@ describe('columns come from the facts present', () => {
 		const videos = factColumnKeys([item()]);
 		expect(videos).toEqual([
 			'kind',
-			'published_at',
-			'duration_seconds',
-			'view_count',
-			'like_count',
-			'like_rate',
-			'comment_count',
-			'views_per_day',
-			'chapter_count',
-			'has_captions',
+			'publishedAt',
+			'durationSeconds',
+			'viewCount',
+			'likeCount',
+			'likeRate',
+			'commentCount',
+			'viewsPerDay',
+			'chapterCount',
+			'hasCaptions',
 		]);
 		const films = factColumnKeys([film()]);
 		expect(films).toEqual([
 			'kind',
-			'published_at',
-			'duration_seconds',
+			'publishedAt',
+			'durationSeconds',
 			'rating',
-			'top_cast',
+			'topCast',
 			'genres',
-			'box_office_usd',
-			'budget_usd',
-			'rating_count',
+			'revenue',
+			'budget',
+			'ratingCount',
 		]);
-		for (const k of ['summary', 'thumbnail_url', 'rating_source', 'likes_hidden']) expect(films).not.toContain(k);
+		for (const k of ['summary', 'thumbnailUrl', 'ratingSource']) expect(films).not.toContain(k);
 	});
 
 	it('a key any row has becomes a column, and a new key needs no code', () => {
 		const keys = factColumnKeys([film(), film({ id: 'f2', facts: { ...filmFacts, awards_count: 3 } })]);
 		expect(keys).toContain('awards_count');
 		const defs = buildImportColumnDefs(toImportRows([film()], sources), now);
-		expect(defs.find((d) => d.colId === 'fact:box_office_usd')?.headerName).toBe('Box office (USD)');
+		expect(defs.find((d) => d.colId === 'fact:revenue')?.headerName).toBe('Revenue (USD)');
 	});
 
 	it('Decide hides secondary facts and bookkeeping; one source hides the Source column', () => {
@@ -212,18 +216,18 @@ describe('columns come from the facts present', () => {
 			'title',
 			'destination',
 			'fact:kind',
-			'fact:published_at',
-			'fact:duration_seconds',
+			'fact:publishedAt',
+			'fact:durationSeconds',
 			'fact:rating',
-			'fact:top_cast',
+			'fact:topCast',
 			'fact:genres',
-			'fact:box_office_usd',
+			'fact:revenue',
 			'status',
 		]);
 		expect(decide.hidden).toEqual([
 			'source',
-			'fact:budget_usd',
-			'fact:rating_count',
+			'fact:budget',
+			'fact:ratingCount',
 			'recency',
 			'externalId',
 			'statsFetchedAt',
@@ -245,9 +249,9 @@ describe('columns come from the facts present', () => {
 		const defs = buildImportColumnDefs(toImportRows([item()], sources), now);
 		const get = (id: string) =>
 			(defs.find((d) => d.colId === id)!.valueGetter as (p: { data: ImportRow }) => unknown)({ data: row() });
-		expect(get('fact:view_count')).toBe(10_000);
-		expect(get('fact:like_rate')).toBeCloseTo(0.03);
-		expect(get('fact:views_per_day')).toBeCloseTo(1000);
+		expect(get('fact:viewCount')).toBe(10_000);
+		expect(get('fact:likeRate')).toBeCloseTo(0.03);
+		expect(get('fact:viewsPerDay')).toBeCloseTo(1000);
 		expect(get('recency')).toBe(1);
 	});
 
@@ -300,7 +304,7 @@ describe('status and selection', () => {
 	it('summarises a selection by destination type, source and time', () => {
 		const s = selectionSummary([
 			row(),
-			row({ id: '2', facts: { duration_seconds: 3600 } }),
+			row({ id: '2', facts: { durationSeconds: 3600 } }),
 			row({ id: '3', destinationType: 'MOVIE', sourceId: '11', facts: {} }),
 		]);
 		expect(s.count).toBe(3);

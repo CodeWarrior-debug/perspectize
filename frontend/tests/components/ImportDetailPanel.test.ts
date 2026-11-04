@@ -39,13 +39,12 @@ function item(overrides: Partial<ImportItem> = {}): ImportItem {
 		title: 'A Voice from Hell, Part 2',
 		facts: {
 			kind: 'video',
-			published_at: '2026-10-25T12:00:00Z',
-			duration_seconds: 1710,
-			view_count: 18_000,
-			comment_count: 32,
-			chapter_count: 0,
-			has_captions: false,
-			likes_hidden: true,
+			publishedAt: '2026-10-25T12:00:00Z',
+			durationSeconds: 1710,
+			viewCount: 18_000,
+			commentCount: 32,
+			chapterCount: 0,
+			hasCaptions: false,
 		},
 		position: 3,
 		excluded: false,
@@ -127,7 +126,7 @@ describe('ImportDetailPanel', () => {
 		const film = item({
 			destinationType: 'MOVIE',
 			title: 'Following',
-			facts: { kind: 'movie', duration_seconds: 4140, rating: 6, rating_count: 6, rating_source: 'Metacritic' },
+			facts: { kind: 'movie', durationSeconds: 4140, rating: 6, ratingCount: 6, ratingSource: 'Metacritic' },
 		});
 		mocks.state.data = {
 			importItemDetails: details({

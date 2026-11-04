@@ -47,8 +47,7 @@ function item(overrides: Partial<ImportItem> = {}): ImportItem {
 		title: 'A video',
 		facts: {
 			kind: 'video',
-			chapter_count: 0,
-			likes_hidden: true,
+			chapterCount: 0,
 		},
 		position: 0,
 		excluded: false,
