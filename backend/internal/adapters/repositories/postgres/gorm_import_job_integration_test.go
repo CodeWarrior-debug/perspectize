@@ -144,7 +144,7 @@ func TestImportJobIntegration_UpsertListAndInLibrary(t *testing.T) {
 	batch[2].Item.Facts.Genres = []string{"Science fiction", "Thriller"}
 	batch[2].Item.Facts.TopCast = []string{"Leonardo DiCaprio", "Ken Watanabe"}
 	pop, reviews, revenue, budget := 38.5, 12, int64(836848102), int64(160000000)
-	batch[2].Item.Facts.Popularity, batch[2].Item.Facts.ReviewCount, batch[2].Item.Facts.RevenueUSD, batch[2].Item.Facts.BudgetUSD = &pop, &reviews, &revenue, &budget
+	batch[2].Item.Facts.Popularity, batch[2].Item.Facts.ReviewCount, batch[2].Item.Facts.BoxOfficeUSD, batch[2].Item.Facts.BudgetUSD = &pop, &reviews, &revenue, &budget
 	c := querycount.Attach(t, f.db)
 	require.NoError(t, f.repo.UpsertItems(ctx, batch))
 	c.AssertExactly(t, 1)
@@ -174,14 +174,14 @@ func TestImportJobIntegration_UpsertListAndInLibrary(t *testing.T) {
 	assert.Equal(t, []string{"Leonardo DiCaprio", "Ken Watanabe"}, items[2].Facts.TopCast)
 	assert.InDelta(t, 38.5, *items[2].Facts.Popularity, 0.001)
 	assert.Equal(t, 12, *items[2].Facts.ReviewCount)
-	assert.Equal(t, revenue, *items[2].Facts.RevenueUSD)
+	assert.Equal(t, revenue, *items[2].Facts.BoxOfficeUSD)
 	assert.Equal(t, budget, *items[2].Facts.BudgetUSD)
-	assert.Nil(t, items[0].Facts.RevenueUSD)
+	assert.Nil(t, items[0].Facts.BoxOfficeUSD)
 	assert.Empty(t, items[0].Facts.Genres, "a fact a source didn't give stays absent")
 	var raw string
 	require.NoError(t, f.db.Raw("SELECT facts::text FROM import_job_items WHERE id = ?", items[0].ID).Scan(&raw).Error)
 	assert.NotContains(t, raw, "genres", "absent facts aren't stored as empty values")
-	assert.NotContains(t, raw, "revenue_usd")
+	assert.NotContains(t, raw, "box_office_usd")
 	assert.Contains(t, raw, `"view_count": 1000`)
 
 	// Re-staging refreshes stats but keeps the import outcome.

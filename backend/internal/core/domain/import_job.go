@@ -192,12 +192,12 @@ type ImportFacts struct {
 	RatingSource string   `json:"rating_source,omitempty"`
 
 	// Films (TMDB, or Wikidata for the demo).
-	ReviewCount *int     `json:"review_count,omitempty"`
-	Popularity  *float64 `json:"popularity,omitempty"`
-	RevenueUSD  *int64   `json:"revenue_usd,omitempty"`
-	BudgetUSD   *int64   `json:"budget_usd,omitempty"`
-	Genres      []string `json:"genres,omitempty"`
-	TopCast     []string `json:"top_cast,omitempty"`
+	ReviewCount  *int     `json:"review_count,omitempty"`
+	Popularity   *float64 `json:"popularity,omitempty"`
+	BoxOfficeUSD *int64   `json:"box_office_usd,omitempty"`
+	BudgetUSD    *int64   `json:"budget_usd,omitempty"`
+	Genres       []string `json:"genres,omitempty"`
+	TopCast      []string `json:"top_cast,omitempty"`
 
 	// Videos.
 	ChapterCount *int  `json:"chapter_count,omitempty"`

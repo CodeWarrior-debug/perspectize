@@ -175,7 +175,7 @@ func (s ImportFixtureSource) Rows(fetched time.Time) []*domain.ImportItemWithDet
 			HasCaptions:     it.HasCaptions,
 			Genres:          it.Genres,
 			TopCast:         it.TopCast,
-			RevenueUSD:      it.Revenue,
+			BoxOfficeUSD:      it.Revenue,
 			BudgetUSD:       it.Budget,
 		}
 		if it.RatingSource != nil {
