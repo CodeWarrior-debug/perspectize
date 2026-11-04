@@ -3925,10 +3925,10 @@ type ImportSource {
   fetchedAt: String
 }
 
-# An admin's import is APPROVED when created; anyone else's is PENDING until
+# An admin's import is APPROVED when created; anyone else's is REQUESTED until
 # an admin approves it (listing starts) or declines it.
 enum ImportRequestStatus {
-  PENDING
+  REQUESTED
   APPROVED
   DECLINED
 }
@@ -3961,15 +3961,18 @@ type ImportItem {
   externalId: String!
   url: String!
   title: String!
-  # The decision facts shown as sheet columns: one object whose snake_case
-  # keys are shared across content types (duration_seconds, view_count,
-  # rating, genres, box_office_usd...; see domain.ImportFacts). A key a source
-  # can't supply is absent, never 0.
+  # Decision facts, shown as sheet columns named after the keys. Keys mean the
+  # same thing for every content type; a missing key is unknown, never 0.
+  # kind ("VIDEO" | "SHORT" | "LIVE" | "MOVIE"), summary, publishedAt,
+  # durationSeconds, viewCount, likeCount (absent when the channel hides likes),
+  # commentCount, rating (0-10), ratingCount, ratingSource (e.g. "TMDB"),
+  # chapterCount, hasCaptions, genres, topCast (up to 3 top-billed),
+  # popularity (TMDB), reviewCount, revenue and budget (USD), thumbnailUrl.
   facts: JSON!
-  # Position in the source listing; 0 is first (newest for channels).
-  position: Int!
   # Marked "don't import" (by anyone, until the import is closed): can't be imported.
   excluded: Boolean!
+  # Position in the source listing; 0 is first (newest for channels).
+  position: Int!
   statsFetchedAt: String!
   # True when content with this URL is already in the library.
   inLibrary: Boolean!
@@ -4696,10 +4699,10 @@ func (ec *executionContext) childFields_ImportItem(ctx context.Context, field gr
 		return ec.fieldContext_ImportItem_title(ctx, field)
 	case "facts":
 		return ec.fieldContext_ImportItem_facts(ctx, field)
-	case "position":
-		return ec.fieldContext_ImportItem_position(ctx, field)
 	case "excluded":
 		return ec.fieldContext_ImportItem_excluded(ctx, field)
+	case "position":
+		return ec.fieldContext_ImportItem_position(ctx, field)
 	case "statsFetchedAt":
 		return ec.fieldContext_ImportItem_statsFetchedAt(ctx, field)
 	case "inLibrary":
@@ -8223,29 +8226,6 @@ func (ec *executionContext) fieldContext_ImportItem_facts(_ context.Context, fie
 	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type JSON does not have child fields"))
 }
 
-func (ec *executionContext) _ImportItem_position(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_ImportItem_position(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.Position, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
-			return ec.marshalNInt2int(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_ImportItem_position(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Int does not have child fields"))
-}
-
 func (ec *executionContext) _ImportItem_excluded(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8267,6 +8247,29 @@ func (ec *executionContext) _ImportItem_excluded(ctx context.Context, field grap
 }
 func (ec *executionContext) fieldContext_ImportItem_excluded(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _ImportItem_position(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImportItem_position(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Position, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImportItem_position(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImportItem", field, false, false, errors.New("field of type Int does not have child fields"))
 }
 
 func (ec *executionContext) _ImportItem_statsFetchedAt(ctx context.Context, field graphql.CollectedField, obj *model.ImportItem) (ret graphql.Marshaler) {
@@ -21072,13 +21075,13 @@ func (ec *executionContext) _ImportItem(ctx context.Context, sel ast.SelectionSe
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "position":
-			out.Values[i] = ec._ImportItem_position(ctx, field, obj)
+		case "excluded":
+			out.Values[i] = ec._ImportItem_excluded(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "excluded":
-			out.Values[i] = ec._ImportItem_excluded(ctx, field, obj)
+		case "position":
+			out.Values[i] = ec._ImportItem_position(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

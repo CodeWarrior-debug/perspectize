@@ -21,14 +21,14 @@ const importJobsUserFK = "import_jobs_user_fk"
 // importItemListColumns is every item column except details (the detail panel
 // fetches those lazily), plus the id of content with the same URL.
 const importItemListColumns = `i.id, i.job_id, i.source_id, i.external_id, i.destination_type, i.canonical_url,
-	i.title, i.position, i.facts, i.stats_fetched_at, i.excluded, i.import_status, i.import_error,
-	i.content_id, i.imported_at, i.created_at, i.updated_at, c.id AS library_content_id`
+	i.title, i.facts, i.position, i.excluded, i.stats_fetched_at, i.import_status, i.import_error, i.content_id,
+	i.imported_at, i.created_at, i.updated_at, c.id AS library_content_id`
 
 // importItemUpsertColumns are refreshed when a candidate is staged again. The
 // import outcome columns are deliberately absent so a re-list never forgets
 // what was imported.
 var importItemUpsertColumns = []string{
-	"title", "position", "facts", "details", "stats_fetched_at", "destination_type", "updated_at",
+	"title", "facts", "position", "details", "stats_fetched_at", "updated_at",
 }
 
 // GormImportJobRepository implements repositories.ImportJobRepository using GORM
@@ -255,7 +255,7 @@ func (r *GormImportJobRepository) ListItems(ctx context.Context, jobID int) ([]*
 		Scan(&models).Error; err != nil {
 		return nil, fmt.Errorf("failed to list import items: %w", err)
 	}
-	return importItemModelsToDomain(models), nil
+	return importItemModelsToDomain(models)
 }
 
 // GetItemsByIDs returns the rows of jobID among ids.
@@ -270,7 +270,7 @@ func (r *GormImportJobRepository) GetItemsByIDs(ctx context.Context, jobID int, 
 		Scan(&models).Error; err != nil {
 		return nil, fmt.Errorf("failed to get import items: %w", err)
 	}
-	return importItemModelsToDomain(models), nil
+	return importItemModelsToDomain(models)
 }
 
 // GetItemWithDetails returns one row and decodes its details payload.
@@ -286,7 +286,11 @@ func (r *GormImportJobRepository) GetItemWithDetails(ctx context.Context, itemID
 	if len(models) == 0 {
 		return nil, fmt.Errorf("%w: import item %d", domain.ErrNotFound, itemID)
 	}
-	out := &domain.ImportItemWithDetails{Item: *importItemModelToDomain(&models[0])}
+	item, err := importItemModelToDomain(&models[0])
+	if err != nil {
+		return nil, err
+	}
+	out := &domain.ImportItemWithDetails{Item: *item}
 	if len(models[0].Details) > 0 {
 		if err := json.Unmarshal(models[0].Details, &out.Details); err != nil {
 			return nil, fmt.Errorf("failed to decode import item details: %w", err)
@@ -356,7 +360,7 @@ func (r *GormImportJobRepository) FailInterrupted(ctx context.Context, detail st
 func (r *GormImportJobRepository) CountPendingRequests(ctx context.Context, userID int) (int, error) {
 	var n int64
 	if err := r.db.WithContext(ctx).Model(&ImportJobModel{}).
-		Where("user_id = ? AND request_status = 'pending'", userID).
+		Where("user_id = ? AND request_status = 'requested'", userID).
 		Count(&n).Error; err != nil {
 		return 0, fmt.Errorf("failed to count import requests: %w", err)
 	}
@@ -368,7 +372,7 @@ func (r *GormImportJobRepository) CountPendingRequests(ctx context.Context, user
 // ErrNotFound. Approving also moves the job's waiting sources to listing.
 func (r *GormImportJobRepository) ReviewJob(ctx context.Context, jobID int, status domain.ImportRequestStatus, note *string, at time.Time) error {
 	result := r.db.WithContext(ctx).Model(&ImportJobModel{}).
-		Where("id = ? AND request_status = 'pending'", jobID).
+		Where("id = ? AND request_status = 'requested'", jobID).
 		Updates(map[string]any{"request_status": importRequestStatusToDB(status), "review_note": note, "reviewed_at": at})
 	if result.Error != nil {
 		return fmt.Errorf("failed to review import job: %w", result.Error)
@@ -397,10 +401,14 @@ func (r *GormImportJobRepository) ReassignByUser(ctx context.Context, fromUserID
 	return nil
 }
 
-func importItemModelsToDomain(models []ImportItemModel) []*domain.ImportItem {
+func importItemModelsToDomain(models []ImportItemModel) ([]*domain.ImportItem, error) {
 	out := make([]*domain.ImportItem, len(models))
 	for i := range models {
-		out[i] = importItemModelToDomain(&models[i])
+		it, err := importItemModelToDomain(&models[i])
+		if err != nil {
+			return nil, err
+		}
+		out[i] = it
 	}
-	return out
+	return out, nil
 }

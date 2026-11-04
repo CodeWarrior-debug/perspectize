@@ -131,8 +131,8 @@ func TestChannelLister_List(t *testing.T) {
 	assert.Equal(t, int64(12000), *v1.Item.Facts.LikeCount)
 	assert.True(t, *v1.Item.Facts.HasCaptions)
 	assert.Equal(t, 3, *v1.Item.Facts.ChapterCount)
-	assert.Equal(t, "Lecture one of the 2017 course.", v1.Item.Facts.Summary)
-	assert.Equal(t, "https://i.ytimg.com/vi/v1/mqdefault.jpg", v1.Item.Facts.ThumbnailURL)
+	assert.Equal(t, "Lecture one of the 2017 course.", *v1.Item.Facts.Summary)
+	assert.Equal(t, "https://i.ytimg.com/vi/v1/mqdefault.jpg", *v1.Item.Facts.ThumbnailURL)
 	assert.Equal(t, fixed, v1.Item.StatsFetchedAt)
 	assert.Equal(t, []string{"jordanbpeterson.com"}, v1.Details.Links)
 	assert.Equal(t, "27", v1.Details.Category)
@@ -140,8 +140,6 @@ func TestChannelLister_List(t *testing.T) {
 
 	v2 := all[1]
 	assert.Nil(t, v2.Item.Facts.LikeCount, "hidden likes stay nil, not 0")
-	assert.True(t, v2.Item.Facts.LikesHidden, "and the row says the channel hides them")
-	assert.False(t, v1.Item.Facts.LikesHidden)
 	assert.Nil(t, v2.Item.Facts.CommentCount)
 	assert.False(t, *v2.Item.Facts.HasCaptions)
 	assert.Equal(t, 2, v2.Item.Position, "position counts the deleted video's slot")

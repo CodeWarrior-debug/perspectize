@@ -258,8 +258,8 @@ type ImportItem struct {
 	URL             string                   `json:"url"`
 	Title           string                   `json:"title"`
 	Facts           map[string]any           `json:"facts"`
-	Position        int                      `json:"position"`
 	Excluded        bool                     `json:"excluded"`
+	Position        int                      `json:"position"`
 	StatsFetchedAt  string                   `json:"statsFetchedAt"`
 	InLibrary       bool                     `json:"inLibrary"`
 	ContentID       *string                  `json:"contentId,omitempty"`

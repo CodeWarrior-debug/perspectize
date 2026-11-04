@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
@@ -573,7 +574,7 @@ func importSourceDomainToModel(s *domain.ImportSource) *ImportSourceModel {
 // importItemModelToDomain converts a GORM ImportItemModel to domain.ImportItem.
 // ContentID prefers the content the import created, then any content with the
 // same URL (LibraryContentID), so a row added by hand still links to it.
-func importItemModelToDomain(m *ImportItemModel) *domain.ImportItem {
+func importItemModelToDomain(m *ImportItemModel) (*domain.ImportItem, error) {
 	it := &domain.ImportItem{
 		ID:              m.ID,
 		JobID:           m.JobID,
@@ -590,10 +591,10 @@ func importItemModelToDomain(m *ImportItemModel) *domain.ImportItem {
 		ContentID:       m.ContentID,
 		InLibrary:       m.LibraryContentID != nil,
 	}
-	// facts is only ever written from domain.ImportFacts, so it always decodes;
-	// an unknown key from a newer server is ignored rather than failing the sheet.
 	if len(m.Facts) > 0 {
-		_ = json.Unmarshal(m.Facts, &it.Facts)
+		if err := json.Unmarshal(m.Facts, &it.Facts); err != nil {
+			return nil, fmt.Errorf("failed to decode facts of import item %d: %w", m.ID, err)
+		}
 	}
 	if it.ContentID == nil {
 		it.ContentID = m.LibraryContentID
@@ -602,30 +603,31 @@ func importItemModelToDomain(m *ImportItemModel) *domain.ImportItem {
 		st := domain.ImportItemStatus(strings.ToUpper(*m.ImportStatus))
 		it.ImportStatus = &st
 	}
-	return it
+	return it, nil
 }
 
 // importItemDomainToModel converts a staged candidate (row + details) to its GORM model
 func importItemDomainToModel(in *domain.ImportItemWithDetails) (*ImportItemModel, error) {
-	details, err := json.Marshal(in.Details)
-	if err != nil {
-		return nil, err
-	}
 	facts, err := json.Marshal(in.Item.Facts)
 	if err != nil {
 		return nil, err
 	}
+	details, err := json.Marshal(in.Details)
+	if err != nil {
+		return nil, err
+	}
 	it := in.Item
-	return &ImportItemModel{
+	m := &ImportItemModel{
 		JobID:           it.JobID,
 		SourceID:        it.SourceID,
 		ExternalID:      it.ExternalID,
 		DestinationType: contentTypeToDBValue(it.DestinationType),
 		CanonicalURL:    it.CanonicalURL,
 		Title:           it.Title,
-		Position:        it.Position,
 		Facts:           facts,
+		Position:        it.Position,
 		Details:         details,
 		StatsFetchedAt:  it.StatsFetchedAt,
-	}, nil
+	}
+	return m, nil
 }

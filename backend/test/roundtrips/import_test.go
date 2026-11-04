@@ -34,7 +34,7 @@ func (staticLister) List(_ context.Context, _ portservices.ResolvedImportSource,
 			Item: domain.ImportItem{
 				ExternalID: id, DestinationType: domain.ContentTypeYouTubeVideo,
 				CanonicalURL: "https://www.youtube.com/watch?v=" + id, Title: fmt.Sprintf("Video %02d", i),
-				Facts:    domain.ImportFacts{Kind: domain.ImportItemKindVideo, Summary: summary, ViewCount: &views, LikesHidden: true},
+				Facts:    domain.ImportFacts{Kind: domain.ImportItemKindVideo, Summary: &summary, ViewCount: &views},
 				Position: i, StatsFetchedAt: time.Now().UTC(),
 			},
 			Details: domain.ImportItemDetails{Description: "Full description", Tags: []string{"t"}},
@@ -152,7 +152,7 @@ func TestImportRequestRoundTrips(t *testing.T) {
 		"name": "Gaither", "sources": []map[string]any{{"sourceType": "YOUTUBE_CHANNEL", "ref": "@GaitherMusic"}},
 	}})
 	req := decode[rtRequest](t, data, "createImportJob")
-	assert.Equal(t, "PENDING", req.RequestStatus)
+	assert.Equal(t, "REQUESTED", req.RequestStatus)
 	assert.Equal(t, "WAITING", req.Sources[0].Status)
 	assert.Empty(t, h.background, "a request lists nothing until approved")
 
@@ -221,8 +221,8 @@ func TestImportJobRoundTrips(t *testing.T) {
 	assert.NotNil(t, got.Sources[0].FetchedAt)
 	assert.Equal(t, "Video 00", got.Items[0].Title)
 	assert.Equal(t, "YOUTUBE_VIDEO", got.Items[0].DestinationType)
-	// Facts carry exactly the keys a source supplied: no like_count, and the reason why.
-	assert.Equal(t, map[string]any{"kind": "video", "summary": "Summary", "view_count": float64(1000), "likes_hidden": true}, got.Items[0].Facts)
+	assert.Equal(t, map[string]any{"kind": "VIDEO", "summary": "Summary", "viewCount": float64(1000)}, got.Items[0].Facts,
+		"facts carry only known keys: no likeCount when likes are unknown")
 	assert.False(t, got.Items[0].InLibrary)
 }
 

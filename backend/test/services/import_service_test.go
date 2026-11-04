@@ -119,7 +119,7 @@ func (r *fakeImportRepo) CountPendingRequests(_ context.Context, userID int) (in
 	defer r.mu.Unlock()
 	n := 0
 	for _, j := range r.jobs {
-		if j.UserID == userID && j.RequestStatus == domain.ImportRequestStatusPending {
+		if j.UserID == userID && j.RequestStatus == domain.ImportRequestStatusRequested {
 			n++
 		}
 	}
@@ -130,7 +130,7 @@ func (r *fakeImportRepo) ReviewJob(_ context.Context, jobID int, status domain.I
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	j, ok := r.jobs[jobID]
-	if !ok || j.RequestStatus != domain.ImportRequestStatusPending {
+	if !ok || j.RequestStatus != domain.ImportRequestStatusRequested {
 		return domain.ErrNotFound
 	}
 	j.RequestStatus, j.ReviewNote, j.ReviewedAt = status, note, &at
@@ -297,8 +297,7 @@ func candidate(ext string, dest domain.ContentType) *domain.ImportItemWithDetail
 	if dest == domain.ContentTypeMovie {
 		url = "https://www.themoviedb.org/movie/" + ext
 	}
-	return &domain.ImportItemWithDetails{Item: domain.ImportItem{ExternalID: ext, DestinationType: dest, CanonicalURL: url, Title: ext,
-		Facts: domain.ImportFacts{Kind: domain.ImportItemKindVideo}}}
+	return &domain.ImportItemWithDetails{Item: domain.ImportItem{ExternalID: ext, DestinationType: dest, CanonicalURL: url, Title: ext, Facts: domain.ImportFacts{Kind: domain.ImportItemKindVideo}}}
 }
 
 // fakeCreator records content creation; urls in exists report ErrAlreadyExists, in fail fail.
@@ -741,7 +740,7 @@ func TestImportService_RequestWaitsForAnAdmin(t *testing.T) {
 
 	job, err := svc.CreateImportJob(ctx, importUser, input)
 	require.NoError(t, err)
-	assert.Equal(t, domain.ImportRequestStatusPending, job.RequestStatus)
+	assert.Equal(t, domain.ImportRequestStatusRequested, job.RequestStatus)
 	assert.Equal(t, domain.ImportSourceStatusWaiting, job.Sources[0].Status)
 	assert.Equal(t, "Title @GaitherMusic", *job.Sources[0].Title, "resolved up front, so the admin sees what was asked for")
 	assert.Equal(t, 0, yt.lists, "a request spends no listing quota")

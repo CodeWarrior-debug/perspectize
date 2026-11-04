@@ -78,8 +78,10 @@ func (f *importJobFixture) videoItem(job *domain.ImportJob, n int) *domain.Impor
 			DestinationType: domain.ContentTypeYouTubeVideo,
 			CanonicalURL:    "https://www.youtube.com/watch?v=" + id,
 			Title:           fmt.Sprintf("Video %d", n),
-			Facts: domain.ImportFacts{Kind: domain.ImportItemKindVideo, Summary: summary,
-				PublishedAt: &pub, DurationSeconds: &dur, ViewCount: &views, LikeCount: &likes},
+			Facts: domain.ImportFacts{
+				Kind: domain.ImportItemKindVideo, Summary: &summary,
+				PublishedAt: &pub, DurationSeconds: &dur, ViewCount: &views, LikeCount: &likes,
+			},
 			Position: n, StatsFetchedAt: time.Now().UTC(),
 		},
 		Details: domain.ImportItemDetails{
@@ -144,7 +146,7 @@ func TestImportJobIntegration_UpsertListAndInLibrary(t *testing.T) {
 	batch[2].Item.Facts.Genres = []string{"Science fiction", "Thriller"}
 	batch[2].Item.Facts.TopCast = []string{"Leonardo DiCaprio", "Ken Watanabe"}
 	pop, reviews, revenue, budget := 38.5, 12, int64(836848102), int64(160000000)
-	batch[2].Item.Facts.Popularity, batch[2].Item.Facts.ReviewCount, batch[2].Item.Facts.BoxOfficeUSD, batch[2].Item.Facts.BudgetUSD = &pop, &reviews, &revenue, &budget
+	batch[2].Item.Facts.Popularity, batch[2].Item.Facts.ReviewCount, batch[2].Item.Facts.Revenue, batch[2].Item.Facts.Budget = &pop, &reviews, &revenue, &budget
 	c := querycount.Attach(t, f.db)
 	require.NoError(t, f.repo.UpsertItems(ctx, batch))
 	c.AssertExactly(t, 1)
@@ -174,15 +176,12 @@ func TestImportJobIntegration_UpsertListAndInLibrary(t *testing.T) {
 	assert.Equal(t, []string{"Leonardo DiCaprio", "Ken Watanabe"}, items[2].Facts.TopCast)
 	assert.InDelta(t, 38.5, *items[2].Facts.Popularity, 0.001)
 	assert.Equal(t, 12, *items[2].Facts.ReviewCount)
-	assert.Equal(t, revenue, *items[2].Facts.BoxOfficeUSD)
-	assert.Equal(t, budget, *items[2].Facts.BudgetUSD)
-	assert.Nil(t, items[0].Facts.BoxOfficeUSD)
-	assert.Empty(t, items[0].Facts.Genres, "a fact a source didn't give stays absent")
-	var raw string
-	require.NoError(t, f.db.Raw("SELECT facts::text FROM import_job_items WHERE id = ?", items[0].ID).Scan(&raw).Error)
-	assert.NotContains(t, raw, "genres", "absent facts aren't stored as empty values")
-	assert.NotContains(t, raw, "box_office_usd")
-	assert.Contains(t, raw, `"view_count": 1000`)
+	assert.Equal(t, revenue, *items[2].Facts.Revenue)
+	assert.Equal(t, budget, *items[2].Facts.Budget)
+	assert.Nil(t, items[0].Facts.Revenue)
+	assert.Nil(t, items[0].Facts.Genres, "a video has no genres: the key is absent")
+	assert.Nil(t, items[0].Facts.TopCast)
+	assert.Equal(t, time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), items[0].Facts.PublishedAt.UTC(), "a time survives the JSONB round trip")
 
 	// Re-staging refreshes stats but keeps the import outcome.
 	require.NoError(t, f.repo.RecordOutcome(ctx, items[0].ID, domain.ImportItemStatusFailed, ptr("quota"), nil))
@@ -312,7 +311,7 @@ func TestImportJobIntegration_RequestsAndReview(t *testing.T) {
 	ctx := context.Background()
 	request := func() *domain.ImportJob {
 		job, err := f.repo.CreateJob(ctx, &domain.ImportJob{
-			UserID: f.other, Name: "Gaither", RequestStatus: domain.ImportRequestStatusPending,
+			UserID: f.other, Name: "Gaither", RequestStatus: domain.ImportRequestStatusRequested,
 			Sources: []*domain.ImportSource{{SourceType: domain.ImportSourceYouTubeChannel, SourceRef: "@GaitherMusic",
 				DestinationType: domain.ContentTypeYouTubeVideo, Status: domain.ImportSourceStatusWaiting}},
 		})
@@ -320,7 +319,7 @@ func TestImportJobIntegration_RequestsAndReview(t *testing.T) {
 		return job
 	}
 	first, second := request(), request()
-	assert.Equal(t, domain.ImportRequestStatusPending, first.RequestStatus)
+	assert.Equal(t, domain.ImportRequestStatusRequested, first.RequestStatus)
 	assert.Equal(t, domain.ImportSourceStatusWaiting, first.Sources[0].Status)
 	assert.Equal(t, domain.ImportRequestStatusApproved, f.newJob(t).RequestStatus, "an unset status is stored as approved")
 

@@ -242,10 +242,14 @@ func (s *ImportService) CreateImportJob(ctx context.Context, actor *domain.Authe
 		}
 	}
 
-	job := &domain.ImportJob{UserID: actor.ID, Name: name, RequestStatus: domain.ImportRequestStatusApproved}
-	sourceStatus := domain.ImportSourceStatusListing
-	if !isAdmin {
-		job.RequestStatus, sourceStatus = domain.ImportRequestStatusPending, domain.ImportSourceStatusWaiting
+	// An admin's import spends quota at once; anyone else's waits for review.
+	// Decided here, from the actor's role: the column has no default to fall back on.
+	job := &domain.ImportJob{UserID: actor.ID, Name: name}
+	var sourceStatus domain.ImportSourceStatus
+	if isAdmin {
+		job.RequestStatus, sourceStatus = domain.ImportRequestStatusApproved, domain.ImportSourceStatusListing
+	} else {
+		job.RequestStatus, sourceStatus = domain.ImportRequestStatusRequested, domain.ImportSourceStatusWaiting
 	}
 	resolved := make([]resolvedSource, len(input.Sources))
 	for i, in := range input.Sources {
@@ -316,7 +320,7 @@ func (s *ImportService) ReviewImportJob(ctx context.Context, actor *domain.Authe
 	if err != nil {
 		return nil, err
 	}
-	if job.RequestStatus != domain.ImportRequestStatusPending {
+	if job.RequestStatus != domain.ImportRequestStatusRequested {
 		return nil, fmt.Errorf("%w: this import is already %s", domain.ErrInvalidInput, strings.ToLower(string(job.RequestStatus)))
 	}
 

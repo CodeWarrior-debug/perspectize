@@ -570,10 +570,10 @@ type ImportSource {
   fetchedAt: String
 }
 
-# An admin's import is APPROVED when created; anyone else's is PENDING until
+# An admin's import is APPROVED when created; anyone else's is REQUESTED until
 # an admin approves it (listing starts) or declines it.
 enum ImportRequestStatus {
-  PENDING
+  REQUESTED
   APPROVED
   DECLINED
 }
@@ -606,15 +606,18 @@ type ImportItem {
   externalId: String!
   url: String!
   title: String!
-  # The decision facts shown as sheet columns: one object whose snake_case
-  # keys are shared across content types (duration_seconds, view_count,
-  # rating, genres, box_office_usd...; see domain.ImportFacts). A key a source
-  # can't supply is absent, never 0.
+  # Decision facts, shown as sheet columns named after the keys. Keys mean the
+  # same thing for every content type; a missing key is unknown, never 0.
+  # kind ("VIDEO" | "SHORT" | "LIVE" | "MOVIE"), summary, publishedAt,
+  # durationSeconds, viewCount, likeCount (absent when the channel hides likes),
+  # commentCount, rating (0-10), ratingCount, ratingSource (e.g. "TMDB"),
+  # chapterCount, hasCaptions, genres, topCast (up to 3 top-billed),
+  # popularity (TMDB), reviewCount, revenue and budget (USD), thumbnailUrl.
   facts: JSON!
-  # Position in the source listing; 0 is first (newest for channels).
-  position: Int!
   # Marked "don't import" (by anyone, until the import is closed): can't be imported.
   excluded: Boolean!
+  # Position in the source listing; 0 is first (newest for channels).
+  position: Int!
   statsFetchedAt: String!
   # True when content with this URL is already in the library.
   inLibrary: Boolean!

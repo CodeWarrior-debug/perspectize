@@ -302,9 +302,21 @@ func (l *PersonLister) enrich(ctx context.Context, films []film) []movieExtras {
 
 func creditToItem(f film, extra movieExtras, position int, summary string, fetched time.Time) *domain.ImportItemWithDetails {
 	c := f.credit
-	facts := domain.ImportFacts{Kind: domain.ImportItemKindMovie, Summary: summary}
+	item := domain.ImportItem{
+		ExternalID:      strconv.Itoa(c.ID),
+		DestinationType: domain.ContentTypeMovie,
+		CanonicalURL:    CanonicalMovieURL(c.ID),
+		Title:           c.Title,
+		Facts:           domain.ImportFacts{Kind: domain.ImportItemKindMovie},
+		Position:        position,
+		StatsFetchedAt:  fetched,
+	}
+	facts := &item.Facts
 	if extra.Tagline != "" {
-		facts.Summary = extra.Tagline
+		tagline := extra.Tagline
+		facts.Summary = &tagline
+	} else if summary != "" {
+		facts.Summary = &summary
 	}
 	if t, err := time.Parse("2006-01-02", c.ReleaseDate); err == nil {
 		facts.PublishedAt = &t
@@ -315,11 +327,14 @@ func creditToItem(f film, extra movieExtras, position int, summary string, fetch
 	}
 	// TMDB reports 0 for a film nobody has rated; that is "no rating", not a score of 0.
 	if c.VoteCount > 0 {
-		rating, count := c.VoteAverage, c.VoteCount
-		facts.Rating, facts.RatingCount, facts.RatingSource = &rating, &count, "TMDB"
+		rating := c.VoteAverage
+		count := c.VoteCount
+		source := "TMDB"
+		facts.Rating, facts.RatingCount, facts.RatingSource = &rating, &count, &source
 	}
 	if c.PosterPath != "" {
-		facts.ThumbnailURL = posterBase + c.PosterPath
+		poster := posterBase + c.PosterPath
+		facts.ThumbnailURL = &poster
 	}
 	genres := make([]string, len(extra.Genres))
 	for i, g := range extra.Genres {
@@ -334,24 +349,15 @@ func creditToItem(f film, extra movieExtras, position int, summary string, fetch
 	}
 	if extra.Budget > 0 {
 		b := extra.Budget
-		facts.BudgetUSD = &b
+		facts.Budget = &b
 	}
 	if extra.Revenue > 0 {
 		r := extra.Revenue
-		facts.BoxOfficeUSD = &r
+		facts.Revenue = &r
 	}
 	if extra.Reviews != nil {
 		n := extra.Reviews.TotalResults
 		facts.ReviewCount = &n
-	}
-	item := domain.ImportItem{
-		ExternalID:      strconv.Itoa(c.ID),
-		DestinationType: domain.ContentTypeMovie,
-		CanonicalURL:    CanonicalMovieURL(c.ID),
-		Title:           c.Title,
-		Facts:           facts,
-		Position:        position,
-		StatsFetchedAt:  fetched,
 	}
 	keywords := make([]string, 0, len(extra.Keywords.Keywords))
 	for _, k := range extra.Keywords.Keywords {

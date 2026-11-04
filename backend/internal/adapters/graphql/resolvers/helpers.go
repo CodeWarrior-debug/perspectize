@@ -1004,15 +1004,20 @@ func importItemToModel(it *domain.ImportItem) *model.ImportItem {
 	return m
 }
 
-// importFactsToMap is the facts object as the client sees it: exactly the
-// jsonb keys (omitted keys stay absent), so the sheet can make a column per key.
+// importFactsToMap turns facts into the JSON scalar's map through their json
+// tags, so the keys clients see are exactly the stored ones and unknown facts
+// stay absent. Facts are plain values, so encoding can't fail; if it ever did,
+// the row shows no facts rather than failing the whole sheet.
 func importFactsToMap(f domain.ImportFacts) map[string]any {
 	out := map[string]any{}
 	b, err := json.Marshal(f)
 	if err != nil {
+		slog.Warn("failed to encode import facts", "error", err)
 		return out
 	}
-	_ = json.Unmarshal(b, &out)
+	if err := json.Unmarshal(b, &out); err != nil {
+		slog.Warn("failed to decode import facts", "error", err)
+	}
 	return out
 }
 

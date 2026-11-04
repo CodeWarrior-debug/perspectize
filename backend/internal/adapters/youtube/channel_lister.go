@@ -265,17 +265,24 @@ func (l *ChannelLister) videos(ctx context.Context, ids []string, kind domain.Im
 }
 
 func channelVideoToItem(v channelVideo, kind domain.ImportItemKind, position int, summary string, fetched time.Time) *domain.ImportItemWithDetails {
-	facts := domain.ImportFacts{
-		Kind:         kind,
-		Summary:      summary,
-		ThumbnailURL: bestThumbnail(v.Snippet.Thumbnails),
-		ViewCount:    parseCount(v.Statistics.ViewCount),
-		LikeCount:    parseCount(v.Statistics.LikeCount),
-		CommentCount: parseCount(v.Statistics.CommentCount),
+	item := domain.ImportItem{
+		ExternalID:      v.ID,
+		DestinationType: domain.ContentTypeYouTubeVideo,
+		CanonicalURL:    NormalizeYouTubeURL(v.ID),
+		Title:           v.Snippet.Title,
+		Facts: domain.ImportFacts{
+			Kind:         kind,
+			ViewCount:    parseCount(v.Statistics.ViewCount),
+			LikeCount:    parseCount(v.Statistics.LikeCount),
+			CommentCount: parseCount(v.Statistics.CommentCount),
+		},
+		Position:       position,
+		StatsFetchedAt: fetched,
 	}
-	// YouTube omits likeCount when the channel hides likes: say so, rather than
-	// leave a blank that reads as "no likes".
-	facts.LikesHidden = facts.LikeCount == nil
+	facts := &item.Facts
+	if summary != "" {
+		facts.Summary = &summary
+	}
 	if t, err := time.Parse(time.RFC3339, v.Snippet.PublishedAt); err == nil {
 		facts.PublishedAt = &t
 	}
@@ -286,18 +293,12 @@ func channelVideoToItem(v channelVideo, kind domain.ImportItemKind, position int
 		has := v.ContentDetails.Caption == "true"
 		facts.HasCaptions = &has
 	}
-	chapters := domain.ParseChapters(v.Snippet.Description)
-	n := len(chapters)
-	facts.ChapterCount = &n
-	item := domain.ImportItem{
-		ExternalID:      v.ID,
-		DestinationType: domain.ContentTypeYouTubeVideo,
-		CanonicalURL:    NormalizeYouTubeURL(v.ID),
-		Title:           v.Snippet.Title,
-		Facts:           facts,
-		Position:        position,
-		StatsFetchedAt:  fetched,
+	if thumb := bestThumbnail(v.Snippet.Thumbnails); thumb != "" {
+		facts.ThumbnailURL = &thumb
 	}
+	chapters := domain.ParseChapters(v.Snippet.Description)
+	chapterCount := len(chapters)
+	facts.ChapterCount = &chapterCount
 
 	return &domain.ImportItemWithDetails{
 		Item: item,

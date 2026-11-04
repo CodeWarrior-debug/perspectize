@@ -267,11 +267,11 @@ type ImportItemModel struct {
 	DestinationType  string          `gorm:"column:destination_type;not null"`
 	CanonicalURL     string          `gorm:"column:canonical_url;not null"`
 	Title            string          `gorm:"column:title;not null"`
-	Position         int             `gorm:"column:position;not null"`
 	Facts            json.RawMessage `gorm:"column:facts;type:jsonb"`
+	Position         int             `gorm:"column:position;not null"`
+	Excluded         bool            `gorm:"column:excluded;not null"`
 	Details          json.RawMessage `gorm:"column:details;type:jsonb"`
 	StatsFetchedAt   time.Time       `gorm:"column:stats_fetched_at;not null"`
-	Excluded         bool            `gorm:"column:excluded;not null"`
 	ImportStatus     *string         `gorm:"column:import_status"`
 	ImportError      *string         `gorm:"column:import_error"`
 	ContentID        *int            `gorm:"column:content_id"`
