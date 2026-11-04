@@ -87,7 +87,8 @@ func (r *contentResolver) ImportedFrom(ctx context.Context, obj *model.Content) 
 			if dataloader.IsNotFound(err) {
 				return nil, nil
 			}
-			return nil, fmt.Errorf("failed to load import for content %s: %w", obj.ID, err)
+			slog.Error("resolving importedFrom via dataloader failed", "contentID", obj.ID, "importJobID", jobID, "error", err)
+			return nil, nil
 		}
 		job = loaded
 	} else {
@@ -97,7 +98,8 @@ func (r *contentResolver) ImportedFrom(ctx context.Context, obj *model.Content) 
 		}
 		jobs, err := r.ImportService.GetImportJobsByIDs(ctx, []int{jobID})
 		if err != nil {
-			return nil, fmt.Errorf("failed to load import for content %s: %w", obj.ID, err)
+			slog.Error("resolving importedFrom failed", "contentID", obj.ID, "importJobID", jobID, "error", err)
+			return nil, nil
 		}
 		job = jobs[jobID]
 	}
@@ -496,7 +498,7 @@ func (r *queryResolver) ContentByID(ctx context.Context, id string) (*model.Cont
 	// "not found", with no extra statement. The loader caches the result, so
 	// the aggregate fields reuse this same load.
 	if onlyIDAndAggregatesSelected(ctx) {
-		_, found, err := r.fetchPerspectiveAggregate(ctx, intID)
+		agg, found, err := r.fetchPerspectiveAggregate(ctx, intID)
 		if err != nil {
 			slog.Error("checking content existence via aggregate failed", "id", id, "error", err)
 			return nil, fmt.Errorf("failed to get content")
@@ -504,7 +506,11 @@ func (r *queryResolver) ContentByID(ctx context.Context, id string) (*model.Cont
 		if !found {
 			return nil, fmt.Errorf("content not found with ID: %s", id)
 		}
-		return &model.Content{ID: strconv.Itoa(intID)}, nil
+		out := &model.Content{ID: strconv.Itoa(intID)}
+		if agg != nil {
+			out.ImportJobID = agg.ImportJobID
+		}
+		return out, nil
 	}
 
 	content, err := r.ContentService.GetByID(ctx, intID)

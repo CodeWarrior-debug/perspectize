@@ -141,11 +141,8 @@ func (s *ImportService) GetImportJobsByIDs(ctx context.Context, ids []int) (map[
 			valid = append(valid, id)
 		}
 	}
-	jobs, err := s.repo.GetJobsByIDs(ctx, valid)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get import jobs: %w", err)
-	}
-	return jobs, nil
+	// The repository already says what failed; wrapping again would double it.
+	return s.repo.GetJobsByIDs(ctx, valid)
 }
 
 func isImportAdmin(u *domain.AuthenticatedUser) bool {

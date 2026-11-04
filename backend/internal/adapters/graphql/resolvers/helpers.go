@@ -641,6 +641,9 @@ var contentFieldsFromID = map[string]bool{
 	"perspectiveCount":   true,
 	"averageRating":      true,
 	"qualityRatingCount": true,
+	// importedFrom needs only the row's import_job_id, which the aggregate
+	// query carries (see ContentByID), so it keeps the fast path.
+	"importedFrom": true,
 }
 
 // onlyIDAndAggregatesSelected reports whether the current field's selection

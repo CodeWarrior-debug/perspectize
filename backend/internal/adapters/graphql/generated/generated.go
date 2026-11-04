@@ -4300,10 +4300,11 @@ type Mutation {
   # Rewrites the list's positions to 1..N in the order of todoIds.
   reorderUserTodoList(listId: IntID!, todoIds: [IntID!]!): [UserTodo!]! @auth
 
-  # Import staging. Creating an import is admin-only (it spends API quota);
-  # sources are listed in the background, so the returned sources are LISTING.
-  # Anyone signed in: an admin's import starts listing, anyone else's waits as a request.
-  # A request needs a name and a description or at least one source.
+  # Import staging. Anyone signed in may create an import. An admin's is approved
+  # at once and starts listing in the background (its sources come back LISTING);
+  # anyone else's is a request awaiting review, with its sources WAITING.
+  # A request needs a name and a description or at least one source, so sources
+  # may be empty when a description is given.
   createImportJob(input: CreateImportJobInput!): ImportJob! @auth
   # Only the requester may edit the description, and not once the import is closed.
   # Returns the import without its sources; query importJob for those.
