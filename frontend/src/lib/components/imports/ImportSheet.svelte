@@ -6,6 +6,7 @@
 	import type { CellClickedEvent, GridApi, GridOptions, IRowNode } from '@ag-grid-community/core';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/shadcn';
+	import XIcon from '@lucide/svelte/icons/x';
 	import ImportDetailPanel from './ImportDetailPanel.svelte';
 	import ImportProgressBar from './ImportProgressBar.svelte';
 	import type { ImportJob } from '$lib/queries/imports';
@@ -33,7 +34,7 @@
 
 	/**
 	 * ImportSheet: one import's staging sheet. A spreadsheet of every candidate
-	 * row with a filter on each column, a detail panel for the focused row, a
+	 * row with a filter on each column, a details drawer for a clicked row, a
 	 * live progress bar while rows import, and a selection bar that imports the
 	 * picked rows or marks them "don't import". Rows already in the library are
 	 * shown but can't be picked. A closed import is read-only.
@@ -140,9 +141,13 @@
 		return () => cancelAnimationFrame(frame);
 	});
 
-	// Focus the first row once, so the panel isn't empty on arrival.
+	// The details drawer opens on a row click and closes with X, the backdrop or Escape.
+	let closeButton = $state<HTMLButtonElement | null>(null);
+	function closeDetails() {
+		focusedId = null;
+	}
 	$effect(() => {
-		if (focusedId === null && rows.length > 0) focusedId = rows[0].id;
+		if (focused) closeButton?.focus();
 	});
 
 	function clearFilters() {
@@ -251,16 +256,7 @@
 		<p class="text-muted-foreground text-sm" data-testid="import-unavailable-note">{note}</p>
 	{/if}
 
-	<div class="grid min-h-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_22rem]">
-		<div class="h-[68vh] min-h-96" style="--ag-row-height: 52px; --ag-header-height: 36px;">
-			<AgGridSvelte5Component {gridOptions} rowData={rows} {theme} {modules} />
-		</div>
-		<div class="lg:h-[68vh]">
-			<ImportDetailPanel item={focused} sourceTitle={focused?.sourceTitle ?? ''} />
-		</div>
-	</div>
-
-	<!-- Next to the Import button, where the eye is when an import starts (the grid can push a bar above it off screen). -->
+	<!-- The command bar sits above the grid, beside the Import button, so the progress bar is where the eye is when an import starts. -->
 	<ImportProgressBar jobId={job.id} />
 
 	<div
@@ -344,4 +340,45 @@
 			</div>
 		{/if}
 	</div>
+
+	<div class="h-[68vh] min-h-96" style="--ag-row-height: 52px; --ag-header-height: 36px;">
+		<AgGridSvelte5Component {gridOptions} rowData={rows} {theme} {modules} />
+	</div>
 </div>
+
+<svelte:window
+	onkeydown={(e) => {
+		if (focused && e.key === 'Escape') closeDetails();
+	}}
+/>
+
+{#if focused}
+	<!-- Clicking outside the drawer closes it; the X and Escape do too. -->
+	<div
+		class="fixed inset-0 z-[60] bg-black/30"
+		data-testid="import-detail-backdrop"
+		aria-hidden="true"
+		onclick={closeDetails}
+	></div>
+	<div
+		class="fixed inset-y-0 right-0 z-[70] flex w-full max-w-md flex-col p-3"
+		role="dialog"
+		aria-modal="true"
+		aria-label="Row details"
+		data-testid="import-detail-drawer"
+	>
+		<div class="relative flex min-h-0 flex-1 flex-col">
+			<button
+				type="button"
+				bind:this={closeButton}
+				class="bg-card text-muted-foreground hover:text-foreground border-border absolute top-2 right-2 z-10 rounded-md border p-1"
+				aria-label="Close details"
+				data-testid="import-detail-close"
+				onclick={closeDetails}
+			>
+				<XIcon class="size-4" />
+			</button>
+			<ImportDetailPanel item={focused} sourceTitle={focused.sourceTitle} />
+		</div>
+	</div>
+{/if}

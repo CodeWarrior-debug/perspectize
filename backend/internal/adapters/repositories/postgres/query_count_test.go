@@ -69,6 +69,19 @@ func TestQueryCount_CategoryGetByIDs_EmptyInputIssuesNoQuery(t *testing.T) {
 	assertAllExpectationsMet(t, mock)
 }
 
+func TestQueryCount_PerspectiveCountVisibleByContentIDs_IsOneQueryForAnyBatchSize(t *testing.T) {
+	ctx := context.Background()
+	db, mock := newMockDB(t)
+	mock.ExpectQuery(`FROM "perspectives" WHERE content_id = ANY\(CAST\(\$1 AS bigint\[\]\)\)`).
+		WillReturnRows(sqlmock.NewRows([]string{"content_id", "count"}).AddRow(1, 2))
+
+	querycount.AssertAtMost(t, db, 1, func() {
+		_, err := NewGormPerspectiveRepository(db).CountVisibleByContentIDs(ctx, seqIDs(50), nil)
+		require.NoError(t, err)
+	})
+	assertAllExpectationsMet(t, mock)
+}
+
 func TestQueryCount_PerspectiveAggregateByContentIDs_IsOneQueryForAnyBatchSize(t *testing.T) {
 	ctx := context.Background()
 	db, mock := newMockDB(t)

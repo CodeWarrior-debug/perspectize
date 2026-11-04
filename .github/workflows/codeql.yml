@@ -1,10 +1,20 @@
 name: "CodeQL"
 
 on:
+  # Code paths only: a docs-only change has nothing for CodeQL to analyse.
+  # The weekly schedule below still scans everything.
   push:
     branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/codeql.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/codeql.yml'
   schedule:
     - cron: "0 6 * * 1" # Weekly Monday 6am UTC
 

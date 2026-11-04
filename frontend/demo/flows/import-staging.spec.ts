@@ -27,11 +27,13 @@ test.describe('import staging', () => {
 		// The pinned checkbox and the title live in different AG Grid containers; match them by row index.
 		const titleCell = page.locator('.ag-pinned-left-cols-container .ag-row').filter({ hasText: 'Memento' });
 		await expect(titleCell).toBeVisible();
-		// Focus the row first: the detail panel reports its status (the Status column is
-		// off screen and AG Grid doesn't render off-screen cells).
+		// Open the row's details first: the drawer reports its status (the Status column
+		// is off screen and AG Grid doesn't render off-screen cells). Escape closes it.
 		await titleCell.getByText('Memento', { exact: true }).click();
 		const status = page.getByTestId('import-detail-status');
 		await expect(status).toHaveText('Not imported');
+		await page.keyboard.press('Escape');
+		await expect(page.getByTestId('import-detail-drawer')).toBeHidden();
 		await titleCell.locator('.ag-selection-checkbox input').check();
 
 		const bar = page.getByTestId('import-selection-bar');
@@ -42,6 +44,7 @@ test.describe('import staging', () => {
 
 		// The live progress bar follows the import, then the sheet refetches once.
 		await expect(page.getByTestId('import-progress-label')).toContainText('of 1', { timeout: 15_000 });
+		await titleCell.getByText('Memento', { exact: true }).click();
 		await expect(status).toHaveText('Imported', { timeout: 15_000 });
 		await expect(page.getByRole('link', { name: 'View in Activity' })).toBeVisible();
 
@@ -101,12 +104,15 @@ test.describe('import staging', () => {
 		await tour.start({ persona: 'ben', path: '/import' });
 		await page.getByRole('link', { name: 'Christopher Nolan films' }).click();
 		const titleCell = page.locator('.ag-pinned-left-cols-container .ag-row').filter({ hasText: 'Following' });
-		await titleCell.getByText('Following', { exact: true }).click();
 		await titleCell.locator('.ag-selection-checkbox input').check();
 		const bar = page.getByTestId('import-selection-bar');
 		await expect(bar).toContainText('Select up to 1,000 at a time.');
 		await bar.getByRole('button', { name: "Don't import" }).click();
+		await titleCell.getByText('Following', { exact: true }).click();
 		await expect(page.getByTestId('import-detail-status')).toHaveText("Won't import");
+		// The backdrop closes the drawer too.
+		await page.getByTestId('import-detail-backdrop').click({ position: { x: 10, y: 10 } });
+		await expect(page.getByTestId('import-detail-drawer')).toBeHidden();
 
 		await page.getByRole('button', { name: "Won't import" }).click();
 		await expect(page.getByTestId('import-counts')).toContainText('1 of');
@@ -118,5 +124,7 @@ test.describe('import staging', () => {
 		await page.getByTestId('import-selection-bar').getByRole('button', { name: 'Clear "don\'t import"' }).click();
 		await row.getByText('Following', { exact: true }).click();
 		await expect(page.getByTestId('import-detail-status')).toHaveText('Not imported');
+		await page.getByTestId('import-detail-close').click();
+		await expect(page.getByTestId('import-detail-drawer')).toBeHidden();
 	});
 });

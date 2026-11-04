@@ -1,6 +1,6 @@
 # Backend Dependency Upgrade Analysis
 
-**Generated:** 2026-10-01 · **Last applied:** 2026-09-12
+**Generated:** 2026-11-01 · **Last applied:** 2026-11-01
 **Scope:** `backend/go.mod` (Go GraphQL API), **direct (non-indirect) dependencies only**
 **Tool used:** `go list -m -u -versions ./...` (Go's built-in module tooling — there's no widely-adopted third-party "ncu for Go"; `go list -u` against the module graph is the standard equivalent) plus `go.mod`'s own `go`/`toolchain` directives and `proxy.golang.org` publish timestamps for age.
 
@@ -8,22 +8,20 @@ This report lives alongside the monthly maintenance routine (see [SKILL.md](SKIL
 
 ## Result summary
 
-The backend is in **very good shape**: of 23 direct dependencies, **all 23 are on the latest published version** as of 2026-10-01 (no action this run). Last month's only bump, for the record:
+Two direct deps were behind on 2026-11-01 and were bumped: `github.com/99designs/gqlgen` v0.17.95 -> **v0.17.98** (required `make graphql-gen`; `generated.go` changed, the version header in `messaging.resolvers.go` changed, nothing else) and `github.com/jackc/pgx/v5` v5.11.0 -> **v5.12.0**. `go build ./...`, `gofmt -l .`, `go vet -tags perf ./internal/perf/...` and `go test ./...` are clean. `github.com/go-chi/chi/v5` v5.5.0 landed via Dependabot PR #615.
 
-| Package | Was | Now | Behind (at time of check) | Function | Benefits of upgrading | Drawbacks / Risks | Status |
-|---|---|---|---|---|---|---|---|
-| `github.com/jackc/pgx/v5` | v5.10.0 | **v5.11.0** | ~3 months (2026-06-03 → 2026-09-07) | PostgreSQL driver used under GORM's `gorm.io/driver/postgres` for all DB access | Minor release — bug fixes and small feature additions to the Postgres wire-protocol driver; low-risk to take | Minor version bump, but it's the driver for every DB query in the app — validated via full test suite before merging | **Done** — bumped via `go get github.com/jackc/pgx/v5@v5.11.0 && go mod tidy`; `go build ./...` and `go test ./...` both clean |
+Open Dependabot alert: `github.com/go-jose/go-jose/v3` <= 3.0.5 (high, DoS parsing RSA JWKs) has **no patched v3 release**. It is an indirect dependency via `github.com/clerk/clerk-sdk-go/v2` (already latest), so it cannot be fixed here; watch for a Clerk SDK release.
 
-Toolchain: `go.mod` already pins `go 1.26` / `toolchain go1.26.0`, matching the `go version` installed in this environment — no Go toolchain upgrade needed.
+Toolchain: `go.mod` pins `go 1.27.2`; no toolchain upgrade needed.
 
 ## Already up to date (direct deps, no action needed)
 
 | Package | Version | Function |
 |---|---|---|
-| `github.com/99designs/gqlgen` | v0.17.95 | GraphQL server code generator (schema-first) |
+| `github.com/99designs/gqlgen` | v0.17.98 | GraphQL server code generator (schema-first) |
 | `github.com/DATA-DOG/go-sqlmock` | v1.5.2 | SQL mock driver for repository-layer unit tests |
 | `github.com/clerk/clerk-sdk-go/v2` | v2.7.0 | Clerk auth SDK (session/user verification) |
-| `github.com/go-chi/chi/v5` | v5.3.2 | HTTP router |
+| `github.com/go-chi/chi/v5` | v5.5.0 | HTTP router |
 | `github.com/go-chi/cors` | v1.2.2 | CORS middleware for chi |
 | `github.com/go-chi/httprate` | v0.16.0 | Rate-limiting middleware for chi |
 | `github.com/joho/godotenv` | v1.5.1 | `.env` file loading for local dev |

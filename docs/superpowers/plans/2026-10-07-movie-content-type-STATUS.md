@@ -35,7 +35,7 @@ The rebuilt preview is `tools/content-type-designer/previews/movie-activity.html
 - [ ] Try Cast search with scope Director and with scope Cast.
 - [ ] Review the spec's "Decisions to confirm" list.
 - [ ] Decide on the pre-PR follow-ups below.
-- [ ] Decide how to land the preview skill: this branch's rebuilt `tools/content-type-designer/previews/movie-activity.html` and branch `chore/content-type-preview-skill` (6625d888, which holds the skill and the older preview) both add that path, so whichever merges second hits an add/add conflict. Resolve by keeping this branch's rebuilt version, and move `movie-activity.spec.json` into `.claude/skills/content-type-preview/examples/movie.spec.json` once the skill is on the branch.
+- [x] Preview skill landed (2026-11-01, food-item spec PR): commit `6625d888` was never on GitHub, so `.claude/skills/content-type-preview/` was rebuilt from this branch's `movie-activity.html`. `movie-activity.spec.json` moved to `examples/movie.spec.json`, and rebuilding it reproduces the committed preview.
 
 Note: verify with migrate-free steps only (no `make migrate-*` against the shared database).
 
