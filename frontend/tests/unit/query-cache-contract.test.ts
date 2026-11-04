@@ -108,6 +108,27 @@ describe('query key hygiene', () => {
 		);
 		expect(new Set(hashes).size).toBe(3);
 	});
+
+	it('the viewer-scoped aggregates key is per viewer: two viewers never share a cache entry', () => {
+		const forViewer = (viewer: string | null) => hashKey(queryKeys.content.aggregates('3', viewer));
+		expect(forViewer('user_admin')).not.toBe(forViewer('user_member'));
+		expect(forViewer('user_admin')).not.toBe(forViewer(null));
+		expect(forViewer(null)).toBe(forViewer(null));
+	});
+
+	it('a viewer-scoped aggregates entry is evicted by the content detail prefix (mutations still reach it)', () => {
+		const aggregatesAdmin = queryKeys.content.aggregates('3', 'user_admin');
+		const aggregatesMember = queryKeys.content.aggregates('3', 'user_member');
+		client.setQueryData(aggregatesAdmin, { contentByID: { id: '3', importedFrom: { id: '12', name: 'x' } } });
+		client.setQueryData(aggregatesMember, { contentByID: { id: '3', importedFrom: null } });
+		expect(client.getQueryData(aggregatesMember)).toEqual({ contentByID: { id: '3', importedFrom: null } });
+		expect(client.getQueryData(queryKeys.content.aggregates('3', 'user_other'))).toBeUndefined();
+
+		void client.invalidateQueries({ queryKey: queryKeys.content.detail('3') });
+
+		expect(client.getQueryState(aggregatesAdmin)?.isInvalidated).toBe(true);
+		expect(client.getQueryState(aggregatesMember)?.isInvalidated).toBe(true);
+	});
 });
 
 describe('eviction: useDeletePerspective.onSuccess evicts exactly what changed', () => {

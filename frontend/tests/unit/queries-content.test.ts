@@ -3,6 +3,7 @@ import {
 	LIST_CONTENT,
 	GET_CONTENT,
 	GET_CONTENT_DETAILS,
+	GET_CONTENT_AGGREGATES,
 	CREATE_CONTENT_FROM_YOUTUBE,
 	CREATE_CONTENT_FROM_MOVIE,
 	type ContentItem,
@@ -84,8 +85,10 @@ describe('GraphQL query definitions', () => {
 			expect(LIST_CONTENT).not.toMatch(/\bresponse\b/);
 		});
 
-		it('selects importedFrom { id name } so the row can link to its import', () => {
-			expect(LIST_CONTENT).toMatch(/importedFrom\s*\{\s*id\s+name\s*\}/);
+		// The list is prefetched anonymously (routes/+page.ts), so it must select no viewer-dependent
+		// field. importedFrom is null for a closed import unless the viewer is an admin.
+		it('does not select importedFrom (viewer-dependent; the prefetch is anonymous)', () => {
+			expect(LIST_CONTENT).not.toMatch(/importedFrom/);
 		});
 
 		it('is defined and is a string', () => {
@@ -170,8 +173,12 @@ describe('GraphQL query definitions', () => {
 			expect(GET_CONTENT_DETAILS).toMatch(/\bmovie\b/);
 		});
 
-		it('selects importedFrom { id name } for the "Imported from" link', () => {
-			expect(GET_CONTENT_DETAILS).toMatch(/importedFrom\s*\{\s*id\s+name\s*\}/);
+		it('does not select importedFrom (its key has no viewer; the viewer-scoped aggregates query carries it)', () => {
+			expect(GET_CONTENT_DETAILS).not.toMatch(/importedFrom/);
+		});
+
+		it('GET_CONTENT_AGGREGATES selects importedFrom { id name } for the "Imported from" link', () => {
+			expect(GET_CONTENT_AGGREGATES).toMatch(/importedFrom\s*\{\s*id\s+name\s*\}/);
 		});
 	});
 

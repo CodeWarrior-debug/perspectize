@@ -30,6 +30,11 @@ export const queryKeys = {
 		// Full ContentItem row (GET_CONTENT_DETAILS) for a details modal opened on an
 		// item that isn't in the loaded Activity rows (e.g. via `?open=<id>`).
 		row: (id: string) => [...queryKeys.content.details(), 'row', id] as const,
+		// Viewer-scoped aggregates for one content (GET_CONTENT_AGGREGATES). A child of
+		// `detail(id)`, so mutations that invalidate `detail(id)` still evict it. Keyed per
+		// viewer: perspective counts and the import a row came from both resolve per viewer.
+		aggregates: (id: string, viewerId: string | null) =>
+			[...queryKeys.content.detail(id), 'aggregates', viewerId ?? 'anonymous'] as const,
 		// ListComparableContent (ComparePicker.svelte) — a distinct shape/query
 		// from `list` above (adds perspectiveCount, no pagination), keyed by
 		// the debounced search term.

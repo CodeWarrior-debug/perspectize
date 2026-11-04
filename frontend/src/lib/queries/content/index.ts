@@ -56,9 +56,6 @@ export interface ContentItem {
 		entityType: string | null;
 		wikipediaUrl: string | null;
 	} | null;
-	// The import that created this row. Null for hand-added content, and for a closed
-	// import when the viewer isn't an admin (the backend decides; the UI just shows it when set).
-	importedFrom?: ImportJobRef | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -140,10 +137,6 @@ export const LIST_CONTENT = gql`
 					description
 					entityType
 					wikipediaUrl
-				}
-				importedFrom {
-					id
-					name
 				}
 				createdAt
 				updatedAt
@@ -286,10 +279,6 @@ export const GET_CONTENT_DETAILS = gql`
 				entityType
 				wikipediaUrl
 			}
-			importedFrom {
-				id
-				name
-			}
 			createdAt
 			updatedAt
 		}
@@ -307,6 +296,9 @@ export interface ContentDetailsResponse {
 export interface ContentAggregates {
 	perspectiveCount: number | null;
 	averageRating: number | null;
+	// The import that created this row, or null: hand-added content, and a closed import
+	// the viewer can't see (the backend decides; the UI shows the row only when set).
+	importedFrom?: ImportJobRef | null;
 	// How many public perspectives set a Quality rating — i.e. how many
 	// values averageRating was actually averaged over. Can be less than
 	// perspectiveCount since Quality is optional. Shown in a tooltip on the
@@ -325,6 +317,10 @@ export const GET_CONTENT_AGGREGATES = gql`
 			perspectiveCount
 			averageRating
 			qualityRatingCount
+			importedFrom {
+				id
+				name
+			}
 		}
 	}
 `;

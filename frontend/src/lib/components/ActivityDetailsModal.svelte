@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ImportJobRef, LengthDisplay } from '$lib/queries/content';
+	import type { LengthDisplay } from '$lib/queries/content';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import XIcon from '@lucide/svelte/icons/x';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
@@ -38,8 +38,6 @@
 		length: number | null;
 		lengthUnits: string | null;
 		lengthDisplay?: LengthDisplay | null;
-		// The import that created this row; the link is shown only when set.
-		importedFrom?: ImportJobRef | null;
 		publishedAt: string | null;
 		createdAt?: string;
 		updatedAt: string;
@@ -99,6 +97,8 @@
 	// the currently-open content's id, so it only fetches while the modal is
 	// actually open for a given item (re-runs if the id changes while open).
 	const aggregatesQuery = useContentAggregates(() => (open ? (content?.id ?? null) : null));
+	// The "Imported from" row waits for this viewer-scoped query: absent while loading, on error, or when null.
+	const importedFrom = $derived(aggregatesQuery.data?.contentByID?.importedFrom ?? null);
 	const perspectiveCountDisplay = $derived(
 		aggregatesQuery.isLoading ? '…' : (aggregatesQuery.data?.contentByID?.perspectiveCount ?? 0).toString(),
 	);
@@ -245,14 +245,11 @@
 					</a>
 				{/if}
 
-				{#if content.importedFrom}
+				{#if importedFrom}
 					<div class="mt-3.5 text-[13px] text-muted-foreground">
 						<span>Imported from</span>
-						<a
-							href={`/import/${content.importedFrom.id}`}
-							class="font-medium text-primary underline-offset-2 hover:underline"
-						>
-							{content.importedFrom.name}
+						<a href={`/import/${importedFrom.id}`} class="font-medium text-primary underline-offset-2 hover:underline">
+							{importedFrom.name}
 						</a>
 					</div>
 				{/if}
