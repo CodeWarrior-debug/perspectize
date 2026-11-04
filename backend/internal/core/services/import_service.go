@@ -236,10 +236,16 @@ type resolvedSource struct {
 }
 
 // cleanImportDescription trims and sanitizes a description with the same
-// policy as perspective reviews. An empty result means no description; a
-// result over domain.MaxImportJobDescriptionChars is ErrInvalidInput.
+// policy as perspective reviews. Emptiness is judged by visible text, so an
+// empty editor's markup is no description; it returns "" and nothing is stored.
+// Images count as no text: a body with only an image is empty. A result over
+// domain.MaxImportJobDescriptionChars is ErrInvalidInput.
 func cleanImportDescription(raw string) (string, error) {
-	clean := strings.TrimSpace(sanitizeReview(strings.TrimSpace(raw)))
+	sanitized := sanitizeReview(strings.TrimSpace(raw))
+	if visibleText(sanitized) == "" {
+		return "", nil
+	}
+	clean := strings.TrimSpace(sanitized)
 	if utf8.RuneCountInString(clean) > domain.MaxImportJobDescriptionChars {
 		return "", fmt.Errorf("%w: the description is at most %s characters", domain.ErrInvalidInput, formatThousands(domain.MaxImportJobDescriptionChars))
 	}

@@ -1106,18 +1106,70 @@ func TestCreateImportJob_NeitherNameDescriptionNorSourcesRejected(t *testing.T) 
 	svc := newImportService(repo, &fakeLister{}, nil, &fakeCreator{})
 	blank, markupOnly := "   ", "<script>alert(1)</script>"
 
-	for name, input := range map[string]domain.CreateImportJobInput{
+	cases := map[string]domain.CreateImportJobInput{
 		"name only":                       {Name: "x"},
 		"blank description, no sources":   {Name: "x", Description: &blank},
 		"description that sanitizes away": {Name: "x", Description: &markupOnly},
 		"no name, description only":       {Name: " ", Description: &blank},
-	} {
+	}
+	// An empty rich-text editor sends markup with no visible text.
+	for _, empty := range emptyEditorOutputs {
+		d := empty
+		cases["empty editor "+empty] = domain.CreateImportJobInput{Name: "x", Description: &d}
+	}
+	for name, input := range cases {
 		t.Run(name, func(t *testing.T) {
 			_, err := svc.CreateImportJob(context.Background(), importUser, input)
 			assert.ErrorIs(t, err, domain.ErrInvalidInput)
 		})
 	}
 	assert.Empty(t, repo.jobs, "nothing is saved when the request is rejected")
+}
+
+// emptyEditorOutputs are descriptions with no visible text: what an empty
+// rich-text editor sends, and an image-only body (an image has no text to read).
+var emptyEditorOutputs = []string{
+	`<p></p>`,
+	`<p><br></p>`,
+	`<p> </p>`,
+	`<p>&nbsp;</p>`,
+	`<p><img src="https://example.com/a.png" alt=""></p>`,
+}
+
+func TestCreateImportJob_VisibleTextDescriptionAccepted(t *testing.T) {
+	svc := newImportService(newFakeImportRepo(), &fakeLister{}, nil, &fakeCreator{})
+	desc := `<p>Hello</p>`
+	job, err := svc.CreateImportJob(context.Background(), importUser, domain.CreateImportJobInput{Name: "x", Description: &desc})
+	require.NoError(t, err)
+	require.NotNil(t, job.Description)
+	assert.Equal(t, "<p>Hello</p>", *job.Description, "visible text is stored, sanitized")
+}
+
+func TestCreateImportJob_EmptyEditorWithSourceIsAccepted(t *testing.T) {
+	yt := &fakeLister{}
+	svc := newImportService(newFakeImportRepo(), yt, nil, &fakeCreator{})
+	empty := `<p></p>`
+	job, err := svc.CreateImportJob(context.Background(), importUser, domain.CreateImportJobInput{
+		Name: "x", Description: &empty,
+		Sources: []domain.CreateImportSourceInput{{SourceType: domain.ImportSourceYouTubeChannel, Ref: "@x"}},
+	})
+	require.NoError(t, err, "a source is enough; an empty description is simply not stored")
+	assert.Nil(t, job.Description)
+}
+
+func TestCreateImportJob_DescriptionOnlyRequestsCountAgainstTheCap(t *testing.T) {
+	repo := newFakeImportRepo()
+	svc := newImportService(repo, &fakeLister{}, nil, &fakeCreator{})
+	ctx := context.Background()
+	desc := "Describe what you want."
+	input := domain.CreateImportJobInput{Name: "x", Description: &desc}
+	for range domain.MaxPendingImportRequests {
+		_, err := svc.CreateImportJob(ctx, importUser, input)
+		require.NoError(t, err)
+	}
+	_, err := svc.CreateImportJob(ctx, importUser, input)
+	assert.ErrorIs(t, err, domain.ErrInvalidInput, "a description-only request is a pending request too")
+	assert.Len(t, repo.jobs, domain.MaxPendingImportRequests)
 }
 
 func TestCreateImportJob_DescriptionSanitized(t *testing.T) {
@@ -1188,6 +1240,12 @@ func TestUpdateImportJobDescription_BlankRejected(t *testing.T) {
 	_, err = svc.UpdateImportJobDescription(ctx, importUser, job.ID, "   ")
 	assert.ErrorIs(t, err, domain.ErrInvalidInput, "clearing the description would leave a request with nothing to read")
 	assert.Equal(t, "first", *repo.jobs[job.ID].Description)
+
+	for _, empty := range emptyEditorOutputs {
+		_, err = svc.UpdateImportJobDescription(ctx, importUser, job.ID, empty)
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, "an empty editor is not a description: %s", empty)
+	}
+	assert.Equal(t, "first", *repo.jobs[job.ID].Description, "refused edits change nothing")
 }
 
 func TestUpdateImportJobDescription_ClosedImportRejected(t *testing.T) {
