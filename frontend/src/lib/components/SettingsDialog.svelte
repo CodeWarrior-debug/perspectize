@@ -2,19 +2,24 @@
 	import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/shadcn';
 	import ThemeCustomizePanel from '$lib/components/theme/ThemeCustomizePanel.svelte';
 	import FeedbackDialog from '$lib/components/FeedbackDialog.svelte';
+	import ContributePanel from '$lib/components/contribute/ContributePanel.svelte';
 	import type { ThemeStore } from '$lib/theme/store.svelte';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import { replayCoach } from '$lib/onboarding/coachGate.svelte';
+	import { CONTRIBUTE_TAB_ENABLED } from '$lib/contribute/config';
 
 	let { open = $bindable(false), store }: { open?: boolean; store: ThemeStore } = $props();
 
-	type SectionId = 'general' | 'theme' | 'feedback';
+	type SectionId = 'general' | 'theme' | 'feedback' | 'contribute';
 
-	const sections: { id: SectionId; label: string }[] = [
+	const ALL_SECTIONS: { id: SectionId; label: string }[] = [
 		{ id: 'general', label: 'General' },
 		{ id: 'theme', label: 'Customize Theme' },
 		{ id: 'feedback', label: 'Send Feedback' },
+		{ id: 'contribute', label: 'Contribute' },
 	];
+
+	const sections = ALL_SECTIONS.filter((s) => s.id !== 'contribute' || CONTRIBUTE_TAB_ENABLED);
 
 	let activeSection = $state<SectionId>('general');
 
@@ -44,6 +49,7 @@
 						class="shrink-0 whitespace-nowrap text-left text-sm px-2 py-1.5 rounded-md {activeSection === section.id
 							? 'bg-muted font-medium'
 							: 'text-muted-foreground hover:bg-muted/50'}"
+						aria-current={activeSection === section.id ? 'page' : undefined}
 						onclick={() => (activeSection = section.id)}
 					>
 						{section.label}
@@ -67,6 +73,8 @@
 					</div>
 				{:else if activeSection === 'theme'}
 					<ThemeCustomizePanel {store} />
+				{:else if activeSection === 'contribute'}
+					<ContributePanel />
 				{:else if activeSection === 'feedback'}
 					<FeedbackDialog
 						onClose={() => {
