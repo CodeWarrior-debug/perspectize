@@ -273,8 +273,8 @@ rollout step is the GraphQL schema change going out with a normal deploy.
 
 Amazon linking (§9), Google Books fallback, pasting an Open Library URL into the general
 Add Content window, *when* the description is fetched (§8 — layout is decided, timing
-isn't), monthly/yearly/now/forever trending windows, word count (§7a — needs an answer
-before it's in scope at all), an edition picker (showing all editions of a work),
+isn't), monthly/yearly/now/forever trending windows, word count (§7a — dropped), an
+edition picker (showing all editions of a work),
 batch/barcode-scanner ISBN entry.
 
 ## Decisions to confirm
@@ -304,10 +304,9 @@ finding, confirmed live via its own test script. Useful both to explore the API 
 as a living reference once the Go adapter exists (the adapter should return the same
 shapes these requests do).
 
-## Open question (yours, not mine)
+## Resolved: word count (§7a)
 
-**Word count (§7a).** Open Library has no word-count field anywhere in its schema — this
-isn't a missing fetch, it's not tracked by the source at all. Three ways forward: (a) an
-*estimated* word count from pages × an assumed words-per-page, clearly labeled as an
-estimate; (b) a different data source entirely (none found tonight that's free); (c) drop
-it. Need your call before this is anything but a question mark in the design.
+**Dropped.** Owner's call — no word count anywhere in v1, estimated or otherwise. Open
+Library has no word-count field in its schema at all, so there was never a free, accurate
+source for it; Pages (`number_of_pages_median`) is the only length figure Book ships
+with. Nothing in the backend, schema, or preview should carry a word-count field.
