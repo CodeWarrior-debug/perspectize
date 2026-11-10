@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import SignInTrigger from '$lib/components/auth/SignInTrigger.svelte';
+	import ImportAddSources from '$lib/components/imports/ImportAddSources.svelte';
 	import ImportDescription from '$lib/components/imports/ImportDescription.svelte';
 	import ImportJobActions from '$lib/components/imports/ImportJobActions.svelte';
 	import ImportJobStatus from '$lib/components/imports/ImportJobStatus.svelte';
@@ -48,6 +49,7 @@
 			<ImportJobStatus {job} />
 			<ImportDescription {job} />
 			<ImportSourceList sources={job.sources} />
+			<ImportAddSources {job} meId={me.me?.id} isAdmin={me.isAdmin} />
 			<ImportJobActions {job} isAdmin={me.isAdmin} />
 		</header>
 		{#if job.requestStatus === 'APPROVED'}

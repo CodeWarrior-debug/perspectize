@@ -1,5 +1,14 @@
 import type { ColDef, IDateFilterParams, ValueFormatterParams } from '@ag-grid-community/core';
-import type { ImportDestinationType, ImportFactValue, ImportItem, ImportSource } from '$lib/queries/imports';
+import type {
+	CreateImportSourceInput,
+	ImportDestinationType,
+	ImportFactValue,
+	ImportItem,
+	ImportPersonRole,
+	ImportRequestStatus,
+	ImportSource,
+	ImportSourceType,
+} from '$lib/queries/imports';
 import { EMPTY_VALUE, formatCount, formatCountExact, formatDurationSeconds, typeCellRenderer } from './formatting';
 import { contentTypeLabel } from './grid-config';
 import { sanitizeHtml } from './sanitize';
@@ -232,6 +241,53 @@ export function hasDescriptionText(html: string | null | undefined): boolean {
  */
 export function isSourceFilled(ref: string): boolean {
 	return ref.trim() !== '';
+}
+
+/** An import holds at most this many sources in all (the server's cap). */
+export const MAX_IMPORT_SOURCES = 10;
+
+/** One editable source row in a form. `key` keeps Svelte's keyed each stable as rows come and go. */
+export interface SourceRow {
+	key: number;
+	sourceType: ImportSourceType;
+	ref: string;
+	role: ImportPersonRole | 'BOTH';
+}
+
+let nextSourceRowKey = 1;
+export function newSourceRow(): SourceRow {
+	return { key: nextSourceRowKey++, sourceType: 'YOUTUBE_CHANNEL', ref: '', role: 'DIRECTOR' };
+}
+
+/** Blank rows are dropped; a filled row is always sent, so the server judges it. */
+export function toSourceInputs(rows: readonly SourceRow[]): CreateImportSourceInput[] {
+	return rows
+		.filter((s) => isSourceFilled(s.ref))
+		.map((s) => ({
+			sourceType: s.sourceType,
+			ref: s.ref.trim(),
+			role: s.sourceType === 'TMDB_PERSON' && s.role !== 'BOTH' ? s.role : null,
+		}));
+}
+
+/**
+ * Who may add sources, mirroring the server: never to a closed or declined
+ * import, and never past the cap. The requester may while the request still
+ * waits for review; once it is approved only an admin may (it spends listing quota).
+ */
+export function canAddImportSources(
+	job: {
+		requestedBy: { id: string } | null;
+		requestStatus: ImportRequestStatus;
+		closedAt: string | null;
+		sources: readonly unknown[];
+	},
+	viewer: { id: string | null | undefined; isAdmin: boolean },
+): boolean {
+	if (job.closedAt || job.requestStatus === 'DECLINED' || job.sources.length >= MAX_IMPORT_SOURCES) return false;
+	if (viewer.isAdmin) return true;
+	if (job.requestStatus !== 'REQUESTED' || !viewer.id || !job.requestedBy) return false;
+	return String(job.requestedBy.id) === String(viewer.id);
 }
 
 /** Only the requester can edit the description, and never once the import is closed. */

@@ -359,6 +359,19 @@ export const UPDATE_IMPORT_JOB_DESCRIPTION = gql`
 	}
 `;
 
+/**
+ * Adds sources to an open import. Selects the job id and status only: the
+ * cache evicts the sheet and refetches it rather than trusting this result.
+ */
+export const ADD_IMPORT_JOB_SOURCES = gql`
+	mutation AddImportJobSources($input: AddImportJobSourcesInput!) {
+		addImportJobSources(input: $input) {
+			id
+			requestStatus
+		}
+	}
+`;
+
 export const SET_IMPORT_ITEMS_EXCLUDED = gql`
 	mutation SetImportItemsExcluded($input: SetImportItemsExcludedInput!) {
 		setImportItemsExcluded(input: $input)
@@ -421,6 +434,10 @@ export interface CloseImportJobResponse {
 
 export interface UpdateImportJobDescriptionResponse {
 	updateImportJobDescription: { id: string; description: string | null; updatedAt: string };
+}
+
+export interface AddImportJobSourcesResponse {
+	addImportJobSources: { id: string; requestStatus: ImportRequestStatus };
 }
 
 export interface SetImportItemsExcludedResponse {

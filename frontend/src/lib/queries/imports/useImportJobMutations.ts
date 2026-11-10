@@ -1,10 +1,12 @@
 import { createMutation, useQueryClient, type QueryClient } from '@tanstack/svelte-query';
 import { graphqlRequest } from '../client';
 import {
+	ADD_IMPORT_JOB_SOURCES,
 	CLOSE_IMPORT_JOB,
 	CREATE_IMPORT_JOB,
 	REVIEW_IMPORT_JOB,
 	UPDATE_IMPORT_JOB_DESCRIPTION,
+	type AddImportJobSourcesResponse,
 	type CloseImportJobResponse,
 	type CreateImportSourceInput,
 	type CreateImportJobResponse,
@@ -31,6 +33,12 @@ export interface ReviewImportJobVars {
 	jobId: string;
 	approve: boolean;
 	note?: string;
+}
+
+export interface AddImportJobSourcesVars {
+	jobId: string;
+	/** At least one. */
+	sources: CreateImportSourceInput[];
 }
 
 export interface CloseImportJobVars {
@@ -102,6 +110,26 @@ export function useUpdateImportJobDescription() {
 			}),
 		onSuccess: (_d: UpdateImportJobDescriptionResponse, vars: UpdateImportJobDescriptionVars) =>
 			updateImportJobDescriptionOnSuccess(client, vars.jobId),
+	}));
+}
+
+/**
+ * Add sources to an open import: the requester while the request waits, an
+ * admin any time (listing then starts at once). Evicts the lists and that
+ * import's sheet, which refetches with the new sources.
+ */
+export function useAddImportJobSources() {
+	const client = useQueryClient();
+	return createMutation(() => ({
+		mutationFn: (vars: AddImportJobSourcesVars) =>
+			graphqlRequest<AddImportJobSourcesResponse>(ADD_IMPORT_JOB_SOURCES, {
+				input: {
+					jobId: Number(vars.jobId),
+					sources: vars.sources.map((s) => ({ sourceType: s.sourceType, ref: s.ref, role: s.role ?? null })),
+				},
+			}),
+		onSuccess: (_d: AddImportJobSourcesResponse, vars: AddImportJobSourcesVars) =>
+			importJobChangedOnSuccess(client, vars.jobId),
 	}));
 }
 

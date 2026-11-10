@@ -1,13 +1,17 @@
 <script lang="ts">
-	import PlusIcon from '@lucide/svelte/icons/plus';
-	import XIcon from '@lucide/svelte/icons/x';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/shadcn';
 	import CommentsEditor from '$lib/components/CommentsEditor.svelte';
-	import { DEMO_MODE } from '$lib/auth/demo.svelte';
-	import type { ImportPersonRole, ImportSourceType } from '$lib/queries/imports';
+	import ImportSourceRows from '$lib/components/imports/ImportSourceRows.svelte';
 	import { useCreateImportJob } from '$lib/queries/imports/useImportJobMutations';
-	import { hasDescriptionText, importErrorMessage, isSourceFilled } from '$lib/utils/import-sheet';
+	import {
+		hasDescriptionText,
+		importErrorMessage,
+		isSourceFilled,
+		newSourceRow,
+		toSourceInputs,
+		type SourceRow,
+	} from '$lib/utils/import-sheet';
 
 	/**
 	 * Request an import: a name, and a description and/or one or more sources (a
@@ -17,21 +21,10 @@
 	 */
 	let { isAdmin, onCreated }: { isAdmin: boolean; onCreated?: () => void } = $props();
 
-	const MAX_SOURCES = 10;
-
-	interface SourceRow {
-		key: number;
-		sourceType: ImportSourceType;
-		ref: string;
-		role: ImportPersonRole | 'BOTH';
-	}
-
-	let nextKey = 1;
-	const blank = (): SourceRow => ({ key: nextKey++, sourceType: 'YOUTUBE_CHANNEL', ref: '', role: 'DIRECTOR' });
 	let name = $state('');
 	/** Sanitized HTML from the editor; "<p></p>" and other empty markup count as no description. */
 	let description = $state('');
-	let sources = $state<SourceRow[]>([blank()]);
+	let sources = $state<SourceRow[]>([newSourceRow()]);
 	let error = $state('');
 	const create = useCreateImportJob();
 
@@ -40,11 +33,6 @@
 		name.trim() !== '' && (hasDescription || sources.some((s) => isSourceFilled(s.ref))) && !create.isPending,
 	);
 
-	const PLACEHOLDER: Record<ImportSourceType, string> = {
-		YOUTUBE_CHANNEL: '@JordanBPeterson, or a channel URL',
-		TMDB_PERSON: 'Christopher Nolan, 525, or a TMDB person URL',
-	};
-
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
 		error = '';
@@ -52,14 +40,7 @@
 			const res = await create.mutateAsync({
 				name: name.trim(),
 				description: hasDescription ? description : null,
-				// Blank rows are dropped here; a filled row is always sent, so the server judges it.
-				sources: sources
-					.filter((s) => isSourceFilled(s.ref))
-					.map((s) => ({
-						sourceType: s.sourceType,
-						ref: s.ref.trim(),
-						role: s.sourceType === 'TMDB_PERSON' && s.role !== 'BOTH' ? s.role : null,
-					})),
+				sources: toSourceInputs(sources),
 			});
 			const job = res.createImportJob;
 			toast.success(
@@ -69,7 +50,7 @@
 			);
 			name = '';
 			description = '';
-			sources = [blank()];
+			sources = [newSourceRow()];
 			onCreated?.();
 		} catch (err) {
 			error = importErrorMessage(err);
@@ -115,65 +96,7 @@
 		<legend class="mb-1.5 text-sm font-medium">
 			Sources <span class="text-muted-foreground font-normal">(optional with a description)</span>
 		</legend>
-		{#each sources as src, i (src.key)}
-			<div class="flex flex-wrap items-center gap-2" data-testid="import-request-source">
-				<select
-					bind:value={src.sourceType}
-					aria-label={`Source ${i + 1} type`}
-					class="border-border bg-background text-foreground rounded-md border px-2 py-2 text-sm"
-				>
-					<option value="YOUTUBE_CHANNEL">YouTube channel</option>
-					<option value="TMDB_PERSON">Person's films (TMDB)</option>
-				</select>
-				<input
-					type="text"
-					bind:value={src.ref}
-					maxlength={200}
-					placeholder={PLACEHOLDER[src.sourceType]}
-					aria-label={`Source ${i + 1}`}
-					class="border-border bg-background text-foreground min-w-72 flex-1 rounded-md border px-3 py-2 text-sm"
-				/>
-				{#if src.sourceType === 'TMDB_PERSON'}
-					<select
-						bind:value={src.role}
-						aria-label={`Source ${i + 1} credits`}
-						class="border-border bg-background text-foreground rounded-md border px-2 py-2 text-sm"
-					>
-						<option value="DIRECTOR">Directed</option>
-						<option value="CAST">Acted in</option>
-						<option value="BOTH">Both</option>
-					</select>
-				{/if}
-				{#if sources.length > 1}
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						aria-label={`Remove source ${i + 1}`}
-						onclick={() => (sources = sources.filter((s) => s.key !== src.key))}
-					>
-						<XIcon />
-					</Button>
-				{/if}
-			</div>
-		{/each}
-		{#if sources.length < MAX_SOURCES}
-			<Button
-				type="button"
-				variant="outline"
-				size="sm"
-				class="self-start"
-				onclick={() => (sources = [...sources, blank()])}
-			>
-				<PlusIcon /> Add a source
-			</Button>
-		{/if}
-		{#if DEMO_MODE}
-			<p class="text-muted-foreground text-xs">
-				Demo mode has sample data for @JordanBPeterson, @DrJordanBPetersonClips, @PetersonAcademy, @gracetoyou and
-				Christopher Nolan (or 525).
-			</p>
-		{/if}
+		<ImportSourceRows bind:sources />
 	</fieldset>
 
 	{#if error}

@@ -3,11 +3,15 @@ import type { ImportFacts, ImportItem, ImportSource } from '$lib/queries/imports
 import { EMPTY_VALUE } from '$lib/utils/formatting';
 import {
 	buildImportColumnDefs,
+	canAddImportSources,
 	canEditImportDescription,
 	descriptionText,
 	destinationCellRenderer,
 	hasDescriptionText,
 	isSourceFilled,
+	MAX_IMPORT_SOURCES,
+	newSourceRow,
+	toSourceInputs,
 	factColumnDef,
 	factKeys,
 	factTooltip,
@@ -365,5 +369,51 @@ describe('messages', () => {
 		expect(progressLabel({ total: 4, done: 4, imported: 4, skipped: 0, failed: 0, running: false })).toBe(
 			'Imported 4 of 4',
 		);
+	});
+});
+
+describe('adding sources', () => {
+	const requested = {
+		requestedBy: { id: '2' },
+		requestStatus: 'REQUESTED' as const,
+		closedAt: null,
+		sources: [] as unknown[],
+	};
+	const me = { id: '2', isAdmin: false };
+
+	it('the requester may add while the request waits; after approval only an admin may', () => {
+		expect(canAddImportSources(requested, me)).toBe(true);
+		const approved = { ...requested, requestStatus: 'APPROVED' as const };
+		expect(canAddImportSources(approved, me)).toBe(false);
+		expect(canAddImportSources(approved, { id: '1', isAdmin: true })).toBe(true);
+	});
+
+	it('someone else, or a signed-out viewer, may not add to a request', () => {
+		expect(canAddImportSources(requested, { id: '3', isAdmin: false })).toBe(false);
+		expect(canAddImportSources(requested, { id: null, isAdmin: false })).toBe(false);
+		expect(canAddImportSources({ ...requested, requestedBy: null }, me)).toBe(false);
+	});
+
+	it('nobody adds to a closed or declined import, or one at the cap', () => {
+		const admin = { id: '1', isAdmin: true };
+		expect(canAddImportSources({ ...requested, closedAt: '2026-10-30T00:00:00Z' }, admin)).toBe(false);
+		expect(canAddImportSources({ ...requested, requestStatus: 'DECLINED' }, admin)).toBe(false);
+		const full = { ...requested, sources: Array.from({ length: MAX_IMPORT_SOURCES }) };
+		expect(canAddImportSources(full, admin)).toBe(false);
+		expect(canAddImportSources({ ...requested, sources: Array.from({ length: MAX_IMPORT_SOURCES - 1 }) }, admin)).toBe(
+			true,
+		);
+	});
+
+	it('blank rows are dropped, refs are trimmed, and only a TMDB person keeps a single credit role', () => {
+		const yt = { ...newSourceRow(), ref: '  @x  ' };
+		const blank = newSourceRow();
+		const person = { ...newSourceRow(), sourceType: 'TMDB_PERSON' as const, ref: 'Nolan', role: 'CAST' as const };
+		const both = { ...person, key: 99, ref: 'Gaither', role: 'BOTH' as const };
+		expect(toSourceInputs([yt, blank, person, both])).toEqual([
+			{ sourceType: 'YOUTUBE_CHANNEL', ref: '@x', role: null },
+			{ sourceType: 'TMDB_PERSON', ref: 'Nolan', role: 'CAST' },
+			{ sourceType: 'TMDB_PERSON', ref: 'Gaither', role: null },
+		]);
 	});
 });
