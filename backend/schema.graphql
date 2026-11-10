@@ -690,6 +690,12 @@ input UpdateImportJobDescriptionInput {
   description: String!
 }
 
+input AddImportJobSourcesInput {
+  jobId: IntID!
+  # At least one; an import holds at most 10 sources in all.
+  sources: [CreateImportSourceInput!]!
+}
+
 # Live progress of an import's running batch(es), pushed at most twice a
 # second while rows import. done = imported + skipped + failed.
 type ImportProgress {
@@ -821,6 +827,10 @@ type Mutation {
   # Returns the import without its sources; query importJob for those.
   updateImportJobDescription(input: UpdateImportJobDescriptionInput!): ImportJob! @auth
   # Admin only: approve (start listing) or decline a requested import.
+  # Adds sources to an open import. The requester may while the request waits for
+  # review (the sources wait too); after approval only an admin may, and listing
+  # starts at once. Returns the job with all its sources.
+  addImportJobSources(input: AddImportJobSourcesInput!): ImportJob! @auth
   reviewImportJob(input: ReviewImportJobInput!): ImportJob! @auth
   # Anyone signed in, until the import is closed. Returns how many rows changed.
   setImportItemsExcluded(input: SetImportItemsExcludedInput!): Int! @auth

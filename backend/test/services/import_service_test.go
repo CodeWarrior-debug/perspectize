@@ -155,6 +155,23 @@ func (r *fakeImportRepo) UpdateJobDescription(_ context.Context, jobID, userID i
 	return &cp, nil
 }
 
+func (r *fakeImportRepo) AddSources(_ context.Context, jobID int, sources []*domain.ImportSource) ([]*domain.ImportSource, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	j, ok := r.jobs[jobID]
+	if !ok {
+		return nil, domain.ErrNotFound
+	}
+	out := make([]*domain.ImportSource, len(sources))
+	for i, s := range sources {
+		sc := *s
+		sc.ID, sc.JobID = r.id(), jobID
+		j.Sources = append(j.Sources, &sc)
+		out[i] = &sc
+	}
+	return out, nil
+}
+
 func (r *fakeImportRepo) ReviewJob(_ context.Context, jobID int, status domain.ImportRequestStatus, note *string, at time.Time) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -1286,4 +1303,132 @@ func TestReviewImportJob_ApproveWithNoSourcesStartsNothing(t *testing.T) {
 	assert.Equal(t, desc, *got.Description)
 	assert.Equal(t, 0, yt.resolves, "nothing to resolve")
 	assert.Equal(t, 0, yt.lists, "nothing to list")
+}
+
+// --- AddImportJobSources --------------------------------------------------------
+
+func ytSources(refs ...string) []domain.CreateImportSourceInput {
+	out := make([]domain.CreateImportSourceInput, len(refs))
+	for i, ref := range refs {
+		out[i] = domain.CreateImportSourceInput{SourceType: domain.ImportSourceYouTubeChannel, Ref: ref}
+	}
+	return out
+}
+
+func describedRequest(t *testing.T, svc *services.ImportService, actor *domain.AuthenticatedUser) *domain.ImportJob {
+	t.Helper()
+	desc := "Find me good sermons."
+	job, err := svc.CreateImportJob(context.Background(), actor, domain.CreateImportJobInput{Name: "Sermons", Description: &desc})
+	require.NoError(t, err)
+	return job
+}
+
+func TestAddImportJobSources_RequesterWhileWaitingSavesWaiting(t *testing.T) {
+	repo := newFakeImportRepo()
+	yt := &fakeLister{}
+	svc := newImportService(repo, yt, nil, &fakeCreator{})
+	job := describedRequest(t, svc, importUser)
+
+	got, err := svc.AddImportJobSources(context.Background(), importUser, job.ID, ytSources("a", "b"))
+	require.NoError(t, err)
+	require.Len(t, got.Sources, 2)
+	for _, s := range got.Sources {
+		assert.Equal(t, domain.ImportSourceStatusWaiting, s.Status, "unreviewed sources wait")
+	}
+	assert.Equal(t, 0, yt.lists, "nothing lists before an admin approves")
+
+	_, err = svc.ReviewImportJob(context.Background(), importAdmin, job.ID, true, "")
+	require.NoError(t, err)
+	assert.Equal(t, 2, yt.lists, "approval lists the sources the requester added")
+}
+
+func TestAddImportJobSources_AdminOnApprovedStartsListing(t *testing.T) {
+	repo := newFakeImportRepo()
+	yt := &fakeLister{}
+	svc := newImportService(repo, yt, nil, &fakeCreator{})
+	job := describedRequest(t, svc, importUser)
+	_, err := svc.ReviewImportJob(context.Background(), importAdmin, job.ID, true, "")
+	require.NoError(t, err)
+
+	got, err := svc.AddImportJobSources(context.Background(), importAdmin, job.ID, ytSources("a"))
+	require.NoError(t, err, "this is the description-only dead end")
+	require.Len(t, got.Sources, 1)
+	assert.NotEqual(t, domain.ImportSourceStatusWaiting, got.Sources[0].Status, "listing began (the inline spawner may already have finished it)")
+	assert.Equal(t, 1, yt.lists, "an admin's added source starts listing at once")
+}
+
+func TestAddImportJobSources_Forbidden(t *testing.T) {
+	ctx := context.Background()
+	repo := newFakeImportRepo()
+	svc := newImportService(repo, &fakeLister{}, nil, &fakeCreator{})
+	job := describedRequest(t, svc, importUser)
+	other := &domain.AuthenticatedUser{ID: 3, Role: domain.UserRoleDefault}
+
+	_, err := svc.AddImportJobSources(ctx, nil, job.ID, ytSources("a"))
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+	_, err = svc.AddImportJobSources(ctx, other, job.ID, ytSources("a"))
+	assert.ErrorIs(t, err, domain.ErrForbidden, "someone else's request")
+
+	_, err = svc.ReviewImportJob(ctx, importAdmin, job.ID, true, "")
+	require.NoError(t, err)
+	_, err = svc.AddImportJobSources(ctx, importUser, job.ID, ytSources("a"))
+	assert.ErrorIs(t, err, domain.ErrForbidden, "after approval adding sources spends quota: admin only")
+	assert.Empty(t, repo.jobs[job.ID].Sources, "refused calls save nothing")
+}
+
+func TestAddImportJobSources_ClosedOrDeclinedRejected(t *testing.T) {
+	ctx := context.Background()
+	repo := newFakeImportRepo()
+	svc := newImportService(repo, &fakeLister{}, nil, &fakeCreator{})
+
+	closed := describedRequest(t, svc, importUser)
+	_, err := svc.CloseImportJob(ctx, importAdmin, closed.ID, true)
+	require.NoError(t, err)
+	_, err = svc.AddImportJobSources(ctx, importAdmin, closed.ID, ytSources("a"))
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+
+	declined := describedRequest(t, svc, importUser)
+	_, err = svc.ReviewImportJob(ctx, importAdmin, declined.ID, false, "no")
+	require.NoError(t, err)
+	_, err = svc.AddImportJobSources(ctx, importAdmin, declined.ID, ytSources("a"))
+	assert.ErrorIs(t, err, domain.ErrInvalidInput, "a declined request takes no sources")
+	_, err = svc.AddImportJobSources(ctx, importUser, declined.ID, ytSources("a"))
+	assert.ErrorIs(t, err, domain.ErrForbidden, "the requester is past the review window")
+}
+
+func TestAddImportJobSources_CapCountsExistingSources(t *testing.T) {
+	ctx := context.Background()
+	repo := newFakeImportRepo()
+	svc := newImportService(repo, &fakeLister{}, nil, &fakeCreator{})
+	job := describedRequest(t, svc, importUser)
+
+	refs := make([]string, domain.MaxImportSourcesPerJob)
+	for i := range refs {
+		refs[i] = fmt.Sprintf("r%d", i)
+	}
+	_, err := svc.AddImportJobSources(ctx, importUser, job.ID, ytSources(refs[:domain.MaxImportSourcesPerJob-1]...))
+	require.NoError(t, err, "up to the cap is fine")
+
+	_, err = svc.AddImportJobSources(ctx, importUser, job.ID, ytSources("x", "y"))
+	assert.ErrorIs(t, err, domain.ErrInvalidInput, "existing sources count toward the cap")
+	assert.Len(t, repo.jobs[job.ID].Sources, domain.MaxImportSourcesPerJob-1)
+}
+
+func TestAddImportJobSources_BadInputSavesNothing(t *testing.T) {
+	ctx := context.Background()
+	repo := newFakeImportRepo()
+	yt := &fakeLister{}
+	svc := newImportService(repo, yt, nil, &fakeCreator{})
+	job := describedRequest(t, svc, importUser)
+
+	_, err := svc.AddImportJobSources(ctx, importUser, job.ID, nil)
+	assert.ErrorIs(t, err, domain.ErrInvalidInput, "at least one source")
+
+	yt.resolveErr = domain.ErrNotFound
+	_, err = svc.AddImportJobSources(ctx, importUser, job.ID, ytSources("a", "b"))
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	assert.Empty(t, repo.jobs[job.ID].Sources, "a source that does not resolve saves none of the batch")
+
+	_, err = svc.AddImportJobSources(ctx, importUser, 999, ytSources("a"))
+	assert.ErrorIs(t, err, domain.ErrNotFound, "unknown import")
 }

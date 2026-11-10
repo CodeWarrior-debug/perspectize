@@ -79,6 +79,28 @@ func (r *mutationResolver) UpdateImportJobDescription(ctx context.Context, input
 	return importJobToModel(job), nil
 }
 
+// AddImportJobSources is the resolver for the addImportJobSources field. Who may
+// add, and when, is enforced in the service.
+func (r *mutationResolver) AddImportJobSources(ctx context.Context, input model.AddImportJobSourcesInput) (*model.ImportJob, error) {
+	svc, err := r.imports()
+	if err != nil {
+		return nil, err
+	}
+	actor, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	sources := make([]domain.CreateImportSourceInput, len(input.Sources))
+	for i, s := range input.Sources {
+		sources[i] = domain.CreateImportSourceInput{SourceType: s.SourceType, Ref: s.Ref, Role: s.Role}
+	}
+	job, err := svc.AddImportJobSources(ctx, actor, input.JobID, sources)
+	if err != nil {
+		return nil, importError(err)
+	}
+	return importJobToModel(job), nil
+}
+
 // ReviewImportJob is the resolver for the reviewImportJob field.
 func (r *mutationResolver) ReviewImportJob(ctx context.Context, input model.ReviewImportJobInput) (*model.ImportJob, error) {
 	svc, err := r.imports()

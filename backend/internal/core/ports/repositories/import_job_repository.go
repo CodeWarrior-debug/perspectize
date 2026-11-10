@@ -53,6 +53,11 @@ type ImportJobRepository interface {
 	// not-found, someone else's, and closed apart.
 	UpdateJobDescription(ctx context.Context, jobID, userID int, description string) (*domain.ImportJob, error)
 
+	// AddSources inserts sources onto an existing job in one multi-row
+	// statement and returns them with ids (1 statement; 0 for empty sources).
+	// domain.ErrNotFound when the job doesn't exist.
+	AddSources(ctx context.Context, jobID int, sources []*domain.ImportSource) ([]*domain.ImportSource, error)
+
 	// UpdateSource writes listing progress onto a source (1 statement).
 	UpdateSource(ctx context.Context, sourceID int, update ImportSourceUpdate) error
 

@@ -16,6 +16,11 @@ type ThreadEvent interface {
 	IsThreadEvent()
 }
 
+type AddImportJobSourcesInput struct {
+	JobID   int                        `json:"jobId"`
+	Sources []*CreateImportSourceInput `json:"sources"`
+}
+
 type CategorizedRating struct {
 	Category string `json:"category"`
 	Rating   int    `json:"rating"`

@@ -162,6 +162,31 @@ func (r *GormImportJobRepository) UpdateJobDescription(ctx context.Context, jobI
 	return importJobModelToDomain(&m), nil
 }
 
+// AddSources inserts sources onto an existing job in one multi-row INSERT.
+// A job id that doesn't exist trips the job foreign key.
+func (r *GormImportJobRepository) AddSources(ctx context.Context, jobID int, sources []*domain.ImportSource) ([]*domain.ImportSource, error) {
+	if len(sources) == 0 {
+		return nil, nil
+	}
+	models := make([]*ImportSourceModel, len(sources))
+	for i, s := range sources {
+		models[i] = importSourceDomainToModel(s)
+		models[i].JobID = jobID
+	}
+	if err := r.db.WithContext(ctx).Clauses(clause.Returning{}).Create(&models).Error; err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolation {
+			return nil, fmt.Errorf("%w: import job %d", domain.ErrNotFound, jobID)
+		}
+		return nil, fmt.Errorf("failed to insert import sources: %w", err)
+	}
+	out := make([]*domain.ImportSource, len(models))
+	for i, m := range models {
+		out[i] = importSourceModelToDomain(m)
+	}
+	return out, nil
+}
+
 // SetClosed closes (at) or reopens (nil) a job.
 func (r *GormImportJobRepository) SetClosed(ctx context.Context, id int, at *time.Time) error {
 	result := r.db.WithContext(ctx).Model(&ImportJobModel{}).Where("id = ?", id).Update("closed_at", at)

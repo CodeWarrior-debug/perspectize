@@ -516,3 +516,50 @@ func TestUpdateImportJobDescriptionRoundTrips(t *testing.T) {
 	assert.Contains(t, msg, "closed")
 	assert.Len(t, h.counter.Statements(), 2, "a miss on a closed import costs the same two statements")
 }
+
+const addImportJobSourcesMutation = `mutation($input: AddImportJobSourcesInput!) {
+  addImportJobSources(input: $input) { id requestStatus sources { status } }
+}`
+
+// TestAddImportJobSourcesRoundTrips pins adding sources: the job read (2
+// statements) plus one multi-row sources INSERT, however many sources. The
+// requester's wait for review; an admin's on an approved import list at once.
+// A refused add stops after the read (2).
+func TestAddImportJobSourcesRoundTrips(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "imp-as-a")
+	_, token := h.user("imp-as-u")
+	created := decode[rtDescribedRequest](t, h.gql(token, createDescribedRequestMutation, map[string]any{"input": map[string]any{
+		"name": "Sermons", "description": "first", "sources": []map[string]any{},
+	}}), "createImportJob")
+	src := func(refs ...string) map[string]any {
+		list := make([]map[string]any, len(refs))
+		for i, r := range refs {
+			list[i] = map[string]any{"sourceType": "YOUTUBE_CHANNEL", "ref": r}
+		}
+		return map[string]any{"input": map[string]any{"jobId": created.ID, "sources": list}}
+	}
+
+	h.warm(token)
+	data := h.roundTrips(3, token, addImportJobSourcesMutation, src("@one", "@two"))
+	added := decode[rtDescribedRequest](t, data, "addImportJobSources")
+	require.Len(t, added.Sources, 2)
+	assert.Equal(t, "WAITING", added.Sources[0].Status, "the requester's sources wait for review")
+	assert.Empty(t, h.background, "nothing lists before approval")
+
+	h.gql(adminToken, reviewImportJobMutation, map[string]any{"input": map[string]any{"jobId": created.ID, "approve": true}})
+	h.runBackground()
+
+	h.warm(token)
+	h.counter.Reset()
+	msg := h.gqlError(token, addImportJobSourcesMutation, src("@three"))
+	assert.Contains(t, msg, "ask an admin")
+	assert.Len(t, h.counter.Statements(), 2, "a refused add costs the job read only")
+
+	h.warm(adminToken)
+	data = h.roundTrips(3, adminToken, addImportJobSourcesMutation, src("@three"))
+	byAdmin := decode[rtDescribedRequest](t, data, "addImportJobSources")
+	require.Len(t, byAdmin.Sources, 3)
+	assert.Equal(t, "LISTING", byAdmin.Sources[2].Status)
+	assert.Len(t, h.background, 1, "an admin's add on an approved import starts listing")
+}

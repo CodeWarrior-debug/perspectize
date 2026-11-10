@@ -58,6 +58,16 @@ type ImportService interface {
 	// returned job has no sources.
 	UpdateImportJobDescription(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, description string) (*domain.ImportJob, error)
 
+	// AddImportJobSources checks and saves more sources onto an open import, at
+	// most domain.MaxImportSourcesPerJob in all. The requester may add them
+	// while the request is still waiting for review (saved WAITING); once it is
+	// approved only an admin may (saved LISTING, listing starts at once), since
+	// that spends listing quota. domain.ErrForbidden for anyone else,
+	// domain.ErrInvalidInput for a closed or declined import, no sources, too
+	// many, or a bad source; domain.ErrNotFound for an unknown import or a
+	// source that doesn't exist. Returns the job with all its sources.
+	AddImportJobSources(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, sources []domain.CreateImportSourceInput) (*domain.ImportJob, error)
+
 	// ReviewImportJob approves (starting listing) or declines a REQUESTED
 	// import. Admin only (domain.ErrForbidden). A decline needs a note.
 	// domain.ErrInvalidInput when the import isn't REQUESTED any more.

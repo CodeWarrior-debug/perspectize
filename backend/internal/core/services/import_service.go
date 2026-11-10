@@ -302,38 +302,11 @@ func (s *ImportService) CreateImportJob(ctx context.Context, actor *domain.Authe
 	} else {
 		job.RequestStatus, sourceStatus = domain.ImportRequestStatusRequested, domain.ImportSourceStatusWaiting
 	}
-	resolved := make([]resolvedSource, len(input.Sources))
-	for i, in := range input.Sources {
-		if !in.SourceType.Valid() {
-			return nil, fmt.Errorf("%w: unknown source type %q", domain.ErrInvalidInput, in.SourceType)
-		}
-		if in.Role != nil && in.SourceType != domain.ImportSourceTMDBPerson {
-			return nil, fmt.Errorf("%w: role only applies to TMDB people", domain.ErrInvalidInput)
-		}
-		lister, ok := s.listers[in.SourceType]
-		if !ok {
-			return nil, fmt.Errorf("%w: %s sources are not configured on this server", domain.ErrInvalidInput, in.SourceType)
-		}
-		ref := strings.TrimSpace(in.Ref)
-		if ref == "" || len(ref) > 200 {
-			return nil, fmt.Errorf("%w: source %d needs a reference of 1-200 characters", domain.ErrInvalidInput, i+1)
-		}
-		r, err := lister.Resolve(ctx, ref)
-		if err != nil {
-			return nil, fmt.Errorf("source %d (%s): %w", i+1, ref, err)
-		}
-		resolved[i] = resolvedSource{lister: lister, resolved: *r}
-		title, link := r.Title, r.URL
-		job.Sources = append(job.Sources, &domain.ImportSource{
-			SourceType:      in.SourceType,
-			SourceRef:       ref,
-			Title:           &title,
-			URL:             &link,
-			Role:            in.Role,
-			DestinationType: in.SourceType.DestinationType(),
-			Status:          sourceStatus,
-		})
+	sources, resolved, err := s.resolveSources(ctx, input.Sources, sourceStatus)
+	if err != nil {
+		return nil, err
 	}
+	job.Sources = sources
 
 	created, err := s.repo.CreateJob(ctx, job)
 	if err != nil {
@@ -343,6 +316,100 @@ func (s *ImportService) CreateImportJob(ctx context.Context, actor *domain.Authe
 		s.startListing(created.Sources, resolved)
 	}
 	return created, nil
+}
+
+// resolveSources validates each input and resolves it against its API, so a bad
+// source fails the whole call before anything is saved. The sources come back
+// with status, alongside the resolved forms listing needs.
+func (s *ImportService) resolveSources(ctx context.Context, inputs []domain.CreateImportSourceInput, status domain.ImportSourceStatus) ([]*domain.ImportSource, []resolvedSource, error) {
+	sources := make([]*domain.ImportSource, 0, len(inputs))
+	resolved := make([]resolvedSource, len(inputs))
+	for i, in := range inputs {
+		if !in.SourceType.Valid() {
+			return nil, nil, fmt.Errorf("%w: unknown source type %q", domain.ErrInvalidInput, in.SourceType)
+		}
+		if in.Role != nil && in.SourceType != domain.ImportSourceTMDBPerson {
+			return nil, nil, fmt.Errorf("%w: role only applies to TMDB people", domain.ErrInvalidInput)
+		}
+		lister, ok := s.listers[in.SourceType]
+		if !ok {
+			return nil, nil, fmt.Errorf("%w: %s sources are not configured on this server", domain.ErrInvalidInput, in.SourceType)
+		}
+		ref := strings.TrimSpace(in.Ref)
+		if ref == "" || len(ref) > 200 {
+			return nil, nil, fmt.Errorf("%w: source %d needs a reference of 1-200 characters", domain.ErrInvalidInput, i+1)
+		}
+		r, err := lister.Resolve(ctx, ref)
+		if err != nil {
+			return nil, nil, fmt.Errorf("source %d (%s): %w", i+1, ref, err)
+		}
+		resolved[i] = resolvedSource{lister: lister, resolved: *r}
+		title, link := r.Title, r.URL
+		sources = append(sources, &domain.ImportSource{
+			SourceType:      in.SourceType,
+			SourceRef:       ref,
+			Title:           &title,
+			URL:             &link,
+			Role:            in.Role,
+			DestinationType: in.SourceType.DestinationType(),
+			Status:          status,
+		})
+	}
+	return sources, resolved, nil
+}
+
+// AddImportJobSources adds sources to an open import. Spending listing quota
+// needs an admin's say-so: the requester may add while the request waits for
+// review (the sources wait with it); after approval only an admin may, and
+// listing starts at once. This is how an approved description-only request
+// gets its sources.
+func (s *ImportService) AddImportJobSources(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, inputs []domain.CreateImportSourceInput) (*domain.ImportJob, error) {
+	if actor == nil {
+		return nil, fmt.Errorf("%w: sign in to add sources", domain.ErrForbidden)
+	}
+	if len(inputs) == 0 {
+		return nil, fmt.Errorf("%w: add at least one source", domain.ErrInvalidInput)
+	}
+	job, err := s.repo.GetJob(ctx, jobID)
+	if err != nil {
+		return nil, err
+	}
+	isAdmin := actor.Role == domain.UserRoleAdmin
+	switch {
+	case !isAdmin && job.UserID != actor.ID:
+		return nil, fmt.Errorf("%w: only the person who requested this import, or an admin, may add sources", domain.ErrForbidden)
+	case !isAdmin && job.RequestStatus != domain.ImportRequestStatusRequested:
+		return nil, fmt.Errorf("%w: this import is already reviewed; ask an admin to add sources", domain.ErrForbidden)
+	case job.ClosedAt != nil:
+		return nil, fmt.Errorf("%w: this import is closed", domain.ErrInvalidInput)
+	case job.RequestStatus == domain.ImportRequestStatusDeclined:
+		return nil, fmt.Errorf("%w: this request was declined", domain.ErrInvalidInput)
+	}
+	if len(job.Sources)+len(inputs) > domain.MaxImportSourcesPerJob {
+		return nil, fmt.Errorf("%w: an import takes at most %d sources (it has %d)",
+			domain.ErrInvalidInput, domain.MaxImportSourcesPerJob, len(job.Sources))
+	}
+
+	approved := job.RequestStatus == domain.ImportRequestStatusApproved
+	status := domain.ImportSourceStatusWaiting
+	if approved {
+		status = domain.ImportSourceStatusListing
+	}
+	sources, resolved, err := s.resolveSources(ctx, inputs, status)
+	if err != nil {
+		return nil, err
+	}
+	existing := append([]*domain.ImportSource(nil), job.Sources...)
+	added, err := s.repo.AddSources(ctx, jobID, sources)
+	if err != nil {
+		return nil, err
+	}
+	if approved {
+		s.startListing(added, resolved)
+	}
+	out := *job
+	out.Sources = append(existing, added...)
+	return &out, nil
 }
 
 func (s *ImportService) startListing(sources []*domain.ImportSource, resolved []resolvedSource) {
