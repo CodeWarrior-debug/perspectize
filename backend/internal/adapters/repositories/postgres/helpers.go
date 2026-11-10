@@ -124,6 +124,7 @@ var computedSortColumns = map[string]string{
 	"AddedBy":      "added_by",
 	"ReleaseDate":  "release_date_sort",
 	"TmdbScore":    "tmdb_score",
+	"Author":       "author_sort",
 }
 
 // computedSortSelects returns the ", (expr) AS alias" select-list suffix for every
