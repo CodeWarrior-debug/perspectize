@@ -3,8 +3,11 @@
 Status: brainstormed interactively tonight (2026-11-09); not yet built. Preview of the
 intended grid: `tools/content-type-designer/previews/book-activity.html`, built by the
 `content-type-preview` skill from `.claude/skills/content-type-preview/examples/book.spec.json`.
-Postman collection for the Open Library endpoints this design relies on:
-`docs/superpowers/specs/postman/book-openlibrary.postman_collection.json` (§10).
+Preview of the intended Discover page (Search/Trending/ISBN tabs):
+`tools/content-type-designer/previews/book-discover.html` — hand-built, since
+`content-type-preview` only covers the Activity table; no skill exists yet for a
+Discover-page mock. Postman collection for the Open Library endpoints this design relies
+on: `docs/superpowers/specs/postman/book-openlibrary.postman_collection.json` (§10).
 Test case throughout: *East of Eden* (John Steinbeck).
 
 ## Scope
