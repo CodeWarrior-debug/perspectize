@@ -16,6 +16,27 @@ type ThreadEvent interface {
 	IsThreadEvent()
 }
 
+type BookSearchPage struct {
+	Items        []*BookSearchResult `json:"items"`
+	Page         int                 `json:"page"`
+	TotalPages   int                 `json:"totalPages"`
+	TotalResults int                 `json:"totalResults"`
+}
+
+type BookSearchResult struct {
+	WorkKey          string   `json:"workKey"`
+	Title            string   `json:"title"`
+	AuthorName       []string `json:"authorName"`
+	CoverID          *int     `json:"coverId,omitempty"`
+	FirstPublishYear *int     `json:"firstPublishYear,omitempty"`
+	PageCountMedian  *int     `json:"pageCountMedian,omitempty"`
+	Subjects         []string `json:"subjects"`
+	RatingsAverage   *float64 `json:"ratingsAverage,omitempty"`
+	RatingsCount     *int     `json:"ratingsCount,omitempty"`
+	EditionCount     *int     `json:"editionCount,omitempty"`
+	URL              string   `json:"url"`
+}
+
 type CategorizedRating struct {
 	Category string `json:"category"`
 	Rating   int    `json:"rating"`
@@ -62,7 +83,9 @@ type Content struct {
 	Description   *string               `json:"description,omitempty"`
 	Response      map[string]any        `json:"response,omitempty"`
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
-	Movie                   map[string]any `json:"movie,omitempty"`
+	Movie map[string]any `json:"movie,omitempty"`
+	// Book-specific metadata (the shaped Open Library payload); null for other content types.
+	Book                    map[string]any `json:"book,omitempty"`
 	PrimaryCategory         *Category      `json:"primaryCategory,omitempty"`
 	VerseStartID            *int           `json:"verseStartID,omitempty"`
 	VerseEndID              *int           `json:"verseEndID,omitempty"`
@@ -120,6 +143,10 @@ type CreateClaimInput struct {
 	Text            string `json:"text"`
 	UserID          int    `json:"userID"`
 	ParentContentID int    `json:"parentContentID"`
+}
+
+type CreateContentFromBookInput struct {
+	URL string `json:"url"`
 }
 
 type CreateContentFromMovieInput struct {
