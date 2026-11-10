@@ -34,12 +34,26 @@
       }
     },
     {
+      "id": "author",
+      "kind": "text",
+      "label": "Author",
+      "status": "proposed",
+      "header": {
+        "body": "Primary author. A default column, not just the item cell's sub-line — sortable and filterable on its own.",
+        "src": "response.authorName[0]"
+      },
+      "cell": {
+        "src": "response.authorName[0]",
+        "whenEmpty": "No author on record for this work."
+      }
+    },
+    {
       "id": "published",
-      "kind": "num",
+      "kind": "text",
       "label": "Published",
       "status": "proposed",
       "header": {
-        "body": "First publish year. Sorts oldest/newest; unknown sorts last.",
+        "body": "First publish year. Sorts oldest/newest; unknown sorts last. Rendered as a plain 4-digit string, never through the numeric formatter (which would add a thousands separator and show \"1,952\").",
         "src": "response.firstPublishYear"
       },
       "cell": {
@@ -77,12 +91,12 @@
       }
     },
     {
-      "id": "subjects",
+      "id": "tags",
       "kind": "tags",
-      "label": "Subjects",
+      "label": "Tags",
       "status": "proposed",
       "header": {
-        "body": "Open Library's crowdsourced subject tags, as chips. An external-source tag set (like Movie's TMDB keywords) — overlaps issue #560 (separating source tags from user tags).",
+        "body": "Open Library's crowdsourced subject tags, as chips — reuses the project's existing shared Tags column (also fed by YouTube video tags and Movie's TMDB keywords), not a one-off \"Subjects\" header. A genre/theme split was considered and rejected: Open Library's separate 'genres' field is often empty (none for this trending result) and needs an extra per-tag lookup to resolve to a label, so the flat subject list is kept as one tag set, like Movie's keywords. External-source tag set — overlaps issue #560 (separating source tags from user tags).",
         "src": "response.subjects[]"
       },
       "cell": {
@@ -102,6 +116,12 @@
           "sub": "John Steinbeck",
           "thumb": "https://covers.openlibrary.org/b/id/11386937-M.jpg"
         },
+        "author": {
+          "value": "John Steinbeck",
+          "tip": {
+            "src": "response.authorName[0]"
+          }
+        },
         "published": {
           "value": "1952",
           "tip": {
@@ -112,7 +132,7 @@
           "value": "611",
           "tip": {
             "src": "response.pageCountMedian",
-            "v": "Median across 105 indexed editions"
+            "v": "Median across 105 indexed editions — this work's own edition has number_of_pages: 525 on record; the median is a cross-edition aggregate, not this book's page count."
           }
         },
         "rating": {
@@ -122,7 +142,7 @@
             "v": "4.1 from 100 ratings (Open Library, live 2026-11-09)"
           }
         },
-        "subjects": {
+        "tags": {
           "value": [
             "historical fiction",
             "classics",
@@ -144,15 +164,29 @@
         "text": [
           [
             null,
-            "Not fetched in v1 — Open Library's description lives on the canonical /works/{id}.json record, a separate call from the search index that gives everything else on this row. Deferred until the details modal is built (design doc §4, §7)."
+            "Steinbeck considered East of Eden to be his masterpiece. In his journal, Journal of a Novel, he notes that “this is the book I have always wanted and have worked and prayed to be able to write.” Set primarily in the Salinas Valley in the early twentieth century, the novel traces three generations of two families – the Trasks and the Hamiltons – as they grapple with the ever-present forces of good and evil."
+          ],
+          [
+            null,
+            "Part allegory, part autobiography, and part epic, East of Eden was an ambitious project from the start – a gift to Steinbeck’s sons meant to teach them about identity, grief, and what it means to be human. Tinged with biblical echoes of the fall of Adam and Eve and the rivalry of Cain and Abel, this sprawling saga has captivated audiences for generations."
           ]
         ],
         "links": [
           {
+            "label": "Related works on Open Library",
+            "status": "proposed",
+            "items": [
+              "East of Eden 1/2 and 2/2 (a two-volume edition of this same work)",
+              "East of Eden / The Wayward Bus (an omnibus containing this work)",
+              "3 more omnibus/collection editions"
+            ]
+          },
+          {
             "label": "Sources",
             "status": "proposed",
             "items": [
-              "Open Library: openlibrary.org/works/OL23166W"
+              "Open Library: openlibrary.org/works/OL23166W",
+              "Description: steinbeck.org/about-john/his-works"
             ]
           }
         ],
@@ -208,6 +242,12 @@
           "sub": "James Clear",
           "thumb": "https://covers.openlibrary.org/b/id/12539702-M.jpg"
         },
+        "author": {
+          "value": "James Clear",
+          "tip": {
+            "src": "response.authorName[0]"
+          }
+        },
         "published": {
           "value": "2016",
           "tip": {
@@ -227,7 +267,7 @@
             "v": "3.97 from 1489 ratings (Open Library, live 2026-11-09)"
           }
         },
-        "subjects": {
+        "tags": {
           "value": [
             "Habit",
             "Behavior modification",
@@ -248,7 +288,7 @@
         "text": [
           [
             null,
-            "Not fetched in v1 — see East of Eden's details for why."
+            "No matter your goals, Atomic Habits offers a proven framework for improving every day. James Clear, one of the world's leading experts on habit formation, reveals practical strategies that will teach you exactly how to form good habits, break bad ones, and master the tiny behaviors that lead to remarkable results."
           ]
         ],
         "links": [
@@ -302,6 +342,12 @@
           "sub": "Bill Brent",
           "thumb": "https://covers.openlibrary.org/b/id/727275-M.jpg"
         },
+        "author": {
+          "value": "Bill Brent",
+          "tip": {
+            "src": "response.authorName[0]"
+          }
+        },
         "published": {
           "value": "1997",
           "tip": {
@@ -320,7 +366,7 @@
             "empty": "No community ratings yet. Fewer than 5 ratings mutes this cell even when a number exists; here there is none at all."
           }
         },
-        "subjects": {
+        "tags": {
           "value": [
             "Zines",
             "Publishing",
@@ -340,7 +386,7 @@
         "text": [
           [
             null,
-            "Not fetched in v1 — see East of Eden's details for why."
+            "No description on record. Confirmed live 2026-11-09: Open Library's canonical work record for this title has a null description field — not a fetch that was skipped, the source genuinely has none."
           ]
         ],
         "links": [
@@ -393,6 +439,12 @@
           "sub": "Alex Wrekk",
           "thumb": null
         },
+        "author": {
+          "value": "Alex Wrekk",
+          "tip": {
+            "src": "response.authorName[0]"
+          }
+        },
         "published": {
           "value": "1999",
           "tip": {
@@ -411,7 +463,7 @@
             "empty": "No community ratings yet."
           }
         },
-        "subjects": {
+        "tags": {
           "value": [
             "Fan magazines",
             "Nostalgia",
@@ -430,7 +482,11 @@
         "text": [
           [
             null,
-            "A real, sparse Open Library record: no cover, no ratings, just three subjects. This is the row the \"unknown, not zero\" empty-cell rule exists for."
+            "This issue is written in diary form and contains stories of events and situations that happened in different locations such as Utah and Portland. The author reflects upon the meaning of the past and feelings of nostalgia and belonging associated with home and homecoming."
+          ],
+          [
+            null,
+            "A real, sparse Open Library record otherwise: no cover, no ratings, just three subjects. This is the row the \"unknown, not zero\" empty-cell rule exists for."
           ]
         ],
         "links": [
