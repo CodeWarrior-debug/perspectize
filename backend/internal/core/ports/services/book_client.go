@@ -51,3 +51,12 @@ type BookTrendingClient interface {
 	// TrendingBooks returns one page of trending books for the window.
 	TrendingBooks(ctx context.Context, window domain.TrendingWindow, page int) (*BookSearchPage, error)
 }
+
+// BookISBNClient resolves an ISBN to the Open Library work it belongs to
+// (/isbn/{isbn}.json, which 302s to a specific edition record).
+type BookISBNClient interface {
+	// ResolveISBN returns the bare work key (e.g. "OL23166W", no "/works/"
+	// prefix) for the edition the ISBN identifies. Returns domain.ErrNotFound
+	// when Open Library has no record for the ISBN.
+	ResolveISBN(ctx context.Context, isbn string) (workKey string, err error)
+}

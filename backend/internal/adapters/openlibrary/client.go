@@ -44,6 +44,7 @@ type Client struct {
 var (
 	_ services.BookSearchClient   = (*Client)(nil)
 	_ services.BookTrendingClient = (*Client)(nil)
+	_ services.BookISBNClient     = (*Client)(nil)
 )
 
 // NewClient creates an Open Library client. No API key is needed.
@@ -219,6 +220,34 @@ func (c *Client) TrendingBooks(ctx context.Context, window domain.TrendingWindow
 		return nil, err
 	}
 	return parseTrending(body, page)
+}
+
+// ResolveISBN looks up the edition for an ISBN and returns the bare work key
+// it belongs to. Open Library's /isbn/{isbn}.json 302s to the edition
+// record; http.Client follows that redirect by default (NewClient never sets
+// CheckRedirect), so get() already returns the edition body.
+func (c *Client) ResolveISBN(ctx context.Context, isbn string) (string, error) {
+	body, err := c.get(ctx, "/isbn/"+isbn+".json", nil)
+	if err != nil {
+		return "", err
+	}
+	var edition struct {
+		Works []struct {
+			Key string `json:"key"`
+		} `json:"works"`
+	}
+	if err := json.Unmarshal(body, &edition); err != nil {
+		// Deliberately not wrapping err: decoder errors can echo upstream content.
+		return "", fmt.Errorf("%w: failed to parse isbn response", ErrOpenLibraryAPI)
+	}
+	if len(edition.Works) == 0 {
+		return "", fmt.Errorf("%w: edition has no work reference", ErrOpenLibraryAPI)
+	}
+	key := edition.Works[0].Key
+	if len(key) > len(worksPrefix) && key[:len(worksPrefix)] == worksPrefix {
+		key = key[len(worksPrefix):]
+	}
+	return key, nil
 }
 
 func parseTrending(raw []byte, page int) (*services.BookSearchPage, error) {

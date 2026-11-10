@@ -128,6 +128,31 @@ func TestClient_SearchBooks_ErrorsSanitized(t *testing.T) {
 	assert.ErrorIs(t, err, ErrOpenLibraryAPI)
 }
 
+func TestClient_ResolveISBN_Found(t *testing.T) {
+	var gotPath string
+	fixture := serveFixture(t, "isbn_east_of_eden.json")
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		fixture(w, r)
+	})
+
+	workKey, err := c.ResolveISBN(context.Background(), "9780434740024")
+	require.NoError(t, err)
+
+	assert.Equal(t, "/isbn/9780434740024.json", gotPath)
+	assert.Equal(t, "OL23166W", workKey)
+}
+
+func TestClient_ResolveISBN_NotFound(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+
+	_, err := c.ResolveISBN(context.Background(), "9780000000001")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
 func TestClient_TransportErrorSanitized(t *testing.T) {
 	c := NewClient()
 	c.baseURL = "http://127.0.0.1:1"
