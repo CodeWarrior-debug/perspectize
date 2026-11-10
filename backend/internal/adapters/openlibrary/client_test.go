@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
@@ -151,6 +152,40 @@ func TestClient_ResolveISBN_NotFound(t *testing.T) {
 	_, err := c.ResolveISBN(context.Background(), "9780000000001")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+// TestClient_ResolveISBN_EscapesPathInput asserts that reserved characters in
+// the caller's ISBN string cannot add path segments, query params or fragments
+// to the upstream request. The server records the raw (still-escaped) path.
+func TestClient_ResolveISBN_EscapesPathInput(t *testing.T) {
+	tests := []struct {
+		name     string
+		isbn     string
+		wantPath string
+	}{
+		{"slash adds no segment", "978/evil", "/isbn/978%2Fevil.json"},
+		{"traversal stays in one segment", "../search", "/isbn/..%2Fsearch.json"},
+		{"question mark stays in path", "978?x=1", "/isbn/978%3Fx=1.json"},
+		{"hash stays in path", "978#frag", "/isbn/978%23frag.json"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotRaw, gotQuery string
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				gotRaw = r.URL.EscapedPath()
+				gotQuery = r.URL.RawQuery
+				w.WriteHeader(http.StatusNotFound)
+			})
+
+			_, err := c.ResolveISBN(context.Background(), tt.isbn)
+			require.ErrorIs(t, err, domain.ErrNotFound)
+
+			assert.Equal(t, tt.wantPath, gotRaw)
+			assert.True(t, strings.HasPrefix(gotRaw, "/isbn/"))
+			assert.Equal(t, 2, strings.Count(gotRaw, "/"), "path must keep exactly /isbn/<one segment>.json")
+			assert.Empty(t, gotQuery)
+		})
+	}
 }
 
 func TestClient_TransportErrorSanitized(t *testing.T) {

@@ -227,7 +227,7 @@ func (c *Client) TrendingBooks(ctx context.Context, window domain.TrendingWindow
 // record; http.Client follows that redirect by default (NewClient never sets
 // CheckRedirect), so get() already returns the edition body.
 func (c *Client) ResolveISBN(ctx context.Context, isbn string) (string, error) {
-	body, err := c.get(ctx, "/isbn/"+isbn+".json", nil)
+	body, err := c.get(ctx, "/isbn/"+url.PathEscape(isbn)+".json", nil)
 	if err != nil {
 		return "", err
 	}
