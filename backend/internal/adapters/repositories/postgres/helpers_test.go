@@ -191,6 +191,32 @@ func TestBuildContentSortRules(t *testing.T) {
 			wantTieOrder: paginator.DESC,
 		},
 		{
+			name:   "author ascending uses a CASE expression with an empty-author guard and sorts missing authors last",
+			sortBy: domain.ContentSortByAuthor,
+			order:  domain.SortOrderAsc,
+			wantPrimary: paginator.Rule{
+				Key:   "Author",
+				Order: paginator.ASC,
+				SQLRepr: "CASE WHEN response->'authorName'->>0 IS NULL OR response->'authorName'->>0 = '' " +
+					"THEN NULL ELSE response->'authorName'->>0 END",
+				NULLReplacement: nullAuthorAsc,
+			},
+			wantTieOrder: paginator.ASC,
+		},
+		{
+			name:   "author descending sorts missing authors last",
+			sortBy: domain.ContentSortByAuthor,
+			order:  domain.SortOrderDesc,
+			wantPrimary: paginator.Rule{
+				Key:   "Author",
+				Order: paginator.DESC,
+				SQLRepr: "CASE WHEN response->'authorName'->>0 IS NULL OR response->'authorName'->>0 = '' " +
+					"THEN NULL ELSE response->'authorName'->>0 END",
+				NULLReplacement: nullAuthorDesc,
+			},
+			wantTieOrder: paginator.DESC,
+		},
+		{
 			name:   "published at uses string null replacement",
 			sortBy: domain.ContentSortByPublishedAt,
 			order:  domain.SortOrderAsc,
