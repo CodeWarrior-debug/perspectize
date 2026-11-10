@@ -145,6 +145,10 @@ Uses `ag-grid-svelte5` (bundles AG Grid v32.x). **Do NOT install `ag-grid-commun
 
 **A tight AG Grid `rowHeight` clips descenders** (g/y/p/q/j) on a `line-clamp-2` title: the row's `overflow: hidden` cuts the last line when content height is marginally under `rowHeight`. A 2-line `text-[13px] leading-[1.5]` title (~39px) needs ~64px, not 45-50px. After changing `rowHeight` or the title's font-size/line-height/clamp count, zoom into a rendered row to verify.
 
+**AG Grid scroll behaviour (Activity table):** the `perspectize` and `item` columns are `pinned: 'left'` and `app.css` forces the horizontal scrollbar visible (`.ag-body-horizontal-scroll-viewport` and the `.ag-horizontal-left/right-spacer` gutters), because a mouse has no sideways-scroll gesture and macOS overlay scrollbars hide until used. Columns are `flex` + `sizeColumnsToFit()`, so the grid only overflows once the picker enables enough columns (25 in total).
+
+**Cloud-feasible visual check of the Activity grid (no Clerk, no backend):** `VITE_DEMO_MODE=true pnpm exec vite dev`, open `/?demo_as=alice`, and Playwright-`route('**/graphql')` mock `ListContent` (`content.items` needs `contentType: 'YOUTUBE_VIDEO'` or the default Type filter hides every row) and `Me`. Launch Chromium with `ignoreDefaultArgs: ['--hide-scrollbars']`, or scrollbar styling can't be seen.
+
 **Date formatting timezone:** `formatDate`/`formatDateCompact` use local time (`toLocaleDateString`). Test with midday UTC (`T12:00:00Z`), not midnight, or dates shift a day in US timezones.
 
 **AG Grid doesn't render in jsdom** (no lifecycle, Grid API or cells). Extract grid logic into pure functions in `$lib/utils/grid-config.ts` (sort mapping, pagination bounds, responsive tiers, comparators, column metadata) and renderers/formatters into `$lib/utils/formatting.ts`, and unit-test those. Test grid integration (filter UI, sort clicks, responsive `$effect`s) with Playwright E2E or Vitest Browser Mode. See [ADDING_AG_GRID_COLUMN.md](../.claude/docs/ADDING_AG_GRID_COLUMN.md) testing section.
