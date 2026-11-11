@@ -9,16 +9,16 @@ Plan: [2026-11-11-web-page-content-type-plan.md](../plans/2026-11-11-web-page-co
 
 `WEB_PAGE` is any http(s) page that no other type claims. You paste a URL and the backend reads the page's `<head>` once for its title, description, site name, preview image and publish date, then stores the row. People categorise it and write perspectives on it like any other content.
 
-**In v1:** add by URL; metadata read once at add time; the six columns below; the details view; Wikidata category (already built for every type); Activity filter by type; and **related content on a perspective** (§8). For example, in your perspective on a YouTube video you attach an article saying that video set the production standard for the next generation. The perspective stores the article's **content ID**, not its URL.
+**In v1:** add by URL; metadata read once at add time; the six columns below; the details view; Wikidata category (already built for every type); Activity filter by type; **page types with blog post first** (§9), a multi-valued role list aligned with Schema.org; and **related content on a perspective** (§8). For example, in your perspective on a YouTube video you attach a blog post saying that video set the production standard for the next generation. The perspective stores the post's **content ID**, not its URL.
 
-**Not in v1:** a content-to-content relation outside a perspective; a reverse "cited by" view on the related item (the table in §8 makes it cheap later); a Discover tab; re-reading metadata on a schedule; full-text extraction, archiving or screenshots of the page; per-site adapters (Medium, Substack, X and so on).
+**Not in v1:** a content-to-content relation outside a perspective; a reverse "cited by" view on the related item (the table in §8 makes it cheap later); a Discover tab; re-reading metadata on a schedule; full-text extraction, archiving or screenshots of the page; per-site adapters (Medium, Substack, X and so on); page types other than blog post, and changing a page's types after it is added (both in §9).
 
 ## 1. Ingestion
 
 | Step | Rule |
 |---|---|
 | Detect | Frontend `detectContentCandidates`: any `http(s)://` URL that is not YouTube, TMDB/IMDb or Bible Gateway now returns `{ type: 'WEB_PAGE', url }` instead of nothing. The precedence order is unchanged, with Web page last among URLs. |
-| Mutation | `createContentFromWebPage(input: { url: String! }): CreateContentResult! @auth`. It returns `alreadyExisted` like the others. |
+| Mutation | `createContentFromWebPage(input: { url: String!, pageTypes: [WebPageType!] }): CreateContentResult! @auth`. `pageTypes` omitted = use what the reader detected; `[]` = none. It returns `alreadyExisted` like the others. |
 | Canonical URL (dedupe key) | Lowercase the scheme and host, drop `www.`, the fragment, `utm_*`/`fbclid`/`gclid`, the default port and a trailing slash (except on `/`). If the page declares `<link rel=canonical>` **on the same registrable domain**, use that. The global `UNIQUE(url)` stays the dedupe key. If the canonical URL already belongs to another type (a YouTube watch URL can't reach here; a Wikipedia URL could), return the existing row. |
 | Fetch | One GET, details in §4. It **never blocks the add**: on any failure the row is still created with `fetch.status` set and the title falling back to `host + path`. |
 
@@ -37,6 +37,8 @@ The shared columns are `name` (title), `url` (canonical) and `created_at`. Every
   "imageUrl": "https://…",                           // og:image (absolute), else null
   "faviconUrl": "https://arxiv.org/favicon.ico",     // <link rel=icon>, else /favicon.ico (not verified)
   "publishedAt": "2017-06-12",                       // article:published_time > citation_date > JSON-LD datePublished; null if none
+  "pageTypes": ["BLOG_POST"],                        // roles the page plays, first = primary; [] = plain web page (§9)
+  "author": "Jane Doe",                              // JSON-LD author name > meta[name=author]; null if none. Max 200 chars
   "lang": "en",                                      // <html lang>, else null
   "fetch": { "status": "OK", "httpStatus": 200, "at": "2026-11-11T08:00:00Z" }
   // status: OK | BLOCKED (4xx) | ERROR (5xx/network) | TIMEOUT | NOT_HTML | TOO_LARGE.
@@ -62,7 +64,7 @@ The shared columns are `name` (title), `url` (canonical) and `created_at`. Every
 
 **Category needs no new work.** The column, the Wikidata typeahead popover, `setPrimaryCategory` and the `categories` table are all type-agnostic (`ActivityTable.svelte` colId `category`, `CategoryServiceImpl.SetPrimaryCategory`). The only work is to confirm the column is not hidden when the type filter is Web page only, and to cover that with a test.
 
-**Column picker only:** description, language, fetched (date and time).
+**Column picker only:** page types (pills), author, description, language, fetched (date and time). Page types stay out of the defaults because in v1 most rows have none; the Activity filter (§9) and the details view carry it instead.
 
 ## 4. Fetching safely (the only real risk)
 
@@ -80,9 +82,9 @@ Images are **not** downloaded or proxied. The frontend loads `imageUrl`/`favicon
 
 ## 5. Details view
 
-Title, site and URL (opens in a new tab, `rel="noopener noreferrer"`); description, or "This page has no description" when there is none; tiles for Site, Published, Fetched (date **and time** the metadata was read, in the viewer's local time, e.g. "2026-11-11 08:02"; no status) and Language; perspectives. Footer: "Title, description and image come from the page's own metadata, read once when the link was added. Perspectize links to the page; it does not copy its content."
+Title, site and URL (opens in a new tab, `rel="noopener noreferrer"`); description, or "This page has no description" when there is none; tiles for Type (the `pageTypes` labels, "Web page" when empty), Site, Author (shown only when the page declares one), Published, Fetched (date **and time** the metadata was read, in the viewer's local time, e.g. "2026-11-11 08:02"; no status) and Language; perspectives. Footer: "Title, description and image come from the page's own metadata, read once when the link was added. Perspectize links to the page; it does not copy its content."
 
-**Import preview (Decision 8):** after the URL is pasted, the Add dialog shows the fetched title, site, description, image and published date before Save. A blocked fetch shows "We couldn't read this page's details (HTTP 403). You can still save the link." This needs a read-only `previewWebPage(url)` query that runs the same fetcher without writing anything.
+**Import preview (Decision 8):** after the URL is pasted, the Add dialog shows the fetched title, site, author, description, image and published date before Save, plus the page types it detected as a checkbox ("This is a blog post", ticked when detected, and tickable by hand when not; §9). A blocked fetch shows "We couldn't read this page's details (HTTP 403). You can still save the link." This needs a read-only `previewWebPage(url)` query that runs the same fetcher without writing anything.
 
 ## 6. Source terms and liability (Decision 9)
 
@@ -100,6 +102,9 @@ We store only what the page publishes for link previews (title, description, ima
 | D3 | Can the person who added a page rename it when the title is bad or missing? | Yes, via the existing `display_title`. It is in the plan as the last, optional task. |
 | D4 | Should `previewWebPage` (the import preview) ship in v1 or follow? | v1, because Decision 8 applies to every type. |
 | D5 | Wikipedia URLs: save as Web page, or offer "set as category" instead? | Save as Web page; no special case in v1. |
+| D9 | Which page types ship in v1? | **Blog post only** (requested 2026-11-11). The field is a list from day one, so adding Article, Web app, Game and so on later is an enum value, not a migration (§9). |
+| D10 | Auto-detect blog posts, or only let the adder choose? | Both: detect from Schema.org `BlogPosting` markup, and let the adder tick or untick it in the Add dialog. No URL guessing such as `/blog/`. |
+| D11 | Can types change after the page is added? | Not in v1 (the row is shared, and the adder's choice is fixed at add time). Revisit with D3's rename, which has the same "who may edit a shared row" question. |
 
 ## 8. Related content on a perspective
 
@@ -178,3 +183,52 @@ Typing text that isn't a URL shows "Paste a link." Pasting the perspective's own
 - **Perspective view only:** a read-only "Related" list under the review text. Each item shows title, site and type icon, has an ↗ to the original URL, and links to that item's own details modal.
 - **Content details modal:** nothing beyond the optional "N related" count on a perspective entry (decision D8).
 - **Activity grid:** nothing new in v1.
+
+## 9. Page types (multi-role), blog post first
+
+**Why.** A web page is not one kind of thing: one is an article, another is a place where a game is played, another is a dashboard. There is no official single list of page roles, but [Schema.org](https://schema.org/WebPage) is the de facto vocabulary, and unlike the others (Open Graph's `og:type`, Dublin Core's type list) it already allows a page to carry several types at once. Perspectize uses its own short enum, each value mapped to a Schema.org type, rather than inventing labels or exposing raw Schema.org names.
+
+**Multi-role.** `pageTypes` is an **ordered list; the first entry is the primary role**. A page with no entry is a plain web page. One list covers "primary plus secondary roles" without a second field, and it matches how Schema.org markup can declare several `@type` values.
+
+**Site type is separate and out of scope.** This describes one *page* ("this post"), not the *site* ("a blog"). A site-level field can follow later without touching this one.
+
+### Vocabulary
+
+| Perspectize value | Schema.org type | Ships in |
+|---|---|---|
+| `BLOG_POST` | [BlogPosting](https://schema.org/BlogPosting) (a kind of [Article](https://schema.org/Article)) | **v1** |
+| `ARTICLE` | Article, NewsArticle, Report | later |
+| `TUTORIAL` | HowTo, Recipe | later |
+| `DISCUSSION` | DiscussionForumPosting, QAPage | later |
+| `WEB_APP` | WebApplication | later |
+| `DASHBOARD` | WebApplication with `additionalType` | later |
+| `GAME` | VideoGame | later |
+| `DATASET` | Dataset | later |
+
+The later rows are a roadmap, not a promise; each one is a new enum value plus a detector, with no migration. `DASHBOARD` has no Schema.org type of its own, so it would lean on `additionalType`. Add them only when a real page needs them.
+
+### Detecting a blog post
+
+Only Schema.org markup counts: a JSON-LD block in the page's `<head>` whose `@type` is, or includes, `BlogPosting` (a string or an array, at the top level or inside `@graph`). Not enough, on their own: `og:type=article` (news pages use it too) and URL patterns such as `/blog/`. A site that puts its JSON-LD in `<body>` is not detected, because the reader stops at `</head>` (§4); the adder ticks "This is a blog post" in the Add dialog instead. **Missing is empty, never a guess.**
+
+`author` is read in the same pass, as JSON-LD `author.name` (string, object or first array item), else `meta[name=author]`, capped at 200 characters.
+
+### API and filter
+
+```graphql
+enum WebPageType { BLOG_POST }               # additive: later values never break clients
+type WebPagePreview { …spec §2 fields…  pageTypes: [WebPageType!]!  author: String }
+input ContentFilter { …existing…  webPageTypes: [WebPageType!] }   # match any (OR); web page rows only
+```
+
+The list is stored in `content.response` (no migration) as the uppercase enum names, and `webPageTypes` filters with JSONB containment, one `response->'pageTypes' @> '["BLOG_POST"]'` per value, OR'd. Use `@>` rather than the `?|` operators: GORM reads a bare `?` as a bind placeholder. The enum is bound to a domain type in `gqlgen.yml` like the others, with no hand-written conversion switch. Rows of other content types never match a `webPageTypes` filter, as with the movie column filters.
+
+### Where it shows
+
+| Surface | What |
+|---|---|
+| Add dialog (import preview) | A "This is a blog post" checkbox, ticked when detected, plus the author line. |
+| Activity filter | A "Page type" control that appears when the type filter is Web page only. Blog post is its only option in v1. |
+| Details view | A **Type** tile ("Blog post", or "Web page" when empty) and an **Author** tile when known. |
+| Column picker | "Page types" pills and "Author". Neither is a default column. |
+| Perspective editor | Unchanged. A related blog post is just a web page chip; its Type is not shown on the chip in v1. |

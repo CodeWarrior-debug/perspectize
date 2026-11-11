@@ -2,7 +2,7 @@
 
 > **For agentic workers:** execute with `superpowers:subagent-driven-development` (or `superpowers:executing-plans` inline). Steps use `- [ ]` checkboxes. TDD: write the failing test first in every task.
 
-**Goal:** add a lightweight `WEB_PAGE` type: paste any URL, the backend reads the page's `<head>` once, and the row appears in Activity with six columns, including the existing Wikidata Category. A perspective can also attach related content by **content ID** (spec §8), e.g. an article about the video the perspective is on.
+**Goal:** add a lightweight `WEB_PAGE` type: paste any URL, the backend reads the page's `<head>` once, and the row appears in Activity with six columns, including the existing Wikidata Category. Each page can carry a list of **page types**, with `BLOG_POST` the only one in v1 (spec §9). A perspective can also attach related content by **content ID** (spec §8), e.g. a blog post about the video the perspective is on.
 
 **Spec:** [2026-11-11-web-page-content-type-design.md](../specs/2026-11-11-web-page-content-type-design.md). Preview: `tools/content-type-designer/previews/web-page-activity.html`.
 
@@ -18,6 +18,7 @@
 - [ ] Test `backend/test/domain/content_test.go`: `ContentTypeWebPage == "WEB_PAGE"`, and that it round-trips through the lowercase DB converter as `web_page`.
 - [ ] Add `ContentTypeWebPage ContentType = "WEB_PAGE"` to `backend/internal/core/domain/content.go`, plus a `WebPageMeta` struct matching spec §2 (`FinalURL, Domain, SiteName, Title, Description, ImageURL, FaviconURL, PublishedAt, Lang *string`; `Fetch{Status, HTTPStatus, At}`).
 - [ ] Add a `FetchStatus` type with constants `OK BLOCKED ERROR TIMEOUT NOT_HTML TOO_LARGE`.
+- [ ] Add `type WebPageType string` with the UPPERCASE constant `WebPageTypeBlogPost WebPageType = "BLOG_POST"`, and `PageTypes []WebPageType` and `Author *string` on `WebPageMeta`. Test that the JSON round trip keeps `pageTypes` as `["BLOG_POST"]`, and that a nil list marshals as `[]`, not `null` (the API field is non-null). Keep the Schema.org mapping (`BlogPosting`) in a single table next to the constant, so later values are one line each.
 
 ### Task 2: URL canonicaliser (pure function)
 - [ ] Table test `backend/internal/adapters/webpage/canonical_test.go` covering: uppercase host → lower; `www.` dropped; `#frag` dropped; `utm_source`, `fbclid` and `gclid` dropped while other query params are kept **in their original order**; `:443` dropped; trailing `/` dropped except on root; `ftp://` rejected; no scheme rejected.
@@ -39,6 +40,13 @@
 - [ ] Fixtures in `backend/internal/adapters/webpage/testdata/`: `arxiv.html` (citation_date, no og:site_name), `og_full.html` (every og tag + JSON-LD datePublished), `bare.html` (`<title>` only), `relative_image.html` (relative og:image and icon). Trim to `<head>`.
 - [ ] Table test: each fixture → the expected `WebPageMeta`. Precedence: title is `og:title` > `<title>`; description is `og:description` > `meta[name=description]`; publishedAt is `article:published_time` > `citation_date`/`citation_publication_date` > JSON-LD `datePublished`, normalised to `YYYY-MM-DD`; URLs are made absolute against `finalUrl`; whitespace is collapsed; missing fields are `nil`.
 - [ ] Implement `ParseHead(r io.Reader, base *url.URL) WebPageMeta` with `golang.org/x/net/html`'s tokenizer, stopping at `</head>`.
+- [ ] **Page types and author (spec §9).** Add fixtures `blogposting.html` (JSON-LD `"@type":"BlogPosting"` with `author` as an object), `blogposting_graph.html` (inside `@graph`, with `"@type":["Article","BlogPosting"]` and `author` as an array), `og_article_only.html` (`og:type=article`, no JSON-LD), `blogposting_in_body.html` (the JSON-LD after `</head>`) and `author_meta.html` (`meta[name=author]`, no JSON-LD). Tests:
+  - the first two → `PageTypes == [BLOG_POST]`, and the author comes from `author.name` (the first item of an array);
+  - `og_article_only` → `PageTypes == []`, because `og:type=article` alone is not a blog post (D10);
+  - `blogposting_in_body` → `[]` (the reader stops at `</head>`, which the Add dialog's checkbox makes up for);
+  - `author_meta` → author from the meta tag; an author over 200 characters is cut at 200;
+  - malformed JSON-LD never panics and yields `[]`, with the rest of the metadata intact.
+- [ ] Implement the JSON-LD walk (`@type` as a string or array; top level or `@graph`) in the same tokenizer pass, with no regex.
 
 ### Task 5: Port + service
 - [ ] Port `backend/internal/core/ports/services/webpage_client.go`: `Fetch(ctx, url) (domain.WebPageMeta, error)`. The fetch result always carries `Fetch.Status`; the error is only for invalid input or a blocked address.
@@ -47,17 +55,19 @@
   - fetch `BLOCKED` → **row still created**, name = `host + path`, `fetch.status = BLOCKED`;
   - blocked address / invalid URL → `ErrInvalidInput`, no row;
   - an existing canonical URL → `alreadyExisted = true`, no second fetch-and-insert (dedupe check before fetch);
-  - a declared same-domain canonical that already exists → return that row.
-- [ ] Implement `ContentService.CreateFromWebPage(ctx, url, userID)` and `PreviewWebPage(ctx, url)` (fetch and parse only; never writes).
+  - a declared same-domain canonical that already exists → return that row;
+  - page types: `pageTypes` omitted → stored as detected; `[BLOG_POST]` passed when nothing was detected → stored; `[]` passed when one was detected → stored as `[]`; duplicates collapse and keep first-seen order; a value outside the enum can't reach the service (GraphQL rejects it), but the service still returns `ErrInvalidInput` for one.
+- [ ] Implement `ContentService.CreateFromWebPage(ctx, url, pageTypes *[]WebPageType, userID)` and `PreviewWebPage(ctx, url)` (fetch and parse only; never writes). When the row already exists (`alreadyExisted`), the stored types win and the argument is ignored (D11).
 
 ### Task 6: GraphQL
-- [ ] Schema (`graphql-designer`): add `WEB_PAGE` to `enum ContentType`; `createContentFromWebPage(input: CreateContentFromWebPageInput!): CreateContentResult! @auth`; `previewWebPage(url: String!): WebPagePreview @auth`, where the type has the spec §2 fields plus `alreadyExistsContentId: IntID`. Run `make graphql-gen` and handle its known `schema.resolvers.go` collision.
+- [ ] Schema (`graphql-designer`): add `WEB_PAGE` to `enum ContentType`; `enum WebPageType { BLOG_POST }`; `createContentFromWebPage(input: CreateContentFromWebPageInput!): CreateContentResult! @auth` where the input is `{ url: String!, pageTypes: [WebPageType!] }`; `previewWebPage(url: String!): WebPagePreview @auth`, where the type has the spec §2 fields (including `pageTypes: [WebPageType!]!` and `author: String`) plus `alreadyExistsContentId: IntID`. Bind `WebPageType` to the domain type in `gqlgen.yml`, with no conversion switch (backend CLAUDE.md, Enum & ID Handling). Run `make graphql-gen` and handle its known `schema.resolvers.go` collision.
 - [ ] Resolver tests in `backend/test/resolvers/` (new `content_webpage_resolver_test.go`): unauthenticated → error; create returns the row; preview writes nothing (count rows before and after).
 - [ ] Wire the client in `backend/cmd/server/main.go`.
 
 ### Task 7: Sorting and filtering
 - [ ] Extend the `published_at_sort` expression in `backend/internal/adapters/repositories/postgres/helpers.go` with a `web_page` branch on `response->>'publishedAt'`. Test that a mixed YouTube + web page list sorts by date with nulls last.
 - [ ] A query-count test (`.docs/QUERY_BUDGET.md`) proving that listing web pages adds no queries: Category is already dataloaded.
+- [ ] **Page type filter (spec §9).** Add `webPageTypes: [WebPageType!]` to `input ContentFilter` (next to the movie column filters, with the same comment style: web page rows only; other rows never match). Repository tests with the sqlmock harness: one value → one `response->'pageTypes' @> '["BLOG_POST"]'` condition; several → OR'd; omitted or empty → no condition; combined with `contentTypes` → ANDed. Use `@>`, never the `?` operators (GORM treats `?` as a placeholder). The filter adds no extra query (the list still costs the page, plus the count only with `includeTotalCount`). Tests for the SQL the filter produces go in `backend/test/repositories/`.
 
 ### Task 8: Verify and open PR 1
 - [ ] Run `go build ./...`, `gofmt -l .` (must be empty), `go test ./...` and `graphify update .`.
@@ -110,18 +120,22 @@ Branch from `main` after PR 1 merges. It needs no web page code, but it is easie
 - [ ] Add `CREATE_CONTENT_FROM_WEB_PAGE` and `PREVIEW_WEB_PAGE` documents, and the `WebPageMeta` TS type, under `frontend/src/lib/queries/content/`.
 - [ ] `useCreateWebPage` **must use the authenticated `graphqlRequest()`**, not the bare `graphqlClient`. Its test asserts this by mocking `graphqlRequest`.
 - [ ] Cache contract test: a successful create invalidates the content list keys exactly as movie create does.
+- [ ] `useCreateWebPage` takes `pageTypes?: WebPageType[]`. Test that it is sent when the adder changed the checkbox and omitted when they left the detected value alone (omitted means "use what was detected", spec §1). Add `WebPageType` to the generated types and the `webPageTypes` field to the content filter variables.
 
 ### Task 11: Add dialog with import preview
 - [ ] States to test (each is a separate test): loading the preview; `OK` with title, site, description, image and date; `BLOCKED` with the "couldn't read… you can still save" message and Save enabled; `alreadyExistsContentId` with "Already saved — open it" in place of Save; a network error on the preview, which still allows Save.
 - [ ] Implement it in the existing Add Content dialog branch for the detected type. Load images with `referrerpolicy="no-referrer"` and fall back to the glyph on `error`.
+- [ ] **Blog post checkbox (spec §9).** Test each state separately: detected → "This is a blog post" is ticked and the author line shows; not detected → unticked and still tickable; the author line is absent when `author` is null; unticking a detected blog post sends `pageTypes: []`; ticking one sends `[BLOG_POST]`; leaving it alone sends nothing; the `BLOCKED` state keeps the checkbox enabled, because the adder can still say what the page is; `alreadyExistsContentId` hides the checkbox, since the stored types win (D11).
 
 ### Task 12: Grid renderers
 - [ ] Tests in `frontend/tests/unit/formatting.test.ts`: the WebPage item cell shows title + site (or domain) + thumb, and the glyph when there is no image; the Site cell; the Published cell shows `—` with the "declares no publish date" tooltip when null.
 - [ ] Component test in `ActivityTable.test.ts`: with the type filter set to **Web page only**, the default visible columns are exactly `◎, WebPage, Site, Category, Published, Added`; **Category is visible and opens the Wikidata popover on click**; clicking ◎ opens the perspective editor only, and clicking the WebPage cell opens content details only. This is the regression guard for the user's one hard requirement.
 - [ ] Add the type to the type filter, the icon map and the per-type default column set, and add tooltip specs to `activityTooltipSpecs.ts`.
+- [ ] **Page type filter and picker columns (spec §9).** Component tests: the "Page type" control shows only when the type filter is Web page only, offers Blog post and nothing else, and sends `webPageTypes: [BLOG_POST]`; choosing it changes the list's cache key (cache contract test), and clearing it restores the unfiltered key. "Page types" and "Author" are in the column picker but **not** in the default visible set (the default-column assertion above still lists exactly six). The Page types cell renders pills, and shows `—` with the tooltip "No page type set" when the list is empty (missing is not a value).
 
 ### Task 13: Details view
 - [ ] Test the states: with a description / without one ("This page has no description"); the Fetched tile shows date **and time** in local time, never a status value; there is no related-content section in this modal.
+- [ ] Test the Type tile ("Blog post" for `[BLOG_POST]`, "Web page" for `[]`) and the Author tile (shown only when `author` is set, never "Unknown").
 - [ ] Add the Web page section to `ActivityDetailsModal.svelte`.
 
 ### Task 14 (optional, D3): Rename
@@ -149,6 +163,6 @@ Branch from `main` after PR 1 merges. It needs no web page code, but it is easie
 - [ ] Implement it in the perspective view component(s) (wherever a perspective's review text is shown, e.g. the compare page), plus the count in `ActivityDetailsModal.svelte`'s perspectives summary. Data comes from the perspective query and is never fetched per item.
 
 ### Task 15: Verify and open PR 3
-- [ ] Run `pnpm run test:run` and `pnpm run check`, then do browser verification via the `pr-verification` skill: add arxiv, a blocked site and a duplicate; set a category on the new row; on a YouTube video perspective, attach an article by URL, save, reload, and see it listed under Related. This needs PR 2's migration on the DB the dev server uses: ask first, never apply it yourself.
+- [ ] Run `pnpm run test:run` and `pnpm run check`, then do browser verification via the `pr-verification` skill: add arxiv, a blocked site, a duplicate and a blog post (check the checkbox is ticked when detected, and tick it by hand on a page without markup); filter by Page type; set a category on the new row; on a YouTube video perspective, attach an article by URL, save, reload, and see it listed under Related. This needs PR 2's migration on the DB the dev server uses: ask first, never apply it yourself.
 - [ ] Evidence: an sv- video (behaviour change). Label `new-content-type`.
 - [ ] Update `.claude/docs/ADDING_CONTENT_TYPE.md` with a short "Worked example: Web page (no external API)" pointer, since this is the first type with a generic fetcher.

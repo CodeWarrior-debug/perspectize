@@ -12,9 +12,10 @@
     "sources": [
       "docs/superpowers/specs/2026-11-11-web-page-content-type-design.md",
       "frontend/src/lib/components/ActivityTable.svelte (Category column)",
-      "backend/schema.graphql (Content.primaryCategory, setPrimaryCategory)"
+      "backend/schema.graphql (Content.primaryCategory, setPrimaryCategory)",
+      "docs/superpowers/specs/2026-11-11-web-page-content-type-design.md §9 (page types)"
     ],
-    "note": "Proposed lightweight type; nothing is built. Six default columns on purpose: the type exists mainly to save related links, so the grid stays narrow. Category is the existing Wikidata category column, which already works on every content type. Page titles, sites and dates are real public pages but were not fetched by the metadata reader (it does not exist yet); categories and the 'Added' dates are illustrative. Thumbnails are not inlined (artifacts block remote images), so every row shows the type glyph where the app would show the page's og:image or favicon."
+    "note": "Proposed lightweight type; nothing is built. Six default columns on purpose: the type exists mainly to save related links, so the grid stays narrow. Category is the existing Wikidata category column, which already works on every content type. Page titles, sites and dates are real public pages but were not fetched by the metadata reader (it does not exist yet); categories and the 'Added' dates are illustrative. Thumbnails are not inlined (artifacts block remote images), so every row shows the type glyph where the app would show the page's og:image or favicon. Page types (blog post first, spec section 9) are not a default column: they show as a Type tile in the details view, as pills and an Author column in the column picker, and as a Page type filter when the type filter is Web page only. Row 6 is an invented blog post on a .example domain, so no real site is claimed to publish BlogPosting markup."
   },
   "columns": [
     {
@@ -143,6 +144,12 @@
         ],
         "tiles": [
           {
+            "k": "Type",
+            "v": "Web page",
+            "status": "proposed",
+            "tip": "response.pageTypes is empty: a plain web page. Missing is not a guess."
+          },
+          {
             "k": "Site",
             "v": "arXiv.org",
             "status": "proposed",
@@ -212,6 +219,12 @@
           }
         ],
         "tiles": [
+          {
+            "k": "Type",
+            "v": "Web page",
+            "status": "proposed",
+            "tip": "response.pageTypes is empty: a plain web page. Missing is not a guess."
+          },
           {
             "k": "Site",
             "v": "paulgraham.com",
@@ -291,6 +304,12 @@
         ],
         "tiles": [
           {
+            "k": "Type",
+            "v": "Web page",
+            "status": "proposed",
+            "tip": "response.pageTypes is empty: a plain web page. Missing is not a guess."
+          },
+          {
             "k": "Site",
             "v": "Wikipedia",
             "status": "proposed",
@@ -355,6 +374,12 @@
           }
         ],
         "tiles": [
+          {
+            "k": "Type",
+            "v": "Web page",
+            "status": "proposed",
+            "tip": "response.pageTypes is empty: a plain web page. Missing is not a guess."
+          },
           {
             "k": "Site",
             "v": "nytimes.com",
@@ -428,6 +453,12 @@
         ],
         "tiles": [
           {
+            "k": "Type",
+            "v": "Web page",
+            "status": "proposed",
+            "tip": "response.pageTypes is empty: a plain web page. Missing is not a guess."
+          },
+          {
             "k": "Site",
             "v": "Svelte",
             "status": "proposed",
@@ -455,6 +486,88 @@
         ],
         "otherPerspectives": 0,
         "footer": "Title, description and image come from the page's own metadata, read once when the link was added."
+      }
+    },
+    {
+      "id": 6,
+      "fill": "full",
+      "hasPerspective": true,
+      "cells": {
+        "item": {
+          "title": "The video that reset the production bar",
+          "sub": "Filmcraft Notes"
+        },
+        "site": "filmcraft.example",
+        "category": "Film production",
+        "published": {
+          "value": "2026-10-28",
+          "tip": {
+            "src": "JSON-LD datePublished",
+            "extra": "Read from the BlogPosting markup in the page's <head>."
+          }
+        },
+        "added": "2026-11-11"
+      },
+      "details": {
+        "title": "The video that reset the production bar",
+        "subtitle": "Filmcraft Notes · filmcraft.example/notes/the-video-that-reset-the-bar",
+        "textLabel": "Description",
+        "textStatus": "proposed",
+        "text": [
+          [
+            null,
+            "The page's own summary (og:description), stored once at add time. This is the kind of page you would attach to a perspective on a video, as related content."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Open",
+            "status": "proposed",
+            "items": [
+              "filmcraft.example/notes/the-video-that-reset-the-bar ↗"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Type",
+            "v": "Blog post",
+            "status": "proposed",
+            "tip": "response.pageTypes = [BLOG_POST], detected from a JSON-LD BlogPosting block in <head> (schema.org/BlogPosting). The adder can tick or untick it in the Add dialog."
+          },
+          {
+            "k": "Site",
+            "v": "Filmcraft Notes",
+            "status": "proposed",
+            "tip": "response.siteName (og:site_name)"
+          },
+          {
+            "k": "Author",
+            "v": "Jordan Lee",
+            "status": "proposed",
+            "tip": "response.author: JSON-LD author.name, else meta[name=author]. Hidden when the page declares none."
+          },
+          {
+            "k": "Published",
+            "v": "2026-10-28",
+            "status": "proposed",
+            "tip": "content.published_at"
+          },
+          {
+            "k": "Fetched",
+            "v": "2026-11-11 09:15",
+            "status": "proposed",
+            "tip": "response.fetch.at: when the page's metadata was read (add time), shown in your local time"
+          },
+          {
+            "k": "Language",
+            "v": "en",
+            "status": "proposed",
+            "tip": "response.lang"
+          }
+        ],
+        "otherPerspectives": 1,
+        "footer": "Title, description and image come from the page's own metadata, read once when the link was added. Perspectize links to the page; it does not copy its content."
       }
     }
   ],
