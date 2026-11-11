@@ -85,5 +85,5 @@ tests/
 ## Do NOT
 
 - Import from `ag-grid-community` (use `@ag-grid-community/*`)
-- Import AG Grid CSS (use `withParams()` on a theme: Activity uses `ACTIVITY_GRID_THEME` from `$lib/utils/grid-theme`, a `themeBalham`)
+- Import AG Grid CSS (use `withParams()` on a theme: Activity uses `ACTIVITY_GRID_THEME` from `$lib/utils/grid-theme`; Plan uses `themeBalham` with `GRID_THEME_PARAMS`)
 - Use `AgGridSvelte` (use `AgGridSvelte5Component`)

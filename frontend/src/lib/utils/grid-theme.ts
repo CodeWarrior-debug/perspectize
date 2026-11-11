@@ -53,7 +53,7 @@ export const ACTIVITY_HEADER_PARAMS = {
  * token-driven params. Row and header heights are fixed by the params above, so the gain is
  * horizontal only: cell and header padding halve (16px -> 8px), which untruncates the movie
  * view's "Genre" / "Rated" / "Released" headers and some channel names. Descender margin, hover,
- * zebra and every preset stay as they were (see the PR for the measurements). The Plan grid still
- * uses `themeQuartz` with the same params.
+ * zebra and every preset stay as they were (see the PR for the measurements). The Plan grid also
+ * uses `themeBalham` with the shared params, without the Activity header tweaks.
  */
 export const ACTIVITY_GRID_THEME = themeBalham.withParams(GRID_THEME_PARAMS).withParams(ACTIVITY_HEADER_PARAMS);
