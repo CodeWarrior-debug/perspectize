@@ -137,8 +137,9 @@ describe("app.html's pre-paint font script", () => {
 	// The inline script in app.html applies the cached picks before the app loads; it must
 	// produce exactly what applyFontsToDom does, or the page visibly re-styles on hydration.
 	const html = readFileSync(resolve(__dirname, '../../../src/app.html'), 'utf8');
-	const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
-		.map((m) => m[1])
+	// Parse with the DOM rather than a regex: a <script> regex is the classic bad HTML filter.
+	const script = [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('script')]
+		.map((s) => s.textContent ?? '')
 		.find((s) => s.includes('perspectize-fonts-applied'));
 
 	function runPrePaint() {
