@@ -72,12 +72,15 @@ A contiguous range of verses in one book. See the Scripture context.
 A single proposition stated so it can be affirmed or denied.
 
 **Book**:
-A published work, not a particular physical copy. Identified by ISBN-13, or by title and primary author when there is none.
+A published work, not a particular physical copy. Identified by its Open Library work, so every edition of the same work is one book.
 _Avoid_: Edition, copy
 
 **Edition**:
 One published form of a book (a printing, a translation, a format), carrying its own ISBN. Many editions belong to one book.
 _Avoid_: Version, copy
+
+**Resolved ISBN**:
+The ISBN a person typed to add a book. It finds the edition, then the book; the ISBN is kept on the book for a later edition picker but does not identify it.
 
 **Book part**:
 A distinct section of a book that can be written about on its own: a chapter, a piece of frontmatter or a piece of endmatter. Belongs to exactly one book. Proposed.
