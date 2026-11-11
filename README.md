@@ -3,7 +3,11 @@
 <!-- TODO: Add hero banner image -->
 <!-- ![Perspectize Banner](assets/banner.png) -->
 
-A platform for storing, refining, and sharing perspectives on content, with philosophy that the app should give the user calm and control - not addicting and endlessly distracting the user, in the way of many sharing platforms.  Currently supports YouTube videos and Bible passages, with a foundation designed to support more content types (books, articles, podcasts, etc.).
+**When 👍 is not enough**
+
+Where measured positions get the measures & metadata they deserve.
+
+Perspectize supports YouTube videos, movies, Bible passages and claims today, with more types planned.
 
 <!-- TODO: Add demo GIF showing the Activity page in action -->
 <!-- ![Perspectize Demo](assets/demo.gif) -->
