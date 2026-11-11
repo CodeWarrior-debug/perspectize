@@ -39,6 +39,16 @@ export const GRID_THEME_PARAMS = {
 export const GRID_COLOR_PARAM_KEYS = Object.keys(GRID_THEME_PARAMS).filter((k) => /Color$/.test(k));
 
 /**
+ * Quieter Activity headers: 11px labels in the muted-foreground token, which `deriveTheme` picks to
+ * pass AA text contrast on `--color-muted` (the header background) in every preset. The uppercase
+ * and letter-spacing half lives in app.css under `.activity-grid`: they are not theme params.
+ */
+export const ACTIVITY_HEADER_PARAMS = {
+	headerFontSize: 11,
+	headerTextColor: 'var(--color-muted-foreground)',
+} as const;
+
+/**
  * The Activity table's theme: Balham's tighter 4px spacing (Quartz uses 8px) under the shared
  * token-driven params. Row and header heights are fixed by the params above, so the gain is
  * horizontal only: cell and header padding halve (16px -> 8px), which untruncates the movie
@@ -46,4 +56,4 @@ export const GRID_COLOR_PARAM_KEYS = Object.keys(GRID_THEME_PARAMS).filter((k) =
  * zebra and every preset stay as they were (see the PR for the measurements). The Plan grid still
  * uses `themeQuartz` with the same params.
  */
-export const ACTIVITY_GRID_THEME = themeBalham.withParams(GRID_THEME_PARAMS);
+export const ACTIVITY_GRID_THEME = themeBalham.withParams(GRID_THEME_PARAMS).withParams(ACTIVITY_HEADER_PARAMS);
