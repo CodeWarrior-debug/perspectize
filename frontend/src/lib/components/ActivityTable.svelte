@@ -101,6 +101,7 @@
 		parsePersonFilter,
 		rowMatchesPerson,
 		showColumnRelevanceCallout,
+		NUMERIC_COL_IDS,
 	} from '$lib/utils/grid-config';
 	import { ACTIVITY_GRID_THEME } from '$lib/utils/grid-theme';
 	import { emptyCellClassRules } from '$lib/utils/grid-empty';
@@ -824,8 +825,12 @@
 				valueGetter: tmdbScoreValueGetter,
 				comparator: unknownLastComparator,
 				valueFormatter: (params) => formatTmdbScore(params.value),
-				// Muted when the score rests on fewer than 50 votes.
-				cellClass: (params) => (hasLowVoteCount({ data: params.data }) ? 'text-muted-foreground' : ''),
+				// Muted when the score rests on fewer than 50 votes. A colDef `cellClass` replaces the one
+				// `type: 'rightAligned'` adds, so the alignment class is repeated here.
+				cellClass: (params) => [
+					'ag-right-aligned-cell',
+					...(hasLowVoteCount({ data: params.data }) ? ['text-muted-foreground'] : []),
+				],
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.tmdbScore },
 				headerTooltip: 'TMDB user score out of 10. Muted when fewer than 50 votes.',
 				hide: true,
@@ -1026,6 +1031,7 @@
 		] as ColDef<ContentItem>[]
 	).map((col) => ({
 		...col,
+		...(col.colId && NUMERIC_COL_IDS.has(col.colId) ? { type: 'rightAligned' } : {}),
 		minWidth: col.minWidth ?? headerMinWidth(col.headerName ?? '', col.filter !== false),
 	}));
 
