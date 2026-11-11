@@ -92,12 +92,19 @@ the search result. **Decision to confirm:** this means CreateFromBook calls the 
 `ratings_average`, or `number_of_pages_median` — those are search-index aggregates, not on
 the work record itself, confirmed live tonight). The write-up assumes the search-index
 route; the details-view description (§8) needs a second, separate `/works/{id}.json`
-call — its layout is decided (§8), but whether that call happens eagerly here or lazily
-when the details modal opens is still open.
+call. **Decided 2026-11-11: that call happens eagerly, here at add time**, and the
+description (and related-works list) is stored in the row's JSONB, so the details view
+needs no network. `Update source data` refreshes it.
 
-Only the Discover **Add** button (from any of the three tabs) creates a book in v1 — no
-paste-a-Open-Library-URL flow in the general Add Content window. The mutation already
-takes a bare URL, so adding that input path later is a small follow-up, not a redesign.
+**Authors (decided 2026-11-11):** `response.authors` keeps every author as an ordered list
+(`{ name, openLibraryKey? }`), no migration. The grid shows the first author, `+N` for the
+rest; the Author sort and filter use the first author's name.
+
+**Pasted links (decided 2026-11-11, reverses the earlier cut):** besides the Discover
+**Add** button (from any of the three tabs), the general Add Content window recognises a
+pasted `openlibrary.org/works/<id>` link and calls the same `createContentFromBook`. The
+mutation already takes a bare URL, so this is a detection rule plus the existing add path.
+Only work links are recognised; an `/books/OL…M` edition link resolves to its work first.
 
 ### 5. ISBN entry: a third Discover tab, independent of Amazon
 
@@ -202,10 +209,8 @@ community-contributed; may be incomplete."
 
 **Layout decided tonight using real descriptions** (East of Eden, *Atomic Habits*, and
 *Brainscan* all have one on the canonical `/works/{id}.json` record; *Make a zine!*
-genuinely has none — confirmed live, not a fetch that was skipped). **When it's fetched is
-still open** — eagerly at add time (one more call per add) vs. lazily when the details
-modal opens (one more call per view) is not decided; tonight only settled what it looks
-like once it's there.
+genuinely has none — confirmed live, not a fetch that was skipped). **It is fetched
+eagerly at add time** (decided 2026-11-11; see §4) and stored with the row.
 
 Two things the real text surfaced that a placeholder wouldn't have:
 - **Descriptions are markdown, not plain text** — bold, links, and horizontal rules all
@@ -271,11 +276,10 @@ rollout step is the GraphQL schema change going out with a normal deploy.
 
 ## Out of scope
 
-Amazon linking (§9), Google Books fallback, pasting an Open Library URL into the general
-Add Content window, *when* the description is fetched (§8 — layout is decided, timing
-isn't), monthly/yearly/now/forever trending windows, word count (§7a — dropped), an
-edition picker (showing all editions of a work),
-batch/barcode-scanner ISBN entry.
+Amazon linking (§9), Google Books fallback, monthly/yearly/now/forever trending windows,
+word count (§7a — dropped), an edition picker (showing all editions of a work),
+batch/barcode-scanner ISBN entry, manual entry for books not on Open Library, and book
+parts (chapter, frontmatter, endmatter), deferred to a later spec.
 
 ## Decisions to confirm
 
