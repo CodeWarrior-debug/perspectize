@@ -1037,6 +1037,24 @@
 	padding-right: 0;
 }
 
+/* Funnel states. AG Grid marks an active filter with a tinted block plus a 4px ring around the
+   icon, which reads as an oversized rectangle in a 36px header. Instead the funnel itself takes
+   the primary colour and keeps AG Grid's small dot; hover is a small rounded wash. */
+.ag-header-cell .ag-header-cell-filter-button:hover {
+	border-radius: 4px;
+	box-shadow: 0 0 0 2px var(--ag-icon-button-hover-color);
+}
+.ag-header-cell .ag-header-cell-filter-button.ag-filter-active {
+	background-color: transparent;
+	box-shadow: none;
+	color: var(--color-primary);
+}
+.ag-header-cell .ag-header-cell-filter-button.ag-filter-active:hover {
+	background-color: var(--ag-icon-button-hover-color);
+	border-radius: 4px;
+	box-shadow: 0 0 0 2px var(--ag-icon-button-hover-color);
+}
+
 /* Hover bar — drawn on AG Grid's own hover overlay so it sits on top of the opaque hover colour. */
 .ag-row-hover:not(.ag-full-width-row)::before {
 	box-shadow: inset 3px 0 0 var(--color-row-accent);
