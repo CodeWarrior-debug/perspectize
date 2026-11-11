@@ -2,7 +2,6 @@
 	import AgGridSvelte5Component from 'ag-grid-svelte5';
 	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
-	import { themeQuartz } from '@ag-grid-community/theming';
 	import type {
 		GridApi,
 		GridOptions,
@@ -103,7 +102,7 @@
 		rowMatchesPerson,
 		showColumnRelevanceCallout,
 	} from '$lib/utils/grid-config';
-	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
+	import { buildGridTheme, parseGridThemeName } from '$lib/utils/grid-theme';
 	import { emptyCellClassRules } from '$lib/utils/grid-empty';
 	import { useCardMode, useResponsiveTier } from '$lib/utils/responsive.svelte';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
@@ -599,7 +598,8 @@
 
 	const modules = [ClientSideRowModelModule];
 
-	const theme = themeQuartz.withParams(GRID_THEME_PARAMS);
+	// *TEMP* - density experiment: ?gridTheme=balham swaps in the denser base theme
+	const theme = buildGridTheme(parseGridThemeName(page.url.searchParams.get('gridTheme')));
 
 	// flex = clamp-like: proportional sizing with min/max constraints
 	// minWidth is auto-derived from headerName unless explicitly set (e.g. Item = 200)

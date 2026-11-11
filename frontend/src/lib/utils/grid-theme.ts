@@ -1,3 +1,5 @@
+import { themeBalham, themeQuartz } from '@ag-grid-community/theming';
+
 /**
  * AG Grid theme params for the Activity table. Colours are token references, not hex, so the
  * grid follows the theme picker (presets and custom themes) like the rest of the app. AG Grid
@@ -35,3 +37,21 @@ export const GRID_THEME_PARAMS = {
 
 /** Params whose value is a colour — the ones that must never be hard-coded. */
 export const GRID_COLOR_PARAM_KEYS = Object.keys(GRID_THEME_PARAMS).filter((k) => /Color$/.test(k));
+
+/** Base AG Grid themes the Activity table can be rendered with. Quartz is the default. */
+export type GridThemeName = 'quartz' | 'balham';
+
+/**
+ * Reads the `gridTheme` URL param. Anything other than `balham` falls back to Quartz, so a
+ * stale or mistyped link never breaks the grid.
+ * *TEMP* - density experiment: compare Quartz with the denser Balham, then keep one.
+ */
+export function parseGridThemeName(value: string | null | undefined): GridThemeName {
+	return value === 'balham' ? 'balham' : 'quartz';
+}
+
+/** Same token-driven params on either base theme, so only density and chrome differ. */
+export function buildGridTheme(name: GridThemeName) {
+	const base = name === 'balham' ? themeBalham : themeQuartz;
+	return base.withParams(GRID_THEME_PARAMS);
+}

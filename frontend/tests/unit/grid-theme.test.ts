@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { GRID_COLOR_PARAM_KEYS, GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
+import {
+	buildGridTheme,
+	GRID_COLOR_PARAM_KEYS,
+	GRID_THEME_PARAMS,
+	parseGridThemeName,
+} from '$lib/utils/grid-theme';
 
 describe('GRID_THEME_PARAMS', () => {
 	it('takes every colour from a theme token so the grid follows the picker', () => {
@@ -28,5 +33,22 @@ describe('header', () => {
 		expect(GRID_THEME_PARAMS.headerBackgroundColor).toBe('var(--color-muted)');
 		expect(GRID_THEME_PARAMS.headerTextColor).toBe('var(--color-foreground)');
 		expect(GRID_THEME_PARAMS.headerColumnBorder).toBe(false);
+	});
+});
+
+describe('grid theme selection', () => {
+	it('defaults to quartz for missing or unknown values', () => {
+		expect(parseGridThemeName(null)).toBe('quartz');
+		expect(parseGridThemeName(undefined)).toBe('quartz');
+		expect(parseGridThemeName('nope')).toBe('quartz');
+	});
+
+	it('selects balham only when asked', () => {
+		expect(parseGridThemeName('balham')).toBe('balham');
+	});
+
+	it('builds a theme for each base', () => {
+		expect(buildGridTheme('quartz')).toBeDefined();
+		expect(buildGridTheme('balham')).toBeDefined();
 	});
 });
