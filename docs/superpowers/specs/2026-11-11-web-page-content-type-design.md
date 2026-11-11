@@ -9,9 +9,9 @@ Plan: [2026-11-11-web-page-content-type-plan.md](../plans/2026-11-11-web-page-co
 
 `WEB_PAGE` is any http(s) page that no other type claims. You paste a URL and the backend reads the page's `<head>` once for its title, description, site name, preview image and publish date, then stores the row. People categorise it and write perspectives on it like any other content.
 
-**In v1:** add by URL; metadata read once at add time; the six columns below; the details view; Wikidata category (already built for every type); Activity filter by type.
+**In v1:** add by URL; metadata read once at add time; the six columns below; the details view; Wikidata category (already built for every type); Activity filter by type; and **related content on a perspective** (§8). For example, in your perspective on a YouTube video you attach an article saying that video set the production standard for the next generation. The perspective stores the article's **content ID**, not its URL.
 
-**Not in v1:** an explicit "related to item X" link between two content rows (§7, decision D1); a Discover tab; re-reading metadata on a schedule; full-text extraction, archiving or screenshots of the page; per-site adapters (Medium, Substack, X and so on).
+**Not in v1:** a content-to-content relation outside a perspective; a reverse "cited by" view on the related item (the table in §8 makes it cheap later); a Discover tab; re-reading metadata on a schedule; full-text extraction, archiving or screenshots of the page; per-site adapters (Medium, Substack, X and so on).
 
 ## 1. Ingestion
 
@@ -45,7 +45,7 @@ The shared columns are `name` (title), `url` (canonical) and `created_at`. Every
 
 **Missing is `null`, never a guess.** `content.name` is `title`, or `host + path` when the title is null. A user rename would write `display_title`, the existing first-write-wins column, which needs no migration (decision D3).
 
-**No migration.** `content.content_type` has no CHECK constraint, and nothing above needs a new column.
+**No migration for the type itself.** `content.content_type` has no CHECK constraint, and nothing above needs a new column. Related content (§8) adds one table.
 
 ## 3. Default columns (6)
 
@@ -90,8 +90,75 @@ We store only what the page publishes for link previews (title, description, ima
 
 | # | Question | Proposed default |
 |---|---|---|
-| D1 | "Related links": is a **shared Wikidata category** enough for now, or do you need an explicit "this page relates to video X" link? | Category only in v1. An explicit `content_relation (from_id, to_id, created_by)` table is a separate follow-up and needs a migration. |
+| D1 | ~~Is a shared category enough for related links?~~ | **Decided 2026-11-11:** no. Related content is attached on a perspective by content ID (§8). |
+| D6 | Can a perspective relate any content type, or only web pages? | Any type. The editor's paste box runs the same detection as Add Content, so a YouTube, movie or Bible Gateway link becomes that type's row. |
+| D7 | Should related content inherit the perspective's privacy? | Yes. It is part of the perspective and has no privacy setting of its own. |
 | D2 | Display label: "Web page", "Link" or "Article"? | **Web page** (enum `WEB_PAGE`). |
 | D3 | Can the person who added a page rename it when the title is bad or missing? | Yes, via the existing `display_title`. It is in the plan as the last, optional task. |
 | D4 | Should `previewWebPage` (the import preview) ship in v1 or follow? | v1, because Decision 8 applies to every type. |
 | D5 | Wikipedia URLs: save as Web page, or offer "set as category" instead? | Save as Web page; no special case in v1. |
+
+## 8. Related content on a perspective
+
+**Use case.** Someone has a perspective on a YouTube video. They find an article arguing that this video set the production-quality standard for the next generation, and they attach that article to their perspective as related. The article becomes a `WEB_PAGE` content row (or is reused if it already exists), and **the perspective references its content ID**.
+
+### Storage: a join table, not URL strings
+
+Migration `0000NN_add_perspective_related_content` (the number is provisional; take the next free one on `main` before merge):
+
+```sql
+CREATE TABLE IF NOT EXISTS perspective_related_content (
+  perspective_id INTEGER     NOT NULL REFERENCES perspectives(id) ON DELETE CASCADE,
+  content_id     INTEGER     NOT NULL REFERENCES content(id)      ON DELETE RESTRICT,
+  position       SMALLINT    NOT NULL,          -- display order chosen by the author, 0-based
+  added_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (perspective_id, content_id)
+);
+CREATE INDEX IF NOT EXISTS idx_perspective_related_content_content
+  ON perspective_related_content (content_id);   -- reverse "cited by" lookups later
+-- down: DROP TABLE IF EXISTS perspective_related_content;
+```
+
+- **Why not an `INTEGER[]` like `related_perspective_ids`?** An array has no foreign key, so a deleted or mistyped ID would dangle silently. The table guarantees every ID is a real content row, and it gives an indexed reverse lookup.
+- **FK kinds follow `backend/CLAUDE.md`:** the perspective → child rows FK is `CASCADE` (deleting a perspective drops its links); the FK to `content` is `RESTRICT`, like every other content FK.
+- No owner column is needed: the perspective owns the rows. User deletion already reassigns perspectives, so nothing new goes in `UserService.Delete`.
+
+### API
+
+```graphql
+type Perspective {
+  # …existing fields…
+  "Content the author attached as related, in their chosen order. Follows the perspective's privacy."
+  relatedContent: [Content!]!       # dataloaded; [] when none
+  relatedContentIDs: [Int!]!
+}
+input CreatePerspectiveInput { relatedContentIDs: [IntID!] }   # omit = none
+input UpdatePerspectiveInput {
+  "Omit = unchanged; [] = clear; a list replaces the whole set, in this order."
+  relatedContentIDs: [IntID!]
+}
+```
+
+**Validation (in the service, `ErrInvalidInput`):** at most 20 IDs; no duplicates; every ID exists (a single `WHERE id = ANY($1)` count); and **not the perspective's own `contentID`**, since a video can't be related to itself.
+
+**Writes:** replace-the-set in one transaction (`DELETE … WHERE perspective_id = $1`, then a multi-row `INSERT`). Two statements, whatever the list length.
+
+**Reads:** `Perspective.relatedContent` goes through a per-request dataloader keyed by perspective ID: one query joining `perspective_related_content` to `content` for every perspective on the page. A query-count test pins this at **+1 query per request**, not per perspective.
+
+**Privacy:** a private perspective's related content is visible only where the perspective is. The related content rows themselves stay public content, as they are today.
+
+### Editor flow
+
+In the perspective editor (all content types), a **Related content** section with a single paste box:
+
+1. Paste a URL and run `detectContentCandidates` on it. A YouTube, movie or Bible Gateway link resolves to that type; any other URL resolves to `WEB_PAGE`.
+2. Call that type's existing create mutation. They all return `{ content, alreadyExisted }`, so an article someone already saved is reused, not duplicated.
+3. Push `content.id` onto the list, rendered as a removable chip: thumb, title, site. The chips can be reordered by drag, or by ↑/↓ buttons for keyboard users.
+4. Save the perspective with `relatedContentIDs`.
+
+Typing text that isn't a URL shows "Paste a link." Pasting the perspective's own content shows "That's the item you're writing about." A failed fetch still adds the chip, because the web page row is still created (§1).
+
+### Where it shows
+
+- **Perspective view and details modal (your perspective and others'):** a "Related" list under the review text. Each item shows title, site and type icon, opens that item's details, and has an ↗ to the original URL.
+- **Activity grid:** nothing new in v1.

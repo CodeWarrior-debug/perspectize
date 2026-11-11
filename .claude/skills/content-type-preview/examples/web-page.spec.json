@@ -248,6 +248,21 @@
   ],
   "perspective": {
     "ratings": ["Quality", "Agreement", "Importance", "Confidence"],
-    "addFieldHint": "why this link matters"
+    "addFieldHint": "why this link matters",
+    "extension": {
+      "label": "Related content",
+      "badge": "proposed",
+      "status": "proposed",
+      "tip": "On every perspective, not just web pages. Paste a link: it becomes (or reuses) a content row, and the perspective stores that content ID, never the URL string. Stored in perspective_related_content; up to 20, in your order. Spec §8.",
+      "options": [
+        "Attention Is All You Need · arxiv.org",
+        "Sermon on the Mount · Wikipedia",
+        "$state • Svelte Docs · svelte.dev"
+      ],
+      "freeText": {
+        "label": "Paste a link",
+        "placeholder": "https://… an article, video or page related to this item"
+      }
+    }
   }
 }

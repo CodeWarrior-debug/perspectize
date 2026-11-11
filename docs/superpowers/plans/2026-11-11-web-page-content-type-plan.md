@@ -2,11 +2,11 @@
 
 > **For agentic workers:** execute with `superpowers:subagent-driven-development` (or `superpowers:executing-plans` inline). Steps use `- [ ]` checkboxes. TDD: write the failing test first in every task.
 
-**Goal:** add a lightweight `WEB_PAGE` type: paste any URL, the backend reads the page's `<head>` once, and the row appears in Activity with six columns, including the existing Wikidata Category.
+**Goal:** add a lightweight `WEB_PAGE` type: paste any URL, the backend reads the page's `<head>` once, and the row appears in Activity with six columns, including the existing Wikidata Category. A perspective can also attach related content by **content ID** (spec §8), e.g. an article about the video the perspective is on.
 
 **Spec:** [2026-11-11-web-page-content-type-design.md](../specs/2026-11-11-web-page-content-type-design.md). Preview: `tools/content-type-designer/previews/web-page-activity.html`.
 
-**Release:** dark backend first ([.docs/RELEASE_APPROACHES.md](../../../.docs/RELEASE_APPROACHES.md)). PR 1 is backend only and invisible until the frontend sends the mutation. PR 2 is the frontend. **No migration in either PR.**
+**Release:** dark backend first ([.docs/RELEASE_APPROACHES.md](../../../.docs/RELEASE_APPROACHES.md)). PR 1 is the web page backend and PR 2 the related-content backend; both are invisible until the frontend uses them. PR 3 is the frontend for both. **Only PR 2 has a migration** (one new table). Apply it by hand per environment before PR 3 merges; never run `migrate up` during dev.
 
 **Agents:** `go-backend` + `test-writer` (PR 1, with `graphql-designer` for the schema), `svelte-frontend` + `vitest-writer` (PR 2). Review PR 1 with `code-reviewer`, paying particular attention to the SSRF dialer.
 
@@ -65,7 +65,42 @@
 
 ---
 
-## PR 2 — frontend (`feature/web-page-content-type-frontend`)
+## PR 2 — related content backend (`feature/perspective-related-content-backend`)
+
+Branch from `main` after PR 1 merges. It needs no web page code, but it is easier to review on its own.
+
+### Task R1: Migration (`db-migration` agent; write and review only)
+- [ ] `make migrate-create name=add_perspective_related_content`, then fill in the up/down SQL exactly as in spec §8: table, PK `(perspective_id, content_id)`, FK `CASCADE` to perspectives, FK `RESTRICT` to content, index on `content_id`, `IF NOT EXISTS` / `IF EXISTS`. The number is provisional; rename it to the next free number on `main` just before merge.
+- [ ] Check it against the isolated demo DB only (`make demo-up`, port 5434). **Never against `DATABASE_URL`.**
+
+### Task R2: Domain, port and repository
+- [ ] Add `RelatedContentIDs []int` to `domain.Perspective`, plus a repository port `ReplaceRelatedContent(ctx, tx, perspectiveID, contentIDs)` and `RelatedContentByPerspectiveIDs(ctx, ids) (map[int][]domain.Content, error)`.
+- [ ] Repository tests (sqlmock harness): replace = exactly one `DELETE` + one multi-row `INSERT` carrying `position`; `[]` = only the `DELETE`; the batch read is one query ordered by `perspective_id, position`.
+- [ ] Implement them in `gorm_perspective_repository.go` (or a small `gorm_perspective_related_content_repository.go`), with a GORM model for the table in `gorm_models.go`.
+
+### Task R3: Service validation
+- [ ] Tests in `backend/test/services/perspective_service_test.go`:
+  - 21 IDs → `ErrInvalidInput`;
+  - a duplicate ID → `ErrInvalidInput`;
+  - an unknown ID → `ErrInvalidInput` naming it;
+  - the perspective's own `contentID` → `ErrInvalidInput`;
+  - create with IDs → stored in order;
+  - update: omitted → unchanged, `[]` → cleared, list → replaced;
+  - only the owner can update (the existing owner guard covers it; assert it).
+- [ ] Implement this in `PerspectiveService` Create/Update. Writing the perspective row and replacing its related content happen in **one transaction**.
+
+### Task R4: GraphQL and dataloader
+- [ ] Schema (`graphql-designer`): `Perspective.relatedContent: [Content!]!`, `Perspective.relatedContentIDs: [Int!]!`, and `relatedContentIDs: [IntID!]` on both inputs, with the doc strings from spec §8. Run `make graphql-gen`.
+- [ ] A `relatedContent` dataloader keyed by perspective ID, registered with the existing per-request loaders.
+- [ ] Resolver tests in a new `backend/test/resolvers/perspective_related_content_resolver_test.go`: round trip of create → query → update → clear; another user's **private** perspective doesn't expose its related content.
+- [ ] **Query-count test:** listing 20 perspectives that select `relatedContent` costs exactly +1 query over the same list without it (`.docs/QUERY_BUDGET.md`).
+
+### Task R5: Verify and open PR 2
+- [ ] Run `go build ./...`, `gofmt -l .`, `go test ./...` and `graphify update .`. The PR body says it needs a manual `migrate up` per environment (it will be labelled `migrations-unapplied`). Demo reason: dark backend, no visible change.
+
+---
+
+## PR 3 — frontend (`feature/web-page-content-type-frontend`)
 
 ### Task 9: Detection
 - [ ] `frontend/tests/unit/detectContentType.test.ts`: `https://arxiv.org/abs/1706.03762` → `WEB_PAGE`; YouTube, TMDB and Bible Gateway URLs **still** win; `example.com` with no scheme is not a web page; `ftp://x` is not.
@@ -92,7 +127,26 @@
 ### Task 14 (optional, D3): Rename
 - [ ] Only if D3 is confirmed: an Edit title action for the adder, writing `display_title`. Test it: shown only to the adder, and saving updates the row.
 
-### Task 15: Verify and open PR 2
-- [ ] Run `pnpm run test:run` and `pnpm run check`, then do browser verification via the `pr-verification` skill: add arxiv, a blocked site and a duplicate; set a category on the new row.
+### Task R6: Related content in the perspective editor
+- [ ] Extend the perspective query fragments with `relatedContent { id name url contentType response primaryCategory { label } }` and `relatedContentIDs`. Mutation hooks pass `relatedContentIDs` (via `graphqlRequest()`).
+- [ ] Component tests for a new `RelatedContentField.svelte`, one per state:
+  - empty ("Paste a link to an article, video or page");
+  - pasting a web URL → pending chip → resolved chip with title and site;
+  - pasting an already-saved URL → reuses the ID, no duplicate chip;
+  - pasting a YouTube URL → created as `YOUTUBE_VIDEO`, not as a web page;
+  - pasting the perspective's own content → "That's the item you're writing about", no chip;
+  - non-URL text → "Paste a link";
+  - a blocked fetch → the chip is still added, showing the URL as its title;
+  - remove a chip; reorder with ↑/↓;
+  - 20 chips → the input is disabled with "Up to 20";
+  - save sends the IDs in chip order.
+- [ ] Implement the field: it reuses `detectContentCandidates` and each type's existing create hook (they return `alreadyExisted`). Mount it in the perspective editor for **every** content type.
+
+### Task R7: Related content in perspective views
+- [ ] Test the details modal: a perspective with related items shows a "Related" list (title, site, type icon, ↗ with `rel="noopener noreferrer"`); one without shows no section. Clicking an item opens that item's details.
+- [ ] Implement it in `ActivityDetailsModal.svelte` and wherever a perspective's review text is shown (the compare page, for example). Data comes from the perspective query and is never fetched per item.
+
+### Task 15: Verify and open PR 3
+- [ ] Run `pnpm run test:run` and `pnpm run check`, then do browser verification via the `pr-verification` skill: add arxiv, a blocked site and a duplicate; set a category on the new row; on a YouTube video perspective, attach an article by URL, save, reload, and see it listed under Related. This needs PR 2's migration on the DB the dev server uses: ask first, never apply it yourself.
 - [ ] Evidence: an sv- video (behaviour change). Label `new-content-type`.
 - [ ] Update `.claude/docs/ADDING_CONTENT_TYPE.md` with a short "Worked example: Web page (no external API)" pointer, since this is the first type with a generic fetcher.
