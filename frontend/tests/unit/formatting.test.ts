@@ -25,7 +25,6 @@ import {
 	durationFilterValueGetter,
 	dateValueFormatter,
 	contentRowId,
-	headerMinWidth,
 	getSourceDataCooldown,
 	formatRemainingTime,
 	SOURCE_DATA_COOLDOWN_MS,
@@ -791,57 +790,6 @@ describe('typeCellRenderer', () => {
 		expect(result.querySelector('svg[data-icon="bible-passage"]')).toBeTruthy();
 		expect(result.querySelector('svg[fill="#FF0000"]')).toBeNull();
 		expect(result.querySelector('.sr-only')?.textContent).toBe('Bible Passage');
-	});
-});
-
-describe('headerMinWidth', () => {
-	it('returns a positive integer', () => {
-		const result = headerMinWidth('Type');
-		expect(result).toBeGreaterThan(0);
-		expect(Number.isInteger(result)).toBe(true);
-	});
-
-	it('longer names produce wider minimums', () => {
-		const short = headerMinWidth('Date');
-		const long = headerMinWidth('Description');
-		expect(long).toBeGreaterThan(short);
-	});
-
-	it('filter icon adds width', () => {
-		const withFilter = headerMinWidth('Item', true);
-		const withoutFilter = headerMinWidth('Item', false);
-		expect(withFilter).toBeGreaterThan(withoutFilter);
-	});
-
-	it('defaults hasFilter to true', () => {
-		const defaultCall = headerMinWidth('Type');
-		const explicitTrue = headerMinWidth('Type', true);
-		expect(defaultCall).toBe(explicitTrue);
-	});
-
-	it('empty name still has space for icons and padding', () => {
-		const result = headerMinWidth('');
-		expect(result).toBeGreaterThan(0);
-	});
-
-	it('produces consistent results for known headers', () => {
-		// These are the actual column headers — verify they produce reasonable widths
-		const headers = ['Type', 'Length', 'Views', 'Likes', 'Date', 'Channel', 'Tags'];
-		for (const name of headers) {
-			const width = headerMinWidth(name);
-			// Must be wide enough for text + icons (at least 60px) and not absurdly large
-			expect(width).toBeGreaterThanOrEqual(60);
-			expect(width).toBeLessThanOrEqual(200);
-		}
-	});
-
-	it('width scales linearly with character count', () => {
-		const w4 = headerMinWidth('AAAA');
-		const w8 = headerMinWidth('AAAAAAAA');
-		// 4 extra chars at ~0.55em * 14px = ~30.8px difference
-		const diff = w8 - w4;
-		expect(diff).toBeGreaterThanOrEqual(28);
-		expect(diff).toBeLessThanOrEqual(34);
 	});
 });
 

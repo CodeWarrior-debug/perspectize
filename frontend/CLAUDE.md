@@ -119,7 +119,7 @@ Uses `ag-grid-svelte5` (bundles AG Grid v32.x). **Do NOT install `ag-grid-commun
 
 **AG Grid paints row hover on `.ag-row-hover::before`**, above the row background and below cell content. So an opaque hover colour is safe and keeps hover identical on odd and even rows (an alpha hover composites differently over the zebra). The left hover bar is an `inset` box-shadow on that same `::before` (`app.css`).
 
-**Column minimum widths must fit the page container.** The Activity page is capped at `max-w-screen-xl` (1280px), leaving a 1212px grid; `headerMinWidth` (`formatting.ts`) sums to just under that. Extra header room (an icon slot, a divider) silently overflows and clips the last column on wide screens. The `?f.type=youtube` URL filter goes through the grid's filter model, so the mobile card list (grid unmounted) ignores it.
+**Column minimum widths must fit the page container.** The Activity page is capped at `max-w-screen-xl` (1280px), leaving a 1212px grid, and each default lg set's minimums must sum to at most that (`movieColumns.test.ts`). Every column's floor is `headerMinWidth` (`lib/utils/grid-header-width.ts`): the label measured from Geist's own glyph widths (`grid-header-metrics.ts`, regenerate with `scripts/gen-header-metrics.py`) plus padding, sort arrow and funnel read from the theme (`headerChrome`), so a heading never truncates or runs into its funnel. An explicit colDef `minWidth` only raises that floor (for cell content). Changing the header layout in `app.css` means changing `headerChrome` too. The `?f.type=youtube` URL filter goes through the grid's filter model, so the mobile card list (grid unmounted) ignores it.
 
 ## Figma Design Workflow
 

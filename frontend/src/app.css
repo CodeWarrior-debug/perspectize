@@ -1024,6 +1024,19 @@
 	opacity: 1;
 }
 
+/* Header spacing. headerMinWidth (lib/utils/grid-header-width.ts) reserves exactly this layout,
+   so a column at its minimum width shows its whole label, sort arrow and funnel: one --ag-spacing
+   between the label and the funnel (AG Grid leaves none), and the sort arrow one gap from its
+   label rather than two (AG Grid adds its own padding on top of the label's gap). Change these
+   and headerChrome (grid-theme.ts) together. */
+.ag-header-cell .ag-cell-label-container {
+	gap: var(--ag-spacing);
+}
+.ag-header-cell .ag-sort-indicator-icon {
+	padding-left: 0;
+	padding-right: 0;
+}
+
 /* Hover bar — drawn on AG Grid's own hover overlay so it sits on top of the opaque hover colour. */
 .ag-row-hover:not(.ag-full-width-row)::before {
 	box-shadow: inset 3px 0 0 var(--color-row-accent);
