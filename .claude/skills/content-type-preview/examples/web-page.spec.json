@@ -29,7 +29,7 @@
     {
       "id": "item",
       "kind": "item",
-      "label": "Page",
+      "label": "WebPage",
       "status": "proposed",
       "header": {
         "body": "Page title with its preview image (og:image, else favicon) and the site name under it. Click opens the details view; the ↗ opens the page in a new tab. Sorts A to Z.",

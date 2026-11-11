@@ -116,8 +116,8 @@ Branch from `main` after PR 1 merges. It needs no web page code, but it is easie
 - [ ] Implement it in the existing Add Content dialog branch for the detected type. Load images with `referrerpolicy="no-referrer"` and fall back to the glyph on `error`.
 
 ### Task 12: Grid renderers
-- [ ] Tests in `frontend/tests/unit/formatting.test.ts`: the Page item cell shows title + site (or domain) + thumb, and the glyph when there is no image; the Site cell; the Published cell shows `—` with the "declares no publish date" tooltip when null.
-- [ ] Component test in `ActivityTable.test.ts`: with the type filter set to **Web page only**, the default visible columns are exactly `◎, Page, Site, Category, Published, Added`, and **Category is visible and opens the Wikidata popover on click**. This is the regression guard for the user's one hard requirement.
+- [ ] Tests in `frontend/tests/unit/formatting.test.ts`: the WebPage item cell shows title + site (or domain) + thumb, and the glyph when there is no image; the Site cell; the Published cell shows `—` with the "declares no publish date" tooltip when null.
+- [ ] Component test in `ActivityTable.test.ts`: with the type filter set to **Web page only**, the default visible columns are exactly `◎, WebPage, Site, Category, Published, Added`; **Category is visible and opens the Wikidata popover on click**; clicking ◎ opens the perspective editor only, and clicking the WebPage cell opens content details only. This is the regression guard for the user's one hard requirement.
 - [ ] Add the type to the type filter, the icon map and the per-type default column set, and add tooltip specs to `activityTooltipSpecs.ts`.
 
 ### Task 13: Details view

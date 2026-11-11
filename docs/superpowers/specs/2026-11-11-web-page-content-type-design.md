@@ -54,7 +54,7 @@ The shared columns are `name` (title), `url` (canonical) and `created_at`. Every
 | # | Column | Kind | Source | Empty means | Status |
 |---|---|---|---|---|---|
 | 1 | ◎ Perspectize | perspectize | derived | — | shipped |
-| 2 | Page | item | `name` + `siteName` (else domain) + `imageUrl` / `faviconUrl` thumb | — | new renderer branch |
+| 2 | WebPage | item | `name` + `siteName` (else domain) + `imageUrl` / `faviconUrl` thumb | — | new renderer branch |
 | 3 | Site | text | `response.domain` | never empty | new |
 | 4 | **Category** | pill | `content.primaryCategory` | "No category set yet. Click to pick one." | **already shipped for all types** |
 | 5 | Published | date | `response.publishedAt` | "The page declares no publish date." | new branch in the existing published-at sort expression |
