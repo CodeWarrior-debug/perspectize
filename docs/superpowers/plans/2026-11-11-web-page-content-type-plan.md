@@ -121,7 +121,7 @@ Branch from `main` after PR 1 merges. It needs no web page code, but it is easie
 - [ ] Add the type to the type filter, the icon map and the per-type default column set, and add tooltip specs to `activityTooltipSpecs.ts`.
 
 ### Task 13: Details view
-- [ ] Test the states: with a description / without one ("This page has no description"); fetch `BLOCKED` tile.
+- [ ] Test the states: with a description / without one ("This page has no description"); the Fetched tile shows date **and time** in local time, never a status value; there is no related-content section in this modal.
 - [ ] Add the Web page section to `ActivityDetailsModal.svelte`.
 
 ### Task 14 (optional, D3): Rename
@@ -140,11 +140,13 @@ Branch from `main` after PR 1 merges. It needs no web page code, but it is easie
   - remove a chip; reorder with ↑/↓;
   - 20 chips → the input is disabled with "Up to 20";
   - save sends the IDs in chip order.
-- [ ] Implement the field: it reuses `detectContentCandidates` and each type's existing create hook (they return `alreadyExisted`). Mount it in the perspective editor for **every** content type.
+  - reopening a saved perspective → chips render from `perspective.relatedContent`, with no extra request.
+- [ ] Implement the field, **paste only, with no pick-list**. It reuses `detectContentCandidates` and each type's existing create hook (they return `{ content, alreadyExisted }`); the chip's title, site and thumb come from that returned `content`. Mount it in the perspective editor for **every** content type, never in a content details modal.
 
 ### Task R7: Related content in perspective views
-- [ ] Test the details modal: a perspective with related items shows a "Related" list (title, site, type icon, ↗ with `rel="noopener noreferrer"`); one without shows no section. Clicking an item opens that item's details.
-- [ ] Implement it in `ActivityDetailsModal.svelte` and wherever a perspective's review text is shown (the compare page, for example). Data comes from the perspective query and is never fetched per item.
+- [ ] Test the **perspective view**: a perspective with related items shows a read-only "Related" list under the review (title, site, type icon, ↗ with `rel="noopener noreferrer"`); one without shows no section. Clicking an item opens that item's own details modal.
+- [ ] Test the **content details modal**: a perspective entry in its summary shows "N related" when N > 0 and nothing when 0, and **never the list itself** (D8).
+- [ ] Implement it in the perspective view component(s) (wherever a perspective's review text is shown, e.g. the compare page), plus the count in `ActivityDetailsModal.svelte`'s perspectives summary. Data comes from the perspective query and is never fetched per item.
 
 ### Task 15: Verify and open PR 3
 - [ ] Run `pnpm run test:run` and `pnpm run check`, then do browser verification via the `pr-verification` skill: add arxiv, a blocked site and a duplicate; set a category on the new row; on a YouTube video perspective, attach an article by URL, save, reload, and see it listed under Related. This needs PR 2's migration on the DB the dev server uses: ask first, never apply it yourself.

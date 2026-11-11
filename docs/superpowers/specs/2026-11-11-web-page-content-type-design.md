@@ -39,7 +39,9 @@ The shared columns are `name` (title), `url` (canonical) and `created_at`. Every
   "publishedAt": "2017-06-12",                       // article:published_time > citation_date > JSON-LD datePublished; null if none
   "lang": "en",                                      // <html lang>, else null
   "fetch": { "status": "OK", "httpStatus": 200, "at": "2026-11-11T08:00:00Z" }
-  // status: OK | BLOCKED (4xx) | ERROR (5xx/network) | TIMEOUT | NOT_HTML | TOO_LARGE
+  // status: OK | BLOCKED (4xx) | ERROR (5xx/network) | TIMEOUT | NOT_HTML | TOO_LARGE.
+  // Internal only: it drives the fallback title and the Add dialog's "couldn't read" message.
+  // It is never shown as a value in the grid or the details view; only `at` is shown.
 }
 ```
 
@@ -60,7 +62,7 @@ The shared columns are `name` (title), `url` (canonical) and `created_at`. Every
 
 **Category needs no new work.** The column, the Wikidata typeahead popover, `setPrimaryCategory` and the `categories` table are all type-agnostic (`ActivityTable.svelte` colId `category`, `CategoryServiceImpl.SetPrimaryCategory`). The only work is to confirm the column is not hidden when the type filter is Web page only, and to cover that with a test.
 
-**Column picker only:** description, language, fetch status.
+**Column picker only:** description, language, fetched (date and time).
 
 ## 4. Fetching safely (the only real risk)
 
@@ -78,9 +80,9 @@ Images are **not** downloaded or proxied. The frontend loads `imageUrl`/`favicon
 
 ## 5. Details view
 
-Title, site and URL (opens in a new tab, `rel="noopener noreferrer"`); description, or "This page has no description" when there is none; tiles for Site, Published, Fetched (status + date) and Language; perspectives. Footer: "Title, description and image come from the page's own metadata, read once when the link was added. Perspectize links to the page; it does not copy its content."
+Title, site and URL (opens in a new tab, `rel="noopener noreferrer"`); description, or "This page has no description" when there is none; tiles for Site, Published, Fetched (date **and time** the metadata was read, in the viewer's local time, e.g. "2026-11-11 08:02"; no status) and Language; perspectives. Footer: "Title, description and image come from the page's own metadata, read once when the link was added. Perspectize links to the page; it does not copy its content."
 
-**Import preview (Decision 8):** after the URL is pasted, the Add dialog shows the fetched title, site, description, image, published date and fetch status before Save. A blocked fetch shows "We couldn't read this page's details (HTTP 403). You can still save the link." This needs a read-only `previewWebPage(url)` query that runs the same fetcher without writing anything.
+**Import preview (Decision 8):** after the URL is pasted, the Add dialog shows the fetched title, site, description, image and published date before Save. A blocked fetch shows "We couldn't read this page's details (HTTP 403). You can still save the link." This needs a read-only `previewWebPage(url)` query that runs the same fetcher without writing anything.
 
 ## 6. Source terms and liability (Decision 9)
 
@@ -93,6 +95,7 @@ We store only what the page publishes for link previews (title, description, ima
 | D1 | ~~Is a shared category enough for related links?~~ | **Decided 2026-11-11:** no. Related content is attached on a perspective by content ID (§8). |
 | D6 | Can a perspective relate any content type, or only web pages? | Any type. The editor's paste box runs the same detection as Add Content, so a YouTube, movie or Bible Gateway link becomes that type's row. |
 | D7 | Should related content inherit the perspective's privacy? | Yes. It is part of the perspective and has no privacy setting of its own. |
+| D8 | Should a perspective entry in a content details modal show an "N related" count? | Yes: the count only, never the list. |
 | D2 | Display label: "Web page", "Link" or "Article"? | **Web page** (enum `WEB_PAGE`). |
 | D3 | Can the person who added a page rename it when the title is bad or missing? | Yes, via the existing `display_title`. It is in the plan as the last, optional task. |
 | D4 | Should `previewWebPage` (the import preview) ship in v1 or follow? | v1, because Decision 8 applies to every type. |
@@ -147,18 +150,31 @@ input UpdatePerspectiveInput {
 
 **Privacy:** a private perspective's related content is visible only where the perspective is. The related content rows themselves stay public content, as they are today.
 
-### Editor flow
+### Two separate surfaces: don't blend them
 
-In the perspective editor (all content types), a **Related content** section with a single paste box:
+Related content is a **perspective** field. It never appears in a content item's own details modal, and the Web page type's details view (§5) has no related-content section.
+
+| Surface | What it is | Related content? |
+|---|---|---|
+| **Content details modal** (e.g. the YouTube video's) | Facts about the item: title, tiles, description, a perspectives summary | **No.** At most, a perspective entry in its summary shows a count such as "3 related", which opens that perspective. |
+| **Perspective editor** (Add/Edit perspective, on any type) | The author's ratings, review, feelings… | **Yes, an input:** the paste box below. |
+| **Perspective view** (reading one perspective, yours or someone else's) | One person's take | **Yes, a read-only list** under the review text. |
+
+### Editor flow (paste only; there is no "choose from a list")
+
+The only way to add an item is to paste its link. The editor never offers a pick-list, because it has no source of candidates to offer. Each chip's title, site and thumbnail come from **the content row the paste created or reused** (`content.name`, `response.siteName`/`domain` and `response.imageUrl` for a web page; the equivalent fields for other types). That row is returned by the create mutation in step 2, so no extra query is needed.
 
 1. Paste a URL and run `detectContentCandidates` on it. A YouTube, movie or Bible Gateway link resolves to that type; any other URL resolves to `WEB_PAGE`.
-2. Call that type's existing create mutation. They all return `{ content, alreadyExisted }`, so an article someone already saved is reused, not duplicated.
-3. Push `content.id` onto the list, rendered as a removable chip: thumb, title, site. The chips can be reordered by drag, or by ↑/↓ buttons for keyboard users.
+2. Call that type's existing create mutation. They all return `{ content, alreadyExisted }`, so an article someone already saved is reused, not duplicated, and the returned `content` supplies the chip's data.
+3. Push `content.id` onto the list, rendered as a removable chip (thumb, title, site). Reorder by drag, or by ↑/↓ for keyboard users.
 4. Save the perspective with `relatedContentIDs`.
 
-Typing text that isn't a URL shows "Paste a link." Pasting the perspective's own content shows "That's the item you're writing about." A failed fetch still adds the chip, because the web page row is still created (§1).
+When the perspective is reopened for editing, the chips come from `Perspective.relatedContent`, which is already loaded with the perspective (dataloaded, §8 API).
+
+Typing text that isn't a URL shows "Paste a link." Pasting the perspective's own content shows "That's the item you're writing about." A failed fetch still adds the chip, because the web page row is still created (§1); its title is the URL fallback.
 
 ### Where it shows
 
-- **Perspective view and details modal (your perspective and others'):** a "Related" list under the review text. Each item shows title, site and type icon, opens that item's details, and has an ↗ to the original URL.
+- **Perspective view only:** a read-only "Related" list under the review text. Each item shows title, site and type icon, has an ↗ to the original URL, and links to that item's own details modal.
+- **Content details modal:** nothing beyond the optional "N related" count on a perspective entry (decision D8).
 - **Activity grid:** nothing new in v1.

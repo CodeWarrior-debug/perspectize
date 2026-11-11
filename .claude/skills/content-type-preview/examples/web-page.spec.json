@@ -100,10 +100,25 @@
       "fill": "full",
       "hasPerspective": true,
       "cells": {
-        "item": { "title": "Attention Is All You Need", "sub": "arXiv.org" },
+        "item": {
+          "title": "Attention Is All You Need",
+          "sub": "arXiv.org"
+        },
         "site": "arxiv.org",
-        "category": { "value": "Transformer", "tip": { "src": "content.primaryCategory", "v": "Transformer — deep learning architecture (Wikidata; label illustrative)" } },
-        "published": { "value": "2017-06-12", "tip": { "src": "citation_date meta tag", "extra": "arXiv exposes citation_* tags rather than article:published_time; the reader accepts both." } },
+        "category": {
+          "value": "Transformer",
+          "tip": {
+            "src": "content.primaryCategory",
+            "v": "Transformer — deep learning architecture (Wikidata; label illustrative)"
+          }
+        },
+        "published": {
+          "value": "2017-06-12",
+          "tip": {
+            "src": "citation_date meta tag",
+            "extra": "arXiv exposes citation_* tags rather than article:published_time; the reader accepts both."
+          }
+        },
         "added": "2026-11-11"
       },
       "details": {
@@ -111,15 +126,46 @@
         "subtitle": "arXiv.org · arxiv.org/abs/1706.03762",
         "textLabel": "Description",
         "textStatus": "proposed",
-        "text": [[null, "The page's own summary (og:description or meta description), stored once at add time. The abstract is not scraped beyond what the page puts in its <head>."]],
+        "text": [
+          [
+            null,
+            "The page's own summary (og:description or meta description), stored once at add time. The abstract is not scraped beyond what the page puts in its <head>."
+          ]
+        ],
         "links": [
-          { "label": "Open", "status": "proposed", "items": ["arxiv.org/abs/1706.03762 ↗ (opens in a new tab)"] }
+          {
+            "label": "Open",
+            "status": "proposed",
+            "items": [
+              "arxiv.org/abs/1706.03762 ↗ (opens in a new tab)"
+            ]
+          }
         ],
         "tiles": [
-          { "k": "Site", "v": "arXiv.org", "status": "proposed", "tip": "response.siteName (og:site_name), else domain" },
-          { "k": "Published", "v": "2017-06-12", "status": "proposed", "tip": "content.published_at" },
-          { "k": "Fetched", "v": "OK", "status": "proposed", "tip": "response.fetch.status: OK | BLOCKED | TIMEOUT | NOT_HTML", "sub": "2026-11-11" },
-          { "k": "Language", "v": "en", "status": "proposed", "tip": "response.lang (<html lang>)" }
+          {
+            "k": "Site",
+            "v": "arXiv.org",
+            "status": "proposed",
+            "tip": "response.siteName (og:site_name), else domain"
+          },
+          {
+            "k": "Published",
+            "v": "2017-06-12",
+            "status": "proposed",
+            "tip": "content.published_at"
+          },
+          {
+            "k": "Fetched",
+            "v": "2026-11-11 08:02",
+            "status": "proposed",
+            "tip": "response.fetch.at: when the page's metadata was read (add time), shown in your local time"
+          },
+          {
+            "k": "Language",
+            "v": "en",
+            "status": "proposed",
+            "tip": "response.lang (<html lang>)"
+          }
         ],
         "otherPerspectives": 2,
         "footer": "Title, description and image come from the page's own metadata, read once when the link was added. Perspectize links to the page; it does not copy its content."
@@ -130,10 +176,19 @@
       "fill": "full",
       "hasPerspective": false,
       "cells": {
-        "item": { "title": "How to Do Great Work", "sub": "paulgraham.com" },
+        "item": {
+          "title": "How to Do Great Work",
+          "sub": "paulgraham.com"
+        },
         "site": "paulgraham.com",
         "category": "Essay",
-        "published": { "value": "", "tip": { "src": "content.published_at", "empty": "The page has no date metadata; 'July 2023' is in the body text, which the reader does not parse." } },
+        "published": {
+          "value": "",
+          "tip": {
+            "src": "content.published_at",
+            "empty": "The page has no date metadata; 'July 2023' is in the body text, which the reader does not parse."
+          }
+        },
         "added": "2026-11-10"
       },
       "details": {
@@ -141,15 +196,48 @@
         "subtitle": "paulgraham.com · paulgraham.com/greatwork.html",
         "textLabel": "Description",
         "textStatus": "proposed",
-        "text": [[null, "No og:description or meta description: the details view says so instead of showing a blank box."]],
+        "text": [
+          [
+            null,
+            "No og:description or meta description: the details view says so instead of showing a blank box."
+          ]
+        ],
         "links": [
-          { "label": "Open", "status": "proposed", "items": ["paulgraham.com/greatwork.html ↗"] }
+          {
+            "label": "Open",
+            "status": "proposed",
+            "items": [
+              "paulgraham.com/greatwork.html ↗"
+            ]
+          }
         ],
         "tiles": [
-          { "k": "Site", "v": "paulgraham.com", "status": "proposed", "tip": "No og:site_name; falls back to the domain" },
-          { "k": "Published", "v": "", "status": "proposed", "tip": "content.published_at", "empty": "Not declared by the page" },
-          { "k": "Fetched", "v": "OK", "status": "proposed", "tip": "response.fetch.status", "sub": "2026-11-10" },
-          { "k": "Language", "v": "", "status": "proposed", "tip": "response.lang", "empty": "Not declared" }
+          {
+            "k": "Site",
+            "v": "paulgraham.com",
+            "status": "proposed",
+            "tip": "No og:site_name; falls back to the domain"
+          },
+          {
+            "k": "Published",
+            "v": "",
+            "status": "proposed",
+            "tip": "content.published_at",
+            "empty": "Not declared by the page"
+          },
+          {
+            "k": "Fetched",
+            "v": "2026-11-10 21:14",
+            "status": "proposed",
+            "tip": "response.fetch.at: when the page's metadata was read (add time), shown in your local time"
+          },
+          {
+            "k": "Language",
+            "v": "",
+            "status": "proposed",
+            "tip": "response.lang",
+            "empty": "Not declared"
+          }
         ],
         "otherPerspectives": 0,
         "footer": "Title, description and image come from the page's own metadata, read once when the link was added."
@@ -160,10 +248,25 @@
       "fill": "full",
       "hasPerspective": true,
       "cells": {
-        "item": { "title": "Sermon on the Mount", "sub": "Wikipedia" },
+        "item": {
+          "title": "Sermon on the Mount",
+          "sub": "Wikipedia"
+        },
         "site": "en.wikipedia.org",
-        "category": { "value": "Sermon on the Mount", "tip": { "src": "content.primaryCategory", "v": "Sermon on the Mount — Wikidata category (label illustrative)" } },
-        "published": { "value": "", "tip": { "src": "content.published_at", "empty": "Wikipedia articles declare a modified date, not a publish date." } },
+        "category": {
+          "value": "Sermon on the Mount",
+          "tip": {
+            "src": "content.primaryCategory",
+            "v": "Sermon on the Mount — Wikidata category (label illustrative)"
+          }
+        },
+        "published": {
+          "value": "",
+          "tip": {
+            "src": "content.published_at",
+            "empty": "Wikipedia articles declare a modified date, not a publish date."
+          }
+        },
         "added": "2026-11-09"
       },
       "details": {
@@ -171,15 +274,47 @@
         "subtitle": "Wikipedia · en.wikipedia.org/wiki/Sermon_on_the_Mount",
         "textLabel": "Description",
         "textStatus": "proposed",
-        "text": [[null, "The page's meta description, stored once at add time."]],
+        "text": [
+          [
+            null,
+            "The page's meta description, stored once at add time."
+          ]
+        ],
         "links": [
-          { "label": "Open", "status": "proposed", "items": ["en.wikipedia.org/wiki/Sermon_on_the_Mount ↗"] }
+          {
+            "label": "Open",
+            "status": "proposed",
+            "items": [
+              "en.wikipedia.org/wiki/Sermon_on_the_Mount ↗"
+            ]
+          }
         ],
         "tiles": [
-          { "k": "Site", "v": "Wikipedia", "status": "proposed", "tip": "response.siteName" },
-          { "k": "Published", "v": "", "status": "proposed", "tip": "content.published_at", "empty": "Not declared" },
-          { "k": "Fetched", "v": "OK", "status": "proposed", "tip": "response.fetch.status", "sub": "2026-11-09" },
-          { "k": "Language", "v": "en", "status": "proposed", "tip": "response.lang" }
+          {
+            "k": "Site",
+            "v": "Wikipedia",
+            "status": "proposed",
+            "tip": "response.siteName"
+          },
+          {
+            "k": "Published",
+            "v": "",
+            "status": "proposed",
+            "tip": "content.published_at",
+            "empty": "Not declared"
+          },
+          {
+            "k": "Fetched",
+            "v": "2026-11-09 16:40",
+            "status": "proposed",
+            "tip": "response.fetch.at: when the page's metadata was read (add time), shown in your local time"
+          },
+          {
+            "k": "Language",
+            "v": "en",
+            "status": "proposed",
+            "tip": "response.lang"
+          }
         ],
         "otherPerspectives": 1,
         "footer": "Text from Wikipedia is CC BY-SA; Perspectize stores only the title and short description and links to the article."
@@ -190,7 +325,10 @@
       "fill": "sparse",
       "hasPerspective": false,
       "cells": {
-        "item": { "title": "www.nytimes.com/2026/11/02/technology/…", "sub": "nytimes.com · metadata not read" },
+        "item": {
+          "title": "www.nytimes.com/2026/11/02/technology/…",
+          "sub": "nytimes.com · metadata not read"
+        },
         "site": "nytimes.com",
         "category": "",
         "published": "",
@@ -201,15 +339,48 @@
         "subtitle": "nytimes.com · the site refused the metadata request (HTTP 403)",
         "textLabel": "Description",
         "textStatus": "proposed",
-        "text": [[null, "The link is still saved: a blocked or slow site never stops the add. The title falls back to the URL path; you can rename it, and 'Retry metadata' tries the fetch again."]],
+        "text": [
+          [
+            null,
+            "The link is still saved: a blocked or slow site never stops the add. The title falls back to the URL path; you can rename it, and 'Retry metadata' tries the fetch again."
+          ]
+        ],
         "links": [
-          { "label": "Open", "status": "proposed", "items": ["nytimes.com/2026/11/02/technology/… ↗"] }
+          {
+            "label": "Open",
+            "status": "proposed",
+            "items": [
+              "nytimes.com/2026/11/02/technology/… ↗"
+            ]
+          }
         ],
         "tiles": [
-          { "k": "Site", "v": "nytimes.com", "status": "proposed", "tip": "Domain only; og:site_name unknown" },
-          { "k": "Published", "v": "", "status": "proposed", "tip": "content.published_at", "empty": "Unknown (not fetched)" },
-          { "k": "Fetched", "v": "BLOCKED", "status": "proposed", "tip": "response.fetch.status", "sub": "HTTP 403" },
-          { "k": "Language", "v": "", "status": "proposed", "tip": "response.lang", "empty": "Unknown" }
+          {
+            "k": "Site",
+            "v": "nytimes.com",
+            "status": "proposed",
+            "tip": "Domain only; og:site_name unknown"
+          },
+          {
+            "k": "Published",
+            "v": "",
+            "status": "proposed",
+            "tip": "content.published_at",
+            "empty": "Unknown (not fetched)"
+          },
+          {
+            "k": "Fetched",
+            "v": "2026-11-08 10:05",
+            "status": "proposed",
+            "tip": "response.fetch.at: when the page's metadata was read (add time), shown in your local time"
+          },
+          {
+            "k": "Language",
+            "v": "",
+            "status": "proposed",
+            "tip": "response.lang",
+            "empty": "Unknown"
+          }
         ],
         "otherPerspectives": 0,
         "footer": "Metadata could not be read. Nothing about this page is guessed."
@@ -220,10 +391,19 @@
       "fill": "full",
       "hasPerspective": false,
       "cells": {
-        "item": { "title": "$state • Svelte Docs", "sub": "Svelte" },
+        "item": {
+          "title": "$state • Svelte Docs",
+          "sub": "Svelte"
+        },
         "site": "svelte.dev",
         "category": "Svelte",
-        "published": { "value": "", "tip": { "src": "content.published_at", "empty": "Docs pages declare no publish date." } },
+        "published": {
+          "value": "",
+          "tip": {
+            "src": "content.published_at",
+            "empty": "Docs pages declare no publish date."
+          }
+        },
         "added": "2026-11-07"
       },
       "details": {
@@ -231,15 +411,47 @@
         "subtitle": "Svelte · svelte.dev/docs/svelte/$state",
         "textLabel": "Description",
         "textStatus": "proposed",
-        "text": [[null, "The page's og:description, stored once at add time."]],
+        "text": [
+          [
+            null,
+            "The page's og:description, stored once at add time."
+          ]
+        ],
         "links": [
-          { "label": "Open", "status": "proposed", "items": ["svelte.dev/docs/svelte/$state ↗"] }
+          {
+            "label": "Open",
+            "status": "proposed",
+            "items": [
+              "svelte.dev/docs/svelte/$state ↗"
+            ]
+          }
         ],
         "tiles": [
-          { "k": "Site", "v": "Svelte", "status": "proposed", "tip": "response.siteName" },
-          { "k": "Published", "v": "", "status": "proposed", "tip": "content.published_at", "empty": "Not declared" },
-          { "k": "Fetched", "v": "OK", "status": "proposed", "tip": "response.fetch.status", "sub": "2026-11-07" },
-          { "k": "Language", "v": "en", "status": "proposed", "tip": "response.lang" }
+          {
+            "k": "Site",
+            "v": "Svelte",
+            "status": "proposed",
+            "tip": "response.siteName"
+          },
+          {
+            "k": "Published",
+            "v": "",
+            "status": "proposed",
+            "tip": "content.published_at",
+            "empty": "Not declared"
+          },
+          {
+            "k": "Fetched",
+            "v": "2026-11-07 13:27",
+            "status": "proposed",
+            "tip": "response.fetch.at: when the page's metadata was read (add time), shown in your local time"
+          },
+          {
+            "k": "Language",
+            "v": "en",
+            "status": "proposed",
+            "tip": "response.lang"
+          }
         ],
         "otherPerspectives": 0,
         "footer": "Title, description and image come from the page's own metadata, read once when the link was added."
@@ -247,22 +459,12 @@
     }
   ],
   "perspective": {
-    "ratings": ["Quality", "Agreement", "Importance", "Confidence"],
-    "addFieldHint": "why this link matters",
-    "extension": {
-      "label": "Related content",
-      "badge": "proposed",
-      "status": "proposed",
-      "tip": "On every perspective, not just web pages. Paste a link: it becomes (or reuses) a content row, and the perspective stores that content ID, never the URL string. Stored in perspective_related_content; up to 20, in your order. Spec §8.",
-      "options": [
-        "Attention Is All You Need · arxiv.org",
-        "Sermon on the Mount · Wikipedia",
-        "$state • Svelte Docs · svelte.dev"
-      ],
-      "freeText": {
-        "label": "Paste a link",
-        "placeholder": "https://… an article, video or page related to this item"
-      }
-    }
+    "ratings": [
+      "Quality",
+      "Agreement",
+      "Importance",
+      "Confidence"
+    ],
+    "addFieldHint": "why this link matters"
   }
 }
