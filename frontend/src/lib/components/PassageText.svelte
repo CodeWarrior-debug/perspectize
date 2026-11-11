@@ -98,7 +98,7 @@
 
 <div
 	bind:this={container}
-	class="passage-text relative font-[family-name:var(--font-family-serif)] text-[15px] leading-relaxed text-foreground"
+	class="passage-text relative font-slot-longform font-[family-name:var(--font-family-serif)] text-[15px] leading-relaxed text-foreground"
 >
 	{#if overCap}
 		<p class="text-muted-foreground">{verseCount} verses — too long to display here.</p>

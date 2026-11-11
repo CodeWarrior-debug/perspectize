@@ -139,7 +139,7 @@
 				onclick={() => onOpenDetails(String(row.id))}
 			>
 				<div
-					class="line-clamp-2 font-[family-name:var(--font-family-serif)] text-sm leading-tight font-semibold text-foreground"
+					class="line-clamp-2 font-slot-cell font-[family-name:var(--font-family-serif)] text-sm leading-tight font-semibold text-foreground"
 				>
 					{(isPassage(row) && row.displayTitle) || row.name}
 				</div>

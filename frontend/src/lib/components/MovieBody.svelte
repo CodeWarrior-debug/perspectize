@@ -12,14 +12,14 @@
 {#if m?.overview}
 	<div class="mt-3.5 border-t border-border pt-3.5">
 		<div class="mb-1.5 text-[11px] tracking-wide text-muted-foreground uppercase">Synopsis</div>
-		<div class="font-serif text-[13px] whitespace-pre-wrap text-foreground">{m.overview}</div>
+		<div class="font-slot-longform font-serif text-[13px] whitespace-pre-wrap text-foreground">{m.overview}</div>
 	</div>
 {/if}
 
 {#if people.length > 0}
 	<div class="mt-3.5">
 		<div class="mb-1.5 text-[11px] tracking-wide text-muted-foreground uppercase">Top cast</div>
-		<ul class="space-y-1 font-[family-name:var(--font-family-serif)] text-[13px] text-foreground">
+		<ul class="space-y-1 font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] text-foreground">
 			{#each people as person (`${person.role}-${person.id}`)}
 				<li>
 					<a
@@ -42,7 +42,7 @@
 {#if keywords.length > 0}
 	<div class="mt-3.5">
 		<div class="mb-1.5 text-[11px] tracking-wide text-muted-foreground uppercase">Keywords</div>
-		<div class="font-[family-name:var(--font-family-serif)] text-[13px] text-foreground">
+		<div class="font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] text-foreground">
 			{keywords.join(', ')}
 		</div>
 	</div>

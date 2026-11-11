@@ -14,7 +14,7 @@ function textOnlyCell(label: string): HTMLElement {
 	const title = document.createElement('div');
 	title.dataset.testid = 'item-title';
 	title.className =
-		'line-clamp-2 min-w-0 flex-1 whitespace-normal text-left font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground';
+		'line-clamp-2 min-w-0 flex-1 whitespace-normal text-left font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground';
 	title.textContent = label;
 
 	cell.append(title);
