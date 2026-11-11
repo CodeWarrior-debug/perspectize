@@ -3,6 +3,9 @@
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import XIcon from '@lucide/svelte/icons/x';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
+	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
+	import ScaleIcon from '@lucide/svelte/icons/scale';
+	import { MODAL_ACTION_CLASS } from '$lib/components/modal-action';
 	import { Dialog, DialogContent, DialogTitle, DialogClose } from '$lib/components/shadcn';
 	import {
 		formatCount,
@@ -177,12 +180,12 @@
 								maxlength="120"
 								placeholder="Add a title (optional, set once)"
 								aria-label="Passage title"
-								class="min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-[13px] text-foreground"
+								class="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-[13px] text-foreground"
 							/>
 							<button
 								type="submit"
 								disabled={setPassageTitle.isPending || !titleDraft.trim()}
-								class="inline-flex items-center gap-1.5 rounded-md border border-primary px-3 py-1.5 text-[13px] font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
+								class={MODAL_ACTION_CLASS}
 							>
 								Save title
 							</button>
@@ -317,7 +320,7 @@
 					{/if}
 				</div>
 
-				<div class="mt-3.5 flex items-start justify-between gap-3 border-t border-border pt-3.5">
+				<div class="mt-3.5 border-t border-border pt-3.5">
 					<div>
 						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Last updated in Perspectize</div>
 						<div
@@ -327,37 +330,40 @@
 							{formatDate(content.updatedAt)}
 						</div>
 					</div>
-					<div class="flex flex-col items-end gap-1">
-						<div class="flex flex-wrap items-center justify-end gap-2">
-							<a
-								href={`/compare?contentId=${content.id}`}
-								class="inline-flex items-center gap-1.5 rounded-md border border-primary px-3.5 py-2 text-[13px] font-semibold text-primary hover:bg-primary/5"
+					<!-- Actions get their own full-width row so they read as one even set
+					     instead of a ragged right-aligned wrap beside the date. Each one
+					     grows from the same basis, so a row of them is close to equal width
+					     and they wrap whole onto a new row on a phone. -->
+					<div class="mt-3 flex flex-wrap gap-2" data-testid="details-actions">
+						<a href={`/compare?contentId=${content.id}`} class="{MODAL_ACTION_CLASS} grow basis-36">
+							<ScaleIcon />
+							Compare
+						</a>
+						{#if onAddToPlan}
+							<AddToPlanButton variant="text" class="grow basis-36" onclick={() => onAddToPlan(content)} />
+						{/if}
+						{#if !isPassage && !isMovie}
+							<button
+								type="button"
+								disabled={updateSourceData.isPending || cooldown.active}
+								onclick={handleUpdateSourceData}
+								class="{MODAL_ACTION_CLASS} grow basis-36"
 							>
-								Compare
-							</a>
-							{#if onAddToPlan}
-								<AddToPlanButton variant="text" onclick={() => onAddToPlan(content)} />
-							{/if}
-							{#if !isPassage && !isMovie}
-								<button
-									type="button"
-									disabled={updateSourceData.isPending || cooldown.active}
-									onclick={handleUpdateSourceData}
-									class="inline-flex items-center gap-1.5 rounded-md border border-primary px-3.5 py-2 text-[13px] font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
-								>
-									{#if updateSourceData.isPending}
-										<LoaderCircleIcon class="size-3.5 animate-spin" />
-									{/if}
-									Update source data
-								</button>
-							{/if}
-						</div>
-						{#if !isPassage && !isMovie && cooldown.active}
-							<div class="max-w-[280px] text-right text-[11px] text-muted-foreground">
-								This was updated recently. Check back in {formatRemainingTime(cooldown.remainingMs)} to refresh again.
-							</div>
+								<!-- Same slot for both icons so the button keeps its width. -->
+								{#if updateSourceData.isPending}
+									<LoaderCircleIcon class="animate-spin" />
+								{:else}
+									<RefreshCwIcon />
+								{/if}
+								Update source data
+							</button>
 						{/if}
 					</div>
+					{#if !isPassage && !isMovie && cooldown.active}
+						<div class="mt-1.5 text-[11px] text-muted-foreground">
+							This was updated recently. Check back in {formatRemainingTime(cooldown.remainingMs)} to refresh again.
+						</div>
+					{/if}
 				</div>
 
 				{#if !isPassage && !isMovie && hasDescription}
