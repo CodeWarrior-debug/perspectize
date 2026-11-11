@@ -1,4 +1,4 @@
-import { themeBalham, themeQuartz } from '@ag-grid-community/theming';
+import { themeBalham } from '@ag-grid-community/theming';
 
 /**
  * AG Grid theme params for the Activity table. Colours are token references, not hex, so the
@@ -38,20 +38,12 @@ export const GRID_THEME_PARAMS = {
 /** Params whose value is a colour — the ones that must never be hard-coded. */
 export const GRID_COLOR_PARAM_KEYS = Object.keys(GRID_THEME_PARAMS).filter((k) => /Color$/.test(k));
 
-/** Base AG Grid themes the Activity table can be rendered with. Quartz is the default. */
-export type GridThemeName = 'quartz' | 'balham';
-
 /**
- * Reads the `gridTheme` URL param. Anything other than `balham` falls back to Quartz, so a
- * stale or mistyped link never breaks the grid.
- * *TEMP* - density experiment: compare Quartz with the denser Balham, then keep one.
+ * The Activity table's theme: Balham's tighter 4px spacing (Quartz uses 8px) under the shared
+ * token-driven params. Row and header heights are fixed by the params above, so the gain is
+ * horizontal only: cell and header padding halve (16px -> 8px), which untruncates the movie
+ * view's "Genre" / "Rated" / "Released" headers and some channel names. Descender margin, hover,
+ * zebra and every preset stay as they were (see the PR for the measurements). The Plan grid still
+ * uses `themeQuartz` with the same params.
  */
-export function parseGridThemeName(value: string | null | undefined): GridThemeName {
-	return value === 'balham' ? 'balham' : 'quartz';
-}
-
-/** Same token-driven params on either base theme, so only density and chrome differ. */
-export function buildGridTheme(name: GridThemeName) {
-	const base = name === 'balham' ? themeBalham : themeQuartz;
-	return base.withParams(GRID_THEME_PARAMS);
-}
+export const ACTIVITY_GRID_THEME = themeBalham.withParams(GRID_THEME_PARAMS);

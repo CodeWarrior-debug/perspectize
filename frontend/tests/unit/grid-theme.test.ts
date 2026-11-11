@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-	buildGridTheme,
-	GRID_COLOR_PARAM_KEYS,
-	GRID_THEME_PARAMS,
-	parseGridThemeName,
-} from '$lib/utils/grid-theme';
+import { themeBalham, themeQuartz } from '@ag-grid-community/theming';
+import { ACTIVITY_GRID_THEME, GRID_COLOR_PARAM_KEYS, GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
 
 describe('GRID_THEME_PARAMS', () => {
 	it('takes every colour from a theme token so the grid follows the picker', () => {
@@ -36,19 +32,27 @@ describe('header', () => {
 	});
 });
 
-describe('grid theme selection', () => {
-	it('defaults to quartz for missing or unknown values', () => {
-		expect(parseGridThemeName(null)).toBe('quartz');
-		expect(parseGridThemeName(undefined)).toBe('quartz');
-		expect(parseGridThemeName('nope')).toBe('quartz');
+describe('ACTIVITY_GRID_THEME', () => {
+	it('is built on Balham, not Quartz', () => {
+		expect(ACTIVITY_GRID_THEME.id).toBe(themeBalham.id);
+		expect(ACTIVITY_GRID_THEME.id).not.toBe(themeQuartz.id);
 	});
 
-	it('selects balham only when asked', () => {
-		expect(parseGridThemeName('balham')).toBe('balham');
+	it('keeps Balham’s tighter 4px spacing, half of Quartz’s 8px, which is where the extra width comes from', () => {
+		expect(ACTIVITY_GRID_THEME.getParams().spacing).toBe(4);
+		expect(themeQuartz.getParams().spacing).toBe(8);
 	});
 
-	it('builds a theme for each base', () => {
-		expect(buildGridTheme('quartz')).toBeDefined();
-		expect(buildGridTheme('balham')).toBeDefined();
+	it('applies the shared token params on top, so the grid still follows the theme picker', () => {
+		const params = ACTIVITY_GRID_THEME.getParams();
+		for (const key of GRID_COLOR_PARAM_KEYS) {
+			expect(String(params[key])).toBe(String(GRID_THEME_PARAMS[key as keyof typeof GRID_THEME_PARAMS]));
+		}
+	});
+
+	it('pins row and header height, so Balham does not shrink the 2-line title rows', () => {
+		const params = ACTIVITY_GRID_THEME.getParams();
+		expect(params.rowHeight).toBe(GRID_THEME_PARAMS.rowHeight);
+		expect(params.headerHeight).toBe(GRID_THEME_PARAMS.headerHeight);
 	});
 });

@@ -102,7 +102,7 @@
 		rowMatchesPerson,
 		showColumnRelevanceCallout,
 	} from '$lib/utils/grid-config';
-	import { buildGridTheme, parseGridThemeName } from '$lib/utils/grid-theme';
+	import { ACTIVITY_GRID_THEME } from '$lib/utils/grid-theme';
 	import { emptyCellClassRules } from '$lib/utils/grid-empty';
 	import { useCardMode, useResponsiveTier } from '$lib/utils/responsive.svelte';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
@@ -598,8 +598,7 @@
 
 	const modules = [ClientSideRowModelModule];
 
-	// *TEMP* - density experiment: ?gridTheme=balham swaps in the denser base theme
-	const theme = buildGridTheme(parseGridThemeName(page.url.searchParams.get('gridTheme')));
+	const theme = ACTIVITY_GRID_THEME;
 
 	// flex = clamp-like: proportional sizing with min/max constraints
 	// minWidth is auto-derived from headerName unless explicitly set (e.g. Item = 200)
