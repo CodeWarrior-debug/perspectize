@@ -86,8 +86,8 @@
 - [ ] Add the type to the type filter, the icon map and the per-type default column set, and add tooltip specs to `activityTooltipSpecs.ts`.
 
 ### Task 13: Details view
-- [ ] Test the states: with a description / without one ("This page has no description"); fetch `BLOCKED` tile; a Same category list with items / an empty one (hidden, not "0 items").
-- [ ] Add the Web page section to `ActivityDetailsModal.svelte`. Same category reuses the content list query filtered by `primaryCategoryId`, limit 10, and is fetched on open only.
+- [ ] Test the states: with a description / without one ("This page has no description"); fetch `BLOCKED` tile.
+- [ ] Add the Web page section to `ActivityDetailsModal.svelte`.
 
 ### Task 14 (optional, D3): Rename
 - [ ] Only if D3 is confirmed: an Edit title action for the adder, writing `display_title`. Test it: shown only to the adder, and saving updates the row.

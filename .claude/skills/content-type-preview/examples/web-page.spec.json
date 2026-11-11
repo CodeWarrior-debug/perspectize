@@ -56,7 +56,7 @@
       "label": "Category",
       "status": "shipped",
       "header": {
-        "body": "Wikidata category, the same column YouTube videos have. Click the cell to search Wikidata and set it. This is how a link joins related videos, passages and films: give them the same category.",
+        "body": "Wikidata category, the same column YouTube videos have. Click the cell to search Wikidata and set it.",
         "src": "content.primaryCategory (setPrimaryCategory mutation, categories table)",
         "extra": "Nothing new to build: the column, popover and mutation are type-agnostic today."
       },
@@ -113,8 +113,7 @@
         "textStatus": "proposed",
         "text": [[null, "The page's own summary (og:description or meta description), stored once at add time. The abstract is not scraped beyond what the page puts in its <head>."]],
         "links": [
-          { "label": "Open", "status": "proposed", "items": ["arxiv.org/abs/1706.03762 ↗ (opens in a new tab)"] },
-          { "label": "Same category", "status": "proposed", "items": ["Other items with category Transformer: videos, passages, films, pages"] }
+          { "label": "Open", "status": "proposed", "items": ["arxiv.org/abs/1706.03762 ↗ (opens in a new tab)"] }
         ],
         "tiles": [
           { "k": "Site", "v": "arXiv.org", "status": "proposed", "tip": "response.siteName (og:site_name), else domain" },
@@ -163,7 +162,7 @@
       "cells": {
         "item": { "title": "Sermon on the Mount", "sub": "Wikipedia" },
         "site": "en.wikipedia.org",
-        "category": { "value": "Sermon on the Mount", "tip": { "src": "content.primaryCategory", "v": "Same category as the Matthew 5–7 passage, so the two show together under that category." } },
+        "category": { "value": "Sermon on the Mount", "tip": { "src": "content.primaryCategory", "v": "Sermon on the Mount — Wikidata category (label illustrative)" } },
         "published": { "value": "", "tip": { "src": "content.published_at", "empty": "Wikipedia articles declare a modified date, not a publish date." } },
         "added": "2026-11-09"
       },
@@ -174,8 +173,7 @@
         "textStatus": "proposed",
         "text": [[null, "The page's meta description, stored once at add time."]],
         "links": [
-          { "label": "Open", "status": "proposed", "items": ["en.wikipedia.org/wiki/Sermon_on_the_Mount ↗"] },
-          { "label": "Same category", "status": "proposed", "items": ["Matthew 5:1–7:29 (Bible passage)"] }
+          { "label": "Open", "status": "proposed", "items": ["en.wikipedia.org/wiki/Sermon_on_the_Mount ↗"] }
         ],
         "tiles": [
           { "k": "Site", "v": "Wikipedia", "status": "proposed", "tip": "response.siteName" },

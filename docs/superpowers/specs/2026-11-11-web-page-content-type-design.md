@@ -78,7 +78,7 @@ Images are **not** downloaded or proxied. The frontend loads `imageUrl`/`favicon
 
 ## 5. Details view
 
-Title, site and URL (opens in a new tab, `rel="noopener noreferrer"`); description, or "This page has no description" when there is none; tiles for Site, Published, Fetched (status + date) and Language; the **Same category** list (other content with this `primaryCategory`, any type, capped at 10); perspectives. Footer: "Title, description and image come from the page's own metadata, read once when the link was added. Perspectize links to the page; it does not copy its content."
+Title, site and URL (opens in a new tab, `rel="noopener noreferrer"`); description, or "This page has no description" when there is none; tiles for Site, Published, Fetched (status + date) and Language; perspectives. Footer: "Title, description and image come from the page's own metadata, read once when the link was added. Perspectize links to the page; it does not copy its content."
 
 **Import preview (Decision 8):** after the URL is pasted, the Add dialog shows the fetched title, site, description, image, published date and fetch status before Save. A blocked fetch shows "We couldn't read this page's details (HTTP 403). You can still save the link." This needs a read-only `previewWebPage(url)` query that runs the same fetcher without writing anything.
 
@@ -90,7 +90,7 @@ We store only what the page publishes for link previews (title, description, ima
 
 | # | Question | Proposed default |
 |---|---|---|
-| D1 | "Related links": is a **shared Wikidata category** enough for now, or do you need an explicit "this page relates to video X" link? | Category is enough for v1, and Same category in the details view makes it visible. An explicit `content_relation (from_id, to_id, created_by)` table is a separate follow-up and needs a migration. |
+| D1 | "Related links": is a **shared Wikidata category** enough for now, or do you need an explicit "this page relates to video X" link? | Category only in v1. An explicit `content_relation (from_id, to_id, created_by)` table is a separate follow-up and needs a migration. |
 | D2 | Display label: "Web page", "Link" or "Article"? | **Web page** (enum `WEB_PAGE`). |
 | D3 | Can the person who added a page rename it when the title is bad or missing? | Yes, via the existing `display_title`. It is in the plan as the last, optional task. |
 | D4 | Should `previewWebPage` (the import preview) ship in v1 or follow? | v1, because Decision 8 applies to every type. |
