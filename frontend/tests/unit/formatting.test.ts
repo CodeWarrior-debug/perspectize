@@ -34,6 +34,7 @@ import {
 	vsBudgetPercent,
 	formatVsBudget,
 	durationTooltip,
+	contentTags,
 } from '$lib/utils/formatting';
 
 describe('shared h:mm:ss duration', () => {
@@ -791,6 +792,31 @@ describe('typeCellRenderer', () => {
 		expect(result.querySelector('svg[data-icon="bible-passage"]')).toBeTruthy();
 		expect(result.querySelector('svg[fill="#FF0000"]')).toBeNull();
 		expect(result.querySelector('.sr-only')?.textContent).toBe('Bible Passage');
+	});
+
+	it('shows a book glyph in the theme muted colour for BOOK, labelled Book', () => {
+		const result = typeCellRenderer({ data: { contentType: 'BOOK' } }) as HTMLElement;
+
+		expect(result.title).toBe('Book');
+		expect(result.querySelector('svg')?.getAttribute('stroke')).toBe('var(--color-muted-foreground)');
+		expect(result.querySelector('.sr-only')?.textContent).toBe('Book');
+	});
+});
+
+describe('contentTags', () => {
+	it('returns the real tags when the row has them', () => {
+		expect(contentTags({ contentType: 'BOOK', tags: ['a'], book: { subjects: ['Fiction'] } })).toEqual(['a']);
+	});
+
+	it('falls back to a book row subjects when it has no real tags', () => {
+		expect(contentTags({ contentType: 'BOOK', tags: null, book: { subjects: ['Fiction', 'Family'] } })).toEqual([
+			'Fiction',
+			'Family',
+		]);
+	});
+
+	it('returns null for a book with no subjects', () => {
+		expect(contentTags({ contentType: 'BOOK', tags: null, book: { subjects: [] } })).toBeNull();
 	});
 });
 
