@@ -92,6 +92,14 @@ type ContentFilter struct {
 	MaxTmdbScore   *float64
 	// Book column filters (books only). AuthorContains matches the first author's name.
 	AuthorContains *string
+	// Book ranges (books only, inclusive). Year is the first publish year, pages the median
+	// across editions, rating the Open Library average out of 5.
+	MinPublishYear *int
+	MaxPublishYear *int
+	MinPages       *int
+	MaxPages       *int
+	MinBookRating  *float64
+	MaxBookRating  *float64
 }
 
 // ContentListParams contains parameters for paginated content queries

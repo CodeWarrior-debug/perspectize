@@ -12,6 +12,8 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/perf/querycount"
 )
 
+func cF64(f float64) *float64 { return &f }
+
 func TestList_BookColumnFilters(t *testing.T) {
 	ctx := context.Background()
 	cases := []struct {
@@ -33,6 +35,21 @@ func TestList_BookColumnFilters(t *testing.T) {
 		{"combined with genre contains", domain.ContentFilter{GenreContains: cStr("drama"), AuthorContains: cStr("stein")},
 			`WHERE \(response->'genres'\)::text ILIKE \$1 AND \(response->'authors'->0->>'name'\) ILIKE \$2 ORDER BY`,
 			[]driver.Value{"%drama%", "%stein%", int64(11)}},
+		// Numeric ranges read the stored book keys as NUMERIC and bind every bound.
+		{"published year range", domain.ContentFilter{MinPublishYear: cInt(1950), MaxPublishYear: cInt(1960)},
+			`WHERE \(response->>'firstPublishYear'\)::NUMERIC >= \$1 AND \(response->>'firstPublishYear'\)::NUMERIC <= \$2 ORDER BY`,
+			[]driver.Value{int64(1950), int64(1960), int64(11)}},
+		{"min pages only", domain.ContentFilter{MinPages: cInt(300)},
+			`WHERE \(response->>'pageCountMedian'\)::NUMERIC >= \$1 ORDER BY`, []driver.Value{int64(300), int64(11)}},
+		{"max pages only", domain.ContentFilter{MaxPages: cInt(500)},
+			`WHERE \(response->>'pageCountMedian'\)::NUMERIC <= \$1 ORDER BY`, []driver.Value{int64(500), int64(11)}},
+		{"book rating range", domain.ContentFilter{MinBookRating: cF64(3.5), MaxBookRating: cF64(4.5)},
+			`WHERE \(response->>'ratingsAverage'\)::NUMERIC >= \$1 AND \(response->>'ratingsAverage'\)::NUMERIC <= \$2 ORDER BY`,
+			[]driver.Value{3.5, 4.5, int64(11)}},
+		{"author, year, pages and rating AND together", domain.ContentFilter{
+			AuthorContains: cStr("stein"), MinPublishYear: cInt(1900), MinPages: cInt(100), MinBookRating: cF64(4)},
+			`WHERE \(response->'authors'->0->>'name'\) ILIKE \$1 AND \(response->>'firstPublishYear'\)::NUMERIC >= \$2 AND \(response->>'pageCountMedian'\)::NUMERIC >= \$3 AND \(response->>'ratingsAverage'\)::NUMERIC >= \$4 ORDER BY`,
+			[]driver.Value{"%stein%", int64(1900), int64(100), float64(4), int64(11)}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

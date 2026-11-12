@@ -245,6 +245,26 @@ func applyBookColumnFilters(query *gorm.DB, f *domain.ContentFilter) *gorm.DB {
 	if f.AuthorContains != nil && *f.AuthorContains != "" {
 		query = query.Where("(response->'authors'->0->>'name') ILIKE ?", "%"+*f.AuthorContains+"%")
 	}
+	// Numeric ranges cast the JSONB text to NUMERIC. A row without the key (every non-book
+	// row, or a book with the value unknown) yields NULL, so a set bound excludes it.
+	if f.MinPublishYear != nil {
+		query = query.Where("(response->>'firstPublishYear')::NUMERIC >= ?", *f.MinPublishYear)
+	}
+	if f.MaxPublishYear != nil {
+		query = query.Where("(response->>'firstPublishYear')::NUMERIC <= ?", *f.MaxPublishYear)
+	}
+	if f.MinPages != nil {
+		query = query.Where("(response->>'pageCountMedian')::NUMERIC >= ?", *f.MinPages)
+	}
+	if f.MaxPages != nil {
+		query = query.Where("(response->>'pageCountMedian')::NUMERIC <= ?", *f.MaxPages)
+	}
+	if f.MinBookRating != nil {
+		query = query.Where("(response->>'ratingsAverage')::NUMERIC >= ?", *f.MinBookRating)
+	}
+	if f.MaxBookRating != nil {
+		query = query.Where("(response->>'ratingsAverage')::NUMERIC <= ?", *f.MaxBookRating)
+	}
 	return query
 }
 
