@@ -14,8 +14,15 @@ import {
 	sortableColumnsFor,
 	releasedComparator,
 	itemColumnHeader,
+	CONTENT_TYPE_OPTIONS,
 } from '$lib/utils/grid-config';
 import type { ContentItem } from '$lib/queries/content';
+
+describe('CONTENT_TYPE_OPTIONS (Book)', () => {
+	it('offers Book as a type filter option', () => {
+		expect(CONTENT_TYPE_OPTIONS).toContainEqual({ value: 'book', label: 'Book' });
+	});
+});
 
 function row(overrides: Partial<ContentItem>): ContentItem {
 	return {

@@ -43,6 +43,7 @@ export function planItemCellRenderer(todo: UserTodoItem): HTMLElement | string {
 			verseStartID: content.verseStartID,
 			verseEndID: content.verseEndID,
 			movie: content.movie,
+			book: content.book,
 		},
 	});
 }
