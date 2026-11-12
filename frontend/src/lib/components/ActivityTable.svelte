@@ -906,7 +906,7 @@
 			},
 			// Book columns (Open Library). Hidden by default; the responsive effect shows the Book default
 			// set when the type filter is exactly BOOK. Author sorts on the server (AUTHOR). Published, Pages
-			// and Rating sort in "Loaded" mode only, and have no filter (no URL key). Editions is picker-only.
+			// and Rating sort in "Loaded" mode only; all three filter on the server (f.published, f.pages, f.bookrating). Editions is picker-only.
 			{
 				colId: 'author',
 				headerName: 'Author',
@@ -926,7 +926,7 @@
 				flex: 0.8,
 				minWidth: 105,
 				maxWidth: 130,
-				filter: false,
+				filter: 'agNumberColumnFilter',
 				// A number to sort by, shown as the plain year (never through the thousands-separated formatter).
 				valueGetter: (params) => {
 					const year = publishedValueGetter({ data: params.data });
@@ -943,7 +943,7 @@
 				flex: 0.6,
 				minWidth: 70,
 				maxWidth: 110,
-				filter: false,
+				filter: 'agNumberColumnFilter',
 				valueGetter: pagesValueGetter,
 				comparator: unknownLastComparator,
 				valueFormatter: (params) => (params.value == null ? EMPTY_VALUE : String(params.value)),
@@ -954,9 +954,9 @@
 				colId: 'rating',
 				headerName: 'Book rating',
 				flex: 0.7,
-				minWidth: 90,
-				maxWidth: 120,
-				filter: false,
+				minWidth: 128,
+				maxWidth: 150,
+				filter: 'agNumberColumnFilter',
 				valueGetter: ratingValueGetter,
 				comparator: unknownLastComparator,
 				valueFormatter: (params) => formatBookRating(params.value),

@@ -421,6 +421,12 @@ export const COLUMNS: readonly ColumnMeta[] = [
 			const year = publishedValueGetter({ data: row });
 			return year === null ? null : Number(year);
 		},
+		filterKey: 'published',
+		filterValue: (row) => {
+			const year = publishedValueGetter({ data: row });
+			return year === null ? null : Number(year);
+		},
+		filterRange: 'number',
 	},
 	{
 		colId: 'pages',
@@ -429,6 +435,9 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		sortable: true,
 		clientOnlySort: true,
 		sortValue: (row) => pagesValueGetter({ data: row }),
+		filterKey: 'pages',
+		filterValue: (row) => pagesValueGetter({ data: row }),
+		filterRange: 'number',
 	},
 	{
 		colId: 'rating',
@@ -437,6 +446,9 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		sortable: true,
 		clientOnlySort: true,
 		sortValue: (row) => ratingValueGetter({ data: row }),
+		filterKey: 'bookrating',
+		filterValue: (row) => ratingValueGetter({ data: row }),
+		filterRange: 'number',
 	},
 	{ colId: 'editions', label: 'Editions', picker: 'data', sortable: false },
 	// Movie picker-only columns (never in the default set).

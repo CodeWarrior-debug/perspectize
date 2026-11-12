@@ -480,6 +480,12 @@ export interface ContentFilterInput {
 	castContains?: string;
 	// Book filter (book rows only): case-insensitive contains on the first author.
 	authorContains?: string;
+	minPublishYear?: number;
+	maxPublishYear?: number;
+	minPages?: number;
+	maxPages?: number;
+	minBookRating?: number;
+	maxBookRating?: number;
 	ageRating?: string[];
 	releasedAfter?: string;
 	releasedBefore?: string;
@@ -706,6 +712,45 @@ export function urlParamsToGraphQLFilter(
 				}
 				if (max !== undefined) {
 					result.maxTmdbScore = max;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'published': {
+				const { min, max } = parseNumberRange(value);
+				if (min !== undefined) {
+					result.minPublishYear = min;
+					hasAny = true;
+				}
+				if (max !== undefined) {
+					result.maxPublishYear = max;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'pages': {
+				const { min, max } = parseNumberRange(value);
+				if (min !== undefined) {
+					result.minPages = min;
+					hasAny = true;
+				}
+				if (max !== undefined) {
+					result.maxPages = max;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'bookrating': {
+				const { min, max } = parseNumberRange(value);
+				if (min !== undefined) {
+					result.minBookRating = min;
+					hasAny = true;
+				}
+				if (max !== undefined) {
+					result.maxBookRating = max;
 					hasAny = true;
 				}
 				break;
