@@ -423,7 +423,7 @@ describe('Movie default column set', () => {
 	});
 
 	it('shows the spec default columns at lg and omits Date Added', () => {
-		const { visible } = defaultColumnVisibility('lg', true);
+		const { visible } = defaultColumnVisibility('lg', 'movie');
 		expect(visible).toEqual(
 			expect.arrayContaining([
 				'perspectize',
@@ -447,14 +447,14 @@ describe('Movie default column set', () => {
 	});
 
 	it('reveals Movie columns progressively by tier', () => {
-		expect(defaultColumnVisibility('xs', true).visible).toEqual(['perspectize', 'item', 'type']);
-		const md = defaultColumnVisibility('md', true).visible;
+		expect(defaultColumnVisibility('xs', 'movie').visible).toEqual(['perspectize', 'item', 'type']);
+		const md = defaultColumnVisibility('md', 'movie').visible;
 		expect(md).toContain('cast');
 		expect(md).not.toContain('boxOffice');
 	});
 
 	it('keeps the YouTube set unchanged and hides every Movie column', () => {
-		const lg = defaultColumnVisibility('lg', false);
+		const lg = defaultColumnVisibility('lg', 'general');
 		expect(lg.visible).toEqual(
 			expect.arrayContaining([
 				'item',
@@ -475,13 +475,13 @@ describe('Movie default column set', () => {
 			expect(lg.hidden, id).toContain(id);
 		}
 		expect(lg.hidden).toContain('description');
-		expect(defaultColumnVisibility('xs', false).visible).toEqual(['item', 'type', 'perspectize']);
+		expect(defaultColumnVisibility('xs', 'general').visible).toEqual(['item', 'type', 'perspectize']);
 	});
 
 	it('every column is either shown or hidden, never both', () => {
 		for (const tier of ['xs', 'sm', 'md', 'lg'] as const) {
-			for (const movieOnly of [true, false]) {
-				const { visible, hidden } = defaultColumnVisibility(tier, movieOnly);
+			for (const view of ['movie', 'general'] as const) {
+				const { visible, hidden } = defaultColumnVisibility(tier, view);
 				expect(visible.filter((c) => hidden.includes(c))).toEqual([]);
 			}
 		}
@@ -578,13 +578,13 @@ describe('default column sets fit the 1212px grid', () => {
 		return Math.max(explicit, header);
 	}
 	it('YouTube lg set sums under 1212', () => {
-		const { visible } = defaultColumnVisibility('lg', false);
+		const { visible } = defaultColumnVisibility('lg', 'general');
 		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
 		expect(total).toBeLessThanOrEqual(1212);
 	});
 
 	it('Movie lg set sums under 1212', () => {
-		const { visible } = defaultColumnVisibility('lg', true);
+		const { visible } = defaultColumnVisibility('lg', 'movie');
 		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
 		expect(total).toBeLessThanOrEqual(1212);
 	});
@@ -595,6 +595,25 @@ describe('default column sets fit the 1212px grid', () => {
 			const max = b.match(/\n\s*maxWidth:\s*(\d+)/)?.[1];
 			if (id && max) expect(minWidth(id), id).toBeLessThanOrEqual(Number(max));
 		}
+	});
+
+	it('Movie lg minimum widths are the header-derived floors (sum 1192)', () => {
+		const { visible } = defaultColumnVisibility('lg', 'movie');
+		const widths = Object.fromEntries(visible.map((id) => [id, minWidth(id)]));
+		expect(widths).toMatchObject({
+			item: 185,
+			type: 88,
+			genre: 79,
+			rated: 98,
+			cast: 125,
+			duration: 121,
+			released: 121,
+			boxOffice: 90,
+			vsBudget: 60,
+			tmdbScore: 104,
+			tags: 71,
+		});
+		expect(Object.values(widths).reduce((a, b) => a + b, 0)).toBe(1192);
 	});
 
 	it('the map in ActivityTable floors every column at its header width', () => {

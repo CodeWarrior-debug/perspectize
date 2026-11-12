@@ -3,6 +3,9 @@
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import XIcon from '@lucide/svelte/icons/x';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
+	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
+	import ScaleIcon from '@lucide/svelte/icons/scale';
+	import { MODAL_ACTION_CLASS } from '$lib/components/modal-action';
 	import { Dialog, DialogContent, DialogTitle, DialogClose } from '$lib/components/shadcn';
 	import {
 		formatCount,
@@ -20,6 +23,9 @@
 	import { ratingToDisplay } from '$lib/utils/ratings';
 	import MovieTiles from '$lib/components/MovieTiles.svelte';
 	import MovieBody from '$lib/components/MovieBody.svelte';
+	import BookTiles from '$lib/components/BookTiles.svelte';
+	import BookBody from '$lib/components/BookBody.svelte';
+	import { bookAuthors, bookResponse, openLibraryCoverUrl } from '$lib/utils/bookFormatting';
 	import PassageText from '$lib/components/PassageText.svelte';
 	import PassagePositionBar from '$lib/components/PassagePositionBar.svelte';
 	import PassageLinks from '$lib/components/PassageLinks.svelte';
@@ -48,6 +54,9 @@
 		verseEndID?: number | null;
 		// MOVIE rows only: the shaped TMDB payload selected by LIST_CONTENT.
 		movie?: unknown;
+		// BOOK rows only: the shaped Open Library payload selected by LIST_CONTENT / GET_CONTENT_DETAILS.
+		book?: unknown;
+		response?: unknown;
 	}
 
 	let {
@@ -64,6 +73,7 @@
 	} = $props();
 
 	const isMovie = $derived(content?.contentType === 'MOVIE');
+	const isBook = $derived(content?.contentType === 'BOOK');
 	const isPassage = $derived(content?.contentType === 'BIBLE_PASSAGE');
 	const hasVerseRange = $derived(isPassage && content?.verseStartID != null && content?.verseEndID != null);
 	const setPassageTitle = useSetPassageDisplayTitle();
@@ -80,6 +90,13 @@
 	const thumbSrc = $derived(videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null);
 	const movie = $derived(content ? movieResponse(content) : null);
 	const posterSrc = $derived(movie?.posterPath ? `https://image.tmdb.org/t/p/w342${movie.posterPath}` : null);
+	const bookData = $derived(bookResponse(content));
+	const coverSrc = $derived(isBook ? openLibraryCoverUrl(bookData?.coverId, 'L') : null);
+	const authorNames = $derived(
+		bookAuthors(content)
+			.map((a) => a.name)
+			.join(', '),
+	);
 	const hasTags = $derived(!!content?.tags && content.tags.length > 0);
 	const hasDescription = $derived(!!content?.description && content.description.trim().length > 0);
 
@@ -135,7 +152,9 @@
 							? 'Bible Passage'
 							: isMovie
 								? 'Movie'
-								: 'YouTube Video'}
+								: isBook
+									? 'Book'
+									: 'YouTube Video'}
 				</DialogTitle>
 				<DialogClose class="text-primary-foreground/80 hover:text-primary-foreground">
 					<XIcon class="size-[18px]" />
@@ -177,12 +196,12 @@
 								maxlength="120"
 								placeholder="Add a title (optional, set once)"
 								aria-label="Passage title"
-								class="min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-[13px] text-foreground"
+								class="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-[13px] text-foreground"
 							/>
 							<button
 								type="submit"
 								disabled={setPassageTitle.isPending || !titleDraft.trim()}
-								class="inline-flex items-center gap-1.5 rounded-md border border-primary px-3 py-1.5 text-[13px] font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
+								class={MODAL_ACTION_CLASS}
 							>
 								Save title
 							</button>
@@ -191,7 +210,7 @@
 				{:else}
 					<div class="flex items-start gap-3.5">
 						<div
-							class={isMovie
+							class={isMovie || isBook
 								? 'aspect-[2/3] w-[92px] flex-none overflow-hidden rounded-md bg-muted'
 								: 'h-[68px] w-[120px] flex-none overflow-hidden rounded-md bg-muted'}
 						>
@@ -201,6 +220,15 @@
 										src={posterSrc}
 										alt={`${content.name} poster`}
 										class="h-full w-full object-cover"
+										onerror={(e) => e.currentTarget.remove()}
+									/>
+								{/if}
+							{:else if isBook}
+								{#if coverSrc}
+									<img
+										src={coverSrc}
+										alt={`${content.name} cover`}
+										class="h-full w-full object-contain"
 										onerror={(e) => e.currentTarget.remove()}
 									/>
 								{/if}
@@ -224,7 +252,11 @@
 									<div class="mt-1 text-[13px] text-muted-foreground italic">{movie.tagline}</div>
 								{/if}
 							{:else}
-								<div class="mt-1 text-[13px] text-muted-foreground">{content.channelTitle}</div>
+								{#if isBook}
+									{#if authorNames}<div class="mt-1 text-[13px] text-muted-foreground">{authorNames}</div>{/if}
+								{:else}
+									<div class="mt-1 text-[13px] text-muted-foreground">{content.channelTitle}</div>
+								{/if}
 							{/if}
 						</div>
 					</div>
@@ -266,6 +298,8 @@
 							lengthUnits={content.lengthUnits}
 							precision={content.lengthDisplay?.precision}
 						/>
+					{:else if isBook}
+						<BookTiles row={content} />
 					{:else if !isPassage}
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Views</div>
@@ -317,7 +351,7 @@
 					{/if}
 				</div>
 
-				<div class="mt-3.5 flex items-start justify-between gap-3 border-t border-border pt-3.5">
+				<div class="mt-3.5 border-t border-border pt-3.5">
 					<div>
 						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Last updated in Perspectize</div>
 						<div
@@ -327,40 +361,43 @@
 							{formatDate(content.updatedAt)}
 						</div>
 					</div>
-					<div class="flex flex-col items-end gap-1">
-						<div class="flex flex-wrap items-center justify-end gap-2">
-							<a
-								href={`/compare?contentId=${content.id}`}
-								class="inline-flex items-center gap-1.5 rounded-md border border-primary px-3.5 py-2 text-[13px] font-semibold text-primary hover:bg-primary/5"
+					<!-- Actions get their own full-width row so they read as one even set
+					     instead of a ragged right-aligned wrap beside the date. Each one
+					     grows from the same basis, so a row of them is close to equal width
+					     and they wrap whole onto a new row on a phone. -->
+					<div class="mt-3 flex flex-wrap gap-2" data-testid="details-actions">
+						<a href={`/compare?contentId=${content.id}`} class="{MODAL_ACTION_CLASS} grow basis-36">
+							<ScaleIcon />
+							Compare
+						</a>
+						{#if onAddToPlan}
+							<AddToPlanButton variant="text" class="grow basis-36" onclick={() => onAddToPlan(content)} />
+						{/if}
+						{#if !isPassage && !isMovie}
+							<button
+								type="button"
+								disabled={updateSourceData.isPending || cooldown.active}
+								onclick={handleUpdateSourceData}
+								class="{MODAL_ACTION_CLASS} grow basis-36"
 							>
-								Compare
-							</a>
-							{#if onAddToPlan}
-								<AddToPlanButton variant="text" onclick={() => onAddToPlan(content)} />
-							{/if}
-							{#if !isPassage && !isMovie}
-								<button
-									type="button"
-									disabled={updateSourceData.isPending || cooldown.active}
-									onclick={handleUpdateSourceData}
-									class="inline-flex items-center gap-1.5 rounded-md border border-primary px-3.5 py-2 text-[13px] font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
-								>
-									{#if updateSourceData.isPending}
-										<LoaderCircleIcon class="size-3.5 animate-spin" />
-									{/if}
-									Update source data
-								</button>
-							{/if}
-						</div>
-						{#if !isPassage && !isMovie && cooldown.active}
-							<div class="max-w-[280px] text-right text-[11px] text-muted-foreground">
-								This was updated recently. Check back in {formatRemainingTime(cooldown.remainingMs)} to refresh again.
-							</div>
+								<!-- Same slot for both icons so the button keeps its width. -->
+								{#if updateSourceData.isPending}
+									<LoaderCircleIcon class="animate-spin" />
+								{:else}
+									<RefreshCwIcon />
+								{/if}
+								Update source data
+							</button>
 						{/if}
 					</div>
+					{#if !isPassage && !isMovie && cooldown.active}
+						<div class="mt-1.5 text-[11px] text-muted-foreground">
+							This was updated recently. Check back in {formatRemainingTime(cooldown.remainingMs)} to refresh again.
+						</div>
+					{/if}
 				</div>
 
-				{#if !isPassage && !isMovie && hasDescription}
+				{#if !isPassage && !isMovie && !isBook && hasDescription}
 					<div class="mt-3.5 border-t border-border pt-3.5">
 						<div class="mb-1.5 text-[11px] tracking-wide text-muted-foreground uppercase">Description</div>
 						<div class="font-serif text-[13px] whitespace-pre-wrap text-foreground">
@@ -369,13 +406,17 @@
 					</div>
 				{/if}
 
-				{#if !isPassage && !isMovie && hasTags}
+				{#if !isPassage && !isMovie && !isBook && hasTags}
 					<div class="mt-3.5">
 						<div class="mb-1.5 text-[11px] tracking-wide text-muted-foreground uppercase">Tags</div>
 						<div class="font-[family-name:var(--font-family-serif)] text-[13px] text-foreground">
 							{formatTags(content.tags)}
 						</div>
 					</div>
+				{/if}
+
+				{#if isBook}
+					<BookBody row={content} />
 				{/if}
 
 				{#if isMovie}

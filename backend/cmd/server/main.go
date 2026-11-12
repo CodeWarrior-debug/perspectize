@@ -236,7 +236,8 @@ func main() {
 	importRepo := postgres.NewGormImportJobRepository(db)
 
 	// Initialize services
-	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient), services.WithMovieSearch(movieSearchClient), services.WithMovieTrending(movieTrendingClient))
+	contentOpts := []services.ContentServiceOption{services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient), services.WithMovieSearch(movieSearchClient), services.WithMovieTrending(movieTrendingClient)}
+	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, append(contentOpts, bookServiceOptions()...)...)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo,
 		services.WithImportJobRepository(importRepo))
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)

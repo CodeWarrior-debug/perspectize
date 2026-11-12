@@ -74,6 +74,11 @@ func TestList_ComputedSortKeyCursor(t *testing.T) {
 		{"age rating null desc", domain.ContentSortByAgeRating, domain.SortOrderDesc, "age_rating", nil, `null`, nullAgeRatingDesc},
 		{"release date", domain.ContentSortByReleaseDate, domain.SortOrderDesc, "release_date_sort", "2001-12-18", `"2001-12-18"`, "2001-12-18"},
 		{"release date null asc", domain.ContentSortByReleaseDate, domain.SortOrderAsc, "release_date_sort", nil, `null`, nullReleaseDateAsc},
+		{"author asc", domain.ContentSortByAuthor, domain.SortOrderAsc, "author_sort", "Tolkien, J.R.R.", `"Tolkien, J.R.R."`, "Tolkien, J.R.R."},
+		{"author desc", domain.ContentSortByAuthor, domain.SortOrderDesc, "author_sort", "Tolkien, J.R.R.", `"Tolkien, J.R.R."`, "Tolkien, J.R.R."},
+		// Missing author: page-1 cursor carries null; page 2 binds the sentinel that sorts unknowns last.
+		{"author null asc", domain.ContentSortByAuthor, domain.SortOrderAsc, "author_sort", nil, `null`, nullAuthorAsc},
+		{"author null desc", domain.ContentSortByAuthor, domain.SortOrderDesc, "author_sort", nil, `null`, nullAuthorDesc},
 		{"tmdb score", domain.ContentSortByTmdbScore, domain.SortOrderDesc, "tmdb_score", 8.4, `8.4`, 8.4},
 		{"tmdb score null desc", domain.ContentSortByTmdbScore, domain.SortOrderDesc, "tmdb_score", nil, `null`, nullTmdbScoreDesc},
 	}
