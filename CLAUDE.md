@@ -69,11 +69,12 @@ Unreadable `.env*` files are expected, not a broken setup. Evidence capture: [.d
 **Monorepo docs:**
 - [Architecture](.docs/ARCHITECTURE.md) — system design, hexagonal architecture (deep-modules rules live in each stack CLAUDE.md)
 - [Local Development](.docs/LOCAL_DEVELOPMENT.md) · [Agent Routing](.docs/AGENTS.md) · [Domain Guide](.docs/DOMAIN_GUIDE.md) · [Go Patterns](.docs/GO_PATTERNS.md) (error handling, DB queries)
+- [Glossary Map](GLOSSARY-MAP.md) — product vocabulary by context (Perspectives, Content Types, Browsing, Import, Plan, Scripture, Messaging, Accounts, Delivery); use its terms in specs, intents and UI copy
 - [Security](.docs/SECURITY.md) — secret management, rotation, incident response
 - [Migration Rollout](.docs/MIGRATION_ROLLOUT.md) — applying a migration to production Neon
 - [Neon Preview Branches](.docs/NEON_BRANCHING.md) — one Neon branch per open PR
 - [Release Approaches](.docs/RELEASE_APPROACHES.md) — shipping multi-PR features unseen; default is "**dark backend**"
-- [Dependency Security](.docs/DEPENDENCY_SECURITY.md) — Trivy/pnpm-audit, CVE remediation
+- [Dependency Security](.docs/DEPENDENCY_SECURITY.md) — Trivy/pnpm-audit, CVE remediation; Dependabot triage/merge is step 3 of the `monthly-maintenance` skill; many Dependabot PRs red at once = a CVE on `main` (gotcha 9)
 - [Worktrees](.docs/WORKTREES.md) — location convention, 5 numbered reusable worktrees
 - [Agent registry](.claude/agent-registry/README.md) — per-machine checkout claims and the verification slot. Setup once per machine: `node .claude/agent-registry/agent-registry.mjs install`
 - [Demo Mode](.docs/DEMO_MODE.md) — Docker demo stack, Playwright tours (`make demo-test`, `make demo-record`)

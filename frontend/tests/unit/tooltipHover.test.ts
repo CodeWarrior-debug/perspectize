@@ -42,6 +42,7 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 		// Limitation: asserts the map, not that ActivityTable columnDefs reference it (AG Grid does not render in jsdom).
 		expect(Object.keys(S).sort()).toEqual(
 			[
+				'author',
 				'boxOffice',
 				'budget',
 				'cast',
@@ -52,6 +53,7 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 				'likes',
 				'percentLiked',
 				'perspectize',
+				'rating',
 				'synopsis',
 				'tags',
 				'tmdbScore',
