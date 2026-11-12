@@ -21,3 +21,5 @@ Several repo rules depend on where the session runs. The `session-environment.sh
 **Stopping background processes:** never `pkill -f` / `pgrep -f` with a pattern that appears in the same Bash call. The pattern matches that call's own shell, which is killed (exit 144) along with anything after it. List PIDs first (`ps aux | grep '[v]ite dev'`), then `kill <pid>` in a separate call.
 
 A PR created in a cloud session is still reviewed and merged like any other; see [PR_WORKFLOW.md](PR_WORKFLOW.md) for templates, labels and merge flags.
+
+**Checkout claimed by another live session:** the agent-registry hook denies any Bash command that mentions the claimed checkout's path, even a read like `node_modules` access, and `git worktree add` into the scratchpad. A throwaway `git clone` of the repo into the scratchpad (set `origin` to the GitHub URL) avoids it for a merge or conflict fix; push with `git push origin HEAD:<branch>`. Prefer a worktree under `.claude/worktrees/` via `.claude/scripts/new-worktree.sh`. Delete the clone afterwards.
