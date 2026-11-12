@@ -31,7 +31,7 @@ export const FONT_SLOT_INFO: Record<FontSlot, FontSlotInfo> = {
 		advice:
 			'Headings are short and often bold, and column headers are small. A clean sans-serif stays crisp at 11–14px; a display serif adds character to page titles, but check it still reads as a column header.',
 		defaultLabel: 'Geist',
-		sample: 'Activity · Duration · Released',
+		sample: 'Library · Duration · Released',
 		sampleClass: 'text-[17px] font-semibold',
 		defaultFontClass: '', // inherits Geist, the app's default font
 		recommended: [

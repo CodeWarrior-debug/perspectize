@@ -14,7 +14,7 @@ test('guest product tour: sign in, browse activity, compare two takes', async ({
 	await tour.click(page.getByTestId('demo-persona-alice'));
 
 	await expect(activityRow(page, 'But what is a neural network?')).toBeVisible();
-	await tour.caption('Activity shows everything added so far, with the numbers that matter.');
+	await tour.caption('The Library shows everything added so far, with the numbers that matter.');
 
 	await tour.click(activityRow(page, 'But what is a neural network?').getByText('But what is a neural network?'));
 	const details = page.getByRole('dialog');

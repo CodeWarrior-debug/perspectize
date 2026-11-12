@@ -10,22 +10,22 @@ Re-run this list for every design-sync pass. "M" = mobile pass (not captured in 
 
 | # | Page | State | Desktop | Mobile | How to reach it |
 |---|------|-------|:-------:|:------:|-----------------|
-| 1 | Activity | No filter | x | M | `/` |
-| 2 | Activity | Filtered to YouTube only | x | M | Type column header filter button, "contains" `youtube` (desktop). Mobile card mode has no column headers; needs another route to the filter |
-| 3 | Activity | Filtered to Bible only | x | M | same, `bible` |
-| 4 | Activity | Content detail: Bible passage | x | M | click a passage row's title (Bible filter on) |
-| 5 | Activity | Content detail: YouTube | x | M | click a video row's title |
-| 6 | Activity | Perspective form: Bible passage | x | M | click the `+` in the first column of a passage row |
-| 7 | Activity | Perspective form: YouTube | x | M | same on a video row |
+| 1 | Library | No filter | x | M | `/content-library` |
+| 2 | Library | Filtered to YouTube only | x | M | Type column header filter button, "contains" `youtube` (desktop). Mobile card mode has no column headers; needs another route to the filter |
+| 3 | Library | Filtered to Bible only | x | M | same, `bible` |
+| 4 | Library | Content detail: Bible passage | x | M | click a passage row's title (Bible filter on) |
+| 5 | Library | Content detail: YouTube | x | M | click a video row's title |
+| 6 | Library | Perspective form: Bible passage | x | M | click the `+` in the first column of a passage row |
+| 7 | Library | Perspective form: YouTube | x | M | same on a video row |
 | 8 | Header | Add Video popover | x | M | header "Add Video" button |
 | 9 | Settings | Customize Theme (presets) | x | M | header gear |
 | 10 | Settings | Customize Theme, custom colors expanded | x | M | Settings, "Customize" button (the dialog has one section only) |
 | 11 | Header | User menu | x | M | avatar |
 | 12 | Header | User menu, Manage account | x | M | avatar, "Manage account" (Clerk modal) |
-| 13 | Activity | Columns picker | x | M | footer "Columns" |
-| 14 | Activity | Edit sorts | x | M | footer "Edit sorts" |
-| 15 | Activity | Search-fields picker | x | M | toolbar sliders button next to search |
-| 16 | Activity | By User view | x | M | "By User" toggle |
+| 13 | Library | Columns picker | x | M | footer "Columns" |
+| 14 | Library | Edit sorts | x | M | footer "Edit sorts" |
+| 15 | Library | Search-fields picker | x | M | toolbar sliders button next to search |
+| 16 | Library | By User view | x | M | "By User" toggle |
 | 17 | Discover | Default (trending) | x | M | `/discover` |
 | 18 | Discover | Search results | x | M | search "hegel aesthetics" |
 | 19 | Compare | Empty (no content selected) | x | M | `/compare` |
@@ -33,7 +33,7 @@ Re-run this list for every design-sync pass. "M" = mobile pass (not captured in 
 | 21 | Compare | Two users populated | x | M | `/compare?contentId=103` |
 | 22 | Messages | Conversation list | x | M | `/messages` |
 | 23 | Messages | Thread | x | M | `/messages/1` |
-| 24 | Activity | Messages widget open | x | M | floating chat button, bottom right |
+| 24 | Library | Messages widget open | x | M | floating chat button, bottom right |
 
 **Not capturable / skipped:** Discover duration/time/sort dropdowns (native `<select>`, the popup doesn't render in screenshots), theme preset switching (would change the saved theme), sign-out.
 
@@ -82,5 +82,5 @@ Re-run this list for every design-sync pass. "M" = mobile pass (not captured in 
 
 - **Discover titles show raw HTML entities** (`Hegel&#39;s &quot;Aesthetics&quot;`, `Art&#39;s`) in `18`. A real display bug, not a capture artifact. Not logged to `.planning/phases/bugs/BACKLOG.md` yet.
 - `11` and `12` show the Clerk test user's email address - fine for local design sync, scrub before any public sharing.
-- Activity `01` and `08` show the same unfiltered state; `08` also has the Add Video popover open.
+- Library `01` and `08` show the same unfiltered state; `08` also has the Add Video popover open.
 - Data is shared dev data (test rows from the Bible passage validation are visible: Romans 8:28, Psalms 119/78/23, Matthew 17:21, John 3:16).

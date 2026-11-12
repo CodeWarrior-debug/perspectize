@@ -250,7 +250,7 @@ just its own column filter):
    indexes.
 2. Add the scope to `SearchScopeKey`/`ALL_SEARCH_SCOPES` in
    `gridUrlState.ts`, and `SCOPE_TO_GQL_FIELD`.
-3. Add a label to `SCOPE_LABELS` in `frontend/src/routes/+page.svelte` (the
+3. Add a label to `SCOPE_LABELS` in `frontend/src/routes/content-library/+page.svelte` (the
    search-field-scope popover).
 
 ---

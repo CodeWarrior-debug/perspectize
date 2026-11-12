@@ -5,7 +5,7 @@ import { graphqlRequest } from '../client';
 import { CREATE_CONTENT_FROM_PASSAGE, type CreateContentFromPassageResponse } from '../bible';
 import { queryKeys } from '../keys';
 import type { PassageRange } from '$lib/utils/bible';
-import { activityContentHref } from '$lib/utils/contentLinks';
+import { libraryContentHref } from '$lib/utils/contentLinks';
 
 export function useAddPassage() {
 	const queryClient = useQueryClient();
@@ -30,7 +30,7 @@ export function useAddPassage() {
 			// so both cases get a way to jump to it.
 			const id = passage?.id;
 			toast.success(`Added: ${passage?.displayTitle ?? passage?.name ?? 'passage'}`, {
-				action: id ? { label: 'Go to passage', onClick: () => goto(activityContentHref(id)) } : undefined,
+				action: id ? { label: 'Go to passage', onClick: () => goto(libraryContentHref(id)) } : undefined,
 			});
 			// Idempotent server call: new or pre-existing rows both come back as
 			// Content, so refetch lists instead of blindly prepending (no duplicates).

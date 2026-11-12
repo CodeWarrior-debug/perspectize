@@ -6,9 +6,9 @@ How people look at content and perspectives: the pages, the grid, filtering and 
 
 ### Pages
 
-**Activity**:
-The home page: a grid (cards on narrow screens) of content with its perspectives and facts.
-_Avoid_: Library, feed, dashboard
+**Library**:
+The content library for all Perspectize members, at `/content-library`: a grid (cards on narrow screens) of content with its perspectives and facts. Signed-in visitors to `/` are sent here. "Content library" in full; "Library" in the nav and headings. It was called Activity until it was renamed, and code names from then remain (`ActivityTable`, `activityList`).
+_Avoid_: Activity (former name), feed, dashboard
 
 **Discover**:
 The page for finding content to add: a feed when the search box is empty, and search per type.
