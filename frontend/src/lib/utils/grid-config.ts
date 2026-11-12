@@ -17,12 +17,7 @@ import {
 	tmdbScoreValueGetter,
 	moviePeople,
 } from './formatting';
-import {
-	authorValueGetter,
-	pagesValueGetter,
-	publishedValueGetter,
-	ratingValueGetter,
-} from './bookFormatting';
+import { authorValueGetter, pagesValueGetter, publishedValueGetter, ratingValueGetter } from './bookFormatting';
 
 /**
  * Display label for a content type — used by the type column valueGetter.
@@ -437,7 +432,7 @@ export const COLUMNS: readonly ColumnMeta[] = [
 	},
 	{
 		colId: 'rating',
-		label: 'Rating',
+		label: 'Book rating',
 		picker: 'data',
 		sortable: true,
 		clientOnlySort: true,

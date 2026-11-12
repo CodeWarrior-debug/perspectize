@@ -154,7 +154,7 @@ describe('Book column registry', () => {
 
 	it('offers Author, Published, Pages, Rating and Editions in the column picker', () => {
 		const labels = DATA_COLUMNS.map((c) => c.label);
-		for (const label of ['Author', 'Published', 'Pages', 'Rating', 'Editions']) {
+		for (const label of ['Author', 'Published', 'Pages', 'Book rating', 'Editions']) {
 			expect(labels, label).toContain(label);
 		}
 	});
