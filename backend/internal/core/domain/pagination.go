@@ -90,6 +90,8 @@ type ContentFilter struct {
 	MaxBoxOffice   *float64
 	MinTmdbScore   *float64
 	MaxTmdbScore   *float64
+	// Book column filters (books only). AuthorContains matches the first author's name.
+	AuthorContains *string
 }
 
 // ContentListParams contains parameters for paginated content queries

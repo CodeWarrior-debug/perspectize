@@ -537,6 +537,7 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		params.Filter.MaxBoxOffice = filter.MaxBoxOffice
 		params.Filter.MinTmdbScore = filter.MinTmdbScore
 		params.Filter.MaxTmdbScore = filter.MaxTmdbScore
+		params.Filter.AuthorContains = filter.AuthorContains
 		params.Filter.MinViewCount = filter.MinViewCount
 		params.Filter.MaxViewCount = filter.MaxViewCount
 		params.Filter.MinLikeCount = filter.MinLikeCount

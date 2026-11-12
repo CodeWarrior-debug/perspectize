@@ -1610,3 +1610,23 @@ func TestPaginatedContentQuery_WithMovieColumnFilters(t *testing.T) {
 	require.NotNil(t, f.MaxTmdbScore)
 	assert.Equal(t, 9.0, *f.MaxTmdbScore)
 }
+
+func TestPaginatedContentQuery_WithAuthorContains(t *testing.T) {
+	var got domain.ContentListParams
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			got = params
+			return &domain.PaginatedContent{}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: { authorContains: "steinbeck" }) { items { id } } }`)
+	assert.Empty(t, result.Errors)
+
+	require.NotNil(t, got.Filter)
+	require.NotNil(t, got.Filter.AuthorContains)
+	assert.Equal(t, "steinbeck", *got.Filter.AuthorContains)
+}
