@@ -5,6 +5,7 @@ import {
 	GET_CONTENT_DETAILS,
 	CREATE_CONTENT_FROM_YOUTUBE,
 	CREATE_CONTENT_FROM_MOVIE,
+	CREATE_CONTENT_FROM_BOOK,
 	type ContentItem,
 	type ContentResponse,
 	type CreateContentResponse,
@@ -81,6 +82,11 @@ describe('GraphQL query definitions', () => {
 	describe('LIST_CONTENT', () => {
 		it('selects the shaped `movie` payload instead of the raw `response`', () => {
 			expect(LIST_CONTENT).toMatch(/\bmovie\b/);
+			expect(LIST_CONTENT).not.toMatch(/\bresponse\b/);
+		});
+
+		it('selects the shaped `book` payload instead of the raw `response`', () => {
+			expect(LIST_CONTENT).toMatch(/\bbook\b/);
 			expect(LIST_CONTENT).not.toMatch(/\bresponse\b/);
 		});
 
@@ -164,6 +170,24 @@ describe('GraphQL query definitions', () => {
 		it('selects both `response` and `movie`', () => {
 			expect(GET_CONTENT_DETAILS).toMatch(/\bresponse\b/);
 			expect(GET_CONTENT_DETAILS).toMatch(/\bmovie\b/);
+		});
+
+		it('selects `book` alongside `response`', () => {
+			expect(GET_CONTENT_DETAILS).toMatch(/\bresponse\b/);
+			expect(GET_CONTENT_DETAILS).toMatch(/\bbook\b/);
+		});
+	});
+
+	describe('CREATE_CONTENT_FROM_BOOK', () => {
+		it('is a CreateContentFromBook mutation taking CreateContentFromBookInput', () => {
+			expect(CREATE_CONTENT_FROM_BOOK).toContain('mutation CreateContentFromBook($input: CreateContentFromBookInput!)');
+			expect(CREATE_CONTENT_FROM_BOOK).toContain('createContentFromBook(input: $input)');
+		});
+
+		it('requests the fields the success toast and its Go-to action need', () => {
+			for (const field of ['id', 'name', 'contentType', 'url']) {
+				expect(CREATE_CONTENT_FROM_BOOK).toContain(field);
+			}
 		});
 	});
 

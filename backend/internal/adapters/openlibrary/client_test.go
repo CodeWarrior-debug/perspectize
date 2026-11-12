@@ -70,6 +70,47 @@ func TestClient_SearchBooks_EastOfEden(t *testing.T) {
 	assert.Equal(t, 611, *item.PageCountMedian)
 }
 
+// TestClient_SearchBooks_ParsesAuthorKey: the work's author_key list is parsed
+// parallel to author_name, so the service can attach a key to each author.
+func TestClient_SearchBooks_ParsesAuthorKey(t *testing.T) {
+	c := newTestClient(t, serveFixture(t, "search_by_key_east_of_eden.json"))
+
+	page, err := c.SearchBooks(context.Background(), `key:"/works/OL23166W"`, 1)
+	require.NoError(t, err)
+	require.NotEmpty(t, page.Items)
+	item := page.Items[0]
+	assert.Equal(t, []string{"John Steinbeck"}, item.AuthorName)
+	assert.Equal(t, []string{"OL25788A"}, item.AuthorKey)
+}
+
+// TestClient_SearchBooks_NoAuthorKeyLeavesNil: fixtures recorded before
+// author_key was requested still parse, with AuthorKey nil (not an empty slice
+// that could be mistaken for a key-per-author list).
+func TestClient_SearchBooks_NoAuthorKeyLeavesNil(t *testing.T) {
+	c := newTestClient(t, serveFixture(t, "search_east_of_eden.json"))
+
+	page, err := c.SearchBooks(context.Background(), "East of Eden Steinbeck", 1)
+	require.NoError(t, err)
+	require.NotEmpty(t, page.Items)
+	assert.Nil(t, page.Items[0].AuthorKey)
+}
+
+// TestClient_RequestsAuthorKeyField: every search asks for author_key, using
+// the exported Fields constant so the requested list and the test cannot drift.
+func TestClient_RequestsAuthorKeyField(t *testing.T) {
+	var gotFields string
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotFields = r.URL.Query().Get("fields")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"docs":[]}`))
+	})
+
+	_, err := c.SearchBooks(context.Background(), "x", 1)
+	require.NoError(t, err)
+	assert.Equal(t, Fields, gotFields)
+	assert.Contains(t, strings.Split(gotFields, ","), "author_key")
+}
+
 func TestClient_TrendingBooks_Weekly(t *testing.T) {
 	var gotPath string
 	var gotParams url.Values

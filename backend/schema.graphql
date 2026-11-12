@@ -432,6 +432,14 @@ input ContentFilter {
   maxBoxOffice: Float
   minTmdbScore: Float        # TMDB vote average (0-10), inclusive
   maxTmdbScore: Float
+  # Book column filters (book rows only; other rows never match)
+  authorContains: String     # Case-insensitive contains on the first author's name (books only)
+  minPublishYear: Int        # First publish year, inclusive
+  maxPublishYear: Int
+  minPages: Int              # Median page count across editions, inclusive
+  maxPages: Int
+  minBookRating: Float       # Open Library average rating (0-5), inclusive
+  maxBookRating: Float
   # View/like count filters
   minViewCount: Int
   maxViewCount: Int

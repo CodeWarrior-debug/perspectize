@@ -249,8 +249,8 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 		return paginator.Rule{
 			Key:   "Author",
 			Order: paginatorOrder,
-			SQLRepr: "CASE WHEN response->'authorName'->>0 IS NULL OR response->'authorName'->>0 = '' " +
-				"THEN NULL ELSE response->'authorName'->>0 END",
+			SQLRepr: "CASE WHEN response->'authors'->0->>'name' IS NULL OR response->'authors'->0->>'name' = '' " +
+				"THEN NULL ELSE response->'authors'->0->>'name' END",
 			NULLReplacement: authorNull,
 		}
 	case domain.ContentSortByReleaseDate:

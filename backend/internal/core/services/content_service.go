@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"regexp"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
@@ -29,6 +30,7 @@ type ContentService struct {
 	bookSearch    portservices.BookSearchClient
 	bookTrending  portservices.BookTrendingClient
 	bookISBN      portservices.BookISBNClient
+	bookWork      portservices.BookWorkClient
 }
 
 // ContentServiceOption configures optional ContentService dependencies.
@@ -74,6 +76,13 @@ func WithBookTrending(client portservices.BookTrendingClient) ContentServiceOpti
 // and CreateFromBook's raw-ISBN input path).
 func WithBookISBN(client portservices.BookISBNClient) ContentServiceOption {
 	return func(s *ContentService) { s.bookISBN = client }
+}
+
+// WithBookWork enables the Open Library work record (description and related
+// works) read at add and refresh time, and edition-link resolution. Its
+// failures never block a book from being added.
+func WithBookWork(client portservices.BookWorkClient) ContentServiceOption {
+	return func(s *ContentService) { s.bookWork = client }
 }
 
 // NewContentService creates a new content service
@@ -200,6 +209,16 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID int) (*
 		return nil, fmt.Errorf("%w: content has no source URL to refresh", domain.ErrInvalidInput)
 	}
 
+	switch existing.ContentType {
+	case domain.ContentTypeBook:
+		return s.refreshBook(ctx, existing)
+	case "", domain.ContentTypeYouTubeVideo:
+		// YouTube rows (and rows loaded without a type, as in older tests) take the path below.
+	default:
+		// Movie refresh is out of scope; other types have no refresh source yet.
+		return nil, fmt.Errorf("%w: content type %s cannot be refreshed", domain.ErrInvalidInput, existing.ContentType)
+	}
+
 	videoID, err := s.youtubeClient.ExtractVideoID(*existing.URL)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidURL, err)
@@ -219,6 +238,60 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID int) (*
 		return nil, fmt.Errorf("failed to update content metadata: %w", err)
 	}
 
+	return updated, nil
+}
+
+// refreshBook re-reads a BOOK row's work from Open Library. The work id comes
+// from the stored URL, the search record gives fresh metadata, and the work
+// record is best effort. The existing description, related works and
+// resolvedFromISBN are carried over, so a refresh never wipes them: the
+// description and related works are replaced only by a successful fetch.
+func (s *ContentService) refreshBook(ctx context.Context, existing *domain.Content) (*domain.Content, error) {
+	kind, workKey, err := parseBookInput(*existing.URL)
+	if err != nil || kind != bookInputWorkID {
+		return nil, fmt.Errorf("%w: content has no Open Library work URL to refresh", domain.ErrInvalidInput)
+	}
+	if s.bookSearch == nil {
+		return nil, ErrBookClientUnavailable
+	}
+
+	result, err := s.lookupBookByWorkKey(ctx, workKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Stored values to keep. A corrupt payload only loses them, so it is logged, not fatal.
+	var prev struct {
+		Description      string              `json:"description"`
+		RelatedWorks     []shapedRelatedWork `json:"relatedWorks"`
+		ResolvedFromISBN string              `json:"resolvedFromISBN"`
+	}
+	if len(existing.Response) > 0 {
+		if err := json.Unmarshal(existing.Response, &prev); err != nil {
+			slog.Warn("stored book payload is not parseable; refreshing without its description", "contentID", existing.ID, "error", err)
+		}
+	}
+
+	shaped := shapeBookResult(*result)
+	shaped.Description = prev.Description
+	if prev.RelatedWorks != nil {
+		shaped.RelatedWorks = prev.RelatedWorks
+	}
+	shaped.ResolvedFromISBN = prev.ResolvedFromISBN
+	if work := s.fetchBookWork(ctx, workKey); work != nil {
+		shaped.Description = work.Description
+		shaped.RelatedWorks = shapeRelatedWorks(work.RelatedWorks)
+	}
+
+	responseJSON, err := json.Marshal(shaped)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal book response: %w", err)
+	}
+
+	updated, err := s.repo.UpdateMetadata(ctx, existing.ID, result.Title, responseJSON, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update content metadata: %w", err)
+	}
 	return updated, nil
 }
 
@@ -630,13 +703,62 @@ func movieNotAllowed(response json.RawMessage) bool {
 	return shaped.Adult || strings.EqualFold(strings.TrimSpace(shaped.Certification), "NC-17")
 }
 
-// bookWorksURLRe matches a canonical Open Library work URL and captures the
-// bare work key (e.g. "OL23166W").
-var bookWorksURLRe = regexp.MustCompile(`^https://openlibrary\.org/works/(OL\w+)`)
+// bookWorkLinkRe and bookEditionLinkRe find an Open Library work or edition id
+// in a pasted link. The scheme and www are optional and the match is not
+// anchored at the front, like the Movie parser; any slug, query or fragment
+// after the id is ignored. The id is the only thing kept, so the stored URL
+// is always canonicalBookURL(workKey).
+var (
+	bookWorkLinkRe    = regexp.MustCompile(`(?i)openlibrary\.org/works/(OL\d+W)(?:[/?#]|$)`)
+	bookEditionLinkRe = regexp.MustCompile(`(?i)openlibrary\.org/books/(OL\d+M)(?:[/?#]|$)`)
+)
 
-// isbnRe matches an ISBN-10 (9 digits + check digit, digit or X) or ISBN-13
-// (13 digits), with no hyphens.
-var isbnRe = regexp.MustCompile(`^(?:\d{9}[0-9Xx]|\d{13})$`)
+// isbnRe matches a normalised ISBN-10 (9 digits + digit or X) or ISBN-13
+// (13 digits). Input is normalised by normalizeISBN first.
+var isbnRe = regexp.MustCompile(`^(?:\d{9}[0-9X]|\d{13})$`)
+
+// bookInputKind says which form of book input parseBookInput recognised.
+type bookInputKind int
+
+const (
+	bookInputWorkID bookInputKind = iota + 1
+	bookInputEditionID
+	bookInputISBN
+)
+
+// parseBookInput classifies a pasted Open Library work link, edition link or
+// ISBN and returns its bare id: a work id (OL…W), an edition id (OL…M) or a
+// normalised ISBN. Anything else is ErrInvalidInput, before any URL is built.
+func parseBookInput(raw string) (bookInputKind, string, error) {
+	s := strings.TrimSpace(raw)
+	if m := bookWorkLinkRe.FindStringSubmatch(s); m != nil {
+		return bookInputWorkID, strings.ToUpper(m[1]), nil
+	}
+	if m := bookEditionLinkRe.FindStringSubmatch(s); m != nil {
+		return bookInputEditionID, strings.ToUpper(m[1]), nil
+	}
+	if isbn := normalizeISBN(s); isbnRe.MatchString(isbn) {
+		return bookInputISBN, isbn, nil
+	}
+	return 0, "", fmt.Errorf("%w: not an Open Library work or edition link, or an ISBN", domain.ErrInvalidInput)
+}
+
+// normalizeISBN drops spaces and hyphens and uppercases a trailing X. It does
+// not validate the result; parseBookInput and ResolveBookISBN do that.
+func normalizeISBN(raw string) string {
+	var b strings.Builder
+	for _, r := range raw {
+		switch {
+		case unicode.IsSpace(r) || r == '-':
+			continue
+		case r == 'x':
+			b.WriteRune('X')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
 
 // ErrBookClientUnavailable is returned by CreateFromBook, SearchBooks,
 // TrendingBooks and ResolveBookISBN when the service was built without the
@@ -653,25 +775,68 @@ func canonicalBookURL(workKey string) string {
 // nil so a missing Open Library field (e.g. no author_name) marshals to []
 // rather than null.
 type shapedBook struct {
-	WorkKey          string   `json:"workKey"`
-	Title            string   `json:"title"`
-	AuthorName       []string `json:"authorName"`
-	CoverID          *int     `json:"coverId"`
-	FirstPublishYear *int     `json:"firstPublishYear"`
-	PageCountMedian  *int     `json:"pageCountMedian"`
-	Subjects         []string `json:"subjects"`
-	RatingsAverage   *float64 `json:"ratingsAverage"`
-	RatingsCount     *int     `json:"ratingsCount"`
-	EditionCount     *int     `json:"editionCount"`
+	WorkKey          string         `json:"workKey"`
+	Title            string         `json:"title"`
+	Authors          []shapedAuthor `json:"authors"`
+	CoverID          *int           `json:"coverId"`
+	FirstPublishYear *int           `json:"firstPublishYear"`
+	PageCountMedian  *int           `json:"pageCountMedian"`
+	Subjects         []string       `json:"subjects"`
+	RatingsAverage   *float64       `json:"ratingsAverage"`
+	RatingsCount     *int           `json:"ratingsCount"`
+	EditionCount     *int           `json:"editionCount"`
+	// Description comes from the work record; omitted when empty.
+	Description string `json:"description,omitempty"`
+	// RelatedWorks comes from the work record; never nil (empty list when none).
+	RelatedWorks []shapedRelatedWork `json:"relatedWorks"`
+	// ResolvedFromISBN is the normalised ISBN the user supplied, when the book
+	// was added by ISBN. Metadata only; identity stays the work URL.
+	ResolvedFromISBN string `json:"resolvedFromISBN,omitempty"`
+}
+
+// shapedRelatedWork is one related-works link in a stored book.
+type shapedRelatedWork struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+}
+
+// shapeRelatedWorks converts work-record related works to their stored shape.
+// Never returns nil.
+func shapeRelatedWorks(in []portservices.BookRelatedWork) []shapedRelatedWork {
+	out := make([]shapedRelatedWork, 0, len(in))
+	for _, r := range in {
+		out = append(out, shapedRelatedWork{Title: r.Title, URL: r.URL})
+	}
+	return out
+}
+
+// shapedAuthor is one entry of a stored book's authors list. OpenLibraryKey is
+// omitted when Open Library gave no key for this author.
+type shapedAuthor struct {
+	Name           string `json:"name"`
+	OpenLibraryKey string `json:"openLibraryKey,omitempty"`
+}
+
+// shapeAuthors pairs each author name with its Open Library key by index, but
+// only when the two lists have equal length. With any mismatch the names are
+// kept and no key is attached, since a key on the wrong author is worse than
+// none. Never returns nil.
+func shapeAuthors(names, keys []string) []shapedAuthor {
+	authors := make([]shapedAuthor, 0, len(names))
+	paired := len(names) == len(keys)
+	for i, name := range names {
+		a := shapedAuthor{Name: name}
+		if paired {
+			a.OpenLibraryKey = keys[i]
+		}
+		authors = append(authors, a)
+	}
+	return authors
 }
 
 // shapeBookResult converts a BookSearchResult to the JSON shape stored in
 // Content.Response.
 func shapeBookResult(r portservices.BookSearchResult) shapedBook {
-	authors := r.AuthorName
-	if authors == nil {
-		authors = []string{}
-	}
 	subjects := r.Subjects
 	if subjects == nil {
 		subjects = []string{}
@@ -679,7 +844,8 @@ func shapeBookResult(r portservices.BookSearchResult) shapedBook {
 	return shapedBook{
 		WorkKey:          r.WorkKey,
 		Title:            r.Title,
-		AuthorName:       authors,
+		Authors:          shapeAuthors(r.AuthorName, r.AuthorKey),
+		RelatedWorks:     []shapedRelatedWork{},
 		CoverID:          r.CoverID,
 		FirstPublishYear: r.FirstPublishYear,
 		PageCountMedian:  r.PageCountMedian,
@@ -719,36 +885,46 @@ func (s *ContentService) lookupBookByWorkKey(ctx context.Context, workKey string
 // work URL before any Open Library search call, so a repeat add costs no
 // extra lookup beyond ISBN resolution (when the input was an ISBN).
 func (s *ContentService) CreateFromBook(ctx context.Context, rawURLOrISBN string, userID int) (*domain.Content, error) {
-	raw := strings.TrimSpace(rawURLOrISBN)
-
-	var workKey string
-	isISBN := false
-	switch {
-	case bookWorksURLRe.MatchString(raw):
-		workKey = bookWorksURLRe.FindStringSubmatch(raw)[1]
-	case isbnRe.MatchString(raw):
-		isISBN = true
-	default:
-		return nil, fmt.Errorf("%w: not an Open Library work URL or ISBN", domain.ErrInvalidInput)
+	kind, id, err := parseBookInput(rawURLOrISBN)
+	if err != nil {
+		return nil, err
 	}
 
 	if s.bookSearch == nil {
 		return nil, ErrBookClientUnavailable
 	}
 
-	if isISBN {
+	var workKey, isbn string
+	switch kind {
+	case bookInputWorkID:
+		workKey = id
+	case bookInputEditionID:
+		if s.bookWork == nil {
+			return nil, ErrBookClientUnavailable
+		}
+		resolved, err := s.bookWork.ResolveEdition(ctx, id)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				return nil, fmt.Errorf("%w: edition not found", domain.ErrNotFound)
+			}
+			slog.Error("failed to resolve edition", "editionID", id, "userID", userID, "error", err)
+			return nil, fmt.Errorf("failed to resolve edition")
+		}
+		workKey = resolved
+	case bookInputISBN:
 		if s.bookISBN == nil {
 			return nil, ErrBookClientUnavailable
 		}
-		resolved, err := s.bookISBN.ResolveISBN(ctx, raw)
+		resolved, err := s.bookISBN.ResolveISBN(ctx, id)
 		if err != nil {
 			if errors.Is(err, domain.ErrNotFound) {
 				return nil, fmt.Errorf("%w: isbn not found", domain.ErrNotFound)
 			}
-			slog.Error("failed to resolve isbn", "isbn", raw, "userID", userID, "error", err)
+			slog.Error("failed to resolve isbn", "isbn", id, "userID", userID, "error", err)
 			return nil, fmt.Errorf("failed to resolve isbn")
 		}
 		workKey = resolved
+		isbn = id
 	}
 
 	canonicalURL := canonicalBookURL(workKey)
@@ -766,7 +942,14 @@ func (s *ContentService) CreateFromBook(ctx context.Context, rawURLOrISBN string
 		return nil, err
 	}
 
-	responseJSON, err := json.Marshal(shapeBookResult(*result))
+	shaped := shapeBookResult(*result)
+	if work := s.fetchBookWork(ctx, workKey); work != nil {
+		shaped.Description = work.Description
+		shaped.RelatedWorks = shapeRelatedWorks(work.RelatedWorks)
+	}
+	shaped.ResolvedFromISBN = isbn
+
+	responseJSON, err := json.Marshal(shaped)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal book response: %w", err)
 	}
@@ -787,6 +970,22 @@ func (s *ContentService) CreateFromBook(ctx context.Context, rawURLOrISBN string
 		return created, domain.ErrAlreadyExists
 	}
 	return created, nil
+}
+
+// fetchBookWork reads the work record's description and related works. It is
+// best effort: a nil result means no client is configured or the fetch failed,
+// and the caller keeps going without description data. Errors are logged
+// without upstream detail.
+func (s *ContentService) fetchBookWork(ctx context.Context, workKey string) *portservices.BookWork {
+	if s.bookWork == nil {
+		return nil
+	}
+	work, err := s.bookWork.FetchWork(ctx, workKey)
+	if err != nil {
+		slog.Warn("failed to fetch book work record; continuing without description", "workKey", workKey, "error", err)
+		return nil
+	}
+	return work
 }
 
 // SearchBooks returns one page of Open Library work search results. The
@@ -836,7 +1035,7 @@ func (s *ContentService) TrendingBooks(ctx context.Context, window domain.Trendi
 // the BookSearchResult without writing. Backs the ISBN tab's
 // preview-before-add (spec Section 5).
 func (s *ContentService) ResolveBookISBN(ctx context.Context, isbn string) (*portservices.BookSearchResult, error) {
-	raw := strings.TrimSpace(isbn)
+	raw := normalizeISBN(isbn)
 	if !isbnRe.MatchString(raw) {
 		return nil, fmt.Errorf("%w: not a valid ISBN", domain.ErrInvalidInput)
 	}
