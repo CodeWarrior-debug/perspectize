@@ -2,7 +2,6 @@
 	import AgGridSvelte5Component from 'ag-grid-svelte5';
 	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
-	import { themeQuartz } from '@ag-grid-community/theming';
 	import type {
 		GridApi,
 		GridOptions,
@@ -102,8 +101,9 @@
 		parsePersonFilter,
 		rowMatchesPerson,
 		showColumnRelevanceCallout,
+		NUMERIC_COL_IDS,
 	} from '$lib/utils/grid-config';
-	import { GRID_THEME_PARAMS } from '$lib/utils/grid-theme';
+	import { ACTIVITY_GRID_THEME } from '$lib/utils/grid-theme';
 	import { emptyCellClassRules } from '$lib/utils/grid-empty';
 	import { useCardMode, useResponsiveTier } from '$lib/utils/responsive.svelte';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
@@ -609,7 +609,7 @@
 
 	const modules = [ClientSideRowModelModule];
 
-	const theme = themeQuartz.withParams(GRID_THEME_PARAMS);
+	const theme = ACTIVITY_GRID_THEME;
 
 	// flex = clamp-like: proportional sizing with min/max constraints
 	// minWidth is auto-derived from headerName unless explicitly set (e.g. Item = 200)
@@ -835,8 +835,12 @@
 				valueGetter: tmdbScoreValueGetter,
 				comparator: unknownLastComparator,
 				valueFormatter: (params) => formatTmdbScore(params.value),
-				// Muted when the score rests on fewer than 50 votes.
-				cellClass: (params) => (hasLowVoteCount({ data: params.data }) ? 'text-muted-foreground' : ''),
+				// Muted when the score rests on fewer than 50 votes. A colDef `cellClass` replaces the one
+				// `type: 'rightAligned'` adds, so the alignment class is repeated here.
+				cellClass: (params) => [
+					'ag-right-aligned-cell',
+					...(hasLowVoteCount({ data: params.data }) ? ['text-muted-foreground'] : []),
+				],
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.tmdbScore },
 				headerTooltip: 'TMDB user score out of 10. Muted when fewer than 50 votes.',
 				hide: true,
@@ -1112,6 +1116,7 @@
 		] as ColDef<ContentItem>[]
 	).map((col) => ({
 		...col,
+		...(col.colId && NUMERIC_COL_IDS.has(col.colId) ? { type: 'rightAligned' } : {}),
 		minWidth: col.minWidth ?? headerMinWidth(col.headerName ?? '', col.filter !== false),
 	}));
 
@@ -1486,7 +1491,7 @@
 		<div
 			bind:this={gridContainer}
 			data-testid="ag-grid-container"
-			class="{isMobile ? 'overflow-y-auto' : 'flex-1'} min-h-0"
+			class="activity-grid {isMobile ? 'overflow-y-auto' : 'flex-1'} min-h-0"
 			style="--ag-row-height: 49px; --ag-header-height: 36px;"
 		>
 			<AgGridSvelte5Component {gridOptions} {rowData} {theme} {modules} />

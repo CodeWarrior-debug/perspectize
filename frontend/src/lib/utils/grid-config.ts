@@ -531,6 +531,23 @@ export function showColumnRelevanceCallout(typeFilter: string | undefined): bool
 	return selectedTypes(typeFilter).length !== 1;
 }
 
+/**
+ * Columns whose cells are numbers (counts, money, scores, durations). The grid right-aligns them
+ * and their headers so digits line up down the column: the one table rule every reference
+ * (Datawrapper, Primer, Carbon) agrees on. Identifiers such as `tmdbId` stay left-aligned.
+ */
+export const NUMERIC_COL_IDS: ReadonlySet<string> = new Set([
+	'duration',
+	'views',
+	'likes',
+	'percentLiked',
+	'boxOffice',
+	'vsBudget',
+	'tmdbScore',
+	'budget',
+	'votes',
+]);
+
 /** Per-tier column lists. Columns in `hidden` are forced off; createdAt/updatedAt and the admin columns are in neither list (colDef `hide: true`, picker only). */
 const MOVIE_ONLY_PICKER = ['budget', 'votes', 'collection', 'synopsis', 'tmdbId'];
 const MOVIE_DEFAULT_COLS = ['genre', 'rated', 'cast', 'released', 'boxOffice', 'vsBudget', 'tmdbScore'];

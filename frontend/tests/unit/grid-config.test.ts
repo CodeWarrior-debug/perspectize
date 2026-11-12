@@ -14,6 +14,7 @@ import {
 	sortableColumnsFor,
 	releasedComparator,
 	itemColumnHeader,
+	NUMERIC_COL_IDS,
 	CONTENT_TYPE_OPTIONS,
 } from '$lib/utils/grid-config';
 import type { ContentItem } from '$lib/queries/content';
@@ -49,6 +50,46 @@ function row(overrides: Partial<ContentItem>): ContentItem {
 // ---------------------------------------------------------------------------
 // capitalizeContentType
 // ---------------------------------------------------------------------------
+describe('NUMERIC_COL_IDS (right-aligned columns)', () => {
+	it('names only real columns, so a rename cannot leave a stale id behind', () => {
+		const real = new Set(togglableColIds(true));
+		for (const id of NUMERIC_COL_IDS) expect(real.has(id), id).toBe(true);
+	});
+
+	it('covers every count, money, score and duration column', () => {
+		for (const id of [
+			'duration',
+			'views',
+			'likes',
+			'percentLiked',
+			'boxOffice',
+			'vsBudget',
+			'tmdbScore',
+			'budget',
+			'votes',
+		]) {
+			expect(NUMERIC_COL_IDS.has(id), id).toBe(true);
+		}
+	});
+
+	it('leaves text, dates and identifiers left-aligned', () => {
+		for (const id of [
+			'item',
+			'type',
+			'genre',
+			'rated',
+			'cast',
+			'released',
+			'publishDate',
+			'channel',
+			'tags',
+			'tmdbId',
+		]) {
+			expect(NUMERIC_COL_IDS.has(id), id).toBe(false);
+		}
+	});
+});
+
 describe('capitalizeContentType', () => {
 	it('capitalizes first letter and lowercases rest', () => {
 		expect(capitalizeContentType('CLAIM')).toBe('Claim');
