@@ -60,7 +60,6 @@
 		contentTags,
 		truncateDescription,
 		contentRowId,
-		headerMinWidth,
 		castCellRenderer,
 		genreValueGetter,
 		ratedValueGetter,
@@ -84,6 +83,7 @@
 		textOrEmpty,
 		EMPTY_VALUE,
 	} from '$lib/utils/formatting';
+	import { headerMinWidth } from '$lib/utils/grid-header-width';
 	import {
 		capitalizeContentType,
 		durationComparator,
@@ -648,9 +648,8 @@
 				colId: 'type',
 				headerName: 'Type',
 				flex: 0.5,
-				// The cell is a single icon; 84 still fits the header text, sort arrow and filter button.
-				minWidth: 84,
-				maxWidth: 100,
+				// The cell is a single icon; minWidth comes from the header (text, sort arrow, funnel).
+				maxWidth: 110,
 
 				filter: ContentTypeFilter,
 				valueGetter: (params) => capitalizeContentType(params.data?.contentType),
@@ -669,15 +668,13 @@
 				hide: true,
 			},
 			// Movie columns (TMDB). Hidden by default; the responsive effect shows the Movie
-			// default set when the type filter is exactly MOVIE. Minimum widths are tuned so
-			// that set fits the 1212px grid: perspectize 50 + item 185 + genre 82 + rated 82
-			// + cast 125 + duration 111 + released 105 + box office 138 + vs. budget 118
-			// + TMDB score 121 + tags 90 = 1207. Box office keeps room for its sort arrow.
+			// default set when the type filter is exactly MOVIE. Header-only columns take their
+			// minWidth from headerMinWidth (never below the whole heading + sort arrow + funnel);
+			// movieColumns.test.ts checks the default set still fits the 1212px grid.
 			{
 				colId: 'genre',
 				headerName: 'Genre',
 				flex: 1,
-				minWidth: 82,
 				maxWidth: 180,
 				sortable: false,
 				filter: 'agTextColumnFilter',
@@ -690,8 +687,7 @@
 				colId: 'rated',
 				headerName: 'Rated',
 				flex: 0.5,
-				minWidth: 82,
-				maxWidth: 100,
+				maxWidth: 120,
 				filter: AgeRatingFilter,
 				valueGetter: ratedValueGetter,
 				comparator: ratedComparator,
@@ -723,10 +719,7 @@
 				colId: 'duration',
 				headerName: 'Duration',
 				flex: 0.7,
-				// Explicit floor: headerMinWidth('Duration') is 126, which pushed the YouTube lg set
-				// past the 1212px grid and clipped Tags. 111 (what 'Length' used) keeps it at 1211.
-				minWidth: 111,
-				maxWidth: 120,
+				maxWidth: 140,
 
 				filter: 'agNumberColumnFilter',
 				filterParams: {
@@ -786,7 +779,6 @@
 				colId: 'released',
 				headerName: 'Released',
 				flex: 1,
-				minWidth: 105,
 				maxWidth: 140,
 				comparator: releasedComparator,
 				filter: 'agDateColumnFilter',
@@ -801,7 +793,6 @@
 				colId: 'boxOffice',
 				headerName: 'Take',
 				flex: 0.8,
-				minWidth: 96, // "Take" + sort arrow + filter button
 				maxWidth: 150,
 				filter: 'agNumberColumnFilter',
 				valueGetter: boxOfficeValueGetter,
@@ -815,7 +806,6 @@
 				colId: 'vsBudget',
 				headerName: 'ROI',
 				flex: 0.8,
-				minWidth: 72, // "ROI" + sort arrow (no filter button)
 				maxWidth: 130,
 				filter: false,
 				valueGetter: vsBudgetValueGetter,
@@ -829,7 +819,6 @@
 				colId: 'tmdbScore',
 				headerName: 'Rating',
 				flex: 0.7,
-				minWidth: 111,
 				maxWidth: 130,
 				filter: 'agNumberColumnFilter',
 				valueGetter: tmdbScoreValueGetter,
@@ -885,7 +874,6 @@
 				colId: 'tags',
 				headerName: 'Tags',
 				flex: 1.5,
-				minWidth: 90,
 				maxWidth: 250,
 				sortable: false,
 				filter: 'agTextColumnFilter',
@@ -1117,7 +1105,12 @@
 	).map((col) => ({
 		...col,
 		...(col.colId && NUMERIC_COL_IDS.has(col.colId) ? { type: 'rightAligned' } : {}),
-		minWidth: col.minWidth ?? headerMinWidth(col.headerName ?? '', col.filter !== false),
+		// Never narrower than the whole heading + sort arrow + funnel. An explicit minWidth only
+		// raises the floor (for cell content, e.g. Item's thumbnail and title); it can't lower it.
+		minWidth: Math.max(
+			col.minWidth ?? 0,
+			headerMinWidth(col.headerName ?? '', { filter: col.filter !== false, sortable: col.sortable !== false }),
+		),
 	}));
 
 	// ---------------------------------------------------------------------------

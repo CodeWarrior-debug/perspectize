@@ -11,7 +11,7 @@ import {
 } from '$lib/utils/grid-config';
 import { columnViewFor as columnViewForFromLayouts } from '$lib/utils/columnLayouts';
 import { urlParamsToGraphQLFilter } from '$lib/utils/gridUrlState';
-import { headerMinWidth } from '$lib/utils/formatting';
+import { headerMinWidth } from '$lib/utils/grid-header-width';
 import { ACTIVITY_TOOLTIP_SPECS } from '$lib/utils/activityTooltipSpecs';
 import activityTableSource from '$lib/components/ActivityTable.svelte?raw';
 
@@ -225,12 +225,16 @@ describe('Book colDefs in ActivityTable', () => {
 		if (!b) throw new Error(`no colDef for ${colId}`);
 		return b;
 	};
+	// Mirrors ActivityTable's colDef map: an explicit minWidth only raises the header floor.
 	function minWidth(colId: string): number {
 		const b = block(colId);
-		const explicit = b.match(/\n\s*minWidth:\s*(\d+)/)?.[1];
-		if (explicit) return Number(explicit);
+		const explicit = Number(b.match(/\n\s*minWidth:\s*(\d+)/)?.[1] ?? 0);
 		const name = b.match(/headerName:\s*'([^']*)'/)?.[1] ?? '';
-		return headerMinWidth(name, !/\n\s*filter:\s*false/.test(b));
+		const header = headerMinWidth(name, {
+			filter: !/\n\s*filter:\s*false/.test(b),
+			sortable: !/\n\s*sortable:\s*false/.test(b),
+		});
+		return Math.max(explicit, header);
 	}
 
 	it('has a colDef for every Book column', () => {

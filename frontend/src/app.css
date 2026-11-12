@@ -1024,6 +1024,37 @@
 	opacity: 1;
 }
 
+/* Header spacing. headerMinWidth (lib/utils/grid-header-width.ts) reserves exactly this layout,
+   so a column at its minimum width shows its whole label, sort arrow and funnel: one --ag-spacing
+   between the label and the funnel (AG Grid leaves none), and the sort arrow one gap from its
+   label rather than two (AG Grid adds its own padding on top of the label's gap). Change these
+   and headerChrome (grid-theme.ts) together. */
+.ag-header-cell .ag-cell-label-container {
+	gap: var(--ag-spacing);
+}
+.ag-header-cell .ag-sort-indicator-icon {
+	padding-left: 0;
+	padding-right: 0;
+}
+
+/* Funnel states. AG Grid marks an active filter with a tinted block plus a 4px ring around the
+   icon, which reads as an oversized rectangle in a 36px header. Instead the funnel itself takes
+   the primary colour and keeps AG Grid's small dot; hover is a small rounded wash. */
+.ag-header-cell .ag-header-cell-filter-button:hover {
+	border-radius: 4px;
+	box-shadow: 0 0 0 2px var(--ag-icon-button-hover-color);
+}
+.ag-header-cell .ag-header-cell-filter-button.ag-filter-active {
+	background-color: transparent;
+	box-shadow: none;
+	color: var(--color-primary);
+}
+.ag-header-cell .ag-header-cell-filter-button.ag-filter-active:hover {
+	background-color: var(--ag-icon-button-hover-color);
+	border-radius: 4px;
+	box-shadow: 0 0 0 2px var(--ag-icon-button-hover-color);
+}
+
 /* Activity headers: small uppercase labels (size and colour come from ACTIVITY_HEADER_PARAMS). */
 .activity-grid .ag-header-cell-text {
 	text-transform: uppercase;

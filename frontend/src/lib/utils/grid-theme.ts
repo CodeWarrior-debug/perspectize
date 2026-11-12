@@ -55,3 +55,68 @@ export const ACTIVITY_HEADER_PARAMS = {
  * uses `themeBalham` with the shared params, without the Activity header tweaks.
  */
 export const ACTIVITY_GRID_THEME = themeBalham.withParams(GRID_THEME_PARAMS).withParams(ACTIVITY_HEADER_PARAMS);
+
+/**
+ * How the Activity header label is set beyond the theme params. app.css applies these under
+ * `.activity-grid .ag-header-cell-text`; they are not theme params, so they're mirrored here for
+ * the width measurement, and `tests/unit/gridHeaderWidth.test.ts` checks the two agree.
+ */
+export interface HeaderTextCase {
+	/** `text-transform: uppercase` on the label. */
+	uppercase: boolean;
+	/** `letter-spacing` on the label, in em. */
+	letterSpacingEm: number;
+}
+
+export const ACTIVITY_HEADER_TEXT_CASE: HeaderTextCase = { uppercase: true, letterSpacingEm: 0.06 };
+
+/**
+ * Horizontal space, in px, that AG Grid draws around a header label in the Activity grid, read
+ * from the theme itself so it follows any change to `spacing` / `iconSize` / `headerFontSize`:
+ *
+ *   [pad] label [gap] sort-arrow [gap] filter-funnel [pad]
+ *
+ * - `fontSize`: the header font size (`headerFontSize`, or `fontSize` when it only refers to it).
+ * - `padding`: header cell padding on each side (`cellHorizontalPadding` = spacing * 2 * scale).
+ * - `sort`: the label's flex gap (spacing) + the arrow icon. app.css drops AG Grid's extra
+ *   padding-left on the arrow, so it sits one gap from its label rather than two.
+ * - `filter`: the gap app.css adds between the label and the funnel (spacing) + the funnel icon.
+ * - `uppercase` / `letterSpacingEm`: how app.css sets the label (see HeaderTextCase).
+ *
+ * `headerMinWidth` (grid-header-width.ts) adds these to the label's measured width, so a column at its
+ * minimum still shows its whole heading, its sort arrow and its funnel without overlap.
+ */
+export interface HeaderChrome extends HeaderTextCase {
+	fontSize: number;
+	padding: number;
+	sort: number;
+	filter: number;
+}
+
+export function headerChrome(
+	theme: { getParams(): Record<string, unknown> } = ACTIVITY_GRID_THEME,
+	textCase: HeaderTextCase = { uppercase: false, letterSpacingEm: 0 },
+): HeaderChrome {
+	const p = theme.getParams();
+	const num = (key: string): number => {
+		const v = p[key];
+		if (typeof v === 'number') return v;
+		// A param can be a reference to another one, e.g. Quartz's headerFontSize = { ref: 'fontSize' }.
+		if (v && typeof v === 'object' && typeof (v as { ref?: unknown }).ref === 'string') {
+			return num((v as { ref: string }).ref);
+		}
+		throw new Error(`grid theme param ${key} is not a number: ${JSON.stringify(v)}`);
+	};
+	const spacing = num('spacing');
+	const iconSize = num('iconSize');
+	return {
+		fontSize: num('headerFontSize'),
+		padding: spacing * 2 * num('cellHorizontalPaddingScale'),
+		sort: spacing + iconSize,
+		filter: spacing + iconSize,
+		...textCase,
+	};
+}
+
+/** The Activity grid's header chrome, computed once. */
+export const ACTIVITY_HEADER_CHROME: HeaderChrome = headerChrome(ACTIVITY_GRID_THEME, ACTIVITY_HEADER_TEXT_CASE);

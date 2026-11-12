@@ -381,23 +381,6 @@ export function extractVideoIdFromUrl(url: string | null): string | null {
 }
 
 /**
- * Compute minimum AG Grid column width (px) so header text + icons never truncate.
- * AG Grid only accepts px — we derive from the grid's font metrics.
- */
-const GRID_FONT_SIZE = 14; // matches AG Grid theme fontSize
-export function headerMinWidth(name: string, hasFilter = true): number {
-	const charWidthEm = 0.55; // approx em per char at font-weight 600
-	const paddingEm = 1.5; // left + right cell padding
-	const sortIconEm = 1.6; // sort indicator — widened so short headers (e.g. "Length") don't truncate once an active sort indicator is actually painted, not just reserved for
-	const filterIconEm = hasFilter ? 1.5 : 0;
-	// No column divider any more (headerColumnBorder is off and the resize handle is an overlay),
-	// so nothing to reserve — keeps the full column set inside the max-w-screen-xl page container.
-	const separatorEm = 0;
-	const totalEm = name.length * charWidthEm + paddingEm + sortIconEm + filterIconEm + separatorEm;
-	return Math.ceil(totalEm * GRID_FONT_SIZE);
-}
-
-/**
  * AG Grid cell renderer for item column with thumbnail and clickable title.
  */
 export function itemCellRenderer(params: { data?: { name: string; url: string | null } }): HTMLElement | string {
