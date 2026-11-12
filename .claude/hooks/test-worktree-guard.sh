@@ -36,7 +36,13 @@ expect_deny "$MAIN" "git worktree add $MAIN/.claude/worktrees/../../x branch"
 expect_deny "$MAIN" "git worktree add $MAIN/.claude/worktrees-evil/x branch"
 expect_deny "$MAIN" "cd foo && git worktree add /tmp/x branch"
 expect_deny "$MAIN" "git worktree add --lock --reason why /tmp/x branch"
-expect_deny "$NESTED" "git worktree add .claude/worktrees/x branch"
+expect_deny "$MAIN" "git worktree add $NESTED/.claude/worktrees/x branch"
+# Relative path run from inside an existing worktree nests it; needs a real worktree as cwd.
+if git -C "$NESTED" rev-parse --git-dir >/dev/null 2>&1; then
+  expect_deny "$NESTED" "git worktree add .claude/worktrees/x branch"
+else
+  echo "SKIP deny:  relative path from inside a worktree (no $NESTED here)"
+fi
 
 # Not a worktree add: must not fire
 expect_allow "$MAIN" "git status"

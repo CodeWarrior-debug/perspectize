@@ -42,7 +42,7 @@
 
 - [ ] **Step 1: Write `test-worktree-guard.sh`.** A helper `run <cwd> <command>` pipes `{"cwd":..., "tool_input":{"command":...}}` (built with `jq -n`) into the hook; `expect_allow` / `expect_deny` assert empty output / `"deny"` in output. `MAIN` is the first path from `git worktree list --porcelain`. Cases (cwd `MAIN` unless stated):
   - allow: `git worktree add MAIN/.claude/worktrees/x -b b origin/main`; `git -C MAIN worktree add MAIN/.claude/worktrees/x branch`; `git worktree add .claude/worktrees/x branch`; `git worktree add --lock --reason why MAIN/.claude/worktrees/x branch`
-  - deny: `git worktree add /tmp/x branch`; `git worktree add /private/tmp/claude-501/s/scratchpad/wt branch`; `git -C MAIN worktree add /tmp/x branch`; `git worktree add MAIN/.claude/worktrees/../../x branch`; `git worktree add MAIN/.claude/worktrees-evil/x branch`; `cd foo && git worktree add /tmp/x branch`; `git worktree add --lock --reason why /tmp/x branch`; `git worktree add .claude/worktrees/x branch` with cwd `MAIN/.claude/worktrees/2`
+  - deny: `git worktree add /tmp/x branch`; `git worktree add /private/tmp/claude-501/s/scratchpad/wt branch`; `git -C MAIN worktree add /tmp/x branch`; `git worktree add MAIN/.claude/worktrees/../../x branch`; `git worktree add MAIN/.claude/worktrees-evil/x branch`; `cd foo && git worktree add /tmp/x branch`; `git worktree add --lock --reason why /tmp/x branch`; `git worktree add MAIN/.claude/worktrees/2/.claude/worktrees/x branch` (nested, absolute); and, only when `MAIN/.claude/worktrees/2` exists (else print SKIP), `git worktree add .claude/worktrees/x branch` with that cwd
   - allow (not a worktree add): `git status`; `git worktree list`; `git worktree remove /tmp/x`; `git commit -m "git worktree add /tmp/x"`
 - [ ] **Step 2: Run it and confirm it fails.** Run: `bash .claude/hooks/test-worktree-guard.sh`. Expected: FAIL lines (hook file missing).
 - [ ] **Step 3: Implement `.claude/hooks/worktree-guard.sh`.** Split the command on `&&`, `||`, `;`, `|` (as `deny-env-read.sh` does); for each segment that starts with `git [-C <dir>] worktree add`, take the first positional argument after `add` (skip flags; `-b`, `-B`, `--reason` consume the next token), strip quotes; if relative, resolve it against the `-C` dir else the JSON `.cwd`; collapse `.`/`..` with a small awk function; allow iff the result starts with `<main root>/.claude/worktrees/` (trailing slash included). Main root is the first `worktree` entry of `git -C <cwd> worktree list --porcelain`; if it cannot be found, allow. Missing `jq`, like the sibling hooks, allows.
@@ -71,7 +71,7 @@
 **Interfaces:**
 - Produces: read-only; prints groups `REMOVABLE`, `MERGED-DIRTY`, `NO-PR`, `OPEN-PR`, `OUT-OF-PLACE`. `REMOVABLE` prints two lines per worktree (`git worktree remove '<path>'` and `git branch -D '<branch>'`), never joined.
 
-- [ ] **Step 1: Copy the scratchpad draft** `worktree-fix/worktree-report.sh` (`/private/tmp/claude-501/-Users-jamesjordan-GitHub-perspectize/64a0eedb-79b5-4b42-93e6-af639ef1ab93/scratchpad/worktree-fix/`) into `.claude/scripts/`.
+- [ ] **Step 1: Start from the draft** written during the worktree investigation (classifier only, no `OUT-OF-PLACE` group) and save it as `.claude/scripts/worktree-report.sh`.
 - [ ] **Step 2: Add the `OUT-OF-PLACE` group:** any worktree other than the main checkout whose path is not under `<main root>/.claude/worktrees/` is listed there (with branch and dirty count) instead of being classified.
 - [ ] **Step 3: Split the REMOVABLE command line** into two printed lines.
 - [ ] **Step 4: Run it.** Run: `bash .claude/scripts/worktree-report.sh`. Expected: all five section headers print, this worktree (`.claude/worktrees/2`) appears under `NO-PR`, exit 0.
@@ -97,5 +97,5 @@
 - Modify: `~/.claude/skills/low-risk-merge/SKILL.md` line 16
 - Modify: `~/.claude/projects/-Users-jamesjordan-GitHub-perspectize/memory/concurrent-sessions-need-worktrees.md`
 
-- [ ] **Step 1: Edit `low-risk-merge/SKILL.md` step 3 (Docs PR),** after `superpowers:writing-skills` guidance: replace the scratchpad `git worktree add <scratchpad>/<name> origin/<branch>` with `.claude/scripts/new-worktree.sh <branch> lowrisk-<pr>`, and keep "Remove the worktree afterward".
+- [ ] **Step 1: Edit `low-risk-merge/SKILL.md` step 3 (Docs PR),** after `superpowers:writing-skills` guidance: replace the scratchpad `git worktree add <scratchpad>/<name> origin/<branch>` with `.claude/scripts/new-worktree.sh <branch> lowrisk-<pr>`, and replace "Remove the worktree afterward" with removing it and then `git branch -D <branch>` (the script leaves a local tracking branch), each as its own command.
 - [ ] **Step 2: Update the existing memory file** (do not create a new one): the rule was prose only and covered interactive sessions; the `CLAUDE.md` hard rule plus `worktree-guard.sh` now enforce it, and the hook applies only once merged to `main`.
