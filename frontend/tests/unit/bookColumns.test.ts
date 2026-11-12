@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	COL_TO_SORT,
+	COLUMNS,
 	DATA_COLUMNS,
 	defaultColumnVisibility,
 	isBookOnlyTypeFilter,
@@ -174,6 +175,44 @@ describe('Book column registry', () => {
 describe('Author filter', () => {
 	it('maps f.author to the backend authorContains filter', () => {
 		expect(urlParamsToGraphQLFilter({ author: 'steinbeck' }, '')).toEqual({ authorContains: 'steinbeck' });
+	});
+});
+
+describe('Published, Pages and Book rating filters', () => {
+	it('maps f.published to the first-publish-year range', () => {
+		expect(urlParamsToGraphQLFilter({ published: '1950..1960' }, '')).toEqual({
+			minPublishYear: 1950,
+			maxPublishYear: 1960,
+		});
+	});
+
+	it('maps f.pages to the page-count range, open on either end', () => {
+		expect(urlParamsToGraphQLFilter({ pages: '300..' }, '')).toEqual({ minPages: 300 });
+		expect(urlParamsToGraphQLFilter({ pages: '..500' }, '')).toEqual({ maxPages: 500 });
+	});
+
+	it('maps f.bookrating to the rating range and keeps decimals', () => {
+		expect(urlParamsToGraphQLFilter({ bookrating: '3.5..4.5' }, '')).toEqual({
+			minBookRating: 3.5,
+			maxBookRating: 4.5,
+		});
+	});
+
+	it('gives each of the three columns a number-range filter key', () => {
+		for (const [colId, filterKey] of [
+			['published', 'published'],
+			['pages', 'pages'],
+			['rating', 'bookrating'],
+		] as const) {
+			const col = COLUMNS.find((c) => c.colId === colId);
+			expect(col?.filterKey, colId).toBe(filterKey);
+			expect(col?.filterRange, colId).toBe('number');
+			expect(col?.filterValue, colId).toBeTypeOf('function');
+		}
+	});
+
+	it('leaves Editions without a filter (the server has no field for it)', () => {
+		expect(COLUMNS.find((c) => c.colId === 'editions')?.filterKey).toBeUndefined();
 	});
 });
 
