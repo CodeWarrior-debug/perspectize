@@ -449,8 +449,11 @@ const CLAIM_ICON_PATH =
 const MOVIE_ICON_PATH =
 	'M4 2h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5';
 
-/** Open-book glyph for BOOK rows (outline, themed stroke). */
-const BOOK_ICON_PATH = 'M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z';
+/**
+ * Closed-book glyph (Lucide "book") for BOOK rows (outline, themed stroke). Deliberately not an
+ * open book: BIBLE_PASSAGE already uses Lucide's "book-open", and the two must read apart in the Type column.
+ */
+const BOOK_ICON_PATH = 'M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20';
 
 export function typeCellRenderer(params: { data?: { contentType: string } }): HTMLElement | string {
 	if (!params.data) return '';
