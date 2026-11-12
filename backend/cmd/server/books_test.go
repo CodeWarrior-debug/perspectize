@@ -25,3 +25,10 @@ func TestBookServiceOptions_ConfigureBookClients(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 	assert.NotErrorIs(t, err, services.ErrBookClientUnavailable)
 }
+
+// TestBookServiceOptions_CountsEveryBookClient guards the option count: search,
+// trending, ISBN and work. No network-free call reaches the work client, so a
+// dropped option would otherwise go unnoticed.
+func TestBookServiceOptions_CountsEveryBookClient(t *testing.T) {
+	assert.Len(t, bookServiceOptions(), 4)
+}
