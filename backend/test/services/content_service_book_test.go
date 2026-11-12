@@ -390,6 +390,214 @@ func TestResolveBookISBN_InvalidShape(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }
 
+type mockBookWorkClient struct {
+	fetchFn      func(ctx context.Context, workKey string) (*portservices.BookWork, error)
+	editionFn    func(ctx context.Context, editionKey string) (string, error)
+	fetchCalls   int
+	editionCalls int
+}
+
+func (m *mockBookWorkClient) FetchWork(ctx context.Context, workKey string) (*portservices.BookWork, error) {
+	m.fetchCalls++
+	return m.fetchFn(ctx, workKey)
+}
+
+func (m *mockBookWorkClient) ResolveEdition(ctx context.Context, editionKey string) (string, error) {
+	m.editionCalls++
+	return m.editionFn(ctx, editionKey)
+}
+
+// storedBookRepo is an in-memory content repo: one row, found by URL, so a
+// second add of the same work sees the first add's row.
+func storedBookRepo(t *testing.T) (*mockContentRepository, **domain.Content) {
+	t.Helper()
+	var stored *domain.Content
+	repo := &mockContentRepository{
+		getByURLFn: func(ctx context.Context, url string) (*domain.Content, error) {
+			if stored != nil && stored.URL != nil && *stored.URL == url {
+				return stored, nil
+			}
+			return nil, domain.ErrNotFound
+		},
+		getOrCreateByURLFn: func(ctx context.Context, c *domain.Content, refresh bool) (*domain.Content, bool, error) {
+			stored = c
+			return c, false, nil
+		},
+	}
+	return repo, &stored
+}
+
+func rawBookResponseOf(t *testing.T, c *domain.Content) map[string]json.RawMessage {
+	t.Helper()
+	require.NotNil(t, c)
+	var raw map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(c.Response, &raw))
+	return raw
+}
+
+func TestCreateFromBook_StoresWorkDescriptionAndRelatedWorks(t *testing.T) {
+	bs := singleResultSearch(t, "OL23166W", eastOfEden())
+	bw := &mockBookWorkClient{fetchFn: func(ctx context.Context, workKey string) (*portservices.BookWork, error) {
+		assert.Equal(t, "OL23166W", workKey)
+		return &portservices.BookWork{
+			Description:  "Steinbeck considered East of Eden to be his masterpiece.",
+			RelatedWorks: []portservices.BookRelatedWork{{Title: "East of Eden 1/2", URL: "https://openlibrary.org/works/OL17811975W"}},
+		}, nil
+	}}
+	var saved *domain.Content
+	repo := &mockContentRepository{
+		getByURLFn: func(ctx context.Context, url string) (*domain.Content, error) { return nil, domain.ErrNotFound },
+		getOrCreateByURLFn: func(ctx context.Context, c *domain.Content, refresh bool) (*domain.Content, bool, error) {
+			saved = c
+			return c, false, nil
+		},
+	}
+	svc := services.NewContentService(repo, nil, nil, services.WithBookSearch(bs), services.WithBookWork(bw))
+
+	_, err := svc.CreateFromBook(context.Background(), "https://openlibrary.org/works/OL23166W", 1)
+	require.NoError(t, err)
+	assert.Equal(t, 1, bw.fetchCalls)
+
+	raw := rawBookResponseOf(t, saved)
+	assert.JSONEq(t, `"Steinbeck considered East of Eden to be his masterpiece."`, string(raw["description"]))
+	assert.JSONEq(t, `[{"title":"East of Eden 1/2","url":"https://openlibrary.org/works/OL17811975W"}]`, string(raw["relatedWorks"]))
+}
+
+func TestCreateFromBook_WorkURLOmitsResolvedFromISBN(t *testing.T) {
+	bs := singleResultSearch(t, "OL23166W", eastOfEden())
+	bw := &mockBookWorkClient{fetchFn: func(ctx context.Context, workKey string) (*portservices.BookWork, error) {
+		return &portservices.BookWork{RelatedWorks: []portservices.BookRelatedWork{}}, nil
+	}}
+	repo, saved := storedBookRepo(t)
+	svc := services.NewContentService(repo, nil, nil, services.WithBookSearch(bs), services.WithBookWork(bw))
+
+	got, err := svc.CreateFromBook(context.Background(), "https://openlibrary.org/works/OL23166W", 1)
+	require.NoError(t, err)
+	assert.Same(t, *saved, got)
+	assert.NotContains(t, rawBookResponseOf(t, got), "resolvedFromISBN")
+}
+
+func TestCreateFromBook_HyphenatedISBNStoresNormalisedValue(t *testing.T) {
+	bi := &mockBookISBNClient{resolveFn: func(ctx context.Context, isbn string) (string, error) {
+		assert.Equal(t, "9780434740024", isbn, "resolver receives the normalised ISBN")
+		return "OL23166W", nil
+	}}
+	bs := singleResultSearch(t, "OL23166W", eastOfEden())
+	repo, saved := storedBookRepo(t)
+	svc := services.NewContentService(repo, nil, nil, services.WithBookSearch(bs), services.WithBookISBN(bi))
+
+	_, err := svc.CreateFromBook(context.Background(), "978-0-434-74002-4", 1)
+	require.NoError(t, err)
+	raw := rawBookResponseOf(t, *saved)
+	assert.JSONEq(t, `"9780434740024"`, string(raw["resolvedFromISBN"]))
+	assert.Equal(t, "https://openlibrary.org/works/OL23166W", *(*saved).URL)
+}
+
+func TestCreateFromBook_EditionLinkResolvesThenDedupesOnWorkURL(t *testing.T) {
+	bi := &mockBookISBNClient{resolveFn: func(ctx context.Context, isbn string) (string, error) {
+		t.Fatal("an edition link must not call the ISBN resolver")
+		return "", nil
+	}}
+	bw := &mockBookWorkClient{
+		editionFn: func(ctx context.Context, editionKey string) (string, error) {
+			assert.Equal(t, "OL22640535M", editionKey)
+			return "OL23166W", nil
+		},
+		fetchFn: func(ctx context.Context, workKey string) (*portservices.BookWork, error) {
+			return &portservices.BookWork{RelatedWorks: []portservices.BookRelatedWork{}}, nil
+		},
+	}
+	bs := singleResultSearch(t, "OL23166W", eastOfEden())
+	repo, saved := storedBookRepo(t)
+	svc := services.NewContentService(repo, nil, nil, services.WithBookSearch(bs), services.WithBookWork(bw), services.WithBookISBN(bi))
+
+	first, err := svc.CreateFromBook(context.Background(), "https://openlibrary.org/books/OL22640535M/East_of_Eden", 1)
+	require.NoError(t, err)
+	assert.Equal(t, "https://openlibrary.org/works/OL23166W", *(*saved).URL)
+	assert.NotContains(t, rawBookResponseOf(t, first), "resolvedFromISBN", "an edition link is not an ISBN input")
+
+	second, err := svc.CreateFromBook(context.Background(), "https://openlibrary.org/works/OL23166W", 1)
+	assert.ErrorIs(t, err, domain.ErrAlreadyExists)
+	assert.Same(t, first, second)
+	assert.Equal(t, 1, bs.calls, "the duplicate costs no second search call")
+	assert.Equal(t, 1, bw.editionCalls)
+}
+
+func TestCreateFromBook_EditionNotFound(t *testing.T) {
+	bw := &mockBookWorkClient{editionFn: func(ctx context.Context, editionKey string) (string, error) {
+		return "", domain.ErrNotFound
+	}}
+	svc := services.NewContentService(&mockContentRepository{}, nil, nil, services.WithBookSearch(&mockBookSearchClient{}), services.WithBookWork(bw))
+	_, err := svc.CreateFromBook(context.Background(), "https://openlibrary.org/books/OL22640535M", 1)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	assert.NotErrorIs(t, err, services.ErrBookClientUnavailable)
+}
+
+func TestCreateFromBook_EditionResolveErrorIsGeneric(t *testing.T) {
+	bw := &mockBookWorkClient{editionFn: func(ctx context.Context, editionKey string) (string, error) {
+		return "", errors.New("secret upstream detail Bearer abc")
+	}}
+	svc := services.NewContentService(&mockContentRepository{}, nil, nil, services.WithBookSearch(&mockBookSearchClient{}), services.WithBookWork(bw))
+	_, err := svc.CreateFromBook(context.Background(), "https://openlibrary.org/books/OL22640535M", 1)
+	require.Error(t, err)
+	assert.Equal(t, "failed to resolve edition", err.Error())
+}
+
+func TestCreateFromBook_EditionLinkWithoutWorkClient(t *testing.T) {
+	svc := services.NewContentService(&mockContentRepository{}, nil, nil, services.WithBookSearch(&mockBookSearchClient{}))
+	_, err := svc.CreateFromBook(context.Background(), "https://openlibrary.org/books/OL22640535M", 1)
+	assert.ErrorIs(t, err, services.ErrBookClientUnavailable)
+}
+
+// TestCreateFromBook_WorkFetchFailureStillCreates: the work record is best
+// effort. A failing fetch never blocks the add; the row has no description
+// and an empty relatedWorks list.
+func TestCreateFromBook_WorkFetchFailureStillCreates(t *testing.T) {
+	bw := &mockBookWorkClient{fetchFn: func(ctx context.Context, workKey string) (*portservices.BookWork, error) {
+		return nil, errors.New("upstream 500")
+	}}
+	bs := singleResultSearch(t, "OL23166W", eastOfEden())
+	repo, saved := storedBookRepo(t)
+	svc := services.NewContentService(repo, nil, nil, services.WithBookSearch(bs), services.WithBookWork(bw))
+
+	got, err := svc.CreateFromBook(context.Background(), "https://openlibrary.org/works/OL23166W", 1)
+	require.NoError(t, err)
+	assert.Equal(t, "East of Eden", got.Name)
+	assert.NotNil(t, *saved)
+
+	raw := rawBookResponseOf(t, got)
+	assert.NotContains(t, raw, "description")
+	assert.JSONEq(t, `[]`, string(raw["relatedWorks"]))
+}
+
+// TestCreateFromBook_NoWorkClientStillCreates: a service built without
+// WithBookWork adds the book the same way as a failed work fetch, not as
+// ErrBookClientUnavailable.
+func TestCreateFromBook_NoWorkClientStillCreates(t *testing.T) {
+	bs := singleResultSearch(t, "OL23166W", eastOfEden())
+	repo, _ := storedBookRepo(t)
+	svc := services.NewContentService(repo, nil, nil, services.WithBookSearch(bs))
+
+	got, err := svc.CreateFromBook(context.Background(), "https://openlibrary.org/works/OL23166W", 1)
+	require.NoError(t, err)
+	raw := rawBookResponseOf(t, got)
+	assert.NotContains(t, raw, "description")
+	assert.JSONEq(t, `[]`, string(raw["relatedWorks"]))
+}
+
+func TestResolveBookISBN_HyphenatedISBN(t *testing.T) {
+	bi := &mockBookISBNClient{resolveFn: func(ctx context.Context, isbn string) (string, error) {
+		assert.Equal(t, "9780434740024", isbn)
+		return "OL23166W", nil
+	}}
+	bs := singleResultSearch(t, "OL23166W", eastOfEden())
+	svc := services.NewContentService(&mockContentRepository{}, nil, nil, services.WithBookSearch(bs), services.WithBookISBN(bi))
+
+	result, err := svc.ResolveBookISBN(context.Background(), "978-0-434-74002-4")
+	require.NoError(t, err)
+	assert.Equal(t, "East of Eden", result.Title)
+}
+
 func TestResolveBookISBN_NotFound(t *testing.T) {
 	bi := &mockBookISBNClient{resolveFn: func(ctx context.Context, isbn string) (string, error) {
 		return "", domain.ErrNotFound
