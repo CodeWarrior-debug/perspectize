@@ -209,6 +209,16 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID int) (*
 		return nil, fmt.Errorf("%w: content has no source URL to refresh", domain.ErrInvalidInput)
 	}
 
+	switch existing.ContentType {
+	case domain.ContentTypeBook:
+		return s.refreshBook(ctx, existing)
+	case "", domain.ContentTypeYouTubeVideo:
+		// YouTube rows (and rows loaded without a type, as in older tests) take the path below.
+	default:
+		// Movie refresh is out of scope; other types have no refresh source yet.
+		return nil, fmt.Errorf("%w: content type %s cannot be refreshed", domain.ErrInvalidInput, existing.ContentType)
+	}
+
 	videoID, err := s.youtubeClient.ExtractVideoID(*existing.URL)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidURL, err)
@@ -228,6 +238,60 @@ func (s *ContentService) UpdateSourceData(ctx context.Context, contentID int) (*
 		return nil, fmt.Errorf("failed to update content metadata: %w", err)
 	}
 
+	return updated, nil
+}
+
+// refreshBook re-reads a BOOK row's work from Open Library. The work id comes
+// from the stored URL, the search record gives fresh metadata, and the work
+// record is best effort. The existing description, related works and
+// resolvedFromISBN are carried over, so a refresh never wipes them: the
+// description and related works are replaced only by a successful fetch.
+func (s *ContentService) refreshBook(ctx context.Context, existing *domain.Content) (*domain.Content, error) {
+	kind, workKey, err := parseBookInput(*existing.URL)
+	if err != nil || kind != bookInputWorkID {
+		return nil, fmt.Errorf("%w: content has no Open Library work URL to refresh", domain.ErrInvalidInput)
+	}
+	if s.bookSearch == nil {
+		return nil, ErrBookClientUnavailable
+	}
+
+	result, err := s.lookupBookByWorkKey(ctx, workKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Stored values to keep. A corrupt payload only loses them, so it is logged, not fatal.
+	var prev struct {
+		Description      string              `json:"description"`
+		RelatedWorks     []shapedRelatedWork `json:"relatedWorks"`
+		ResolvedFromISBN string              `json:"resolvedFromISBN"`
+	}
+	if len(existing.Response) > 0 {
+		if err := json.Unmarshal(existing.Response, &prev); err != nil {
+			slog.Warn("stored book payload is not parseable; refreshing without its description", "contentID", existing.ID, "error", err)
+		}
+	}
+
+	shaped := shapeBookResult(*result)
+	shaped.Description = prev.Description
+	if prev.RelatedWorks != nil {
+		shaped.RelatedWorks = prev.RelatedWorks
+	}
+	shaped.ResolvedFromISBN = prev.ResolvedFromISBN
+	if work := s.fetchBookWork(ctx, workKey); work != nil {
+		shaped.Description = work.Description
+		shaped.RelatedWorks = shapeRelatedWorks(work.RelatedWorks)
+	}
+
+	responseJSON, err := json.Marshal(shaped)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal book response: %w", err)
+	}
+
+	updated, err := s.repo.UpdateMetadata(ctx, existing.ID, result.Title, responseJSON, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update content metadata: %w", err)
+	}
 	return updated, nil
 }
 
