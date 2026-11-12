@@ -79,7 +79,7 @@ function renderPassageCell(opts: {
 
 	const title = document.createElement('div');
 	title.dataset.testid = 'item-title';
-	title.className = `${displayTitle ? 'line-clamp-1' : 'line-clamp-2'} font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline`;
+	title.className = `${displayTitle ? 'line-clamp-1' : 'line-clamp-2'} font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline`;
 	title.textContent = displayTitle || name;
 	textWrap.appendChild(title);
 
@@ -137,7 +137,7 @@ function renderMovieCell(opts: {
 	const title = document.createElement('div');
 	title.dataset.testid = 'item-title';
 	title.className =
-		'line-clamp-1 font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
+		'line-clamp-1 font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
 	title.textContent = name;
 	textWrap.appendChild(title);
 	if (m?.year) {
@@ -306,7 +306,7 @@ export function activityItemCellRenderer(params: ActivityItemCellRendererParams)
 	const title = document.createElement('div');
 	title.dataset.testid = 'item-title';
 	title.className =
-		'line-clamp-2 min-w-0 flex-1 whitespace-normal text-left font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
+		'line-clamp-2 min-w-0 flex-1 whitespace-normal text-left font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
 	title.textContent = name;
 
 	cell.appendChild(thumbSlot(thumbWrap));

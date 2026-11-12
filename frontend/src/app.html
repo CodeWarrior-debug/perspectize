@@ -5,7 +5,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta
 			http-equiv="Content-Security-Policy"
-			content="default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.services https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: https://image.tmdb.org https://covers.openlibrary.org; connect-src 'self' http://localhost:8080 ws://localhost:8080 https://*.sevalla.app wss://*.sevalla.app https://api.perspectize.com wss://api.perspectize.com https://*.clerk.accounts.dev https://*.clerk.services https://*.grafana.net https://i.ytimg.com https://www.youtube-nocookie.com; font-src 'self' data:; worker-src 'self' blob:; frame-src https://challenges.cloudflare.com https://*.clerk.accounts.dev https://www.youtube.com https://www.youtube-nocookie.com; base-uri 'self'; form-action 'self';"
+			content="default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.services https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: https://image.tmdb.org; connect-src 'self' http://localhost:8080 ws://localhost:8080 https://*.sevalla.app wss://*.sevalla.app https://api.perspectize.com wss://api.perspectize.com https://*.clerk.accounts.dev https://*.clerk.services https://*.grafana.net https://i.ytimg.com https://www.youtube-nocookie.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; frame-src https://challenges.cloudflare.com https://*.clerk.accounts.dev https://www.youtube.com https://www.youtube-nocookie.com; base-uri 'self'; form-action 'self';"
 		/>
 		<link rel="preload" href="/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin />
 		<link rel="preload" href="/fonts/Charter-Bold.woff2" as="font" type="font/woff2" crossorigin />
@@ -136,6 +136,29 @@
 					}
 				} catch (e) {
 					// Corrupt/unavailable cache — fall back to the default theme silently.
+				}
+			})();
+			// Same for Settings → Fonts picks: cache written by lib/fonts/store.svelte.ts
+			// (applyFontsToDom does the same work once the app runs).
+			(function () {
+				try {
+					var raw = localStorage.getItem('perspectize-fonts-applied');
+					if (!raw) return;
+					var cache = JSON.parse(raw);
+					var root = document.documentElement;
+					for (var slot in cache.stacks) {
+						root.style.setProperty('--font-slot-' + slot, cache.stacks[slot]);
+						root.setAttribute('data-font-' + slot, '');
+					}
+					if (typeof cache.href === 'string' && cache.href.indexOf('https://fonts.googleapis.com/') === 0) {
+						var link = document.createElement('link');
+						link.id = 'perspectize-fonts-css';
+						link.rel = 'stylesheet';
+						link.href = cache.href;
+						document.head.appendChild(link);
+					}
+				} catch (e) {
+					// Corrupt/unavailable cache — keep the default fonts.
 				}
 			})();
 		</script>

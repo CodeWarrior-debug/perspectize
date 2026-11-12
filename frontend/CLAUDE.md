@@ -103,6 +103,8 @@ Tokens live in `src/app.css` under `@theme` (no external pipeline), consumed via
 
 **Theme preset names must be unique across all of `THEME_PRESETS`, not just ids** (`tests/components/theme-customize-panel.test.ts` uses `getByText` per name). After editing `presets.ts`, regenerate `app.css`'s `[data-theme]` blocks with `npx tsx gen-preset-css.mjs` and splice its output in place of the existing preset blocks (between the `Reading Room (default) needs no block` comment and the next unrelated CSS section); never hand-edit hex values.
 
+**User font picks (Settings → Fonts, `lib/fonts/`)** mirror the theme store: localStorage plus a `perspectize-fonts-applied` pre-paint cache applied by `app.html` (`tests/unit/fonts/font-store.test.ts` keeps the two in step). Restyling is opt-in via `:root[data-font-*]` rules in `app.css`, so any new serif-styled element needs a `font-slot-cell` / `font-slot-longform` marker class or `slot-coverage.test.ts` fails; an inline `font-family` style can't be beaten by a marker, so use `var(--font-slot-longform, <current stack>)` there. Refresh the font list with `node scripts/gen-font-catalog.mjs` (fetches from jsdelivr, which cloud sandboxes block: pass `--from <google-fonts-v2.json>`).
+
 ## AG Grid Svelte 5 Setup (CRITICAL)
 
 Uses `ag-grid-svelte5` (bundles AG Grid v32.x). **Do NOT install `ag-grid-community` separately.** Import from `@ag-grid-community/*`, use `AgGridSvelte5Component`, style via `withParams()` on a base theme (Activity and Plan: `themeBalham`). Setup: [docs/AG_GRID.md](docs/AG_GRID.md).
@@ -156,6 +158,8 @@ Uses `ag-grid-svelte5` (bundles AG Grid v32.x). **Do NOT install `ag-grid-commun
 **A test with heavy render work gets its own timeout, not a rerun** (e.g. `SettingsDialog.test.ts` theme section, 28 presets): `it(name, fn, 15000)`.
 
 **Vitest Browser Mode (`tests/browser/`, `vitest.config.browser.ts`) runs in CI** (`frontend-test.yml`, Playwright Chromium); a red browser step is a real failure. Run it locally first with `pnpm run test:browser --browser.headless=true` (flags go directly, no `--`: after `--` they parse as a file-name filter). Tests needing demo mode (no Clerk) call `vi.hoisted(() => vi.stubEnv('VITE_DEMO_MODE', 'true'))` at the top of the file; a config-level `define` leaks into the unit project and breaks every Clerk-auth unit test. `svelte-clerk` is aliased to a stub in the browser config (the real package needs SvelteKit virtual modules). macOS needs no Playwright download: the config drives the installed Google Chrome (override with `PW_CHROMIUM_EXECUTABLE`).
+
+**`vitest.config.browser.ts` has no Tailwind plugin**, so harness screenshots render utilities unstyled. For a one-off visual check, copy the config with `tailwindcss()` (`@tailwindcss/vite`) added and run `pnpm exec vitest run -c <copy>`; don't commit the copy. Cloud: `PW_CHROMIUM_EXECUTABLE=/opt/pw-browsers/chromium-<ver>/chrome-linux64/chrome` (`ls /opt/pw-browsers`), screenshots via `SV_SCREENSHOTS_DIR`.
 
 **Browser tests: wait for cells, not rows.** AG Grid creates `.ag-row` before cell renderers draw, so a count right after `waitForGridReady()` can see 0 cells. Poll: `await expect.poll(() => document.querySelectorAll(sel).length).toBe(n)`.
 

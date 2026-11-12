@@ -167,7 +167,7 @@
 					<div class="min-w-0">
 						<div
 							data-testid="passage-title"
-							class="font-[family-name:var(--font-family-serif)] text-[17px] leading-tight font-bold text-foreground"
+							class="font-slot-cell font-[family-name:var(--font-family-serif)] text-[17px] leading-tight font-bold text-foreground"
 						>
 							{content.displayTitle || content.name}
 						</div>
@@ -243,7 +243,7 @@
 						</div>
 						<div class="min-w-0">
 							<div
-								class="font-[family-name:var(--font-family-serif)] text-[17px] leading-tight font-bold text-foreground"
+								class="font-slot-cell font-[family-name:var(--font-family-serif)] text-[17px] leading-tight font-bold text-foreground"
 							>
 								{content.name}
 							</div>
@@ -278,7 +278,9 @@
 				<div class="mt-4.5 grid grid-cols-2 gap-2.5">
 					<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Perspectives</div>
-						<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-lg font-bold text-foreground">
+						<div
+							class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-lg font-bold text-foreground"
+						>
 							{perspectiveCountDisplay}
 						</div>
 					</div>
@@ -287,7 +289,9 @@
 						data-tooltip={qualityRatingCountTooltip}
 					>
 						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Avg. Rating</div>
-						<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-lg font-bold text-foreground">
+						<div
+							class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-lg font-bold text-foreground"
+						>
 							{averageRatingDisplay}
 						</div>
 					</div>
@@ -303,31 +307,41 @@
 					{:else if !isPassage}
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Views</div>
-							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
+							<div
+								class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
+							>
 								{formatCount(content.viewCount)}
 							</div>
 						</div>
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Likes</div>
-							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
+							<div
+								class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
+							>
 								{formatCount(content.likeCount)}
 							</div>
 						</div>
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Duration</div>
-							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
+							<div
+								class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
+							>
 								{formatDuration(content.length, content.lengthUnits, content.lengthDisplay?.precision)}
 							</div>
 						</div>
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Date</div>
-							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
+							<div
+								class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
+							>
 								{content.publishedAt ? formatDate(content.publishedAt) : '—'}
 							</div>
 						</div>
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Category</div>
-							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
+							<div
+								class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
+							>
 								{#if content.primaryCategory?.wikipediaUrl}
 									<a
 										href={content.primaryCategory.wikipediaUrl}
@@ -344,7 +358,9 @@
 						</div>
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Date Added</div>
-							<div class="mt-0.5 font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground">
+							<div
+								class="mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-[15px] font-bold text-foreground"
+							>
 								{content.createdAt ? formatDate(content.createdAt) : '—'}
 							</div>
 						</div>
@@ -355,7 +371,7 @@
 					<div>
 						<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Last updated in Perspectize</div>
 						<div
-							class="hover-tooltip mt-0.5 font-[family-name:var(--font-family-serif)] text-sm text-foreground"
+							class="hover-tooltip mt-0.5 font-slot-cell font-[family-name:var(--font-family-serif)] text-sm text-foreground"
 							data-tooltip={formatDateTime(content.updatedAt)}
 						>
 							{formatDate(content.updatedAt)}
@@ -400,7 +416,7 @@
 				{#if !isPassage && !isMovie && !isBook && hasDescription}
 					<div class="mt-3.5 border-t border-border pt-3.5">
 						<div class="mb-1.5 text-[11px] tracking-wide text-muted-foreground uppercase">Description</div>
-						<div class="font-serif text-[13px] whitespace-pre-wrap text-foreground">
+						<div class="font-slot-longform font-serif text-[13px] whitespace-pre-wrap text-foreground">
 							{content.description}
 						</div>
 					</div>
@@ -409,7 +425,7 @@
 				{#if !isPassage && !isMovie && !isBook && hasTags}
 					<div class="mt-3.5">
 						<div class="mb-1.5 text-[11px] tracking-wide text-muted-foreground uppercase">Tags</div>
-						<div class="font-[family-name:var(--font-family-serif)] text-[13px] text-foreground">
+						<div class="font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] text-foreground">
 							{formatTags(content.tags)}
 						</div>
 					</div>
