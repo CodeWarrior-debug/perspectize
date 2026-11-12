@@ -122,3 +122,11 @@ gh pr merge 123 --squash --delete-branch --admin
 - `--squash` — Single commit (cleaner history)
 - `--delete-branch` — Auto-delete branch after merge
 - `--admin` — Bypass branch protection when needed
+
+### Stacked PRs (GitHub stacks)
+
+- `gh pr merge` is refused for a PR in a stack ("must be merged using the asynchronous merge REST API"), and `gh stack merge` cannot bypass the required review. Merge bottom-first with `gh api -X PUT repos/CodeWarrior-debug/perspectize/pulls/<n>/merge-async -f merge_method=merge -F bypass_rules=true -f sha=<head sha>`, then poll `GET .../merge-async/<uuid>`. `bypass_rules` is the admin bypass (the `owners-protect-default` ruleset lists the admin role). The API has no delete-branch option: delete the branch afterwards with `gh api -X DELETE repos/CodeWarrior-debug/perspectize/git/refs/heads/<branch>`.
+- To keep individual commits use `merge_method=merge`. "Rebase and merge" is refused once a branch holds a merge commit, e.g. from resolving a conflict with `main`.
+- After merging the bottom PR, the next one retargets to `main` and CI reruns; wait for green before merging it. A conflict fix on a lower PR usually conflicts again in the one above (merge the lower branch into it).
+- You cannot approve your own PR (`gh pr review --approve` fails); admin bypass is the way through.
+- Tooling: `gh stack` extension plus the user-scope `gh-stack` skill (`gh skill install github/gh-stack gh-stack --agent claude-code --scope user`; needs `gh` 2.90+).
