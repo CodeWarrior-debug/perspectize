@@ -237,6 +237,17 @@ func applyMovieColumnFilters(query *gorm.DB, f *domain.ContentFilter) *gorm.DB {
 	return query
 }
 
+// applyBookColumnFilters applies the book grid's per-column filters. They read the
+// structured authors list in the response JSONB. The first author is the one matched:
+// a row without that key yields NULL, so a set filter excludes it. The value is
+// always bound.
+func applyBookColumnFilters(query *gorm.DB, f *domain.ContentFilter) *gorm.DB {
+	if f.AuthorContains != nil && *f.AuthorContains != "" {
+		query = query.Where("(response->'authors'->0->>'name') ILIKE ?", "%"+*f.AuthorContains+"%")
+	}
+	return query
+}
+
 // maxSearchPhrases caps comma-separated phrases per search to bound query size.
 const maxSearchPhrases = 10
 
@@ -348,6 +359,7 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		}
 		query = applyPersonFilter(query, params.Filter.PersonID, params.Filter.PersonRole)
 		query = applyMovieColumnFilters(query, params.Filter)
+		query = applyBookColumnFilters(query, params.Filter)
 		// View count filters (JSONB extraction)
 		if params.Filter.MinViewCount != nil {
 			query = query.Where("(response->'items'->0->'statistics'->>'viewCount')::BIGINT >= ?", *params.Filter.MinViewCount)
