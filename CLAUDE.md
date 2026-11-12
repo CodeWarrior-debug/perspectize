@@ -9,6 +9,7 @@
 - **No chained bash commands:** run each shell command as its own Bash tool call, never joined with `&&`. Chained commands don't match permission allow-list patterns and block on approval prompts. Applies to all agents and subagents.
 - **Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`)** during dev or verification — `DATABASE_URL` is the **shared Neon database**. Migrations are written and reviewed only, then applied manually per environment at rollout. Details and numbering: `backend/CLAUDE.md` → Migrations.
 - **Never attempt to log in or enter credentials.** `.env*` files (except `.env.example`) are unreadable by design; ask the human to re-run the one-time login if signed out.
+- **Worktrees live only under `.claude/worktrees/`** — never a scratchpad, `/tmp` or sibling folder. Create with `.claude/scripts/new-worktree.sh <branch> [name]` or `EnterWorktree`. Whoever creates one removes it when done (push or discard its work first). `worktree-guard.sh` denies the rest; `bash .claude/scripts/worktree-report.sh` lists strays. Details: [.docs/WORKTREES.md](.docs/WORKTREES.md).
 - **Never commit `.planning/phases/bugs/` files** (gitignored; see Bug logging).
 
 ## GitHub & Repository Management
@@ -29,7 +30,7 @@
 
 ## Branch Naming
 
-**Always branch from updated `main`:** `git checkout main`, `git pull origin main`, `git checkout -b <name>`.
+**Always branch from fresh `origin/main`, in a worktree:** `.claude/scripts/new-worktree.sh <type>/<name>` (it fetches first). Switching branches in the main checkout collides with other sessions.
 
 **Format:** `type/initiativePrefix-issueNumber-description-in-kebab-case`. `type` is `feature`, `bugfix` or `chore`; `initiativePrefix` is `INI` (Initialization Phase). `initiativePrefix` and `issueNumber` are a pair: both, or neither when no issue already exists. Examples: `feature/INI-16-youtube-post-graphql`, `feature/youtube-post-graphql`.
 
