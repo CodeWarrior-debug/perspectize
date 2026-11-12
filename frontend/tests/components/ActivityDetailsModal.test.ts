@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
+import { MODAL_ACTION_CLASS } from '$lib/components/modal-action';
 
 // Hoisted mocks — shared pattern for useUpdateSourceData components (see AddVideoPopover.test.ts)
 const mocks = vi.hoisted(() => ({
@@ -516,6 +517,13 @@ describe('ActivityDetailsModal', () => {
 			expect(screen.getByRole('button', { name: /save title/i })).toBeDisabled();
 		});
 
+		it('sizes Save title like the other dialog actions and its input to match (#667)', () => {
+			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+			const save = screen.getByRole('button', { name: /save title/i });
+			for (const c of MODAL_ACTION_CLASS.split(' ')) expect(save).toHaveClass(c);
+			expect(screen.getByLabelText('Passage title')).toHaveClass('h-9');
+		});
+
 		it('offers original language for a passage', () => {
 			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
 			expect(screen.getByRole('button', { name: /show original language/i })).toBeInTheDocument();
@@ -621,6 +629,52 @@ describe('ActivityDetailsModal', () => {
 			authState.userId = 'user_1';
 			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 			expect(screen.queryByRole('button', { name: 'Add to plan' })).toBeNull();
+		});
+	});
+
+	describe('action buttons (#667)', () => {
+		const shared = MODAL_ACTION_CLASS.split(' ');
+
+		beforeEach(() => {
+			authState.userId = 'user_1';
+		});
+
+		function actions() {
+			return [
+				screen.getByRole('link', { name: /compare/i }),
+				screen.getByRole('button', { name: 'Add to plan' }),
+				screen.getByRole('button', { name: 'Update source data' }),
+			];
+		}
+
+		it('gives Compare, Add to plan and Update source data the same size and look', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			for (const el of actions()) {
+				for (const c of shared) expect(el).toHaveClass(c);
+				expect(el).toHaveClass('grow', 'basis-36');
+			}
+		});
+
+		it('gives every action one leading icon, so none sits lower or narrower than its neighbours', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			for (const el of actions()) expect(el.querySelectorAll('svg')).toHaveLength(1);
+		});
+
+		it('swaps the refresh icon for a spinner while updating, keeping one icon so the width holds', () => {
+			mocks.mockMutationState.isPending = true;
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			const button = screen.getByRole('button', { name: 'Update source data' });
+			const icons = button.querySelectorAll('svg');
+			expect(icons).toHaveLength(1);
+			expect(icons[0]).toHaveClass('animate-spin');
+		});
+
+		it('puts the actions on their own row under the date instead of beside it', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			const row = screen.getByTestId('details-actions');
+			expect(row).toHaveClass('flex', 'flex-wrap', 'gap-2');
+			expect(row).not.toHaveTextContent(/last updated/i);
+			for (const el of actions()) expect(row).toContainElement(el);
 		});
 	});
 });

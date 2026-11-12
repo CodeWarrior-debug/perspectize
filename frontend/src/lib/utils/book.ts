@@ -12,6 +12,20 @@ const REFERENCE_LINE_RE = /^[ \t]*\[[^\]]+\]:[^\n]*$/gm;
 const RULE_LINE_RE = /^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$/gm;
 const ITALIC_RE = /(^|[\s(])[*_]([^\s*_][^*_\n]*?)[*_](?=[\s).,;:!?]|$)/gm;
 
+/**
+ * Strips HTML tags until the string stops changing. One pass is not enough: removing the
+ * inner tag of `<scr<b>ipt>` leaves a fresh `<script>` (CodeQL js/incomplete-multi-character-sanitization).
+ */
+function stripTags(input: string): string {
+	let previous: string;
+	let current = input;
+	do {
+		previous = current;
+		current = current.replace(HTML_TAG_RE, '');
+	} while (current !== previous);
+	return current;
+}
+
 /** True when the input is an Open Library work or edition link (scheme optional, slug/query/hash allowed). */
 export function validateBookInput(raw: string): boolean {
 	return OPEN_LIBRARY_BOOK_RE.test(raw.trim());
@@ -24,10 +38,7 @@ export function validateBookInput(raw: string): boolean {
  * only ever be rendered as text, never as HTML.
  */
 export function descriptionText(markdown: string): string {
-	return markdown
-		.replace(IMAGE_RE, '')
-		.replace(LINK_RE, '$1')
-		.replace(HTML_TAG_RE, '')
+	return stripTags(markdown.replace(IMAGE_RE, '').replace(LINK_RE, '$1'))
 		.replace(REFERENCE_LINE_RE, '')
 		.replace(RULE_LINE_RE, '')
 		.replace(/\*\*|__/g, '')

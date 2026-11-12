@@ -51,6 +51,11 @@ describe('descriptionText', () => {
 		expect(descriptionText('One\n\n\n\n\nTwo')).toBe('One\n\nTwo');
 	});
 
+	it('leaves no tag behind when stripping one reveals another (nested tags)', () => {
+		expect(descriptionText('a <scr<b>ipt>alert(1)</scr</b>ipt> b')).not.toMatch(/<\/?script/i);
+		expect(descriptionText('<<b>script>x<</b>/script>')).not.toMatch(/<\/?script/i);
+	});
+
 	it('is empty for an empty description', () => {
 		expect(descriptionText('')).toBe('');
 	});
