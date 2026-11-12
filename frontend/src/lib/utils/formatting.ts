@@ -1,4 +1,5 @@
 import { BIBLE_PASSAGE_ICON_SVG } from './icons';
+import { bookSubjects } from './bookFormatting';
 import type { LengthDisplay } from '$lib/queries/content';
 
 /** The one "no value" glyph for grid cells; keep new formatters on it. */
@@ -448,6 +449,9 @@ const CLAIM_ICON_PATH =
 const MOVIE_ICON_PATH =
 	'M4 2h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5';
 
+/** Open-book glyph for BOOK rows (outline, themed stroke). */
+const BOOK_ICON_PATH = 'M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z';
+
 export function typeCellRenderer(params: { data?: { contentType: string } }): HTMLElement | string {
 	if (!params.data) return '';
 
@@ -481,6 +485,28 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 		const label = document.createElement('span');
 		label.className = 'sr-only';
 		label.textContent = 'Movie';
+		container.appendChild(svg);
+		container.appendChild(label);
+		return container;
+	}
+
+	if (params.data.contentType === 'BOOK') {
+		container.title = 'Book';
+		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		svg.setAttribute('width', '20');
+		svg.setAttribute('height', '20');
+		svg.setAttribute('viewBox', '0 0 24 24');
+		svg.setAttribute('fill', 'none');
+		svg.setAttribute('stroke', 'var(--color-muted-foreground)');
+		svg.setAttribute('stroke-width', '2');
+		svg.setAttribute('stroke-linecap', 'round');
+		svg.setAttribute('stroke-linejoin', 'round');
+		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+		path.setAttribute('d', BOOK_ICON_PATH);
+		svg.appendChild(path);
+		const label = document.createElement('span');
+		label.className = 'sr-only';
+		label.textContent = 'Book';
 		container.appendChild(svg);
 		container.appendChild(label);
 		return container;
@@ -690,6 +716,7 @@ export interface MovieResponse {
 export interface MovieRow {
 	contentType?: string;
 	movie?: unknown;
+	book?: unknown;
 	response?: unknown;
 	tags?: string[] | null;
 }
@@ -952,13 +979,15 @@ export function tmdbIdValueGetter(params: { data?: MovieRow }): number | null {
 
 /**
  * Tags for a row: the real tags (YouTube) when present, else TMDB keywords for a
- * Movie. Keywords are a source-provided set (see GitHub issue 560 for the planned
- * source vs user tag split; deliberately not modelled here).
+ * Movie, else Open Library subjects for a Book. Keywords and subjects are source-provided
+ * sets (see GitHub issue 560 for the planned source vs user tag split; deliberately not
+ * modelled here).
  */
 export function contentTags(row: MovieRow | null | undefined): string[] | null {
 	if (row?.tags && row.tags.length > 0) return row.tags;
 	const keywords = movieResponse(row)?.keywords;
-	return keywords && keywords.length > 0 ? keywords : null;
+	if (keywords && keywords.length > 0) return keywords;
+	return bookSubjects(row);
 }
 
 /** Display text for a nullable string cell. */
