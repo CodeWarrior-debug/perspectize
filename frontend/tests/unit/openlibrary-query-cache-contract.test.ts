@@ -9,11 +9,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hashKey } from '@tanstack/svelte-query';
-import {
-	BOOK_SEARCH_STALE_TIME,
-	BOOK_TRENDING_STALE_TIME,
-	openLibraryKeys,
-} from '$lib/services/openLibraryApi';
+import { BOOK_SEARCH_STALE_TIME, BOOK_TRENDING_STALE_TIME, openLibraryKeys } from '$lib/services/openLibraryApi';
 import { tmdbKeys } from '$lib/services/tmdbApi';
 import { countingFetch, makeClient, mountConsumers } from '../helpers/queryBudget';
 
