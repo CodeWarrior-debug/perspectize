@@ -197,8 +197,8 @@ func TestBuildContentSortRules(t *testing.T) {
 			wantPrimary: paginator.Rule{
 				Key:   "Author",
 				Order: paginator.ASC,
-				SQLRepr: "CASE WHEN response->'authorName'->>0 IS NULL OR response->'authorName'->>0 = '' " +
-					"THEN NULL ELSE response->'authorName'->>0 END",
+				SQLRepr: "CASE WHEN response->'authors'->0->>'name' IS NULL OR response->'authors'->0->>'name' = '' " +
+					"THEN NULL ELSE response->'authors'->0->>'name' END",
 				NULLReplacement: nullAuthorAsc,
 			},
 			wantTieOrder: paginator.ASC,
@@ -210,8 +210,8 @@ func TestBuildContentSortRules(t *testing.T) {
 			wantPrimary: paginator.Rule{
 				Key:   "Author",
 				Order: paginator.DESC,
-				SQLRepr: "CASE WHEN response->'authorName'->>0 IS NULL OR response->'authorName'->>0 = '' " +
-					"THEN NULL ELSE response->'authorName'->>0 END",
+				SQLRepr: "CASE WHEN response->'authors'->0->>'name' IS NULL OR response->'authors'->0->>'name' = '' " +
+					"THEN NULL ELSE response->'authors'->0->>'name' END",
 				NULLReplacement: nullAuthorDesc,
 			},
 			wantTieOrder: paginator.DESC,

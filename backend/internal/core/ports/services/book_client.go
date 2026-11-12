@@ -15,6 +15,10 @@ type BookSearchResult struct {
 	WorkKey    string
 	Title      string
 	AuthorName []string
+	// AuthorKey is Open Library's author id per author (e.g. "OL25788A"),
+	// parallel to AuthorName. It is nil when the search did not return
+	// author_key; consumers must not assume equal length.
+	AuthorKey []string
 	// CoverID is Open Library's cover image id; nil when there is no cover.
 	CoverID *int
 	// FirstPublishYear is nil when Open Library has no value.
