@@ -96,9 +96,11 @@
 		const year = publishedValueGetter({ data: row });
 		const pages = pagesValueGetter({ data: row });
 		const rating = ratingValueGetter({ data: row });
-		return [year, pages !== null ? `${pages} pages` : null, rating !== null ? `★ ${formatBookRating(rating)}` : null].filter(
-			(f): f is string => !!f,
-		);
+		return [
+			year,
+			pages !== null ? `${pages} pages` : null,
+			rating !== null ? `★ ${formatBookRating(rating)}` : null,
+		].filter((f): f is string => !!f);
 	}
 
 	/**
