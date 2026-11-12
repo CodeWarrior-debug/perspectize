@@ -45,6 +45,7 @@ var (
 	_ services.BookSearchClient   = (*Client)(nil)
 	_ services.BookTrendingClient = (*Client)(nil)
 	_ services.BookISBNClient     = (*Client)(nil)
+	_ services.BookWorkClient     = (*Client)(nil)
 )
 
 // NewClient creates an Open Library client. No API key is needed.
@@ -233,6 +234,12 @@ func (c *Client) ResolveISBN(ctx context.Context, isbn string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return editionWorkKey(body)
+}
+
+// editionWorkKey extracts the bare work id from an edition record's works[0]
+// reference. Shared by ResolveISBN and ResolveEdition.
+func editionWorkKey(body []byte) (string, error) {
 	var edition struct {
 		Works []struct {
 			Key string `json:"key"`
@@ -240,7 +247,7 @@ func (c *Client) ResolveISBN(ctx context.Context, isbn string) (string, error) {
 	}
 	if err := json.Unmarshal(body, &edition); err != nil {
 		// Deliberately not wrapping err: decoder errors can echo upstream content.
-		return "", fmt.Errorf("%w: failed to parse isbn response", ErrOpenLibraryAPI)
+		return "", fmt.Errorf("%w: failed to parse edition response", ErrOpenLibraryAPI)
 	}
 	if len(edition.Works) == 0 {
 		return "", fmt.Errorf("%w: edition has no work reference", ErrOpenLibraryAPI)

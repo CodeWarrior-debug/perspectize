@@ -56,6 +56,39 @@ type BookTrendingClient interface {
 	TrendingBooks(ctx context.Context, window domain.TrendingWindow, page int) (*BookSearchPage, error)
 }
 
+// BookRelatedWork is a related Open Library work named in a work description
+// (for example a volume split or a combined omnibus). URL is the canonical
+// work link, https://openlibrary.org/works/<id>.
+type BookRelatedWork struct {
+	Title string
+	URL   string
+}
+
+// BookWork is the description data from Open Library's canonical work record
+// (/works/{id}.json). It carries no author, rating or page data; those come
+// from search.json.
+type BookWork struct {
+	// Description is plain text with \n line endings. Empty when the record has
+	// none. Any trailing "Contains:"/"Also contained in:" block is removed and
+	// returned as RelatedWorks instead.
+	Description string
+	// RelatedWorks is never nil; it is empty when there are none.
+	RelatedWorks []BookRelatedWork
+}
+
+// BookWorkClient reads Open Library's canonical work and edition records.
+type BookWorkClient interface {
+	// FetchWork returns the description data for a bare work id (e.g.
+	// "OL23166W"). Returns domain.ErrInvalidInput for an id that does not match
+	// ^OL\d+W$ (no request is made) and domain.ErrNotFound on a 404.
+	FetchWork(ctx context.Context, workKey string) (*BookWork, error)
+	// ResolveEdition returns the bare work id (e.g. "OL23166W") an edition
+	// record (bare id such as "OL22640535M") belongs to. Returns
+	// domain.ErrInvalidInput for an id that does not match ^OL\d+M$ and
+	// domain.ErrNotFound on a 404.
+	ResolveEdition(ctx context.Context, editionKey string) (workKey string, err error)
+}
+
 // BookISBNClient resolves an ISBN to the Open Library work it belongs to
 // (/isbn/{isbn}.json, which 302s to a specific edition record).
 type BookISBNClient interface {
