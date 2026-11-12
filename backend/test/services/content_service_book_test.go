@@ -598,6 +598,163 @@ func TestResolveBookISBN_HyphenatedISBN(t *testing.T) {
 	assert.Equal(t, "East of Eden", result.Title)
 }
 
+// --- UpdateSourceData for BOOK ---
+
+// metadataWrite records what a refresh read and wrote, so tests can assert both
+// the payload and the DB cost (one GetByID, one UpdateMetadata).
+type metadataWrite struct {
+	getByIDCalls int
+	calls        int
+	id           int
+	name         string
+	response     json.RawMessage
+	length       *int
+}
+
+func bookRefreshRepo(row *domain.Content, w *metadataWrite) *mockContentRepository {
+	return &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			w.getByIDCalls++
+			return row, nil
+		},
+		updateMetadataFn: func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error) {
+			w.calls++
+			w.id = id
+			w.name = name
+			w.response = response
+			w.length = length
+			return &domain.Content{ID: id, Name: name, ContentType: domain.ContentTypeBook, Response: response}, nil
+		},
+	}
+}
+
+func bookRow(response string) *domain.Content {
+	url := "https://openlibrary.org/works/OL23166W"
+	return &domain.Content{
+		ID:            9,
+		Name:          "Old Title",
+		URL:           &url,
+		ContentType:   domain.ContentTypeBook,
+		AddedByUserID: 7,
+		Response:      json.RawMessage(response),
+	}
+}
+
+func TestUpdateSourceData_BookRenamesAndStoresFreshRatings(t *testing.T) {
+	row := bookRow(`{"workKey":"OL23166W","title":"Old Title","authors":[],"ratingsAverage":1.0}`)
+	avg, count := 4.5, 120
+	bs := singleResultSearch(t, "OL23166W", portservices.BookSearchResult{
+		WorkKey: "OL23166W", Title: "East of Eden", AuthorName: []string{"John Steinbeck"},
+		RatingsAverage: &avg, RatingsCount: &count,
+	})
+	bw := &mockBookWorkClient{fetchFn: func(ctx context.Context, workKey string) (*portservices.BookWork, error) {
+		return &portservices.BookWork{RelatedWorks: []portservices.BookRelatedWork{}}, nil
+	}}
+	w := &metadataWrite{}
+	svc := services.NewContentService(bookRefreshRepo(row, w), nil, nil, services.WithBookSearch(bs), services.WithBookWork(bw))
+
+	got, err := svc.UpdateSourceData(context.Background(), 9)
+	require.NoError(t, err)
+	assert.Equal(t, "East of Eden", got.Name)
+	assert.Equal(t, 9, w.id)
+	assert.Equal(t, "East of Eden", w.name)
+	assert.Nil(t, w.length, "a book has no length, so none is written")
+
+	raw := rawBookResponseOf(t, &domain.Content{Response: w.response})
+	assert.JSONEq(t, `4.5`, string(raw["ratingsAverage"]))
+	assert.JSONEq(t, `120`, string(raw["ratingsCount"]))
+
+	// DB cost is unchanged by the refresh: one read, one write.
+	assert.Equal(t, 1, w.getByIDCalls)
+	assert.Equal(t, 1, w.calls)
+}
+
+func TestUpdateSourceData_BookKeepsResolvedFromISBN(t *testing.T) {
+	row := bookRow(`{"workKey":"OL23166W","title":"East of Eden","authors":[],"resolvedFromISBN":"9780434740024"}`)
+	bs := singleResultSearch(t, "OL23166W", eastOfEden())
+	bw := &mockBookWorkClient{fetchFn: func(ctx context.Context, workKey string) (*portservices.BookWork, error) {
+		return &portservices.BookWork{RelatedWorks: []portservices.BookRelatedWork{}}, nil
+	}}
+	w := &metadataWrite{}
+	svc := services.NewContentService(bookRefreshRepo(row, w), nil, nil, services.WithBookSearch(bs), services.WithBookWork(bw))
+
+	_, err := svc.UpdateSourceData(context.Background(), 9)
+	require.NoError(t, err)
+	raw := rawBookResponseOf(t, &domain.Content{Response: w.response})
+	assert.JSONEq(t, `"9780434740024"`, string(raw["resolvedFromISBN"]))
+}
+
+func TestUpdateSourceData_BookWorkFailureKeepsDescriptionAndRelatedWorks(t *testing.T) {
+	row := bookRow(`{"workKey":"OL23166W","title":"East of Eden","authors":[],` +
+		`"description":"Old description.","relatedWorks":[{"title":"Vol 1/2","url":"https://openlibrary.org/works/OL17811975W"}]}`)
+	bs := singleResultSearch(t, "OL23166W", eastOfEden())
+	bw := &mockBookWorkClient{fetchFn: func(ctx context.Context, workKey string) (*portservices.BookWork, error) {
+		return nil, errors.New("upstream 500")
+	}}
+	w := &metadataWrite{}
+	svc := services.NewContentService(bookRefreshRepo(row, w), nil, nil, services.WithBookSearch(bs), services.WithBookWork(bw))
+
+	_, err := svc.UpdateSourceData(context.Background(), 9)
+	require.NoError(t, err, "a failed work fetch does not fail the refresh")
+	raw := rawBookResponseOf(t, &domain.Content{Response: w.response})
+	assert.JSONEq(t, `"Old description."`, string(raw["description"]))
+	assert.JSONEq(t, `[{"title":"Vol 1/2","url":"https://openlibrary.org/works/OL17811975W"}]`, string(raw["relatedWorks"]))
+}
+
+func TestUpdateSourceData_BookWorkSuccessReplacesDescriptionAndRelatedWorks(t *testing.T) {
+	row := bookRow(`{"workKey":"OL23166W","title":"East of Eden","authors":[],` +
+		`"description":"Old description.","relatedWorks":[{"title":"Vol 1/2","url":"https://openlibrary.org/works/OL17811975W"}]}`)
+	bs := singleResultSearch(t, "OL23166W", eastOfEden())
+	bw := &mockBookWorkClient{fetchFn: func(ctx context.Context, workKey string) (*portservices.BookWork, error) {
+		return &portservices.BookWork{Description: "New description.", RelatedWorks: []portservices.BookRelatedWork{}}, nil
+	}}
+	w := &metadataWrite{}
+	svc := services.NewContentService(bookRefreshRepo(row, w), nil, nil, services.WithBookSearch(bs), services.WithBookWork(bw))
+
+	_, err := svc.UpdateSourceData(context.Background(), 9)
+	require.NoError(t, err)
+	raw := rawBookResponseOf(t, &domain.Content{Response: w.response})
+	assert.JSONEq(t, `"New description."`, string(raw["description"]))
+	assert.JSONEq(t, `[]`, string(raw["relatedWorks"]))
+}
+
+func TestUpdateSourceData_BookNotFoundInSearch(t *testing.T) {
+	row := bookRow(`{"workKey":"OL23166W","title":"East of Eden","authors":[]}`)
+	bs := &mockBookSearchClient{searchFn: func(ctx context.Context, query string, page int) (*portservices.BookSearchPage, error) {
+		return &portservices.BookSearchPage{}, nil
+	}}
+	w := &metadataWrite{}
+	svc := services.NewContentService(bookRefreshRepo(row, w), nil, nil, services.WithBookSearch(bs))
+
+	_, err := svc.UpdateSourceData(context.Background(), 9)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	assert.Equal(t, 0, w.calls, "nothing is written when the book is gone")
+}
+
+func TestUpdateSourceData_BookWithoutSearchClient(t *testing.T) {
+	row := bookRow(`{"workKey":"OL23166W","title":"East of Eden","authors":[]}`)
+	w := &metadataWrite{}
+	svc := services.NewContentService(bookRefreshRepo(row, w), nil, nil)
+
+	_, err := svc.UpdateSourceData(context.Background(), 9)
+	assert.ErrorIs(t, err, services.ErrBookClientUnavailable)
+}
+
+func TestUpdateSourceData_MovieRefreshStaysOutOfScope(t *testing.T) {
+	url := "https://www.themoviedb.org/movie/603"
+	row := &domain.Content{ID: 9, Name: "The Matrix", URL: &url, ContentType: domain.ContentTypeMovie}
+	w := &metadataWrite{}
+	yt := &mockYouTubeClient{extractVideoIDFn: func(u string) (string, error) {
+		t.Fatal("a movie row must not reach the YouTube path")
+		return "", nil
+	}}
+	svc := services.NewContentService(bookRefreshRepo(row, w), yt, nil)
+
+	_, err := svc.UpdateSourceData(context.Background(), 9)
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	assert.Equal(t, 0, w.calls)
+}
+
 func TestResolveBookISBN_NotFound(t *testing.T) {
 	bi := &mockBookISBNClient{resolveFn: func(ctx context.Context, isbn string) (string, error) {
 		return "", domain.ErrNotFound
