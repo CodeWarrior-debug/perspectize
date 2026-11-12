@@ -37,7 +37,8 @@ func (m *mockCategoryRepository) GetByID(ctx context.Context, id int) (*domain.C
 
 // mockWikidataClient implements services.WikidataClient for testing
 type mockWikidataClient struct {
-	searchFn func(ctx context.Context, query string, language string, limit int) ([]domain.WikidataSearchResult, error)
+	searchFn          func(ctx context.Context, query string, language string, limit int) ([]domain.WikidataSearchResult, error)
+	getWikipediaURLFn func(ctx context.Context, qid string) (string, error)
 }
 
 func (m *mockWikidataClient) Search(ctx context.Context, query string, language string, limit int) ([]domain.WikidataSearchResult, error) {
@@ -45,6 +46,13 @@ func (m *mockWikidataClient) Search(ctx context.Context, query string, language 
 		return m.searchFn(ctx, query, language, limit)
 	}
 	return []domain.WikidataSearchResult{}, nil
+}
+
+func (m *mockWikidataClient) GetWikipediaURL(ctx context.Context, qid string) (string, error) {
+	if m.getWikipediaURLFn != nil {
+		return m.getWikipediaURLFn(ctx, qid)
+	}
+	return "", nil
 }
 
 // mockContentRepoForCategory implements repositories.ContentRepository for category tests
@@ -239,6 +247,124 @@ func TestSetPrimaryCategory_UpdateFKFails(t *testing.T) {
 	_, err := svc.SetPrimaryCategory(context.Background(), input)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "update content primary category")
+}
+
+func TestSetPrimaryCategory_FetchesAndStoresWikipediaURL(t *testing.T) {
+	var upserted *domain.Category
+	categoryRepo := &mockCategoryRepository{
+		upsertFn: func(ctx context.Context, category *domain.Category) (*domain.Category, error) {
+			upserted = category
+			category.ID = 1
+			return category, nil
+		},
+	}
+	wikidataClient := &mockWikidataClient{
+		getWikipediaURLFn: func(ctx context.Context, qid string) (string, error) {
+			assert.Equal(t, "Q12345", qid)
+			return "https://en.wikipedia.org/wiki/Science", nil
+		},
+	}
+	svc := services.NewCategoryService(categoryRepo, &mockContentRepoForCategory{}, wikidataClient)
+
+	input := portservices.SetPrimaryCategoryInput{
+		ContentID: 1,
+		QID:       "Q12345",
+		Label:     "Science",
+	}
+
+	_, err := svc.SetPrimaryCategory(context.Background(), input)
+	require.NoError(t, err)
+	require.NotNil(t, upserted)
+	assert.Equal(t, "https://en.wikipedia.org/wiki/Science", upserted.WikipediaURL)
+}
+
+func TestSetPrimaryCategory_WikipediaURLFetchFailureIsNonFatal(t *testing.T) {
+	var upserted *domain.Category
+	categoryRepo := &mockCategoryRepository{
+		upsertFn: func(ctx context.Context, category *domain.Category) (*domain.Category, error) {
+			upserted = category
+			category.ID = 1
+			return category, nil
+		},
+	}
+	wikidataClient := &mockWikidataClient{
+		getWikipediaURLFn: func(ctx context.Context, qid string) (string, error) {
+			return "", fmt.Errorf("wikidata unreachable")
+		},
+	}
+	svc := services.NewCategoryService(categoryRepo, &mockContentRepoForCategory{}, wikidataClient)
+
+	input := portservices.SetPrimaryCategoryInput{
+		ContentID: 1,
+		QID:       "Q12345",
+		Label:     "Science",
+	}
+
+	// The mutation as a whole must still succeed — a Wikidata sitelink
+	// lookup failure shouldn't block setting the category.
+	_, err := svc.SetPrimaryCategory(context.Background(), input)
+	require.NoError(t, err)
+	require.NotNil(t, upserted)
+	assert.Empty(t, upserted.WikipediaURL)
+}
+
+// --- RemovePrimaryCategory Tests ---
+
+func TestRemovePrimaryCategory_Success(t *testing.T) {
+	catID := 42
+	var clearedContentID int
+	var clearedCategoryID *int
+	contentRepo := &mockContentRepoForCategory{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{ID: id, Name: "Test Video", PrimaryCategoryID: &catID}, nil
+		},
+		updatePrimaryCategoryFn: func(ctx context.Context, contentID int, categoryID *int) error {
+			clearedContentID = contentID
+			clearedCategoryID = categoryID
+			return nil
+		},
+	}
+	svc := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})
+
+	result, err := svc.RemovePrimaryCategory(context.Background(), 1)
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.ID)
+	assert.Equal(t, 1, clearedContentID)
+	assert.Nil(t, clearedCategoryID)
+}
+
+func TestRemovePrimaryCategory_InvalidContentID(t *testing.T) {
+	svc := services.NewCategoryService(&mockCategoryRepository{}, &mockContentRepoForCategory{}, &mockWikidataClient{})
+
+	_, err := svc.RemovePrimaryCategory(context.Background(), 0)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrInvalidInput))
+}
+
+func TestRemovePrimaryCategory_ContentNotFound(t *testing.T) {
+	contentRepo := &mockContentRepoForCategory{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return nil, domain.ErrNotFound
+		},
+	}
+	svc := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})
+
+	_, err := svc.RemovePrimaryCategory(context.Background(), 999)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "get content")
+}
+
+func TestRemovePrimaryCategory_UpdateFKFails(t *testing.T) {
+	contentRepo := &mockContentRepoForCategory{
+		updatePrimaryCategoryFn: func(ctx context.Context, contentID int, categoryID *int) error {
+			return fmt.Errorf("database error")
+		},
+	}
+	svc := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})
+
+	_, err := svc.RemovePrimaryCategory(context.Background(), 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "clear content primary category")
 }
 
 // --- SearchWikidata Tests ---

@@ -72,8 +72,9 @@
 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
 	import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
-	import CategoryTypeahead from '$lib/components/CategoryTypeahead.svelte';
+	import CategoryTypeahead, { type CurrentCategory } from '$lib/components/CategoryTypeahead.svelte';
 	import { useSetPrimaryCategory } from '$lib/queries/hooks/useSetPrimaryCategory';
+	import { useRemovePrimaryCategory } from '$lib/queries/hooks/useRemovePrimaryCategory';
 	import type { WikidataSearchResult } from '$lib/queries/categories';
 
 	// Popover state for Perspectize column
@@ -85,11 +86,12 @@
 	// Popover state for Category column
 	let categoryPopoverOpen = $state(false);
 	let categoryPopoverContentId = $state<number | null>(null);
-	let categoryPopoverCurrentCategory = $state<{ label: string; wikidataQid: string } | null>(null);
+	let categoryPopoverCurrentCategory = $state<CurrentCategory | null>(null);
 	let categoryPopoverPosition = $state({ x: 0, y: 0 });
 
-	// Category mutation hook
+	// Category mutation hooks
 	const setPrimaryCategoryMutation = useSetPrimaryCategory();
+	const removePrimaryCategoryMutation = useRemovePrimaryCategory();
 
 	function handleCategorySelect(result: WikidataSearchResult) {
 		if (categoryPopoverContentId == null) return;
@@ -100,6 +102,12 @@
 			description: result.description ?? undefined,
 			entityType: result.entityType ?? undefined,
 		});
+		categoryPopoverOpen = false;
+	}
+
+	function handleCategoryRemove() {
+		if (categoryPopoverContentId == null) return;
+		removePrimaryCategoryMutation.mutate(categoryPopoverContentId);
 		categoryPopoverOpen = false;
 	}
 
@@ -653,6 +661,9 @@
 					? {
 							label: event.data.primaryCategory.label,
 							wikidataQid: event.data.primaryCategory.wikidataQid,
+							description: event.data.primaryCategory.description,
+							entityType: event.data.primaryCategory.entityType,
+							wikipediaUrl: event.data.primaryCategory.wikipediaUrl,
 						}
 					: null;
 				categoryPopoverPosition = { x: rect.left ?? rect.x, y: (rect.bottom ?? rect.y) + 4 };
@@ -1026,14 +1037,14 @@
 		}}
 		aria-label="Close category search"
 	></button>
-	<div
-		class="fixed z-50 rounded-md border bg-popover shadow-md"
-		style="left: {categoryPopoverPosition.x}px; top: {categoryPopoverPosition.y}px;"
-	>
+	<!-- Positioning wrapper only — CategoryTypeahead owns its own popover card
+	     styling (bg/border/shadow/padding/animation), matching PopoverContent. -->
+	<div class="fixed z-50" style="left: {categoryPopoverPosition.x}px; top: {categoryPopoverPosition.y}px;">
 		<CategoryTypeahead
 			contentId={categoryPopoverContentId ?? 0}
 			currentCategory={categoryPopoverCurrentCategory}
 			onSelect={handleCategorySelect}
+			onRemove={handleCategoryRemove}
 			onClose={() => {
 				categoryPopoverOpen = false;
 			}}

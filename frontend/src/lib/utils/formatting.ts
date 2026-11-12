@@ -425,9 +425,45 @@ export function categoryCellRenderer(params: {
 	if (category) {
 		const label = document.createElement('span');
 		label.textContent = category.label;
-		label.title = category.description ?? category.wikidataQid;
 		label.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
 		container.appendChild(label);
+
+		// Reference-explainer tooltip, matching the app's other dark hover
+		// tooltips (e.g. the "About perspectives" info icon in
+		// PerspectivePopover.svelte) rather than the browser's native `title`
+		// tooltip. Rendered as a fixed-position element appended to <body>
+		// instead of nested inside the cell — AG Grid clips anything that
+		// overflows a cell/row, so a nested tooltip would get cut off.
+		let tooltipEl: HTMLDivElement | null = null;
+		const showTooltip = () => {
+			if (tooltipEl) return;
+			tooltipEl = document.createElement('div');
+			tooltipEl.className =
+				'fixed z-[100] max-w-64 rounded-lg bg-foreground px-3 py-2 text-xs text-background shadow-xl pointer-events-none';
+
+			const title = document.createElement('div');
+			title.className = 'font-medium';
+			title.textContent = category.label;
+			tooltipEl.appendChild(title);
+
+			if (category.description) {
+				const desc = document.createElement('div');
+				desc.className = 'mt-0.5 text-background/80';
+				desc.textContent = category.description;
+				tooltipEl.appendChild(desc);
+			}
+
+			document.body.appendChild(tooltipEl);
+			const rect = label.getBoundingClientRect();
+			tooltipEl.style.left = `${rect.left}px`;
+			tooltipEl.style.top = `${rect.bottom + 6}px`;
+		};
+		const hideTooltip = () => {
+			tooltipEl?.remove();
+			tooltipEl = null;
+		};
+		label.addEventListener('mouseenter', showTooltip);
+		label.addEventListener('mouseleave', hideTooltip);
 	} else {
 		const plus = document.createElement('span');
 		plus.textContent = '+';

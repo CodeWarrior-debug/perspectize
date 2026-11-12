@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
@@ -45,12 +46,23 @@ func (s *CategoryServiceImpl) SetPrimaryCategory(ctx context.Context, input port
 		return nil, fmt.Errorf("%w: label must not be empty", domain.ErrInvalidInput)
 	}
 
+	// Look up the English Wikipedia sitelink for this QID. Most Wikidata items
+	// don't have one — that's a normal case (empty string), not a failure —
+	// and a Wikidata API hiccup here shouldn't block setting the category, so
+	// this is logged and swallowed rather than returned as an error.
+	wikipediaURL, err := s.wikidataClient.GetWikipediaURL(ctx, input.QID)
+	if err != nil {
+		slog.Warn("looking up wikipedia sitelink failed, continuing without it", "error", err, "qid", input.QID)
+		wikipediaURL = ""
+	}
+
 	// Build domain category from input
 	category := &domain.Category{
-		WikidataQID: input.QID,
-		Label:       input.Label,
-		Description: input.Description,
-		EntityType:  input.EntityType,
+		WikidataQID:  input.QID,
+		Label:        input.Label,
+		Description:  input.Description,
+		EntityType:   input.EntityType,
+		WikipediaURL: wikipediaURL,
 	}
 
 	// Upsert category (insert or update by wikidata_qid)
@@ -73,6 +85,30 @@ func (s *CategoryServiceImpl) SetPrimaryCategory(ctx context.Context, input port
 
 	// Fetch updated content
 	content, err := s.contentRepo.GetByID(ctx, input.ContentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch updated content: %w", err)
+	}
+
+	return content, nil
+}
+
+// RemovePrimaryCategory clears a content item's primary category back to unset/null.
+func (s *CategoryServiceImpl) RemovePrimaryCategory(ctx context.Context, contentID int) (*domain.Content, error) {
+	if contentID <= 0 {
+		return nil, fmt.Errorf("%w: content id must be a positive integer", domain.ErrInvalidInput)
+	}
+
+	// Verify content exists
+	_, err := s.contentRepo.GetByID(ctx, contentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get content: %w", err)
+	}
+
+	if err := s.contentRepo.UpdatePrimaryCategoryID(ctx, contentID, nil); err != nil {
+		return nil, fmt.Errorf("failed to clear content primary category: %w", err)
+	}
+
+	content, err := s.contentRepo.GetByID(ctx, contentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch updated content: %w", err)
 	}

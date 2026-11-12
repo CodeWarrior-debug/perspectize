@@ -359,6 +359,27 @@ func (r *mutationResolver) CreateClaim(ctx context.Context, input model.CreateCl
 
 // SetPrimaryCategory is the resolver for the setPrimaryCategory field.
 func (r *mutationResolver) SetPrimaryCategory(ctx context.Context, input model.SetPrimaryCategoryInput) (*model.Content, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	existing, err := r.ContentService.GetByID(ctx, input.ContentID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("content not found")
+		}
+		slog.Error("loading content for category authorization failed", "error", err, "contentID", input.ContentID)
+		return nil, fmt.Errorf("failed to set primary category: %v", err)
+	}
+
+	// Setting the initial category (nobody has categorized this content yet)
+	// is open to any authenticated user. CHANGING an already-set category is
+	// restricted to an admin or whoever originally added the content.
+	if existing.PrimaryCategoryID != nil && authUser.Role != domain.UserRoleAdmin && authUser.ID != existing.AddedByUserID {
+		return nil, fmt.Errorf("%w: only an admin or the user who added this content can change its category", domain.ErrForbidden)
+	}
+
 	description := ""
 	if input.Description != nil {
 		description = *input.Description
@@ -386,6 +407,46 @@ func (r *mutationResolver) SetPrimaryCategory(ctx context.Context, input model.S
 		}
 		slog.Error("setting primary category failed", "error", err, "contentID", input.ContentID)
 		return nil, fmt.Errorf("failed to set primary category: %v", err)
+	}
+
+	return domainToModel(content), nil
+}
+
+// RemovePrimaryCategory is the resolver for the removePrimaryCategory field.
+func (r *mutationResolver) RemovePrimaryCategory(ctx context.Context, contentID int) (*model.Content, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	existing, err := r.ContentService.GetByID(ctx, contentID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("content not found")
+		}
+		slog.Error("loading content for category authorization failed", "error", err, "contentID", contentID)
+		return nil, fmt.Errorf("failed to remove primary category: %v", err)
+	}
+
+	// Removing only makes sense when a category is already set, and — like
+	// changing one — is restricted to an admin or whoever added the content.
+	if existing.PrimaryCategoryID == nil {
+		return nil, fmt.Errorf("content has no category set to remove")
+	}
+	if authUser.Role != domain.UserRoleAdmin && authUser.ID != existing.AddedByUserID {
+		return nil, fmt.Errorf("%w: only an admin or the user who added this content can remove its category", domain.ErrForbidden)
+	}
+
+	content, err := r.CategoryService.RemovePrimaryCategory(ctx, contentID)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("invalid input: %w", err)
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("content not found")
+		}
+		slog.Error("removing primary category failed", "error", err, "contentID", contentID)
+		return nil, fmt.Errorf("failed to remove primary category: %v", err)
 	}
 
 	return domainToModel(content), nil

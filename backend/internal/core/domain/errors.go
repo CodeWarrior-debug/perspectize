@@ -11,4 +11,5 @@ var (
 	ErrInvalidRating  = errors.New("rating must be between 0 and 10000")
 	ErrSentinelUser   = errors.New("cannot modify the system sentinel user")
 	ErrDeleteSentinel = errors.New("cannot delete the system sentinel user")
+	ErrForbidden      = errors.New("not authorized to perform this action")
 )

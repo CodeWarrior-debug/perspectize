@@ -18,12 +18,17 @@ export interface CategoryItem {
 	label: string;
 	description: string | null;
 	entityType: string | null;
+	wikipediaUrl: string | null;
 	createdAt: string;
 	updatedAt: string;
 }
 
 export interface SetPrimaryCategoryResponse {
 	setPrimaryCategory: ContentItem;
+}
+
+export interface RemovePrimaryCategoryResponse {
+	removePrimaryCategory: ContentItem;
 }
 
 export const WIKIDATA_SEARCH = gql`
@@ -48,6 +53,24 @@ export const SET_PRIMARY_CATEGORY = gql`
 				label
 				description
 				entityType
+				wikipediaUrl
+			}
+		}
+	}
+`;
+
+export const REMOVE_PRIMARY_CATEGORY = gql`
+	mutation RemovePrimaryCategory($contentId: IntID!) {
+		removePrimaryCategory(contentId: $contentId) {
+			id
+			name
+			primaryCategory {
+				id
+				wikidataQid
+				label
+				description
+				entityType
+				wikipediaUrl
 			}
 		}
 	}

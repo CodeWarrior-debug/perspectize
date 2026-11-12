@@ -48,13 +48,14 @@ type ComplexityRoot struct {
 	}
 
 	Category struct {
-		CreatedAt   func(childComplexity int) int
-		Description func(childComplexity int) int
-		EntityType  func(childComplexity int) int
-		ID          func(childComplexity int) int
-		Label       func(childComplexity int) int
-		UpdatedAt   func(childComplexity int) int
-		WikidataQid func(childComplexity int) int
+		CreatedAt    func(childComplexity int) int
+		Description  func(childComplexity int) int
+		EntityType   func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Label        func(childComplexity int) int
+		UpdatedAt    func(childComplexity int) int
+		WikidataQid  func(childComplexity int) int
+		WikipediaURL func(childComplexity int) int
 	}
 
 	Content struct {
@@ -91,6 +92,7 @@ type ComplexityRoot struct {
 		CreateUser               func(childComplexity int, input model.CreateUserInput) int
 		DeletePerspective        func(childComplexity int, id string) int
 		DeleteUser               func(childComplexity int, id string) int
+		RemovePrimaryCategory    func(childComplexity int, contentID int) int
 		SetPrimaryCategory       func(childComplexity int, input model.SetPrimaryCategoryInput) int
 		UpdateContentSourceData  func(childComplexity int, contentID int) int
 		UpdatePerspective        func(childComplexity int, input model.UpdatePerspectiveInput) int
@@ -190,6 +192,7 @@ type MutationResolver interface {
 	DeletePerspective(ctx context.Context, id string) (bool, error)
 	CreateClaim(ctx context.Context, input model.CreateClaimInput) (*model.Content, error)
 	SetPrimaryCategory(ctx context.Context, input model.SetPrimaryCategoryInput) (*model.Content, error)
+	RemovePrimaryCategory(ctx context.Context, contentID int) (*model.Content, error)
 }
 type QueryResolver interface {
 	Me(ctx context.Context) (*model.User, error)
@@ -279,6 +282,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Category.WikidataQid(childComplexity), true
+	case "Category.wikipediaUrl":
+		if e.ComplexityRoot.Category.WikipediaURL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Category.WikipediaURL(childComplexity), true
 
 	case "Content.addedBy":
 		if e.ComplexityRoot.Content.AddedBy == nil {
@@ -474,6 +483,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteUser(childComplexity, args["id"].(string)), true
+	case "Mutation.removePrimaryCategory":
+		if e.ComplexityRoot.Mutation.RemovePrimaryCategory == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_removePrimaryCategory_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.RemovePrimaryCategory(childComplexity, args["contentId"].(int)), true
 	case "Mutation.setPrimaryCategory":
 		if e.ComplexityRoot.Mutation.SetPrimaryCategory == nil {
 			break
@@ -1063,6 +1083,7 @@ type Category {
   label: String!
   description: String
   entityType: String
+  wikipediaUrl: String
   createdAt: String!
   updatedAt: String!
 }
@@ -1261,6 +1282,7 @@ type Mutation {
 
   # Category mutations
   setPrimaryCategory(input: SetPrimaryCategoryInput!): Content! @auth
+  removePrimaryCategory(contentId: IntID!): Content! @auth
 }
 
 type Query {
@@ -1333,6 +1355,8 @@ func (ec *executionContext) childFields_Category(ctx context.Context, field grap
 		return ec.fieldContext_Category_description(ctx, field)
 	case "entityType":
 		return ec.fieldContext_Category_entityType(ctx, field)
+	case "wikipediaUrl":
+		return ec.fieldContext_Category_wikipediaUrl(ctx, field)
 	case "createdAt":
 		return ec.fieldContext_Category_createdAt(ctx, field)
 	case "updatedAt":
@@ -1730,6 +1754,20 @@ func (ec *executionContext) field_Mutation_deleteUser_args(ctx context.Context, 
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_removePrimaryCategory_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "contentId",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNIntID2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["contentId"] = arg0
 	return args, nil
 }
 
@@ -2247,6 +2285,29 @@ func (ec *executionContext) _Category_entityType(ctx context.Context, field grap
 	)
 }
 func (ec *executionContext) fieldContext_Category_entityType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Category", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Category_wikipediaUrl(ctx context.Context, field graphql.CollectedField, obj *model.Category) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Category_wikipediaUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.WikipediaURL, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Category_wikipediaUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Category", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
@@ -3394,6 +3455,63 @@ func (ec *executionContext) fieldContext_Mutation_setPrimaryCategory(ctx context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_setPrimaryCategory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_removePrimaryCategory(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_removePrimaryCategory(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().RemovePrimaryCategory(ctx, fc.Args["contentId"].(int))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.Content
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Content) graphql.Marshaler {
+			return ec.marshalNContent2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_removePrimaryCategory(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Content(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_removePrimaryCategory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -6817,6 +6935,11 @@ func (ec *executionContext) _Category(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
+		case "wikipediaUrl":
+			out.Values[i] = ec._Category_wikipediaUrl(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		case "createdAt":
 			out.Values[i] = ec._Category_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -7139,6 +7262,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "setPrimaryCategory":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_setPrimaryCategory(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "removePrimaryCategory":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_removePrimaryCategory(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++

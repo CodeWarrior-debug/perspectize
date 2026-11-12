@@ -20,6 +20,9 @@ type CategoryService interface {
 	// SetPrimaryCategory upserts a category from Wikidata data, then assigns it as the content's primary category
 	SetPrimaryCategory(ctx context.Context, input SetPrimaryCategoryInput) (*domain.Content, error)
 
+	// RemovePrimaryCategory clears a content item's primary category (sets it back to unset/null)
+	RemovePrimaryCategory(ctx context.Context, contentID int) (*domain.Content, error)
+
 	// SearchWikidata proxies a search query to the Wikidata Entity Search API
 	SearchWikidata(ctx context.Context, query string, language string, limit int) ([]domain.WikidataSearchResult, error)
 

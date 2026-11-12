@@ -239,6 +239,10 @@ func (m *mockWikidataClient) Search(ctx context.Context, query string, language 
 	return []domain.WikidataSearchResult{}, nil
 }
 
+func (m *mockWikidataClient) GetWikipediaURL(ctx context.Context, qid string) (string, error) {
+	return "", nil
+}
+
 // graphqlResponse represents a generic GraphQL JSON response
 type graphqlResponse struct {
 	Data   json.RawMessage `json:"data"`
@@ -247,17 +251,25 @@ type graphqlResponse struct {
 	} `json:"errors"`
 }
 
-// injectAuthMiddleware is a test HTTP middleware that injects an AuthenticatedUser
-// into the context, simulating a logged-in user for directive tests.
-func injectAuthMiddleware(next http.Handler) http.Handler {
+// defaultTestAuthUser is the AuthenticatedUser injected by setupTestServer.
+// Tests that need a different caller (e.g. an admin, or a specific
+// AddedByUserID match/mismatch for category authorization) should use
+// setupTestServerWithAuthUser instead.
+func defaultTestAuthUser() *domain.AuthenticatedUser {
+	return &domain.AuthenticatedUser{
+		ID:       1,
+		ClerkID:  "clerk_test_user",
+		Username: "testuser",
+		Email:    "test@example.com",
+		Role:     domain.UserRoleDefault,
+	}
+}
+
+// injectAuthMiddleware is a test HTTP middleware that injects the given
+// AuthenticatedUser into the context, simulating a logged-in user for
+// directive tests.
+func injectAuthMiddleware(authUser *domain.AuthenticatedUser, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authUser := &domain.AuthenticatedUser{
-			ID:       1,
-			ClerkID:  "clerk_test_user",
-			Username: "testuser",
-			Email:    "test@example.com",
-			Role:     domain.UserRoleDefault,
-		}
 		ctx := auth.WithAuthenticatedUser(r.Context(), authUser)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -267,6 +279,13 @@ func injectAuthMiddleware(next http.Handler) http.Handler {
 // Wires auth directives and injects an authenticated user context via auth middleware
 // so mutation tests pass the @auth directive check.
 func setupTestServer(repo *mockContentRepository, ytClient *mockYouTubeClient) *httptest.Server {
+	return setupTestServerWithAuthUser(repo, ytClient, defaultTestAuthUser())
+}
+
+// setupTestServerWithAuthUser is like setupTestServer but injects a caller-supplied
+// AuthenticatedUser instead of the default — for tests asserting behavior that
+// depends on the caller's identity or role (e.g. category-authorization rules).
+func setupTestServerWithAuthUser(repo *mockContentRepository, ytClient *mockYouTubeClient, authUser *domain.AuthenticatedUser) *httptest.Server {
 	userRepo := &mockUserRepository{}
 	perspectiveRepo := &mockPerspectiveRepository{}
 	categoryRepo := &mockCategoryRepository{}
@@ -287,7 +306,7 @@ func setupTestServer(repo *mockContentRepository, ytClient *mockYouTubeClient) *
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(gqlConfig))
 
 	// Wrap with test middleware that injects an authenticated user context
-	authHandler := injectAuthMiddleware(srv)
+	authHandler := injectAuthMiddleware(authUser, srv)
 	return httptest.NewServer(authHandler)
 }
 
@@ -1141,6 +1160,9 @@ func TestPaginatedContentQuery_WithMinMaxLengthFilter(t *testing.T) {
 // --- SetPrimaryCategory Mutation Tests ---
 
 func TestSetPrimaryCategory_Success(t *testing.T) {
+	// Caller (ID 1, from defaultTestAuthUser) is also the content's
+	// AddedByUserID — the owner is always allowed to change an
+	// already-categorized item's category.
 	catID := 42
 	repo := &mockContentRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
@@ -1148,6 +1170,7 @@ func TestSetPrimaryCategory_Success(t *testing.T) {
 				ID:                id,
 				Name:              "Test Video",
 				ContentType:       domain.ContentTypeYouTube,
+				AddedByUserID:     1,
 				PrimaryCategoryID: &catID,
 			}, nil
 		},
@@ -1185,6 +1208,225 @@ func TestSetPrimaryCategory_ContentNotFound(t *testing.T) {
 
 	result := executeGraphQL(t, server, `mutation { setPrimaryCategory(input: { contentId: 999, qid: "Q12345", label: "Science" }) { id } }`)
 
+	require.NotEmpty(t, result.Errors)
+	assert.Contains(t, result.Errors[0].Message, "content not found")
+}
+
+// --- SetPrimaryCategory Authorization Tests ---
+//
+// Rule: setting the INITIAL category (nobody has categorized this content
+// yet) is open to any authenticated user. CHANGING an already-set category
+// is restricted to an admin or whoever originally added the content
+// (AddedByUserID).
+
+func TestSetPrimaryCategory_InitialSet_AnyAuthenticatedUserAllowed(t *testing.T) {
+	// No category set yet (PrimaryCategoryID nil), and the caller (ID 1) is
+	// NOT the one who added this content (AddedByUserID 999) — still allowed,
+	// since nobody has categorized it yet.
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{
+				ID:                id,
+				Name:              "Uncategorized Video",
+				ContentType:       domain.ContentTypeYouTube,
+				AddedByUserID:     999,
+				PrimaryCategoryID: nil,
+			}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { setPrimaryCategory(input: { contentId: 1, qid: "Q12345", label: "Science" }) { id } }`)
+
+	assert.Empty(t, result.Errors)
+}
+
+func TestSetPrimaryCategory_ChangeExisting_ForbiddenForNonOwnerNonAdmin(t *testing.T) {
+	// Category already set (PrimaryCategoryID non-nil). Caller (ID 1, role
+	// DEFAULT) is neither the content's AddedByUserID (999) nor an admin.
+	catID := 42
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{
+				ID:                id,
+				Name:              "Already Categorized Video",
+				ContentType:       domain.ContentTypeYouTube,
+				AddedByUserID:     999,
+				PrimaryCategoryID: &catID,
+			}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { setPrimaryCategory(input: { contentId: 1, qid: "Q12345", label: "Science" }) { id } }`)
+
+	require.NotEmpty(t, result.Errors)
+	assert.Contains(t, result.Errors[0].Message, "not authorized")
+}
+
+func TestSetPrimaryCategory_ChangeExisting_AllowedForAdmin(t *testing.T) {
+	// Category already set. Caller is an admin but not the content's
+	// AddedByUserID — still allowed, since admins can change any category.
+	catID := 42
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{
+				ID:                id,
+				Name:              "Already Categorized Video",
+				ContentType:       domain.ContentTypeYouTube,
+				AddedByUserID:     999,
+				PrimaryCategoryID: &catID,
+			}, nil
+		},
+	}
+
+	adminUser := &domain.AuthenticatedUser{
+		ID:       2,
+		ClerkID:  "clerk_test_admin",
+		Username: "adminuser",
+		Email:    "admin@example.com",
+		Role:     domain.UserRoleAdmin,
+	}
+	server := setupTestServerWithAuthUser(repo, &mockYouTubeClient{}, adminUser)
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { setPrimaryCategory(input: { contentId: 1, qid: "Q12345", label: "Science" }) { id } }`)
+
+	assert.Empty(t, result.Errors)
+}
+
+func TestSetPrimaryCategory_ChangeExisting_AllowedForOwner(t *testing.T) {
+	// Category already set. Caller (ID 1) IS the content's AddedByUserID.
+	catID := 42
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{
+				ID:                id,
+				Name:              "Already Categorized Video",
+				ContentType:       domain.ContentTypeYouTube,
+				AddedByUserID:     1,
+				PrimaryCategoryID: &catID,
+			}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { setPrimaryCategory(input: { contentId: 1, qid: "Q12345", label: "Science" }) { id } }`)
+
+	assert.Empty(t, result.Errors)
+}
+
+// --- RemovePrimaryCategory Mutation Tests ---
+
+func TestRemovePrimaryCategory_AllowedForOwner(t *testing.T) {
+	catID := 42
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{
+				ID:                id,
+				Name:              "Test Video",
+				ContentType:       domain.ContentTypeYouTube,
+				AddedByUserID:     1,
+				PrimaryCategoryID: &catID,
+			}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { removePrimaryCategory(contentId: 1) { id } }`)
+	assert.Empty(t, result.Errors)
+}
+
+func TestRemovePrimaryCategory_AllowedForAdmin(t *testing.T) {
+	catID := 42
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{
+				ID:                id,
+				Name:              "Test Video",
+				ContentType:       domain.ContentTypeYouTube,
+				AddedByUserID:     999,
+				PrimaryCategoryID: &catID,
+			}, nil
+		},
+	}
+
+	adminUser := &domain.AuthenticatedUser{
+		ID:       2,
+		ClerkID:  "clerk_test_admin",
+		Username: "adminuser",
+		Email:    "admin@example.com",
+		Role:     domain.UserRoleAdmin,
+	}
+	server := setupTestServerWithAuthUser(repo, &mockYouTubeClient{}, adminUser)
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { removePrimaryCategory(contentId: 1) { id } }`)
+	assert.Empty(t, result.Errors)
+}
+
+func TestRemovePrimaryCategory_ForbiddenForNonOwnerNonAdmin(t *testing.T) {
+	catID := 42
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{
+				ID:                id,
+				Name:              "Test Video",
+				ContentType:       domain.ContentTypeYouTube,
+				AddedByUserID:     999,
+				PrimaryCategoryID: &catID,
+			}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { removePrimaryCategory(contentId: 1) { id } }`)
+	require.NotEmpty(t, result.Errors)
+	assert.Contains(t, result.Errors[0].Message, "not authorized")
+}
+
+func TestRemovePrimaryCategory_NoCategorySet(t *testing.T) {
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{
+				ID:                id,
+				Name:              "Test Video",
+				ContentType:       domain.ContentTypeYouTube,
+				AddedByUserID:     1,
+				PrimaryCategoryID: nil,
+			}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { removePrimaryCategory(contentId: 1) { id } }`)
+	require.NotEmpty(t, result.Errors)
+	assert.Contains(t, result.Errors[0].Message, "no category set")
+}
+
+func TestRemovePrimaryCategory_ContentNotFound(t *testing.T) {
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return nil, domain.ErrNotFound
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { removePrimaryCategory(contentId: 999) { id } }`)
 	require.NotEmpty(t, result.Errors)
 	assert.Contains(t, result.Errors[0].Message, "content not found")
 }

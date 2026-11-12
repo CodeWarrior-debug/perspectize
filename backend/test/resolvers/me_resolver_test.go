@@ -36,7 +36,7 @@ func setupTestServerWithUserRepo(userRepo *mockUserRepository) *httptest.Server 
 		},
 	}
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(gqlConfig))
-	authHandler := injectAuthMiddleware(srv)
+	authHandler := injectAuthMiddleware(defaultTestAuthUser(), srv)
 	return httptest.NewServer(authHandler)
 }
 

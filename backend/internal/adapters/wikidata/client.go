@@ -143,6 +143,63 @@ func (c *Client) doSearch(ctx context.Context, reqURL string) ([]domain.Wikidata
 	return results, nil
 }
 
+// sitelinksResponse matches the Wikidata wbgetentities JSON response shape
+// when requested with props=sitelinks/urls.
+type sitelinksResponse struct {
+	Entities map[string]struct {
+		Sitelinks map[string]struct {
+			URL string `json:"url"`
+		} `json:"sitelinks"`
+	} `json:"entities"`
+}
+
+// GetWikipediaURL looks up the English Wikipedia sitelink for a Wikidata QID.
+// Returns "" (no error) if the item has no English Wikipedia article — most
+// Wikidata items don't, and that's a normal case, not a failure.
+func (c *Client) GetWikipediaURL(ctx context.Context, qid string) (string, error) {
+	params := url.Values{}
+	params.Set("action", "wbgetentities")
+	params.Set("ids", qid)
+	params.Set("props", "sitelinks/urls")
+	params.Set("sitefilter", "enwiki")
+	params.Set("format", "json")
+
+	reqURL := c.baseURL + "?" + params.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("User-Agent", c.userAgent)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", &APIError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	var parsed sitelinksResponse
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return "", fmt.Errorf("decoding response: %w", err)
+	}
+
+	entity, ok := parsed.Entities[qid]
+	if !ok {
+		return "", nil
+	}
+	sitelink, ok := entity.Sitelinks["enwiki"]
+	if !ok {
+		return "", nil
+	}
+	return sitelink.URL, nil
+}
+
 // APIError represents an HTTP error from the Wikidata API
 type APIError struct {
 	StatusCode int

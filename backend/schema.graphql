@@ -88,6 +88,7 @@ type Category {
   label: String!
   description: String
   entityType: String
+  wikipediaUrl: String
   createdAt: String!
   updatedAt: String!
 }
@@ -286,6 +287,7 @@ type Mutation {
 
   # Category mutations
   setPrimaryCategory(input: SetPrimaryCategoryInput!): Content! @auth
+  removePrimaryCategory(contentId: IntID!): Content! @auth
 }
 
 type Query {

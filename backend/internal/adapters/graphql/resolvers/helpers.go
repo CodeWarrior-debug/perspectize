@@ -113,7 +113,7 @@ func categoryDomainToModel(c *domain.Category) *model.Category {
 	if c == nil {
 		return nil
 	}
-	return &model.Category{
+	category := &model.Category{
 		ID:          strconv.Itoa(c.ID),
 		WikidataQid: c.WikidataQID,
 		Label:       c.Label,
@@ -122,6 +122,12 @@ func categoryDomainToModel(c *domain.Category) *model.Category {
 		CreatedAt:   c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:   c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
+	// Most Wikidata items have no English Wikipedia article — return null
+	// rather than a pointer to an empty string in that case.
+	if c.WikipediaURL != "" {
+		category.WikipediaURL = &c.WikipediaURL
+	}
+	return category
 }
 
 // perspectiveDomainToModel converts a domain Perspective to a GraphQL model Perspective

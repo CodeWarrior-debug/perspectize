@@ -721,7 +721,7 @@ describe('categoryCellRenderer', () => {
 		expect(span?.style.color).toBe('rgb(163, 163, 163)');
 	});
 
-	it('sets title attribute to description when present', () => {
+	it('does not use the native title attribute (custom dark tooltip instead)', () => {
 		const result = categoryCellRenderer({
 			data: {
 				primaryCategory: {
@@ -733,10 +733,35 @@ describe('categoryCellRenderer', () => {
 		});
 
 		const span = result.querySelector('span');
-		expect(span?.title).toBe('Study of matter and energy');
+		expect(span?.title).toBe('');
 	});
 
-	it('sets title attribute to wikidataQid when description is null', () => {
+	it('shows a dark reference-explainer tooltip on mouseenter, appended to body, with label as title and no wikidataQid', () => {
+		const result = categoryCellRenderer({
+			data: {
+				primaryCategory: {
+					label: 'Physics',
+					description: 'Study of matter and energy',
+					wikidataQid: 'Q413',
+				},
+			},
+		});
+		const span = result.querySelector('span')!;
+
+		span.dispatchEvent(new MouseEvent('mouseenter'));
+
+		const tooltip = document.body.querySelector('.bg-foreground');
+		expect(tooltip).toBeTruthy();
+		expect(tooltip?.className).toContain('text-background');
+		expect(tooltip?.textContent).not.toContain('Q413');
+		expect(tooltip?.querySelector('.font-medium')?.textContent).toBe('Physics');
+		expect(tooltip?.textContent).toContain('Study of matter and energy');
+
+		// Cleanup so this test doesn't leak a tooltip into other tests
+		span.dispatchEvent(new MouseEvent('mouseleave'));
+	});
+
+	it('omits the description element from the tooltip when null', () => {
 		const result = categoryCellRenderer({
 			data: {
 				primaryCategory: {
@@ -746,9 +771,35 @@ describe('categoryCellRenderer', () => {
 				},
 			},
 		});
+		const span = result.querySelector('span')!;
 
-		const span = result.querySelector('span');
-		expect(span?.title).toBe('Q2329');
+		span.dispatchEvent(new MouseEvent('mouseenter'));
+
+		const tooltip = document.body.querySelector('.bg-foreground');
+		expect(tooltip?.querySelector('.font-medium')?.textContent).toBe('Chemistry');
+		expect(tooltip?.textContent).not.toContain('Q2329');
+		expect(tooltip?.children.length).toBe(1);
+
+		span.dispatchEvent(new MouseEvent('mouseleave'));
+	});
+
+	it('removes the tooltip on mouseleave', () => {
+		const result = categoryCellRenderer({
+			data: {
+				primaryCategory: {
+					label: 'Physics',
+					description: 'Study of matter and energy',
+					wikidataQid: 'Q413',
+				},
+			},
+		});
+		const span = result.querySelector('span')!;
+
+		span.dispatchEvent(new MouseEvent('mouseenter'));
+		expect(document.body.querySelector('.bg-foreground')).toBeTruthy();
+
+		span.dispatchEvent(new MouseEvent('mouseleave'));
+		expect(document.body.querySelector('.bg-foreground')).toBeNull();
 	});
 
 	it('renders "+" when data is undefined', () => {

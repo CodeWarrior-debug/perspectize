@@ -33,7 +33,7 @@ func (r *GormCategoryRepository) Upsert(ctx context.Context, category *domain.Ca
 
 	err := r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "wikidata_qid"}},
-		DoUpdates: clause.AssignmentColumns([]string{"label", "description", "entity_type", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"label", "description", "entity_type", "wikipedia_url", "updated_at"}),
 	}).Create(model).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to upsert category: %w", err)

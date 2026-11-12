@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
 	WIKIDATA_SEARCH,
 	SET_PRIMARY_CATEGORY,
+	REMOVE_PRIMARY_CATEGORY,
 	type WikidataSearchResult,
 	type WikidataSearchResponse,
 	type CategoryItem,
 	type SetPrimaryCategoryResponse,
+	type RemovePrimaryCategoryResponse,
 } from '$lib/queries/categories';
 
 describe('Category GraphQL query definitions', () => {
@@ -42,6 +44,7 @@ describe('Category GraphQL query definitions', () => {
 				label: 'human',
 				description: 'common name of Homo sapiens',
 				entityType: 'item',
+				wikipediaUrl: 'https://en.wikipedia.org/wiki/Human',
 				createdAt: '2026-01-01T12:00:00Z',
 				updatedAt: '2026-01-01T12:00:00Z',
 			};
@@ -71,6 +74,7 @@ describe('Category GraphQL query definitions', () => {
 						label: 'human',
 						description: 'common name of Homo sapiens',
 						entityType: 'item',
+						wikipediaUrl: 'https://en.wikipedia.org/wiki/Human',
 					},
 					createdAt: '2024-01-01',
 					updatedAt: '2024-01-01',
@@ -145,6 +149,60 @@ describe('Category GraphQL query definitions', () => {
 			expect(SET_PRIMARY_CATEGORY).toContain('label');
 			expect(SET_PRIMARY_CATEGORY).toContain('description');
 			expect(SET_PRIMARY_CATEGORY).toContain('entityType');
+			expect(SET_PRIMARY_CATEGORY).toContain('wikipediaUrl');
+		});
+	});
+
+	describe('REMOVE_PRIMARY_CATEGORY', () => {
+		it('is defined and is a string', () => {
+			expect(REMOVE_PRIMARY_CATEGORY).toBeDefined();
+			expect(typeof REMOVE_PRIMARY_CATEGORY).toBe('string');
+		});
+
+		it('contains the RemovePrimaryCategory operation name', () => {
+			expect(REMOVE_PRIMARY_CATEGORY).toContain('RemovePrimaryCategory');
+		});
+
+		it('is a mutation operation', () => {
+			expect(REMOVE_PRIMARY_CATEGORY).toContain('mutation');
+		});
+
+		it('takes an IntID contentId argument', () => {
+			expect(REMOVE_PRIMARY_CATEGORY).toContain('$contentId: IntID!');
+		});
+
+		it('calls removePrimaryCategory mutation', () => {
+			expect(REMOVE_PRIMARY_CATEGORY).toContain('removePrimaryCategory(contentId: $contentId)');
+		});
+
+		it('requests nested primaryCategory fields in response', () => {
+			expect(REMOVE_PRIMARY_CATEGORY).toContain('primaryCategory {');
+			expect(REMOVE_PRIMARY_CATEGORY).toContain('wikidataQid');
+			expect(REMOVE_PRIMARY_CATEGORY).toContain('wikipediaUrl');
+		});
+
+		it('exports RemovePrimaryCategoryResponse interface', () => {
+			const response: RemovePrimaryCategoryResponse = {
+				removePrimaryCategory: {
+					id: '1',
+					addedByUserID: '1',
+					name: 'Test Video',
+					url: 'https://youtube.com/watch?v=test',
+					contentType: 'VIDEO',
+					length: 100,
+					lengthUnits: 'SECONDS',
+					viewCount: 1000,
+					likeCount: 100,
+					channelTitle: 'Test Channel',
+					publishedAt: '2024-01-01',
+					tags: ['test'],
+					description: 'Test description',
+					primaryCategory: null,
+					createdAt: '2024-01-01',
+					updatedAt: '2024-01-01',
+				},
+			};
+			expect(response.removePrimaryCategory.primaryCategory).toBeNull();
 		});
 	});
 });

@@ -119,6 +119,30 @@ Object.defineProperty(window, 'localStorage', {
 	value: new LocalStorageMock(),
 });
 
+// Mock Element.animate (jsdom doesn't implement the Web Animations API).
+// Svelte 5's built-in transitions (fade, scale, fly, etc. from
+// 'svelte/transition') call element.animate() directly — without this stub,
+// any component using `in:`/`out:`/`transition:` throws
+// "TypeError: element.animate is not a function" in every test that renders
+// it, even when the test has nothing to do with the animation itself.
+if (!Element.prototype.animate) {
+	Element.prototype.animate = vi.fn().mockReturnValue({
+		cancel: vi.fn(),
+		finish: vi.fn(),
+		play: vi.fn(),
+		pause: vi.fn(),
+		reverse: vi.fn(),
+		finished: Promise.resolve(),
+		onfinish: null,
+		oncancel: null,
+		effect: null,
+		currentTime: 0,
+		playbackRate: 1,
+		addEventListener: vi.fn(),
+		removeEventListener: vi.fn(),
+	}) as unknown as typeof Element.prototype.animate;
+}
+
 // Mock window.matchMedia for responsive components
 Object.defineProperty(window, 'matchMedia', {
 	writable: true,
