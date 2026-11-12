@@ -3972,6 +3972,12 @@ input ContentFilter {
   maxTmdbScore: Float
   # Book column filters (book rows only; other rows never match)
   authorContains: String     # Case-insensitive contains on the first author's name (books only)
+  minPublishYear: Int        # First publish year, inclusive
+  maxPublishYear: Int
+  minPages: Int              # Median page count across editions, inclusive
+  maxPages: Int
+  minBookRating: Float       # Open Library average rating (0-5), inclusive
+  maxBookRating: Float
   # View/like count filters
   minViewCount: Int
   maxViewCount: Int
@@ -19517,7 +19523,7 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "authorContains", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
+	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "authorContains", "minPublishYear", "maxPublishYear", "minPages", "maxPages", "minBookRating", "maxBookRating", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -19650,6 +19656,48 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.AuthorContains = data
+		case "minPublishYear":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minPublishYear"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MinPublishYear = data
+		case "maxPublishYear":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("maxPublishYear"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MaxPublishYear = data
+		case "minPages":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minPages"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MinPages = data
+		case "maxPages":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("maxPages"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MaxPages = data
+		case "minBookRating":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minBookRating"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MinBookRating = data
+		case "maxBookRating":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("maxBookRating"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MaxBookRating = data
 		case "minViewCount":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minViewCount"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
