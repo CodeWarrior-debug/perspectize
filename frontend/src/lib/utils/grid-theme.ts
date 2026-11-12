@@ -23,13 +23,11 @@ export const GRID_THEME_PARAMS = {
 	selectedRowBackgroundColor: 'var(--color-row-hover)',
 	columnHoverColor: 'transparent',
 	headerColumnResizeHandleColor: 'var(--color-border)',
-	// 49px fits a 32px thumbnail alongside a 2-line, 13px/1.5-leading title (39px of text
-	// + the cell's py-[3px] padding = 45px) with a ~4px safety margin
-	// (it was ~9px at 64px/py-2). A much tighter margin clips descenders (g/y/p/q/j) on the second
-	// line via the row's own overflow:hidden, even though line-clamp itself only ever
-	// cuts whole lines. Trimmed from 64px so more rows fit above the fold on smaller
-	// desktop screens (e.g. an 11" MacBook Air) (margin trimmed to ~5px, verified visually). See
-	// CLAUDE.md's AG Grid gotcha.
+	// 49px = a 2-line, 13px/1.5-leading title (39px of text) + the cell's py-[3px] padding (6px)
+	// = 45px, plus a ~4px safety margin. A tighter margin clips descenders (g/y/p/q/j) on the
+	// second line via the row's own overflow:hidden, even though line-clamp itself only cuts
+	// whole lines. Trimmed from 64px (~9px margin) so more rows fit above the fold on small
+	// desktop screens (e.g. an 11" MacBook Air). See CLAUDE.md's AG Grid gotcha.
 	rowHeight: 49,
 	headerHeight: 36,
 	listItemHeight: 24,
@@ -39,52 +37,86 @@ export const GRID_THEME_PARAMS = {
 export const GRID_COLOR_PARAM_KEYS = Object.keys(GRID_THEME_PARAMS).filter((k) => /Color$/.test(k));
 
 /**
+ * Quieter Activity headers: 11px labels in the muted-foreground token, which `deriveTheme` picks to
+ * pass AA text contrast on `--color-muted` (the header background) in every preset. The uppercase
+ * and letter-spacing half lives in app.css under `.activity-grid`: they are not theme params.
+ */
+export const ACTIVITY_HEADER_PARAMS = {
+	headerFontSize: 11,
+	headerTextColor: 'var(--color-muted-foreground)',
+} as const;
+
+/**
  * The Activity table's theme: Balham's tighter 4px spacing (Quartz uses 8px) under the shared
  * token-driven params. Row and header heights are fixed by the params above, so the gain is
  * horizontal only: cell and header padding halve (16px -> 8px), which untruncates the movie
  * view's "Genre" / "Rated" / "Released" headers and some channel names. Descender margin, hover,
- * zebra and every preset stay as they were (see the PR for the measurements). The Plan grid still
- * uses `themeQuartz` with the same params.
+ * zebra and every preset stay as they were (see the PR for the measurements). The Plan grid also
+ * uses `themeBalham` with the shared params, without the Activity header tweaks.
  */
-export const ACTIVITY_GRID_THEME = themeBalham.withParams(GRID_THEME_PARAMS);
+export const ACTIVITY_GRID_THEME = themeBalham.withParams(GRID_THEME_PARAMS).withParams(ACTIVITY_HEADER_PARAMS);
+
+/**
+ * How the Activity header label is set beyond the theme params. app.css applies these under
+ * `.activity-grid .ag-header-cell-text`; they are not theme params, so they're mirrored here for
+ * the width measurement, and `tests/unit/gridHeaderWidth.test.ts` checks the two agree.
+ */
+export interface HeaderTextCase {
+	/** `text-transform: uppercase` on the label. */
+	uppercase: boolean;
+	/** `letter-spacing` on the label, in em. */
+	letterSpacingEm: number;
+}
+
+export const ACTIVITY_HEADER_TEXT_CASE: HeaderTextCase = { uppercase: true, letterSpacingEm: 0.06 };
 
 /**
  * Horizontal space, in px, that AG Grid draws around a header label in the Activity grid, read
- * from the theme itself so it follows any change to `spacing` / `iconSize` / `fontSize`:
+ * from the theme itself so it follows any change to `spacing` / `iconSize` / `headerFontSize`:
  *
  *   [pad] label [gap] sort-arrow [gap] filter-funnel [pad]
  *
+ * - `fontSize`: the header font size (`headerFontSize`, or `fontSize` when it only refers to it).
  * - `padding`: header cell padding on each side (`cellHorizontalPadding` = spacing * 2 * scale).
  * - `sort`: the label's flex gap (spacing) + the arrow icon. app.css drops AG Grid's extra
  *   padding-left on the arrow, so it sits one gap from its label rather than two.
  * - `filter`: the gap app.css adds between the label and the funnel (spacing) + the funnel icon.
+ * - `uppercase` / `letterSpacingEm`: how app.css sets the label (see HeaderTextCase).
  *
  * `headerMinWidth` (grid-header-width.ts) adds these to the label's measured width, so a column at its
  * minimum still shows its whole heading, its sort arrow and its funnel without overlap.
  */
-export interface HeaderChrome {
+export interface HeaderChrome extends HeaderTextCase {
 	fontSize: number;
 	padding: number;
 	sort: number;
 	filter: number;
 }
 
-export function headerChrome(theme: { getParams(): Record<string, unknown> } = ACTIVITY_GRID_THEME): HeaderChrome {
+export function headerChrome(
+	theme: { getParams(): Record<string, unknown> } = ACTIVITY_GRID_THEME,
+	textCase: HeaderTextCase = { uppercase: false, letterSpacingEm: 0 },
+): HeaderChrome {
 	const p = theme.getParams();
 	const num = (key: string): number => {
 		const v = p[key];
-		if (typeof v !== 'number') throw new Error(`grid theme param ${key} is not a number: ${JSON.stringify(v)}`);
-		return v;
+		if (typeof v === 'number') return v;
+		// A param can be a reference to another one, e.g. Quartz's headerFontSize = { ref: 'fontSize' }.
+		if (v && typeof v === 'object' && typeof (v as { ref?: unknown }).ref === 'string') {
+			return num((v as { ref: string }).ref);
+		}
+		throw new Error(`grid theme param ${key} is not a number: ${JSON.stringify(v)}`);
 	};
 	const spacing = num('spacing');
 	const iconSize = num('iconSize');
 	return {
-		fontSize: num('fontSize'),
+		fontSize: num('headerFontSize'),
 		padding: spacing * 2 * num('cellHorizontalPaddingScale'),
 		sort: spacing + iconSize,
 		filter: spacing + iconSize,
+		...textCase,
 	};
 }
 
 /** The Activity grid's header chrome, computed once. */
-export const ACTIVITY_HEADER_CHROME: HeaderChrome = headerChrome();
+export const ACTIVITY_HEADER_CHROME: HeaderChrome = headerChrome(ACTIVITY_GRID_THEME, ACTIVITY_HEADER_TEXT_CASE);

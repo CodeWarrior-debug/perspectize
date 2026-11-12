@@ -7,15 +7,25 @@ import { ACTIVITY_HEADER_CHROME, type HeaderChrome } from './grid-theme';
  */
 const HEADER_WIDTH_GUARD_PX = 2;
 
+/** How a header label is set: its size, and optionally uppercase and letter-spaced. */
+export interface HeaderTextStyle {
+	fontSize: number;
+	uppercase?: boolean;
+	letterSpacingEm?: number;
+}
+
 /**
- * Width in px of `text` set in the header font (Geist 600) at `fontSize`, from the font's own
- * advance widths. Characters outside printable ASCII count as the widest glyph, so a label can
- * be over-estimated but never under-estimated.
+ * Width in px of `text` set in the header font (Geist 600), from the font's own advance widths,
+ * uppercased and letter-spaced the way the style says. CSS adds letter-spacing after every
+ * character, the last one included. Characters outside printable ASCII count as the widest
+ * glyph, so a label can be over-estimated but never under-estimated.
  */
-export function headerTextWidth(text: string, fontSize: number = ACTIVITY_HEADER_CHROME.fontSize): number {
+export function headerTextWidth(text: string, style: HeaderTextStyle = ACTIVITY_HEADER_CHROME): number {
+	const { fontSize, uppercase = false, letterSpacingEm = 0 } = style;
+	const shown = uppercase ? text.toUpperCase() : text;
 	let em = 0;
-	for (const ch of text) {
-		em += GEIST_SEMIBOLD_ADVANCE_EM[(ch.codePointAt(0) ?? 0) - 32] ?? GEIST_SEMIBOLD_WIDEST_EM;
+	for (const ch of shown) {
+		em += (GEIST_SEMIBOLD_ADVANCE_EM[(ch.codePointAt(0) ?? 0) - 32] ?? GEIST_SEMIBOLD_WIDEST_EM) + letterSpacingEm;
 	}
 	return em * fontSize;
 }
@@ -40,7 +50,7 @@ export function headerMinWidth(
 	{ filter = true, sortable = true }: HeaderWidthOptions = {},
 	chrome: HeaderChrome = ACTIVITY_HEADER_CHROME,
 ): number {
-	let width = chrome.padding * 2 + headerTextWidth(name, chrome.fontSize) + HEADER_WIDTH_GUARD_PX;
+	let width = chrome.padding * 2 + headerTextWidth(name, chrome) + HEADER_WIDTH_GUARD_PX;
 	if (sortable) width += chrome.sort;
 	if (filter) width += chrome.filter;
 	return Math.ceil(width);

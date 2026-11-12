@@ -101,6 +101,7 @@
 		parsePersonFilter,
 		rowMatchesPerson,
 		showColumnRelevanceCallout,
+		NUMERIC_COL_IDS,
 	} from '$lib/utils/grid-config';
 	import { ACTIVITY_GRID_THEME } from '$lib/utils/grid-theme';
 	import { emptyCellClassRules } from '$lib/utils/grid-empty';
@@ -813,8 +814,12 @@
 				valueGetter: tmdbScoreValueGetter,
 				comparator: unknownLastComparator,
 				valueFormatter: (params) => formatTmdbScore(params.value),
-				// Muted when the score rests on fewer than 50 votes.
-				cellClass: (params) => (hasLowVoteCount({ data: params.data }) ? 'text-muted-foreground' : ''),
+				// Muted when the score rests on fewer than 50 votes. A colDef `cellClass` replaces the one
+				// `type: 'rightAligned'` adds, so the alignment class is repeated here.
+				cellClass: (params) => [
+					'ag-right-aligned-cell',
+					...(hasLowVoteCount({ data: params.data }) ? ['text-muted-foreground'] : []),
+				],
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.tmdbScore },
 				headerTooltip: 'TMDB user score out of 10. Muted when fewer than 50 votes.',
 				hide: true,
@@ -1014,6 +1019,7 @@
 		] as ColDef<ContentItem>[]
 	).map((col) => ({
 		...col,
+		...(col.colId && NUMERIC_COL_IDS.has(col.colId) ? { type: 'rightAligned' } : {}),
 		// Never narrower than the whole heading + sort arrow + funnel. An explicit minWidth only
 		// raises the floor (for cell content, e.g. Item's thumbnail and title); it can't lower it.
 		minWidth: Math.max(
@@ -1393,7 +1399,7 @@
 		<div
 			bind:this={gridContainer}
 			data-testid="ag-grid-container"
-			class="{isMobile ? 'overflow-y-auto' : 'flex-1'} min-h-0"
+			class="activity-grid {isMobile ? 'overflow-y-auto' : 'flex-1'} min-h-0"
 			style="--ag-row-height: 49px; --ag-header-height: 36px;"
 		>
 			<AgGridSvelte5Component {gridOptions} {rowData} {theme} {modules} />

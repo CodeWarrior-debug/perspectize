@@ -1055,6 +1055,12 @@
 	box-shadow: 0 0 0 2px var(--ag-icon-button-hover-color);
 }
 
+/* Activity headers: small uppercase labels (size and colour come from ACTIVITY_HEADER_PARAMS). */
+.activity-grid .ag-header-cell-text {
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+
 /* Hover bar — drawn on AG Grid's own hover overlay so it sits on top of the opaque hover colour. */
 .ag-row-hover:not(.ag-full-width-row)::before {
 	box-shadow: inset 3px 0 0 var(--color-row-accent);
