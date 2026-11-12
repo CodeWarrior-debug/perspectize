@@ -5,6 +5,7 @@ import Page from '../../src/routes/discover/+page.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
 import { MOVIE_SEARCH, MOVIE_TRENDING } from '$lib/services/tmdbApi';
+import { BOOK_SEARCH, BOOK_TRENDING } from '$lib/services/openLibraryApi';
 import { YOUTUBE_TRENDING } from '$lib/services/youtubeApi';
 import { LIST_CONTENT } from '$lib/queries/content';
 
@@ -22,6 +23,7 @@ vi.mock('$app/state', () => ({
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
 vi.mock('$lib/queries/content/useAddMovie', () => ({ useAddMovie: () => ({ mutate: vi.fn(), isPending: false }) }));
 vi.mock('$lib/queries/content/useAddVideo', () => ({ useAddVideo: () => ({ mutate: vi.fn(), isPending: false }) }));
+vi.mock('$lib/queries/content/useAddBook', () => ({ useAddBook: () => ({ mutate: vi.fn(), isPending: false }) }));
 vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
 
 function respond(doc: string) {
@@ -29,6 +31,8 @@ function respond(doc: string) {
 	if (doc === LIST_CONTENT) return { content: { items: [] } };
 	if (doc === MOVIE_SEARCH) return { movieSearch: { items: [], page: 1, totalPages: 0, totalResults: 0 } };
 	if (doc === MOVIE_TRENDING) return { movieTrending: { items: [], page: 1, totalPages: 0, totalResults: 0 } };
+	if (doc === BOOK_SEARCH) return { bookSearch: { items: [], page: 1, totalPages: 0, totalResults: 0 } };
+	if (doc === BOOK_TRENDING) return { bookTrending: { items: [], page: 1, totalPages: 0, totalResults: 0 } };
 	throw new Error('unexpected document');
 }
 
@@ -105,5 +109,84 @@ describe('Discover page source switch', () => {
 		await fireEvent.click(screen.getByRole('tab', { name: 'YouTube' }));
 
 		expect(goto).not.toHaveBeenCalled();
+	});
+});
+
+describe('Discover page Books source', () => {
+	beforeEach(async () => {
+		vi.clearAllMocks();
+		mocks.pageUrl.current = new URL('http://localhost/discover');
+		mocks.graphqlRequest.mockImplementation(async (doc: string) => respond(doc));
+	});
+
+	it('?source=books selects the Books tab and defaults to the Search sub-tab', async () => {
+		mocks.pageUrl.current = new URL('http://localhost/discover?source=books');
+		renderPage();
+		await tick();
+
+		expect(screen.getByRole('tab', { name: 'Books' })).toHaveAttribute('aria-selected', 'true');
+		expect(screen.getByRole('tab', { name: 'Search' })).toHaveAttribute('aria-selected', 'true');
+		expect(screen.getByRole('textbox', { name: /search books by title or author/i })).toBeInTheDocument();
+		expect(screen.queryByRole('textbox', { name: 'Search YouTube, or paste a video link' })).not.toBeInTheDocument();
+		expect(screen.getByText('Search Open Library, browse trending books or add one by ISBN')).toBeInTheDocument();
+	});
+
+	it('?source=books&tab=isbn selects the ISBN sub-tab', async () => {
+		mocks.pageUrl.current = new URL('http://localhost/discover?source=books&tab=isbn');
+		renderPage();
+		await tick();
+
+		expect(screen.getByRole('tab', { name: 'ISBN' })).toHaveAttribute('aria-selected', 'true');
+		expect(screen.getByRole('tab', { name: 'Search' })).toHaveAttribute('aria-selected', 'false');
+		expect(screen.getByRole('textbox', { name: /^isbn$/i })).toBeInTheDocument();
+		expect(screen.queryByRole('textbox', { name: /search books by title or author/i })).not.toBeInTheDocument();
+	});
+
+	it('?source=books&tab=trending selects the Trending sub-tab and shows trending books', async () => {
+		mocks.pageUrl.current = new URL('http://localhost/discover?source=books&tab=trending');
+		renderPage();
+		await tick();
+
+		expect(screen.getByRole('tab', { name: 'Trending' })).toHaveAttribute('aria-selected', 'true');
+		expect(screen.getByText('Trending books')).toBeInTheDocument();
+	});
+
+	it('clicking Books writes ?source=books into the URL without a new history entry', async () => {
+		const { goto } = await import('$app/navigation');
+		renderPage();
+
+		await fireEvent.click(screen.getByRole('tab', { name: 'Books' }));
+
+		expect(goto).toHaveBeenCalledWith('/discover?source=books', {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true,
+		});
+	});
+
+	it('clicking the Trending sub-tab writes ?source=books&tab=trending', async () => {
+		const { goto } = await import('$app/navigation');
+		mocks.pageUrl.current = new URL('http://localhost/discover?source=books');
+		renderPage();
+		await tick();
+
+		await fireEvent.click(screen.getByRole('tab', { name: 'Trending' }));
+
+		expect(goto).toHaveBeenCalledWith('/discover?source=books&tab=trending', {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true,
+		});
+	});
+
+	it('clicking YouTube while on Books removes both the source and the tab params', async () => {
+		const { goto } = await import('$app/navigation');
+		mocks.pageUrl.current = new URL('http://localhost/discover?source=books&tab=isbn');
+		renderPage();
+		await tick();
+
+		await fireEvent.click(screen.getByRole('tab', { name: 'YouTube' }));
+
+		expect(goto).toHaveBeenCalledWith('/discover', { replaceState: true, keepFocus: true, noScroll: true });
 	});
 });
