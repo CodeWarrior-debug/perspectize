@@ -653,25 +653,45 @@ func canonicalBookURL(workKey string) string {
 // nil so a missing Open Library field (e.g. no author_name) marshals to []
 // rather than null.
 type shapedBook struct {
-	WorkKey          string   `json:"workKey"`
-	Title            string   `json:"title"`
-	AuthorName       []string `json:"authorName"`
-	CoverID          *int     `json:"coverId"`
-	FirstPublishYear *int     `json:"firstPublishYear"`
-	PageCountMedian  *int     `json:"pageCountMedian"`
-	Subjects         []string `json:"subjects"`
-	RatingsAverage   *float64 `json:"ratingsAverage"`
-	RatingsCount     *int     `json:"ratingsCount"`
-	EditionCount     *int     `json:"editionCount"`
+	WorkKey          string         `json:"workKey"`
+	Title            string         `json:"title"`
+	Authors          []shapedAuthor `json:"authors"`
+	CoverID          *int           `json:"coverId"`
+	FirstPublishYear *int           `json:"firstPublishYear"`
+	PageCountMedian  *int           `json:"pageCountMedian"`
+	Subjects         []string       `json:"subjects"`
+	RatingsAverage   *float64       `json:"ratingsAverage"`
+	RatingsCount     *int           `json:"ratingsCount"`
+	EditionCount     *int           `json:"editionCount"`
+}
+
+// shapedAuthor is one entry of a stored book's authors list. OpenLibraryKey is
+// omitted when Open Library gave no key for this author.
+type shapedAuthor struct {
+	Name           string `json:"name"`
+	OpenLibraryKey string `json:"openLibraryKey,omitempty"`
+}
+
+// shapeAuthors pairs each author name with its Open Library key by index, but
+// only when the two lists have equal length. With any mismatch the names are
+// kept and no key is attached, since a key on the wrong author is worse than
+// none. Never returns nil.
+func shapeAuthors(names, keys []string) []shapedAuthor {
+	authors := make([]shapedAuthor, 0, len(names))
+	paired := len(names) == len(keys)
+	for i, name := range names {
+		a := shapedAuthor{Name: name}
+		if paired {
+			a.OpenLibraryKey = keys[i]
+		}
+		authors = append(authors, a)
+	}
+	return authors
 }
 
 // shapeBookResult converts a BookSearchResult to the JSON shape stored in
 // Content.Response.
 func shapeBookResult(r portservices.BookSearchResult) shapedBook {
-	authors := r.AuthorName
-	if authors == nil {
-		authors = []string{}
-	}
 	subjects := r.Subjects
 	if subjects == nil {
 		subjects = []string{}
@@ -679,7 +699,7 @@ func shapeBookResult(r portservices.BookSearchResult) shapedBook {
 	return shapedBook{
 		WorkKey:          r.WorkKey,
 		Title:            r.Title,
-		AuthorName:       authors,
+		Authors:          shapeAuthors(r.AuthorName, r.AuthorKey),
 		CoverID:          r.CoverID,
 		FirstPublishYear: r.FirstPublishYear,
 		PageCountMedian:  r.PageCountMedian,

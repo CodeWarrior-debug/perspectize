@@ -29,7 +29,7 @@ const maxResponseBytes = 5 << 20
 
 // Fields is the exact `fields=` filter requested on every search.json and
 // trending.json call, shared with tests so they assert against the same value.
-const Fields = "key,title,author_name,cover_i,first_publish_year,number_of_pages_median,subject,ratings_average,ratings_count,edition_count"
+const Fields = "key,title,author_name,author_key,cover_i,first_publish_year,number_of_pages_median,subject,ratings_average,ratings_count,edition_count"
 
 // searchLimit is how many results are requested per page.
 const searchLimit = 25
@@ -113,6 +113,7 @@ type olWork struct {
 	Key                 string   `json:"key"`
 	Title               string   `json:"title"`
 	AuthorName          []string `json:"author_name"`
+	AuthorKey           []string `json:"author_key"`
 	CoverI              *int     `json:"cover_i"`
 	FirstPublishYear    *int     `json:"first_publish_year"`
 	NumberOfPagesMedian *int     `json:"number_of_pages_median"`
@@ -134,6 +135,7 @@ func (w olWork) toSearchResult() services.BookSearchResult {
 		WorkKey:          key,
 		Title:            w.Title,
 		AuthorName:       w.AuthorName,
+		AuthorKey:        w.AuthorKey,
 		CoverID:          w.CoverI,
 		FirstPublishYear: w.FirstPublishYear,
 		PageCountMedian:  w.NumberOfPagesMedian,

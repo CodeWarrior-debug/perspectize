@@ -45,7 +45,37 @@ func eastOfEden() portservices.BookSearchResult {
 		WorkKey:    "OL23166W",
 		Title:      "East of Eden",
 		AuthorName: []string{"John Steinbeck"},
+		AuthorKey:  []string{"OL25788A"},
 	}
+}
+
+// storedAuthor mirrors the stored response.authors element. The key is
+// omitempty, so an absent key and a stored empty string both decode to "";
+// absence is asserted on the raw map where it matters.
+type storedAuthor struct {
+	Name           string `json:"name"`
+	OpenLibraryKey string `json:"openLibraryKey,omitempty"`
+}
+
+// createdBookResponse runs CreateFromBook for result and returns the stored
+// response as a raw key map, so tests can assert both presence and absence.
+func createdBookResponse(t *testing.T, result portservices.BookSearchResult) map[string]json.RawMessage {
+	t.Helper()
+	bs := singleResultSearch(t, result.WorkKey, result)
+	var saved *domain.Content
+	repo := &mockContentRepository{
+		getByURLFn: func(ctx context.Context, url string) (*domain.Content, error) { return nil, domain.ErrNotFound },
+		getOrCreateByURLFn: func(ctx context.Context, c *domain.Content, refresh bool) (*domain.Content, bool, error) {
+			saved = c
+			return c, false, nil
+		},
+	}
+	svc := services.NewContentService(repo, nil, nil, services.WithBookSearch(bs))
+	_, err := svc.CreateFromBook(context.Background(), "https://openlibrary.org/works/"+result.WorkKey, 1)
+	require.NoError(t, err)
+	var raw map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(saved.Response, &raw))
+	return raw
 }
 
 func singleResultSearch(t *testing.T, workKey string, result portservices.BookSearchResult) *mockBookSearchClient {
@@ -81,12 +111,16 @@ func TestCreateFromBook_Success(t *testing.T) {
 	assert.Equal(t, 7, saved.AddedByUserID)
 
 	var shaped struct {
-		WorkKey    string   `json:"workKey"`
-		AuthorName []string `json:"authorName"`
+		WorkKey string         `json:"workKey"`
+		Authors []storedAuthor `json:"authors"`
 	}
 	require.NoError(t, json.Unmarshal(saved.Response, &shaped))
 	assert.Equal(t, "OL23166W", shaped.WorkKey)
-	assert.Equal(t, []string{"John Steinbeck"}, shaped.AuthorName)
+	assert.Equal(t, []storedAuthor{{Name: "John Steinbeck", OpenLibraryKey: "OL25788A"}}, shaped.Authors)
+
+	var raw map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(saved.Response, &raw))
+	assert.NotContains(t, raw, "authorName", "authorName is replaced by the structured authors list")
 }
 
 func TestCreateFromBook_DuplicateSkipsFetch(t *testing.T) {
@@ -224,12 +258,63 @@ func TestCreateFromBook_MissingAuthorNameNoPanic(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Mystery Book", got.Name)
 
-	var shaped struct {
-		AuthorName []string `json:"authorName"`
+	var raw map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(saved.Response, &raw))
+	assert.JSONEq(t, `[]`, string(raw["authors"]), "a missing author marshals to [], never null")
+}
+
+// TestCreateFromBook_AuthorKeysPairedByIndex: equal-length name and key lists
+// pair up by index, so each author carries its own key.
+func TestCreateFromBook_AuthorKeysPairedByIndex(t *testing.T) {
+	result := portservices.BookSearchResult{
+		WorkKey:    "OL9W",
+		Title:      "Good Omens",
+		AuthorName: []string{"Terry Pratchett", "Neil Gaiman"},
+		AuthorKey:  []string{"OL1A", "OL2A"},
 	}
-	require.NoError(t, json.Unmarshal(saved.Response, &shaped))
-	assert.NotNil(t, shaped.AuthorName)
-	assert.Empty(t, shaped.AuthorName)
+	raw := createdBookResponse(t, result)
+	var authors []storedAuthor
+	require.NoError(t, json.Unmarshal(raw["authors"], &authors))
+	assert.Equal(t, []storedAuthor{
+		{Name: "Terry Pratchett", OpenLibraryKey: "OL1A"},
+		{Name: "Neil Gaiman", OpenLibraryKey: "OL2A"},
+	}, authors)
+}
+
+// TestCreateFromBook_MismatchedAuthorKeysDropped: when the key list is not the
+// same length as the name list, names are kept and no key is attached (a key
+// on the wrong author is worse than none).
+func TestCreateFromBook_MismatchedAuthorKeysDropped(t *testing.T) {
+	result := portservices.BookSearchResult{
+		WorkKey:    "OL9W",
+		Title:      "Good Omens",
+		AuthorName: []string{"Terry Pratchett", "Neil Gaiman"},
+		AuthorKey:  []string{"OL1A", "OL2A", "OL3A"},
+	}
+	raw := createdBookResponse(t, result)
+	var authors []map[string]any
+	require.NoError(t, json.Unmarshal(raw["authors"], &authors))
+	require.Len(t, authors, 2)
+	for _, a := range authors {
+		assert.NotContains(t, a, "openLibraryKey")
+	}
+	assert.Equal(t, "Terry Pratchett", authors[0]["name"])
+	assert.Equal(t, "Neil Gaiman", authors[1]["name"])
+}
+
+// TestCreateFromBook_NoAuthorKeysNamesOnly: a search result with no author_key
+// at all still stores the names, with no openLibraryKey on any author.
+func TestCreateFromBook_NoAuthorKeysNamesOnly(t *testing.T) {
+	result := portservices.BookSearchResult{
+		WorkKey:    "OL9W",
+		Title:      "Good Omens",
+		AuthorName: []string{"Terry Pratchett"},
+	}
+	raw := createdBookResponse(t, result)
+	var authors []map[string]any
+	require.NoError(t, json.Unmarshal(raw["authors"], &authors))
+	require.Len(t, authors, 1)
+	assert.Equal(t, map[string]any{"name": "Terry Pratchett"}, authors[0])
 }
 
 func TestSearchBooks(t *testing.T) {
