@@ -15,8 +15,15 @@ import {
 	releasedComparator,
 	itemColumnHeader,
 	NUMERIC_COL_IDS,
+	CONTENT_TYPE_OPTIONS,
 } from '$lib/utils/grid-config';
 import type { ContentItem } from '$lib/queries/content';
+
+describe('CONTENT_TYPE_OPTIONS (Book)', () => {
+	it('offers Book as a type filter option', () => {
+		expect(CONTENT_TYPE_OPTIONS).toContainEqual({ value: 'book', label: 'Book' });
+	});
+});
 
 function row(overrides: Partial<ContentItem>): ContentItem {
 	return {
@@ -155,7 +162,7 @@ describe('durationComparator', () => {
 // Column-picker registry
 // ---------------------------------------------------------------------------
 describe('column-picker registry', () => {
-	it('DATA_COLUMNS holds the 25 user-togglable data columns', () => {
+	it('DATA_COLUMNS holds the 30 user-togglable data columns', () => {
 		expect(DATA_COLUMNS.map((c) => c.colId)).toEqual([
 			'type',
 			'category',
@@ -175,6 +182,11 @@ describe('column-picker registry', () => {
 			'user',
 			'tags',
 			'description',
+			'author',
+			'published',
+			'pages',
+			'rating',
+			'editions',
 			'budget',
 			'votes',
 			'collection',
@@ -205,13 +217,13 @@ describe('column-picker registry', () => {
 		}
 	});
 
-	it('togglableColIds(false) returns only the 25 data columns', () => {
+	it('togglableColIds(false) returns only the 30 data columns', () => {
 		expect(togglableColIds(false)).toEqual(DATA_COLUMNS.map((c) => c.colId));
 	});
 
-	it('togglableColIds(true) returns all 28 columns', () => {
+	it('togglableColIds(true) returns all 33 columns', () => {
 		const ids = togglableColIds(true);
-		expect(ids).toHaveLength(28);
+		expect(ids).toHaveLength(33);
 		expect(ids).toEqual([...DATA_COLUMNS.map((c) => c.colId), ...INTERNAL_COLUMNS.map((c) => c.colId)]);
 	});
 
