@@ -952,7 +952,7 @@
 			},
 			{
 				colId: 'rating',
-				headerName: 'Rating',
+				headerName: 'Book rating',
 				flex: 0.7,
 				minWidth: 90,
 				maxWidth: 120,
