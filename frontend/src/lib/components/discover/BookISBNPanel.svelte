@@ -36,7 +36,7 @@
 
 	type IsbnState = 'idle' | 'invalid' | 'incomplete' | 'resolving' | 'found' | 'notFound' | 'error';
 
-	const state = $derived<IsbnState>(
+	const isbnState = $derived<IsbnState>(
 		check === 'empty'
 			? 'idle'
 			: check === 'invalid'
@@ -79,11 +79,11 @@
 		/>
 	</div>
 
-	{#if state === 'incomplete'}
+	{#if isbnState === 'incomplete'}
 		<p class="text-sm text-muted-foreground text-center py-8">An ISBN has 10 or 13 digits.</p>
-	{:else if state === 'invalid'}
+	{:else if isbnState === 'invalid'}
 		<p class="text-sm text-destructive text-center py-8">That ISBN's check digit doesn't match. Check for a typo.</p>
-	{:else if state === 'resolving'}
+	{:else if isbnState === 'resolving'}
 		<div class="flex flex-col gap-4" aria-busy="true" aria-label="Looking up ISBN">
 			<div class="flex flex-col sm:flex-row gap-4 p-3 border border-border rounded-lg bg-card animate-pulse">
 				<div class="w-32 sm:w-28 aspect-[2/3] bg-muted rounded shrink-0"></div>
@@ -94,15 +94,15 @@
 				</div>
 			</div>
 		</div>
-	{:else if state === 'error'}
+	{:else if isbnState === 'error'}
 		{@const errorInfo = classifyError(lookup.error)}
 		<div class="flex flex-col items-center gap-3 py-8 text-center">
 			<p class="text-sm text-destructive">{errorInfo.message}</p>
 			<Button variant="outline" size="sm" onclick={() => lookup.refetch()}>Retry</Button>
 		</div>
-	{:else if state === 'notFound'}
+	{:else if isbnState === 'notFound'}
 		<p class="text-sm text-muted-foreground text-center py-8">No book found for that ISBN</p>
-	{:else if state === 'found' && lookup.data}
+	{:else if isbnState === 'found' && lookup.data}
 		<BookCard
 			result={lookup.data}
 			isInLibrary={libraryUrls.has(lookup.data.url)}
