@@ -2,7 +2,7 @@
 	import { Button } from '$lib/components/shadcn';
 	import type { BookSearchResult } from '$lib/services/openLibraryApi';
 	import { openLibraryCoverUrl } from '$lib/utils/bookFormatting';
-	import BookOpenIcon from '@lucide/svelte/icons/book-open';
+	import BookIcon from '@lucide/svelte/icons/book';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import BookPlusIcon from '@lucide/svelte/icons/book-plus';
 
@@ -64,7 +64,7 @@
 			/>
 		{:else}
 			<div class="size-full flex items-center justify-center text-muted-foreground">
-				<BookOpenIcon class="size-8" aria-hidden="true" />
+				<BookIcon class="size-8" aria-hidden="true" />
 			</div>
 		{/if}
 	</div>
