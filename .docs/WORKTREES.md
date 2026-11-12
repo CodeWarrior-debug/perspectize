@@ -34,9 +34,15 @@ For routine isolated work (branch inspection, PR analysis, one-off experiments �
    If it's clean (no uncommitted changes) and not flagged `locked` in `git worktree list`, it's safe to switch its branch and reuse it.
 2. **If it has uncommitted changes or looks mid-task**, don't silently discard that state — surface what's in it and ask before switching its branch.
 3. **If all 5 are busy**, use a named overflow worktree (see above) rather than freeing one of them.
-4. This numbered set is separate from worktrees created by other flows (e.g. `EnterWorktree`-spawned random-named directories, or a `superpowers:using-git-worktrees` isolation worktree for an in-flight feature) — leave those alone; they're not part of the reusable pool.
+4. This numbered set is separate from worktrees created by other flows (e.g. `EnterWorktree`-spawned random-named directories, agent `isolation: worktree` (`agent-<hash>`), or a `superpowers:using-git-worktrees` isolation worktree for an in-flight feature). Don't reuse those as slots, and don't treat them as ownerless either: **whoever created one removes it when the task ends** (push or discard its work first). `bash .claude/scripts/worktree-report.sh` lists what is removable.
 
 **Why:** keeps worktree usage bounded and predictable instead of accumulating one-off directories under `.claude/worktrees/` indefinitely.
+
+## Guard and cleanup
+
+- **Guard:** `.claude/hooks/worktree-guard.sh` (PreToolUse, Bash) denies `git worktree add` unless the path is under the main checkout's `.claude/worktrees/`: no scratchpad, `/tmp`, sibling folder, `..` escape, or nesting inside another worktree. It only fires for commands that go through Bash. Worktrees the harness makes itself (agent `isolation: worktree`, `EnterWorktree`) are invisible to it. Test: `bash .claude/hooks/test-worktree-guard.sh`.
+- **Report:** `bash .claude/scripts/worktree-report.sh` (read-only) groups every worktree as REMOVABLE, MERGED-DIRTY, NO-PR, OPEN-PR or OUT-OF-PLACE and prints the removal commands for the safe group, one per line. The `monthly-maintenance` skill runs it (step 1b).
+- **Before removing a NO-PR or MERGED-DIRTY worktree,** look for work that exists nowhere else: push unpushed commits to `<branch>-followup`, then remove it. Squash merges hide whether a branch's commits were merged, so compare the tip with the PR's head commit rather than trusting `git branch --merged`.
 
 ## Worktrees on an existing branch: use the script
 

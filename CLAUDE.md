@@ -9,6 +9,7 @@
 - **No chained bash commands:** run each shell command as its own Bash tool call, never joined with `&&`. Chained commands don't match permission allow-list patterns and block on approval prompts. Applies to all agents and subagents.
 - **Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`)** during dev or verification — `DATABASE_URL` is the **shared Neon database**. Migrations are written and reviewed only, then applied manually per environment at rollout. Details and numbering: `backend/CLAUDE.md` → Migrations.
 - **Never attempt to log in or enter credentials.** `.env*` files (except `.env.example`) are unreadable by design; ask the human to re-run the one-time login if signed out.
+- **Worktrees live only under `.claude/worktrees/`** — never a scratchpad, `/tmp` or sibling folder. Create with `.claude/scripts/new-worktree.sh <branch> [name]` or `EnterWorktree`. Whoever creates one removes it when done (push or discard its work first). `worktree-guard.sh` denies the rest; `bash .claude/scripts/worktree-report.sh` lists strays. Details: [.docs/WORKTREES.md](.docs/WORKTREES.md).
 - **Never commit `.planning/phases/bugs/` files** (gitignored; see Bug logging).
 
 ## GitHub & Repository Management
@@ -21,7 +22,7 @@
 
 **`/revise-claude-md` must not block the PR:** commit its CLAUDE.md edits on the PR branch, list them in the PR body's Session Learnings, and open the PR without asking. The human's review at merge is the approval.
 
-**PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, the `new-content-type` label (specs and first implementations of a new content type), the migration labels (synced automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges.
+**PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, the `new-content-type` label (specs and first implementations of a new content type), the migration labels (synced automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges (stacked PRs merge differently: PR_WORKFLOW.md → Stacked PRs).
 
 **`@claude` GitHub workflow (`.github/workflows/claude.yml`):** comment-triggered runs use the file from `main`, so workflow edits take effect only once merged (ship them as their own `chore` PR). Deps are installed in workflow steps before Claude starts; `--allowed-tools` in `claude_args` is a narrow allowlist: never add `pnpm install`/`curl`/`gh api`. Claude starts at the repo root, so allowlisted commands use `pnpm --dir frontend run ...` / `go -C backend ...`. Never give it `DATABASE_URL` (DB tests skip without it).
 
@@ -29,7 +30,7 @@
 
 ## Branch Naming
 
-**Always branch from updated `main`:** `git checkout main`, `git pull origin main`, `git checkout -b <name>`.
+**Always branch from fresh `origin/main`, in a worktree:** `.claude/scripts/new-worktree.sh <type>/<name>` (it fetches first). Switching branches in the main checkout collides with other sessions.
 
 **Format:** `type/initiativePrefix-issueNumber-description-in-kebab-case`. `type` is `feature`, `bugfix` or `chore`; `initiativePrefix` is `INI` (Initialization Phase). `initiativePrefix` and `issueNumber` are a pair: both, or neither when no issue already exists. Examples: `feature/INI-16-youtube-post-graphql`, `feature/youtube-post-graphql`.
 

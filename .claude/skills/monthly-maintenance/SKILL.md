@@ -14,6 +14,12 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
 
 1. **Confirm scope with the user** before making changes — this routine touches branches and merges PRs. A quick one-line heads-up is enough ("Running monthly maintenance: cleaning merged branches, merging dependabot/security PRs, updating graphify, re-running gsd map-codebase — proceeding unless you'd like to skip any of these").
 
+1b. **Clean up worktrees first** (a branch checked out in a worktree cannot be deleted in step 2).
+   - Run `bash .claude/scripts/worktree-report.sh` (read-only).
+   - REMOVABLE: show the list; on the user's yes, run each printed line as its own command.
+   - MERGED-DIRTY, NO-PR, OUT-OF-PLACE: summarise to the user and remove none. A NO-PR worktree may hold the only copy of its commits; pushing it as `<branch>-followup` is the user's call.
+   - OPEN-PR: leave alone.
+
 2. **Delete merged branches (local + remote).**
    - `git fetch origin --prune`
    - List branches already merged into `origin/main`: `git branch -r --merged origin/main` (exclude `origin/main` itself and any branch someone is actively working on).
