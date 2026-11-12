@@ -478,6 +478,8 @@ export interface ContentFilterInput {
 	personRole?: 'CAST' | 'DIRECTOR';
 	genreContains?: string;
 	castContains?: string;
+	// Book filter (book rows only): case-insensitive contains on the first author.
+	authorContains?: string;
 	ageRating?: string[];
 	releasedAfter?: string;
 	releasedBefore?: string;
@@ -647,6 +649,11 @@ export function urlParamsToGraphQLFilter(
 
 			case 'cast':
 				result.castContains = value;
+				hasAny = true;
+				break;
+
+			case 'author':
+				result.authorContains = value;
 				hasAny = true;
 				break;
 
