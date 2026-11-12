@@ -76,6 +76,17 @@ export function authorCellRenderer(params: { data?: BookRow }): HTMLElement | st
 	return span;
 }
 
+export type CoverSize = 'S' | 'M' | 'L';
+
+/**
+ * Absolute Open Library cover URL for a cover id, or null when the work has no cover. S is for
+ * grids and the Item cell, M for cards, L for details. Lives here (pure) so cell renderers can
+ * use it without the GraphQL client; openLibraryApi.ts re-exports it.
+ */
+export function openLibraryCoverUrl(coverId: number | null | undefined, size: CoverSize = 'M'): string | null {
+	return coverId ? `https://covers.openlibrary.org/b/id/${coverId}-${size}.jpg` : null;
+}
+
 /** A positive number, or null: 0 and missing both mean unknown. */
 function known(value: number | null | undefined): number | null {
 	return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;

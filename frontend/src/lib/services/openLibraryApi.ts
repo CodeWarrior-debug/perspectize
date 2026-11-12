@@ -126,12 +126,8 @@ export async function lookupBookByIsbn(isbn: string): Promise<BookSearchResult |
 	return data.bookByISBN;
 }
 
-export type CoverSize = 'S' | 'M' | 'L';
-
-/** Absolute Open Library cover URL for a cover id, or null when the work has no cover. S is for grids, M for cards, L for details. */
-export function openLibraryCoverUrl(coverId: number | null | undefined, size: CoverSize = 'M'): string | null {
-	return coverId ? `https://covers.openlibrary.org/b/id/${coverId}-${size}.jpg` : null;
-}
+// The cover URL is pure, so it lives in bookFormatting (cell renderers use it without this module's client).
+export { openLibraryCoverUrl, type CoverSize } from '$lib/utils/bookFormatting';
 
 export const openLibraryKeys = {
 	all: ['openlibrary'] as const,

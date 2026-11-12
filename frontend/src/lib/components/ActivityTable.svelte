@@ -127,6 +127,16 @@
 	import CellPopover, { type PopoverState } from '$lib/components/CellPopover.svelte';
 	import { buildPopoverState, createHoverController } from '$lib/utils/tooltipHover';
 	import { ACTIVITY_TOOLTIP_SPECS } from '$lib/utils/activityTooltipSpecs';
+	import {
+		authorCellRenderer,
+		authorValueGetter,
+		editionsValueGetter,
+		formatBookRating,
+		hasLowRatingCount,
+		pagesValueGetter,
+		publishedValueGetter,
+		ratingValueGetter,
+	} from '$lib/utils/bookFormatting';
 	import { onDestroy, untrack } from 'svelte';
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
@@ -894,6 +904,81 @@
 				headerTooltip: 'Video description from YouTube API',
 				hide: true,
 			},
+			// Book columns (Open Library). Hidden by default; the responsive effect shows the Book default
+			// set when the type filter is exactly BOOK. Author sorts on the server (AUTHOR). Published, Pages
+			// and Rating sort in "Loaded" mode only, and have no filter (no URL key). Editions is picker-only.
+			{
+				colId: 'author',
+				headerName: 'Author',
+				flex: 2,
+				minWidth: 140,
+				filter: 'agTextColumnFilter',
+				valueGetter: authorValueGetter,
+				filterValueGetter: (params) => authorValueGetter({ data: params.data }) ?? '',
+				cellRenderer: authorCellRenderer,
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.author },
+				headerTooltip: 'Author(s) from Open Library',
+				hide: true,
+			},
+			{
+				colId: 'published',
+				headerName: 'Published',
+				flex: 0.8,
+				minWidth: 105,
+				maxWidth: 130,
+				filter: false,
+				// A number to sort by, shown as the plain year (never through the thousands-separated formatter).
+				valueGetter: (params) => {
+					const year = publishedValueGetter({ data: params.data });
+					return year === null ? null : Number(year);
+				},
+				comparator: unknownLastComparator,
+				valueFormatter: (params) => (params.value == null ? EMPTY_VALUE : String(params.value)),
+				headerTooltip: 'First published year',
+				hide: true,
+			},
+			{
+				colId: 'pages',
+				headerName: 'Pages',
+				flex: 0.6,
+				minWidth: 70,
+				maxWidth: 110,
+				filter: false,
+				valueGetter: pagesValueGetter,
+				comparator: unknownLastComparator,
+				valueFormatter: (params) => (params.value == null ? EMPTY_VALUE : String(params.value)),
+				headerTooltip: 'Median page count across editions',
+				hide: true,
+			},
+			{
+				colId: 'rating',
+				headerName: 'Rating',
+				flex: 0.7,
+				minWidth: 90,
+				maxWidth: 120,
+				filter: false,
+				valueGetter: ratingValueGetter,
+				comparator: unknownLastComparator,
+				valueFormatter: (params) => formatBookRating(params.value),
+				// Muted when the rating rests on fewer than 5 ratings.
+				cellClass: (params) => (hasLowRatingCount({ data: params.data }) ? 'text-muted-foreground' : ''),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.rating },
+				headerTooltip: 'Open Library community rating out of 5. Muted when fewer than 5 ratings.',
+				hide: true,
+			},
+			{
+				colId: 'editions',
+				headerName: 'Editions',
+				flex: 0.6,
+				minWidth: 80,
+				maxWidth: 110,
+				sortable: false,
+				filter: false,
+				valueGetter: editionsValueGetter,
+				valueFormatter: (params) => (params.value == null ? EMPTY_VALUE : String(params.value)),
+				headerTooltip: 'Number of editions',
+				hide: true,
+			},
 			// Movie picker-only columns (never in the default set).
 			{
 				colId: 'budget',
@@ -1287,7 +1372,7 @@
 	// sm (445-639): Perspectize, Item, Type, Category, Channel
 	// md (640-899): Perspectize, Item, Type, Category, Channel, Duration, Date
 	// lg (900+):    Perspectize, Item, Type, Category, Channel, Duration, Date, Views, Likes, Tags
-	// With the type filter exactly MOVIE, the Movie set applies instead (defaultColumnVisibility).
+	// With the type filter exactly MOVIE (or BOOK), the Movie (or Book) set applies instead (defaultColumnVisibility).
 	// A view with a saved setup (column picker) shows that instead of its defaults, which
 	// also re-applies it after a grid remount (cardMode toggle, error recovery).
 	// Switching view (e.g. to exactly MOVIE) shows a toast offering the previous columns back.

@@ -10,6 +10,9 @@ import {
 } from '$lib/utils/grid-config';
 import { columnViewFor as columnViewForFromLayouts } from '$lib/utils/columnLayouts';
 import { urlParamsToGraphQLFilter } from '$lib/utils/gridUrlState';
+import { headerMinWidth } from '$lib/utils/formatting';
+import { ACTIVITY_TOOLTIP_SPECS } from '$lib/utils/activityTooltipSpecs';
+import activityTableSource from '$lib/components/ActivityTable.svelte?raw';
 
 const TIERS: ResponsiveTier[] = ['xs', 'sm', 'md', 'lg'];
 
@@ -171,5 +174,81 @@ describe('Book column registry', () => {
 describe('Author filter', () => {
 	it('maps f.author to the backend authorContains filter', () => {
 		expect(urlParamsToGraphQLFilter({ author: 'steinbeck' }, '')).toEqual({ authorContains: 'steinbeck' });
+	});
+});
+
+// The grid's colDefs live in ActivityTable.svelte (AG Grid does not render in jsdom), so these
+// read its source, as the Movie column tests do.
+describe('Book colDefs in ActivityTable', () => {
+	const blocks = activityTableSource.split(/(?=colId:\s*')/g);
+	const block = (colId: string): string => {
+		const b = blocks.find((x) => x.startsWith(`colId: '${colId}'`));
+		if (!b) throw new Error(`no colDef for ${colId}`);
+		return b;
+	};
+	function minWidth(colId: string): number {
+		const b = block(colId);
+		const explicit = b.match(/\n\s*minWidth:\s*(\d+)/)?.[1];
+		if (explicit) return Number(explicit);
+		const name = b.match(/headerName:\s*'([^']*)'/)?.[1] ?? '';
+		return headerMinWidth(name, !/\n\s*filter:\s*false/.test(b));
+	}
+
+	it('has a colDef for every Book column', () => {
+		for (const colId of ['author', 'published', 'pages', 'rating', 'editions']) {
+			expect(() => block(colId), colId).not.toThrow();
+		}
+	});
+
+	it('the Book lg set fits the 1212px grid', () => {
+		const { visible } = defaultColumnVisibility('lg', 'book');
+		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
+		expect(total).toBeLessThanOrEqual(1212);
+	});
+
+	it('the Book md set fits the 1212px grid', () => {
+		const { visible } = defaultColumnVisibility('md', 'book');
+		const total = visible.reduce((sum, id) => sum + minWidth(id), 0);
+		expect(total).toBeLessThanOrEqual(1212);
+	});
+
+	it('Published renders the plain year, never through the thousands-separated number formatter', () => {
+		const published = block('published');
+		expect(published).toMatch(/String\(params\.value\)/);
+		expect(published).not.toMatch(/formatCount|toLocaleString|formatBookRating/);
+	});
+
+	it('Rating is muted under 5 ratings', () => {
+		expect(block('rating')).toMatch(/hasLowRatingCount\(\{ data: params\.data \}\)/);
+	});
+
+	it('names each Book column header tooltip as planned', () => {
+		expect(block('author')).toContain("headerTooltip: 'Author(s) from Open Library'");
+		expect(block('published')).toContain("headerTooltip: 'First published year'");
+		expect(block('pages')).toContain("headerTooltip: 'Median page count across editions'");
+		expect(block('rating')).toContain(
+			"headerTooltip: 'Open Library community rating out of 5. Muted when fewer than 5 ratings.'",
+		);
+		expect(block('editions')).toContain("headerTooltip: 'Number of editions'");
+	});
+});
+
+describe('Book tooltip specs', () => {
+	it('author lists every author on hover, and says so when there are none', () => {
+		const spec = ACTIVITY_TOOLTIP_SPECS.author as unknown as {
+			items: (c: { data: unknown }) => string[];
+			emptyText: string;
+		};
+		const row = { contentType: 'BOOK', book: { authors: [{ name: 'A' }, { name: 'B' }] } };
+		expect(spec.items({ data: row })).toEqual(['A', 'B']);
+		expect(spec.emptyText).toBe('No author');
+	});
+
+	it('rating explains the average and the count, or that there are no ratings yet', () => {
+		const spec = ACTIVITY_TOOLTIP_SPECS.rating as unknown as { text: (c: { data: unknown }) => string };
+		expect(spec.text({ data: { contentType: 'BOOK', book: { ratingsAverage: 4.1, ratingsCount: 100 } } })).toBe(
+			'4.1 out of 5 · 100 ratings',
+		);
+		expect(spec.text({ data: { contentType: 'BOOK', book: { ratingsAverage: null } } })).toBe('No ratings yet');
 	});
 });
