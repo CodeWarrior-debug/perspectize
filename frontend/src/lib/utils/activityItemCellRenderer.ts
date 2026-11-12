@@ -162,6 +162,7 @@ export interface ActivityItemCellRendererParams {
 		verseStartID?: number | null;
 		verseEndID?: number | null;
 		movie?: unknown;
+		book?: unknown;
 		response?: unknown;
 	};
 	context?: { onOpenDetails?: (contentId: string) => void };

@@ -39,6 +39,7 @@ const CONTENT_TYPE_LABELS: Partial<Record<ContentType, string>> = {
 	// CLAIM: 'Claim', // not ready in the UI yet; uncomment to offer it in the filter
 	BIBLE_PASSAGE: 'Bible Passage',
 	MOVIE: 'Movie',
+	BOOK: 'Book',
 };
 
 /** Type-filter options. `value` is the lowercased form used in the filter model and `f.type=` URL param. */
