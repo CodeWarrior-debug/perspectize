@@ -3764,6 +3764,8 @@ input ContentFilter {
   maxBoxOffice: Float
   minTmdbScore: Float        # TMDB vote average (0-10), inclusive
   maxTmdbScore: Float
+  # Book column filters (book rows only; other rows never match)
+  authorContains: String     # Case-insensitive contains on the first author's name (books only)
   # View/like count filters
   minViewCount: Int
   maxViewCount: Int
@@ -18614,7 +18616,7 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
+	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "authorContains", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -18740,6 +18742,13 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.MaxTmdbScore = data
+		case "authorContains":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("authorContains"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AuthorContains = data
 		case "minViewCount":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minViewCount"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)

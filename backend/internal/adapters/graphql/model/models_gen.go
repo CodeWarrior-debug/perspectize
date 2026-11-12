@@ -94,6 +94,7 @@ type ContentFilter struct {
 	MaxBoxOffice        *float64                    `json:"maxBoxOffice,omitempty"`
 	MinTmdbScore        *float64                    `json:"minTmdbScore,omitempty"`
 	MaxTmdbScore        *float64                    `json:"maxTmdbScore,omitempty"`
+	AuthorContains      *string                     `json:"authorContains,omitempty"`
 	MinViewCount        *int                        `json:"minViewCount,omitempty"`
 	MaxViewCount        *int                        `json:"maxViewCount,omitempty"`
 	MinLikeCount        *int                        `json:"minLikeCount,omitempty"`
