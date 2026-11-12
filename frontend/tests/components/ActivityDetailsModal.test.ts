@@ -527,6 +527,76 @@ describe('ActivityDetailsModal', () => {
 		});
 	});
 
+	describe('BOOK content', () => {
+		const eastOfEden = {
+			workKey: 'OL23166W',
+			title: 'East of Eden',
+			authors: [{ name: 'John Steinbeck' }],
+			coverId: 11386937,
+			firstPublishYear: 1952,
+			pageCountMedian: 611,
+			subjects: ['Fiction'],
+			ratingsAverage: 4.1,
+			ratingsCount: 100,
+			editionCount: 65,
+			description: 'A saga of two families.',
+			relatedWorks: [],
+		};
+		const bookRow = (book: unknown) => ({
+			...content,
+			name: 'East of Eden',
+			url: 'https://openlibrary.org/works/OL23166W',
+			channelTitle: null,
+			contentType: 'BOOK',
+			viewCount: null,
+			likeCount: null,
+			length: null,
+			lengthUnits: null,
+			description: null,
+			tags: null,
+			primaryCategory: null,
+			book,
+		});
+		const open = (book: unknown) =>
+			render(ActivityDetailsModal, { props: { content: bookRow(book), open: true, onClose: vi.fn() } });
+
+		it('labels the header Book, shows the author under the title, and the Open Library attribution', () => {
+			open(eastOfEden);
+			expect(screen.getByText('Book')).toBeInTheDocument();
+			expect(screen.getByText('John Steinbeck')).toBeInTheDocument();
+			expect(
+				screen.getByText('Data: Open Library (archive.org), community-contributed; may be incomplete.'),
+			).toBeInTheDocument();
+			expect(screen.queryByText('YouTube Video')).not.toBeInTheDocument();
+			expect(screen.queryByText(/uses the TMDB API/)).not.toBeInTheDocument();
+		});
+
+		it('drops the YouTube Views and Likes tiles and shows the book tiles', () => {
+			open(eastOfEden);
+			expect(screen.queryByText('Views')).not.toBeInTheDocument();
+			expect(screen.queryByText('Likes')).not.toBeInTheDocument();
+			expect(screen.getByText('Pages')).toBeInTheDocument();
+			expect(screen.getByText('Rating count')).toBeInTheDocument();
+		});
+
+		it('keeps the Update source data button, since Open Library data is refreshed', () => {
+			open(eastOfEden);
+			expect(screen.getByRole('button', { name: /update source data/i })).toBeInTheDocument();
+		});
+
+		it('shows the large cover fitted (object-contain), not cropped', () => {
+			open(eastOfEden);
+			const img = document.querySelector('img[src="https://covers.openlibrary.org/b/id/11386937-L.jpg"]');
+			expect(img).not.toBeNull();
+			expect(img?.className).toContain('object-contain');
+		});
+
+		it('renders the description once, in the book body (never through the YouTube description section)', () => {
+			open(eastOfEden);
+			expect(screen.getAllByText('A saga of two families.')).toHaveLength(1);
+		});
+	});
+
 	describe('add to plan', () => {
 		beforeEach(() => {
 			authState.userId = null;
