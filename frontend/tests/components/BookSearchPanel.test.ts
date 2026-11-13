@@ -4,6 +4,8 @@ import { tick, type Component } from 'svelte';
 import BookSearchPanel from '$lib/components/discover/BookSearchPanel.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
+
+vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
 import {
 	BOOK_SEARCH,
 	BOOK_SEARCH_DEBOUNCE_MS,
@@ -71,7 +73,7 @@ function respondWith(
 
 function renderPanel(overrides: Record<string, unknown> = {}) {
 	const props = {
-		libraryUrls: new Set<string>(),
+		library: new Map(),
 		onAdd: vi.fn(),
 		...overrides,
 	};
@@ -181,13 +183,13 @@ describe('BookSearchPanel', () => {
 			respondWith(() => ({
 				bookSearch: bookPage({ items: [book(1, 'East of Eden'), book(2, 'Brainscan')], totalPages: 1 }),
 			}));
-			renderPanel({ libraryUrls: new Set([EAST_OF_EDEN_URL]) });
+			renderPanel({ library: new Map([[EAST_OF_EDEN_URL, { id: '7', name: 'Tracked' }]]) });
 
 			await typeText('eden');
 			await settle(BOOK_SEARCH_DEBOUNCE_MS);
 
 			expect(screen.getByRole('link', { name: 'Brainscan' })).toBeInTheDocument();
-			expect(screen.getAllByRole('button', { name: 'In Library' })).toHaveLength(1);
+			expect(screen.getAllByTestId('library-status')).toHaveLength(1);
 			expect(screen.getAllByRole('button', { name: 'Add to Perspectize' })).toHaveLength(1);
 		});
 
@@ -358,10 +360,10 @@ describe('BookSearchPanel', () => {
 				() => ({ bookSearch: bookPage({}) }),
 				() => ({ bookTrending: bookPage({ items: [DUNE, EDEN] }) }),
 			);
-			const props = renderPanel({ libraryUrls: new Set([DUNE.url]) });
+			const props = renderPanel({ library: new Map([[DUNE.url, { id: '7', name: 'Tracked' }]]) });
 			await settle();
 
-			expect(screen.getAllByRole('button', { name: 'In Library' })).toHaveLength(1);
+			expect(screen.getAllByTestId('library-status')).toHaveLength(1);
 			await fireEvent.click(screen.getByRole('button', { name: 'Add to Perspectize' }));
 
 			expect(props.onAdd).toHaveBeenCalledWith(EDEN.url);

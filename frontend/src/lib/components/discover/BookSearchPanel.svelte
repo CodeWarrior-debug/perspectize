@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { LibraryItem } from './libraryItem';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { Button, Input } from '$lib/components/shadcn';
 	import BookCard from './BookCard.svelte';
@@ -22,7 +23,7 @@
 	let {
 		value = $bindable(''),
 		inputRef = $bindable(null),
-		libraryUrls,
+		library,
 		pendingUrl = null,
 		onAdd,
 	}: {
@@ -30,7 +31,7 @@
 		/** Exposes the input element so the page can focus it (Cmd/Ctrl+K). */
 		inputRef?: HTMLInputElement | null;
 		/** Canonical work URLs already in the library. */
-		libraryUrls: Set<string>;
+		library: ReadonlyMap<string, LibraryItem>;
 		/** URL of the book being added right now, or null. */
 		pendingUrl?: string | null;
 		/** Called with a result's canonical url when its Add button is clicked. */
@@ -170,7 +171,7 @@
 				? 'Type at least 2 characters to search.'
 				: 'Search Open Library for a book to add it to Perspectize.'}
 		</p>
-		<BookTrendingFeed bind:timeWindow={trendingWindow} {libraryUrls} {pendingUrl} {onAdd} />
+		<BookTrendingFeed bind:timeWindow={trendingWindow} {library} {pendingUrl} {onAdd} />
 	{:else if isDebouncing || (searchEnabled && search.isPending)}
 		<div class="flex flex-col gap-4" aria-busy="true" aria-label="Searching books">
 			{#each Array(4) as _, i (i)}
@@ -198,7 +199,12 @@
 	{:else}
 		<div class="flex flex-col gap-4">
 			{#each items as result, i (`${i}-${result.workKey}`)}
-				<BookCard {result} isInLibrary={libraryUrls.has(result.url)} isPending={pendingUrl === result.url} {onAdd} />
+				<BookCard
+					{result}
+					libraryItem={library.get(result.url) ?? null}
+					isPending={pendingUrl === result.url}
+					{onAdd}
+				/>
 			{/each}
 
 			{#if moreForTerm.loading}

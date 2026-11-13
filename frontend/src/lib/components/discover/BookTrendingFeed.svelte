@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { LibraryItem } from './libraryItem';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { Button } from '$lib/components/shadcn';
 	import BookCard from './BookCard.svelte';
@@ -14,13 +15,13 @@
 	// tab). The window lives in the owner (bound) so the toggle survives a search and coming back to idle.
 	let {
 		timeWindow = $bindable('WEEK'),
-		libraryUrls,
+		library,
 		pendingUrl = null,
 		onAdd,
 	}: {
 		timeWindow?: TrendingWindow;
 		/** Canonical work URLs already in the library. */
-		libraryUrls: Set<string>;
+		library: ReadonlyMap<string, LibraryItem>;
 		/** URL of the book being added right now, or null. */
 		pendingUrl?: string | null;
 		/** Called with a result's canonical url when its Add button is clicked. */
@@ -151,7 +152,12 @@
 	{:else}
 		<div class="flex flex-col gap-4">
 			{#each items as result, i (`${i}-${result.workKey}`)}
-				<BookCard {result} isInLibrary={libraryUrls.has(result.url)} isPending={pendingUrl === result.url} {onAdd} />
+				<BookCard
+					{result}
+					libraryItem={library.get(result.url) ?? null}
+					isPending={pendingUrl === result.url}
+					{onAdd}
+				/>
 			{/each}
 
 			{#if moreForWindow.loading}
