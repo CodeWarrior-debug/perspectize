@@ -224,7 +224,8 @@ export enum Privacy {
 
 | File                                        | Purpose                             |
 | ------------------------------------------- | ----------------------------------- |
-| `src/routes/+page.svelte`                   | Home page (landing, search)         |
+| `src/routes/+page.svelte`                   | Home: sends signed-in visitors to the Library |
+| `src/routes/content-library/+page.svelte`   | Library page (content grid, search) |
 | `src/routes/perspectives/+page.svelte`      | Browse perspectives (grid, filters) |
 | `src/lib/components/PerspectiveCard.svelte` | Perspective display card            |
 | `src/lib/components/PerspectiveForm.svelte` | Create/edit perspective form        |

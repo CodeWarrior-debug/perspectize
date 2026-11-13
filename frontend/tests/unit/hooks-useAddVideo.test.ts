@@ -123,7 +123,7 @@ describe('useAddVideo hook', () => {
 				createContentFromYouTube: { content: { name: 'Existing Video', id: '42' }, alreadyExisted: true },
 			});
 			mockToastWarning.mock.calls[0][1].action.onClick();
-			expect(goto).toHaveBeenCalledWith('/?open=42');
+			expect(goto).toHaveBeenCalledWith('/content-library?open=42');
 		});
 
 		it('falls back to a full refetch when the response has no content item', () => {

@@ -42,7 +42,7 @@ describe('useOpenPassage', () => {
 			createContentFromPassage: { id: '12', name: 'John 3:16', contentType: 'BIBLE_PASSAGE', displayTitle: null },
 		});
 		expect(mocks.invalidate).toHaveBeenCalled();
-		expect(goto).toHaveBeenCalledWith('/?open=12');
+		expect(goto).toHaveBeenCalledWith('/content-library?open=12');
 		expect(mocks.success).not.toHaveBeenCalled();
 	});
 

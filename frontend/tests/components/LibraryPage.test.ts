@@ -1,5 +1,6 @@
 /**
- * Tests for the Activity page's search-scope picker (src/routes/+page.svelte).
+ * Tests for the Library page's header and search-scope picker
+ * (src/routes/content-library/+page.svelte).
  * ActivityTable itself is stubbed out — it has its own extensive test suite
  * (tests/components/ActivityTable.test.ts) — so these focus purely on the
  * search box + scope popover writing the right `q`/`qf` URL params.
@@ -25,12 +26,12 @@ vi.mock('$lib/queries/users/useMe.svelte', () => ({
 	}),
 }));
 
-import Page from '../../src/routes/+page.svelte';
+import Page from '../../src/routes/content-library/+page.svelte';
 
-describe('Activity page search scope picker', () => {
+describe('Library page search scope picker', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockPageState.url = new URL('http://localhost/');
+		mockPageState.url = new URL('http://localhost/content-library');
 		meState.me = null;
 	});
 
@@ -39,6 +40,29 @@ describe('Activity page search scope picker', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /choose which fields to search/i }));
 		await tick();
 	}
+
+	it('titles the page Library, as the shared library for all members', () => {
+		render(Page);
+		expect(screen.getByRole('heading', { level: 1, name: 'Library' })).toBeInTheDocument();
+		expect(
+			screen.getByText("Everything Perspectize members have added, and how they've measured it."),
+		).toBeInTheDocument();
+	});
+
+	it('stays on /content-library when the search box is cleared', async () => {
+		vi.useFakeTimers();
+		try {
+			mockPageState.url = new URL('http://localhost/content-library?q=cooking');
+			render(Page);
+
+			await fireEvent.input(screen.getByPlaceholderText('Search content...'), { target: { value: '' } });
+			await vi.advanceTimersByTimeAsync(300);
+
+			expect(goto).toHaveBeenCalledWith('/content-library', expect.anything());
+		} finally {
+			vi.useRealTimers();
+		}
+	});
 
 	it('renders the search input and the scope picker trigger', () => {
 		render(Page);
@@ -56,7 +80,7 @@ describe('Activity page search scope picker', () => {
 	});
 
 	it('reflects an existing qf param by unchecking the excluded scopes', async () => {
-		mockPageState.url = new URL('http://localhost/?qf=title%2Cdesc%2Cchannel');
+		mockPageState.url = new URL('http://localhost/content-library?qf=title%2Cdesc%2Cchannel');
 		await openScopePicker();
 		expect(screen.getByRole('checkbox', { name: 'Title' })).toBeChecked();
 		expect(screen.getByRole('checkbox', { name: 'Description' })).toBeChecked();
@@ -72,7 +96,7 @@ describe('Activity page search scope picker', () => {
 	});
 
 	it('does not allow unchecking the last remaining scope', async () => {
-		mockPageState.url = new URL('http://localhost/?qf=title');
+		mockPageState.url = new URL('http://localhost/content-library?qf=title');
 		await openScopePicker();
 
 		await fireEvent.click(screen.getByRole('checkbox', { name: 'Title' }));
@@ -81,7 +105,7 @@ describe('Activity page search scope picker', () => {
 	});
 
 	it('re-checking a scope removes qf from the URL once all four are selected again', async () => {
-		mockPageState.url = new URL('http://localhost/?qf=title%2Cdesc%2Cchannel');
+		mockPageState.url = new URL('http://localhost/content-library?qf=title%2Cdesc%2Cchannel');
 		await openScopePicker();
 
 		await fireEvent.click(screen.getByRole('checkbox', { name: 'Tags' }));
@@ -114,7 +138,7 @@ describe('Activity page search scope picker', () => {
 
 		it('filters the User column to the signed-in username, resetting to page 1', async () => {
 			meState.me = { id: '7', username: 'ann' };
-			mockPageState.url = new URL('http://localhost/?page=3');
+			mockPageState.url = new URL('http://localhost/content-library?page=3');
 			render(Page);
 
 			const button = screen.getByRole('button', { name: 'Mine' });
@@ -128,7 +152,7 @@ describe('Activity page search scope picker', () => {
 
 		it('is pressed when f.user matches the username (case-insensitive) and clears only that filter on click', async () => {
 			meState.me = { id: '7', username: 'Ann' };
-			mockPageState.url = new URL('http://localhost/?f.user=ann&f.type=youtube_video');
+			mockPageState.url = new URL('http://localhost/content-library?f.user=ann&f.type=youtube_video');
 			render(Page);
 
 			const button = screen.getByRole('button', { name: 'Mine' });
@@ -141,7 +165,7 @@ describe('Activity page search scope picker', () => {
 
 		it('is not pressed when the User filter is someone else', () => {
 			meState.me = { id: '7', username: 'ann' };
-			mockPageState.url = new URL('http://localhost/?f.user=bob');
+			mockPageState.url = new URL('http://localhost/content-library?f.user=bob');
 			render(Page);
 			expect(screen.getByRole('button', { name: 'Mine' })).toHaveAttribute('aria-pressed', 'false');
 		});

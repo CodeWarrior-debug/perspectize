@@ -1,7 +1,7 @@
 /**
  * The Activity list request: the one place that decides the TanStack key and the
  * LIST_CONTENT variables for a URL state. ActivityTable and the route prefetch
- * (routes/+page.ts) both call this, so the key and the request cannot drift apart.
+ * (routes/content-library/+page.ts and routes/+page.ts) both call this, so the key and the request cannot drift apart.
  *
  * Pure: no runes, no network, no Clerk, so it can run at route load (#636).
  */
