@@ -32,6 +32,11 @@ The run log lives in [ROUTINES.md](../../../ROUTINES.md) at the repo root — re
    - For each, confirm CI is green (`gh pr checks <number>`), then merge per the repo's standard merge preferences: `gh pr merge <number> --squash --delete-branch --admin`.
    - Do not merge a PR with failing checks or merge conflicts — flag it for the user instead.
 
+3b. **Collect Session Learnings from merged PRs.**
+   - List PRs merged since the last run (date in [ROUTINES.md](../../../ROUTINES.md)): `gh pr list --state merged --search "merged:>=YYYY-MM-DD" --json number,title,body --limit 100`.
+   - Extract each body's `## Session Learnings` section (skip "None"/empty). These are the non-critical learnings; CRITICAL ones were already committed on their PR branch ([definition](../../../.docs/PR_WORKFLOW.md#session-learnings)).
+   - De-duplicate, then apply the ones still worth keeping to the right CLAUDE.md or `.docs/` file (root CLAUDE.md only for repo-wide rules), and list what was applied or dropped in the routine's PR body.
+
 4. **Update graphify.**
    - `graphify update .` (AST-only refresh, no API cost) to keep the knowledge graph current.
 
