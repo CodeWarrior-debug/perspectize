@@ -21,14 +21,14 @@
 {#if description}
 	<div class="mt-3.5 border-t border-border pt-3.5">
 		<div class="mb-1.5 text-[11px] tracking-wide text-muted-foreground uppercase">Description</div>
-		<div class="font-serif text-[13px] whitespace-pre-wrap text-foreground">{description}</div>
+		<div class="font-slot-longform font-serif text-[13px] whitespace-pre-wrap text-foreground">{description}</div>
 	</div>
 {/if}
 
 {#if related.length > 0}
 	<div class="mt-3.5">
 		<div class="mb-1.5 text-[11px] tracking-wide text-muted-foreground uppercase">Related works</div>
-		<ul class="space-y-1 font-[family-name:var(--font-family-serif)] text-[13px] text-foreground">
+		<ul class="space-y-1 font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] text-foreground">
 			{#each related as work, i (i)}
 				<li>
 					<a
