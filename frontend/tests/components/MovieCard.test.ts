@@ -73,7 +73,7 @@ describe('MovieCard', () => {
 		render(MovieCard, { props: { result: matrix, onAdd, libraryItem: { id: '7', name: 'The Matrix' } } });
 
 		expect(screen.getByTestId('library-status')).toHaveTextContent('In Library');
-		expect(screen.getByRole('link', { name: 'Go to item' })).toHaveAttribute('href', '/?open=7');
+		expect(screen.getByRole('link', { name: 'Go to item' })).toHaveAttribute('href', '/content-library?open=7');
 		expect(screen.queryByRole('button', { name: 'Add to Perspectize' })).not.toBeInTheDocument();
 	});
 });

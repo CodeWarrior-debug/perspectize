@@ -54,7 +54,7 @@ Adding content ends in a toast (`useAddVideo.ts`, `useAddMovie.ts`, `useAddPassa
 `Compare.svelte:279` links to `/`. The user clicks a CTA about *this* content and ends up on the generic grid, unfiltered and without the editor open. Open the perspective popover in place (the component is already used elsewhere), or deep-link to `/?open=<id>&perspective=1`. On save, return to Compare so they see themselves in the comparison.
 
 ### 3. Plain YouTube add has no "Go to video" — M / S
-Duplicate videos get `Go to video` (`useAddVideo.ts`) and movies/passages get `Go to …`, but a genuine new YouTube add shows a bare "Added: …". The most common path is the one without the shortcut. Reuse `activityContentHref`.
+Duplicate videos get `Go to video` (`useAddVideo.ts`) and movies/passages get `Go to …`, but a genuine new YouTube add shows a bare "Added: …". The most common path is the one without the shortcut. Reuse `libraryContentHref`.
 
 ### 9. Newly added item may not appear in the grid — H / M
 Activity starts with `f.type=youtube`, so a user who adds a movie or Bible passage from the header popover sees a success toast but no new row. The "Go to …" action opens the modal via the `?open=` fallback query, which works, but the grid itself never shows it. Options: when the added type is excluded by the active filter, say so in the toast ("Hidden by your YouTube filter — show all"), or have the toast action also relax the type filter. Also *verify* sort/page behavior: `useAddVideo` prepends to every cached list regardless of that list's filters/sort/page.
@@ -94,7 +94,7 @@ Clerk loading, Plan, Compare and the compare picker use text-only placeholders; 
 `discover/+page.svelte` builds `libraryUrls` from `LIST_CONTENT(first: 100)` (its own comment calls this an MVP tradeoff). Past 100 items, trending cards for videos you already added show an active **Add** button; clicking yields the duplicate warning. Replace with a server lookup by URL/video id for the visible cards.
 
 ### 11. "In Library" cards are dead ends — M / S
-The disabled state (`VideoCard.svelte`, `isInLibrary` branch) shows a label and nothing else, because only this-session adds have the metadata. Make it a link to `activityContentHref(...)`, resolved by URL on click, so the user can jump to their copy.
+The disabled state (`VideoCard.svelte`, `isInLibrary` branch) shows a label and nothing else, because only this-session adds have the metadata. Make it a link to `libraryContentHref(...)`, resolved by URL on click, so the user can jump to their copy.
 
 ### 12. Discover search leaves the app — M / M
 Typing a query hands off to youtube.com (quota-driven). The user then has to copy a URL back and paste it into the search box. Reduce the round trip: detect a YouTube URL on the clipboard when the box is focused ("Add the video you copied?"), and show a short hint explaining the hand-off. A small server-side search cache would remove the hand-off entirely.
