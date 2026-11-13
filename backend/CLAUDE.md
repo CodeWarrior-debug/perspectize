@@ -30,7 +30,7 @@ Env vars override `config/config.json` (local, gitignored; copy `config/config.e
 
 **Sevalla build:** Dockerfile builder, Docker context `backend`, Dockerfile path `backend/Dockerfile` (Sevalla requires the redundant `backend/` prefix).
 
-**CORS** is in the API middleware chain (`internal/server/api.go`, options from `server.CORSOptions()`); origins come from `CORS_ORIGINS` (`internal/config/security.go`, comma-separated), defaulting to `*`. Set it to the frontend origin in every deployed environment. `AllowedHeaders` must list every custom header the frontend sends (`traceparent`, `tracestate`, `X-Client-Version`, `X-Client-Platform`) or browser preflight rejects the request.
+**CORS** is in the API middleware chain (`internal/server/api.go`, options from `server.CORSOptions()`); origins come from `CORS_ORIGINS` (`internal/config/security.go`, comma-separated), defaulting to `*`. CORS must stay **before** the rate limiter, or a 429 has no CORS headers and the browser reports it as a CORS error (#586). Set it to the frontend origin in every deployed environment. `AllowedHeaders` must list every custom header the frontend sends (`traceparent`, `tracestate`, `X-Client-Version`, `X-Client-Platform`) or browser preflight rejects the request.
 
 ## GraphQL
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { LibraryItem } from './libraryItem';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { Button } from '$lib/components/shadcn';
 	import MovieCard from './MovieCard.svelte';
@@ -16,13 +17,13 @@
 	// survives a search and coming back to idle.
 	let {
 		timeWindow = $bindable('WEEK'),
-		libraryUrls,
+		library,
 		pendingUrl = null,
 		onAdd,
 	}: {
 		timeWindow?: TrendingWindow;
 		/** Canonical movie URLs already in the library. */
-		libraryUrls: Set<string>;
+		library: ReadonlyMap<string, LibraryItem>;
 		/** URL of the movie being added right now, or null. */
 		pendingUrl?: string | null;
 		/** Called with a result's canonical url when its Add button is clicked. */
@@ -150,7 +151,12 @@
 	{:else}
 		<div class="flex flex-col gap-4">
 			{#each items as result, i (`${i}-${result.tmdbId}`)}
-				<MovieCard {result} isInLibrary={libraryUrls.has(result.url)} isPending={pendingUrl === result.url} {onAdd} />
+				<MovieCard
+					{result}
+					libraryItem={library.get(result.url) ?? null}
+					isPending={pendingUrl === result.url}
+					{onAdd}
+				/>
 			{/each}
 
 			{#if moreForWindow.loading}

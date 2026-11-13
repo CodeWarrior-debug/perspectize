@@ -1,20 +1,48 @@
 <script lang="ts">
 	import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/shadcn';
 	import ThemeCustomizePanel from '$lib/components/theme/ThemeCustomizePanel.svelte';
+	import FontSettingsPanel from '$lib/components/fonts/FontSettingsPanel.svelte';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import FeedbackDialog from '$lib/components/FeedbackDialog.svelte';
 	import type { ThemeStore } from '$lib/theme/store.svelte';
+	import { createFontStore, type FontStore } from '$lib/fonts/store.svelte';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import { replayCoach } from '$lib/onboarding/coachGate.svelte';
 
-	let { open = $bindable(false), store }: { open?: boolean; store: ThemeStore } = $props();
+	let {
+		open = $bindable(false),
+		store,
+		// Header passes the app-wide store; the fallback keeps standalone mounts (tests) working.
+		fontStore = createFontStore(),
+	}: { open?: boolean; store: ThemeStore; fontStore?: FontStore } = $props();
 
-	type SectionId = 'general' | 'theme' | 'feedback';
+	type SectionId = 'general' | 'theme' | 'fonts' | 'feedback';
 
 	const sections: { id: SectionId; label: string }[] = [
 		{ id: 'general', label: 'General' },
 		{ id: 'theme', label: 'Customize Theme' },
+		{ id: 'fonts', label: 'Fonts' },
 		{ id: 'feedback', label: 'Send Feedback' },
 	];
+
+	// "Peek" hides the dialog so font picks can be judged against the whole page, then a
+	// floating button brings Settings back on the same section.
+	let peeking = $state(false);
+
+	function startPeek() {
+		peeking = true;
+		open = false;
+	}
+
+	function endPeek() {
+		peeking = false;
+		open = true;
+	}
+
+	$effect(() => {
+		// Any other way of reopening Settings ends the peek too.
+		if (open) peeking = false;
+	});
 
 	let activeSection = $state<SectionId>('general');
 
@@ -67,6 +95,8 @@
 					</div>
 				{:else if activeSection === 'theme'}
 					<ThemeCustomizePanel {store} />
+				{:else if activeSection === 'fonts'}
+					<FontSettingsPanel store={fontStore} onPeek={startPeek} />
 				{:else if activeSection === 'feedback'}
 					<FeedbackDialog
 						onClose={() => {
@@ -78,3 +108,14 @@
 		</div>
 	</DialogContent>
 </Dialog>
+
+{#if peeking}
+	<button
+		type="button"
+		onclick={endPeek}
+		class="fixed bottom-24 left-1/2 z-50 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-lg hover:bg-primary/90"
+	>
+		<SettingsIcon class="size-4" />
+		Back to Settings
+	</button>
+{/if}

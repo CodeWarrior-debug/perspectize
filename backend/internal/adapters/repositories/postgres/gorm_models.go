@@ -78,6 +78,7 @@ type ContentModel struct {
 	ReleaseDate  *string  `gorm:"column:release_date_sort;->;-:migration"`
 	TmdbScore    *float64 `gorm:"column:tmdb_score;->;-:migration"`
 	ChannelTitle *string  `gorm:"column:channel_title_sort;->;-:migration"`
+	Author       *string  `gorm:"column:author_sort;->;-:migration"`
 
 	// AddedBy is the lowercased adder username, read-only and populated only when List
 	// selects it for the ADDED_BY sort. Unlike the dummies above it must carry a real

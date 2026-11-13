@@ -1610,3 +1610,57 @@ func TestPaginatedContentQuery_WithMovieColumnFilters(t *testing.T) {
 	require.NotNil(t, f.MaxTmdbScore)
 	assert.Equal(t, 9.0, *f.MaxTmdbScore)
 }
+
+func TestPaginatedContentQuery_WithAuthorContains(t *testing.T) {
+	var got domain.ContentListParams
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			got = params
+			return &domain.PaginatedContent{}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: { authorContains: "steinbeck" }) { items { id } } }`)
+	assert.Empty(t, result.Errors)
+
+	require.NotNil(t, got.Filter)
+	require.NotNil(t, got.Filter.AuthorContains)
+	assert.Equal(t, "steinbeck", *got.Filter.AuthorContains)
+}
+
+func TestPaginatedContentQuery_WithBookRangeFilters(t *testing.T) {
+	var got domain.ContentListParams
+	repo := &mockContentRepository{
+		listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+			got = params
+			return &domain.PaginatedContent{}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content(filter: {
+		minPublishYear: 1950, maxPublishYear: 1960,
+		minPages: 300, maxPages: 500,
+		minBookRating: 3.5, maxBookRating: 4.5
+	}) { items { id } } }`)
+	assert.Empty(t, result.Errors)
+
+	require.NotNil(t, got.Filter)
+	require.NotNil(t, got.Filter.MinPublishYear)
+	assert.Equal(t, 1950, *got.Filter.MinPublishYear)
+	require.NotNil(t, got.Filter.MaxPublishYear)
+	assert.Equal(t, 1960, *got.Filter.MaxPublishYear)
+	require.NotNil(t, got.Filter.MinPages)
+	assert.Equal(t, 300, *got.Filter.MinPages)
+	require.NotNil(t, got.Filter.MaxPages)
+	assert.Equal(t, 500, *got.Filter.MaxPages)
+	require.NotNil(t, got.Filter.MinBookRating)
+	assert.Equal(t, 3.5, *got.Filter.MinBookRating)
+	require.NotNil(t, got.Filter.MaxBookRating)
+	assert.Equal(t, 4.5, *got.Filter.MaxBookRating)
+}

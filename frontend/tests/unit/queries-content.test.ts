@@ -6,6 +6,7 @@ import {
 	GET_CONTENT_AGGREGATES,
 	CREATE_CONTENT_FROM_YOUTUBE,
 	CREATE_CONTENT_FROM_MOVIE,
+	CREATE_CONTENT_FROM_BOOK,
 	type ContentItem,
 	type ContentResponse,
 	type CreateContentResponse,
@@ -89,6 +90,11 @@ describe('GraphQL query definitions', () => {
 		// field. importedFrom is null for a closed import unless the viewer is an admin.
 		it('does not select importedFrom (viewer-dependent; the prefetch is anonymous)', () => {
 			expect(LIST_CONTENT).not.toMatch(/importedFrom/);
+		});
+
+		it('selects the shaped `book` payload instead of the raw `response`', () => {
+			expect(LIST_CONTENT).toMatch(/\bbook\b/);
+			expect(LIST_CONTENT).not.toMatch(/\bresponse\b/);
 		});
 
 		it('is defined and is a string', () => {
@@ -179,6 +185,24 @@ describe('GraphQL query definitions', () => {
 
 		it('GET_CONTENT_AGGREGATES selects importedFrom { id name } for the "Imported from" link', () => {
 			expect(GET_CONTENT_AGGREGATES).toMatch(/importedFrom\s*\{\s*id\s+name\s*\}/);
+		});
+
+		it('selects `book` alongside `response`', () => {
+			expect(GET_CONTENT_DETAILS).toMatch(/\bresponse\b/);
+			expect(GET_CONTENT_DETAILS).toMatch(/\bbook\b/);
+		});
+	});
+
+	describe('CREATE_CONTENT_FROM_BOOK', () => {
+		it('is a CreateContentFromBook mutation taking CreateContentFromBookInput', () => {
+			expect(CREATE_CONTENT_FROM_BOOK).toContain('mutation CreateContentFromBook($input: CreateContentFromBookInput!)');
+			expect(CREATE_CONTENT_FROM_BOOK).toContain('createContentFromBook(input: $input)');
+		});
+
+		it('requests the fields the success toast and its Go-to action need', () => {
+			for (const field of ['id', 'name', 'contentType', 'url']) {
+				expect(CREATE_CONTENT_FROM_BOOK).toContain(field);
+			}
 		});
 	});
 

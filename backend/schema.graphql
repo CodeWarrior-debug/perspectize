@@ -149,6 +149,37 @@ type MovieSearchPage {
   totalResults: Int!
 }
 
+# One book from Open Library search or trending (Discover page Books source).
+type BookSearchResult {
+  workKey: String!
+  title: String!
+  authorName: [String!]!
+  # Open Library cover id; build the URL as https://covers.openlibrary.org/b/id/<id>-<size>.jpg
+  coverId: Int
+  firstPublishYear: Int
+  pageCountMedian: Int
+  subjects: [String!]!
+  ratingsAverage: Float
+  ratingsCount: Int
+  editionCount: Int
+  # Open Library reading-log counts. They count Open Library users only, not readers in general;
+  # each is null when Open Library omits it (null is not zero).
+  wantToReadCount: Int
+  currentlyReadingCount: Int
+  alreadyReadCount: Int
+  # Open Library's own total across the shelves
+  readingLogCount: Int
+  # Canonical content URL (https://openlibrary.org/works/<id>) — pass to createContentFromBook
+  url: String!
+}
+
+type BookSearchPage {
+  items: [BookSearchResult!]!
+  page: Int!
+  totalPages: Int!
+  totalResults: Int!
+}
+
 # Time window for TMDB trending lists.
 enum TrendingWindow {
   DAY
@@ -201,6 +232,8 @@ type Content {
   response: JSON
   "Movie-specific metadata (the shaped TMDB payload); null for other content types."
   movie: JSON
+  "Book-specific metadata (the shaped Open Library payload); null for other content types."
+  book: JSON
   primaryCategory: Category
   # BIBLE_PASSAGE only: computed verse ordinals (see bible_book.verses_per_chapter)
   # and the optional, first-write-wins display title. Null for other content types.
@@ -261,6 +294,7 @@ enum ContentSortBy {
   TMDB_SCORE
   # Username of the user who added the content (case-insensitive)
   ADDED_BY
+  AUTHOR
 }
 
 enum SortOrder {
@@ -279,6 +313,7 @@ enum ContentType {
   CLAIM
   BIBLE_PASSAGE
   MOVIE
+  BOOK
 }
 
 # Text columns that ContentFilter.search can be scoped to.
@@ -300,6 +335,11 @@ enum PersonRole {
 # Inputs
 input CreateContentFromMovieInput {
   # IMDb or TMDB movie URL
+  url: String!
+}
+
+input CreateContentFromBookInput {
+  # Open Library work URL, or a raw ISBN-10/ISBN-13 (resolved to a work key server-side)
   url: String!
 }
 
@@ -399,6 +439,14 @@ input ContentFilter {
   maxBoxOffice: Float
   minTmdbScore: Float        # TMDB vote average (0-10), inclusive
   maxTmdbScore: Float
+  # Book column filters (book rows only; other rows never match)
+  authorContains: String     # Case-insensitive contains on the first author's name (books only)
+  minPublishYear: Int        # First publish year, inclusive
+  maxPublishYear: Int
+  minPages: Int              # Median page count across editions, inclusive
+  maxPages: Int
+  minBookRating: Float       # Open Library average rating (0-5), inclusive
+  maxBookRating: Float
   # View/like count filters
   minViewCount: Int
   maxViewCount: Int
@@ -730,6 +778,9 @@ type Mutation {
   # Movie mutations
   createContentFromMovie(input: CreateContentFromMovieInput!): Content! @auth
 
+  # Book mutations
+  createContentFromBook(input: CreateContentFromBookInput!): Content! @auth
+
   # Bible passage mutations
   createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth
   # First-write-wins: if a title already exists, returns the content with the existing title.
@@ -833,6 +884,16 @@ type Query {
 
   # Discover page: TMDB trending movies, cached server-side (~1h). window defaults to WEEK; page defaults to 1 (max 500).
   movieTrending(window: TrendingWindow = WEEK, page: Int): MovieSearchPage!
+
+  # Book Discover queries
+  # Discover page: Open Library book search (not cached server-side). page defaults to 1 (max 500).
+  bookSearch(query: String!, page: Int): BookSearchPage!
+
+  # Discover page: Open Library trending books, cached server-side (~1h). window defaults to WEEK; page defaults to 1 (max 500).
+  bookTrending(window: TrendingWindow = WEEK, page: Int): BookSearchPage!
+
+  # Discover page: look up a single book by ISBN-10/ISBN-13. Null when not found.
+  bookByISBN(isbn: String!): BookSearchResult
 
   # Perspective queries
   perspectiveByID(id: ID!): Perspective

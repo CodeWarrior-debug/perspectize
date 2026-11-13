@@ -11,7 +11,7 @@ export type { ContentFilterInput } from '$lib/utils/gridUrlState';
 export { activityListRequest, cursorsAfterPage, ACTIVITY_LIST_STALE_TIME_MS, LOADED_MODE_FIRST } from './activityList';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
-export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE';
+export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK';
 
 /** The import job that created a content row. Mirrors the backend `ImportJobRef`. */
 export interface ImportJobRef {
@@ -48,6 +48,9 @@ export interface ContentItem {
 	// MOVIE rows only: the shaped TMDB payload. List rows select this instead of `response`
 	// (so YouTube rows don't ship their snippet twice); null for every other type.
 	movie?: Record<string, unknown> | null;
+	// BOOK rows only: the shaped Open Library payload (same list-row/details split as `movie`);
+	// null for every other type. Read it through bookFormatting's bookResponse().
+	book?: Record<string, unknown> | null;
 	primaryCategory: {
 		id: string;
 		wikidataQid: string;
@@ -130,6 +133,7 @@ export const LIST_CONTENT = gql`
 				tags
 				description
 				movie
+				book
 				primaryCategory {
 					id
 					wikidataQid
@@ -271,6 +275,7 @@ export const GET_CONTENT_DETAILS = gql`
 			description
 			response
 			movie
+			book
 			primaryCategory {
 				id
 				wikidataQid
@@ -383,6 +388,28 @@ export interface CreateContentFromMovieResponse {
 	};
 }
 
+// Idempotent like CREATE_CONTENT_FROM_MOVIE: an existing book (same work) comes back as a normal Content.
+// `url` is a work URL or a bare ISBN; the server resolves either to the work.
+export const CREATE_CONTENT_FROM_BOOK = gql`
+	mutation CreateContentFromBook($input: CreateContentFromBookInput!) {
+		createContentFromBook(input: $input) {
+			id
+			name
+			url
+			contentType
+		}
+	}
+`;
+
+export interface CreateContentFromBookResponse {
+	createContentFromBook: {
+		id: string;
+		name: string;
+		url: string | null;
+		contentType: string;
+	};
+}
+
 export const UPDATE_CONTENT_SOURCE_DATA = gql`
 	mutation UpdateContentSourceData($contentId: IntID!) {
 		updateContentSourceData(contentId: $contentId) {
@@ -402,6 +429,8 @@ export const UPDATE_CONTENT_SOURCE_DATA = gql`
 			publishedAt
 			tags
 			description
+			movie
+			book
 			createdAt
 			updatedAt
 		}

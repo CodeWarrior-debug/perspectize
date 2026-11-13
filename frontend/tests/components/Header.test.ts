@@ -165,8 +165,8 @@ describe('Header component', () => {
 		const labels = screen
 			.getAllByRole('link')
 			.map((a) => a.textContent?.trim())
-			.filter((t) => ['Activity', 'Discover', 'Compare', 'Plan', 'Import'].includes(t ?? ''));
-		expect(labels).toEqual(['Activity', 'Discover', 'Compare', 'Plan', 'Import']);
+			.filter((t) => ['Library', 'Discover', 'Compare', 'Plan', 'Import'].includes(t ?? ''));
+		expect(labels).toEqual(['Library', 'Discover', 'Compare', 'Plan', 'Import']);
 	});
 
 	describe('Import nav link', () => {
@@ -194,18 +194,34 @@ describe('Header component', () => {
 			expect(screen.getByRole('link', { name: 'Import' })).toHaveAttribute('aria-current', 'page');
 		});
 
-		it('does not mark Import as current on the Activity page (/)', () => {
-			mockPageState.url = new URL('http://localhost/');
+		it('does not mark Import as current on the Library page (/content-library)', () => {
+			mockPageState.url = new URL('http://localhost/content-library');
 			render(Header);
 			expect(screen.getByRole('link', { name: 'Import' })).not.toHaveAttribute('aria-current');
-			expect(screen.getByRole('link', { name: 'Activity' })).toHaveAttribute('aria-current', 'page');
+			expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute('aria-current', 'page');
 		});
 	});
 
-	it('renders an Activity navigation link pointing to /', () => {
+	it('renders a Library navigation link pointing to /content-library', () => {
 		render(Header);
-		const link = screen.getByRole('link', { name: 'Activity' });
-		expect(link).toHaveAttribute('href', '/');
+		const link = screen.getByRole('link', { name: 'Library' });
+		expect(link).toHaveAttribute('href', '/content-library');
+	});
+
+	it('marks Library as the current page on /content-library, and nothing on /', () => {
+		const original = mockPageState.url;
+		try {
+			mockPageState.url = new URL('http://localhost/content-library?f.type=movie');
+			const { unmount } = render(Header);
+			expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute('aria-current', 'page');
+			unmount();
+
+			mockPageState.url = new URL('http://localhost/');
+			render(Header);
+			expect(screen.getByRole('link', { name: 'Library' })).not.toHaveAttribute('aria-current');
+		} finally {
+			mockPageState.url = original;
+		}
 	});
 
 	it('does not render a Messages nav link (messaging entry point is the floating widget)', () => {
