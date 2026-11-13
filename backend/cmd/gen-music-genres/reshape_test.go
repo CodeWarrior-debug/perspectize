@@ -11,7 +11,7 @@ import (
 )
 
 const snapshotPath = "../../data/music-genres/apple-genres-34.compact.json"
-const migrationPath = "../../migrations/000033_add_music_genres.up.sql"
+const migrationPath = "../../migrations/000039_add_music_genres.up.sql"
 
 func loadRoots(t *testing.T) []node {
 	t.Helper()
@@ -98,6 +98,6 @@ func TestCommittedMigrationMatchesGenerator(t *testing.T) {
 	require.NoError(t, err)
 	committed, err := os.ReadFile(migrationPath)
 	require.NoError(t, err, "run: go -C backend run ./cmd/gen-music-genres")
-	assert.Equal(t, RenderUp(rows), string(committed), "000033 is generated; re-run the generator instead of editing it")
+	assert.Equal(t, RenderUp(rows), string(committed), "000039 is generated; re-run the generator instead of editing it")
 	assert.True(t, strings.HasPrefix(string(committed), "-- GENERATED"))
 }

@@ -1,4 +1,4 @@
-// Command gen-music-genres writes migration 000033 (music_genres seed) from the
+// Command gen-music-genres writes migration 000039 (music_genres seed) from the
 // compact Apple snapshot, applying ADR 0006 Option C. Run from backend/:
 //
 //	go run ./cmd/gen-music-genres
@@ -13,7 +13,7 @@ import (
 
 func main() {
 	in := flag.String("in", "data/music-genres/apple-genres-34.compact.json", "compact Apple genre snapshot")
-	out := flag.String("out", "migrations/000033_add_music_genres", "migration path prefix; .up.sql and .down.sql are added")
+	out := flag.String("out", "migrations/000039_add_music_genres", "migration path prefix; .up.sql and .down.sql are added")
 	flag.Parse()
 	if err := run(*in, *out); err != nil {
 		fmt.Fprintln(os.Stderr, err)

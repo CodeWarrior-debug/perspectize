@@ -18,8 +18,8 @@
   - the demo stack's own Postgres (`make demo-up`, applied automatically by its `migrate` service);
   - the Neon branch `audio-track-verify` in Task 19.
 - Migration numbers are **provisional until merge**:
-  - `000032` is the existing, unapplied ISRC index; this plan renames and rewrites it.
-  - New migrations: `000033_add_music_genres`, `000034_add_content_genre_id`, `000035_add_track_links`.
+  - `000038` is the existing, unapplied ISRC index; this plan renames and rewrites it.
+  - New migrations: `000039_add_music_genres`, `000040_add_content_genre_id`, `000041_add_track_links`.
   - If `main` gains migrations first, renumber before merge. Nothing is applied to the shared DB by this plan.
 - `.env*` files (except `.env.example`) are unreadable. Never try to read or print them.
 - Never print a database URL. Any command that could echo one is piped through `sed -E 's#postgres(ql)?://[^ ]+#<branch-url>#g'`.
@@ -74,7 +74,7 @@
 - `backend/internal/core/services/content_audio_track.go`: `CreateAudioTrack`, the link-only path, and the genre and link service methods.
 - `backend/cmd/gen-music-genres/main.go` and `reshape.go`: the Option C reshape and seed SQL generator.
 - `backend/data/music-genres/apple-genres-34.compact.json`: the compact Apple snapshot.
-- `backend/migrations/000033_add_music_genres.{up,down}.sql` (generated), `000034_add_content_genre_id.*` and `000035_add_track_links.*`.
+- `backend/migrations/000039_add_music_genres.{up,down}.sql` (generated), `000040_add_content_genre_id.*` and `000041_add_track_links.*`.
 - Tests: `test/domain/audio_track_test.go`, `test/domain/music_genre_test.go`, `test/musiclinks/parse_test.go`, `test/services/content_audio_track_test.go`, `test/resolvers/audio_track_resolver_test.go`, `internal/adapters/repositories/postgres/gorm_audio_track_repository_test.go`, `internal/adapters/repositories/postgres/gorm_music_genre_repository_test.go`, `internal/adapters/repositories/cached/music_genre_repository_test.go`, `cmd/gen-music-genres/reshape_test.go`, and `test/roundtrips/audio_track_test.go`.
 
 **Backend — modify**
@@ -82,7 +82,7 @@
 - Ports and services: `ports/services/content_service.go`, `ports/services/youtube_client.go` (`AgeRestricted`), `ports/services/music_clients.go` (`Explicit`), `services/content_music.go` and `services/content_service.go`.
 - Adapters: `adapters/youtube/client.go`, `adapters/ytmusic/client.go`, and in `adapters/repositories/postgres/` the files `gorm_content_repository.go`, `gorm_models.go` and `gorm_mappers.go`.
 - GraphQL: `schema.graphql`, `gqlgen.yml`, `adapters/graphql/resolvers/{content.resolvers.go,helpers.go,resolver.go}`, `adapters/graphql/dataloader/dataloader.go` and `directives/auth_test.go`.
-- Wiring and tests: `internal/server/api.go`, `cmd/server/main.go`, `test/roundtrips/harness_test.go`, and the migration `000032_*` (rename and rewrite).
+- Wiring and tests: `internal/server/api.go`, `cmd/server/main.go`, `test/roundtrips/harness_test.go`, and the migration `000038_*` (rename and rewrite).
 
 **Frontend — create**
 - Utilities: `src/lib/utils/audioLinks.ts` (mirror of the parser), `src/lib/utils/genreTree.ts` (tree build, search and Recent) and `src/lib/utils/playerCoordinator.ts` (claim/release and the BroadcastChannel).
@@ -111,10 +111,10 @@
 |---|------|-------|-----------|--------------------------|
 | 1 | Rename YOUTUBE_MUSIC to AUDIO_TRACK (backend) | backend | — | 2, 7, 12, 13, 14 |
 | 2 | Rename to AUDIO_TRACK (frontend) | frontend | 1 (the schema names) | 3–7 |
-| 3 | `response.music` layout, `Content.audioTrack`, migration 000032 | backend | 1 | 4, 7 |
-| 4 | Option C reshape generator and `music_genres` seed (000033) | backend | — | 1–3, 7 |
-| 5 | `content.genre_id` (000034), genre domain and genre repos | backend | 3, 4 | 6, 7 |
-| 6 | `track_links` (000035), domain and `AudioTrackRepository` | backend | 5 | 7 |
+| 3 | `response.music` layout, `Content.audioTrack`, migration 000038 | backend | 1 | 4, 7 |
+| 4 | Option C reshape generator and `music_genres` seed (000039) | backend | — | 1–3, 7 |
+| 5 | `content.genre_id` (000040), genre domain and genre repos | backend | 3, 4 | 6, 7 |
+| 6 | `track_links` (000041), domain and `AudioTrackRepository` | backend | 5 | 7 |
 | 7 | `musiclinks` parser | backend | — | everything |
 | 8 | Service: `CreateAudioTrack` link-only path, genre and link methods | backend | 5, 6, 7 | 11–14 |
 | 9 | Service: the YouTube Music path (age, explicit, MBID, uploads, batching, suggestion) | backend | 8 | 11–14 |
@@ -330,7 +330,7 @@ git -C /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track commi
 
 ---
 
-### Task 3: `response.music` layout, `Content.audioTrack`, migration 000032
+### Task 3: `response.music` layout, `Content.audioTrack`, migration 000038
 
 Old-spec decisions 12 and 13 still apply. Music keys stop being top-level response keys and move into one `music` object. The GraphQL field exposes that object, as `movie: JSON` does for movies. `relatedMedia` and `lyrics` stay top-level, because `SetResponseKey` writes them by key.
 
@@ -338,7 +338,7 @@ Old-spec decisions 12 and 13 still apply. Music keys stop being top-level respon
 - Create: `backend/internal/core/domain/audio_track.go`
 - Modify: `backend/internal/core/services/content_music.go`. Replace the `musicFields` struct, `enrichMusic`, `merge` and `readMusicSummary`.
 - Modify: `backend/internal/adapters/repositories/postgres/gorm_content_repository.go`, in `GetByISRC`.
-- Rename and rewrite: `backend/migrations/000032_youtube_music_isrc_index.{up,down}.sql` becomes `000032_audio_track_isrc_index.{up,down}.sql`.
+- Rename and rewrite: `backend/migrations/000032_youtube_music_isrc_index.{up,down}.sql` becomes `000038_audio_track_isrc_index.{up,down}.sql`.
 - Modify: `backend/schema.graphql`, adding `audioTrack: JSON` to `Content`.
 - Modify: `backend/internal/adapters/graphql/resolvers/helpers.go`, in `domainToModel`.
 - Test: `backend/test/domain/audio_track_test.go`, `backend/test/services/content_music_test.go`, `backend/internal/adapters/repositories/postgres/query_count_test.go` and `backend/test/resolvers/content_music_resolver_test.go`.
@@ -677,7 +677,7 @@ In `gorm_content_repository.go`:
 
 ```go
 // GetByISRC returns the AUDIO_TRACK row whose response.music carries this ISRC.
-// Backed by the partial expression index idx_content_music_isrc (000032).
+// Backed by the partial expression index idx_content_music_isrc (000038).
 func (r *GormContentRepository) GetByISRC(ctx context.Context, isrc string) (*domain.Content, error) {
 	var model ContentModel
 	err := r.db.WithContext(ctx).
@@ -689,13 +689,13 @@ func (r *GormContentRepository) GetByISRC(ctx context.Context, isrc string) (*do
 Rename the migration so it keeps its number and gains new contents:
 
 ```bash
-git -C /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track mv backend/migrations/000032_youtube_music_isrc_index.up.sql backend/migrations/000032_audio_track_isrc_index.up.sql
+git -C /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track mv backend/migrations/000032_youtube_music_isrc_index.up.sql backend/migrations/000038_audio_track_isrc_index.up.sql
 ```
 ```bash
-git -C /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track mv backend/migrations/000032_youtube_music_isrc_index.down.sql backend/migrations/000032_audio_track_isrc_index.down.sql
+git -C /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track mv backend/migrations/000032_youtube_music_isrc_index.down.sql backend/migrations/000038_audio_track_isrc_index.down.sql
 ```
 
-`backend/migrations/000032_audio_track_isrc_index.up.sql`:
+`backend/migrations/000038_audio_track_isrc_index.up.sql`:
 
 ```sql
 -- PROVISIONAL NUMBER until merge. Never applied to the shared DB by the
@@ -707,7 +707,7 @@ CREATE INDEX IF NOT EXISTS idx_content_music_isrc
     WHERE content_type = 'audio_track';
 ```
 
-`backend/migrations/000032_audio_track_isrc_index.down.sql`:
+`backend/migrations/000038_audio_track_isrc_index.down.sql`:
 
 ```sql
 DROP INDEX IF EXISTS idx_content_music_isrc;
@@ -749,7 +749,7 @@ git -C /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track commi
 ```
 
 ---
-### Task 4: Option C reshape generator and `music_genres` seed (000033)
+### Task 4: Option C reshape generator and `music_genres` seed (000039)
 
 The genre table is seeded from Apple's genre snapshot, reshaped per ADR 0006 Option C. Three things are committed: the compact snapshot, a small Go generator, and its output. A drift test fails if anyone hand-edits the SQL or the lists.
 
@@ -757,7 +757,7 @@ The genre table is seeded from Apple's genre snapshot, reshaped per ADR 0006 Opt
 - Create: `backend/data/music-genres/apple-genres-34.compact.json`
 - Create: `backend/cmd/gen-music-genres/reshape.go`
 - Create: `backend/cmd/gen-music-genres/main.go`
-- Create (generated): `backend/migrations/000033_add_music_genres.up.sql` and `.down.sql`
+- Create (generated): `backend/migrations/000039_add_music_genres.up.sql` and `.down.sql`
 - Test: `backend/cmd/gen-music-genres/reshape_test.go`
 
 **Interfaces:**
@@ -798,7 +798,7 @@ import (
 )
 
 const snapshotPath = "../../data/music-genres/apple-genres-34.compact.json"
-const migrationPath = "../../migrations/000033_add_music_genres.up.sql"
+const migrationPath = "../../migrations/000039_add_music_genres.up.sql"
 
 func loadRoots(t *testing.T) []node {
 	t.Helper()
@@ -885,7 +885,7 @@ func TestCommittedMigrationMatchesGenerator(t *testing.T) {
 	require.NoError(t, err)
 	committed, err := os.ReadFile(migrationPath)
 	require.NoError(t, err, "run: go -C backend run ./cmd/gen-music-genres")
-	assert.Equal(t, RenderUp(rows), string(committed), "000033 is generated; re-run the generator instead of editing it")
+	assert.Equal(t, RenderUp(rows), string(committed), "000039 is generated; re-run the generator instead of editing it")
 	assert.True(t, strings.HasPrefix(string(committed), "-- GENERATED"))
 }
 ```
@@ -1066,7 +1066,7 @@ func RenderUp(rows []Row) string {
 `backend/cmd/gen-music-genres/main.go`:
 
 ```go
-// Command gen-music-genres writes migration 000033 (music_genres seed) from the
+// Command gen-music-genres writes migration 000039 (music_genres seed) from the
 // compact Apple snapshot, applying ADR 0006 Option C. Run from backend/:
 //
 //	go run ./cmd/gen-music-genres
@@ -1081,7 +1081,7 @@ import (
 
 func main() {
 	in := flag.String("in", "data/music-genres/apple-genres-34.compact.json", "compact Apple genre snapshot")
-	out := flag.String("out", "migrations/000033_add_music_genres", "migration path prefix; .up.sql and .down.sql are added")
+	out := flag.String("out", "migrations/000039_add_music_genres", "migration path prefix; .up.sql and .down.sql are added")
 	flag.Parse()
 	if err := run(*in, *out); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -1118,7 +1118,7 @@ Generate the migration:
 ```bash
 go -C /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track/backend run ./cmd/gen-music-genres
 ```
-Expected: `wrote 523 genres to migrations/000033_add_music_genres.up.sql`.
+Expected: `wrote 523 genres to migrations/000039_add_music_genres.up.sql`.
 
 - [ ] **Step 5: Run the test to verify it passes**
 
@@ -1128,7 +1128,7 @@ Expected: `ok`.
 - [ ] **Step 6: Commit**
 
 ```bash
-git -C /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track add backend/data/music-genres backend/cmd/gen-music-genres backend/migrations/000033_add_music_genres.up.sql backend/migrations/000033_add_music_genres.down.sql
+git -C /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track add backend/data/music-genres backend/cmd/gen-music-genres backend/migrations/000039_add_music_genres.up.sql backend/migrations/000039_add_music_genres.down.sql
 ```
 ```bash
 git -C /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track commit -m "feat(audio-track): seed music_genres from Apple's tree, reshaped per Option C (ADR 0006)"
@@ -1136,10 +1136,10 @@ git -C /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track commi
 
 ---
 
-### Task 5: `content.genre_id` (000034), genre domain and genre repositories
+### Task 5: `content.genre_id` (000040), genre domain and genre repositories
 
 **Files:**
-- Create: `backend/migrations/000034_add_content_genre_id.up.sql` and `.down.sql`
+- Create: `backend/migrations/000040_add_content_genre_id.up.sql` and `.down.sql`
 - Create: `backend/internal/core/domain/music_genre.go`
 - Modify: `backend/internal/core/domain/content.go` (add `GenreID *int`) and `backend/internal/core/domain/errors.go` (`ErrGenreLocked`)
 - Create: `backend/internal/core/ports/repositories/audio_track_repository.go` (the `MusicGenreRepository` port; Task 6 appends to it)
@@ -1381,7 +1381,7 @@ Expected: FAIL to compile with `undefined: domain.MatchGenre`, `undefined: NewGo
 
 - [ ] **Step 3: Implement**
 
-`backend/migrations/000034_add_content_genre_id.up.sql`:
+`backend/migrations/000040_add_content_genre_id.up.sql`:
 
 ```sql
 -- PROVISIONAL NUMBER until merge. Never applied to the shared DB by the
@@ -1394,7 +1394,7 @@ ALTER TABLE content
 COMMENT ON COLUMN content.genre_id IS 'AUDIO_TRACK genre (music_genres.id). Anyone sets it while NULL; the adder may change it within 30 days (ADR 0006).';
 ```
 
-`backend/migrations/000034_add_content_genre_id.down.sql`:
+`backend/migrations/000040_add_content_genre_id.down.sql`:
 
 ```sql
 ALTER TABLE content DROP COLUMN IF EXISTS genre_id;
@@ -1695,10 +1695,10 @@ git -C /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track commi
 
 ---
 
-### Task 6: `track_links` (000035), domain and `AudioTrackRepository`
+### Task 6: `track_links` (000041), domain and `AudioTrackRepository`
 
 **Files:**
-- Create: `backend/migrations/000035_add_track_links.up.sql` and `.down.sql`
+- Create: `backend/migrations/000041_add_track_links.up.sql` and `.down.sql`
 - Modify: `backend/internal/core/domain/audio_track.go` (add `TrackLink` and its enums)
 - Modify: `backend/internal/core/ports/repositories/audio_track_repository.go` (append `AudioTrackRepository`)
 - Create: `backend/internal/adapters/repositories/postgres/gorm_audio_track_repository.go`
@@ -1995,7 +1995,7 @@ Expected: FAIL to compile with `undefined: NewGormAudioTrackRepository` and `und
 
 - [ ] **Step 3: Implement**
 
-`backend/migrations/000035_add_track_links.up.sql`:
+`backend/migrations/000041_add_track_links.up.sql`:
 
 ```sql
 -- PROVISIONAL NUMBER until merge. Never applied to the shared DB by the
@@ -2022,7 +2022,7 @@ COMMENT ON TABLE track_links IS 'Links to one AUDIO_TRACK recording (ADR 0005). 
 COMMENT ON COLUMN track_links.unavailable_at IS 'Set once when the embed reports 101/150 (ticket 03). Never cleared automatically in v1.';
 ```
 
-`backend/migrations/000035_add_track_links.down.sql`:
+`backend/migrations/000041_add_track_links.down.sql`:
 
 ```sql
 DROP TABLE IF EXISTS track_links;
@@ -7602,11 +7602,11 @@ Expected: `svelte-check found 0 errors` (or the same baseline as `origin/main`; 
 ```bash
 grep -rn "YOUTUBE_MUSIC\|youtube_music\|useMusicTrack\|MusicTrackPanel\|CreateContentFromYouTubeMusic\|createContentFromYouTubeMusic\|GET_MUSIC_TRACK\|queryKeys.content.music(" /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track/backend /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track/frontend/src /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track/frontend/tests --include="*.go" --include="*.ts" --include="*.svelte" --include="*.graphql" --include="*.sql"
 ```
-Expected: only the 000032 down-migration/comments that name the old value deliberately (if any). There should be no code hits.
+Expected: only the 000038 down-migration/comments that name the old value deliberately (if any). There should be no code hits.
 
-- [ ] **Step 4: A clean demo stack (applies 000032 through 000035 from scratch)**
+- [ ] **Step 4: A clean demo stack (applies 000038 through 000041 from scratch)**
 
-An existing demo volume may already have the *old* provisional 000032 recorded, so wipe it first. It is disposable by design.
+An existing demo volume may already have the *old* provisional 000038 recorded, so wipe it first. It is disposable by design.
 
 ```bash
 make -C /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track demo-wipe
@@ -7671,7 +7671,7 @@ Note any differences in the PR. Leave the demo stack up for Task 20.
 
 ### Task 19: Neon branch `audio-track-verify` (migrations against a copy of production)
 
-This proves 000032–000035 apply, reverse and re-apply on real production-shaped data, using the handoff pattern: the agent creates the branch, and the human writes the connection string to a file the agent never prints. **The shared database (main branch) is never migrated.** The branch carries copies of production rows, so record nothing there (no clip, no screenshots).
+This proves 000038–000041 apply, reverse and re-apply on real production-shaped data, using the handoff pattern: the agent creates the branch, and the human writes the connection string to a file the agent never prints. **The shared database (main branch) is never migrated.** The branch carries copies of production rows, so record nothing there (no clip, no screenshots).
 
 **Files:** none.
 
@@ -7715,7 +7715,7 @@ Every `migrate` command reads the URL from the file and pipes its output through
 ```bash
 migrate -path /Users/jamesjordan/GitHub/perspectize/.claude/worktrees/audio-track/backend/migrations -database "$(cat /Users/jamesjordan/.perspectize-neon-branch.url)" version 2>&1 | sed -E 's#//[^@]*@#//***@#g'
 ```
-Expected: `31` (production's latest applied migration). If it is `32`, the old provisional `000032_youtube_music_isrc_index` was applied somewhere. Stop and report, because Task 3 renames that file in place.
+Expected: `34` (production's latest applied migration: the claim content migrations 000032 to 000034, #612). If it is `38` or higher, one of this PR's migrations was applied early. Stop and report, because the files are renumbered in place.
 
 Then run this four times. Check `version` after each run and look at the new object in between: `\d music_genres`, `SELECT count(*) FROM music_genres` = 523, `\d content` shows `genre_id`, `\d track_links`.
 
@@ -7887,7 +7887,7 @@ Keep `demo-audio-track` (it is reusable for later audio work). Delete throwaway 
 7. **Demo seed of audio tracks** (`cmd/seed-demo`). The clip adds its own.
 8. **Server-side genre sort** and a genre facet in the type filter.
 9. **Roundtrip budgets for the YouTube Music create path** (InnerTube and MusicBrainz are faked in the service tests; roundtrips cover the link-only path).
-10. **An index on `response->'music'->>'mbid'`** (the "index needs evidence" rule; ISRC has one from 000032).
+10. **An index on `response->'music'->>'mbid'`** (the "index needs evidence" rule; ISRC has one from 000038).
 11. **Age restriction for link-only providers.** Those providers give no data without an API, so only YouTube is checked.
 
 ## Decisions the docs did not settle (flagged, not guessed)
@@ -7905,11 +7905,11 @@ Each one is implemented as stated below so the plan is executable, and each need
 9. **`createContentFromYouTube` with a `music.youtube.com` link** still creates a YOUTUBE_VIDEO, as today. Should it redirect to `createAudioTrack` or return an error? The plan leaves it (the frontend no longer sends music links there).
 10. **The player subscription:** after the `listening` handshake, the plan expects the embed to post `onStateChange` and `infoDelivery.playerState`. jsdom can't prove this, so it needs a browser check in Task 18 Step 7. If only `infoDelivery` arrives, `parseEmbedMessage` already handles it.
 11. **"Mark a listen link unavailable"** in the brief is read as: mark the EMBED link (a YouTube upload) that failed with 101/150. LISTEN links are never played here, so they are never marked.
-12. **Existing `youtube_music` rows:** the plan assumes there are none (no data UPDATE in 000032). Task 19 Step 6 checks this on production-shaped data.
+12. **Existing `youtube_music` rows:** the plan assumes there are none (no data UPDATE in 000038). Task 19 Step 6 checks this on production-shaped data.
 13. **The genre suggestion comes from MusicBrainz tags only**, matched through the alias map. There is no Apple API in v1, so the "Apple genre" suggestion the ADR mentions is not available.
 14. **The same-song prompt on the YouTube path** re-fetches YouTube and InnerTube metadata when the user answers (one extra quota unit), instead of caching the first lookup.
 15. **`CreateWithLink` race:** two simultaneous first adds of the same link conflict on `UNIQUE(provider, provider_track_id)`. The loser gets `alreadyExisted: true`, but its content row may be left without a link if the CTE is split across statements by a future refactor. The single-statement CTE avoids that today.
-16. **The demo DB volume must be wiped** (`make demo-wipe`) on any machine that ran the earlier provisional 000032, since its version number is reused.
+16. **The demo DB volume must be wiped** (`make demo-wipe`) on any machine that ran the earlier provisional 000038, since its version number is reused.
 17. **Demo mode and InnerTube:** the demo backend uses the offline YouTube fixture but the *real* InnerTube/MusicBrainz clients. The YouTube Music part of the clip therefore needs internet, and fails offline.
 
 ## Self-Review
@@ -7939,7 +7939,7 @@ Each one is implemented as stated below so the plan is executable, and each need
   - `queryKeys.content.audioTrack` and `queryKeys.music.genres` are used consistently in Tasks 11, 15 and 16.
   - `onUnplayable(videoId, code)` matches between Tasks 14 and 16.
   - `defaultColumnVisibility(tier, movieOnly, audioOnly)` matches between Task 17 and `columnLayouts.defaultLayout`.
-- **Migration numbers:** 000032 (renamed in place, provisional), then 000033 genres, 000034 genre_id and 000035 track_links. All are provisional until merge, and nothing is applied to the shared DB.
+- **Migration numbers:** 000038 (renamed in place, provisional), then 000039 genres, 000040 genre_id and 000041 track_links. All are provisional until merge, and nothing is applied to the shared DB.
 
 ## Execution Handoff
 

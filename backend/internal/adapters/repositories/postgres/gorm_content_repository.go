@@ -531,7 +531,7 @@ func (r *GormContentRepository) ClearDisplayTitle(ctx context.Context, contentID
 }
 
 // GetByISRC returns the AUDIO_TRACK row whose response.music carries this ISRC.
-// Backed by the partial expression index idx_content_music_isrc (000032).
+// Backed by the partial expression index idx_content_music_isrc (000038).
 func (r *GormContentRepository) GetByISRC(ctx context.Context, isrc string) (*domain.Content, error) {
 	var model ContentModel
 	err := r.db.WithContext(ctx).
