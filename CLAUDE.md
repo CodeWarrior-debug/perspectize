@@ -88,7 +88,7 @@ Unreadable `.env*` files are expected, not a broken setup. Evidence capture: [.d
 
 **How-to guides:**
 - [Adding a Content Type](.claude/docs/ADDING_CONTENT_TYPE.md) — end-to-end, backend + frontend
-- [Content Type Designer](tools/content-type-designer/README.md) — plan a new type's columns, tooltips and details view before coding. `dist/` is committed: after editing `src/`, run `npx tsc -p tsconfig.json` in that dir and commit both (not its package-lock.json). Serve it (`python3 -m http.server`) to test; ES modules won't load from file://. Cloud sessions have Playwright at /opt/node22/lib/node_modules/playwright.
+- [Content Type Designer](tools/content-type-designer/README.md) — plan a new type's columns, tooltips and details view before coding. `dist/` is committed: after editing `src/`, run `npx tsc -p tsconfig.json` in that dir and commit both (not its package-lock.json). Serve it (`python3 -m http.server`) to test; ES modules won't load from file://. Cloud sessions have Playwright at /opt/node22/lib/node_modules/playwright. For sample research, the Met API is keyless and Europeana accepts the public demo key `wskey=api2demo`.
 
 **Planning & backlog:**
 - [Feature Backlog](FEATURE_BACKLOG.md) — capture future ideas here during development
