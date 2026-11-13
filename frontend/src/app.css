@@ -1193,3 +1193,19 @@ select.select-inset {
 	background-size: 0.35rem 0.35rem;
 	background-repeat: no-repeat;
 }
+
+/* Activity grid: always-visible, themed horizontal scrollbar (mouse users get no
+   gesture to discover sideways scroll, and macOS overlay scrollbars hide until used).
+   The spacers sit under the pinned columns and carry their own scrollbar gutter. */
+.ag-body-horizontal-scroll-viewport,
+.ag-horizontal-left-spacer,
+.ag-horizontal-right-spacer {
+	overflow-x: scroll;
+	scrollbar-width: thin;
+	scrollbar-color: var(--color-primary) var(--color-muted);
+}
+.ag-horizontal-left-spacer,
+.ag-horizontal-right-spacer {
+	/* Nothing to scroll here: show the track only, no thumb. */
+	scrollbar-color: transparent var(--color-muted);
+}

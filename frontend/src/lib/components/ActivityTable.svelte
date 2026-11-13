@@ -618,6 +618,8 @@
 		[
 			{
 				colId: 'perspectize',
+				pinned: 'left', // stays visible when the grid scrolls horizontally
+				lockPinned: true,
 				headerName: '',
 				headerComponent: PerspectiveHeaderRenderer,
 				headerTooltip: 'Perspectize — add or edit your perspective',
@@ -634,6 +636,8 @@
 			},
 			{
 				colId: 'item',
+				pinned: 'left', // keeps row identity visible while scrolling right
+				lockPinned: true,
 				headerName: 'Item',
 				flex: 2,
 				minWidth: 185,
