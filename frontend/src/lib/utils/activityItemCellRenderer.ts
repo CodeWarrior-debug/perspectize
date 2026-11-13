@@ -199,7 +199,7 @@ function renderBookCell(opts: {
 	const title = document.createElement('div');
 	title.dataset.testid = 'item-title';
 	title.className =
-		'line-clamp-1 font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
+		'line-clamp-1 font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
 	title.textContent = name;
 	textWrap.appendChild(title);
 	if (author) {
