@@ -293,6 +293,7 @@
 <div
 	class="comment-editor-wrapper border border-input rounded-lg bg-card overflow-hidden flex flex-col w-full min-w-0"
 	style:--pe-min-height={expanded ? 'min(60vh, 560px)' : `${minHeight}px`}
+	style:--pe-max-height={expanded ? 'min(60vh, 560px)' : `max(${minHeight}px, min(40vh, 320px))`}
 	data-expanded={expanded}
 >
 	<!-- Toolbar -->
@@ -337,7 +338,12 @@
 	</div>
 
 	<!-- Editor content -->
-	<div bind:this={editorElement}></div>
+	<!-- Scrolls past --pe-max-height so a long review never pushes the dialog's submit button off-screen -->
+	<div
+		bind:this={editorElement}
+		class="comment-editor-scroll"
+		style="max-height: var(--pe-max-height); overflow-y: auto;"
+	></div>
 </div>
 
 <style>
