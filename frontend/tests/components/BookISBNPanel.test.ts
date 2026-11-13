@@ -6,6 +6,8 @@ import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
 import { BOOK_BY_ISBN, type BookSearchResult } from '$lib/services/openLibraryApi';
 
+vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
+
 const mocks = vi.hoisted(() => ({ graphqlRequest: vi.fn() }));
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
 
@@ -28,7 +30,7 @@ const eastOfEden: BookSearchResult = {
 };
 
 function renderPanel(overrides: Record<string, unknown> = {}) {
-	const props = { libraryUrls: new Set<string>(), onAdd: vi.fn(), ...overrides };
+	const props = { library: new Map(), onAdd: vi.fn(), ...overrides };
 	const component = BookISBNPanel as unknown as Component;
 	render(TestWrapper, { props: { queryClient: makeClient(), component, props } });
 	return props;
@@ -109,11 +111,11 @@ describe('BookISBNPanel', () => {
 	});
 
 	it('found: marks the book In Library when its work is already tracked', async () => {
-		renderPanel({ libraryUrls: new Set([eastOfEden.url]) });
+		renderPanel({ library: new Map([[eastOfEden.url, { id: '7', name: 'Tracked' }]]) });
 
 		await type(VALID_ISBN_13);
 
-		expect(await screen.findByRole('button', { name: 'In Library' })).toBeDisabled();
+		expect(await screen.findByTestId('library-status')).toBeInTheDocument();
 	});
 
 	it('notFound: a valid ISBN with no record says so', async () => {

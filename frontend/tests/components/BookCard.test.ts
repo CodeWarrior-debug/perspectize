@@ -3,6 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/svelte';
 import BookCard from '$lib/components/discover/BookCard.svelte';
 import type { BookSearchResult } from '$lib/services/openLibraryApi';
 
+vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
+
 const EAST_OF_EDEN_URL = 'https://openlibrary.org/works/OL23166W';
 
 const eastOfEden: BookSearchResult = {
@@ -34,7 +36,10 @@ const brainscan: BookSearchResult = {
 	url: 'https://openlibrary.org/works/OL99W',
 };
 
-function renderCard(result: BookSearchResult, props: { isInLibrary?: boolean; isPending?: boolean } = {}) {
+function renderCard(
+	result: BookSearchResult,
+	props: { libraryItem?: { id: string; name: string } | null; isPending?: boolean } = {},
+) {
 	const onAdd = vi.fn();
 	const view = render(BookCard, { props: { result, onAdd, ...props } });
 	return { ...view, onAdd };
@@ -98,9 +103,10 @@ describe('BookCard', () => {
 		expect(screen.getByText('★ 4.1 (100)')).toHaveClass('text-foreground');
 	});
 
-	it('shows In Library as disabled with no Add button for a work already in the library', () => {
-		renderCard(eastOfEden, { isInLibrary: true });
-		expect(screen.getByRole('button', { name: 'In Library' })).toBeDisabled();
+	it('shows the shared library actions, and no Add button, for a work already in the library', () => {
+		renderCard(eastOfEden, { libraryItem: { id: '7', name: 'East of Eden' } });
+		expect(screen.getByTestId('library-status')).toHaveTextContent('In Library');
+		expect(screen.getByRole('link', { name: 'Go to item' })).toHaveAttribute('href', '/?open=7');
 		expect(screen.queryByRole('button', { name: 'Add to Perspectize' })).not.toBeInTheDocument();
 	});
 

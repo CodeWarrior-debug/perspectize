@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { LibraryItem } from './libraryItem';
 	import { createQuery } from '@tanstack/svelte-query';
 	import { Button, Input } from '$lib/components/shadcn';
 	import BookCard from './BookCard.svelte';
@@ -8,12 +9,12 @@
 	// Add one book by its ISBN. Nothing is requested until the number is complete and its check digit
 	// matches: a typo never reaches Open Library, which can resolve a bad checksum to an unrelated record.
 	let {
-		libraryUrls,
+		library,
 		pendingUrl = null,
 		onAdd,
 	}: {
 		/** Canonical work URLs already in the library. */
-		libraryUrls: Set<string>;
+		library: ReadonlyMap<string, LibraryItem>;
 		/** URL of the book being added right now, or null. */
 		pendingUrl?: string | null;
 		/** Called with the resolved work's canonical url when its Add button is clicked. */
@@ -105,7 +106,7 @@
 	{:else if isbnState === 'found' && lookup.data}
 		<BookCard
 			result={lookup.data}
-			isInLibrary={libraryUrls.has(lookup.data.url)}
+			libraryItem={library.get(lookup.data.url) ?? null}
 			isPending={pendingUrl === lookup.data.url}
 			{onAdd}
 		/>

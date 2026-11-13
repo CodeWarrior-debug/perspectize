@@ -3,6 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/svelte';
 import MovieCard from '$lib/components/discover/MovieCard.svelte';
 import type { MovieSearchResult } from '$lib/services/tmdbApi';
 
+vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
+
 const matrix: MovieSearchResult = {
 	tmdbId: 603,
 	title: 'The Matrix',
@@ -66,11 +68,12 @@ describe('MovieCard', () => {
 		expect(screen.getByRole('button', { name: 'Adding…' })).toBeDisabled();
 	});
 
-	it('shows a disabled "In Library" state with no Add button when the movie is already tracked', async () => {
+	it('shows the shared library actions, and no Add button, when the movie is already tracked', () => {
 		const onAdd = vi.fn();
-		render(MovieCard, { props: { result: matrix, onAdd, isInLibrary: true } });
+		render(MovieCard, { props: { result: matrix, onAdd, libraryItem: { id: '7', name: 'The Matrix' } } });
 
-		expect(screen.getByRole('button', { name: 'In Library' })).toBeDisabled();
+		expect(screen.getByTestId('library-status')).toHaveTextContent('In Library');
+		expect(screen.getByRole('link', { name: 'Go to item' })).toHaveAttribute('href', '/?open=7');
 		expect(screen.queryByRole('button', { name: 'Add to Perspectize' })).not.toBeInTheDocument();
 	});
 });

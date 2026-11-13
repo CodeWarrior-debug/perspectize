@@ -6,6 +6,8 @@ import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
 import { MOVIE_SEARCH, MOVIE_SEARCH_DEBOUNCE_MS, MOVIE_TRENDING, type MovieSearchPage } from '$lib/services/tmdbApi';
 
+vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
+
 const mocks = vi.hoisted(() => ({ graphqlRequest: vi.fn() }));
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
 
@@ -67,7 +69,7 @@ function respondWith(
 
 function renderPanel(overrides: Record<string, unknown> = {}) {
 	const props = {
-		libraryUrls: new Set<string>(),
+		library: new Map(),
 		onAdd: vi.fn(),
 		onAddUrl: vi.fn(),
 		...overrides,
@@ -178,14 +180,14 @@ describe('MovieSearchPanel', () => {
 			respondWith(() => ({
 				movieSearch: movieSearchPage({ items: [movie(603, 'The Matrix'), movie(949, 'Heat')], totalPages: 1 }),
 			}));
-			renderPanel({ libraryUrls: new Set([TMDB_LINK]) });
+			renderPanel({ library: new Map([[TMDB_LINK, { id: '7', name: 'Tracked' }]]) });
 
 			await typeText('matrix');
 			await settle(MOVIE_SEARCH_DEBOUNCE_MS);
 
 			expect(screen.getByRole('link', { name: 'Heat' })).toBeInTheDocument();
 			expect(screen.getByRole('link', { name: 'The Matrix' })).toBeInTheDocument();
-			expect(screen.getAllByRole('button', { name: 'In Library' })).toHaveLength(1);
+			expect(screen.getAllByTestId('library-status')).toHaveLength(1);
 			expect(screen.getAllByRole('button', { name: 'Add to Perspectize' })).toHaveLength(1);
 		});
 
@@ -564,10 +566,10 @@ describe('MovieSearchPanel', () => {
 				() => ({ movieSearch: movieSearchPage({}) }),
 				() => ({ movieTrending: movieSearchPage({ items: [DUNE, OPPENHEIMER] }) }),
 			);
-			const props = renderPanel({ libraryUrls: new Set([DUNE.url]) });
+			const props = renderPanel({ library: new Map([[DUNE.url, { id: '7', name: 'Tracked' }]]) });
 			await settle();
 
-			expect(screen.getAllByRole('button', { name: 'In Library' })).toHaveLength(1);
+			expect(screen.getAllByTestId('library-status')).toHaveLength(1);
 			await fireEvent.click(screen.getByRole('button', { name: 'Add to Perspectize' }));
 
 			expect(props.onAdd).toHaveBeenCalledWith(OPPENHEIMER.url);

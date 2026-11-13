@@ -6,6 +6,8 @@ import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
 import { BOOK_TRENDING, type BookSearchPage, type BookSearchResult } from '$lib/services/openLibraryApi';
 
+vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
+
 const mocks = vi.hoisted(() => ({ graphqlRequest: vi.fn() }));
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
 
@@ -49,7 +51,7 @@ function respondWith(trending: (variables: { window: string; page: number }) => 
 }
 
 function renderFeed(overrides: Record<string, unknown> = {}) {
-	const props = { libraryUrls: new Set<string>(), onAdd: vi.fn(), ...overrides };
+	const props = { library: new Map(), onAdd: vi.fn(), ...overrides };
 	const component = BookTrendingFeed as unknown as Component;
 	render(TestWrapper, { props: { queryClient: makeClient(), component, props } });
 	return props;
@@ -80,12 +82,12 @@ describe('BookTrendingFeed', () => {
 
 	it('renders the trending books and marks the ones in the library', async () => {
 		respondWith(() => ({ bookTrending: bookPage({ items: [book(1, 'Dune'), book(2, 'Brainscan')] }) }));
-		renderFeed({ libraryUrls: new Set([book(1, 'Dune').url]) });
+		renderFeed({ library: new Map([[book(1, 'Dune').url, { id: '7', name: 'Tracked' }]]) });
 		await settle();
 
 		expect(screen.getByRole('link', { name: 'Dune' })).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: 'Brainscan' })).toBeInTheDocument();
-		expect(screen.getAllByRole('button', { name: 'In Library' })).toHaveLength(1);
+		expect(screen.getAllByTestId('library-status')).toHaveLength(1);
 	});
 
 	it('passes the url of a book to onAdd when its Add is clicked', async () => {
