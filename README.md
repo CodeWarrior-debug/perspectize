@@ -9,6 +9,8 @@ Where measured positions get the measures & metadata they deserve.
 
 Perspectize supports YouTube videos, movies, Bible passages and claims today, with more types planned.
 
+Perspectize is a platform for storing, refining, and sharing perspectives on content. Unlike the addicting, buzzy busy-ness of many social media platforms, Perspectize is built to give the user calm, clarity, and control - not endlessly distracting the user or hiding the control levers for the content. Lovers of dashboards and granular controls will especially appreciate.
+
 <!-- TODO: Add demo GIF showing the Activity page in action -->
 <!-- ![Perspectize Demo](assets/demo.gif) -->
 
