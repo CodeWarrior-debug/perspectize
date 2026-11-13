@@ -53,7 +53,7 @@ describe('ActionPicker', () => {
 
 	function openPicker() {
 		const input = screen.getByRole('combobox');
-		fireEvent.focus(input);
+		fireEvent.click(input);
 		return input;
 	}
 
@@ -127,5 +127,39 @@ describe('ActionPicker', () => {
 
 		expect(await screen.findByRole('alert')).toHaveTextContent('label is taken');
 		expect(onChange).not.toHaveBeenCalled();
+	});
+
+	describe('when the list opens', () => {
+		it('stays closed on focus alone (the dialog autofocuses this field)', () => {
+			render(ActionPicker, { props: { value: null, onChange: vi.fn() } });
+			const input = screen.getByRole('combobox');
+			fireEvent.focus(input);
+			expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+			expect(input).toHaveAttribute('aria-expanded', 'false');
+		});
+
+		it('opens on a click', () => {
+			render(ActionPicker, { props: { value: null, onChange: vi.fn() } });
+			fireEvent.click(screen.getByRole('combobox'));
+			expect(screen.getByRole('listbox')).toBeInTheDocument();
+		});
+
+		it('opens on ArrowDown', () => {
+			render(ActionPicker, { props: { value: null, onChange: vi.fn() } });
+			fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
+			expect(screen.getByRole('listbox')).toBeInTheDocument();
+		});
+
+		it('opens on typing', () => {
+			render(ActionPicker, { props: { value: null, onChange: vi.fn() } });
+			fireEvent.input(screen.getByRole('combobox'), { target: { value: 'Ac' } });
+			expect(screen.getByRole('listbox')).toBeInTheDocument();
+		});
+
+		it('does not open when disabled', () => {
+			render(ActionPicker, { props: { value: null, onChange: vi.fn(), disabled: true } });
+			fireEvent.click(screen.getByRole('combobox'));
+			expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+		});
 	});
 });
