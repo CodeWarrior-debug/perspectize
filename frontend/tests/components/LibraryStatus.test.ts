@@ -25,7 +25,7 @@ describe('LibraryStatus', () => {
 		expect(screen.getByText('In Library')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Add perspective' })).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: 'Compare' })).toHaveAttribute('href', '/compare?contentId=42');
-		expect(screen.getByRole('link', { name: 'Go to item' })).toHaveAttribute('href', '/?open=42');
+		expect(screen.getByRole('link', { name: 'Go to item' })).toHaveAttribute('href', '/content-library?open=42');
 	});
 
 	it('does not mount the perspective editor until Add perspective is clicked', () => {

@@ -2,7 +2,7 @@
 	import { Button } from '$lib/components/shadcn';
 	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
 	import { useMe } from '$lib/queries/users/useMe.svelte';
-	import { activityContentHref } from '$lib/utils/contentLinks';
+	import { libraryContentHref } from '$lib/utils/contentLinks';
 	import CheckIcon from '@lucide/svelte/icons/check';
 
 	let {
@@ -47,7 +47,7 @@
 		<Button variant="outline" size="sm" href={`/compare?contentId=${contentId}`} onclick={stopPropagation}>
 			Compare
 		</Button>
-		<Button variant="outline" size="sm" href={activityContentHref(contentId)} onclick={stopPropagation}>
+		<Button variant="outline" size="sm" href={libraryContentHref(contentId)} onclick={stopPropagation}>
 			Go to item
 		</Button>
 	</div>

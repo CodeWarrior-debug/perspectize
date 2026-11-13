@@ -106,7 +106,7 @@ describe('BookCard', () => {
 	it('shows the shared library actions, and no Add button, for a work already in the library', () => {
 		renderCard(eastOfEden, { libraryItem: { id: '7', name: 'East of Eden' } });
 		expect(screen.getByTestId('library-status')).toHaveTextContent('In Library');
-		expect(screen.getByRole('link', { name: 'Go to item' })).toHaveAttribute('href', '/?open=7');
+		expect(screen.getByRole('link', { name: 'Go to item' })).toHaveAttribute('href', '/content-library?open=7');
 		expect(screen.queryByRole('button', { name: 'Add to Perspectize' })).not.toBeInTheDocument();
 	});
 
