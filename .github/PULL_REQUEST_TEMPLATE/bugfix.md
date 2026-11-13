@@ -44,6 +44,10 @@ https://github.com/user-attachments/assets/<!-- video-id -->
 | 1 | <!-- e.g. signed in, I open my own perspective and click the trash icon --> | <!-- e.g. a "can't be undone" confirmation appears; nothing is deleted yet --> | | |
 | 2 | <!-- --> | <!-- --> | | |
 
+## Session Learnings
+
+<!-- Filled in after the PR is open, while CI runs (/revise-claude-md). Non-critical learnings only: the monthly-maintenance routine collects them. CRITICAL ones (data loss, security, failing CI) are committed on this branch instead, see .docs/PR_WORKFLOW.md#session-learnings. Write "None" if there are none. -->
+
 ## Follow-up Steps
 
 <!-- Manual actions needed after merge, in order if sequence matters. Delete section if none. -->

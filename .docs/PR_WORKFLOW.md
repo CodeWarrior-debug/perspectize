@@ -23,7 +23,18 @@ gh api repos/CodeWarrior-debug/perspectize/issues/123 --jq '.title, .html_url'
 gh api repos/CodeWarrior-debug/perspectize/pulls/123/comments
 ```
 
-**Creating a PR:** the `require-session-reflection-before-pr.sh` hook blocks `gh pr create` until `/revise-claude-md` has run, and it can't detect completion. After running it, create the PR with `gh api repos/CodeWarrior-debug/perspectize/pulls -f title="..." -f body="..." -f head="branch" -f base="main"`.
+**Creating a PR:** push and open the PR immediately with `gh api repos/CodeWarrior-debug/perspectize/pulls -f title="..." -f body="..." -f head="branch" -f base="main"` (`gh pr create` fails with the Projects Classic deprecation). The `require-session-reflection-before-pr.sh` hook no longer blocks `gh pr create`; it allows it and prints a warning that session learnings must still be reviewed after the PR is up. See [Session learnings](#session-learnings).
+
+## Session learnings
+
+`/revise-claude-md` never delays the PR. The flow:
+
+1. Push and open the PR immediately.
+2. While CI runs for the first time, run `/revise-claude-md`.
+3. **CRITICAL** learning → commit the CLAUDE.md/doc edit on the PR branch.
+4. Anything else → put it in the PR body under **Session Learnings** (the section in every PR template). The `monthly-maintenance` routine collects these from merged PR bodies (step 3b).
+
+**CRITICAL means exactly this** (the only definition; other docs link here): a learning that corrects a rule which would cause **data loss**, a **security problem**, or a **failing CI**. Everything else is non-critical, however useful. If the PR has no learnings, write "None" under the heading.
 
 **Cloud sessions:** `gh` is unavailable. Open the PR yourself with the GitHub MCP `create_pull_request` tool and set labels with `issue_write` — see [SESSION_ENVIRONMENT.md](SESSION_ENVIRONMENT.md).
 

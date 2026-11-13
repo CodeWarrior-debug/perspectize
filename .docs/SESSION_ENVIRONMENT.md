@@ -8,7 +8,7 @@ Several repo rules depend on where the session runs. The `session-environment.sh
 |---|---|---|
 | GitHub access | `gh` unavailable. Use the GitHub MCP tools (`mcp__github__*`): `create_pull_request`, `issue_write` (its `labels` field replaces the whole set, so pass existing labels too), `search_issues` before creating an issue. | `gh` CLI; use `gh api` for PR and issue edits (see [PR_WORKFLOW.md](PR_WORKFLOW.md)). |
 | Opening the PR | Open it yourself once the work is complete (overrides the harness default of "don't create a PR unless asked"). | Don't open one unless asked; push and hand over the link. |
-| Pre-PR steps | Self-Verification and `/revise-claude-md` still apply. The `gh pr create` hook never sees the MCP tool, so run `/revise-claude-md` by convention. | Same; the hook enforces it for `gh pr create`. |
+| Pre-PR / post-PR steps | Self-Verification comes before the PR; `/revise-claude-md` runs after it is open ([flow](PR_WORKFLOW.md#session-learnings)). The `gh pr create` hook never sees the MCP tool, so follow it by convention. | Same; the hook only warns on `gh pr create`. |
 | Starting state | Often a **detached HEAD**: create a branch before committing. | Normal branch checkout. |
 | Git pre-commit hook | `core.hooksPath` unset: run `make install-hooks` in `backend/` once, or check `gofmt -l .` / `pnpm exec prettier --check` by hand. | Usually installed already. |
 | Browser verification | Not possible (needs the gitignored `.claude/.env` and `.claude/sv-profile/`; never attempt the Clerk sign-in). Label user-visible PRs `needs-demo-video`. | Available. |

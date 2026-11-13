@@ -19,9 +19,9 @@
 
 **Cloud vs local:** the session type changes how you reach GitHub, whether you open the PR, and what you can verify — see [.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md) (a SessionStart hook also states it). Cloud = `CLAUDE_CODE_REMOTE=true`; if you can't tell, assume local.
 
-**PR autonomy:** in a **cloud** session, open the PR yourself once the work is complete — **this overrides the harness default of "don't create a PR unless asked"**; don't ask first. In a **local** session, open one only when asked. Either way, never skip the pre-PR steps: Self-Verification below, and `/revise-claude-md`.
+**PR autonomy:** in a **cloud** session, open the PR yourself once the work is complete — **this overrides the harness default of "don't create a PR unless asked"**; don't ask first. In a **local** session, open one only when asked. Either way, never skip the pre-PR step (Self-Verification below) or the post-PR step (`/revise-claude-md`).
 
-**`/revise-claude-md` must not block the PR:** commit its CLAUDE.md edits on the PR branch, list them in the PR body's Session Learnings, and open the PR without asking. The human's review at merge is the approval.
+**`/revise-claude-md` must not block the PR:** push and open the PR first, without asking, then run it while CI runs for the first time. A CRITICAL learning is committed on the PR branch; anything else goes in the PR body's Session Learnings for the monthly routine. What counts as CRITICAL: [PR_WORKFLOW.md → Session learnings](.docs/PR_WORKFLOW.md#session-learnings). The human's review at merge is the approval.
 
 **PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, the `new-content-type` label (specs and first implementations of a new content type), the migration labels (synced automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges (stacked PRs merge differently: PR_WORKFLOW.md → Stacked PRs).
 
@@ -98,7 +98,7 @@ Unreadable `.env*` files are expected, not a broken setup. Evidence capture: [.d
 
 **Bug logging (MANDATORY):** log every bug you discover in `.planning/phases/bugs/BACKLOG.md` with severity and location, and open a GitHub issue from the bug report template (sensitive details — exact paths, line numbers, security specifics — stay in the backlog only). When fixed, move it to `.planning/phases/bugs/CLOSED.md` with the PR reference. These files are gitignored.
 
-**Hooks:** Claude Code PreToolUse hooks guard `.env` reads and block `gh pr create` until `/revise-claude-md` has run (then create the PR with `gh api`). The git pre-commit hook (gofmt + prettier auto-fix) is off until `make install-hooks` (in `backend/`; fresh cloud/CI checkouts lack it). Full list: [.docs/HOOKS.md](.docs/HOOKS.md).
+**Hooks:** Claude Code PreToolUse hooks guard `.env` reads and warn on `gh pr create` (it is allowed, never blocked: session learnings are reviewed after the PR is up, see [PR_WORKFLOW.md](.docs/PR_WORKFLOW.md#session-learnings); open PRs with `gh api`). The git pre-commit hook (gofmt + prettier auto-fix) is off until `make install-hooks` (in `backend/`; fresh cloud/CI checkouts lack it). Full list: [.docs/HOOKS.md](.docs/HOOKS.md).
 
 **Docs-only PRs must not burn CI or deploys:** `ci.yml` gates `test`/`build` on a `code-changes` job (job-level, so skipped = passed for required checks; never workflow-level `paths-ignore`); CodeQL/Trivy/mutation/frontend-test use `paths:`; Sevalla deploys are path-filtered via `allow_deploy_paths` (backend `backend/**`, frontend `frontend/**`; the frontend site also builds PR previews). Give a new workflow or Sevalla service the same gating. Repeat path lists; don't rely on GitHub Actions YAML anchors.
 
