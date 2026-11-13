@@ -231,14 +231,14 @@ export const TYPES: ContentTypeProfile[] = [
     enumValue: 'BOOK',
     gist: 'A published book — a work, not a specific physical copy.',
     ingestion: 'api',
-    enrichment: 'Open Library (/isbn/{isbn}.json, /search.json) with Google Books fallback',
+    enrichment: 'Open Library (/search.json, /trending/{window}.json, /isbn/{isbn}.json, /works/{id}.json); no Google Books fallback',
     urlRequired: false,
-    urlPattern: 'optional: openlibrary.org/works/<id>',
-    identity: 'ISBN-13 (fallback: title + primary author)',
+    urlPattern: 'optional input: openlibrary.org/works/<id>; stored url is always the canonical work URL',
+    identity: 'Open Library work key (openlibrary.org/works/<id>). An ISBN resolves to its work; the ISBN is kept as response.resolvedFromISBN but does not identify the book',
     icon: 'book',
     accent: '#8B5E3C',
-    sharesUrlSpace: true,
-    thumbnail: 'covers.openlibrary.org/b/isbn/<isbn>-M.jpg'
+    sharesUrlSpace: false,
+    thumbnail: 'covers.openlibrary.org/b/id/<cover_i>-M.jpg'
   },
   {
     id: 'article',

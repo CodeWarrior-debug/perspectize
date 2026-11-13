@@ -17,6 +17,7 @@ import {
 	tmdbScoreValueGetter,
 	moviePeople,
 } from './formatting';
+import { authorValueGetter, pagesValueGetter, publishedValueGetter, ratingValueGetter } from './bookFormatting';
 
 /**
  * Display label for a content type — used by the type column valueGetter.
@@ -39,6 +40,7 @@ const CONTENT_TYPE_LABELS: Partial<Record<ContentType, string>> = {
 	// CLAIM: 'Claim', // not ready in the UI yet; uncomment to offer it in the filter
 	BIBLE_PASSAGE: 'Bible Passage',
 	MOVIE: 'Movie',
+	BOOK: 'Book',
 };
 
 /** Type-filter options. `value` is the lowercased form used in the filter model and `f.type=` URL param. */
@@ -396,6 +398,59 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		filterKey: 'desc',
 		filterValue: (row) => row.description?.toLowerCase() ?? null,
 	},
+	// Book columns (BOOK rows read their `book` JSON; see bookFormatting.ts). Shown by default
+	// only when the type filter is exactly BOOK (defaultColumnVisibility below). Author is the
+	// one server-sortable Book column; the rest sort client-side only (no backend sort key).
+	{
+		colId: 'author',
+		label: 'Author',
+		picker: 'data',
+		sortable: true,
+		sortValue: (row) => authorValueGetter({ data: row })?.toLowerCase() ?? null,
+		serverSort: 'AUTHOR',
+		filterKey: 'author',
+		filterValue: (row) => authorValueGetter({ data: row })?.toLowerCase() ?? null,
+	},
+	{
+		colId: 'published',
+		label: 'Published',
+		picker: 'data',
+		sortable: true,
+		clientOnlySort: true,
+		sortValue: (row) => {
+			const year = publishedValueGetter({ data: row });
+			return year === null ? null : Number(year);
+		},
+		filterKey: 'published',
+		filterValue: (row) => {
+			const year = publishedValueGetter({ data: row });
+			return year === null ? null : Number(year);
+		},
+		filterRange: 'number',
+	},
+	{
+		colId: 'pages',
+		label: 'Pages',
+		picker: 'data',
+		sortable: true,
+		clientOnlySort: true,
+		sortValue: (row) => pagesValueGetter({ data: row }),
+		filterKey: 'pages',
+		filterValue: (row) => pagesValueGetter({ data: row }),
+		filterRange: 'number',
+	},
+	{
+		colId: 'rating',
+		label: 'Book rating',
+		picker: 'data',
+		sortable: true,
+		clientOnlySort: true,
+		sortValue: (row) => ratingValueGetter({ data: row }),
+		filterKey: 'bookrating',
+		filterValue: (row) => ratingValueGetter({ data: row }),
+		filterRange: 'number',
+	},
+	{ colId: 'editions', label: 'Editions', picker: 'data', sortable: false },
 	// Movie picker-only columns (never in the default set).
 	{ colId: 'budget', label: 'Budget', picker: 'data', sortable: false },
 	{ colId: 'votes', label: 'Votes', picker: 'data', sortable: false },
@@ -451,6 +506,21 @@ export function isMovieOnlyTypeFilter(typeFilter: string | undefined): boolean {
 	return types.length === 1 && types[0] === 'movie';
 }
 
+/** True when the `f.type` URL value names exactly one type and it is BOOK. */
+export function isBookOnlyTypeFilter(typeFilter: string | undefined): boolean {
+	const types = selectedTypes(typeFilter);
+	return types.length === 1 && types[0] === 'book';
+}
+
+/** A default column set: one per single-type filter (Movie, Book), otherwise the general (YouTube) set. */
+export type ColumnView = 'movie' | 'book' | 'general';
+
+export function columnViewFor(typeFilter: string | undefined): ColumnView {
+	if (isMovieOnlyTypeFilter(typeFilter)) return 'movie';
+	if (isBookOnlyTypeFilter(typeFilter)) return 'book';
+	return 'general';
+}
+
 /**
  * True when the type filter is empty or names two or more types: the single
  * column set can't suit every row (Budget is blank for videos, Views for
@@ -461,30 +531,54 @@ export function showColumnRelevanceCallout(typeFilter: string | undefined): bool
 	return selectedTypes(typeFilter).length !== 1;
 }
 
+/**
+ * Columns whose cells are numbers (counts, money, scores, durations). The grid right-aligns them
+ * and their headers so digits line up down the column: the one table rule every reference
+ * (Datawrapper, Primer, Carbon) agrees on. Identifiers such as `tmdbId` stay left-aligned.
+ */
+export const NUMERIC_COL_IDS: ReadonlySet<string> = new Set([
+	'duration',
+	'views',
+	'likes',
+	'percentLiked',
+	'boxOffice',
+	'vsBudget',
+	'tmdbScore',
+	'budget',
+	'votes',
+]);
+
 /** Per-tier column lists. Columns in `hidden` are forced off; createdAt/updatedAt and the admin columns are in neither list (colDef `hide: true`, picker only). */
 const MOVIE_ONLY_PICKER = ['budget', 'votes', 'collection', 'synopsis', 'tmdbId'];
 const MOVIE_DEFAULT_COLS = ['genre', 'rated', 'cast', 'released', 'boxOffice', 'vsBudget', 'tmdbScore'];
+/** Book-only columns: Editions is picker-only, the rest are in the Book default set (defaultColumnVisibility). */
+const BOOK_COLS = ['author', 'published', 'pages', 'rating', 'editions'];
 
 /**
  * Which grid columns the responsive system shows at a tier. With the type filter
  * exactly MOVIE the Movie default set applies: ◎ Film Type Genre Rated Cast
  * Duration Released Box office Vs. budget TMDB Score Tags (Date Added, Budget, Collection, Votes, Synopsis, TMDB ID stay
- * in the picker). Any other filter keeps the YouTube layout and hides the Movie
- * columns, which would be empty. Mirrored by the colDef `hide` flags in
+ * in the picker). The Book set (type filter exactly BOOK) is Item, Type, Author,
+ * Published, Pages, Rating, Tags, widening by tier. Any other filter keeps the YouTube
+ * layout and hides the Movie and Book columns, which would be empty. Mirrored by the colDef `hide` flags in
  * ActivityTable.svelte (initial default); this is the override that wins.
  */
 export function defaultColumnVisibility(
 	tier: ResponsiveTier,
-	movieOnly: boolean,
+	view: ColumnView,
 ): { visible: string[]; hidden: string[] } {
 	const sm = tier !== 'xs';
 	const md = tier === 'md' || tier === 'lg';
 	const lg = tier === 'lg';
-	const visible: string[] = movieOnly ? ['perspectize', 'item', 'type'] : ['item', 'type', 'perspectize'];
-	if (movieOnly) {
+	const visible: string[] = view === 'general' ? ['item', 'type', 'perspectize'] : ['perspectize', 'item', 'type'];
+	if (view === 'movie') {
 		if (sm) visible.push('genre', 'rated');
 		if (md) visible.push('cast', 'duration', 'released');
 		if (lg) visible.push('boxOffice', 'vsBudget', 'tmdbScore', 'tags');
+	} else if (view === 'book') {
+		if (sm) visible.push('author');
+		if (md) visible.push('published', 'pages');
+		if (lg) visible.push('rating', 'tags');
 	} else {
 		if (sm) visible.push('category', 'channel');
 		if (md) visible.push('duration', 'publishDate');
@@ -505,6 +599,7 @@ export function defaultColumnVisibility(
 		'description',
 		...MOVIE_DEFAULT_COLS,
 		...MOVIE_ONLY_PICKER,
+		...BOOK_COLS,
 	];
 	return { visible, hidden: managed.filter((c) => !visible.includes(c)) };
 }
@@ -805,7 +900,21 @@ export function syncItemHeader(api: HeaderApi, name: string): boolean {
 	return true;
 }
 
-/** Item column header: "Film" when the type filter is exactly MOVIE, otherwise "Item". */
+/** Item column header: "Film" for a MOVIE-only filter, "Book" for a BOOK-only one, otherwise "Item". */
 export function itemColumnHeader(typeFilter: string | undefined): string {
-	return isMovieOnlyTypeFilter(typeFilter) ? 'Film' : 'Item';
+	if (isMovieOnlyTypeFilter(typeFilter)) return 'Film';
+	if (isBookOnlyTypeFilter(typeFilter)) return 'Book';
+	return 'Item';
+}
+
+/**
+ * The grid API only if its grid is still alive, else null. The cardMode breakpoint and the
+ * error state destroy the grid while effects and click handlers still hold the old API, and
+ * calling it then logs "Grid API function X() cannot be called as the grid has been destroyed"
+ * (and applyColumnState throws). Use at the call site instead of a bare `!api` check.
+ */
+export function liveGridApi<T extends { isDestroyed(): boolean }>(
+	api: T | null | undefined,
+): T | null {
+	return api && !api.isDestroyed() ? api : null;
 }

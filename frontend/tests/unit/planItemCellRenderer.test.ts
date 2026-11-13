@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { planItemCellRenderer } from '$lib/utils/planItemCellRenderer';
+import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
 import type { UserTodoItem } from '$lib/queries/userTodos';
+
+// Pass-through spy: real rendering, but we can see what data the Plan cell hands over.
+vi.mock('$lib/utils/activityItemCellRenderer', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$lib/utils/activityItemCellRenderer')>();
+	return { ...actual, activityItemCellRenderer: vi.fn(actual.activityItemCellRenderer) };
+});
 
 function todo(overrides: Partial<UserTodoItem> = {}): UserTodoItem {
 	return {
@@ -109,6 +116,24 @@ describe('planItemCellRenderer', () => {
 			) as HTMLElement;
 			expect(cell.querySelector('img')?.getAttribute('src')).toBe('https://image.tmdb.org/t/p/w92/heat.jpg');
 			expect(cell.textContent).toContain('Heat');
+		});
+
+		it('hands a book row its `book` payload to the item cell renderer', () => {
+			const book = { title: 'East of Eden', coverId: 11386937 };
+			planItemCellRenderer(
+				todo({
+					content: {
+						id: '40',
+						name: 'East of Eden',
+						url: 'https://openlibrary.org/works/OL23166W',
+						contentType: 'BOOK',
+						book,
+					},
+				}),
+			);
+			expect(activityItemCellRenderer).toHaveBeenLastCalledWith(
+				expect.objectContaining({ data: expect.objectContaining({ contentType: 'BOOK', book }) }),
+			);
 		});
 
 		it('shows a Bible passage as an icon tile, not an image', () => {

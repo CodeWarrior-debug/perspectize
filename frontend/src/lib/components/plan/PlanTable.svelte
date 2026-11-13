@@ -1,7 +1,7 @@
 <script lang="ts">
 	import AgGridSvelte5Component from 'ag-grid-svelte5';
 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
-	import { themeQuartz } from '@ag-grid-community/theming';
+	import { themeBalham } from '@ag-grid-community/theming';
 	import type {
 		CellClickedEvent,
 		GridApi,
@@ -59,7 +59,7 @@
 	const cardMode = $derived(card.current);
 
 	const modules = [ClientSideRowModelModule];
-	const theme = themeQuartz.withParams(GRID_THEME_PARAMS);
+	const theme = themeBalham.withParams(GRID_THEME_PARAMS);
 
 	function buildGridOptions(inListMode: boolean): GridOptions<UserTodoItem> {
 		return {

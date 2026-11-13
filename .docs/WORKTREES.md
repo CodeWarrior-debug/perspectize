@@ -20,7 +20,7 @@ For routine isolated work (branch inspection, PR analysis, one-off experiments â
 
 **Claim order:** take the lowest-numbered slot that is free. A slot is free when it doesn't exist yet, or when it is clean, not `locked`, and its branch is finished (PR merged, remote branch gone). A finished slot holding only untracked files is still claimable (they survive a branch switch); mention them. Check for conflicts first: no open PR on its branch, and no overlap with another in-flight branch touching the same files. If a slot is not claimable, move to the next number. Create missing slots with `.claude/scripts/new-worktree.sh <branch> <n>`; reuse an existing one with `git -C .claude/worktrees/<n> checkout -b <new-branch> origin/main`, then `git branch --unset-upstream` so it can't push to `main`.
 
-**Live claims:** a worktree (or the main checkout) can also be busy because another Claude session on this machine is writing to it. The agent registry records that in `LOCAL_AGENT_CHECKOUTS.md` at the main checkout root, and its PreToolUse hook denies writes there. Treat a claimed slot as busy; `node .claude/agent-registry/agent-registry.mjs status` lists the claims and drops dead ones.
+**Live claims:** a worktree (or the main checkout) can also be busy because another Claude session on this machine is writing to it. The agent registry records that in `LOCAL_AGENT_CHECKOUTS.md` at the main checkout root, and its PreToolUse hook denies writes there. Treat a claimed slot as busy; `node .claude/agent-registry/agent-registry.mjs status` lists the claims and drops dead ones. The hook judges by the shell's cwd: `git -C <worktree> â€¦` run from a claimed main checkout is still denied. `cd` into the worktree first.
 
 **Overflow:** once all 5 numbered slots are busy, use a work-specific named worktree (e.g. `.claude/worktrees/idle-pause-realtime-stream`) instead of asking.
 
@@ -34,9 +34,15 @@ For routine isolated work (branch inspection, PR analysis, one-off experiments â
    If it's clean (no uncommitted changes) and not flagged `locked` in `git worktree list`, it's safe to switch its branch and reuse it.
 2. **If it has uncommitted changes or looks mid-task**, don't silently discard that state â€” surface what's in it and ask before switching its branch.
 3. **If all 5 are busy**, use a named overflow worktree (see above) rather than freeing one of them.
-4. This numbered set is separate from worktrees created by other flows (e.g. `EnterWorktree`-spawned random-named directories, or a `superpowers:using-git-worktrees` isolation worktree for an in-flight feature) â€” leave those alone; they're not part of the reusable pool.
+4. This numbered set is separate from worktrees created by other flows (e.g. `EnterWorktree`-spawned random-named directories, agent `isolation: worktree` (`agent-<hash>`), or a `superpowers:using-git-worktrees` isolation worktree for an in-flight feature). Don't reuse those as slots, and don't treat them as ownerless either: **whoever created one removes it when the task ends** (push or discard its work first). `bash .claude/scripts/worktree-report.sh` lists what is removable.
 
 **Why:** keeps worktree usage bounded and predictable instead of accumulating one-off directories under `.claude/worktrees/` indefinitely.
+
+## Guard and cleanup
+
+- **Guard:** `.claude/hooks/worktree-guard.sh` (PreToolUse, Bash) denies `git worktree add` unless the path is under the main checkout's `.claude/worktrees/`: no scratchpad, `/tmp`, sibling folder, `..` escape, or nesting inside another worktree. It only fires for commands that go through Bash. Worktrees the harness makes itself (agent `isolation: worktree`, `EnterWorktree`) are invisible to it. Test: `bash .claude/hooks/test-worktree-guard.sh`.
+- **Report:** `bash .claude/scripts/worktree-report.sh` (read-only) groups every worktree as REMOVABLE, MERGED-DIRTY, NO-PR, OPEN-PR or OUT-OF-PLACE and prints the removal commands for the safe group, one per line. The `monthly-maintenance` skill runs it (step 1b).
+- **Before removing a NO-PR or MERGED-DIRTY worktree,** look for work that exists nowhere else: push unpushed commits to `<branch>-followup`, then remove it. Squash merges hide whether a branch's commits were merged, so compare the tip with the PR's head commit rather than trusting `git branch --merged`.
 
 ## Worktrees on an existing branch: use the script
 

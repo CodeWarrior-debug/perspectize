@@ -100,7 +100,7 @@
 			editorProps: {
 				attributes: {
 					class: 'tiptap-content',
-					style: `min-height: var(--pe-min-height, ${minHeight}px); padding: 8px 10px; outline: none; font-family: var(--font-serif); font-size: 13.5px; line-height: 1.5; color: var(--color-foreground); overflow-wrap: anywhere; word-break: break-word; white-space: pre-wrap;`,
+					style: `min-height: var(--pe-min-height, ${minHeight}px); padding: 8px 10px; outline: none; font-family: var(--font-slot-longform, var(--font-serif)); font-size: 13.5px; line-height: 1.5; color: var(--color-foreground); overflow-wrap: anywhere; word-break: break-word; white-space: pre-wrap;`,
 				},
 			},
 		});
