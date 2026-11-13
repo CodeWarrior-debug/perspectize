@@ -229,7 +229,7 @@ function render(){
     <div class="sec"><h4>Perspectives</h4>${row.hasPerspective?`<div>Yours · ${Object.entries(ratings).slice(0,2).map(([k,v])=>`${k} ${v}`).join(' · ')} <a href="#" onclick="return false" style="color:var(--primary)">edit</a></div><div style="color:var(--muted-fg)">${d.otherPerspectives??2} others</div>`:`<div class="empty">None yet.</div>`}</div>
    </div></div>`;
   const persp = `<div class="persp">
-    <h3>Add perspective <span class="badge shipped">shipped</span> <span style="font-weight:400;color:var(--muted-fg)">on <span class="serif">${esc(d.title)}${d.subtitle?' · '+esc(d.subtitle):''}</span></span></h3>
+    <h3>${row.hasPerspective?'Edit':'Add'} perspective <span class="badge shipped">shipped</span></h3>
     ${Object.entries(ratings).map(([k,v])=>`<div class="rating"><label>${esc(k)}</label><button data-r="${esc(k)}" data-d="-1">−</button><div class="track"><i style="width:${v*10}%"></i></div><button data-r="${esc(k)}" data-d="1">+</button><span class="n">${v}</span><button class="x" title="Remove field">×</button></div>`).join('')}
     <div class="addf">+ Add a field — e.g. ${esc(P.addFieldHint||'clarity')}</div>
     ${E?`<div class="ext"><div class="hd"><b>${esc(E.label)}</b> ${E.badge?`<span class="badge ${E.status||'proposed'}" data-tip="${tipRef(esc(E.tip||''))}">${esc(E.badge)}</span>`:''}
@@ -237,14 +237,15 @@ function render(){
       ${ext.mode==='choose'||!E.freeText?`<div class="opts">${E.options.map(h=>`<button class="${ext.pick===h?'on':''}" data-hp="${esc(h)}">${esc(h)}</button>`).join('')}</div>`:`<input type="text" id="exttext" placeholder="${esc(E.freeText.placeholder||'')}" value="${esc(ext.text)}">`}
       </div>`:''}
     <textarea rows="3" placeholder="Comment (optional)"></textarea>
-    <div class="row"><span class="sw ${priv?'on':''}" id="priv"><i></i> Private</span><span><button class="btn" id="back">Back to details</button> <button class="btn pri">Save perspective</button></span></div>
+    <div class="row"><span class="sw ${priv?'on':''}" id="priv"><i></i> Private</span><span><button class="btn" id="back">Cancel</button> <button class="btn pri">Save perspective</button></span></div>
    </div>`;
-  modal.innerHTML = `<div class="mh"><div><div class="k">${esc(S.type.label)} · Content details</div><div class="ttl ${S.type.serifTitles===false?'sans':''}">${esc(d.title)}</div>${d.subtitle?`<div class="sub serif">${esc(d.subtitle)}</div>`:''}</div>
-    <div style="display:flex;gap:6px"><button class="pri" id="addp">${row.hasPerspective?'Edit':'Add'} perspective</button><button id="close">Close</button></div></div>
-    ${details}${view==='persp'?persp:''}
-    <div class="ctrl"><button id="prev" ${i===0?'disabled':''}>← ${i>0?esc(S.rows[i-1].details.title):''}</button><span>${i+1} of ${S.rows.length}${d.footer?' · '+esc(d.footer):''}</span><button id="next" ${i===S.rows.length-1?'disabled':''}>${i<S.rows.length-1?esc(S.rows[i+1].details.title):''} →</button></div>`;
+  modal.innerHTML = `<div class="mh"><div><div class="k">${esc(S.type.label)} · ${view==='persp'?(row.hasPerspective?'Your perspective':'Add perspective'):'Content details'}</div><div class="ttl ${S.type.serifTitles===false?'sans':''}">${esc(d.title)}</div>${d.subtitle?`<div class="sub serif">${esc(d.subtitle)}</div>`:''}</div>
+    <div style="display:flex;gap:6px">${view==='persp'?`<button id="todet">Content details</button>`:`<button class="pri" id="addp">${row.hasPerspective?'Edit':'Add'} perspective</button>`}<button id="close">Close</button></div></div>
+    ${view==='persp'?persp:details}
+    <div class="ctrl"><button id="prev" ${i===0?'disabled':''}>← ${i>0?esc(S.rows[i-1].details.title):''}</button><span>${i+1} of ${S.rows.length}${d.footer&&view!=='persp'?' · '+esc(d.footer):''}</span><button id="next" ${i===S.rows.length-1?'disabled':''}>${i<S.rows.length-1?esc(S.rows[i+1].details.title):''} →</button></div>`;
   modal.querySelector('#close').onclick=closeModal;
-  modal.querySelector('#addp').onclick=()=>{view='persp';render();modal.querySelector('.persp').scrollIntoView({behavior:'smooth'});};
+  const ap=modal.querySelector('#addp'); if(ap) ap.onclick=()=>{view='persp';render();};
+  const td=modal.querySelector('#todet'); if(td) td.onclick=()=>{view='details';render();};
   modal.querySelector('#prev').onclick=()=>{if(i>0)openModal(S.rows[i-1].id,view)};
   modal.querySelector('#next').onclick=()=>{if(i<S.rows.length-1)openModal(S.rows[i+1].id,view)};
   modal.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{ratings[b.dataset.r]=Math.min(10,Math.max(1,ratings[b.dataset.r]+ +b.dataset.d));render();});
@@ -252,7 +253,7 @@ function render(){
   modal.querySelectorAll('[data-hp]').forEach(b=>b.onclick=()=>{ext.pick=ext.pick===b.dataset.hp?null:b.dataset.hp;render();});
   const et=modal.querySelector('#exttext'); if(et) et.oninput=e=>ext.text=e.target.value;
   const pv=modal.querySelector('#priv'); if(pv) pv.onclick=()=>{priv=!priv;render();};
-  const bk=modal.querySelector('#back'); if(bk) bk.onclick=()=>{view='details';render();};
+  const bk=modal.querySelector('#back'); if(bk) bk.onclick=closeModal;
 }
 document.addEventListener('click',e=>{ const o=e.target.closest('[data-open]'); if(o){openModal(o.dataset.open,o.dataset.view||'details');return;} if(e.target===ov)closeModal(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeModal(); });

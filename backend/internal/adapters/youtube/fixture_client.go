@@ -34,6 +34,10 @@ func (c *FixtureClient) ExtractVideoID(url string) (string, error) {
 func (c *FixtureClient) GetVideoMetadata(_ context.Context, videoID string) (*services.VideoMetadata, error) {
 	v, ok := demo.VideoByID(videoID)
 	if !ok {
+		// A row from the seeded import sheet: serve its real metadata.
+		v, ok = demo.ImportVideoByID(videoID)
+	}
+	if !ok {
 		v = demo.Video{
 			ID:           videoID,
 			Title:        fmt.Sprintf("Demo video %s", videoID),

@@ -7,8 +7,10 @@
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { page } from '$app/state';
 	import { createThemeStore } from '$lib/theme/store.svelte';
+	import { createFontStore } from '$lib/fonts/store.svelte';
 
 	const themeStore = createThemeStore();
+	const fontStore = createFontStore();
 	let settingsOpen = $state(false);
 
 	// The header sits on --color-primary, so the ring uses --color-primary-foreground (always
@@ -67,7 +69,7 @@
 				<UserMenu />
 			</AuthShow>
 
-			<SettingsDialog bind:open={settingsOpen} store={themeStore} />
+			<SettingsDialog bind:open={settingsOpen} store={themeStore} {fontStore} />
 
 			<AuthShow when="signed-out">
 				<SignInTrigger>

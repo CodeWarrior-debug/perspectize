@@ -39,6 +39,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
+	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/services"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/server"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/database"
@@ -80,6 +81,20 @@ type harness struct {
 
 	userIDs    []int
 	contentIDs []int
+
+	// contentService is the harness's ContentService, shared with the import service.
+	contentService func() *services.ContentService
+	// background holds import work (listing, imports) collected instead of run.
+	background []func()
+}
+
+// runBackground runs and clears the collected import work.
+func (h *harness) runBackground() {
+	work := h.background
+	h.background = nil
+	for _, f := range work {
+		f()
+	}
 }
 
 var saltSeq atomic.Int64
@@ -120,6 +135,8 @@ func newHarnessWithPool(t *testing.T, pool database.PoolConfig) *harness {
 	threadRepo := postgres.NewGormMessageThreadRepository(db)
 	messageRepo := postgres.NewGormMessageRepository(db)
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
+	content := services.NewContentService(h.contentRepo, youtube.NewFixtureClient(), tmdb.NewFixtureClient(), services.WithBibleReference(bibleReferenceRepo), services.WithMovieSearch(tmdb.NewFixtureClient()), services.WithMovieTrending(tmdb.NewFixtureClient()))
+	h.contentService = func() *services.ContentService { return content }
 
 	notifier, err := realtime.NewPgNotifier(context.Background(), dsn, counter)
 	require.NoError(t, err)
@@ -129,13 +146,22 @@ func newHarnessWithPool(t *testing.T, pool database.PoolConfig) *harness {
 	todoListRepo := postgres.NewGormUserTodoListRepository(db)
 	todoActionRepo := cached.NewTodoActionRepository(postgres.NewGormTodoActionRepository(db), cached.DefaultTodoActionTTL)
 
+	// Import staging: a static lister, and background work collected rather
+	// than run, so a round-trip count covers only the request itself.
+	importRepo := postgres.NewGormImportJobRepository(db)
+	importService := services.NewImportService(importRepo,
+		map[domain.ImportSourceType]portservices.ImportSourceLister{domain.ImportSourceYouTubeChannel: staticLister{}},
+		h.contentService(),
+		services.WithImportSpawn(func(f func()) { h.background = append(h.background, f) }))
+
 	deps := server.Deps{
-		ContentService:     services.NewContentService(h.contentRepo, youtube.NewFixtureClient(), tmdb.NewFixtureClient(), services.WithBibleReference(bibleReferenceRepo), services.WithMovieSearch(tmdb.NewFixtureClient()), services.WithMovieTrending(tmdb.NewFixtureClient())),
+		ContentService:     h.contentService(),
 		UserService:        services.NewUserService(userRepo, h.contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo),
 		PerspectiveService: services.NewPerspectiveService(perspectiveRepo, userRepo),
 		CategoryService:    services.NewCategoryService(categoryRepo, h.contentRepo, noWikidata{}),
 		UserTodoService:    services.NewUserTodoService(todoRepo, todoListRepo, todoActionRepo),
 		MessagingService:   services.NewMessagingService(threadRepo, messageRepo, hub, services.NewSlidingWindowLimiter(1000, time.Second)),
+		ImportService:      importService,
 		UserRepo:           userRepo,
 		ThreadRepo:         threadRepo,
 		Hub:                hub,
@@ -277,6 +303,8 @@ func (h *harness) cleanup() {
 	ctx := context.Background()
 	db := h.db.WithContext(ctx)
 	if len(h.userIDs) > 0 {
+		// Import sources and items cascade from their job.
+		_ = db.Exec("DELETE FROM import_jobs WHERE user_id IN ?", h.userIDs).Error
 		_ = db.Exec("DELETE FROM perspectives WHERE user_id IN ?", h.userIDs).Error
 		// Todos reference content, lists and actions with RESTRICT, so they go first.
 		_ = db.Exec("DELETE FROM user_todos WHERE user_id IN ?", h.userIDs).Error

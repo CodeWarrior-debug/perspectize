@@ -1,4 +1,5 @@
 import type { CellCtx, ColTooltipSpec } from './tooltipSpec';
+import { authorValueGetter, bookAuthors, ratingTooltip, ratingValueGetter } from './bookFormatting';
 import {
 	formatCountExact,
 	percentLikedTooltip,
@@ -59,6 +60,16 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 	tmdbScore: {
 		text: (c: CellCtx) => tmdbScoreTooltip({ data: c.data }),
 		copyValue: (c: CellCtx) => tmdbScoreValueGetter({ data: c.data }),
+	},
+	author: {
+		mode: 'multi',
+		emptyText: 'No author',
+		items: (c: CellCtx) => bookAuthors(c.data).map((a) => a.name),
+		copyValue: (c: CellCtx) => authorValueGetter({ data: c.data }),
+	},
+	rating: {
+		text: (c: CellCtx) => ratingTooltip({ data: c.data }),
+		copyValue: (c: CellCtx) => ratingValueGetter({ data: c.data }),
 	},
 	budget: {
 		text: (c: CellCtx) => formatMoneyExact(budgetValueGetter({ data: c.data })),
