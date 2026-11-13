@@ -157,4 +157,27 @@ describe('CommentsEditor', () => {
 			expect(select.value).toBe('0');
 		});
 	});
+	describe('content height cap', () => {
+		it('collapsed: the editing area scrolls past a capped height instead of growing', async () => {
+			render(CommentsEditor, { props: { value: '', onChange: vi.fn(), minHeight: 68 } });
+			await waitFor(() => expect(document.querySelector('.ProseMirror')).not.toBeNull());
+
+			const wrapper = document.querySelector('.comment-editor-wrapper') as HTMLElement;
+			const scroller = document.querySelector('.comment-editor-scroll') as HTMLElement;
+			expect(wrapper.style.getPropertyValue('--pe-max-height')).toBe('max(68px, min(40vh, 320px))');
+			expect(scroller.style.overflowY).toBe('auto');
+			expect(scroller.style.maxHeight).toBe('var(--pe-max-height)');
+			expect(scroller.querySelector('.ProseMirror')).not.toBeNull();
+		});
+
+		it('expanded: the cap matches the expanded height so the pop-out also scrolls', async () => {
+			render(CommentsEditor, {
+				props: { value: '', onChange: vi.fn(), minHeight: 68, expanded: true },
+			});
+			await waitFor(() => expect(document.querySelector('.ProseMirror')).not.toBeNull());
+
+			const wrapper = document.querySelector('.comment-editor-wrapper') as HTMLElement;
+			expect(wrapper.style.getPropertyValue('--pe-max-height')).toBe('min(60vh, 560px)');
+		});
+	});
 });
