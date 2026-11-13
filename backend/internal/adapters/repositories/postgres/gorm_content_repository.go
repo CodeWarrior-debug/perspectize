@@ -237,6 +237,37 @@ func applyMovieColumnFilters(query *gorm.DB, f *domain.ContentFilter) *gorm.DB {
 	return query
 }
 
+// applyBookColumnFilters applies the book grid's per-column filters. They read the
+// structured authors list in the response JSONB. The first author is the one matched:
+// a row without that key yields NULL, so a set filter excludes it. The value is
+// always bound.
+func applyBookColumnFilters(query *gorm.DB, f *domain.ContentFilter) *gorm.DB {
+	if f.AuthorContains != nil && *f.AuthorContains != "" {
+		query = query.Where("(response->'authors'->0->>'name') ILIKE ?", "%"+*f.AuthorContains+"%")
+	}
+	// Numeric ranges cast the JSONB text to NUMERIC. A row without the key (every non-book
+	// row, or a book with the value unknown) yields NULL, so a set bound excludes it.
+	if f.MinPublishYear != nil {
+		query = query.Where("(response->>'firstPublishYear')::NUMERIC >= ?", *f.MinPublishYear)
+	}
+	if f.MaxPublishYear != nil {
+		query = query.Where("(response->>'firstPublishYear')::NUMERIC <= ?", *f.MaxPublishYear)
+	}
+	if f.MinPages != nil {
+		query = query.Where("(response->>'pageCountMedian')::NUMERIC >= ?", *f.MinPages)
+	}
+	if f.MaxPages != nil {
+		query = query.Where("(response->>'pageCountMedian')::NUMERIC <= ?", *f.MaxPages)
+	}
+	if f.MinBookRating != nil {
+		query = query.Where("(response->>'ratingsAverage')::NUMERIC >= ?", *f.MinBookRating)
+	}
+	if f.MaxBookRating != nil {
+		query = query.Where("(response->>'ratingsAverage')::NUMERIC <= ?", *f.MaxBookRating)
+	}
+	return query
+}
+
 // maxSearchPhrases caps comma-separated phrases per search to bound query size.
 const maxSearchPhrases = 10
 
@@ -348,6 +379,7 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		}
 		query = applyPersonFilter(query, params.Filter.PersonID, params.Filter.PersonRole)
 		query = applyMovieColumnFilters(query, params.Filter)
+		query = applyBookColumnFilters(query, params.Filter)
 		// View count filters (JSONB extraction)
 		if params.Filter.MinViewCount != nil {
 			query = query.Where("(response->'items'->0->'statistics'->>'viewCount')::BIGINT >= ?", *params.Filter.MinViewCount)
@@ -384,6 +416,16 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		// Adder username filter (subquery on users, no JOIN — see ADDED_BY sort rule)
 		if params.Filter.AddedByUsername != nil && *params.Filter.AddedByUsername != "" {
 			query = query.Where("added_by_user_id IN (SELECT id FROM users WHERE username ILIKE ?)", "%"+*params.Filter.AddedByUsername+"%")
+		}
+		// Perspective-count filter: counts what the viewer may see (public +
+		// their own), the same scope as the perspectives list, so a row that
+		// passes here has that many perspectives to compare.
+		if params.Filter.MinPerspectiveCount != nil && *params.Filter.MinPerspectiveCount > 0 {
+			visible, args := visiblePerspectivePredicate(params.ViewerID)
+			args = append(args, *params.Filter.MinPerspectiveCount)
+			query = query.Where(
+				"(SELECT COUNT(*) FROM perspectives WHERE perspectives.content_id = content.id AND ("+visible+")) >= ?",
+				args...)
 		}
 		// Created/Updated date filters (direct columns)
 		if params.Filter.CreatedAfter != nil {

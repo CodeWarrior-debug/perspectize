@@ -15,12 +15,13 @@ import (
 
 // mockPerspectiveRepository implements repositories.PerspectiveRepository for testing
 type mockPerspectiveRepository struct {
-	createFn    func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
-	getByIDFn   func(ctx context.Context, id int) (*domain.Perspective, error)
-	updateFn    func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
-	deleteFn    func(ctx context.Context, id int, ownerUserID int) error
-	listFn      func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
-	aggregateFn func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
+	createFn       func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error)
+	getByIDFn      func(ctx context.Context, id int) (*domain.Perspective, error)
+	updateFn       func(ctx context.Context, p *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
+	deleteFn       func(ctx context.Context, id int, ownerUserID int) error
+	listFn         func(ctx context.Context, params domain.PerspectiveListParams) (*domain.PaginatedPerspectives, error)
+	aggregateFn    func(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
+	visibleCountFn func(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error)
 
 	feelingStatsFn     func(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error)
 	customFieldStatsFn func(ctx context.Context, contentID *int, key string) (*domain.CustomFieldStats, error)
@@ -71,6 +72,13 @@ func (m *mockPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 		return m.aggregateFn(ctx, contentIDs)
 	}
 	return map[int]*domain.PerspectiveAggregate{}, nil
+}
+
+func (m *mockPerspectiveRepository) CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
+	if m.visibleCountFn != nil {
+		return m.visibleCountFn(ctx, contentIDs, viewerID)
+	}
+	return map[int]int{}, nil
 }
 
 func (m *mockPerspectiveRepository) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {
@@ -700,6 +708,41 @@ func TestPerspectiveService_ListPerspectives_PrivacyEnforcement(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.True(t, got.RestrictToPublicOrOwner)
+	})
+}
+
+func TestPerspectiveService_CountVisibleByContentIDs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("passes the viewer and ids to the repository and returns its counts", func(t *testing.T) {
+		viewer := 7
+		repo := &mockPerspectiveRepository{
+			visibleCountFn: func(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
+				assert.Equal(t, []int{1, 2}, contentIDs)
+				require.NotNil(t, viewerID)
+				assert.Equal(t, 7, *viewerID)
+				return map[int]int{1: 3}, nil
+			},
+		}
+		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+
+		got, err := svc.CountVisibleByContentIDs(ctx, []int{1, 2}, &viewer)
+		require.NoError(t, err)
+		assert.Equal(t, map[int]int{1: 3}, got)
+	})
+
+	t.Run("wraps a repository error", func(t *testing.T) {
+		repo := &mockPerspectiveRepository{
+			visibleCountFn: func(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
+				return nil, errors.New("boom")
+			},
+		}
+		svc := services.NewPerspectiveService(repo, &mockUserRepoForPerspective{})
+
+		got, err := svc.CountVisibleByContentIDs(ctx, []int{1}, nil)
+		assert.Nil(t, got)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to count visible perspectives by content")
 	})
 }
 

@@ -100,6 +100,10 @@ Then run the script with `BASE_URL=http://localhost:<f>`. The `chat-panel`
 scenario measures the messaging panel's top edge against the app header at several
 viewport heights.
 
+**Two traps when the screenshots look wrong.**
+- **The sv profile keeps a saved Activity column layout** (localStorage `perspectize:activityColumns:v1`), so a capture may show extra or different columns, not the defaults. Ignore it for one tab with `page.addInitScript` that makes `Storage.prototype.getItem` return `null` for that key (and drops its `setItem`); don't clear it, it is the test user's state.
+- **`verification-servers.mjs` exits 1 with "password authentication failed" (SQLSTATE 28P01) in `logs/verify-backend.log`:** the `DATABASE_URL` host is stale, not necessarily the password. Compare its `ep-…` host with the project's endpoints (Neon MCP `list_postgres_endpoints`); the dev backend should point at the `production` branch's endpoint. Fix the env file by hand; agents can't read it.
+
 ## 1. Start Services
 
 The everyday dev database is hosted on Neon (cloud PostgreSQL) — no local database setup needed. Docker Desktop is installed and is used only for the isolated demo stack (`make demo-up` / `demo-test` / `demo-record`, own Postgres on port 5434); start it with `open -a Docker` if the daemon isn't running.

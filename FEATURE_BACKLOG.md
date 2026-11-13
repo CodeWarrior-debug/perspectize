@@ -635,3 +635,21 @@ Two related extensions to the Plan page (user todos, PR #576). Both are explorat
 **Depends on:** the sharing model being finalised, and the shared BaseTable work in #577 so a shared or nested list does not become a third copy of the grid.
 
 **Priority:** Optional / unscheduled.
+
+---
+
+## Facebook Video / Reel Content Type
+
+**Spec:** [docs/superpowers/specs/2026-10-19-facebook-video-content-type-design.md](docs/superpowers/specs/2026-10-19-facebook-video-content-type-design.md) (proposal, unscheduled, written without superpowers).
+
+Paste a public Facebook video or Reel link; it plays inline behind a click-to-load gate and collects perspectives. Unlike YouTube, Meta offers no lawful metadata source (oEmbed lost title/thumbnail in 2025 and may not be stored; Graph needs Page Public Content Access; scraping is banned), so title and creator are user-entered and there is no thumbnail, duration or view count. No migration, no API key.
+
+**Blocks public launch (not the build):** the app has no privacy policy, terms, DMCA agent or report flow yet; the spec's §6.2 lists them. Seven decisions to confirm are in its §9.
+
+**Priority:** Deferred by [ADR 0001](docs/adr/0001-defer-facebook-video-content-type.md): storing metadata needs a Meta App Review and Business Verification we probably wouldn't pass. Revisit conditions are in the ADR.
+
+## Food & Drink Content Type
+
+**Spec:** [docs/superpowers/specs/2026-11-01-food-item-content-type-design.md](docs/superpowers/specs/2026-11-01-food-item-content-type-design.md) (proposal, unscheduled, written without superpowers). **Intent:** [project-management/intents/food-item-content-type.md](project-management/intents/food-item-content-type.md) (draft).
+
+One `FOOD_ITEM` type for packaged foods, generic foods and beverages, added by barcode, USDA/Open Food Facts URL or Discover search. Nutrition comes from USDA FoodData Central (CC0, free key, 1,000 req/h) with Open Food Facts (ODbL, no key, 15 reads/min per IP) for images, Nutri-Score, NOVA and allergens. It is normalised to per-serving and per-100 g/ml so items sort side by side. No migration. Nine decisions to confirm are in its §14.

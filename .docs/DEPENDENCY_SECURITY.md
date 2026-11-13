@@ -231,6 +231,12 @@ trivy fs frontend/pnpm-lock.yaml --severity HIGH,CRITICAL --scanners vuln
 
 Also compare against `origin/main`, not your checkout. The root checkout can be on an older branch whose lockfile differs from `main` by hundreds of lines, and a finding there may already be fixed on `main`.
 
+### 9. Every Dependabot PR red on "Trivy vulnerability scan" = a CVE already on `main`
+
+Trivy only runs on lockfile-touching PRs, so a CVE published after the last dependency PR stays invisible until Dependabot's next batch, then fails all of them at once even though every other check is green. Don't fix the PRs one by one: bump the package on `main` (a `chore(deps)` PR), then comment `@dependabot rebase` on each open PR. Example: `golang.org/x/net` v0.61.0 → v0.62.0 (CVE-2026-78661, 2026-11).
+
+Reading the failure through the GitHub MCP: `get_job_logs` with `return_content: true` needs `tail_lines` of about 400. A small tail returns only post-job cleanup. Look for the `Total: N (HIGH: …)` table in the first Trivy step (the `format: table` gate).
+
 ## Known unfixable findings
 
 Some advisories have no patched release yet. Document them rather than

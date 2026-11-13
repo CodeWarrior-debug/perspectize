@@ -8,9 +8,10 @@ export interface LengthDisplay {
 }
 
 export type { ContentFilterInput } from '$lib/utils/gridUrlState';
+export { activityListRequest, cursorsAfterPage, ACTIVITY_LIST_STALE_TIME_MS, LOADED_MODE_FIRST } from './activityList';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
-export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE';
+export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK';
 
 export interface ContentItem {
 	id: string;
@@ -41,6 +42,9 @@ export interface ContentItem {
 	// MOVIE rows only: the shaped TMDB payload. List rows select this instead of `response`
 	// (so YouTube rows don't ship their snippet twice); null for every other type.
 	movie?: Record<string, unknown> | null;
+	// BOOK rows only: the shaped Open Library payload (same list-row/details split as `movie`);
+	// null for every other type. Read it through bookFormatting's bookResponse().
+	book?: Record<string, unknown> | null;
 	primaryCategory: {
 		id: string;
 		wikidataQid: string;
@@ -123,6 +127,7 @@ export const LIST_CONTENT = gql`
 				tags
 				description
 				movie
+				book
 				primaryCategory {
 					id
 					wikidataQid
@@ -145,19 +150,22 @@ export const LIST_CONTENT = gql`
 	}
 `;
 
-// Compare page's "choose something to compare" picker: needs perspectiveCount
-// per row to filter down to content that actually has 2+ perspectives to
-// compare, which is why this is a separate query from LIST_CONTENT (see the
-// cost comment on GET_CONTENT_AGGREGATES below) — capped at a modest `first`
-// so the added per-row dataloader cost stays bounded to this one picker
-// fetch, not every Activity grid page load.
+// Compare page's "choose something to compare" picker: filters server-side to
+// content with 2+ perspectives the viewer can read (minPerspectiveCount) and
+// shows each row's visiblePerspectiveCount. A separate query from LIST_CONTENT
+// (see the cost comment on GET_CONTENT_AGGREGATES below) — capped at a modest
+// `first` so the added per-row dataloader cost stays bounded to this one
+// picker fetch, not every Activity grid page load.
 export interface ComparePickerContentItem {
 	id: string;
 	name: string;
 	contentType: string;
 	channelTitle: string | null;
 	url: string | null;
-	perspectiveCount: number | null;
+	// Perspectives the viewer can read (public + their own). perspectiveCount
+	// also counts other people's private ones, so it can read higher than the
+	// Compare page can show.
+	visiblePerspectiveCount: number | null;
 }
 
 export interface ListComparableContentResponse {
@@ -175,7 +183,7 @@ export const LIST_COMPARABLE_CONTENT = gql`
 				contentType
 				channelTitle
 				url
-				perspectiveCount
+				visiblePerspectiveCount
 			}
 		}
 	}
@@ -261,6 +269,7 @@ export const GET_CONTENT_DETAILS = gql`
 			description
 			response
 			movie
+			book
 			primaryCategory {
 				id
 				wikidataQid
@@ -359,6 +368,28 @@ export const CREATE_CONTENT_FROM_MOVIE = gql`
 
 export interface CreateContentFromMovieResponse {
 	createContentFromMovie: {
+		id: string;
+		name: string;
+		url: string | null;
+		contentType: string;
+	};
+}
+
+// Idempotent like CREATE_CONTENT_FROM_MOVIE: an existing book (same work) comes back as a normal Content.
+// `url` is a work URL or a bare ISBN; the server resolves either to the work.
+export const CREATE_CONTENT_FROM_BOOK = gql`
+	mutation CreateContentFromBook($input: CreateContentFromBookInput!) {
+		createContentFromBook(input: $input) {
+			id
+			name
+			url
+			contentType
+		}
+	}
+`;
+
+export interface CreateContentFromBookResponse {
+	createContentFromBook: {
 		id: string;
 		name: string;
 		url: string | null;

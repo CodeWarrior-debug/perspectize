@@ -14,6 +14,15 @@
 		movieResponse,
 	} from '$lib/utils/formatting';
 	import { passageIconLabels } from '$lib/utils/bible';
+	import {
+		authorCellText,
+		bookResponse,
+		formatBookRating,
+		openLibraryCoverUrl,
+		pagesValueGetter,
+		publishedValueGetter,
+		ratingValueGetter,
+	} from '$lib/utils/bookFormatting';
 	import BiblePassageIcon from '$lib/components/BiblePassageIcon.svelte';
 	import AddToPlanButton from '$lib/components/plan/AddToPlanButton.svelte';
 
@@ -36,6 +45,8 @@
 		contentType?: string;
 		// MOVIE rows carry TMDB data in their JSON `response` (or `movie`); see formatting.ts.
 		movie?: unknown;
+		// BOOK rows carry Open Library data in `book` (or `response`); see bookFormatting.ts.
+		book?: unknown;
 		response?: unknown;
 		displayTitle?: string | null;
 		verseStartID?: number | null;
@@ -66,6 +77,7 @@
 
 	const isPassage = (row: CardRow) => row.contentType === 'BIBLE_PASSAGE';
 	const isMovie = (row: CardRow) => row.contentType === 'MOVIE';
+	const isBook = (row: CardRow) => row.contentType === 'BOOK';
 
 	/** Year, rating, runtime and TMDB score for a movie card (unknown parts are skipped). */
 	function movieFacts(row: CardRow): string[] {
@@ -79,17 +91,34 @@
 		].filter((f): f is string => !!f);
 	}
 
-	/** YouTube thumbnail, or a movie's TMDB poster (portrait, so it is fitted, not cropped). */
-	function thumbSrc(row: CardRow): { src: string; poster: boolean } | null {
-		const videoId = extractVideoIdFromUrl(row.url);
-		if (videoId) return { src: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, poster: false };
-		const posterPath = movieResponse(row)?.posterPath;
-		return posterPath ? { src: `https://image.tmdb.org/t/p/w154${posterPath}`, poster: true } : null;
+	/** Book facts that Open Library has: year, median pages, community rating. Unknown parts are skipped. */
+	function bookFacts(row: CardRow): string[] {
+		const year = publishedValueGetter({ data: row });
+		const pages = pagesValueGetter({ data: row });
+		const rating = ratingValueGetter({ data: row });
+		return [
+			year,
+			pages !== null ? `${pages} pages` : null,
+			rating !== null ? `★ ${formatBookRating(rating)}` : null,
+		].filter((f): f is string => !!f);
 	}
 
-	/** Grey tile only behind a video thumbnail or an empty slot; posters and the book sit on the card colour. */
+	/**
+	 * YouTube thumbnail, or a movie's TMDB poster or a book's Open Library cover. Posters and covers
+	 * vary in aspect, so they are fitted, not cropped.
+	 */
+	function thumbSrc(row: CardRow): { src: string; fitted: boolean } | null {
+		const videoId = extractVideoIdFromUrl(row.url);
+		if (videoId) return { src: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, fitted: false };
+		const posterPath = movieResponse(row)?.posterPath;
+		if (posterPath) return { src: `https://image.tmdb.org/t/p/w154${posterPath}`, fitted: true };
+		const cover = openLibraryCoverUrl(bookResponse(row)?.coverId, 'M');
+		return cover ? { src: cover, fitted: true } : null;
+	}
+
+	/** Grey tile only behind a video thumbnail or an empty slot; posters, covers and the passage sit on the card colour. */
 	function thumbBg(row: CardRow): string {
-		if (isPassage(row) || thumbSrc(row)?.poster) return '';
+		if (isPassage(row) || thumbSrc(row)?.fitted) return '';
 		return 'bg-muted';
 	}
 
@@ -117,11 +146,11 @@
 						<img
 							src={thumb.src}
 							alt=""
-							class="h-full w-full {thumb.poster ? 'object-contain' : 'object-cover'}"
+							class="h-full w-full {thumb.fitted ? 'object-contain' : 'object-cover'}"
 							onerror={(e) => e.currentTarget.remove()}
 						/>
 					{/if}
-					{#if thumb && !thumb.poster}
+					{#if thumb && !thumb.fitted}
 						<span
 							data-testid="card-play-badge"
 							class="absolute right-1 bottom-1 flex items-center justify-center rounded bg-black/65 p-1"
@@ -139,7 +168,7 @@
 				onclick={() => onOpenDetails(String(row.id))}
 			>
 				<div
-					class="line-clamp-2 font-[family-name:var(--font-family-serif)] text-sm leading-tight font-semibold text-foreground"
+					class="line-clamp-2 font-slot-cell font-[family-name:var(--font-family-serif)] text-sm leading-tight font-semibold text-foreground"
 				>
 					{(isPassage(row) && row.displayTitle) || row.name}
 				</div>
@@ -147,6 +176,23 @@
 					{#if row.displayTitle}
 						<div data-testid={`card-subtitle-${row.id}`} class="mt-1 line-clamp-1 text-xs text-muted-foreground">
 							{row.name}
+						</div>
+					{/if}
+				{:else if isBook(row)}
+					{#if authorCellText(row)}
+						<div data-testid={`card-book-author-${row.id}`} class="mt-1 line-clamp-1 text-xs text-muted-foreground">
+							{authorCellText(row)}
+						</div>
+					{/if}
+					{#if bookFacts(row).length}
+						<div
+							data-testid={`card-book-facts-${row.id}`}
+							class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+						>
+							{#each bookFacts(row) as fact, i (i)}
+								{#if i > 0}<span>&middot;</span>{/if}
+								<span>{fact}</span>
+							{/each}
 						</div>
 					{/if}
 				{:else if isMovie(row)}

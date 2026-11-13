@@ -1006,6 +1006,34 @@
 	font-family: 'Geist', system-ui, sans-serif;
 }
 
+/*
+ * Settings → Fonts overrides (lib/fonts/store.svelte.ts). Each rule only matches while the
+ * user has picked a font for that slot (data-font-* on <html>), so the defaults above are
+ * untouched otherwise. Unlayered on purpose: beats the `font-[family-name:…]` / `font-serif`
+ * utilities on the marked elements. Mark an element with font-slot-{heading,cell,longform}
+ * to put it in a slot.
+ */
+:root[data-font-heading]
+	:is(
+		h1,
+		h2,
+		h3,
+		h4,
+		[data-slot='dialog-title'],
+		[data-slot='drawer-title'],
+		.ag-header-cell-text,
+		.ag-header-group-text,
+		.font-slot-heading
+	) {
+	font-family: var(--font-slot-heading);
+}
+:root[data-font-cell] :is(.ag-cell:not([col-id='type']), .font-slot-cell) {
+	font-family: var(--font-slot-cell);
+}
+:root[data-font-longform] .font-slot-longform {
+	font-family: var(--font-slot-longform);
+}
+
 /* Column resize handles and filter buttons show on hover/focus (filter also when active), so the
    header reads as labels first instead of a row of dividers and icons. */
 .ag-header-cell-resize::after {
@@ -1022,6 +1050,43 @@
 .ag-header-cell:hover .ag-header-cell-filter-button,
 .ag-header-cell:focus-within .ag-header-cell-filter-button {
 	opacity: 1;
+}
+
+/* Header spacing. headerMinWidth (lib/utils/grid-header-width.ts) reserves exactly this layout,
+   so a column at its minimum width shows its whole label, sort arrow and funnel: one --ag-spacing
+   between the label and the funnel (AG Grid leaves none), and the sort arrow one gap from its
+   label rather than two (AG Grid adds its own padding on top of the label's gap). Change these
+   and headerChrome (grid-theme.ts) together. */
+.ag-header-cell .ag-cell-label-container {
+	gap: var(--ag-spacing);
+}
+.ag-header-cell .ag-sort-indicator-icon {
+	padding-left: 0;
+	padding-right: 0;
+}
+
+/* Funnel states. AG Grid marks an active filter with a tinted block plus a 4px ring around the
+   icon, which reads as an oversized rectangle in a 36px header. Instead the funnel itself takes
+   the primary colour and keeps AG Grid's small dot; hover is a small rounded wash. */
+.ag-header-cell .ag-header-cell-filter-button:hover {
+	border-radius: 4px;
+	box-shadow: 0 0 0 2px var(--ag-icon-button-hover-color);
+}
+.ag-header-cell .ag-header-cell-filter-button.ag-filter-active {
+	background-color: transparent;
+	box-shadow: none;
+	color: var(--color-primary);
+}
+.ag-header-cell .ag-header-cell-filter-button.ag-filter-active:hover {
+	background-color: var(--ag-icon-button-hover-color);
+	border-radius: 4px;
+	box-shadow: 0 0 0 2px var(--ag-icon-button-hover-color);
+}
+
+/* Activity headers: small uppercase labels (size and colour come from ACTIVITY_HEADER_PARAMS). */
+.activity-grid .ag-header-cell-text {
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
 }
 
 /* Hover bar — drawn on AG Grid's own hover overlay so it sits on top of the opaque hover colour. */

@@ -78,6 +78,7 @@ type ContentModel struct {
 	ReleaseDate  *string  `gorm:"column:release_date_sort;->;-:migration"`
 	TmdbScore    *float64 `gorm:"column:tmdb_score;->;-:migration"`
 	ChannelTitle *string  `gorm:"column:channel_title_sort;->;-:migration"`
+	Author       *string  `gorm:"column:author_sort;->;-:migration"`
 
 	// AddedBy is the lowercased adder username, read-only and populated only when List
 	// selects it for the ADDED_BY sort. Unlike the dummies above it must carry a real
@@ -218,3 +219,68 @@ type UserTodoModel struct {
 
 // TableName returns the table name for UserTodoModel
 func (UserTodoModel) TableName() string { return "user_todos" }
+
+// ImportJobModel is the GORM persistence model for the import_jobs table
+type ImportJobModel struct {
+	ID            int        `gorm:"primaryKey;autoIncrement"`
+	UserID        int        `gorm:"column:user_id;not null"`
+	Name          string     `gorm:"column:name;not null"`
+	RequestStatus string     `gorm:"column:request_status;not null"`
+	ReviewNote    *string    `gorm:"column:review_note"`
+	ReviewedAt    *time.Time `gorm:"column:reviewed_at"`
+	ClosedAt      *time.Time `gorm:"column:closed_at"`
+	CreatedAt     time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt     time.Time  `gorm:"autoUpdateTime"`
+}
+
+// TableName returns the table name for ImportJobModel
+func (ImportJobModel) TableName() string { return "import_jobs" }
+
+// ImportSourceModel is the GORM persistence model for the import_job_sources table
+type ImportSourceModel struct {
+	ID              int        `gorm:"primaryKey;autoIncrement"`
+	JobID           int        `gorm:"column:job_id;not null"`
+	SourceType      string     `gorm:"column:source_type;not null"`
+	SourceRef       string     `gorm:"column:source_ref;not null"`
+	Title           *string    `gorm:"column:title"`
+	URL             *string    `gorm:"column:url"`
+	Role            *string    `gorm:"column:role"`
+	DestinationType string     `gorm:"column:destination_type;not null"`
+	Status          string     `gorm:"column:status;not null"`
+	StatusDetail    *string    `gorm:"column:status_detail"`
+	ItemCount       int        `gorm:"column:item_count;not null"`
+	FetchedAt       *time.Time `gorm:"column:fetched_at"`
+	CreatedAt       time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt       time.Time  `gorm:"autoUpdateTime"`
+}
+
+// TableName returns the table name for ImportSourceModel
+func (ImportSourceModel) TableName() string { return "import_job_sources" }
+
+// ImportItemModel is the GORM persistence model for the import_job_items table.
+// LibraryContentID is read-only: list queries select the id of content whose
+// URL matches canonical_url into it, so "in library" costs no extra query.
+type ImportItemModel struct {
+	ID               int             `gorm:"primaryKey;autoIncrement"`
+	JobID            int             `gorm:"column:job_id;not null"`
+	SourceID         int             `gorm:"column:source_id;not null"`
+	ExternalID       string          `gorm:"column:external_id;not null"`
+	DestinationType  string          `gorm:"column:destination_type;not null"`
+	CanonicalURL     string          `gorm:"column:canonical_url;not null"`
+	Title            string          `gorm:"column:title;not null"`
+	Facts            json.RawMessage `gorm:"column:facts;type:jsonb"`
+	Position         int             `gorm:"column:position;not null"`
+	Excluded         bool            `gorm:"column:excluded;not null"`
+	Details          json.RawMessage `gorm:"column:details;type:jsonb"`
+	StatsFetchedAt   time.Time       `gorm:"column:stats_fetched_at;not null"`
+	ImportStatus     *string         `gorm:"column:import_status"`
+	ImportError      *string         `gorm:"column:import_error"`
+	ContentID        *int            `gorm:"column:content_id"`
+	ImportedAt       *time.Time      `gorm:"column:imported_at"`
+	LibraryContentID *int            `gorm:"column:library_content_id;->;-:migration"`
+	CreatedAt        time.Time       `gorm:"autoCreateTime"`
+	UpdatedAt        time.Time       `gorm:"autoUpdateTime"`
+}
+
+// TableName returns the table name for ImportItemModel
+func (ImportItemModel) TableName() string { return "import_job_items" }

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
@@ -495,4 +496,138 @@ func userTodoDomainToModel(t *domain.UserTodo) *UserTodoModel {
 		ListPosition:    t.ListPosition,
 		// CreatedAt and UpdatedAt are managed by GORM
 	}
+}
+
+// importJobModelToDomain converts a GORM ImportJobModel (without sources) to domain.ImportJob
+func importJobModelToDomain(m *ImportJobModel) *domain.ImportJob {
+	return &domain.ImportJob{
+		ID:            m.ID,
+		UserID:        m.UserID,
+		Name:          m.Name,
+		RequestStatus: domain.ImportRequestStatus(strings.ToUpper(m.RequestStatus)),
+		ReviewNote:    m.ReviewNote,
+		ReviewedAt:    m.ReviewedAt,
+		ClosedAt:      m.ClosedAt,
+		Sources:       []*domain.ImportSource{},
+		CreatedAt:     m.CreatedAt,
+		UpdatedAt:     m.UpdatedAt,
+	}
+}
+
+// importRequestStatusToDB is the stored (lowercase) form; an unset status means approved.
+func importRequestStatusToDB(st domain.ImportRequestStatus) string {
+	if st == "" {
+		st = domain.ImportRequestStatusApproved
+	}
+	return strings.ToLower(string(st))
+}
+
+// importSourceModelToDomain converts a GORM ImportSourceModel to domain.ImportSource
+func importSourceModelToDomain(m *ImportSourceModel) *domain.ImportSource {
+	s := &domain.ImportSource{
+		ID:              m.ID,
+		JobID:           m.JobID,
+		SourceType:      domain.ImportSourceType(strings.ToUpper(m.SourceType)),
+		SourceRef:       m.SourceRef,
+		Title:           m.Title,
+		URL:             m.URL,
+		DestinationType: contentTypeFromDBValue(m.DestinationType),
+		Status:          domain.ImportSourceStatus(strings.ToUpper(m.Status)),
+		StatusDetail:    m.StatusDetail,
+		ItemCount:       m.ItemCount,
+		FetchedAt:       m.FetchedAt,
+		CreatedAt:       m.CreatedAt,
+		UpdatedAt:       m.UpdatedAt,
+	}
+	if m.Role != nil {
+		role := domain.ImportPersonRole(strings.ToUpper(*m.Role))
+		s.Role = &role
+	}
+	return s
+}
+
+// importSourceDomainToModel converts a domain.ImportSource to its GORM model
+func importSourceDomainToModel(s *domain.ImportSource) *ImportSourceModel {
+	m := &ImportSourceModel{
+		ID:              s.ID,
+		JobID:           s.JobID,
+		SourceType:      strings.ToLower(string(s.SourceType)),
+		SourceRef:       s.SourceRef,
+		Title:           s.Title,
+		URL:             s.URL,
+		DestinationType: contentTypeToDBValue(s.DestinationType),
+		Status:          strings.ToLower(string(s.Status)),
+		StatusDetail:    s.StatusDetail,
+		ItemCount:       s.ItemCount,
+		FetchedAt:       s.FetchedAt,
+	}
+	if m.Status == "" {
+		m.Status = strings.ToLower(string(domain.ImportSourceStatusListing))
+	}
+	if s.Role != nil {
+		role := strings.ToLower(string(*s.Role))
+		m.Role = &role
+	}
+	return m
+}
+
+// importItemModelToDomain converts a GORM ImportItemModel to domain.ImportItem.
+// ContentID prefers the content the import created, then any content with the
+// same URL (LibraryContentID), so a row added by hand still links to it.
+func importItemModelToDomain(m *ImportItemModel) (*domain.ImportItem, error) {
+	it := &domain.ImportItem{
+		ID:              m.ID,
+		JobID:           m.JobID,
+		SourceID:        m.SourceID,
+		ExternalID:      m.ExternalID,
+		DestinationType: contentTypeFromDBValue(m.DestinationType),
+		CanonicalURL:    m.CanonicalURL,
+		Title:           m.Title,
+		Position:        m.Position,
+		Excluded:        m.Excluded,
+		StatsFetchedAt:  m.StatsFetchedAt,
+		ImportError:     m.ImportError,
+		ImportedAt:      m.ImportedAt,
+		ContentID:       m.ContentID,
+		InLibrary:       m.LibraryContentID != nil,
+	}
+	if len(m.Facts) > 0 {
+		if err := json.Unmarshal(m.Facts, &it.Facts); err != nil {
+			return nil, fmt.Errorf("failed to decode facts of import item %d: %w", m.ID, err)
+		}
+	}
+	if it.ContentID == nil {
+		it.ContentID = m.LibraryContentID
+	}
+	if m.ImportStatus != nil {
+		st := domain.ImportItemStatus(strings.ToUpper(*m.ImportStatus))
+		it.ImportStatus = &st
+	}
+	return it, nil
+}
+
+// importItemDomainToModel converts a staged candidate (row + details) to its GORM model
+func importItemDomainToModel(in *domain.ImportItemWithDetails) (*ImportItemModel, error) {
+	facts, err := json.Marshal(in.Item.Facts)
+	if err != nil {
+		return nil, err
+	}
+	details, err := json.Marshal(in.Details)
+	if err != nil {
+		return nil, err
+	}
+	it := in.Item
+	m := &ImportItemModel{
+		JobID:           it.JobID,
+		SourceID:        it.SourceID,
+		ExternalID:      it.ExternalID,
+		DestinationType: contentTypeToDBValue(it.DestinationType),
+		CanonicalURL:    it.CanonicalURL,
+		Title:           it.Title,
+		Facts:           facts,
+		Position:        it.Position,
+		Details:         details,
+		StatsFetchedAt:  it.StatsFetchedAt,
+	}
+	return m, nil
 }

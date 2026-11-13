@@ -30,6 +30,12 @@ type PerspectiveRepository interface {
 	// public perspectives are simply absent from the result map (count 0).
 	AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
 
+	// CountVisibleByContentIDs counts, for each given content ID, the
+	// perspectives viewerID may read: public ones plus their own (public only
+	// when viewerID is nil). One grouped query for any number of IDs; content
+	// with none visible is absent from the map (count 0).
+	CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error)
+
 	// FeelingStats computes count/average/stddev for perspectives carrying the
 	// given feeling (matched by emoji, optionally narrowed by label), scoped
 	// to one content ID or, when contentID is nil, every perspective.
