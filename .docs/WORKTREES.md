@@ -18,7 +18,19 @@ For routine isolated work (branch inspection, PR analysis, one-off experiments â
 .claude/worktrees/5
 ```
 
-**Claim order:** take the lowest-numbered slot that is free. A slot is free when it doesn't exist yet, or when it is clean, not `locked`, and its branch is finished (PR merged, remote branch gone). A finished slot holding only untracked files is still claimable (they survive a branch switch); mention them. Check for conflicts first: no open PR on its branch, and no overlap with another in-flight branch touching the same files. If a slot is not claimable, move to the next number. Create missing slots with `.claude/scripts/new-worktree.sh <branch> <n>`; reuse an existing one with `git -C .claude/worktrees/<n> checkout -b <new-branch> origin/main`, then `git branch --unset-upstream` so it can't push to `main`.
+**Home branches:** each numbered slot has a **home branch** `wt/<n>` (`wt/1` to `wt/5`) that exists only to give the slot somewhere to rest. It is never pushed, never gets a PR, and never merges; it just tracks `origin/main` (`git merge --ff-only origin/main` brings it up to date, or don't bother, since the next task branches from `origin/main` anyway). An idle slot sits on `wt/<n>`; a busy slot sits on a task branch. Name them `wt/<n>`, not a bare digit, which makes `git checkout 2` and pathspecs ambiguous.
+
+**Why a home branch:** a task branch stays checked out in its slot after the PR merges, so git refuses to delete it (`gh pr merge --delete-branch` skips the local delete, `git branch -d` fails) until something else is checked out there. Returning the slot to `wt/<n>` when the work ends frees the task branch, and gives the registry and `worktree-report.sh` a stable "this slot is idle" signal instead of guessing from PR state.
+
+**Claim order:** take the lowest-numbered slot that is free. A slot is free when it doesn't exist yet, or when it is on its home branch `wt/<n>` and clean. A slot still on a task branch is busy until that branch is finished (see **Finishing** below): this covers a legacy slot from before home branches existed. A free slot holding only untracked files is still claimable (they survive a branch switch); mention them. Check for conflicts first: no open PR on the slot's branch, and no overlap with another in-flight branch touching the same files. If a slot is not claimable, move to the next number.
+
+**Starting work:**
+- Missing slot: `.claude/scripts/new-worktree.sh wt/<n> <n>` creates it on its home branch (no upstream, push disabled), then `git -C .claude/worktrees/<n> checkout --no-track -b <type/name> origin/main`.
+- Existing free slot: `git -C .claude/worktrees/<n> checkout --no-track -b <type/name> origin/main`. `--no-track` means the task branch has no upstream, so a bare `git push` can't target `main`.
+
+**Finishing (PR merged or abandoned):** from the slot, `git checkout wt/<n>`, `git merge --ff-only origin/main`, then `git branch -D <task-branch>` (`-D`, because a squash merge hides that the branch's commits landed). Do this before leaving the slot; the next session finds it free. Never push `wt/<n>`: `new-worktree.sh` sets `branch.wt/<n>.pushRemote` to a remote that doesn't exist, so a bare `git push` fails loudly. An explicit `git push origin wt/<n>` still works, so don't type it.
+
+**Migrating a legacy slot:** a slot already on a task branch moves to its home branch when that work finishes: `git checkout --no-track -b wt/<n> origin/main` (or, if `wt/<n>` exists, `git checkout wt/<n>` then `git merge --ff-only origin/main`), then `git config branch.wt/<n>.pushRemote no_push` (a fresh `wt/<n>` made by hand has no push block until you set it), then delete the finished task branch. Do not move a slot off a live task branch just to adopt the convention.
 
 **Live claims:** a worktree (or the main checkout) can also be busy because another Claude session on this machine is writing to it. The agent registry records that in `LOCAL_AGENT_CHECKOUTS.md` at the main checkout root, and its PreToolUse hook denies writes there. Treat a claimed slot as busy; `node .claude/agent-registry/agent-registry.mjs status` lists the claims and drops dead ones. The hook judges by the shell's cwd: `git -C <worktree> â€¦` run from a claimed main checkout is still denied. `cd` into the worktree first.
 
@@ -31,17 +43,17 @@ For routine isolated work (branch inspection, PR analysis, one-off experiments â
    git worktree list
    git -C .claude/worktrees/<n> status
    ```
-   If it's clean (no uncommitted changes) and not flagged `locked` in `git worktree list`, it's safe to switch its branch and reuse it.
+   If it's on its home branch `wt/<n>`, clean (no uncommitted changes) and not flagged `locked` in `git worktree list`, it's free: branch from `origin/main` as in **Starting work**. If it's clean but on a task branch, it's busy until that work is finished (**Finishing**).
 2. **If it has uncommitted changes or looks mid-task**, don't silently discard that state â€” surface what's in it and ask before switching its branch.
 3. **If all 5 are busy**, use a named overflow worktree (see above) rather than freeing one of them.
 4. This numbered set is separate from worktrees created by other flows (e.g. `EnterWorktree`-spawned random-named directories, agent `isolation: worktree` (`agent-<hash>`), or a `superpowers:using-git-worktrees` isolation worktree for an in-flight feature). Don't reuse those as slots, and don't treat them as ownerless either: **whoever created one removes it when the task ends** (push or discard its work first). `bash .claude/scripts/worktree-report.sh` lists what is removable.
 
-**Why:** keeps worktree usage bounded and predictable instead of accumulating one-off directories under `.claude/worktrees/` indefinitely.
+**Why a fixed set:** keeps worktree usage bounded and predictable instead of accumulating one-off directories under `.claude/worktrees/` indefinitely.
 
 ## Guard and cleanup
 
 - **Guard:** `.claude/hooks/worktree-guard.sh` (PreToolUse, Bash) denies `git worktree add` unless the path is under the main checkout's `.claude/worktrees/`: no scratchpad, `/tmp`, sibling folder, `..` escape, or nesting inside another worktree. It only fires for commands that go through Bash. Worktrees the harness makes itself (agent `isolation: worktree`, `EnterWorktree`) are invisible to it. Test: `bash .claude/hooks/test-worktree-guard.sh`.
-- **Report:** `bash .claude/scripts/worktree-report.sh` (read-only) groups every worktree as REMOVABLE, MERGED-DIRTY, NO-PR, OPEN-PR or OUT-OF-PLACE and prints the removal commands for the safe group, one per line. The `monthly-maintenance` skill runs it (step 1b).
+- **Report:** `bash .claude/scripts/worktree-report.sh` (read-only) groups every worktree as REMOVABLE, MERGED-DIRTY, NO-PR, OPEN-PR, IDLE-SLOT (a clean numbered slot resting on its `wt/<n>` home branch) or OUT-OF-PLACE and prints the removal commands for the safe group, one per line. The `monthly-maintenance` skill runs it (step 1b).
 - **Before removing a NO-PR or MERGED-DIRTY worktree,** look for work that exists nowhere else: push unpushed commits to `<branch>-followup`, then remove it. Squash merges hide whether a branch's commits were merged, so compare the tip with the PR's head commit rather than trusting `git branch --merged`.
 
 ## Worktrees on an existing branch: use the script

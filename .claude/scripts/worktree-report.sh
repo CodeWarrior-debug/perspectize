@@ -8,6 +8,8 @@
 #   NO-PR         no PR found (or tip has commits beyond the PR head): may hold
 #                 unpushed work, push it to a <branch>-followup before removing
 #   OPEN-PR       keep
+#   IDLE-SLOT     a numbered slot resting on its home branch wt/<n>, clean: free to claim
+#                 (not a cleanup candidate; a wt/<n> that is dirty or ahead lands in NO-PR)
 #   OUT-OF-PLACE  not under <main checkout>/.claude/worktrees/ (scratchpad, /tmp,
 #                 sibling folder): breaks the .docs/WORKTREES.md convention
 #
@@ -20,7 +22,7 @@ main_root=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
 git -C "$main_root" fetch -q origin main 2>/dev/null
 allowed="$main_root/.claude/worktrees/"
 
-removable=(); merged_dirty=(); no_pr=(); open_pr=(); out_of_place=()
+removable=(); merged_dirty=(); no_pr=(); open_pr=(); out_of_place=(); idle=()
 while IFS=$'\t' read -r path branch; do
   [ "$path" = "$main_root" ] && continue
   dirty=$(git -C "$path" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
@@ -29,6 +31,16 @@ while IFS=$'\t' read -r path branch; do
     *) out_of_place+=("$path [${branch:-detached}] dirty=$dirty"); continue ;;
   esac
   [ -n "$branch" ] || { no_pr+=("$path (detached HEAD) dirty=$dirty"); continue; }
+  case "$branch" in
+    wt/*)
+      # A slot home branch never has a PR. Idle = clean and nothing beyond origin/main.
+      if [ "$dirty" = 0 ] && git merge-base --is-ancestor "$(git -C "$path" rev-parse HEAD)" origin/main 2>/dev/null; then
+        idle+=("$path [$branch]")
+      else
+        no_pr+=("$path [$branch] home branch is not idle: dirty=$dirty ahead=$(git rev-list --count "origin/main..$branch" 2>/dev/null)")
+      fi
+      continue ;;
+  esac
   pr=$(gh pr list --head "$branch" --state all --json number,state,headRefOid \
         --jq '.[0] | "\(.number) \(.state) \(.headRefOid)"' 2>/dev/null)
   num=${pr%% *}; rest=${pr#* }; state=${rest%% *}; head=${rest#* }
@@ -63,6 +75,8 @@ section "NO-PR: check for unpushed commits" "${#no_pr[@]}"
 for r in "${no_pr[@]}"; do echo "$r"; done
 section "OPEN-PR: keep" "${#open_pr[@]}"
 for r in "${open_pr[@]}"; do echo "$r"; done
+section "IDLE-SLOT: on its wt/<n> home branch, clean: free to claim" "${#idle[@]}"
+for r in "${idle[@]}"; do echo "$r"; done
 section "OUT-OF-PLACE: not under $allowed" "${#out_of_place[@]}"
 for r in "${out_of_place[@]}"; do echo "$r"; done
 exit 0
