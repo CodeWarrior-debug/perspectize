@@ -1,6 +1,6 @@
 # Web page roles, websites and blog import from a file — Design
 
-Status: **proposal, not reviewed.** Request (2026-11-12): bring Grandpa's WordPress blog (jordans-journey.com, 1,077 posts) into Perspectize through the import staging sheet. The content type is a **web page**, not a new "blog post" type. A web page carries **one or more roles** (blog post is the first), and a web page **may** be a child of a **website**, but does not have to be.
+Status: **decisions D12–D18 confirmed as proposed (2026-11-13); spec itself still awaiting PR review.** Request (2026-11-12): bring Grandpa's WordPress blog (jordans-journey.com, 1,077 posts) into Perspectize through the import staging sheet. The content type is a **web page**, not a new "blog post" type. A web page carries **one or more roles** (blog post is the first), and a web page **may** be a child of a **website**, but does not have to be.
 
 Extends: [web page content type design](2026-11-11-web-page-content-type-design.md) (`WEB_PAGE`, `previewWebPage`, §9 page types) and the [import staging plan](../plans/2026-10-27-import-staging-plan.md). Plan: [2026-11-12-web-page-website-and-blog-import-plan.md](../plans/2026-11-12-web-page-website-and-blog-import-plan.md).
 
@@ -90,9 +90,9 @@ The job is `APPROVED`, the source is `READY` with `fetchedAt` = now and `itemCou
 | Pick and import rows on the sheet | human | Needs the `/import` page: today only on the unmerged `feature/import-staging-frontend`. |
 | Frontend PR: bare-host detection, "File under" checkbox, Part of / Pages lists, Roles and Words columns | review + merge | After the import sheet lands. |
 
-## 5. Decisions to confirm
+## 5. Decisions (confirmed 2026-11-13, all as proposed)
 
-| # | Question | Proposed default |
+| # | Question | Decision |
 |---|---|---|
 | D12 | Rename `pageTypes` to `webPageRoles` (§1)? | Yes, now, before anything is built. |
 | D13 | Is a website its own content type (`WEBSITE`), or only a host name shown on pages? | Own type, because it needs perspectives and a category like any content, and a parent must be a row. |
