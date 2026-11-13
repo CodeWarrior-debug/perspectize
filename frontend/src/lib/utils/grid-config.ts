@@ -906,3 +906,15 @@ export function itemColumnHeader(typeFilter: string | undefined): string {
 	if (isBookOnlyTypeFilter(typeFilter)) return 'Book';
 	return 'Item';
 }
+
+/**
+ * The grid API only if its grid is still alive, else null. The cardMode breakpoint and the
+ * error state destroy the grid while effects and click handlers still hold the old API, and
+ * calling it then logs "Grid API function X() cannot be called as the grid has been destroyed"
+ * (and applyColumnState throws). Use at the call site instead of a bare `!api` check.
+ */
+export function liveGridApi<T extends { isDestroyed(): boolean }>(
+	api: T | null | undefined,
+): T | null {
+	return api && !api.isDestroyed() ? api : null;
+}
