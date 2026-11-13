@@ -4,11 +4,11 @@
 -- ON DELETE SET NULL: removing an import never removes the content it created.
 -- No index: nothing filters content by import yet; add one when a query does.
 --
--- Numbering: 000033 is provisional (open PRs may claim it too). Rename to the
+-- Numbering: 000036 is provisional (open PRs may claim it too). Rename to the
 -- next free number on main before merging (backend/CLAUDE.md -> Migrations).
 --
 -- Idempotent: safe on a fresh DB or one already patched out of band. Apply by
--- hand per environment, after 000032 (import_jobs must exist).
+-- hand per environment, after 000035 (import_jobs must exist).
 
 ALTER TABLE content ADD COLUMN IF NOT EXISTS import_job_id integer NULL;
 

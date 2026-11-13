@@ -22,7 +22,7 @@
 ## Global Constraints
 
 - Migrations are written and reviewed only. **Never** run `make migrate-up/down` or `migrate ... up/down` (`DATABASE_URL` is the shared Neon DB). Local verification uses a throwaway Postgres (`testdb`) or the demo stack's Postgres on :5434.
-- Next free migration numbers on `main` are `000033` (#654) and `000034` (#655). They are provisional; rename to the next free number on `main` as the last step before merge. Note `feature/audio-track-content-type` also holds 32–35 and will need to renumber.
+- Next free migration numbers on `main` are `000036` (#654) and `000037` (#655). They are provisional; rename to the next free number on `main` as the last step before merge. Note `feature/audio-track-content-type` holds 38–41 after its renumbering.
 - Idempotent DDL (`ADD COLUMN IF NOT EXISTS`, `DROP ... IF EXISTS`); verify up → up → down → up on a local Postgres.
 - Every DB-touching change carries a query-count test (`internal/perf/querycount`) and, for new GraphQL operations, a round-trip count in `backend/test/roundtrips/import_test.go`. Frontend: cache-contract tests (`imports-cache-contract.test.ts` style).
 - Rating-style numeric fields use `valid_integer_range`; none are added here.
@@ -51,7 +51,7 @@
 - Modify `backend/internal/core/services/content_service.go`: read the import job id from context on create.
 - Modify ports `ports/services/import_service.go`, `ports/repositories/import_job_repository.go`, content repository mapper/model (`gorm_models.go`, `gorm_mappers.go`).
 - Modify `backend/schema.graphql`, `backend/gqlgen.yml`, `resolvers/import.resolvers.go`, `resolvers/content.resolvers.go`, `dataloader/dataloader.go`.
-- Create `backend/migrations/000033_add_content_import_job_id.{up,down}.sql`, `000034_add_import_job_description.{up,down}.sql`.
+- Create `backend/migrations/000036_add_content_import_job_id.{up,down}.sql`, `000037_add_import_job_description.{up,down}.sql`.
 - Tests under `backend/test/services/`, `backend/test/roundtrips/`, `backend/internal/adapters/repositories/postgres/gorm_import_job_integration_test.go`, `dataloader_test.go`.
 
 **Frontend (#620's branch):**
@@ -104,7 +104,7 @@
 ## Task 2: Record the import a content row came from (#654, backend)
 
 **Files:**
-- Create: `backend/migrations/000033_add_content_import_job_id.up.sql`, `.down.sql`
+- Create: `backend/migrations/000036_add_content_import_job_id.up.sql`, `.down.sql`
 - Modify: `backend/internal/core/domain/` (Content gets `ImportJobID *int`), `gorm_models.go`, `gorm_mappers.go`, `backend/internal/core/services/content_service.go`, `import_service.go` (`importOne`), `ports/repositories/import_job_repository.go`, `gorm_import_job_repository.go`, `backend/schema.graphql`, `gqlgen.yml`, `dataloader/dataloader.go`, `resolvers/content.resolvers.go`
 - Test: `backend/test/services/content_service_test.go` (or the existing content create test file), `backend/internal/adapters/repositories/postgres/gorm_import_job_integration_test.go`, `backend/internal/adapters/graphql/dataloader/dataloader_test.go`, `backend/test/roundtrips/import_test.go`
 
@@ -128,7 +128,7 @@
 ## Task 3: Request description and optional sources (#655, backend)
 
 **Files:**
-- Create: `backend/migrations/000034_add_import_job_description.up.sql`, `.down.sql`
+- Create: `backend/migrations/000037_add_import_job_description.up.sql`, `.down.sql`
 - Modify: `domain/import_job.go` (`ImportJob.Description *string`, `CreateImportJobInput.Description *string`), `gorm_models.go`, `gorm_mappers.go`, `gorm_import_job_repository.go`, `import_service.go` (`CreateImportJob`, `ReviewImportJob`, new `UpdateImportJobDescription`), ports, `schema.graphql`, `resolvers/import.resolvers.go`
 - Test: `backend/test/services/import_service_test.go`, `gorm_import_job_integration_test.go`, `backend/test/roundtrips/import_test.go`
 
