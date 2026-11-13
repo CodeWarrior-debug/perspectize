@@ -29,7 +29,7 @@ const maxResponseBytes = 5 << 20
 
 // Fields is the exact `fields=` filter requested on every search.json and
 // trending.json call, shared with tests so they assert against the same value.
-const Fields = "key,title,author_name,author_key,cover_i,first_publish_year,number_of_pages_median,subject,ratings_average,ratings_count,edition_count"
+const Fields = "key,title,author_name,author_key,cover_i,first_publish_year,number_of_pages_median,subject,ratings_average,ratings_count,edition_count,want_to_read_count,currently_reading_count,already_read_count,readinglog_count"
 
 // searchLimit is how many results are requested per page.
 const searchLimit = 25
@@ -122,6 +122,11 @@ type olWork struct {
 	RatingsAverage      *float64 `json:"ratings_average"`
 	RatingsCount        *int     `json:"ratings_count"`
 	EditionCount        *int     `json:"edition_count"`
+	// Reading-log counts: pointers so an omitted field stays nil (missing is not zero).
+	WantToReadCount       *int `json:"want_to_read_count"`
+	CurrentlyReadingCount *int `json:"currently_reading_count"`
+	AlreadyReadCount      *int `json:"already_read_count"`
+	ReadingLogCount       *int `json:"readinglog_count"`
 }
 
 // worksPrefix is stripped from a work's "key" field (e.g. "/works/OL23166W").
@@ -144,6 +149,11 @@ func (w olWork) toSearchResult() services.BookSearchResult {
 		RatingsAverage:   w.RatingsAverage,
 		RatingsCount:     w.RatingsCount,
 		EditionCount:     w.EditionCount,
+
+		WantToReadCount:       w.WantToReadCount,
+		CurrentlyReadingCount: w.CurrentlyReadingCount,
+		AlreadyReadCount:      w.AlreadyReadCount,
+		ReadingLogCount:       w.ReadingLogCount,
 	}
 }
 

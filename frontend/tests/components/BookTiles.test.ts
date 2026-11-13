@@ -74,3 +74,45 @@ describe('BookTiles', () => {
 		expect(container.textContent).not.toContain('undefined');
 	});
 });
+
+describe('BookTiles reading log', () => {
+	const withLog = (book: Record<string, unknown>): BookRow => ({ contentType: 'BOOK', book: { title: 'X', ...book } });
+
+	it('shows the three counts and the caveat with the as-of date', () => {
+		const { container } = render(BookTiles, {
+			props: {
+				row: withLog({
+					wantToReadCount: 1189,
+					currentlyReadingCount: 79,
+					alreadyReadCount: 153,
+					readingLogFetchedAt: '2026-11-12T12:00:00Z',
+				}),
+			},
+		});
+		expect(tileValue('Want to read')).toBe('1,189');
+		expect(tileValue('Reading now')).toBe('79');
+		expect(tileValue('Have read')).toBe('153');
+		expect(container.textContent).toContain('Open Library users only, not readers in general');
+		expect(container.textContent).toContain('as of Nov 12, 2026');
+	});
+
+	it('shows a real 0 as 0', () => {
+		render(BookTiles, {
+			props: { row: withLog({ wantToReadCount: 5, currentlyReadingCount: 0, alreadyReadCount: 0 }) },
+		});
+		expect(tileValue('Reading now')).toBe('0');
+	});
+
+	it('shows dashes and no caveat for a row stored before the counts existed', () => {
+		const { container } = render(BookTiles, { props: { row: eastOfEden } });
+		expect(tileValue('Want to read')).toBe('—');
+		expect(tileValue('Have read')).toBe('—');
+		expect(container.textContent).not.toContain('Open Library users only');
+	});
+
+	it('omits "as of" when counts exist without a stored time', () => {
+		const { container } = render(BookTiles, { props: { row: withLog({ wantToReadCount: 2 }) } });
+		expect(container.textContent).toContain('Open Library users only');
+		expect(container.textContent).not.toContain('as of');
+	});
+});

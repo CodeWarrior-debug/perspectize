@@ -32,6 +32,13 @@ type BookSearchResult struct {
 	RatingsCount *int
 	// EditionCount is nil when Open Library has no value.
 	EditionCount *int
+	// Reading-log counts are Open Library users' shelves only, not readers in
+	// general. Each is nil when Open Library omits it (missing is not zero).
+	WantToReadCount       *int
+	CurrentlyReadingCount *int
+	AlreadyReadCount      *int
+	// ReadingLogCount is Open Library's own total across the shelves.
+	ReadingLogCount *int
 }
 
 // BookSearchPage is one page of Open Library work search/trending results.

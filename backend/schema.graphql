@@ -162,6 +162,13 @@ type BookSearchResult {
   ratingsAverage: Float
   ratingsCount: Int
   editionCount: Int
+  # Open Library reading-log counts. They count Open Library users only, not readers in general;
+  # each is null when Open Library omits it (null is not zero).
+  wantToReadCount: Int
+  currentlyReadingCount: Int
+  alreadyReadCount: Int
+  # Open Library's own total across the shelves
+  readingLogCount: Int
   # Canonical content URL (https://openlibrary.org/works/<id>) — pass to createContentFromBook
   url: String!
 }

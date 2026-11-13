@@ -209,6 +209,7 @@ describe('column-picker registry', () => {
 			'pages',
 			'rating',
 			'editions',
+			'readers',
 			'budget',
 			'votes',
 			'collection',
@@ -243,9 +244,9 @@ describe('column-picker registry', () => {
 		expect(togglableColIds(false)).toEqual(DATA_COLUMNS.map((c) => c.colId));
 	});
 
-	it('togglableColIds(true) returns all 33 columns', () => {
+	it('togglableColIds(true) returns all 34 columns', () => {
 		const ids = togglableColIds(true);
-		expect(ids).toHaveLength(33);
+		expect(ids).toHaveLength(34);
 		expect(ids).toEqual([...DATA_COLUMNS.map((c) => c.colId), ...INTERNAL_COLUMNS.map((c) => c.colId)]);
 	});
 

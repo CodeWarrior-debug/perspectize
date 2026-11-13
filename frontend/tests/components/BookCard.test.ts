@@ -18,6 +18,10 @@ const eastOfEden: BookSearchResult = {
 	ratingsAverage: 4.1,
 	ratingsCount: 100,
 	editionCount: 65,
+	wantToReadCount: 1189,
+	currentlyReadingCount: 79,
+	alreadyReadCount: 153,
+	readingLogCount: 1421,
 	url: EAST_OF_EDEN_URL,
 };
 
@@ -33,6 +37,10 @@ const brainscan: BookSearchResult = {
 	ratingsAverage: null,
 	ratingsCount: null,
 	editionCount: 1,
+	wantToReadCount: null,
+	currentlyReadingCount: null,
+	alreadyReadCount: null,
+	readingLogCount: null,
 	url: 'https://openlibrary.org/works/OL99W',
 };
 
@@ -119,5 +127,35 @@ describe('BookCard', () => {
 		const { onAdd } = renderCard(eastOfEden);
 		await fireEvent.click(screen.getByRole('button', { name: 'Add to Perspectize' }));
 		expect(onAdd).toHaveBeenCalledWith(EAST_OF_EDEN_URL);
+	});
+});
+
+describe('BookCard reading log', () => {
+	it('shows the breakdown and says it is Open Library users only', () => {
+		renderCard(eastOfEden);
+		const line = screen.getByText('1,189 want to read · 79 reading now · 153 have read on Open Library');
+		expect(line).toHaveAttribute('title', 'Open Library users only, not readers in general');
+	});
+
+	it('keeps a real 0 and leaves a missing count out', () => {
+		renderCard({
+			...eastOfEden,
+			wantToReadCount: 3,
+			currentlyReadingCount: 0,
+			alreadyReadCount: null,
+			readingLogCount: null,
+		});
+		expect(screen.getByText('3 want to read · 0 reading now on Open Library')).toBeInTheDocument();
+	});
+
+	it('says there is no data, never 0, when Open Library gave no counts', () => {
+		renderCard(brainscan);
+		expect(screen.getByText('No Open Library reading-log data')).toBeInTheDocument();
+		expect(screen.queryByText(/want to read/)).toBeNull();
+	});
+
+	it('falls back to the shelved total when only the total is known', () => {
+		renderCard({ ...brainscan, readingLogCount: 1421 });
+		expect(screen.getByText('1,421 shelved on Open Library')).toBeInTheDocument();
 	});
 });

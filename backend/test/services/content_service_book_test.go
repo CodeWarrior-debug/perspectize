@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -762,4 +763,85 @@ func TestResolveBookISBN_NotFound(t *testing.T) {
 	svc := services.NewContentService(&mockContentRepository{}, nil, nil, services.WithBookSearch(&mockBookSearchClient{}), services.WithBookISBN(bi))
 	_, err := svc.ResolveBookISBN(context.Background(), "9780434740024")
 	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+// --- Reading-log snapshot (Open Library users' shelves) ---
+
+func fixedClock(ts string) services.ContentServiceOption {
+	at, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		panic(err)
+	}
+	return services.WithClock(func() time.Time { return at })
+}
+
+// TestCreateFromBook_StoresReadingLogSnapshot: the four counts and the fetch time
+// are stored in the response JSONB, taken from the same single search call.
+func TestCreateFromBook_StoresReadingLogSnapshot(t *testing.T) {
+	r := eastOfEden()
+	r.WantToReadCount, r.CurrentlyReadingCount, r.AlreadyReadCount, r.ReadingLogCount =
+		intPtr(1189), intPtr(79), intPtr(153), intPtr(1421)
+	bs := singleResultSearch(t, "OL23166W", r)
+	var saved *domain.Content
+	repo := &mockContentRepository{
+		getByURLFn: func(ctx context.Context, url string) (*domain.Content, error) { return nil, domain.ErrNotFound },
+		getOrCreateByURLFn: func(ctx context.Context, c *domain.Content, refresh bool) (*domain.Content, bool, error) {
+			saved = c
+			return c, false, nil
+		},
+	}
+	svc := services.NewContentService(repo, nil, nil, services.WithBookSearch(bs), fixedClock("2026-11-12T09:30:00Z"))
+
+	_, err := svc.CreateFromBook(context.Background(), "https://openlibrary.org/works/OL23166W", 1)
+	require.NoError(t, err)
+
+	var raw map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(saved.Response, &raw))
+	assert.JSONEq(t, `1189`, string(raw["wantToReadCount"]))
+	assert.JSONEq(t, `79`, string(raw["currentlyReadingCount"]))
+	assert.JSONEq(t, `153`, string(raw["alreadyReadCount"]))
+	assert.JSONEq(t, `1421`, string(raw["readingLogCount"]))
+	assert.JSONEq(t, `"2026-11-12T09:30:00Z"`, string(raw["readingLogFetchedAt"]))
+	assert.Equal(t, 1, bs.calls, "counts add no Open Library call: the one search is the only fetch")
+}
+
+// TestCreateFromBook_ReadingLogMissingIsNullZeroIsZero: an omitted count is stored
+// as JSON null and an explicit 0 stays 0, so the UI can tell them apart.
+func TestCreateFromBook_ReadingLogMissingIsNullZeroIsZero(t *testing.T) {
+	r := eastOfEden()
+	r.WantToReadCount = intPtr(3)
+	r.CurrentlyReadingCount = intPtr(0)
+	raw := createdBookResponse(t, r)
+
+	assert.JSONEq(t, `3`, string(raw["wantToReadCount"]))
+	assert.JSONEq(t, `0`, string(raw["currentlyReadingCount"]))
+	assert.JSONEq(t, `null`, string(raw["alreadyReadCount"]))
+	assert.JSONEq(t, `null`, string(raw["readingLogCount"]))
+}
+
+// TestUpdateSourceData_BookRefreshesReadingLogSnapshot: "Update source data"
+// replaces the counts and bumps the as-of time; still one search, one DB read and one write.
+func TestUpdateSourceData_BookRefreshesReadingLogSnapshot(t *testing.T) {
+	row := bookRow(`{"workKey":"OL23166W","title":"East of Eden","authors":[],` +
+		`"wantToReadCount":1000,"readingLogFetchedAt":"2026-11-01T00:00:00Z"}`)
+	r := eastOfEden()
+	r.WantToReadCount = intPtr(1189)
+	bs := singleResultSearch(t, "OL23166W", r)
+	bw := &mockBookWorkClient{fetchFn: func(ctx context.Context, workKey string) (*portservices.BookWork, error) {
+		return &portservices.BookWork{RelatedWorks: []portservices.BookRelatedWork{}}, nil
+	}}
+	w := &metadataWrite{}
+	svc := services.NewContentService(bookRefreshRepo(row, w), nil, nil,
+		services.WithBookSearch(bs), services.WithBookWork(bw), fixedClock("2026-11-12T10:00:00Z"))
+
+	_, err := svc.UpdateSourceData(context.Background(), 9)
+	require.NoError(t, err)
+
+	raw := rawBookResponseOf(t, &domain.Content{Response: w.response})
+	assert.JSONEq(t, `1189`, string(raw["wantToReadCount"]))
+	assert.JSONEq(t, `null`, string(raw["readingLogCount"]), "a count Open Library no longer reports is cleared, not carried over")
+	assert.JSONEq(t, `"2026-11-12T10:00:00Z"`, string(raw["readingLogFetchedAt"]))
+	assert.Equal(t, 1, bs.calls)
+	assert.Equal(t, 1, w.getByIDCalls)
+	assert.Equal(t, 1, w.calls)
 }

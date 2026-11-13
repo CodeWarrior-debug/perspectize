@@ -44,9 +44,10 @@ func setupBookSearchServer(search *stubBookSearch) *httptest.Server {
 
 func TestBookSearch_MapsResultAndCanonicalURL(t *testing.T) {
 	year, cover, pages, rating, count, editions := 1937, 258027, 310, 4.3, 1200, 50
+	want, reading, read, total := 1189, 0, 153, 1342 // reading is a real 0, not missing
 	search := &stubBookSearch{page: &portservices.BookSearchPage{
 		Items: []portservices.BookSearchResult{
-			{WorkKey: "OL23166W", Title: "The Hobbit", AuthorName: []string{"J.R.R. Tolkien"}, CoverID: &cover, FirstPublishYear: &year, PageCountMedian: &pages, Subjects: []string{"Fantasy"}, RatingsAverage: &rating, RatingsCount: &count, EditionCount: &editions},
+			{WorkKey: "OL23166W", Title: "The Hobbit", AuthorName: []string{"J.R.R. Tolkien"}, CoverID: &cover, FirstPublishYear: &year, PageCountMedian: &pages, Subjects: []string{"Fantasy"}, RatingsAverage: &rating, RatingsCount: &count, EditionCount: &editions, WantToReadCount: &want, CurrentlyReadingCount: &reading, AlreadyReadCount: &read, ReadingLogCount: &total},
 			{WorkKey: "OL1W", Title: "Bare"},
 		},
 		Page: 2, TotalPages: 5, TotalResults: 93,
@@ -54,15 +55,15 @@ func TestBookSearch_MapsResultAndCanonicalURL(t *testing.T) {
 	server := setupBookSearchServer(search)
 	defer server.Close()
 
-	resp := executeGraphQL(t, server, `{ bookSearch(query: "hobbit", page: 2) { items { workKey title authorName coverId firstPublishYear pageCountMedian subjects ratingsAverage ratingsCount editionCount url } page totalPages totalResults } }`)
+	resp := executeGraphQL(t, server, `{ bookSearch(query: "hobbit", page: 2) { items { workKey title authorName coverId firstPublishYear pageCountMedian subjects ratingsAverage ratingsCount editionCount wantToReadCount currentlyReadingCount alreadyReadCount readingLogCount url } page totalPages totalResults } }`)
 	require.Empty(t, resp.Errors)
 	assert.Equal(t, "hobbit", search.query)
 	assert.Equal(t, 2, search.pageN)
 
 	assert.JSONEq(t, `{"bookSearch": {
 		"items": [
-			{"workKey": "OL23166W", "title": "The Hobbit", "authorName": ["J.R.R. Tolkien"], "coverId": 258027, "firstPublishYear": 1937, "pageCountMedian": 310, "subjects": ["Fantasy"], "ratingsAverage": 4.3, "ratingsCount": 1200, "editionCount": 50, "url": "https://openlibrary.org/works/OL23166W"},
-			{"workKey": "OL1W", "title": "Bare", "authorName": [], "coverId": null, "firstPublishYear": null, "pageCountMedian": null, "subjects": [], "ratingsAverage": null, "ratingsCount": null, "editionCount": null, "url": "https://openlibrary.org/works/OL1W"}
+			{"workKey": "OL23166W", "title": "The Hobbit", "authorName": ["J.R.R. Tolkien"], "coverId": 258027, "firstPublishYear": 1937, "pageCountMedian": 310, "subjects": ["Fantasy"], "ratingsAverage": 4.3, "ratingsCount": 1200, "editionCount": 50, "wantToReadCount": 1189, "currentlyReadingCount": 0, "alreadyReadCount": 153, "readingLogCount": 1342, "url": "https://openlibrary.org/works/OL23166W"},
+			{"workKey": "OL1W", "title": "Bare", "authorName": [], "coverId": null, "firstPublishYear": null, "pageCountMedian": null, "subjects": [], "ratingsAverage": null, "ratingsCount": null, "editionCount": null, "wantToReadCount": null, "currentlyReadingCount": null, "alreadyReadCount": null, "readingLogCount": null, "url": "https://openlibrary.org/works/OL1W"}
 		],
 		"page": 2, "totalPages": 5, "totalResults": 93
 	}}`, string(resp.Data))

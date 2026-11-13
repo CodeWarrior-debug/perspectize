@@ -26,6 +26,10 @@ const eastOfEden: BookSearchResult = {
 	ratingsAverage: 4.1,
 	ratingsCount: 100,
 	editionCount: 65,
+	wantToReadCount: null,
+	currentlyReadingCount: null,
+	alreadyReadCount: null,
+	readingLogCount: null,
 	url: 'https://openlibrary.org/works/OL23166W',
 };
 

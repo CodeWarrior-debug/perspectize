@@ -236,3 +236,62 @@ func TestClient_TransportErrorSanitized(t *testing.T) {
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "http://")
 }
+
+// TestClient_RequestsReadingLogFields: every search and trending call asks for
+// the four reading-log counts, on the same single request (no extra HTTP call).
+func TestClient_RequestsReadingLogFields(t *testing.T) {
+	calls := 0
+	var gotFields string
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		gotFields = r.URL.Query().Get("fields")
+		serveFixture(t, "search_reading_log.json")(w, r)
+	})
+	_, err := c.SearchBooks(context.Background(), "east of eden", 1)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, calls, "reading-log counts ride the existing search call")
+	fields := strings.Split(gotFields, ",")
+	for _, f := range []string{"want_to_read_count", "currently_reading_count", "already_read_count", "readinglog_count"} {
+		assert.Contains(t, fields, f)
+	}
+}
+
+// TestClient_SearchBooks_ReadingLogNilVersusZero: a count Open Library reports
+// as 0 stays a pointer to 0; a count it omits stays nil.
+func TestClient_SearchBooks_ReadingLogNilVersusZero(t *testing.T) {
+	c := newTestClient(t, serveFixture(t, "search_reading_log.json"))
+	page, err := c.SearchBooks(context.Background(), "x", 1)
+	require.NoError(t, err)
+	require.Len(t, page.Items, 3)
+
+	full := page.Items[0]
+	require.NotNil(t, full.WantToReadCount)
+	require.NotNil(t, full.CurrentlyReadingCount)
+	require.NotNil(t, full.AlreadyReadCount)
+	require.NotNil(t, full.ReadingLogCount)
+	assert.Equal(t, []int{1189, 79, 153, 1421},
+		[]int{*full.WantToReadCount, *full.CurrentlyReadingCount, *full.AlreadyReadCount, *full.ReadingLogCount})
+
+	zero := page.Items[1]
+	require.NotNil(t, zero.CurrentlyReadingCount, "an explicit 0 is a real value")
+	assert.Equal(t, 0, *zero.CurrentlyReadingCount)
+	require.NotNil(t, zero.AlreadyReadCount)
+	assert.Equal(t, 0, *zero.AlreadyReadCount)
+
+	missing := page.Items[2]
+	assert.Nil(t, missing.WantToReadCount)
+	assert.Nil(t, missing.CurrentlyReadingCount)
+	assert.Nil(t, missing.AlreadyReadCount)
+	assert.Nil(t, missing.ReadingLogCount)
+}
+
+// TestClient_TrendingBooks_ReadingLogMissingIsNil: trending shares the work shape, so
+// an old trending fixture with no reading-log fields maps to nil, not 0.
+func TestClient_TrendingBooks_ReadingLogMissingIsNil(t *testing.T) {
+	c := newTestClient(t, serveFixture(t, "trending_weekly.json"))
+	page, err := c.TrendingBooks(context.Background(), domain.TrendingWindowWeek, 1)
+	require.NoError(t, err)
+	require.NotEmpty(t, page.Items)
+	assert.Nil(t, page.Items[0].WantToReadCount)
+}

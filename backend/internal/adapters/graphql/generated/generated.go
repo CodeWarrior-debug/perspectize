@@ -58,17 +58,21 @@ type ComplexityRoot struct {
 	}
 
 	BookSearchResult struct {
-		AuthorName       func(childComplexity int) int
-		CoverID          func(childComplexity int) int
-		EditionCount     func(childComplexity int) int
-		FirstPublishYear func(childComplexity int) int
-		PageCountMedian  func(childComplexity int) int
-		RatingsAverage   func(childComplexity int) int
-		RatingsCount     func(childComplexity int) int
-		Subjects         func(childComplexity int) int
-		Title            func(childComplexity int) int
-		URL              func(childComplexity int) int
-		WorkKey          func(childComplexity int) int
+		AlreadyReadCount      func(childComplexity int) int
+		AuthorName            func(childComplexity int) int
+		CoverID               func(childComplexity int) int
+		CurrentlyReadingCount func(childComplexity int) int
+		EditionCount          func(childComplexity int) int
+		FirstPublishYear      func(childComplexity int) int
+		PageCountMedian       func(childComplexity int) int
+		RatingsAverage        func(childComplexity int) int
+		RatingsCount          func(childComplexity int) int
+		ReadingLogCount       func(childComplexity int) int
+		Subjects              func(childComplexity int) int
+		Title                 func(childComplexity int) int
+		URL                   func(childComplexity int) int
+		WantToReadCount       func(childComplexity int) int
+		WorkKey               func(childComplexity int) int
 	}
 
 	CategorizedRating struct {
@@ -770,6 +774,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.BookSearchPage.TotalResults(childComplexity), true
 
+	case "BookSearchResult.alreadyReadCount":
+		if e.ComplexityRoot.BookSearchResult.AlreadyReadCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.AlreadyReadCount(childComplexity), true
 	case "BookSearchResult.authorName":
 		if e.ComplexityRoot.BookSearchResult.AuthorName == nil {
 			break
@@ -782,6 +792,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.BookSearchResult.CoverID(childComplexity), true
+	case "BookSearchResult.currentlyReadingCount":
+		if e.ComplexityRoot.BookSearchResult.CurrentlyReadingCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.CurrentlyReadingCount(childComplexity), true
 	case "BookSearchResult.editionCount":
 		if e.ComplexityRoot.BookSearchResult.EditionCount == nil {
 			break
@@ -812,6 +828,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.BookSearchResult.RatingsCount(childComplexity), true
+	case "BookSearchResult.readingLogCount":
+		if e.ComplexityRoot.BookSearchResult.ReadingLogCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.ReadingLogCount(childComplexity), true
 	case "BookSearchResult.subjects":
 		if e.ComplexityRoot.BookSearchResult.Subjects == nil {
 			break
@@ -830,6 +852,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.BookSearchResult.URL(childComplexity), true
+	case "BookSearchResult.wantToReadCount":
+		if e.ComplexityRoot.BookSearchResult.WantToReadCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.WantToReadCount(childComplexity), true
 	case "BookSearchResult.workKey":
 		if e.ComplexityRoot.BookSearchResult.WorkKey == nil {
 			break
@@ -3700,6 +3728,13 @@ type BookSearchResult {
   ratingsAverage: Float
   ratingsCount: Int
   editionCount: Int
+  # Open Library reading-log counts. They count Open Library users only, not readers in general;
+  # each is null when Open Library omits it (null is not zero).
+  wantToReadCount: Int
+  currentlyReadingCount: Int
+  alreadyReadCount: Int
+  # Open Library's own total across the shelves
+  readingLogCount: Int
   # Canonical content URL (https://openlibrary.org/works/<id>) — pass to createContentFromBook
   url: String!
 }
@@ -4804,6 +4839,14 @@ func (ec *executionContext) childFields_BookSearchResult(ctx context.Context, fi
 		return ec.fieldContext_BookSearchResult_ratingsCount(ctx, field)
 	case "editionCount":
 		return ec.fieldContext_BookSearchResult_editionCount(ctx, field)
+	case "wantToReadCount":
+		return ec.fieldContext_BookSearchResult_wantToReadCount(ctx, field)
+	case "currentlyReadingCount":
+		return ec.fieldContext_BookSearchResult_currentlyReadingCount(ctx, field)
+	case "alreadyReadCount":
+		return ec.fieldContext_BookSearchResult_alreadyReadCount(ctx, field)
+	case "readingLogCount":
+		return ec.fieldContext_BookSearchResult_readingLogCount(ctx, field)
 	case "url":
 		return ec.fieldContext_BookSearchResult_url(ctx, field)
 	}
@@ -7446,6 +7489,98 @@ func (ec *executionContext) _BookSearchResult_editionCount(ctx context.Context, 
 	)
 }
 func (ec *executionContext) fieldContext_BookSearchResult_editionCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchResult_wantToReadCount(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_wantToReadCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.WantToReadCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_wantToReadCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchResult_currentlyReadingCount(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_currentlyReadingCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CurrentlyReadingCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_currentlyReadingCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchResult_alreadyReadCount(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_alreadyReadCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.AlreadyReadCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_alreadyReadCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchResult_readingLogCount(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_readingLogCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ReadingLogCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_readingLogCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Int")
 }
 
@@ -21851,6 +21986,26 @@ func (ec *executionContext) _BookSearchResult(ctx context.Context, sel ast.Selec
 			}
 		case "editionCount":
 			out.Values[i] = ec._BookSearchResult_editionCount(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "wantToReadCount":
+			out.Values[i] = ec._BookSearchResult_wantToReadCount(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "currentlyReadingCount":
+			out.Values[i] = ec._BookSearchResult_currentlyReadingCount(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "alreadyReadCount":
+			out.Values[i] = ec._BookSearchResult_alreadyReadCount(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "readingLogCount":
+			out.Values[i] = ec._BookSearchResult_readingLogCount(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}

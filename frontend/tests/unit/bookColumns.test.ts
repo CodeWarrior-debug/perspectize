@@ -91,6 +91,7 @@ describe('Book default column set', () => {
 			'percentLiked',
 			'description',
 			'editions',
+			'readers',
 		]) {
 			expect(hidden, id).toContain(id);
 		}
@@ -141,7 +142,7 @@ describe('the other views keep their exact default sets', () => {
 	it('the movie and general views hide every Book column', () => {
 		for (const view of ['movie', 'general'] as const) {
 			const { hidden } = defaultColumnVisibility('lg', view);
-			for (const id of ['author', 'published', 'pages', 'rating', 'editions']) {
+			for (const id of ['author', 'published', 'pages', 'rating', 'editions', 'readers']) {
 				expect(hidden, `${view}:${id}`).toContain(id);
 			}
 		}
@@ -155,7 +156,7 @@ describe('Book column registry', () => {
 
 	it('offers Author, Published, Pages, Rating and Editions in the column picker', () => {
 		const labels = DATA_COLUMNS.map((c) => c.label);
-		for (const label of ['Author', 'Published', 'Pages', 'Book rating', 'Editions']) {
+		for (const label of ['Author', 'Published', 'Pages', 'Book rating', 'Editions', 'Readers']) {
 			expect(labels, label).toContain(label);
 		}
 	});
@@ -238,7 +239,7 @@ describe('Book colDefs in ActivityTable', () => {
 	}
 
 	it('has a colDef for every Book column', () => {
-		for (const colId of ['author', 'published', 'pages', 'rating', 'editions']) {
+		for (const colId of ['author', 'published', 'pages', 'rating', 'editions', 'readers']) {
 			expect(() => block(colId), colId).not.toThrow();
 		}
 	});
@@ -273,10 +274,40 @@ describe('Book colDefs in ActivityTable', () => {
 			"headerTooltip: 'Open Library community rating out of 5. Muted when fewer than 5 ratings.'",
 		);
 		expect(block('editions')).toContain("headerTooltip: 'Number of editions'");
+		expect(block('readers')).toContain('Open Library users only, not readers in general');
+	});
+
+	it('Readers is picker-only, sorts client-side and has no server sort or filter', () => {
+		const readers = COLUMNS.find((c) => c.colId === 'readers');
+		expect(readers?.picker).toBe('data');
+		expect(readers?.clientOnlySort).toBe(true);
+		expect(readers?.filterKey).toBeUndefined();
+		expect(COL_TO_SORT.readers).toBeUndefined();
+		for (const tier of TIERS) {
+			expect(defaultColumnVisibility(tier, 'book').visible, tier).not.toContain('readers');
+		}
 	});
 });
 
 describe('Book tooltip specs', () => {
+	it('readers explains the breakdown, the Open-Library-only caveat and the as-of date', () => {
+		const spec = ACTIVITY_TOOLTIP_SPECS.readers as unknown as { text: (c: { data: unknown }) => string };
+		const text = spec.text({
+			data: {
+				contentType: 'BOOK',
+				book: {
+					wantToReadCount: 1189,
+					currentlyReadingCount: 79,
+					alreadyReadCount: 153,
+					readingLogFetchedAt: '2026-11-12T12:00:00Z',
+				},
+			},
+		});
+		expect(text).toContain('1,189 want to read · 79 reading now · 153 have read');
+		expect(text).toContain('Open Library users only');
+		expect(text).toContain('as of Nov 12, 2026');
+	});
+
 	it('author lists every author on hover, and says so when there are none', () => {
 		const spec = ACTIVITY_TOOLTIP_SPECS.author as unknown as {
 			items: (c: { data: unknown }) => string[];

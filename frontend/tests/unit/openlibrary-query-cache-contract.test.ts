@@ -158,3 +158,25 @@ describe('book ISBN lookup key hygiene', () => {
 		expect(hashKey(openLibraryKeys.isbn('9780434740024'))).not.toBe(hashKey(openLibraryKeys.isbn('0306406152')));
 	});
 });
+
+describe('reading-log counts add no network call', () => {
+	it('every book query selects the four counts on its one call', async () => {
+		const { BOOK_SEARCH, BOOK_TRENDING, BOOK_BY_ISBN } = await import('$lib/services/openLibraryApi');
+		for (const doc of [BOOK_SEARCH, BOOK_TRENDING, BOOK_BY_ISBN]) {
+			for (const field of ['wantToReadCount', 'currentlyReadingCount', 'alreadyReadCount', 'readingLogCount']) {
+				expect(doc, field).toContain(field);
+			}
+		}
+	});
+
+	it('counts ride the existing search: three consumers still cost one fetch', async () => {
+		const fetcher = countingFetch({ items: [{ workKey: 'OL1W', wantToReadCount: 1189 }] });
+		const stop = await mountConsumers(
+			makeClient(),
+			{ queryKey: openLibraryKeys.search('steinbeck', 1), queryFn: fetcher, staleTime: BOOK_SEARCH_STALE_TIME },
+			3,
+		);
+		expect(fetcher.fetches()).toBe(1);
+		stop();
+	});
+});
