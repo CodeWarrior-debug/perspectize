@@ -30,6 +30,12 @@ export interface BookSearchResult {
 	ratingsAverage: number | null;
 	ratingsCount: number | null;
 	editionCount: number | null;
+	/** Open Library reading-log counts: its users only, not readers in general. null = Open Library omitted it; 0 is a real zero. */
+	wantToReadCount: number | null;
+	currentlyReadingCount: number | null;
+	alreadyReadCount: number | null;
+	/** Open Library's own total across the shelves. */
+	readingLogCount: number | null;
 	/** Canonical https://openlibrary.org/works/<key> link; pass to createContentFromBook. */
 	url: string;
 }
@@ -53,6 +59,10 @@ const BOOK_RESULT_FIELDS = `
 	ratingsAverage
 	ratingsCount
 	editionCount
+	wantToReadCount
+	currentlyReadingCount
+	alreadyReadCount
+	readingLogCount
 	url
 `;
 

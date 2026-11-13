@@ -22,6 +22,13 @@ export interface BookResponse {
 	ratingsAverage?: number | null;
 	ratingsCount?: number | null;
 	editionCount?: number | null;
+	/** Open Library reading-log counts (its users only). null/absent = unknown, 0 = a real zero. */
+	wantToReadCount?: number | null;
+	currentlyReadingCount?: number | null;
+	alreadyReadCount?: number | null;
+	readingLogCount?: number | null;
+	/** ISO time the counts were fetched; they are a snapshot refreshed by "Update source data". */
+	readingLogFetchedAt?: string;
 	description?: string;
 	relatedWorks?: { title: string; url: string }[];
 	resolvedFromISBN?: string;
@@ -142,4 +149,93 @@ export function editionsValueGetter(params: { data?: BookRow }): number | null {
 export function bookSubjects(row: BookRow | null | undefined): string[] | null {
 	const subjects = bookResponse(row)?.subjects;
 	return subjects && subjects.length > 0 ? subjects : null;
+}
+
+/** Why every reading-log figure carries a caveat: the shelves are Open Library members', not all readers. */
+export const READING_LOG_CAVEAT = 'Open Library users only, not readers in general';
+
+/** A count that may legitimately be 0: only null, undefined and non-numbers are unknown. */
+function knownCount(value: number | null | undefined): number | null {
+	return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+export interface ReadingLog {
+	wantToRead: number | null;
+	currentlyReading: number | null;
+	alreadyRead: number | null;
+	total: number | null;
+}
+
+/** The four reading-log counts from camelCase fields (a stored payload or a Discover result). */
+export function readingLogOf(
+	source:
+		| {
+				wantToReadCount?: number | null;
+				currentlyReadingCount?: number | null;
+				alreadyReadCount?: number | null;
+				readingLogCount?: number | null;
+		  }
+		| null
+		| undefined,
+): ReadingLog {
+	return {
+		wantToRead: knownCount(source?.wantToReadCount),
+		currentlyReading: knownCount(source?.currentlyReadingCount),
+		alreadyRead: knownCount(source?.alreadyReadCount),
+		total: knownCount(source?.readingLogCount),
+	};
+}
+
+/** True when Open Library gave at least one of the counts. */
+export function hasReadingLog(log: ReadingLog): boolean {
+	return log.wantToRead !== null || log.currentlyReading !== null || log.alreadyRead !== null || log.total !== null;
+}
+
+function count(n: number): string {
+	return n.toLocaleString('en-US');
+}
+
+/**
+ * "1,189 want to read · 79 reading now · 153 have read". A missing count is left out (never
+ * shown as 0); a real 0 stays. Empty string when nothing is known.
+ */
+export function readingLogBreakdown(log: ReadingLog): string {
+	const parts = [
+		log.wantToRead === null ? null : `${count(log.wantToRead)} want to read`,
+		log.currentlyReading === null ? null : `${count(log.currentlyReading)} reading now`,
+		log.alreadyRead === null ? null : `${count(log.alreadyRead)} have read`,
+	].filter((part): part is string => part !== null);
+	// Only the total is known: say so rather than showing nothing.
+	if (parts.length === 0 && log.total !== null) return `${count(log.total)} shelved`;
+	return parts.join(' · ');
+}
+
+/** "Nov 12, 2026" for a valid ISO time, or null (a row stored before the snapshot existed). */
+export function formatAsOf(iso: string | null | undefined): string | null {
+	if (!iso) return null;
+	const date = new Date(iso);
+	if (Number.isNaN(date.getTime())) return null;
+	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** The Readers column's value and sort key: the want-to-read count, null when unknown (0 is real). */
+export function readersValueGetter(params: { data?: BookRow }): number | null {
+	return readingLogOf(bookResponse(params.data)).wantToRead;
+}
+
+/** The Readers cell: the want-to-read count with a thousands separator, or the dash. */
+export function formatReaders(value: number | null | undefined): string {
+	return value === null || value === undefined ? EMPTY_VALUE : count(value);
+}
+
+/** Hover text for the Readers cell: breakdown, snapshot date and the Open-Library-only caveat. */
+export function readersTooltip(params: { data?: BookRow }): string {
+	const response = bookResponse(params.data);
+	const log = readingLogOf(response);
+	if (!hasReadingLog(log)) {
+		return 'No Open Library reading-log data yet. Update source data to fetch it.';
+	}
+	const asOf = formatAsOf(response?.readingLogFetchedAt);
+	const parts = [readingLogBreakdown(log), `${READING_LOG_CAVEAT}${asOf ? `, as of ${asOf}` : ''}`];
+	return parts.filter((part) => part !== '').join('. ');
 }

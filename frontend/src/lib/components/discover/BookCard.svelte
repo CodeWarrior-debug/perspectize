@@ -1,7 +1,12 @@
 <script lang="ts">
 	import { Button } from '$lib/components/shadcn';
 	import type { BookSearchResult } from '$lib/services/openLibraryApi';
-	import { openLibraryCoverUrl } from '$lib/utils/bookFormatting';
+	import {
+		READING_LOG_CAVEAT,
+		readingLogBreakdown,
+		readingLogOf,
+		openLibraryCoverUrl,
+	} from '$lib/utils/bookFormatting';
 	import BookIcon from '@lucide/svelte/icons/book';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import BookPlusIcon from '@lucide/svelte/icons/book-plus';
@@ -44,6 +49,9 @@
 			editions === null ? null : `${editions} ${editions === 1 ? 'edition' : 'editions'}`,
 		].filter((fact): fact is string => fact !== null),
 	);
+	// Reading-log counts: a missing count is left out of the line, a real 0 stays.
+	const readingLog = $derived(readingLogOf(result));
+	const readingLogText = $derived(readingLogBreakdown(readingLog));
 	const subjects = $derived(result.subjects.slice(0, 4));
 </script>
 
@@ -85,6 +93,11 @@
 		{/if}
 		<p class="text-sm text-muted-foreground">{facts.join(' · ')}</p>
 		<p class="text-sm {lowRating || rating === null ? 'text-muted-foreground' : 'text-foreground'}">{ratingText}</p>
+		{#if readingLogText}
+			<p class="text-sm text-muted-foreground" title={READING_LOG_CAVEAT}>{readingLogText} on Open Library</p>
+		{:else}
+			<p class="text-sm text-muted-foreground">No Open Library reading-log data</p>
+		{/if}
 		{#if subjects.length > 0}
 			<div class="flex flex-wrap gap-1 mt-1">
 				{#each subjects as subject, i (i)}

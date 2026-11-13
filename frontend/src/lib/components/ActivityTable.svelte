@@ -132,10 +132,12 @@
 		authorValueGetter,
 		editionsValueGetter,
 		formatBookRating,
+		formatReaders,
 		hasLowRatingCount,
 		pagesValueGetter,
 		publishedValueGetter,
 		ratingValueGetter,
+		readersValueGetter,
 	} from '$lib/utils/bookFormatting';
 	import { onDestroy, untrack } from 'svelte';
 	import ListOrderedIcon from '@lucide/svelte/icons/list-ordered';
@@ -898,7 +900,7 @@
 			},
 			// Book columns (Open Library). Hidden by default; the responsive effect shows the Book default
 			// set when the type filter is exactly BOOK. Author sorts on the server (AUTHOR). Published, Pages
-			// and Rating sort in "Loaded" mode only; all three filter on the server (f.published, f.pages, f.bookrating). Editions is picker-only.
+			// and Rating sort in "Loaded" mode only; all three filter on the server (f.published, f.pages, f.bookrating). Editions and Readers are picker-only.
 			{
 				colId: 'author',
 				headerName: 'Author',
@@ -969,6 +971,22 @@
 				valueGetter: editionsValueGetter,
 				valueFormatter: (params) => (params.value == null ? EMPTY_VALUE : String(params.value)),
 				headerTooltip: 'Number of editions',
+				hide: true,
+			},
+			{
+				// Open Library "want to read" count; the hover popover has the full breakdown. Picker-only,
+				// sorts in "Loaded" mode only, no filter (the server has no field for it).
+				colId: 'readers',
+				headerName: 'Readers',
+				flex: 0.6,
+				minWidth: 90,
+				maxWidth: 120,
+				filter: false,
+				valueGetter: readersValueGetter,
+				comparator: unknownLastComparator,
+				valueFormatter: (params) => formatReaders(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.readers },
+				headerTooltip: 'Open Library members who want to read this. Open Library users only, not readers in general.',
 				hide: true,
 			},
 			// Movie picker-only columns (never in the default set).

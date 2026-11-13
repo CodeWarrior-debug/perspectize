@@ -13,6 +13,13 @@ import {
 	publishedValueGetter,
 	ratingTooltip,
 	ratingValueGetter,
+	readersTooltip,
+	readersValueGetter,
+	readingLogBreakdown,
+	readingLogOf,
+	formatAsOf,
+	formatReaders,
+	READING_LOG_CAVEAT,
 	type BookRow,
 } from '$lib/utils/bookFormatting';
 import { EMPTY_VALUE } from '$lib/utils/formatting';
@@ -223,5 +230,73 @@ describe('editions and subjects', () => {
 	it('bookSubjects is the subject list, or null when there are none', () => {
 		expect(bookSubjects(brainscan)).toEqual(['Zines', 'Comics', 'Humor']);
 		expect(bookSubjects(makeAZine)).toBeNull();
+	});
+});
+
+describe('reading log (Open Library users only)', () => {
+	const row = (book: Record<string, unknown>): BookRow => ({ contentType: 'BOOK', book });
+	const full = row({
+		wantToReadCount: 1189,
+		currentlyReadingCount: 79,
+		alreadyReadCount: 153,
+		readingLogCount: 1421,
+		readingLogFetchedAt: '2026-11-12T12:00:00Z',
+	});
+
+	it('readersValueGetter is the want-to-read count', () => {
+		expect(readersValueGetter({ data: full })).toBe(1189);
+	});
+
+	it('a real 0 stays 0 and a missing count is null', () => {
+		expect(readersValueGetter({ data: row({ wantToReadCount: 0 }) })).toBe(0);
+		expect(readersValueGetter({ data: row({ wantToReadCount: null }) })).toBeNull();
+		expect(readersValueGetter({ data: row({}) })).toBeNull();
+		expect(readersValueGetter({ data: { contentType: 'MOVIE', book: { wantToReadCount: 5 } } })).toBeNull();
+	});
+
+	it('formatReaders separates thousands, keeps 0 and dashes unknown', () => {
+		expect(formatReaders(1189)).toBe('1,189');
+		expect(formatReaders(0)).toBe('0');
+		expect(formatReaders(null)).toBe(EMPTY_VALUE);
+		expect(formatReaders(undefined)).toBe(EMPTY_VALUE);
+	});
+
+	it('readingLogBreakdown leaves a missing count out and keeps a 0', () => {
+		expect(readingLogBreakdown(readingLogOf(full.book as never))).toBe(
+			'1,189 want to read · 79 reading now · 153 have read',
+		);
+		expect(readingLogBreakdown(readingLogOf({ wantToReadCount: 3, currentlyReadingCount: 0 }))).toBe(
+			'3 want to read · 0 reading now',
+		);
+		expect(readingLogBreakdown(readingLogOf({}))).toBe('');
+	});
+
+	it('readingLogBreakdown falls back to the total when only it is known', () => {
+		expect(readingLogBreakdown(readingLogOf({ readingLogCount: 1421 }))).toBe('1,421 shelved');
+	});
+
+	it('formatAsOf renders a date, and null for a missing or invalid time', () => {
+		expect(formatAsOf('2026-11-12T12:00:00Z')).toBe('Nov 12, 2026');
+		expect(formatAsOf(undefined)).toBeNull();
+		expect(formatAsOf('not a date')).toBeNull();
+	});
+
+	it('readersTooltip has the breakdown, the Open-Library-only caveat and the as-of date', () => {
+		const text = readersTooltip({ data: full });
+		expect(text).toContain('1,189 want to read · 79 reading now · 153 have read');
+		expect(text).toContain(READING_LOG_CAVEAT);
+		expect(text).toContain('as of Nov 12, 2026');
+	});
+
+	it('readersTooltip omits "as of" for a row with counts but no stored time', () => {
+		const text = readersTooltip({ data: row({ wantToReadCount: 4 }) });
+		expect(text).toContain('4 want to read');
+		expect(text).not.toContain('as of');
+	});
+
+	it('readersTooltip says there is no data, rather than 0, for a row without counts', () => {
+		const text = readersTooltip({ data: row({ title: 'Old row' }) });
+		expect(text).toMatch(/No Open Library reading-log data/);
+		expect(text).not.toMatch(/\b0\b/);
 	});
 });

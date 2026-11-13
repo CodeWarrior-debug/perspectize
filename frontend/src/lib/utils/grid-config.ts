@@ -17,7 +17,13 @@ import {
 	tmdbScoreValueGetter,
 	moviePeople,
 } from './formatting';
-import { authorValueGetter, pagesValueGetter, publishedValueGetter, ratingValueGetter } from './bookFormatting';
+import {
+	authorValueGetter,
+	pagesValueGetter,
+	publishedValueGetter,
+	ratingValueGetter,
+	readersValueGetter,
+} from './bookFormatting';
 
 /**
  * Display label for a content type — used by the type column valueGetter.
@@ -451,6 +457,16 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		filterRange: 'number',
 	},
 	{ colId: 'editions', label: 'Editions', picker: 'data', sortable: false },
+	// Open Library reading-log "want to read" count: picker-only (All columns), sorts in "Loaded" mode
+	// only (no server sort: rows added before the snapshot have no counts to order by).
+	{
+		colId: 'readers',
+		label: 'Readers',
+		picker: 'data',
+		sortable: true,
+		clientOnlySort: true,
+		sortValue: (row) => readersValueGetter({ data: row }),
+	},
 	// Movie picker-only columns (never in the default set).
 	{ colId: 'budget', label: 'Budget', picker: 'data', sortable: false },
 	{ colId: 'votes', label: 'Votes', picker: 'data', sortable: false },
@@ -551,8 +567,8 @@ export const NUMERIC_COL_IDS: ReadonlySet<string> = new Set([
 /** Per-tier column lists. Columns in `hidden` are forced off; createdAt/updatedAt and the admin columns are in neither list (colDef `hide: true`, picker only). */
 const MOVIE_ONLY_PICKER = ['budget', 'votes', 'collection', 'synopsis', 'tmdbId'];
 const MOVIE_DEFAULT_COLS = ['genre', 'rated', 'cast', 'released', 'boxOffice', 'vsBudget', 'tmdbScore'];
-/** Book-only columns: Editions is picker-only, the rest are in the Book default set (defaultColumnVisibility). */
-const BOOK_COLS = ['author', 'published', 'pages', 'rating', 'editions'];
+/** Book-only columns: Editions and Readers are picker-only, the rest are in the Book default set (defaultColumnVisibility). */
+const BOOK_COLS = ['author', 'published', 'pages', 'rating', 'editions', 'readers'];
 
 /**
  * Which grid columns the responsive system shows at a tier. With the type filter

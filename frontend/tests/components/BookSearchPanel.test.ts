@@ -30,6 +30,10 @@ function book(id: number, title: string): BookSearchResult {
 		ratingsAverage: 4,
 		ratingsCount: 10,
 		editionCount: 2,
+		wantToReadCount: null,
+		currentlyReadingCount: null,
+		alreadyReadCount: null,
+		readingLogCount: null,
 		url: `https://openlibrary.org/works/OL${id}W`,
 	};
 }

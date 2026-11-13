@@ -54,6 +54,7 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 				'percentLiked',
 				'perspectize',
 				'rating',
+				'readers',
 				'synopsis',
 				'tags',
 				'tmdbScore',

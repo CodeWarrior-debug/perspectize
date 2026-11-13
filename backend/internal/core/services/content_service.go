@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -31,10 +32,17 @@ type ContentService struct {
 	bookTrending  portservices.BookTrendingClient
 	bookISBN      portservices.BookISBNClient
 	bookWork      portservices.BookWorkClient
+	// now stamps a book's reading-log snapshot; tests inject a fixed clock.
+	now func() time.Time
 }
 
 // ContentServiceOption configures optional ContentService dependencies.
 type ContentServiceOption func(*ContentService)
+
+// WithClock overrides the time source used to stamp snapshots (tests only).
+func WithClock(now func() time.Time) ContentServiceOption {
+	return func(s *ContentService) { s.now = now }
+}
 
 // WithBibleReference enables BIBLE_PASSAGE creation by supplying the reference-data repository.
 func WithBibleReference(repo repositories.BibleReferenceRepository) ContentServiceOption {
@@ -272,7 +280,7 @@ func (s *ContentService) refreshBook(ctx context.Context, existing *domain.Conte
 		}
 	}
 
-	shaped := shapeBookResult(*result)
+	shaped := shapeBookResult(*result, s.clock())
 	shaped.Description = prev.Description
 	if prev.RelatedWorks != nil {
 		shaped.RelatedWorks = prev.RelatedWorks
@@ -785,6 +793,13 @@ type shapedBook struct {
 	RatingsAverage   *float64       `json:"ratingsAverage"`
 	RatingsCount     *int           `json:"ratingsCount"`
 	EditionCount     *int           `json:"editionCount"`
+	// Reading-log counts (Open Library users only) are a snapshot taken at
+	// ReadingLogFetchedAt (RFC 3339 UTC); nil when Open Library omitted one.
+	WantToReadCount       *int   `json:"wantToReadCount"`
+	CurrentlyReadingCount *int   `json:"currentlyReadingCount"`
+	AlreadyReadCount      *int   `json:"alreadyReadCount"`
+	ReadingLogCount       *int   `json:"readingLogCount"`
+	ReadingLogFetchedAt   string `json:"readingLogFetchedAt,omitempty"`
 	// Description comes from the work record; omitted when empty.
 	Description string `json:"description,omitempty"`
 	// RelatedWorks comes from the work record; never nil (empty list when none).
@@ -836,7 +851,7 @@ func shapeAuthors(names, keys []string) []shapedAuthor {
 
 // shapeBookResult converts a BookSearchResult to the JSON shape stored in
 // Content.Response.
-func shapeBookResult(r portservices.BookSearchResult) shapedBook {
+func shapeBookResult(r portservices.BookSearchResult, fetchedAt time.Time) shapedBook {
 	subjects := r.Subjects
 	if subjects == nil {
 		subjects = []string{}
@@ -853,7 +868,21 @@ func shapeBookResult(r portservices.BookSearchResult) shapedBook {
 		RatingsAverage:   r.RatingsAverage,
 		RatingsCount:     r.RatingsCount,
 		EditionCount:     r.EditionCount,
+
+		WantToReadCount:       r.WantToReadCount,
+		CurrentlyReadingCount: r.CurrentlyReadingCount,
+		AlreadyReadCount:      r.AlreadyReadCount,
+		ReadingLogCount:       r.ReadingLogCount,
+		ReadingLogFetchedAt:   fetchedAt.UTC().Format(time.RFC3339),
 	}
+}
+
+// clock returns the snapshot time, defaulting to the wall clock.
+func (s *ContentService) clock() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now()
 }
 
 // lookupBookByWorkKey resolves a bare Open Library work key (e.g. "OL23166W")
@@ -942,7 +971,7 @@ func (s *ContentService) CreateFromBook(ctx context.Context, rawURLOrISBN string
 		return nil, err
 	}
 
-	shaped := shapeBookResult(*result)
+	shaped := shapeBookResult(*result, s.clock())
 	if work := s.fetchBookWork(ctx, workKey); work != nil {
 		shaped.Description = work.Description
 		shaped.RelatedWorks = shapeRelatedWorks(work.RelatedWorks)

@@ -24,17 +24,21 @@ type BookSearchPage struct {
 }
 
 type BookSearchResult struct {
-	WorkKey          string   `json:"workKey"`
-	Title            string   `json:"title"`
-	AuthorName       []string `json:"authorName"`
-	CoverID          *int     `json:"coverId,omitempty"`
-	FirstPublishYear *int     `json:"firstPublishYear,omitempty"`
-	PageCountMedian  *int     `json:"pageCountMedian,omitempty"`
-	Subjects         []string `json:"subjects"`
-	RatingsAverage   *float64 `json:"ratingsAverage,omitempty"`
-	RatingsCount     *int     `json:"ratingsCount,omitempty"`
-	EditionCount     *int     `json:"editionCount,omitempty"`
-	URL              string   `json:"url"`
+	WorkKey               string   `json:"workKey"`
+	Title                 string   `json:"title"`
+	AuthorName            []string `json:"authorName"`
+	CoverID               *int     `json:"coverId,omitempty"`
+	FirstPublishYear      *int     `json:"firstPublishYear,omitempty"`
+	PageCountMedian       *int     `json:"pageCountMedian,omitempty"`
+	Subjects              []string `json:"subjects"`
+	RatingsAverage        *float64 `json:"ratingsAverage,omitempty"`
+	RatingsCount          *int     `json:"ratingsCount,omitempty"`
+	EditionCount          *int     `json:"editionCount,omitempty"`
+	WantToReadCount       *int     `json:"wantToReadCount,omitempty"`
+	CurrentlyReadingCount *int     `json:"currentlyReadingCount,omitempty"`
+	AlreadyReadCount      *int     `json:"alreadyReadCount,omitempty"`
+	ReadingLogCount       *int     `json:"readingLogCount,omitempty"`
+	URL                   string   `json:"url"`
 }
 
 type CategorizedRating struct {

@@ -64,7 +64,13 @@ func bookSearchResultToModel(r portservices.BookSearchResult) *model.BookSearchR
 		RatingsAverage:   r.RatingsAverage,
 		RatingsCount:     r.RatingsCount,
 		EditionCount:     r.EditionCount,
-		URL:              bookWorksURLPrefix + r.WorkKey,
+
+		WantToReadCount:       r.WantToReadCount,
+		CurrentlyReadingCount: r.CurrentlyReadingCount,
+		AlreadyReadCount:      r.AlreadyReadCount,
+		ReadingLogCount:       r.ReadingLogCount,
+
+		URL: bookWorksURLPrefix + r.WorkKey,
 	}
 }
 

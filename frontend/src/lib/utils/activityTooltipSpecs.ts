@@ -1,5 +1,12 @@
 import type { CellCtx, ColTooltipSpec } from './tooltipSpec';
-import { authorValueGetter, bookAuthors, ratingTooltip, ratingValueGetter } from './bookFormatting';
+import {
+	authorValueGetter,
+	bookAuthors,
+	ratingTooltip,
+	ratingValueGetter,
+	readersTooltip,
+	readersValueGetter,
+} from './bookFormatting';
 import {
 	formatCountExact,
 	percentLikedTooltip,
@@ -70,6 +77,10 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 	rating: {
 		text: (c: CellCtx) => ratingTooltip({ data: c.data }),
 		copyValue: (c: CellCtx) => ratingValueGetter({ data: c.data }),
+	},
+	readers: {
+		text: (c: CellCtx) => readersTooltip({ data: c.data }),
+		copyValue: (c: CellCtx) => readersValueGetter({ data: c.data }),
 	},
 	budget: {
 		text: (c: CellCtx) => formatMoneyExact(budgetValueGetter({ data: c.data })),
