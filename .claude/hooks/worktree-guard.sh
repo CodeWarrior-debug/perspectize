@@ -9,8 +9,8 @@
 # Relative paths resolve against `git -C <dir>` if given, else the tool call's cwd,
 # and `.`/`..` are collapsed before the prefix check (so `..` cannot escape).
 #
-# Blind spot: worktrees the harness makes itself (Agent `isolation: worktree`,
-# EnterWorktree) never go through Bash. `.claude/scripts/worktree-report.sh` covers
+# Blind spot: worktrees the harness makes itself (Agent `isolation: worktree`) never go
+# through Bash (EnterWorktree is covered by enter-worktree-guard.sh). `.claude/scripts/worktree-report.sh` covers
 # those. Like the sibling hooks it allows when jq or the main checkout is missing.
 # Test: bash .claude/hooks/test-worktree-guard.sh
 
