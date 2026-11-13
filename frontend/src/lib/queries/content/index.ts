@@ -416,6 +416,8 @@ export const UPDATE_CONTENT_SOURCE_DATA = gql`
 			publishedAt
 			tags
 			description
+			movie
+			book
 			createdAt
 			updatedAt
 		}
