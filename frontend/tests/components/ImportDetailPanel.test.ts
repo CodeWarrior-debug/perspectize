@@ -158,7 +158,7 @@ describe('ImportDetailPanel', () => {
 		const { unmount } = render(ImportDetailPanel, {
 			props: { item: item({ inLibrary: true, importStatus: 'IMPORTED', contentId: '12' }), sourceTitle: 's' },
 		});
-		expect(screen.getByRole('link', { name: 'View in Activity' })).toHaveAttribute('href', '/?open=12');
+		expect(screen.getByRole('link', { name: 'View in Library' })).toHaveAttribute('href', '/content-library?open=12');
 		unmount();
 		render(ImportDetailPanel, {
 			props: {

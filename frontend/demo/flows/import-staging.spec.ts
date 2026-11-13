@@ -46,7 +46,7 @@ test.describe('import staging', () => {
 		await expect(page.getByTestId('import-progress-label')).toContainText('of 1', { timeout: 15_000 });
 		await titleCell.getByText('Memento', { exact: true }).click();
 		await expect(status).toHaveText('Imported', { timeout: 15_000 });
-		await expect(page.getByRole('link', { name: 'View in Activity' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'View in Library' })).toBeVisible();
 
 		// Asking again is a no-op: the row is now in the library.
 		const jobs = await request.post(GRAPHQL_URL, {

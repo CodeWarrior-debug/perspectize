@@ -4,7 +4,7 @@
 	import { useImportItemDetails } from '$lib/queries/imports/useImportItemDetails';
 	import { formatDurationSeconds, EMPTY_VALUE } from '$lib/utils/formatting';
 	import { contentTypeLabel } from '$lib/utils/grid-config';
-	import { activityContentHref } from '$lib/utils/contentLinks';
+	import { libraryContentHref } from '$lib/utils/contentLinks';
 	import { factKeys, factText, factTooltip, formatFact, importStatusLabel, prettifyKey } from '$lib/utils/import-sheet';
 
 	/**
@@ -89,7 +89,7 @@
 					Open source <ExternalLinkIcon class="size-3.5" />
 				</a>
 				{#if item.contentId}
-					<a class="text-primary underline" href={activityContentHref(item.contentId)}>View in Activity</a>
+					<a class="text-primary underline" href={libraryContentHref(item.contentId)}>View in Library</a>
 				{/if}
 			</div>
 			{#if item.importError && item.importStatus === 'FAILED'}
