@@ -13,6 +13,7 @@ const (
 	ContentTypeClaim        ContentType = "CLAIM"
 	ContentTypeBiblePassage ContentType = "BIBLE_PASSAGE"
 	ContentTypeMovie        ContentType = "MOVIE"
+	ContentTypeBook         ContentType = "BOOK"
 )
 
 // ContentSearchField identifies a text column that a ContentFilter.search term

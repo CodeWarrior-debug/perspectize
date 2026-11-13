@@ -14,8 +14,38 @@ import {
 	sortableColumnsFor,
 	releasedComparator,
 	itemColumnHeader,
+	NUMERIC_COL_IDS,
+	CONTENT_TYPE_OPTIONS,
+	liveGridApi,
 } from '$lib/utils/grid-config';
 import type { ContentItem } from '$lib/queries/content';
+
+describe('CONTENT_TYPE_OPTIONS (Book)', () => {
+	it('offers Book as a type filter option', () => {
+		expect(CONTENT_TYPE_OPTIONS).toContainEqual({ value: 'book', label: 'Book' });
+	});
+});
+
+describe('liveGridApi', () => {
+	it('returns the api while the grid is alive', () => {
+		const api = { isDestroyed: () => false };
+		expect(liveGridApi(api)).toBe(api);
+	});
+
+	it('returns null once the grid is destroyed, so callers skip setFilterModel/sizeColumnsToFit', () => {
+		const setFilterModel = vi.fn();
+		const api = { isDestroyed: () => true, setFilterModel };
+		const live = liveGridApi(api);
+		live?.setFilterModel(null);
+		expect(live).toBeNull();
+		expect(setFilterModel).not.toHaveBeenCalled();
+	});
+
+	it('returns null for a missing api (no grid mounted)', () => {
+		expect(liveGridApi(null)).toBeNull();
+		expect(liveGridApi(undefined)).toBeNull();
+	});
+});
 
 function row(overrides: Partial<ContentItem>): ContentItem {
 	return {
@@ -42,6 +72,46 @@ function row(overrides: Partial<ContentItem>): ContentItem {
 // ---------------------------------------------------------------------------
 // capitalizeContentType
 // ---------------------------------------------------------------------------
+describe('NUMERIC_COL_IDS (right-aligned columns)', () => {
+	it('names only real columns, so a rename cannot leave a stale id behind', () => {
+		const real = new Set(togglableColIds(true));
+		for (const id of NUMERIC_COL_IDS) expect(real.has(id), id).toBe(true);
+	});
+
+	it('covers every count, money, score and duration column', () => {
+		for (const id of [
+			'duration',
+			'views',
+			'likes',
+			'percentLiked',
+			'boxOffice',
+			'vsBudget',
+			'tmdbScore',
+			'budget',
+			'votes',
+		]) {
+			expect(NUMERIC_COL_IDS.has(id), id).toBe(true);
+		}
+	});
+
+	it('leaves text, dates and identifiers left-aligned', () => {
+		for (const id of [
+			'item',
+			'type',
+			'genre',
+			'rated',
+			'cast',
+			'released',
+			'publishDate',
+			'channel',
+			'tags',
+			'tmdbId',
+		]) {
+			expect(NUMERIC_COL_IDS.has(id), id).toBe(false);
+		}
+	});
+});
+
 describe('capitalizeContentType', () => {
 	it('capitalizes first letter and lowercases rest', () => {
 		expect(capitalizeContentType('CLAIM')).toBe('Claim');
@@ -114,7 +184,7 @@ describe('durationComparator', () => {
 // Column-picker registry
 // ---------------------------------------------------------------------------
 describe('column-picker registry', () => {
-	it('DATA_COLUMNS holds the 25 user-togglable data columns', () => {
+	it('DATA_COLUMNS holds the 30 user-togglable data columns', () => {
 		expect(DATA_COLUMNS.map((c) => c.colId)).toEqual([
 			'type',
 			'category',
@@ -134,6 +204,12 @@ describe('column-picker registry', () => {
 			'user',
 			'tags',
 			'description',
+			'author',
+			'published',
+			'pages',
+			'rating',
+			'editions',
+			'readers',
 			'budget',
 			'votes',
 			'collection',
@@ -164,13 +240,13 @@ describe('column-picker registry', () => {
 		}
 	});
 
-	it('togglableColIds(false) returns only the 25 data columns', () => {
+	it('togglableColIds(false) returns only the 30 data columns', () => {
 		expect(togglableColIds(false)).toEqual(DATA_COLUMNS.map((c) => c.colId));
 	});
 
-	it('togglableColIds(true) returns all 28 columns', () => {
+	it('togglableColIds(true) returns all 34 columns', () => {
 		const ids = togglableColIds(true);
-		expect(ids).toHaveLength(28);
+		expect(ids).toHaveLength(34);
 		expect(ids).toEqual([...DATA_COLUMNS.map((c) => c.colId), ...INTERNAL_COLUMNS.map((c) => c.colId)]);
 	});
 

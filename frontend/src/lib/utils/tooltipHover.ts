@@ -22,7 +22,8 @@ export function buildPopoverState(params: BuildPopoverParams): PopoverState | nu
 	if (spec.mode === 'multi') {
 		const items = spec.items?.(ctx) ?? [];
 		if (items.length === 0) return empty();
-		return { anchor: params.cellEl, mode: 'multi', text: '', copy: null, items };
+		const copyValues = spec.itemCopyValues?.(ctx);
+		return { anchor: params.cellEl, mode: 'multi', text: '', copy: null, items, ...(copyValues && { copyValues }) };
 	}
 	const text = displayText(spec, ctx);
 	if (text.trim() === '') return empty();

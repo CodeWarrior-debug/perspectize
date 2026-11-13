@@ -79,12 +79,12 @@ describe('ComparePicker', () => {
 		expect(gotoMock).toHaveBeenCalledWith('/compare?contentId=11');
 	});
 
-	it('shows an empty state and a way back to Activity when nothing qualifies', async () => {
+	it('shows an empty state and a way back to Library when nothing qualifies', async () => {
 		mockRequest.mockResolvedValue({ content: { items: [] } });
 		renderPicker();
 
 		await waitFor(() => expect(screen.getByTestId('picker-empty')).toBeInTheDocument());
-		expect(screen.getByRole('link', { name: 'Go to Activity' })).toHaveAttribute('href', '/');
+		expect(screen.getByRole('link', { name: 'Go to Library' })).toHaveAttribute('href', '/content-library');
 	});
 
 	it('shows an error state when the query fails', async () => {

@@ -23,7 +23,18 @@ gh api repos/CodeWarrior-debug/perspectize/issues/123 --jq '.title, .html_url'
 gh api repos/CodeWarrior-debug/perspectize/pulls/123/comments
 ```
 
-**Creating a PR:** the `require-session-reflection-before-pr.sh` hook blocks `gh pr create` until `/revise-claude-md` has run, and it can't detect completion. After running it, create the PR with `gh api repos/CodeWarrior-debug/perspectize/pulls -f title="..." -f body="..." -f head="branch" -f base="main"`.
+**Creating a PR:** push and open the PR immediately with `gh api repos/CodeWarrior-debug/perspectize/pulls -f title="..." -f body="..." -f head="branch" -f base="main"` (`gh pr create` fails with the Projects Classic deprecation). The `require-session-reflection-before-pr.sh` hook no longer blocks `gh pr create`; it allows it and prints a warning that session learnings must still be reviewed after the PR is up. See [Session learnings](#session-learnings).
+
+## Session learnings
+
+`/revise-claude-md` never delays the PR. The flow:
+
+1. Push and open the PR immediately.
+2. While CI runs for the first time, run `/revise-claude-md`.
+3. **CRITICAL** learning → commit the CLAUDE.md/doc edit on the PR branch.
+4. Anything else → put it in the PR body under **Session Learnings** (the section in every PR template). The `monthly-maintenance` routine collects these from merged PR bodies (step 3b).
+
+**CRITICAL means exactly this** (the only definition; other docs link here): a learning that corrects a rule which would cause **data loss**, a **security problem**, or a **failing CI**. Everything else is non-critical, however useful. If the PR has no learnings, write "None" under the heading.
 
 **Cloud sessions:** `gh` is unavailable. Open the PR yourself with the GitHub MCP `create_pull_request` tool and set labels with `issue_write` — see [SESSION_ENVIRONMENT.md](SESSION_ENVIRONMENT.md).
 
@@ -122,3 +133,11 @@ gh pr merge 123 --squash --delete-branch --admin
 - `--squash` — Single commit (cleaner history)
 - `--delete-branch` — Auto-delete branch after merge
 - `--admin` — Bypass branch protection when needed
+
+### Stacked PRs (GitHub stacks)
+
+- `gh pr merge` is refused for a PR in a stack ("must be merged using the asynchronous merge REST API"), and `gh stack merge` cannot bypass the required review. Merge bottom-first with `gh api -X PUT repos/CodeWarrior-debug/perspectize/pulls/<n>/merge-async -f merge_method=merge -F bypass_rules=true -f sha=<head sha>`, then poll `GET .../merge-async/<uuid>`. `bypass_rules` is the admin bypass (the `owners-protect-default` ruleset lists the admin role). The API has no delete-branch option: delete the branch afterwards with `gh api -X DELETE repos/CodeWarrior-debug/perspectize/git/refs/heads/<branch>`.
+- To keep individual commits use `merge_method=merge`. "Rebase and merge" is refused once a branch holds a merge commit, e.g. from resolving a conflict with `main`.
+- After merging the bottom PR, the next one retargets to `main` and CI reruns; wait for green before merging it. A conflict fix on a lower PR usually conflicts again in the one above (merge the lower branch into it).
+- You cannot approve your own PR (`gh pr review --approve` fails); admin bypass is the way through.
+- Tooling: `gh stack` extension plus the user-scope `gh-stack` skill (`gh skill install github/gh-stack gh-stack --agent claude-code --scope user`; needs `gh` 2.90+).

@@ -7,8 +7,11 @@
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { page } from '$app/state';
 	import { createThemeStore } from '$lib/theme/store.svelte';
+	import { createFontStore } from '$lib/fonts/store.svelte';
+	import { LIBRARY_PATH } from '$lib/utils/contentLinks';
 
 	const themeStore = createThemeStore();
+	const fontStore = createFontStore();
 	let settingsOpen = $state(false);
 
 	// The header sits on --color-primary, so the ring uses --color-primary-foreground (always
@@ -17,14 +20,14 @@
 		'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80 focus-visible:ring-offset-2 focus-visible:ring-offset-primary';
 
 	const navLinks = [
-		{ href: '/', label: 'Activity' },
+		{ href: LIBRARY_PATH, label: 'Library' },
 		{ href: '/discover', label: 'Discover' },
 		{ href: '/compare', label: 'Compare' },
 		{ href: '/plan', label: 'Plan' },
 	];
 
 	function isActive(href: string): boolean {
-		return href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href);
+		return page.url.pathname.startsWith(href);
 	}
 </script>
 
@@ -67,7 +70,7 @@
 				<UserMenu />
 			</AuthShow>
 
-			<SettingsDialog bind:open={settingsOpen} store={themeStore} />
+			<SettingsDialog bind:open={settingsOpen} store={themeStore} {fontStore} />
 
 			<AuthShow when="signed-out">
 				<SignInTrigger>

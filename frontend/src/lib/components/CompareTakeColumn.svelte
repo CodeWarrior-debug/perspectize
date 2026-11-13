@@ -26,7 +26,9 @@
 		</span>
 		<span class="text-[13px] font-semibold text-foreground">{name}</span>
 	</div>
-	<div class="font-[family-name:var(--font-family-serif)] text-[13.5px] leading-snug text-foreground">
+	<div
+		class="font-slot-longform font-[family-name:var(--font-family-serif)] text-[13.5px] leading-snug text-foreground"
+	>
 		{#if review}
 			<SafeHtml html={review} />
 		{:else}

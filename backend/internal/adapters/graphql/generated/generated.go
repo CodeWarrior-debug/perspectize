@@ -50,6 +50,31 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	BookSearchPage struct {
+		Items        func(childComplexity int) int
+		Page         func(childComplexity int) int
+		TotalPages   func(childComplexity int) int
+		TotalResults func(childComplexity int) int
+	}
+
+	BookSearchResult struct {
+		AlreadyReadCount      func(childComplexity int) int
+		AuthorName            func(childComplexity int) int
+		CoverID               func(childComplexity int) int
+		CurrentlyReadingCount func(childComplexity int) int
+		EditionCount          func(childComplexity int) int
+		FirstPublishYear      func(childComplexity int) int
+		PageCountMedian       func(childComplexity int) int
+		RatingsAverage        func(childComplexity int) int
+		RatingsCount          func(childComplexity int) int
+		ReadingLogCount       func(childComplexity int) int
+		Subjects              func(childComplexity int) int
+		Title                 func(childComplexity int) int
+		URL                   func(childComplexity int) int
+		WantToReadCount       func(childComplexity int) int
+		WorkKey               func(childComplexity int) int
+	}
+
 	CategorizedRating struct {
 		Category func(childComplexity int) int
 		Rating   func(childComplexity int) int
@@ -70,6 +95,7 @@ type ComplexityRoot struct {
 		AddedBy                 func(childComplexity int) int
 		AddedByUserID           func(childComplexity int) int
 		AverageRating           func(childComplexity int) int
+		Book                    func(childComplexity int) int
 		ChannelTitle            func(childComplexity int) int
 		CommentCount            func(childComplexity int) int
 		ContentType             func(childComplexity int) int
@@ -336,6 +362,7 @@ type ComplexityRoot struct {
 		ClearPassageDisplayTitle        func(childComplexity int, contentID int) int
 		CloseImportJob                  func(childComplexity int, input model.CloseImportJobInput) int
 		CreateClaim                     func(childComplexity int, input model.CreateClaimInput) int
+		CreateContentFromBook           func(childComplexity int, input model.CreateContentFromBookInput) int
 		CreateContentFromMovie          func(childComplexity int, input model.CreateContentFromMovieInput) int
 		CreateContentFromPassage        func(childComplexity int, input model.CreateContentFromPassageInput) int
 		CreateContentFromYouTube        func(childComplexity int, input model.CreateContentFromYouTubeInput) int
@@ -455,6 +482,9 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		BookByIsbn         func(childComplexity int, isbn string) int
+		BookSearch         func(childComplexity int, query string, page *int) int
+		BookTrending       func(childComplexity int, window *domain.TrendingWindow, page *int) int
 		Content            func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.ContentSortBy, sortOrder *domain.SortOrder, sorts []*model.ContentSortInput, includeTotalCount *bool, filter *model.ContentFilter) int
 		ContentByID        func(childComplexity int, id string) int
 		CustomFieldStats   func(childComplexity int, contentID *int, key string) int
@@ -630,6 +660,7 @@ type MutationResolver interface {
 	CreateContentFromYouTube(ctx context.Context, input model.CreateContentFromYouTubeInput) (*model.CreateContentResult, error)
 	UpdateContentSourceData(ctx context.Context, contentID int) (*model.Content, error)
 	CreateContentFromMovie(ctx context.Context, input model.CreateContentFromMovieInput) (*model.Content, error)
+	CreateContentFromBook(ctx context.Context, input model.CreateContentFromBookInput) (*model.Content, error)
 	CreateContentFromPassage(ctx context.Context, input model.CreateContentFromPassageInput) (*model.Content, error)
 	SetPassageDisplayTitle(ctx context.Context, input model.SetPassageDisplayTitleInput) (*model.Content, error)
 	ClearPassageDisplayTitle(ctx context.Context, contentID int) (*model.Content, error)
@@ -686,6 +717,9 @@ type QueryResolver interface {
 	YoutubeTrending(ctx context.Context, regionCode *string, pageToken *string) (*model.YouTubeTrendingPage, error)
 	MovieSearch(ctx context.Context, query string, page *int) (*model.MovieSearchPage, error)
 	MovieTrending(ctx context.Context, window *domain.TrendingWindow, page *int) (*model.MovieSearchPage, error)
+	BookSearch(ctx context.Context, query string, page *int) (*model.BookSearchPage, error)
+	BookTrending(ctx context.Context, window *domain.TrendingWindow, page *int) (*model.BookSearchPage, error)
+	BookByIsbn(ctx context.Context, isbn string) (*model.BookSearchResult, error)
 	PerspectiveByID(ctx context.Context, id string) (*model.Perspective, error)
 	Perspectives(ctx context.Context, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) (*model.PaginatedPerspectives, error)
 	FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*model.FeelingStats, error)
@@ -742,6 +776,122 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	ec := newExecutionContext(nil, e, nil)
 	_ = ec
 	switch typeName + "." + field {
+
+	case "BookSearchPage.items":
+		if e.ComplexityRoot.BookSearchPage.Items == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchPage.Items(childComplexity), true
+	case "BookSearchPage.page":
+		if e.ComplexityRoot.BookSearchPage.Page == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchPage.Page(childComplexity), true
+	case "BookSearchPage.totalPages":
+		if e.ComplexityRoot.BookSearchPage.TotalPages == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchPage.TotalPages(childComplexity), true
+	case "BookSearchPage.totalResults":
+		if e.ComplexityRoot.BookSearchPage.TotalResults == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchPage.TotalResults(childComplexity), true
+
+	case "BookSearchResult.alreadyReadCount":
+		if e.ComplexityRoot.BookSearchResult.AlreadyReadCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.AlreadyReadCount(childComplexity), true
+	case "BookSearchResult.authorName":
+		if e.ComplexityRoot.BookSearchResult.AuthorName == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.AuthorName(childComplexity), true
+	case "BookSearchResult.coverId":
+		if e.ComplexityRoot.BookSearchResult.CoverID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.CoverID(childComplexity), true
+	case "BookSearchResult.currentlyReadingCount":
+		if e.ComplexityRoot.BookSearchResult.CurrentlyReadingCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.CurrentlyReadingCount(childComplexity), true
+	case "BookSearchResult.editionCount":
+		if e.ComplexityRoot.BookSearchResult.EditionCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.EditionCount(childComplexity), true
+	case "BookSearchResult.firstPublishYear":
+		if e.ComplexityRoot.BookSearchResult.FirstPublishYear == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.FirstPublishYear(childComplexity), true
+	case "BookSearchResult.pageCountMedian":
+		if e.ComplexityRoot.BookSearchResult.PageCountMedian == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.PageCountMedian(childComplexity), true
+	case "BookSearchResult.ratingsAverage":
+		if e.ComplexityRoot.BookSearchResult.RatingsAverage == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.RatingsAverage(childComplexity), true
+	case "BookSearchResult.ratingsCount":
+		if e.ComplexityRoot.BookSearchResult.RatingsCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.RatingsCount(childComplexity), true
+	case "BookSearchResult.readingLogCount":
+		if e.ComplexityRoot.BookSearchResult.ReadingLogCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.ReadingLogCount(childComplexity), true
+	case "BookSearchResult.subjects":
+		if e.ComplexityRoot.BookSearchResult.Subjects == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.Subjects(childComplexity), true
+	case "BookSearchResult.title":
+		if e.ComplexityRoot.BookSearchResult.Title == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.Title(childComplexity), true
+	case "BookSearchResult.url":
+		if e.ComplexityRoot.BookSearchResult.URL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.URL(childComplexity), true
+	case "BookSearchResult.wantToReadCount":
+		if e.ComplexityRoot.BookSearchResult.WantToReadCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.WantToReadCount(childComplexity), true
+	case "BookSearchResult.workKey":
+		if e.ComplexityRoot.BookSearchResult.WorkKey == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BookSearchResult.WorkKey(childComplexity), true
 
 	case "CategorizedRating.category":
 		if e.ComplexityRoot.CategorizedRating.Category == nil {
@@ -823,6 +973,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.AverageRating(childComplexity), true
+	case "Content.book":
+		if e.ComplexityRoot.Content.Book == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.Book(childComplexity), true
 	case "Content.channelTitle":
 		if e.ComplexityRoot.Content.ChannelTitle == nil {
 			break
@@ -1951,6 +2107,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateClaim(childComplexity, args["input"].(model.CreateClaimInput)), true
+	case "Mutation.createContentFromBook":
+		if e.ComplexityRoot.Mutation.CreateContentFromBook == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createContentFromBook_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateContentFromBook(childComplexity, args["input"].(model.CreateContentFromBookInput)), true
 	case "Mutation.createContentFromMovie":
 		if e.ComplexityRoot.Mutation.CreateContentFromMovie == nil {
 			break
@@ -2653,6 +2820,39 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.PresenceChanged.UserID(childComplexity), true
 
+	case "Query.bookByISBN":
+		if e.ComplexityRoot.Query.BookByIsbn == nil {
+			break
+		}
+
+		args, err := ec.field_Query_bookByISBN_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.BookByIsbn(childComplexity, args["isbn"].(string)), true
+	case "Query.bookSearch":
+		if e.ComplexityRoot.Query.BookSearch == nil {
+			break
+		}
+
+		args, err := ec.field_Query_bookSearch_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.BookSearch(childComplexity, args["query"].(string), args["page"].(*int)), true
+	case "Query.bookTrending":
+		if e.ComplexityRoot.Query.BookTrending == nil {
+			break
+		}
+
+		args, err := ec.field_Query_bookTrending_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.BookTrending(childComplexity, args["window"].(*domain.TrendingWindow), args["page"].(*int)), true
 	case "Query.content":
 		if e.ComplexityRoot.Query.Content == nil {
 			break
@@ -3383,6 +3583,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("ContentFilter", ec.unmarshalInputContentFilter),
 			graphql.NewInputUnmarshaler("ContentSortInput", ec.unmarshalInputContentSortInput),
 			graphql.NewInputUnmarshaler("CreateClaimInput", ec.unmarshalInputCreateClaimInput),
+			graphql.NewInputUnmarshaler("CreateContentFromBookInput", ec.unmarshalInputCreateContentFromBookInput),
 			graphql.NewInputUnmarshaler("CreateContentFromMovieInput", ec.unmarshalInputCreateContentFromMovieInput),
 			graphql.NewInputUnmarshaler("CreateContentFromPassageInput", ec.unmarshalInputCreateContentFromPassageInput),
 			graphql.NewInputUnmarshaler("CreateContentFromYouTubeInput", ec.unmarshalInputCreateContentFromYouTubeInput),
@@ -3652,6 +3853,37 @@ type MovieSearchPage {
   totalResults: Int!
 }
 
+# One book from Open Library search or trending (Discover page Books source).
+type BookSearchResult {
+  workKey: String!
+  title: String!
+  authorName: [String!]!
+  # Open Library cover id; build the URL as https://covers.openlibrary.org/b/id/<id>-<size>.jpg
+  coverId: Int
+  firstPublishYear: Int
+  pageCountMedian: Int
+  subjects: [String!]!
+  ratingsAverage: Float
+  ratingsCount: Int
+  editionCount: Int
+  # Open Library reading-log counts. They count Open Library users only, not readers in general;
+  # each is null when Open Library omits it (null is not zero).
+  wantToReadCount: Int
+  currentlyReadingCount: Int
+  alreadyReadCount: Int
+  # Open Library's own total across the shelves
+  readingLogCount: Int
+  # Canonical content URL (https://openlibrary.org/works/<id>) — pass to createContentFromBook
+  url: String!
+}
+
+type BookSearchPage {
+  items: [BookSearchResult!]!
+  page: Int!
+  totalPages: Int!
+  totalResults: Int!
+}
+
 # Time window for TMDB trending lists.
 enum TrendingWindow {
   DAY
@@ -3704,6 +3936,8 @@ type Content {
   response: JSON
   "Movie-specific metadata (the shaped TMDB payload); null for other content types."
   movie: JSON
+  "Book-specific metadata (the shaped Open Library payload); null for other content types."
+  book: JSON
   primaryCategory: Category
   # The import that created this row. Null for hand-added content, and when that
   # import is closed and the viewer isn't an admin.
@@ -3767,6 +4001,7 @@ enum ContentSortBy {
   TMDB_SCORE
   # Username of the user who added the content (case-insensitive)
   ADDED_BY
+  AUTHOR
 }
 
 enum SortOrder {
@@ -3785,6 +4020,7 @@ enum ContentType {
   CLAIM
   BIBLE_PASSAGE
   MOVIE
+  BOOK
 }
 
 # Text columns that ContentFilter.search can be scoped to.
@@ -3806,6 +4042,11 @@ enum PersonRole {
 # Inputs
 input CreateContentFromMovieInput {
   # IMDb or TMDB movie URL
+  url: String!
+}
+
+input CreateContentFromBookInput {
+  # Open Library work URL, or a raw ISBN-10/ISBN-13 (resolved to a work key server-side)
   url: String!
 }
 
@@ -3905,6 +4146,14 @@ input ContentFilter {
   maxBoxOffice: Float
   minTmdbScore: Float        # TMDB vote average (0-10), inclusive
   maxTmdbScore: Float
+  # Book column filters (book rows only; other rows never match)
+  authorContains: String     # Case-insensitive contains on the first author's name (books only)
+  minPublishYear: Int        # First publish year, inclusive
+  maxPublishYear: Int
+  minPages: Int              # Median page count across editions, inclusive
+  maxPages: Int
+  minBookRating: Float       # Open Library average rating (0-5), inclusive
+  maxBookRating: Float
   # View/like count filters
   minViewCount: Int
   maxViewCount: Int
@@ -4277,6 +4526,9 @@ type Mutation {
   # Movie mutations
   createContentFromMovie(input: CreateContentFromMovieInput!): Content! @auth
 
+  # Book mutations
+  createContentFromBook(input: CreateContentFromBookInput!): Content! @auth
+
   # Bible passage mutations
   createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth
   # First-write-wins: if a title already exists, returns the content with the existing title.
@@ -4389,6 +4641,16 @@ type Query {
 
   # Discover page: TMDB trending movies, cached server-side (~1h). window defaults to WEEK; page defaults to 1 (max 500).
   movieTrending(window: TrendingWindow = WEEK, page: Int): MovieSearchPage!
+
+  # Book Discover queries
+  # Discover page: Open Library book search (not cached server-side). page defaults to 1 (max 500).
+  bookSearch(query: String!, page: Int): BookSearchPage!
+
+  # Discover page: Open Library trending books, cached server-side (~1h). window defaults to WEEK; page defaults to 1 (max 500).
+  bookTrending(window: TrendingWindow = WEEK, page: Int): BookSearchPage!
+
+  # Discover page: look up a single book by ISBN-10/ISBN-13. Null when not found.
+  bookByISBN(isbn: String!): BookSearchResult
 
   # Perspective queries
   perspectiveByID(id: ID!): Perspective
@@ -4732,6 +4994,56 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // Each function is generated once per unique object type, deduplicating the
 // switch statements that were previously inlined in every fieldContext_* function.
 
+func (ec *executionContext) childFields_BookSearchPage(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "items":
+		return ec.fieldContext_BookSearchPage_items(ctx, field)
+	case "page":
+		return ec.fieldContext_BookSearchPage_page(ctx, field)
+	case "totalPages":
+		return ec.fieldContext_BookSearchPage_totalPages(ctx, field)
+	case "totalResults":
+		return ec.fieldContext_BookSearchPage_totalResults(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type BookSearchPage", field.Name)
+}
+
+func (ec *executionContext) childFields_BookSearchResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "workKey":
+		return ec.fieldContext_BookSearchResult_workKey(ctx, field)
+	case "title":
+		return ec.fieldContext_BookSearchResult_title(ctx, field)
+	case "authorName":
+		return ec.fieldContext_BookSearchResult_authorName(ctx, field)
+	case "coverId":
+		return ec.fieldContext_BookSearchResult_coverId(ctx, field)
+	case "firstPublishYear":
+		return ec.fieldContext_BookSearchResult_firstPublishYear(ctx, field)
+	case "pageCountMedian":
+		return ec.fieldContext_BookSearchResult_pageCountMedian(ctx, field)
+	case "subjects":
+		return ec.fieldContext_BookSearchResult_subjects(ctx, field)
+	case "ratingsAverage":
+		return ec.fieldContext_BookSearchResult_ratingsAverage(ctx, field)
+	case "ratingsCount":
+		return ec.fieldContext_BookSearchResult_ratingsCount(ctx, field)
+	case "editionCount":
+		return ec.fieldContext_BookSearchResult_editionCount(ctx, field)
+	case "wantToReadCount":
+		return ec.fieldContext_BookSearchResult_wantToReadCount(ctx, field)
+	case "currentlyReadingCount":
+		return ec.fieldContext_BookSearchResult_currentlyReadingCount(ctx, field)
+	case "alreadyReadCount":
+		return ec.fieldContext_BookSearchResult_alreadyReadCount(ctx, field)
+	case "readingLogCount":
+		return ec.fieldContext_BookSearchResult_readingLogCount(ctx, field)
+	case "url":
+		return ec.fieldContext_BookSearchResult_url(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type BookSearchResult", field.Name)
+}
+
 func (ec *executionContext) childFields_CategorizedRating(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "category":
@@ -4802,6 +5114,8 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_response(ctx, field)
 	case "movie":
 		return ec.fieldContext_Content_movie(ctx, field)
+	case "book":
+		return ec.fieldContext_Content_book(ctx, field)
 	case "primaryCategory":
 		return ec.fieldContext_Content_primaryCategory(ctx, field)
 	case "importedFrom":
@@ -5780,6 +6094,20 @@ func (ec *executionContext) field_Mutation_createClaim_args(ctx context.Context,
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_createContentFromBook_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.CreateContentFromBookInput, error) {
+			return ec.unmarshalNCreateContentFromBookInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromBookInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createContentFromMovie_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -6321,6 +6649,64 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		return nil, err
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_bookByISBN_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "isbn",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["isbn"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_bookSearch_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "query",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["query"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "page",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOInt2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["page"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_bookTrending_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "window",
+		func(ctx context.Context, v any) (*domain.TrendingWindow, error) {
+			return ec.unmarshalOTrendingWindow2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐTrendingWindow(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["window"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "page",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOInt2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["page"] = arg1
 	return args, nil
 }
 
@@ -7050,6 +7436,452 @@ func (ec *executionContext) field___Type_inputFields_args(ctx context.Context, r
 
 // region    **************************** field.gotpl *****************************
 
+func (ec *executionContext) _BookSearchPage_items(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchPage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchPage_items(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Items, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.BookSearchResult) graphql.Marshaler {
+			return ec.marshalNBookSearchResult2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐBookSearchResultᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchPage_items(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BookSearchPage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_BookSearchResult(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BookSearchPage_page(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchPage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchPage_page(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Page, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchPage_page(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchPage", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchPage_totalPages(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchPage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchPage_totalPages(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TotalPages, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchPage_totalPages(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchPage", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchPage_totalResults(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchPage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchPage_totalResults(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TotalResults, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchPage_totalResults(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchPage", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchResult_workKey(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_workKey(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.WorkKey, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_workKey(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "String")
+}
+
+func (ec *executionContext) _BookSearchResult_title(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_title(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Title, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_title(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "String")
+}
+
+func (ec *executionContext) _BookSearchResult_authorName(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_authorName(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.AuthorName, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_authorName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "String")
+}
+
+func (ec *executionContext) _BookSearchResult_coverId(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_coverId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CoverID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_coverId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchResult_firstPublishYear(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_firstPublishYear(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.FirstPublishYear, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_firstPublishYear(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchResult_pageCountMedian(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_pageCountMedian(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PageCountMedian, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_pageCountMedian(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchResult_subjects(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_subjects(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Subjects, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_subjects(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "String")
+}
+
+func (ec *executionContext) _BookSearchResult_ratingsAverage(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_ratingsAverage(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.RatingsAverage, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_ratingsAverage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Float")
+}
+
+func (ec *executionContext) _BookSearchResult_ratingsCount(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_ratingsCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.RatingsCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_ratingsCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchResult_editionCount(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_editionCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.EditionCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_editionCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchResult_wantToReadCount(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_wantToReadCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.WantToReadCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_wantToReadCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchResult_currentlyReadingCount(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_currentlyReadingCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CurrentlyReadingCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_currentlyReadingCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchResult_alreadyReadCount(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_alreadyReadCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.AlreadyReadCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_alreadyReadCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchResult_readingLogCount(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_readingLogCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ReadingLogCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_readingLogCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _BookSearchResult_url(ctx context.Context, field graphql.CollectedField, obj *model.BookSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BookSearchResult_url(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.URL, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BookSearchResult_url(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BookSearchResult", field, false, false, "String")
+}
+
 func (ec *executionContext) _CategorizedRating_category(ctx context.Context, field graphql.CollectedField, obj *model.CategorizedRating) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -7709,6 +8541,29 @@ func (ec *executionContext) _Content_movie(ctx context.Context, field graphql.Co
 	)
 }
 func (ec *executionContext) fieldContext_Content_movie(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, false, false, "JSON")
+}
+
+func (ec *executionContext) _Content_book(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_book(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Book, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v map[string]any) graphql.Marshaler {
+			return ec.marshalOJSON2map(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_book(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Content", field, false, false, "JSON")
 }
 
@@ -11711,6 +12566,63 @@ func (ec *executionContext) fieldContext_Mutation_createContentFromMovie(ctx con
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_createContentFromBook(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_createContentFromBook(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CreateContentFromBook(ctx, fc.Args["input"].(model.CreateContentFromBookInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.Content
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Content) graphql.Marshaler {
+			return ec.marshalNContent2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐContent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_createContentFromBook(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Content(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createContentFromBook_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_createContentFromPassage(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -15618,6 +16530,138 @@ func (ec *executionContext) fieldContext_Query_movieTrending(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_bookSearch(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_bookSearch(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().BookSearch(ctx, fc.Args["query"].(string), fc.Args["page"].(*int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.BookSearchPage) graphql.Marshaler {
+			return ec.marshalNBookSearchPage2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐBookSearchPage(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_bookSearch(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_BookSearchPage(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_bookSearch_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_bookTrending(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_bookTrending(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().BookTrending(ctx, fc.Args["window"].(*domain.TrendingWindow), fc.Args["page"].(*int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.BookSearchPage) graphql.Marshaler {
+			return ec.marshalNBookSearchPage2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐBookSearchPage(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_bookTrending(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_BookSearchPage(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_bookTrending_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_bookByISBN(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_bookByISBN(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().BookByIsbn(ctx, fc.Args["isbn"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.BookSearchResult) graphql.Marshaler {
+			return ec.marshalOBookSearchResult2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐBookSearchResult(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Query_bookByISBN(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_BookSearchResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_bookByISBN_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_perspectiveByID(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -19403,7 +20447,7 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
+	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "authorContains", "minPublishYear", "maxPublishYear", "minPages", "maxPages", "minBookRating", "maxBookRating", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -19529,6 +20573,55 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.MaxTmdbScore = data
+		case "authorContains":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("authorContains"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AuthorContains = data
+		case "minPublishYear":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minPublishYear"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MinPublishYear = data
+		case "maxPublishYear":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("maxPublishYear"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MaxPublishYear = data
+		case "minPages":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minPages"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MinPages = data
+		case "maxPages":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("maxPages"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MaxPages = data
+		case "minBookRating":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minBookRating"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MinBookRating = data
+		case "maxBookRating":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("maxBookRating"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MaxBookRating = data
 		case "minViewCount":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minViewCount"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
@@ -19753,6 +20846,48 @@ func (ec *executionContext) unmarshalInputCreateClaimInput(ctx context.Context, 
 func UnmarshalCreateClaimInput(ctx context.Context, raw any) (model.CreateClaimInput, error) {
 	var out model.CreateClaimInput
 	err := graphql.UnmarshalNamedInputFromContext(ctx, "CreateClaimInput", raw, &out)
+	return out, err
+}
+
+func (ec *executionContext) unmarshalInputCreateContentFromBookInput(ctx context.Context, obj any) (model.CreateContentFromBookInput, error) {
+	var it model.CreateContentFromBookInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"url"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "url":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("url"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.URL = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalCreateContentFromBookInput unmarshals raw into the CreateContentFromBookInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalCreateContentFromBookInput(ctx context.Context, raw any) (model.CreateContentFromBookInput, error) {
+	var out model.CreateContentFromBookInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "CreateContentFromBookInput", raw, &out)
 	return out, err
 }
 
@@ -21590,6 +22725,157 @@ func (ec *executionContext) _ThreadEvent(ctx context.Context, sel ast.SelectionS
 
 // region    **************************** object.gotpl ****************************
 
+var bookSearchPageImplementors = []string{"BookSearchPage"}
+
+func (ec *executionContext) _BookSearchPage(ctx context.Context, sel ast.SelectionSet, obj *model.BookSearchPage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, bookSearchPageImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("BookSearchPage")
+		case "items":
+			out.Values[i] = ec._BookSearchPage_items(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "page":
+			out.Values[i] = ec._BookSearchPage_page(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalPages":
+			out.Values[i] = ec._BookSearchPage_totalPages(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalResults":
+			out.Values[i] = ec._BookSearchPage_totalResults(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var bookSearchResultImplementors = []string{"BookSearchResult"}
+
+func (ec *executionContext) _BookSearchResult(ctx context.Context, sel ast.SelectionSet, obj *model.BookSearchResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, bookSearchResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("BookSearchResult")
+		case "workKey":
+			out.Values[i] = ec._BookSearchResult_workKey(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "title":
+			out.Values[i] = ec._BookSearchResult_title(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "authorName":
+			out.Values[i] = ec._BookSearchResult_authorName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "coverId":
+			out.Values[i] = ec._BookSearchResult_coverId(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "firstPublishYear":
+			out.Values[i] = ec._BookSearchResult_firstPublishYear(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "pageCountMedian":
+			out.Values[i] = ec._BookSearchResult_pageCountMedian(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "subjects":
+			out.Values[i] = ec._BookSearchResult_subjects(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "ratingsAverage":
+			out.Values[i] = ec._BookSearchResult_ratingsAverage(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "ratingsCount":
+			out.Values[i] = ec._BookSearchResult_ratingsCount(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "editionCount":
+			out.Values[i] = ec._BookSearchResult_editionCount(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "wantToReadCount":
+			out.Values[i] = ec._BookSearchResult_wantToReadCount(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "currentlyReadingCount":
+			out.Values[i] = ec._BookSearchResult_currentlyReadingCount(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "alreadyReadCount":
+			out.Values[i] = ec._BookSearchResult_alreadyReadCount(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "readingLogCount":
+			out.Values[i] = ec._BookSearchResult_readingLogCount(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "url":
+			out.Values[i] = ec._BookSearchResult_url(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var categorizedRatingImplementors = []string{"CategorizedRating"}
 
 func (ec *executionContext) _CategorizedRating(ctx context.Context, sel ast.SelectionSet, obj *model.CategorizedRating) graphql.Marshaler {
@@ -21795,6 +23081,11 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "movie":
 			out.Values[i] = ec._Content_movie(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "book":
+			out.Values[i] = ec._Content_book(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
@@ -23450,6 +24741,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "createContentFromBook":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createContentFromBook(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createContentFromPassage":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createContentFromPassage(ctx, field)
@@ -24353,6 +25651,24 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				true, true,
 				func(ctx context.Context) graphql.Marshaler {
 					return ec._Query_movieTrending(ctx, field)
+				})
+		case "bookSearch":
+			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
+				true, true,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Query_bookSearch(ctx, field)
+				})
+		case "bookTrending":
+			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
+				true, true,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Query_bookTrending(ctx, field)
+				})
+		case "bookByISBN":
+			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
+				true, false,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Query_bookByISBN(ctx, field)
 				})
 		case "perspectiveByID":
 			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
@@ -25530,6 +26846,38 @@ func (ec *executionContext) unmarshalNAddImportJobSourcesInput2githubᚗcomᚋCo
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNBookSearchPage2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐBookSearchPage(ctx context.Context, sel ast.SelectionSet, v *model.BookSearchPage) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "BookSearchPage!")
+		return graphql.Null
+	}
+	return ec._BookSearchPage(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNBookSearchResult2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐBookSearchResultᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.BookSearchResult) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNBookSearchResult2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐBookSearchResult(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNBookSearchResult2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐBookSearchResult(ctx context.Context, sel ast.SelectionSet, v *model.BookSearchResult) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "BookSearchResult!")
+		return graphql.Null
+	}
+	return ec._BookSearchResult(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -25638,6 +26986,11 @@ func (ec *executionContext) marshalNContentType2githubᚗcomᚋCodeWarriorᚑdeb
 
 func (ec *executionContext) unmarshalNCreateClaimInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateClaimInput(ctx context.Context, v any) (model.CreateClaimInput, error) {
 	res, err := ec.unmarshalInputCreateClaimInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNCreateContentFromBookInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromBookInput(ctx context.Context, v any) (model.CreateContentFromBookInput, error) {
+	res, err := ec.unmarshalInputCreateContentFromBookInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -26887,6 +28240,13 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 		graphql.AddInvalidNullFromMarshaler(ctx, "__TypeKind!")
 	}
 	return res
+}
+
+func (ec *executionContext) marshalOBookSearchResult2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐBookSearchResult(ctx context.Context, sel ast.SelectionSet, v *model.BookSearchResult) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._BookSearchResult(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v any) (bool, error) {

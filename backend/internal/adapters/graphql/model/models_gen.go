@@ -21,6 +21,31 @@ type AddImportJobSourcesInput struct {
 	Sources []*CreateImportSourceInput `json:"sources"`
 }
 
+type BookSearchPage struct {
+	Items        []*BookSearchResult `json:"items"`
+	Page         int                 `json:"page"`
+	TotalPages   int                 `json:"totalPages"`
+	TotalResults int                 `json:"totalResults"`
+}
+
+type BookSearchResult struct {
+	WorkKey               string   `json:"workKey"`
+	Title                 string   `json:"title"`
+	AuthorName            []string `json:"authorName"`
+	CoverID               *int     `json:"coverId,omitempty"`
+	FirstPublishYear      *int     `json:"firstPublishYear,omitempty"`
+	PageCountMedian       *int     `json:"pageCountMedian,omitempty"`
+	Subjects              []string `json:"subjects"`
+	RatingsAverage        *float64 `json:"ratingsAverage,omitempty"`
+	RatingsCount          *int     `json:"ratingsCount,omitempty"`
+	EditionCount          *int     `json:"editionCount,omitempty"`
+	WantToReadCount       *int     `json:"wantToReadCount,omitempty"`
+	CurrentlyReadingCount *int     `json:"currentlyReadingCount,omitempty"`
+	AlreadyReadCount      *int     `json:"alreadyReadCount,omitempty"`
+	ReadingLogCount       *int     `json:"readingLogCount,omitempty"`
+	URL                   string   `json:"url"`
+}
+
 type CategorizedRating struct {
 	Category string `json:"category"`
 	Rating   int    `json:"rating"`
@@ -67,7 +92,9 @@ type Content struct {
 	Description   *string               `json:"description,omitempty"`
 	Response      map[string]any        `json:"response,omitempty"`
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
-	Movie                   map[string]any `json:"movie,omitempty"`
+	Movie map[string]any `json:"movie,omitempty"`
+	// Book-specific metadata (the shaped Open Library payload); null for other content types.
+	Book                    map[string]any `json:"book,omitempty"`
 	PrimaryCategory         *Category      `json:"primaryCategory,omitempty"`
 	ImportedFrom            *ImportJobRef  `json:"importedFrom,omitempty"`
 	VerseStartID            *int           `json:"verseStartID,omitempty"`
@@ -101,6 +128,13 @@ type ContentFilter struct {
 	MaxBoxOffice        *float64                    `json:"maxBoxOffice,omitempty"`
 	MinTmdbScore        *float64                    `json:"minTmdbScore,omitempty"`
 	MaxTmdbScore        *float64                    `json:"maxTmdbScore,omitempty"`
+	AuthorContains      *string                     `json:"authorContains,omitempty"`
+	MinPublishYear      *int                        `json:"minPublishYear,omitempty"`
+	MaxPublishYear      *int                        `json:"maxPublishYear,omitempty"`
+	MinPages            *int                        `json:"minPages,omitempty"`
+	MaxPages            *int                        `json:"maxPages,omitempty"`
+	MinBookRating       *float64                    `json:"minBookRating,omitempty"`
+	MaxBookRating       *float64                    `json:"maxBookRating,omitempty"`
 	MinViewCount        *int                        `json:"minViewCount,omitempty"`
 	MaxViewCount        *int                        `json:"maxViewCount,omitempty"`
 	MinLikeCount        *int                        `json:"minLikeCount,omitempty"`
@@ -127,6 +161,10 @@ type CreateClaimInput struct {
 	Text            string `json:"text"`
 	UserID          int    `json:"userID"`
 	ParentContentID int    `json:"parentContentID"`
+}
+
+type CreateContentFromBookInput struct {
+	URL string `json:"url"`
 }
 
 type CreateContentFromMovieInput struct {

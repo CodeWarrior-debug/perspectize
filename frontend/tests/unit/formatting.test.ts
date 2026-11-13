@@ -25,7 +25,6 @@ import {
 	durationFilterValueGetter,
 	dateValueFormatter,
 	contentRowId,
-	headerMinWidth,
 	getSourceDataCooldown,
 	formatRemainingTime,
 	SOURCE_DATA_COOLDOWN_MS,
@@ -34,6 +33,7 @@ import {
 	vsBudgetPercent,
 	formatVsBudget,
 	durationTooltip,
+	contentTags,
 } from '$lib/utils/formatting';
 
 describe('shared h:mm:ss duration', () => {
@@ -792,56 +792,30 @@ describe('typeCellRenderer', () => {
 		expect(result.querySelector('svg[fill="#FF0000"]')).toBeNull();
 		expect(result.querySelector('.sr-only')?.textContent).toBe('Bible Passage');
 	});
+
+	it('shows a book glyph in the theme muted colour for BOOK, labelled Book', () => {
+		const result = typeCellRenderer({ data: { contentType: 'BOOK' } }) as HTMLElement;
+
+		expect(result.title).toBe('Book');
+		expect(result.querySelector('svg')?.getAttribute('stroke')).toBe('var(--color-muted-foreground)');
+		expect(result.querySelector('.sr-only')?.textContent).toBe('Book');
+	});
 });
 
-describe('headerMinWidth', () => {
-	it('returns a positive integer', () => {
-		const result = headerMinWidth('Type');
-		expect(result).toBeGreaterThan(0);
-		expect(Number.isInteger(result)).toBe(true);
+describe('contentTags', () => {
+	it('returns the real tags when the row has them', () => {
+		expect(contentTags({ contentType: 'BOOK', tags: ['a'], book: { subjects: ['Fiction'] } })).toEqual(['a']);
 	});
 
-	it('longer names produce wider minimums', () => {
-		const short = headerMinWidth('Date');
-		const long = headerMinWidth('Description');
-		expect(long).toBeGreaterThan(short);
+	it('falls back to a book row subjects when it has no real tags', () => {
+		expect(contentTags({ contentType: 'BOOK', tags: null, book: { subjects: ['Fiction', 'Family'] } })).toEqual([
+			'Fiction',
+			'Family',
+		]);
 	});
 
-	it('filter icon adds width', () => {
-		const withFilter = headerMinWidth('Item', true);
-		const withoutFilter = headerMinWidth('Item', false);
-		expect(withFilter).toBeGreaterThan(withoutFilter);
-	});
-
-	it('defaults hasFilter to true', () => {
-		const defaultCall = headerMinWidth('Type');
-		const explicitTrue = headerMinWidth('Type', true);
-		expect(defaultCall).toBe(explicitTrue);
-	});
-
-	it('empty name still has space for icons and padding', () => {
-		const result = headerMinWidth('');
-		expect(result).toBeGreaterThan(0);
-	});
-
-	it('produces consistent results for known headers', () => {
-		// These are the actual column headers — verify they produce reasonable widths
-		const headers = ['Type', 'Length', 'Views', 'Likes', 'Date', 'Channel', 'Tags'];
-		for (const name of headers) {
-			const width = headerMinWidth(name);
-			// Must be wide enough for text + icons (at least 60px) and not absurdly large
-			expect(width).toBeGreaterThanOrEqual(60);
-			expect(width).toBeLessThanOrEqual(200);
-		}
-	});
-
-	it('width scales linearly with character count', () => {
-		const w4 = headerMinWidth('AAAA');
-		const w8 = headerMinWidth('AAAAAAAA');
-		// 4 extra chars at ~0.55em * 14px = ~30.8px difference
-		const diff = w8 - w4;
-		expect(diff).toBeGreaterThanOrEqual(28);
-		expect(diff).toBeLessThanOrEqual(34);
+	it('returns null for a book with no subjects', () => {
+		expect(contentTags({ contentType: 'BOOK', tags: null, book: { subjects: [] } })).toBeNull();
 	});
 });
 

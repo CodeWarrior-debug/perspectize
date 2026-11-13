@@ -39,6 +39,8 @@ Exit `0` built, `1` spec invalid (each error listed), `2` usage or IO error. War
   - The item cell is `{title, sub, thumb, thumbShape: poster|contain}`.
   - `details` holds the modal: `title`, `subtitle`, `media`, `mediaFit: contain`, `text`, `links`, `tiles`, `tags` and `footer`.
 - **`perspective`**: `{ ratings, addFieldHint, extension? }`.
+  - Clicking ◎ opens a perspective-only modal and the item column opens content details. Keep them separate: a content fact never goes in the perspective form.
+  - `extension` is a type-specific pick-one field with fixed `options`. Never use it for a perspective feature shared by every type (e.g. related content), because those options have no data source.
 
 ## Images
 

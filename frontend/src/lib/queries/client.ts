@@ -20,7 +20,7 @@ export const graphqlClient = new GraphQLClient(GRAPHQL_ENDPOINT);
 
 /**
  * The one TanStack QueryClient. A module singleton (not created in a component) so the route
- * load (routes/+page.ts) can prefetch into the same cache the app reads from, before any
+ * load (routes/content-library/+page.ts) can prefetch into the same cache the app reads from, before any
  * component mounts. The app is SPA-only (ssr = false), so there is no per-request cache to share.
  */
 export const queryClient = new QueryClient({

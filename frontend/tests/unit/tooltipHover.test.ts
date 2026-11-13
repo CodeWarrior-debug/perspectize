@@ -42,6 +42,7 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 		// Limitation: asserts the map, not that ActivityTable columnDefs reference it (AG Grid does not render in jsdom).
 		expect(Object.keys(S).sort()).toEqual(
 			[
+				'author',
 				'boxOffice',
 				'budget',
 				'cast',
@@ -52,6 +53,8 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 				'likes',
 				'percentLiked',
 				'perspectize',
+				'rating',
+				'readers',
 				'synopsis',
 				'tags',
 				'tmdbScore',
@@ -103,6 +106,20 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 
 	it('tags with items is multi with no copy', () => {
 		expect(mk('tags', { tags: ['a', 'b'] })).toMatchObject({ mode: 'multi', items: ['a', 'b'], copy: null, text: '' });
+	});
+
+	it('tags carry no copyValues (label is copied)', () => {
+		expect(mk('tags', { tags: ['a'] })).not.toHaveProperty('copyValues');
+	});
+
+	it('cast rows show role + TMDB id but copyValues are bare names', () => {
+		const data = {
+			contentType: 'MOVIE',
+			movie: { directors: [{ id: 1, name: 'Gus Van Sant' }], cast: [{ id: 880, name: 'Ben Affleck', character: 'Chuckie', order: 0 }] },
+		};
+		const s = mk('cast', data);
+		expect(s?.items).toEqual(['Gus Van Sant · Director · TMDB #1', 'Ben Affleck · as Chuckie · TMDB #880']);
+		expect(s?.copyValues).toEqual(['Gus Van Sant', 'Ben Affleck']);
 	});
 
 	it('tags empty or missing gives No tags', () => {
