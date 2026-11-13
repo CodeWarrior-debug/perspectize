@@ -820,6 +820,11 @@ export function castCellRenderer(params: { data?: MovieRow }): HTMLElement | str
 	return container;
 }
 
+/** Cast tooltip copy text, parallel to `castTooltipItems`: the person's name only. */
+export function castTooltipCopyValues(row: MovieRow | null | undefined): string[] {
+	return moviePeople(row).map((p) => p.name);
+}
+
 /** Cast tooltip checklist rows: name, role (Director / as <character>) and TMDB person id. */
 export function castTooltipItems(row: MovieRow | null | undefined): string[] {
 	return moviePeople(row).map((p) => {
