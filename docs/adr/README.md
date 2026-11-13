@@ -7,3 +7,4 @@ Each record has **Status** (Proposed / Accepted / Superseded by NNNN), **Date**,
 | ADR | Decision | Status |
 |---|---|---|
 | [0001](0001-defer-facebook-video-content-type.md) | Defer the Facebook video / Reel content type | Accepted |
+| [0002](0002-sharing-model.md) | Long-term sharing model: two slots, private audiences (direction, not scheduled) | Accepted |

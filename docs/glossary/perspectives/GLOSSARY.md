@@ -87,7 +87,7 @@ For one content item or all content: how many perspectives carry a feeling, what
 ### Visibility
 
 **Privacy**:
-Whether a perspective (or todo, or list) is public or private. Exactly two levels; default public.
+Whether a perspective (or todo, or list) is public or private. Exactly two levels; default public. Wider audiences for a private perspective (sharelist, criteria rule, aggregates) are separate settings, not a third level: see [ADR 0002](../../adr/0002-sharing-model.md).
 _Avoid_: Visibility, sharing level, unlisted
 
 **Owner**:
