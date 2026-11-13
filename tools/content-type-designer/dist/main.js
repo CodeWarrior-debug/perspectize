@@ -9,7 +9,7 @@ import { bindingFor, cellSortValue, cellText, gapText, previewRowsFor, profileFo
 import { attachTip, cellTipContent } from './tip.js';
 const STORAGE_KEY = 'perspectize.content-type-designer.v1';
 /** Seed the type currently being designed, so a fresh open / reset lands on a filled-in form. */
-const DEFAULT_SEED = 'painting';
+const DEFAULT_SEED = 'food';
 function seededState(typeId) {
     const state = blankState();
     const t = TYPES.find((x) => x.id === typeId);
@@ -740,6 +740,7 @@ function renderSamples(current, grid) {
 const ICONS = {
     'play-badge': '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="7 4 20 12 7 20"/></svg>',
     'book-cross': '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M12 8v6M9.5 10.5h5"/></svg>',
+    food: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 7c-1.5-2-5-2.5-6.5 0S4 14 6 17.5 10 21 12 20c2 1 4 1 6-2.5S20.5 9.5 18.5 7 13.5 5 12 7z"/><path d="M12 7c0-2 1-3.5 3-4"/></svg>',
     palette: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-1.9-.5-1.2.3-2.3 1.6-2.3H17a4 4 0 0 0 4-4c0-5.2-4-9.8-9-9.8z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10" cy="7" r="1.2" fill="currentColor"/><circle cx="15" cy="7.5" r="1.2" fill="currentColor"/></svg>',
     statue: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="5" r="2.2"/><path d="M9.5 21V11.5a2.5 2.5 0 0 1 5 0V21M7 21h10M8.5 13.5 6.5 10M15.5 13.5l2-3.5"/></svg>',
     pencil: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20l1.2-4.5L16 4.7a2 2 0 0 1 2.8 0l.5.5a2 2 0 0 1 0 2.8L8.5 18.8z"/><path d="M14 6.5l3.5 3.5"/></svg>',

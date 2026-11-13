@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import Header from '$lib/components/Header.svelte';
+import { mockPageState } from '../setup';
 
 // Mock svelte-clerk components
 vi.mock('svelte-clerk', () => ({
@@ -32,6 +33,8 @@ vi.mock('svelte-clerk', () => ({
 // that this test file doesn't otherwise provide — mock the primitives instead of
 // wrapping every render() call site in a QueryClientProvider.
 vi.mock('@tanstack/svelte-query', () => ({
+	// $lib/queries/client builds the shared app QueryClient at import time.
+	QueryClient: class {},
 	createQuery: vi.fn(() => ({ data: undefined, isSuccess: false, isError: false })),
 	createMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 	useQueryClient: vi.fn(() => ({
@@ -162,14 +165,30 @@ describe('Header component', () => {
 		const labels = screen
 			.getAllByRole('link')
 			.map((a) => a.textContent?.trim())
-			.filter((t) => ['Activity', 'Discover', 'Compare', 'Plan'].includes(t ?? ''));
-		expect(labels).toEqual(['Activity', 'Discover', 'Compare', 'Plan']);
+			.filter((t) => ['Library', 'Discover', 'Compare', 'Plan'].includes(t ?? ''));
+		expect(labels).toEqual(['Library', 'Discover', 'Compare', 'Plan']);
 	});
 
-	it('renders an Activity navigation link pointing to /', () => {
+	it('renders a Library navigation link pointing to /content-library', () => {
 		render(Header);
-		const link = screen.getByRole('link', { name: 'Activity' });
-		expect(link).toHaveAttribute('href', '/');
+		const link = screen.getByRole('link', { name: 'Library' });
+		expect(link).toHaveAttribute('href', '/content-library');
+	});
+
+	it('marks Library as the current page on /content-library, and nothing on /', () => {
+		const original = mockPageState.url;
+		try {
+			mockPageState.url = new URL('http://localhost/content-library?f.type=movie');
+			const { unmount } = render(Header);
+			expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute('aria-current', 'page');
+			unmount();
+
+			mockPageState.url = new URL('http://localhost/');
+			render(Header);
+			expect(screen.getByRole('link', { name: 'Library' })).not.toHaveAttribute('aria-current');
+		} finally {
+			mockPageState.url = original;
+		}
 	});
 
 	it('does not render a Messages nav link (messaging entry point is the floating widget)', () => {

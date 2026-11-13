@@ -19,6 +19,7 @@ const (
 	ContentSortByAddedBy      ContentSortBy = "ADDED_BY"
 	ContentSortByReleaseDate  ContentSortBy = "RELEASE_DATE"
 	ContentSortByTmdbScore    ContentSortBy = "TMDB_SCORE"
+	ContentSortByAuthor       ContentSortBy = "AUTHOR"
 )
 
 // PersonRole is the role a person plays on a movie, used by ContentFilter.PersonRole.
@@ -68,6 +69,9 @@ type ContentFilter struct {
 	DescriptionSearch *string
 	// AddedByUsername matches the adder's username (ILIKE, via the users table)
 	AddedByUsername *string
+	// MinPerspectiveCount keeps content with at least this many perspectives
+	// visible to ContentListParams.ViewerID (public, plus the viewer's own).
+	MinPerspectiveCount *int
 	// Record date filters (direct columns)
 	CreatedAfter  *string
 	CreatedBefore *string
@@ -86,6 +90,16 @@ type ContentFilter struct {
 	MaxBoxOffice   *float64
 	MinTmdbScore   *float64
 	MaxTmdbScore   *float64
+	// Book column filters (books only). AuthorContains matches the first author's name.
+	AuthorContains *string
+	// Book ranges (books only, inclusive). Year is the first publish year, pages the median
+	// across editions, rating the Open Library average out of 5.
+	MinPublishYear *int
+	MaxPublishYear *int
+	MinPages       *int
+	MaxPages       *int
+	MinBookRating  *float64
+	MaxBookRating  *float64
 }
 
 // ContentListParams contains parameters for paginated content queries
@@ -101,6 +115,9 @@ type ContentListParams struct {
 	Sorts             []ContentSortRule
 	IncludeTotalCount bool
 	Filter            *ContentFilter
+	// ViewerID is the signed-in caller, nil when anonymous. Only
+	// Filter.MinPerspectiveCount reads it.
+	ViewerID *int
 }
 
 // PaginatedContent represents a paginated list of content

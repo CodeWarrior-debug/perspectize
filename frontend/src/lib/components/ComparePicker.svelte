@@ -2,12 +2,15 @@
 	/**
 	 * Empty-state picker for /compare with no ?contentId — lets a visitor
 	 * search for content and jump straight into a comparison, instead of the
-	 * page being a dead end that only explains "open it from Activity"
+	 * page being a dead end that only explains "open it from Library"
 	 * (compare-page-enhancements #1).
 	 *
-	 * Only surfaces content with 2+ perspectives (comparison needs two takes)
-	 * — see LIST_COMPARABLE_CONTENT's comment for why perspectiveCount isn't
-	 * just added to the main Activity list query.
+	 * Only surfaces content with 2+ perspectives visible to the viewer
+	 * (comparison needs two takes), filtered server-side via
+	 * minPerspectiveCount, and each row shows the same viewer-scoped count
+	 * (visiblePerspectiveCount), so the label matches what Compare can show.
+	 * See LIST_COMPARABLE_CONTENT's comment for why it isn't just added to the
+	 * main Library list query.
 	 */
 	import { createQuery } from '@tanstack/svelte-query';
 	import { goto } from '$app/navigation';
@@ -17,6 +20,7 @@
 	import ContentSearchInput from '$lib/components/ContentSearchInput.svelte';
 	import { Button } from '$lib/components/shadcn';
 	import { extractVideoIdFromUrl } from '$lib/utils/formatting';
+	import { LIBRARY_PATH } from '$lib/utils/contentLinks';
 
 	let searchValue = $state('');
 	let debouncedQuery = $state('');
@@ -26,16 +30,15 @@
 		queryFn: () =>
 			graphqlRequest<ListComparableContentResponse>(LIST_COMPARABLE_CONTENT, {
 				first: 40,
-				filter: debouncedQuery ? { search: debouncedQuery } : undefined,
+				// 2+ perspectives is the minimum for a comparison to mean anything.
+				// Filtered server-side, before the page limit, so older content
+				// with several perspectives isn't pushed out by newer rows with none.
+				filter: debouncedQuery ? { search: debouncedQuery, minPerspectiveCount: 2 } : { minPerspectiveCount: 2 },
 			}),
 		staleTime: 30 * 1000,
 	}));
 
-	// 2+ perspectives is the minimum for a comparison to mean anything — see
-	// module comment above.
-	const comparableItems = $derived(
-		(query.data?.content.items ?? []).filter((item) => (item.perspectiveCount ?? 0) >= 2),
-	);
+	const comparableItems = $derived(query.data?.content.items ?? []);
 
 	function openComparison(contentId: string) {
 		goto(`/compare?contentId=${contentId}`);
@@ -65,7 +68,7 @@
 						? 'No content matching your search has more than one perspective yet.'
 						: 'No content has more than one perspective yet.'}
 				</p>
-				<Button href="/" variant="outline">Go to Activity</Button>
+				<Button href={LIBRARY_PATH} variant="outline">Go to Library</Button>
 			</div>
 		{:else}
 			{#each comparableItems as item (item.id)}
@@ -89,7 +92,7 @@
 							<span class="truncate text-[12px] text-muted-foreground">{item.channelTitle}</span>
 						{/if}
 					</div>
-					<span class="flex-none text-[12px] text-muted-foreground">{item.perspectiveCount} perspectives</span>
+					<span class="flex-none text-[12px] text-muted-foreground">{item.visiblePerspectiveCount} perspectives</span>
 				</button>
 			{/each}
 		{/if}

@@ -41,6 +41,8 @@
   .tile svg{width:20px;height:20px}
   .tile img{width:100%;height:100%;object-fit:cover}
   .tile.poster{width:24px;height:36px}
+  .tile.contain{background:#fff;border:1px solid var(--border)}.tile.contain img{object-fit:contain}
+  .media.contain{object-fit:contain;background:#fff;border:1px solid var(--border)}
   .item .t{font-family:ui-serif,Georgia,serif;font-size:13px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
   .item .t.sans{font-family:inherit}
   .item .t:hover{text-decoration:underline;color:var(--primary)}
@@ -142,6 +144,7 @@
 <script>
 const S = SPEC;
 const ICONS = {
+  food:'<path d="M12 7c-1.5-2-5-2.5-6.5 0S4 14 6 17.5 10 21 12 20c2 1 4 1 6-2.5S20.5 9.5 18.5 7 13.5 5 12 7z"/><path d="M12 7c0-2 1-3.5 3-4"/>',
   book:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M12 6v8M9 9h6"/>',
   film:'<rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 7h5M17 17h5"/>',
   music:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
@@ -164,7 +167,7 @@ document.getElementById('note').innerHTML = `<b>What you are looking at.</b> The
 // ---- cell renderers by column.kind ----
 const R = {
   perspectize: (c,row) => `<span class="pz ${row.hasPerspective?'has':''}" data-open="${row.id}" data-view="persp">✎</span>`,
-  item: (c,row) => { const v=c||{}; const th = v.thumb ? `<span class="tile ${v.thumbShape==='poster'?'poster':''}"><img src="${esc(v.thumb)}" alt=""></span>` : `<span class="tile">${icon(S.type.icon)}</span>`;
+  item: (c,row) => { const v=c||{}; const th = v.thumb ? `<span class="tile ${v.thumbShape==='poster'?'poster':v.thumbShape==='contain'?'contain':''}"><img src="${esc(v.thumb)}" alt=""></span>` : `<span class="tile">${icon(S.type.icon)}</span>`;
     const t = v.title ?? '—', sub = v.sub || null;
     return `<div class="item">${th}<div><div class="t ${S.type.serifTitles===false?'sans':''}" data-open="${row.id}">${esc(t)}</div>${sub?`<div class="s">${esc(sub)}</div>`:''}</div></div>`; },
   pill: c => isEmpty(c) ? DASH : `<span class="pill">${esc(val(c))}</span>${c.suffix?`<span class="suffix">${esc(c.suffix)}</span>`:''}`,
@@ -216,7 +219,7 @@ function render(){
   const textHtml = (d.text||[]).map(([n,t])=> n==null ? `<div class="empty">${esc(t)}</div>` : `<div><sup>${esc(n)}</sup>${esc(t)}</div>`).join('');
   const pos = d.position;
   const details = `<div class="mb"><div>
-    ${d.media?`<img class="media" src="${esc(d.media)}" alt="">`:''}
+    ${d.media?`<img class="media ${d.mediaFit==='contain'?'contain':''}" src="${esc(d.media)}" alt="">`:''}
     ${textHtml?`<div class="sec"><h4>${esc(d.textLabel||'Text')} ${d.textStatus?`<span class="badge ${d.textStatus}">${d.textStatus}</span>`:''}</h4><div class="text ${S.type.serifText===false?'sans':''}">${textHtml}</div></div>`:''}
     ${pos?`<div class="sec"><h4>${esc(pos.label)} ${pos.status?`<span class="badge ${pos.status}">${pos.status}</span>`:''}</h4><div class="bar" data-tip="${tipRef(esc(pos.tip||''))}">${(pos.markers||[]).map(m=>`<span class="mk" style="left:${m}%"></span>`).join('')}<span class="seg" style="left:${pos.left}%;width:${pos.width}%"></span></div><div class="bar-lbl">${(pos.labels||[]).map(l=>`<span>${esc(l)}</span>`).join('')}</div></div>`:''}
     ${(d.links||[]).map(g=>`<div class="sec links"><h4>${esc(g.label)} ${g.status?`<span class="badge ${g.status}">${g.status}</span>`:''}</h4>${g.picker?`<div>${esc(g.picker.label)}: <select>${g.picker.options.map(o=>`<option>${esc(o)}</option>`).join('')}</select> <a href="#" onclick="return false">${esc(g.picker.link)} ↗</a> ${g.picker.note?`<span style="color:var(--muted-fg);font-size:11px">(${esc(g.picker.note)})</span>`:''}</div>`:''}${g.items?`<ul>${g.items.map(x=>`<li><a href="#" onclick="return false">${esc(x)}</a></li>`).join('')}</ul>`:''}</div>`).join('')}
@@ -226,7 +229,7 @@ function render(){
     <div class="sec"><h4>Perspectives</h4>${row.hasPerspective?`<div>Yours · ${Object.entries(ratings).slice(0,2).map(([k,v])=>`${k} ${v}`).join(' · ')} <a href="#" onclick="return false" style="color:var(--primary)">edit</a></div><div style="color:var(--muted-fg)">${d.otherPerspectives??2} others</div>`:`<div class="empty">None yet.</div>`}</div>
    </div></div>`;
   const persp = `<div class="persp">
-    <h3>Add perspective <span class="badge shipped">shipped</span> <span style="font-weight:400;color:var(--muted-fg)">on <span class="serif">${esc(d.title)}${d.subtitle?' · '+esc(d.subtitle):''}</span></span></h3>
+    <h3>${row.hasPerspective?'Edit':'Add'} perspective <span class="badge shipped">shipped</span></h3>
     ${Object.entries(ratings).map(([k,v])=>`<div class="rating"><label>${esc(k)}</label><button data-r="${esc(k)}" data-d="-1">−</button><div class="track"><i style="width:${v*10}%"></i></div><button data-r="${esc(k)}" data-d="1">+</button><span class="n">${v}</span><button class="x" title="Remove field">×</button></div>`).join('')}
     <div class="addf">+ Add a field — e.g. ${esc(P.addFieldHint||'clarity')}</div>
     ${E?`<div class="ext"><div class="hd"><b>${esc(E.label)}</b> ${E.badge?`<span class="badge ${E.status||'proposed'}" data-tip="${tipRef(esc(E.tip||''))}">${esc(E.badge)}</span>`:''}
@@ -234,14 +237,15 @@ function render(){
       ${ext.mode==='choose'||!E.freeText?`<div class="opts">${E.options.map(h=>`<button class="${ext.pick===h?'on':''}" data-hp="${esc(h)}">${esc(h)}</button>`).join('')}</div>`:`<input type="text" id="exttext" placeholder="${esc(E.freeText.placeholder||'')}" value="${esc(ext.text)}">`}
       </div>`:''}
     <textarea rows="3" placeholder="Comment (optional)"></textarea>
-    <div class="row"><span class="sw ${priv?'on':''}" id="priv"><i></i> Private</span><span><button class="btn" id="back">Back to details</button> <button class="btn pri">Save perspective</button></span></div>
+    <div class="row"><span class="sw ${priv?'on':''}" id="priv"><i></i> Private</span><span><button class="btn" id="back">Cancel</button> <button class="btn pri">Save perspective</button></span></div>
    </div>`;
-  modal.innerHTML = `<div class="mh"><div><div class="k">${esc(S.type.label)} · Content details</div><div class="ttl ${S.type.serifTitles===false?'sans':''}">${esc(d.title)}</div>${d.subtitle?`<div class="sub serif">${esc(d.subtitle)}</div>`:''}</div>
-    <div style="display:flex;gap:6px"><button class="pri" id="addp">${row.hasPerspective?'Edit':'Add'} perspective</button><button id="close">Close</button></div></div>
-    ${details}${view==='persp'?persp:''}
-    <div class="ctrl"><button id="prev" ${i===0?'disabled':''}>← ${i>0?esc(S.rows[i-1].details.title):''}</button><span>${i+1} of ${S.rows.length}${d.footer?' · '+esc(d.footer):''}</span><button id="next" ${i===S.rows.length-1?'disabled':''}>${i<S.rows.length-1?esc(S.rows[i+1].details.title):''} →</button></div>`;
+  modal.innerHTML = `<div class="mh"><div><div class="k">${esc(S.type.label)} · ${view==='persp'?(row.hasPerspective?'Your perspective':'Add perspective'):'Content details'}</div><div class="ttl ${S.type.serifTitles===false?'sans':''}">${esc(d.title)}</div>${d.subtitle?`<div class="sub serif">${esc(d.subtitle)}</div>`:''}</div>
+    <div style="display:flex;gap:6px">${view==='persp'?`<button id="todet">Content details</button>`:`<button class="pri" id="addp">${row.hasPerspective?'Edit':'Add'} perspective</button>`}<button id="close">Close</button></div></div>
+    ${view==='persp'?persp:details}
+    <div class="ctrl"><button id="prev" ${i===0?'disabled':''}>← ${i>0?esc(S.rows[i-1].details.title):''}</button><span>${i+1} of ${S.rows.length}${d.footer&&view!=='persp'?' · '+esc(d.footer):''}</span><button id="next" ${i===S.rows.length-1?'disabled':''}>${i<S.rows.length-1?esc(S.rows[i+1].details.title):''} →</button></div>`;
   modal.querySelector('#close').onclick=closeModal;
-  modal.querySelector('#addp').onclick=()=>{view='persp';render();modal.querySelector('.persp').scrollIntoView({behavior:'smooth'});};
+  const ap=modal.querySelector('#addp'); if(ap) ap.onclick=()=>{view='persp';render();};
+  const td=modal.querySelector('#todet'); if(td) td.onclick=()=>{view='details';render();};
   modal.querySelector('#prev').onclick=()=>{if(i>0)openModal(S.rows[i-1].id,view)};
   modal.querySelector('#next').onclick=()=>{if(i<S.rows.length-1)openModal(S.rows[i+1].id,view)};
   modal.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{ratings[b.dataset.r]=Math.min(10,Math.max(1,ratings[b.dataset.r]+ +b.dataset.d));render();});
@@ -249,7 +253,7 @@ function render(){
   modal.querySelectorAll('[data-hp]').forEach(b=>b.onclick=()=>{ext.pick=ext.pick===b.dataset.hp?null:b.dataset.hp;render();});
   const et=modal.querySelector('#exttext'); if(et) et.oninput=e=>ext.text=e.target.value;
   const pv=modal.querySelector('#priv'); if(pv) pv.onclick=()=>{priv=!priv;render();};
-  const bk=modal.querySelector('#back'); if(bk) bk.onclick=()=>{view='details';render();};
+  const bk=modal.querySelector('#back'); if(bk) bk.onclick=closeModal;
 }
 document.addEventListener('click',e=>{ const o=e.target.closest('[data-open]'); if(o){openModal(o.dataset.open,o.dataset.view||'details');return;} if(e.target===ov)closeModal(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeModal(); });

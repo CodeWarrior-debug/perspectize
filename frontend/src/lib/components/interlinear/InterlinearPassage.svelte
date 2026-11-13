@@ -131,7 +131,7 @@
 	<!-- Delegated handlers on the container: keyboard activation happens on the inner <button>s, whose click bubbles here. -->
 	<!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
 	<div
-		class="font-[family-name:var(--font-family-serif)] text-[15px] leading-relaxed text-foreground"
+		class="font-slot-longform font-[family-name:var(--font-family-serif)] text-[15px] leading-relaxed text-foreground"
 		onmouseover={onOver}
 		onmouseout={onOut}
 		onfocusin={onOver}

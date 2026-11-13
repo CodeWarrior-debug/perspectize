@@ -92,14 +92,14 @@ export const TYPES = [
         enumValue: 'BOOK',
         gist: 'A published book — a work, not a specific physical copy.',
         ingestion: 'api',
-        enrichment: 'Open Library (/isbn/{isbn}.json, /search.json) with Google Books fallback',
+        enrichment: 'Open Library (/search.json, /trending/{window}.json, /isbn/{isbn}.json, /works/{id}.json); no Google Books fallback',
         urlRequired: false,
-        urlPattern: 'optional: openlibrary.org/works/<id>',
-        identity: 'ISBN-13 (fallback: title + primary author)',
+        urlPattern: 'optional input: openlibrary.org/works/<id>; stored url is always the canonical work URL',
+        identity: 'Open Library work key (openlibrary.org/works/<id>). An ISBN resolves to its work; the ISBN is kept as response.resolvedFromISBN but does not identify the book',
         icon: 'book',
         accent: '#8B5E3C',
-        sharesUrlSpace: true,
-        thumbnail: 'covers.openlibrary.org/b/isbn/<isbn>-M.jpg'
+        sharesUrlSpace: false,
+        thumbnail: 'covers.openlibrary.org/b/id/<cover_i>-M.jpg'
     },
     {
         id: 'article',
@@ -497,6 +497,53 @@ export const TYPES = [
         ]
     },
     {
+        id: 'food',
+        label: 'Food & drink',
+        plural: 'Foods & drinks',
+        enumValue: 'FOOD_ITEM',
+        gist: 'A food or beverage as eaten or bought — a packaged product (one barcode), a generic food ("banana, raw") or a drink — with its calories and nutrition panel.',
+        ingestion: 'api',
+        enrichment: 'USDA FoodData Central (api.nal.usda.gov/fdc/v1/food/{fdcId}, /foods/search; CC0, data.gov key, 1,000 req/h) for nutrition, preferring Branded label data; Open Food Facts (world.openfoodfacts.org/api/v2/product/{barcode}; ODbL, no key, 15 reads/min per IP) for image, Nutri-Score, NOVA, allergens and categories. Both are called in parallel on a barcode add.',
+        urlRequired: false,
+        urlPattern: 'barcode (UPC-A, EAN-13, EAN-8, GTIN-14) | world.openfoodfacts.org/product/<barcode>[/slug] | fdc.nal.usda.gov/food-details/<fdcId>/nutrients',
+        identity: 'GTIN-13 when the item has a barcode (canonical url = Open Food Facts product url, whichever source supplied the numbers); otherwise the FDC id (canonical url = FDC food-details url)',
+        icon: 'food',
+        accent: '#C2410C',
+        sharesUrlSpace: false,
+        thumbnail: 'Open Food Facts image_front_url (images.openfoodfacts.org, CC BY-SA — attribute "Open Food Facts contributors"); hotlinked, never copied. Generic USDA foods have no image: food/drink glyph tile by kind.',
+        detect: {
+            hosts: ['world.openfoodfacts.org', 'fr.openfoodfacts.org', 'us.openfoodfacts.org', 'fdc.nal.usda.gov'],
+            path: '^/(?:product|food-details)/(\\d{6,14})(?:/.*)?$',
+            examples: [
+                'https://world.openfoodfacts.org/product/3017624010701/nutella-ferrero',
+                'https://fdc.nal.usda.gov/food-details/173944/nutrients',
+                'https://world.openfoodfacts.org/category/sodas'
+            ]
+        },
+        discover: {
+            placement: 'search-only',
+            status: 'proposed',
+            search: 'Backend foodSearch: FDC /foods/search first (1,000/h — debounced type-ahead, 3+ chars), grouped Generic vs Packaged; Open Food Facts /api/v2/search only when FDC returns < 5 packaged hits or "Include international" is on (10/min shared; cached 24 h per query). Cards carry name, brand, image, serving, calories per serving, data quality and an in-library mark.',
+            searchMode: 'in-app',
+            feedLabel: '',
+            feedKind: 'none',
+            feedSource: 'None: neither source has popularity data worth ranking (Open Food Facts scan counts are sparse and skewed to France).',
+            refresh: 'n/a',
+            fetchFrom: 'backend',
+            filters: ['Food / Drink', 'Generic / Packaged', 'Include international (Open Food Facts)'],
+            reason: 'Foods are looked up, not browsed: people add what they have in hand or search by name. Search must run on the backend because the FDC key is secret and the Open Food Facts limit is per IP and shared by every user.'
+        },
+        detailOnly: [
+            { label: 'Ingredients', path: "response->>'ingredientsText'" },
+            { label: 'Full nutrient panel', path: "response->'panel' (foodNutrientPanel; details query only)" },
+            { label: 'Per 100 g/ml', path: "response->'per100'" },
+            { label: 'Package size', path: "response->'packageQuantity'" },
+            { label: 'Traces', path: "response->'traces'" },
+            { label: 'Data quality', path: "response->>'nutritionSource' + response->>'offCompleteness'" },
+            { label: 'Data as of', path: "response->'sourceModifiedAt'" }
+        ]
+    },
+    {
         id: 'tvShow',
         label: 'TV show',
         plural: 'TV shows',
@@ -663,6 +710,11 @@ export const COLUMNS = [
                 tooltip: 'Title and image from the museum record (The Met or Europeana). Click the title for details; click the image to open the painting on metmuseum.org or europeana.eu.',
                 cellTip: 'English title, then the original-language title when it differs ("Het melkmeisje"), and the source ("The Met" / "Europeana · Rijksmuseum"). Copy copies the English title.',
                 appearance: 'Thumbnail in the existing slot with object-fit: contain on a neutral mat, not cover — cropping a painting misrepresents it (portraits are tall, Washington Crossing the Delaware is 1.7:1, The Night Watch 1.2:1). Palette icon tile when no image. Title line-clamp-2 — Europeana titles can be a sentence (the Night Watch\'s is 107 characters). Subtitle: source id in 11px muted mono. Commons-sourced images carry a small "ⓘ" with the attribution in the tooltip.'
+            }),
+            food: b('Item', 'required', 'api', 'name + response.brand + response.kind + response.imageUrl', true, {
+                tooltip: 'Product or food name with its Open Food Facts front image; brand and Food/Drink under it. Generic USDA foods have no brand or image.',
+                cellTip: 'Name — brand · kind. Copy copies the name.',
+                appearance: 'Thumbnail with object-fit: contain on white (packshots are tall jars and cans). Subtitle "Brand · Food|Drink"; generic foods read "Generic (USDA) · Food". Food or drink glyph tile when there is no image.'
             })
         }
     },
@@ -750,9 +802,11 @@ export const COLUMNS = [
         gapFallback: 'em-dash',
         bindings: Object.fromEntries(TYPES.map((t) => [
             t.id,
-            isTmdb(t.id)
+            isTmdb(t.id) || t.id === 'food'
                 ? b('Category', 'optional', 'user', 'primary_category_id', false, {
-                    tooltip: 'Wikidata category — off by default for TMDB types, where Genre does the same job from the source.'
+                    tooltip: t.id === 'food'
+                        ? 'Wikidata category — off for Food & drink, where every row is Food & Drink; Open Food Facts categories ride in Tags.'
+                        : 'Wikidata category — off by default for TMDB types, where Genre does the same job from the source.'
                 })
                 : b('Category', 'optional', 'user', 'primary_category_id', true)
         ]))
@@ -770,6 +824,10 @@ export const COLUMNS = [
         filterable: true,
         gapFallback: 'em-dash',
         bindings: {
+            food: b('Kind', 'required', 'derived', "response->>'kind' (FOOD | BEVERAGE) + response->>'form' (SOLID | LIQUID)", false, {
+                tooltip: 'Food or drink. Derived from Open Food Facts / FDC categories, then from a liquid serving unit; soup is liquid but food.',
+                carriedBy: 'Item subtitle ("Brand · Drink")'
+            }),
             bible: b('Genre', 'required', 'derived', 'bible_book.division + bible_book.testament (via verse_start_id → book)', true, {
                 tooltip: 'Canonical division of the book: Torah, History, Wisdom, Major/Minor Prophets, Gospels, Acts, Pauline/General Epistles, Apocalyptic. OT/NT shown after it. From data/bible/books.json, not user-entered.',
                 appearance: 'Division as a quiet pill; testament as a muted "· OT" / "· NT" suffix. Filter is a set filter over the 10 divisions in canonical order, not alphabetical.'
@@ -877,6 +935,10 @@ export const COLUMNS = [
         filterable: true,
         gapFallback: 'em-dash',
         bindings: {
+            food: b('Brand', 'typical', 'api', "response->>'brand' (OFF brands, else FDC brandOwner)", false, {
+                tooltip: 'Brand or brand owner. Blank for generic USDA foods. Searchable (ContentSearchField BRAND).',
+                carriedBy: 'Item subtitle'
+            }),
             youtube: b('Channel', 'required', 'api', "response->>'channelTitle'", true),
             movie: b('Director', 'typical', 'api', "credits.crew[job='Director'].name", true, {
                 tooltip: 'Director(s) from TMDB credits; co-directors are joined with "&".',
@@ -973,6 +1035,11 @@ export const COLUMNS = [
         gapFallback: 'em-dash',
         align: 'right',
         bindings: {
+            food: b('Serving', 'typical', 'api', "response->'serving' {amount, unit, label}", true, {
+                unit: 'g or ml',
+                tooltip: 'Serving size as on the label: weight or volume first, household measure in brackets. Blank when the source has none, and the nutrient cells then fall back to per 100 g/ml with a "/100g" suffix. Grams and millilitres never sort as one axis (mixed-unit alert).',
+                appearance: '"37 g (2 tbsp)", "355 ml (1 can)". Right-aligned.'
+            }),
             youtube: b('Length', 'required', 'api', 'length + length_units', true, { unit: 'seconds → h:mm:ss', tooltip: 'Video duration from the YouTube API' }),
             movie: b('Runtime', 'required', 'api', 'length + length_units', true, {
                 unit: 'minutes',
@@ -1005,6 +1072,168 @@ export const COLUMNS = [
                 unit: 'words (BSB)',
                 tooltip: 'PLANNED — not written by CreateFromPassage today. Word count of the passage in the Berean Standard Bible; other translations differ. Counted once when the passage is added.',
                 appearance: 'Right-aligned integer with thousands separator, e.g. "453". The unit lives in the header, not the cell. Sorting alongside other types raises the mixed-unit alert (filter to one type, or sort by Type then Length).'
+            })
+        }
+    },
+    {
+        id: 'calories',
+        generic: 'Calories',
+        group: 'nutrition',
+        valueType: 'number',
+        tooltip: 'Energy in kcal',
+        storage: 'jsonb',
+        sortable: true,
+        filterable: true,
+        gapFallback: 'hide-column',
+        align: 'right',
+        bindings: {
+            food: b('Calories', 'typical', 'api', "response->'perServing'->>'energyKcal' | response->'per100'->>'energyKcal'", true, {
+                unit: 'kcal',
+                tooltip: 'Energy per serving, the number on the label (FDC nutrient 208 / OFF energy-kcal). kJ-only records are converted ÷ 4.184. When there is no serving the cell shows per-100 with a "/100g" suffix. Per serving by default; the header toggle (nutritionBasis) switches every nutrient column to per 100 g/ml. Missing is unknown, never 0, and sorts last.',
+                appearance: '"200 kcal"; "496 kcal /100g" when only per-100 exists. A "low data" flag when Open Food Facts completeness < 0.5.'
+            })
+        }
+    },
+    {
+        id: 'protein',
+        generic: 'Protein',
+        group: 'nutrition',
+        valueType: 'number',
+        tooltip: 'Protein in grams',
+        storage: 'jsonb',
+        sortable: true,
+        filterable: true,
+        gapFallback: 'hide-column',
+        align: 'right',
+        bindings: {
+            food: b('Protein', 'typical', 'api', "response->'perServing'->>'protein'", true, {
+                unit: 'g',
+                tooltip: 'FDC 203 / OFF proteins. Per serving by default; the header toggle (nutritionBasis) switches every nutrient column to per 100 g/ml. Missing is unknown, never 0, and sorts last.'
+            })
+        }
+    },
+    {
+        id: 'carbs',
+        generic: 'Carbs',
+        group: 'nutrition',
+        valueType: 'number',
+        tooltip: 'Total carbohydrate in grams',
+        storage: 'jsonb',
+        sortable: true,
+        filterable: true,
+        gapFallback: 'hide-column',
+        align: 'right',
+        bindings: {
+            food: b('Carbs', 'typical', 'api', "response->'perServing'->>'carbohydrate'", true, {
+                unit: 'g',
+                tooltip: 'FDC 205 / OFF carbohydrates. US labels include fiber in total carbohydrate; EU labels do not, and Open Food Facts keeps whichever the label used. Per serving by default; the header toggle (nutritionBasis) switches every nutrient column to per 100 g/ml. Missing is unknown, never 0, and sorts last.'
+            })
+        }
+    },
+    {
+        id: 'fat',
+        generic: 'Fat',
+        group: 'nutrition',
+        valueType: 'number',
+        tooltip: 'Total fat in grams',
+        storage: 'jsonb',
+        sortable: true,
+        filterable: true,
+        gapFallback: 'hide-column',
+        align: 'right',
+        bindings: {
+            food: b('Fat', 'typical', 'api', "response->'perServing'->>'fat'", true, {
+                unit: 'g',
+                tooltip: 'FDC 204 / OFF fat; saturated and trans fat in the tooltip and the picker. Per serving by default; the header toggle (nutritionBasis) switches every nutrient column to per 100 g/ml. Missing is unknown, never 0, and sorts last.'
+            })
+        }
+    },
+    {
+        id: 'sugars',
+        generic: 'Sugars',
+        group: 'nutrition',
+        valueType: 'number',
+        tooltip: 'Total sugars in grams',
+        storage: 'jsonb',
+        sortable: true,
+        filterable: true,
+        gapFallback: 'hide-column',
+        align: 'right',
+        bindings: {
+            food: b('Sugars', 'typical', 'api', "response->'perServing'->>'sugars'", true, {
+                unit: 'g',
+                tooltip: 'FDC 269 / OFF sugars; added sugars (FDC 539, often missing outside the US) in the tooltip. Per serving by default; the header toggle (nutritionBasis) switches every nutrient column to per 100 g/ml. Missing is unknown, never 0, and sorts last.'
+            })
+        }
+    },
+    {
+        id: 'sodium',
+        generic: 'Sodium',
+        group: 'nutrition',
+        valueType: 'number',
+        tooltip: 'Sodium in milligrams',
+        storage: 'jsonb',
+        sortable: true,
+        filterable: true,
+        gapFallback: 'hide-column',
+        align: 'right',
+        bindings: {
+            food: b('Sodium', 'typical', 'api', "response->'perServing'->>'sodium'", false, {
+                unit: 'mg',
+                tooltip: 'FDC 307 / OFF sodium × 1000 (OFF derives salt and sodium from each other). Per serving by default; the header toggle (nutritionBasis) switches every nutrient column to per 100 g/ml. Missing is unknown, never 0, and sorts last.'
+            })
+        }
+    },
+    {
+        id: 'nutriScore',
+        generic: 'Nutri-Score',
+        group: 'nutrition',
+        valueType: 'enum',
+        tooltip: 'Front-of-pack nutrition grade A–E',
+        storage: 'jsonb',
+        sortable: true,
+        filterable: true,
+        gapFallback: 'hide-column',
+        align: 'left',
+        bindings: {
+            food: b('Nutri-Score', 'typical', 'api', "response->>'nutriScore' (OFF nutriscore_grade)", true, {
+                tooltip: 'Open Food Facts\' A–E grade (EU method, not a USDA rating). Sorts A first, unknown last. OFF returns "not-applicable" for alcoholic drinks and some categories; generic USDA foods have none.',
+                appearance: 'Letter badge in the official Nutri-Score colours (A dark green … E red-orange). Blank, not "—", when not applicable.'
+            })
+        }
+    },
+    {
+        id: 'nova',
+        generic: 'NOVA',
+        group: 'nutrition',
+        valueType: 'enum',
+        tooltip: 'Degree of processing, 1–4',
+        storage: 'jsonb',
+        sortable: true,
+        filterable: true,
+        gapFallback: 'hide-column',
+        align: 'left',
+        bindings: {
+            food: b('NOVA', 'typical', 'api', "response->>'novaGroup' (OFF nova_group)", false, {
+                tooltip: 'NOVA group from Open Food Facts: 1 unprocessed … 4 ultra-processed. Computed from ingredients, so blank when they are missing.'
+            })
+        }
+    },
+    {
+        id: 'allergens',
+        generic: 'Allergens',
+        group: 'nutrition',
+        valueType: 'tags',
+        tooltip: 'Allergens listed on the label',
+        storage: 'jsonb',
+        sortable: false,
+        filterable: true,
+        gapFallback: 'hide-column',
+        align: 'left',
+        bindings: {
+            food: b('Allergens', 'typical', 'api', "response->'allergens' (OFF allergens_tags, en: stripped)", true, {
+                tooltip: 'Allergens on the label, as chips; "may contain" traces in the tooltip. The filter is "Hide items listing…", never "Safe for…", and also hides rows with no allergen data, because unknown is not none. Not medical advice: check the package.',
+                cellTip: 'Checklist of allergens, then traces. An empty list from Open Food Facts reads "None listed"; missing data reads "Unknown".'
             })
         }
     },
@@ -1043,6 +1272,9 @@ export const COLUMNS = [
         filterable: true,
         gapFallback: 'substitute',
         bindings: {
+            food: b('Data as of', 'typical', 'api', "response->'sourceModifiedAt' (FDC modifiedDate / OFF last_modified_t)", false, {
+                tooltip: 'When the source last changed this record. Recipes get reformulated under the same barcode, so old label data can be wrong.'
+            }),
             youtube: b('Published', 'required', 'api', "response->>'publishedAt'", true),
             movie: b('Released', 'required', 'api', "response->>'release_date'", true, {
                 tooltip: 'Primary release date from TMDB. The US theatrical date can differ; both are in the details view.',
@@ -1199,8 +1431,10 @@ export const COLUMNS = [
         align: 'center',
         bindings: Object.fromEntries(TYPES.filter((t) => t.id !== 'claim' && t.id !== 'perspective' && t.id !== 'bible').map((t) => [
             t.id,
-            b('Rating', 'optional', 'user', "response->>'userRating'", true, {
-                tooltip: 'Your rating — user-entered, never fetched'
+            b('Rating', 'optional', 'user', "response->>'userRating'", t.id !== 'food', {
+                tooltip: t.id === 'food'
+                    ? 'Your rating — off by default for Food & drink so the nutrition columns fit; the perspective covers it.'
+                    : 'Your rating — user-entered, never fetched'
             })
         ]))
     },
@@ -1321,6 +1555,10 @@ export const COLUMNS = [
         filterable: true,
         gapFallback: 'em-dash',
         bindings: {
+            food: b('Barcode', 'typical', 'api', "response->>'gtin' (GTIN-13) · response->>'fdcId'", false, {
+                tooltip: 'GTIN-13 for packaged items (UPC-A gets a leading 0), FDC id for generic foods. The canonical url built from it is the dedupe key.',
+                appearance: 'Monospace "03017624010701 · fdc:2345678". Debug column — leave in the picker.'
+            }),
             youtube: b('Video ID', 'required', 'api', "response->>'videoId'", false),
             movie: b('TMDB ID', 'required', 'api', "response->>'tmdbId'", false, {
                 tooltip: 'TMDB movie id — the dedupe key. The IMDb id (tt…) is stored beside it from external_ids.',
@@ -1371,17 +1609,21 @@ export const COLUMNS = [
                 ? b('Keywords', 'optional', 'api', "keywords (append_to_response=keywords)", false, {
                     tooltip: 'TMDB keywords — community-curated, sometimes noisy. TMDB has none for seasons or episodes.'
                 })
-                : t.id === 'bible'
-                    ? b('Tags', 'optional', 'derived', '[testament, division] → tags', false, {
-                        tooltip: 'PLANNED (Q10, answer box unchecked) — e.g. "Old Testament, Major Prophets". Redundant with Genre while that column exists.'
+                : t.id === 'food'
+                    ? b('Categories', 'optional', 'api', "response->'categories' (OFF categories_tags, en: stripped)", false, {
+                        tooltip: 'Open Food Facts categories (spreads, sodas, beers…), an external-source tag set — see issue #560 on keeping source tags apart from user tags.'
                     })
-                    : t.id === 'painting' || isArt(t.id)
-                        ? b('Subjects', 'optional', 'api', "Met response->'tags'[].term | Europeana proxy dcSubject labels (Iconclass URIs resolved via concepts[].prefLabel.en; unresolved URIs dropped)", false, {
-                            tooltip: 'What the painting depicts. The Met tags every highlight; Europeana subjects are often Iconclass codes with no English label, so many Europeana rows are blank.',
-                            cellTip: 'Multi mode: every subject as a checklist, "Copy selected" / "Copy all".',
-                            appearance: 'First two subjects with a "+N" counter, as for TMDB keywords.'
+                    : t.id === 'bible'
+                        ? b('Tags', 'optional', 'derived', '[testament, division] → tags', false, {
+                            tooltip: 'PLANNED (Q10, answer box unchecked) — e.g. "Old Testament, Major Prophets". Redundant with Genre while that column exists.'
                         })
-                        : b('Tags', 'optional', t.ingestion === 'api' ? 'api' : 'user', "response->'tags'", false)
+                        : t.id === 'painting' || isArt(t.id)
+                            ? b('Subjects', 'optional', 'api', "Met response->'tags'[].term | Europeana proxy dcSubject labels (Iconclass URIs resolved via concepts[].prefLabel.en; unresolved URIs dropped)", false, {
+                                tooltip: 'What the painting depicts. The Met tags every highlight; Europeana subjects are often Iconclass codes with no English label, so many Europeana rows are blank.',
+                                cellTip: 'Multi mode: every subject as a checklist, "Copy selected" / "Copy all".',
+                                appearance: 'First two subjects with a "+N" counter, as for TMDB keywords.'
+                            })
+                            : b('Tags', 'optional', t.ingestion === 'api' ? 'api' : 'user', "response->'tags'", false)
         ]))
     },
     {
@@ -1438,7 +1680,7 @@ export const COLUMNS = [
         sortable: true,
         filterable: true,
         gapFallback: 'em-dash',
-        bindings: Object.fromEntries(TYPES.map((t) => [t.id, b('Date Added', 'required', 'derived', 'created_at', true)]))
+        bindings: Object.fromEntries(TYPES.map((t) => [t.id, b('Date Added', 'required', 'derived', 'created_at', t.id !== 'food')]))
     },
     {
         id: 'updatedAt',
@@ -1470,6 +1712,7 @@ export const GROUP_LABELS = {
     identity: 'Identity',
     attribution: 'Attribution',
     scale: 'Scale',
+    nutrition: 'Nutrition',
     reception: 'Reception',
     temporal: 'Time & progress',
     economics: 'Economics',
@@ -2838,6 +3081,97 @@ export const SAMPLES = {
             avgRating: "4.5",
             updatedAt: "2026-10-29"
         }
+    ],
+    // Food & drink. Coca-Cola, Fage, Ritter Sport and the Guinness "Biere" row
+    // are real Open Food Facts records fetched 2026-11-01 (values per 100 g/ml
+    // scaled to the label serving). Nutella's per-100 g figures are real OFF; its
+    // US label serving is illustrative. Banana and coffee are USDA SR Legacy
+    // generics, illustrative (FDC was not reachable with DEMO_KEY). Chosen for
+    // the edge cases: generic food (no brand, image, Nutri-Score or allergens),
+    // a near-zero-calorie drink, an alcoholic drink with a messy crowdsourced
+    // record (named "Biere", no serving), and a real five-allergen product.
+    food: [
+        {
+            item: { text: 'Nutella', sub: 'Ferrero · Food', img: 'https://images.openfoodfacts.org/images/products/301/762/401/0701/front_en.100.400.jpg', href: 'https://world.openfoodfacts.org/product/3017624010701' },
+            length: { text: '37 g (2 tbsp)', tip: 'US label serving from FDC Branded (illustrative). Open Food Facts has no serving for this EAN.' },
+            calories: { text: '200 kcal', tip: '200 kcal per 37 g · 539 kcal per 100 g (OFF, live)', sort: 200 },
+            protein: '2 g', carbs: '22 g', fat: '12 g', sugars: '21 g', sodium: '15 mg',
+            nutriScore: 'E', nova: '4',
+            allergens: { text: 'nuts, milk', items: ['nuts', 'milk'], tip: 'OFF lists nuts for EAN 3017624010701; milk is on the US label.' },
+            genre: 'Food', creator: 'Ferrero', identifier: '03017624010701', date: '2026-09-22',
+            tags: 'Spreads, Sweet spreads, Hazelnut spreads',
+            'detail:Ingredients': 'Sugar, palm oil, hazelnuts (13%), skimmed milk powder (8.7%), fat-reduced cocoa (7.4%), emulsifier: lecithins (soy), vanillin.',
+            'detail:Per 100 g/ml': '539 kcal · fat 30.9 g (sat. 10.6) · carbs 57.5 g · sugars 56.3 g · protein 6.3 g · sodium 43 mg',
+            'detail:Data quality': 'Manufacturer label (USDA) + crowdsourced, 76% complete',
+            createdAt: '2026-11-01'
+        },
+        {
+            item: { text: 'Banana, raw', sub: 'Generic (USDA) · Food', href: 'https://fdc.nal.usda.gov/food-details/173944/nutrients' },
+            length: { text: '118 g (1 medium)', tip: 'FDC foodPortions: 1 medium (7" to 7-7/8" long)' },
+            calories: { text: '105 kcal', tip: 'Calculated: 89 kcal per 100 g × 118 g (nutritionDerived)', sort: 105 },
+            protein: '1.3 g', carbs: '27 g', fat: '0.4 g', sugars: '14.4 g', sodium: '1 mg',
+            allergens: { text: 'Unknown', tip: 'USDA generic foods carry no allergen list. Unknown, not allergen-free.' },
+            genre: 'Food', identifier: 'fdc:173944',
+            'detail:Per 100 g/ml': '89 kcal · protein 1.1 g · carbs 22.8 g · fiber 2.6 g · sugars 12.2 g · potassium 358 mg',
+            'detail:Data quality': 'USDA lab data (SR Legacy)',
+            createdAt: '2026-11-01'
+        },
+        {
+            item: { text: 'Coca-Cola Original', sub: 'Coca-Cola · Drink', img: 'https://images.openfoodfacts.org/images/products/544/900/000/0996/front_en.1129.400.jpg', href: 'https://world.openfoodfacts.org/product/5449000000996' },
+            length: '330 ml (1 can)',
+            calories: { text: '140 kcal', tip: '140 kcal per 330 ml · 42.4 kcal per 100 ml', sort: 140 },
+            protein: '0 g', carbs: '35 g', fat: '0 g', sugars: '35 g', sodium: '0 mg',
+            nutriScore: 'E', nova: '4',
+            allergens: { text: 'None listed', tip: 'Open Food Facts lists no allergens (an empty list, known none).' },
+            genre: 'Drink', creator: 'Coca-Cola', identifier: '5449000000996',
+            tags: 'Beverages, Carbonated drinks, Sodas, Colas',
+            'detail:Data quality': 'Crowdsourced, 89% complete',
+            createdAt: '2026-11-01'
+        },
+        {
+            item: { text: 'Coffee, brewed, black', sub: 'Generic (USDA) · Drink', href: 'https://fdc.nal.usda.gov/food-details/171890/nutrients' },
+            length: '237 ml (1 cup)',
+            calories: { text: '2 kcal', tip: 'Near zero: Protein / 100 kcal and Sugar % of kcal read n/a and sort last.', sort: 2 },
+            protein: '0.3 g', carbs: '0 g', fat: '0 g', sugars: '0 g', sodium: '5 mg',
+            allergens: { text: 'Unknown', tip: 'No allergen list for USDA generic foods.' },
+            genre: 'Drink', identifier: 'fdc:171890',
+            'detail:Data quality': 'USDA lab data (SR Legacy)',
+            createdAt: '2026-11-01'
+        },
+        {
+            item: { text: 'Total', sub: 'Fage · Food', img: 'https://images.openfoodfacts.org/images/products/520/105/401/7524/front_en.14.400.jpg', href: 'https://world.openfoodfacts.org/product/5201054017524' },
+            length: '100 g (1 serving)',
+            calories: { text: '70 kcal', sort: 70 },
+            protein: { text: '9.9 g', tip: '14 g protein per 100 kcal' }, carbs: '3 g', fat: '2 g', sugars: '3 g', sodium: '39 mg',
+            nutriScore: 'A', nova: '1',
+            allergens: { text: 'milk', items: ['milk'] },
+            genre: 'Food', creator: 'Fage', identifier: '5201054017524',
+            tags: 'Dairies, Yogurts, Greek-style yogurts',
+            'detail:Data quality': 'Crowdsourced, 89% complete',
+            createdAt: '2026-11-01'
+        },
+        {
+            item: { text: 'Biere', sub: 'Guinness · Drink', img: 'https://images.openfoodfacts.org/images/products/500/021/302/1293/front_fr.8.400.jpg', href: 'https://world.openfoodfacts.org/product/5000213021293' },
+            calories: { text: '43 kcal /100ml', tip: 'No serving on record (440 ml can, but no serving_size), so per 100 ml with the suffix. Crowdsourced, 57% complete.', sort: 43 },
+            protein: '0.5 g /100ml', carbs: '3 g /100ml', sugars: '0.4 g /100ml',
+            allergens: { text: 'Unknown', tip: 'No allergens recorded on this entry, though beer contains barley (gluten). Missing data, not allergen-free.' },
+            genre: 'Drink', creator: 'Guinness', identifier: '5000213021293',
+            tags: 'Beverages, Alcoholic beverages, Beers',
+            'detail:Data quality': 'Crowdsourced, 57% complete — the product name is just "Biere"',
+            createdAt: '2026-11-01'
+        },
+        {
+            item: { text: 'Marzipan', sub: 'Ritter Sport · Food', img: 'https://images.openfoodfacts.org/images/products/400/041/702/5005/front_en.237.400.jpg', href: 'https://world.openfoodfacts.org/product/4000417025005' },
+            length: '6.52 g (1 cube)',
+            calories: { text: '32 kcal', tip: '32 kcal per cube · 496 kcal per 100 g', sort: 32 },
+            protein: '0.5 g', carbs: '3.4 g', fat: '1.8 g', sugars: '3.3 g', sodium: '26 mg',
+            nutriScore: 'E', nova: '4',
+            allergens: { text: 'eggs, milk, nuts, peanuts, soybeans', items: ['eggs', 'milk', 'nuts', 'peanuts', 'soybeans'] },
+            genre: 'Food', creator: 'Ritter Sport', identifier: '4000417025005',
+            tags: 'Snacks, Chocolates, Marzipan',
+            'detail:Data quality': 'Crowdsourced, 96% complete',
+            createdAt: '2026-11-01'
+        }
     ]
 };
 /**
@@ -2846,6 +3180,30 @@ export const SAMPLES = {
  * placeholders for the missing cells instead.
  */
 export const SAMPLE_FULL = {
+    food: {
+        item: { text: 'Nutella', sub: 'Ferrero · Food', img: 'https://images.openfoodfacts.org/images/products/301/762/401/0701/front_en.100.400.jpg', href: 'https://world.openfoodfacts.org/product/3017624010701' },
+        genre: 'Food',
+        creator: 'Ferrero',
+        length: '37 g (2 tbsp)',
+        calories: '200 kcal', protein: '2 g', carbs: '22 g', fat: '12 g', sugars: '21 g', sodium: '15 mg',
+        nutriScore: 'E', nova: '4',
+        allergens: { text: 'nuts, milk', items: ['nuts', 'milk'] },
+        date: '2026-09-22',
+        rating: '★★★☆☆',
+        identifier: '03017624010701 · fdc:2345678',
+        tags: 'Spreads, Sweet spreads, Hazelnut spreads',
+        category: 'Food & Drink',
+        createdAt: '2026-11-01',
+        updatedAt: '2026-11-01',
+        id: '5120',
+        'detail:Ingredients': 'Sugar, palm oil, hazelnuts (13%), skimmed milk powder (8.7%), fat-reduced cocoa (7.4%), emulsifier: lecithins (soy), vanillin.',
+        'detail:Full nutrient panel': '42 nutrients (vitamins, minerals, fatty acids) — loaded on open',
+        'detail:Per 100 g/ml': '539 kcal · fat 30.9 g · carbs 57.5 g · sugars 56.3 g · protein 6.3 g',
+        'detail:Package size': '400 g',
+        'detail:Traces': 'None listed',
+        'detail:Data quality': 'Manufacturer label (USDA) + crowdsourced, 76% complete',
+        'detail:Data as of': 'OFF 2026-09-22 · FDC 2025-04'
+    },
     // The Milkmaid, because a Europeana row is the harder case: every binding is
     // filled, with the two the Met cannot fill (About) and Europeana cannot fill
     // (On view) given illustrative values and saying so.

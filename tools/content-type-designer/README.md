@@ -134,21 +134,26 @@ change.
 
 ## Seeded types
 
-Twenty-one deliberately dissimilar types ship as seed data, so the catalog is not
+Twenty-two deliberately dissimilar types ship as seed data, so the catalog is not
 quietly YouTube-shaped:
 
 YouTube video · Movie · Book · Blog article · Podcast episode · Music track ·
 Propositional truth claim · Joke · Purchase · Another person's perspective ·
 Place visit · Research paper · Bible passage · TV show · TV season · TV episode ·
-Painting · Sculpture · Drawing · Print · Photograph
+Painting · Sculpture · Drawing · Print · Photograph · Food & drink
 
 They differ on every axis that matters: API-enriched vs scraped vs manual vs
 internal-reference; URL-identified vs ISBN/DOI/GUID-identified vs text-hash
 identified; with and without duration, audience counts, money, and stance.
 
-A fresh open (or **Reset form**) lands on the Painting seed, the type
+A fresh open (or **Reset form**) lands on the Food & drink seed, the type
 currently being designed (see
-`docs/superpowers/specs/2026-09-26-painting-content-type-design.md`). It is
+`docs/superpowers/specs/2026-11-01-food-item-content-type-design.md`). Its sample rows
+are real Open Food Facts records (fetched 2026-11-01) plus two USDA generics, and it
+adds a **Nutrition** column group (Calories, Protein, Carbs, Fat, Sugars, Sodium,
+Nutri-Score, NOVA, Allergens) that no other type binds.
+
+The Painting seed (spec `docs/superpowers/specs/2026-09-26-painting-content-type-design.md`) is
 filled to the Movie seed's depth from two real catalogues: five Met records
 and five Europeana records (Rijksmuseum, Mauritshuis, Finnish National
 Gallery, MNAC). Each binding names its path per source ("Met … | Europeana …"),
@@ -203,7 +208,7 @@ Two deterministic documents, copyable or downloadable:
 
 | File | Purpose |
 |---|---|
-| `src/catalog.ts` | The 21 seeded type profiles, the generic column catalog with per-type bindings (tooltip, cell popover, appearance), and sample rows |
+| `src/catalog.ts` | The 22 seeded type profiles, the generic column catalog with per-type bindings (tooltip, cell popover, appearance), and sample rows |
 | `src/details.ts` | Details-view layouts per type, with a generic fallback |
 | `src/model.ts` | State shape, visibility resolution (incl. what-if overrides), row fill states, gap analysis |
 | `src/emit.ts` | Deterministic markdown generation (spec, matrix, single-type views) |
@@ -212,3 +217,4 @@ Two deterministic documents, copyable or downloadable:
 | `src/detect.ts` | Mirror of the app's Add Content link detection, plus the draft's rule |
 | `src/thumbs.ts` | Generated inline thumbnails (`scripts/build_thumbs.py`) |
 | `src/main.ts` | Form rendering and localStorage persistence |
+| `previews/<type>-activity.html` | Throwaway single-type previews, built by the `content-type-preview` skill (`.claude/skills/content-type-preview/`) from its `examples/<type>.spec.json`. Never hand-edit; rebuild |

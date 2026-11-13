@@ -452,7 +452,7 @@
 				</div>
 			</div>
 		</div>
-		<p class="text-[13px] font-serif text-muted-foreground text-center mt-0.5 line-clamp-1 max-w-full">
+		<p class="font-slot-cell text-[13px] font-serif text-muted-foreground text-center mt-0.5 line-clamp-1 max-w-full">
 			{contentName}
 		</p>
 	</div>
@@ -480,7 +480,7 @@
 				class="flex flex-1 items-center justify-between gap-2 h-14 px-3 rounded-lg border border-border bg-card cursor-pointer text-left"
 			>
 				<span
-					class="font-serif text-[13px] line-clamp-2 flex-1"
+					class="font-slot-longform font-serif text-[13px] line-clamp-2 flex-1"
 					class:text-foreground={hasComment}
 					class:text-muted-foreground={!hasComment}
 				>

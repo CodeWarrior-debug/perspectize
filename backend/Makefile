@@ -117,5 +117,8 @@ mutate: mutate-preflight
 	GOFLAGS='$(MUTATE_GOFLAGS)' gremlins unleash $(GREMLINS_ARGS) .
 
 # Only mutate lines changed vs $(MUTATE_BASE) (what CI runs on PRs): make mutate-diff
+# diff.relative makes Gremlins' internal `git diff` print paths relative to backend/ ("internal/x.go").
+# Without it they are repo-root paths ("backend/internal/x.go"), never match a mutant's module-relative
+# path, and EVERY mutant is skipped: "Killed: 0, Lived: 0, Skipped: N" in ~100ms and a green job.
 mutate-diff: mutate-preflight
-	GOFLAGS='$(MUTATE_GOFLAGS)' gremlins unleash --diff $(MUTATE_BASE) $(GREMLINS_ARGS) .
+	GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.relative GIT_CONFIG_VALUE_0=true GOFLAGS='$(MUTATE_GOFLAGS)' gremlins unleash --diff $(MUTATE_BASE) $(GREMLINS_ARGS) .

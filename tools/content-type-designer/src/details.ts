@@ -346,7 +346,44 @@ export const DETAILS: Partial<Record<TypeId, DetailsLayout>> = {
   photograph: museumLayout('Photograph', {
     sections: [{ label: 'Other prints', key: 'detail:Other prints', kind: 'list', tooltip: 'Rows sharing this work\'s QID, as for Print.', source: 'rows with the same workQid' }],
     notes: ['Many photographs after ~1925 are in copyright with no image at either source: the hero falls back to the type icon and the source link does the work.']
-  })
+  }),
+  food: {
+    heading: 'Food & drink',
+    media: 'thumb',
+    subtitle: ['creator', 'genre', 'length'],
+    link: 'url',
+    tiles: [
+      PERSPECTIVES,
+      AVG_RATING,
+      { col: 'calories' },
+      { col: 'protein' },
+      { col: 'carbs' },
+      { col: 'fat' },
+      { col: 'sugars' },
+      { col: 'sodium' },
+      { col: 'nutriScore' },
+      { col: 'nova' },
+      { key: 'detail:Data quality', label: 'Data quality', tooltip: 'USDA lab data, manufacturer label (USDA Branded) or crowdsourced (Open Food Facts, with its completeness)', source: "response->>'nutritionSource' + response->>'offCompleteness'" },
+      { col: 'date' },
+      DATE_ADDED
+    ],
+    sections: [
+      { label: 'Allergens', col: 'allergens', kind: 'chips', tooltip: 'From the label and public databases; may be incomplete or out of date. Check the package if you have an allergy.' },
+      { label: 'Per 100 g/ml', key: 'detail:Per 100 g/ml', kind: 'text', source: "response->'per100'" },
+      { label: 'Ingredients', key: 'detail:Ingredients', kind: 'text', source: "response->>'ingredientsText'" },
+      { label: 'Full nutrient panel', key: 'detail:Full nutrient panel', kind: 'text', tooltip: 'Vitamins, minerals and fatty acids — fetched by the details query only (foodNutrientPanel), never with list rows.', source: "response->'panel'" },
+      { label: 'Categories', col: 'tags', kind: 'chips' }
+    ],
+    actions: ['Compare', 'Refresh from source'],
+    attribution: 'Nutrition data: USDA FoodData Central (public domain) and/or Open Food Facts (ODbL); images: Open Food Facts contributors, CC BY-SA. Credits shown only for the sources this item used.',
+    notes: [
+      'Thumb is the Open Food Facts packshot, contained not cropped; generic USDA foods have the glyph.',
+      'Subtitle packs brand · Food/Drink · serving so the tiles can be all nutrition.',
+      'Tiles follow the grid basis toggle (per serving / per 100 g/ml) and show the other basis underneath.',
+      'Allergen section carries the not-medical-advice line; the grid filter says "Hide items listing…", never "Safe for…".',
+      'Full panel loads lazily on open (QUERY_BUDGET.md): 60–150 nutrients for USDA Foundation foods.'
+    ]
+  }
 };
 
 /** Layout for a type, falling back to one built from its default-visible bindings. */

@@ -47,7 +47,7 @@ describe('useAddMovie hook', () => {
 			action: { label: 'Go to movie', onClick: expect.any(Function) },
 		});
 		mockToastSuccess.mock.calls[0][1].action.onClick();
-		expect(goto).toHaveBeenCalledWith('/?open=42');
+		expect(goto).toHaveBeenCalledWith('/content-library?open=42');
 	});
 
 	it('falls back to a generic label and no action when the response has no row', () => {

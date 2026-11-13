@@ -77,3 +77,4 @@ The convention is new. Start an intent by copying [`intents/_template.md`](inten
 | Intent | Status |
 |--------|--------|
 | [Calculated columns (user-defined custom metrics)](intents/calculated-columns.md) | draft |
+| [Per-user rate limiting (and the missing chat button)](intents/per-user-rate-limiting.md) | draft |
