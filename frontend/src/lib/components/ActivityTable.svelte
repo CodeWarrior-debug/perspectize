@@ -144,7 +144,7 @@
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
 	import ColumnRelevanceCallout from '$lib/components/ColumnRelevanceCallout.svelte';
-	import { ContentTypeFilter, AgeRatingFilter } from '$lib/utils/contentTypeFilter';
+	import { ContentTypeFilter, AgeRatingFilter, WebRoleFilter } from '$lib/utils/contentTypeFilter';
 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
 	import AddToPlanDialog from '$lib/components/plan/AddToPlanDialog.svelte';
@@ -946,7 +946,7 @@
 				flex: 1,
 				maxWidth: 220,
 				sortable: false,
-				filter: false,
+				filter: WebRoleFilter,
 				cellRenderer: webRolesCellRenderer,
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webRoles },
 				headerTooltip: 'What the page is for, as set by whoever added it',

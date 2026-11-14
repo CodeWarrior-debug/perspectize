@@ -482,7 +482,8 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		filterValue: (row) => webPagePublished(row),
 		filterRange: 'date',
 	},
-	{ colId: 'webRoles', label: 'Roles', picker: 'data', sortable: false },
+	// Server filter only (f.webrole): a page can carry both roles, which the client cannot match on the card list.
+	{ colId: 'webRoles', label: 'Roles', picker: 'data', sortable: false, filterKey: 'webrole', filterSet: true },
 	{
 		colId: 'webAuthor',
 		label: 'Author',

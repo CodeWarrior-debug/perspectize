@@ -15,6 +15,7 @@ import {
 	PERSON_FILTER_KEY,
 	parsePersonFilter,
 } from './grid-config';
+import { WEB_PAGE_ROLE_OPTIONS } from './webPage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -754,6 +755,19 @@ export function urlParamsToGraphQLFilter(
 				}
 				if (max !== undefined) {
 					result.maxBookRating = max;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'webrole': {
+				// Unknown roles are dropped, like unknown types: the server rejects anything outside WebPageRole.
+				const known = new Set(WEB_PAGE_ROLE_OPTIONS.map((o) => o.value.toLowerCase()));
+				const roles = parseSetValue(value)
+					.filter((v) => known.has(v))
+					.map((v) => v.toUpperCase() as WebPageRole);
+				if (roles.length > 0) {
+					result.webPageRoles = roles;
 					hasAny = true;
 				}
 				break;

@@ -23,6 +23,7 @@ describe('CONTENT_TYPE_OPTIONS', () => {
 			{ value: 'bible_passage', label: 'Bible Passage' },
 			{ value: 'movie', label: 'Movie' },
 			{ value: 'book', label: 'Book' },
+			{ value: 'web_page', label: 'Webpage' },
 		]);
 	});
 
@@ -36,7 +37,7 @@ describe('ContentTypeFilter', () => {
 	it('renders one labelled checkbox per content type', () => {
 		const { filter } = setup();
 		const labels = [...filter.getGui().querySelectorAll('label')].map((l) => l.textContent);
-		expect(labels).toEqual(['YouTube Video', 'Bible Passage', 'Movie', 'Book']);
+		expect(labels).toEqual(['YouTube Video', 'Bible Passage', 'Movie', 'Book', 'Webpage']);
 	});
 
 	it('is inactive with nothing ticked', () => {
