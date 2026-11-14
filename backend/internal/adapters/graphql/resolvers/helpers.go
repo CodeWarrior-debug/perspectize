@@ -19,6 +19,20 @@ import (
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
 
+// webPageInputMessage is the user-facing message for a webpage input error, or ""
+// when err is not one. The role is checked before the URL: an unknown role wraps
+// domain.ErrInvalidInput too, and must not be reported as a bad URL. An SSRF refusal
+// is reported as a URL problem and names no address.
+func webPageInputMessage(err error) string {
+	switch {
+	case errors.Is(err, domain.ErrUnknownWebPageRole):
+		return "unknown webpage role"
+	case errors.Is(err, domain.ErrInvalidInput):
+		return "invalid webpage URL: use an http or https link to a public page"
+	}
+	return ""
+}
+
 // webPagePreviewToModel maps the import-preview result to its GraphQL shape.
 // Missing metadata stays nil (missing is not a value). The read time is RFC 3339 UTC.
 func webPagePreviewToModel(p *portservices.WebPagePreview) *model.WebPagePreview {

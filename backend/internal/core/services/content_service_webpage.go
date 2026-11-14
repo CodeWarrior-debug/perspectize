@@ -173,7 +173,7 @@ func normaliseWebPageRoles(in []domain.WebPageRole) ([]domain.WebPageRole, error
 	seen := make(map[domain.WebPageRole]bool, len(in))
 	for _, r := range in {
 		if !r.IsValid() {
-			return nil, fmt.Errorf("%w: unknown webpage role", domain.ErrInvalidInput)
+			return nil, fmt.Errorf("%w: %w", domain.ErrInvalidInput, domain.ErrUnknownWebPageRole)
 		}
 		if seen[r] {
 			continue

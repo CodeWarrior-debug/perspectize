@@ -299,9 +299,9 @@ func (r *mutationResolver) CreateContentFromWebPage(ctx context.Context, input m
 		return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: true}, nil
 	}
 	if err != nil {
-		if errors.Is(err, domain.ErrInvalidInput) {
+		if msg := webPageInputMessage(err); msg != "" {
 			// The message never says why (an SSRF refusal names no address).
-			return nil, fmt.Errorf("invalid webpage URL: use an http or https link to a public page")
+			return nil, errors.New(msg)
 		}
 		// Details are already logged server-side by the service layer.
 		slog.Error("creating webpage content failed", "userID", authUser.ID, "error", err)
@@ -315,8 +315,8 @@ func (r *mutationResolver) CreateContentFromWebPage(ctx context.Context, input m
 func (r *queryResolver) PreviewWebPage(ctx context.Context, url string) (*model.WebPagePreview, error) {
 	preview, err := r.ContentService.PreviewWebPage(ctx, url)
 	if err != nil {
-		if errors.Is(err, domain.ErrInvalidInput) {
-			return nil, fmt.Errorf("invalid webpage URL: use an http or https link to a public page")
+		if msg := webPageInputMessage(err); msg != "" {
+			return nil, errors.New(msg)
 		}
 		slog.Error("previewing webpage failed", "error", err)
 		return nil, fmt.Errorf("failed to read webpage")

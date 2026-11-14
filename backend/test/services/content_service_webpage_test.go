@@ -265,6 +265,7 @@ func TestCreateFromWebPage_UnknownRoleIsInvalidInput(t *testing.T) {
 	_, err := newWebPageService(&mockContentRepository{}, client).CreateFromWebPage(context.Background(), "https://example.com/p",
 		[]domain.WebPageRole{domain.WebPageRole("ARTICLE")}, 1)
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	assert.ErrorIs(t, err, domain.ErrUnknownWebPageRole, "the role error names the role, not the URL")
 	assert.Equal(t, 0, client.calls)
 }
 
