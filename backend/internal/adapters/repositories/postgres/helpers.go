@@ -169,7 +169,9 @@ const (
 	// Published dates (ISO strings, date or timestamp): ASC needs a value after
 	// every real one; DESC uses "" (before all). A row with no date sorts last in
 	// either direction.
-	nullPublishedAtAsc  = "￿￿￿￿"
+	// ASC uses 9999-99-99 rather than a code point above all text: real dates start
+	// with 1 or 2, and digits sort the same in any collation.
+	nullPublishedAtAsc  = "9999-99-99"
 	nullPublishedAtDesc = ""
 )
 
