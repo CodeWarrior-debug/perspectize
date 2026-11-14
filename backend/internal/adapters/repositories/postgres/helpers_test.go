@@ -67,6 +67,10 @@ func TestContentTypeDBValueConversion(t *testing.T) {
 	assert.Equal(t, domain.ContentTypeClaim, contentTypeFromDBValue("claim"))
 	assert.Equal(t, domain.ContentTypeYouTubeVideo, contentTypeFromDBValue("YouTube_Video"))
 	assert.Equal(t, domain.ContentType(""), contentTypeFromDBValue(""))
+
+	// WEB_PAGE round-trips through the lowercase DB value (the column has no CHECK constraint).
+	assert.Equal(t, "web_page", contentTypeToDBValue(domain.ContentTypeWebPage))
+	assert.Equal(t, domain.ContentTypeWebPage, contentTypeFromDBValue("web_page"))
 }
 
 func TestPrivacyDBValueConversion(t *testing.T) {

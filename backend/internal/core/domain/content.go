@@ -14,7 +14,85 @@ const (
 	ContentTypeBiblePassage ContentType = "BIBLE_PASSAGE"
 	ContentTypeMovie        ContentType = "MOVIE"
 	ContentTypeBook         ContentType = "BOOK"
+	ContentTypeWebPage      ContentType = "WEB_PAGE"
 )
+
+// WebPageRole is a role a webpage plays, chosen by the person who added it
+// (never read from the page). Stored uppercase in content.response under
+// "webPageRoles"; the first entry is the primary role.
+type WebPageRole string
+
+const (
+	WebPageRoleBlogPost          WebPageRole = "BLOG_POST"
+	WebPageRoleSessionTranscript WebPageRole = "SESSION_TRANSCRIPT"
+)
+
+// webPageRoleSchemaOrg maps each role to its Schema.org type. Add one line per
+// new role; this is the only place the mapping lives.
+var webPageRoleSchemaOrg = map[WebPageRole]string{
+	WebPageRoleBlogPost:          "BlogPosting",
+	WebPageRoleSessionTranscript: "Conversation", // closest Schema.org match for a working-session record
+}
+
+// SchemaOrgType returns the Schema.org type for a role, or "" for an unknown role.
+func (r WebPageRole) SchemaOrgType() string {
+	return webPageRoleSchemaOrg[r]
+}
+
+// FetchStatus records how the metadata read of a webpage went. Internal to the
+// add flow and the import preview: it is never shown as a value in the grid.
+type FetchStatus string
+
+const (
+	FetchStatusOK       FetchStatus = "OK"
+	FetchStatusBlocked  FetchStatus = "BLOCKED" // the page answered 4xx
+	FetchStatusError    FetchStatus = "ERROR"   // 5xx, a network failure, or too many redirects
+	FetchStatusTimeout  FetchStatus = "TIMEOUT"
+	FetchStatusNotHTML  FetchStatus = "NOT_HTML"
+	FetchStatusTooLarge FetchStatus = "TOO_LARGE"
+)
+
+// WebPageSchemaVersion is the version of the stored WebPageMeta shape.
+const WebPageSchemaVersion = 1
+
+// WebPageFetch is the outcome of one metadata read. HTTPStatus is nil when no
+// response arrived (timeout, network error).
+type WebPageFetch struct {
+	Status     FetchStatus `json:"status"`
+	HTTPStatus *int        `json:"httpStatus"`
+	At         time.Time   `json:"at"`
+}
+
+// WebPageMeta is the metadata read from a webpage's <head> once, at add time
+// (stored in content.response). Missing values are nil, never a guess.
+type WebPageMeta struct {
+	SchemaVersion int           `json:"schemaVersion"`
+	FinalURL      string        `json:"finalUrl"`
+	Domain        string        `json:"domain"`
+	SiteName      *string       `json:"siteName"`
+	Title         *string       `json:"title"`
+	Description   *string       `json:"description"`
+	ImageURL      *string       `json:"imageUrl"`
+	FaviconURL    *string       `json:"faviconUrl"`
+	PublishedAt   *string       `json:"publishedAt"`
+	Roles         []WebPageRole `json:"webPageRoles"`
+	Author        *string       `json:"author"`
+	Lang          *string       `json:"lang"`
+	Fetch         WebPageFetch  `json:"fetch"`
+	// DeclaredCanonical is the page's <link rel=canonical>, absolute. It drives
+	// dedupe only and is never stored (json:"-").
+	DeclaredCanonical string `json:"-"`
+}
+
+// MarshalJSON writes a nil role list as [] (the API field is non-null).
+func (m WebPageMeta) MarshalJSON() ([]byte, error) {
+	type plain WebPageMeta // no methods, so no recursion
+	p := plain(m)
+	if p.Roles == nil {
+		p.Roles = []WebPageRole{}
+	}
+	return json.Marshal(p)
+}
 
 // ContentSearchField identifies a text column that a ContentFilter.search term
 // may be scoped to via ContentFilter.searchFields. Omitted/empty selects TITLE only
