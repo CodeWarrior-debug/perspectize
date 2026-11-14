@@ -1,0 +1,47 @@
+/**
+ * Webpage helpers shared by the Add dialog, the Activity grid and the details view.
+ * Pure functions only: no reactive state, no network.
+ */
+import type { WebPageFetch, WebPageRole } from '$lib/queries/content';
+
+/** The roles an adder can pick, in the order the dropdown lists them. */
+export const WEB_PAGE_ROLE_OPTIONS: ReadonlyArray<{ value: WebPageRole; label: string }> = [
+	{ value: 'BLOG_POST', label: 'Blog post' },
+	{ value: 'SESSION_TRANSCRIPT', label: 'Session transcript' },
+];
+
+const ROLE_LABELS = new Map<string, string>(WEB_PAGE_ROLE_OPTIONS.map((o) => [o.value, o.label]));
+
+/** One role's label. An unknown value (a later enum the client does not know yet) shows as-is. */
+export function webPageRoleLabel(role: string): string {
+	return ROLE_LABELS.get(role) ?? role;
+}
+
+/**
+ * The Type tile: the roles in stored order, joined with a comma. No roles reads as a plain
+ * "Webpage", never as unknown: a missing role is an empty list, not a guess.
+ */
+export function webPageRolesLabel(roles: readonly string[] | null | undefined): string {
+	if (!roles || roles.length === 0) return 'Webpage';
+	return roles.map(webPageRoleLabel).join(', ');
+}
+
+/**
+ * What the Add dialog says when the page's details could not be read. Null when the details
+ * were read (OK) or there is no fetch yet. Save stays open in every case: a failed read never
+ * blocks the add. A missing HTTP status is left out, never printed as "HTTP null".
+ */
+export function webPageReadNotice(fetch: WebPageFetch | null | undefined): string | null {
+	if (!fetch || fetch.status === 'OK') return null;
+	const save = 'You can still save the link.';
+	switch (fetch.status) {
+		case 'BLOCKED':
+			return fetch.httpStatus == null
+				? `We couldn't read this page's details. ${save}`
+				: `We couldn't read this page's details (HTTP ${fetch.httpStatus}). ${save}`;
+		case 'NOT_HTML':
+			return "This link isn't an HTML page, so there are no details to read. You can still save it.";
+		default:
+			return `We couldn't read this page's details. ${save}`;
+	}
+}
