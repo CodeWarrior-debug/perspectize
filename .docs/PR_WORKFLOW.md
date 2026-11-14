@@ -134,6 +134,8 @@ gh pr merge 123 --squash --delete-branch --admin
 - `--delete-branch` — Auto-delete branch after merge
 - `--admin` — Bypass branch protection when needed
 
+**After every merge, sync local `main` in the same turn** (a stacked merge counts too: sync once after the last one): `git -C <main checkout> fetch origin`, then `git -C <main checkout> merge --ff-only origin/main`. Skip it only when that checkout holds uncommitted edits to a file the merge changed (`git diff --name-only main origin/main` against `git status --short`), and say so. Never commit to local `main`: it diverges from `origin/main` and every later `--ff-only` fails. Finish the worktree slot too (WORKTREES.md → Finishing).
+
 ### Stacked PRs (GitHub stacks)
 
 - `gh pr merge` is refused for a PR in a stack ("must be merged using the asynchronous merge REST API"), and `gh stack merge` cannot bypass the required review. Merge bottom-first with `gh api -X PUT repos/CodeWarrior-debug/perspectize/pulls/<n>/merge-async -f merge_method=merge -F bypass_rules=true -f sha=<head sha>`, then poll `GET .../merge-async/<uuid>`. `bypass_rules` is the admin bypass (the `owners-protect-default` ruleset lists the admin role). The API has no delete-branch option: delete the branch afterwards with `gh api -X DELETE repos/CodeWarrior-debug/perspectize/git/refs/heads/<branch>`.
