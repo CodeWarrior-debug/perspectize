@@ -22,6 +22,7 @@ export const COLUMN_LAYOUTS_KEY = 'perspectize:activityColumns:v1';
 export const COLUMN_VIEW_LABEL: Record<ColumnView, string> = {
 	movie: 'Movie columns',
 	book: 'Book columns',
+	webpage: 'Webpage columns',
 	general: 'standard columns',
 };
 
