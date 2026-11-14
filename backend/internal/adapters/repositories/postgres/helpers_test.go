@@ -221,16 +221,30 @@ func TestBuildContentSortRules(t *testing.T) {
 			wantTieOrder: paginator.DESC,
 		},
 		{
-			name:   "published at uses string null replacement",
+			// Nulls sort last in both directions: a webpage (or movie/book) with no date
+			// must not float to the top of an ascending sort.
+			name:   "published at ascending puts nulls last with a high sentinel",
 			sortBy: domain.ContentSortByPublishedAt,
 			order:  domain.SortOrderAsc,
 			wantPrimary: paginator.Rule{
 				Key:             "PublishedAt",
 				Order:           paginator.ASC,
-				SQLRepr:         "response->'items'->0->'snippet'->>'publishedAt'",
-				NULLReplacement: "",
+				SQLRepr:         "CASE WHEN content_type = 'web_page' THEN response->>'publishedAt' ELSE response->'items'->0->'snippet'->>'publishedAt' END",
+				NULLReplacement: "￿￿￿￿",
 			},
 			wantTieOrder: paginator.ASC,
+		},
+		{
+			name:   "published at descending puts nulls last with an empty string",
+			sortBy: domain.ContentSortByPublishedAt,
+			order:  domain.SortOrderDesc,
+			wantPrimary: paginator.Rule{
+				Key:             "PublishedAt",
+				Order:           paginator.DESC,
+				SQLRepr:         "CASE WHEN content_type = 'web_page' THEN response->>'publishedAt' ELSE response->'items'->0->'snippet'->>'publishedAt' END",
+				NULLReplacement: "",
+			},
+			wantTieOrder: paginator.DESC,
 		},
 		{
 			name:   "channel title uses string null replacement",

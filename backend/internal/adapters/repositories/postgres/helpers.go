@@ -166,6 +166,11 @@ const (
 	// "" (before all), so a missing/empty author sorts last in either direction.
 	nullAuthorAsc  = "￿￿￿￿"
 	nullAuthorDesc = ""
+	// Published dates (ISO strings, date or timestamp): ASC needs a value after
+	// every real one; DESC uses "" (before all). A row with no date sorts last in
+	// either direction.
+	nullPublishedAtAsc  = "￿￿￿￿"
+	nullPublishedAtDesc = ""
 )
 
 // contentSortRule builds a single paginator.Rule for one content sort column.
@@ -269,11 +274,17 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 			NULLReplacement: tmdbScoreNull,
 		}
 	case domain.ContentSortByPublishedAt:
+		// A webpage keeps its own publishedAt (YYYY-MM-DD); a YouTube video keeps it in
+		// the snippet. Each row reads only the branch for its type.
+		publishedNull := nullPublishedAtDesc
+		if order == domain.SortOrderAsc {
+			publishedNull = nullPublishedAtAsc
+		}
 		return paginator.Rule{
 			Key:             "PublishedAt",
 			Order:           paginatorOrder,
-			SQLRepr:         "response->'items'->0->'snippet'->>'publishedAt'",
-			NULLReplacement: "",
+			SQLRepr:         "CASE WHEN content_type = 'web_page' THEN response->>'publishedAt' ELSE response->'items'->0->'snippet'->>'publishedAt' END",
+			NULLReplacement: publishedNull,
 		}
 	case domain.ContentSortByChannelTitle:
 		return paginator.Rule{
