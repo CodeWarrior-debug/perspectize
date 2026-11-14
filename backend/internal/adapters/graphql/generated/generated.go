@@ -122,6 +122,7 @@ type ComplexityRoot struct {
 		VerseStartID            func(childComplexity int) int
 		ViewCount               func(childComplexity int) int
 		VisiblePerspectiveCount func(childComplexity int) int
+		WebPage                 func(childComplexity int) int
 	}
 
 	CreateContentResult struct {
@@ -1160,6 +1161,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.VisiblePerspectiveCount(childComplexity), true
+	case "Content.webPage":
+		if e.ComplexityRoot.Content.WebPage == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.WebPage(childComplexity), true
 
 	case "CreateContentResult.alreadyExisted":
 		if e.ComplexityRoot.CreateContentResult.AlreadyExisted == nil {
@@ -4078,6 +4085,8 @@ type Content {
   movie: JSON
   "Book-specific metadata (the shaped Open Library payload); null for other content types."
   book: JSON
+  "Webpage-specific metadata for the grid: siteName, domain, imageUrl, faviconUrl, publishedAt, author, webPageRoles (never null, [] when none); null for other content types."
+  webPage: JSON
   primaryCategory: Category
   # The import that created this row. Null for hand-added content, and when that
   # import is closed and the viewer isn't an admin.
@@ -5314,6 +5323,8 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_movie(ctx, field)
 	case "book":
 		return ec.fieldContext_Content_book(ctx, field)
+	case "webPage":
+		return ec.fieldContext_Content_webPage(ctx, field)
 	case "primaryCategory":
 		return ec.fieldContext_Content_primaryCategory(ctx, field)
 	case "importedFrom":
@@ -8832,6 +8843,29 @@ func (ec *executionContext) _Content_book(ctx context.Context, field graphql.Col
 	)
 }
 func (ec *executionContext) fieldContext_Content_book(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, false, false, "JSON")
+}
+
+func (ec *executionContext) _Content_webPage(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_webPage(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.WebPage, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v map[string]any) graphql.Marshaler {
+			return ec.marshalOJSON2map(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_webPage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Content", field, false, false, "JSON")
 }
 
@@ -23878,6 +23912,11 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "book":
 			out.Values[i] = ec._Content_book(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "webPage":
+			out.Values[i] = ec._Content_webPage(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				atomic.AddUint32(&out.Invalids, 1)
 			}

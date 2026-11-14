@@ -162,6 +162,25 @@ func onboardingDomainToModel(o *domain.UserOnboarding) *model.UserOnboarding {
 	}
 }
 
+// webPageGridPayload is the trimmed webpage payload the grid reads, taken from the
+// stored response already loaded with the row. A key the page never declared is
+// null (missing is not a value); webPageRoles is never null, [] when there are none.
+func webPageGridPayload(response map[string]any) map[string]any {
+	roles, ok := response["webPageRoles"].([]any)
+	if !ok || roles == nil {
+		roles = []any{}
+	}
+	return map[string]any{
+		"siteName":     response["siteName"],
+		"domain":       response["domain"],
+		"imageUrl":     response["imageUrl"],
+		"faviconUrl":   response["faviconUrl"],
+		"publishedAt":  response["publishedAt"],
+		"author":       response["author"],
+		"webPageRoles": roles,
+	}
+}
+
 // domainToModel converts a domain Content to a GraphQL model Content
 func domainToModel(c *domain.Content) *model.Content {
 	m := &model.Content{
@@ -197,6 +216,9 @@ func domainToModel(c *domain.Content) *model.Content {
 			}
 			if c.ContentType == domain.ContentTypeBook {
 				m.Book = responseMap
+			}
+			if c.ContentType == domain.ContentTypeWebPage {
+				m.WebPage = webPageGridPayload(responseMap)
 			}
 		}
 

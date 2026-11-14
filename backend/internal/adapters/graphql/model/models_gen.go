@@ -94,7 +94,9 @@ type Content struct {
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
 	Movie map[string]any `json:"movie,omitempty"`
 	// Book-specific metadata (the shaped Open Library payload); null for other content types.
-	Book                    map[string]any `json:"book,omitempty"`
+	Book map[string]any `json:"book,omitempty"`
+	// Webpage-specific metadata for the grid: siteName, domain, imageUrl, faviconUrl, publishedAt, author, webPageRoles (never null, [] when none); null for other content types.
+	WebPage                 map[string]any `json:"webPage,omitempty"`
 	PrimaryCategory         *Category      `json:"primaryCategory,omitempty"`
 	ImportedFrom            *ImportJobRef  `json:"importedFrom,omitempty"`
 	VerseStartID            *int           `json:"verseStartID,omitempty"`

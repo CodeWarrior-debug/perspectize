@@ -234,6 +234,8 @@ type Content {
   movie: JSON
   "Book-specific metadata (the shaped Open Library payload); null for other content types."
   book: JSON
+  "Webpage-specific metadata for the grid: siteName, domain, imageUrl, faviconUrl, publishedAt, author, webPageRoles (never null, [] when none); null for other content types."
+  webPage: JSON
   primaryCategory: Category
   # The import that created this row. Null for hand-added content, and when that
   # import is closed and the viewer isn't an admin.

@@ -164,3 +164,47 @@ func TestPreviewWebPage_ExistingRowReturnsItsID(t *testing.T) {
 	// IntID marshals as a string; accept either form so the test pins the value, not the encoding.
 	assert.True(t, strings.Contains(fmt.Sprint(data.PreviewWebPage.AlreadyExistsContentID), "5"))
 }
+
+// The grid payload is built from the stored row already loaded by the list, so the
+// list costs one repository call however many webpages it returns.
+func TestContentList_WebPagePayloadRolesNeverNullAndNoExtraLoad(t *testing.T) {
+	calls := 0
+	repo := &mockContentRepository{listFn: func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
+		calls++
+		url := "https://example.com/post"
+		return &domain.PaginatedContent{Items: []*domain.Content{
+			{ID: 1, Name: "Post", URL: &url, ContentType: domain.ContentTypeWebPage,
+				Response: json.RawMessage(`{"siteName":"Jordan's Journey","domain":"example.com","imageUrl":"https://example.com/i.png","webPageRoles":["BLOG_POST"]}`)},
+			{ID: 2, Name: "Plain", URL: &url, ContentType: domain.ContentTypeWebPage,
+				Response: json.RawMessage(`{"domain":"example.com","webPageRoles":[]}`)},
+			{ID: 3, Name: "Video", URL: &url, ContentType: domain.ContentTypeYouTubeVideo,
+				Response: json.RawMessage(`{"items":[]}`)},
+		}}, nil
+	}}
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `{ content { items { id webPage } } }`)
+	require.Empty(t, result.Errors)
+	var data struct {
+		Content struct {
+			Items []struct {
+				ID      string         `json:"id"`
+				WebPage map[string]any `json:"webPage"`
+			} `json:"items"`
+		} `json:"content"`
+	}
+	require.NoError(t, json.Unmarshal(result.Data, &data))
+	require.Len(t, data.Content.Items, 3)
+
+	withRoles := data.Content.Items[0].WebPage
+	assert.Equal(t, "Jordan's Journey", withRoles["siteName"])
+	assert.Equal(t, "example.com", withRoles["domain"])
+	assert.Equal(t, []any{"BLOG_POST"}, withRoles["webPageRoles"])
+
+	plain := data.Content.Items[1].WebPage
+	assert.Equal(t, []any{}, plain["webPageRoles"], "roles are an empty list, never null")
+
+	assert.Nil(t, data.Content.Items[2].WebPage, "other content types have no webPage payload")
+	assert.Equal(t, 1, calls, "the list is one repository call; the payload adds none")
+}
