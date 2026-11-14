@@ -46,7 +46,11 @@ Any other `**Field:**` is a lint error.
 - Skip admin/dev-only UI and backend behavior with no UI.
 - **Sign-in:** the root layout (`frontend/src/routes/+layout.svelte`) shows the guest landing page on every route while signed out, so every in-app task is `Sign-in required: yes`. Only the guest landing and sign-in entries are `no`.
 - Before writing a `Not supported` line or a trap seed, search the whole frontend (Settings included) for the feature. A feature that "doesn't exist" in one component often lives in another.
-- Not caveman-compressed: savings are negligible with caching and scoped loading, and terse fragments hurt accuracy.
+- **Pruned, not fragmented.** Write full sentences: terse fragments hurt accuracy, and they save little with caching and scoped loading. Cut filler instead:
+  - one home per fact: say it once, in the entry that owns it;
+  - drop sentences the model follows by default (for example "be concise" or "be accurate");
+  - state things positively where you can. `Not supported:` lines stay as guardrails; the prompt pairs each with the closest supported option.
+- Fragment-style compression stays unproven until the eval A/B the app-guide spec names (it needs a live `ANTHROPIC_API_KEY`).
 
 ## Eval seeds
 
@@ -61,14 +65,16 @@ Any other `**Field:**` is a lint error.
 
 ## Area index
 
-| Slug | Title | Status |
-|---|---|---|
-| `getting-started` | Getting Started | verified (3 rounds) |
-| `activity` | Activity | verified (1 round) |
-| `adding-content` | Adding Content | verified (2 rounds) |
-| `perspectives` | Perspectives | verified (1 round) |
-| `bible` | Bible Passages | verified (2 rounds) |
-| `compare` | Compare Perspectives | verified (pilot, 3 rounds) |
-| `discover` | Discover | verified (3 rounds) |
-| `messaging` | Messaging | verified (1 round) |
-| `settings` | Settings & Theme | verified (2 rounds); `settings.change-theme` (theme panel) reserved for the owner |
+**Verified at** is the `origin/main` commit and date the verifier checked the area against, as `<short sha> (YYYY-MM-DD)`. `—` means not yet re-verified. The monthly routine's step 5b lists commits to an area's `Source` files since this commit.
+
+| Slug | Title | Status | Verified at |
+|---|---|---|---|
+| `getting-started` | Getting Started | verified (3 rounds) | — |
+| `activity` | Activity | verified (1 round) | — |
+| `adding-content` | Adding Content | verified (2 rounds) | — |
+| `perspectives` | Perspectives | verified (1 round) | — |
+| `bible` | Bible Passages | verified (2 rounds) | — |
+| `compare` | Compare Perspectives | verified (pilot, 3 rounds) | — |
+| `discover` | Discover | verified (3 rounds) | — |
+| `messaging` | Messaging | verified (1 round) | — |
+| `settings` | Settings & Theme | verified (2 rounds); `settings.change-theme` (theme panel) reserved for the owner | — |

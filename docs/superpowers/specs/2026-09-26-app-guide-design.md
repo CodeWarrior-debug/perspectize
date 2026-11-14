@@ -110,7 +110,7 @@ Field rules:
 | `**Sign-in required:**` | yes | `yes` or `no` |
 | `**Source:**` | yes | One or more backticked repo-relative paths that exist |
 
-Style: concise plain English, second person, present tense, no speculation, no marketing. Not caveman-compressed (decided: the savings are negligible with caching and scoped loading, and it costs accuracy and maintainability; an eval A/B test can revisit this later). Every claim must be traceable to a `Source` file. If something can't be confirmed from code, leave it out and flag it to the owner.
+Style: concise plain English, second person, present tense, no speculation, no marketing. Pruned, not fragmented (decided 2026-09-26: fragment-style compression saves little with caching and scoped loading and costs accuracy and maintainability; an eval A/B test can revisit this later. Refined 2026-11-14: cut filler, repeated facts and instructions the model follows by default, but keep full sentences; see `2026-11-14-app-guide-refresh-design.md`). Every claim must be traceable to a `Source` file. If something can't be confirmed from code, leave it out and flag it to the owner.
 
 ### Eval seeds
 
