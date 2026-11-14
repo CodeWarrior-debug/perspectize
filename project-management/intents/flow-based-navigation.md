@@ -69,7 +69,7 @@ Each letter needs one natural verb for each flow: **retrieve** (gather content i
 | L | Locate, Load, Lasso | Look over, Learn, Linger | Lend (a view), Laud, Log | stretch |
 | M | Mine, Muster, Map | Mull, Measure, Mark up | Muse, Mark, Make a case | okay |
 | O | Obtain, Onboard | Observe, Outline, Overview | Opine, Offer, Object | strong |
-| P | Procure, Pull, Prospect | Peruse, Ponder, Pore over | Publish, Post, Posit | strong |
+| P | Procure, Pull, Prospect | Peruse, Ponder, Pore over | Publish, Post, Posit, Pontificate (playful) | strong |
 | Q | Quest, Quarry | Question, Query, Quiz | Quip, Quote, Qualify | playful |
 | R | Retrieve, Reap, Round up | Review, Read, Revisit | **Respond**, React, Reflect, Remark | strong (current) |
 | S | Source, Scout, Save | Study, Scan, Scrutinize | Share, Speak, Say | strong |
