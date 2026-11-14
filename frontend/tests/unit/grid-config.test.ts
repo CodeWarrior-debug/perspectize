@@ -688,3 +688,32 @@ describe('syncItemHeader (Film/Item header without closing an open filter popup)
 		expect(refreshHeader).not.toHaveBeenCalled();
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Type column: hidden whenever the filter names exactly one type (every type, every tier)
+// ---------------------------------------------------------------------------
+describe('Type column with a single-type filter', () => {
+	const tiers = ['xs', 'sm', 'md', 'lg'] as const;
+	const solos = [
+		{ view: 'general', solo: 'youtube_video' },
+		{ view: 'general', solo: 'bible_passage' },
+		{ view: 'movie', solo: 'movie' },
+		{ view: 'book', solo: 'book' },
+		{ view: 'claim', solo: 'claim' },
+	] as const;
+
+	it.each(solos)('hides Type for $solo at every tier', ({ view, solo }) => {
+		for (const tier of tiers) {
+			const { visible, hidden } = defaultColumnVisibility(tier, view, solo);
+			expect(visible, `${solo} ${tier}`).not.toContain('type');
+			expect(hidden, `${solo} ${tier}`).toContain('type');
+		}
+	});
+
+	it('shows Type when no single type is named (no filter or several types)', () => {
+		for (const tier of tiers) {
+			expect(defaultColumnVisibility(tier, 'general').visible).toContain('type');
+			expect(defaultColumnVisibility(tier, 'general', null).visible).toContain('type');
+		}
+	});
+});
