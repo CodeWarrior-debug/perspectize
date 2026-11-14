@@ -69,7 +69,7 @@ Any other `**Field:**` is a lint error.
 
 | Slug | Title | Status | Verified at |
 |---|---|---|---|
-| `getting-started` | Getting Started | verified (3 rounds) | — |
+| `getting-started` | Getting Started | verified (2 rounds) | ea74656e (2026-11-14) |
 | `activity` | Activity | verified (1 round) | — |
 | `adding-content` | Adding Content | verified (2 rounds) | — |
 | `perspectives` | Perspectives | verified (1 round) | — |
