@@ -28,6 +28,7 @@
 	import WebPageTiles from '$lib/components/WebPageTiles.svelte';
 	import WebPageBody from '$lib/components/WebPageBody.svelte';
 	import { webPageSite } from '$lib/utils/webPage';
+	import { useContentDetails } from '$lib/queries/content/useContentDetails';
 	import { bookAuthors, bookResponse, openLibraryCoverUrl } from '$lib/utils/bookFormatting';
 	import PassageText from '$lib/components/PassageText.svelte';
 	import PassagePositionBar from '$lib/components/PassagePositionBar.svelte';
@@ -80,6 +81,25 @@
 	const isMovie = $derived(content?.contentType === 'MOVIE');
 	const isBook = $derived(content?.contentType === 'BOOK');
 	const isWebPage = $derived(content?.contentType === 'WEB_PAGE');
+	// A list row carries the shaped webpage payload but not `response` (the metadata behind the Fetched
+	// tile and the description). Load the details for that one page while the modal is open. A row that
+	// already has `response`, or a closed modal, makes no request. The hook's key is the one a deep link
+	// uses, so the two share a cache entry.
+	const needsWebPageDetails = $derived(open && isWebPage && content != null && content.response == null);
+	const webPageDetails = useContentDetails(() => (needsWebPageDetails && content ? content.id : null));
+	const webPageState = $derived<'loading' | 'failed' | 'loaded'>(
+		!needsWebPageDetails
+			? 'loaded'
+			: webPageDetails.isError
+				? 'failed'
+				: webPageDetails.isPending
+					? 'loading'
+					: 'loaded',
+	);
+	/** The row with its loaded details `response` merged in. A row that already has one is returned as is. */
+	function withWebPageDetails(row: ModalContent): ModalContent {
+		return { ...row, response: row.response ?? webPageDetails.data?.contentByID?.response ?? null };
+	}
 	const isPassage = $derived(content?.contentType === 'BIBLE_PASSAGE');
 	const hasVerseRange = $derived(isPassage && content?.verseStartID != null && content?.verseEndID != null);
 	const setPassageTitle = useSetPassageDisplayTitle();
@@ -336,7 +356,7 @@
 					{:else if isBook}
 						<BookTiles row={content} />
 					{:else if isWebPage}
-						<WebPageTiles row={content} />
+						<WebPageTiles row={withWebPageDetails(content)} loading={webPageState === 'loading'} />
 					{:else if !isPassage}
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Views</div>
@@ -469,7 +489,7 @@
 				{/if}
 
 				{#if isWebPage}
-					<WebPageBody row={content} />
+					<WebPageBody row={withWebPageDetails(content)} state={webPageState} />
 				{/if}
 
 				{#if isMovie}

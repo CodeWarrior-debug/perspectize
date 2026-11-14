@@ -6,7 +6,10 @@
 	// guess. The Author tile appears only when the page declares an author.
 	let {
 		row,
+		loading = false,
 	}: {
+		/** True while the details request is in flight: the Fetched tile shows a placeholder, not a dash. */
+		loading?: boolean;
 		row: {
 			url: string | null;
 			webPage?: Parameters<typeof webPageSite>[0]['webPage'];
@@ -23,7 +26,7 @@
 		{ label: 'Type', value: webPageRolesLabel(webPageRolesOf(row)) },
 		{ label: 'Site', value: webPageSite(row) ?? EMPTY_VALUE },
 		{ label: 'Published', value: formatPublishDate(row.webPage?.publishedAt ?? null) },
-		{ label: 'Fetched', value: fetchedAt ? formatDateTime(fetchedAt) : EMPTY_VALUE },
+		{ label: 'Fetched', value: loading ? '…' : fetchedAt ? formatDateTime(fetchedAt) : EMPTY_VALUE },
 		{ label: 'Category', value: row.primaryCategory?.label ?? EMPTY_VALUE },
 		{ label: 'Date Added', value: row.createdAt ? formatDate(row.createdAt) : EMPTY_VALUE },
 	]);
