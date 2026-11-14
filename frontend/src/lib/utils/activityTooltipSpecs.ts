@@ -1,9 +1,18 @@
 import type { CellCtx, ColTooltipSpec } from './tooltipSpec';
 import {
+	authorValueGetter,
+	bookAuthors,
+	ratingTooltip,
+	ratingValueGetter,
+	readersTooltip,
+	readersValueGetter,
+} from './bookFormatting';
+import {
 	formatCountExact,
 	percentLikedTooltip,
 	percentLikedValueGetter,
 	castTooltipItems,
+	castTooltipCopyValues,
 	boxOfficeTooltip,
 	boxOfficeValueGetter,
 	vsBudgetTooltip,
@@ -48,7 +57,12 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 		copyValue: (c: CellCtx) => percentLikedValueGetter({ data: c.data }),
 	},
 	tags: { mode: 'multi', emptyText: 'No tags', items: (c: CellCtx) => contentTags(c.data) ?? [] },
-	cast: { mode: 'multi', emptyText: 'No cast or directors', items: (c: CellCtx) => castTooltipItems(c.data) },
+	cast: {
+		mode: 'multi',
+		emptyText: 'No cast or directors',
+		items: (c: CellCtx) => castTooltipItems(c.data),
+		itemCopyValues: (c: CellCtx) => castTooltipCopyValues(c.data),
+	},
 	boxOffice: {
 		text: (c: CellCtx) => boxOfficeTooltip({ data: c.data }),
 		copyValue: (c: CellCtx) => boxOfficeValueGetter({ data: c.data }),
@@ -60,6 +74,20 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 	tmdbScore: {
 		text: (c: CellCtx) => tmdbScoreTooltip({ data: c.data }),
 		copyValue: (c: CellCtx) => tmdbScoreValueGetter({ data: c.data }),
+	},
+	author: {
+		mode: 'multi',
+		emptyText: 'No author',
+		items: (c: CellCtx) => bookAuthors(c.data).map((a) => a.name),
+		copyValue: (c: CellCtx) => authorValueGetter({ data: c.data }),
+	},
+	rating: {
+		text: (c: CellCtx) => ratingTooltip({ data: c.data }),
+		copyValue: (c: CellCtx) => ratingValueGetter({ data: c.data }),
+	},
+	readers: {
+		text: (c: CellCtx) => readersTooltip({ data: c.data }),
+		copyValue: (c: CellCtx) => readersValueGetter({ data: c.data }),
 	},
 	budget: {
 		text: (c: CellCtx) => formatMoneyExact(budgetValueGetter({ data: c.data })),

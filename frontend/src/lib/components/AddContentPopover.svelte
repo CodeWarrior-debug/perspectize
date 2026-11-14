@@ -3,10 +3,12 @@
 	import FormPopover from '$lib/components/FormPopover.svelte';
 	import PassagePicker from '$lib/components/PassagePicker.svelte';
 	import { useAddMovie } from '$lib/queries/content/useAddMovie';
+	import { useAddBook } from '$lib/queries/content/useAddBook';
 	import { useAddVideo } from '$lib/queries/content/useAddVideo';
 	import { useAddPassage } from '$lib/queries/content/useAddPassage';
 	import { validateYouTubeUrl } from '$lib/utils/youtube';
 	import { contentNotAllowedMessage, validateMovieInput } from '$lib/utils/movie';
+	import { validateBookInput } from '$lib/utils/book';
 	import { detectContentType } from '$lib/utils/detectContentType';
 	import type { PassageRange } from '$lib/utils/bible';
 	import { defaultRange, isRangeInBounds, isRangeOrdered } from '$lib/utils/passageRange';
@@ -16,8 +18,8 @@
 	import EraserIcon from '@lucide/svelte/icons/eraser';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 
-	type ChosenType = 'YOUTUBE_VIDEO' | 'BIBLE_PASSAGE' | 'MOVIE';
-	const CHOSEN_TYPES: ChosenType[] = ['YOUTUBE_VIDEO', 'BIBLE_PASSAGE', 'MOVIE'];
+	type ChosenType = 'YOUTUBE_VIDEO' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK';
+	const CHOSEN_TYPES: ChosenType[] = ['YOUTUBE_VIDEO', 'BIBLE_PASSAGE', 'MOVIE', 'BOOK'];
 
 	let {
 		triggerVariant = 'default',
@@ -26,6 +28,7 @@
 	} = $props();
 
 	const movieMutation = useAddMovie();
+	const bookMutation = useAddBook();
 
 	let open = $state(false);
 	let input = $state('');
@@ -51,7 +54,10 @@
 			// Only `open` may be a dependency here: `reset` reads the reactive mutation object, so
 			// without untrack a success re-runs this effect (open is still true) and resets the
 			// mutation before the close-on-success effect sees `isSuccess`.
-			untrack(() => movieMutation.reset());
+			untrack(() => {
+				movieMutation.reset();
+				bookMutation.reset();
+			});
 		}
 	});
 
@@ -64,25 +70,36 @@
 
 	const passageMutation = useAddPassage();
 	const videoMutation = useAddVideo();
-	const isPending = $derived(videoMutation.isPending || passageMutation.isPending || movieMutation.isPending);
+	const isPending = $derived(
+		videoMutation.isPending || passageMutation.isPending || movieMutation.isPending || bookMutation.isPending,
+	);
 
 	$effect(() => {
-		if (videoMutation.isSuccess || passageMutation.isSuccess || movieMutation.isSuccess) {
+		if (videoMutation.isSuccess || passageMutation.isSuccess || movieMutation.isSuccess || bookMutation.isSuccess) {
 			open = false;
 		}
 	});
 
-	const notAllowedMessage = $derived(contentNotAllowedMessage(movieMutation.error));
+	const notAllowedMessage = $derived(
+		contentNotAllowedMessage(effectiveType === 'BOOK' ? bookMutation.error : movieMutation.error),
+	);
 
 	const chipLabel = $derived.by(() => {
 		if (!effectiveType) return 'Select a type';
 		const name =
-			effectiveType === 'YOUTUBE_VIDEO' ? 'YouTube' : effectiveType === 'BIBLE_PASSAGE' ? 'Bible passage' : 'Movie';
+			effectiveType === 'YOUTUBE_VIDEO'
+				? 'YouTube'
+				: effectiveType === 'BIBLE_PASSAGE'
+					? 'Bible passage'
+					: effectiveType === 'MOVIE'
+						? 'Movie'
+						: 'Book';
 		return manualType ? `Type: ${name}` : `Detected: ${name}`;
 	});
 
 	const isSubmitDisabled = $derived.by(() => {
-		if (effectiveType === 'YOUTUBE_VIDEO' || effectiveType === 'MOVIE') return !input.trim();
+		if (effectiveType === 'YOUTUBE_VIDEO' || effectiveType === 'MOVIE' || effectiveType === 'BOOK')
+			return !input.trim();
 		if (effectiveType === 'BIBLE_PASSAGE') return !rangeValid;
 		return true;
 	});
@@ -140,6 +157,14 @@
 			}
 			error = '';
 			movieMutation.mutate(url);
+		} else if (effectiveType === 'BOOK') {
+			const url = input.trim();
+			if (!validateBookInput(url)) {
+				error = 'Please enter a valid Open Library book link';
+				return;
+			}
+			error = '';
+			bookMutation.mutate(url);
 		} else if (effectiveType === 'BIBLE_PASSAGE') {
 			if (!rangeValid) return;
 			error = '';
@@ -164,7 +189,7 @@
 	{triggerVariant}
 	triggerLabel="Add Content"
 	title="Add Content"
-	description="Paste a YouTube, TMDB or IMDb link, or type a Bible reference like John 3:16-18."
+	description="Paste a YouTube, TMDB, IMDb or Open Library link, or type a Bible reference like John 3:16-18."
 	submitLabel="Add"
 	pendingLabel="Adding..."
 	{isPending}
@@ -202,6 +227,11 @@
 			{#if error}
 				<p class="text-sm text-red-600">{error}</p>
 			{/if}
+			{#if effectiveType === 'BOOK' && bookMutation.isError}
+				<p class="text-sm text-red-600">
+					{notAllowedMessage ?? 'Could not add this book. Check the link and try again.'}
+				</p>
+			{/if}
 			{#if effectiveType === 'MOVIE' && movieMutation.isError}
 				<p class="text-sm text-red-600">
 					{notAllowedMessage ?? 'Could not add this movie. Check the link and try again.'}
@@ -221,6 +251,7 @@
 					<option value="YOUTUBE_VIDEO">YouTube</option>
 					<option value="BIBLE_PASSAGE">Bible passage</option>
 					<option value="MOVIE">Movie</option>
+					<option value="BOOK">Book</option>
 				</select>
 				<div class="ml-auto flex items-center gap-1">
 					<button
@@ -251,6 +282,12 @@
 			{#if effectiveType === 'MOVIE'}
 				<p class="text-xs text-muted-foreground">
 					This product uses the TMDB API but is not endorsed or certified by TMDB.
+				</p>
+			{/if}
+
+			{#if effectiveType === 'BOOK'}
+				<p class="text-xs text-muted-foreground">
+					Data: Open Library (archive.org), community-contributed; may be incomplete.
 				</p>
 			{/if}
 

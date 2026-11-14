@@ -493,7 +493,7 @@ func TestGormPerspectiveRepository_AggregateByContentIDs(t *testing.T) {
 		// COUNT(quality)/the Quality column at all.
 		rows := sqlmock.NewRows([]string{"content_id", "count", "quality_count", "avg_quality"}).
 			AddRow(11, 1, 0, nil)
-		mock.ExpectQuery(`SELECT c.id AS content_id, COUNT\(p.id\) AS count, COUNT\(p.quality\) AS quality_count, AVG\(p.quality\) AS avg_quality, c.privacy AS privacy, c.added_by_user_id AS owner_id FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id WHERE c.id = ANY\(CAST\(\$1 AS bigint\[\]\)\) GROUP BY "c"."id"`).
+		mock.ExpectQuery(`SELECT c.id AS content_id, COUNT\(p.id\) AS count, COUNT\(p.quality\) AS quality_count, AVG\(p.quality\) AS avg_quality, c.privacy AS privacy, c.added_by_user_id AS owner_id, c.import_job_id FROM content AS c LEFT JOIN perspectives p ON p.content_id = c.id WHERE c.id = ANY\(CAST\(\$1 AS bigint\[\]\)\) GROUP BY "c"."id"`).
 			WithArgs("{11}"). // one bigint[] parameter, not one placeholder per id
 			WillReturnRows(rows)
 
@@ -529,6 +529,53 @@ func TestGormPerspectiveRepository_AggregateByContentIDs(t *testing.T) {
 		got, err := NewGormPerspectiveRepository(db).AggregateByContentIDs(ctx, []int{})
 		require.NoError(t, err)
 		assert.Empty(t, got)
+		assertAllExpectationsMet(t, mock)
+	})
+}
+
+func TestGormPerspectiveRepository_CountVisibleByContentIDs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("signed in counts public or own, one bigint[] parameter", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`SELECT content_id, COUNT\(\*\) AS count FROM "perspectives" WHERE content_id = ANY\(CAST\(\$1 AS bigint\[\]\)\) AND \(privacy = \$2 OR user_id = \$3\) GROUP BY "content_id"`).
+			WithArgs("{11,12}", "public", 7).
+			WillReturnRows(sqlmock.NewRows([]string{"content_id", "count"}).AddRow(11, 3))
+
+		got, err := NewGormPerspectiveRepository(db).CountVisibleByContentIDs(ctx, []int{11, 12}, cInt(7))
+		require.NoError(t, err)
+		assert.Equal(t, map[int]int{11: 3}, got, "content with none visible is absent")
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("anonymous counts public only", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`AND privacy = \$2 GROUP BY "content_id"`).
+			WithArgs("{11}", "public").
+			WillReturnRows(sqlmock.NewRows([]string{"content_id", "count"}).AddRow(11, 1))
+
+		got, err := NewGormPerspectiveRepository(db).CountVisibleByContentIDs(ctx, []int{11}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, map[int]int{11: 1}, got)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("empty contentIDs short-circuits without a query", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		got, err := NewGormPerspectiveRepository(db).CountVisibleByContentIDs(ctx, []int{}, nil)
+		require.NoError(t, err)
+		assert.Empty(t, got)
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("wraps a database error", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`FROM "perspectives"`).WillReturnError(errors.New("boom"))
+
+		got, err := NewGormPerspectiveRepository(db).CountVisibleByContentIDs(ctx, []int{1}, nil)
+		assert.Nil(t, got)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to count visible perspectives by content")
 		assertAllExpectationsMet(t, mock)
 	})
 }

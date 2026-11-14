@@ -4,9 +4,7 @@ import { formatRatingScore } from '$lib/utils/formatting';
 import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
 
 describe('perspectiveRating', () => {
-	const byContentId = new Map([
-		['13', { quality: 7000, importance: 4000, agreement: null }],
-	]);
+	const byContentId = new Map([['13', { quality: 7000, importance: 4000, agreement: null }]]);
 
 	it('returns the viewer rating for the row content id', () => {
 		expect(perspectiveRating(byContentId, 13, 'quality')).toBe(7000);
@@ -49,9 +47,7 @@ describe('activityItemCellRenderer for claims', () => {
 	it('draws no thumbnail for a claim, only the title', () => {
 		const cell = activityItemCellRenderer(params('CLAIM') as never) as HTMLElement;
 		expect(cell.querySelector('[data-testid="item-thumb"]')).toBeNull();
-		expect(cell.querySelector('[data-testid="item-title"]')?.textContent).toBe(
-			'The glove did not fit O.J. Simpson',
-		);
+		expect(cell.querySelector('[data-testid="item-title"]')?.textContent).toBe('The glove did not fit O.J. Simpson');
 	});
 
 	it('keeps the thumbnail slot for a YouTube video', () => {

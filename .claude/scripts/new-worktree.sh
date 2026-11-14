@@ -15,7 +15,9 @@
 #   .claude/scripts/new-worktree.sh <branch> [name] [--dry-run]
 #
 #   <branch>   Existing local branch, existing origin/<branch>, or a new branch name.
-#              New branches start from a freshly fetched origin/main.
+#              New branches start from a freshly fetched origin/main. For a numbered slot
+#              use its home branch: `new-worktree.sh wt/<n> <n>` (push disabled, see
+#              .docs/WORKTREES.md).
 #   [name]     Directory name under .claude/worktrees/ (default: branch with / -> -).
 #   --dry-run  Print what would be created and copied, change nothing.
 #
@@ -87,6 +89,14 @@ if [ "$DRY_RUN" -eq 1 ]; then
 fi
 
 "${ADD_CMD[@]}"
+
+# A slot home branch (wt/<n>, see .docs/WORKTREES.md) only gives a numbered worktree a place to rest
+# between tasks. Point its pushRemote at a remote that doesn't exist so a bare `git push` fails
+# loudly instead of publishing it.
+case "$BRANCH" in
+  wt/*) git -C "$MAIN_ROOT" config "branch.$BRANCH.pushRemote" no_push
+        echo "home branch: pushRemote set to no_push (never push $BRANCH)" ;;
+esac
 
 for f in "${FILES[@]:-}"; do
   [ -n "$f" ] || continue

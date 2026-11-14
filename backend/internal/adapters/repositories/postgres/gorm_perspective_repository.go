@@ -160,12 +160,8 @@ func (r *GormPerspectiveRepository) List(ctx context.Context, params domain.Pers
 	// WHERE shape chosen over UNION: benchmark 2026-09-10 (plan Task 6) — WHERE
 	// ~8.9ms vs UNION ~9.3ms unindexed, 0.02ms vs 0.29ms with a (user_id,created_at) index.
 	if params.RestrictToPublicOrOwner {
-		if params.ViewerID != nil {
-			query = query.Where("privacy = ? OR user_id = ?",
-				privacyToDBValue(domain.PrivacyPublic), *params.ViewerID)
-		} else {
-			query = query.Where("privacy = ?", privacyToDBValue(domain.PrivacyPublic))
-		}
+		visible, args := visiblePerspectivePredicate(params.ViewerID)
+		query = query.Where(visible, args...)
 	}
 
 	// Content privacy dominates perspective privacy: a perspective on a private
@@ -230,6 +226,7 @@ type aggregateRow struct {
 	AvgQuality   *float64
 	Privacy      string
 	OwnerID      int
+	ImportJobID  *int
 }
 
 // AggregateByContentIDs computes, per content ID, the count of ALL
@@ -255,7 +252,7 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 	var rows []aggregateRow
 	err := r.db.WithContext(ctx).
 		Table("content AS c").
-		Select("c.id AS content_id, COUNT(p.id) AS count, COUNT(p.quality) AS quality_count, AVG(p.quality) AS avg_quality, c.privacy AS privacy, c.added_by_user_id AS owner_id").
+		Select("c.id AS content_id, COUNT(p.id) AS count, COUNT(p.quality) AS quality_count, AVG(p.quality) AS avg_quality, c.privacy AS privacy, c.added_by_user_id AS owner_id, c.import_job_id").
 		Joins("LEFT JOIN perspectives p ON p.content_id = c.id").
 		Where("c.id = ANY(CAST(? AS bigint[]))", intsToArray(contentIDs)).
 		Group("c.id").
@@ -273,7 +270,41 @@ func (r *GormPerspectiveRepository) AggregateByContentIDs(ctx context.Context, c
 			AverageQuality: row.AvgQuality,
 			ContentPrivacy: contentPrivacyFromDB(row.Privacy),
 			ContentOwnerID: row.OwnerID,
+			ImportJobID:    row.ImportJobID,
 		}
+	}
+	return out, nil
+}
+
+type visibleCountRow struct {
+	ContentID int
+	Count     int
+}
+
+// CountVisibleByContentIDs counts, per content ID, the perspectives the viewer
+// may read: public rows, plus their own when viewerID is set. This is the same
+// predicate List applies (RestrictToPublicOrOwner), so the count matches what
+// the perspectives list returns. Content with none visible has no row.
+func (r *GormPerspectiveRepository) CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
+	if len(contentIDs) == 0 {
+		return map[int]int{}, nil
+	}
+
+	visible, args := visiblePerspectivePredicate(viewerID)
+	query := r.db.WithContext(ctx).
+		Table("perspectives").
+		Select("content_id, COUNT(*) AS count").
+		Where("content_id = ANY(CAST(? AS bigint[]))", intsToArray(contentIDs)).
+		Where(visible, args...)
+
+	var rows []visibleCountRow
+	if err := query.Group("content_id").Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("failed to count visible perspectives by content: %w", err)
+	}
+
+	out := make(map[int]int, len(rows))
+	for _, row := range rows {
+		out[row.ContentID] = row.Count
 	}
 	return out, nil
 }

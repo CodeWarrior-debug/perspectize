@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	castCellRenderer,
 	castTooltipItems,
+	castTooltipCopyValues,
 	movieResponse,
 	boxOfficeValueGetter,
 	vsBudgetValueGetter,
@@ -36,7 +37,7 @@ import {
 	ratedComparator,
 } from '$lib/utils/grid-config';
 import activityTableSource from '$lib/components/ActivityTable.svelte?raw';
-import { headerMinWidth } from '$lib/utils/formatting';
+import { headerMinWidth } from '$lib/utils/grid-header-width';
 import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
 import {
 	sortsToGraphQL,
@@ -161,6 +162,18 @@ describe('castTooltipItems', () => {
 			}),
 		);
 		expect(items).toEqual(['Chris Evans · as Steve · TMDB #111', 'Chris Evans · as Lance · TMDB #222']);
+	});
+});
+
+describe('castTooltipCopyValues', () => {
+	it('is the bare name per row, parallel to castTooltipItems', () => {
+		const row = movie({ directors: DIRECTORS, cast: CAST.slice(0, 1) });
+		expect(castTooltipCopyValues(row)).toEqual(['Christopher Nolan', 'Leonardo DiCaprio']);
+		expect(castTooltipCopyValues(row)).toHaveLength(castTooltipItems(row).length);
+	});
+
+	it('is empty for a null response', () => {
+		expect(castTooltipCopyValues(movie(null))).toEqual([]);
 	});
 });
 
@@ -565,13 +578,17 @@ describe('grid comparators (Loaded-mode desktop grid)', () => {
 
 describe('default column sets fit the 1212px grid', () => {
 	const blocks = activityTableSource.split(/(?=colId:\s*')/g);
+	// Mirrors ActivityTable's colDef map: the header floor, raised (never lowered) by an explicit minWidth.
 	function minWidth(colId: string): number {
 		const b = blocks.find((x) => x.startsWith(`colId: '${colId}'`));
 		if (!b) throw new Error(`no colDef for ${colId}`);
-		const explicit = b.match(/\n\s*minWidth:\s*(\d+)/)?.[1];
-		if (explicit) return Number(explicit);
+		const explicit = Number(b.match(/\n\s*minWidth:\s*(\d+)/)?.[1] ?? 0);
 		const name = b.match(/headerName:\s*'([^']*)'/)?.[1] ?? '';
-		return headerMinWidth(name, !/\n\s*filter:\s*false/.test(b));
+		const header = headerMinWidth(name, {
+			filter: !/\n\s*filter:\s*false/.test(b),
+			sortable: !/\n\s*sortable:\s*false/.test(b),
+		});
+		return Math.max(explicit, header);
 	}
 	it('YouTube lg set sums under 1212', () => {
 		const { visible } = defaultColumnVisibility('lg', 'general');
@@ -591,31 +608,36 @@ describe('default column sets fit the 1212px grid', () => {
 		expect(total).toBeLessThanOrEqual(1212);
 	});
 
-	it('Movie lg minimum widths are the tuned table without Type, which the filter names (sum 1109)', () => {
+	it('no colDef has its effective minWidth (header floor included) above its maxWidth', () => {
+		for (const b of blocks) {
+			const id = b.match(/^colId:\s*'([^']+)'/)?.[1];
+			const max = b.match(/\n\s*maxWidth:\s*(\d+)/)?.[1];
+			if (id && max) expect(minWidth(id), id).toBeLessThanOrEqual(Number(max));
+		}
+	});
+
+	it('Movie lg minimum widths are the header-derived floors without Type, which the filter names (sum 1104)', () => {
 		const { visible } = defaultColumnVisibility('lg', 'movie', 'movie');
 		expect(visible).not.toContain('type');
 		const widths = Object.fromEntries(visible.map((id) => [id, minWidth(id)]));
 		expect(widths).toMatchObject({
 			item: 185,
-			genre: 82,
-			rated: 82,
+			genre: 79,
+			rated: 98,
 			cast: 125,
-			duration: 111,
-			released: 105,
-			boxOffice: 96,
-			vsBudget: 72,
-			tmdbScore: 111,
-			tags: 90,
+			duration: 121,
+			released: 121,
+			boxOffice: 90,
+			vsBudget: 60,
+			tmdbScore: 104,
+			tags: 71,
 		});
-		expect(Object.values(widths).reduce((a, b) => a + b, 0)).toBe(1109);
+		expect(Object.values(widths).reduce((a, b) => a + b, 0)).toBe(1104);
 	});
 
-	it('no colDef has minWidth above maxWidth', () => {
-		for (const b of blocks) {
-			const min = b.match(/\n\s*minWidth:\s*(\d+)/)?.[1];
-			const max = b.match(/\n\s*maxWidth:\s*(\d+)/)?.[1];
-			if (min && max) expect(Number(min), b.slice(0, 30)).toBeLessThanOrEqual(Number(max));
-		}
+	it('the map in ActivityTable floors every column at its header width', () => {
+		// Guards against a colDef's explicit minWidth replacing (rather than raising) the header floor.
+		expect(activityTableSource).toMatch(/minWidth:\s*Math\.max\(\s*col\.minWidth \?\? 0,\s*headerMinWidth\(/);
 	});
 });
 

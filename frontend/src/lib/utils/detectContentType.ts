@@ -1,5 +1,6 @@
 import { validateYouTubeUrl } from './youtube';
 import { validateMovieInput } from './movie';
+import { validateBookInput } from './book';
 import { parseReference, type PassageRange } from './passageParserAdapter';
 
 export type { PassageRange };
@@ -10,6 +11,8 @@ export type DetectionResult =
 	| { type: 'BIBLE_PASSAGE'; range: PassageRange; source: 'text' | 'biblegateway' }
 	/** TMDB or IMDb title link (a bare IMDb id is also accepted, silently). */
 	| { type: 'MOVIE'; url: string }
+	/** Open Library work or edition link. Author and other Open Library links are never a book. */
+	| { type: 'BOOK'; url: string }
 	| { type: null };
 
 const BIBLE_GATEWAY_HOSTS = new Set(['biblegateway.com', 'www.biblegateway.com']);
@@ -38,8 +41,9 @@ function parseBibleGatewayUrl(url: URL): PassageRange | null {
  * (AN Q21) so this has at most one entry, but the list shape lets a future ambiguous
  * type be added without a signature change.
  *
- * Precedence: YouTube URL > movie link > Bible Gateway URL > typed Bible reference. Anything else
- * (any other URL, free text) is no match: empty candidates, never guessed.
+ * Precedence: YouTube URL > movie link > Open Library book link > Bible Gateway URL > typed Bible
+ * reference. Anything else (any other URL, free text) is no match: empty candidates, never
+ * guessed. Claims are declared on the Declare page, not detected here.
  */
 export function detectContentCandidates(input: string): DetectionResult[] {
 	const trimmed = input.trim();
@@ -48,6 +52,8 @@ export function detectContentCandidates(input: string): DetectionResult[] {
 	if (validateYouTubeUrl(trimmed)) return [{ type: 'YOUTUBE_VIDEO', url: trimmed }];
 
 	if (validateMovieInput(trimmed)) return [{ type: 'MOVIE', url: trimmed }];
+
+	if (validateBookInput(trimmed)) return [{ type: 'BOOK', url: trimmed }];
 
 	const url = parseUrl(trimmed);
 	if (url) {

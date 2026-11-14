@@ -16,6 +16,36 @@ type ThreadEvent interface {
 	IsThreadEvent()
 }
 
+type AddImportJobSourcesInput struct {
+	JobID   int                        `json:"jobId"`
+	Sources []*CreateImportSourceInput `json:"sources"`
+}
+
+type BookSearchPage struct {
+	Items        []*BookSearchResult `json:"items"`
+	Page         int                 `json:"page"`
+	TotalPages   int                 `json:"totalPages"`
+	TotalResults int                 `json:"totalResults"`
+}
+
+type BookSearchResult struct {
+	WorkKey               string   `json:"workKey"`
+	Title                 string   `json:"title"`
+	AuthorName            []string `json:"authorName"`
+	CoverID               *int     `json:"coverId,omitempty"`
+	FirstPublishYear      *int     `json:"firstPublishYear,omitempty"`
+	PageCountMedian       *int     `json:"pageCountMedian,omitempty"`
+	Subjects              []string `json:"subjects"`
+	RatingsAverage        *float64 `json:"ratingsAverage,omitempty"`
+	RatingsCount          *int     `json:"ratingsCount,omitempty"`
+	EditionCount          *int     `json:"editionCount,omitempty"`
+	WantToReadCount       *int     `json:"wantToReadCount,omitempty"`
+	CurrentlyReadingCount *int     `json:"currentlyReadingCount,omitempty"`
+	AlreadyReadCount      *int     `json:"alreadyReadCount,omitempty"`
+	ReadingLogCount       *int     `json:"readingLogCount,omitempty"`
+	URL                   string   `json:"url"`
+}
+
 type CategorizedRating struct {
 	Category string `json:"category"`
 	Rating   int    `json:"rating"`
@@ -35,6 +65,11 @@ type Category struct {
 	WikipediaURL *string `json:"wikipediaUrl,omitempty"`
 	CreatedAt    string  `json:"createdAt"`
 	UpdatedAt    string  `json:"updatedAt"`
+}
+
+type CloseImportJobInput struct {
+	JobID  int  `json:"jobId"`
+	Closed bool `json:"closed"`
 }
 
 type Content struct {
@@ -57,54 +92,67 @@ type Content struct {
 	Description   *string               `json:"description,omitempty"`
 	Response      map[string]any        `json:"response,omitempty"`
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
-	Movie           map[string]any `json:"movie,omitempty"`
+	Movie map[string]any `json:"movie,omitempty"`
+	// Book-specific metadata (the shaped Open Library payload); null for other content types.
+	Book            map[string]any `json:"book,omitempty"`
 	PrimaryCategory *Category      `json:"primaryCategory,omitempty"`
+	ImportedFrom    *ImportJobRef  `json:"importedFrom,omitempty"`
 	VerseStartID    *int           `json:"verseStartID,omitempty"`
 	VerseEndID      *int           `json:"verseEndID,omitempty"`
 	DisplayTitle    *string        `json:"displayTitle,omitempty"`
 	// User-set attributes; for CLAIM, effectiveDate and evaluateBy as YYYY-MM-DD. Null when unset.
-	CustomFields       map[string]any `json:"customFields,omitempty"`
-	Privacy            domain.Privacy `json:"privacy"`
-	PerspectiveCount   *int           `json:"perspectiveCount,omitempty"`
-	AverageRating      *float64       `json:"averageRating,omitempty"`
-	QualityRatingCount *int           `json:"qualityRatingCount,omitempty"`
-	CreatedAt          string         `json:"createdAt"`
-	UpdatedAt          string         `json:"updatedAt"`
-	PrimaryCategoryID  *int           `json:"-"`
+	CustomFields            map[string]any `json:"customFields,omitempty"`
+	Privacy                 domain.Privacy `json:"privacy"`
+	PerspectiveCount        *int           `json:"perspectiveCount,omitempty"`
+	VisiblePerspectiveCount *int           `json:"visiblePerspectiveCount,omitempty"`
+	AverageRating           *float64       `json:"averageRating,omitempty"`
+	QualityRatingCount      *int           `json:"qualityRatingCount,omitempty"`
+	CreatedAt               string         `json:"createdAt"`
+	UpdatedAt               string         `json:"updatedAt"`
+	ImportJobID             *int           `json:"-"`
+	PrimaryCategoryID       *int           `json:"-"`
 }
 
 type ContentFilter struct {
-	ContentType       *domain.ContentType         `json:"contentType,omitempty"`
-	ContentTypes      []domain.ContentType        `json:"contentTypes,omitempty"`
-	MinLengthSeconds  *int                        `json:"minLengthSeconds,omitempty"`
-	MaxLengthSeconds  *int                        `json:"maxLengthSeconds,omitempty"`
-	Search            *string                     `json:"search,omitempty"`
-	SearchFields      []domain.ContentSearchField `json:"searchFields,omitempty"`
-	PersonID          *int                        `json:"personId,omitempty"`
-	PersonRole        *domain.PersonRole          `json:"personRole,omitempty"`
-	GenreContains     *string                     `json:"genreContains,omitempty"`
-	CastContains      *string                     `json:"castContains,omitempty"`
-	AgeRating         []string                    `json:"ageRating,omitempty"`
-	ReleasedAfter     *string                     `json:"releasedAfter,omitempty"`
-	ReleasedBefore    *string                     `json:"releasedBefore,omitempty"`
-	MinBoxOffice      *float64                    `json:"minBoxOffice,omitempty"`
-	MaxBoxOffice      *float64                    `json:"maxBoxOffice,omitempty"`
-	MinTmdbScore      *float64                    `json:"minTmdbScore,omitempty"`
-	MaxTmdbScore      *float64                    `json:"maxTmdbScore,omitempty"`
-	MinViewCount      *int                        `json:"minViewCount,omitempty"`
-	MaxViewCount      *int                        `json:"maxViewCount,omitempty"`
-	MinLikeCount      *int                        `json:"minLikeCount,omitempty"`
-	MaxLikeCount      *int                        `json:"maxLikeCount,omitempty"`
-	PublishedAfter    *string                     `json:"publishedAfter,omitempty"`
-	PublishedBefore   *string                     `json:"publishedBefore,omitempty"`
-	ChannelTitle      *string                     `json:"channelTitle,omitempty"`
-	TagContains       *string                     `json:"tagContains,omitempty"`
-	DescriptionSearch *string                     `json:"descriptionSearch,omitempty"`
-	AddedByUsername   *string                     `json:"addedByUsername,omitempty"`
-	CreatedAfter      *string                     `json:"createdAfter,omitempty"`
-	CreatedBefore     *string                     `json:"createdBefore,omitempty"`
-	UpdatedAfter      *string                     `json:"updatedAfter,omitempty"`
-	UpdatedBefore     *string                     `json:"updatedBefore,omitempty"`
+	ContentType         *domain.ContentType         `json:"contentType,omitempty"`
+	ContentTypes        []domain.ContentType        `json:"contentTypes,omitempty"`
+	MinLengthSeconds    *int                        `json:"minLengthSeconds,omitempty"`
+	MaxLengthSeconds    *int                        `json:"maxLengthSeconds,omitempty"`
+	Search              *string                     `json:"search,omitempty"`
+	SearchFields        []domain.ContentSearchField `json:"searchFields,omitempty"`
+	PersonID            *int                        `json:"personId,omitempty"`
+	PersonRole          *domain.PersonRole          `json:"personRole,omitempty"`
+	GenreContains       *string                     `json:"genreContains,omitempty"`
+	CastContains        *string                     `json:"castContains,omitempty"`
+	AgeRating           []string                    `json:"ageRating,omitempty"`
+	ReleasedAfter       *string                     `json:"releasedAfter,omitempty"`
+	ReleasedBefore      *string                     `json:"releasedBefore,omitempty"`
+	MinBoxOffice        *float64                    `json:"minBoxOffice,omitempty"`
+	MaxBoxOffice        *float64                    `json:"maxBoxOffice,omitempty"`
+	MinTmdbScore        *float64                    `json:"minTmdbScore,omitempty"`
+	MaxTmdbScore        *float64                    `json:"maxTmdbScore,omitempty"`
+	AuthorContains      *string                     `json:"authorContains,omitempty"`
+	MinPublishYear      *int                        `json:"minPublishYear,omitempty"`
+	MaxPublishYear      *int                        `json:"maxPublishYear,omitempty"`
+	MinPages            *int                        `json:"minPages,omitempty"`
+	MaxPages            *int                        `json:"maxPages,omitempty"`
+	MinBookRating       *float64                    `json:"minBookRating,omitempty"`
+	MaxBookRating       *float64                    `json:"maxBookRating,omitempty"`
+	MinViewCount        *int                        `json:"minViewCount,omitempty"`
+	MaxViewCount        *int                        `json:"maxViewCount,omitempty"`
+	MinLikeCount        *int                        `json:"minLikeCount,omitempty"`
+	MaxLikeCount        *int                        `json:"maxLikeCount,omitempty"`
+	PublishedAfter      *string                     `json:"publishedAfter,omitempty"`
+	PublishedBefore     *string                     `json:"publishedBefore,omitempty"`
+	ChannelTitle        *string                     `json:"channelTitle,omitempty"`
+	TagContains         *string                     `json:"tagContains,omitempty"`
+	DescriptionSearch   *string                     `json:"descriptionSearch,omitempty"`
+	AddedByUsername     *string                     `json:"addedByUsername,omitempty"`
+	MinPerspectiveCount *int                        `json:"minPerspectiveCount,omitempty"`
+	CreatedAfter        *string                     `json:"createdAfter,omitempty"`
+	CreatedBefore       *string                     `json:"createdBefore,omitempty"`
+	UpdatedAfter        *string                     `json:"updatedAfter,omitempty"`
+	UpdatedBefore       *string                     `json:"updatedBefore,omitempty"`
 }
 
 type ContentSortInput struct {
@@ -119,6 +167,10 @@ type CreateClaimInput struct {
 	EffectiveDate   *string         `json:"effectiveDate,omitempty"`
 	EvaluateBy      *string         `json:"evaluateBy,omitempty"`
 	Privacy         *domain.Privacy `json:"privacy,omitempty"`
+}
+
+type CreateContentFromBookInput struct {
+	URL string `json:"url"`
 }
 
 type CreateContentFromMovieInput struct {
@@ -142,6 +194,18 @@ type CreateContentFromYouTubeInput struct {
 type CreateContentResult struct {
 	Content        *Content `json:"content"`
 	AlreadyExisted bool     `json:"alreadyExisted"`
+}
+
+type CreateImportJobInput struct {
+	Name        string                     `json:"name"`
+	Description *string                    `json:"description,omitempty"`
+	Sources     []*CreateImportSourceInput `json:"sources"`
+}
+
+type CreateImportSourceInput struct {
+	SourceType domain.ImportSourceType  `json:"sourceType"`
+	Ref        string                   `json:"ref"`
+	Role       *domain.ImportPersonRole `json:"role,omitempty"`
 }
 
 type CreateMessageThreadInput struct {
@@ -233,6 +297,118 @@ type FeelingStats struct {
 	AverageIntensity      *float64 `json:"averageIntensity,omitempty"`
 	StdDevIntensity       *float64 `json:"stdDevIntensity,omitempty"`
 	PercentOfPerspectives *float64 `json:"percentOfPerspectives,omitempty"`
+}
+
+type ImportChapter struct {
+	StartSeconds int    `json:"startSeconds"`
+	Title        string `json:"title"`
+}
+
+type ImportItem struct {
+	ID              string                   `json:"id"`
+	SourceID        string                   `json:"sourceId"`
+	DestinationType domain.ContentType       `json:"destinationType"`
+	ExternalID      string                   `json:"externalId"`
+	URL             string                   `json:"url"`
+	Title           string                   `json:"title"`
+	Facts           map[string]any           `json:"facts"`
+	Excluded        bool                     `json:"excluded"`
+	Position        int                      `json:"position"`
+	StatsFetchedAt  string                   `json:"statsFetchedAt"`
+	InLibrary       bool                     `json:"inLibrary"`
+	ContentID       *string                  `json:"contentId,omitempty"`
+	ImportStatus    *domain.ImportItemStatus `json:"importStatus,omitempty"`
+	ImportError     *string                  `json:"importError,omitempty"`
+	ImportedAt      *string                  `json:"importedAt,omitempty"`
+}
+
+type ImportItemDetails struct {
+	Item        *ImportItem      `json:"item"`
+	Description string           `json:"description"`
+	Tags        []string         `json:"tags"`
+	Chapters    []*ImportChapter `json:"chapters"`
+	Links       []string         `json:"links"`
+	People      []*ImportPerson  `json:"people"`
+	Genres      []string         `json:"genres"`
+	Language    *string          `json:"language,omitempty"`
+}
+
+type ImportItemsInput struct {
+	JobID   int   `json:"jobId"`
+	ItemIds []int `json:"itemIds"`
+}
+
+type ImportItemsResult struct {
+	Queued           int `json:"queued"`
+	AlreadyInLibrary int `json:"alreadyInLibrary"`
+	AlreadyQueued    int `json:"alreadyQueued"`
+	NotFound         int `json:"notFound"`
+	Excluded         int `json:"excluded"`
+}
+
+type ImportJob struct {
+	ID              string                     `json:"id"`
+	Name            string                     `json:"name"`
+	Description     *string                    `json:"description,omitempty"`
+	RequestStatus   domain.ImportRequestStatus `json:"requestStatus"`
+	RequestedBy     *User                      `json:"requestedBy,omitempty"`
+	ReviewNote      *string                    `json:"reviewNote,omitempty"`
+	ReviewedAt      *string                    `json:"reviewedAt,omitempty"`
+	ClosedAt        *string                    `json:"closedAt,omitempty"`
+	Sources         []*ImportSource            `json:"sources"`
+	CreatedAt       string                     `json:"createdAt"`
+	UpdatedAt       string                     `json:"updatedAt"`
+	Items           []*ImportItem              `json:"items"`
+	RequesterUserID int                        `json:"-"`
+}
+
+type ImportJobRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type ImportListingProgress struct {
+	JobID     string                         `json:"jobId"`
+	Listing   bool                           `json:"listing"`
+	Sources   []*ImportSourceListingProgress `json:"sources"`
+	UpdatedAt string                         `json:"updatedAt"`
+}
+
+type ImportPerson struct {
+	Name string `json:"name"`
+	Role string `json:"role"`
+}
+
+type ImportProgress struct {
+	JobID     string `json:"jobId"`
+	Total     int    `json:"total"`
+	Done      int    `json:"done"`
+	Imported  int    `json:"imported"`
+	Skipped   int    `json:"skipped"`
+	Failed    int    `json:"failed"`
+	Running   bool   `json:"running"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type ImportSource struct {
+	ID              string                    `json:"id"`
+	SourceType      domain.ImportSourceType   `json:"sourceType"`
+	SourceRef       string                    `json:"sourceRef"`
+	Title           *string                   `json:"title,omitempty"`
+	URL             *string                   `json:"url,omitempty"`
+	Role            *domain.ImportPersonRole  `json:"role,omitempty"`
+	DestinationType domain.ContentType        `json:"destinationType"`
+	Status          domain.ImportSourceStatus `json:"status"`
+	StatusDetail    *string                   `json:"statusDetail,omitempty"`
+	ItemCount       int                       `json:"itemCount"`
+	FetchedAt       *string                   `json:"fetchedAt,omitempty"`
+}
+
+type ImportSourceListingProgress struct {
+	SourceID string                    `json:"sourceId"`
+	Staged   int                       `json:"staged"`
+	Batches  int                       `json:"batches"`
+	Status   domain.ImportSourceStatus `json:"status"`
 }
 
 type InboxEvent struct {
@@ -415,10 +591,22 @@ type ReadReceiptChanged struct {
 
 func (ReadReceiptChanged) IsThreadEvent() {}
 
+type ReviewImportJobInput struct {
+	JobID   int     `json:"jobId"`
+	Approve bool    `json:"approve"`
+	Note    *string `json:"note,omitempty"`
+}
+
 type SendMessageInput struct {
 	ThreadID    string `json:"threadId"`
 	Body        string `json:"body"`
 	ClientNonce string `json:"clientNonce"`
+}
+
+type SetImportItemsExcludedInput struct {
+	JobID    int   `json:"jobId"`
+	ItemIds  []int `json:"itemIds"`
+	Excluded bool  `json:"excluded"`
 }
 
 type SetPassageDisplayTitleInput struct {
@@ -466,6 +654,11 @@ type UpdateClaimInput struct {
 	EffectiveDate *string         `json:"effectiveDate,omitempty"`
 	EvaluateBy    *string         `json:"evaluateBy,omitempty"`
 	Privacy       *domain.Privacy `json:"privacy,omitempty"`
+}
+
+type UpdateImportJobDescriptionInput struct {
+	JobID       int    `json:"jobId"`
+	Description string `json:"description"`
 }
 
 // Partial update: omit a field to leave it unchanged. For quality, agreement,

@@ -13,6 +13,7 @@ const (
 	ContentTypeClaim        ContentType = "CLAIM"
 	ContentTypeBiblePassage ContentType = "BIBLE_PASSAGE"
 	ContentTypeMovie        ContentType = "MOVIE"
+	ContentTypeBook         ContentType = "BOOK"
 )
 
 // ClaimMaxLength caps a claim's normalised text, in characters (runes).
@@ -87,9 +88,12 @@ type Content struct {
 	CustomFields json.RawMessage
 	// Privacy controls who can read the row. Empty is treated as PrivacyPublic on
 	// write. CLAIM content is created PrivacyPrivate (owner-only).
-	Privacy   Privacy
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	Privacy Privacy
+	// ImportJobID is the import that created this row; nil for hand-added content.
+	// Set once at insert: a later re-add of the same URL never changes it.
+	ImportJobID *int
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 // VisibleTo reports whether viewerID may read this row. A PRIVATE row is visible

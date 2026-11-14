@@ -23,7 +23,18 @@ gh api repos/CodeWarrior-debug/perspectize/issues/123 --jq '.title, .html_url'
 gh api repos/CodeWarrior-debug/perspectize/pulls/123/comments
 ```
 
-**Creating a PR:** the `require-session-reflection-before-pr.sh` hook blocks `gh pr create` until `/revise-claude-md` has run, and it can't detect completion. After running it, create the PR with `gh api repos/CodeWarrior-debug/perspectize/pulls -f title="..." -f body="..." -f head="branch" -f base="main"`.
+**Creating a PR:** push and open the PR immediately with `gh api repos/CodeWarrior-debug/perspectize/pulls -f title="..." -f body="..." -f head="branch" -f base="main"` (`gh pr create` fails with the Projects Classic deprecation). The `require-session-reflection-before-pr.sh` hook no longer blocks `gh pr create`; it allows it and prints a warning that session learnings must still be reviewed after the PR is up. See [Session learnings](#session-learnings).
+
+## Session learnings
+
+`/revise-claude-md` never delays the PR. The flow:
+
+1. Push and open the PR immediately.
+2. While CI runs for the first time, run `/revise-claude-md`.
+3. **CRITICAL** learning → commit the CLAUDE.md/doc edit on the PR branch.
+4. Anything else → put it in the PR body under **Session Learnings** (the section in every PR template). The `monthly-maintenance` routine collects these from merged PR bodies (step 3b).
+
+**CRITICAL means exactly this** (the only definition; other docs link here): a learning that corrects a rule which would cause **data loss**, a **security problem**, or a **failing CI**. Everything else is non-critical, however useful. If the PR has no learnings, write "None" under the heading.
 
 **Cloud sessions:** `gh` is unavailable. Open the PR yourself with the GitHub MCP `create_pull_request` tool and set labels with `issue_write` — see [SESSION_ENVIRONMENT.md](SESSION_ENVIRONMENT.md).
 
@@ -75,6 +86,16 @@ Marks a PR opened from a **cloud** session whose remaining work needs the user's
 - **Cloud sessions:** apply the label (and list the local-only steps) instead of claiming unverified work is done.
 - **Local sessions:** remove the label once every checklist item under "Local session takeover" is done.
 
+## `new-content-type` label
+
+Marks a PR that carries the **spec or first implementation of a new content type**: the design/spec/brainstorm docs for a type that doesn't exist yet (including designer-tool seeds), and the PRs that first land the type in the app (backend type, ingest, first frontend slices).
+
+- **Put it on:** at creation time, on every PR whose main purpose is introducing a new type (e.g. `MOVIE`, `AUDIO_TRACK`, `BIBLE_PASSAGE`, a Food & Drink spec). Apply it to each PR of a multi-PR first implementation (backend slice, frontend slice, integration/re-land).
+- **Don't put it on:** later changes to an existing type (new columns, sorts, filters, polish), or generic work that only touches content types (e.g. a rename, `content-type-designer` tooling with no new type). Judge by the diff, not the title.
+- **Independent of the other labels.** It describes what the PR is, not its review state, so it can sit beside `needs-demo-video` / `ready for review` and the migration labels. Keep it when the other labels are swapped.
+- **Find them:** `gh pr list --state all --label new-content-type`.
+- **Cloud sessions:** set it with the GitHub MCP `issue_write` tool; its `labels` field replaces the whole set, so pass the existing labels too.
+
 ## CI
 
 - **Trigger:** `ci.yml` runs only on PRs and pushes to `main`. Pushing a feature branch with no PR runs nothing, so a PR is the way to get CI's verdict.
@@ -112,3 +133,13 @@ gh pr merge 123 --squash --delete-branch --admin
 - `--squash` — Single commit (cleaner history)
 - `--delete-branch` — Auto-delete branch after merge
 - `--admin` — Bypass branch protection when needed
+
+**After every merge, local `main` must be synced in the same turn.** The `sync-main-after-merge.sh` PostToolUse hook does it after `gh pr merge` and the merge API ([HOOKS.md](HOOKS.md)); read its message, and when it says it skipped, or a merge happened some other way (the GitHub UI, another machine), do it by hand: `git -C <main checkout> fetch origin`, then `git -C <main checkout> merge --ff-only origin/main`. Skip only when that checkout holds uncommitted edits to a file the merge changed (`git diff --name-only main origin/main` against `git status --short`), and say so. For a stacked merge the hook syncs after each PR; the last sync is the one that counts. Never commit to local `main`: it diverges from `origin/main` and every later `--ff-only` fails. Finish the worktree slot too (WORKTREES.md → Finishing).
+
+### Stacked PRs (GitHub stacks)
+
+- `gh pr merge` is refused for a PR in a stack ("must be merged using the asynchronous merge REST API"), and `gh stack merge` cannot bypass the required review. Merge bottom-first with `gh api -X PUT repos/CodeWarrior-debug/perspectize/pulls/<n>/merge-async -f merge_method=merge -F bypass_rules=true -f sha=<head sha>`, then poll `GET .../merge-async/<uuid>`. `bypass_rules` is the admin bypass (the `owners-protect-default` ruleset lists the admin role). The API has no delete-branch option: delete the branch afterwards with `gh api -X DELETE repos/CodeWarrior-debug/perspectize/git/refs/heads/<branch>`.
+- To keep individual commits use `merge_method=merge`. "Rebase and merge" is refused once a branch holds a merge commit, e.g. from resolving a conflict with `main`.
+- After merging the bottom PR, the next one retargets to `main` and CI reruns; wait for green before merging it. A conflict fix on a lower PR usually conflicts again in the one above (merge the lower branch into it).
+- You cannot approve your own PR (`gh pr review --approve` fails); admin bypass is the way through.
+- Tooling: `gh stack` extension plus the user-scope `gh-stack` skill (`gh skill install github/gh-stack gh-stack --agent claude-code --scope user`; needs `gh` 2.90+).

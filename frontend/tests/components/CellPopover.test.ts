@@ -69,6 +69,30 @@ describe('CellPopover', () => {
 		expect(writeText).toHaveBeenCalledWith('a, b');
 	});
 
+	const castState = () => ({
+		anchor: anchor(),
+		mode: 'multi' as const,
+		text: '',
+		copy: null,
+		items: ['Ben Affleck · as Chuckie Sullivan · TMDB #880', 'Matt Damon · as Will Hunting · TMDB #1892'],
+		copyValues: ['Ben Affleck', 'Matt Damon'],
+	});
+
+	it('multi mode: rows stay fully visible but Copy selected copies only the name', async () => {
+		render(CellPopover, { ...base, state: castState() });
+		const row = screen.getByTestId('tip-item-Ben Affleck · as Chuckie Sullivan · TMDB #880');
+		expect(row.textContent).toBe('Ben Affleck · as Chuckie Sullivan · TMDB #880');
+		await fireEvent.click(row);
+		await fireEvent.click(screen.getByTestId('tip-copy-selected'));
+		expect(writeText).toHaveBeenCalledWith('Ben Affleck');
+	});
+
+	it('multi mode: Copy all copies names only', async () => {
+		render(CellPopover, { ...base, state: castState() });
+		await fireEvent.click(screen.getByTestId('tip-copy-all'));
+		expect(writeText).toHaveBeenCalledWith('Ben Affleck, Matt Damon');
+	});
+
 	it('Esc calls onClose', async () => {
 		const onClose = vi.fn();
 		render(CellPopover, {

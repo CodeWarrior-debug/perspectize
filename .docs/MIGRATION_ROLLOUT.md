@@ -34,7 +34,28 @@ Use `make -s` (silent) for every `migrate-*` target. Without `-s`, make echoes t
 5. **Apply one.** `make -s migrate-up-n N=1 DB_URL="$(cat ~/.perspectize-neon-prod.url)"`. Expect `<n>/u <name>`.
 6. **Verify.** `make -s migrate-version DB_URL="$(cat ~/.perspectize-neon-prod.url)"` shows the new number, clean. Then check what the migration created (counts, seeded rows) with a few `SELECT`s in the Neon SQL editor. The PR body should list the exact queries and expected values.
 7. **Label.** Swap `migrations-unapplied` for `migrations-applied` on the PR (`.docs/PR_WORKFLOW.md` → Migration labels) once every environment is done. There is one live database (Neon `production`), so that is after this run.
-8. **Clean up.** After a day or so of the change running cleanly: `neon branches delete pre-<migration-number>-<short-name>`. Also delete any leftover `*-verify` branch and its `~/.perspectize-neon-branch.*` file. `~/.perspectize-neon-prod.url` can stay on a personal machine (it is `chmod 600`); re-run step 2 to refresh it after the database password is rotated.
+8. **Clean up.** After a day or so of the change running cleanly: `neon branches delete pre-<migration-number>-<short-name>`. Also delete any leftover `*-verify` branch. Connection-string files (`~/.perspectize-neon-prod.url`, `~/.perspectize-neon-branch.url`) stay on a personal machine (they are `chmod 600`); re-run step 2 to refresh the production one after the database password is rotated.
+
+## Verifying on a Neon branch first (for a migration or user-visible change)
+
+Before production, prove the migration and the UI it serves on a throwaway branch. For a migration or a user-visible change, don't label the PR `needs-demo-video` and leave verification as a follow-up: create the branch, apply the migration to it only, seed demo data, run the stack locally, and record the clip (`~/.claude/tools/video-capture`, see [VERIFICATION.md](VERIFICATION.md)).
+
+**Auth and branch handoff.** The user approved this split, and it keeps the connection string out of the chat:
+
+1. The user runs `neon auth` if `neon projects list` fails as signed out.
+2. The agent runs the read and create steps: `neon projects list`, `neon branches list --project-id lively-fog-94104513`, and `neon branches create --project-id lively-fog-94104513 --name <task>-verify --parent production`.
+3. The user runs only the connection-string step, redirected to a file: `neon connection-string <branch> --project-id lively-fog-94104513 --pooled=false --role-name neondb_owner --database-name neondb > ~/.perspectize-neon-branch.url`, then `chmod 600` it.
+4. The agent uses the file inline and masks the URL in any output, for example `migrate -path migrations -database "$(cat ~/.perspectize-neon-branch.url)" up 2>&1 | sed -E 's#postgres(ql)?://[^ ]+#<branch-url>#g'`. Check the version before, backfill counts, and `down 1` then `up` for reversibility.
+
+Keep the connection-string file in place (`chmod 600`), as with the production file in step 2 above.
+
+**Gotchas:**
+
+- A branch off `production` holds a copy of production rows. Schema-only branches are not available on this project, so UI that lists content will show real titles in a recorded clip. Filter the recording to the new type, and never run an unfiltered `select` on `content` in chat.
+- Ask before deleting a branch, and before any bulk delete on it (such as `TRUNCATE`). Clean up is listed in step 8 above.
+- Never apply a migration to production while its number is provisional. Another open PR may claim the same number, and golang-migrate would silently skip the second file. Apply after the number is final.
+- Local backend: `SERVER_PORT` moves the listen port, so a verification backend can run beside the usual `:8080`. A plain `DATABASE_URL` set inline beats `backend/.env`, because `godotenv.Load()` does not override existing env vars. A worktree has no `backend/.env`.
+- Read the captured frames yourself (extract them with the venv's ffmpeg) before calling a clip evidence. A script's own "pass" log can be a false positive.
 
 ## Order relative to the deploy
 

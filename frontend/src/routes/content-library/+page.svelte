@@ -1,0 +1,177 @@
+<script module lang="ts">
+	// Start fetching the table (and AG Grid, ~244KB gzipped) the moment this route module
+	// evaluates, in parallel with Clerk's script. The root layout renders nothing until
+	// `ClerkLoaded`, so awaiting the import from the template only began the AG Grid
+	// download after Clerk finished: two serial network steps on the LCP path (#636).
+	// The page still handles failure below via `{:catch}`.
+	const activityTableImport = import('$lib/components/ActivityTable.svelte');
+	activityTableImport.catch(() => {}); // avoid an unhandled-rejection reload before the template awaits it
+</script>
+
+<script lang="ts">
+	import { Input, Popover, PopoverContent, PopoverTrigger, buttonVariants } from '$lib/components/shadcn';
+	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
+	import SearchIcon from '@lucide/svelte/icons/search';
+	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
+	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
+	import { parseGridParams, serializeGridParams, searchScopesFor, type SearchScopeKey } from '$lib/utils/gridUrlState';
+	import { useMe } from '$lib/queries/users/useMe.svelte';
+	import { LIBRARY_PATH } from '$lib/utils/contentLinks';
+
+	// Derive current grid params from URL
+	const gridParams = $derived(parseGridParams(page.url.searchParams));
+
+	// "Mine" is just a shortcut for the User column's text filter (`f.user=<my username>`) —
+	// the same filter the column menu sets, so it shows as a chip and survives a reload.
+	const meCtx = useMe();
+	const myUsername = $derived(meCtx.me?.username ?? null);
+	const mineActive = $derived(
+		myUsername !== null && gridParams.filters.user?.toLowerCase() === myUsername.toLowerCase(),
+	);
+
+	function toggleMine() {
+		if (myUsername === null) return;
+		const { user: _previous, ...rest } = gridParams.filters;
+		const filters = mineActive ? rest : { ...rest, user: myUsername };
+		const search = serializeGridParams({ ...gridParams, filters, page: 1 });
+		goto(search ? `?${search}` : LIBRARY_PATH, { replaceState: true, keepFocus: true, noScroll: true });
+	}
+
+	// Local search input state (tracks what user has typed)
+	// Initialized from URL on mount; user typing updates this independently of URL
+	let searchInput = $state(page.url.searchParams.get('q') ?? '');
+
+	const SCOPE_LABELS: Record<SearchScopeKey, string> = {
+		title: 'Title',
+		desc: 'Description',
+		channel: 'Channel',
+		tags: 'Tags',
+		cast: 'Cast',
+		director: 'Director',
+	};
+
+	// Cast and Director are offered (and on by default) only while the type filter includes Movie.
+	const availableScopes = $derived(searchScopesFor(gridParams.filters));
+
+	// Debounced search → URL update
+	let searchTimer: ReturnType<typeof setTimeout>;
+	function handleSearchInput(value: string) {
+		searchInput = value;
+		clearTimeout(searchTimer);
+		searchTimer = setTimeout(() => {
+			const updated = { ...gridParams, q: value, page: 1 };
+			const search = serializeGridParams(updated);
+			goto(search ? `?${search}` : LIBRARY_PATH, { replaceState: true, keepFocus: true, noScroll: true });
+		}, 300);
+	}
+
+	function toggleScope(scope: SearchScopeKey) {
+		const current = gridParams.qFields;
+		const isSelected = current.includes(scope);
+		// Always leave at least one scope selected — unchecking the last one is a no-op.
+		if (isSelected && current.length === 1) return;
+		const nextFields = isSelected ? current.filter((s) => s !== scope) : [...current, scope];
+		const updated = { ...gridParams, qFields: nextFields, page: 1 };
+		const search = serializeGridParams(updated);
+		goto(search ? `?${search}` : LIBRARY_PATH, { replaceState: true, keepFocus: true, noScroll: true });
+	}
+
+	const scopeSummary = $derived(
+		gridParams.qFields.length === availableScopes.length
+			? 'All fields'
+			: gridParams.qFields.map((s) => SCOPE_LABELS[s]).join(', '),
+	);
+</script>
+
+<div class="flex flex-col h-[calc(100vh-4rem)]">
+	<!-- Page Header: Title + Search -->
+	<div class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4">
+		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+			<div>
+				<h1 class="text-2xl font-semibold text-foreground">Library</h1>
+				<p class="text-sm text-muted-foreground mt-1">
+					Everything Perspectize members have added, and how they've measured it.
+				</p>
+			</div>
+			<!-- FilterChips (inside the grid card) moves itself here on desktop to save a row of height. -->
+			<div id="activity-chips-slot" class="hidden md:flex flex-1 min-w-0 items-center"></div>
+			<div class="flex items-center gap-2">
+				{#if myUsername}
+					<button
+						type="button"
+						aria-pressed={mineActive}
+						title={mineActive ? 'Showing only items you added — click to show everyone' : 'Show only items you added'}
+						class="px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors {mineActive
+							? 'border-primary bg-primary text-primary-foreground'
+							: 'border-input bg-background text-muted-foreground hover:text-foreground'}"
+						onclick={toggleMine}
+					>
+						Mine
+					</button>
+				{/if}
+				<div class="relative w-full sm:w-64 md:w-80">
+					<SearchIcon
+						class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none"
+					/>
+					<Input
+						type="text"
+						placeholder="Search content..."
+						value={searchInput}
+						oninput={(e) => handleSearchInput(e.currentTarget.value)}
+						class="pl-9"
+					/>
+				</div>
+				<Popover>
+					<PopoverTrigger
+						class={buttonVariants({ variant: 'outline', size: 'icon' })}
+						aria-label="Choose which fields to search ({scopeSummary})"
+						title="Search fields: {scopeSummary}"
+					>
+						<SlidersHorizontalIcon class="size-4" />
+					</PopoverTrigger>
+					<PopoverContent align="end" class="w-56 p-2">
+						<p class="text-xs font-medium text-muted-foreground px-2 pb-1">Search in</p>
+						{#each availableScopes as scope (scope)}
+							<label class="flex items-center gap-2 px-2 py-1.5 rounded-sm text-sm cursor-pointer hover:bg-accent">
+								<input
+									type="checkbox"
+									checked={gridParams.qFields.includes(scope)}
+									onchange={() => toggleScope(scope)}
+									class="size-4 accent-primary"
+								/>
+								{SCOPE_LABELS[scope]}
+							</label>
+						{/each}
+					</PopoverContent>
+				</Popover>
+			</div>
+		</div>
+	</div>
+
+	<!-- ColumnRelevanceCallout (rendered by ActivityTable) moves itself here: above the card's top-right
+	     corner, outside the table frame. Collapses to nothing when empty. -->
+	<div
+		id="activity-callout-slot"
+		class="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 flex justify-end empty:hidden"
+	></div>
+
+	<!-- Content Card -->
+	<!-- pb-4 (not pb-20: that reserved an ~80px dead strip that cost a grid row). The fixed Messages
+	     button is cleared by the pagination bar's own right padding instead (ActivityTable).
+	     ActivityTable is dynamically imported (kicked off in the module script above): this route's own
+	     module is what SvelteKit's client router loads up front to resolve this route,
+	     before the root layout's ClerkLoading/ClerkLoaded gate even decides whether
+	     to render this page at all — so a static import here forces every visitor
+	     (including signed-out ones, who never see this content) to pay for AG Grid
+	     (~800KB) before anything paints. -->
+	<div class="flex-1 min-h-0 w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 pb-4">
+		<div class="border border-border rounded-lg shadow-sm overflow-hidden h-full flex flex-col">
+			{#await activityTableImport then { default: ActivityTable }}
+				<ActivityTable />
+			{:catch}
+				<LazyLoadError what="the library table" />
+			{/await}
+		</div>
+	</div>
+</div>

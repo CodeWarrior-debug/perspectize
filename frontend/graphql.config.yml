@@ -1,0 +1,7 @@
+# Read by WebStorm's GraphQL plugin: schema comes from the backend (same list as backend/gqlgen.yml),
+# operations are the gql`` template literals in the frontend's .ts and .svelte files.
+schema:
+  - ../backend/schema.graphql
+  - ../backend/messaging.graphql
+documents:
+  - src/**/*.{ts,svelte}

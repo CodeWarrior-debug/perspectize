@@ -98,7 +98,8 @@ func (s *PerspectiveService) Create(ctx context.Context, input portservices.Crea
 		input.Confidence != nil ||
 		input.Like != nil ||
 		input.Review != nil ||
-		input.Description != nil
+		input.Description != nil ||
+		len(input.Feelings) > 0
 	if !hasContent {
 		return nil, fmt.Errorf("%w: at least one field must be provided", domain.ErrInvalidInput)
 	}
@@ -411,6 +412,17 @@ func (s *PerspectiveService) AggregateByContentIDs(ctx context.Context, contentI
 		return nil, fmt.Errorf("failed to aggregate perspectives by content: %w", err)
 	}
 	return aggregates, nil
+}
+
+// CountVisibleByContentIDs counts the perspectives the viewer may read per
+// content ID (public plus their own) — the count the Compare page can
+// actually show, unlike AggregateByContentIDs which counts every row.
+func (s *PerspectiveService) CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
+	counts, err := s.repo.CountVisibleByContentIDs(ctx, contentIDs, viewerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count visible perspectives by content: %w", err)
+	}
+	return counts, nil
 }
 
 // FeelingStats computes feeling count/average/stddev intensity — see

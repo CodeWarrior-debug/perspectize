@@ -26,6 +26,15 @@ describe('app.html Content-Security-Policy', () => {
 		expect(directive('frame-src')).toContain('https://www.youtube-nocookie.com');
 	});
 
+	it('allows Google Fonts stylesheets and font files so Settings → Fonts picks can load', () => {
+		expect(directive('style-src')).toContain('https://fonts.googleapis.com');
+		expect(directive('font-src')).toContain('https://fonts.gstatic.com');
+	});
+
+	it('keeps self-hosted fonts (Geist, Charter) loadable', () => {
+		expect(directive('font-src')).toContain("'self'");
+	});
+
 	it('allows the Grafana Faro collector so RUM/errors/traces can be sent', () => {
 		expect(directive('connect-src')).toContain('https://*.grafana.net');
 	});

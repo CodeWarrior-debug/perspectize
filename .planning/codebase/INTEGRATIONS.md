@@ -1,96 +1,83 @@
 # External Integrations
 
-**Analysis Date:** 2026-10-01
+**Analysis Date:** 2026-11-01
 
 ## APIs & External Services
 
-**Video metadata:**
-- YouTube Data API v3 (`https://www.googleapis.com/youtube/v3`) - fetch video metadata for content
-  - Backend client: `backend/internal/adapters/youtube/client.go` (+ `parser.go`, in-memory TTL `cache.go`)
-  - Offline fixture client for demo mode: `backend/internal/adapters/youtube/fixture_client.go`
-  - Auth: `YOUTUBE_API_KEY`; cache TTL `YOUTUBE_API_CACHE_TTL_SECONDS` (default 21600, 0 disables)
-  - Client strips key-bearing googleapis URLs from error messages (key sent as query param)
-- YouTube Data API v3 (frontend, Discover page search + trending) - Auth: `VITE_YOUTUBE_API_KEY` (browser-exposed; must be referrer-restricted)
-- YouTube embeds/thumbnails: `youtube-nocookie.com`, `i.ytimg.com`, `yt3.ggpht.com` (allowed in CSP in `frontend/src/app.html`)
-
-**Knowledge/taxonomy:**
-- Wikidata (`https://www.wikidata.org/w/api.php`) - category typeahead/search, with retry/backoff
-  - Client: `backend/internal/adapters/wikidata/client.go`
-  - Auth: none
-- Wikipedia (`en.wikipedia.org`) - category links (migration `000027_add_category_wikipedia_url`)
-
-**Bible content:**
-- Interlinear Bible data seeded from local files (`backend/cmd/seed-bible/`, `backend/cmd/seed-bible/data/`); outbound reference links to `biblegateway.com`, `stepbible.org`, `biblehub.com` from the frontend (`frontend/src/lib/queries/bible/`)
-
-**Bot protection:**
-- Cloudflare Turnstile (`challenges.cloudflare.com`) - used by Clerk sign-in; allowed in CSP `script-src`/`frame-src`
+**Content metadata:**
+- YouTube Data API v3 (`https://www.googleapis.com/youtube/v3`) - video metadata and Trending chart
+  - Client: `backend/internal/adapters/youtube/client.go` (with `cache.go` in-memory TTL cache, `parser.go`); offline `fixture_client.go` used in demo mode
+  - Auth: `YOUTUBE_API_KEY`
+  - Cache TTLs: `YOUTUBE_API_CACHE_TTL_SECONDS` (default 21600), `YOUTUBE_TRENDING_CACHE_TTL_SECONDS` (default 3600)
+- TMDB API (`https://api.themoviedb.org/3`) - movie lookups/trending
+  - Client: `backend/internal/adapters/tmdb/client.go` (`cache.go`, `parse.go`, `fixture_client.go`; `unconfigured.go` when token absent)
+  - Auth: `TMDB_API_READ_ACCESS_TOKEN` (v4 bearer)
+- Wikidata (`https://www.wikidata.org/w/api.php`) and Wikipedia links - entity lookups
+  - Client: `backend/internal/adapters/wikidata/client.go` (retry/backoff); no key
 
 ## Data Storage
 
 **Databases:**
-- PostgreSQL (17 in CI; Sevalla-managed in dev/prod; 18 in demo compose)
-  - Connection: `DATABASE_URL` (Sevalla may need `?sslmode=disable`), optional `DATABASE_PASSWORD`
-  - Client: GORM + pgx/v5 (`backend/pkg/database/postgres.go`, repositories in `backend/internal/adapters/repositories/postgres/`)
-  - Migrations: golang-migrate SQL files in `backend/migrations/`, applied manually per environment (no runner in server, CI, or Sevalla hooks)
-  - Realtime: Postgres `LISTEN`/`NOTIFY` on channel `thread_events` via a dedicated connection (`backend/internal/adapters/realtime/listener.go`), fanned out to WebSocket subscribers (`hub.go`, `presence.go`)
+- Neon Postgres (production; cut over 2026-10-06; old Sevalla DB suspended). Local demo uses `postgres:18` in Docker.
+  - Connection: `DATABASE_URL` (must be the DIRECT, non-pooler string because of LISTEN/NOTIFY)
+  - Client: GORM + pgx (`backend/internal/adapters/repositories/postgres`), cached wrappers in `backend/internal/adapters/repositories/cached`
+  - Migrations: golang-migrate SQL in `backend/migrations` (applied manually per environment; never run against the shared DB during dev)
+  - Realtime: Postgres LISTEN/NOTIFY via `backend/internal/adapters/realtime/listener.go`, fanned out by `hub.go` over WebSocket GraphQL subscriptions
+  - Preview branches: one Neon branch per PR via `.github/workflows/neon-preview-branch.yml` (`neondatabase/create-branch-action@v6`, `delete-branch-action@v3`)
 
 **File Storage:**
-- Local filesystem only (static onboarding videos optional under `frontend/static/onboarding/`)
+- Local filesystem only (onboarding videos served from `frontend/static/onboarding/` or a CDN URL)
 
 **Caching:**
-- In-process YouTube response cache (`backend/internal/adapters/youtube/cache.go`; not shared across replicas)
-- Client-side TanStack Query cache (`frontend/src/lib/queries/`)
+- In-process memory caches only (YouTube, TMDB, `repositories/cached`); not shared across replicas
 
 ## Authentication & Identity
 
 **Auth Provider:**
 - Clerk
-  - Backend: JWT verification via clerk-sdk-go (`backend/internal/adapters/auth/token_verifier.go`, `clerk_middleware.go`); `CLERK_SECRET_KEY`
-  - Frontend: `svelte-clerk` behind the `$lib/auth` facade (`useAuthState`, `getAuthToken`, `components/auth/`); `VITE_CLERK_PUBLISHABLE_KEY`
-  - Authorization: `@owner`/auth directives in `backend/internal/adapters/graphql/directives/`, `auth.RequireAuth(ctx)`
-- Demo mode: unsigned `Bearer demo.<persona>` tokens (`backend/internal/adapters/auth/demo_token_verifier.go`); `DEMO_MODE=true`/`VITE_DEMO_MODE=true`; no `ClerkProvider` rendered
+  - Backend: `backend/internal/adapters/auth/clerk_middleware.go`, `token_verifier.go` (JWT verification via `clerk-sdk-go/v2`); `CLERK_SECRET_KEY` required when `APP_ENV=production` (`backend/internal/config/security.go`)
+  - Frontend: `svelte-clerk` with `VITE_CLERK_PUBLISHABLE_KEY` (`frontend/src/lib/auth`)
+  - Demo mode: unsigned `Bearer demo.<persona>` tokens via `backend/internal/adapters/auth/demo_token_verifier.go`; refused when `APP_ENV=production` (`backend/internal/config/demo.go`)
 
 ## Monitoring & Observability
 
-**Error Tracking:**
-- None (no Sentry or similar detected)
+**Error Tracking / RUM:**
+- Grafana Faro (browser errors, web vitals, fetch tracing): `frontend/src/lib/telemetry.ts`, `VITE_FARO_URL`, `VITE_APP_ENV`; sourcemaps via `@grafana/faro-rollup-plugin`
 
-**Tracing:**
-- OpenTelemetry OTLP/HTTP exporter, enabled only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (`backend/cmd/server/main.go`)
+**Traces/Metrics/Logs:**
+- OpenTelemetry -> Grafana Cloud over OTLP/HTTP; `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_SERVICE_NAME` (default `perspectize-backend`), `OTEL_TRACES_SAMPLER(_ARG)`; blank endpoint disables export
+- Local tracer stack: `docker-compose.observability.yml` (`make obs-up`, otel-lgtm + Alloy)
+- Runbook: `.docs/OBSERVABILITY.md`
 
 **Logs:**
-- `log/slog` structured logging (`backend/pkg/logger/logger.go`); request timing in `backend/pkg/middleware/timing.go` and `backend/pkg/graphql/timing.go`; DB pool stats at `/debug/db-stats` (non-production)
-- Frontend web vitals: `frontend/src/lib/vitals.ts`; Lighthouse CI (`frontend/lighthouserc.cjs`)
+- Structured `slog` bridged to OTel (`otelslog`); `/health`, `/ready`, `/version` endpoints in `backend/cmd/server/main.go` (health/ready excluded from tracing)
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Sevalla (backend Dockerfile app, `backend/Dockerfile`, context `backend`; frontend static site behind Cloudflare). Backend deploys when `backend/` changes reach `main`; frontend deploys on PRs/commits
-- Backend endpoints: `/graphql` (HTTP + WebSocket), `/webhooks/clerk`, `/health`, `/ready`, `/version`, plus playground and `/debug/db-stats` outside production
-- Production API origin referenced: `api.perspectize.com` (CSP in `frontend/src/app.html`)
+- Sevalla (backend app deploys on `backend/` changes to main; frontend static site deploys on PRs/commits; single DB/environment)
 
 **CI Pipeline:**
-- GitHub Actions in `.github/workflows/`: `ci.yml` (Go test/lint with Postgres 17 service, build, perf-tag vet, gofmt, demo E2E), `frontend-test.yml` (Vitest unit + browser), `codeql.yml` (weekly), `trivy.yml` (lockfile vuln scan), `mutation.yml`, `migration-labels.yml`, `tag-main.yml`
-- Coverage: Codecov (`codecov/codecov-action`)
-- Dependabot: `.github/dependabot.yml`
+- GitHub Actions in `.github/workflows/`: `ci.yml` (build/test, gofmt, frontend checks), `frontend-test.yml`, `codeql.yml`, `trivy.yml`, `mutation.yml`, `migration-labels.yml`, `neon-preview-branch.yml`, `tag-main.yml`
+- Dependabot for Go and pnpm dependencies
 
 ## Environment Configuration
 
 **Required env vars:**
-- Backend: `DATABASE_URL`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SIGNING_SECRET`, `JWT_SECRET` (production); `YOUTUBE_API_KEY` (metadata fetch); `CORS_ORIGINS` (set to frontend origin; defaults to `*`)
-- Frontend: `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_GRAPHQL_URL`, `VITE_YOUTUBE_API_KEY`
+- Backend: `DATABASE_URL`, `CLERK_SECRET_KEY` (prod), `CLERK_WEBHOOK_SIGNING_SECRET`, `CORS_ORIGINS`
+- Frontend: `VITE_GRAPHQL_URL`, `VITE_CLERK_PUBLISHABLE_KEY`
 
 **Secrets location:**
-- Local `.env` files (gitignored, `backend/.env`, `frontend/.env`); deployed secrets in Sevalla environment settings; CI secrets in GitHub. See `.docs/SECURITY.md`
+- `backend/.env` and `frontend/.env` locally (present, gitignored, not read); Sevalla dashboard in deployed environments; GitHub Actions secrets for Neon branching. See `.docs/SECURITY.md`.
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- `POST /webhooks/clerk` - Clerk user sync, Svix-signature verified (`backend/internal/adapters/auth/webhook_handler.go`); includes update-to-create fallback
+- `POST /webhooks/clerk` - Clerk user sync, Svix signature verified (`backend/internal/adapters/auth/webhook_handler.go`, route in `backend/cmd/server/main.go`); needs `CLERK_WEBHOOK_SIGNING_SECRET`
 
 **Outgoing:**
 - None
 
 ---
 
-*Integration audit: 2026-10-01*
+*Integration audit: 2026-11-01*

@@ -548,6 +548,37 @@ func TestGormContentRepository_List(t *testing.T) {
 		})
 	}
 
+	// MinPerspectiveCount counts only perspectives the viewer may see, and runs
+	// in the WHERE so it applies before the page limit.
+	perspectiveCountCases := []struct {
+		name      string
+		viewerID  *int
+		min       int
+		wantSQLRe string
+	}{
+		{"anonymous counts public only", nil, 2,
+			`WHERE \(\(SELECT COUNT\(\*\) FROM perspectives WHERE perspectives.content_id = content.id AND \(privacy = \$1\)\) >= \$2\) AND content.privacy = \$3`},
+		{"signed in counts public or own", cInt(7), 2,
+			`WHERE \(\(SELECT COUNT\(\*\) FROM perspectives WHERE perspectives.content_id = content.id AND \(privacy = \$1 OR user_id = \$2\)\) >= \$3\) AND \(\(content.privacy = \$4 OR content.added_by_user_id = \$5\)\)`},
+		{"zero is no filter", nil, 0, `SELECT \* FROM "content"`},
+	}
+	for _, pc := range perspectiveCountCases {
+		t.Run("min perspective count: "+pc.name, func(t *testing.T) {
+			db, mock := newMockDB(t)
+			mock.ExpectQuery(pc.wantSQLRe).WillReturnRows(contentRows())
+
+			_, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{
+				First:     cInt(5),
+				SortBy:    domain.ContentSortByUpdatedAt,
+				SortOrder: domain.SortOrderDesc,
+				ViewerID:  pc.viewerID,
+				Filter:    &domain.ContentFilter{MinPerspectiveCount: cInt(pc.min)},
+			})
+			require.NoError(t, err)
+			assertAllExpectationsMet(t, mock)
+		})
+	}
+
 	// SearchFields scopes the free-text Search term to specific columns, OR'd
 	// together — distinct from the other filter fields above, which are each
 	// independently ANDed in. These cases are the contract for that OR grouping.

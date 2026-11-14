@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
 	"log/slog"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -40,6 +42,69 @@ func movieSearchPageToModel(page *portservices.MovieSearchPage) *model.MovieSear
 		})
 	}
 	return out
+}
+
+// bookWorksURLPrefix is the canonical Open Library work URL prefix, used to
+// build BookSearchResult.URL the same way ContentService.CreateFromBook
+// builds the content row's canonical URL.
+const bookWorksURLPrefix = "https://openlibrary.org/works/"
+
+// bookSearchResultToModel maps one Open Library work result to the GraphQL
+// shape, deriving the canonical URL from the work key the same way
+// ContentService's own canonicalBookURL does — createContentFromBook takes
+// that URL, so the add path dedupes the same way as a pasted link.
+func bookSearchResultToModel(r portservices.BookSearchResult) *model.BookSearchResult {
+	return &model.BookSearchResult{
+		WorkKey:          r.WorkKey,
+		Title:            r.Title,
+		AuthorName:       stringsOrEmpty(r.AuthorName),
+		CoverID:          r.CoverID,
+		FirstPublishYear: r.FirstPublishYear,
+		PageCountMedian:  r.PageCountMedian,
+		Subjects:         stringsOrEmpty(r.Subjects),
+		RatingsAverage:   r.RatingsAverage,
+		RatingsCount:     r.RatingsCount,
+		EditionCount:     r.EditionCount,
+
+		WantToReadCount:       r.WantToReadCount,
+		CurrentlyReadingCount: r.CurrentlyReadingCount,
+		AlreadyReadCount:      r.AlreadyReadCount,
+		ReadingLogCount:       r.ReadingLogCount,
+
+		URL: bookWorksURLPrefix + r.WorkKey,
+	}
+}
+
+// bookSearchPageToModel maps one Open Library search/trending page to the
+// GraphQL shape. Items is never null.
+func bookSearchPageToModel(page *portservices.BookSearchPage) *model.BookSearchPage {
+	out := &model.BookSearchPage{
+		Items:        make([]*model.BookSearchResult, 0, len(page.Items)),
+		Page:         page.Page,
+		TotalPages:   page.TotalPages,
+		TotalResults: page.TotalResults,
+	}
+	for _, item := range page.Items {
+		out.Items = append(out.Items, bookSearchResultToModel(item))
+	}
+	return out
+}
+
+// hyphenatedISBNRe matches a string made only of digits, X/x and hyphens —
+// shaped like a human-entered ISBN-10/13 (e.g. "978-0-434-74002-4").
+var hyphenatedISBNRe = regexp.MustCompile(`^[0-9Xx-]+$`)
+
+// normalizeHyphenatedISBN strips hyphens from a raw ISBN-shaped input before
+// it reaches ContentService: its isbnRe only matches bare-digit ISBN-10/13,
+// so a hyphenated ISBN would otherwise be misclassified and rejected with
+// ErrInvalidInput (Task 5 review finding). Input that isn't ISBN-shaped (an
+// Open Library work URL, or an already bare ISBN) passes through unchanged.
+func normalizeHyphenatedISBN(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if strings.Contains(trimmed, "-") && hyphenatedISBNRe.MatchString(trimmed) {
+		return strings.ReplaceAll(trimmed, "-", "")
+	}
+	return raw
 }
 
 // userDomainToModel converts a domain User to a GraphQL model User
@@ -90,10 +155,12 @@ func domainToModel(c *domain.Content) *model.Content {
 		// Non-schema field — lets contentResolver.PrimaryCategory batch-load the
 		// category by FK via dataloader instead of re-fetching the content row.
 		PrimaryCategoryID: c.PrimaryCategoryID,
-		VerseStartID:      c.VerseStartID,
-		VerseEndID:        c.VerseEndID,
-		DisplayTitle:      c.DisplayTitle,
-		Privacy:           contentPrivacy(c.Privacy),
+		// Non-schema field — lets contentResolver.ImportedFrom batch-load the import.
+		ImportJobID:  c.ImportJobID,
+		VerseStartID: c.VerseStartID,
+		VerseEndID:   c.VerseEndID,
+		DisplayTitle: c.DisplayTitle,
+		Privacy:      contentPrivacy(c.Privacy),
 	}
 
 	// Parse the user-set custom fields JSONB; nil/empty stays null in GraphQL.
@@ -115,6 +182,9 @@ func domainToModel(c *domain.Content) *model.Content {
 			m.Response = responseMap
 			if c.ContentType == domain.ContentTypeMovie {
 				m.Movie = responseMap
+			}
+			if c.ContentType == domain.ContentTypeBook {
+				m.Book = responseMap
 			}
 		}
 
@@ -660,6 +730,9 @@ var contentFieldsFromID = map[string]bool{
 	"perspectiveCount":   true,
 	"averageRating":      true,
 	"qualityRatingCount": true,
+	// importedFrom needs only the row's import_job_id, which the aggregate
+	// query carries (see ContentByID), so it keeps the fast path.
+	"importedFrom": true,
 }
 
 // onlyIDAndAggregatesSelected reports whether the current field's selection
@@ -958,4 +1031,174 @@ func (r *Resolver) userTodoListByKey(ctx context.Context, key dataloader.UserTod
 		}
 	}
 	return nil, nil
+}
+
+// --- Import staging mapping -------------------------------------------------
+
+func isoTime(t time.Time) string { return t.UTC().Format(time.RFC3339) }
+
+func isoTimePtr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := isoTime(*t)
+	return &s
+}
+
+func int64ToFloatPtr(n *int64) *float64 {
+	if n == nil {
+		return nil
+	}
+	f := float64(*n)
+	return &f
+}
+
+// importJobRefToModel is the short form of an import, as Content.importedFrom shows it.
+func importJobRefToModel(j *domain.ImportJob) *model.ImportJobRef {
+	return &model.ImportJobRef{ID: strconv.Itoa(j.ID), Name: j.Name}
+}
+
+func importJobToModel(j *domain.ImportJob) *model.ImportJob {
+	sources := make([]*model.ImportSource, len(j.Sources))
+	for i, s := range j.Sources {
+		sources[i] = &model.ImportSource{
+			ID:              strconv.Itoa(s.ID),
+			SourceType:      s.SourceType,
+			SourceRef:       s.SourceRef,
+			Title:           s.Title,
+			URL:             s.URL,
+			Role:            s.Role,
+			DestinationType: s.DestinationType,
+			Status:          s.Status,
+			StatusDetail:    s.StatusDetail,
+			ItemCount:       s.ItemCount,
+			FetchedAt:       isoTimePtr(s.FetchedAt),
+		}
+	}
+	return &model.ImportJob{
+		ID:              strconv.Itoa(j.ID),
+		Name:            j.Name,
+		Description:     j.Description,
+		RequestStatus:   j.RequestStatus,
+		ReviewNote:      j.ReviewNote,
+		ReviewedAt:      isoTimePtr(j.ReviewedAt),
+		ClosedAt:        isoTimePtr(j.ClosedAt),
+		Sources:         sources,
+		CreatedAt:       isoTime(j.CreatedAt),
+		UpdatedAt:       isoTime(j.UpdatedAt),
+		RequesterUserID: j.UserID,
+	}
+}
+
+func importItemToModel(it *domain.ImportItem) *model.ImportItem {
+	m := &model.ImportItem{
+		ID:              strconv.Itoa(it.ID),
+		SourceID:        strconv.Itoa(it.SourceID),
+		DestinationType: it.DestinationType,
+		ExternalID:      it.ExternalID,
+		URL:             it.CanonicalURL,
+		Title:           it.Title,
+		Facts:           importFactsToMap(it.Facts),
+		Position:        it.Position,
+		Excluded:        it.Excluded,
+		StatsFetchedAt:  isoTime(it.StatsFetchedAt),
+		InLibrary:       it.InLibrary,
+		ImportStatus:    it.ImportStatus,
+		ImportError:     it.ImportError,
+		ImportedAt:      isoTimePtr(it.ImportedAt),
+	}
+	if it.ContentID != nil {
+		id := strconv.Itoa(*it.ContentID)
+		m.ContentID = &id
+	}
+	return m
+}
+
+// importFactsToMap turns facts into the JSON scalar's map through their json
+// tags, so the keys clients see are exactly the stored ones and unknown facts
+// stay absent. Facts are plain values, so encoding can't fail; if it ever did,
+// the row shows no facts rather than failing the whole sheet.
+func importFactsToMap(f domain.ImportFacts) map[string]any {
+	out := map[string]any{}
+	b, err := json.Marshal(f)
+	if err != nil {
+		slog.Warn("failed to encode import facts", "error", err)
+		return out
+	}
+	if err := json.Unmarshal(b, &out); err != nil {
+		slog.Warn("failed to decode import facts", "error", err)
+	}
+	return out
+}
+
+func importItemDetailsToModel(d *domain.ImportItemWithDetails) *model.ImportItemDetails {
+	chapters := make([]*model.ImportChapter, len(d.Details.Chapters))
+	for i, c := range d.Details.Chapters {
+		chapters[i] = &model.ImportChapter{StartSeconds: c.StartSeconds, Title: c.Title}
+	}
+	people := make([]*model.ImportPerson, len(d.Details.People))
+	for i, p := range d.Details.People {
+		people[i] = &model.ImportPerson{Name: p.Name, Role: p.Role}
+	}
+	out := &model.ImportItemDetails{
+		Item:        importItemToModel(&d.Item),
+		Description: d.Details.Description,
+		Tags:        stringsOrEmpty(d.Details.Tags),
+		Chapters:    chapters,
+		Links:       stringsOrEmpty(d.Details.Links),
+		People:      people,
+		Genres:      stringsOrEmpty(d.Details.Genres),
+	}
+	if d.Details.Language != "" {
+		lang := d.Details.Language
+		out.Language = &lang
+	}
+	return out
+}
+
+func modelToCreateImportJobInput(in model.CreateImportJobInput) domain.CreateImportJobInput {
+	out := domain.CreateImportJobInput{Name: in.Name, Description: in.Description, Sources: make([]domain.CreateImportSourceInput, len(in.Sources))}
+	for i, s := range in.Sources {
+		out.Sources[i] = domain.CreateImportSourceInput{SourceType: s.SourceType, Ref: s.Ref, Role: s.Role}
+	}
+	return out
+}
+
+// stringsOrEmpty returns s, or an empty slice for nil, for non-null GraphQL lists.
+func stringsOrEmpty(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
+}
+
+func importProgressToModel(p domain.ImportProgress) *model.ImportProgress {
+	return &model.ImportProgress{
+		JobID:     strconv.Itoa(p.JobID),
+		Total:     p.Total,
+		Done:      p.Done,
+		Imported:  p.Imported,
+		Skipped:   p.Skipped,
+		Failed:    p.Failed,
+		Running:   p.Running,
+		UpdatedAt: isoTime(p.UpdatedAt),
+	}
+}
+
+func importListingProgressToModel(p domain.ImportListingProgress) *model.ImportListingProgress {
+	sources := make([]*model.ImportSourceListingProgress, len(p.Sources))
+	for i, src := range p.Sources {
+		sources[i] = &model.ImportSourceListingProgress{
+			SourceID: strconv.Itoa(src.SourceID),
+			Staged:   src.Staged,
+			Batches:  src.Batches,
+			Status:   src.Status,
+		}
+	}
+	return &model.ImportListingProgress{
+		JobID:     strconv.Itoa(p.JobID),
+		Listing:   p.Listing,
+		Sources:   sources,
+		UpdatedAt: isoTime(p.UpdatedAt),
+	}
 }

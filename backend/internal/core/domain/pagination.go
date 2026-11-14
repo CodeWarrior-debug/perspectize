@@ -19,6 +19,7 @@ const (
 	ContentSortByAddedBy      ContentSortBy = "ADDED_BY"
 	ContentSortByReleaseDate  ContentSortBy = "RELEASE_DATE"
 	ContentSortByTmdbScore    ContentSortBy = "TMDB_SCORE"
+	ContentSortByAuthor       ContentSortBy = "AUTHOR"
 )
 
 // PersonRole is the role a person plays on a movie, used by ContentFilter.PersonRole.
@@ -68,6 +69,9 @@ type ContentFilter struct {
 	DescriptionSearch *string
 	// AddedByUsername matches the adder's username (ILIKE, via the users table)
 	AddedByUsername *string
+	// MinPerspectiveCount keeps content with at least this many perspectives
+	// visible to ContentListParams.ViewerID (public, plus the viewer's own).
+	MinPerspectiveCount *int
 	// Record date filters (direct columns)
 	CreatedAfter  *string
 	CreatedBefore *string
@@ -86,6 +90,16 @@ type ContentFilter struct {
 	MaxBoxOffice   *float64
 	MinTmdbScore   *float64
 	MaxTmdbScore   *float64
+	// Book column filters (books only). AuthorContains matches the first author's name.
+	AuthorContains *string
+	// Book ranges (books only, inclusive). Year is the first publish year, pages the median
+	// across editions, rating the Open Library average out of 5.
+	MinPublishYear *int
+	MaxPublishYear *int
+	MinPages       *int
+	MaxPages       *int
+	MinBookRating  *float64
+	MaxBookRating  *float64
 }
 
 // ContentListParams contains parameters for paginated content queries
@@ -104,7 +118,7 @@ type ContentListParams struct {
 
 	// ViewerID is the authenticated caller's local user id, or nil when
 	// anonymous. The repository always limits results to public rows plus
-	// the viewer's own private rows.
+	// the viewer's own private rows. Filter.MinPerspectiveCount also reads it.
 	ViewerID *int
 }
 

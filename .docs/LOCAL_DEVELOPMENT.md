@@ -115,7 +115,7 @@ DATABASE_URL=postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
 YOUTUBE_API_KEY=your_youtube_api_key_here
 
 # Server
-PORT=8080
+SERVER_PORT=8080
 ENV=development
 
 # Logging
@@ -188,8 +188,8 @@ make dev
 #### With Specific Flags
 
 ```bash
-# Custom port
-PORT=3000 make run
+# Custom port (SERVER_PORT, not PORT: hosting platforms set PORT)
+SERVER_PORT=3000 make run
 
 # Debug logging
 LOG_LEVEL=debug make run
@@ -425,7 +425,7 @@ lsof -i :8080
 kill -9 <PID>
 
 # Or use different port
-PORT=3000 make run
+SERVER_PORT=3000 make run
 ```
 
 ### Migration Failures

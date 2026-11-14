@@ -121,3 +121,16 @@ describe('useUpdateSourceData hook', () => {
 		});
 	});
 });
+
+describe('UPDATE_CONTENT_SOURCE_DATA selection set', () => {
+	// The hook swaps the mutation result into cached list rows. List rows carry `book`/`movie`,
+	// so a result without them blanks the Book/Movie tiles (including the Open Library
+	// reading-log counts) until the next reload.
+	it('selects the typed payloads list rows carry, so a refreshed row keeps them', async () => {
+		const { UPDATE_CONTENT_SOURCE_DATA, LIST_CONTENT } = await import('$lib/queries/content');
+		for (const field of ['book', 'movie']) {
+			expect(LIST_CONTENT).toMatch(new RegExp(`\\n\\s+${field}\\n`));
+			expect(UPDATE_CONTENT_SOURCE_DATA).toMatch(new RegExp(`\\n\\s+${field}\\n`));
+		}
+	});
+});

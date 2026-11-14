@@ -20,6 +20,7 @@
 		sortRatingRows,
 		agreementPercent,
 	} from '$lib/utils/comparePerspectives';
+	import { LIBRARY_PATH } from '$lib/utils/contentLinks';
 	import { identityColor } from '$lib/utils/compareIdentity';
 	import ComparePickerRow from '$lib/components/ComparePickerRow.svelte';
 	import CompareOverallRow from '$lib/components/CompareOverallRow.svelte';
@@ -174,7 +175,10 @@
 		return `${leftLabel} and ${rightLabel} rated different dimensions — nothing to compare directly.`;
 	});
 
-	const loading = $derived(perspectivesQuery.isLoading);
+	// isPending, not isLoading: isLoading is false until the first fetch is in
+	// flight (and while paused offline), which let the empty state flash before
+	// the perspectives arrived.
+	const loading = $derived(perspectivesQuery.isPending);
 	const hasComparison = $derived(perspectives.length >= 2 && !!leftPerspective && !!rightPerspective);
 	const hasNoPerspectives = $derived(!loading && perspectives.length === 0);
 
@@ -190,7 +194,7 @@
 </script>
 
 <div class="mx-auto flex max-w-[880px] flex-col gap-4 px-5 py-5">
-	<a href="/" class="text-[13px] text-muted-foreground hover:text-foreground">&larr; Back to Activity</a>
+	<a href={LIBRARY_PATH} class="text-[13px] text-muted-foreground hover:text-foreground">&larr; Back to Library</a>
 
 	<div class="flex items-center gap-2">
 		<GlassesIcon class="size-[18px]" style="color: var(--color-primary);" />
@@ -276,7 +280,7 @@
 				<p class="text-[12.5px] text-muted-foreground">
 					You haven't shared a perspective on this yet — these are all other people's takes.
 				</p>
-				<Button href="/" size="sm" variant="outline">Add yours</Button>
+				<Button href={LIBRARY_PATH} size="sm" variant="outline">Add yours</Button>
 			</div>
 		{/if}
 

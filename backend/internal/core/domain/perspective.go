@@ -172,6 +172,10 @@ type PerspectiveAggregate struct {
 	// hide another user's private content without a second query.
 	ContentPrivacy Privacy
 	ContentOwnerID int
+	// ImportJobID is the import that created the content row (nil for hand-added
+	// content). It rides on the aggregate so the details modal can name the import
+	// without reading the whole content row.
+	ImportJobID *int
 }
 
 // FeelingStats summarizes how many perspectives in scope (one content item,

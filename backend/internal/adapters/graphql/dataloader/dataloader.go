@@ -26,6 +26,10 @@ type ctxKey struct{}
 type Loaders struct {
 	CategoryByID                    *dataloadgen.Loader[int, *domain.Category]
 	PerspectiveAggregateByContentID *dataloadgen.Loader[int, *domain.PerspectiveAggregate]
+	// VisiblePerspectiveCount batches per-content counts of the perspectives a
+	// given viewer may read. Keyed by viewer too, since the count differs per
+	// viewer (a viewer's own private perspectives count for them alone).
+	VisiblePerspectiveCount *dataloadgen.Loader[VisiblePerspectiveKey, int]
 	// ContentByID batches Perspective.content lookups.
 	ContentByID *dataloadgen.Loader[int, *domain.Content]
 	// UserByID batches Message.sender / ThreadParticipant.user /
@@ -38,12 +42,22 @@ type Loaders struct {
 	// UserTodoListByID batches UserTodo.list lookups. The key carries the
 	// viewer, because a PRIVATE list is returned only to its owner.
 	UserTodoListByID *dataloadgen.Loader[UserTodoListKey, *domain.UserTodoList]
+	// ImportJobByID batches Content.importedFrom lookups. Closed imports are
+	// returned too; the resolver decides who may see them.
+	ImportJobByID *dataloadgen.Loader[int, *domain.ImportJob]
 }
 
 // ThreadStatsKey identifies one viewer's stats for one thread.
 type ThreadStatsKey struct {
 	ViewerID int
 	ThreadID int
+}
+
+// VisiblePerspectiveKey identifies one content row's perspective count as seen
+// by one viewer. ViewerID 0 is an anonymous caller.
+type VisiblePerspectiveKey struct {
+	ViewerID  int
+	ContentID int
 }
 
 // UserTodoListKey identifies one list as seen by one viewer. ViewerID 0 is an
@@ -61,6 +75,7 @@ type Services struct {
 	Content     portservices.ContentService
 	Messaging   portservices.MessagingService
 	UserTodo    portservices.UserTodoService
+	ImportJob   portservices.ImportService
 }
 
 // NewLoaders builds a fresh set of loaders backed by the given services.
@@ -72,15 +87,31 @@ func NewLoaders(s Services) *Loaders {
 	cnb := &contentBatcher{service: s.Content}
 	tab := &todoActionBatcher{service: s.UserTodo}
 	tlb := &userTodoListBatcher{service: s.UserTodo}
+	ijb := &importJobBatcher{service: s.ImportJob}
 	return &Loaders{
 		CategoryByID:                    dataloadgen.NewMappedLoader(cb.byID),
 		PerspectiveAggregateByContentID: dataloadgen.NewMappedLoader(pb.byContentID),
+		VisiblePerspectiveCount:         dataloadgen.NewMappedLoader(pb.visibleByKey),
 		UserByID:                        dataloadgen.NewMappedLoader(ub.byID),
 		ThreadStats:                     dataloadgen.NewMappedLoader(tb.byKey),
 		ContentByID:                     dataloadgen.NewMappedLoader(cnb.byID),
 		TodoActionByID:                  dataloadgen.NewMappedLoader(tab.byID),
 		UserTodoListByID:                dataloadgen.NewMappedLoader(tlb.byKey),
+		ImportJobByID:                   dataloadgen.NewMappedLoader(ijb.byID),
 	}
+}
+
+// importJobBatcher resolves a batch of import job IDs in one service call.
+type importJobBatcher struct {
+	service portservices.ImportService
+}
+
+func (b *importJobBatcher) byID(ctx context.Context, ids []int) (map[int]*domain.ImportJob, error) {
+	if b.service == nil {
+		// Imports not wired on this server: every key is absent, so resolvers see nil.
+		return map[int]*domain.ImportJob{}, nil
+	}
+	return b.service.GetImportJobsByIDs(ctx, ids)
 }
 
 // Middleware injects a fresh *Loaders into the context of every request. It
@@ -250,6 +281,33 @@ type perspectiveAggregateBatcher struct {
 // resolvers treat as "count 0 / no average" via IsNotFound.
 func (b *perspectiveAggregateBatcher) byContentID(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 	return b.service.AggregateByContentIDs(ctx, contentIDs)
+}
+
+// visibleByKey resolves a batch of (viewer, content) keys, one service call per
+// distinct viewer in the batch (a request normally has exactly one). A content
+// ID with no visible perspectives is absent, which dataloadgen surfaces as
+// ErrNotFound; resolvers read that as a count of 0.
+func (b *perspectiveAggregateBatcher) visibleByKey(ctx context.Context, keys []VisiblePerspectiveKey) (map[VisiblePerspectiveKey]int, error) {
+	byViewer := make(map[int][]int)
+	for _, k := range keys {
+		byViewer[k.ViewerID] = append(byViewer[k.ViewerID], k.ContentID)
+	}
+	out := make(map[VisiblePerspectiveKey]int, len(keys))
+	for viewer, contentIDs := range byViewer {
+		var viewerID *int
+		if viewer != 0 {
+			v := viewer
+			viewerID = &v
+		}
+		counts, err := b.service.CountVisibleByContentIDs(ctx, contentIDs, viewerID)
+		if err != nil {
+			return nil, err
+		}
+		for cid, n := range counts {
+			out[VisiblePerspectiveKey{ViewerID: viewer, ContentID: cid}] = n
+		}
+	}
+	return out, nil
 }
 
 // IsNotFound reports whether a loader error is just "this key had no row",

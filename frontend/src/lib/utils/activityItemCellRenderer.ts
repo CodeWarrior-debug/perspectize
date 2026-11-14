@@ -1,4 +1,5 @@
 import { extractVideoIdFromUrl, movieResponse } from './formatting';
+import { authorCellText, bookResponse, openLibraryCoverUrl } from './bookFormatting';
 import {
 	BIBLE_PASSAGE_ICON_SVG_SCALABLE,
 	BIBLE_ICON_WRAPPER_CLASS,
@@ -78,7 +79,7 @@ function renderPassageCell(opts: {
 
 	const title = document.createElement('div');
 	title.dataset.testid = 'item-title';
-	title.className = `${displayTitle ? 'line-clamp-1' : 'line-clamp-2'} font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline`;
+	title.className = `${displayTitle ? 'line-clamp-1' : 'line-clamp-2'} font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline`;
 	title.textContent = displayTitle || name;
 	textWrap.appendChild(title);
 
@@ -136,7 +137,7 @@ function renderMovieCell(opts: {
 	const title = document.createElement('div');
 	title.dataset.testid = 'item-title';
 	title.className =
-		'line-clamp-1 font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
+		'line-clamp-1 font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
 	title.textContent = name;
 	textWrap.appendChild(title);
 	if (m?.year) {
@@ -144,6 +145,68 @@ function renderMovieCell(opts: {
 		subtitle.dataset.testid = 'item-subtitle';
 		subtitle.className = 'line-clamp-1 text-[11px] leading-[1.5] text-muted-foreground';
 		subtitle.textContent = String(m.year);
+		textWrap.appendChild(subtitle);
+	}
+
+	cell.appendChild(thumbSlot(thumb));
+	cell.appendChild(textWrap);
+	return cell;
+}
+
+/**
+ * Book variant of the Item cell: the Open Library cover (small, fitted, never cropped) beside the
+ * title, with the author as a subtitle. Cover click opens the Open Library work in a new tab, cell
+ * click opens the details modal. No cover leaves a grey slot; no author leaves no subtitle.
+ */
+function renderBookCell(opts: {
+	id: string | number;
+	name: string;
+	url: string | null;
+	book?: unknown;
+	response?: unknown;
+	onOpenDetails?: (contentId: string) => void;
+}): HTMLElement {
+	const { id, name, url, book, response, onOpenDetails } = opts;
+	const row = { contentType: 'BOOK', book, response };
+	const coverUrl = openLibraryCoverUrl(bookResponse(row)?.coverId, 'S');
+	const author = authorCellText(row);
+
+	const cell = document.createElement('div');
+	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-[3px] cursor-pointer';
+	cell.addEventListener('click', () => onOpenDetails?.(String(id)));
+
+	const thumb = document.createElement('div');
+	thumb.dataset.testid = 'item-thumb';
+	// Book covers vary in aspect, so they are fitted, not cropped. The grey slot shows only with no cover.
+	thumb.className = coverUrl
+		? 'h-[42px] w-7 flex-none overflow-hidden rounded'
+		: 'h-[42px] w-7 flex-none overflow-hidden rounded bg-muted';
+	thumb.addEventListener('click', (e) => {
+		e.stopPropagation();
+		if (url) window.open(url, '_blank', 'noopener,noreferrer');
+	});
+	if (coverUrl) {
+		const img = document.createElement('img');
+		img.src = coverUrl;
+		img.alt = '';
+		img.className = 'h-full w-full object-contain';
+		img.onerror = () => img.remove();
+		thumb.appendChild(img);
+	}
+
+	const textWrap = document.createElement('div');
+	textWrap.className = 'min-w-0 flex-1 text-left whitespace-normal';
+	const title = document.createElement('div');
+	title.dataset.testid = 'item-title';
+	title.className =
+		'line-clamp-1 font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
+	title.textContent = name;
+	textWrap.appendChild(title);
+	if (author) {
+		const subtitle = document.createElement('div');
+		subtitle.dataset.testid = 'item-subtitle';
+		subtitle.className = 'line-clamp-1 text-[11px] leading-[1.5] text-muted-foreground';
+		subtitle.textContent = author;
 		textWrap.appendChild(subtitle);
 	}
 
@@ -162,6 +225,7 @@ export interface ActivityItemCellRendererParams {
 		verseStartID?: number | null;
 		verseEndID?: number | null;
 		movie?: unknown;
+		book?: unknown;
 		response?: unknown;
 	};
 	context?: { onOpenDetails?: (contentId: string) => void };
@@ -184,7 +248,7 @@ const PLAY_ICON_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="non
 export function activityItemCellRenderer(params: ActivityItemCellRendererParams): HTMLElement | string {
 	if (!params.data) return '';
 
-	const { id, name, url, contentType, displayTitle, verseStartID, verseEndID, movie, response } = params.data;
+	const { id, name, url, contentType, displayTitle, verseStartID, verseEndID, movie, book, response } = params.data;
 	const onOpenDetails = params.context?.onOpenDetails;
 
 	if (contentType === 'BIBLE_PASSAGE') {
@@ -193,6 +257,10 @@ export function activityItemCellRenderer(params: ActivityItemCellRendererParams)
 
 	if (contentType === 'MOVIE') {
 		return renderMovieCell({ id, name, url, movie, response, onOpenDetails });
+	}
+
+	if (contentType === 'BOOK') {
+		return renderBookCell({ id, name, url, book, response, onOpenDetails });
 	}
 
 	// No native `title` attribute here (or on the thumbnail below) — the column's
@@ -238,7 +306,7 @@ export function activityItemCellRenderer(params: ActivityItemCellRendererParams)
 	const title = document.createElement('div');
 	title.dataset.testid = 'item-title';
 	title.className =
-		'line-clamp-2 min-w-0 flex-1 whitespace-normal text-left font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
+		'line-clamp-2 min-w-0 flex-1 whitespace-normal text-left font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
 	title.textContent = name;
 
 	// A claim has no video to thumbnail, so its title takes the whole cell.
