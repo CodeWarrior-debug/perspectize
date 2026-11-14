@@ -19,6 +19,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/repositories/postgres"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/web/handlers"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/webpage"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/wikidata"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/youtube"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/config"
@@ -236,7 +237,9 @@ func main() {
 	importRepo := postgres.NewGormImportJobRepository(db)
 
 	// Initialize services
-	contentOpts := []services.ContentServiceOption{services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient), services.WithMovieSearch(movieSearchClient), services.WithMovieTrending(movieTrendingClient)}
+	// The webpage reader is SSRF-safe on every connection (adapters/webpage). It has no
+	// configuration: the address policy is fixed, not environment-driven.
+	contentOpts := []services.ContentServiceOption{services.WithBibleReference(bibleReferenceRepo), services.WithYouTubeTrending(trendingClient), services.WithMovieSearch(movieSearchClient), services.WithMovieTrending(movieTrendingClient), services.WithWebPageClient(webpage.NewClient(webpage.Options{}))}
 	contentService := services.NewContentService(contentRepo, youtubeClient, movieClient, append(contentOpts, bookServiceOptions()...)...)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo,
 		services.WithImportJobRepository(importRepo))
