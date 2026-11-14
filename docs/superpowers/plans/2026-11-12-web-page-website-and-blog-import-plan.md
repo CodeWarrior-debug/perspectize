@@ -1,14 +1,14 @@
-# Web page roles, websites and blog import from a file — Implementation Plan
+# Webpage roles, websites and blog import from a file — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** let an admin stage the scraped Jordan's Journey blog (1,077 posts) as import candidates, and import the picked rows as `WEB_PAGE` content with role `BLOG_POST`, filed under an optional `WEBSITE` parent.
 
-**Architecture:** extend the web page backend with a `WEBSITE` content type and a nullable `content.parent_content_id`; add an admin-only `CANDIDATE_FILE` import source that stages rows from a file without any listing or network call; make the import worker create web pages from the staged facts (prefetched metadata) and file them under the website, which is find-or-created once per batch.
+**Architecture:** extend the webpage backend with a `WEBSITE` content type and a nullable `content.parent_content_id`; add an admin-only `CANDIDATE_FILE` import source that stages rows from a file without any listing or network call; make the import worker create webpages from the staged facts (prefetched metadata) and file them under the website, which is find-or-created once per batch.
 
 **Tech Stack:** Go (gqlgen, GORM, golang.org/x/net/html), PostgreSQL (one migration), SvelteKit + Vitest, Python 3.11 (the scraper repo).
 
-**Spec:** [2026-11-12-web-page-website-and-blog-import-design.md](../specs/2026-11-12-web-page-website-and-blog-import-design.md). Builds on the [web page design](../specs/2026-11-11-web-page-content-type-design.md) and [plan](2026-11-11-web-page-content-type-plan.md): **PR 1 of that plan (its Tasks 1–8) must be merged first.** Names used below (`WebPageMeta`, `FetchStatus`, `webpage.Canonicalize`, `ContentService.CreateFromWebPage`) come from it; this plan changes the `CreateFromWebPage` signature as stated in Task 4.
+**Spec:** [2026-11-12-web-page-website-and-blog-import-design.md](../specs/2026-11-12-web-page-website-and-blog-import-design.md). Builds on the [webpage design](../specs/2026-11-11-web-page-content-type-design.md) and [plan](2026-11-11-web-page-content-type-plan.md): **PR 1 of that plan (its Tasks 1–8) must be merged first.** Names used below (`WebPageMeta`, `FetchStatus`, `webpage.Canonicalize`, `ContentService.CreateFromWebPage`) come from it; this plan changes the `CreateFromWebPage` signature as stated in Task 4.
 
 ## Global Constraints
 
@@ -21,7 +21,7 @@
 - GraphQL: edit `schema.graphql`, run `make graphql-gen`, then delete the colliding `schema.resolvers.go` after copying new stubs into the per-domain file (`backend/CLAUDE.md`).
 - Enums bind through `gqlgen.yml` to domain types; no hand-written conversion switches. IDs in inputs use the `IntID` scalar.
 - `ImportFacts` keys keep one meaning across types: reading time is `durationSeconds`. New keys this plan adds: `webPageRoles`, `wordCount`.
-- Role values in v1: `BLOG_POST` only. JSON key `webPageRoles`, enum `WebPageRole`.
+- Role values in v1: `BLOG_POST` and `SESSION_TRANSCRIPT`, picked by the adder (no detection). JSON key `webPageRoles`, enum `WebPageRole`.
 - Limits: 1–5000 items per file; `externalId` ≤ 64 chars; title ≤ 300, summary ≤ 600, author ≤ 200, ≤ 20 tags.
 - Website canonical URL is `https://<host>/` (`www.` dropped). A URL with path `/` and no query is never a `WEB_PAGE`.
 
@@ -50,7 +50,7 @@ Inputs and conditions the spec implies that a person would hit, most likely firs
 - [ ] **Step 1:** Replace `pageTypes`→`webPageRoles`, `WebPageType`→`WebPageRole`, `webPageTypes`→`webPageRoles`, and the UI labels "Page type(s)"→"Role(s)" in the three source files.
 - [ ] **Step 2:** Rebuild the preview from `web-page.spec.json`.
 - [ ] **Step 3:** Run `grep -rn "pageTypes\|WebPageType\|webPageTypes" docs .claude tools` — Expected: no output.
-- [ ] **Step 4:** Commit `docs: rename web page types to roles`.
+- [ ] **Step 4:** Commit `docs: rename webpage types to roles`.
 
 ### Task 2: Domain, enums and the parent column
 
@@ -62,14 +62,14 @@ Inputs and conditions the spec implies that a person would hit, most likely firs
 - Test: `backend/test/domain/content_test.go`, `backend/test/domain/webpage_role_test.go`
 
 **Interfaces:**
-- Produces: `domain.ContentTypeWebsite`; `domain.Content.ParentContentID *int`; `type WebPageRole string` with `WebPageRoleBlogPost WebPageRole = "BLOG_POST"` and `func (r WebPageRole) Valid() bool`; `FetchStatusImported FetchStatus = "IMPORTED"` added to the base plan's `FetchStatus`.
+- Produces: `domain.ContentTypeWebsite`; `domain.Content.ParentContentID *int`; `type WebPageRole string` with `WebPageRoleBlogPost WebPageRole = "BLOG_POST"`, `WebPageRoleSessionTranscript WebPageRole = "SESSION_TRANSCRIPT"` and `func (r WebPageRole) Valid() bool`; `FetchStatusImported FetchStatus = "IMPORTED"` added to the base plan's `FetchStatus`.
 
-- [ ] **Step 1: Write failing tests** — `TestContentTypeWebsiteValue` (`== "WEBSITE"`); `TestWebPageRoleValid` (`BLOG_POST` true; `""`, `"NEWS"`, `"blog_post"` false); `TestContentParentIDRoundTrip` in the mapper test: nil stays nil, `ptr(7)` round-trips, DB content type string is `website`.
+- [ ] **Step 1: Write failing tests** — `TestContentTypeWebsiteValue` (`== "WEBSITE"`); `TestWebPageRoleValid` (`BLOG_POST` and `SESSION_TRANSCRIPT` true; `""`, `"NEWS"`, `"blog_post"` false); `TestContentParentIDRoundTrip` in the mapper test: nil stays nil, `ptr(7)` round-trips, DB content type string is `website`.
 - [ ] **Step 2:** Run `go test ./test/domain/... ./internal/adapters/repositories/postgres/...` — Expected: FAIL (undefined).
 - [ ] **Step 3: Implement** the constants, `Valid()`, the field, the GORM column `ParentContentID *int \`gorm:"column:parent_content_id"\`` and both mapper directions.
 - [ ] **Step 4: Migration.** Run `ls backend/migrations | tail -5` and `grep -rl parent_content_id backend/migrations`. If a migration already adds `parent_content_id` (the TMDB hierarchy landed), skip this step. Otherwise `make migrate-create name=add_content_parent_id` and write, idempotently: `ALTER TABLE content ADD COLUMN IF NOT EXISTS parent_content_id BIGINT NULL REFERENCES content(id) ON DELETE RESTRICT;` and `CREATE INDEX IF NOT EXISTS idx_content_parent_content_id ON content (parent_content_id) WHERE parent_content_id IS NOT NULL;`; down drops the index then the column. The number is provisional.
 - [ ] **Step 5:** Run the Step 2 command — Expected: PASS. Run `go build ./...`.
-- [ ] **Step 6: Commit** `feat(content): WEBSITE type, parent_content_id and web page roles`.
+- [ ] **Step 6: Commit** `feat(content): WEBSITE type, parent_content_id and webpage roles`.
 
 ### Task 3: Site-root rule (pure functions)
 
@@ -99,7 +99,7 @@ Inputs and conditions the spec implies that a person would hit, most likely firs
 ```go
 type CreateWebPageInput struct {
     URL             string
-    Roles           []domain.WebPageRole // nil = detected; empty non-nil = none
+    Roles           []domain.WebPageRole // nil or empty = none (the adder picks; nothing is detected)
     ParentContentID *int                 // must be a WEBSITE on the same host
     Prefetched      *domain.WebPageMeta  // set: skip the network fetch (import files)
 }
@@ -115,12 +115,12 @@ Both return `domain.ErrAlreadyExists` with the existing row, like `CreateFromBoo
   - `ParentContentID` pointing at a `WEB_PAGE` row, a missing row, or a website on another host → `ErrInvalidInput`, no insert.
   - valid parent → saved `ParentContentID` equals it.
   - `Prefetched` set → the client's `Fetch` is never called; `Response.fetch.status == "IMPORTED"`.
-  - `Roles: []WebPageRole{"NEWS"}` → `ErrInvalidInput`; empty non-nil → saved `webPageRoles` is `[]`.
+  - `Roles: []WebPageRole{"NEWS"}` → `ErrInvalidInput`; nil or empty → saved `webPageRoles` is `[]`.
   - existing canonical URL → `(existing, ErrAlreadyExists)`, parent **unchanged** even when `ParentContentID` is passed.
 - [ ] **Step 2:** Run `go test ./test/services/ -run 'Website|WebPage'` — Expected: FAIL.
 - [ ] **Step 3: Implement.** Order in `CreateFromWebPage`: canonicalise → root check → role validation → dedupe by URL (return before any fetch) → parent validation (one `GetByID`) → fetch unless `Prefetched` → build `Response` → `GetOrCreateByURL`. `CreateFromWebsite` reuses the same fetch-and-build helper with the `SiteRoot` URL.
 - [ ] **Step 4:** Re-run — Expected: PASS. Update every mock of the content service port under `backend/test/` that the compiler flags.
-- [ ] **Step 5: Commit** `feat(content): create websites and file web pages under them`.
+- [ ] **Step 5: Commit** `feat(content): create websites and file webpages under them`.
 
 ### Task 5: GraphQL surface for websites and filing
 
@@ -133,16 +133,16 @@ Both return `domain.ErrAlreadyExists` with the existing row, like `CreateFromBoo
 - Produces:
 ```graphql
 enum ContentType { …existing… WEBSITE }
-enum WebPageRole { BLOG_POST }
+enum WebPageRole { BLOG_POST SESSION_TRANSCRIPT }
 input CreateContentFromWebPageInput { url: String!  webPageRoles: [WebPageRole!]  parentContentID: IntID }   # replaces the base input
 input CreateContentFromWebsiteInput { url: String! }
 type Mutation { createContentFromWebsite(input: CreateContentFromWebsiteInput!): CreateContentResult! @auth }
 type Content { …existing…  parentContentID: Int  parentContent: Content }   # parentContent via dataloader
-input ContentFilter { …existing…  parentContentID: IntID  webPageRoles: [WebPageRole!] }   # roles: any-of, web page rows only
+input ContentFilter { …existing…  parentContentID: IntID  webPageRoles: [WebPageRole!] }   # roles: any-of, webpage rows only
 ```
 `ContentFilter.webPageRoles` filters with `response->'webPageRoles' @> '["BLOG_POST"]'` per value, OR'd (never `?|`; GORM reads `?` as a placeholder).
 
-- [ ] **Step 1: Write failing tests.** Resolver: unauthenticated `createContentFromWebsite` errors; create returns type `WEBSITE`; `createContentFromWebPage` with `parentContentID` returns a row whose `parentContent.id` matches. Repository: `parentContentID` filter returns only that website's children; `webPageRoles: [BLOG_POST]` returns blog posts and excludes a YouTube row and a plain web page; query count for listing 20 pages selecting `parentContent` is exactly +1 over the same list without it.
+- [ ] **Step 1: Write failing tests.** Resolver: unauthenticated `createContentFromWebsite` errors; create returns type `WEBSITE`; `createContentFromWebPage` with `parentContentID` returns a row whose `parentContent.id` matches. Repository: `parentContentID` filter returns only that website's children; `webPageRoles: [BLOG_POST]` returns blog posts and excludes a YouTube row and a plain webpage; query count for listing 20 pages selecting `parentContent` is exactly +1 over the same list without it.
 - [ ] **Step 2:** Run `go test ./test/resolvers/... ./internal/adapters/repositories/postgres/... -run 'Website|ParentContent|WebPageRole'` — Expected: FAIL.
 - [ ] **Step 3: Implement** schema, `make graphql-gen` (handle the collision), the `parentContent` field as `resolver: true` in `gqlgen.yml` backed by a per-request content-by-ID loader (reuse an existing one if present), the filter clauses in the repository, and the resolver wiring in `cmd/server/main.go` if a new dependency appears.
 - [ ] **Step 4:** Re-run — Expected: PASS. Then `go build ./...`, `gofmt -l .` (empty), `go vet -tags perf ./internal/perf/...`.
@@ -199,7 +199,7 @@ GraphQL: `stageImportFromFile(input: StageImportFromFileInput!): ImportJob! @aut
 - [ ] **Step 2:** Run `go test ./test/services/ -run ImportWebPage` — Expected: FAIL.
 - [ ] **Step 3: Implement.** In `runImports`, before starting the worker pool, resolve each distinct source's website once into `map[sourceID]*int` (treat `ErrAlreadyExists` as success using the returned row); pass it to `importOne`. Keep the pool and outcome recording unchanged.
 - [ ] **Step 4:** Re-run — Expected: PASS. Update the other `importContentCreator` fakes the compiler flags.
-- [ ] **Step 5: Commit** `feat(import): import staged web pages under their website`.
+- [ ] **Step 5: Commit** `feat(import): import staged webpages under their website`.
 
 ### Task 8: Verify and open PR 1
 
@@ -210,7 +210,7 @@ GraphQL: `stageImportFromFile(input: StageImportFromFileInput!): ImportJob! @aut
 
 ## PR 2 — exporter (scrappy-scraper repo, branch `wordpress-blog-scraper`)
 
-### Task 9: Emit the web page shape
+### Task 9: Emit the webpage shape
 
 **Files:**
 - Modify: `src/wordpress_scraper/perspectize.py`, `tests/test_perspectize_export.py`
@@ -222,7 +222,7 @@ GraphQL: `stageImportFromFile(input: StageImportFromFileInput!): ImportJob! @aut
 - [ ] **Step 2:** `python -m pytest tests -q` — Expected: FAIL on those assertions.
 - [ ] **Step 3:** Change `DESTINATION_TYPE`, `SOURCE_TYPE`, the `kind`, add the roles fact and `websiteUrl`; bump `FORMAT`.
 - [ ] **Step 4:** Re-run — Expected: 19 passed. Re-export `output/jordans-journey` and copy `perspectize-import.json` to `~/Downloads/jordans-journey-archive/`.
-- [ ] **Step 5:** Commit `refactor(wordpress): export blog posts as web pages with a BLOG_POST role` and push.
+- [ ] **Step 5:** Commit `refactor(wordpress): export blog posts as webpages with a BLOG_POST role` and push.
 
 ---
 
@@ -233,7 +233,7 @@ Branch from `main` after PR 1 is merged **and** `feature/import-staging-frontend
 ### Task 10: Detection and the Add dialog's "File under" checkbox
 
 **Files:**
-- Modify: `frontend/src/lib/utils/detectContentType.ts`, the Add dialog branch for web pages from the base plan's Task 11, `frontend/src/lib/queries/content/` (mutation documents)
+- Modify: `frontend/src/lib/utils/detectContentType.ts`, the Add dialog branch for webpages from the base plan's Task 11, `frontend/src/lib/queries/content/` (mutation documents)
 - Test: `frontend/tests/unit/detectContentType.test.ts`, the Add dialog component test
 
 **Interfaces:** Consumes Task 5's mutations and `Content.parentContent`. Produces `{ type: 'WEBSITE', url }` from `detectContentCandidates`.
@@ -247,21 +247,21 @@ Branch from `main` after PR 1 is merged **and** `feature/import-staging-frontend
 
 **Files:** Modify `ActivityDetailsModal.svelte`; Test `frontend/tests/components/ActivityDetailsModal.test.ts`.
 
-- [ ] **Step 1: Write failing tests**, one per state: a web page with a parent shows "Part of <site>" linking to that website's modal; without a parent shows nothing; a website shows "Pages in this site" (newest first, title, published date, role), the first 50 with a "N pages in total" line; a website with no pages shows "No pages saved from this site yet"; neither view shows the other's section.
+- [ ] **Step 1: Write failing tests**, one per state: a webpage with a parent shows "Part of <site>" linking to that website's modal; without a parent shows nothing; a website shows "Pages in this site" (newest first, title, published date, role), the first 50 with a "N pages in total" line; a website with no pages shows "No pages saved from this site yet"; neither view shows the other's section.
 - [ ] **Step 2:** Run the test file — Expected: FAIL. **Step 3:** Implement with the `parentContentID` filter from Task 5 (one query per opened website). **Step 4:** PASS. **Step 5:** Commit `feat(web-page): part-of and pages-in-site on details`.
 
 ### Task 12: Role filter
 
 **Files:** Modify the Activity type-filter component from the base plan; Test its component test.
 
-- [ ] **Step 1: Write failing tests**: the "Role" control appears only when the type filter is Web page only; choosing Blog post sends `webPageRoles: [BLOG_POST]`; clearing removes the key. **Step 2–4:** FAIL, implement, PASS. **Step 5:** Commit `feat(web-page): filter by role`.
+- [ ] **Step 1: Write failing tests**: the "Role" control appears only when the type filter is Webpage only; it offers Blog post and Session transcript and nothing else; choosing Blog post sends `webPageRoles: [BLOG_POST]`, choosing both sends both (OR); clearing removes the key. **Step 2–4:** FAIL, implement, PASS. **Step 5:** Commit `feat(web-page): filter by role`.
 
 ### Task 13: Import sheet columns
 
 **Files:** Modify the `/import/[id]` sheet's column definitions and its Decide/All column sets; Test the sheet's component test.
 
 - [ ] **Step 1: Write failing tests**: a `PAGE` row shows Title + summary, Published, Words (`wordCount`), Reading time (`durationSeconds`), Comments (blank when absent, never 0), Roles (pill per entry) in **Decide**; Source and Import in **All**; a row missing `wordCount` shows "—"; the Roles header filter finds blog posts; a `PAGE` row's thumbnail loads with `referrerpolicy="no-referrer"` and falls back to the glyph on error.
-- [ ] **Step 2–4:** FAIL, implement, PASS. **Step 5:** Commit `feat(import): web page columns on the staging sheet`.
+- [ ] **Step 2–4:** FAIL, implement, PASS. **Step 5:** Commit `feat(import): webpage columns on the staging sheet`.
 
 ### Task 14: Verify and open PR 3
 
