@@ -61,7 +61,7 @@ function listRow(overrides: Record<string, unknown> = {}) {
 
 /** The details row (GET_CONTENT_DETAILS): the same fields plus `response` (WebPageMeta). */
 function detailsRow(response: Record<string, unknown>) {
-	return { ...listRow(), response } as never;
+	return { ...(listRow() as object), response } as never;
 }
 
 const loadedResponse = (description: string | null) => ({
