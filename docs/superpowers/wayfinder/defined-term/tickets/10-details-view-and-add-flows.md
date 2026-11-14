@@ -1,6 +1,6 @@
 # Term details view and Add flows
 
-Type: `wayfinder:prototype` (HITL) · Status: open · Blocked by: [Definition identity, editing and lazy creation](05-definition-identity-and-editing.md), [Storing Wiktionary text: licence obligations](02-wiktionary-licence-obligations.md) · Claimed by: none
+Type: `wayfinder:prototype` (HITL) · Status: open · Blocked by: [Definition identity, editing and lazy creation](05-definition-identity-and-editing.md) · Claimed by: none (the licence research is closed; its credit wording and read-only rule apply)
 
 ## Question
 
