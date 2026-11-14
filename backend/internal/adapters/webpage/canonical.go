@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
-	"golang.org/x/net/publicsuffix"
 )
 
 // isTrackingParam reports whether a query key is campaign or click-tracking noise
@@ -82,38 +81,27 @@ func isDefaultPort(scheme, port string) bool {
 	return (scheme == "http" && port == "80") || (scheme == "https" && port == "443")
 }
 
-// PreferDeclaredCanonical returns the page's declared <link rel=canonical> only
-// when it is on the same registrable domain as the fetched URL. Otherwise (a
-// cross-domain declaration, an unparseable one, or a host with no registrable
-// domain such as an IP address) it returns fetched.
-func PreferDeclaredCanonical(fetched, declared string) string {
+// PreferDeclaredCanonical returns the page's declared <link rel=canonical> as the
+// dedupe key only when it names the host of the page actually read (finalURL):
+// same host after www. is dropped and case is folded, http or https, default
+// port. Anything else returns requested. The check is per host, not per
+// registrable domain, so a sibling subdomain (attacker.example.com declaring
+// bob.example.com) cannot claim another user's URL. Judging the final host also
+// stops an open redirect from borrowing the requested host's declaration.
+func PreferDeclaredCanonical(requested, finalURL, declared string) string {
 	if declared == "" {
-		return fetched
+		return requested
 	}
 	declaredCanonical, err := Canonicalize(declared)
 	if err != nil {
-		return fetched
+		return requested
 	}
-	fetchedHost, ok := registrableDomain(fetched)
-	if !ok {
-		return fetched
+	// Canonicalize keeps only non-default ports, so any port left is refused.
+	if u, err := url.Parse(declaredCanonical); err != nil || u.Port() != "" {
+		return requested
 	}
-	declaredHost, ok := registrableDomain(declaredCanonical)
-	if !ok || declaredHost != fetchedHost {
-		return fetched
+	if hostOf(declaredCanonical) == "" || hostOf(declaredCanonical) != hostOf(finalURL) {
+		return requested
 	}
 	return declaredCanonical
-}
-
-// registrableDomain returns the eTLD+1 of a URL's host, or false when there is none.
-func registrableDomain(raw string) (string, bool) {
-	u, err := url.Parse(raw)
-	if err != nil {
-		return "", false
-	}
-	site, err := publicsuffix.EffectiveTLDPlusOne(u.Hostname())
-	if err != nil {
-		return "", false
-	}
-	return site, true
 }

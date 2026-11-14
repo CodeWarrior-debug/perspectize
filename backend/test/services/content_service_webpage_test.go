@@ -179,10 +179,10 @@ func TestCreateFromWebPage_ExistingCanonicalURLSkipsFetchAndInsert(t *testing.T)
 }
 
 func TestCreateFromWebPage_DeclaredSameDomainCanonicalExistingReturnsThatRow(t *testing.T) {
-	t.Run("same registrable domain: the declared URL is the key", func(t *testing.T) {
+	t.Run("same host: the declared URL is the key", func(t *testing.T) {
 		client := &mockWebPageClient{fetchFn: func(_ context.Context, _ string) (domain.WebPageMeta, error) {
-			meta := okWebPage("https://blog.example.com/post", "Post")
-			meta.DeclaredCanonical = "https://example.com/post"
+			meta := okWebPage("https://example.com/post?ref=x", "Post")
+			meta.DeclaredCanonical = "https://example.com/canonical-post"
 			return meta, nil
 		}}
 		var keyed string
@@ -191,11 +191,28 @@ func TestCreateFromWebPage_DeclaredSameDomainCanonicalExistingReturnsThatRow(t *
 			return &domain.Content{ID: 9, URL: c.URL, ContentType: domain.ContentTypeWebPage}, true, nil
 		}}
 
-		got, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), "https://blog.example.com/post", nil, 1)
+		got, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), "https://example.com/post", nil, 1)
 		assert.ErrorIs(t, err, domain.ErrAlreadyExists)
-		assert.Equal(t, "https://example.com/post", keyed)
+		assert.Equal(t, "https://example.com/canonical-post", keyed)
 		require.NotNil(t, got)
 		assert.Equal(t, 9, got.ID)
+	})
+
+	t.Run("sibling subdomain on a shared platform cannot claim another URL", func(t *testing.T) {
+		client := &mockWebPageClient{fetchFn: func(_ context.Context, _ string) (domain.WebPageMeta, error) {
+			meta := okWebPage("https://attacker.substack.com/x", "Mine")
+			meta.DeclaredCanonical = "https://bob.substack.com/x"
+			return meta, nil
+		}}
+		var keyed string
+		repo := &mockContentRepository{getOrCreateByURLFn: func(_ context.Context, c *domain.Content, _ bool) (*domain.Content, bool, error) {
+			keyed = *c.URL
+			return c, false, nil
+		}}
+
+		_, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), "https://attacker.substack.com/x", nil, 1)
+		require.NoError(t, err)
+		assert.Equal(t, "https://attacker.substack.com/x", keyed)
 	})
 
 	t.Run("cross-domain declared canonical is ignored", func(t *testing.T) {

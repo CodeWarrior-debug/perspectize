@@ -53,22 +53,88 @@ func TestCanonicalize_RejectsNonWebURLs(t *testing.T) {
 	}
 }
 
+// PreferDeclaredCanonical's key rule: a declared canonical is used only when its
+// host (www. dropped, lowercased) equals the host of the page that was actually
+// read, and it is http(s) on the default port. A registrable-domain match is not
+// enough: a sibling subdomain could otherwise claim another user's URL.
 func TestPreferDeclaredCanonical(t *testing.T) {
-	t.Run("same registrable domain: declared is used", func(t *testing.T) {
-		got := PreferDeclaredCanonical("https://blog.example.com/post?ref=x", "https://example.com/post")
-		assert.Equal(t, "https://example.com/post", got)
-	})
-	t.Run("different registrable domain: declared is ignored", func(t *testing.T) {
-		got := PreferDeclaredCanonical("https://example.com/a", "https://evil.test/a")
-		assert.Equal(t, "https://example.com/a", got)
-	})
-	t.Run("empty declared: fetched is kept", func(t *testing.T) {
-		assert.Equal(t, "https://example.com/a", PreferDeclaredCanonical("https://example.com/a", ""))
-	})
-	t.Run("unparseable declared: fetched is kept", func(t *testing.T) {
-		assert.Equal(t, "https://example.com/a", PreferDeclaredCanonical("https://example.com/a", "ftp://example.com/b"))
-	})
-	t.Run("IP host has no registrable domain: fetched is kept", func(t *testing.T) {
-		assert.Equal(t, "http://127.0.0.1/x", PreferDeclaredCanonical("http://127.0.0.1/x", "http://127.0.0.1/y"))
-	})
+	const requested = "https://example.com/a"
+	tests := []struct {
+		name     string
+		final    string
+		declared string
+		want     string
+	}{
+		{
+			name:     "same host: declared is used",
+			final:    "https://example.com/a?ref=x",
+			declared: "https://example.com/post",
+			want:     "https://example.com/post",
+		},
+		{
+			name:     "www on the declared side only: same host, declared is used",
+			final:    "https://example.com/a",
+			declared: "https://www.example.com/post/",
+			want:     "https://example.com/post",
+		},
+		{
+			name:     "same registrable domain, different host: ignored",
+			final:    "https://blog.example.com/a",
+			declared: "https://example.com/post",
+			want:     requested,
+		},
+		{
+			name:     "sibling subdomain on a shared platform: ignored",
+			final:    "https://attacker.substack.com/a",
+			declared: "https://bob.substack.com/post",
+			want:     requested,
+		},
+		{
+			name:     "cross-domain declared: ignored",
+			final:    "https://example.com/a",
+			declared: "https://evil.test/a",
+			want:     requested,
+		},
+		{
+			name:     "open redirect: the page read is on another host, so its declared URL is ignored",
+			final:    "https://evil.test/landing",
+			declared: "https://example.com/post",
+			want:     requested,
+		},
+		{
+			name:     "non-default port: ignored",
+			final:    "https://example.com/a",
+			declared: "https://example.com:8443/post",
+			want:     requested,
+		},
+		{
+			name:     "default http port is not a non-default port: used",
+			final:    "http://example.com/a",
+			declared: "http://example.com:80/post",
+			want:     "http://example.com/post",
+		},
+		{
+			name:     "non-http scheme: ignored",
+			final:    "https://example.com/a",
+			declared: "ftp://example.com/post",
+			want:     requested,
+		},
+		{
+			name:     "empty declared: requested is kept",
+			final:    "https://example.com/a",
+			declared: "",
+			want:     requested,
+		},
+		{
+			name:     "IP host, same address: declared is used",
+			final:    "http://127.0.0.1/y",
+			declared: "http://127.0.0.1/x",
+			want:     "http://127.0.0.1/x",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, PreferDeclaredCanonical(requested, tt.final, tt.declared))
+		})
+	}
 }

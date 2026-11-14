@@ -132,10 +132,9 @@ func (s *ContentService) fetchWebPage(ctx context.Context, canonical string) (do
 }
 
 // webPageKey is the URL the row is stored under: the page's declared canonical
-// when it is on the same registrable domain as the requested URL, else the
-// requested canonical.
+// when it names the host of the page actually read, else the requested canonical.
 func webPageKey(canonical string, meta domain.WebPageMeta) string {
-	return webpage.PreferDeclaredCanonical(canonical, meta.DeclaredCanonical)
+	return webpage.PreferDeclaredCanonical(canonical, meta.FinalURL, meta.DeclaredCanonical)
 }
 
 // webPageName is the page title, or host + path when the page has no title.
