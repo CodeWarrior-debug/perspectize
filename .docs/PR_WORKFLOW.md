@@ -134,7 +134,7 @@ gh pr merge 123 --squash --delete-branch --admin
 - `--delete-branch` — Auto-delete branch after merge
 - `--admin` — Bypass branch protection when needed
 
-**After every merge, sync local `main` in the same turn** (a stacked merge counts too: sync once after the last one): `git -C <main checkout> fetch origin`, then `git -C <main checkout> merge --ff-only origin/main`. Skip it only when that checkout holds uncommitted edits to a file the merge changed (`git diff --name-only main origin/main` against `git status --short`), and say so. Never commit to local `main`: it diverges from `origin/main` and every later `--ff-only` fails. Finish the worktree slot too (WORKTREES.md → Finishing).
+**After every merge, local `main` must be synced in the same turn.** The `sync-main-after-merge.sh` PostToolUse hook does it after `gh pr merge` and the merge API ([HOOKS.md](HOOKS.md)); read its message, and when it says it skipped, or a merge happened some other way (the GitHub UI, another machine), do it by hand: `git -C <main checkout> fetch origin`, then `git -C <main checkout> merge --ff-only origin/main`. Skip only when that checkout holds uncommitted edits to a file the merge changed (`git diff --name-only main origin/main` against `git status --short`), and say so. For a stacked merge the hook syncs after each PR; the last sync is the one that counts. Never commit to local `main`: it diverges from `origin/main` and every later `--ff-only` fails. Finish the worktree slot too (WORKTREES.md → Finishing).
 
 ### Stacked PRs (GitHub stacks)
 
