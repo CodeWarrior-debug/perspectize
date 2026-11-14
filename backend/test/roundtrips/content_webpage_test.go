@@ -69,7 +69,7 @@ func TestCreateContentFromWebPage(t *testing.T) {
 
 func TestPreviewWebPage(t *testing.T) {
 	h := newHarness(t)
-	_, token := h.user("webpage-preview")
+	_, token := h.user("wp-preview")
 	h.warm(token)
 	url := fmt.Sprintf("https://webpage-preview-rt-%d.test/post", time.Now().UnixNano())
 	vars := map[string]any{"url": url}
