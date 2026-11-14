@@ -1,27 +1,82 @@
 [
   {
-    "question": "How do I search for a video by title on the Activity page?",
+    "question": "How do I search for a video by title in the Library?",
     "expect_ids": ["activity.search-content"],
     "must_not_claim": []
   },
   {
-    "question": "Can I sort the Activity table by more than one column at once?",
+    "question": "Can I search the Library for movies by actor or director?",
+    "expect_ids": ["activity.search-content", "activity.filter-by-person"],
+    "must_not_claim": []
+  },
+  {
+    "question": "Why do I only see YouTube videos in the Library, and how do I see my Bible passages, movies or books?",
+    "expect_ids": ["activity.filter-by-type"],
+    "must_not_claim": []
+  },
+  {
+    "question": "I filtered the Library to movies and the columns changed. What happened, and can I get my old columns back?",
+    "expect_ids": ["activity.column-sets"],
+    "must_not_claim": []
+  },
+  {
+    "question": "How do I show only the items I added to the Library?",
+    "expect_ids": ["activity.filter-by-user"],
+    "must_not_claim": []
+  },
+  {
+    "question": "Where is the By User tab that grouped recent activity by person?",
+    "expect_ids": ["activity.filter-by-user"],
+    "must_not_claim": ["the Library has a By User tab", "switch to the By User view", "Include my private perspectives toggle in the Library"]
+  },
+  {
+    "question": "Can I sort the Library by more than one column at once?",
     "expect_ids": ["activity.sort-content"],
     "must_not_claim": []
   },
   {
-    "question": "How do I permanently save my chosen columns so they're still there after I refresh?",
+    "question": "If I pick my own columns in the Library, will they still be there after I refresh or on my phone and other devices?",
     "expect_ids": ["activity.choose-columns"],
-    "must_not_claim": ["saved permanently", "persists after refresh", "saved to your account"]
+    "must_not_claim": ["column choices sync to your account", "column choices follow you to other devices", "column choices reset on refresh"]
   },
   {
-    "question": "Can I filter the Activity table on my phone the same way the column filter menus work on desktop?",
-    "expect_ids": ["activity.filter-columns"],
+    "question": "Can I filter the Library on my phone the same way the column filter menus work on desktop?",
+    "expect_ids": ["activity.filter-columns", "activity.narrow-screens"],
     "must_not_claim": ["column filter menus on mobile", "same filter menu on the card list"]
   },
   {
-    "question": "In the By User view, can I see other people's private perspectives if I turn on 'Include my private perspectives'?",
-    "expect_ids": ["activity.by-user-privacy"],
-    "must_not_claim": ["shows other users' private perspectives", "reveals everyone's private perspectives"]
+    "question": "The Library only shows 50 items. How do I see more, and how many rows can I show per page?",
+    "expect_ids": ["activity.data-mode", "activity.paginate"],
+    "must_not_claim": []
+  },
+  {
+    "question": "I can see a movie's cast in the Library. How do I find the other movies with the same actor?",
+    "expect_ids": ["activity.filter-by-person"],
+    "must_not_claim": []
+  },
+  {
+    "question": "How do I change the category of a video in the Library?",
+    "expect_ids": ["activity.set-category"],
+    "must_not_claim": []
+  },
+  {
+    "question": "How do I add a Library item to my plan?",
+    "expect_ids": ["activity.add-to-plan"],
+    "must_not_claim": ["Add to plan icon on desktop table rows"]
+  },
+  {
+    "question": "What can I do in the Library on my phone?",
+    "expect_ids": ["activity.narrow-screens"],
+    "must_not_claim": ["Columns button on mobile", "hover popovers on the card list"]
+  },
+  {
+    "question": "How do I open a video's details, and how do I delete a video I added from the Library?",
+    "expect_ids": ["activity.open-details"],
+    "must_not_claim": ["delete button in the details dialog", "you can delete a content item from the Library"]
+  },
+  {
+    "question": "How do I copy the full description of an item from the Library table?",
+    "expect_ids": ["activity.hover-cell-details"],
+    "must_not_claim": []
   }
 ]

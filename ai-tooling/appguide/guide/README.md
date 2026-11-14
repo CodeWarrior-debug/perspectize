@@ -70,7 +70,7 @@ Any other `**Field:**` is a lint error.
 | Slug | Title | Status | Verified at |
 |---|---|---|---|
 | `getting-started` | Getting Started | verified (2 rounds) | ea74656e (2026-11-14) |
-| `activity` | Activity | verified (1 round) | — |
+| `activity` | Library (slug kept from "Activity") | verified (3 rounds) | ea74656e (2026-11-14) |
 | `adding-content` | Adding Content | verified (3 rounds) | ea74656e (2026-11-14) |
 | `perspectives` | Perspectives | verified (1 round) | ea74656e (2026-11-14) |
 | `bible` | Bible Passages | verified (2 rounds) | — |
