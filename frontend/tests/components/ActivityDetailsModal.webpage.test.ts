@@ -40,6 +40,7 @@ vi.mock('$lib/auth/useAuthState', () => ({
 
 const FETCHED_AT = '2026-11-10T12:30:00Z';
 
+// Typed loosely: the fixture uses plain strings for the content type and roles.
 function webPageContent(overrides: Record<string, unknown> = {}) {
 	return {
 		id: '77',
@@ -68,7 +69,7 @@ function webPageContent(overrides: Record<string, unknown> = {}) {
 		},
 		response: { fetch: { status: 'OK', httpStatus: 200, at: FETCHED_AT } },
 		...overrides,
-	};
+	} as never;
 }
 
 function tileValue(label: string): string {

@@ -57,7 +57,7 @@ describe('WebPageTiles: Author tile', () => {
 describe('WebPageTiles: Fetched tile', () => {
 	it('shows the date and the time the page was read, in local time', () => {
 		const at = '2026-11-10T12:30:00Z';
-		const row = { ...withRoles([]), response: { fetch: { status: 'OK', httpStatus: 200, at } } } as never;
+		const row = { ...base, response: { fetch: { status: 'OK', httpStatus: 200, at } } } as never;
 		render(WebPageTiles, { props: { row } });
 		expect(tileValue('Fetched')).toBe(formatDateTime(at));
 	});

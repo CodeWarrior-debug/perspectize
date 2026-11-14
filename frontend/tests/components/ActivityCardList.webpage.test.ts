@@ -24,16 +24,18 @@ const webPage = (overrides: Record<string, unknown> = {}) => ({
 	...overrides,
 });
 
-const pageRow = (id: string, webPageOverrides: Record<string, unknown> = {}) => ({
-	id,
-	name: 'A post title',
-	url: 'https://www.example.com/post',
-	channelTitle: null,
-	length: null,
-	lengthUnits: null,
-	contentType: 'WEB_PAGE',
-	webPage: webPage(webPageOverrides),
-});
+// The card row is typed loosely here: the test fixtures use plain strings for roles and type.
+const pageRow = (id: string, webPageOverrides: Record<string, unknown> = {}) =>
+	({
+		id,
+		name: 'A post title',
+		url: 'https://www.example.com/post',
+		channelTitle: null,
+		length: null,
+		lengthUnits: null,
+		contentType: 'WEB_PAGE',
+		webPage: webPage(webPageOverrides),
+	}) as never;
 
 describe('ActivityCardList: webpage card', () => {
 	it('shows the site, the published year and the author', () => {
