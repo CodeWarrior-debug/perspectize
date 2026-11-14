@@ -49,8 +49,6 @@
 
 **New work uses obra/superpowers** (`superpowers:writing-plans` → `superpowers:executing-plans` / `superpowers:subagent-driven-development`; plans/specs in `docs/superpowers/`). **GSD is legacy** — only finish in-flight `.planning/phases/` work with its existing plan files; never start new work with it. If no `superpowers:*` skill is listed this session, any plan/spec you write carries the "written without superpowers" banner. Details, spike-doc format, remaining GSD commands: [.docs/PLANNING.md](.docs/PLANNING.md).
 
-**`gsd:new-milestone` is destructive here:** its `phases clear --confirm` step deletes every `.planning/phases/` dir and it resets `STATE.md`, and `gsd-roadmapper` rewrites `STATE.md`. While v1.1 is in flight, run it non-destructively: skip the clear, keep STATE, write `.planning/vX.Y-REQUIREMENTS.md` + `.planning/vX.Y-research/` (never `.planning/research/`, which holds v1.0 research), and append phases to `ROADMAP.md` by hand.
-
 ## Self-Verification (MANDATORY)
 
 **Before claiming work is complete, pushing, or creating a PR**, run the relevant subset and report the output summary, not just "tests pass":
