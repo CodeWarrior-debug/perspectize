@@ -476,6 +476,32 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 		return container;
 	}
 
+	if (params.data.contentType === 'WEB_PAGE') {
+		// Lucide "globe" (outline, themed stroke): a web page is not a video, so no YouTube red.
+		container.title = 'Webpage';
+		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		svg.setAttribute('width', '20');
+		svg.setAttribute('height', '20');
+		svg.setAttribute('viewBox', '0 0 24 24');
+		svg.setAttribute('fill', 'none');
+		svg.setAttribute('stroke', 'var(--color-muted-foreground)');
+		svg.setAttribute('stroke-width', '2');
+		svg.setAttribute('stroke-linecap', 'round');
+		svg.setAttribute('stroke-linejoin', 'round');
+		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+		path.setAttribute(
+			'd',
+			'M12 2a10 10 0 1 0 0 20 10 10 0 1 0 0-20M2 12h20M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20',
+		);
+		svg.appendChild(path);
+		const label = document.createElement('span');
+		label.className = 'sr-only';
+		label.textContent = 'Webpage';
+		container.appendChild(svg);
+		container.appendChild(label);
+		return container;
+	}
+
 	if (params.data.contentType === 'BOOK') {
 		container.title = 'Book';
 		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

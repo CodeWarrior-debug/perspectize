@@ -25,7 +25,9 @@ import {
 	synopsisValueGetter,
 	formatMoneyExact,
 	budgetValueGetter,
+	formatDate,
 } from './formatting';
+import { webPageAuthor, webPagePublished, webPageRoleLabel, webPageRolesOf, webPageSite } from './webPage';
 
 /** Per-column hover popover specs for ActivityTable, keyed by colId. */
 export const ACTIVITY_TOOLTIP_SPECS = {
@@ -56,7 +58,10 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 		copyValue: (c: CellCtx) => percentLikedValueGetter({ data: c.data }),
 	},
 	tags: { mode: 'multi', emptyText: 'No tags', items: (c: CellCtx) => contentTags(c.data) ?? [] },
-	cast: { mode: 'multi', emptyText: 'No cast or directors', items: (c: CellCtx) => castTooltipItems(c.data),
+	cast: {
+		mode: 'multi',
+		emptyText: 'No cast or directors',
+		items: (c: CellCtx) => castTooltipItems(c.data),
 		itemCopyValues: (c: CellCtx) => castTooltipCopyValues(c.data),
 	},
 	boxOffice: {
@@ -88,6 +93,29 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 	budget: {
 		text: (c: CellCtx) => formatMoneyExact(budgetValueGetter({ data: c.data })),
 		copyValue: (c: CellCtx) => budgetValueGetter({ data: c.data }),
+	},
+	webSite: {
+		emptyText: 'No site',
+		text: (c: CellCtx) => webPageSite(c.data) ?? '',
+		copyValue: (c: CellCtx) => webPageSite(c.data),
+	},
+	webPublished: {
+		emptyText: 'No published date',
+		text: (c: CellCtx) => {
+			const iso = webPagePublished(c.data);
+			return iso ? formatDate(iso) : '';
+		},
+		copyValue: (c: CellCtx) => webPagePublished(c.data),
+	},
+	webRoles: {
+		mode: 'multi',
+		emptyText: 'No role set',
+		items: (c: CellCtx) => webPageRolesOf(c.data).map(webPageRoleLabel),
+	},
+	webAuthor: {
+		emptyText: 'No author',
+		text: (c: CellCtx) => webPageAuthor(c.data) ?? '',
+		copyValue: (c: CellCtx) => webPageAuthor(c.data),
 	},
 	synopsis: { emptyText: 'No synopsis', text: (c: CellCtx) => synopsisValueGetter({ data: c.data }) ?? '' },
 	description: { emptyText: 'No description', text: (c: CellCtx) => c.data?.description ?? '' },
