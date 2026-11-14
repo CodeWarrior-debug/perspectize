@@ -246,12 +246,11 @@ func (c *Client) Fetch(ctx context.Context, rawURL string) (domain.WebPageMeta, 
 		return failedAt(finalURL, fetchedAt, domain.FetchStatusTooLarge, &code), nil
 	}
 
-	meta := domain.WebPageMeta{
-		SchemaVersion: domain.WebPageSchemaVersion,
-		FinalURL:      finalURL,
-		Domain:        hostOf(finalURL),
-		Fetch:         domain.WebPageFetch{Status: domain.FetchStatusOK, HTTPStatus: &code, At: fetchedAt},
-	}
+	meta := ParseHead(bytes.NewReader(data), resp.Request.URL)
+	meta.SchemaVersion = domain.WebPageSchemaVersion
+	meta.FinalURL = finalURL
+	meta.Domain = hostOf(finalURL)
+	meta.Fetch = domain.WebPageFetch{Status: domain.FetchStatusOK, HTTPStatus: &code, At: fetchedAt}
 	return meta, nil
 }
 
