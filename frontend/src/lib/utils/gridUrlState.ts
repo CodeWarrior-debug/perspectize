@@ -2,6 +2,7 @@
  * URL ↔ grid state synchronization utilities.
  * Serializes/deserializes AG Grid filter models to/from URL search params.
  */
+import type { WebPageRole } from '$lib/queries/content';
 import {
 	COL_TO_SORT,
 	SORT_TO_COL,
@@ -455,6 +456,8 @@ const SCOPE_TO_GQL_FIELD: Record<SearchScopeKey, ContentSearchFieldGQL> = {
 export interface ContentFilterInput {
 	contentType?: string;
 	contentTypes?: string[];
+	/** Webpage rows only; any of the listed roles matches (OR). Other content types never match. */
+	webPageRoles?: WebPageRole[];
 	minLengthSeconds?: number;
 	maxLengthSeconds?: number;
 	search?: string;

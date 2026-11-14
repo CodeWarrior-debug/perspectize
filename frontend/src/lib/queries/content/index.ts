@@ -11,7 +11,56 @@ export type { ContentFilterInput } from '$lib/utils/gridUrlState';
 export { activityListRequest, cursorsAfterPage, ACTIVITY_LIST_STALE_TIME_MS, LOADED_MODE_FIRST } from './activityList';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
-export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK';
+export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK' | 'WEB_PAGE';
+
+/**
+ * A webpage's role (the backend `WebPageRole` enum). Chosen by the adder, never read from the page.
+ * The first entry is the primary role. Stored in `response.webPageRoles`.
+ */
+export type WebPageRole = 'BLOG_POST' | 'SESSION_TRANSCRIPT';
+
+export type WebPageFetchStatus = 'OK' | 'BLOCKED' | 'ERROR' | 'TIMEOUT' | 'NOT_HTML' | 'TOO_LARGE';
+
+/** `fetch` on a webpage: internal status (drives the fallback title and the dialog message) plus when it was read. */
+export interface WebPageFetch {
+	status: WebPageFetchStatus;
+	/** Null when no HTTP response arrived (TIMEOUT, network ERROR). Never render it as "HTTP null". */
+	httpStatus: number | null;
+	at: string;
+}
+
+/** The metadata read from a webpage's `<head>`, as stored in `Content.response` for WEB_PAGE rows. */
+export interface WebPageMeta {
+	finalUrl: string;
+	domain: string;
+	siteName: string | null;
+	title: string | null;
+	description: string | null;
+	imageUrl: string | null;
+	faviconUrl: string | null;
+	publishedAt: string | null;
+	lang: string | null;
+	author: string | null;
+	webPageRoles: WebPageRole[];
+	fetch: WebPageFetch;
+}
+
+/** The read-only import preview (`previewWebPage`). It never carries roles: the adder picks those. */
+export interface WebPagePreview {
+	finalUrl: string;
+	domain: string;
+	siteName: string | null;
+	title: string | null;
+	description: string | null;
+	imageUrl: string | null;
+	faviconUrl: string | null;
+	publishedAt: string | null;
+	lang: string | null;
+	author: string | null;
+	fetch: WebPageFetch;
+	/** IntID: the id of a row already saved for this page, or null. Serialised as a string, like `ContentItem.id`. */
+	alreadyExistsContentId: string | null;
+}
 
 /** The import job that created a content row. Mirrors the backend `ImportJobRef`. */
 export interface ImportJobRef {
@@ -408,6 +457,59 @@ export interface CreateContentFromBookResponse {
 		url: string | null;
 		contentType: string;
 	};
+}
+
+// Same result shape as CREATE_CONTENT_FROM_YOUTUBE: `alreadyExisted` tells the caller whether the
+// page was already saved (find-or-create). `webPageRoles` is omitted from the input when none are
+// picked, which stores a plain webpage. The server reads the page itself; the client sends only the url.
+export const CREATE_CONTENT_FROM_WEB_PAGE = gql`
+	mutation CreateContentFromWebPage($input: CreateContentFromWebPageInput!) {
+		createContentFromWebPage(input: $input) {
+			content {
+				id
+				name
+				url
+				contentType
+			}
+			alreadyExisted
+		}
+	}
+`;
+
+export interface CreateContentFromWebPageResponse {
+	createContentFromWebPage: {
+		content: { id: string; name: string; url: string | null; contentType: string };
+		alreadyExisted: boolean;
+	};
+}
+
+// Read-only: runs the same fetch and parse as the create, and writes nothing. Shown in the add dialog
+// before Save. Never cached for long: `useWebPagePreview` sets its staleTime.
+export const PREVIEW_WEB_PAGE = gql`
+	query PreviewWebPage($url: String!) {
+		previewWebPage(url: $url) {
+			finalUrl
+			domain
+			siteName
+			title
+			description
+			imageUrl
+			faviconUrl
+			publishedAt
+			lang
+			author
+			fetch {
+				status
+				httpStatus
+				at
+			}
+			alreadyExistsContentId
+		}
+	}
+`;
+
+export interface PreviewWebPageResponse {
+	previewWebPage: WebPagePreview | null;
 }
 
 export const UPDATE_CONTENT_SOURCE_DATA = gql`
