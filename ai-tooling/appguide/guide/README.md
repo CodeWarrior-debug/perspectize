@@ -77,4 +77,4 @@ Any other `**Field:**` is a lint error.
 | `compare` | Compare Perspectives | verified (pilot, 3 rounds) | — |
 | `discover` | Discover | verified (3 rounds) | ea74656e (2026-11-14) |
 | `messaging` | Messaging | verified (1 round) | — |
-| `settings` | Settings & Theme | verified (2 rounds); `settings.change-theme` (theme panel) reserved for the owner | — |
+| `settings` | Settings & Theme | verified (1 round); `settings.change-theme` (theme panel) reserved for the owner | ea74656e (2026-11-14) |

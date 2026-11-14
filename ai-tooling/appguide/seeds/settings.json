@@ -1,7 +1,13 @@
 [
   { "question": "How do I open Settings?", "expect_ids": ["settings.open"], "must_not_claim": [] },
-  { "question": "I dismissed the onboarding walkthrough, how do I get it back?", "expect_ids": ["settings.onboarding-toggle"], "must_not_claim": [] },
+  { "question": "I dismissed the onboarding walkthrough, how do I get it back?", "expect_ids": ["settings.onboarding-toggle"], "must_not_claim": ["Show onboarding next session"] },
+  { "question": "How do I change the font used for Bible passages and descriptions?", "expect_ids": ["settings.change-fonts"], "must_not_claim": [] },
+  { "question": "Is there a quick way to switch to a matching set of fonts?", "expect_ids": ["settings.font-pairing"], "must_not_claim": [] },
+  { "question": "I picked some fonts and want the app's original look back, how?", "expect_ids": ["settings.reset-fonts"], "must_not_claim": [] },
+  { "question": "How can I see my font choices on the whole page instead of through the Settings window?", "expect_ids": ["settings.font-peek"], "must_not_claim": [] },
+  { "question": "Where do I report a bug or suggest a feature?", "expect_ids": ["settings.send-feedback"], "must_not_claim": [] },
   { "question": "How do I sign out of Perspectize?", "expect_ids": ["settings.sign-out"], "must_not_claim": [] },
   { "question": "Where do I edit my account profile details?", "expect_ids": ["settings.manage-account"], "must_not_claim": [] },
-  { "question": "Can I delete my account from the Settings dialog?", "expect_ids": [], "must_not_claim": ["delete your account", "delete account"] }
+  { "question": "Can I delete my account from the Settings dialog?", "expect_ids": [], "must_not_claim": ["delete your account", "delete account"] },
+  { "question": "Can I upload my own font file to use in Perspectize?", "expect_ids": ["settings.change-fonts"], "must_not_claim": ["upload your own font", "upload a font file"] }
 ]
