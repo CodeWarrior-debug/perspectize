@@ -164,7 +164,7 @@ describe('CommentsEditor', () => {
 
 			const wrapper = document.querySelector('.comment-editor-wrapper') as HTMLElement;
 			const scroller = document.querySelector('.comment-editor-scroll') as HTMLElement;
-			expect(wrapper.style.getPropertyValue('--pe-max-height')).toBe('max(68px, min(40vh, 320px))');
+			expect(wrapper.style.getPropertyValue('--pe-max-height')).toBe('max(68px, min(40dvh, 320px))');
 			expect(scroller.style.overflowY).toBe('auto');
 			expect(scroller.style.maxHeight).toBe('var(--pe-max-height)');
 			expect(scroller.querySelector('.ProseMirror')).not.toBeNull();
@@ -177,7 +177,7 @@ describe('CommentsEditor', () => {
 			await waitFor(() => expect(document.querySelector('.ProseMirror')).not.toBeNull());
 
 			const wrapper = document.querySelector('.comment-editor-wrapper') as HTMLElement;
-			expect(wrapper.style.getPropertyValue('--pe-max-height')).toBe('min(60vh, 560px)');
+			expect(wrapper.style.getPropertyValue('--pe-max-height')).toBe('min(60dvh, 560px)');
 		});
 	});
 });
