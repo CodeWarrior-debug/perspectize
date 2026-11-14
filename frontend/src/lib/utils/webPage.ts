@@ -2,7 +2,7 @@
  * Webpage helpers shared by the Add dialog, the Activity grid and the details view.
  * Pure functions only: no reactive state, no network.
  */
-import type { ContentItem, WebPageFetch, WebPageRole } from '$lib/queries/content';
+import type { ContentItem, WebPageFetch, WebPageMeta, WebPageRole } from '$lib/queries/content';
 
 /** The roles an adder can pick, in the order the dropdown lists them. */
 export const WEB_PAGE_ROLE_OPTIONS: ReadonlyArray<{ value: WebPageRole; label: string }> = [
@@ -77,4 +77,13 @@ export function webPageRolesOf(row: WebPageRow): WebPageRole[] {
 /** Author column: the author the page declares, or null (shown as a dash, never "Unknown"). */
 export function webPageAuthor(row: WebPageRow): string | null {
 	return row.webPage?.author || null;
+}
+
+/**
+ * When the page was read, from the details `response` (`fetch.at`), or null. The details modal shows the
+ * time, never the fetch status. The list payload does not carry it, so a list-only row returns null.
+ */
+export function webPageFetchedAt(row: { response?: unknown } | null | undefined): string | null {
+	const meta = row?.response as Partial<WebPageMeta> | null | undefined;
+	return meta?.fetch?.at || null;
 }
