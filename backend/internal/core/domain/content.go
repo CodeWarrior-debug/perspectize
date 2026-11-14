@@ -13,6 +13,7 @@ const (
 	ContentTypeClaim        ContentType = "CLAIM"
 	ContentTypeBiblePassage ContentType = "BIBLE_PASSAGE"
 	ContentTypeMovie        ContentType = "MOVIE"
+	ContentTypeBook         ContentType = "BOOK"
 )
 
 // ContentSearchField identifies a text column that a ContentFilter.search term
@@ -79,6 +80,9 @@ type Content struct {
 	VerseStartID      *int    // BIBLE_PASSAGE only — computed ordinal (see BibleVerseOrdinal), not a table FK
 	VerseEndID        *int    // BIBLE_PASSAGE only
 	DisplayTitle      *string // BIBLE_PASSAGE only — optional, first-write-wins
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	// ImportJobID is the import that created this row; nil for hand-added content.
+	// Set once at insert: a later re-add of the same URL never changes it.
+	ImportJobID *int
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }

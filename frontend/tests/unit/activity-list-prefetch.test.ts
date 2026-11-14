@@ -169,9 +169,12 @@ describe('failed prefetch', () => {
 	});
 });
 
-describe('route load (routes/+page.ts)', () => {
-	it('prefetches the Activity list for the URL state in a browser, outside demo mode', async () => {
-		const { load } = await import('../../src/routes/+page');
+describe.each([
+	['routes/content-library/+page.ts', () => import('../../src/routes/content-library/+page')],
+	['routes/+page.ts (forwards to the Library)', () => import('../../src/routes/+page')],
+])('route load (%s)', (_name, importRoute) => {
+	it('prefetches the Library list for the URL state in a browser, outside demo mode', async () => {
+		const { load } = await importRoute();
 		const result = load({ url: new URL('http://localhost/?mode=all&f.type=movie') } as never);
 
 		expect(result).toBeUndefined(); // not awaited: the page never waits on the prefetch
@@ -183,7 +186,7 @@ describe('route load (routes/+page.ts)', () => {
 	it('skips the prefetch in demo mode (no Clerk gate to overlap)', async () => {
 		vi.resetModules();
 		vi.doMock('$lib/auth', () => ({ DEMO_MODE: true, getAuthToken: vi.fn() }));
-		const { load } = await import('../../src/routes/+page');
+		const { load } = await importRoute();
 		load({ url: new URL('http://localhost/') } as never);
 		expect(requestMock).not.toHaveBeenCalled();
 		vi.doUnmock('$lib/auth');
@@ -191,7 +194,7 @@ describe('route load (routes/+page.ts)', () => {
 
 	it('skips the prefetch when not in a browser (SSR)', async () => {
 		env.browser = false;
-		const { load } = await import('../../src/routes/+page');
+		const { load } = await importRoute();
 		load({ url: new URL('http://localhost/') } as never);
 		expect(requestMock).not.toHaveBeenCalled();
 	});

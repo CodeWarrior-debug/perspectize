@@ -9,6 +9,7 @@ function mockGridApi() {
 	return {
 		setFilterModel: mockSetFilterModel,
 		getFilterModel: mockGetFilterModel,
+		isDestroyed: () => false,
 	} as any;
 }
 
@@ -105,6 +106,22 @@ describe('FilterChips', () => {
 		const clearBtn = screen.getByText('Clear all');
 		await fireEvent.click(clearBtn);
 		expect(mockSetFilterModel).toHaveBeenCalledWith(null);
+	});
+
+	it('falls back to onClearAll and never touches a destroyed grid on Clear all', async () => {
+		const api = { ...mockGridApi(), isDestroyed: () => true };
+		const onClearAll = vi.fn();
+		render(FilterChips, {
+			props: {
+				gridApi: api,
+				filterModel: { channel: { filterType: 'text', type: 'contains', filter: 'test' } },
+				onClearAll,
+			},
+		});
+
+		await fireEvent.click(screen.getByText('Clear all'));
+		expect(mockSetFilterModel).not.toHaveBeenCalled();
+		expect(onClearAll).toHaveBeenCalledTimes(1);
 	});
 
 	it('removes a single filter when X is clicked', async () => {

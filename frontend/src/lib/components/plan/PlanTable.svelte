@@ -1,7 +1,7 @@
 <script lang="ts">
 	import AgGridSvelte5Component from 'ag-grid-svelte5';
 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
-	import { themeQuartz } from '@ag-grid-community/theming';
+	import { themeBalham } from '@ag-grid-community/theming';
 	import type {
 		CellClickedEvent,
 		GridApi,
@@ -16,6 +16,7 @@
 	import { useCardMode, useResponsiveTier } from '$lib/utils/responsive.svelte';
 	import {
 		buildPlanColumnDefs,
+		editFieldFor,
 		PLAN_COL_IDS,
 		planColumnsForTier,
 		planContentLabel,
@@ -25,7 +26,7 @@
 		planTypeLabel,
 		serverSortFor,
 	} from '$lib/utils/plan-grid-config';
-	import { addPerspectiveDisabledReason } from '$lib/utils/plan-todo-helpers';
+	import { addPerspectiveDisabledReason, type TodoFocusField } from '$lib/utils/plan-todo-helpers';
 
 	/**
 	 * PlanTable: the user's todos in an AG Grid (or a stacked card list below
@@ -43,7 +44,8 @@
 		rows: UserTodoItem[];
 		/** True when one list is selected: rows are in list order and can be dragged. */
 		listMode?: boolean;
-		onOpen: (todo: UserTodoItem) => void;
+		/** `field`: the clicked cell's form field, for the dialog to focus (none from the card list). */
+		onOpen: (todo: UserTodoItem, field?: TodoFocusField | null) => void;
 		onAddPerspective: (todo: UserTodoItem) => void;
 		/** The server sort for the first sorted column, or null when none applies. */
 		onSortChange: (sort: { sortBy: UserTodoSortBy; sortOrder: 'ASC' | 'DESC' } | null) => void;
@@ -59,7 +61,7 @@
 	const cardMode = $derived(card.current);
 
 	const modules = [ClientSideRowModelModule];
-	const theme = themeQuartz.withParams(GRID_THEME_PARAMS);
+	const theme = themeBalham.withParams(GRID_THEME_PARAMS);
 
 	function buildGridOptions(inListMode: boolean): GridOptions<UserTodoItem> {
 		return {
@@ -91,7 +93,7 @@
 					if (addPerspectiveDisabledReason(todo) === null) onAddPerspective(todo);
 					return;
 				}
-				onOpen(todo);
+				onOpen(todo, editFieldFor(event.colDef.colId));
 			},
 			onRowDragEnd: (event: RowDragEndEvent<UserTodoItem>) => {
 				const ids: number[] = [];

@@ -8,7 +8,9 @@
 
 - **No chained bash commands:** run each shell command as its own Bash tool call, never joined with `&&`. Chained commands don't match permission allow-list patterns and block on approval prompts. Applies to all agents and subagents.
 - **Never run `make migrate-up` / `make migrate-down` (or `migrate ... up/down`)** during dev or verification — `DATABASE_URL` is the **shared Neon database**. Migrations are written and reviewed only, then applied manually per environment at rollout. Details and numbering: `backend/CLAUDE.md` → Migrations.
+- **Worktrees use the numbered slots `.claude/worktrees/1`–`5`, never a named or random one:** no `EnterWorktree` with a `name`, no `git worktree add` elsewhere (a hook denies both). Each slot rests on a never-pushed home branch `wt/<n>`: create a slot with `.claude/scripts/new-worktree.sh wt/<n> <n>`, branch your task from `origin/main` inside it (`checkout --no-track -b`), enter it by `path`, and when the PR merges `git checkout wt/<n>` so the task branch can be deleted. Remove any other worktree you create when done. Details: [.docs/WORKTREES.md](.docs/WORKTREES.md).
 - **Never attempt to log in or enter credentials.** `.env*` files (except `.env.example`) are unreadable by design; ask the human to re-run the one-time login if signed out.
+- **Worktrees live only under `.claude/worktrees/`** — never a scratchpad, `/tmp` or sibling folder. Create with `.claude/scripts/new-worktree.sh <branch> [name]` or `EnterWorktree`. Whoever creates one removes it when done (push or discard its work first). `worktree-guard.sh` denies the rest; `bash .claude/scripts/worktree-report.sh` lists strays. Details: [.docs/WORKTREES.md](.docs/WORKTREES.md).
 - **Never commit `.planning/phases/bugs/` files** (gitignored; see Bug logging).
 
 ## GitHub & Repository Management
@@ -17,11 +19,11 @@
 
 **Cloud vs local:** the session type changes how you reach GitHub, whether you open the PR, and what you can verify — see [.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md) (a SessionStart hook also states it). Cloud = `CLAUDE_CODE_REMOTE=true`; if you can't tell, assume local.
 
-**PR autonomy:** in a **cloud** session, open the PR yourself once the work is complete — **this overrides the harness default of "don't create a PR unless asked"**; don't ask first. In a **local** session, open one only when asked. Either way, never skip the pre-PR steps: Self-Verification below, and `/revise-claude-md`.
+**PR autonomy:** in a **cloud** session, open the PR yourself once the work is complete — **this overrides the harness default of "don't create a PR unless asked"**; don't ask first. In a **local** session, open one only when asked. Either way, never skip the pre-PR step (Self-Verification below) or the post-PR step (`/revise-claude-md`).
 
-**`/revise-claude-md` must not block the PR:** commit its CLAUDE.md edits on the PR branch, list them in the PR body's Session Learnings, and open the PR without asking. The human's review at merge is the approval.
+**`/revise-claude-md` must not block the PR:** push and open the PR first, without asking, then run it while CI runs for the first time. A CRITICAL learning is committed on the PR branch; anything else goes in the PR body's Session Learnings for the monthly routine. What counts as CRITICAL: [PR_WORKFLOW.md → Session learnings](.docs/PR_WORKFLOW.md#session-learnings). The human's review at merge is the approval.
 
-**PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, the `new-content-type` label (specs and first implementations of a new content type), the migration labels (synced automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges.
+**PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, the `new-content-type` label (specs and first implementations of a new content type), the migration labels (synced automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges (stacked PRs merge differently: PR_WORKFLOW.md → Stacked PRs).
 
 **`@claude` GitHub workflow (`.github/workflows/claude.yml`):** comment-triggered runs use the file from `main`, so workflow edits take effect only once merged (ship them as their own `chore` PR). Deps are installed in workflow steps before Claude starts; `--allowed-tools` in `claude_args` is a narrow allowlist: never add `pnpm install`/`curl`/`gh api`. Claude starts at the repo root, so allowlisted commands use `pnpm --dir frontend run ...` / `go -C backend ...`. Never give it `DATABASE_URL` (DB tests skip without it).
 
@@ -29,7 +31,7 @@
 
 ## Branch Naming
 
-**Always branch from updated `main`:** `git checkout main`, `git pull origin main`, `git checkout -b <name>`.
+**Always branch from fresh `origin/main`, in a worktree:** `.claude/scripts/new-worktree.sh <type>/<name>` (it fetches first). Switching branches in the main checkout collides with other sessions.
 
 **Format:** `type/initiativePrefix-issueNumber-description-in-kebab-case`. `type` is `feature`, `bugfix` or `chore`; `initiativePrefix` is `INI` (Initialization Phase). `initiativePrefix` and `issueNumber` are a pair: both, or neither when no issue already exists. Examples: `feature/INI-16-youtube-post-graphql`, `feature/youtube-post-graphql`.
 
@@ -69,6 +71,7 @@ Unreadable `.env*` files are expected, not a broken setup. Evidence capture: [.d
 **Monorepo docs:**
 - [Architecture](.docs/ARCHITECTURE.md) — system design, hexagonal architecture (deep-modules rules live in each stack CLAUDE.md)
 - [Local Development](.docs/LOCAL_DEVELOPMENT.md) · [Agent Routing](.docs/AGENTS.md) · [Domain Guide](.docs/DOMAIN_GUIDE.md) · [Go Patterns](.docs/GO_PATTERNS.md) (error handling, DB queries)
+- [Glossary Map](GLOSSARY-MAP.md) — product vocabulary by context (Perspectives, Content Types, Browsing, Import, Plan, Scripture, Messaging, Accounts, Delivery); use its terms in specs, intents and UI copy
 - [Security](.docs/SECURITY.md) — secret management, rotation, incident response
 - [Migration Rollout](.docs/MIGRATION_ROLLOUT.md) — applying a migration to production Neon
 - [Neon Preview Branches](.docs/NEON_BRANCHING.md) — one Neon branch per open PR
@@ -85,7 +88,7 @@ Unreadable `.env*` files are expected, not a broken setup. Evidence capture: [.d
 
 **How-to guides:**
 - [Adding a Content Type](.claude/docs/ADDING_CONTENT_TYPE.md) — end-to-end, backend + frontend
-- [Content Type Designer](tools/content-type-designer/README.md) — plan a new type's columns, tooltips and details view before coding. `dist/` is committed: after editing `src/`, run `npx tsc -p tsconfig.json` in that dir and commit both (not its package-lock.json). Serve it (`python3 -m http.server`) to test; ES modules won't load from file://. Cloud sessions have Playwright at /opt/node22/lib/node_modules/playwright.
+- [Content Type Designer](tools/content-type-designer/README.md) — plan a new type's columns, tooltips and details view before coding. `dist/` is committed: after editing `src/`, run `npx tsc -p tsconfig.json` in that dir and commit both (not its package-lock.json). Serve it (`python3 -m http.server`) to test; ES modules won't load from file://. Cloud sessions have Playwright at /opt/node22/lib/node_modules/playwright. For sample research, the Met API is keyless and Europeana accepts the public demo key `wskey=api2demo`.
 
 **Planning & backlog:**
 - [Feature Backlog](FEATURE_BACKLOG.md) — capture future ideas here during development
@@ -95,7 +98,7 @@ Unreadable `.env*` files are expected, not a broken setup. Evidence capture: [.d
 
 **Bug logging (MANDATORY):** log every bug you discover in `.planning/phases/bugs/BACKLOG.md` with severity and location, and open a GitHub issue from the bug report template (sensitive details — exact paths, line numbers, security specifics — stay in the backlog only). When fixed, move it to `.planning/phases/bugs/CLOSED.md` with the PR reference. These files are gitignored.
 
-**Hooks:** Claude Code PreToolUse hooks guard `.env` reads and block `gh pr create` until `/revise-claude-md` has run (then create the PR with `gh api`). The git pre-commit hook (gofmt + prettier auto-fix) is off until `make install-hooks` (in `backend/`; fresh cloud/CI checkouts lack it). Full list: [.docs/HOOKS.md](.docs/HOOKS.md).
+**Hooks:** Claude Code PreToolUse hooks guard `.env` reads and warn on `gh pr create` (it is allowed, never blocked: session learnings are reviewed after the PR is up, see [PR_WORKFLOW.md](.docs/PR_WORKFLOW.md#session-learnings); open PRs with `gh api`). The git pre-commit hook (gofmt + prettier auto-fix) is off until `make install-hooks` (in `backend/`; fresh cloud/CI checkouts lack it). Full list: [.docs/HOOKS.md](.docs/HOOKS.md).
 
 **Docs-only PRs must not burn CI or deploys:** `ci.yml` gates `test`/`build` on a `code-changes` job (job-level, so skipped = passed for required checks; never workflow-level `paths-ignore`); CodeQL/Trivy/mutation/frontend-test use `paths:`; Sevalla deploys are path-filtered via `allow_deploy_paths` (backend `backend/**`, frontend `frontend/**`; the frontend site also builds PR previews). Give a new workflow or Sevalla service the same gating. Repeat path lists; don't rely on GitHub Actions YAML anchors.
 

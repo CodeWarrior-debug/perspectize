@@ -15,7 +15,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// Constraint names from migration 000032_add_import_staging.
+// Constraint names from migration 000035_add_import_staging.
 const importJobsUserFK = "import_jobs_user_fk"
 
 // importItemListColumns is every item column except details (the detail panel
@@ -46,7 +46,7 @@ func NewGormImportJobRepository(db *gorm.DB) *GormImportJobRepository {
 
 // CreateJob inserts the job, then all its sources in one multi-row INSERT.
 func (r *GormImportJobRepository) CreateJob(ctx context.Context, job *domain.ImportJob) (*domain.ImportJob, error) {
-	jm := &ImportJobModel{UserID: job.UserID, Name: job.Name, RequestStatus: importRequestStatusToDB(job.RequestStatus)}
+	jm := &ImportJobModel{UserID: job.UserID, Name: job.Name, Description: job.Description, RequestStatus: importRequestStatusToDB(job.RequestStatus)}
 	if err := r.db.WithContext(ctx).Clauses(clause.Returning{}).Create(jm).Error; err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolation && pgErr.ConstraintName == importJobsUserFK {
@@ -112,6 +112,25 @@ func (r *GormImportJobRepository) GetJob(ctx context.Context, id int) (*domain.I
 	return job, nil
 }
 
+// GetJobsByIDs returns the jobs among ids without their sources, in one query.
+func (r *GormImportJobRepository) GetJobsByIDs(ctx context.Context, ids []int) (map[int]*domain.ImportJob, error) {
+	out := make(map[int]*domain.ImportJob, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	var models []ImportJobModel
+	if err := r.db.WithContext(ctx).
+		Where("id = ANY(CAST(? AS bigint[]))", intsToArray(ids)).
+		Find(&models).Error; err != nil {
+		return nil, fmt.Errorf("failed to get import jobs: %w", err)
+	}
+	for i := range models {
+		job := importJobModelToDomain(&models[i])
+		out[job.ID] = job
+	}
+	return out, nil
+}
+
 // GetJobState returns one job without its sources (1 query), or ErrNotFound:
 // enough to check it is approved and open before writing to its rows.
 func (r *GormImportJobRepository) GetJobState(ctx context.Context, id int) (*domain.ImportJob, error) {
@@ -123,6 +142,49 @@ func (r *GormImportJobRepository) GetJobState(ctx context.Context, id int) (*dom
 		return nil, fmt.Errorf("failed to get import job: %w", err)
 	}
 	return importJobModelToDomain(&m), nil
+}
+
+// UpdateJobDescription sets the description in one UPDATE scoped to the owner
+// and to an open job. RETURNING gives the updated row back, so a hit costs one
+// statement; a miss (no row) is domain.ErrNotFound for the caller to explain.
+func (r *GormImportJobRepository) UpdateJobDescription(ctx context.Context, jobID, userID int, description string) (*domain.ImportJob, error) {
+	var m ImportJobModel
+	result := r.db.WithContext(ctx).Model(&m).
+		Clauses(clause.Returning{}).
+		Where("id = ? AND user_id = ? AND closed_at IS NULL", jobID, userID).
+		Update("description", description)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to update import description: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return nil, fmt.Errorf("%w: import job %d", domain.ErrNotFound, jobID)
+	}
+	return importJobModelToDomain(&m), nil
+}
+
+// AddSources inserts sources onto an existing job in one multi-row INSERT.
+// A job id that doesn't exist trips the job foreign key.
+func (r *GormImportJobRepository) AddSources(ctx context.Context, jobID int, sources []*domain.ImportSource) ([]*domain.ImportSource, error) {
+	if len(sources) == 0 {
+		return nil, nil
+	}
+	models := make([]*ImportSourceModel, len(sources))
+	for i, s := range sources {
+		models[i] = importSourceDomainToModel(s)
+		models[i].JobID = jobID
+	}
+	if err := r.db.WithContext(ctx).Clauses(clause.Returning{}).Create(&models).Error; err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolation {
+			return nil, fmt.Errorf("%w: import job %d", domain.ErrNotFound, jobID)
+		}
+		return nil, fmt.Errorf("failed to insert import sources: %w", err)
+	}
+	out := make([]*domain.ImportSource, len(models))
+	for i, m := range models {
+		out[i] = importSourceModelToDomain(m)
+	}
+	return out, nil
 }
 
 // SetClosed closes (at) or reopens (nil) a job.

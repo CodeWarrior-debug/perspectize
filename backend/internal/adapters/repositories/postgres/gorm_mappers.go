@@ -162,6 +162,7 @@ func contentModelToDomain(m *ContentModel) *domain.Content {
 		VerseStartID:      m.VerseStartID,
 		VerseEndID:        m.VerseEndID,
 		DisplayTitle:      m.DisplayTitle,
+		ImportJobID:       m.ImportJobID,
 		CreatedAt:         m.CreatedAt,
 		UpdatedAt:         m.UpdatedAt,
 	}
@@ -186,6 +187,7 @@ func contentDomainToModel(c *domain.Content) *ContentModel {
 		VerseStartID:      c.VerseStartID,
 		VerseEndID:        c.VerseEndID,
 		DisplayTitle:      c.DisplayTitle,
+		ImportJobID:       c.ImportJobID,
 		// CreatedAt and UpdatedAt are managed by GORM
 	}
 }
@@ -504,6 +506,7 @@ func importJobModelToDomain(m *ImportJobModel) *domain.ImportJob {
 		ID:            m.ID,
 		UserID:        m.UserID,
 		Name:          m.Name,
+		Description:   m.Description,
 		RequestStatus: domain.ImportRequestStatus(strings.ToUpper(m.RequestStatus)),
 		ReviewNote:    m.ReviewNote,
 		ReviewedAt:    m.ReviewedAt,

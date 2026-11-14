@@ -124,6 +124,7 @@ var computedSortColumns = map[string]string{
 	"AddedBy":      "added_by",
 	"ReleaseDate":  "release_date_sort",
 	"TmdbScore":    "tmdb_score",
+	"Author":       "author_sort",
 }
 
 // computedSortSelects returns the ", (expr) AS alias" select-list suffix for every
@@ -161,15 +162,21 @@ const (
 	// TMDB vote averages are 0-10.
 	nullTmdbScoreAsc  float64 = 99
 	nullTmdbScoreDesc float64 = -1
+	// Author names: ASC needs a value after every plausible real name; DESC uses
+	// "" (before all), so a missing/empty author sorts last in either direction.
+	nullAuthorAsc  = "￿￿￿￿"
+	nullAuthorDesc = ""
 )
 
 // contentSortRule builds a single paginator.Rule for one content sort column.
 func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) paginator.Rule {
 	boxOfficeNull, vsBudgetNull, ageRatingNull := nullBoxOfficeDesc, nullVsBudgetDesc, nullAgeRatingDesc
 	releaseDateNull, tmdbScoreNull := nullReleaseDateDesc, nullTmdbScoreDesc
+	authorNull := nullAuthorDesc
 	if order == domain.SortOrderAsc {
 		boxOfficeNull, vsBudgetNull, ageRatingNull = nullBoxOfficeAsc, nullVsBudgetAsc, nullAgeRatingAsc
 		releaseDateNull, tmdbScoreNull = nullReleaseDateAsc, nullTmdbScoreAsc
+		authorNull = nullAuthorAsc
 	}
 	// Map domain.SortOrder to paginator.Order
 	var paginatorOrder paginator.Order
@@ -236,6 +243,15 @@ func contentSortRule(sortBy domain.ContentSortBy, order domain.SortOrder) pagina
 			SQLRepr: "CASE response->>'certification' WHEN 'G' THEN 1 WHEN 'PG' THEN 2 " +
 				"WHEN 'PG-13' THEN 3 WHEN 'R' THEN 4 WHEN 'NC-17' THEN 5 ELSE NULL END",
 			NULLReplacement: ageRatingNull,
+		}
+	case domain.ContentSortByAuthor:
+		// Book authors; a missing/empty author counts as unknown and sorts last.
+		return paginator.Rule{
+			Key:   "Author",
+			Order: paginatorOrder,
+			SQLRepr: "CASE WHEN response->'authors'->0->>'name' IS NULL OR response->'authors'->0->>'name' = '' " +
+				"THEN NULL ELSE response->'authors'->0->>'name' END",
+			NULLReplacement: authorNull,
 		}
 	case domain.ContentSortByReleaseDate:
 		// ISO YYYY-MM-DD, so string order is date order; an empty date counts as unknown.

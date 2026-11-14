@@ -97,3 +97,8 @@ func TestMovieConstants(t *testing.T) {
 	assert.Equal(t, domain.PersonRole("CAST"), domain.PersonRoleCast)
 	assert.Equal(t, domain.PersonRole("DIRECTOR"), domain.PersonRoleDirector)
 }
+
+func TestBookConstants(t *testing.T) {
+	assert.Equal(t, domain.ContentType("BOOK"), domain.ContentTypeBook)
+	assert.Equal(t, domain.ContentSortBy("AUTHOR"), domain.ContentSortByAuthor)
+}

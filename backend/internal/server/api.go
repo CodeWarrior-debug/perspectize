@@ -152,14 +152,18 @@ func NewGraphQLServer(d Deps) *handler.Server {
 }
 
 // Middleware returns the API middleware stack, outermost first. Order
-// matters: rate limit before auth to prevent DoS.
+// matters: CORS wraps the rate limiter so a 429 still carries
+// Access-Control-Allow-Origin (otherwise the browser reports it as a CORS
+// error), and the rate limiter runs before auth to prevent DoS. Preflight
+// OPTIONS requests are answered by the CORS handler and so never reach the
+// rate limiter.
 func Middleware(d Deps) []func(http.Handler) http.Handler {
 	return []func(http.Handler) http.Handler{
 		middleware.RequestID,
 		middleware.RealIP,
 		perfmw.ClientInfo,                        // tags every request (even unauthenticated/rate-limited) with client.version/platform
+		cors.Handler(CORSOptions(d.CORSOrigins)), // C-05: CORS restricted to config origins; before the limiter so 429s carry CORS headers
 		apimw.GlobalRateLimit(d.RateLimitPerMin), // H-11: rate limiting before auth
-		cors.Handler(CORSOptions(d.CORSOrigins)), // C-05: CORS restricted to config origins
 		apimw.SecureHeaders(),                    // M-14: security headers (HSTS, X-Content-Type-Options, X-Frame-Options)
 		apimw.ContentTypeValidation,              // M-15: CSRF protection via Content-Type
 		auth.Middleware(d.UserRepo, d.TokenVerifier),
@@ -172,6 +176,7 @@ func Middleware(d Deps) []func(http.Handler) http.Handler {
 			Content:     d.ContentService,
 			Messaging:   d.MessagingService,
 			UserTodo:    d.UserTodoService,
+			ImportJob:   d.ImportService,
 		}),
 		perfmw.RequestTimer, // structured request timing (replaces chi Logger)
 		perfmw.Recoverer,    // structured panic recovery (JSON via slog)

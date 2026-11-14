@@ -103,7 +103,7 @@ function field(selector: string): HTMLElement {
 
 async function pickAction(label: string) {
 	const input = field('#todo-action');
-	fireEvent.focus(input);
+	fireEvent.click(input);
 	fireEvent.click(await screen.findByRole('option', { name: label }));
 }
 
@@ -487,6 +487,93 @@ describe('TodoDialog', () => {
 			await waitFor(() => expect((field('#todo-percent') as HTMLInputElement).value).toBe('100'));
 			expect(mocks.updateMutateAsync).not.toHaveBeenCalled();
 			expect(mocks.createMutateAsync).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('focusField (the clicked Plan cell)', () => {
+		const withContent = () => todo({ content: { id: '9', name: 'A great video' }, name: null });
+
+		it.each([
+			['action', '#todo-action'],
+			['name', '#todo-name'],
+			['priority', '#todo-priority'],
+			['status', '#todo-status'],
+			['percentComplete', '#todo-percent'],
+			['startDate', '#todo-start'],
+			['endDate', '#todo-end'],
+			['dueDate', '#todo-due'],
+			['list', '#todo-list'],
+			['privacy', '#todo-privacy'],
+		] as const)('%s focuses %s', async (focusField, selector) => {
+			render(TodoDialog, { props: { open: true, lists: LISTS, todo: todo(), focusField } });
+			await waitFor(() => expect(document.activeElement).toBe(field(selector)));
+		});
+
+		it('comments expands the collapsed editor and focuses it', async () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS, todo: todo(), focusField: 'comments' } });
+			await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Comment')));
+			expect(screen.queryByRole('button', { name: 'Add comments' })).not.toBeInTheDocument();
+		});
+
+		/** Where the dialog's own autofocus lands (bits-ui's first tabbable; jsdom has no layout, so not always Action). */
+		async function defaultFocus(props: Record<string, unknown>): Promise<string> {
+			const { unmount } = render(TodoDialog, { props: { open: true, lists: LISTS, ...props } });
+			let where = '';
+			await waitFor(() => {
+				const el = document.activeElement as HTMLElement | null;
+				expect(el && el !== document.body).toBe(true);
+				// bits-ui ids differ per mount, so compare by tag and role.
+				where = `${el!.tagName}[role=${el!.getAttribute('role')}]#${el!.id.startsWith('bits-') ? '' : el!.id}`;
+			});
+			unmount();
+			return where;
+		}
+
+		it('name on a todo with content (no Title field) keeps the default focus', async () => {
+			const baseline = await defaultFocus({ todo: withContent() });
+			const withField = await defaultFocus({ todo: withContent(), focusField: 'name' });
+			expect(withField).toBe(baseline);
+		});
+
+		it('focusing Action does not open its list', async () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS, todo: todo(), focusField: 'action' } });
+			await waitFor(() => expect(document.activeElement).toBe(field('#todo-action')));
+			expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+		});
+
+		it('a programmatic focus of Action (as the default autofocus does) does not open its list', async () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS, todo: todo() } });
+			field('#todo-action').focus();
+			expect(document.activeElement).toBe(field('#todo-action'));
+			expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+		});
+	});
+
+	describe('View content', () => {
+		it('reports the linked content', () => {
+			const onViewContent = vi.fn();
+			render(TodoDialog, {
+				props: {
+					open: true,
+					lists: LISTS,
+					todo: todo({ content: { id: '9', name: 'A great video' }, name: null }),
+					onViewContent,
+				},
+			});
+			fireEvent.click(screen.getByRole('button', { name: 'View content' }));
+			expect(onViewContent).toHaveBeenCalledWith({ id: '9', name: 'A great video' });
+		});
+
+		it('is not offered for a free-text todo', () => {
+			render(TodoDialog, { props: { open: true, lists: LISTS, todo: todo(), onViewContent: vi.fn() } });
+			expect(screen.queryByRole('button', { name: 'View content' })).not.toBeInTheDocument();
+		});
+
+		it('is not offered when the caller has no details view', () => {
+			render(TodoDialog, {
+				props: { open: true, lists: LISTS, todo: todo({ content: { id: '9', name: 'A great video' }, name: null }) },
+			});
+			expect(screen.queryByRole('button', { name: 'View content' })).not.toBeInTheDocument();
 		});
 	});
 });

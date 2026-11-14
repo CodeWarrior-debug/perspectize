@@ -16,6 +16,36 @@ type ThreadEvent interface {
 	IsThreadEvent()
 }
 
+type AddImportJobSourcesInput struct {
+	JobID   int                        `json:"jobId"`
+	Sources []*CreateImportSourceInput `json:"sources"`
+}
+
+type BookSearchPage struct {
+	Items        []*BookSearchResult `json:"items"`
+	Page         int                 `json:"page"`
+	TotalPages   int                 `json:"totalPages"`
+	TotalResults int                 `json:"totalResults"`
+}
+
+type BookSearchResult struct {
+	WorkKey               string   `json:"workKey"`
+	Title                 string   `json:"title"`
+	AuthorName            []string `json:"authorName"`
+	CoverID               *int     `json:"coverId,omitempty"`
+	FirstPublishYear      *int     `json:"firstPublishYear,omitempty"`
+	PageCountMedian       *int     `json:"pageCountMedian,omitempty"`
+	Subjects              []string `json:"subjects"`
+	RatingsAverage        *float64 `json:"ratingsAverage,omitempty"`
+	RatingsCount          *int     `json:"ratingsCount,omitempty"`
+	EditionCount          *int     `json:"editionCount,omitempty"`
+	WantToReadCount       *int     `json:"wantToReadCount,omitempty"`
+	CurrentlyReadingCount *int     `json:"currentlyReadingCount,omitempty"`
+	AlreadyReadCount      *int     `json:"alreadyReadCount,omitempty"`
+	ReadingLogCount       *int     `json:"readingLogCount,omitempty"`
+	URL                   string   `json:"url"`
+}
+
 type CategorizedRating struct {
 	Category string `json:"category"`
 	Rating   int    `json:"rating"`
@@ -62,8 +92,11 @@ type Content struct {
 	Description   *string               `json:"description,omitempty"`
 	Response      map[string]any        `json:"response,omitempty"`
 	// Movie-specific metadata (the shaped TMDB payload); null for other content types.
-	Movie                   map[string]any `json:"movie,omitempty"`
+	Movie map[string]any `json:"movie,omitempty"`
+	// Book-specific metadata (the shaped Open Library payload); null for other content types.
+	Book                    map[string]any `json:"book,omitempty"`
 	PrimaryCategory         *Category      `json:"primaryCategory,omitempty"`
+	ImportedFrom            *ImportJobRef  `json:"importedFrom,omitempty"`
 	VerseStartID            *int           `json:"verseStartID,omitempty"`
 	VerseEndID              *int           `json:"verseEndID,omitempty"`
 	DisplayTitle            *string        `json:"displayTitle,omitempty"`
@@ -73,6 +106,7 @@ type Content struct {
 	QualityRatingCount      *int           `json:"qualityRatingCount,omitempty"`
 	CreatedAt               string         `json:"createdAt"`
 	UpdatedAt               string         `json:"updatedAt"`
+	ImportJobID             *int           `json:"-"`
 	PrimaryCategoryID       *int           `json:"-"`
 }
 
@@ -94,6 +128,13 @@ type ContentFilter struct {
 	MaxBoxOffice        *float64                    `json:"maxBoxOffice,omitempty"`
 	MinTmdbScore        *float64                    `json:"minTmdbScore,omitempty"`
 	MaxTmdbScore        *float64                    `json:"maxTmdbScore,omitempty"`
+	AuthorContains      *string                     `json:"authorContains,omitempty"`
+	MinPublishYear      *int                        `json:"minPublishYear,omitempty"`
+	MaxPublishYear      *int                        `json:"maxPublishYear,omitempty"`
+	MinPages            *int                        `json:"minPages,omitempty"`
+	MaxPages            *int                        `json:"maxPages,omitempty"`
+	MinBookRating       *float64                    `json:"minBookRating,omitempty"`
+	MaxBookRating       *float64                    `json:"maxBookRating,omitempty"`
 	MinViewCount        *int                        `json:"minViewCount,omitempty"`
 	MaxViewCount        *int                        `json:"maxViewCount,omitempty"`
 	MinLikeCount        *int                        `json:"minLikeCount,omitempty"`
@@ -122,6 +163,10 @@ type CreateClaimInput struct {
 	ParentContentID int    `json:"parentContentID"`
 }
 
+type CreateContentFromBookInput struct {
+	URL string `json:"url"`
+}
+
 type CreateContentFromMovieInput struct {
 	URL string `json:"url"`
 }
@@ -146,8 +191,9 @@ type CreateContentResult struct {
 }
 
 type CreateImportJobInput struct {
-	Name    string                     `json:"name"`
-	Sources []*CreateImportSourceInput `json:"sources"`
+	Name        string                     `json:"name"`
+	Description *string                    `json:"description,omitempty"`
+	Sources     []*CreateImportSourceInput `json:"sources"`
 }
 
 type CreateImportSourceInput struct {
@@ -297,6 +343,7 @@ type ImportItemsResult struct {
 type ImportJob struct {
 	ID              string                     `json:"id"`
 	Name            string                     `json:"name"`
+	Description     *string                    `json:"description,omitempty"`
 	RequestStatus   domain.ImportRequestStatus `json:"requestStatus"`
 	RequestedBy     *User                      `json:"requestedBy,omitempty"`
 	ReviewNote      *string                    `json:"reviewNote,omitempty"`
@@ -307,6 +354,18 @@ type ImportJob struct {
 	UpdatedAt       string                     `json:"updatedAt"`
 	Items           []*ImportItem              `json:"items"`
 	RequesterUserID int                        `json:"-"`
+}
+
+type ImportJobRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type ImportListingProgress struct {
+	JobID     string                         `json:"jobId"`
+	Listing   bool                           `json:"listing"`
+	Sources   []*ImportSourceListingProgress `json:"sources"`
+	UpdatedAt string                         `json:"updatedAt"`
 }
 
 type ImportPerson struct {
@@ -337,6 +396,13 @@ type ImportSource struct {
 	StatusDetail    *string                   `json:"statusDetail,omitempty"`
 	ItemCount       int                       `json:"itemCount"`
 	FetchedAt       *string                   `json:"fetchedAt,omitempty"`
+}
+
+type ImportSourceListingProgress struct {
+	SourceID string                    `json:"sourceId"`
+	Staged   int                       `json:"staged"`
+	Batches  int                       `json:"batches"`
+	Status   domain.ImportSourceStatus `json:"status"`
 }
 
 type InboxEvent struct {
@@ -576,6 +642,11 @@ type TypingChanged struct {
 }
 
 func (TypingChanged) IsThreadEvent() {}
+
+type UpdateImportJobDescriptionInput struct {
+	JobID       int    `json:"jobId"`
+	Description string `json:"description"`
+}
 
 // Partial update: omit a field to leave it unchanged. For quality, agreement,
 // importance, confidence, like, review, customFields and feelings, sending an

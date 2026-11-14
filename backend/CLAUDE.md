@@ -30,7 +30,7 @@ Env vars override `config/config.json` (local, gitignored; copy `config/config.e
 
 **Sevalla build:** Dockerfile builder, Docker context `backend`, Dockerfile path `backend/Dockerfile` (Sevalla requires the redundant `backend/` prefix).
 
-**CORS** is in the API middleware chain (`internal/server/api.go`, options from `server.CORSOptions()`); origins come from `CORS_ORIGINS` (`internal/config/security.go`, comma-separated), defaulting to `*`. Set it to the frontend origin in every deployed environment. `AllowedHeaders` must list every custom header the frontend sends (`traceparent`, `tracestate`, `X-Client-Version`, `X-Client-Platform`) or browser preflight rejects the request.
+**CORS** is in the API middleware chain (`internal/server/api.go`, options from `server.CORSOptions()`); origins come from `CORS_ORIGINS` (`internal/config/security.go`, comma-separated), defaulting to `*`. CORS must stay **before** the rate limiter, or a 429 has no CORS headers and the browser reports it as a CORS error (#586). Set it to the frontend origin in every deployed environment. `AllowedHeaders` must list every custom header the frontend sends (`traceparent`, `tracestate`, `X-Client-Version`, `X-Client-Platform`) or browser preflight rejects the request.
 
 ## GraphQL
 
@@ -46,7 +46,7 @@ Schema-first in `schema.graphql`: edit schema → `make graphql-gen` → impleme
 
 ## Testing
 
-- **Integration tests `t.Skip()` when the DB is unavailable**, so a green run without `DATABASE_URL` may have tested nothing. In a cloud session: `pg_ctlcluster 16 main start`, migrate a **local** `testdb` (never the shared Neon DB), then `DATABASE_URL=postgres://…/testdb go test -p 1 ./...`.
+- **Integration tests `t.Skip()` when the DB is unavailable**, so a green run without `DATABASE_URL` may have tested nothing. In a cloud session: `pg_ctlcluster 16 main start`, migrate a **local** `testdb` (never the shared Neon DB), then `DATABASE_URL=postgres://…/testdb go test -p 1 ./...`. Locally, use a throwaway database on the demo stack (`postgres://demo:demo@localhost:5434/<db>?sslmode=disable`, migrated by hand with the repo's `migrate` binary, never the Neon URL); confirm with `-v` that DB tests PASS rather than SKIP.
 - **Build-tagged harnesses rot.** `perf`-tagged code isn't compiled by `go build/test ./...`; CI runs `go vet -tags perf ./internal/perf/...`. Run it after changing `NewResolver` / `dataloader.Middleware` signatures.
 - **Env isolation:** tests that load config clear env vars with `t.Setenv("KEY", "")` (see `clearConfigEnvVars` in `test/config/config_test.go`).
 - **Adding a method to a port interface** breaks every mock implementing it; update the mocks under `test/`.

@@ -1,40 +1,25 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import type { VideoItem } from '$lib/services/youtubeApi';
-	import type { ContentItem } from '$lib/queries/content';
 	import { Button } from '$lib/components/shadcn';
-	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
-	import { formatDate, formatDuration, formatIsoDuration, formatCount } from '$lib/utils/formatting';
-	import CheckIcon from '@lucide/svelte/icons/check';
+	import LibraryStatus from './LibraryStatus.svelte';
+	import type { LibraryItem } from './libraryItem';
+	import { formatDate, formatIsoDuration } from '$lib/utils/formatting';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
 	import PlayIcon from '@lucide/svelte/icons/play';
 
 	let {
 		video,
-		isInLibrary = false,
+		libraryItem = null,
 		isPending = false,
 		onAdd,
-		addedContent = null,
-		userId = null,
 		index = null,
 	}: {
 		video: VideoItem;
-		isInLibrary?: boolean;
+		/** The video's library row when it is already in the user's library, else null. */
+		libraryItem?: LibraryItem | null;
 		isPending?: boolean;
 		onAdd: (videoId: string) => void;
-		/**
-		 * Full content metadata from THIS session's successful "Add to
-		 * Perspectize" call (CreateContentFromYouTube's response.content) —
-		 * populated by discover/+page.svelte's addedContentByVideoId map, keyed
-		 * by video id. Only set right after a click on this card's Add button;
-		 * pre-existing already-tracked videos (isInLibrary from the page's
-		 * libraryUrls check) never get this, because libraryUrls only carries a
-		 * URL, not a numeric contentId or metadata — see the isInLibrary branch
-		 * below for how that's handled.
-		 */
-		addedContent?: ContentItem | null;
-		/** Numeric Clerk-derived user id, needed to open PerspectivePopover. */
-		userId?: number | null;
 		/** Position within the results list — the first couple of cards get fetchpriority="high"/eager loading on their thumbnail, since they're likely above the fold. */
 		index?: number | null;
 	} = $props();
@@ -94,14 +79,10 @@
 		}
 	}
 
-	/** Stops the Add-to-Perspectize button / details-card links from also triggering the card's own click-to-watch handler. */
+	/** Stops the Add-to-Perspectize button from also triggering the card's own click-to-watch handler. */
 	function stopPropagation(event: Event) {
 		event.stopPropagation();
 	}
-
-	let popoverOpen = $state(false);
-
-	const contentIdNumber = $derived(addedContent ? Number(addedContent.id) : null);
 </script>
 
 <!-- Named generically: renders both search.list and videos.list (trending) items identically. -->
@@ -168,51 +149,8 @@
 		<p class="text-sm text-muted-foreground mt-2 line-clamp-2">{video.description}</p>
 	</div>
 	<div class="shrink-0 self-start w-full sm:w-56">
-		{#if addedContent}
-			<!-- Content details card, shown once this video has been added to
-			     Perspectize this session. -->
-			<div class="flex flex-col gap-1.5 text-sm border border-border rounded-md p-2.5 bg-muted/40">
-				<p class="text-xs font-medium text-muted-foreground">Added to Perspectize</p>
-				<dl class="grid grid-cols-2 gap-x-2 gap-y-0.5 text-xs">
-					<dt class="text-muted-foreground">Duration</dt>
-					<dd>{formatDuration(addedContent.length, addedContent.lengthUnits)}</dd>
-					<dt class="text-muted-foreground">Views</dt>
-					<dd>{formatCount(addedContent.viewCount)}</dd>
-					<dt class="text-muted-foreground">Likes</dt>
-					<dd>{formatCount(addedContent.likeCount)}</dd>
-					<dt class="text-muted-foreground">Channel</dt>
-					<dd class="truncate">{addedContent.channelTitle ?? '—'}</dd>
-					{#if addedContent.primaryCategory}
-						<dt class="text-muted-foreground">Category</dt>
-						<dd class="truncate">{addedContent.primaryCategory.label}</dd>
-					{/if}
-				</dl>
-				<div class="flex gap-2 mt-1">
-					<Button
-						variant="outline"
-						size="sm"
-						onclick={(event: MouseEvent) => {
-							stopPropagation(event);
-							popoverOpen = true;
-						}}
-					>
-						Add perspective
-					</Button>
-					<Button variant="outline" size="sm" href={`/compare?contentId=${addedContent.id}`} onclick={stopPropagation}>
-						Compare
-					</Button>
-				</div>
-			</div>
-		{:else if isInLibrary}
-			<!-- Known follow-up (brainstorm item #6): a contentByUrls lookup would let
-			     pre-existing tracked videos (found only via the page's libraryUrls URL
-			     set, with no numeric contentId or metadata attached) get the same
-			     details-card treatment as a freshly-added video. Until then, keep this
-			     simple disabled indicator rather than fabricating a contentId. -->
-			<Button variant="outline" size="sm" disabled onclick={stopPropagation}>
-				<CheckIcon class="size-4" />
-				In Library
-			</Button>
+		{#if libraryItem}
+			<LibraryStatus contentId={libraryItem.id} contentName={libraryItem.name} />
 		{:else}
 			<Button
 				variant="default"
@@ -229,22 +167,3 @@
 		{/if}
 	</div>
 </div>
-
-{#if popoverOpen && contentIdNumber !== null}
-	<!-- Dynamically imported: PerspectivePopover pulls in the Tiptap-based
-	     CommentsEditor, which shouldn't load eagerly for every Discover page
-	     visit — see ActivityTable.svelte's identical lazy-import pattern. -->
-	{#await import('$lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
-		<PerspectivePopover
-			contentId={contentIdNumber}
-			contentName={addedContent?.name ?? video.title}
-			userId={userId ?? 0}
-			bind:open={popoverOpen}
-			onClose={() => {
-				popoverOpen = false;
-			}}
-		/>
-	{:catch}
-		<LazyLoadError what="the perspective editor" floating />
-	{/await}
-{/if}

@@ -130,7 +130,7 @@ func (t *importProgressTracker) publishLocked(jp *jobProgress) {
 // channel holds one snapshot, and a newer one replaces an unread older one.
 // Only the publisher (under the tracker's lock) sends, so the drain-then-send
 // can't race another sender.
-func sendLatest(ch chan domain.ImportProgress, s domain.ImportProgress) {
+func sendLatest[T any](ch chan T, s T) {
 	select {
 	case ch <- s:
 		return

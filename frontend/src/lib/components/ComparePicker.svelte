@@ -2,7 +2,7 @@
 	/**
 	 * Empty-state picker for /compare with no ?contentId — lets a visitor
 	 * search for content and jump straight into a comparison, instead of the
-	 * page being a dead end that only explains "open it from Activity"
+	 * page being a dead end that only explains "open it from Library"
 	 * (compare-page-enhancements #1).
 	 *
 	 * Only surfaces content with 2+ perspectives visible to the viewer
@@ -10,7 +10,7 @@
 	 * minPerspectiveCount, and each row shows the same viewer-scoped count
 	 * (visiblePerspectiveCount), so the label matches what Compare can show.
 	 * See LIST_COMPARABLE_CONTENT's comment for why it isn't just added to the
-	 * main Activity list query.
+	 * main Library list query.
 	 */
 	import { createQuery } from '@tanstack/svelte-query';
 	import { goto } from '$app/navigation';
@@ -20,6 +20,7 @@
 	import ContentSearchInput from '$lib/components/ContentSearchInput.svelte';
 	import { Button } from '$lib/components/shadcn';
 	import { extractVideoIdFromUrl } from '$lib/utils/formatting';
+	import { LIBRARY_PATH } from '$lib/utils/contentLinks';
 
 	let searchValue = $state('');
 	let debouncedQuery = $state('');
@@ -67,7 +68,7 @@
 						? 'No content matching your search has more than one perspective yet.'
 						: 'No content has more than one perspective yet.'}
 				</p>
-				<Button href="/" variant="outline">Go to Activity</Button>
+				<Button href={LIBRARY_PATH} variant="outline">Go to Library</Button>
 			</div>
 		{:else}
 			{#each comparableItems as item (item.id)}

@@ -504,7 +504,7 @@ describe('Compare', () => {
 		await waitFor(() => {
 			expect(screen.getByTestId('add-perspective-cta')).toBeInTheDocument();
 		});
-		expect(screen.getByRole('link', { name: 'Add yours' })).toHaveAttribute('href', '/');
+		expect(screen.getByRole('link', { name: 'Add yours' })).toHaveAttribute('href', '/content-library');
 	});
 
 	it('does not prompt when the viewer already has a perspective on this content', async () => {

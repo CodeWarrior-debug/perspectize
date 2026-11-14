@@ -70,6 +70,52 @@ func (r *contentResolver) PrimaryCategory(ctx context.Context, obj *model.Conten
 	return categoryDomainToModel(category), nil
 }
 
+// ImportedFrom is the resolver for the importedFrom field. The import comes from
+// the per-request import job loader (one batched query per request). It is null
+// for hand-added content, for an import that no longer exists, and for a closed
+// import unless the viewer is an admin.
+func (r *contentResolver) ImportedFrom(ctx context.Context, obj *model.Content) (*model.ImportJobRef, error) {
+	if obj.ImportJobID == nil {
+		return nil, nil
+	}
+	jobID := *obj.ImportJobID
+
+	var job *domain.ImportJob
+	if loaders := dataloader.For(ctx); loaders != nil {
+		loaded, err := loaders.ImportJobByID.Load(ctx, jobID)
+		if err != nil {
+			if dataloader.IsNotFound(err) {
+				return nil, nil
+			}
+			slog.Error("resolving importedFrom via dataloader failed", "contentID", obj.ID, "importJobID", jobID, "error", err)
+			return nil, nil
+		}
+		job = loaded
+	} else {
+		// No dataloader middleware (direct resolver tests): one single-row lookup.
+		if r.ImportService == nil {
+			return nil, nil
+		}
+		jobs, err := r.ImportService.GetImportJobsByIDs(ctx, []int{jobID})
+		if err != nil {
+			slog.Error("resolving importedFrom failed", "contentID", obj.ID, "importJobID", jobID, "error", err)
+			return nil, nil
+		}
+		job = jobs[jobID]
+	}
+	if job == nil {
+		return nil, nil
+	}
+
+	if job.ClosedAt != nil {
+		viewer, _ := auth.ForContext(ctx)
+		if viewer == nil || viewer.Role != domain.UserRoleAdmin {
+			return nil, nil
+		}
+	}
+	return importJobRefToModel(job), nil
+}
+
 // PerspectiveCount is the resolver for the perspectiveCount field.
 //
 // Batched per-request via the PerspectiveAggregateByContentID dataloader
@@ -452,7 +498,7 @@ func (r *queryResolver) ContentByID(ctx context.Context, id string) (*model.Cont
 	// "not found", with no extra statement. The loader caches the result, so
 	// the aggregate fields reuse this same load.
 	if onlyIDAndAggregatesSelected(ctx) {
-		_, found, err := r.fetchPerspectiveAggregate(ctx, intID)
+		agg, found, err := r.fetchPerspectiveAggregate(ctx, intID)
 		if err != nil {
 			slog.Error("checking content existence via aggregate failed", "id", id, "error", err)
 			return nil, fmt.Errorf("failed to get content")
@@ -460,7 +506,11 @@ func (r *queryResolver) ContentByID(ctx context.Context, id string) (*model.Cont
 		if !found {
 			return nil, fmt.Errorf("content not found with ID: %s", id)
 		}
-		return &model.Content{ID: strconv.Itoa(intID)}, nil
+		out := &model.Content{ID: strconv.Itoa(intID)}
+		if agg != nil {
+			out.ImportJobID = agg.ImportJobID
+		}
+		return out, nil
 	}
 
 	content, err := r.ContentService.GetByID(ctx, intID)
@@ -537,6 +587,13 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		params.Filter.MaxBoxOffice = filter.MaxBoxOffice
 		params.Filter.MinTmdbScore = filter.MinTmdbScore
 		params.Filter.MaxTmdbScore = filter.MaxTmdbScore
+		params.Filter.AuthorContains = filter.AuthorContains
+		params.Filter.MinPublishYear = filter.MinPublishYear
+		params.Filter.MaxPublishYear = filter.MaxPublishYear
+		params.Filter.MinPages = filter.MinPages
+		params.Filter.MaxPages = filter.MaxPages
+		params.Filter.MinBookRating = filter.MinBookRating
+		params.Filter.MaxBookRating = filter.MaxBookRating
 		params.Filter.MinViewCount = filter.MinViewCount
 		params.Filter.MaxViewCount = filter.MaxViewCount
 		params.Filter.MinLikeCount = filter.MinLikeCount
@@ -671,4 +728,107 @@ func (r *queryResolver) MovieTrending(ctx context.Context, window *domain.Trendi
 		return nil, fmt.Errorf("trending movies are unavailable right now")
 	}
 	return movieSearchPageToModel(result), nil
+}
+
+// CreateContentFromBook is the resolver for the createContentFromBook field.
+// Mirrors CreateContentFromMovie's structure: identity comes from the session
+// only, and an idempotent duplicate returns the existing row rather than an error.
+func (r *mutationResolver) CreateContentFromBook(ctx context.Context, input model.CreateContentFromBookInput) (*model.Content, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+
+	// The input may be an Open Library work URL or a raw ISBN-10/13. Strip
+	// hyphens from hyphenated ISBNs (e.g. "978-0-434-74002-4") before they
+	// reach ContentService: its isbnRe only matches bare-digit ISBNs, so a
+	// hyphenated one would otherwise be misclassified and rejected with
+	// ErrInvalidInput (carried forward from Task 5's review).
+	rawURLOrISBN := normalizeHyphenatedISBN(input.URL)
+
+	content, err := r.ContentService.CreateFromBook(ctx, rawURLOrISBN, authUser.ID)
+	// Idempotent duplicate: return the existing row.
+	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
+		return domainToModel(content), nil
+	}
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrInvalidInput):
+			return nil, fmt.Errorf("invalid book URL or ISBN: use an Open Library work link or an ISBN-10/13")
+		case errors.Is(err, domain.ErrNotFound):
+			return nil, fmt.Errorf("book not found")
+		}
+		// Details are already logged server-side by the service layer.
+		return nil, fmt.Errorf("failed to create content from book")
+	}
+	return domainToModel(content), nil
+}
+
+// BookSearch is the resolver for the bookSearch field. It is public (no @auth)
+// like movieSearch; adding a found book still requires sign-in through
+// createContentFromBook. Open Library failures are logged server-side and
+// returned as a generic message.
+func (r *queryResolver) BookSearch(ctx context.Context, query string, page *int) (*model.BookSearchPage, error) {
+	pageNum := 0 // service treats 0 as page 1
+	if page != nil {
+		pageNum = *page
+	}
+
+	result, err := r.ContentService.SearchBooks(ctx, query, pageNum)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("%w", err)
+		}
+		slog.Error("failed to search books", "error", err)
+		return nil, fmt.Errorf("book search is unavailable right now")
+	}
+	return bookSearchPageToModel(result), nil
+}
+
+// BookTrending is the resolver for the bookTrending field. It is public (no @auth)
+// like bookSearch. A nil window reaches the service as "" (WEEK) and a nil page as
+// 0 (page 1). Open Library failures are logged server-side and returned as a
+// generic message.
+func (r *queryResolver) BookTrending(ctx context.Context, window *domain.TrendingWindow, page *int) (*model.BookSearchPage, error) {
+	var win domain.TrendingWindow // service treats empty as WEEK
+	if window != nil {
+		win = *window
+	}
+	pageNum := 0 // service treats 0 as page 1
+	if page != nil {
+		pageNum = *page
+	}
+
+	result, err := r.ContentService.TrendingBooks(ctx, win, pageNum)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("%w", err)
+		}
+		slog.Error("failed to load trending books", "error", err)
+		return nil, fmt.Errorf("trending books are unavailable right now")
+	}
+	return bookSearchPageToModel(result), nil
+}
+
+// BookByIsbn is the resolver for the bookByISBN field. It is public (no @auth)
+// like bookSearch; returns null (not an error) when Open Library has no
+// record for the ISBN, so the client can show "not found" without surfacing
+// a GraphQL error.
+func (r *queryResolver) BookByIsbn(ctx context.Context, isbn string) (*model.BookSearchResult, error) {
+	// See CreateContentFromBook: normalize a hyphenated ISBN before it reaches
+	// ContentService's bare-digit isbnRe (Task 5 finding).
+	raw := normalizeHyphenatedISBN(isbn)
+
+	result, err := r.ContentService.ResolveBookISBN(ctx, raw)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, nil
+		}
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("%w", err)
+		}
+		slog.Error("failed to resolve book by isbn", "error", err)
+		return nil, fmt.Errorf("book lookup is unavailable right now")
+	}
+	return bookSearchResultToModel(*result), nil
 }

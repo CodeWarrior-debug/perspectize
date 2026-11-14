@@ -159,6 +159,20 @@ export interface TodoFormValues {
 	listId: number | null;
 }
 
+/** A TodoDialog field that can take focus when the dialog opens (the clicked Plan cell's field). */
+export type TodoFocusField =
+	| 'action'
+	| 'name'
+	| 'priority'
+	| 'status'
+	| 'percentComplete'
+	| 'startDate'
+	| 'endDate'
+	| 'dueDate'
+	| 'list'
+	| 'privacy'
+	| 'comments';
+
 export function clampPercent(value: number): number {
 	if (!Number.isFinite(value)) return 0;
 	return Math.min(100, Math.max(0, Math.round(value)));

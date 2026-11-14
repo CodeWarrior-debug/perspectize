@@ -80,4 +80,24 @@ type ContentService interface {
 	// page. The window defaults to WEEK; page 0 means 1, otherwise 1-500. Served
 	// from the backend cache.
 	TrendingMovies(ctx context.Context, window domain.TrendingWindow, page int) (*MovieSearchPage, error)
+
+	// CreateFromBook creates BOOK content from an Open Library work URL or a
+	// bare ISBN-10/13, attributed to the given user. If the work already
+	// exists, returns the existing content along with ErrAlreadyExists.
+	CreateFromBook(ctx context.Context, rawURLOrISBN string, userID int) (*domain.Content, error)
+
+	// SearchBooks returns one page of Open Library work search results for the
+	// Discover page's Books source. The query is trimmed and must be 1-100
+	// characters; page 0 means 1 and must otherwise be 1-500.
+	SearchBooks(ctx context.Context, query string, page int) (*BookSearchPage, error)
+
+	// TrendingBooks returns one page of Open Library's trending books for the
+	// Discover page. The window defaults to WEEK; page 0 means 1, otherwise
+	// 1-500. Served from the backend cache.
+	TrendingBooks(ctx context.Context, window domain.TrendingWindow, page int) (*BookSearchPage, error)
+
+	// ResolveBookISBN resolves an ISBN-10/13 to its Open Library work without
+	// writing, for the ISBN tab's preview-before-add. Returns ErrNotFound when
+	// Open Library has no record for the ISBN.
+	ResolveBookISBN(ctx context.Context, isbn string) (*BookSearchResult, error)
 }

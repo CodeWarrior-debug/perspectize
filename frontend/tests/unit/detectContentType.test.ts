@@ -46,6 +46,17 @@ describe('detectContentType', () => {
 			{ type: 'MOVIE', url: 'https://www.imdb.com/title/tt0133093/' },
 		],
 		['bare imdb id is accepted silently', 'tt0133093', { type: 'MOVIE', url: 'tt0133093' }],
+		[
+			'open library work url is a book',
+			'https://openlibrary.org/works/OL23166W',
+			{ type: 'BOOK', url: 'https://openlibrary.org/works/OL23166W' },
+		],
+		[
+			'open library edition url is a book',
+			'https://openlibrary.org/books/OL7353617M/Some_title',
+			{ type: 'BOOK', url: 'https://openlibrary.org/books/OL7353617M/Some_title' },
+		],
+		['open library author url is never a book or a claim', 'https://openlibrary.org/authors/OL23919A', { type: null }],
 		['tmdb tv url is not a movie', 'https://www.themoviedb.org/tv/1399', { type: null }],
 		['bible gateway url', bg, gw],
 		[
