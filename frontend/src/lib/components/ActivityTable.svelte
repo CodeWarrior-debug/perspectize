@@ -910,8 +910,9 @@
 				hide: true,
 			},
 			// Webpage columns. Hidden by default; the responsive effect shows the Webpage default set when
-			// the type filter is exactly WEB_PAGE. Roles is a server filter only (Loaded mode cannot filter a
-			// multi-valued field), so it has no column filter. Site and Published are shown from md up.
+			// the type filter is exactly WEB_PAGE. Roles is picker-only (never in the default set); its header
+			// filter is server-side only (f.webrole), since Loaded mode cannot filter a multi-valued field.
+			// Site shows from sm up, Published from md up.
 			{
 				colId: 'webSite',
 				headerName: 'Site',

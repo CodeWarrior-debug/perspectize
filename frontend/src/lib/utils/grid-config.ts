@@ -460,7 +460,7 @@ export const COLUMNS: readonly ColumnMeta[] = [
 	},
 	// Webpage columns (WEB_PAGE rows read their shaped `webPage` JSON; see webPage.ts). Shown by
 	// default only when the type filter is exactly Webpage (defaultColumnVisibility). Roles and
-	// Author are picker-only. Roles is filtered server-side only (the Role control, not a column filter).
+	// Author are picker-only. Roles is filtered server-side only (f.webrole, a checkbox list on the Roles header).
 	{
 		colId: 'webSite',
 		label: 'Site',
