@@ -26,10 +26,10 @@
 </script>
 
 <div class="space-y-1">
-	<span id="webpage-roles-label" class="text-sm font-medium">Page roles</span>
+	<span id="webpage-roles-label" class="text-sm font-medium">Roles</span>
 	<button
 		type="button"
-		aria-label="Page roles"
+		aria-label="Roles"
 		aria-haspopup="listbox"
 		aria-expanded={expanded}
 		onclick={() => (expanded = !expanded)}

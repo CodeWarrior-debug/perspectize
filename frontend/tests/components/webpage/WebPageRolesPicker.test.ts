@@ -10,7 +10,7 @@ function renderPicker(roles: WebPageRole[], disabled = false) {
 }
 
 const openList = async () => {
-	await fireEvent.click(screen.getByRole('button', { name: /page roles/i }));
+	await fireEvent.click(screen.getByRole('button', { name: /^roles$/i }));
 };
 const option = (label: string) => screen.getByRole('option', { name: label });
 
@@ -55,6 +55,6 @@ describe('WebPageRolesPicker', () => {
 
 	it('disabled: the list cannot be opened', async () => {
 		renderPicker([], true);
-		expect(screen.getByRole('button', { name: /page roles/i })).toBeDisabled();
+		expect(screen.getByRole('button', { name: /^roles$/i })).toBeDisabled();
 	});
 });

@@ -51,7 +51,7 @@ function renderPanel(props: {
 	return { onRolesChange };
 }
 
-const picker = () => screen.queryByRole('button', { name: /page roles/i });
+const picker = () => screen.queryByRole('button', { name: 'Roles' });
 
 describe('WebPageImportPreview', () => {
 	it('loading: says the page is being read, and the roles picker is still usable', () => {
