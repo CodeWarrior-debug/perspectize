@@ -1,6 +1,6 @@
 # Discover tab
 
-Type: `wayfinder:prototype` (HITL) · Status: open · Blocked by: [Datamuse for suggestions](01-datamuse-suggestions.md) · Claimed by: none
+Type: `wayfinder:prototype` (HITL) · Status: open · Blocked by: none (the Datamuse research is closed) · Claimed by: none
 
 ## Question
 

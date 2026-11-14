@@ -23,7 +23,7 @@ A locked design ready to hand to `superpowers:writing-plans`: a spec for the two
 - Source facts (probed 2026-11-14 from a cloud session):
   - Free Dictionary API (`api.dictionaryapi.dev`): keyless, exact-word lookup only, content is Wiktionary under CC BY-SA, CORS open, unknown word returns 404, sends `x-ratelimit-limit: 450` (window unknown).
   - Wiktionary's own REST and prefix-search APIs returned 429 from this cloud IP.
-  - Datamuse `sug` returned sensible suggestions with no key; its terms are not yet checked.
+  - Datamuse `sug` returns sensible suggestions; a key becomes required on 2027-02-01 and its CORS is unreliable from a browser (see the Datamuse research below).
   - Rejected: Merriam-Webster (non-commercial only, 1,000 queries per day, automated queries need written approval) and Wordnik (no caching on the basic plan).
 - Finding: parent/child content exists in the glossary but not in code. Only claims have a parent, as a `parentContentId` inside the JSON response. TV seasons and book parts are designed, not built. These two types would be the first real pair, unless we reuse the claim pointer.
 - Rules to follow: `.claude/docs/ADDING_CONTENT_TYPE.md` Decisions 1 to 9 (Discover is Decision 7, import preview is Decision 8, source terms are Decision 9). Query budget in `.docs/QUERY_BUDGET.md` applies to the lazy definitions list.
@@ -31,11 +31,10 @@ A locked design ready to hand to `superpowers:writing-plans`: a spec for the two
 
 ## Decisions so far
 
-(none closed yet)
+- [Datamuse for suggestions](tickets/01-datamuse-suggestions.md): call it from the backend with a 24-hour prefix cache, not the browser; a key is required from 2027-02-01 and the owner must request one; Wiktionary prefix search is the fallback
 
 ## Open tickets (frontier first)
 
-- [Datamuse for suggestions: terms, CORS, limits](tickets/01-datamuse-suggestions.md): research, AFK, unblocked
 - [Storing Wiktionary text: licence obligations](tickets/02-wiktionary-licence-obligations.md): research, AFK, unblocked
 - [Dictionary source: reliability and alternatives](tickets/03-dictionary-source-reliability.md): research, AFK, unblocked
 - [Parent/child infrastructure](tickets/04-parent-child-infrastructure.md): grilling, HITL, unblocked
@@ -43,7 +42,8 @@ A locked design ready to hand to `superpowers:writing-plans`: a spec for the two
 - [Who sees a custom definition](tickets/06-visibility-ownership-abuse.md): grilling, blocked by definition identity
 - [The `@` reference picker](tickets/07-reference-picker.md): grilling, blocked by definition identity
 - [Columns and tooltips for both types](tickets/08-columns-and-tooltips.md): grilling, blocked by definition identity
-- [Discover tab](tickets/09-discover-tab.md): prototype, HITL, blocked by Datamuse research
+- [Discover tab](tickets/09-discover-tab.md): prototype, HITL, unblocked
+- [Suggestion source and the Datamuse key](tickets/12-suggestion-source-and-datamuse-key.md): grilling, blocked by the source reliability research
 - [Term details view and Add flows](tickets/10-details-view-and-add-flows.md): prototype, HITL, blocked by definition identity and the licence research
 - [Designer preview for both types](tickets/11-designer-preview.md): prototype, HITL, blocked by columns, Discover and details view
 
