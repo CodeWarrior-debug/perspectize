@@ -16,12 +16,32 @@
   },
   {
     "question": "Can I delete a perspective I already saved?",
-    "expect_ids": [],
-    "must_not_claim": ["delete a perspective", "remove a saved perspective"]
+    "expect_ids": ["perspectives.delete"],
+    "must_not_claim": []
+  },
+  {
+    "question": "I deleted a perspective by mistake. Can I get it back?",
+    "expect_ids": ["perspectives.delete"],
+    "must_not_claim": ["restore a deleted perspective", "undo the delete"]
   },
   {
     "question": "Can I attach an image file from my computer to my review?",
     "expect_ids": ["perspectives.review"],
     "must_not_claim": ["upload an image file", "attach a file"]
+  },
+  {
+    "question": "Can I share my perspective with just a few friends instead of making it public?",
+    "expect_ids": ["perspectives.privacy"],
+    "must_not_claim": ["share with specific people", "friends-only"]
+  },
+  {
+    "question": "I have a movie on my Plan. How do I write my perspective on it from there?",
+    "expect_ids": ["perspectives.open"],
+    "must_not_claim": []
+  },
+  {
+    "question": "I saved a perspective on something that was on my Plan. Why did a toast ask me about marking a Todo done?",
+    "expect_ids": ["perspectives.mark-todo-done"],
+    "must_not_claim": []
   }
 ]
