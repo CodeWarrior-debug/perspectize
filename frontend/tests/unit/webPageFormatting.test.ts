@@ -35,7 +35,9 @@ describe('webRolesCellRenderer', () => {
 	});
 
 	it('shows one pill per role, in stored order, with the readable label', () => {
-		const el = webRolesCellRenderer({ data: page({ webPageRoles: ['SESSION_TRANSCRIPT', 'BLOG_POST'] }) }) as HTMLElement;
+		const el = webRolesCellRenderer({
+			data: page({ webPageRoles: ['SESSION_TRANSCRIPT', 'BLOG_POST'] }),
+		}) as HTMLElement;
 		const pills = [...el.querySelectorAll('span.rounded-full')].map((p) => p.textContent);
 		expect(pills).toEqual(['Session transcript', 'Blog post']);
 	});
