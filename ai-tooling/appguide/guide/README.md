@@ -74,7 +74,7 @@ Any other `**Field:**` is a lint error.
 | `adding-content` | Adding Content | verified (3 rounds) | ea74656e (2026-11-14) |
 | `perspectives` | Perspectives | verified (1 round) | ea74656e (2026-11-14) |
 | `bible` | Bible Passages | verified (3 rounds) | ea74656e (2026-11-14) |
-| `compare` | Compare Perspectives | verified (pilot, 3 rounds) | — |
+| `compare` | Compare Perspectives | verified (3 rounds) | ea74656e (2026-11-14) |
 | `discover` | Discover | verified (3 rounds) | ea74656e (2026-11-14) |
 | `messaging` | Messaging | verified (3 rounds; the round-3 edits to `messaging.move-button` and `messaging.mute-thread` were not re-verified) | ea74656e (2026-11-14) |
 | `settings` | Settings & Theme | verified (1 round); `settings.change-theme` (theme panel) reserved for the owner | ea74656e (2026-11-14) |
