@@ -85,3 +85,48 @@ describe('webPageReadNotice (what the add dialog says when the page could not be
 		);
 	});
 });
+
+describe('webpage row readers (list rows carry the shaped webPage payload)', () => {
+	const row = (over: Record<string, unknown> = {}) =>
+		({
+			id: '1',
+			name: 'Attention Is All You Need',
+			url: 'https://www.arxiv.org/abs/1706.03762',
+			contentType: 'WEB_PAGE',
+			webPage: null,
+			...over,
+		}) as never;
+
+	it('site falls back to the domain, then to the url host, when no site name is set', async () => {
+		const { webPageSite } = await import('$lib/utils/webPage');
+		expect(webPageSite(row({ webPage: { siteName: 'arXiv.org', domain: 'arxiv.org', webPageRoles: [] } }))).toBe(
+			'arXiv.org',
+		);
+		expect(webPageSite(row({ webPage: { siteName: null, domain: 'arxiv.org', webPageRoles: [] } }))).toBe('arxiv.org');
+		expect(webPageSite(row({ webPage: null }))).toBe('arxiv.org');
+	});
+
+	it('site is null when there is no url and no metadata', async () => {
+		const { webPageSite } = await import('$lib/utils/webPage');
+		expect(webPageSite(row({ url: null, webPage: null }))).toBeNull();
+	});
+
+	it('published date is null (never a guess) when the page declares none', async () => {
+		const { webPagePublished } = await import('$lib/utils/webPage');
+		expect(webPagePublished(row({ webPage: { publishedAt: '2017-06-12', webPageRoles: [] } }))).toBe('2017-06-12');
+		expect(webPagePublished(row({ webPage: { publishedAt: null, webPageRoles: [] } }))).toBeNull();
+		expect(webPagePublished(row({ webPage: null }))).toBeNull();
+	});
+
+	it('roles are the stored list, and [] when there is no metadata', async () => {
+		const { webPageRolesOf } = await import('$lib/utils/webPage');
+		expect(webPageRolesOf(row({ webPage: { webPageRoles: ['BLOG_POST'] } }))).toEqual(['BLOG_POST']);
+		expect(webPageRolesOf(row({ webPage: null }))).toEqual([]);
+	});
+
+	it('author is null when the page declares none (the Author column shows a dash, never "Unknown")', async () => {
+		const { webPageAuthor } = await import('$lib/utils/webPage');
+		expect(webPageAuthor(row({ webPage: { author: 'Jane Doe', webPageRoles: [] } }))).toBe('Jane Doe');
+		expect(webPageAuthor(row({ webPage: { author: null, webPageRoles: [] } }))).toBeNull();
+	});
+});

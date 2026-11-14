@@ -45,6 +45,20 @@ export interface WebPageMeta {
 	fetch: WebPageFetch;
 }
 
+/**
+ * The shaped webpage fields a list row carries (`ContentItem.webPage`). Every field is nullable
+ * except `webPageRoles`, which is never null (`[]` when the page has none). Missing is null, not a guess.
+ */
+export interface WebPageListMeta {
+	siteName: string | null;
+	domain: string | null;
+	imageUrl: string | null;
+	faviconUrl: string | null;
+	publishedAt: string | null;
+	author: string | null;
+	webPageRoles: WebPageRole[];
+}
+
 /** The read-only import preview (`previewWebPage`). It never carries roles: the adder picks those. */
 export interface WebPagePreview {
 	finalUrl: string;
@@ -100,6 +114,9 @@ export interface ContentItem {
 	// BOOK rows only: the shaped Open Library payload (same list-row/details split as `movie`);
 	// null for every other type. Read it through bookFormatting's bookResponse().
 	book?: Record<string, unknown> | null;
+	// WEB_PAGE rows only: the shaped page fields for list rows (same split as `movie`/`book`; the raw
+	// `response` is never selected in lists). Null for every other type. Read it through webPage.ts.
+	webPage?: WebPageListMeta | null;
 	primaryCategory: {
 		id: string;
 		wikidataQid: string;
@@ -183,6 +200,7 @@ export const LIST_CONTENT = gql`
 				description
 				movie
 				book
+				webPage
 				primaryCategory {
 					id
 					wikidataQid
