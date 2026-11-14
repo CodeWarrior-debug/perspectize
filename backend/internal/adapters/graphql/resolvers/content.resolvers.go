@@ -632,6 +632,7 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		params.Filter.MaxPages = filter.MaxPages
 		params.Filter.MinBookRating = filter.MinBookRating
 		params.Filter.MaxBookRating = filter.MaxBookRating
+		params.Filter.WebPageRoles = filter.WebPageRoles
 		params.Filter.MinViewCount = filter.MinViewCount
 		params.Filter.MaxViewCount = filter.MaxViewCount
 		params.Filter.MinLikeCount = filter.MinLikeCount

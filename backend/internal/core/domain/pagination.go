@@ -100,6 +100,9 @@ type ContentFilter struct {
 	MaxPages       *int
 	MinBookRating  *float64
 	MaxBookRating  *float64
+	// WebPageRoles matches webpage rows that play any of these roles (OR'd). Other
+	// content types never match. Empty = no role filter.
+	WebPageRoles []WebPageRole
 }
 
 // ContentListParams contains parameters for paginated content queries
