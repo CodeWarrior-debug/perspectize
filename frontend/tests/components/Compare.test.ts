@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import { QueryClient } from '@tanstack/svelte-query';
 import TestWrapper from '../helpers/TestWrapper.svelte';
@@ -70,6 +70,28 @@ describe('Compare', () => {
 		clerkState.auth.userId = '1';
 	});
 
+	// Usernames come from Perspective.user on the perspectives query; the page
+	// must not download the whole users table (it used to, via ListUsers).
+	afterEach(() => {
+		const queries = mockRequest.mock.calls.map((c: unknown[]) => String(c[0]));
+		expect(queries.some((q: string) => q.includes('ListUsers'))).toBe(false);
+	});
+
+	it('shows the loading state, not an empty state, while perspectives are still in flight', async () => {
+		mockRequest.mockImplementation((query: string) => {
+			if (query.includes('ListPerspectivesByContent')) return new Promise(() => {});
+			if (query.includes('GetContent')) return Promise.resolve(contentResponse);
+			if (query.includes('query Me')) return Promise.resolve(meResponse);
+			return Promise.resolve({});
+		});
+
+		renderCompare({ contentId: '10', initialLeftId: null, initialRightId: null });
+
+		expect(await screen.findByText(/loading comparison/i)).toBeInTheDocument();
+		expect(screen.queryByText(/no one has shared a perspective/i)).not.toBeInTheDocument();
+		expect(screen.queryByText(/no other perspectives/i)).not.toBeInTheDocument();
+	});
+
 	it('shows an empty state when only one perspective exists on the content', async () => {
 		mockRequest.mockImplementation((query: string) => {
 			if (query.includes('ListUsers')) return Promise.resolve({ users: [{ id: '1', username: 'me' }] });
@@ -80,6 +102,7 @@ describe('Compare', () => {
 							{
 								id: 'p1',
 								userID: '1',
+								user: { id: '1', username: 'me' },
 								contentID: '10',
 								quality: 8000,
 								agreement: null,
@@ -128,6 +151,7 @@ describe('Compare', () => {
 							{
 								id: 'p1',
 								userID: '1',
+								user: { id: '1', username: 'me' },
 								contentID: '10',
 								quality: 8000,
 								agreement: null,
@@ -147,6 +171,7 @@ describe('Compare', () => {
 							{
 								id: 'p2',
 								userID: '2',
+								user: { id: '2', username: 'Jamie Lee' },
 								contentID: '10',
 								quality: 7000,
 								agreement: null,
@@ -199,6 +224,7 @@ describe('Compare', () => {
 							{
 								id: 'p1',
 								userID: '1',
+								user: { id: '1', username: 'me' },
 								contentID: '10',
 								quality: 8000,
 								agreement: null,
@@ -218,6 +244,7 @@ describe('Compare', () => {
 							{
 								id: 'p2',
 								userID: '2',
+								user: { id: '2', username: 'Jamie Lee' },
 								contentID: '10',
 								quality: 7000,
 								agreement: null,
@@ -237,6 +264,7 @@ describe('Compare', () => {
 							{
 								id: 'p3',
 								userID: '3',
+								user: { id: '3', username: 'Sam Rivera' },
 								contentID: '10',
 								quality: 6000,
 								agreement: null,
@@ -324,6 +352,7 @@ describe('Compare', () => {
 							{
 								id: 'p1',
 								userID: '1',
+								user: { id: '1', username: 'me' },
 								contentID: '10',
 								quality: 8000,
 								agreement: null,
@@ -343,6 +372,7 @@ describe('Compare', () => {
 							{
 								id: 'p2',
 								userID: '2',
+								user: { id: '2', username: 'Jamie Lee' },
 								contentID: '10',
 								quality: 7000,
 								agreement: null,
@@ -423,6 +453,7 @@ describe('Compare', () => {
 							{
 								id: 'p2',
 								userID: '2',
+								user: { id: '2', username: 'Jamie Lee' },
 								contentID: '10',
 								quality: 8000,
 								agreement: null,
@@ -442,6 +473,7 @@ describe('Compare', () => {
 							{
 								id: 'p3',
 								userID: '3',
+								user: { id: '3', username: 'Sam Rivera' },
 								contentID: '10',
 								quality: 6000,
 								agreement: null,
@@ -472,7 +504,7 @@ describe('Compare', () => {
 		await waitFor(() => {
 			expect(screen.getByTestId('add-perspective-cta')).toBeInTheDocument();
 		});
-		expect(screen.getByRole('link', { name: 'Add yours' })).toHaveAttribute('href', '/');
+		expect(screen.getByRole('link', { name: 'Add yours' })).toHaveAttribute('href', '/content-library');
 	});
 
 	it('does not prompt when the viewer already has a perspective on this content', async () => {
@@ -496,6 +528,7 @@ describe('Compare', () => {
 							{
 								id: 'p1',
 								userID: '1',
+								user: { id: '1', username: 'me' },
 								contentID: '10',
 								quality: 8000,
 								agreement: null,
@@ -550,6 +583,7 @@ describe('Compare', () => {
 							{
 								id: 'p1',
 								userID: '1',
+								user: { id: '1', username: 'me' },
 								contentID: '10',
 								quality: 8000,
 								agreement: 7000,
@@ -569,6 +603,7 @@ describe('Compare', () => {
 							{
 								id: 'p2',
 								userID: '2',
+								user: { id: '2', username: 'jjagent' },
 								contentID: '10',
 								quality: null,
 								agreement: null,
@@ -632,6 +667,7 @@ describe('Compare', () => {
 							{
 								id: 'p1',
 								userID: '1',
+								user: { id: '1', username: 'me' },
 								contentID: '10',
 								quality: 8000,
 								agreement: null,

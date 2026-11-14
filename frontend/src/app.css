@@ -996,9 +996,42 @@
 	font-family: 'Charter', 'Georgia', 'Times New Roman', serif;
 }
 
+/* One faint style for every "no value" dash, in grids and cards. Token-based, so it follows the theme. */
+.empty-marker {
+	color: color-mix(in srgb, var(--color-muted-foreground) 70%, transparent);
+}
+
 /* Keep Geist on type column (icon-only, no text to style) */
 .ag-cell[col-id='type'] {
 	font-family: 'Geist', system-ui, sans-serif;
+}
+
+/*
+ * Settings → Fonts overrides (lib/fonts/store.svelte.ts). Each rule only matches while the
+ * user has picked a font for that slot (data-font-* on <html>), so the defaults above are
+ * untouched otherwise. Unlayered on purpose: beats the `font-[family-name:…]` / `font-serif`
+ * utilities on the marked elements. Mark an element with font-slot-{heading,cell,longform}
+ * to put it in a slot.
+ */
+:root[data-font-heading]
+	:is(
+		h1,
+		h2,
+		h3,
+		h4,
+		[data-slot='dialog-title'],
+		[data-slot='drawer-title'],
+		.ag-header-cell-text,
+		.ag-header-group-text,
+		.font-slot-heading
+	) {
+	font-family: var(--font-slot-heading);
+}
+:root[data-font-cell] :is(.ag-cell:not([col-id='type']), .font-slot-cell) {
+	font-family: var(--font-slot-cell);
+}
+:root[data-font-longform] .font-slot-longform {
+	font-family: var(--font-slot-longform);
 }
 
 /* Column resize handles and filter buttons show on hover/focus (filter also when active), so the
@@ -1017,6 +1050,43 @@
 .ag-header-cell:hover .ag-header-cell-filter-button,
 .ag-header-cell:focus-within .ag-header-cell-filter-button {
 	opacity: 1;
+}
+
+/* Header spacing. headerMinWidth (lib/utils/grid-header-width.ts) reserves exactly this layout,
+   so a column at its minimum width shows its whole label, sort arrow and funnel: one --ag-spacing
+   between the label and the funnel (AG Grid leaves none), and the sort arrow one gap from its
+   label rather than two (AG Grid adds its own padding on top of the label's gap). Change these
+   and headerChrome (grid-theme.ts) together. */
+.ag-header-cell .ag-cell-label-container {
+	gap: var(--ag-spacing);
+}
+.ag-header-cell .ag-sort-indicator-icon {
+	padding-left: 0;
+	padding-right: 0;
+}
+
+/* Funnel states. AG Grid marks an active filter with a tinted block plus a 4px ring around the
+   icon, which reads as an oversized rectangle in a 36px header. Instead the funnel itself takes
+   the primary colour and keeps AG Grid's small dot; hover is a small rounded wash. */
+.ag-header-cell .ag-header-cell-filter-button:hover {
+	border-radius: 4px;
+	box-shadow: 0 0 0 2px var(--ag-icon-button-hover-color);
+}
+.ag-header-cell .ag-header-cell-filter-button.ag-filter-active {
+	background-color: transparent;
+	box-shadow: none;
+	color: var(--color-primary);
+}
+.ag-header-cell .ag-header-cell-filter-button.ag-filter-active:hover {
+	background-color: var(--ag-icon-button-hover-color);
+	border-radius: 4px;
+	box-shadow: 0 0 0 2px var(--ag-icon-button-hover-color);
+}
+
+/* Activity headers: small uppercase labels (size and colour come from ACTIVITY_HEADER_PARAMS). */
+.activity-grid .ag-header-cell-text {
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
 }
 
 /* Hover bar — drawn on AG Grid's own hover overlay so it sits on top of the opaque hover colour. */
@@ -1100,4 +1170,42 @@
 	opacity: 0.4;
 	cursor: default;
 	text-decoration: none;
+}
+
+/* A modal dialog sets `pointer-events: none` on <body>, and a toast inherits it, so a toast's action
+   button (e.g. "Mark 100% complete too?" raised while a dialog is open) can't be clicked. Re-enable it
+   on the toast only; the dialog ignores clicks inside a toast (see isInsideToast in utils/toast.ts). */
+[data-sonner-toast] {
+	pointer-events: auto;
+}
+
+/* A native <select> whose arrow sits inset from the right edge (the browser's own arrow is flush against it).
+   The chevron is two currentColor gradients, so it follows the theme. Pair with the usual border/height classes. */
+select.select-inset {
+	appearance: none;
+	padding-inline-end: 2rem;
+	background-image:
+		linear-gradient(45deg, transparent 50%, currentColor 50%),
+		linear-gradient(135deg, currentColor 50%, transparent 50%);
+	background-position:
+		calc(100% - 1.15rem) 50%,
+		calc(100% - 0.8rem) 50%;
+	background-size: 0.35rem 0.35rem;
+	background-repeat: no-repeat;
+}
+
+/* Activity grid: always-visible, themed horizontal scrollbar (mouse users get no
+   gesture to discover sideways scroll, and macOS overlay scrollbars hide until used).
+   The spacers sit under the pinned columns and carry their own scrollbar gutter. */
+.ag-body-horizontal-scroll-viewport,
+.ag-horizontal-left-spacer,
+.ag-horizontal-right-spacer {
+	overflow-x: scroll;
+	scrollbar-width: thin;
+	scrollbar-color: var(--color-primary) var(--color-muted);
+}
+.ag-horizontal-left-spacer,
+.ag-horizontal-right-spacer {
+	/* Nothing to scroll here: show the track only, no thumb. */
+	scrollbar-color: transparent var(--color-muted);
 }

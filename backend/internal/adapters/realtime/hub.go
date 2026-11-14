@@ -25,7 +25,8 @@ const subBufferSize = 64
 // thread_events channel. PgNotifier is the production implementation; a nil
 // Notifier makes the Hub fall back to purely in-process delivery.
 type Notifier interface {
-	Notify(ctx context.Context, payload string) error
+	// Notify emits every payload, in order, in one round trip.
+	Notify(ctx context.Context, payloads ...string) error
 }
 
 // threadSub is one registered thread subscriber: its delivery channel plus the
@@ -43,10 +44,11 @@ type Hub struct {
 	inbox    map[int]map[int]chan domain.InboxEvent // userID -> subID -> channel
 	nextID   int
 	nextInID int
+	changed  chan struct{} // cap 1; signaled whenever the subscriber set changes
 
 	msgRepo    repositories.MessageRepository
-	threadRepo repositories.ThreadRepository // used by the inbox fan-out to resolve participants
-	notifier   Notifier                      // optional; nil means in-process-only ephemerals
+	threadRepo repositories.MessageThreadRepository // used by the inbox fan-out to resolve participants
+	notifier   Notifier                             // optional; nil means in-process-only ephemerals
 }
 
 // NewHub constructs a Hub. threadRepo is used by the MESSAGE_POSTED inbox
@@ -54,10 +56,11 @@ type Hub struct {
 // by PublishEphemeral to emit events over Postgres NOTIFY so every instance
 // (including this one, via its own Listener) receives them; pass nil for
 // in-process-only delivery.
-func NewHub(msgRepo repositories.MessageRepository, threadRepo repositories.ThreadRepository, notifier Notifier) *Hub {
+func NewHub(msgRepo repositories.MessageRepository, threadRepo repositories.MessageThreadRepository, notifier Notifier) *Hub {
 	return &Hub{
 		subs:       make(map[int]map[int]*threadSub),
 		inbox:      make(map[int]map[int]chan domain.InboxEvent),
+		changed:    make(chan struct{}, 1),
 		msgRepo:    msgRepo,
 		threadRepo: threadRepo,
 		notifier:   notifier,
@@ -81,6 +84,7 @@ func (h *Hub) Subscribe(threadID, userID int) (<-chan domain.ThreadEvent, func()
 	}
 	h.subs[threadID][id] = &threadSub{ch: ch, userID: userID}
 	h.mu.Unlock()
+	h.signalChanged()
 
 	var once sync.Once
 	unsub := func() {
@@ -95,6 +99,7 @@ func (h *Hub) Subscribe(threadID, userID int) (<-chan domain.ThreadEvent, func()
 func (h *Hub) remove(threadID, id int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	defer h.signalChanged()
 	m := h.subs[threadID]
 	if m == nil {
 		return
@@ -110,6 +115,36 @@ func (h *Hub) remove(threadID, id int) {
 	close(sub.ch)
 }
 
+// SubscriberCount returns the number of live subscribers (thread streams plus
+// inbox streams). The Listener uses it to decide whether it needs a database
+// connection at all.
+func (h *Hub) SubscriberCount() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	n := 0
+	for _, m := range h.subs {
+		n += len(m)
+	}
+	for _, m := range h.inbox {
+		n += len(m)
+	}
+	return n
+}
+
+// Changed returns a channel that receives a value after the subscriber set
+// changes. It has capacity one and signals coalesce, so a receiver must re-read
+// SubscriberCount rather than count signals.
+func (h *Hub) Changed() <-chan struct{} { return h.changed }
+
+// signalChanged is a non-blocking send: a pending signal already tells the
+// receiver to re-check.
+func (h *Hub) signalChanged() {
+	select {
+	case h.changed <- struct{}{}:
+	default:
+	}
+}
+
 // DropSubscriber closes and removes every subscription userID holds on
 // threadID. It is idempotent and closes channels under the write lock, exactly
 // like remove, so it can never race a Broadcast mid-send. Used when a
@@ -118,6 +153,7 @@ func (h *Hub) remove(threadID, id int) {
 func (h *Hub) DropSubscriber(threadID, userID int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	defer h.signalChanged()
 	m := h.subs[threadID]
 	if m == nil {
 		return
@@ -148,6 +184,7 @@ func (h *Hub) SubscribeInbox(userID int) (<-chan domain.InboxEvent, func()) {
 	}
 	h.inbox[userID][id] = ch
 	h.mu.Unlock()
+	h.signalChanged()
 
 	var once sync.Once
 	unsub := func() {
@@ -161,6 +198,7 @@ func (h *Hub) SubscribeInbox(userID int) (<-chan domain.InboxEvent, func()) {
 func (h *Hub) removeInbox(userID, id int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	defer h.signalChanged()
 	m := h.inbox[userID]
 	if m == nil {
 		return
@@ -226,15 +264,20 @@ func (h *Hub) fanOutInbox(ctx context.Context, threadID int, seq int64, at time.
 		if p.LeftAt != nil {
 			continue
 		}
-		unread := seq - p.LastReadSeq
-		if unread < 0 {
-			unread = 0
+		// Same source as the thread list's unreadCount: only messages sent by
+		// others past the participant's read pointer. Deriving it from seq
+		// arithmetic would count the sender's own messages.
+		stats, err := h.msgRepo.ThreadStats(ctx, p.UserID, []int{threadID})
+		if err != nil {
+			slog.Warn("realtime hub: inbox fan-out could not load unread count",
+				"thread_id", threadID, "user_id", p.UserID, "err", err)
+			continue
 		}
 		h.broadcastInbox(p.UserID, domain.InboxEvent{
 			ThreadID:      threadID,
 			LastMessageAt: lastMessageAt,
 			LatestSeq:     seq,
-			UnreadCount:   int(unread),
+			UnreadCount:   stats[threadID].Unread,
 		})
 	}
 }
@@ -364,16 +407,25 @@ func (h *Hub) PublishEnvelope(ctx context.Context, env domain.EventEnvelope) {
 //
 // Without a Notifier (unit tests, or any process with no Listener) it falls
 // back to in-process fan-out.
-func (h *Hub) PublishEphemeral(ctx context.Context, env domain.EventEnvelope) error {
-	if h.notifier == nil {
-		h.PublishEnvelope(ctx, env)
+func (h *Hub) PublishEphemeral(ctx context.Context, envs ...domain.EventEnvelope) error {
+	if len(envs) == 0 {
 		return nil
 	}
-	payload, err := json.Marshal(env)
-	if err != nil {
-		return fmt.Errorf("marshal %s envelope: %w", env.Type, err)
+	if h.notifier == nil {
+		for _, env := range envs {
+			h.PublishEnvelope(ctx, env)
+		}
+		return nil
 	}
-	return h.notifier.Notify(ctx, string(payload))
+	payloads := make([]string, len(envs))
+	for i, env := range envs {
+		payload, err := json.Marshal(env)
+		if err != nil {
+			return fmt.Errorf("marshal %s envelope: %w", env.Type, err)
+		}
+		payloads[i] = string(payload)
+	}
+	return h.notifier.Notify(ctx, payloads...)
 }
 
 // ResetAll sends a StreamResetEvent to every subscriber of every thread. Used

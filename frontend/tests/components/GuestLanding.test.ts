@@ -20,8 +20,10 @@ import GuestLanding from '$lib/components/onboarding/GuestLanding.svelte';
 describe('GuestLanding', () => {
 	it('renders value line and Sign in affordance', () => {
 		render(GuestLanding);
-		expect(screen.getByRole('heading', { name: /perspectize/i })).toBeInTheDocument();
-		expect(screen.getByText(/collect perspectives on the media you care about/i)).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'When 👍 is not enough' })).toBeInTheDocument();
+		expect(
+			screen.getByText('Where measured positions get the measures & metadata they deserve.')
+		).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
 	});
 

@@ -133,8 +133,9 @@ Is the field already in the ContentItem TypeScript interface?
 | **`minWidth`** | Floor width when using flex | — |
 | **`maxWidth`** | Cap width for flex columns | — |
 
-The grid is capped at `max-w-screen-xl` on the Activity page — `headerMinWidth`
-(`formatting.ts`) sums to just under that. A new column's minimum width
+The grid is capped at `max-w-screen-xl` on the Activity page (a 1212px grid). Every
+column's floor is `headerMinWidth` (`lib/utils/grid-header-width.ts`: the measured label plus
+padding, sort arrow and funnel), and an explicit `minWidth` can only raise it. A new column's minimum width
 counts against that budget; check it doesn't push the total over and clip
 the last column (see `frontend/CLAUDE.md`'s "Column minimum widths" gotcha).
 
@@ -249,7 +250,7 @@ just its own column filter):
    indexes.
 2. Add the scope to `SearchScopeKey`/`ALL_SEARCH_SCOPES` in
    `gridUrlState.ts`, and `SCOPE_TO_GQL_FIELD`.
-3. Add a label to `SCOPE_LABELS` in `frontend/src/routes/+page.svelte` (the
+3. Add a label to `SCOPE_LABELS` in `frontend/src/routes/content-library/+page.svelte` (the
    search-field-scope popover).
 
 ---
@@ -294,7 +295,7 @@ The effect uses **four** tiers, not two — `xs` (<445px), `sm` (445–639px),
 const alwaysVisible = ['item', 'type', 'perspectize']; // every tier
 const smCols = ['category', 'channel'];                // sm and wider
 const mdCols = ['duration', 'publishDate'];             // md and wider
-const lgCols = ['views', 'likes', 'percentLiked', 'tags']; // lg only
+const lgCols = ['views', 'likes', 'percentLiked', 'user', 'tags']; // lg only
 const alwaysHidden = ['description'];                   // never shown by the tier system
 // createdAt/updatedAt/id/addedByUserID/url stay hidden via their colDef
 // `hide: true` until the user (or, for the admin-only ones, an admin)

@@ -1,0 +1,19 @@
+# Gremlins mutation-testing config — see docs/superpowers/specs/*-test-hardening-spike.md
+#
+# Run `make mutate` (full) or `make mutate-diff` (changed lines vs origin/main).
+unleash:
+  # Most tests live in backend/test/... (external to the package under test), so a
+  # mutant must be checked against the whole suite, not just its own package's tests.
+  # Without this, cross-package-covered mutants are reported as falsely LIVED.
+  integration: true
+  # Gather coverage from tests in *any* package for code in internal/ and pkg/.
+  coverpkg: './internal/...,./pkg/...'
+  exclude-files:
+    - 'generated' # gqlgen output
+    - '^cmd/' # composition roots / one-off seed tools
+    - '/test/' # test code itself
+    - '^internal/perf/' # benchmarks/perf harness, needs a live DB
+  # Per-mutant timeout = (coverage-gathering time) x this. Run with GOFLAGS=-count=1
+  # (the Make targets do) so that baseline isn't a ~1s go-test-cache hit — otherwise
+  # every mutant, which needs the whole suite, is reported TIMED OUT.
+  timeout-coefficient: 5

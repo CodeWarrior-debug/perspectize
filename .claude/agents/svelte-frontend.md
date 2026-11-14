@@ -1,7 +1,7 @@
 ---
 name: svelte-frontend
 description: SvelteKit implementer for frontend/ (Svelte 5 runes, TanStack Query + graphql-request, shadcn-svelte, Tailwind v4, AG Grid). Use when a task adds or changes a component, route, query hook or frontend utility, when a backend schema change needs matching frontend queries, or when a plan task is tagged svelte-frontend. Not for visual design direction (frontend-design skill), Figma extraction (figma-designer) or Go code. See "When to invoke" in the agent body.
-model: sonnet
+model: haiku
 color: magenta
 tools:
   - Read
@@ -64,6 +64,10 @@ wins.
   - shadcn primitives live in `components/shadcn/`, exported via its barrel.
   - Import Lucide icons per icon (`@lucide/svelte/icons/<name>`).
 - **Secrets:** never read `.env` files and never attempt a Clerk sign-in.
+
+## Query caching & call budget
+
+Read [.docs/QUERY_BUDGET.md](../../.docs/QUERY_BUDGET.md) and the "Query caching & call budget" section of `frontend/CLAUDE.md`. One hook + one key per piece of data, a deliberate `staleTime`, a `queryKey` covering every `queryFn` variable, and mutations that invalidate exactly the affected keys.
 
 ## Process
 

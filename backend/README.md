@@ -32,6 +32,8 @@ Or use your existing PostgreSQL instance (update config/config.json).
 
 ### 3. Run Migrations
 
+> Only against a local or demo database. With a Neon `DATABASE_URL` this hits the shared database; see [.docs/MIGRATION_ROLLOUT.md](../.docs/MIGRATION_ROLLOUT.md).
+
 ```bash
 make migrate-up
 ```

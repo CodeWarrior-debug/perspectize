@@ -18,6 +18,15 @@ Closes #<!-- issue number -->
 
 https://github.com/user-attachments/assets/<!-- video-id -->
 
+## Query Budget
+
+<!-- Delete this section only if the PR touches no DB access and no data fetching. See .docs/QUERY_BUDGET.md -->
+
+- [ ] Backend: new/changed queries have a `querycount` test (batch = 1 query for any N; empty input = 0); per-row GraphQL fields use a dataloader
+- [ ] Frontend: new `createQuery` has a deliberate `staleTime`, reuses the existing hook/key (no duplicate fetch), and its `queryKey` includes every variable `queryFn` sends
+- [ ] Frontend: mutations evict exactly the affected keys — real-`QueryClient` test asserts what is invalidated **and** what is not
+- [ ] Migration adds an index for any new filtered/sorted column (or says why not)
+
 ## Test Plan
 
 - [ ] <!-- How to verify this works -->
@@ -35,11 +44,15 @@ https://github.com/user-attachments/assets/<!-- video-id -->
 | 1 | <!-- e.g. signed in, I open my own perspective and click the trash icon --> | <!-- e.g. a "can't be undone" confirmation appears; nothing is deleted yet --> | | |
 | 2 | <!-- --> | <!-- --> | | |
 
+## Session Learnings
+
+<!-- Filled in after the PR is open, while CI runs (/revise-claude-md). Non-critical learnings only: the monthly-maintenance routine collects them. CRITICAL ones (data loss, security, failing CI) are committed on this branch instead, see .docs/PR_WORKFLOW.md#session-learnings. Write "None" if there are none. -->
+
 ## Follow-up Steps
 
 <!-- Manual actions needed after merge, in order if sequence matters. Delete section if none. -->
 
-- [ ] DB migration: `migrate up` against `<!-- environment(s) -->` (manual per .docs — never automated)
+- [ ] DB migration: `migrate up` against `<!-- environment(s) -->` (manual per .docs/MIGRATION_ROLLOUT.md — never automated)
 - [ ] Task/script: <!-- e.g. backfill script, one-off command -->
 - [ ] <!-- Additional step -->
 

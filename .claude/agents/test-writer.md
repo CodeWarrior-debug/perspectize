@@ -1,7 +1,7 @@
 ---
 name: test-writer
 description: Go test author for the backend. Use when new or changed Go code needs tests, when a coverage gap is identified, when a bug needs a failing regression test before the fix, or when a plan task is tagged test-writer. Writes table-driven testify tests using the repo's hand-written mocks and its sqlmock-backed GORM harness. Not for frontend (Vitest) tests. See "When to invoke" in the agent body.
-model: sonnet
+model: haiku
 color: green
 tools:
   - Read
@@ -58,6 +58,10 @@ must fail for the stated reason).
 - **Config tests** clear env vars with `t.Setenv("KEY", "")`. See
   `clearConfigEnvVars`.
 - **gqlgen `first` defaults to 10** (a non-nil pointer), not nil. Expect that.
+
+## Query-count tests
+
+For any repository, service or loader change, add a `querycount` assertion (`backend/internal/perf/querycount`; examples in `postgres/query_count_test.go` and `graphql/dataloader/dataloader_test.go`). Cover: batch of 1 vs 50 costs the same, empty input costs 0, repeated dataloader keys fetch once. Set the budget to today's cost, not a generous ceiling, and prove it can fail (temporarily loop the call and watch the test go red). Details: [.docs/QUERY_BUDGET.md](../../.docs/QUERY_BUDGET.md).
 
 ## Process
 

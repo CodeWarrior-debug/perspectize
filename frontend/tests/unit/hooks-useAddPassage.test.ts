@@ -66,7 +66,7 @@ describe('useAddPassage', () => {
 			createContentFromPassage: { id: '7', name: 'John 3:16-18', contentType: 'BIBLE_PASSAGE', displayTitle: null },
 		});
 		mocks.success.mock.calls[0][1].action.onClick();
-		expect(goto).toHaveBeenCalledWith('/?open=7');
+		expect(goto).toHaveBeenCalledWith('/content-library?open=7');
 	});
 
 	it.each([

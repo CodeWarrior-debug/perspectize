@@ -52,7 +52,7 @@ gh release create screenshots \
 
 **For interactive behavior — hover states, multi-step flows, popovers that open and close, animations — a video is better than screenshots.** A still can't show that a hover draws a connector, a popover closes on success, or a form syncs as you type. Use screenshots for static layout, video for interaction (often both on the same PR).
 
-Record the running app with [`tools/video-capture`](../tools/video-capture/README.md) (CDP screencast + a venv-bundled ffmpeg; the DevTools MCP itself can't record), or Vitest Browser Mode's opt-in `recordVideo` (see `frontend/CLAUDE.md`). Name videos `sv-<plan>-video-NN-<what>-<width>px.mp4`. The same bucket release hosts them, and upload and URL lookup are identical to screenshots with a different glob:
+Record the running app with [`tools/video-capture`](../tools/video-capture/README.md) (CDP screencast + a venv-bundled ffmpeg; the DevTools MCP itself can't record), or Vitest Browser Mode's opt-in `recordVideo` (see [VITEST_BROWSER_CAPTURE.md](VITEST_BROWSER_CAPTURE.md)). Name videos `sv-<plan>-video-NN-<what>-<width>px.mp4`. The same bucket release hosts them, and upload and URL lookup are identical to screenshots with a different glob:
 
 ```bash
 gh release upload screenshots /Users/jamesjordan/Downloads/screenshots/sv-<plan>-*.mp4 --clobber

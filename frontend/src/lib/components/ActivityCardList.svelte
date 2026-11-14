@@ -1,10 +1,30 @@
 <script lang="ts">
+	import type { LengthDisplay } from '$lib/queries/content';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
-	import { extractVideoIdFromUrl, formatDuration, formatCount } from '$lib/utils/formatting';
+	import {
+		extractVideoIdFromUrl,
+		formatDuration,
+		formatCount,
+		releasedValueGetter,
+		ratedValueGetter,
+		tmdbScoreValueGetter,
+		formatTmdbScore,
+		movieResponse,
+	} from '$lib/utils/formatting';
 	import { passageIconLabels } from '$lib/utils/bible';
+	import {
+		authorCellText,
+		bookResponse,
+		formatBookRating,
+		openLibraryCoverUrl,
+		pagesValueGetter,
+		publishedValueGetter,
+		ratingValueGetter,
+	} from '$lib/utils/bookFormatting';
 	import BiblePassageIcon from '$lib/components/BiblePassageIcon.svelte';
+	import AddToPlanButton from '$lib/components/plan/AddToPlanButton.svelte';
 
 	interface CardRow {
 		id: string | number;
@@ -13,6 +33,7 @@
 		channelTitle: string | null;
 		length: number | null;
 		lengthUnits: string | null;
+		lengthDisplay?: LengthDisplay | null;
 		// Gap #13 in the UI gap audit: the mobile card used to show only name/
 		// channel/duration — 2 of the grid's 9 DATA_COLUMNS. Category, views and
 		// likes are the three most-used of the rest; the remaining columns
@@ -22,6 +43,11 @@
 		viewCount?: number | null;
 		likeCount?: number | null;
 		contentType?: string;
+		// MOVIE rows carry TMDB data in their JSON `response` (or `movie`); see formatting.ts.
+		movie?: unknown;
+		// BOOK rows carry Open Library data in `book` (or `response`); see bookFormatting.ts.
+		book?: unknown;
+		response?: unknown;
 		displayTitle?: string | null;
 		verseStartID?: number | null;
 		verseEndID?: number | null;
@@ -32,9 +58,12 @@
 		onOpenDetails,
 		onAddPerspective = () => {},
 		perspectiveContentIds = new Set<string>(),
+		onAddToPlan,
 	}: {
 		rowData: CardRow[];
 		onOpenDetails: (contentId: string) => void;
+		/** Shows an "Add to plan" action per card (signed-in users only) when provided. */
+		onAddToPlan?: (contentId: string) => void;
 		/** Opens the perspective create/edit sheet for a row. Mirrors the grid's Perspectize column. */
 		onAddPerspective?: (contentId: string) => void;
 		/** Content ids the current user already has a perspective on — drives the glasses vs "+" affordance. */
@@ -47,10 +76,50 @@
 	}
 
 	const isPassage = (row: CardRow) => row.contentType === 'BIBLE_PASSAGE';
+	const isMovie = (row: CardRow) => row.contentType === 'MOVIE';
+	const isBook = (row: CardRow) => row.contentType === 'BOOK';
 
-	function thumbSrc(row: CardRow): string | null {
+	/** Year, rating, runtime and TMDB score for a movie card (unknown parts are skipped). */
+	function movieFacts(row: CardRow): string[] {
+		const released = releasedValueGetter({ data: row });
+		const score = tmdbScoreValueGetter({ data: row });
+		return [
+			released ? released.slice(0, 4) : null,
+			ratedValueGetter({ data: row }),
+			row.length ? formatDuration(row.length, row.lengthUnits, row.lengthDisplay?.precision) : null,
+			score != null ? `TMDB ${formatTmdbScore(score)}` : null,
+		].filter((f): f is string => !!f);
+	}
+
+	/** Book facts that Open Library has: year, median pages, community rating. Unknown parts are skipped. */
+	function bookFacts(row: CardRow): string[] {
+		const year = publishedValueGetter({ data: row });
+		const pages = pagesValueGetter({ data: row });
+		const rating = ratingValueGetter({ data: row });
+		return [
+			year,
+			pages !== null ? `${pages} pages` : null,
+			rating !== null ? `★ ${formatBookRating(rating)}` : null,
+		].filter((f): f is string => !!f);
+	}
+
+	/**
+	 * YouTube thumbnail, or a movie's TMDB poster or a book's Open Library cover. Posters and covers
+	 * vary in aspect, so they are fitted, not cropped.
+	 */
+	function thumbSrc(row: CardRow): { src: string; fitted: boolean } | null {
 		const videoId = extractVideoIdFromUrl(row.url);
-		return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null;
+		if (videoId) return { src: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, fitted: false };
+		const posterPath = movieResponse(row)?.posterPath;
+		if (posterPath) return { src: `https://image.tmdb.org/t/p/w154${posterPath}`, fitted: true };
+		const cover = openLibraryCoverUrl(bookResponse(row)?.coverId, 'M');
+		return cover ? { src: cover, fitted: true } : null;
+	}
+
+	/** Grey tile only behind a video thumbnail or an empty slot; posters, covers and the passage sit on the card colour. */
+	function thumbBg(row: CardRow): string {
+		if (isPassage(row) || thumbSrc(row)?.fitted) return '';
+		return 'bg-muted';
 	}
 
 	function handleThumbClick(row: CardRow, e: MouseEvent) {
@@ -66,23 +135,29 @@
 				type="button"
 				data-testid={`card-thumb-${row.id}`}
 				title="Open original content in new tab"
-				class="relative h-16 w-24 flex-none overflow-hidden rounded-md bg-muted"
+				class="relative h-16 w-24 flex-none overflow-hidden rounded-md {thumbBg(row)}"
 				onclick={(e) => handleThumbClick(row, e)}
 			>
 				{#if isPassage(row)}
 					<BiblePassageIcon {...passageIconLabels(row)} />
 				{:else}
-					{#if thumbSrc(row)}
+					{@const thumb = thumbSrc(row)}
+					{#if thumb}
 						<img
-							src={thumbSrc(row)}
+							src={thumb.src}
 							alt=""
-							class="h-full w-full object-cover"
+							class="h-full w-full {thumb.fitted ? 'object-contain' : 'object-cover'}"
 							onerror={(e) => e.currentTarget.remove()}
 						/>
 					{/if}
-					<span class="absolute right-1 bottom-1 flex items-center justify-center rounded bg-[rgba(23,23,23,0.65)] p-1">
-						<PlayIcon class="size-2.5 fill-white text-white" />
-					</span>
+					{#if thumb && !thumb.fitted}
+						<span
+							data-testid="card-play-badge"
+							class="absolute right-1 bottom-1 flex items-center justify-center rounded bg-black/65 p-1"
+						>
+							<PlayIcon class="size-2.5 fill-white text-white" />
+						</span>
+					{/if}
 				{/if}
 			</button>
 
@@ -93,7 +168,7 @@
 				onclick={() => onOpenDetails(String(row.id))}
 			>
 				<div
-					class="line-clamp-2 font-[family-name:var(--font-family-serif)] text-sm leading-tight font-semibold text-foreground"
+					class="line-clamp-2 font-slot-cell font-[family-name:var(--font-family-serif)] text-sm leading-tight font-semibold text-foreground"
 				>
 					{(isPassage(row) && row.displayTitle) || row.name}
 				</div>
@@ -103,6 +178,36 @@
 							{row.name}
 						</div>
 					{/if}
+				{:else if isBook(row)}
+					{#if authorCellText(row)}
+						<div data-testid={`card-book-author-${row.id}`} class="mt-1 line-clamp-1 text-xs text-muted-foreground">
+							{authorCellText(row)}
+						</div>
+					{/if}
+					{#if bookFacts(row).length}
+						<div
+							data-testid={`card-book-facts-${row.id}`}
+							class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+						>
+							{#each bookFacts(row) as fact, i (i)}
+								{#if i > 0}<span>&middot;</span>{/if}
+								<span>{fact}</span>
+							{/each}
+						</div>
+					{/if}
+				{:else if isMovie(row)}
+					<div
+						data-testid={`card-movie-facts-${row.id}`}
+						class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+					>
+						{#each movieFacts(row) as fact, i (i)}
+							{#if i > 0}<span>&middot;</span>{/if}
+							<span>{fact}</span>
+						{/each}
+						{#if row.primaryCategory}
+							<span class="rounded bg-muted px-1.5 py-0.5 text-foreground">{row.primaryCategory.label}</span>
+						{/if}
+					</div>
 				{:else}
 					<div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
 						{#if row.channelTitle}
@@ -110,7 +215,7 @@
 						{/if}
 						{#if row.length}
 							{#if row.channelTitle}<span>&middot;</span>{/if}
-							<span>{formatDuration(row.length, row.lengthUnits)}</span>
+							<span>{formatDuration(row.length, row.lengthUnits, row.lengthDisplay?.precision)}</span>
 						{/if}
 						{#if row.primaryCategory}
 							{#if row.channelTitle || row.length}<span>&middot;</span>{/if}
@@ -155,6 +260,9 @@
 				>
 					<PlusIcon class="size-4" />
 				</button>
+			{/if}
+			{#if onAddToPlan}
+				<AddToPlanButton variant="icon" onclick={() => onAddToPlan(String(row.id))} />
 			{/if}
 		</div>
 	{/each}

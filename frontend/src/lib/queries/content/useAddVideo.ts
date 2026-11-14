@@ -4,7 +4,7 @@ import { goto } from '$app/navigation';
 import { graphqlRequest } from '../client';
 import { CREATE_CONTENT_FROM_YOUTUBE, type CreateContentResponse, type ContentResponse } from './index';
 import { queryKeys } from '../keys';
-import { activityContentHref } from '$lib/utils/contentLinks';
+import { libraryContentHref } from '$lib/utils/contentLinks';
 
 export function useAddVideo() {
 	const queryClient = useQueryClient();
@@ -26,7 +26,7 @@ export function useAddVideo() {
 				const existingId = newItem?.id;
 				toast.warning('This video has already been added', {
 					action: existingId
-						? { label: 'Go to video', onClick: () => goto(activityContentHref(existingId)) }
+						? { label: 'Go to video', onClick: () => goto(libraryContentHref(existingId)) }
 						: undefined,
 				});
 			} else {

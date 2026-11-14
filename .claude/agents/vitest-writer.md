@@ -1,7 +1,7 @@
 ---
 name: vitest-writer
 description: Vitest test author for frontend/ (unit, component via @testing-library/svelte, and Vitest Browser Mode). Use when a Svelte component, query hook or frontend utility needs tests, when a UI bug needs a failing regression test first, when a frontend coverage gap is identified, or when a plan task is tagged vitest-writer. Not for Go tests (test-writer) or Playwright demo tours. See "When to invoke" in the agent body.
-model: sonnet
+model: haiku
 color: green
 tools:
   - Read
@@ -66,6 +66,10 @@ real logic. A test that passes because nothing rendered is worse than no test.
 - **Loading states:** cover `{ isPending: true, isLoading: false }` (a paused,
   offline query), not only `isLoading`.
 - **Never** read `.env` files or hit a real backend.
+
+## Cache and call-count tests
+
+For any `createQuery` or mutation hook, write a **real-`QueryClient`** test with `tests/helpers/queryBudget.ts` (example: `tests/unit/query-cache-contract.test.ts`): N consumers → 1 fetch; a second mount inside `staleTime` → 0 fetches; `hashKey` differs when each `queryFn` variable changes; mutation `onSuccess` → assert both what was invalidated and what was left untouched. A mocked `invalidateQueries` call-check alone is not enough. Details: [.docs/QUERY_BUDGET.md](../../.docs/QUERY_BUDGET.md).
 
 ## Process
 

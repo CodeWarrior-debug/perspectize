@@ -5,6 +5,7 @@ import {
 	lastKnownSeq,
 	typingUsernames,
 	shouldMarkRead,
+	firstUnreadFromOthers,
 } from '$lib/components/messaging/threadView.helpers';
 
 const m = (seq: number, senderId: string, id = `m${seq}`): Message => ({
@@ -54,5 +55,39 @@ describe('threadView.helpers', () => {
 		expect(shouldMarkRead(thread({ unreadCount: 0 }))).toBe(false);
 		expect(shouldMarkRead(thread({ unreadCount: 2 }))).toBe(true);
 		expect(shouldMarkRead(null)).toBe(false);
+	});
+});
+
+describe('firstUnreadFromOthers', () => {
+	it('returns the oldest message from someone else past the read pointer', () => {
+		const items = [m(1, 'u2'), m(2, 'u1'), m(3, 'u2'), m(4, 'u2')];
+		expect(firstUnreadFromOthers(items, 1, 'u1')?.seq).toBe(3);
+	});
+
+	it('returns null when everything from others is already read', () => {
+		expect(firstUnreadFromOthers([m(1, 'u2'), m(2, 'u1')], 2, 'u1')).toBeNull();
+	});
+
+	it('ignores my own messages even when they are past the pointer', () => {
+		expect(firstUnreadFromOthers([m(1, 'u2'), m(2, 'u1'), m(3, 'u1')], 1, 'u1')).toBeNull();
+	});
+
+	it('skips tombstones and optimistic sends', () => {
+		const deleted = { ...m(2, 'u2'), deletedAt: '2026-09-07T15:00:00Z' };
+		const optimistic = m(3, 'u2', 'optimistic:abc');
+		expect(firstUnreadFromOthers([m(1, 'u2'), deleted, optimistic, m(4, 'u2')], 1, 'u1')?.seq).toBe(4);
+	});
+
+	it('compares seqs numerically when the API delivers them as strings', () => {
+		// IntID arrives as a string at runtime: "2" > "16" is true lexicographically.
+		const asStrings = [m(2, 'u2'), m(10, 'u2'), m(17, 'u2')].map((x) => ({
+			...x,
+			seq: String(x.seq) as unknown as number,
+		}));
+		expect(firstUnreadFromOthers(asStrings, '16' as unknown as number, 'u1')?.seq).toBe('17');
+	});
+
+	it('returns null for an empty list', () => {
+		expect(firstUnreadFromOthers([], 0, 'u1')).toBeNull();
 	});
 });

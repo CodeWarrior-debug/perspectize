@@ -166,6 +166,10 @@ type PerspectiveAggregate struct {
 	Count          int
 	QualityCount   int
 	AverageQuality *float64
+	// ImportJobID is the import that created the content row (nil for hand-added
+	// content). It rides on the aggregate so the details modal can name the import
+	// without reading the whole content row.
+	ImportJobID *int
 }
 
 // FeelingStats summarizes how many perspectives in scope (one content item,

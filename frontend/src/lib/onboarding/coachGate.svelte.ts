@@ -16,6 +16,19 @@ export function setCoachForceOpen(open: boolean): void {
 	forceOpen = open;
 }
 
+/** Bumped on every replay so the shell can remount the coach fresh at step 1. */
+let replayNonce = $state(0);
+
+export function getCoachReplayNonce(): number {
+	return replayNonce;
+}
+
+/** Settings → "Restart onboarding": show the coach right now, from step 1. No server round-trip. */
+export function replayCoach(): void {
+	replayNonce += 1;
+	forceOpen = true;
+}
+
 export function resetQuietGraduateAttempt(): void {
 	quietGraduateAttempted = false;
 }

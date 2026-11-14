@@ -17,6 +17,8 @@ export interface ModalInput {
   accent: string;
   /** Binding for a column id for this type, if the type binds it. */
   binding: (colId: string) => Binding | undefined;
+  /** Image (data URI or URL) for the hero tile; the tile falls back to initials. */
+  image?: string;
 }
 
 let showSources = false;
@@ -44,7 +46,7 @@ function listOf(value: SampleCell | undefined): string[] {
   return (cellText(value) ?? '').split(/;\s*/).map((s) => s.trim()).filter(Boolean);
 }
 
-function media(kind: DetailsLayout['media'], title: string, accent: string, url: string | undefined): HTMLElement | null {
+function media(kind: DetailsLayout['media'], title: string, accent: string, url: string | undefined, image?: string): HTMLElement | null {
   if (kind === 'none') return null;
   const initials = title
     .split(/\s+/)
@@ -52,11 +54,12 @@ function media(kind: DetailsLayout['media'], title: string, accent: string, url:
     .slice(0, 2)
     .map((w) => w[0])
     .join('');
-  const caption = { poster: 'poster · w342', still: 'still · w300', thumb: 'hqdefault', icon: 'icon' }[kind];
-  const tile = el('div', { class: `media media-${kind}` }, [
-    el('span', { class: 'media-initials' }, [initials || '◎']),
-    el('span', { class: 'media-caption' }, [caption])
-  ]);
+  const caption = { poster: 'poster · w342', still: 'still · w300', thumb: 'hqdefault', artwork: 'contain', icon: 'icon' }[kind];
+  const tile = el(
+    'div',
+    { class: `media media-${kind}${image ? ' has-image' : ''}` },
+    image ? [el('img', { src: image, alt: '' })] : [el('span', { class: 'media-initials' }, [initials || '◎']), el('span', { class: 'media-caption' }, [caption])]
+  );
   tile.style.setProperty('--type-accent', accent);
   attachTip(tile, () => ({
     body: [url ? `Opens ${url} in a new tab` : 'Image placeholder — the real app loads it from the source'],
@@ -161,7 +164,7 @@ export function openDetails(input: ModalInput): void {
   });
 
   const hero = el('div', { class: 'modal-hero' });
-  const m = media(layout.media, title, input.accent, url);
+  const m = media(layout.media, title, input.accent, url, input.image);
   if (m) hero.append(m);
   const crumbs = (layout.breadcrumb ?? []).map((k) => cellText(row[k])).filter(Boolean) as string[];
   const subtitle = layout.subtitle
@@ -214,7 +217,7 @@ export function openDetails(input: ModalInput): void {
   }
 
   const attribution = layout.attribution
-    ? [el('div', { class: 'attribution' }, [el('span', { class: 'tmdb-mark' }, ['TMDB']), el('span', {}, [layout.attribution])])]
+    ? [el('div', { class: 'attribution' }, [el('span', { class: 'tmdb-mark' }, [layout.attributionMark ?? 'TMDB']), el('span', {}, [layout.attribution])])]
     : [];
 
   const notes = layout.notes?.length

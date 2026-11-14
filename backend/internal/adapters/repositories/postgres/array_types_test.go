@@ -75,6 +75,8 @@ func TestStringArray_Value(t *testing.T) {
 		{name: "element with braces is quoted", in: StringArray{"{x}"}, want: `{"{x}"}`},
 		{name: "mixed quoted and unquoted", in: StringArray{"plain", "with,comma"}, want: `{plain,"with,comma"}`},
 		{name: "empty string element", in: StringArray{""}, want: "{}"},
+		{name: "multibyte runes pass through unescaped", in: StringArray{"🥰 café"}, want: "{🥰 café}"},
+		{name: "jsonb element is quoted and escaped", in: StringArray{`{"emoji":"🥰","note":"a \"b\""}`}, want: `{"{\"emoji\":\"🥰\",\"note\":\"a \\\"b\\\"\"}"}`},
 	}
 
 	for _, tt := range tests {

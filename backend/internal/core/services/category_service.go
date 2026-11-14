@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -70,22 +71,14 @@ func (s *CategoryServiceImpl) SetPrimaryCategory(ctx context.Context, input port
 		return nil, fmt.Errorf("failed to upsert category: %w", err)
 	}
 
-	// Verify content exists
-	_, err = s.contentRepo.GetByID(ctx, input.ContentID)
+	// Point the content at it. The UPDATE returns the updated row, and a
+	// missing content id comes back as ErrNotFound — no read before or after.
+	content, err := s.contentRepo.UpdatePrimaryCategoryID(ctx, input.ContentID, &upserted.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get content: %w", err)
-	}
-
-	// Update the content's primary category FK
-	err = s.contentRepo.UpdatePrimaryCategoryID(ctx, input.ContentID, &upserted.ID)
-	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("failed to get content: %w", err)
+		}
 		return nil, fmt.Errorf("failed to update content primary category: %w", err)
-	}
-
-	// Fetch updated content
-	content, err := s.contentRepo.GetByID(ctx, input.ContentID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch updated content: %w", err)
 	}
 
 	return content, nil

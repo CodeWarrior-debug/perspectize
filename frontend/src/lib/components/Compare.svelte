@@ -1,8 +1,8 @@
 <script lang="ts">
+	import type { LengthDisplay } from '$lib/queries/content';
 	import { createQuery } from '@tanstack/svelte-query';
 	import { goto } from '$app/navigation';
 	import { graphqlRequest } from '$lib/queries/client';
-	import { LIST_USERS, type UsersResponse } from '$lib/queries/users';
 	import {
 		LIST_PERSPECTIVES_BY_CONTENT,
 		MAX_PERSPECTIVES_PER_LIST,
@@ -20,6 +20,7 @@
 		sortRatingRows,
 		agreementPercent,
 	} from '$lib/utils/comparePerspectives';
+	import { LIBRARY_PATH } from '$lib/utils/contentLinks';
 	import { identityColor } from '$lib/utils/compareIdentity';
 	import ComparePickerRow from '$lib/components/ComparePickerRow.svelte';
 	import CompareOverallRow from '$lib/components/CompareOverallRow.svelte';
@@ -41,6 +42,7 @@
 		displayTitle?: string | null;
 		length: number | null;
 		lengthUnits: string | null;
+		lengthDisplay?: LengthDisplay | null;
 	}
 	interface GetContentResponse {
 		contentByID: CompareContentBanner | null;
@@ -57,12 +59,6 @@
 	} = $props();
 
 	const meCtx = useMe();
-
-	const usersQuery = createQuery(() => ({
-		queryKey: queryKeys.users.list(),
-		queryFn: () => graphqlRequest<UsersResponse>(LIST_USERS),
-		staleTime: 5 * 60 * 1000,
-	}));
 
 	const perspectivesQuery = createQuery(() => ({
 		queryKey: queryKeys.perspectives.listByContent(Number(contentId)),
@@ -82,12 +78,15 @@
 	}));
 
 	const perspectives = $derived(perspectivesQuery.data?.perspectives.items ?? []);
-	const users = $derived(usersQuery.data?.users ?? []);
+	// Usernames arrive on the perspective rows themselves (Perspective.user).
+	const usernames = $derived(
+		new Map(perspectives.filter((p) => p.user).map((p) => [p.userID, p.user!.username] as const)),
+	);
 	const content = $derived(contentQuery.data?.contentByID ?? null);
 
 	function displayName(userID: string): string {
 		if (meCtx.me && userID === meCtx.me.id) return 'You';
-		return users.find((u) => u.id === userID)?.username ?? `User ${userID}`;
+		return usernames.get(userID) ?? `User ${userID}`;
 	}
 
 	// Picker candidates: every user with a fetched perspective row (privacy
@@ -176,7 +175,10 @@
 		return `${leftLabel} and ${rightLabel} rated different dimensions — nothing to compare directly.`;
 	});
 
-	const loading = $derived(usersQuery.isLoading || perspectivesQuery.isLoading);
+	// isPending, not isLoading: isLoading is false until the first fetch is in
+	// flight (and while paused offline), which let the empty state flash before
+	// the perspectives arrived.
+	const loading = $derived(perspectivesQuery.isPending);
 	const hasComparison = $derived(perspectives.length >= 2 && !!leftPerspective && !!rightPerspective);
 	const hasNoPerspectives = $derived(!loading && perspectives.length === 0);
 
@@ -192,7 +194,7 @@
 </script>
 
 <div class="mx-auto flex max-w-[880px] flex-col gap-4 px-5 py-5">
-	<a href="/" class="text-[13px] text-muted-foreground hover:text-foreground">&larr; Back to Activity</a>
+	<a href={LIBRARY_PATH} class="text-[13px] text-muted-foreground hover:text-foreground">&larr; Back to Library</a>
 
 	<div class="flex items-center gap-2">
 		<GlassesIcon class="size-[18px]" style="color: var(--color-primary);" />
@@ -218,7 +220,9 @@
 			<span class="text-[13px] font-medium text-foreground">{content!.name}</span>
 		</div>
 		{#if content!.length != null && content!.lengthUnits != null}
-			<span class="text-[12px] text-muted-foreground">{formatDuration(content!.length, content!.lengthUnits)}</span>
+			<span class="text-[12px] text-muted-foreground"
+				>{formatDuration(content!.length, content!.lengthUnits, content!.lengthDisplay?.precision)}</span
+			>
 		{/if}
 	{/snippet}
 
@@ -246,14 +250,13 @@
 
 	{#if loading}
 		<div class="py-12 text-center text-muted-foreground">Loading comparison…</div>
-	{:else if usersQuery.isError || perspectivesQuery.isError}
+	{:else if perspectivesQuery.isError}
 		<div class="flex flex-col items-center gap-3 py-12 text-center text-muted-foreground">
 			<p>Failed to load this comparison.</p>
 			<Button
 				size="sm"
 				variant="outline"
 				onclick={() => {
-					usersQuery.refetch();
 					perspectivesQuery.refetch();
 				}}
 			>
@@ -277,7 +280,7 @@
 				<p class="text-[12.5px] text-muted-foreground">
 					You haven't shared a perspective on this yet — these are all other people's takes.
 				</p>
-				<Button href="/" size="sm" variant="outline">Add yours</Button>
+				<Button href={LIBRARY_PATH} size="sm" variant="outline">Add yours</Button>
 			</div>
 		{/if}
 

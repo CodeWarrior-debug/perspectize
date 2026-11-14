@@ -59,13 +59,13 @@ func TestJSONBArray_Value(t *testing.T) {
 }
 
 func TestContentTypeDBValueConversion(t *testing.T) {
-	assert.Equal(t, "youtube", contentTypeToDBValue(domain.ContentTypeYouTube))
+	assert.Equal(t, "youtube_video", contentTypeToDBValue(domain.ContentTypeYouTubeVideo))
 	assert.Equal(t, "claim", contentTypeToDBValue(domain.ContentTypeClaim))
 	assert.Equal(t, "", contentTypeToDBValue(domain.ContentType("")))
 
-	assert.Equal(t, domain.ContentTypeYouTube, contentTypeFromDBValue("youtube"))
+	assert.Equal(t, domain.ContentTypeYouTubeVideo, contentTypeFromDBValue("youtube_video"))
 	assert.Equal(t, domain.ContentTypeClaim, contentTypeFromDBValue("claim"))
-	assert.Equal(t, domain.ContentTypeYouTube, contentTypeFromDBValue("YouTube"))
+	assert.Equal(t, domain.ContentTypeYouTubeVideo, contentTypeFromDBValue("YouTube_Video"))
 	assert.Equal(t, domain.ContentType(""), contentTypeFromDBValue(""))
 }
 
@@ -191,6 +191,32 @@ func TestBuildContentSortRules(t *testing.T) {
 			wantTieOrder: paginator.DESC,
 		},
 		{
+			name:   "author ascending uses a CASE expression with an empty-author guard and sorts missing authors last",
+			sortBy: domain.ContentSortByAuthor,
+			order:  domain.SortOrderAsc,
+			wantPrimary: paginator.Rule{
+				Key:   "Author",
+				Order: paginator.ASC,
+				SQLRepr: "CASE WHEN response->'authors'->0->>'name' IS NULL OR response->'authors'->0->>'name' = '' " +
+					"THEN NULL ELSE response->'authors'->0->>'name' END",
+				NULLReplacement: nullAuthorAsc,
+			},
+			wantTieOrder: paginator.ASC,
+		},
+		{
+			name:   "author descending sorts missing authors last",
+			sortBy: domain.ContentSortByAuthor,
+			order:  domain.SortOrderDesc,
+			wantPrimary: paginator.Rule{
+				Key:   "Author",
+				Order: paginator.DESC,
+				SQLRepr: "CASE WHEN response->'authors'->0->>'name' IS NULL OR response->'authors'->0->>'name' = '' " +
+					"THEN NULL ELSE response->'authors'->0->>'name' END",
+				NULLReplacement: nullAuthorDesc,
+			},
+			wantTieOrder: paginator.DESC,
+		},
+		{
 			name:   "published at uses string null replacement",
 			sortBy: domain.ContentSortByPublishedAt,
 			order:  domain.SortOrderAsc,
@@ -213,6 +239,18 @@ func TestBuildContentSortRules(t *testing.T) {
 				NULLReplacement: "",
 			},
 			wantTieOrder: paginator.DESC,
+		},
+		{
+			name:   "added by sorts on the lowercased adder username via subquery",
+			sortBy: domain.ContentSortByAddedBy,
+			order:  domain.SortOrderAsc,
+			wantPrimary: paginator.Rule{
+				Key:             "AddedBy",
+				Order:           paginator.ASC,
+				SQLRepr:         "LOWER((SELECT u.username FROM users u WHERE u.id = content.added_by_user_id))",
+				NULLReplacement: "",
+			},
+			wantTieOrder: paginator.ASC,
 		},
 		{
 			name:         "length has no SQLRepr but has int64 null replacement",

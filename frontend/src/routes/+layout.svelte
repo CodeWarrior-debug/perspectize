@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
 	import { beforeNavigate } from '$app/navigation';
 	import { updated } from '$app/state';
 	import { onMount } from 'svelte';
 	import { ClerkProvider, ClerkLoaded, ClerkLoading } from 'svelte-clerk';
-	import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
+	import { QueryClientProvider } from '@tanstack/svelte-query';
+	import { queryClient } from '$lib/queries/client';
 	import { Toaster } from 'svelte-sonner';
+	import { TOASTER_PROPS } from '$lib/utils/toast';
 	import favicon from '$lib/assets/favicon.svg';
 	import { DEMO_MODE } from '$lib/auth';
 	import AuthShow from '$lib/components/auth/AuthShow.svelte';
@@ -17,22 +18,12 @@
 	import MessagingWidget from '$lib/components/messaging/MessagingWidget.svelte';
 	import GuestLanding from '$lib/components/onboarding/GuestLanding.svelte';
 	import OnboardingShell from '$lib/components/onboarding/OnboardingShell.svelte';
-	import { reportWebVitals } from '$lib/vitals';
+	import { initTelemetry } from '$lib/telemetry';
 	import { watchForNewVersion } from '$lib/utils/versionWatch';
 	import { attachVersionHotkey } from '$lib/utils/versionHotkey';
 	import { printVersionInfo } from '$lib/utils/versionInfo';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import '../app.css';
-
-	const queryClient = new QueryClient({
-		defaultOptions: {
-			queries: {
-				enabled: browser,
-				staleTime: 60 * 1000,
-				retry: 1,
-			},
-		},
-	});
 
 	let { children } = $props();
 
@@ -50,7 +41,7 @@
 	});
 
 	onMount(() => {
-		reportWebVitals();
+		void initTelemetry();
 		const stopVersionWatch = watchForNewVersion({
 			check: () => updated.check(),
 			reload: () => location.reload(),
@@ -97,13 +88,13 @@
 {#if DEMO_MODE}
 	<!-- Demo mode: no Clerk at all — seeded personas sign in via DemoPersonaDialog. -->
 	<QueryClientProvider client={queryClient}>
-		<Toaster position="top-right" duration={2000} richColors />
+		<Toaster {...TOASTER_PROPS} />
 		{@render app()}
 	</QueryClientProvider>
 {:else}
 	<ClerkProvider {publishableKey}>
 		<QueryClientProvider client={queryClient}>
-			<Toaster position="top-right" duration={2000} richColors />
+			<Toaster {...TOASTER_PROPS} />
 
 			<ClerkLoading>
 				<div class="flex h-screen items-center justify-center">

@@ -28,6 +28,9 @@ type CreatePassageInput struct {
 type ContentService interface {
 	// CreateFromYouTube creates content from a YouTube URL, attributed to the given user
 	CreateFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error)
+	// CreateFromMovie creates MOVIE content from a TMDB or IMDb movie URL (or bare IMDb id), attributed to the given user.
+	// If the movie already exists, returns the existing content along with ErrAlreadyExists.
+	CreateFromMovie(ctx context.Context, rawURL string, userID int) (*domain.Content, error)
 
 	// CreateFromPassage finds or creates the BIBLE_PASSAGE content row for a verse range.
 	// If the range already exists, returns the existing content along with ErrAlreadyExists.
@@ -50,6 +53,9 @@ type ContentService interface {
 
 	// GetByID retrieves content by ID
 	GetByID(ctx context.Context, id int) (*domain.Content, error)
+	// GetByIDs loads many content rows in one query (the content dataloader);
+	// missing ids are absent.
+	GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error)
 
 	// ListContent retrieves a paginated list of content
 	ListContent(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)
@@ -59,4 +65,39 @@ type ContentService interface {
 
 	// UpdateSourceData refreshes an existing content item's metadata from its source
 	UpdateSourceData(ctx context.Context, contentID int) (*domain.Content, error)
+
+	// YouTubeTrending returns one page of YouTube's most-popular chart for a
+	// region (ISO 3166-1 alpha-2, e.g. "US"). Served from the backend cache, so
+	// Discover visitors share one API call per page per TTL.
+	YouTubeTrending(ctx context.Context, regionCode, pageToken string) (*TrendingPage, error)
+
+	// SearchMovies returns one page of TMDB title search results for the Discover
+	// page's Movies source. The query is trimmed and must be 1-100 characters;
+	// page 0 means 1 and must otherwise be 1-500. Served from the backend cache.
+	SearchMovies(ctx context.Context, query string, page int) (*MovieSearchPage, error)
+
+	// TrendingMovies returns one page of TMDB's trending movies for the Discover
+	// page. The window defaults to WEEK; page 0 means 1, otherwise 1-500. Served
+	// from the backend cache.
+	TrendingMovies(ctx context.Context, window domain.TrendingWindow, page int) (*MovieSearchPage, error)
+
+	// CreateFromBook creates BOOK content from an Open Library work URL or a
+	// bare ISBN-10/13, attributed to the given user. If the work already
+	// exists, returns the existing content along with ErrAlreadyExists.
+	CreateFromBook(ctx context.Context, rawURLOrISBN string, userID int) (*domain.Content, error)
+
+	// SearchBooks returns one page of Open Library work search results for the
+	// Discover page's Books source. The query is trimmed and must be 1-100
+	// characters; page 0 means 1 and must otherwise be 1-500.
+	SearchBooks(ctx context.Context, query string, page int) (*BookSearchPage, error)
+
+	// TrendingBooks returns one page of Open Library's trending books for the
+	// Discover page. The window defaults to WEEK; page 0 means 1, otherwise
+	// 1-500. Served from the backend cache.
+	TrendingBooks(ctx context.Context, window domain.TrendingWindow, page int) (*BookSearchPage, error)
+
+	// ResolveBookISBN resolves an ISBN-10/13 to its Open Library work without
+	// writing, for the ISBN tab's preview-before-add. Returns ErrNotFound when
+	// Open Library has no record for the ISBN.
+	ResolveBookISBN(ctx context.Context, isbn string) (*BookSearchResult, error)
 }

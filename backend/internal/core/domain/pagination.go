@@ -13,6 +13,21 @@ const (
 	ContentSortByPublishedAt  ContentSortBy = "PUBLISHED_AT"
 	ContentSortByChannelTitle ContentSortBy = "CHANNEL_TITLE"
 	ContentSortByLength       ContentSortBy = "LENGTH"
+	ContentSortByBoxOffice    ContentSortBy = "BOX_OFFICE"
+	ContentSortByVsBudget     ContentSortBy = "VS_BUDGET"
+	ContentSortByAgeRating    ContentSortBy = "AGE_RATING"
+	ContentSortByAddedBy      ContentSortBy = "ADDED_BY"
+	ContentSortByReleaseDate  ContentSortBy = "RELEASE_DATE"
+	ContentSortByTmdbScore    ContentSortBy = "TMDB_SCORE"
+	ContentSortByAuthor       ContentSortBy = "AUTHOR"
+)
+
+// PersonRole is the role a person plays on a movie, used by ContentFilter.PersonRole.
+type PersonRole string
+
+const (
+	PersonRoleCast     PersonRole = "CAST"
+	PersonRoleDirector PersonRole = "DIRECTOR"
 )
 
 // SortOrder represents ascending or descending sort direction
@@ -52,11 +67,39 @@ type ContentFilter struct {
 	ChannelTitle      *string
 	TagContains       *string
 	DescriptionSearch *string
+	// AddedByUsername matches the adder's username (ILIKE, via the users table)
+	AddedByUsername *string
+	// MinPerspectiveCount keeps content with at least this many perspectives
+	// visible to ContentListParams.ViewerID (public, plus the viewer's own).
+	MinPerspectiveCount *int
 	// Record date filters (direct columns)
 	CreatedAfter  *string
 	CreatedBefore *string
 	UpdatedAfter  *string
 	UpdatedBefore *string
+	// PersonID/PersonRole match movies by a person (cast or director).
+	PersonID   *int
+	PersonRole *PersonRole
+	// Movie column filters (JSONB extraction on movie rows).
+	GenreContains  *string
+	CastContains   *string // cast or director name contains (case-insensitive)
+	AgeRating      []string
+	ReleasedAfter  *string // ISO date, inclusive
+	ReleasedBefore *string // ISO date, inclusive
+	MinBoxOffice   *float64
+	MaxBoxOffice   *float64
+	MinTmdbScore   *float64
+	MaxTmdbScore   *float64
+	// Book column filters (books only). AuthorContains matches the first author's name.
+	AuthorContains *string
+	// Book ranges (books only, inclusive). Year is the first publish year, pages the median
+	// across editions, rating the Open Library average out of 5.
+	MinPublishYear *int
+	MaxPublishYear *int
+	MinPages       *int
+	MaxPages       *int
+	MinBookRating  *float64
+	MaxBookRating  *float64
 }
 
 // ContentListParams contains parameters for paginated content queries
@@ -72,6 +115,9 @@ type ContentListParams struct {
 	Sorts             []ContentSortRule
 	IncludeTotalCount bool
 	Filter            *ContentFilter
+	// ViewerID is the signed-in caller, nil when anonymous. Only
+	// Filter.MinPerspectiveCount reads it.
+	ViewerID *int
 }
 
 // PaginatedContent represents a paginated list of content

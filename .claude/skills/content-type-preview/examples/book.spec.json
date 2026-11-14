@@ -1,0 +1,548 @@
+{
+  "type": {
+    "label": "Book",
+    "enumValue": "BOOK",
+    "icon": "book",
+    "accent": "#8B5E3C"
+  },
+  "meta": {
+    "date": "2026-11-09",
+    "sources": [
+      "docs/superpowers/specs/2026-11-09-book-content-type-discover-design.md",
+      "Open Library search.json / trending/weekly.json, fetched live 2026-11-09"
+    ],
+    "note": "Proposed type; nothing is built. East of Eden, Atomic Habits, Make a zine! and Brainscan are real Open Library records fetched live 2026-11-09 (search.json for East of Eden/Make a zine!/Brainscan, trending/weekly.json for Atomic Habits). Perspective counts and 'otherPerspectives' are illustrative."
+  },
+  "columns": [
+    {
+      "id": "pz",
+      "kind": "perspectize",
+      "status": "shipped",
+      "header": {
+        "body": "Add or edit your perspective on this book. Filled when you already have one.",
+        "src": "derived: perspectives WHERE content_id AND user_id"
+      }
+    },
+    {
+      "id": "item",
+      "kind": "item",
+      "label": "Book",
+      "status": "proposed",
+      "header": {
+        "body": "Title with the Open Library cover, author underneath. No cover shows the type glyph. Sorts A to Z.",
+        "src": "content.name + response.authorName[0] + response.coverId"
+      }
+    },
+    {
+      "id": "author",
+      "kind": "text",
+      "label": "Author",
+      "status": "proposed",
+      "header": {
+        "body": "Primary author. A default column, not just the item cell's sub-line — sortable and filterable on its own.",
+        "src": "response.authorName[0]"
+      },
+      "cell": {
+        "src": "response.authorName[0]",
+        "whenEmpty": "No author on record for this work."
+      }
+    },
+    {
+      "id": "published",
+      "kind": "text",
+      "label": "Published",
+      "status": "proposed",
+      "header": {
+        "body": "First publish year. Sorts oldest/newest; unknown sorts last. Rendered as a plain 4-digit string, never through the numeric formatter (which would add a thousands separator and show \"1,952\").",
+        "src": "response.firstPublishYear"
+      },
+      "cell": {
+        "src": "response.firstPublishYear",
+        "whenEmpty": "Open Library has no first-publish year on record."
+      }
+    },
+    {
+      "id": "pages",
+      "kind": "num",
+      "label": "Pages",
+      "status": "proposed",
+      "header": {
+        "body": "Median page count across all editions Open Library has indexed for this work, not a specific printing.",
+        "src": "response.pageCountMedian"
+      },
+      "cell": {
+        "src": "response.pageCountMedian",
+        "whenEmpty": "No page count across any indexed edition."
+      }
+    },
+    {
+      "id": "rating",
+      "kind": "num",
+      "label": "Rating",
+      "status": "proposed",
+      "header": {
+        "body": "Open Library community rating out of 5. Muted under 5 ratings — this community's rating counts are far sparser than TMDB's, so the usual \"low sample\" dimming kicks in much earlier here.",
+        "src": "response.ratingsAverage + response.ratingsCount",
+        "extra": "Decision to confirm: dimming threshold is a guess, not measured."
+      },
+      "cell": {
+        "src": "response.ratingsAverage",
+        "whenEmpty": "No community ratings yet."
+      }
+    },
+    {
+      "id": "tags",
+      "kind": "tags",
+      "label": "Tags",
+      "status": "proposed",
+      "header": {
+        "body": "Open Library's crowdsourced subject tags, as chips — reuses the project's existing shared Tags column (also fed by YouTube video tags and Movie's TMDB keywords), not a one-off \"Subjects\" header. A genre/theme split was considered and rejected: Open Library's separate 'genres' field is often empty (none for this trending result) and needs an extra per-tag lookup to resolve to a label, so the flat subject list is kept as one tag set, like Movie's keywords. External-source tag set — overlaps issue #560 (separating source tags from user tags).",
+        "src": "response.subjects[]"
+      },
+      "cell": {
+        "src": "response.subjects[]",
+        "whenEmpty": "No subjects recorded for this work."
+      }
+    }
+  ],
+  "rows": [
+    {
+      "id": 1,
+      "fill": "full",
+      "hasPerspective": true,
+      "cells": {
+        "item": {
+          "title": "East of Eden",
+          "sub": "John Steinbeck",
+          "thumb": "https://covers.openlibrary.org/b/id/11386937-M.jpg"
+        },
+        "author": {
+          "value": "John Steinbeck",
+          "tip": {
+            "src": "response.authorName[0]"
+          }
+        },
+        "published": {
+          "value": "1952",
+          "tip": {
+            "src": "response.firstPublishYear"
+          }
+        },
+        "pages": {
+          "value": "611",
+          "tip": {
+            "src": "response.pageCountMedian",
+            "v": "Median across 105 indexed editions — this work's own edition has number_of_pages: 525 on record; the median is a cross-edition aggregate, not this book's page count."
+          }
+        },
+        "rating": {
+          "value": "4.1",
+          "tip": {
+            "src": "response.ratingsAverage",
+            "v": "4.1 from 100 ratings (Open Library, live 2026-11-09)"
+          }
+        },
+        "tags": {
+          "value": [
+            "historical fiction",
+            "classics",
+            "Fathers and sons",
+            "Sibling rivalry",
+            "Open Library Staff Picks"
+          ],
+          "tip": {
+            "src": "response.subjects[]",
+            "extra": "65 subjects on record; showing the first five. Full list in the details view."
+          }
+        }
+      },
+      "details": {
+        "title": "East of Eden",
+        "subtitle": "John Steinbeck · 1952 · 611 pages (median)",
+        "textLabel": "Description",
+        "textStatus": "proposed",
+        "text": [
+          [
+            null,
+            "Steinbeck considered East of Eden to be his masterpiece. In his journal, Journal of a Novel, he notes that “this is the book I have always wanted and have worked and prayed to be able to write.” Set primarily in the Salinas Valley in the early twentieth century, the novel traces three generations of two families – the Trasks and the Hamiltons – as they grapple with the ever-present forces of good and evil."
+          ],
+          [
+            null,
+            "Part allegory, part autobiography, and part epic, East of Eden was an ambitious project from the start – a gift to Steinbeck’s sons meant to teach them about identity, grief, and what it means to be human. Tinged with biblical echoes of the fall of Adam and Eve and the rivalry of Cain and Abel, this sprawling saga has captivated audiences for generations."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Related works on Open Library",
+            "status": "proposed",
+            "items": [
+              "East of Eden 1/2 and 2/2 (a two-volume edition of this same work)",
+              "East of Eden / The Wayward Bus (an omnibus containing this work)",
+              "3 more omnibus/collection editions"
+            ]
+          },
+          {
+            "label": "Sources",
+            "status": "proposed",
+            "items": [
+              "Open Library: openlibrary.org/works/OL23166W",
+              "Description: steinbeck.org/about-john/his-works"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Rating",
+            "v": "4.1 / 5",
+            "status": "proposed",
+            "tip": "response.ratingsAverage",
+            "sub": "100 ratings"
+          },
+          {
+            "k": "Pages",
+            "v": "611",
+            "status": "proposed",
+            "tip": "response.pageCountMedian (median across editions)"
+          },
+          {
+            "k": "Published",
+            "v": "1952",
+            "status": "proposed",
+            "tip": "response.firstPublishYear"
+          },
+          {
+            "k": "Editions",
+            "v": "105",
+            "status": "proposed",
+            "tip": "response.editionCount"
+          }
+        ],
+        "tags": [
+          "historical fiction",
+          "classics",
+          "Fathers and sons",
+          "Sibling rivalry",
+          "guilt",
+          "freedom"
+        ],
+        "tagsStatus": "proposed",
+        "otherPerspectives": 6,
+        "footer": "Data: Open Library (archive.org), community-contributed; may be incomplete.",
+        "media": "https://covers.openlibrary.org/b/id/11386937-M.jpg",
+        "mediaFit": "contain"
+      }
+    },
+    {
+      "id": 2,
+      "fill": "full",
+      "hasPerspective": false,
+      "cells": {
+        "item": {
+          "title": "Atomic Habits",
+          "sub": "James Clear",
+          "thumb": "https://covers.openlibrary.org/b/id/12539702-M.jpg"
+        },
+        "author": {
+          "value": "James Clear",
+          "tip": {
+            "src": "response.authorName[0]"
+          }
+        },
+        "published": {
+          "value": "2016",
+          "tip": {
+            "src": "response.firstPublishYear"
+          }
+        },
+        "pages": {
+          "value": "322",
+          "tip": {
+            "src": "response.pageCountMedian"
+          }
+        },
+        "rating": {
+          "value": "4.0",
+          "tip": {
+            "src": "response.ratingsAverage",
+            "v": "3.97 from 1489 ratings (Open Library, live 2026-11-09)"
+          }
+        },
+        "tags": {
+          "value": [
+            "Habit",
+            "Behavior modification",
+            "Self-actualization (psychology)",
+            "New York Times bestseller"
+          ],
+          "tip": {
+            "src": "response.subjects[]",
+            "extra": "From trending/weekly.json — the Trending tab's top result tonight, not a search. Trending skews toward current nonfiction bestsellers, not classics (design doc §5)."
+          }
+        }
+      },
+      "details": {
+        "title": "Atomic Habits",
+        "subtitle": "James Clear · 2016 · 322 pages (median)",
+        "textLabel": "Description",
+        "textStatus": "proposed",
+        "text": [
+          [
+            null,
+            "No matter your goals, Atomic Habits offers a proven framework for improving every day. James Clear, one of the world's leading experts on habit formation, reveals practical strategies that will teach you exactly how to form good habits, break bad ones, and master the tiny behaviors that lead to remarkable results."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Sources",
+            "status": "proposed",
+            "items": [
+              "Open Library: openlibrary.org/works/OL17930368W"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Rating",
+            "v": "3.97 / 5",
+            "status": "proposed",
+            "tip": "response.ratingsAverage",
+            "sub": "1,489 ratings"
+          },
+          {
+            "k": "Pages",
+            "v": "322",
+            "status": "proposed",
+            "tip": "response.pageCountMedian (median across editions)"
+          },
+          {
+            "k": "Published",
+            "v": "2016",
+            "status": "proposed",
+            "tip": "response.firstPublishYear"
+          }
+        ],
+        "tags": [
+          "Habit",
+          "Behavior modification",
+          "Business",
+          "Personal Growth"
+        ],
+        "tagsStatus": "proposed",
+        "otherPerspectives": 2,
+        "footer": "Data: Open Library (archive.org), community-contributed; may be incomplete."
+      }
+    },
+    {
+      "id": 3,
+      "fill": "partial",
+      "hasPerspective": false,
+      "cells": {
+        "item": {
+          "title": "Make a zine!",
+          "sub": "Bill Brent",
+          "thumb": "https://covers.openlibrary.org/b/id/727275-M.jpg"
+        },
+        "author": {
+          "value": "Bill Brent",
+          "tip": {
+            "src": "response.authorName[0]"
+          }
+        },
+        "published": {
+          "value": "1997",
+          "tip": {
+            "src": "response.firstPublishYear"
+          }
+        },
+        "pages": {
+          "value": "192",
+          "tip": {
+            "src": "response.pageCountMedian"
+          }
+        },
+        "rating": {
+          "value": null,
+          "tip": {
+            "empty": "No community ratings yet. Fewer than 5 ratings mutes this cell even when a number exists; here there is none at all."
+          }
+        },
+        "tags": {
+          "value": [
+            "Zines",
+            "Publishing",
+            "Self-publishing",
+            "Periodicals"
+          ],
+          "tip": {
+            "src": "response.subjects[]"
+          }
+        }
+      },
+      "details": {
+        "title": "Make a zine!",
+        "subtitle": "Bill Brent · 1997 · 192 pages (median)",
+        "textLabel": "Description",
+        "textStatus": "proposed",
+        "text": [
+          [
+            null,
+            "No description on record. Confirmed live 2026-11-09: Open Library's canonical work record for this title has a null description field — not a fetch that was skipped, the source genuinely has none."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Sources",
+            "status": "proposed",
+            "items": [
+              "Open Library: openlibrary.org/works/OL2765349W"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Rating",
+            "v": null,
+            "status": "proposed",
+            "tip": "response.ratingsAverage",
+            "empty": "no ratings yet"
+          },
+          {
+            "k": "Pages",
+            "v": "192",
+            "status": "proposed",
+            "tip": "response.pageCountMedian (median across editions)"
+          },
+          {
+            "k": "Published",
+            "v": "1997",
+            "status": "proposed",
+            "tip": "response.firstPublishYear"
+          }
+        ],
+        "tags": [
+          "Zines",
+          "Publishing",
+          "Self-publishing"
+        ],
+        "tagsStatus": "proposed",
+        "otherPerspectives": 0,
+        "footer": "Data: Open Library (archive.org), community-contributed; may be incomplete."
+      }
+    },
+    {
+      "id": 4,
+      "fill": "sparse",
+      "hasPerspective": false,
+      "cells": {
+        "item": {
+          "title": "Brainscan",
+          "sub": "Alex Wrekk",
+          "thumb": null
+        },
+        "author": {
+          "value": "Alex Wrekk",
+          "tip": {
+            "src": "response.authorName[0]"
+          }
+        },
+        "published": {
+          "value": "1999",
+          "tip": {
+            "src": "response.firstPublishYear"
+          }
+        },
+        "pages": {
+          "value": "30",
+          "tip": {
+            "src": "response.pageCountMedian"
+          }
+        },
+        "rating": {
+          "value": null,
+          "tip": {
+            "empty": "No community ratings yet."
+          }
+        },
+        "tags": {
+          "value": [
+            "Fan magazines",
+            "Nostalgia",
+            "Zines"
+          ],
+          "tip": {
+            "src": "response.subjects[]"
+          }
+        }
+      },
+      "details": {
+        "title": "Brainscan",
+        "subtitle": "Alex Wrekk · 1999 · 30 pages (median) · no cover on record",
+        "textLabel": "Description",
+        "textStatus": "proposed",
+        "text": [
+          [
+            null,
+            "This issue is written in diary form and contains stories of events and situations that happened in different locations such as Utah and Portland. The author reflects upon the meaning of the past and feelings of nostalgia and belonging associated with home and homecoming."
+          ],
+          [
+            null,
+            "A real, sparse Open Library record otherwise: no cover, no ratings, just three subjects. This is the row the \"unknown, not zero\" empty-cell rule exists for."
+          ]
+        ],
+        "links": [
+          {
+            "label": "Sources",
+            "status": "proposed",
+            "items": [
+              "Open Library: openlibrary.org/works/OL32020028W"
+            ]
+          }
+        ],
+        "tiles": [
+          {
+            "k": "Rating",
+            "v": null,
+            "status": "proposed",
+            "tip": "response.ratingsAverage",
+            "empty": "no ratings yet"
+          },
+          {
+            "k": "Pages",
+            "v": "30",
+            "status": "proposed",
+            "tip": "response.pageCountMedian (median across editions)"
+          },
+          {
+            "k": "Published",
+            "v": "1999",
+            "status": "proposed",
+            "tip": "response.firstPublishYear"
+          },
+          {
+            "k": "Editions",
+            "v": "19",
+            "status": "proposed",
+            "tip": "response.editionCount"
+          }
+        ],
+        "tags": [
+          "Fan magazines",
+          "Nostalgia",
+          "Zines"
+        ],
+        "tagsStatus": "proposed",
+        "otherPerspectives": 0,
+        "footer": "Data: Open Library (archive.org), community-contributed; may be incomplete."
+      }
+    }
+  ],
+  "perspective": {
+    "ratings": [
+      "Quality",
+      "Agreement",
+      "Importance",
+      "Confidence"
+    ],
+    "addFieldHint": "whether you'd recommend it"
+  }
+}

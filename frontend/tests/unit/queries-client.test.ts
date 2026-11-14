@@ -60,7 +60,8 @@ describe('GraphQL client', () => {
 	it('graphqlRequest sends no Authorization header when signed out', async () => {
 		const requestSpy = vi.spyOn(graphqlClient, 'request').mockResolvedValue({ ok: true });
 		await graphqlRequest('query { __typename }');
-		expect(requestSpy).toHaveBeenCalledWith('query { __typename }', undefined, {});
+		expect(requestSpy).toHaveBeenCalledWith('query { __typename }', undefined, expect.any(Object));
+		expect((requestSpy.mock.calls[0] as unknown[])[2]).not.toHaveProperty('Authorization');
 	});
 
 	it('graphqlRequest includes a Bearer Authorization header when signed in', async () => {
@@ -68,7 +69,11 @@ describe('GraphQL client', () => {
 		const requestSpy = vi.spyOn(graphqlClient, 'request').mockResolvedValue({ ok: true });
 		try {
 			await graphqlRequest('query { __typename }', { id: 1 });
-			expect(requestSpy).toHaveBeenCalledWith('query { __typename }', { id: 1 }, { Authorization: 'Bearer tok_abc' });
+			expect(requestSpy).toHaveBeenCalledWith(
+				'query { __typename }',
+				{ id: 1 },
+				expect.objectContaining({ Authorization: 'Bearer tok_abc' }),
+			);
 		} finally {
 			delete (window as any).Clerk;
 		}

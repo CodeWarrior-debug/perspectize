@@ -23,6 +23,10 @@ type Resolver struct {
 	UserService        portservices.UserService
 	PerspectiveService portservices.PerspectiveService
 	CategoryService    portservices.CategoryService
+	UserTodoService    portservices.UserTodoService
+	// ImportService is set after NewResolver by cmd/server (nil in tests that
+	// don't exercise imports; the import resolvers then report "not configured").
+	ImportService portservices.ImportService
 
 	// Messaging feature dependencies.
 	Messaging portservices.MessagingService
@@ -36,6 +40,7 @@ func NewResolver(
 	userService portservices.UserService,
 	perspectiveService portservices.PerspectiveService,
 	categoryService portservices.CategoryService,
+	userTodoService portservices.UserTodoService,
 	messagingService portservices.MessagingService,
 	hub *realtime.Hub,
 	presence *realtime.PresenceTracker,
@@ -45,6 +50,7 @@ func NewResolver(
 		UserService:        userService,
 		PerspectiveService: perspectiveService,
 		CategoryService:    categoryService,
+		UserTodoService:    userTodoService,
 		Messaging:          messagingService,
 		Hub:                hub,
 		Presence:           presence,
@@ -60,6 +66,9 @@ func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResol
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
+// ImportJob returns generated.ImportJobResolver implementation.
+func (r *Resolver) ImportJob() generated.ImportJobResolver { return &importJobResolver{r} }
+
 // User returns generated.UserResolver implementation.
 func (r *Resolver) User() generated.UserResolver { return &userResolver{r} }
 
@@ -67,3 +76,4 @@ type contentResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type userResolver struct{ *Resolver }
+type importJobResolver struct{ *Resolver }

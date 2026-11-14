@@ -1,14 +1,11 @@
 /**
  * Regression test for gap #3 in the UI gap audit: useCreatePerspective/
  * useUpdatePerspective used to scope their cache writes to
- * `queryKeys.perspectives.lists()`, a prefix shared by listByUser,
- * listByContent and activityFeed. TanStack's default (non-exact) key matching
- * treats a prefix match as "the same cache entry", so a create/update on one
- * content/user leaked its PerspectiveItem row into every other cached
- * perspective list, including a different content's Compare picker and the
- * activityFeed cache (a different row shape — ActivityPerspectiveItem, with
- * nested `content` and no rating fields — so the leaked row rendered with no
- * title/thumbnail there), regardless of privacy.
+ * `queryKeys.perspectives.lists()`, a prefix shared by listByUser and
+ * listByContent. TanStack's default (non-exact) key matching treats a prefix
+ * match as "the same cache entry", so a create/update on one content/user
+ * leaked its PerspectiveItem row into every other cached perspective list,
+ * including a different content's Compare picker, regardless of privacy.
  *
  * Unlike the mocked hook tests (hooks-useCreatePerspective.test.ts,
  * hooks-useUpdatePerspective.test.ts), this drives the hooks against a real
@@ -18,12 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient } from '@tanstack/svelte-query';
 import { queryKeys } from '$lib/queries/keys';
-import type {
-	ListPerspectivesByUserResponse,
-	ListActivityPerspectivesResponse,
-	PerspectiveItem,
-	ActivityPerspectiveItem,
-} from '$lib/queries/perspectives';
+import type { ListPerspectivesByUserResponse, PerspectiveItem } from '$lib/queries/perspectives';
 
 let client: QueryClient;
 let capturedCreateOptions: any;
@@ -75,20 +67,6 @@ function userRow(overrides: Partial<PerspectiveItem> = {}): PerspectiveItem {
 	};
 }
 
-function activityRow(overrides: Partial<ActivityPerspectiveItem> = {}): ActivityPerspectiveItem {
-	return {
-		id: '1',
-		userID: '42',
-		contentID: '10',
-		privacy: 'PUBLIC',
-		description: null,
-		content: { id: '10', name: 'Some Video', url: null, channelTitle: 'A Channel', length: 100, lengthUnits: null },
-		createdAt: '2026-01-01T00:00:00Z',
-		updatedAt: '2026-01-01T00:00:00Z',
-		...overrides,
-	};
-}
-
 beforeEach(async () => {
 	vi.clearAllMocks();
 	capturedCreateOptions = undefined;
@@ -102,12 +80,6 @@ beforeEach(async () => {
 	});
 	client.setQueryData<ListPerspectivesByUserResponse>(queryKeys.perspectives.listByContent(11), {
 		perspectives: { items: [userRow({ id: 'other-content-row', contentID: '11' })] },
-	});
-	client.setQueryData<ListActivityPerspectivesResponse>(queryKeys.perspectives.activityFeed(true), {
-		perspectives: { items: [activityRow({ id: 'private-feed-row' })] },
-	});
-	client.setQueryData<ListActivityPerspectivesResponse>(queryKeys.perspectives.activityFeed(false), {
-		perspectives: { items: [activityRow({ id: 'public-feed-row' })] },
 	});
 
 	const { useCreatePerspective } = await import('$lib/queries/perspectives/useCreatePerspective');
@@ -139,30 +111,6 @@ describe('perspective cache scoping (create)', () => {
 		expect(client.getQueryData(queryKeys.perspectives.listByContent(11))).toBe(before);
 	});
 
-	it('does not insert a PerspectiveItem-shaped row into either activityFeed cache', async () => {
-		const beforePrivate = client.getQueryData(queryKeys.perspectives.activityFeed(true));
-		const beforePublic = client.getQueryData(queryKeys.perspectives.activityFeed(false));
-		await capturedCreateOptions.onMutate({ userID: 42, contentID: 10, quality: 5000 });
-		capturedCreateOptions.onSuccess(
-			{ createPerspective: userRow() },
-			{ userID: 42, contentID: 10 },
-			{ previous: [], tempId: 'x' },
-		);
-		expect(client.getQueryData(queryKeys.perspectives.activityFeed(true))).toBe(beforePrivate);
-		expect(client.getQueryData(queryKeys.perspectives.activityFeed(false))).toBe(beforePublic);
-	});
-
-	it('a PRIVATE create leaves the public-only activity feed untouched (no privacy leak)', async () => {
-		const beforePublic = client.getQueryData(queryKeys.perspectives.activityFeed(false));
-		await capturedCreateOptions.onMutate({ userID: 42, contentID: 10, quality: 5000, privacy: 'PRIVATE' });
-		capturedCreateOptions.onSuccess(
-			{ createPerspective: userRow({ privacy: 'PRIVATE' }) },
-			{ userID: 42, contentID: 10, privacy: 'PRIVATE' },
-			{ previous: [], tempId: 'x' },
-		);
-		expect(client.getQueryData(queryKeys.perspectives.activityFeed(false))).toBe(beforePublic);
-	});
-
 	it("still inserts the optimistic row into the creator's own listByUser cache", async () => {
 		client.setQueryData<ListPerspectivesByUserResponse>(queryKeys.perspectives.listByUser(42), {
 			perspectives: { items: [] },
@@ -173,7 +121,7 @@ describe('perspective cache scoping (create)', () => {
 		expect(data?.perspectives.items[0]).toMatchObject({ contentID: '10', quality: 5000 });
 	});
 
-	it('marks the activity feeds and the created content’s listByContent as invalidated (refetch on next mount)', async () => {
+	it('marks the created content’s listByContent as invalidated (refetch on next mount)', async () => {
 		// invalidateQueries only marks a query state that already exists — seed the
 		// created content's listByContent(10) cache so there's a state to check.
 		client.setQueryData<ListPerspectivesByUserResponse>(queryKeys.perspectives.listByContent(10), {
@@ -185,8 +133,6 @@ describe('perspective cache scoping (create)', () => {
 			{ userID: 42, contentID: 10 },
 			{ previous: [], tempId: 'x' },
 		);
-		expect(client.getQueryState(queryKeys.perspectives.activityFeed(true))?.isInvalidated).toBe(true);
-		expect(client.getQueryState(queryKeys.perspectives.activityFeed(false))?.isInvalidated).toBe(true);
 		expect(client.getQueryState(queryKeys.perspectives.listByContent(10))?.isInvalidated).toBe(true);
 	});
 
@@ -210,30 +156,16 @@ describe('perspective cache scoping (create)', () => {
 });
 
 describe('perspective cache scoping (update)', () => {
-	it('patches a row cached under listByContent, but never inserts into activityFeed', async () => {
+	it('patches a row cached under listByContent', async () => {
 		client.setQueryData<ListPerspectivesByUserResponse>(queryKeys.perspectives.listByContent(10), {
 			perspectives: { items: [userRow({ id: '5', quality: 1000 })] },
 		});
-		const beforeFeed = client.getQueryData(queryKeys.perspectives.activityFeed(false));
 
 		await capturedUpdateOptions.onMutate({ id: 5, quality: 9000 });
 		capturedUpdateOptions.onSuccess({ updatePerspective: userRow({ id: '5', quality: 9000 }) });
 
 		const patched = client.getQueryData<ListPerspectivesByUserResponse>(queryKeys.perspectives.listByContent(10));
 		expect(patched?.perspectives.items[0]).toMatchObject({ id: '5', quality: 9000 });
-		expect(client.getQueryData(queryKeys.perspectives.activityFeed(false))).toBe(beforeFeed);
-	});
-
-	it('a PUBLIC→PRIVATE toggle invalidates (does not patch) the activity feeds so the row can be re-filtered server-side', async () => {
-		client.setQueryData<ListPerspectivesByUserResponse>(queryKeys.perspectives.listByContent(10), {
-			perspectives: { items: [userRow({ id: '5', privacy: 'PUBLIC' })] },
-		});
-
-		await capturedUpdateOptions.onMutate({ id: 5, privacy: 'PRIVATE' });
-		capturedUpdateOptions.onSuccess({ updatePerspective: userRow({ id: '5', privacy: 'PRIVATE' }) });
-
-		expect(client.getQueryState(queryKeys.perspectives.activityFeed(false))?.isInvalidated).toBe(true);
-		expect(client.getQueryState(queryKeys.perspectives.activityFeed(true))?.isInvalidated).toBe(true);
 	});
 
 	it('does not touch an unrelated content’s listByContent cache', async () => {

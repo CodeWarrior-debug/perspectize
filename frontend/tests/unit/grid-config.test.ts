@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
+	syncItemHeader,
 	capitalizeContentType,
 	durationComparator,
 	DATA_COLUMNS,
@@ -8,8 +9,43 @@ import {
 	SORTABLE_COLUMNS,
 	compareContentBySorts,
 	filterContentRows,
+	CLIENT_ONLY_SORT_COLS,
+	COL_TO_SORT,
+	sortableColumnsFor,
+	releasedComparator,
+	itemColumnHeader,
+	NUMERIC_COL_IDS,
+	CONTENT_TYPE_OPTIONS,
+	liveGridApi,
 } from '$lib/utils/grid-config';
 import type { ContentItem } from '$lib/queries/content';
+
+describe('CONTENT_TYPE_OPTIONS (Book)', () => {
+	it('offers Book as a type filter option', () => {
+		expect(CONTENT_TYPE_OPTIONS).toContainEqual({ value: 'book', label: 'Book' });
+	});
+});
+
+describe('liveGridApi', () => {
+	it('returns the api while the grid is alive', () => {
+		const api = { isDestroyed: () => false };
+		expect(liveGridApi(api)).toBe(api);
+	});
+
+	it('returns null once the grid is destroyed, so callers skip setFilterModel/sizeColumnsToFit', () => {
+		const setFilterModel = vi.fn();
+		const api = { isDestroyed: () => true, setFilterModel };
+		const live = liveGridApi(api);
+		live?.setFilterModel(null);
+		expect(live).toBeNull();
+		expect(setFilterModel).not.toHaveBeenCalled();
+	});
+
+	it('returns null for a missing api (no grid mounted)', () => {
+		expect(liveGridApi(null)).toBeNull();
+		expect(liveGridApi(undefined)).toBeNull();
+	});
+});
 
 function row(overrides: Partial<ContentItem>): ContentItem {
 	return {
@@ -17,7 +53,7 @@ function row(overrides: Partial<ContentItem>): ContentItem {
 		name: '',
 		addedByUserID: '1',
 		url: null,
-		contentType: 'YOUTUBE',
+		contentType: 'YOUTUBE_VIDEO',
 		length: null,
 		lengthUnits: null,
 		viewCount: null,
@@ -36,10 +72,54 @@ function row(overrides: Partial<ContentItem>): ContentItem {
 // ---------------------------------------------------------------------------
 // capitalizeContentType
 // ---------------------------------------------------------------------------
+describe('NUMERIC_COL_IDS (right-aligned columns)', () => {
+	it('names only real columns, so a rename cannot leave a stale id behind', () => {
+		const real = new Set(togglableColIds(true));
+		for (const id of NUMERIC_COL_IDS) expect(real.has(id), id).toBe(true);
+	});
+
+	it('covers every count, money, score and duration column', () => {
+		for (const id of [
+			'duration',
+			'views',
+			'likes',
+			'percentLiked',
+			'boxOffice',
+			'vsBudget',
+			'tmdbScore',
+			'budget',
+			'votes',
+		]) {
+			expect(NUMERIC_COL_IDS.has(id), id).toBe(true);
+		}
+	});
+
+	it('leaves text, dates and identifiers left-aligned', () => {
+		for (const id of [
+			'item',
+			'type',
+			'genre',
+			'rated',
+			'cast',
+			'released',
+			'publishDate',
+			'channel',
+			'tags',
+			'tmdbId',
+		]) {
+			expect(NUMERIC_COL_IDS.has(id), id).toBe(false);
+		}
+	});
+});
+
 describe('capitalizeContentType', () => {
 	it('capitalizes first letter and lowercases rest', () => {
-		expect(capitalizeContentType('YOUTUBE')).toBe('Youtube');
-		expect(capitalizeContentType('youtube_video')).toBe('Youtube_video');
+		expect(capitalizeContentType('CLAIM')).toBe('Claim');
+	});
+
+	it('shows youtube_video as "YouTube Video" in any casing', () => {
+		expect(capitalizeContentType('YOUTUBE_VIDEO')).toBe('YouTube Video');
+		expect(capitalizeContentType('youtube_video')).toBe('YouTube Video');
 	});
 
 	it('returns empty string for undefined', () => {
@@ -104,18 +184,37 @@ describe('durationComparator', () => {
 // Column-picker registry
 // ---------------------------------------------------------------------------
 describe('column-picker registry', () => {
-	it('DATA_COLUMNS holds the 12 user-togglable data columns', () => {
+	it('DATA_COLUMNS holds the 30 user-togglable data columns', () => {
 		expect(DATA_COLUMNS.map((c) => c.colId)).toEqual([
 			'type',
 			'category',
+			'genre',
+			'rated',
+			'cast',
 			'duration',
 			'views',
 			'likes',
 			'percentLiked',
+			'released',
+			'boxOffice',
+			'vsBudget',
+			'tmdbScore',
 			'publishDate',
 			'channel',
+			'user',
 			'tags',
 			'description',
+			'author',
+			'published',
+			'pages',
+			'rating',
+			'editions',
+			'readers',
+			'budget',
+			'votes',
+			'collection',
+			'synopsis',
+			'tmdbId',
 			'createdAt',
 			'updatedAt',
 		]);
@@ -141,13 +240,13 @@ describe('column-picker registry', () => {
 		}
 	});
 
-	it('togglableColIds(false) returns only the 12 data columns', () => {
+	it('togglableColIds(false) returns only the 30 data columns', () => {
 		expect(togglableColIds(false)).toEqual(DATA_COLUMNS.map((c) => c.colId));
 	});
 
-	it('togglableColIds(true) returns all 15 columns', () => {
+	it('togglableColIds(true) returns all 34 columns', () => {
 		const ids = togglableColIds(true);
-		expect(ids).toHaveLength(15);
+		expect(ids).toHaveLength(34);
 		expect(ids).toEqual([...DATA_COLUMNS.map((c) => c.colId), ...INTERNAL_COLUMNS.map((c) => c.colId)]);
 	});
 
@@ -168,6 +267,12 @@ describe('SORTABLE_COLUMNS', () => {
 		for (const col of SORTABLE_COLUMNS) {
 			expect(col.label.length).toBeGreaterThan(0);
 		}
+	});
+
+	it('includes the client-only Movie columns Released and TMDB Score', () => {
+		const ids = SORTABLE_COLUMNS.map((c) => c.colId);
+		expect(ids).toContain('released');
+		expect(ids).toContain('tmdbScore');
 	});
 
 	it('includes percentLiked — sortable in the grid, must stay sortable in the mobile/Loaded-mode picker too', () => {
@@ -261,7 +366,7 @@ describe('filterContentRows', () => {
 	});
 
 	it('filters by a text "contains" filter (e.g. the default type: youtube filter)', () => {
-		const rows = [row({ id: '1', contentType: 'YOUTUBE' }), row({ id: '2', contentType: 'CLAIM' })];
+		const rows = [row({ id: '1', contentType: 'YOUTUBE_VIDEO' }), row({ id: '2', contentType: 'CLAIM' })];
 		const result = filterContentRows(rows, { type: { filterType: 'text', type: 'contains', filter: 'youtube' } });
 		expect(result.map((r) => r.id)).toEqual(['1']);
 	});
@@ -309,8 +414,8 @@ describe('filterContentRows', () => {
 
 	it('applies multiple filters as AND', () => {
 		const rows = [
-			row({ id: '1', contentType: 'YOUTUBE', viewCount: 500 }),
-			row({ id: '2', contentType: 'YOUTUBE', viewCount: 5000 }),
+			row({ id: '1', contentType: 'YOUTUBE_VIDEO', viewCount: 500 }),
+			row({ id: '2', contentType: 'YOUTUBE_VIDEO', viewCount: 5000 }),
 			row({ id: '3', contentType: 'CLAIM', viewCount: 5000 }),
 		];
 		const result = filterContentRows(rows, {
@@ -324,5 +429,132 @@ describe('filterContentRows', () => {
 		const rows = [row({ id: '1' })];
 		const result = filterContentRows(rows, { notARealColumn: { filterType: 'text', type: 'contains', filter: 'x' } });
 		expect(result.map((r) => r.id)).toEqual(['1']);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// User column (adder's username, filled in client-side from the users list)
+// ---------------------------------------------------------------------------
+describe('user column', () => {
+	it('is offered in the sort picker', () => {
+		expect(SORTABLE_COLUMNS.map((c) => c.colId)).toContain('user');
+	});
+
+	it('sorts case-insensitively by username, ascending and descending', () => {
+		const rows = [
+			row({ id: 'a', addedByUsername: 'bob' }),
+			row({ id: 'b', addedByUsername: 'Ann' }),
+			row({ id: 'c', addedByUsername: 'cy' }),
+		];
+		const asc = [...rows].sort((x, y) => compareContentBySorts(x, y, [{ col: 'user', dir: 'asc' }]));
+		expect(asc.map((r) => r.id)).toEqual(['b', 'a', 'c']);
+		const desc = [...rows].sort((x, y) => compareContentBySorts(x, y, [{ col: 'user', dir: 'desc' }]));
+		expect(desc.map((r) => r.id)).toEqual(['c', 'a', 'b']);
+	});
+
+	it('sorts rows with no resolved username last in both directions', () => {
+		const rows = [row({ id: 'n', addedByUsername: null }), row({ id: 'a', addedByUsername: 'ann' })];
+		for (const dir of ['asc', 'desc'] as const) {
+			const sorted = [...rows].sort((x, y) => compareContentBySorts(x, y, [{ col: 'user', dir }]));
+			expect(sorted.map((r) => r.id)).toEqual(['a', 'n']);
+		}
+	});
+
+	it('filters by username substring, case-insensitively', () => {
+		const rows = [
+			row({ id: 'a', addedByUsername: 'Annabel' }),
+			row({ id: 'b', addedByUsername: 'bob' }),
+			row({ id: 'c', addedByUsername: null }),
+		];
+		const out = filterContentRows(rows, { user: { filterType: 'text', type: 'contains', filter: 'ANN' } });
+		expect(out.map((r) => r.id)).toEqual(['a']);
+	});
+});
+
+// Client-only sort columns (Released, TMDB Score)
+// ---------------------------------------------------------------------------
+describe('client-only sort columns', () => {
+	const movieRow = (id: string, releaseDate: string | null, voteAverage: number | null) =>
+		row({
+			id,
+			contentType: 'MOVIE',
+			response: { releaseDate, voteAverage, voteCount: voteAverage == null ? 0 : 1000 },
+		} as Partial<ContentItem>);
+	const rows = [movieRow('a', '2010-07-15', 8.4), movieRow('b', '1999-03-31', 7.1), movieRow('c', null, null)];
+	const ids = (sorts: { col: string; dir: 'asc' | 'desc' }[]) =>
+		[...rows].sort((x, y) => compareContentBySorts(x, y, sorts)).map((r) => r.id);
+
+	it('map to server sort keys, so All Items mode sorts them across every page', () => {
+		expect(COL_TO_SORT).toMatchObject({ released: 'RELEASE_DATE', tmdbScore: 'TMDB_SCORE' });
+		expect(CLIENT_ONLY_SORT_COLS).not.toContain('released');
+		expect(CLIENT_ONLY_SORT_COLS).not.toContain('tmdbScore');
+	});
+
+	it('Loaded mode offers them in the sort picker', () => {
+		const loaded = sortableColumnsFor('loaded').map((c) => c.colId);
+		expect(loaded).toContain('released');
+		expect(loaded).toContain('tmdbScore');
+	});
+
+	it('All Items mode offers them in the sort picker too', () => {
+		const all = sortableColumnsFor('all').map((c) => c.colId);
+		expect(all).toContain('released');
+		expect(all).toContain('tmdbScore');
+		expect(all).toContain('boxOffice');
+	});
+
+	it('sorts Released chronologically with unknown last in both directions', () => {
+		expect(ids([{ col: 'released', dir: 'asc' }])).toEqual(['b', 'a', 'c']);
+		expect(ids([{ col: 'released', dir: 'desc' }])).toEqual(['a', 'b', 'c']);
+	});
+
+	it('sorts TMDB Score numerically with unrated last in both directions', () => {
+		expect(ids([{ col: 'tmdbScore', dir: 'asc' }])).toEqual(['b', 'a', 'c']);
+		expect(ids([{ col: 'tmdbScore', dir: 'desc' }])).toEqual(['a', 'b', 'c']);
+	});
+
+	it('releasedComparator orders dates and keeps unknown last when descending', () => {
+		expect(releasedComparator('1999-01-01', '2010-01-01')).toBeLessThan(0);
+		expect(releasedComparator(null, '2010-01-01', null, null, false)).toBeGreaterThan(0);
+		expect(releasedComparator(null, '2010-01-01', null, null, true)).toBeLessThan(0); // AG negates for desc
+		expect(releasedComparator('garbage', null)).toBe(0);
+	});
+});
+
+describe('itemColumnHeader', () => {
+	it('is "Film" when the type filter is exactly MOVIE', () => {
+		expect(itemColumnHeader('movie')).toBe('Film');
+	});
+	it('is "Item" for other filters, multiple types, or none', () => {
+		expect(itemColumnHeader('youtube_video')).toBe('Item');
+		expect(itemColumnHeader('movie,youtube_video')).toBe('Item');
+		expect(itemColumnHeader(undefined)).toBe('Item');
+	});
+});
+
+describe('syncItemHeader (Film/Item header without closing an open filter popup)', () => {
+	function fakeApi(headerName: string) {
+		const colDef = { headerName };
+		const refreshHeader = vi.fn();
+		return { colDef, refreshHeader, api: { getColumn: () => ({ getColDef: () => colDef }), refreshHeader } };
+	}
+
+	it('renames and redraws when the name changes (Item -> Film)', () => {
+		const { colDef, refreshHeader, api } = fakeApi('Item');
+		expect(syncItemHeader(api, 'Film')).toBe(true);
+		expect(colDef.headerName).toBe('Film');
+		expect(refreshHeader).toHaveBeenCalledOnce();
+	});
+
+	it('does not redraw when the name is unchanged (any other filter edit)', () => {
+		const { refreshHeader, api } = fakeApi('Film');
+		expect(syncItemHeader(api, 'Film')).toBe(false);
+		expect(refreshHeader).not.toHaveBeenCalled();
+	});
+
+	it('does nothing when the Item column is missing', () => {
+		const refreshHeader = vi.fn();
+		expect(syncItemHeader({ getColumn: () => null, refreshHeader }, 'Film')).toBe(false);
+		expect(refreshHeader).not.toHaveBeenCalled();
 	});
 });

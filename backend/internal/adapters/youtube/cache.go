@@ -2,6 +2,7 @@ package youtube
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -15,32 +16,61 @@ type cacheEntry struct {
 	expiresAt time.Time
 }
 
-// CachingClient wraps a YouTubeClient with an in-memory, TTL-based cache
-// keyed by video ID. It exists to avoid burning YouTube API quota on repeat
-// lookups of the same video (re-adding a video someone else already added,
-// refreshing metadata, etc).
+// trendingEntry holds one cached page of the most-popular chart.
+type trendingEntry struct {
+	page      *services.TrendingPage
+	expiresAt time.Time
+}
+
+// ErrTrendingUnsupported is returned by GetTrending when the wrapped client
+// cannot fetch the most-popular chart.
+var ErrTrendingUnsupported = errors.New("youtube client does not support trending")
+
+// CachingClient wraps a YouTubeClient with an in-memory, TTL-based cache. It
+// exists to avoid burning YouTube API quota on repeat lookups:
+//   - GetVideoMetadata, keyed by video ID (re-adding a video someone else
+//     already added, refreshing metadata, etc).
+//   - GetTrending, keyed by region + page token, so every Discover visitor
+//     shares one videos.list call per page per TTL instead of making their own.
 //
 // The cache is in-memory and per-process only — not Postgres-backed, not
 // shared across replicas, and reset on every deploy/restart. That's an
-// accepted tradeoff; see FEATURE_BACKLOG.md's YouTube Search Proxy entry for
-// the fuller quota-sharing picture (search.list is unaffected — this only
-// caches GetVideoMetadata).
+// accepted tradeoff. Discover no longer calls search.list at all (search
+// hands off to youtube.com), so there is no search cache.
 type CachingClient struct {
 	inner services.YouTubeClient
 	ttl   time.Duration
 
-	mu    sync.Mutex
-	cache map[string]cacheEntry
+	trendingTTL time.Duration
+
+	mu       sync.Mutex
+	cache    map[string]cacheEntry
+	trending map[string]trendingEntry
+}
+
+// CachingOption configures a CachingClient.
+type CachingOption func(*CachingClient)
+
+// WithTrendingTTL sets how long a page of the most-popular chart is cached.
+// Zero or less disables trending caching. Defaults to the metadata TTL.
+func WithTrendingTTL(ttl time.Duration) CachingOption {
+	return func(c *CachingClient) { c.trendingTTL = ttl }
 }
 
 // NewCachingClient wraps inner with a TTL cache. A ttl of zero or less
-// disables caching — every call passes straight through to inner.
-func NewCachingClient(inner services.YouTubeClient, ttl time.Duration) *CachingClient {
-	return &CachingClient{
-		inner: inner,
-		ttl:   ttl,
-		cache: make(map[string]cacheEntry),
+// disables metadata caching — every call passes straight through to inner.
+func NewCachingClient(inner services.YouTubeClient, ttl time.Duration, opts ...CachingOption) *CachingClient {
+	c := &CachingClient{
+		inner:       inner,
+		ttl:         ttl,
+		trendingTTL: ttl,
+		cache:       make(map[string]cacheEntry),
+		trending:    make(map[string]trendingEntry),
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 // GetVideoMetadata returns cached metadata for videoID if present and not
@@ -91,4 +121,47 @@ func (c *CachingClient) GetVideoMetadata(ctx context.Context, videoID string) (*
 // API call, so there's nothing to cache.
 func (c *CachingClient) ExtractVideoID(url string) (string, error) {
 	return c.inner.ExtractVideoID(url)
+}
+
+// GetTrending returns a cached page of the most-popular chart if present and
+// not expired; otherwise it fetches from the wrapped client (which must also
+// implement services.YouTubeTrendingClient) and caches the result. Logged with
+// the same stable "event" field as GetVideoMetadata, under "youtube trending
+// cache".
+func (c *CachingClient) GetTrending(ctx context.Context, regionCode, pageToken string) (*services.TrendingPage, error) {
+	inner, ok := c.inner.(services.YouTubeTrendingClient)
+	if !ok {
+		return nil, ErrTrendingUnsupported
+	}
+	if c.trendingTTL <= 0 {
+		slog.Info("youtube trending cache", "event", "cache_disabled", "regionCode", regionCode)
+		return inner.GetTrending(ctx, regionCode, pageToken)
+	}
+
+	key := regionCode + "|" + pageToken
+
+	c.mu.Lock()
+	entry, hit := c.trending[key]
+	c.mu.Unlock()
+
+	if hit && time.Now().Before(entry.expiresAt) {
+		slog.Info("youtube trending cache", "event", "cache_hit", "regionCode", regionCode, "page", pageToken, "expiresIn", time.Until(entry.expiresAt).String())
+		return entry.page, nil
+	}
+
+	slog.Info("youtube trending cache", "event", "cache_miss", "regionCode", regionCode, "page", pageToken)
+
+	page, err := inner.GetTrending(ctx, regionCode, pageToken)
+	if err != nil {
+		return nil, err
+	}
+
+	c.mu.Lock()
+	c.trending[key] = trendingEntry{page: page, expiresAt: time.Now().Add(c.trendingTTL)}
+	size := len(c.trending)
+	c.mu.Unlock()
+
+	slog.Info("youtube trending cache", "event", "cache_store", "regionCode", regionCode, "page", pageToken, "ttl", c.trendingTTL.String(), "cacheSize", size)
+
+	return page, nil
 }

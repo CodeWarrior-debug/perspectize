@@ -36,6 +36,15 @@ quality := 85
 p.Quality = &quality
 ```
 
+## Privacy
+
+User-owned rows that other users can see carry a `privacy` column: `PUBLIC` / `PRIVATE` in Go and GraphQL (`domain.Privacy`), lowercase in the DB, `NOT NULL DEFAULT 'public'` with a `CHECK` (pattern: `000018_harden_perspective_privacy`).
+
+- **List reads** stay open (no `@auth`) and return public rows plus the viewer's own: the resolver sets `ViewerID` from `auth.ForContext`, the service sets `RestrictToPublicOrOwner`, the repository turns it into a WHERE predicate (`PerspectiveListParams`).
+- **By-id reads** return `null` for someone else's private row, never `FORBIDDEN`, so the id isn't confirmed to exist.
+- **Writes** stay owner-only (see `backend/CLAUDE.md` → Gotchas).
+- Origin: `docs/superpowers/specs/2026-09-09-perspective-privacy-design.md`.
+
 ## Request Flow
 
 ```

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { rangeToVerseIds } from '$lib/utils/bible';
 import { singleVerseRange, singleVerseReference } from '$lib/utils/verseJump';
-import { activityContentHref } from '$lib/utils/contentLinks';
+import { libraryContentHref } from '$lib/utils/contentLinks';
 
 const john316 = rangeToVerseIds({ bookId: 43, startChapter: 3, startVerse: 16, endChapter: 3, endVerse: 16 })!.startId;
 
@@ -27,9 +27,9 @@ describe('verseJump helpers', () => {
 	});
 });
 
-describe('activityContentHref', () => {
+describe('libraryContentHref', () => {
 	it('deep-links to the Activity page with ?open=<id>', () => {
-		expect(activityContentHref('42')).toBe('/?open=42');
-		expect(activityContentHref('a b')).toBe('/?open=a%20b');
+		expect(libraryContentHref('42')).toBe('/content-library?open=42');
+		expect(libraryContentHref('a b')).toBe('/content-library?open=a%20b');
 	});
 });

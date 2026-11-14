@@ -2,11 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import SettingsDialog from '$lib/components/SettingsDialog.svelte';
 import { createThemeStore } from '$lib/theme/store.svelte';
+import { setCoachForceOpen, getCoachForceOpen, getCoachReplayNonce } from '$lib/onboarding/coachGate.svelte';
 
-// Gap #15 in the UI gap audit: SET_ONBOARDING_DISPLAY_NEXT_SESSION was defined
-// and never called from anywhere in the app, so a user who dismissed
-// onboarding had no way to turn it back on. These tests cover the toggle this
-// component now wires up.
+// Settings → Restart onboarding replays the coach immediately (no next-session flag).
 
 const mocks = vi.hoisted(() => ({
 	mockQueryData: undefined as any,
@@ -58,45 +56,67 @@ function reset() {
 describe('SettingsDialog', () => {
 	beforeEach(reset);
 
-	it('renders the General section by default, with the onboarding toggle', () => {
+	it('renders the General section by default, with a Restart onboarding button', () => {
 		render(SettingsDialog, { props: { open: true, store: fakeStore } });
-		expect(screen.getByText('Show onboarding next session')).toBeTruthy();
-		expect(screen.getByRole('switch')).toBeTruthy();
+		expect(screen.getByText('Getting started')).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Restart onboarding' })).toBeTruthy();
 	});
 
-	it('reflects the signed-in user’s current onboarding.displayNextSession as the switch state', () => {
-		mocks.mockQueryData.me.onboarding.displayNextSession = true;
+	it('clicking Restart onboarding opens the coach immediately and closes the dialog', async () => {
+		setCoachForceOpen(false);
+		const before = getCoachReplayNonce();
 		render(SettingsDialog, { props: { open: true, store: fakeStore } });
-		expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('true');
+		await fireEvent.click(screen.getByRole('button', { name: 'Restart onboarding' }));
+		expect(getCoachForceOpen()).toBe(true);
+		expect(getCoachReplayNonce()).toBe(before + 1);
 	});
 
-	it('defaults to unchecked when displayNextSession is false', () => {
-		render(SettingsDialog, { props: { open: true, store: fakeStore } });
-		expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('false');
-	});
-
-	it('flipping the switch calls the mutation with the new value', async () => {
-		render(SettingsDialog, { props: { open: true, store: fakeStore } });
-		const toggle = screen.getByRole('switch');
-		await fireEvent.click(toggle);
-		expect(mocks.mockMutate).toHaveBeenCalledWith(true);
-	});
-
-	it('disables the switch while there is no signed-in user', () => {
+	it('disables Restart onboarding while there is no signed-in user', () => {
 		mocks.mockQueryData = undefined;
 		render(SettingsDialog, { props: { open: true, store: fakeStore } });
-		expect(screen.getByRole('switch')).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Restart onboarding' })).toBeDisabled();
 	});
 
-	it('disables the switch while the mutation is pending', () => {
-		mocks.mockMutationState.isPending = true;
+	it('has a Fonts section in the rail with a picker for each slot', async () => {
 		render(SettingsDialog, { props: { open: true, store: fakeStore } });
-		expect(screen.getByRole('switch')).toBeDisabled();
+		await fireEvent.click(screen.getByRole('button', { name: 'Fonts' }));
+		expect(screen.queryByRole('button', { name: 'Restart onboarding' })).toBeNull();
+		// The font list is lazy-loaded when the section opens.
+		expect(await screen.findByRole('combobox', { name: 'Headings' })).toBeTruthy();
+		expect(screen.getByRole('combobox', { name: 'Table cells' })).toBeTruthy();
+		expect(screen.getByRole('combobox', { name: 'Long-form reading' })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Editorial' })).toBeTruthy();
 	});
 
-	it('switches to the theme section and shows no onboarding toggle there', async () => {
+	it('a pairing applies all three slots at once', async () => {
+		localStorage.removeItem('perspectize-fonts');
+		render(SettingsDialog, { props: { open: true, store: fakeStore } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Fonts' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Editorial' }));
+		const saved = JSON.parse(localStorage.getItem('perspectize-fonts')!);
+		expect([saved.heading.family, saved.cell.family, saved.longform.family]).toEqual([
+			'Fraunces',
+			'Source Serif 4',
+			'Literata',
+		]);
+		expect(document.documentElement.hasAttribute('data-font-heading')).toBe(true);
+		expect(screen.getByRole('button', { name: 'Editorial' }).getAttribute('aria-pressed')).toBe('true');
+		await fireEvent.click(screen.getByRole('button', { name: 'Default' }));
+		expect(document.documentElement.hasAttribute('data-font-heading')).toBe(false);
+	});
+
+	it('Peek hides Settings behind a floating button that brings it back on the Fonts section', async () => {
+		render(SettingsDialog, { props: { open: true, store: fakeStore } });
+		await fireEvent.click(screen.getByRole('button', { name: 'Fonts' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Peek' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Back to Settings' }));
+		expect(screen.queryByRole('button', { name: 'Back to Settings' })).toBeNull();
+		expect(await screen.findByRole('combobox', { name: 'Headings' })).toBeTruthy();
+	});
+
+	it('switches to the theme section and shows no restart button there', async () => {
 		render(SettingsDialog, { props: { open: true, store: fakeStore } });
 		await fireEvent.click(screen.getByRole('button', { name: 'Customize Theme' }));
-		expect(screen.queryByText('Show onboarding next session')).toBeNull();
-	});
+		expect(screen.queryByRole('button', { name: 'Restart onboarding' })).toBeNull();
+	}, 15000); // even though it's not actually stuck. See frontend/CLAUDE.md. // suite's CPU contention that render can miss the default 5s budget // ThemeCustomizePanel mounts all 28 presets on click; under the full
 });

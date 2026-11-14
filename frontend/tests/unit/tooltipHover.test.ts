@@ -41,7 +41,26 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 	it('has an entry for every specced column id', () => {
 		// Limitation: asserts the map, not that ActivityTable columnDefs reference it (AG Grid does not render in jsdom).
 		expect(Object.keys(S).sort()).toEqual(
-			['category', 'description', 'item', 'likes', 'percentLiked', 'perspectize', 'tags', 'views'].sort(),
+			[
+				'author',
+				'boxOffice',
+				'budget',
+				'cast',
+				'category',
+				'description',
+				'duration',
+				'item',
+				'likes',
+				'percentLiked',
+				'perspectize',
+				'rating',
+				'readers',
+				'synopsis',
+				'tags',
+				'tmdbScore',
+				'views',
+				'vsBudget',
+			].sort(),
 		);
 		expect(S.perspectize).toBe(false);
 		for (const k of Object.keys(S) as (keyof typeof S)[]) expect(S[k]).toBeDefined();
@@ -53,6 +72,12 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 
 	it('item shows the name despite undefined value', () => {
 		expect(mk('item', { name: 'Vid' })).toMatchObject({ text: 'Vid', copy: 'Vid' });
+	});
+
+	it('duration names its format: h:mm for a movie runtime, m:ss for a short video', () => {
+		const movie = { length: 179 * 60, lengthUnits: 'seconds', lengthDisplay: { source: 'tmdb', precision: 'MINUTES' } };
+		expect(mk('duration', movie)).toMatchObject({ text: '2:59 (h:mm)', copy: '2:59' });
+		expect(mk('duration', { length: 227, lengthUnits: 'seconds' })).toMatchObject({ text: '3:47 (m:ss)' });
 	});
 
 	it('category shows the primary category label', () => {
@@ -81,6 +106,20 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 
 	it('tags with items is multi with no copy', () => {
 		expect(mk('tags', { tags: ['a', 'b'] })).toMatchObject({ mode: 'multi', items: ['a', 'b'], copy: null, text: '' });
+	});
+
+	it('tags carry no copyValues (label is copied)', () => {
+		expect(mk('tags', { tags: ['a'] })).not.toHaveProperty('copyValues');
+	});
+
+	it('cast rows show role + TMDB id but copyValues are bare names', () => {
+		const data = {
+			contentType: 'MOVIE',
+			movie: { directors: [{ id: 1, name: 'Gus Van Sant' }], cast: [{ id: 880, name: 'Ben Affleck', character: 'Chuckie', order: 0 }] },
+		};
+		const s = mk('cast', data);
+		expect(s?.items).toEqual(['Gus Van Sant · Director · TMDB #1', 'Ben Affleck · as Chuckie · TMDB #880']);
+		expect(s?.copyValues).toEqual(['Gus Van Sant', 'Ben Affleck']);
 	});
 
 	it('tags empty or missing gives No tags', () => {

@@ -1,319 +1,154 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-09-04
+**Analysis Date:** 2026-11-01
 
-This monorepo has two independent test suites: **Go backend** (`backend/test/`, `testify` + stdlib `testing`) and **SvelteKit frontend** (`frontend/tests/`, Vitest + Testing Library + Playwright browser mode).
+## Test Framework
 
----
+**Backend:**
+- Go `testing` + `github.com/stretchr/testify` (`assert`, `require`); gqlgen test client; go-sqlmock for GORM-level tests.
+- Config: `backend/Makefile`, CI in `.github/workflows/ci.yml`.
 
-## Backend: Go Testing
+**Frontend:**
+- Vitest 4 (`vitest.config` projects defined in `frontend/vite.config.ts`): `unit` project (jsdom, globals, `tests/setup.ts`) and `browser` project (`frontend/vitest.config.browser.ts`, Playwright/Chromium via `@vitest/browser-playwright`, `vitest-browser-svelte`).
+- `@testing-library/svelte` + `@testing-library/jest-dom`.
+- E2E: Playwright demo tours in `frontend/demo/` (`flows/`, `tours/`, `playwright.config.ts`) against the Docker demo stack.
 
-### Test Framework
-
-**Runner:** Go stdlib `testing` package, run via `make test` (wraps `go test ./...`).
-
-**Assertion library:** `github.com/stretchr/testify` — `assert` (soft, continues on failure) and `require` (fatal, stops test on failure).
-
-**Run commands:**
+**Run Commands:**
 ```bash
-cd backend
-make test              # All tests
-make test-coverage     # Coverage → coverage.html / coverage.out
-go test ./...          # Equivalent to make test
-go test ./test/services/... -run TestGetByID_Success   # Single test
+# backend/
+make test                      # go test -v -cover -coverpkg=./internal/...,./pkg/... ./...
+make test-coverage             # coverage.out + coverage.html
+go test -p 1 -race ./...       # what CI runs (serial: retention tests sweep shared tables)
+go vet -tags perf ./internal/perf/...   # CI compiles the build-tagged perf harness
+make mutate / make mutate-diff # Gremlins mutation testing (slow; always via make)
+
+# frontend/
+pnpm run test:run              # unit project once (verification/CI)
+pnpm run test                  # watch
+pnpm run test:coverage         # v8 coverage, unit project only
+pnpm run test:browser          # real-browser project (VITEST_BROWSER_VIDEO=1 records video)
+pnpm run demo:test             # Playwright E2E vs demo stack (also `make demo-test` at root)
+pnpm run mutate                # Stryker (config stryker.config.json)
+pnpm run test:duplication      # jscpd
 ```
+Per project preference, run targeted tests while iterating (`pnpm exec vitest run tests/components/X.test.ts`), full suites before a push.
 
-### Test File Organization
+## Test File Organization
 
-**Location:** Centralized under `backend/test/`, mirroring the package structure being tested — NOT co-located with source files.
-```
-backend/test/
-├── config/config_test.go
-├── database/postgres_test.go
-├── domain/{content,errors,perspective,user}_test.go
-├── graphql/intid_test.go
-├── resolvers/{content_resolver,me_resolver,helpers}_test.go
-├── services/{content_service,perspective_service,user_service}_test.go
-├── services/{content_service_bench,perspective_service_bench}_test.go
-└── youtube/{cache,client,parser}_test.go
-```
+**Backend:**
+- Black-box tests in `backend/test/<area>/` using external packages (`package services_test`): `test/services/`, `test/resolvers/`, `test/repositories/`, `test/domain/`, `test/config/`, `test/database/`, `test/realtime/`, `test/messaging/` (websocket E2E), `test/graphql/`, `test/youtube/`, `test/roundtrips/`.
+- White-box tests co-located for unexported code: `internal/core/services/perspective_service_test.go` (`package services`), `internal/adapters/graphql/resolvers/helpers_edges_test.go`, `internal/config/demo_internal_test.go`.
+- Benchmarks: `*_bench_test.go` (`test/services/content_service_bench_test.go`).
+- Query-count helper: `backend/internal/perf/querycount`; opt-in whole-request harness `internal/perf/` behind `-tags perf`.
 
-**Naming:** `<source_area>_test.go`, e.g. `content_service.go` (source) → `test/services/content_service_test.go`. Benchmark files use `_bench_test.go` suffix. Package declared as `<area>_test` (e.g. `package services_test`), forcing tests to only use the package's exported API — no internal white-box access.
+**Frontend:**
+- `frontend/tests/components/<Component>.test.ts` (component rendering), `frontend/tests/unit/<topic>.test.ts` (utils, hooks, cache contracts, parity checks), `frontend/tests/browser/*.test.ts` (real browser, mocks in `tests/browser/mocks/`), `frontend/tests/helpers/` (shared wrappers), `frontend/tests/fixtures/`.
+- Global setup `frontend/tests/setup.ts`.
 
-### Test Structure
+## Test Structure
 
-**Flat `TestXxx` functions**, not `t.Run` table-driven by default (though `t.Run` is used where the project-conventions skill recommends it for validation-heavy cases). Naming pattern is `Test<Method>_<Scenario>`:
+**Go (table/mocks, testify):**
 ```go
-func TestGetByID_Success(t *testing.T) { ... }
-func TestGetByID_NotFound(t *testing.T) { ... }
-func TestGetByID_InvalidID_Zero(t *testing.T) { ... }
-func TestGetByID_InvalidID_Negative(t *testing.T) { ... }
-func TestGetByID_RepositoryError(t *testing.T) { ... }
-```
-Tests are grouped in the file with `// --- MethodName Tests ---` comment banners.
-
-**Assertion patterns:**
-```go
-require.NoError(t, err)             // fatal — stop test if setup/precondition fails
-assert.Equal(t, expected, result)   // soft — collect all failures
-assert.True(t, errors.Is(err, domain.ErrInvalidInput))
-assert.Contains(t, err.Error(), "content id must be a positive integer")
-```
-`require` is used immediately after an operation whose failure would make later assertions meaningless (e.g. `require.NoError` before inspecting the result); `assert` is used for the actual behavioral checks.
-
-### Mocking
-
-**No mocking framework/codegen** (no gomock/mockery). Mocks are **hand-written structs with function fields**, implementing the port interface directly, defined at the top of the relevant `_test.go` file:
-```go
-type mockContentRepository struct {
-    createFn           func(ctx context.Context, content *domain.Content) (*domain.Content, error)
-    getByIDFn          func(ctx context.Context, id int) (*domain.Content, error)
-    getByURLFn         func(ctx context.Context, url string) (*domain.Content, error)
-    getOrCreateByURLFn func(ctx context.Context, content *domain.Content, refreshOnConflict bool) (*domain.Content, bool, error)
-    updateMetadataFn   func(ctx context.Context, id int, name string, response json.RawMessage, length *int) (*domain.Content, error)
-    listFn             func(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)
-}
-
-func (m *mockContentRepository) GetByID(ctx context.Context, id int) (*domain.Content, error) {
-    if m.getByIDFn != nil {
-        return m.getByIDFn(ctx, id)
-    }
-    return nil, domain.ErrNotFound   // sensible zero-value default
+func TestSanitizeReview_StripsScriptTags(t *testing.T) {
+	in := `<p>hello</p><script>alert(1)</script>`
+	got := sanitizeReview(in)
+	assert.Equal(t, "<p>hello</p>", got)
 }
 ```
-Each test only sets the `*Fn` fields it needs; unset fields fall back to a default (usually `domain.ErrNotFound` or a no-op). This lets call-site assertions run inside the mock function itself:
-```go
-getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
-    assert.Equal(t, 1, id)   // assert on the args the service passed in
-    return expected, nil
-},
-```
+- Name: `Test<Unit>_<Behaviour>`. `require` for preconditions that must stop the test, `assert` for checks.
+- Use `t.Helper()` in helpers; `t.Setenv("KEY", "")` to isolate config (see `clearConfigEnvVars` in `test/config/config_test.go`).
+- Errors asserted with `errors.Is` against `domain.Err*` sentinels (`test/domain/errors_test.go`).
 
-**Gotcha (documented in backend `CLAUDE.md`):** adding a method to a port interface (e.g. `ListAll` on `UserRepository`) breaks compilation of every mock implementing that interface — grep `test/` and update all mocks when extending a port.
-
-**What's mocked:** repository ports (`repositories.ContentRepository`), external service ports (`portservices.YouTubeClient`). What's NOT mocked: the service under test itself (real `services.ContentService`), domain logic, error values.
-
-### Fixtures and Factories
-
-No dedicated fixture/factory package — test data is constructed inline as literal `&domain.Content{...}` / `&portservices.VideoMetadata{...}` structs per test. Shared helpers (e.g. `clearConfigEnvVars`) live alongside the tests that need them, e.g. `test/config/config_test.go`.
-
-### Coverage
-
-No enforced coverage threshold for backend (unlike frontend). View coverage:
-```bash
-make test-coverage   # generates backend/coverage.html and coverage.out
-```
-
-### Test Types
-
-**Unit tests** (`test/services/`, `test/domain/`, `test/graphql/`): mock all dependencies, no real DB/network. This is the large majority of the suite.
-
-**Integration tests** (`test/database/postgres_test.go`): connect to a real PostgreSQL instance; **auto-skip via `t.Skip()`** when the DB is unavailable rather than failing:
-```go
-db, err := database.ConnectGORM(dsn, poolCfg)
-if err != nil {
-    t.Skip("Skipping test - PostgreSQL not available. Run 'make docker-up' to start database.")
-}
-```
-
-**Env isolation:** tests that load config must explicitly clear relevant env vars with `t.Setenv("KEY", "")` to avoid bleed-through from the developer's shell/CI env — see `clearConfigEnvVars` helper in `test/config/config_test.go`.
-
-**Benchmarks:** `test/services/content_service_bench_test.go`, `perspective_service_bench_test.go` — standard `func BenchmarkXxx(b *testing.B)`, run via `go test -bench=.`.
-
-### Common Patterns
-
-**Error-path testing via `errors.Is` against domain sentinels:**
-```go
-result, err := svc.GetByID(context.Background(), 0)
-assert.Nil(t, result)
-require.Error(t, err)
-assert.True(t, errors.Is(err, domain.ErrInvalidInput))
-assert.Contains(t, err.Error(), "content id must be a positive integer")
-```
-
-**Dual-return semantics testing** (e.g. "already exists" returns both a non-nil result AND an error):
-```go
-result, err := svc.CreateFromYouTube(context.Background(), canonicalURL, 1)
-require.NotNil(t, result)
-require.Error(t, err)
-assert.True(t, errors.Is(err, domain.ErrAlreadyExists))
-```
-
-**Capturing call arguments via closures** to assert what the service passed downstream (see `capturedID`/`capturedName`/`capturedLength` pattern in `content_service_test.go` `TestUpdateSourceData_Success`).
-
----
-
-## Frontend: Vitest Testing
-
-### Test Framework
-
-**Runner:** Vitest, configured as **two projects** inside `frontend/vite.config.ts` (`test.projects`):
-- `unit` project — jsdom environment, `tests/**/*.{test,spec}.{js,ts}` excluding `tests/browser/**`
-- `browser` project — real Chromium via `@vitest/browser-playwright`, defined separately in `frontend/vitest.config.browser.ts`, scope `tests/browser/**/*.test.ts`
-
-**Component testing:** `@testing-library/svelte` (+ `@testing-library/jest-dom/vitest` matchers).
-
-**Run commands** (from `frontend/`, or `pnpm --dir frontend`):
-```bash
-pnpm run test            # unit project, watch mode
-pnpm run test:run        # unit project, single run (CI/verification)
-pnpm run test:browser    # browser project, single run (real Chromium, AG Grid etc.)
-pnpm run test:browser:watch
-pnpm run test:all        # both projects
-pnpm run test:coverage   # unit project + v8 coverage
-```
-`pnpm exec`/`pnpm run` must be invoked from `frontend/` (or with `--dir frontend`) — running from repo root fails with `ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE`.
-
-### Test File Organization
-
-**Location:** Parallel `tests/` tree, NOT co-located with `src/`:
-```
-frontend/tests/
-├── setup.ts                      # global mocks (see below), loaded for the `unit` project
-├── unit/                         # pure logic: utils, hooks, stores, formatting
-│   ├── hooks-useCreateClaim.test.ts
-│   ├── formatting.test.ts
-│   ├── grid-config.test.ts
-│   └── ...
-├── components/                   # Svelte component rendering tests
-│   ├── ActivityTable.test.ts
-│   ├── FilterBar.test.ts
-│   └── fixtures/SearchBarHost.svelte   # per-test host component when needed
-├── browser/                      # real-browser (Playwright) tests, own project config
-│   ├── ag-grid-integration.test.ts
-│   ├── mocks/{app-environment,app-navigation,app-stores}.ts
-│   └── fixtures/AGGridTestHarness.svelte
-├── fixtures/                     # (currently empty except .gitkeep)
-└── helpers/
-    ├── render.ts                 # renderComponent() + expectClasses() helpers
-    └── TestWrapper.svelte        # dynamic-component test wrapper
-```
-
-**Naming:** `<subject>.test.ts`, hook tests prefixed `hooks-` (`hooks-useCreateClaim.test.ts`, `hooks-useAddVideo.test.ts`), query-layer tests prefixed `queries-` (`queries-content.test.ts`, `queries-keys.test.ts`).
-
-### Test Structure
-
-Standard Vitest BDD-style `describe`/`it`, nested by scenario group:
+**TypeScript (Vitest):**
 ```ts
-import { describe, it, expect } from 'vitest';
-import { formatDuration } from '$lib/utils/formatting';
-
-describe('formatDuration', () => {
-    it('returns dash for null length', () => {
-        expect(formatDuration(null, null)).toBe('—');
-    });
-    it('formats seconds as minutes:seconds', () => {
-        expect(formatDuration(300, 'seconds')).toBe('5:00');
-    });
+describe('FilterChips', () => {
+	beforeEach(() => { vi.clearAllMocks(); });
+	it('renders a chip for a number filter', () => {
+		renderChips({ views: { filterType: 'number', type: 'greaterThan', filter: 1000 } });
+		expect(screen.getByText('Views:')).toBeInTheDocument();
+	});
 });
 ```
-For hook tests, nested `describe` blocks group by concern (`'hook initialization'`, `'mutationFn'`, `'onSuccess callback'`, `'onError callback'`), each with its own `beforeEach` re-invoking the hook under test.
+- Small `renderX(props)` factory per file wraps `render(Component, { props })`; shared `renderComponent` in `tests/helpers/render.ts`.
+- `vi.clearAllMocks()` in `beforeEach`; each distinct UI state gets its own `it` (empty, each filter type, open/closed, loading/error).
 
-**Component render helper** (`tests/helpers/render.ts`):
-```ts
-export function renderComponent<T extends Record<string, any>>(
-    component: Component<T>,
-    props?: Partial<T>,
-): RenderResult<Component<T>> {
-    // @ts-expect-error - Testing Library type mismatch with Svelte 5
-    return render(component, props ? { props } : {});
+## Mocking
+
+**Backend:** hand-written mocks of port interfaces with function fields and sensible defaults; no mock framework.
+```go
+type mockUserRepository struct {
+	getByIDFn func(ctx context.Context, id int) (*domain.User, error)
 }
-
-export function expectClasses(element: HTMLElement, ...classes: string[]) { ... }
+func (m *mockUserRepository) GetByID(ctx context.Context, id int) (*domain.User, error) {
+	if m.getByIDFn != nil { return m.getByIDFn(ctx, id) }
+	return nil, domain.ErrNotFound
+}
 ```
+Seen in `test/services/user_service_test.go` and `test/resolvers/helpers_test.go` (`mockContentRepository`). Adding a method to a port interface requires updating every mock in `test/`.
 
-### Mocking
-
-**`vi.mock` + `vi.hoisted`** for module-level mocks that need to be referenced inside the mock factory (avoids the hoisting trap where `vi.mock` factories run before top-level `const` declarations):
+**Frontend:**
+- Global mocks in `tests/setup.ts`: `$app/environment`, `$app/navigation`, `$app/state` (exports mutable `mockPageState`), `$app/stores`, favicon asset, `IntersectionObserver` (fires immediately), `localStorage` (in-memory class), `matchMedia`.
+- Hook tests mock `@tanstack/svelte-query` and capture options (`tests/unit/hooks-useAddMovie.test.ts`):
 ```ts
-const { mockMutate, mockInvalidateQueries, mockToastSuccess, mockToastError } = vi.hoisted(() => ({
-    mockMutate: vi.fn(),
-    mockInvalidateQueries: vi.fn(),
-    mockToastSuccess: vi.fn(),
-    mockToastError: vi.fn(),
-}));
-
-let capturedMutationOptions: any;
-
+const { mockGraphqlRequest } = vi.hoisted(() => ({ mockGraphqlRequest: vi.fn() }));
+vi.mock('$lib/queries/client', () => ({ graphqlRequest: mockGraphqlRequest }));
 vi.mock('@tanstack/svelte-query', () => ({
-    createMutation: vi.fn((optionsFn: () => any) => {
-        capturedMutationOptions = optionsFn();   // capture the function-wrapper options for direct invocation
-        return { mutate: mockMutate, isPending: false };
-    }),
-    useQueryClient: vi.fn(() => ({ invalidateQueries: mockInvalidateQueries })),
+	createMutation: vi.fn((optionsFn) => { capturedMutationOptions = optionsFn(); return { mutate: vi.fn(), isPending: false }; }),
+	useQueryClient: vi.fn(() => ({ invalidateQueries: mockInvalidateQueries })),
 }));
-
-vi.mock('svelte-sonner', () => ({ toast: { success: mockToastSuccess, error: mockToastError } }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
 ```
-Hooks are then dynamically imported inside each test (`await import('$lib/queries/hooks/useCreateClaim')`) after mocks are registered, and `capturedMutationOptions.onSuccess()` / `.onError(new Error(...))` are invoked directly to test callback branches without going through real TanStack Query internals.
+- A component importing a new `useX` hook needs that hook `vi.mock`ed in its component test (no QueryClient provider is rendered).
+- Stub child components with `tests/helpers/*.svelte` (`FakeCommentsEditor`, `Passthrough`, `TestWrapper`, ...).
+- Browser project aliases `svelte-clerk` and `$app/*` to `tests/browser/mocks/`.
 
-**Global mocks** in `tests/setup.ts` (auto-loaded for the `unit` project via `setupFiles`):
-- `$app/environment`, `$app/navigation`, `$app/state`, `$app/stores` — SvelteKit runtime mocked so components can render outside a real app shell. `mockPageState` is exported mutable so individual tests can override the current URL.
-- `IntersectionObserver` — custom mock that fires `isIntersecting: true` synchronously on `observe()`, so lazy-loading components (e.g. `VideoCard` thumbnails) render real content immediately without simulating scroll.
-- `localStorage` — hand-rolled `Map`-backed `Storage` implementation (Node's native webstorage global shadows jsdom's real one in this environment and is non-functional without a `--localstorage-file` flag).
-- `window.matchMedia` — defaults `matches: false` (desktop) so responsive components don't need per-test setup unless testing mobile breakpoints.
+**Do not mock:** the database in repository/round-trip tests; the real `QueryClient` in cache-contract tests; the real Postgres in `test/roundtrips`.
 
-**What NOT to mock:** pure utility functions under test (`$lib/utils/*`) are called directly/unmocked; only their external dependencies (network, toast, SvelteKit runtime) are mocked.
+## Fixtures and Factories
 
-### Fixtures and Factories
+- Backend: `test/repositories/helpers_test.go` (`openTestDB`, `mustCreateUser` with nanosecond-salted unique names for a persistent DB), `test/roundtrips` harness (`newHarness`, `h.user`, `h.content`, `h.roundTrips`), `test/messaging/harness_test.go`; demo fixtures in `internal/demo/fixtures.go`.
+- Frontend: `frontend/tests/fixtures/`, `frontend/tests/browser/fixtures/`, `frontend/demo/fixtures.ts`.
 
-No dedicated factory library — inline object literals per test, following the same GraphQL-shaped data as backend responses (e.g. `{ createClaim: { id: '1', text: 'Test claim', userID: '42' } }`). Component-specific host/wrapper fixtures live beside their tests: `tests/components/fixtures/SearchBarHost.svelte`, `tests/browser/fixtures/AGGridTestHarness.svelte`.
+## Coverage
 
-**Dynamic component test wrapper gotcha (`tests/helpers/TestWrapper.svelte`):** pass the component under test as a dotted-member expression, `<wrapped.Comp {...props} />`. A bare `<component>` or `.default` renders nothing (empty comment placeholder) and can make assertions pass vacuously — see `frontend/CLAUDE.md` "Testing Gotchas" and prior regression in `tests/components/ActivityTable.test.ts`.
+- Backend: no enforced threshold; `-coverpkg=./internal/...,./pkg/...`; CI uploads `coverage.out` to Codecov (non-blocking).
+- Frontend: v8 thresholds in `frontend/vite.config.ts`: lines 80, functions 75, branches 75, statements 80. Excluded: `src/routes/**`, `src/lib/components/shadcn/**`, `ActivityTable.svelte`, `theme/ColorWheel.svelte`, `tests/helpers/**`, configs.
+- Mutation testing: Gremlins (backend) and Stryker (frontend). A run with nothing surviving is a harness bug; report killed/lived/not-covered and the all-in figure.
 
-### Coverage
+## Test Types
 
-**Enforced thresholds** (`vite.config.ts`, `unit` project, v8 provider):
-```ts
-coverage: {
-    provider: 'v8',
-    reporter: ['text', 'json', 'html'],
-    exclude: [
-        'node_modules/', '.svelte-kit/', '**/*.d.ts', '**/*.config.*', '**/setup.ts',
-        'tests/helpers/**', 'src/lib/components/shadcn/**', 'src/routes/**',
-        'src/lib/components/ActivityTable.svelte',   // excluded — see AG Grid testing strategy below
-    ],
-    thresholds: { lines: 80, functions: 75, branches: 75, statements: 80 },
-}
+**Unit:** mock ports/hooks, no DB (`test/services`, `tests/unit`, `tests/components`).
+
+**Integration:** `openTestDB` reads `DATABASE_URL` and calls `t.Skip("Skipping - PostgreSQL not available")` when absent, so a green local run can mean nothing ran. Never point at the shared Neon DB; in cloud use a local `testdb` and `go test -p 1 ./...`. Some resolver tests are `t.Skip` placeholders for unexported helpers (`test/resolvers/helpers_test.go`).
+
+**Query budget (REQUIRED for DB/data-fetching changes):**
+```go
+c := querycount.Attach(t, db)
+_, _ = repo.GetByIDs(ctx, seqIDs(50))
+c.AssertExactly(t, 1)
 ```
-View coverage: `pnpm run test:coverage` → HTML report in `frontend/coverage/`.
+- Batch methods: same count for 1 and 50 inputs, 0 for empty. Dataloaders: N loads -> 1 service call. Whole-request counts pinned in `test/roundtrips` (`h.roundTrips(2, token, query, vars)`; `RT_MEASURE=1` prints statements). Matchers expect `= ANY(CAST(? AS bigint[]))`.
+- Frontend: `tests/helpers/queryBudget.ts` (`makeClient`, `countingFetch`, `mountConsumers`, `seed`, `invalidationOutcome`) with a REAL `QueryClient`; examples in `tests/unit/query-cache-contract.test.ts`. Assert fetch count, `staleTime`, `hashKey` changes per variable, and both `invalidated` and `untouched` after a mutation (mocked `invalidateQueries` alone is insufficient).
 
-### Test Types
+**E2E:** Playwright (`frontend/demo/`), run in CI job `demo-e2e` via `pnpm run demo:test`; browser-mode component tests in `frontend/tests/browser/` (AG Grid integration, demo sign-in). Screenshots/video land in `SV_SCREENSHOTS_DIR`.
 
-**Unit tests** (`tests/unit/`): pure functions (formatting, ratings, grid-config, URL state), hooks (TanStack Query mutations), stores, GraphQL query-key builders. Majority of the suite; run in jsdom, fast.
+**CI:** `.github/workflows/ci.yml` (Go tests with `-race`, Postgres, migrations on a CI DB, `go build`, `gofmt`, `go vet -tags perf`), `.github/workflows/frontend-test.yml`, `.github/workflows/mutation.yml`.
 
-**Component tests** (`tests/components/`): render real Svelte 5 components via Testing Library + jsdom, assert DOM output/classes/interaction.
+## Common Patterns
 
-**Browser tests** (`tests/browser/`, separate `vitest.config.browser.ts` project): real Chromium via Playwright provider — needed specifically for AG Grid, which does not render/initialize in jsdom (no Grid API, no lifecycle hooks, no cell rendering). AG Grid logic is instead extracted into plain TS in `$lib/utils/grid-config.ts` and `$lib/utils/formatting.ts` and unit-tested there; only true grid integration (filter UI, sort clicks, responsive `$effect` column visibility) goes through browser mode or (future) Playwright E2E.
+**Async (Vitest):** `await import('$lib/queries/content/useAddMovie')` after mocks are set; `await vi.waitFor(() => {...})` for settling; `await capturedMutationOptions.mutationFn(arg)` to drive hook logic.
 
-**E2E:** Not present as a separate framework — Vitest Browser Mode fills this role currently (see AG Grid testing strategy note above).
-
-### Known Limitations / Gotchas
-
-- **Date/timezone:** `formatDate`/`formatDateCompact` use `toLocaleDateString` (local TZ) — always seed test dates at midday UTC (`T12:00:00Z`), never midnight, to avoid the date shifting to the previous day in US timezones. See `formatDateTime` test comment referencing this.
-- **AG Grid cell renderers** inherit `white-space: nowrap` from `.ag-cell` — DOM assertions on wrapping/clamped text need to account for an explicit `whitespace-normal` override on the element under test.
-- Coverage thresholds exclude `ActivityTable.svelte` and all `shadcn/` primitives and `src/routes/**` — do not expect these to move the coverage numbers; new business logic should go in `$lib/utils/`, `$lib/queries/`, or extracted, coverage-counted components instead.
-
-### Common Patterns
-
-**Async/callback testing (mutation `onSuccess`/`onError`):**
-```ts
-capturedMutationOptions.onSuccess();
-expect(mockToastSuccess).toHaveBeenCalledWith('Claim created');
-expect(mockInvalidateQueries).toHaveBeenCalledWith(
-    expect.objectContaining({ queryKey: expect.arrayContaining(['content', 'list']) })
-);
+**Error testing (Go):**
+```go
+wrapped := fmt.Errorf("something failed: %w", domain.ErrNotFound)
+assert.True(t, errors.Is(wrapped, domain.ErrNotFound))
 ```
 
-**Error-message-based branching test (case-insensitive substring match on caught error):**
-```ts
-capturedMutationOptions.onError(new Error('PARENT CONTENT NOT FOUND in the database'));
-expect(mockToastError).toHaveBeenCalledWith('Parent content not found');
-```
+**gqlgen client:** decode targets must declare every selected field (or use `map[string]json.RawMessage`); `first` defaults to a non-nil `10`.
 
-**Pure-function edge-case sweep (null/empty/boundary values are always tested explicitly)** — see `formatting.test.ts` `describe('formatCount', ...)`, `describe('getSourceDataCooldown', ...)` for the TTL-boundary-exactly pattern.
+**Flaky known:** `AddVideoDialog` success-state test can time out under the full suite but passes in isolation.
+
+**When a UI test is worth adding:** only for stateful components; name each state covered. Single-state static visuals need none.
 
 ---
 
-*Testing analysis: 2026-09-04*
+*Testing analysis: 2026-11-01*

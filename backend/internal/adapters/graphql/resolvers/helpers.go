@@ -3,16 +3,108 @@ package resolvers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/dataloader"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model"
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/tmdb"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
+
+// movieSearchPageToModel maps one TMDB search page to the GraphQL shape. The
+// canonical url is what createContentFromMovie takes, so the add path dedupes
+// the same way as a pasted link. Items is never null.
+func movieSearchPageToModel(page *portservices.MovieSearchPage) *model.MovieSearchPage {
+	out := &model.MovieSearchPage{
+		Items:        make([]*model.MovieSearchResult, 0, len(page.Items)),
+		Page:         page.Page,
+		TotalPages:   page.TotalPages,
+		TotalResults: page.TotalResults,
+	}
+	for _, item := range page.Items {
+		out.Items = append(out.Items, &model.MovieSearchResult{
+			TmdbID:      item.TMDBID,
+			Title:       item.Title,
+			ReleaseDate: item.ReleaseDate,
+			Overview:    item.Overview,
+			PosterPath:  item.PosterPath,
+			VoteAverage: item.VoteAverage,
+			URL:         tmdb.CanonicalMovieURL(item.TMDBID),
+		})
+	}
+	return out
+}
+
+// bookWorksURLPrefix is the canonical Open Library work URL prefix, used to
+// build BookSearchResult.URL the same way ContentService.CreateFromBook
+// builds the content row's canonical URL.
+const bookWorksURLPrefix = "https://openlibrary.org/works/"
+
+// bookSearchResultToModel maps one Open Library work result to the GraphQL
+// shape, deriving the canonical URL from the work key the same way
+// ContentService's own canonicalBookURL does — createContentFromBook takes
+// that URL, so the add path dedupes the same way as a pasted link.
+func bookSearchResultToModel(r portservices.BookSearchResult) *model.BookSearchResult {
+	return &model.BookSearchResult{
+		WorkKey:          r.WorkKey,
+		Title:            r.Title,
+		AuthorName:       stringsOrEmpty(r.AuthorName),
+		CoverID:          r.CoverID,
+		FirstPublishYear: r.FirstPublishYear,
+		PageCountMedian:  r.PageCountMedian,
+		Subjects:         stringsOrEmpty(r.Subjects),
+		RatingsAverage:   r.RatingsAverage,
+		RatingsCount:     r.RatingsCount,
+		EditionCount:     r.EditionCount,
+
+		WantToReadCount:       r.WantToReadCount,
+		CurrentlyReadingCount: r.CurrentlyReadingCount,
+		AlreadyReadCount:      r.AlreadyReadCount,
+		ReadingLogCount:       r.ReadingLogCount,
+
+		URL: bookWorksURLPrefix + r.WorkKey,
+	}
+}
+
+// bookSearchPageToModel maps one Open Library search/trending page to the
+// GraphQL shape. Items is never null.
+func bookSearchPageToModel(page *portservices.BookSearchPage) *model.BookSearchPage {
+	out := &model.BookSearchPage{
+		Items:        make([]*model.BookSearchResult, 0, len(page.Items)),
+		Page:         page.Page,
+		TotalPages:   page.TotalPages,
+		TotalResults: page.TotalResults,
+	}
+	for _, item := range page.Items {
+		out.Items = append(out.Items, bookSearchResultToModel(item))
+	}
+	return out
+}
+
+// hyphenatedISBNRe matches a string made only of digits, X/x and hyphens —
+// shaped like a human-entered ISBN-10/13 (e.g. "978-0-434-74002-4").
+var hyphenatedISBNRe = regexp.MustCompile(`^[0-9Xx-]+$`)
+
+// normalizeHyphenatedISBN strips hyphens from a raw ISBN-shaped input before
+// it reaches ContentService: its isbnRe only matches bare-digit ISBN-10/13,
+// so a hyphenated ISBN would otherwise be misclassified and rejected with
+// ErrInvalidInput (Task 5 review finding). Input that isn't ISBN-shaped (an
+// Open Library work URL, or an already bare ISBN) passes through unchanged.
+func normalizeHyphenatedISBN(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if strings.Contains(trimmed, "-") && hyphenatedISBNRe.MatchString(trimmed) {
+		return strings.ReplaceAll(trimmed, "-", "")
+	}
+	return raw
+}
 
 // userDomainToModel converts a domain User to a GraphQL model User
 func userDomainToModel(u *domain.User) *model.User {
@@ -56,14 +148,17 @@ func domainToModel(c *domain.Content) *model.Content {
 		AddedByUserID: strconv.Itoa(c.AddedByUserID),
 		Length:        c.Length,
 		LengthUnits:   c.LengthUnits,
+		LengthDisplay: c.LengthDisplay,
 		CreatedAt:     c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:     c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		// Non-schema field — lets contentResolver.PrimaryCategory batch-load the
 		// category by FK via dataloader instead of re-fetching the content row.
 		PrimaryCategoryID: c.PrimaryCategoryID,
-		VerseStartID:      c.VerseStartID,
-		VerseEndID:        c.VerseEndID,
-		DisplayTitle:      c.DisplayTitle,
+		// Non-schema field — lets contentResolver.ImportedFrom batch-load the import.
+		ImportJobID:  c.ImportJobID,
+		VerseStartID: c.VerseStartID,
+		VerseEndID:   c.VerseEndID,
+		DisplayTitle: c.DisplayTitle,
 	}
 
 	// Parse the raw response JSON into a map for GraphQL
@@ -73,6 +168,12 @@ func domainToModel(c *domain.Content) *model.Content {
 			slog.Warn("failed to parse content response JSON", "contentID", c.ID, "error", err)
 		} else {
 			m.Response = responseMap
+			if c.ContentType == domain.ContentTypeMovie {
+				m.Movie = responseMap
+			}
+			if c.ContentType == domain.ContentTypeBook {
+				m.Book = responseMap
+			}
 		}
 
 		// Extract fields from the YouTube API response
@@ -294,22 +395,61 @@ func messageThreadToModel(t *domain.MessageThread) *model.MessageThread {
 		CreatedAt:     t.CreatedAt.Format(time.RFC3339),
 		Src:           &src,
 	}
-	// Share per-thread lookups (latestSeq) across this thread's field resolvers.
-	out.EnableMemo()
 	return out
 }
 
-// latestSeqOf resolves a thread's highest message seq once per projected thread
-// object, using the trusted (no re-authorization) service call: the query that
-// produced the object already checked participation.
-func (r *Resolver) latestSeqOf(ctx context.Context, obj *model.MessageThread) (int64, error) {
-	return obj.ResolveLatestSeq(func() (int64, error) {
-		tid, err := parseIntID("id", obj.ID)
-		if err != nil {
-			return 0, err
+// threadStatsFor returns the viewer's stats for an already-authorized thread,
+// through the per-request loader so a thread list costs one query for every
+// thread's latestSeq + unreadCount together. Without the loader middleware
+// (unit tests) it falls back to a single-thread call.
+func (r *Resolver) threadStatsFor(ctx context.Context, viewerID int, obj *model.MessageThread) (domain.ThreadStats, error) {
+	tid, err := parseIntID("id", obj.ID)
+	if err != nil {
+		return domain.ThreadStats{}, err
+	}
+	if l := dataloader.For(ctx); l != nil {
+		st, err := l.ThreadStats.Load(ctx, dataloader.ThreadStatsKey{ViewerID: viewerID, ThreadID: tid})
+		if err != nil && !dataloader.IsNotFound(err) {
+			return domain.ThreadStats{}, err
 		}
-		return r.Messaging.ThreadMaxSeq(ctx, tid)
-	})
+		return st, nil
+	}
+	stats, err := r.Messaging.ThreadStats(ctx, viewerID, []int{tid})
+	if err != nil {
+		return domain.ThreadStats{}, err
+	}
+	return stats[tid], nil
+}
+
+// contentByID resolves content through the per-request loader (one query for
+// every perspective's content in a response); nil when it doesn't exist.
+func (r *Resolver) contentByID(ctx context.Context, id int) (*domain.Content, error) {
+	if l := dataloader.For(ctx); l != nil {
+		c, err := l.ContentByID.Load(ctx, id)
+		if dataloader.IsNotFound(err) {
+			return nil, nil
+		}
+		return c, err
+	}
+	c, err := r.ContentService.GetByID(ctx, id)
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil, nil
+	}
+	return c, err
+}
+
+// userByID resolves a user through the per-request loader (one query for all
+// the senders / participants in a response), falling back to a direct lookup
+// when the loader middleware isn't installed.
+func (r *Resolver) userByID(ctx context.Context, id int) (*domain.User, error) {
+	if l := dataloader.For(ctx); l != nil {
+		u, err := l.UserByID.Load(ctx, id)
+		if dataloader.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to get user: %w", domain.ErrNotFound)
+		}
+		return u, err
+	}
+	return r.UserService.GetByID(ctx, id)
 }
 
 // threadParticipantToModel projects a domain participant row onto its GraphQL
@@ -560,4 +700,474 @@ func nilIfEmpty(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// contentFieldsFromID are the Content fields that resolve from its id alone.
+var contentFieldsFromID = map[string]bool{
+	"__typename":         true,
+	"id":                 true,
+	"perspectiveCount":   true,
+	"averageRating":      true,
+	"qualityRatingCount": true,
+	// importedFrom needs only the row's import_job_id, which the aggregate
+	// query carries (see ContentByID), so it keeps the fast path.
+	"importedFrom": true,
+}
+
+// onlyIDAndAggregatesSelected reports whether the current field's selection
+// needs nothing from the content row itself.
+func onlyIDAndAggregatesSelected(ctx context.Context) bool {
+	if graphql.GetFieldContext(ctx) == nil {
+		return false
+	}
+	fields := graphql.CollectFieldsCtx(ctx, nil)
+	if len(fields) == 0 {
+		return false
+	}
+	for _, f := range fields {
+		if !contentFieldsFromID[f.Name] {
+			return false
+		}
+	}
+	return true
+}
+
+// ---- User todo ("Plan") mappers ----
+
+// todoDateLayout is the wire format of every todo date: an ISO calendar date.
+const todoDateLayout = "2006-01-02"
+
+// dateToString formats a date-only value for the wire. Nil stays nil.
+func dateToString(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := t.Format(todoDateLayout)
+	return &s
+}
+
+// parseTodoDate parses an optional ISO date input. A malformed date is a client
+// error, not a server one.
+func parseTodoDate(field string, raw *string) (*time.Time, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	t, err := time.Parse(todoDateLayout, *raw)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s must be an ISO date (YYYY-MM-DD)", domain.ErrInvalidInput, field)
+	}
+	return &t, nil
+}
+
+// omittableTodoDate reads a tri-state date input. Unset leaves the value alone,
+// an explicit null clears it, and a date sets it.
+func omittableTodoDate(field string, o graphql.Omittable[*string]) (*time.Time, bool, error) {
+	raw, cleared := omittablePtr(o)
+	date, err := parseTodoDate(field, raw)
+	if err != nil {
+		return nil, false, err
+	}
+	return date, cleared, nil
+}
+
+// userTodoDomainToModel converts a domain todo to its GraphQL model. The owner,
+// content, action and list ids ride along for the field resolvers.
+func userTodoDomainToModel(t *domain.UserTodo) *model.UserTodo {
+	return &model.UserTodo{
+		ID:              strconv.Itoa(t.ID),
+		Name:            t.Name,
+		Priority:        t.Priority,
+		Status:          t.Status,
+		PercentComplete: t.PercentComplete,
+		StartDate:       dateToString(t.StartDate),
+		EndDate:         dateToString(t.EndDate),
+		DueDate:         dateToString(t.DueDate),
+		Comments:        t.Comments,
+		Privacy:         t.Privacy,
+		ListPosition:    t.ListPosition,
+		CreatedAt:       t.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:       t.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UserID:          t.UserID,
+		ContentID:       t.ContentID,
+		ActionID:        t.ActionID,
+		ListID:          t.ListID,
+	}
+}
+
+// userTodosToModel converts a slice of domain todos, preserving order.
+func userTodosToModel(todos []*domain.UserTodo) []*model.UserTodo {
+	out := make([]*model.UserTodo, len(todos))
+	for i, t := range todos {
+		out[i] = userTodoDomainToModel(t)
+	}
+	return out
+}
+
+// todoActionDomainToModel converts a domain action to its GraphQL model.
+func todoActionDomainToModel(a *domain.TodoAction) *model.TodoAction {
+	return &model.TodoAction{
+		ID:              strconv.Itoa(a.ID),
+		Key:             a.Key,
+		Label:           a.Label,
+		Description:     a.Description,
+		TypicalSequence: a.TypicalSequence,
+		IsPreset:        a.IsPreset(),
+	}
+}
+
+// todoActionsToModel converts a slice of domain actions, preserving order.
+func todoActionsToModel(actions []*domain.TodoAction) []*model.TodoAction {
+	out := make([]*model.TodoAction, len(actions))
+	for i, a := range actions {
+		out[i] = todoActionDomainToModel(a)
+	}
+	return out
+}
+
+// userTodoListDomainToModel converts a domain list to its GraphQL model.
+func userTodoListDomainToModel(l *domain.UserTodoList) *model.UserTodoList {
+	return &model.UserTodoList{
+		ID:          strconv.Itoa(l.ID),
+		Name:        l.Name,
+		Description: l.Description,
+		Privacy:     l.Privacy,
+		CreatedAt:   l.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:   l.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UserID:      l.UserID,
+	}
+}
+
+// userTodoListsToModel converts a slice of domain lists, preserving order.
+func userTodoListsToModel(lists []*domain.UserTodoList) []*model.UserTodoList {
+	out := make([]*model.UserTodoList, len(lists))
+	for i, l := range lists {
+		out[i] = userTodoListDomainToModel(l)
+	}
+	return out
+}
+
+// modelToUserTodoFilter converts the GraphQL filter. A nil filter stays nil.
+func modelToUserTodoFilter(f *model.UserTodoFilter) *domain.UserTodoFilter {
+	if f == nil {
+		return nil
+	}
+	return &domain.UserTodoFilter{
+		UserID:    f.UserID,
+		ContentID: f.ContentID,
+		ListID:    f.ListID,
+		Unlisted:  f.Unlisted != nil && *f.Unlisted,
+		Statuses:  f.Status,
+		ActionID:  f.ActionID,
+	}
+}
+
+// modelToCreateUserTodoInput converts the GraphQL create input. The owner is
+// not set here: the service takes it from the authenticated actor.
+func modelToCreateUserTodoInput(input model.CreateUserTodoInput) (domain.CreateUserTodoInput, error) {
+	startDate, err := parseTodoDate("startDate", input.StartDate)
+	if err != nil {
+		return domain.CreateUserTodoInput{}, err
+	}
+	endDate, err := parseTodoDate("endDate", input.EndDate)
+	if err != nil {
+		return domain.CreateUserTodoInput{}, err
+	}
+	dueDate, err := parseTodoDate("dueDate", input.DueDate)
+	if err != nil {
+		return domain.CreateUserTodoInput{}, err
+	}
+	return domain.CreateUserTodoInput{
+		ContentID:       input.ContentID,
+		Name:            input.Name,
+		ActionID:        input.ActionID,
+		Priority:        input.Priority,
+		Status:          input.Status,
+		PercentComplete: input.PercentComplete,
+		StartDate:       startDate,
+		EndDate:         endDate,
+		DueDate:         dueDate,
+		Comments:        input.Comments,
+		Privacy:         input.Privacy,
+		ListID:          input.ListID,
+	}, nil
+}
+
+// modelToUpdateUserTodoInput converts the GraphQL partial update. The tri-state
+// fields (omitted, explicit null, value) become the value plus Clear* flags the
+// service merges.
+func modelToUpdateUserTodoInput(input model.UpdateUserTodoInput) (domain.UpdateUserTodoInput, error) {
+	out := domain.UpdateUserTodoInput{
+		ID:              input.ID,
+		ActionID:        input.ActionID,
+		Status:          input.Status,
+		PercentComplete: input.PercentComplete,
+		Privacy:         input.Privacy,
+	}
+	out.ContentID, out.ClearContentID = omittablePtr(input.ContentID)
+	out.Name, out.ClearName = omittablePtr(input.Name)
+	out.Priority, out.ClearPriority = omittablePtr(input.Priority)
+	out.Comments, out.ClearComments = omittablePtr(input.Comments)
+	out.ListID, out.ClearListID = omittablePtr(input.ListID)
+
+	var err error
+	if out.StartDate, out.ClearStartDate, err = omittableTodoDate("startDate", input.StartDate); err != nil {
+		return domain.UpdateUserTodoInput{}, err
+	}
+	if out.EndDate, out.ClearEndDate, err = omittableTodoDate("endDate", input.EndDate); err != nil {
+		return domain.UpdateUserTodoInput{}, err
+	}
+	if out.DueDate, out.ClearDueDate, err = omittableTodoDate("dueDate", input.DueDate); err != nil {
+		return domain.UpdateUserTodoInput{}, err
+	}
+	return out, nil
+}
+
+// modelToCreateTodoActionInput converts the GraphQL action input. A missing
+// description is stored as an empty string.
+func modelToCreateTodoActionInput(input model.CreateTodoActionInput) domain.CreateTodoActionInput {
+	out := domain.CreateTodoActionInput{Label: input.Label}
+	if input.Description != nil {
+		out.Description = *input.Description
+	}
+	return out
+}
+
+// modelToCreateUserTodoListInput converts the GraphQL list create input.
+func modelToCreateUserTodoListInput(input model.CreateUserTodoListInput) domain.CreateUserTodoListInput {
+	return domain.CreateUserTodoListInput{
+		Name:        input.Name,
+		Description: input.Description,
+		Privacy:     input.Privacy,
+	}
+}
+
+// modelToUpdateUserTodoListInput converts the GraphQL list partial update. An
+// explicit null on description clears it.
+func modelToUpdateUserTodoListInput(input model.UpdateUserTodoListInput) domain.UpdateUserTodoListInput {
+	out := domain.UpdateUserTodoListInput{
+		ID:      input.ID,
+		Name:    input.Name,
+		Privacy: input.Privacy,
+	}
+	out.Description, out.ClearDescription = omittablePtr(input.Description)
+	return out
+}
+
+// todoActionByID resolves a todo's action through the per-request loader, or
+// directly when the loader middleware isn't installed.
+func (r *Resolver) todoActionByID(ctx context.Context, id int) (*domain.TodoAction, error) {
+	if l := dataloader.For(ctx); l != nil {
+		action, err := l.TodoActionByID.Load(ctx, id)
+		if dataloader.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to get todo action: %w", domain.ErrNotFound)
+		}
+		return action, err
+	}
+	actions, err := r.UserTodoService.GetTodoActionsByIDs(ctx, []int{id})
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range actions {
+		if a != nil && a.ID == id {
+			return a, nil
+		}
+	}
+	return nil, fmt.Errorf("failed to get todo action: %w", domain.ErrNotFound)
+}
+
+// userTodoListByKey resolves a todo's list as the viewer sees it. A nil result
+// means the list is absent, or PRIVATE to someone other than the viewer.
+func (r *Resolver) userTodoListByKey(ctx context.Context, key dataloader.UserTodoListKey) (*domain.UserTodoList, error) {
+	if l := dataloader.For(ctx); l != nil {
+		list, err := l.UserTodoListByID.Load(ctx, key)
+		if dataloader.IsNotFound(err) {
+			return nil, nil
+		}
+		return list, err
+	}
+	var viewer *int
+	if key.ViewerID != 0 {
+		v := key.ViewerID
+		viewer = &v
+	}
+	lists, err := r.UserTodoService.GetUserTodoListsByIDs(ctx, []int{key.ListID}, viewer)
+	if err != nil {
+		return nil, err
+	}
+	for _, l := range lists {
+		if l != nil && l.ID == key.ListID {
+			return l, nil
+		}
+	}
+	return nil, nil
+}
+
+// --- Import staging mapping -------------------------------------------------
+
+func isoTime(t time.Time) string { return t.UTC().Format(time.RFC3339) }
+
+func isoTimePtr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := isoTime(*t)
+	return &s
+}
+
+func int64ToFloatPtr(n *int64) *float64 {
+	if n == nil {
+		return nil
+	}
+	f := float64(*n)
+	return &f
+}
+
+// importJobRefToModel is the short form of an import, as Content.importedFrom shows it.
+func importJobRefToModel(j *domain.ImportJob) *model.ImportJobRef {
+	return &model.ImportJobRef{ID: strconv.Itoa(j.ID), Name: j.Name}
+}
+
+func importJobToModel(j *domain.ImportJob) *model.ImportJob {
+	sources := make([]*model.ImportSource, len(j.Sources))
+	for i, s := range j.Sources {
+		sources[i] = &model.ImportSource{
+			ID:              strconv.Itoa(s.ID),
+			SourceType:      s.SourceType,
+			SourceRef:       s.SourceRef,
+			Title:           s.Title,
+			URL:             s.URL,
+			Role:            s.Role,
+			DestinationType: s.DestinationType,
+			Status:          s.Status,
+			StatusDetail:    s.StatusDetail,
+			ItemCount:       s.ItemCount,
+			FetchedAt:       isoTimePtr(s.FetchedAt),
+		}
+	}
+	return &model.ImportJob{
+		ID:              strconv.Itoa(j.ID),
+		Name:            j.Name,
+		Description:     j.Description,
+		RequestStatus:   j.RequestStatus,
+		ReviewNote:      j.ReviewNote,
+		ReviewedAt:      isoTimePtr(j.ReviewedAt),
+		ClosedAt:        isoTimePtr(j.ClosedAt),
+		Sources:         sources,
+		CreatedAt:       isoTime(j.CreatedAt),
+		UpdatedAt:       isoTime(j.UpdatedAt),
+		RequesterUserID: j.UserID,
+	}
+}
+
+func importItemToModel(it *domain.ImportItem) *model.ImportItem {
+	m := &model.ImportItem{
+		ID:              strconv.Itoa(it.ID),
+		SourceID:        strconv.Itoa(it.SourceID),
+		DestinationType: it.DestinationType,
+		ExternalID:      it.ExternalID,
+		URL:             it.CanonicalURL,
+		Title:           it.Title,
+		Facts:           importFactsToMap(it.Facts),
+		Position:        it.Position,
+		Excluded:        it.Excluded,
+		StatsFetchedAt:  isoTime(it.StatsFetchedAt),
+		InLibrary:       it.InLibrary,
+		ImportStatus:    it.ImportStatus,
+		ImportError:     it.ImportError,
+		ImportedAt:      isoTimePtr(it.ImportedAt),
+	}
+	if it.ContentID != nil {
+		id := strconv.Itoa(*it.ContentID)
+		m.ContentID = &id
+	}
+	return m
+}
+
+// importFactsToMap turns facts into the JSON scalar's map through their json
+// tags, so the keys clients see are exactly the stored ones and unknown facts
+// stay absent. Facts are plain values, so encoding can't fail; if it ever did,
+// the row shows no facts rather than failing the whole sheet.
+func importFactsToMap(f domain.ImportFacts) map[string]any {
+	out := map[string]any{}
+	b, err := json.Marshal(f)
+	if err != nil {
+		slog.Warn("failed to encode import facts", "error", err)
+		return out
+	}
+	if err := json.Unmarshal(b, &out); err != nil {
+		slog.Warn("failed to decode import facts", "error", err)
+	}
+	return out
+}
+
+func importItemDetailsToModel(d *domain.ImportItemWithDetails) *model.ImportItemDetails {
+	chapters := make([]*model.ImportChapter, len(d.Details.Chapters))
+	for i, c := range d.Details.Chapters {
+		chapters[i] = &model.ImportChapter{StartSeconds: c.StartSeconds, Title: c.Title}
+	}
+	people := make([]*model.ImportPerson, len(d.Details.People))
+	for i, p := range d.Details.People {
+		people[i] = &model.ImportPerson{Name: p.Name, Role: p.Role}
+	}
+	out := &model.ImportItemDetails{
+		Item:        importItemToModel(&d.Item),
+		Description: d.Details.Description,
+		Tags:        stringsOrEmpty(d.Details.Tags),
+		Chapters:    chapters,
+		Links:       stringsOrEmpty(d.Details.Links),
+		People:      people,
+		Genres:      stringsOrEmpty(d.Details.Genres),
+	}
+	if d.Details.Language != "" {
+		lang := d.Details.Language
+		out.Language = &lang
+	}
+	return out
+}
+
+func modelToCreateImportJobInput(in model.CreateImportJobInput) domain.CreateImportJobInput {
+	out := domain.CreateImportJobInput{Name: in.Name, Description: in.Description, Sources: make([]domain.CreateImportSourceInput, len(in.Sources))}
+	for i, s := range in.Sources {
+		out.Sources[i] = domain.CreateImportSourceInput{SourceType: s.SourceType, Ref: s.Ref, Role: s.Role}
+	}
+	return out
+}
+
+// stringsOrEmpty returns s, or an empty slice for nil, for non-null GraphQL lists.
+func stringsOrEmpty(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
+}
+
+func importProgressToModel(p domain.ImportProgress) *model.ImportProgress {
+	return &model.ImportProgress{
+		JobID:     strconv.Itoa(p.JobID),
+		Total:     p.Total,
+		Done:      p.Done,
+		Imported:  p.Imported,
+		Skipped:   p.Skipped,
+		Failed:    p.Failed,
+		Running:   p.Running,
+		UpdatedAt: isoTime(p.UpdatedAt),
+	}
+}
+
+func importListingProgressToModel(p domain.ImportListingProgress) *model.ImportListingProgress {
+	sources := make([]*model.ImportSourceListingProgress, len(p.Sources))
+	for i, src := range p.Sources {
+		sources[i] = &model.ImportSourceListingProgress{
+			SourceID: strconv.Itoa(src.SourceID),
+			Staged:   src.Staged,
+			Batches:  src.Batches,
+			Status:   src.Status,
+		}
+	}
+	return &model.ImportListingProgress{
+		JobID:     strconv.Itoa(p.JobID),
+		Listing:   p.Listing,
+		Sources:   sources,
+		UpdatedAt: isoTime(p.UpdatedAt),
+	}
 }

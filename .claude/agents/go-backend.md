@@ -1,7 +1,7 @@
 ---
 name: go-backend
 description: Go backend implementer for backend/ (hexagonal architecture, gqlgen, GORM + pgx). Use when a task changes Go code — a new domain model, port, service method, GORM repository, resolver wiring or HTTP middleware — or when a plan task is tagged go-backend. Not for schema-first GraphQL design (graphql-designer), SQL migrations (db-migration) or frontend work. See "When to invoke" in the agent body.
-model: sonnet
+model: haiku
 color: blue
 tools:
   - Read
@@ -59,6 +59,10 @@ this prompt disagree, the docs and the existing code win.
   updating every hand-written mock in `backend/test/` that implements it.
 - **Never** run `make migrate-up` / `migrate-down`. Hand schema changes to
   `db-migration`.
+
+## Query budget
+
+Read [.docs/QUERY_BUDGET.md](../../.docs/QUERY_BUDGET.md). Any DB-touching change needs a `backend/internal/perf/querycount` assertion: batch methods cost the same for 1 and 50 inputs, empty input costs 0, per-row GraphQL fields go through a dataloader. Never write a repo/service call inside a loop over results.
 
 ## Process
 

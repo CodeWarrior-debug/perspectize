@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
@@ -110,6 +111,38 @@ func categoryDomainToModel(c *domain.Category) *CategoryModel {
 	}
 }
 
+// lengthDisplayJSON is the stored shape of content.length_display: lowercase
+// precision ("seconds"/"minutes"), matching migration 000030's backfill.
+type lengthDisplayJSON struct {
+	Source    string `json:"source"`
+	Precision string `json:"precision"`
+}
+
+// lengthDisplayFromJSON decodes the length_display JSONB column. NULL or an
+// unreadable value is nil, so the client falls back to formatting by length_units.
+func lengthDisplayFromJSON(raw json.RawMessage) *domain.LengthDisplay {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var j lengthDisplayJSON
+	if err := json.Unmarshal(raw, &j); err != nil {
+		return nil
+	}
+	return &domain.LengthDisplay{Source: j.Source, Precision: domain.LengthPrecision(strings.ToUpper(j.Precision))}
+}
+
+// lengthDisplayToJSON encodes LengthDisplay for the length_display JSONB column (nil -> NULL).
+func lengthDisplayToJSON(d *domain.LengthDisplay) json.RawMessage {
+	if d == nil {
+		return nil
+	}
+	raw, err := json.Marshal(lengthDisplayJSON{Source: d.Source, Precision: strings.ToLower(string(d.Precision))})
+	if err != nil {
+		return nil
+	}
+	return raw
+}
+
 // contentModelToDomain converts a GORM ContentModel to domain.Content
 func contentModelToDomain(m *ContentModel) *domain.Content {
 	if m == nil {
@@ -123,11 +156,13 @@ func contentModelToDomain(m *ContentModel) *domain.Content {
 		AddedByUserID:     m.AddedByUserID,
 		Length:            m.Length,
 		LengthUnits:       m.LengthUnits,
+		LengthDisplay:     lengthDisplayFromJSON(m.LengthDisplay),
 		Response:          m.Response,
 		PrimaryCategoryID: m.PrimaryCategoryID,
 		VerseStartID:      m.VerseStartID,
 		VerseEndID:        m.VerseEndID,
 		DisplayTitle:      m.DisplayTitle,
+		ImportJobID:       m.ImportJobID,
 		CreatedAt:         m.CreatedAt,
 		UpdatedAt:         m.UpdatedAt,
 	}
@@ -146,11 +181,13 @@ func contentDomainToModel(c *domain.Content) *ContentModel {
 		AddedByUserID:     c.AddedByUserID,
 		Length:            c.Length,
 		LengthUnits:       c.LengthUnits,
+		LengthDisplay:     lengthDisplayToJSON(c.LengthDisplay),
 		Response:          c.Response,
 		PrimaryCategoryID: c.PrimaryCategoryID,
 		VerseStartID:      c.VerseStartID,
 		VerseEndID:        c.VerseEndID,
 		DisplayTitle:      c.DisplayTitle,
+		ImportJobID:       c.ImportJobID,
 		// CreatedAt and UpdatedAt are managed by GORM
 	}
 }
@@ -332,4 +369,268 @@ func perspectiveDomainToModel(p *domain.Perspective) *PerspectiveModel {
 	m.Review = p.Review
 
 	return m
+}
+
+// todoActionModelToDomain converts a GORM TodoActionModel to domain.TodoAction
+func todoActionModelToDomain(m *TodoActionModel) *domain.TodoAction {
+	if m == nil {
+		return nil
+	}
+	return &domain.TodoAction{
+		ID:              m.ID,
+		Key:             m.Key,
+		Label:           m.Label,
+		Description:     m.Description,
+		TypicalSequence: m.TypicalSequence,
+		UserID:          m.UserID,
+		CreatedAt:       m.CreatedAt,
+		UpdatedAt:       m.UpdatedAt,
+	}
+}
+
+// todoActionDomainToModel converts a domain.TodoAction to GORM TodoActionModel
+func todoActionDomainToModel(a *domain.TodoAction) *TodoActionModel {
+	if a == nil {
+		return nil
+	}
+	return &TodoActionModel{
+		ID:              a.ID,
+		Key:             a.Key,
+		Label:           a.Label,
+		Description:     a.Description,
+		TypicalSequence: a.TypicalSequence,
+		UserID:          a.UserID,
+		// CreatedAt and UpdatedAt are managed by GORM
+	}
+}
+
+// userTodoListModelToDomain converts a GORM UserTodoListModel to domain.UserTodoList
+func userTodoListModelToDomain(m *UserTodoListModel) *domain.UserTodoList {
+	if m == nil {
+		return nil
+	}
+	return &domain.UserTodoList{
+		ID:          m.ID,
+		UserID:      m.UserID,
+		Name:        m.Name,
+		Description: m.Description,
+		Privacy:     privacyFromDBValue(m.Privacy),
+		CreatedAt:   m.CreatedAt,
+		UpdatedAt:   m.UpdatedAt,
+	}
+}
+
+// userTodoListDomainToModel converts a domain.UserTodoList to GORM UserTodoListModel.
+// An empty privacy is written as public, the column default.
+func userTodoListDomainToModel(l *domain.UserTodoList) *UserTodoListModel {
+	if l == nil {
+		return nil
+	}
+	privacy := l.Privacy
+	if privacy == "" {
+		privacy = domain.PrivacyPublic
+	}
+	return &UserTodoListModel{
+		ID:          l.ID,
+		UserID:      l.UserID,
+		Name:        l.Name,
+		Description: l.Description,
+		Privacy:     privacyToDBValue(privacy),
+		// CreatedAt and UpdatedAt are managed by GORM
+	}
+}
+
+// userTodoModelToDomain converts a GORM UserTodoModel to domain.UserTodo
+func userTodoModelToDomain(m *UserTodoModel) *domain.UserTodo {
+	if m == nil {
+		return nil
+	}
+	return &domain.UserTodo{
+		ID:              m.ID,
+		UserID:          m.UserID,
+		ContentID:       m.ContentID,
+		Name:            m.Name,
+		ActionID:        m.ActionID,
+		Priority:        m.Priority,
+		Status:          userTodoStatusFromDBValue(m.Status),
+		PercentComplete: m.PercentComplete,
+		StartDate:       m.StartDate,
+		EndDate:         m.EndDate,
+		DueDate:         m.DueDate,
+		Comments:        m.Comments,
+		Privacy:         privacyFromDBValue(m.Privacy),
+		ListID:          m.ListID,
+		ListPosition:    m.ListPosition,
+		CreatedAt:       m.CreatedAt,
+		UpdatedAt:       m.UpdatedAt,
+	}
+}
+
+// userTodoDomainToModel converts a domain.UserTodo to GORM UserTodoModel. Empty
+// status and privacy are written as the column defaults (not_started, public).
+func userTodoDomainToModel(t *domain.UserTodo) *UserTodoModel {
+	if t == nil {
+		return nil
+	}
+	status := t.Status
+	if status == "" {
+		status = domain.UserTodoStatusNotStarted
+	}
+	privacy := t.Privacy
+	if privacy == "" {
+		privacy = domain.PrivacyPublic
+	}
+	return &UserTodoModel{
+		ID:              t.ID,
+		UserID:          t.UserID,
+		ContentID:       t.ContentID,
+		Name:            t.Name,
+		ActionID:        t.ActionID,
+		Priority:        t.Priority,
+		Status:          userTodoStatusToDBValue(status),
+		PercentComplete: t.PercentComplete,
+		StartDate:       t.StartDate,
+		EndDate:         t.EndDate,
+		DueDate:         t.DueDate,
+		Comments:        t.Comments,
+		Privacy:         privacyToDBValue(privacy),
+		ListID:          t.ListID,
+		ListPosition:    t.ListPosition,
+		// CreatedAt and UpdatedAt are managed by GORM
+	}
+}
+
+// importJobModelToDomain converts a GORM ImportJobModel (without sources) to domain.ImportJob
+func importJobModelToDomain(m *ImportJobModel) *domain.ImportJob {
+	return &domain.ImportJob{
+		ID:            m.ID,
+		UserID:        m.UserID,
+		Name:          m.Name,
+		Description:   m.Description,
+		RequestStatus: domain.ImportRequestStatus(strings.ToUpper(m.RequestStatus)),
+		ReviewNote:    m.ReviewNote,
+		ReviewedAt:    m.ReviewedAt,
+		ClosedAt:      m.ClosedAt,
+		Sources:       []*domain.ImportSource{},
+		CreatedAt:     m.CreatedAt,
+		UpdatedAt:     m.UpdatedAt,
+	}
+}
+
+// importRequestStatusToDB is the stored (lowercase) form; an unset status means approved.
+func importRequestStatusToDB(st domain.ImportRequestStatus) string {
+	if st == "" {
+		st = domain.ImportRequestStatusApproved
+	}
+	return strings.ToLower(string(st))
+}
+
+// importSourceModelToDomain converts a GORM ImportSourceModel to domain.ImportSource
+func importSourceModelToDomain(m *ImportSourceModel) *domain.ImportSource {
+	s := &domain.ImportSource{
+		ID:              m.ID,
+		JobID:           m.JobID,
+		SourceType:      domain.ImportSourceType(strings.ToUpper(m.SourceType)),
+		SourceRef:       m.SourceRef,
+		Title:           m.Title,
+		URL:             m.URL,
+		DestinationType: contentTypeFromDBValue(m.DestinationType),
+		Status:          domain.ImportSourceStatus(strings.ToUpper(m.Status)),
+		StatusDetail:    m.StatusDetail,
+		ItemCount:       m.ItemCount,
+		FetchedAt:       m.FetchedAt,
+		CreatedAt:       m.CreatedAt,
+		UpdatedAt:       m.UpdatedAt,
+	}
+	if m.Role != nil {
+		role := domain.ImportPersonRole(strings.ToUpper(*m.Role))
+		s.Role = &role
+	}
+	return s
+}
+
+// importSourceDomainToModel converts a domain.ImportSource to its GORM model
+func importSourceDomainToModel(s *domain.ImportSource) *ImportSourceModel {
+	m := &ImportSourceModel{
+		ID:              s.ID,
+		JobID:           s.JobID,
+		SourceType:      strings.ToLower(string(s.SourceType)),
+		SourceRef:       s.SourceRef,
+		Title:           s.Title,
+		URL:             s.URL,
+		DestinationType: contentTypeToDBValue(s.DestinationType),
+		Status:          strings.ToLower(string(s.Status)),
+		StatusDetail:    s.StatusDetail,
+		ItemCount:       s.ItemCount,
+		FetchedAt:       s.FetchedAt,
+	}
+	if m.Status == "" {
+		m.Status = strings.ToLower(string(domain.ImportSourceStatusListing))
+	}
+	if s.Role != nil {
+		role := strings.ToLower(string(*s.Role))
+		m.Role = &role
+	}
+	return m
+}
+
+// importItemModelToDomain converts a GORM ImportItemModel to domain.ImportItem.
+// ContentID prefers the content the import created, then any content with the
+// same URL (LibraryContentID), so a row added by hand still links to it.
+func importItemModelToDomain(m *ImportItemModel) (*domain.ImportItem, error) {
+	it := &domain.ImportItem{
+		ID:              m.ID,
+		JobID:           m.JobID,
+		SourceID:        m.SourceID,
+		ExternalID:      m.ExternalID,
+		DestinationType: contentTypeFromDBValue(m.DestinationType),
+		CanonicalURL:    m.CanonicalURL,
+		Title:           m.Title,
+		Position:        m.Position,
+		Excluded:        m.Excluded,
+		StatsFetchedAt:  m.StatsFetchedAt,
+		ImportError:     m.ImportError,
+		ImportedAt:      m.ImportedAt,
+		ContentID:       m.ContentID,
+		InLibrary:       m.LibraryContentID != nil,
+	}
+	if len(m.Facts) > 0 {
+		if err := json.Unmarshal(m.Facts, &it.Facts); err != nil {
+			return nil, fmt.Errorf("failed to decode facts of import item %d: %w", m.ID, err)
+		}
+	}
+	if it.ContentID == nil {
+		it.ContentID = m.LibraryContentID
+	}
+	if m.ImportStatus != nil {
+		st := domain.ImportItemStatus(strings.ToUpper(*m.ImportStatus))
+		it.ImportStatus = &st
+	}
+	return it, nil
+}
+
+// importItemDomainToModel converts a staged candidate (row + details) to its GORM model
+func importItemDomainToModel(in *domain.ImportItemWithDetails) (*ImportItemModel, error) {
+	facts, err := json.Marshal(in.Item.Facts)
+	if err != nil {
+		return nil, err
+	}
+	details, err := json.Marshal(in.Details)
+	if err != nil {
+		return nil, err
+	}
+	it := in.Item
+	m := &ImportItemModel{
+		JobID:           it.JobID,
+		SourceID:        it.SourceID,
+		ExternalID:      it.ExternalID,
+		DestinationType: contentTypeToDBValue(it.DestinationType),
+		CanonicalURL:    it.CanonicalURL,
+		Title:           it.Title,
+		Facts:           facts,
+		Position:        it.Position,
+		Details:         details,
+		StatsFetchedAt:  it.StatsFetchedAt,
+	}
+	return m, nil
 }

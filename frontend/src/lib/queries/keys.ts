@@ -1,3 +1,5 @@
+import type { UserTodosArgs } from './userTodos';
+
 /**
  * Centralized query key factory for type-safe, hierarchical cache invalidation.
  */
@@ -28,10 +30,19 @@ export const queryKeys = {
 		// Full ContentItem row (GET_CONTENT_DETAILS) for a details modal opened on an
 		// item that isn't in the loaded Activity rows (e.g. via `?open=<id>`).
 		row: (id: string) => [...queryKeys.content.details(), 'row', id] as const,
+		// Viewer-scoped aggregates for one content (GET_CONTENT_AGGREGATES). A child of
+		// `detail(id)`, so mutations that invalidate `detail(id)` still evict it. Keyed per
+		// viewer: perspective counts and the import a row came from both resolve per viewer.
+		aggregates: (id: string, viewerId: string | null) =>
+			[...queryKeys.content.detail(id), 'aggregates', viewerId ?? 'anonymous'] as const,
 		// ListComparableContent (ComparePicker.svelte) — a distinct shape/query
 		// from `list` above (adds perspectiveCount, no pagination), keyed by
 		// the debounced search term.
 		comparePicker: (search: string) => [...queryKeys.content.lists(), 'compare-picker', search] as const,
+		// ListContentPicker (plan/ItemPicker.svelte): keyed by the debounced search
+		// and the pressed type chips (ContentType enum values, sorted).
+		itemPicker: (search: string, types: readonly string[]) =>
+			[...queryKeys.content.lists(), 'item-picker', search, types] as const,
 	},
 
 	bible: {
@@ -71,14 +82,33 @@ export const queryKeys = {
 		// ListPerspectivesByContentResponse -- also PerspectiveItem rows.
 		byContentLists: () => [...queryKeys.perspectives.lists(), 'byContent'] as const,
 		listByContent: (contentId: number) => [...queryKeys.perspectives.byContentLists(), { contentId }] as const,
-		// ListActivityPerspectivesResponse -- ActivityPerspectiveItem rows (nested
-		// `content`, no rating fields: a DIFFERENT shape) and privacy-filtered by the
-		// server (includePrivate). Never patch this with a PerspectiveItem -- refetch
-		// it instead, so privacy scoping and the nested content stay correct.
-		activityFeeds: () => [...queryKeys.perspectives.lists(), 'activityFeed'] as const,
-		activityFeed: (includePrivate: boolean) => [...queryKeys.perspectives.activityFeeds(), { includePrivate }] as const,
 		details: () => [...queryKeys.perspectives.all(), 'detail'] as const,
 		detail: (id: string) => [...queryKeys.perspectives.details(), id] as const,
+	},
+
+	// User todos ("Plan"). `list(filters)` takes the exact variables useUserTodos
+	// sends, so every variable changes the key. `todoLists(userId)` is one
+	// owner's todo lists; `todoListsAll()` is the prefix over every owner.
+	userTodos: {
+		all: () => [...queryKeys.all, 'userTodos'] as const,
+		lists: () => [...queryKeys.userTodos.all(), 'list'] as const,
+		list: (filters: UserTodosArgs) => [...queryKeys.userTodos.lists(), filters] as const,
+		details: () => [...queryKeys.userTodos.all(), 'detail'] as const,
+		detail: (id: string) => [...queryKeys.userTodos.details(), id] as const,
+		actions: () => [...queryKeys.userTodos.all(), 'actions'] as const,
+		todoListsAll: () => [...queryKeys.userTodos.all(), 'todoLists'] as const,
+		todoLists: (userId: number | null) => [...queryKeys.userTodos.todoListsAll(), { userId }] as const,
+	},
+
+	// Import staging. `detail(id)` is one import's sheet (job + every row);
+	// `itemDetails(id)` is one row's lazily loaded description/chapters/tags.
+	imports: {
+		all: () => [...queryKeys.all, 'imports'] as const,
+		lists: () => [...queryKeys.imports.all(), 'list'] as const,
+		list: (includeClosed = false) => [...queryKeys.imports.lists(), { includeClosed }] as const,
+		details: () => [...queryKeys.imports.all(), 'detail'] as const,
+		detail: (id: string) => [...queryKeys.imports.details(), id] as const,
+		itemDetails: (itemId: string) => [...queryKeys.imports.all(), 'item', itemId] as const,
 	},
 
 	messaging: {

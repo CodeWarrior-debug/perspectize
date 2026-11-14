@@ -5,6 +5,8 @@
 		text: string;
 		copy: string | null;
 		items: string[];
+		/** Text copied per item (parallel to `items`); falls back to the item label. */
+		copyValues?: string[];
 	}
 </script>
 
@@ -101,9 +103,9 @@
 							type="button"
 							data-testid="tip-copy-selected"
 							disabled={selected.size === 0}
-							onclick={() => copy(itemsCopyText(popover.items, selected))}>Copy selected</button
+							onclick={() => copy(itemsCopyText(popover.items, selected, popover.copyValues))}>Copy selected</button
 						>
-						<button type="button" data-testid="tip-copy-all" onclick={() => copy(itemsCopyText(popover.items, null))}
+						<button type="button" data-testid="tip-copy-all" onclick={() => copy(itemsCopyText(popover.items, null, popover.copyValues))}
 							>Copy all</button
 						>
 					</div>

@@ -18,13 +18,21 @@ import (
 )
 
 // CreateUser is the resolver for the createUser field.
+// Admin only; the actor comes from the session, never from client input.
 func (r *mutationResolver) CreateUser(ctx context.Context, input model.CreateUserInput) (*model.User, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
 	email := ""
 	if input.Email != nil {
 		email = *input.Email
 	}
-	user, err := r.UserService.Create(ctx, input.Username, email)
+	user, err := r.UserService.Create(ctx, authUser, input.Username, email)
 	if err != nil {
+		if errors.Is(err, domain.ErrForbidden) {
+			return nil, fmt.Errorf("access denied: admin only")
+		}
 		if errors.Is(err, domain.ErrAlreadyExists) {
 			return nil, fmt.Errorf("user already exists: %w", err)
 		}
@@ -39,15 +47,23 @@ func (r *mutationResolver) CreateUser(ctx context.Context, input model.CreateUse
 }
 
 // UpdateUser is the resolver for the updateUser field.
+// Only the account owner or an admin; the service enforces it again.
 func (r *mutationResolver) UpdateUser(ctx context.Context, input model.UpdateUserInput) (*model.User, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
 	serviceInput := portservices.UpdateUserInput{
 		ID:       input.ID,
 		Username: input.Username,
 		Email:    input.Email,
 	}
 
-	user, err := r.UserService.Update(ctx, serviceInput)
+	user, err := r.UserService.Update(ctx, authUser, serviceInput)
 	if err != nil {
+		if errors.Is(err, domain.ErrForbidden) {
+			return nil, fmt.Errorf("access denied: you can only modify your own account")
+		}
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, fmt.Errorf("user not found")
 		}
@@ -68,14 +84,22 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, input model.UpdateUse
 }
 
 // DeleteUser is the resolver for the deleteUser field.
+// Only the account owner or an admin; the service enforces it again.
 func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (bool, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return false, fmt.Errorf("access denied: authentication required")
+	}
 	intID, err := strconv.Atoi(id)
 	if err != nil {
 		return false, fmt.Errorf("invalid user ID: %s", id)
 	}
 
-	err = r.UserService.Delete(ctx, intID)
+	err = r.UserService.Delete(ctx, authUser, intID)
 	if err != nil {
+		if errors.Is(err, domain.ErrForbidden) {
+			return false, fmt.Errorf("access denied: you can only delete your own account")
+		}
 		if errors.Is(err, domain.ErrNotFound) {
 			return false, fmt.Errorf("user not found")
 		}
@@ -145,6 +169,13 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 	authUser, err := auth.RequireAuth(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("access denied: authentication required")
+	}
+
+	// The auth middleware already resolved this user's row (through the user
+	// cache, which this instance's onboarding writes refresh in place) — reuse
+	// it rather than reading it again.
+	if row, ok := auth.UserRowForContext(ctx); ok && row.ID == authUser.ID {
+		return userDomainToModel(row), nil
 	}
 
 	user, err := r.UserService.GetByID(ctx, authUser.ID)

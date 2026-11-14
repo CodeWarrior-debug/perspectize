@@ -55,11 +55,11 @@ func (stubBibleRepo) ListBooks(ctx context.Context) ([]domain.BibleBook, error) 
 // setupPassageTestServer is setupTestServer with Bible reference data wired and
 // a caller-chosen role for the injected session user.
 func setupPassageTestServer(repo *mockContentRepository, role domain.UserRole) *httptest.Server {
-	contentService := services.NewContentService(repo, &mockYouTubeClient{}, services.WithBibleReference(stubBibleRepo{}))
-	userService := services.NewUserService(&mockUserRepository{}, repo, &mockPerspectiveRepository{})
+	contentService := services.NewContentService(repo, &mockYouTubeClient{}, nil, services.WithBibleReference(stubBibleRepo{}))
+	userService := services.NewUserService(&mockUserRepository{}, repo, &mockPerspectiveRepository{}, nil, nil, nil)
 	perspectiveService := services.NewPerspectiveService(&mockPerspectiveRepository{}, &mockUserRepository{})
 	categoryService := services.NewCategoryService(&mockCategoryRepository{}, repo, &mockWikidataClient{})
-	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil)
+	resolver := resolvers.NewResolver(contentService, userService, perspectiveService, categoryService, nil, nil, nil, nil)
 	directiveRoot := directives.NewDirectiveRoot(contentService, perspectiveService)
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{
 		Resolvers:  resolver,
@@ -168,7 +168,7 @@ func TestSetPassageDisplayTitle_FirstWriterWins(t *testing.T) {
 func TestSetPassageDisplayTitle_RejectsNonPassageAndBlank(t *testing.T) {
 	repo := &mockContentRepository{
 		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
-			return &domain.Content{ID: id, ContentType: domain.ContentTypeYouTube}, nil
+			return &domain.Content{ID: id, ContentType: domain.ContentTypeYouTubeVideo}, nil
 		},
 	}
 	server := setupPassageTestServer(repo, domain.UserRoleDefault)

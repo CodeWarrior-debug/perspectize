@@ -8,9 +8,14 @@ import (
 
 // PerspectiveRepository defines the contract for perspective persistence
 type PerspectiveRepository interface {
+	// Create inserts the perspective. Returns domain.ErrNotFound when its
+	// UserID doesn't reference an existing user.
 	Create(ctx context.Context, perspective *domain.Perspective) (*domain.Perspective, error)
 	GetByID(ctx context.Context, id int) (*domain.Perspective, error)
-	Update(ctx context.Context, perspective *domain.Perspective) (*domain.Perspective, error)
+	// Update writes the perspective ONLY if it belongs to ownerUserID — like
+	// Delete, the ownership predicate is part of the UPDATE statement itself.
+	// Returns domain.ErrNotFound when no row matched.
+	Update(ctx context.Context, perspective *domain.Perspective, ownerUserID int) (*domain.Perspective, error)
 	// Delete removes the perspective with the given id ONLY if it belongs to
 	// ownerUserID — the ownership predicate is part of the DELETE statement
 	// itself, so a caller can never remove another user's row even if every
@@ -24,6 +29,12 @@ type PerspectiveRepository interface {
 	// average Quality rating of its PUBLIC perspectives. Content IDs with no
 	// public perspectives are simply absent from the result map (count 0).
 	AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
+
+	// CountVisibleByContentIDs counts, for each given content ID, the
+	// perspectives viewerID may read: public ones plus their own (public only
+	// when viewerID is nil). One grouped query for any number of IDs; content
+	// with none visible is absent from the map (count 0).
+	CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error)
 
 	// FeelingStats computes count/average/stddev for perspectives carrying the
 	// given feeling (matched by emoji, optionally narrowed by label), scoped

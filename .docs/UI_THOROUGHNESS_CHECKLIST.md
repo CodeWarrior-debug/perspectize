@@ -23,7 +23,7 @@ A column, field, filter, sort, setting or content type touches some of these lay
 - [ ] Pagination: every list field a new consumer relies on has an explicit `first`, and the consumer knows the default (10) and the max (100). (#4)
 
 ### B. Frontend data layer
-- [ ] The field is selected in **every** query document whose screens should show it: `LIST_CONTENT`, `GET_CONTENT`, `LIST_ACTIVITY_PERSPECTIVES`, `PERSPECTIVE_FIELDS`, creation mutations, and so on. (#8)
+- [ ] The field is selected in **every** query document whose screens should show it: `LIST_CONTENT`, `GET_CONTENT`, `PERSPECTIVE_FIELDS`, creation mutations, and so on. (#8)
 - [ ] The TS response type is updated to match.
 - [ ] **Query keys:** a new list query gets its own key branch. Optimistic `setQueriesData` targets only lists **with the same row shape and the same privacy scope**; others are invalidated, not patched. (#3)
 - [ ] Optimistic updates treat "cleared" as `null`, not `?? previous`. (#2)

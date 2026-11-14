@@ -221,17 +221,6 @@ describe('useCreatePerspective hook', () => {
 			);
 		});
 
-		it('invalidates the activity feeds — never patched with a PerspectiveItem, since their row shape and privacy filtering differ', () => {
-			capturedMutationOptions.onSuccess(
-				{ createPerspective: createdRow },
-				{ userID: 42 },
-				{ previous: [], tempId: 'x' },
-			);
-			expect(mockInvalidateQueries).toHaveBeenCalledWith({
-				queryKey: ['app', 'perspectives', 'list', 'activityFeed'],
-			});
-		});
-
 		it("invalidates the created content's listByContent cache (e.g. an open Compare picker), exact", () => {
 			capturedMutationOptions.onSuccess(
 				{ createPerspective: createdRow },
@@ -244,7 +233,7 @@ describe('useCreatePerspective hook', () => {
 			});
 		});
 
-		it('does not patch listByContent or activityFeed with the new row (only invalidates them)', () => {
+		it('does not patch listByContent with the new row (only invalidates it)', () => {
 			capturedMutationOptions.onSuccess(
 				{ createPerspective: createdRow },
 				{ userID: 42 },
@@ -253,7 +242,6 @@ describe('useCreatePerspective hook', () => {
 			for (const call of mockSetQueriesData.mock.calls) {
 				const key = call[0]?.queryKey ?? call[0];
 				expect(key).not.toContain('byContent');
-				expect(key).not.toContain('activityFeed');
 			}
 		});
 
@@ -297,9 +285,30 @@ describe('useCreatePerspective hook', () => {
 			expect(mockToastError).toHaveBeenCalledWith('Please fill in at least one field');
 		});
 
-		it('shows generic message for unknown errors', () => {
-			capturedMutationOptions.onError(new Error('connection timeout'));
-			expect(mockToastError).toHaveBeenCalledWith('Failed to add perspective. Please try again.');
+		it('shows generic message with a Retry action for unknown errors', () => {
+			capturedMutationOptions.onError(new Error('connection timeout'), { userID: 42, contentID: 10, quality: 7500 });
+			expect(mockToastError).toHaveBeenCalledWith('Failed to add perspective.', {
+				action: { label: 'Retry', onClick: expect.any(Function) },
+			});
+		});
+
+		it('Retry re-runs the same mutation with the same input', () => {
+			const input = { userID: 42, contentID: 10, quality: 7500 };
+			capturedMutationOptions.onError(new Error('connection timeout'), input);
+			const opts = mockToastError.mock.calls.at(-1)![1];
+			expect(mockMutate).not.toHaveBeenCalled();
+			opts.action.onClick();
+			expect(mockMutate).toHaveBeenCalledTimes(1);
+			expect(mockMutate).toHaveBeenCalledWith(input);
+		});
+
+		it('validation errors carry no Retry action', () => {
+			for (const m of ['user not found', 'invalid rating: quality 99999', 'at least one field must be provided']) {
+				mockToastError.mockClear();
+				capturedMutationOptions.onError(new Error(m), { userID: 42, contentID: 10, quality: 7500 });
+				expect(mockToastError).toHaveBeenCalledTimes(1);
+				expect(mockToastError.mock.calls[0]).toHaveLength(1);
+			}
 		});
 
 		it('rolls the optimistic insert back from the snapshot', () => {

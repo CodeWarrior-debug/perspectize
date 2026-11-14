@@ -25,11 +25,37 @@ func (m *mockContentService) CreateFromYouTube(ctx context.Context, url string, 
 	return nil, nil
 }
 
+func (m *mockContentService) YouTubeTrending(ctx context.Context, regionCode, pageToken string) (*portservices.TrendingPage, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) SearchMovies(ctx context.Context, query string, page int) (*portservices.MovieSearchPage, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) TrendingMovies(ctx context.Context, window domain.TrendingWindow, page int) (*portservices.MovieSearchPage, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) CreateFromMovie(ctx context.Context, rawURL string, userID int) (*domain.Content, error) {
+	return nil, nil
+}
+
 func (m *mockContentService) GetByID(ctx context.Context, id int) (*domain.Content, error) {
 	if m.getByIDFn != nil {
 		return m.getByIDFn(ctx, id)
 	}
 	return nil, domain.ErrNotFound
+}
+
+func (m *mockContentService) GetByIDs(ctx context.Context, ids []int) ([]*domain.Content, error) {
+	out := []*domain.Content{}
+	for _, id := range ids {
+		if c, err := m.GetByID(ctx, id); err == nil && c != nil {
+			out = append(out, c)
+		}
+	}
+	return out, nil
 }
 
 func (m *mockContentService) ListContent(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error) {
@@ -64,6 +90,22 @@ func (m *mockContentService) UpdateSourceData(ctx context.Context, contentID int
 	return nil, nil
 }
 
+func (m *mockContentService) CreateFromBook(ctx context.Context, rawURLOrISBN string, userID int) (*domain.Content, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) SearchBooks(ctx context.Context, query string, page int) (*portservices.BookSearchPage, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) TrendingBooks(ctx context.Context, window domain.TrendingWindow, page int) (*portservices.BookSearchPage, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) ResolveBookISBN(ctx context.Context, isbn string) (*portservices.BookSearchResult, error) {
+	return nil, nil
+}
+
 // mockPerspectiveService implements portservices.PerspectiveService for testing
 type mockPerspectiveService struct {
 	getByIDFn func(ctx context.Context, id int) (*domain.Perspective, error)
@@ -80,7 +122,7 @@ func (m *mockPerspectiveService) GetByID(ctx context.Context, id int) (*domain.P
 	return nil, domain.ErrNotFound
 }
 
-func (m *mockPerspectiveService) Update(ctx context.Context, input portservices.UpdatePerspectiveInput) (*domain.Perspective, error) {
+func (m *mockPerspectiveService) Update(ctx context.Context, input portservices.UpdatePerspectiveInput, actorUserID int) (*domain.Perspective, error) {
 	return nil, nil
 }
 
@@ -94,6 +136,10 @@ func (m *mockPerspectiveService) ListPerspectives(ctx context.Context, params do
 
 func (m *mockPerspectiveService) AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 	return map[int]*domain.PerspectiveAggregate{}, nil
+}
+
+func (m *mockPerspectiveService) CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error) {
+	return map[int]int{}, nil
 }
 
 func (m *mockPerspectiveService) FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*domain.FeelingStats, error) {

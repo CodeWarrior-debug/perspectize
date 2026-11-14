@@ -42,7 +42,8 @@ go mod download
 # 5. Install shared git hooks (auto-formats staged Go/Svelte/TS on commit)
 make install-hooks
 
-# 6. Run migrations
+# 6. Run migrations (a local/demo database only. With a Neon DATABASE_URL this hits the
+#    shared database: see .docs/MIGRATION_ROLLOUT.md)
 make migrate-up
 
 # 7. Start the server
@@ -114,7 +115,7 @@ DATABASE_URL=postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
 YOUTUBE_API_KEY=your_youtube_api_key_here
 
 # Server
-PORT=8080
+SERVER_PORT=8080
 ENV=development
 
 # Logging
@@ -123,6 +124,8 @@ LOG_FORMAT=text  # text or json
 ```
 
 ### 3. Database Migrations
+
+> `make migrate-*` runs against whatever `DATABASE_URL` your backend env file points at, which is normally the **shared Neon database**. Use these targets only against a local or demo database. Rolling out to Neon is a manual, one-migration-at-a-time procedure: [MIGRATION_ROLLOUT.md](MIGRATION_ROLLOUT.md).
 
 ```bash
 # Apply all migrations
@@ -185,8 +188,8 @@ make dev
 #### With Specific Flags
 
 ```bash
-# Custom port
-PORT=3000 make run
+# Custom port (SERVER_PORT, not PORT: hosting platforms set PORT)
+SERVER_PORT=3000 make run
 
 # Debug logging
 LOG_LEVEL=debug make run
@@ -422,7 +425,7 @@ lsof -i :8080
 kill -9 <PID>
 
 # Or use different port
-PORT=3000 make run
+SERVER_PORT=3000 make run
 ```
 
 ### Migration Failures

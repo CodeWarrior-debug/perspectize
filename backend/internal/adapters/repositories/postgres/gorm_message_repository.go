@@ -26,14 +26,14 @@ func NewGormMessageRepository(db *gorm.DB) *GormMessageRepository {
 }
 
 // Insert persists a new message. The trg_assign_message_seq trigger assigns the
-// per-thread seq and the DB assigns created_at, so neither is set on the insert.
-// Insertion is idempotent on (thread_id, sender_id, client_nonce): a conflicting
-// insert is a no-op and the pre-existing row is returned unchanged, so a client
-// retrying a send never creates a duplicate.
+// per-thread seq and the DB assigns created_at; RETURNING * hands both back
+// without a re-read. Insertion is idempotent on (thread_id, sender_id,
+// client_nonce): a conflicting insert is a no-op and the pre-existing row is
+// returned unchanged, so a client retrying a send never creates a duplicate.
 func (r *GormMessageRepository) Insert(ctx context.Context, m *domain.Message) (*domain.Message, error) {
 	model := messageDomainToModel(m)
 
-	if err := r.db.WithContext(ctx).
+	res := r.db.WithContext(ctx).
 		Clauses(clause.OnConflict{
 			Columns: []clause.Column{
 				{Name: "thread_id"},
@@ -41,27 +41,25 @@ func (r *GormMessageRepository) Insert(ctx context.Context, m *domain.Message) (
 				{Name: "client_nonce"},
 			},
 			DoNothing: true,
-		}).
-		Create(model).Error; err != nil {
-		return nil, fmt.Errorf("failed to insert message: %w", err)
+		}, clause.Returning{}).
+		Create(model)
+	if res.Error != nil {
+		return nil, fmt.Errorf("failed to insert message: %w", res.Error)
 	}
 
-	var stored MessageModel
-	if model.ID == 0 {
+	if res.RowsAffected == 0 {
 		// Conflict: nothing inserted. Return the row that already exists.
+		var stored MessageModel
 		if err := r.db.WithContext(ctx).
 			Where("thread_id = ? AND sender_id = ? AND client_nonce = ?", model.ThreadID, model.SenderID, model.ClientNonce).
 			First(&stored).Error; err != nil {
 			return nil, fmt.Errorf("failed to load existing message after nonce conflict: %w", err)
 		}
-	} else {
-		// Reload to pick up the trigger-assigned seq and DB created_at.
-		if err := r.db.WithContext(ctx).First(&stored, model.ID).Error; err != nil {
-			return nil, fmt.Errorf("failed to reload inserted message: %w", err)
-		}
+		msg := messageModelToDomain(&stored)
+		return &msg, nil
 	}
 
-	msg := messageModelToDomain(&stored)
+	msg := messageModelToDomain(model)
 	return &msg, nil
 }
 
@@ -137,36 +135,64 @@ func (r *GormMessageRepository) CountSince(ctx context.Context, threadID int, si
 	return int(n), nil
 }
 
-// UpdateBody rewrites a message body and stamps edited_at. The row is reloaded
-// via GetByID so the returned message carries the trigger-assigned seq and the
-// DB created_at unchanged. A missing id is reported as domain.ErrNotFound.
-func (r *GormMessageRepository) UpdateBody(ctx context.Context, messageID int64, body string, editedAt time.Time) (*domain.Message, error) {
-	res := r.db.WithContext(ctx).Model(&MessageModel{}).
-		Where("id = ?", messageID).
-		Updates(map[string]any{"body": body, "edited_at": editedAt})
-	if res.Error != nil {
-		return nil, fmt.Errorf("failed to update message body: %w", res.Error)
+// ThreadStats computes latestSeq and the viewer's unread count for many
+// threads in one round trip. Unread counts only messages sent by someone else:
+// the viewer's own messages are never unread to them. Each correlated subquery
+// is an index range scan on (thread_id, seq), same as the per-thread MaxSeq /
+// CountSince it replaces.
+func (r *GormMessageRepository) ThreadStats(ctx context.Context, viewerUserID int, threadIDs []int) (map[int]domain.ThreadStats, error) {
+	out := make(map[int]domain.ThreadStats, len(threadIDs))
+	if len(threadIDs) == 0 {
+		return out, nil
 	}
-	if res.RowsAffected == 0 {
-		return nil, domain.ErrNotFound
+	var rows []struct {
+		ThreadID  int
+		LatestSeq int64
+		Unread    int
 	}
-	return r.GetByID(ctx, messageID)
+	if err := r.db.WithContext(ctx).Raw(`
+		SELECT tp.thread_id,
+		       (SELECT COALESCE(MAX(m.seq), 0) FROM messages m WHERE m.thread_id = tp.thread_id) AS latest_seq,
+		       (SELECT COUNT(*) FROM messages m WHERE m.thread_id = tp.thread_id AND m.seq > tp.last_read_seq AND m.sender_id <> tp.user_id) AS unread
+		FROM thread_participants tp
+		WHERE tp.user_id = ? AND tp.thread_id = ANY(CAST(? AS bigint[]))`, viewerUserID, intsToArray(threadIDs)).
+		Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("failed to load thread stats: %w", err)
+	}
+	for _, row := range rows {
+		out[row.ThreadID] = domain.ThreadStats{LatestSeq: row.LatestSeq, Unread: row.Unread}
+	}
+	return out, nil
+}
+
+// UpdateBody rewrites a message body and stamps edited_at in one round trip,
+// scoped to the sender and to live (not deleted) messages. RETURNING * carries
+// the unchanged seq and created_at back. No matching row is ErrNotFound.
+func (r *GormMessageRepository) UpdateBody(ctx context.Context, messageID int64, senderID int, body string, editedAt time.Time) (*domain.Message, error) {
+	return r.updateOwn(ctx, messageID, senderID, map[string]any{"body": body, "edited_at": editedAt}, "update message body")
 }
 
 // SoftDelete tombstones a message: deleted_at is set and the body blanked while
-// the row and its seq stay in place so history replay is unaffected. The
-// reloaded row is returned. A missing id is reported as domain.ErrNotFound.
-func (r *GormMessageRepository) SoftDelete(ctx context.Context, messageID int64, deletedAt time.Time) (*domain.Message, error) {
-	res := r.db.WithContext(ctx).Model(&MessageModel{}).
-		Where("id = ?", messageID).
-		Updates(map[string]any{"deleted_at": deletedAt, "body": ""})
+// the row and its seq stay in place so history replay is unaffected. Scoped to
+// the sender and to not-yet-deleted messages; no matching row is ErrNotFound.
+func (r *GormMessageRepository) SoftDelete(ctx context.Context, messageID int64, senderID int, deletedAt time.Time) (*domain.Message, error) {
+	return r.updateOwn(ctx, messageID, senderID, map[string]any{"deleted_at": deletedAt, "body": ""}, "soft-delete message")
+}
+
+func (r *GormMessageRepository) updateOwn(ctx context.Context, messageID int64, senderID int, set map[string]any, action string) (*domain.Message, error) {
+	var updated MessageModel
+	res := r.db.WithContext(ctx).Model(&updated).
+		Clauses(clause.Returning{}).
+		Where("id = ? AND sender_id = ? AND deleted_at IS NULL", messageID, senderID).
+		Updates(set)
 	if res.Error != nil {
-		return nil, fmt.Errorf("failed to soft-delete message: %w", res.Error)
+		return nil, fmt.Errorf("failed to %s: %w", action, res.Error)
 	}
 	if res.RowsAffected == 0 {
 		return nil, domain.ErrNotFound
 	}
-	return r.GetByID(ctx, messageID)
+	msg := messageModelToDomain(&updated)
+	return &msg, nil
 }
 
 func messageModelsToDomain(rows []MessageModel) []domain.Message {

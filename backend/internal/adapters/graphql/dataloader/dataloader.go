@@ -26,25 +26,101 @@ type ctxKey struct{}
 type Loaders struct {
 	CategoryByID                    *dataloadgen.Loader[int, *domain.Category]
 	PerspectiveAggregateByContentID *dataloadgen.Loader[int, *domain.PerspectiveAggregate]
+	// VisiblePerspectiveCount batches per-content counts of the perspectives a
+	// given viewer may read. Keyed by viewer too, since the count differs per
+	// viewer (a viewer's own private perspectives count for them alone).
+	VisiblePerspectiveCount *dataloadgen.Loader[VisiblePerspectiveKey, int]
+	// ContentByID batches Perspective.content lookups.
+	ContentByID *dataloadgen.Loader[int, *domain.Content]
+	// UserByID batches Message.sender / ThreadParticipant.user /
+	// Perspective.user / Content.addedBy lookups.
+	UserByID *dataloadgen.Loader[int, *domain.User]
+	// ThreadStats batches MessageThread.latestSeq / unreadCount per viewer.
+	ThreadStats *dataloadgen.Loader[ThreadStatsKey, domain.ThreadStats]
+	// TodoActionByID batches UserTodo.action lookups.
+	TodoActionByID *dataloadgen.Loader[int, *domain.TodoAction]
+	// UserTodoListByID batches UserTodo.list lookups. The key carries the
+	// viewer, because a PRIVATE list is returned only to its owner.
+	UserTodoListByID *dataloadgen.Loader[UserTodoListKey, *domain.UserTodoList]
+	// ImportJobByID batches Content.importedFrom lookups. Closed imports are
+	// returned too; the resolver decides who may see them.
+	ImportJobByID *dataloadgen.Loader[int, *domain.ImportJob]
+}
+
+// ThreadStatsKey identifies one viewer's stats for one thread.
+type ThreadStatsKey struct {
+	ViewerID int
+	ThreadID int
+}
+
+// VisiblePerspectiveKey identifies one content row's perspective count as seen
+// by one viewer. ViewerID 0 is an anonymous caller.
+type VisiblePerspectiveKey struct {
+	ViewerID  int
+	ContentID int
+}
+
+// UserTodoListKey identifies one list as seen by one viewer. ViewerID 0 is an
+// anonymous caller.
+type UserTodoListKey struct {
+	ViewerID int
+	ListID   int
+}
+
+// Services are the ports the loaders batch through.
+type Services struct {
+	Category    portservices.CategoryService
+	Perspective portservices.PerspectiveService
+	User        portservices.UserService
+	Content     portservices.ContentService
+	Messaging   portservices.MessagingService
+	UserTodo    portservices.UserTodoService
+	ImportJob   portservices.ImportService
 }
 
 // NewLoaders builds a fresh set of loaders backed by the given services.
-func NewLoaders(categoryService portservices.CategoryService, perspectiveService portservices.PerspectiveService) *Loaders {
-	cb := &categoryBatcher{service: categoryService}
-	pb := &perspectiveAggregateBatcher{service: perspectiveService}
+func NewLoaders(s Services) *Loaders {
+	cb := &categoryBatcher{service: s.Category}
+	pb := &perspectiveAggregateBatcher{service: s.Perspective}
+	ub := &userBatcher{service: s.User}
+	tb := &threadStatsBatcher{service: s.Messaging}
+	cnb := &contentBatcher{service: s.Content}
+	tab := &todoActionBatcher{service: s.UserTodo}
+	tlb := &userTodoListBatcher{service: s.UserTodo}
+	ijb := &importJobBatcher{service: s.ImportJob}
 	return &Loaders{
 		CategoryByID:                    dataloadgen.NewMappedLoader(cb.byID),
 		PerspectiveAggregateByContentID: dataloadgen.NewMappedLoader(pb.byContentID),
+		VisiblePerspectiveCount:         dataloadgen.NewMappedLoader(pb.visibleByKey),
+		UserByID:                        dataloadgen.NewMappedLoader(ub.byID),
+		ThreadStats:                     dataloadgen.NewMappedLoader(tb.byKey),
+		ContentByID:                     dataloadgen.NewMappedLoader(cnb.byID),
+		TodoActionByID:                  dataloadgen.NewMappedLoader(tab.byID),
+		UserTodoListByID:                dataloadgen.NewMappedLoader(tlb.byKey),
+		ImportJobByID:                   dataloadgen.NewMappedLoader(ijb.byID),
 	}
 }
 
+// importJobBatcher resolves a batch of import job IDs in one service call.
+type importJobBatcher struct {
+	service portservices.ImportService
+}
+
+func (b *importJobBatcher) byID(ctx context.Context, ids []int) (map[int]*domain.ImportJob, error) {
+	if b.service == nil {
+		// Imports not wired on this server: every key is absent, so resolvers see nil.
+		return map[int]*domain.ImportJob{}, nil
+	}
+	return b.service.GetImportJobsByIDs(ctx, ids)
+}
+
 // Middleware injects a fresh *Loaders into the context of every request. It
-// mirrors the chi middleware conventions in cmd/server/main.go (a
+// mirrors the chi middleware conventions in internal/server (a
 // func(http.Handler) http.Handler).
-func Middleware(categoryService portservices.CategoryService, perspectiveService portservices.PerspectiveService) func(http.Handler) http.Handler {
+func Middleware(s Services) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), ctxKey{}, NewLoaders(categoryService, perspectiveService))
+			ctx := context.WithValue(r.Context(), ctxKey{}, NewLoaders(s))
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -55,6 +131,119 @@ func Middleware(categoryService portservices.CategoryService, perspectiveService
 func For(ctx context.Context) *Loaders {
 	l, _ := ctx.Value(ctxKey{}).(*Loaders)
 	return l
+}
+
+// userBatcher resolves a batch of user IDs in one query.
+type userBatcher struct {
+	service portservices.UserService
+}
+
+func (b *userBatcher) byID(ctx context.Context, ids []int) (map[int]*domain.User, error) {
+	users, err := b.service.GetByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int]*domain.User, len(users))
+	for _, u := range users {
+		if u != nil {
+			out[u.ID] = u
+		}
+	}
+	return out, nil
+}
+
+// contentBatcher resolves a batch of content IDs in one query.
+type contentBatcher struct {
+	service portservices.ContentService
+}
+
+func (b *contentBatcher) byID(ctx context.Context, ids []int) (map[int]*domain.Content, error) {
+	items, err := b.service.GetByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int]*domain.Content, len(items))
+	for _, c := range items {
+		if c != nil {
+			out[c.ID] = c
+		}
+	}
+	return out, nil
+}
+
+// threadStatsBatcher resolves many (viewer, thread) stats in one query per
+// viewer — in practice one query, since a request has a single viewer.
+type threadStatsBatcher struct {
+	service portservices.MessagingService
+}
+
+func (b *threadStatsBatcher) byKey(ctx context.Context, keys []ThreadStatsKey) (map[ThreadStatsKey]domain.ThreadStats, error) {
+	byViewer := make(map[int][]int)
+	for _, k := range keys {
+		byViewer[k.ViewerID] = append(byViewer[k.ViewerID], k.ThreadID)
+	}
+	out := make(map[ThreadStatsKey]domain.ThreadStats, len(keys))
+	for viewer, threadIDs := range byViewer {
+		stats, err := b.service.ThreadStats(ctx, viewer, threadIDs)
+		if err != nil {
+			return nil, err
+		}
+		for tid, st := range stats {
+			out[ThreadStatsKey{ViewerID: viewer, ThreadID: tid}] = st
+		}
+	}
+	return out, nil
+}
+
+// todoActionBatcher resolves a batch of todo action IDs in one service call.
+type todoActionBatcher struct {
+	service portservices.UserTodoService
+}
+
+func (b *todoActionBatcher) byID(ctx context.Context, ids []int) (map[int]*domain.TodoAction, error) {
+	actions, err := b.service.GetTodoActionsByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int]*domain.TodoAction, len(actions))
+	for _, a := range actions {
+		if a != nil {
+			out[a.ID] = a
+		}
+	}
+	return out, nil
+}
+
+// userTodoListBatcher resolves many (viewer, list) keys. Each viewer's lists go
+// through GetUserTodoListsByIDs with that viewer, so a PRIVATE list another user
+// owns is absent from the map and its key surfaces as not-found.
+type userTodoListBatcher struct {
+	service portservices.UserTodoService
+}
+
+func (b *userTodoListBatcher) byKey(ctx context.Context, keys []UserTodoListKey) (map[UserTodoListKey]*domain.UserTodoList, error) {
+	byViewer := make(map[int][]int)
+	for _, k := range keys {
+		byViewer[k.ViewerID] = append(byViewer[k.ViewerID], k.ListID)
+	}
+	out := make(map[UserTodoListKey]*domain.UserTodoList, len(keys))
+	for viewer, listIDs := range byViewer {
+		var viewerID *int
+		if viewer != 0 {
+			v := viewer
+			viewerID = &v
+		}
+		lists, err := b.service.GetUserTodoListsByIDs(ctx, listIDs, viewerID)
+		if err != nil {
+			return nil, err
+		}
+		for _, l := range lists {
+			if l != nil {
+				out[UserTodoListKey{ViewerID: viewer, ListID: l.ID}] = l
+			}
+		}
+	}
+	return out, nil
 }
 
 // categoryBatcher adapts CategoryService to a dataloadgen mapped-fetch func.
@@ -92,6 +281,33 @@ type perspectiveAggregateBatcher struct {
 // resolvers treat as "count 0 / no average" via IsNotFound.
 func (b *perspectiveAggregateBatcher) byContentID(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error) {
 	return b.service.AggregateByContentIDs(ctx, contentIDs)
+}
+
+// visibleByKey resolves a batch of (viewer, content) keys, one service call per
+// distinct viewer in the batch (a request normally has exactly one). A content
+// ID with no visible perspectives is absent, which dataloadgen surfaces as
+// ErrNotFound; resolvers read that as a count of 0.
+func (b *perspectiveAggregateBatcher) visibleByKey(ctx context.Context, keys []VisiblePerspectiveKey) (map[VisiblePerspectiveKey]int, error) {
+	byViewer := make(map[int][]int)
+	for _, k := range keys {
+		byViewer[k.ViewerID] = append(byViewer[k.ViewerID], k.ContentID)
+	}
+	out := make(map[VisiblePerspectiveKey]int, len(keys))
+	for viewer, contentIDs := range byViewer {
+		var viewerID *int
+		if viewer != 0 {
+			v := viewer
+			viewerID = &v
+		}
+		counts, err := b.service.CountVisibleByContentIDs(ctx, contentIDs, viewerID)
+		if err != nil {
+			return nil, err
+		}
+		for cid, n := range counts {
+			out[VisiblePerspectiveKey{ViewerID: viewer, ContentID: cid}] = n
+		}
+	}
+	return out, nil
 }
 
 // IsNotFound reports whether a loader error is just "this key had no row",

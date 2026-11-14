@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
+import { MODAL_ACTION_CLASS } from '$lib/components/modal-action';
 
 // Hoisted mocks — shared pattern for useUpdateSourceData components (see AddVideoPopover.test.ts)
 const mocks = vi.hoisted(() => ({
@@ -35,6 +36,19 @@ vi.mock('svelte-sonner', () => ({
 
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
 
+// The "Add to plan" button reads the auth facade; the real module needs Clerk, so stub it.
+const authState = vi.hoisted(() => ({ userId: null as string | null }));
+vi.mock('$lib/auth/useAuthState', () => ({
+	useAuthState: () => ({
+		get isLoaded() {
+			return true;
+		},
+		get userId() {
+			return authState.userId;
+		},
+	}),
+}));
+
 function reset() {
 	vi.clearAllMocks();
 	mocks.mockMutationState.isPending = false;
@@ -47,7 +61,7 @@ const content = {
 	name: 'Stephen Paea breaking bench',
 	url: 'https://youtube.com/watch?v=abc123',
 	channelTitle: 'TBD tribute',
-	contentType: 'YOUTUBE',
+	contentType: 'YOUTUBE_VIDEO',
 	primaryCategory: { label: 'Powerlifting' },
 	viewCount: 1300000,
 	likeCount: 26500,
@@ -79,6 +93,13 @@ describe('ActivityDetailsModal', () => {
 		expect(screen.getByText('0:59')).toBeInTheDocument(); // duration
 	});
 
+	it('labels the length tile "Duration" to match the grid column', () => {
+		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+
+		expect(screen.getByText('Duration')).toBeInTheDocument();
+		expect(screen.queryByText('Length')).not.toBeInTheDocument();
+	});
+
 	// Gap #11 in the UI gap audit: the modal had no Category or Date Added, and
 	// hard-coded "YouTube Video" regardless of content type -- even though all
 	// three were already on the ContentItem rows both callers pass in.
@@ -107,6 +128,22 @@ describe('ActivityDetailsModal', () => {
 	it('labels the header "YouTube Video" for a YOUTUBE content item', () => {
 		render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 		expect(screen.getByText('YouTube Video')).toBeInTheDocument();
+	});
+
+	describe('TMDB attribution', () => {
+		const TMDB_NOTICE = 'This product uses the TMDB API but is not endorsed or certified by TMDB.';
+
+		it('is shown for a MOVIE row', () => {
+			render(ActivityDetailsModal, {
+				props: { content: { ...content, contentType: 'MOVIE' }, open: true, onClose: vi.fn() },
+			});
+			expect(screen.getByText(TMDB_NOTICE)).toBeInTheDocument();
+		});
+
+		it('is hidden for a YOUTUBE_VIDEO row', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			expect(screen.queryByText(TMDB_NOTICE)).not.toBeInTheDocument();
+		});
 	});
 
 	it('labels the header "Claim" for a CLAIM content item', () => {
@@ -233,6 +270,154 @@ describe('ActivityDetailsModal', () => {
 		expect(link).toHaveAttribute('href', `/compare?contentId=${content.id}`);
 	});
 
+	describe('MOVIE content', () => {
+		const baseMovie = {
+			tagline: 'Welcome to the real world.',
+			overview: 'A hacker learns the truth.',
+			releaseDate: '1999-03-31',
+			genres: ['Action', 'Science Fiction'],
+			certification: 'R',
+			runtimeMinutes: 136,
+			budget: 63000000,
+			revenue: 467000000,
+			voteAverage: 8.2,
+			voteCount: 25000,
+			posterPath: '/poster.jpg',
+			keywords: ['dystopia', 'simulation'],
+			directors: [{ id: 9339, name: 'Lana Wachowski' }],
+			cast: [
+				{ id: 6384, name: 'Keanu Reeves', character: 'Neo', order: 0 },
+				{ id: 2975, name: 'Laurence Fishburne', character: 'Morpheus', order: 1 },
+			],
+		};
+		const movieRow = (movie: unknown) => ({
+			...content,
+			name: 'The Matrix',
+			url: 'https://www.themoviedb.org/movie/603',
+			channelTitle: null,
+			contentType: 'MOVIE',
+			viewCount: null,
+			likeCount: null,
+			length: 8160,
+			lengthUnits: 'seconds',
+			description: null,
+			tags: null,
+			primaryCategory: null,
+			movie,
+		});
+		const open = (movie: unknown) =>
+			render(ActivityDetailsModal, { props: { content: movieRow(movie), open: true, onClose: vi.fn() } });
+
+		it('labels the header Movie and drops YouTube-only tiles and the update button', () => {
+			open(baseMovie);
+			expect(screen.getByText('Movie')).toBeInTheDocument();
+			expect(screen.queryByText('YouTube Video')).not.toBeInTheDocument();
+			expect(screen.queryByText('Views')).not.toBeInTheDocument();
+			expect(screen.queryByText('Likes')).not.toBeInTheDocument();
+			expect(screen.queryByText('Category')).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /update source data/i })).not.toBeInTheDocument();
+			expect(screen.queryByText(/updated recently/i)).not.toBeInTheDocument();
+			expect(screen.getByRole('link', { name: /compare/i })).toBeInTheDocument();
+			expect(screen.getByText('https://www.themoviedb.org/movie/603')).toBeInTheDocument();
+			expect(screen.getByText(/uses the TMDB API/)).toBeInTheDocument();
+		});
+
+		it('hides the update note even when the row was updated moments ago', () => {
+			render(ActivityDetailsModal, {
+				props: {
+					content: { ...movieRow(baseMovie), updatedAt: new Date().toISOString() },
+					open: true,
+					onClose: vi.fn(),
+				},
+			});
+			expect(screen.queryByText(/check back/i)).not.toBeInTheDocument();
+		});
+
+		it('shows the movie fact tiles, poster and tagline', () => {
+			open(baseMovie);
+			expect(screen.getByText('8.2')).toBeInTheDocument();
+			expect(screen.getByText('2:16:00')).toBeInTheDocument();
+			expect(screen.getByText('Mar 31, 1999')).toBeInTheDocument();
+			expect(screen.getByText('R')).toBeInTheDocument();
+			expect(screen.getByText('Action, Science Fiction')).toBeInTheDocument();
+			expect(screen.getByText('Welcome to the real world.')).toBeInTheDocument();
+			expect(screen.getByAltText('The Matrix poster')).toHaveAttribute(
+				'src',
+				'https://image.tmdb.org/t/p/w342/poster.jpg',
+			);
+			for (const label of ['TMDB Score', 'Duration', 'Released', 'Rated', 'Director(s)', 'Genre', 'Budget']) {
+				expect(screen.getByText(label)).toBeInTheDocument();
+			}
+			expect(screen.getByText('Box office')).toBeInTheDocument();
+			expect(screen.getByText('Vs. budget')).toBeInTheDocument();
+		});
+
+		it('shows em dashes, never $0, for zero or null budget and revenue', () => {
+			const { container } = open({ ...baseMovie, budget: 0, revenue: null });
+			expect(container.ownerDocument.body.textContent).not.toContain('$0');
+			const tile = (label: string) => screen.getByText(label).nextElementSibling!.textContent!.trim();
+			expect(tile('Budget')).toBe('—');
+			expect(tile('Box office')).toBe('—');
+			expect(tile('Vs. budget')).toBe('—');
+		});
+
+		it('lists directors first, then cast, each linked to TMDB', () => {
+			open(baseMovie);
+			const keanu = screen.getByRole('link', { name: 'Keanu Reeves' });
+			expect(keanu).toHaveAttribute('href', 'https://www.themoviedb.org/person/6384');
+			expect(keanu).toHaveAttribute('target', '_blank');
+			expect(keanu).toHaveAttribute('rel', 'noopener noreferrer');
+			expect(screen.getByText('as Neo')).toBeInTheDocument();
+			expect(screen.getByText('· Director')).toBeInTheDocument();
+			const names = screen.getAllByRole('link', { name: /Wachowski|Reeves|Fishburne/ }).map((a) => a.textContent);
+			expect(names).toEqual(['Lana Wachowski', 'Keanu Reeves', 'Laurence Fishburne']);
+			expect(screen.getByText('Top cast')).toBeInTheDocument();
+			expect(screen.getByText('A hacker learns the truth.')).toBeInTheDocument();
+			expect(screen.getByText('dystopia, simulation')).toBeInTheDocument();
+		});
+
+		it('shows directors only when there is no cast', () => {
+			open({ ...baseMovie, cast: [] });
+			expect(screen.getByText('· Director')).toBeInTheDocument();
+			expect(screen.queryByText(/^as /)).not.toBeInTheDocument();
+			expect(screen.getByRole('link', { name: 'Lana Wachowski' })).toBeInTheDocument();
+		});
+
+		it('shows cast only when there are no directors', () => {
+			open({ ...baseMovie, directors: [] });
+			expect(screen.queryByText('· Director')).not.toBeInTheDocument();
+			expect(screen.getByRole('link', { name: 'Keanu Reeves' })).toBeInTheDocument();
+			expect(screen.getByText('Director(s)').nextElementSibling!.textContent!.trim()).toBe('—');
+		});
+
+		it('omits the cast section with neither', () => {
+			open({ ...baseMovie, directors: [], cast: [] });
+			expect(screen.queryByText('Top cast')).not.toBeInTheDocument();
+		});
+
+		it('renders without a poster image when posterPath is absent', () => {
+			open({ ...baseMovie, posterPath: null });
+			expect(screen.queryByAltText('The Matrix poster')).not.toBeInTheDocument();
+			expect(screen.getByText('The Matrix')).toBeInTheDocument();
+		});
+
+		it('does not crash when the row has no movie payload', () => {
+			open(null);
+			expect(screen.getByText('Movie')).toBeInTheDocument();
+			expect(screen.getByText('The Matrix')).toBeInTheDocument();
+			expect(screen.queryByText('Top cast')).not.toBeInTheDocument();
+			expect(screen.getByText(/uses the TMDB API/)).toBeInTheDocument();
+		});
+
+		it('keeps Views, Likes and Update source data for a YouTube row', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			expect(screen.getByText('Views')).toBeInTheDocument();
+			expect(screen.getByText('Likes')).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Update source data' })).toBeInTheDocument();
+			expect(screen.getByText('YouTube Video')).toBeInTheDocument();
+		});
+	});
+
 	describe('BIBLE_PASSAGE content', () => {
 		const passage = {
 			id: '7',
@@ -332,6 +517,13 @@ describe('ActivityDetailsModal', () => {
 			expect(screen.getByRole('button', { name: /save title/i })).toBeDisabled();
 		});
 
+		it('sizes Save title like the other dialog actions and its input to match (#667)', () => {
+			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
+			const save = screen.getByRole('button', { name: /save title/i });
+			for (const c of MODAL_ACTION_CLASS.split(' ')) expect(save).toHaveClass(c);
+			expect(screen.getByLabelText('Passage title')).toHaveClass('h-9');
+		});
+
 		it('offers original language for a passage', () => {
 			render(ActivityDetailsModal, { props: { content: passage, open: true, onClose: vi.fn() } });
 			expect(screen.getByRole('button', { name: /show original language/i })).toBeInTheDocument();
@@ -340,6 +532,205 @@ describe('ActivityDetailsModal', () => {
 		it('does not offer original language for a YouTube video', () => {
 			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
 			expect(screen.queryByRole('button', { name: /original language/i })).not.toBeInTheDocument();
+		});
+	});
+
+	// importedFrom is viewer-scoped, so it arrives with the per-viewer aggregates query, not the row.
+	describe('Imported from', () => {
+		it('links the row to the import it was created by once the aggregates arrive', () => {
+			mocks.mockQueryState.data = {
+				contentByID: {
+					id: content.id,
+					perspectiveCount: 0,
+					averageRating: null,
+					qualityRatingCount: 0,
+					importedFrom: { id: '12', name: 'Spring 2026 watchlist' },
+				},
+			};
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+
+			expect(screen.getByText('Imported from')).toBeInTheDocument();
+			const link = screen.getByRole('link', { name: 'Spring 2026 watchlist' });
+			expect(link).toHaveAttribute('href', '/import/12');
+		});
+
+		it('is absent when the aggregates say importedFrom is null (hand-added content, or not visible to this viewer)', () => {
+			mocks.mockQueryState.data = {
+				contentByID: {
+					id: content.id,
+					perspectiveCount: 0,
+					averageRating: null,
+					qualityRatingCount: 0,
+					importedFrom: null,
+				},
+			};
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+
+			expect(screen.queryByText('Imported from')).not.toBeInTheDocument();
+			expect(screen.queryByRole('link', { name: /spring/i })).not.toBeInTheDocument();
+		});
+
+		it('shows no row and no error while the aggregates are still loading', () => {
+			mocks.mockQueryState.isLoading = true;
+			mocks.mockQueryState.data = undefined;
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+
+			expect(screen.queryByText('Imported from')).not.toBeInTheDocument();
+			expect(screen.getByText('Perspectives')).toBeInTheDocument();
+		});
+
+		it('ignores an importedFrom carried on the row itself (only the viewer-scoped query is trusted)', () => {
+			render(ActivityDetailsModal, {
+				props: {
+					content: { ...content, importedFrom: { id: '12', name: 'Spring 2026 watchlist' } } as any,
+					open: true,
+					onClose: vi.fn(),
+				},
+			});
+			expect(screen.queryByText('Imported from')).not.toBeInTheDocument();
+		});
+	});
+
+	describe('BOOK content', () => {
+		const eastOfEden = {
+			workKey: 'OL23166W',
+			title: 'East of Eden',
+			authors: [{ name: 'John Steinbeck' }],
+			coverId: 11386937,
+			firstPublishYear: 1952,
+			pageCountMedian: 611,
+			subjects: ['Fiction'],
+			ratingsAverage: 4.1,
+			ratingsCount: 100,
+			editionCount: 65,
+			description: 'A saga of two families.',
+			relatedWorks: [],
+		};
+		const bookRow = (book: unknown) => ({
+			...content,
+			name: 'East of Eden',
+			url: 'https://openlibrary.org/works/OL23166W',
+			channelTitle: null,
+			contentType: 'BOOK',
+			viewCount: null,
+			likeCount: null,
+			length: null,
+			lengthUnits: null,
+			description: null,
+			tags: null,
+			primaryCategory: null,
+			book,
+		});
+		const open = (book: unknown) =>
+			render(ActivityDetailsModal, { props: { content: bookRow(book), open: true, onClose: vi.fn() } });
+
+		it('labels the header Book, shows the author under the title, and the Open Library attribution', () => {
+			open(eastOfEden);
+			expect(screen.getByText('Book')).toBeInTheDocument();
+			expect(screen.getByText('John Steinbeck')).toBeInTheDocument();
+			expect(
+				screen.getByText('Data: Open Library (archive.org), community-contributed; may be incomplete.'),
+			).toBeInTheDocument();
+			expect(screen.queryByText('YouTube Video')).not.toBeInTheDocument();
+			expect(screen.queryByText(/uses the TMDB API/)).not.toBeInTheDocument();
+		});
+
+		it('drops the YouTube Views and Likes tiles and shows the book tiles', () => {
+			open(eastOfEden);
+			expect(screen.queryByText('Views')).not.toBeInTheDocument();
+			expect(screen.queryByText('Likes')).not.toBeInTheDocument();
+			expect(screen.getByText('Pages')).toBeInTheDocument();
+			expect(screen.getByText('Rating count')).toBeInTheDocument();
+		});
+
+		it('keeps the Update source data button, since Open Library data is refreshed', () => {
+			open(eastOfEden);
+			expect(screen.getByRole('button', { name: /update source data/i })).toBeInTheDocument();
+		});
+
+		it('shows the large cover fitted (object-contain), not cropped', () => {
+			open(eastOfEden);
+			const img = document.querySelector('img[src="https://covers.openlibrary.org/b/id/11386937-L.jpg"]');
+			expect(img).not.toBeNull();
+			expect(img?.className).toContain('object-contain');
+		});
+
+		it('renders the description once, in the book body (never through the YouTube description section)', () => {
+			open(eastOfEden);
+			expect(screen.getAllByText('A saga of two families.')).toHaveLength(1);
+		});
+	});
+
+	describe('add to plan', () => {
+		beforeEach(() => {
+			authState.userId = null;
+		});
+
+		it('shows Add to plan for a signed-in user and passes the content to onAddToPlan', async () => {
+			authState.userId = 'user_1';
+			const onAddToPlan = vi.fn();
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan } });
+
+			await fireEvent.click(screen.getByRole('button', { name: 'Add to plan' }));
+			expect(onAddToPlan).toHaveBeenCalledTimes(1);
+			expect(onAddToPlan).toHaveBeenCalledWith(content);
+		});
+
+		it('hides Add to plan for a signed-out user', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			expect(screen.queryByRole('button', { name: 'Add to plan' })).toBeNull();
+		});
+
+		it('renders no Add to plan action when the parent does not handle it', () => {
+			authState.userId = 'user_1';
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			expect(screen.queryByRole('button', { name: 'Add to plan' })).toBeNull();
+		});
+	});
+
+	describe('action buttons (#667)', () => {
+		const shared = MODAL_ACTION_CLASS.split(' ');
+
+		beforeEach(() => {
+			authState.userId = 'user_1';
+		});
+
+		function actions() {
+			return [
+				screen.getByRole('link', { name: /compare/i }),
+				screen.getByRole('button', { name: 'Add to plan' }),
+				screen.getByRole('button', { name: 'Update source data' }),
+			];
+		}
+
+		it('gives Compare, Add to plan and Update source data the same size and look', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			for (const el of actions()) {
+				for (const c of shared) expect(el).toHaveClass(c);
+				expect(el).toHaveClass('grow', 'basis-36');
+			}
+		});
+
+		it('gives every action one leading icon, so none sits lower or narrower than its neighbours', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			for (const el of actions()) expect(el.querySelectorAll('svg')).toHaveLength(1);
+		});
+
+		it('swaps the refresh icon for a spinner while updating, keeping one icon so the width holds', () => {
+			mocks.mockMutationState.isPending = true;
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			const button = screen.getByRole('button', { name: 'Update source data' });
+			const icons = button.querySelectorAll('svg');
+			expect(icons).toHaveLength(1);
+			expect(icons[0]).toHaveClass('animate-spin');
+		});
+
+		it('puts the actions on their own row under the date instead of beside it', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
+			const row = screen.getByTestId('details-actions');
+			expect(row).toHaveClass('flex', 'flex-wrap', 'gap-2');
+			expect(row).not.toHaveTextContent(/last updated/i);
+			for (const el of actions()) expect(row).toContainElement(el);
 		});
 	});
 });

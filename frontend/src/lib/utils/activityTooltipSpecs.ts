@@ -1,5 +1,31 @@
 import type { CellCtx, ColTooltipSpec } from './tooltipSpec';
-import { formatCountExact, percentLikedTooltip, percentLikedValueGetter } from './formatting';
+import {
+	authorValueGetter,
+	bookAuthors,
+	ratingTooltip,
+	ratingValueGetter,
+	readersTooltip,
+	readersValueGetter,
+} from './bookFormatting';
+import {
+	formatCountExact,
+	percentLikedTooltip,
+	percentLikedValueGetter,
+	castTooltipItems,
+	castTooltipCopyValues,
+	boxOfficeTooltip,
+	boxOfficeValueGetter,
+	vsBudgetTooltip,
+	vsBudgetValueGetter,
+	tmdbScoreTooltip,
+	tmdbScoreValueGetter,
+	durationTooltip,
+	durationValueGetter,
+	contentTags,
+	synopsisValueGetter,
+	formatMoneyExact,
+	budgetValueGetter,
+} from './formatting';
 
 /** Per-column hover popover specs for ActivityTable, keyed by colId. */
 export const ACTIVITY_TOOLTIP_SPECS = {
@@ -11,6 +37,11 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 	category: {
 		text: (c: CellCtx) => c.data?.primaryCategory?.label ?? '',
 		copyValue: (c: CellCtx) => c.data?.primaryCategory?.label ?? '',
+	},
+	duration: {
+		emptyText: 'No duration',
+		text: (c: CellCtx) => durationTooltip({ data: c.data }),
+		copyValue: (c: CellCtx) => durationValueGetter({ data: c.data }),
 	},
 	views: {
 		text: (c: CellCtx) => formatCountExact(c.data?.viewCount ?? null),
@@ -24,6 +55,40 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 		text: (c: CellCtx) => percentLikedTooltip({ data: c.data }),
 		copyValue: (c: CellCtx) => percentLikedValueGetter({ data: c.data }),
 	},
-	tags: { mode: 'multi', emptyText: 'No tags', items: (c: CellCtx) => c.data?.tags ?? [] },
+	tags: { mode: 'multi', emptyText: 'No tags', items: (c: CellCtx) => contentTags(c.data) ?? [] },
+	cast: { mode: 'multi', emptyText: 'No cast or directors', items: (c: CellCtx) => castTooltipItems(c.data),
+		itemCopyValues: (c: CellCtx) => castTooltipCopyValues(c.data),
+	},
+	boxOffice: {
+		text: (c: CellCtx) => boxOfficeTooltip({ data: c.data }),
+		copyValue: (c: CellCtx) => boxOfficeValueGetter({ data: c.data }),
+	},
+	vsBudget: {
+		text: (c: CellCtx) => vsBudgetTooltip({ data: c.data }),
+		copyValue: (c: CellCtx) => vsBudgetValueGetter({ data: c.data }),
+	},
+	tmdbScore: {
+		text: (c: CellCtx) => tmdbScoreTooltip({ data: c.data }),
+		copyValue: (c: CellCtx) => tmdbScoreValueGetter({ data: c.data }),
+	},
+	author: {
+		mode: 'multi',
+		emptyText: 'No author',
+		items: (c: CellCtx) => bookAuthors(c.data).map((a) => a.name),
+		copyValue: (c: CellCtx) => authorValueGetter({ data: c.data }),
+	},
+	rating: {
+		text: (c: CellCtx) => ratingTooltip({ data: c.data }),
+		copyValue: (c: CellCtx) => ratingValueGetter({ data: c.data }),
+	},
+	readers: {
+		text: (c: CellCtx) => readersTooltip({ data: c.data }),
+		copyValue: (c: CellCtx) => readersValueGetter({ data: c.data }),
+	},
+	budget: {
+		text: (c: CellCtx) => formatMoneyExact(budgetValueGetter({ data: c.data })),
+		copyValue: (c: CellCtx) => budgetValueGetter({ data: c.data }),
+	},
+	synopsis: { emptyText: 'No synopsis', text: (c: CellCtx) => synopsisValueGetter({ data: c.data }) ?? '' },
 	description: { emptyText: 'No description', text: (c: CellCtx) => c.data?.description ?? '' },
 } satisfies Record<string, ColTooltipSpec>;

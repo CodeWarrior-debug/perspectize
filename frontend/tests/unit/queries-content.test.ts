@@ -2,7 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
 	LIST_CONTENT,
 	GET_CONTENT,
+	GET_CONTENT_DETAILS,
+	GET_CONTENT_AGGREGATES,
 	CREATE_CONTENT_FROM_YOUTUBE,
+	CREATE_CONTENT_FROM_MOVIE,
+	CREATE_CONTENT_FROM_BOOK,
 	type ContentItem,
 	type ContentResponse,
 	type CreateContentResponse,
@@ -77,6 +81,22 @@ describe('GraphQL query definitions', () => {
 	});
 
 	describe('LIST_CONTENT', () => {
+		it('selects the shaped `movie` payload instead of the raw `response`', () => {
+			expect(LIST_CONTENT).toMatch(/\bmovie\b/);
+			expect(LIST_CONTENT).not.toMatch(/\bresponse\b/);
+		});
+
+		// The list is prefetched anonymously (routes/+page.ts), so it must select no viewer-dependent
+		// field. importedFrom is null for a closed import unless the viewer is an admin.
+		it('does not select importedFrom (viewer-dependent; the prefetch is anonymous)', () => {
+			expect(LIST_CONTENT).not.toMatch(/importedFrom/);
+		});
+
+		it('selects the shaped `book` payload instead of the raw `response`', () => {
+			expect(LIST_CONTENT).toMatch(/\bbook\b/);
+			expect(LIST_CONTENT).not.toMatch(/\bresponse\b/);
+		});
+
 		it('is defined and is a string', () => {
 			expect(LIST_CONTENT).toBeDefined();
 			expect(typeof LIST_CONTENT).toBe('string');
@@ -150,6 +170,54 @@ describe('GraphQL query definitions', () => {
 			expect(GET_CONTENT).toContain('likeCount');
 			expect(GET_CONTENT).toContain('commentCount');
 			expect(GET_CONTENT).toContain('response');
+		});
+	});
+
+	describe('GET_CONTENT_DETAILS', () => {
+		it('selects both `response` and `movie`', () => {
+			expect(GET_CONTENT_DETAILS).toMatch(/\bresponse\b/);
+			expect(GET_CONTENT_DETAILS).toMatch(/\bmovie\b/);
+		});
+
+		it('does not select importedFrom (its key has no viewer; the viewer-scoped aggregates query carries it)', () => {
+			expect(GET_CONTENT_DETAILS).not.toMatch(/importedFrom/);
+		});
+
+		it('GET_CONTENT_AGGREGATES selects importedFrom { id name } for the "Imported from" link', () => {
+			expect(GET_CONTENT_AGGREGATES).toMatch(/importedFrom\s*\{\s*id\s+name\s*\}/);
+		});
+
+		it('selects `book` alongside `response`', () => {
+			expect(GET_CONTENT_DETAILS).toMatch(/\bresponse\b/);
+			expect(GET_CONTENT_DETAILS).toMatch(/\bbook\b/);
+		});
+	});
+
+	describe('CREATE_CONTENT_FROM_BOOK', () => {
+		it('is a CreateContentFromBook mutation taking CreateContentFromBookInput', () => {
+			expect(CREATE_CONTENT_FROM_BOOK).toContain('mutation CreateContentFromBook($input: CreateContentFromBookInput!)');
+			expect(CREATE_CONTENT_FROM_BOOK).toContain('createContentFromBook(input: $input)');
+		});
+
+		it('requests the fields the success toast and its Go-to action need', () => {
+			for (const field of ['id', 'name', 'contentType', 'url']) {
+				expect(CREATE_CONTENT_FROM_BOOK).toContain(field);
+			}
+		});
+	});
+
+	describe('CREATE_CONTENT_FROM_MOVIE', () => {
+		it('is a CreateContentFromMovie mutation taking CreateContentFromMovieInput', () => {
+			expect(CREATE_CONTENT_FROM_MOVIE).toContain(
+				'mutation CreateContentFromMovie($input: CreateContentFromMovieInput!)',
+			);
+			expect(CREATE_CONTENT_FROM_MOVIE).toContain('createContentFromMovie(input: $input)');
+		});
+
+		it('requests the fields the success toast and its Go-to action need', () => {
+			for (const field of ['id', 'name', 'contentType', 'url']) {
+				expect(CREATE_CONTENT_FROM_MOVIE).toContain(field);
+			}
 		});
 	});
 

@@ -76,8 +76,10 @@ type PerspectiveService interface {
 	// GetByID retrieves a perspective by ID
 	GetByID(ctx context.Context, id int) (*domain.Perspective, error)
 
-	// Update updates an existing perspective
-	Update(ctx context.Context, input UpdatePerspectiveInput) (*domain.Perspective, error)
+	// Update updates an existing perspective on behalf of actorUserID, who
+	// must own it (domain.ErrForbidden for someone else's public perspective,
+	// domain.ErrNotFound for a missing or non-public one).
+	Update(ctx context.Context, input UpdatePerspectiveInput, actorUserID int) (*domain.Perspective, error)
 
 	// Delete removes a perspective on behalf of actorUserID, who must own it.
 	// Returns domain.ErrForbidden when the actor isn't the owner, and
@@ -90,6 +92,11 @@ type PerspectiveService interface {
 	// AggregateByContentIDs computes the public-perspective count and average
 	// Quality rating for each given content ID, batched into a single query.
 	AggregateByContentIDs(ctx context.Context, contentIDs []int) (map[int]*domain.PerspectiveAggregate, error)
+
+	// CountVisibleByContentIDs counts, per content ID, the perspectives viewerID
+	// may read (public plus their own), batched into a single query. Absent
+	// IDs have none visible.
+	CountVisibleByContentIDs(ctx context.Context, contentIDs []int, viewerID *int) (map[int]int, error)
 
 	// FeelingStats computes count/average/stddev for perspectives carrying the
 	// given feeling (see domain.FeelingStats), scoped to one content ID or,

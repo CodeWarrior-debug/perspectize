@@ -4,18 +4,23 @@
 #
 # The database is remote (Sevalla) — nothing to start locally for it.
 
-.PHONY: start stop restart status logs help demo-up demo-down demo-reset demo-wipe demo-logs demo-test demo-record
+.PHONY: start stop restart status logs help demo-up demo-down demo-reset demo-wipe demo-logs demo-test demo-record obs-up obs-down obs-smoke
 .DEFAULT_GOAL := help
 
 BACKEND_PORT  := 8080
 FRONTEND_PORT := 5173
 PID_DIR := .dev
 LOG_DIR := logs
+# Agent registry (.claude/agent-registry): `make start` registers your servers as the
+# holder of verification slot 1, so a waiting agent pings you instead of guessing.
+REGISTRY := node .claude/agent-registry/agent-registry.mjs
+# Stop a process and its descendants (air and pnpm spawn children). Children first.
+KILL_TREE = kt() { for c in $$(pgrep -P $$1 2>/dev/null); do kt $$c; done; kill $$1 2>/dev/null; }
 
 help:
 	@echo "Perspectize dev servers:"
 	@echo "  make start    - start backend (:$(BACKEND_PORT)) + frontend (:$(FRONTEND_PORT)) detached"
-	@echo "  make stop     - stop both"
+	@echo "  make stop     - stop what make start in THIS checkout started (never other checkouts' servers)"
 	@echo "  make restart  - stop then start"
 	@echo "  make status   - show what's listening on :$(BACKEND_PORT) / :$(FRONTEND_PORT)"
 	@echo "  make logs     - tail -f $(LOG_DIR)/*.log"
@@ -26,6 +31,11 @@ help:
 	@echo "  make demo-test    - reset, then run tours + flows as Playwright E2E"
 	@echo "  make demo-record  - reset, then record tours to frontend/demo/out/videos/"
 	@echo "  make demo-down    - stop (keeps data)  |  make demo-wipe - stop + delete data"
+	@echo ""
+	@echo "Observability tracer (demo stack + local Grafana LGTM; see .docs/OBSERVABILITY.md):"
+	@echo "  make obs-up       - demo stack + lgtm + alloy, telemetry on; Grafana http://localhost:3000"
+	@echo "  make obs-smoke    - send GraphQL traffic, assert metrics/traces/logs reached Grafana"
+	@echo "  make obs-down     - stop demo + observability containers (demo data kept)"
 
 start:
 	@mkdir -p $(PID_DIR) $(LOG_DIR)
@@ -43,25 +53,23 @@ start:
 		nohup pnpm --dir frontend run dev > $(LOG_DIR)/frontend.log 2>&1 & echo $$! > $(PID_DIR)/frontend.pid; \
 		echo "frontend: started (pid $$(cat $(PID_DIR)/frontend.pid)), log $(LOG_DIR)/frontend.log"; \
 	fi
+	@$(REGISTRY) human-start --slot 1 --pid-file $(PID_DIR)/backend.pid --pid-file $(PID_DIR)/frontend.pid 2>/dev/null || true
 	@echo "Run 'make logs' to follow output, 'make stop' to shut down."
 
+# Stops only what `make start` in THIS checkout started (its pid files and their
+# children). It never kills by port or by name: other checkouts and agents run
+# dev servers too.
 stop:
-	@for name in backend frontend; do \
+	@$(KILL_TREE); for name in backend frontend; do \
 		if [ -f $(PID_DIR)/$$name.pid ]; then \
 			pid=$$(cat $(PID_DIR)/$$name.pid); \
-			if kill $$pid 2>/dev/null; then echo "$$name: sent TERM to pid $$pid"; fi; \
+			kt $$pid && echo "$$name: stopped pid $$pid and its children"; \
 			rm -f $(PID_DIR)/$$name.pid; \
+		else \
+			echo "$$name: no pid file in this checkout, nothing to stop (see 'make status')"; \
 		fi; \
 	done
-	@sleep 1
-	@# Fallbacks — air/pnpm spawn children that may outlive the parent pid.
-	@for port in $(BACKEND_PORT) $(FRONTEND_PORT); do \
-		pids=$$(lsof -ti tcp:$$port 2>/dev/null); \
-		if [ -n "$$pids" ]; then echo "port $$port: killing $$pids"; kill $$pids 2>/dev/null || true; fi; \
-	done
-	@pkill -f 'go tool air' 2>/dev/null || true
-	@pkill -f 'backend/tmp/main' 2>/dev/null || true
-	@pkill -f 'vite dev' 2>/dev/null || true
+	@$(REGISTRY) human-stop --slot 1 2>/dev/null || true
 	@echo "stopped."
 
 restart: stop start
@@ -102,3 +110,24 @@ demo-test: demo-reset
 demo-record: demo-reset
 	$(DEMO_ENV) pnpm --dir frontend run demo:record
 	@echo "Videos: frontend/demo/out/videos/*.webm"
+
+# --- Observability tracer ---------------------------------------------------
+# The demo stack plus docker-compose.observability.yml: grafana/otel-lgtm
+# (Grafana/Prometheus/Tempo/Loki) and Alloy (Faro receiver), with the backend's
+# OTLP export and the frontend's Faro SDK switched on. Same compose project as
+# the demo stack, so stop it with obs-down (demo-down would leave lgtm/alloy
+# running as orphans). Runbook: .docs/OBSERVABILITY.md.
+OBS_COMPOSE := docker compose -f docker-compose.demo.yml -f docker-compose.observability.yml
+
+obs-up:
+	GIT_COMMIT=$$(git rev-parse HEAD) GIT_BRANCH=$$(git rev-parse --abbrev-ref HEAD) \
+		$(OBS_COMPOSE) up -d --build --wait backend frontend alloy lgtm
+	@echo "Grafana: http://localhost:3000  (dashboard: Perspectize / Perspectize API; anonymous admin)"
+	@echo "Demo:    http://localhost:4173  (API http://localhost:8081/graphql, Faro -> http://localhost:12347/collect)"
+	@echo "Next:    make obs-smoke"
+
+obs-down:
+	$(OBS_COMPOSE) down
+
+obs-smoke:
+	bash ops/observability/smoke.sh
