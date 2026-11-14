@@ -98,11 +98,17 @@ const MaxAdminImportItemsPerRequest = 5000
 // admin has to read each one.
 const MaxPendingImportRequests = 3
 
+// MaxImportJobDescriptionChars bounds an import's description after it is
+// sanitized (the stored text, in characters).
+const MaxImportJobDescriptionChars = 20000
+
 // ImportJob is a named import: one or more sources whose candidates share one staging sheet.
 type ImportJob struct {
-	ID            int
-	UserID        int // creator (the requester, for a request)
-	Name          string
+	ID     int
+	UserID int // creator (the requester, for a request)
+	Name   string
+	// Description says what the request is for. Only the requester writes it; it is not a comment thread.
+	Description   *string
 	RequestStatus ImportRequestStatus
 	ReviewNote    *string // the admin's reason, when declined (optional on approve)
 	ReviewedAt    *time.Time
@@ -222,10 +228,12 @@ type CreateImportSourceInput struct {
 	Role       *ImportPersonRole
 }
 
-// CreateImportJobInput is what an admin supplies to start an import.
+// CreateImportJobInput is what someone supplies to start an import (or request one).
+// A name and either a description or at least one source are required.
 type CreateImportJobInput struct {
-	Name    string
-	Sources []CreateImportSourceInput
+	Name        string
+	Description *string
+	Sources     []CreateImportSourceInput
 }
 
 // ImportBatchResult reports what an importItems call did with the requested rows.
@@ -254,5 +262,25 @@ type ImportProgress struct {
 	Failed   int
 	// Running is true while any batch of this import is still importing.
 	Running   bool
+	UpdatedAt time.Time
+}
+
+// ImportSourceListingProgress is how far one source's listing has got. Staged
+// counts rows upserted so far; Batches counts the batches they came in.
+type ImportSourceListingProgress struct {
+	SourceID int
+	Staged   int
+	Batches  int
+	Status   ImportSourceStatus
+}
+
+// ImportListingProgress is a live view of an import's sources being listed,
+// kept in memory and pushed to admins while the sheet is still filling.
+type ImportListingProgress struct {
+	JobID int
+	// Sources are ordered by SourceID.
+	Sources []ImportSourceListingProgress
+	// Listing is true while any source is still LISTING.
+	Listing   bool
 	UpdatedAt time.Time
 }

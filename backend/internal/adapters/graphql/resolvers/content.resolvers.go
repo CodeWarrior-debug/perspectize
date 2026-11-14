@@ -70,6 +70,52 @@ func (r *contentResolver) PrimaryCategory(ctx context.Context, obj *model.Conten
 	return categoryDomainToModel(category), nil
 }
 
+// ImportedFrom is the resolver for the importedFrom field. The import comes from
+// the per-request import job loader (one batched query per request). It is null
+// for hand-added content, for an import that no longer exists, and for a closed
+// import unless the viewer is an admin.
+func (r *contentResolver) ImportedFrom(ctx context.Context, obj *model.Content) (*model.ImportJobRef, error) {
+	if obj.ImportJobID == nil {
+		return nil, nil
+	}
+	jobID := *obj.ImportJobID
+
+	var job *domain.ImportJob
+	if loaders := dataloader.For(ctx); loaders != nil {
+		loaded, err := loaders.ImportJobByID.Load(ctx, jobID)
+		if err != nil {
+			if dataloader.IsNotFound(err) {
+				return nil, nil
+			}
+			slog.Error("resolving importedFrom via dataloader failed", "contentID", obj.ID, "importJobID", jobID, "error", err)
+			return nil, nil
+		}
+		job = loaded
+	} else {
+		// No dataloader middleware (direct resolver tests): one single-row lookup.
+		if r.ImportService == nil {
+			return nil, nil
+		}
+		jobs, err := r.ImportService.GetImportJobsByIDs(ctx, []int{jobID})
+		if err != nil {
+			slog.Error("resolving importedFrom failed", "contentID", obj.ID, "importJobID", jobID, "error", err)
+			return nil, nil
+		}
+		job = jobs[jobID]
+	}
+	if job == nil {
+		return nil, nil
+	}
+
+	if job.ClosedAt != nil {
+		viewer, _ := auth.ForContext(ctx)
+		if viewer == nil || viewer.Role != domain.UserRoleAdmin {
+			return nil, nil
+		}
+	}
+	return importJobRefToModel(job), nil
+}
+
 // PerspectiveCount is the resolver for the perspectiveCount field.
 //
 // Batched per-request via the PerspectiveAggregateByContentID dataloader
@@ -452,7 +498,7 @@ func (r *queryResolver) ContentByID(ctx context.Context, id string) (*model.Cont
 	// "not found", with no extra statement. The loader caches the result, so
 	// the aggregate fields reuse this same load.
 	if onlyIDAndAggregatesSelected(ctx) {
-		_, found, err := r.fetchPerspectiveAggregate(ctx, intID)
+		agg, found, err := r.fetchPerspectiveAggregate(ctx, intID)
 		if err != nil {
 			slog.Error("checking content existence via aggregate failed", "id", id, "error", err)
 			return nil, fmt.Errorf("failed to get content")
@@ -460,7 +506,11 @@ func (r *queryResolver) ContentByID(ctx context.Context, id string) (*model.Cont
 		if !found {
 			return nil, fmt.Errorf("content not found with ID: %s", id)
 		}
-		return &model.Content{ID: strconv.Itoa(intID)}, nil
+		out := &model.Content{ID: strconv.Itoa(intID)}
+		if agg != nil {
+			out.ImportJobID = agg.ImportJobID
+		}
+		return out, nil
 	}
 
 	content, err := r.ContentService.GetByID(ctx, intID)

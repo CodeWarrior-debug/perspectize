@@ -131,3 +131,52 @@ func TestVisiblePerspectiveCountLoader_AnonymousViewerReachesTheServiceAsNil(t *
 	require.Len(t, svc.viewers, 1)
 	assert.Nil(t, svc.viewers[0], "anonymous is nil, never 0")
 }
+
+type countingImportService struct {
+	portservices.ImportService // nil: any other method panics
+	calls                      atomic.Int32
+	mu                         sync.Mutex
+	lastIDs                    []int
+}
+
+func (s *countingImportService) GetImportJobsByIDs(_ context.Context, ids []int) (map[int]*domain.ImportJob, error) {
+	s.calls.Add(1)
+	s.mu.Lock()
+	s.lastIDs = append([]int(nil), ids...)
+	s.mu.Unlock()
+	out := make(map[int]*domain.ImportJob, len(ids))
+	for _, id := range ids {
+		out[id] = &domain.ImportJob{ID: id, Name: "job"}
+	}
+	return out, nil
+}
+
+func TestImportJobLoader_NLoadsOneServiceCall(t *testing.T) {
+	svc := &countingImportService{}
+	loaders := NewLoaders(Services{ImportJob: svc})
+
+	const n = 50
+	var wg sync.WaitGroup
+	for id := 1; id <= n; id++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			job, err := loaders.ImportJobByID.Load(context.Background(), id)
+			assert.NoError(t, err)
+			if assert.NotNil(t, job) {
+				assert.Equal(t, id, job.ID)
+			}
+		}(id)
+	}
+	wg.Wait()
+
+	assert.EqualValues(t, 1, svc.calls.Load(), "50 concurrent loads must be one batched call")
+	assert.Len(t, svc.lastIDs, n)
+}
+
+func TestImportJobLoader_NilServiceLoadsAsNotFound(t *testing.T) {
+	loaders := NewLoaders(Services{})
+
+	_, err := loaders.ImportJobByID.Load(context.Background(), 1)
+	assert.True(t, IsNotFound(err), "no import service wired: the key is absent, not a panic")
+}

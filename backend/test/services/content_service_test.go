@@ -407,6 +407,72 @@ func TestCreateFromYouTube_GetByURLUnexpectedError(t *testing.T) {
 
 // --- NewContentService Tests ---
 
+// importTestYouTubeClient resolves any URL to a 300-second video.
+func importTestYouTubeClient() *mockYouTubeClient {
+	return &mockYouTubeClient{
+		extractVideoIDFn: func(url string) (string, error) { return "dQw4w9WgXcQ", nil },
+		getVideoMetadataFn: func(ctx context.Context, videoID string) (*portservices.VideoMetadata, error) {
+			return &portservices.VideoMetadata{Title: "Imported", Duration: 300, Response: json.RawMessage(`{}`)}, nil
+		},
+	}
+}
+
+func TestCreateFromYouTube_RecordsImportJobWhenContextCarriesOne(t *testing.T) {
+	var saved *domain.Content
+	repo := &mockContentRepository{
+		getOrCreateByURLFn: func(ctx context.Context, content *domain.Content, refreshOnConflict bool) (*domain.Content, bool, error) {
+			saved = content
+			content.ID = 1
+			return content, false, nil
+		},
+	}
+	svc := services.NewContentService(repo, importTestYouTubeClient(), nil)
+
+	ctx := services.WithImportJobID(context.Background(), 42)
+	_, err := svc.CreateFromYouTube(ctx, "https://youtu.be/dQw4w9WgXcQ", 7)
+
+	require.NoError(t, err)
+	require.NotNil(t, saved.ImportJobID, "a create inside an import records the import")
+	assert.Equal(t, 42, *saved.ImportJobID)
+}
+
+func TestCreateFromYouTube_NoContextLeavesImportJobNull(t *testing.T) {
+	var saved *domain.Content
+	repo := &mockContentRepository{
+		getOrCreateByURLFn: func(ctx context.Context, content *domain.Content, refreshOnConflict bool) (*domain.Content, bool, error) {
+			saved = content
+			content.ID = 1
+			return content, false, nil
+		},
+	}
+	svc := services.NewContentService(repo, importTestYouTubeClient(), nil)
+
+	_, err := svc.CreateFromYouTube(context.Background(), "https://youtu.be/dQw4w9WgXcQ", 7)
+
+	require.NoError(t, err)
+	assert.Nil(t, saved.ImportJobID, "a hand-added create has no import")
+}
+
+func TestCreateFromMovie_RecordsImportJobWhenContextCarriesOne(t *testing.T) {
+	rt := 8160
+	mc := &mockMovieClient{getMovieFn: func(ctx context.Context, id int) (*portservices.MovieMetadata, error) {
+		return movieMeta(&rt), nil
+	}}
+	var saved *domain.Content
+	repo := &mockContentRepository{getOrCreateByURLFn: func(ctx context.Context, c *domain.Content, refresh bool) (*domain.Content, bool, error) {
+		saved = c
+		return c, false, nil
+	}}
+	svc := services.NewContentService(repo, nil, mc)
+
+	ctx := services.WithImportJobID(context.Background(), 42)
+	_, err := svc.CreateFromMovie(ctx, "https://www.themoviedb.org/movie/603-the-matrix", 7)
+
+	require.NoError(t, err)
+	require.NotNil(t, saved.ImportJobID)
+	assert.Equal(t, 42, *saved.ImportJobID)
+}
+
 func TestNewContentService(t *testing.T) {
 	repo := &mockContentRepository{}
 	ytClient := &mockYouTubeClient{}

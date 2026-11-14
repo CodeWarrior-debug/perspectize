@@ -131,6 +131,39 @@ func TestImportJobIntegration_CreateGetAndList(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
+// GetJobsByIDs is one statement for any number of ids and none for empty input.
+func TestImportJobIntegration_GetJobsByIDsOneStatementForAnyCount(t *testing.T) {
+	f := newImportJobFixture(t)
+	ctx := context.Background()
+	c := querycount.Attach(t, f.db)
+
+	one := f.newJob(t)
+	c.Reset()
+	got, err := f.repo.GetJobsByIDs(ctx, []int{one.ID, -1})
+	require.NoError(t, err)
+	c.AssertExactly(t, 1)
+	require.Len(t, got, 1, "an unknown id is absent, not an error")
+	require.Contains(t, got, one.ID)
+	assert.Equal(t, "Peterson and Nolan", got[one.ID].Name)
+	assert.Empty(t, got[one.ID].Sources, "the batch loads jobs without their sources")
+
+	ids := []int{one.ID}
+	for i := 1; i < 50; i++ {
+		ids = append(ids, f.newJob(t).ID)
+	}
+	c.Reset()
+	got, err = f.repo.GetJobsByIDs(ctx, ids)
+	require.NoError(t, err)
+	c.AssertExactly(t, 1)
+	assert.Len(t, got, 50)
+
+	c.Reset()
+	got, err = f.repo.GetJobsByIDs(ctx, nil)
+	require.NoError(t, err)
+	c.AssertExactly(t, 0)
+	assert.Empty(t, got)
+}
+
 func TestImportJobIntegration_CreateJobUnknownUser(t *testing.T) {
 	f := newImportJobFixture(t)
 	_, err := f.repo.CreateJob(context.Background(), &domain.ImportJob{UserID: -5, Name: "x"})
@@ -420,4 +453,68 @@ func TestImportJobIntegration_CloseAndExclude(t *testing.T) {
 	assert.ErrorIs(t, f.repo.SetClosed(ctx, -1, nil), domain.ErrNotFound)
 	_, err = f.repo.GetJobState(ctx, -1)
 	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+// A request with a description and no sources is one INSERT, and the
+// description comes back from the database.
+func TestImportJobIntegration_CreateStoresDescriptionWithoutSources(t *testing.T) {
+	f := newImportJobFixture(t)
+	ctx := context.Background()
+	desc := "Describe the sermons I mean, not the channel."
+
+	c := querycount.Attach(t, f.db)
+	job, err := f.repo.CreateJob(ctx, &domain.ImportJob{UserID: f.other, Name: "Sermons", Description: &desc})
+	require.NoError(t, err)
+	c.AssertExactly(t, 1) // the job row only: no sources to insert
+
+	require.NotNil(t, job.Description)
+	assert.Equal(t, desc, *job.Description)
+	assert.Empty(t, job.Sources)
+
+	c.Reset()
+	got, err := f.repo.GetJobState(ctx, job.ID)
+	require.NoError(t, err)
+	c.AssertExactly(t, 1)
+	require.NotNil(t, got.Description)
+	assert.Equal(t, desc, *got.Description)
+}
+
+// UpdateJobDescription is one statement whether it hits or misses; the
+// service reads the job on a miss to say why. A non-owner and a closed import
+// both miss, and the stored text is unchanged.
+func TestImportJobIntegration_UpdateJobDescription(t *testing.T) {
+	f := newImportJobFixture(t)
+	ctx := context.Background()
+	first := "first"
+	job, err := f.repo.CreateJob(ctx, &domain.ImportJob{UserID: f.other, Name: "Request", Description: &first})
+	require.NoError(t, err)
+
+	c := querycount.Attach(t, f.db)
+	updated, err := f.repo.UpdateJobDescription(ctx, job.ID, f.other, "second")
+	require.NoError(t, err)
+	c.AssertExactly(t, 1)
+	assert.Equal(t, job.ID, updated.ID)
+	require.NotNil(t, updated.Description)
+	assert.Equal(t, "second", *updated.Description)
+	assert.Empty(t, updated.Sources, "RETURNING carries the job row only")
+
+	c.Reset()
+	_, err = f.repo.UpdateJobDescription(ctx, job.ID, f.admin, "not the requester")
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	c.AssertExactly(t, 1)
+
+	closedAt := time.Now().UTC()
+	require.NoError(t, f.repo.SetClosed(ctx, job.ID, &closedAt))
+	c.Reset()
+	_, err = f.repo.UpdateJobDescription(ctx, job.ID, f.other, "after close")
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	c.AssertExactly(t, 1)
+
+	_, err = f.repo.UpdateJobDescription(ctx, -1, f.other, "unknown")
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+
+	stored, err := f.repo.GetJobState(ctx, job.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stored.Description)
+	assert.Equal(t, "second", *stored.Description, "misses change nothing")
 }

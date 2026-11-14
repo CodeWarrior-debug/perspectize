@@ -42,6 +42,9 @@ type Loaders struct {
 	// UserTodoListByID batches UserTodo.list lookups. The key carries the
 	// viewer, because a PRIVATE list is returned only to its owner.
 	UserTodoListByID *dataloadgen.Loader[UserTodoListKey, *domain.UserTodoList]
+	// ImportJobByID batches Content.importedFrom lookups. Closed imports are
+	// returned too; the resolver decides who may see them.
+	ImportJobByID *dataloadgen.Loader[int, *domain.ImportJob]
 }
 
 // ThreadStatsKey identifies one viewer's stats for one thread.
@@ -72,6 +75,7 @@ type Services struct {
 	Content     portservices.ContentService
 	Messaging   portservices.MessagingService
 	UserTodo    portservices.UserTodoService
+	ImportJob   portservices.ImportService
 }
 
 // NewLoaders builds a fresh set of loaders backed by the given services.
@@ -83,6 +87,7 @@ func NewLoaders(s Services) *Loaders {
 	cnb := &contentBatcher{service: s.Content}
 	tab := &todoActionBatcher{service: s.UserTodo}
 	tlb := &userTodoListBatcher{service: s.UserTodo}
+	ijb := &importJobBatcher{service: s.ImportJob}
 	return &Loaders{
 		CategoryByID:                    dataloadgen.NewMappedLoader(cb.byID),
 		PerspectiveAggregateByContentID: dataloadgen.NewMappedLoader(pb.byContentID),
@@ -92,7 +97,21 @@ func NewLoaders(s Services) *Loaders {
 		ContentByID:                     dataloadgen.NewMappedLoader(cnb.byID),
 		TodoActionByID:                  dataloadgen.NewMappedLoader(tab.byID),
 		UserTodoListByID:                dataloadgen.NewMappedLoader(tlb.byKey),
+		ImportJobByID:                   dataloadgen.NewMappedLoader(ijb.byID),
 	}
+}
+
+// importJobBatcher resolves a batch of import job IDs in one service call.
+type importJobBatcher struct {
+	service portservices.ImportService
+}
+
+func (b *importJobBatcher) byID(ctx context.Context, ids []int) (map[int]*domain.ImportJob, error) {
+	if b.service == nil {
+		// Imports not wired on this server: every key is absent, so resolvers see nil.
+		return map[int]*domain.ImportJob{}, nil
+	}
+	return b.service.GetImportJobsByIDs(ctx, ids)
 }
 
 // Middleware injects a fresh *Loaders into the context of every request. It

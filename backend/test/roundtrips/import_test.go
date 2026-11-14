@@ -3,6 +3,7 @@ package roundtrips
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -290,4 +291,275 @@ func TestImportExcludeAndCloseRoundTrips(t *testing.T) {
 	assert.Equal(t, "null", string(hidden["importJob"]), "a closed import is hidden from a non-admin")
 	msg := h.gqlError(token, setExcludedMutation, map[string]any{"input": map[string]any{"jobId": job.ID, "itemIds": ids, "excluded": false}})
 	assert.Contains(t, msg, "closed")
+}
+
+// TestImportListingProgressRoundTrips pins the admin's listing-progress
+// subscription: opening it costs two statements (the import row, then its sources),
+// and a non-admin is refused before any statement runs. The subscription
+// doesn't go through the HTTP handler, so the count is taken on the service.
+func TestImportListingProgressRoundTrips(t *testing.T) {
+	h := newHarness(t)
+	adminID, adminToken := adminUser(t, h, "imp-lp")
+	job := createRoundTripImport(t, h, adminToken)
+	userID, _ := h.user("imp-lpu")
+	jobID, err := strconv.Atoi(job.ID)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	h.counter.Reset()
+	_, err = h.importService.SubscribeListingProgress(ctx, &domain.AuthenticatedUser{ID: userID, Role: domain.UserRoleDefault}, jobID)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+	assert.Empty(t, h.counter.Statements(), "a non-admin is refused before the database is asked")
+
+	h.counter.Reset()
+	ch, err := h.importService.SubscribeListingProgress(ctx, &domain.AuthenticatedUser{ID: adminID, Role: domain.UserRoleAdmin}, jobID)
+	require.NoError(t, err)
+	assert.Len(t, h.counter.Statements(), 2, "two statements: the import row and its sources (GetJob)")
+	first := <-ch
+	assert.Equal(t, jobID, first.JobID)
+	require.Len(t, first.Sources, 1, "the listing ran inline: its source is already known")
+	assert.Equal(t, domain.ImportSourceStatusReady, first.Sources[0].Status)
+	assert.Equal(t, 30, first.Sources[0].Staged)
+}
+
+const contentOriginQuery = `query($id: ID!) { contentByID(id: $id) { id importedFrom { id name } } }`
+
+const contentsOriginQuery = `query($first: Int) { content(first: $first) { items { id importedFrom { id name } } } }`
+
+// importedFromRef and contentOrigin decode Content.importedFrom.
+type importedFromRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type contentOrigin struct {
+	ID           string           `json:"id"`
+	ImportedFrom *importedFromRef `json:"importedFrom"`
+}
+
+// importRowsAsAdmin creates an admin's import, imports its first n rows and
+// returns the import and the content each row became.
+func importRowsAsAdmin(t *testing.T, h *harness, adminToken string, n int) (rtImportJob, []string) {
+	t.Helper()
+	job := createRoundTripImport(t, h, adminToken)
+	sheet := decode[rtImportJob](t, h.gql(adminToken, importJobQuery, map[string]any{"id": job.ID}), "importJob")
+	ids := make([]string, n)
+	for i := range ids {
+		ids[i] = sheet.Items[i].ID
+	}
+	h.gql(adminToken, importItemsMutation, map[string]any{"input": map[string]any{"jobId": job.ID, "itemIds": ids}})
+	h.runBackground()
+
+	after := decode[rtImportJob](t, h.gql(adminToken, importJobQuery, map[string]any{"id": job.ID}), "importJob")
+	contentIDs := make([]string, n)
+	for i := range contentIDs {
+		require.NotNil(t, after.Items[i].ContentID, after.Items[i].Title)
+		contentIDs[i] = *after.Items[i].ContentID
+		h.trackContent(contentIDs[i])
+	}
+	return job, contentIDs
+}
+
+// TestContentImportedFrom_NullWhenClosedAndViewerNotAdmin: an open import is
+// named to everyone; once an admin closes it, a non-admin sees the content
+// but not the import.
+func TestContentImportedFrom_NullWhenClosedAndViewerNotAdmin(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "imp-vca")
+	_, userToken := h.user("imp-vcu")
+	job, contentIDs := importRowsAsAdmin(t, h, adminToken, 1)
+	vars := map[string]any{"id": contentIDs[0]}
+
+	h.warm(userToken)
+	open := decode[contentOrigin](t, h.gql(userToken, contentOriginQuery, vars), "contentByID")
+	require.NotNil(t, open.ImportedFrom, "an open import is visible to everyone")
+	assert.Equal(t, job.ID, open.ImportedFrom.ID)
+	assert.Equal(t, job.Name, open.ImportedFrom.Name)
+
+	h.gql(adminToken, closeImportJobMutation, map[string]any{"input": map[string]any{"jobId": job.ID, "closed": true}})
+
+	closed := decode[contentOrigin](t, h.gql(userToken, contentOriginQuery, vars), "contentByID")
+	assert.Equal(t, contentIDs[0], closed.ID, "the content itself stays visible")
+	assert.Nil(t, closed.ImportedFrom, "a closed import is hidden from a non-admin")
+}
+
+// TestContentImportedFrom_AdminSeesClosedImport: an admin still sees the
+// import of a row once it is closed.
+func TestContentImportedFrom_AdminSeesClosedImport(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "imp-vaa")
+	job, contentIDs := importRowsAsAdmin(t, h, adminToken, 1)
+	h.gql(adminToken, closeImportJobMutation, map[string]any{"input": map[string]any{"jobId": job.ID, "closed": true}})
+
+	h.warm(adminToken)
+	got := decode[contentOrigin](t, h.gql(adminToken, contentOriginQuery, map[string]any{"id": contentIDs[0]}), "contentByID")
+	require.NotNil(t, got.ImportedFrom, "an admin sees a closed import")
+	assert.Equal(t, job.ID, got.ImportedFrom.ID)
+}
+
+// TestContentImportedFrom_NullForHandAddedContent: content added by hand was
+// never part of an import.
+func TestContentImportedFrom_NullForHandAddedContent(t *testing.T) {
+	h := newHarness(t)
+	userID, token := h.user("imp-hand")
+	contentID := h.content(userID, "hand-added")
+	h.warm(token)
+
+	got := decode[contentOrigin](t, h.gql(token, contentOriginQuery, map[string]any{"id": strconv.Itoa(contentID)}), "contentByID")
+	assert.Nil(t, got.ImportedFrom)
+}
+
+// TestContentsImportedFromRoundTrips pins a content list that selects
+// importedFrom: the page is one statement whatever its size, and the imports
+// it names come from one batched lookup. Five rows cost the same as one.
+func TestContentsImportedFromRoundTrips(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "imp-cr")
+	importRowsAsAdmin(t, h, adminToken, 5)
+	h.warm(adminToken)
+
+	type page struct {
+		Items []contentOrigin `json:"items"`
+	}
+	one := h.roundTrips(2, adminToken, contentsOriginQuery, map[string]any{"first": 1})
+	require.Len(t, decode[page](t, one, "content").Items, 1)
+
+	many := h.roundTrips(2, adminToken, contentsOriginQuery, map[string]any{"first": 5})
+	items := decode[page](t, many, "content").Items
+	require.Len(t, items, 5)
+	for _, it := range items {
+		assert.NotNil(t, it.ImportedFrom, it.ID)
+	}
+}
+
+const createDescribedRequestMutation = `mutation($input: CreateImportJobInput!) {
+  createImportJob(input: $input) { id name description requestStatus sources { status } }
+}`
+
+const updateImportJobDescriptionMutation = `mutation($input: UpdateImportJobDescriptionInput!) {
+  updateImportJobDescription(input: $input) { id description sources { id } }
+}`
+
+type rtDescribedRequest struct {
+	ID            string  `json:"id"`
+	Description   *string `json:"description"`
+	RequestStatus string  `json:"requestStatus"`
+	Sources       []struct {
+		Status string `json:"status"`
+	} `json:"sources"`
+}
+
+// TestCreateImportJobDescriptionOnlyRoundTrips pins a request with a
+// description and no sources: the pending-request count and the job INSERT, and
+// nothing for sources (2 statements). An admin's is the job INSERT alone (1).
+func TestCreateImportJobDescriptionOnlyRoundTrips(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "imp-dc-a")
+	_, token := h.user("imp-dc-u")
+	h.warm(token)
+
+	data := h.roundTrips(2, token, createDescribedRequestMutation, map[string]any{"input": map[string]any{
+		"name": "Sermons", "description": "<p>The sermons <strong>from</strong> the 1990s.</p>", "sources": []map[string]any{},
+	}})
+	req := decode[rtDescribedRequest](t, data, "createImportJob")
+	assert.Equal(t, "REQUESTED", req.RequestStatus)
+	require.NotNil(t, req.Description)
+	assert.Equal(t, "<p>The sermons <strong>from</strong> the 1990s.</p>", *req.Description)
+	assert.Empty(t, req.Sources)
+
+	h.warm(adminToken)
+	data = h.roundTrips(1, adminToken, createDescribedRequestMutation, map[string]any{"input": map[string]any{
+		"name": "Sermons", "description": "Admin's own", "sources": []map[string]any{},
+	}})
+	own := decode[rtDescribedRequest](t, data, "createImportJob")
+	assert.Equal(t, "APPROVED", own.RequestStatus)
+	assert.Empty(t, h.background, "an admin's import with no sources lists nothing")
+}
+
+// TestUpdateImportJobDescriptionRoundTrips pins the requester's edit: one
+// statement (a scoped UPDATE with RETURNING). A refused edit costs two: the
+// UPDATE that matched nothing, then the read that says whether the import is
+// someone else's or closed.
+func TestUpdateImportJobDescriptionRoundTrips(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "imp-ud-a")
+	_, token := h.user("imp-ud-u")
+	created := decode[rtDescribedRequest](t, h.gql(token, createDescribedRequestMutation, map[string]any{"input": map[string]any{
+		"name": "Sermons", "description": "first", "sources": []map[string]any{},
+	}}), "createImportJob")
+	h.warm(token)
+
+	data := h.roundTrips(1, token, updateImportJobDescriptionMutation, map[string]any{"input": map[string]any{
+		"jobId": created.ID, "description": "<p>second</p>",
+	}})
+	updated := decode[rtDescribedRequest](t, data, "updateImportJobDescription")
+	require.NotNil(t, updated.Description)
+	assert.Equal(t, "<p>second</p>", *updated.Description)
+	assert.Empty(t, updated.Sources, "the edit returns the import without its sources")
+
+	h.warm(adminToken)
+	h.counter.Reset()
+	msg := h.gqlError(adminToken, updateImportJobDescriptionMutation, map[string]any{"input": map[string]any{
+		"jobId": created.ID, "description": "admin edit",
+	}})
+	assert.Contains(t, msg, "only the person who requested")
+	assert.Len(t, h.counter.Statements(), 2, "a miss: the scoped UPDATE, then the read that says why")
+
+	h.gql(adminToken, closeImportJobMutation, map[string]any{"input": map[string]any{"jobId": created.ID, "closed": true}})
+	h.warm(token)
+	h.counter.Reset()
+	msg = h.gqlError(token, updateImportJobDescriptionMutation, map[string]any{"input": map[string]any{
+		"jobId": created.ID, "description": "after close",
+	}})
+	assert.Contains(t, msg, "closed")
+	assert.Len(t, h.counter.Statements(), 2, "a miss on a closed import costs the same two statements")
+}
+
+const addImportJobSourcesMutation = `mutation($input: AddImportJobSourcesInput!) {
+  addImportJobSources(input: $input) { id requestStatus sources { status } }
+}`
+
+// TestAddImportJobSourcesRoundTrips pins adding sources: the job read (2
+// statements) plus one multi-row sources INSERT, however many sources. The
+// requester's wait for review; an admin's on an approved import list at once.
+// A refused add stops after the read (2).
+func TestAddImportJobSourcesRoundTrips(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "imp-as-a")
+	_, token := h.user("imp-as-u")
+	created := decode[rtDescribedRequest](t, h.gql(token, createDescribedRequestMutation, map[string]any{"input": map[string]any{
+		"name": "Sermons", "description": "first", "sources": []map[string]any{},
+	}}), "createImportJob")
+	src := func(refs ...string) map[string]any {
+		list := make([]map[string]any, len(refs))
+		for i, r := range refs {
+			list[i] = map[string]any{"sourceType": "YOUTUBE_CHANNEL", "ref": r}
+		}
+		return map[string]any{"input": map[string]any{"jobId": created.ID, "sources": list}}
+	}
+
+	h.warm(token)
+	data := h.roundTrips(3, token, addImportJobSourcesMutation, src("@one", "@two"))
+	added := decode[rtDescribedRequest](t, data, "addImportJobSources")
+	require.Len(t, added.Sources, 2)
+	assert.Equal(t, "WAITING", added.Sources[0].Status, "the requester's sources wait for review")
+	assert.Empty(t, h.background, "nothing lists before approval")
+
+	h.gql(adminToken, reviewImportJobMutation, map[string]any{"input": map[string]any{"jobId": created.ID, "approve": true}})
+	h.runBackground()
+
+	h.warm(token)
+	h.counter.Reset()
+	msg := h.gqlError(token, addImportJobSourcesMutation, src("@three"))
+	assert.Contains(t, msg, "ask an admin")
+	assert.Len(t, h.counter.Statements(), 2, "a refused add costs the job read only")
+
+	h.warm(adminToken)
+	data = h.roundTrips(3, adminToken, addImportJobSourcesMutation, src("@three"))
+	byAdmin := decode[rtDescribedRequest](t, data, "addImportJobSources")
+	require.Len(t, byAdmin.Sources, 3)
+	assert.Equal(t, "LISTING", byAdmin.Sources[2].Status)
+	assert.Len(t, h.background, 1, "an admin's add on an approved import starts listing")
 }

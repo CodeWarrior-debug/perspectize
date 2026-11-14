@@ -154,9 +154,11 @@ func domainToModel(c *domain.Content) *model.Content {
 		// Non-schema field — lets contentResolver.PrimaryCategory batch-load the
 		// category by FK via dataloader instead of re-fetching the content row.
 		PrimaryCategoryID: c.PrimaryCategoryID,
-		VerseStartID:      c.VerseStartID,
-		VerseEndID:        c.VerseEndID,
-		DisplayTitle:      c.DisplayTitle,
+		// Non-schema field — lets contentResolver.ImportedFrom batch-load the import.
+		ImportJobID:  c.ImportJobID,
+		VerseStartID: c.VerseStartID,
+		VerseEndID:   c.VerseEndID,
+		DisplayTitle: c.DisplayTitle,
 	}
 
 	// Parse the raw response JSON into a map for GraphQL
@@ -707,6 +709,9 @@ var contentFieldsFromID = map[string]bool{
 	"perspectiveCount":   true,
 	"averageRating":      true,
 	"qualityRatingCount": true,
+	// importedFrom needs only the row's import_job_id, which the aggregate
+	// query carries (see ContentByID), so it keeps the fast path.
+	"importedFrom": true,
 }
 
 // onlyIDAndAggregatesSelected reports whether the current field's selection
@@ -1017,6 +1022,11 @@ func int64ToFloatPtr(n *int64) *float64 {
 	return &f
 }
 
+// importJobRefToModel is the short form of an import, as Content.importedFrom shows it.
+func importJobRefToModel(j *domain.ImportJob) *model.ImportJobRef {
+	return &model.ImportJobRef{ID: strconv.Itoa(j.ID), Name: j.Name}
+}
+
 func importJobToModel(j *domain.ImportJob) *model.ImportJob {
 	sources := make([]*model.ImportSource, len(j.Sources))
 	for i, s := range j.Sources {
@@ -1037,6 +1047,7 @@ func importJobToModel(j *domain.ImportJob) *model.ImportJob {
 	return &model.ImportJob{
 		ID:              strconv.Itoa(j.ID),
 		Name:            j.Name,
+		Description:     j.Description,
 		RequestStatus:   j.RequestStatus,
 		ReviewNote:      j.ReviewNote,
 		ReviewedAt:      isoTimePtr(j.ReviewedAt),
@@ -1115,7 +1126,7 @@ func importItemDetailsToModel(d *domain.ImportItemWithDetails) *model.ImportItem
 }
 
 func modelToCreateImportJobInput(in model.CreateImportJobInput) domain.CreateImportJobInput {
-	out := domain.CreateImportJobInput{Name: in.Name, Sources: make([]domain.CreateImportSourceInput, len(in.Sources))}
+	out := domain.CreateImportJobInput{Name: in.Name, Description: in.Description, Sources: make([]domain.CreateImportSourceInput, len(in.Sources))}
 	for i, s := range in.Sources {
 		out.Sources[i] = domain.CreateImportSourceInput{SourceType: s.SourceType, Ref: s.Ref, Role: s.Role}
 	}
@@ -1139,6 +1150,24 @@ func importProgressToModel(p domain.ImportProgress) *model.ImportProgress {
 		Skipped:   p.Skipped,
 		Failed:    p.Failed,
 		Running:   p.Running,
+		UpdatedAt: isoTime(p.UpdatedAt),
+	}
+}
+
+func importListingProgressToModel(p domain.ImportListingProgress) *model.ImportListingProgress {
+	sources := make([]*model.ImportSourceListingProgress, len(p.Sources))
+	for i, src := range p.Sources {
+		sources[i] = &model.ImportSourceListingProgress{
+			SourceID: strconv.Itoa(src.SourceID),
+			Staged:   src.Staged,
+			Batches:  src.Batches,
+			Status:   src.Status,
+		}
+	}
+	return &model.ImportListingProgress{
+		JobID:     strconv.Itoa(p.JobID),
+		Listing:   p.Listing,
+		Sources:   sources,
 		UpdatedAt: isoTime(p.UpdatedAt),
 	}
 }
