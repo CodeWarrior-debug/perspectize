@@ -38,6 +38,15 @@ var (
 	cgnatPrefix     = netip.MustParsePrefix("100.64.0.0/10")
 	thisNetPrefix   = netip.MustParsePrefix("0.0.0.0/8")
 	siteLocalPrefix = netip.MustParsePrefix("fec0::/10")
+	// NAT64 translates to any IPv4 address, private ones included.
+	nat64WellKnownPrefix = netip.MustParsePrefix("64:ff9b::/96")
+	nat64LocalPrefix     = netip.MustParsePrefix("64:ff9b:1::/48")
+	// 6to4 embeds an IPv4 address; the whole 2002::/16 is refused rather than parsed.
+	sixToFourPrefix = netip.MustParsePrefix("2002::/16")
+	// Benchmarking (RFC 2544), IETF protocol assignments, and reserved space.
+	benchmarkPrefix = netip.MustParsePrefix("198.18.0.0/15")
+	ietfPrefix      = netip.MustParsePrefix("192.0.0.0/24")
+	reservedPrefix  = netip.MustParsePrefix("240.0.0.0/4") // includes 255.255.255.255
 )
 
 // Options configures the client. The zero value is production-ready.
@@ -182,8 +191,14 @@ func isPublicAddr(ip netip.Addr) bool {
 		ip.IsInterfaceLocalMulticast() || ip.IsMulticast() {
 		return false
 	}
-	if cgnatPrefix.Contains(ip) || thisNetPrefix.Contains(ip) || siteLocalPrefix.Contains(ip) {
-		return false
+	for _, blocked := range []netip.Prefix{
+		cgnatPrefix, thisNetPrefix, siteLocalPrefix,
+		nat64WellKnownPrefix, nat64LocalPrefix, sixToFourPrefix,
+		benchmarkPrefix, ietfPrefix, reservedPrefix,
+	} {
+		if blocked.Contains(ip) {
+			return false
+		}
 	}
 	return true
 }

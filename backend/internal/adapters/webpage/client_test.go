@@ -261,6 +261,12 @@ func TestIsPublicAddr(t *testing.T) {
 		"127.0.0.1", "10.1.2.3", "172.31.255.255", "192.168.0.1", "169.254.169.254",
 		"100.64.0.1", "100.127.255.255", "0.0.0.0", "224.0.0.251", "::1", "::", "fd12::1",
 		"fe80::1", "fec0::1", "ff02::1", "::ffff:10.0.0.1",
+		// NAT64 (well-known and local-use) can reach private IPv4 behind a gateway.
+		"64:ff9b::808:808", "64:ff9b::a00:1", "64:ff9b:1::1",
+		// 6to4 embeds an IPv4 address in 2002::/16; blocked whole.
+		"2002::1", "2002:c000:204::1",
+		// Benchmarking, IETF protocol assignments, reserved, and broadcast.
+		"198.18.0.1", "198.19.255.255", "192.0.0.8", "240.0.0.1", "255.255.255.255",
 	}
 	for _, s := range public {
 		assert.True(t, isPublicAddr(netip.MustParseAddr(s)), "%s should be public", s)
