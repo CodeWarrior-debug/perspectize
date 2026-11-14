@@ -1,7 +1,9 @@
 [
   { "question": "How do I add a YouTube video to my library?", "expect_ids": ["adding-content.add-youtube-video"], "must_not_claim": [] },
   { "question": "Can I paste in a Bible Gateway link to add a passage?", "expect_ids": ["adding-content.add-bible-passage"], "must_not_claim": [] },
+  { "question": "Can I add a movie to Perspectize by pasting its IMDb link?", "expect_ids": ["adding-content.add-movie"], "must_not_claim": [] },
+  { "question": "How do I add a book using an Open Library link?", "expect_ids": ["adding-content.add-book"], "must_not_claim": [] },
+  { "question": "How do I bring in every video from a YouTube channel instead of adding them one at a time?", "expect_ids": ["adding-content.request-import", "adding-content.import-from-sheet"], "must_not_claim": [] },
   { "question": "I typed a claim like 'the earth is round' into Add Content — why won't it add?", "expect_ids": ["adding-content.open-add-content"], "must_not_claim": ["claims can be added", "add a claim"] },
-  { "question": "Where's the button to add content?", "expect_ids": ["adding-content.open-add-content"], "must_not_claim": [] },
-  { "question": "Can I add a podcast episode or article instead of a YouTube video?", "expect_ids": [], "must_not_claim": ["podcast", "article", "add a podcast", "add an article"] }
+  { "question": "Can I add a podcast episode or article instead of a YouTube video?", "expect_ids": [], "must_not_claim": ["add a podcast", "add an article", "podcast episodes are supported"] }
 ]
