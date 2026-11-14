@@ -12,8 +12,14 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 )
 
-// maxAuthorRunes caps the stored author name.
-const maxAuthorRunes = 200
+// Rune caps on stored text. A page controls every one of these, so each is bounded
+// whichever source (<title>, og:, meta) it came from.
+const (
+	maxTitleRunes       = 300
+	maxDescriptionRunes = 1000
+	maxSiteNameRunes    = 200
+	maxAuthorRunes      = 200
+)
 
 // dateLayouts are the date forms accepted from meta tags and JSON-LD. The first
 // that parses wins; the stored value is always YYYY-MM-DD as written on the page.
@@ -107,10 +113,10 @@ scan:
 	}
 
 	meta := domain.WebPageMeta{
-		SiteName:    nilIfEmpty(collapse(h.siteName)),
+		SiteName:    nilIfEmpty(truncateRunes(collapse(h.siteName), maxSiteNameRunes)),
 		Lang:        nilIfEmpty(collapse(h.lang)),
-		Description: nilIfEmpty(first(collapse(h.ogDescription), collapse(h.metaDesc))),
-		Title:       nilIfEmpty(first(collapse(h.ogTitle), collapse(titleText.String()))),
+		Description: nilIfEmpty(truncateRunes(first(collapse(h.ogDescription), collapse(h.metaDesc)), maxDescriptionRunes)),
+		Title:       nilIfEmpty(truncateRunes(first(collapse(h.ogTitle), collapse(titleText.String())), maxTitleRunes)),
 	}
 
 	if img, ok := absoluteHTTP(base, h.ogImage); ok {
@@ -331,5 +337,5 @@ func truncateRunes(s string, n int) string {
 	if len(r) <= n {
 		return s
 	}
-	return string(r[:n])
+	return strings.TrimSpace(string(r[:n]))
 }

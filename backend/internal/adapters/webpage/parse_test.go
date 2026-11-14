@@ -154,6 +154,32 @@ func TestParseHead_AuthorCappedAt200Runes(t *testing.T) {
 	assert.Equal(t, strings.Repeat("é", 200), *got.Author)
 }
 
+func TestParseHead_TextFieldsCapped(t *testing.T) {
+	// A hostile page can put hundreds of KB in a title. Each stored text field has
+	// a rune cap, whichever source (<title> or og:) supplied it.
+	huge := strings.Repeat("é", 400_000)
+	html := fmt.Sprintf(`<html><head><title>%s</title><meta name="description" content="%s"><meta property="og:site_name" content="%s"></head>`,
+		huge, strings.Repeat("d", 5000), strings.Repeat("s", 5000))
+	base, _ := url.Parse("https://example.com/")
+
+	got := ParseHead(strings.NewReader(html), base)
+	require.NotNil(t, got.Title)
+	require.NotNil(t, got.Description)
+	require.NotNil(t, got.SiteName)
+	assert.Equal(t, 300, len([]rune(*got.Title)), "title is capped at 300 runes")
+	assert.Equal(t, 1000, len([]rune(*got.Description)), "description is capped at 1000 runes")
+	assert.Equal(t, 200, len([]rune(*got.SiteName)), "site name is capped at 200 runes")
+}
+
+func TestParseHead_OGTitleCapped(t *testing.T) {
+	html := fmt.Sprintf(`<html><head><meta property="og:title" content="%s"></head>`, strings.Repeat("t", 5000))
+	base, _ := url.Parse("https://example.com/")
+
+	got := ParseHead(strings.NewReader(html), base)
+	require.NotNil(t, got.Title)
+	assert.Equal(t, 300, len([]rune(*got.Title)))
+}
+
 func TestParseHead_StopsAtHeadEnd(t *testing.T) {
 	// A title placed after </head> belongs to the body, not the metadata.
 	html := `<html><head><meta name="description" content="kept"></head><body><title>ignored</title></body>`
