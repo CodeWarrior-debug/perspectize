@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
@@ -49,6 +50,8 @@ type ImportService struct {
 	workers  int
 	now      func() time.Time
 	progress *importProgressTracker
+	// listing is the source-listing progress admins watch while sheets fill.
+	listing *listingTracker
 	// progressInterval is how often live progress is pushed (tests shorten it).
 	progressInterval time.Duration
 }
@@ -102,6 +105,7 @@ func NewImportService(
 		opt(s)
 	}
 	s.progress = newImportProgressTracker(s.progressInterval, s.now)
+	s.listing = newListingTracker(s.progressInterval, s.now)
 	return s
 }
 
@@ -125,6 +129,20 @@ func (s *ImportService) GetImportJob(ctx context.Context, viewer *domain.Authent
 		return nil, nil
 	}
 	return job, err
+}
+
+// GetImportJobsByIDs returns the imports among ids, without their sources (1
+// query for any number of ids, none for empty). Unknown and non-positive ids
+// are absent. Closed imports are included: the caller decides who may see them.
+func (s *ImportService) GetImportJobsByIDs(ctx context.Context, ids []int) (map[int]*domain.ImportJob, error) {
+	valid := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if id > 0 {
+			valid = append(valid, id)
+		}
+	}
+	// The repository already says what failed; wrapping again would double it.
+	return s.repo.GetJobsByIDs(ctx, valid)
 }
 
 func isImportAdmin(u *domain.AuthenticatedUser) bool {
@@ -214,10 +232,29 @@ type resolvedSource struct {
 	resolved portservices.ResolvedImportSource
 }
 
+// cleanImportDescription trims and sanitizes a description with the same
+// policy as perspective reviews. Emptiness is judged by visible text, so an
+// empty editor's markup is no description; it returns "" and nothing is stored.
+// Images count as no text: a body with only an image is empty. A result over
+// domain.MaxImportJobDescriptionChars is ErrInvalidInput.
+func cleanImportDescription(raw string) (string, error) {
+	sanitized := sanitizeReview(strings.TrimSpace(raw))
+	if visibleText(sanitized) == "" {
+		return "", nil
+	}
+	clean := strings.TrimSpace(sanitized)
+	if utf8.RuneCountInString(clean) > domain.MaxImportJobDescriptionChars {
+		return "", fmt.Errorf("%w: the description is at most %s characters", domain.ErrInvalidInput, formatThousands(domain.MaxImportJobDescriptionChars))
+	}
+	return clean, nil
+}
+
 // CreateImportJob validates and resolves every source before saving anything,
 // so a typo in the third channel doesn't leave a half-made import behind.
-// An admin's import starts listing at once. Anyone else's is a request: saved
-// with its sources WAITING, spending no listing quota until an admin approves it.
+// A request needs a name and either a description or at least one source; it
+// may have up to domain.MaxImportSourcesPerJob. An admin's import starts
+// listing at once. Anyone else's is a request: saved with its sources WAITING,
+// spending no listing quota until an admin approves it.
 func (s *ImportService) CreateImportJob(ctx context.Context, actor *domain.AuthenticatedUser, input domain.CreateImportJobInput) (*domain.ImportJob, error) {
 	if actor == nil {
 		return nil, fmt.Errorf("%w: sign in to request an import", domain.ErrForbidden)
@@ -227,8 +264,19 @@ func (s *ImportService) CreateImportJob(ctx context.Context, actor *domain.Authe
 	if name == "" || len([]rune(name)) > 120 {
 		return nil, fmt.Errorf("%w: import name must be 1-120 characters", domain.ErrInvalidInput)
 	}
-	if len(input.Sources) == 0 || len(input.Sources) > domain.MaxImportSourcesPerJob {
-		return nil, fmt.Errorf("%w: an import needs 1-%d sources", domain.ErrInvalidInput, domain.MaxImportSourcesPerJob)
+	if len(input.Sources) > domain.MaxImportSourcesPerJob {
+		return nil, fmt.Errorf("%w: an import takes at most %d sources", domain.ErrInvalidInput, domain.MaxImportSourcesPerJob)
+	}
+	var description string
+	if input.Description != nil {
+		clean, err := cleanImportDescription(*input.Description)
+		if err != nil {
+			return nil, err
+		}
+		description = clean
+	}
+	if description == "" && len(input.Sources) == 0 {
+		return nil, fmt.Errorf("%w: say what the import is for, or add at least one source", domain.ErrInvalidInput)
 	}
 
 	if !isAdmin {
@@ -245,44 +293,20 @@ func (s *ImportService) CreateImportJob(ctx context.Context, actor *domain.Authe
 	// An admin's import spends quota at once; anyone else's waits for review.
 	// Decided here, from the actor's role: the column has no default to fall back on.
 	job := &domain.ImportJob{UserID: actor.ID, Name: name}
+	if description != "" {
+		job.Description = &description
+	}
 	var sourceStatus domain.ImportSourceStatus
 	if isAdmin {
 		job.RequestStatus, sourceStatus = domain.ImportRequestStatusApproved, domain.ImportSourceStatusListing
 	} else {
 		job.RequestStatus, sourceStatus = domain.ImportRequestStatusRequested, domain.ImportSourceStatusWaiting
 	}
-	resolved := make([]resolvedSource, len(input.Sources))
-	for i, in := range input.Sources {
-		if !in.SourceType.Valid() {
-			return nil, fmt.Errorf("%w: unknown source type %q", domain.ErrInvalidInput, in.SourceType)
-		}
-		if in.Role != nil && in.SourceType != domain.ImportSourceTMDBPerson {
-			return nil, fmt.Errorf("%w: role only applies to TMDB people", domain.ErrInvalidInput)
-		}
-		lister, ok := s.listers[in.SourceType]
-		if !ok {
-			return nil, fmt.Errorf("%w: %s sources are not configured on this server", domain.ErrInvalidInput, in.SourceType)
-		}
-		ref := strings.TrimSpace(in.Ref)
-		if ref == "" || len(ref) > 200 {
-			return nil, fmt.Errorf("%w: source %d needs a reference of 1-200 characters", domain.ErrInvalidInput, i+1)
-		}
-		r, err := lister.Resolve(ctx, ref)
-		if err != nil {
-			return nil, fmt.Errorf("source %d (%s): %w", i+1, ref, err)
-		}
-		resolved[i] = resolvedSource{lister: lister, resolved: *r}
-		title, link := r.Title, r.URL
-		job.Sources = append(job.Sources, &domain.ImportSource{
-			SourceType:      in.SourceType,
-			SourceRef:       ref,
-			Title:           &title,
-			URL:             &link,
-			Role:            in.Role,
-			DestinationType: in.SourceType.DestinationType(),
-			Status:          sourceStatus,
-		})
+	sources, resolved, err := s.resolveSources(ctx, input.Sources, sourceStatus)
+	if err != nil {
+		return nil, err
 	}
+	job.Sources = sources
 
 	created, err := s.repo.CreateJob(ctx, job)
 	if err != nil {
@@ -294,10 +318,140 @@ func (s *ImportService) CreateImportJob(ctx context.Context, actor *domain.Authe
 	return created, nil
 }
 
+// resolveSources validates each input and resolves it against its API, so a bad
+// source fails the whole call before anything is saved. The sources come back
+// with status, alongside the resolved forms listing needs.
+func (s *ImportService) resolveSources(ctx context.Context, inputs []domain.CreateImportSourceInput, status domain.ImportSourceStatus) ([]*domain.ImportSource, []resolvedSource, error) {
+	sources := make([]*domain.ImportSource, 0, len(inputs))
+	resolved := make([]resolvedSource, len(inputs))
+	for i, in := range inputs {
+		if !in.SourceType.Valid() {
+			return nil, nil, fmt.Errorf("%w: unknown source type %q", domain.ErrInvalidInput, in.SourceType)
+		}
+		if in.Role != nil && in.SourceType != domain.ImportSourceTMDBPerson {
+			return nil, nil, fmt.Errorf("%w: role only applies to TMDB people", domain.ErrInvalidInput)
+		}
+		lister, ok := s.listers[in.SourceType]
+		if !ok {
+			return nil, nil, fmt.Errorf("%w: %s sources are not configured on this server", domain.ErrInvalidInput, in.SourceType)
+		}
+		ref := strings.TrimSpace(in.Ref)
+		if ref == "" || len(ref) > 200 {
+			return nil, nil, fmt.Errorf("%w: source %d needs a reference of 1-200 characters", domain.ErrInvalidInput, i+1)
+		}
+		r, err := lister.Resolve(ctx, ref)
+		if err != nil {
+			return nil, nil, fmt.Errorf("source %d (%s): %w", i+1, ref, err)
+		}
+		resolved[i] = resolvedSource{lister: lister, resolved: *r}
+		title, link := r.Title, r.URL
+		sources = append(sources, &domain.ImportSource{
+			SourceType:      in.SourceType,
+			SourceRef:       ref,
+			Title:           &title,
+			URL:             &link,
+			Role:            in.Role,
+			DestinationType: in.SourceType.DestinationType(),
+			Status:          status,
+		})
+	}
+	return sources, resolved, nil
+}
+
+// AddImportJobSources adds sources to an open import. Spending listing quota
+// needs an admin's say-so: the requester may add while the request waits for
+// review (the sources wait with it); after approval only an admin may, and
+// listing starts at once. This is how an approved description-only request
+// gets its sources.
+func (s *ImportService) AddImportJobSources(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, inputs []domain.CreateImportSourceInput) (*domain.ImportJob, error) {
+	if actor == nil {
+		return nil, fmt.Errorf("%w: sign in to add sources", domain.ErrForbidden)
+	}
+	if len(inputs) == 0 {
+		return nil, fmt.Errorf("%w: add at least one source", domain.ErrInvalidInput)
+	}
+	job, err := s.repo.GetJob(ctx, jobID)
+	if err != nil {
+		return nil, err
+	}
+	isAdmin := actor.Role == domain.UserRoleAdmin
+	switch {
+	case !isAdmin && job.UserID != actor.ID:
+		return nil, fmt.Errorf("%w: only the person who requested this import, or an admin, may add sources", domain.ErrForbidden)
+	case !isAdmin && job.RequestStatus != domain.ImportRequestStatusRequested:
+		return nil, fmt.Errorf("%w: this import is already reviewed; ask an admin to add sources", domain.ErrForbidden)
+	case job.ClosedAt != nil:
+		return nil, fmt.Errorf("%w: this import is closed", domain.ErrInvalidInput)
+	case job.RequestStatus == domain.ImportRequestStatusDeclined:
+		return nil, fmt.Errorf("%w: this request was declined", domain.ErrInvalidInput)
+	}
+	if len(job.Sources)+len(inputs) > domain.MaxImportSourcesPerJob {
+		return nil, fmt.Errorf("%w: an import takes at most %d sources (it has %d)",
+			domain.ErrInvalidInput, domain.MaxImportSourcesPerJob, len(job.Sources))
+	}
+
+	approved := job.RequestStatus == domain.ImportRequestStatusApproved
+	status := domain.ImportSourceStatusWaiting
+	if approved {
+		status = domain.ImportSourceStatusListing
+	}
+	sources, resolved, err := s.resolveSources(ctx, inputs, status)
+	if err != nil {
+		return nil, err
+	}
+	existing := append([]*domain.ImportSource(nil), job.Sources...)
+	added, err := s.repo.AddSources(ctx, jobID, sources)
+	if err != nil {
+		return nil, err
+	}
+	if approved {
+		s.startListing(added, resolved)
+	}
+	out := *job
+	out.Sources = append(existing, added...)
+	return &out, nil
+}
+
 func (s *ImportService) startListing(sources []*domain.ImportSource, resolved []resolvedSource) {
 	for i, src := range sources {
 		src, rs := src, resolved[i]
 		s.spawn(func() { s.listSource(src, rs) })
+	}
+}
+
+// UpdateImportJobDescription replaces the description of an import the actor
+// requested. The UPDATE is scoped to the requester and to an open import; on
+// a miss the job is read once to say why (not found, someone else's, closed).
+func (s *ImportService) UpdateImportJobDescription(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, description string) (*domain.ImportJob, error) {
+	if actor == nil {
+		return nil, fmt.Errorf("%w: sign in to edit an import", domain.ErrForbidden)
+	}
+	clean, err := cleanImportDescription(description)
+	if err != nil {
+		return nil, err
+	}
+	if clean == "" {
+		return nil, fmt.Errorf("%w: write a description, or leave it as it was", domain.ErrInvalidInput)
+	}
+	job, err := s.repo.UpdateJobDescription(ctx, jobID, actor.ID, clean)
+	if err == nil {
+		return job, nil
+	}
+	if !errors.Is(err, domain.ErrNotFound) {
+		return nil, err
+	}
+	current, err := s.repo.GetJobState(ctx, jobID)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case current.UserID != actor.ID:
+		return nil, fmt.Errorf("%w: only the person who requested this import may edit its description", domain.ErrForbidden)
+	case current.ClosedAt != nil:
+		return nil, fmt.Errorf("%w: this import is closed", domain.ErrInvalidInput)
+	default:
+		// Open and theirs now, so it changed between the UPDATE and this read.
+		return nil, fmt.Errorf("%w: this import changed while you were editing it; try again", domain.ErrInvalidInput)
 	}
 }
 
@@ -385,6 +539,7 @@ func (s *ImportService) resolveForListing(ctx context.Context, src *domain.Impor
 func (s *ImportService) listSource(src *domain.ImportSource, rs resolvedSource) {
 	ctx, cancel := context.WithTimeout(s.bg, listingTimeout)
 	defer cancel()
+	s.listing.begin(src.JobID, src.ID)
 
 	batches := make(chan []*domain.ImportItemWithDetails, 2)
 	listErr := make(chan error, 1)
@@ -415,6 +570,7 @@ func (s *ImportService) listSource(src *domain.ImportSource, rs resolvedSource) 
 			continue
 		}
 		count += len(batch)
+		s.listing.staged(src.JobID, src.ID, len(batch))
 		progress := count
 		if err := s.repo.UpdateSource(ctx, src.ID, repositories.ImportSourceUpdate{Status: domain.ImportSourceStatusListing, ItemCount: &progress}); err != nil {
 			slog.Warn("import listing progress not saved", "sourceID", src.ID, "error", err)
@@ -438,6 +594,7 @@ func (s *ImportService) listSource(src *domain.ImportSource, rs resolvedSource) 
 	if werr := s.repo.UpdateSource(writeCtx, src.ID, final); werr != nil {
 		slog.Error("import listing result not saved", "sourceID", src.ID, "error", werr)
 	}
+	s.listing.finish(src.JobID, src.ID, final.Status)
 }
 
 // listingFailureDetail is the user-facing reason a listing stopped.
@@ -580,21 +737,37 @@ feed:
 	close(outcomes)
 }
 
+// importJobIDKey is the context key carrying the import a content create belongs to.
+type importJobIDKey struct{}
+
+// WithImportJobID returns ctx carrying the import job a content create is part
+// of, so the row it creates records that import (Content.ImportJobID).
+func WithImportJobID(ctx context.Context, jobID int) context.Context {
+	return context.WithValue(ctx, importJobIDKey{}, jobID)
+}
+
+// importJobIDFrom returns the import job ctx carries, if any.
+func importJobIDFrom(ctx context.Context) (int, bool) {
+	jobID, ok := ctx.Value(importJobIDKey{}).(int)
+	return jobID, ok
+}
+
 // importOne imports one row and records its outcome; ok is false when it
 // was left queued because the import is shutting down.
 func (s *ImportService) importOne(ctx context.Context, actorID int, it *domain.ImportItem) (domain.ImportItemStatus, bool) {
 	if ctx.Err() != nil {
 		return "", false // left queued; RecoverInterrupted fails it at the next start
 	}
+	createCtx := WithImportJobID(ctx, it.JobID)
 	var (
 		content *domain.Content
 		err     error
 	)
 	switch it.DestinationType {
 	case domain.ContentTypeYouTubeVideo:
-		content, err = s.content.CreateFromYouTube(ctx, it.CanonicalURL, actorID)
+		content, err = s.content.CreateFromYouTube(createCtx, it.CanonicalURL, actorID)
 	case domain.ContentTypeMovie:
-		content, err = s.content.CreateFromMovie(ctx, it.CanonicalURL, actorID)
+		content, err = s.content.CreateFromMovie(createCtx, it.CanonicalURL, actorID)
 	default:
 		err = fmt.Errorf("%w: cannot import %s", domain.ErrInvalidInput, it.DestinationType)
 	}
@@ -633,6 +806,19 @@ func (s *ImportService) SubscribeImportProgress(ctx context.Context, actor *doma
 		return nil, err
 	}
 	return s.progress.subscribe(ctx, jobID), nil
+}
+
+// SubscribeListingProgress streams an import's source listing progress: the
+// current state at once, then changes while sources list, until ctx ends.
+// Admin only: the listing is staff's view of a sheet that is still filling.
+func (s *ImportService) SubscribeListingProgress(ctx context.Context, actor *domain.AuthenticatedUser, jobID int) (<-chan domain.ImportListingProgress, error) {
+	if !isImportAdmin(actor) {
+		return nil, fmt.Errorf("%w: only an admin may watch listing progress", domain.ErrForbidden)
+	}
+	if _, err := s.repo.GetJob(ctx, jobID); err != nil {
+		return nil, err
+	}
+	return s.listing.subscribe(ctx, jobID), nil
 }
 
 // formatThousands writes n with comma separators ("1,000").

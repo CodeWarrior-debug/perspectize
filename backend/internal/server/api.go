@@ -176,6 +176,7 @@ func Middleware(d Deps) []func(http.Handler) http.Handler {
 			Content:     d.ContentService,
 			Messaging:   d.MessagingService,
 			UserTodo:    d.UserTodoService,
+			ImportJob:   d.ImportService,
 		}),
 		perfmw.RequestTimer, // structured request timing (replaces chi Logger)
 		perfmw.Recoverer,    // structured panic recovery (JSON via slog)

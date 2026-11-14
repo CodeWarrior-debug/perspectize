@@ -152,6 +152,7 @@ Rules that hold for every type:
 - **Summary in the row, full detail on click.** Long text (descriptions, synopses) is fetched lazily for the detail panel, never sent with every row ([QUERY_BUDGET.md](../../.docs/QUERY_BUDGET.md)).
 - **Counts are a snapshot.** Store when they were fetched and show "as of". The actual import re-fetches fresh metadata.
 - **Decide vs all columns.** Default to the columns that answer the five questions; bookkeeping columns (IDs, source type, recency index) sit behind an "All columns" set.
+- **Record the origin.** An importable type's `Create*` must read `importJobIDFrom(ctx)` (`backend/internal/core/services`) and set `Content.ImportJobID`, or `importedFrom` is silently null for its rows.
 
 Worked example: `docs/superpowers/specs/2026-10-27-youtube-channel-import-design.md` ("The decision row"), which documents each YouTube column with its API source, cost and edge cases. Any spec or preview for a new type's import or picker view includes the same table for that type.
 

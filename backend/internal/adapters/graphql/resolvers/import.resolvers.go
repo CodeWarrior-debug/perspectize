@@ -61,6 +61,46 @@ func (r *mutationResolver) CreateImportJob(ctx context.Context, input model.Crea
 	return importJobToModel(job), nil
 }
 
+// UpdateImportJobDescription is the resolver for the updateImportJobDescription
+// field. Only the requester may edit it; the service enforces that.
+func (r *mutationResolver) UpdateImportJobDescription(ctx context.Context, input model.UpdateImportJobDescriptionInput) (*model.ImportJob, error) {
+	svc, err := r.imports()
+	if err != nil {
+		return nil, err
+	}
+	actor, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	job, err := svc.UpdateImportJobDescription(ctx, actor, input.JobID, input.Description)
+	if err != nil {
+		return nil, importError(err)
+	}
+	return importJobToModel(job), nil
+}
+
+// AddImportJobSources is the resolver for the addImportJobSources field. Who may
+// add, and when, is enforced in the service.
+func (r *mutationResolver) AddImportJobSources(ctx context.Context, input model.AddImportJobSourcesInput) (*model.ImportJob, error) {
+	svc, err := r.imports()
+	if err != nil {
+		return nil, err
+	}
+	actor, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	sources := make([]domain.CreateImportSourceInput, len(input.Sources))
+	for i, s := range input.Sources {
+		sources[i] = domain.CreateImportSourceInput{SourceType: s.SourceType, Ref: s.Ref, Role: s.Role}
+	}
+	job, err := svc.AddImportJobSources(ctx, actor, input.JobID, sources)
+	if err != nil {
+		return nil, importError(err)
+	}
+	return importJobToModel(job), nil
+}
+
 // ReviewImportJob is the resolver for the reviewImportJob field.
 func (r *mutationResolver) ReviewImportJob(ctx context.Context, input model.ReviewImportJobInput) (*model.ImportJob, error) {
 	svc, err := r.imports()
@@ -253,6 +293,40 @@ func (r *subscriptionResolver) ImportProgress(ctx context.Context, jobID string)
 		for p := range in {
 			select {
 			case out <- importProgressToModel(p):
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out, nil
+}
+
+// ImportListingProgress is the resolver for the importListingProgress subscription.
+// The service's channel keeps only the latest state and is throttled, and the
+// service enforces the admin check, so this only maps and forwards.
+func (r *subscriptionResolver) ImportListingProgress(ctx context.Context, jobID string) (<-chan *model.ImportListingProgress, error) {
+	svc, err := r.imports()
+	if err != nil {
+		return nil, err
+	}
+	actor, ok := auth.ForContext(ctx)
+	if !ok {
+		return nil, domain.ErrForbidden
+	}
+	id, err := strconv.Atoi(jobID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: invalid import id", domain.ErrInvalidInput)
+	}
+	in, err := svc.SubscribeListingProgress(ctx, actor, id)
+	if err != nil {
+		return nil, importError(err)
+	}
+	out := make(chan *model.ImportListingProgress, 1)
+	go func() {
+		defer close(out)
+		for p := range in {
+			select {
+			case out <- importListingProgressToModel(p):
 			case <-ctx.Done():
 				return
 			}

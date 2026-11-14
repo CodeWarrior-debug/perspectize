@@ -232,8 +232,9 @@ func TestListContentGridCategoriesCached(t *testing.T) {
 	require.GreaterOrEqual(t, labels, 3, "cached category reflects this instance's own write")
 }
 
-// frontend GET_CONTENT_AGGREGATES (details modal)
-const contentAggregatesQuery = `query($id: ID!) { contentByID(id: $id) { id perspectiveCount averageRating qualityRatingCount } }`
+// frontend GET_CONTENT_AGGREGATES (details modal), verbatim selection set
+// including importedFrom ("Imported from" line).
+const contentAggregatesQuery = `query GetContentAggregates($id: ID!) { contentByID(id: $id) { id perspectiveCount averageRating qualityRatingCount importedFrom { id name } } }`
 
 func TestContentAggregates(t *testing.T) {
 	h := newHarness(t)
@@ -248,6 +249,23 @@ func TestContentAggregates(t *testing.T) {
 		PerspectiveCount int `json:"perspectiveCount"`
 	}](t, data, "contentByID")
 	require.Equal(t, 1, got.PerspectiveCount)
+}
+
+// The details-modal document on imported content: still no content row read
+// (the aggregate query carries import_job_id), plus one batched import-job load.
+func TestContentAggregatesImported(t *testing.T) {
+	h := newHarness(t)
+	_, adminToken := adminUser(t, h, "agg-imp")
+	job, contentIDs := importRowsAsAdmin(t, h, adminToken, 1)
+	h.warm(adminToken)
+
+	data := h.roundTrips(2, adminToken, contentAggregatesQuery, map[string]any{"id": contentIDs[0]})
+	got := decode[contentOrigin](t, data, "contentByID")
+	require.NotNil(t, got.ImportedFrom)
+	require.Equal(t, job.ID, got.ImportedFrom.ID)
+	for _, s := range h.counter.Statements() {
+		require.NotContains(t, s, "response", "the JSONB response column must not be read")
+	}
 }
 
 // An aggregates-only query for an unknown id still errors "content not found"

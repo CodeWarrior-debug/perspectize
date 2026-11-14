@@ -235,6 +235,9 @@ type Content {
   "Book-specific metadata (the shaped Open Library payload); null for other content types."
   book: JSON
   primaryCategory: Category
+  # The import that created this row. Null for hand-added content, and when that
+  # import is closed and the viewer isn't an admin.
+  importedFrom: ImportJobRef
   # BIBLE_PASSAGE only: computed verse ordinals (see bible_book.verses_per_chapter)
   # and the optional, first-write-wins display title. Null for other content types.
   verseStartID: Int
@@ -634,9 +637,17 @@ enum ImportRequestStatus {
   DECLINED
 }
 
+# The import a content row came from, as far as a viewer may see it.
+type ImportJobRef {
+  id: ID!
+  name: String!
+}
+
 type ImportJob {
   id: ID!
   name: String!
+  # What the request is for, written by the requester (sanitized HTML). Not a comment thread.
+  description: String
   requestStatus: ImportRequestStatus!
   # Who created it (the requester, for a request).
   requestedBy: User
@@ -715,6 +726,21 @@ input CreateImportSourceInput {
 
 input CreateImportJobInput {
   name: String!
+  # Required with no sources: what the import is for. Sanitized, at most 20,000 characters.
+  description: String
+  # May be empty when a description is given.
+  sources: [CreateImportSourceInput!]!
+}
+
+input UpdateImportJobDescriptionInput {
+  jobId: IntID!
+  # Replaces the description. Sanitized, at most 20,000 characters; blank is refused.
+  description: String!
+}
+
+input AddImportJobSourcesInput {
+  jobId: IntID!
+  # At least one; an import holds at most 10 sources in all.
   sources: [CreateImportSourceInput!]!
 }
 
@@ -732,9 +758,27 @@ type ImportProgress {
   updatedAt: String!
 }
 
+# Admin-only: how far each source's listing has got, pushed while sheets fill.
+type ImportSourceListingProgress {
+  sourceId: ID!
+  staged: Int!
+  batches: Int!
+  status: ImportSourceStatus!
+}
+
+# Admin-only live view of an import's sources being listed.
+type ImportListingProgress {
+  jobId: ID!
+  listing: Boolean!
+  sources: [ImportSourceListingProgress!]!
+  updatedAt: String!
+}
+
 extend type Subscription {
   # The current count at once, then every change while the import runs.
   importProgress(jobId: ID!): ImportProgress! @auth
+  # Admin only. The current state at once, then every change while sources list.
+  importListingProgress(jobId: ID!): ImportListingProgress! @auth
 }
 
 input ReviewImportJobInput {
@@ -824,11 +868,20 @@ type Mutation {
   # Rewrites the list's positions to 1..N in the order of todoIds.
   reorderUserTodoList(listId: IntID!, todoIds: [IntID!]!): [UserTodo!]! @auth
 
-  # Import staging. Creating an import is admin-only (it spends API quota);
-  # sources are listed in the background, so the returned sources are LISTING.
-  # Anyone signed in: an admin's import starts listing, anyone else's waits as a request.
+  # Import staging. Anyone signed in may create an import. An admin's is approved
+  # at once and starts listing in the background (its sources come back LISTING);
+  # anyone else's is a request awaiting review, with its sources WAITING.
+  # A request needs a name and a description or at least one source, so sources
+  # may be empty when a description is given.
   createImportJob(input: CreateImportJobInput!): ImportJob! @auth
+  # Only the requester may edit the description, and not once the import is closed.
+  # Returns the import without its sources; query importJob for those.
+  updateImportJobDescription(input: UpdateImportJobDescriptionInput!): ImportJob! @auth
   # Admin only: approve (start listing) or decline a requested import.
+  # Adds sources to an open import. The requester may while the request waits for
+  # review (the sources wait too); after approval only an admin may, and listing
+  # starts at once. Returns the job with all its sources.
+  addImportJobSources(input: AddImportJobSourcesInput!): ImportJob! @auth
   reviewImportJob(input: ReviewImportJobInput!): ImportJob! @auth
   # Anyone signed in, until the import is closed. Returns how many rows changed.
   setImportItemsExcluded(input: SetImportItemsExcludedInput!): Int! @auth

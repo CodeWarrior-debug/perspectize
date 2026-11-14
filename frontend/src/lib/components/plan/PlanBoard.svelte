@@ -5,13 +5,14 @@
 	import PlanTable from '$lib/components/plan/PlanTable.svelte';
 	import ListSwitcher from '$lib/components/plan/ListSwitcher.svelte';
 	import TodoDialog from '$lib/components/plan/TodoDialog.svelte';
+	import { useContentDetails } from '$lib/queries/content/useContentDetails';
 	import { useUserTodos } from '$lib/queries/userTodos/useUserTodos';
 	import { useUserTodoLists } from '$lib/queries/userTodos/useUserTodoLists';
 	import { useReorderUserTodoList } from '$lib/queries/userTodos/useReorderUserTodoList';
 	import { useMyPerspectives } from '$lib/queries/perspectives/useMyPerspectives';
 	import type { PerspectiveItem } from '$lib/queries/perspectives';
 	import type { UserTodoItem, UserTodoSortBy } from '$lib/queries/userTodos';
-	import { filterForSelection, type ListSelection } from '$lib/utils/plan-todo-helpers';
+	import { filterForSelection, type ListSelection, type TodoFocusField } from '$lib/utils/plan-todo-helpers';
 
 	/**
 	 * PlanBoard: the signed-in user's plan. Owns the query, the list selection and
@@ -58,15 +59,27 @@
 
 	let dialogOpen = $state(false);
 	let dialogTodo = $state<UserTodoItem | null>(null);
+	let dialogFocusField = $state<TodoFocusField | null>(null);
 
 	function openCreate() {
 		dialogTodo = null;
+		dialogFocusField = null;
 		dialogOpen = true;
 	}
 
-	function openEdit(todo: UserTodoItem) {
+	function openEdit(todo: UserTodoItem, field: TodoFocusField | null = null) {
 		dialogTodo = todo;
+		dialogFocusField = field;
 		dialogOpen = true;
+	}
+
+	// "View content": the Edit Todo dialog closes first so the two dialogs never stack (as on Activity).
+	let detailsContentId = $state<string | null>(null);
+	const detailsQuery = useContentDetails(() => detailsContentId);
+
+	function viewContent(content: { id: string }) {
+		dialogOpen = false;
+		detailsContentId = content.id;
 	}
 
 	let popoverOpen = $state(false);
@@ -132,9 +145,24 @@
 	<TodoDialog
 		bind:open={dialogOpen}
 		todo={dialogTodo}
+		focusField={dialogFocusField}
+		onViewContent={viewContent}
 		{lists}
 		defaultListId={selection.kind === 'list' ? selection.id : null}
 	/>
+{/if}
+
+<!-- The same details view as Activity, loaded only when "View content" is used. -->
+{#if detailsContentId !== null}
+	{#await import('$lib/components/ActivityDetailsModal.svelte') then { default: ActivityDetailsModal }}
+		<ActivityDetailsModal
+			content={detailsQuery.data?.contentByID ?? null}
+			open
+			onClose={() => (detailsContentId = null)}
+		/>
+	{:catch}
+		<LazyLoadError what="the content details" floating />
+	{/await}
 {/if}
 
 <!-- Lazy, like ActivityTable: the Tiptap-based editor only loads when a perspective is opened. -->

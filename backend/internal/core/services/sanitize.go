@@ -1,6 +1,11 @@
 package services
 
-import "github.com/microcosm-cc/bluemonday"
+import (
+	"html"
+	"strings"
+
+	"github.com/microcosm-cc/bluemonday"
+)
 
 func newReviewPolicy() *bluemonday.Policy {
 	p := bluemonday.NewPolicy()
@@ -22,10 +27,22 @@ func newReviewPolicy() *bluemonday.Policy {
 
 var reviewPolicy = newReviewPolicy()
 
+// textOnlyPolicy keeps no tags at all. It is used only to read what a reader
+// sees, never to store anything.
+var textOnlyPolicy = bluemonday.StrictPolicy()
+
 // sanitizeReview strips any HTML outside the perspective editor's supported
 // tag set, mirroring frontend/src/lib/utils/sanitize.ts's DOMPurify config.
 // This is defense-in-depth: the API must not trust HTML from non-browser
 // clients that bypass the frontend's DOMPurify pass.
 func sanitizeReview(html string) string {
 	return reviewPolicy.Sanitize(html)
+}
+
+// visibleText is the text a reader sees of sanitized HTML: tags removed,
+// entities decoded, spaces and no-break spaces trimmed. Empty means there is
+// nothing to read (an empty editor's <p></p>, <p><br></p>, <p>&nbsp;</p>).
+func visibleText(sanitized string) string {
+	text := html.UnescapeString(textOnlyPolicy.Sanitize(sanitized))
+	return strings.Trim(text, " \t\r\n ")
 }

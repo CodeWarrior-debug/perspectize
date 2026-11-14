@@ -55,6 +55,7 @@ type ContentModel struct {
 	VerseStartID      *int            `gorm:"column:verse_start_id"`
 	VerseEndID        *int            `gorm:"column:verse_end_id"`
 	DisplayTitle      *string         `gorm:"column:display_title"`
+	ImportJobID       *int            `gorm:"column:import_job_id"`
 
 	// TotalCount is read-only and only present when List selects it: the
 	// filtered total, computed by a scalar subquery in the same statement as
@@ -225,6 +226,7 @@ type ImportJobModel struct {
 	ID            int        `gorm:"primaryKey;autoIncrement"`
 	UserID        int        `gorm:"column:user_id;not null"`
 	Name          string     `gorm:"column:name;not null"`
+	Description   *string    `gorm:"column:description"`
 	RequestStatus string     `gorm:"column:request_status;not null"`
 	ReviewNote    *string    `gorm:"column:review_note"`
 	ReviewedAt    *time.Time `gorm:"column:reviewed_at"`

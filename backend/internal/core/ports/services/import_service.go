@@ -19,6 +19,11 @@ type ImportService interface {
 	// doesn't exist or is closed and viewer isn't an admin.
 	GetImportJob(ctx context.Context, viewer *domain.AuthenticatedUser, id int) (*domain.ImportJob, error)
 
+	// GetImportJobsByIDs returns the imports among ids without their sources
+	// (1 query for any number of ids). Unknown ids are absent. Closed imports are
+	// included: the caller applies visibility. Backs the content dataloader.
+	GetImportJobsByIDs(ctx context.Context, ids []int) (map[int]*domain.ImportJob, error)
+
 	// SetItemsExcluded marks rows "don't import" or clears the mark, for anyone
 	// signed in, while the import is approved and open (domain.ErrInvalidInput
 	// otherwise). Queued or imported rows are unchanged. Returns rows changed.
@@ -37,12 +42,31 @@ type ImportService interface {
 	GetImportItemDetails(ctx context.Context, itemID int) (*domain.ImportItemWithDetails, error)
 
 	// CreateImportJob checks every source against its API and saves the import.
-	// An admin's is APPROVED and starts listing each source in the background;
+	// It needs a name and either a description or at least one source. An
+	// admin's is APPROVED and starts listing each source in the background;
 	// anyone else's is REQUESTED with WAITING sources, and a person may have at
 	// most domain.MaxPendingImportRequests open. domain.ErrInvalidInput for a
-	// bad name or source, too many open requests, or a source type this server
-	// has no API key for; domain.ErrNotFound when a source doesn't exist.
+	// bad name, description or source, too many open requests, or a source type
+	// this server has no API key for; domain.ErrNotFound when a source doesn't exist.
 	CreateImportJob(ctx context.Context, actor *domain.AuthenticatedUser, input domain.CreateImportJobInput) (*domain.ImportJob, error)
+
+	// UpdateImportJobDescription replaces the description of an import the actor
+	// requested, sanitized and at most domain.MaxImportJobDescriptionChars.
+	// Only the requester may edit it (domain.ErrForbidden, even for an admin),
+	// and not once the import is closed (domain.ErrInvalidInput). A blank
+	// description is refused. domain.ErrNotFound for an unknown import. The
+	// returned job has no sources.
+	UpdateImportJobDescription(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, description string) (*domain.ImportJob, error)
+
+	// AddImportJobSources checks and saves more sources onto an open import, at
+	// most domain.MaxImportSourcesPerJob in all. The requester may add them
+	// while the request is still waiting for review (saved WAITING); once it is
+	// approved only an admin may (saved LISTING, listing starts at once), since
+	// that spends listing quota. domain.ErrForbidden for anyone else,
+	// domain.ErrInvalidInput for a closed or declined import, no sources, too
+	// many, or a bad source; domain.ErrNotFound for an unknown import or a
+	// source that doesn't exist. Returns the job with all its sources.
+	AddImportJobSources(ctx context.Context, actor *domain.AuthenticatedUser, jobID int, sources []domain.CreateImportSourceInput) (*domain.ImportJob, error)
 
 	// ReviewImportJob approves (starting listing) or declines a REQUESTED
 	// import. Admin only (domain.ErrForbidden). A decline needs a note.
@@ -60,6 +84,12 @@ type ImportService interface {
 	// the current count at once, then changes at most twice a second while
 	// rows import. domain.ErrNotFound for an unknown import.
 	SubscribeImportProgress(ctx context.Context, actor *domain.AuthenticatedUser, jobID int) (<-chan domain.ImportProgress, error)
+
+	// SubscribeListingProgress streams an import's source listing progress
+	// until ctx ends: the current state at once, then changes while sources
+	// list. Admin only (domain.ErrForbidden); domain.ErrNotFound for an
+	// unknown import.
+	SubscribeListingProgress(ctx context.Context, actor *domain.AuthenticatedUser, jobID int) (<-chan domain.ImportListingProgress, error)
 
 	// RecoverInterrupted fails work a restart cut short (sources still
 	// listing, rows still queued). Called once at startup.
