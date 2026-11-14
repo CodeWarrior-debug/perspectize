@@ -61,6 +61,8 @@ export interface ContentItem {
 	} | null;
 	createdAt: string;
 	updatedAt: string;
+	// CLAIM rows only: the claim's dates (YYYY-MM-DD). Null on other types and on legacy claims without dates.
+	customFields?: { effectiveDate?: string; evaluateBy?: string } | null;
 }
 
 export interface ContentResponse {
@@ -133,6 +135,7 @@ export const LIST_CONTENT = gql`
 				tags
 				description
 				movie
+				customFields
 				book
 				primaryCategory {
 					id
@@ -275,6 +278,7 @@ export const GET_CONTENT_DETAILS = gql`
 			description
 			response
 			movie
+			customFields
 			book
 			primaryCategory {
 				id

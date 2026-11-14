@@ -39,11 +39,11 @@ export function capitalizeContentType(contentType: string | undefined): string {
 /**
  * Every content type, in the order the Type column's checkbox filter lists them.
  * Hardcoded on purpose (mirrors the backend ContentType enum) — the Record forces
- * a new ContentType to be given a label here (Partial while CLAIM is commented out).
+ * a new ContentType to be given a label here.
  */
 const CONTENT_TYPE_LABELS: Partial<Record<ContentType, string>> = {
 	YOUTUBE_VIDEO: 'YouTube Video',
-	// CLAIM: 'Claim', // not ready in the UI yet; uncomment to offer it in the filter
+	CLAIM: 'Claim',
 	BIBLE_PASSAGE: 'Bible Passage',
 	MOVIE: 'Movie',
 	BOOK: 'Book',
@@ -230,6 +230,27 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		filterSet: true,
 	},
 	{ colId: 'category', label: 'Category', picker: 'data', sortable: false },
+	// Claim date columns (customFields JSON, see Content.customFields). Client-side sort only:
+	// the backend has no sort on custom fields, so in "All Items" mode they are not sortable.
+	{
+		colId: 'effectiveDate',
+		label: 'Effective',
+		picker: 'data',
+		sortable: true,
+		sortValue: (row) => row.customFields?.effectiveDate ?? null,
+	},
+	{
+		colId: 'evaluateBy',
+		label: 'Evaluate by',
+		picker: 'data',
+		sortable: true,
+		sortValue: (row) => row.customFields?.evaluateBy ?? null,
+	},
+	// The viewer's own ratings on each row, read from the perspective map (perspectiveRating),
+	// not from the row, so they are never client-sorted.
+	{ colId: 'myQuality', label: 'My overall', picker: 'data', sortable: false },
+	{ colId: 'myImportance', label: 'My importance', picker: 'data', sortable: false },
+	{ colId: 'myAgreement', label: 'My agreement', picker: 'data', sortable: false },
 	// Movie columns (MOVIE rows read their `response` JSON; see formatting.ts). Shown by
 	// default only when the type filter is exactly MOVIE (defaultColumnVisibility below).
 	{
@@ -506,6 +527,37 @@ export const COLUMNS: readonly ColumnMeta[] = [
 
 export type ResponsiveTier = 'xs' | 'sm' | 'md' | 'lg';
 
+/**
+ * The single lowercase type the `f.type` URL value names, or null when it names none or
+ * several different types. Repeats of one type (`movie,movie`) still name exactly one.
+ */
+export function soloTypeFilter(typeFilter: string | undefined): string | null {
+	if (!typeFilter) return null;
+	const types = new Set(
+		typeFilter
+			.split(',')
+			.map((t) => t.trim().toLowerCase())
+			.filter(Boolean),
+	);
+	return types.size === 1 ? [...types][0] : null;
+}
+
+export type PerspectiveRatingField = 'quality' | 'importance' | 'agreement';
+
+/**
+ * The signed-in viewer's rating for one row, from the perspective map the grid
+ * carries in its context (keyed by content id). Null when the viewer has no
+ * perspective on the row, or hasn't rated this field.
+ */
+export function perspectiveRating(
+	byContentId: Map<string, Partial<Record<PerspectiveRatingField, number | null>>> | undefined,
+	contentId: string | number | undefined,
+	field: PerspectiveRatingField,
+): number | null {
+	if (contentId === undefined) return null;
+	return byContentId?.get(String(contentId))?.[field] ?? null;
+}
+
 /** Distinct, lowercased types named by the `f.type` URL value (empty when unset). */
 function selectedTypes(typeFilter: string | undefined): string[] {
 	if (!typeFilter) return [];
@@ -529,9 +581,10 @@ export function isBookOnlyTypeFilter(typeFilter: string | undefined): boolean {
 }
 
 /** A default column set: one per single-type filter (Movie, Book), otherwise the general (YouTube) set. */
-export type ColumnView = 'movie' | 'book' | 'general';
+export type ColumnView = 'movie' | 'book' | 'claim' | 'general';
 
 export function columnViewFor(typeFilter: string | undefined): ColumnView {
+	if (soloTypeFilter(typeFilter) === 'claim') return 'claim';
 	if (isMovieOnlyTypeFilter(typeFilter)) return 'movie';
 	if (isBookOnlyTypeFilter(typeFilter)) return 'book';
 	return 'general';
@@ -582,24 +635,37 @@ const BOOK_COLS = ['author', 'published', 'pages', 'rating', 'editions', 'reader
 export function defaultColumnVisibility(
 	tier: ResponsiveTier,
 	view: ColumnView,
+	soloType: string | null = null,
 ): { visible: string[]; hidden: string[] } {
 	const sm = tier !== 'xs';
 	const md = tier === 'md' || tier === 'lg';
 	const lg = tier === 'lg';
-	const visible: string[] = view === 'general' ? ['item', 'type', 'perspectize'] : ['perspectize', 'item', 'type'];
-	if (view === 'movie') {
+	// A solo view implies its solo type, so Type is hidden even when the caller passes none.
+	const solo = soloType ?? (view === 'general' ? null : view);
+	let visible: string[];
+	if (view === 'claim') {
+		visible = ['perspectize', 'item'];
+		if (sm) visible.push('category');
+		if (md) visible.push('effectiveDate', 'evaluateBy');
+		if (lg) visible.push('myQuality', 'myImportance', 'myAgreement');
+	} else if (view === 'movie') {
+		visible = ['perspectize', 'item', 'type'];
 		if (sm) visible.push('genre', 'rated');
 		if (md) visible.push('cast', 'duration', 'released');
 		if (lg) visible.push('boxOffice', 'vsBudget', 'tmdbScore', 'tags');
 	} else if (view === 'book') {
+		visible = ['perspectize', 'item', 'type'];
 		if (sm) visible.push('author');
 		if (md) visible.push('published', 'pages');
 		if (lg) visible.push('rating', 'tags');
 	} else {
+		visible = ['item', 'type', 'perspectize'];
 		if (sm) visible.push('category', 'channel');
 		if (md) visible.push('duration', 'publishDate');
 		if (lg) visible.push('views', 'likes', 'percentLiked', 'tags');
 	}
+	// Type is redundant once the filter names one type (any type), so it is hidden then.
+	if (solo !== null) visible = visible.filter((c) => c !== 'type');
 	const managed = [
 		'type',
 		'category',
@@ -613,6 +679,13 @@ export function defaultColumnVisibility(
 		'user',
 		'tags',
 		'description',
+		// Claim date and rating columns and createdAt: forced off outside the claim view (createdAt stays picker-available).
+		'effectiveDate',
+		'evaluateBy',
+		'myQuality',
+		'myImportance',
+		'myAgreement',
+		'createdAt',
 		...MOVIE_DEFAULT_COLS,
 		...MOVIE_ONLY_PICKER,
 		...BOOK_COLS,
@@ -916,8 +989,10 @@ export function syncItemHeader(api: HeaderApi, name: string): boolean {
 	return true;
 }
 
-/** Item column header: "Film" for a MOVIE-only filter, "Book" for a BOOK-only one, otherwise "Item". */
+/** Item column header: "Claim" for exactly CLAIM, "Film" for MOVIE, "Book" for BOOK, otherwise "Item". */
 export function itemColumnHeader(typeFilter: string | undefined): string {
+	const solo = soloTypeFilter(typeFilter);
+	if (solo === 'claim') return 'Claim';
 	if (isMovieOnlyTypeFilter(typeFilter)) return 'Film';
 	if (isBookOnlyTypeFilter(typeFilter)) return 'Book';
 	return 'Item';
@@ -929,8 +1004,6 @@ export function itemColumnHeader(typeFilter: string | undefined): string {
  * calling it then logs "Grid API function X() cannot be called as the grid has been destroyed"
  * (and applyColumnState throws). Use at the call site instead of a bare `!api` check.
  */
-export function liveGridApi<T extends { isDestroyed(): boolean }>(
-	api: T | null | undefined,
-): T | null {
+export function liveGridApi<T extends { isDestroyed(): boolean }>(api: T | null | undefined): T | null {
 	return api && !api.isDestroyed() ? api : null;
 }

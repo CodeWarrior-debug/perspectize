@@ -25,6 +25,7 @@ import {
 	synopsisValueGetter,
 	formatMoneyExact,
 	budgetValueGetter,
+	formatClaimDate,
 } from './formatting';
 
 /** Per-column hover popover specs for ActivityTable, keyed by colId. */
@@ -56,7 +57,10 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 		copyValue: (c: CellCtx) => percentLikedValueGetter({ data: c.data }),
 	},
 	tags: { mode: 'multi', emptyText: 'No tags', items: (c: CellCtx) => contentTags(c.data) ?? [] },
-	cast: { mode: 'multi', emptyText: 'No cast or directors', items: (c: CellCtx) => castTooltipItems(c.data),
+	cast: {
+		mode: 'multi',
+		emptyText: 'No cast or directors',
+		items: (c: CellCtx) => castTooltipItems(c.data),
 		itemCopyValues: (c: CellCtx) => castTooltipCopyValues(c.data),
 	},
 	boxOffice: {
@@ -90,5 +94,22 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 		copyValue: (c: CellCtx) => budgetValueGetter({ data: c.data }),
 	},
 	synopsis: { emptyText: 'No synopsis', text: (c: CellCtx) => synopsisValueGetter({ data: c.data }) ?? '' },
+	// Claim dates: show the formatted day, copy the raw YYYY-MM-DD the backend stores.
+	effectiveDate: {
+		emptyText: 'No effective date',
+		text: (c: CellCtx) => {
+			const raw = c.data?.customFields?.effectiveDate;
+			return raw ? formatClaimDate(raw) : '';
+		},
+		copyValue: (c: CellCtx) => c.data?.customFields?.effectiveDate ?? null,
+	},
+	evaluateBy: {
+		emptyText: 'No evaluate-by date',
+		text: (c: CellCtx) => {
+			const raw = c.data?.customFields?.evaluateBy;
+			return raw ? formatClaimDate(raw) : '';
+		},
+		copyValue: (c: CellCtx) => c.data?.customFields?.evaluateBy ?? null,
+	},
 	description: { emptyText: 'No description', text: (c: CellCtx) => c.data?.description ?? '' },
 } satisfies Record<string, ColTooltipSpec>;

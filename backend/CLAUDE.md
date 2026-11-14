@@ -124,6 +124,8 @@ Order: domain model (`core/domain/`) → repository port (`core/ports/repositori
 - **Numbering:** find the next number with `ls migrations/ | tail -5` (plan-specified numbers may be stale). Numbers on open PRs are **provisional**: don't renumber around other in-flight branches; rename to the next free number on `main` as the last step before merging (golang-migrate won't run with two files sharing a version on `main`). `check-migration-number-before-apply` still on a PR means that rename is due.
 - Prefer idempotent DDL (`DROP CONSTRAINT IF EXISTS` before `ADD`, `UPDATE ... WHERE col IS NULL` before `SET NOT NULL`) so a migration is safe on a fresh DB or one patched out of band.
 
+**JSONB convention:** optional JSONB columns are **nullable with no default**. NULL means unset, and a row that never uses the column stores nothing. Don't write `DEFAULT '{}'` (or `'[]'`) on a new column. Go reads NULL as empty, and an explicit clear writes NULL (see `ClearCustomFields`). Structural columns that must always hold a value (e.g. `user_onboarding`) are the exception and keep `NOT NULL DEFAULT`.
+
 **FK delete behavior depends on the FK's kind** (the "All FKs use ON DELETE RESTRICT" comment in `000006` predates the exceptions):
 - Ownership FKs to `users` and FKs to `content` **block** (explicit `ON DELETE RESTRICT` for new ones). `UserService.Delete` reassigns owned rows to the `[deleted]` sentinel first, so a new user-owned table needs a `ReassignByUser` call there (messaging isn't covered yet: #574).
 - Optional pointers use **`SET NULL`** (`primary_category_id`, `primary_perspective_id`).

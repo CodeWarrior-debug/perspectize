@@ -8,6 +8,8 @@ import (
 
 // SetPrimaryCategoryInput contains the data needed to assign a Wikidata category to content
 type SetPrimaryCategoryInput struct {
+	// ActorUserID is the signed-in user; the content must be visible to them.
+	ActorUserID int
 	ContentID   int
 	QID         string
 	Label       string

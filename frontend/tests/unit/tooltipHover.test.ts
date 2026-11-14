@@ -49,6 +49,8 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 				'category',
 				'description',
 				'duration',
+				'effectiveDate',
+				'evaluateBy',
 				'item',
 				'likes',
 				'percentLiked',
@@ -115,7 +117,10 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 	it('cast rows show role + TMDB id but copyValues are bare names', () => {
 		const data = {
 			contentType: 'MOVIE',
-			movie: { directors: [{ id: 1, name: 'Gus Van Sant' }], cast: [{ id: 880, name: 'Ben Affleck', character: 'Chuckie', order: 0 }] },
+			movie: {
+				directors: [{ id: 1, name: 'Gus Van Sant' }],
+				cast: [{ id: 880, name: 'Ben Affleck', character: 'Chuckie', order: 0 }],
+			},
 		};
 		const s = mk('cast', data);
 		expect(s?.items).toEqual(['Gus Van Sant · Director · TMDB #1', 'Ben Affleck · as Chuckie · TMDB #880']);
@@ -125,6 +130,20 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 	it('tags empty or missing gives No tags', () => {
 		expect(mk('tags', { tags: [] })).toMatchObject({ mode: 'single', text: 'No tags', copy: null, items: [] });
 		expect(mk('tags', {})).toMatchObject({ mode: 'single', text: 'No tags', copy: null, items: [] });
+	});
+
+	it('claim dates show the formatted day and copy the raw YYYY-MM-DD', () => {
+		const claim = { customFields: { effectiveDate: '2026-10-23', evaluateBy: '2026-11-30' } };
+		expect(mk('effectiveDate', claim)).toMatchObject({
+			text: expect.stringMatching(/Oct 23, 2026/),
+			copy: '2026-10-23',
+		});
+		expect(mk('evaluateBy', claim)).toMatchObject({ text: expect.stringMatching(/Nov 30, 2026/), copy: '2026-11-30' });
+	});
+
+	it('a claim without a date shows the empty text, not a placeholder dash', () => {
+		expect(mk('effectiveDate', { customFields: null })).toMatchObject({ text: 'No effective date', copy: null });
+		expect(mk('evaluateBy', { customFields: null })).toMatchObject({ text: 'No evaluate-by date', copy: null });
 	});
 
 	it('description shows full text, or No description when empty', () => {

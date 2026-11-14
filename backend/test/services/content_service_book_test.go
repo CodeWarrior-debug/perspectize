@@ -654,7 +654,7 @@ func TestUpdateSourceData_BookRenamesAndStoresFreshRatings(t *testing.T) {
 	w := &metadataWrite{}
 	svc := services.NewContentService(bookRefreshRepo(row, w), nil, nil, services.WithBookSearch(bs), services.WithBookWork(bw))
 
-	got, err := svc.UpdateSourceData(context.Background(), 9)
+	got, err := svc.UpdateSourceData(context.Background(), 9, 7)
 	require.NoError(t, err)
 	assert.Equal(t, "East of Eden", got.Name)
 	assert.Equal(t, 9, w.id)
@@ -679,7 +679,7 @@ func TestUpdateSourceData_BookKeepsResolvedFromISBN(t *testing.T) {
 	w := &metadataWrite{}
 	svc := services.NewContentService(bookRefreshRepo(row, w), nil, nil, services.WithBookSearch(bs), services.WithBookWork(bw))
 
-	_, err := svc.UpdateSourceData(context.Background(), 9)
+	_, err := svc.UpdateSourceData(context.Background(), 9, 7)
 	require.NoError(t, err)
 	raw := rawBookResponseOf(t, &domain.Content{Response: w.response})
 	assert.JSONEq(t, `"9780434740024"`, string(raw["resolvedFromISBN"]))
@@ -695,7 +695,7 @@ func TestUpdateSourceData_BookWorkFailureKeepsDescriptionAndRelatedWorks(t *test
 	w := &metadataWrite{}
 	svc := services.NewContentService(bookRefreshRepo(row, w), nil, nil, services.WithBookSearch(bs), services.WithBookWork(bw))
 
-	_, err := svc.UpdateSourceData(context.Background(), 9)
+	_, err := svc.UpdateSourceData(context.Background(), 9, 7)
 	require.NoError(t, err, "a failed work fetch does not fail the refresh")
 	raw := rawBookResponseOf(t, &domain.Content{Response: w.response})
 	assert.JSONEq(t, `"Old description."`, string(raw["description"]))
@@ -712,7 +712,7 @@ func TestUpdateSourceData_BookWorkSuccessReplacesDescriptionAndRelatedWorks(t *t
 	w := &metadataWrite{}
 	svc := services.NewContentService(bookRefreshRepo(row, w), nil, nil, services.WithBookSearch(bs), services.WithBookWork(bw))
 
-	_, err := svc.UpdateSourceData(context.Background(), 9)
+	_, err := svc.UpdateSourceData(context.Background(), 9, 7)
 	require.NoError(t, err)
 	raw := rawBookResponseOf(t, &domain.Content{Response: w.response})
 	assert.JSONEq(t, `"New description."`, string(raw["description"]))
@@ -727,7 +727,7 @@ func TestUpdateSourceData_BookNotFoundInSearch(t *testing.T) {
 	w := &metadataWrite{}
 	svc := services.NewContentService(bookRefreshRepo(row, w), nil, nil, services.WithBookSearch(bs))
 
-	_, err := svc.UpdateSourceData(context.Background(), 9)
+	_, err := svc.UpdateSourceData(context.Background(), 9, 7)
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 	assert.Equal(t, 0, w.calls, "nothing is written when the book is gone")
 }
@@ -737,7 +737,7 @@ func TestUpdateSourceData_BookWithoutSearchClient(t *testing.T) {
 	w := &metadataWrite{}
 	svc := services.NewContentService(bookRefreshRepo(row, w), nil, nil)
 
-	_, err := svc.UpdateSourceData(context.Background(), 9)
+	_, err := svc.UpdateSourceData(context.Background(), 9, 7)
 	assert.ErrorIs(t, err, services.ErrBookClientUnavailable)
 }
 
@@ -751,7 +751,7 @@ func TestUpdateSourceData_MovieRefreshStaysOutOfScope(t *testing.T) {
 	}}
 	svc := services.NewContentService(bookRefreshRepo(row, w), yt, nil)
 
-	_, err := svc.UpdateSourceData(context.Background(), 9)
+	_, err := svc.UpdateSourceData(context.Background(), 9, 7)
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 	assert.Equal(t, 0, w.calls)
 }
@@ -834,7 +834,7 @@ func TestUpdateSourceData_BookRefreshesReadingLogSnapshot(t *testing.T) {
 	svc := services.NewContentService(bookRefreshRepo(row, w), nil, nil,
 		services.WithBookSearch(bs), services.WithBookWork(bw), fixedClock("2026-11-12T10:00:00Z"))
 
-	_, err := svc.UpdateSourceData(context.Background(), 9)
+	_, err := svc.UpdateSourceData(context.Background(), 9, 7)
 	require.NoError(t, err)
 
 	raw := rawBookResponseOf(t, &domain.Content{Response: w.response})
