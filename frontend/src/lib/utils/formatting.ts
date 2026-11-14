@@ -111,11 +111,27 @@ export function formatIsoDuration(iso: string | null | undefined): string | null
 	return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A date-only `YYYY-MM-DD` is a calendar day, so it is built in local time. `new Date('2017-06-12')`
+ * would be UTC midnight, which reads as the day before in US timezones. Anything else (a full ISO
+ * timestamp) is an instant and parses as before. Returns an Invalid Date for an impossible day.
+ */
+export function parseDateValue(value: string): Date {
+	const m = DATE_ONLY.exec(value);
+	if (!m) return new Date(value);
+	const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+	const date = new Date(year, month - 1, day);
+	const real = date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+	return real ? date : new Date(NaN);
+}
+
 /**
  * Format ISO date string to locale string.
  */
 export function formatDate(isoString: string): string {
-	const date = new Date(isoString);
+	const date = parseDateValue(isoString);
 	if (isNaN(date.getTime())) return EMPTY_VALUE;
 	return date.toLocaleDateString('en-US', {
 		year: 'numeric',

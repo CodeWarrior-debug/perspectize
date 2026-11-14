@@ -3,7 +3,7 @@
  * state. The shaped row helpers (site, published, roles, author) live in ./webPage.ts.
  */
 import type { ContentItem, WebPageRole } from '$lib/queries/content';
-import { EMPTY_VALUE, formatPublishDate } from './formatting';
+import { EMPTY_VALUE, formatPublishDate, parseDateValue } from './formatting';
 import { webPageAuthor, webPagePublished, webPageRoleLabel, webPageRolesOf, webPageSite } from './webPage';
 
 type WebPageRow = Pick<ContentItem, 'url' | 'webPage'>;
@@ -25,7 +25,7 @@ export function webPublishedValueGetter(params: { data?: WebPageRow }): string |
 /** Published column filter value: a Date for the date filter, or null when the page declares none. */
 export function webPublishedFilterValueGetter(params: { data?: WebPageRow }): Date | null {
 	const iso = webPublishedValueGetter(params);
-	return iso ? new Date(iso) : null;
+	return iso ? parseDateValue(iso) : null;
 }
 
 /** Published column display: the formatted date, or the dash. */
