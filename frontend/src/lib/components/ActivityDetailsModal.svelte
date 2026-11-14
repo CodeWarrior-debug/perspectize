@@ -114,6 +114,8 @@
 	// the currently-open content's id, so it only fetches while the modal is
 	// actually open for a given item (re-runs if the id changes while open).
 	const aggregatesQuery = useContentAggregates(() => (open ? (content?.id ?? null) : null));
+	// The "Imported from" row waits for this viewer-scoped query: absent while loading, on error, or when null.
+	const importedFrom = $derived(aggregatesQuery.data?.contentByID?.importedFrom ?? null);
 	const perspectiveCountDisplay = $derived(
 		aggregatesQuery.isLoading ? '…' : (aggregatesQuery.data?.contentByID?.perspectiveCount ?? 0).toString(),
 	);
@@ -273,6 +275,15 @@
 						<ExternalLinkIcon class="size-3.5 flex-none" />
 						<span>{content.url}</span>
 					</a>
+				{/if}
+
+				{#if importedFrom}
+					<div class="mt-3.5 text-[13px] text-muted-foreground">
+						<span>Imported from</span>
+						<a href={`/import/${importedFrom.id}`} class="font-medium text-primary underline-offset-2 hover:underline">
+							{importedFrom.name}
+						</a>
+					</div>
 				{/if}
 
 				<div class="mt-4.5 grid grid-cols-2 gap-2.5">

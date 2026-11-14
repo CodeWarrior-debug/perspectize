@@ -24,6 +24,7 @@
 		{ href: '/discover', label: 'Discover' },
 		{ href: '/compare', label: 'Compare' },
 		{ href: '/plan', label: 'Plan' },
+		{ href: '/import', label: 'Import' },
 	];
 
 	function isActive(href: string): boolean {

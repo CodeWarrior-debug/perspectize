@@ -30,6 +30,11 @@ export const queryKeys = {
 		// Full ContentItem row (GET_CONTENT_DETAILS) for a details modal opened on an
 		// item that isn't in the loaded Activity rows (e.g. via `?open=<id>`).
 		row: (id: string) => [...queryKeys.content.details(), 'row', id] as const,
+		// Viewer-scoped aggregates for one content (GET_CONTENT_AGGREGATES). A child of
+		// `detail(id)`, so mutations that invalidate `detail(id)` still evict it. Keyed per
+		// viewer: perspective counts and the import a row came from both resolve per viewer.
+		aggregates: (id: string, viewerId: string | null) =>
+			[...queryKeys.content.detail(id), 'aggregates', viewerId ?? 'anonymous'] as const,
 		// ListComparableContent (ComparePicker.svelte) — a distinct shape/query
 		// from `list` above (adds perspectiveCount, no pagination), keyed by
 		// the debounced search term.
@@ -93,6 +98,17 @@ export const queryKeys = {
 		actions: () => [...queryKeys.userTodos.all(), 'actions'] as const,
 		todoListsAll: () => [...queryKeys.userTodos.all(), 'todoLists'] as const,
 		todoLists: (userId: number | null) => [...queryKeys.userTodos.todoListsAll(), { userId }] as const,
+	},
+
+	// Import staging. `detail(id)` is one import's sheet (job + every row);
+	// `itemDetails(id)` is one row's lazily loaded description/chapters/tags.
+	imports: {
+		all: () => [...queryKeys.all, 'imports'] as const,
+		lists: () => [...queryKeys.imports.all(), 'list'] as const,
+		list: (includeClosed = false) => [...queryKeys.imports.lists(), { includeClosed }] as const,
+		details: () => [...queryKeys.imports.all(), 'detail'] as const,
+		detail: (id: string) => [...queryKeys.imports.details(), id] as const,
+		itemDetails: (itemId: string) => [...queryKeys.imports.all(), 'item', itemId] as const,
 	},
 
 	messaging: {

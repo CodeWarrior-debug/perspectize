@@ -13,6 +13,12 @@ export { activityListRequest, cursorsAfterPage, ACTIVITY_LIST_STALE_TIME_MS, LOA
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
 export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK';
 
+/** The import job that created a content row. Mirrors the backend `ImportJobRef`. */
+export interface ImportJobRef {
+	id: string;
+	name: string;
+}
+
 export interface ContentItem {
 	id: string;
 	name: string;
@@ -295,6 +301,9 @@ export interface ContentDetailsResponse {
 export interface ContentAggregates {
 	perspectiveCount: number | null;
 	averageRating: number | null;
+	// The import that created this row, or null: hand-added content, and a closed import
+	// the viewer can't see (the backend decides; the UI shows the row only when set).
+	importedFrom?: ImportJobRef | null;
 	// How many public perspectives set a Quality rating — i.e. how many
 	// values averageRating was actually averaged over. Can be less than
 	// perspectiveCount since Quality is optional. Shown in a tooltip on the
@@ -313,6 +322,10 @@ export const GET_CONTENT_AGGREGATES = gql`
 			perspectiveCount
 			averageRating
 			qualityRatingCount
+			importedFrom {
+				id
+				name
+			}
 		}
 	}
 `;

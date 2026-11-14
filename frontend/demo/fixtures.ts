@@ -149,7 +149,11 @@ export const test = base.extend<TourOptions & { tour: Tour }>({
 	},
 });
 
-/** The Activity grid row for a content title (AG Grid renders rows as divs). */
+/**
+ * The Library grid row for a content title (AG Grid renders rows as divs). The Item
+ * columns are pinned left (#662), so the title and the Perspectize cell live in the
+ * pinned-left half of the row, not the center container.
+ */
 export function activityRow(page: Page, title: string | RegExp): Locator {
-	return page.locator('.ag-center-cols-container .ag-row').filter({ hasText: title });
+	return page.locator('.ag-pinned-left-cols-container .ag-row').filter({ hasText: title });
 }

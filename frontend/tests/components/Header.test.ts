@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import Header from '$lib/components/Header.svelte';
 import { mockPageState } from '../setup';
@@ -165,8 +165,41 @@ describe('Header component', () => {
 		const labels = screen
 			.getAllByRole('link')
 			.map((a) => a.textContent?.trim())
-			.filter((t) => ['Library', 'Discover', 'Compare', 'Plan'].includes(t ?? ''));
-		expect(labels).toEqual(['Library', 'Discover', 'Compare', 'Plan']);
+			.filter((t) => ['Library', 'Discover', 'Compare', 'Plan', 'Import'].includes(t ?? ''));
+		expect(labels).toEqual(['Library', 'Discover', 'Compare', 'Plan', 'Import']);
+	});
+
+	describe('Import nav link', () => {
+		afterEach(() => {
+			mockPageState.url = new URL('http://localhost/');
+		});
+
+		it('renders an Import navigation link pointing to /import, last in the nav', () => {
+			render(Header);
+			const link = screen.getByRole('link', { name: 'Import' });
+			expect(link).toHaveAttribute('href', '/import');
+			const navLinks = screen.getByRole('navigation').querySelectorAll('a');
+			expect(navLinks[navLinks.length - 1]).toBe(link);
+		});
+
+		it('marks Import as the current page on /import', () => {
+			mockPageState.url = new URL('http://localhost/import');
+			render(Header);
+			expect(screen.getByRole('link', { name: 'Import' })).toHaveAttribute('aria-current', 'page');
+		});
+
+		it('keeps Import highlighted on an import detail page (/import/12)', () => {
+			mockPageState.url = new URL('http://localhost/import/12');
+			render(Header);
+			expect(screen.getByRole('link', { name: 'Import' })).toHaveAttribute('aria-current', 'page');
+		});
+
+		it('does not mark Import as current on the Library page (/content-library)', () => {
+			mockPageState.url = new URL('http://localhost/content-library');
+			render(Header);
+			expect(screen.getByRole('link', { name: 'Import' })).not.toHaveAttribute('aria-current');
+			expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute('aria-current', 'page');
+		});
 	});
 
 	it('renders a Library navigation link pointing to /content-library', () => {

@@ -535,6 +535,62 @@ describe('ActivityDetailsModal', () => {
 		});
 	});
 
+	// importedFrom is viewer-scoped, so it arrives with the per-viewer aggregates query, not the row.
+	describe('Imported from', () => {
+		it('links the row to the import it was created by once the aggregates arrive', () => {
+			mocks.mockQueryState.data = {
+				contentByID: {
+					id: content.id,
+					perspectiveCount: 0,
+					averageRating: null,
+					qualityRatingCount: 0,
+					importedFrom: { id: '12', name: 'Spring 2026 watchlist' },
+				},
+			};
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+
+			expect(screen.getByText('Imported from')).toBeInTheDocument();
+			const link = screen.getByRole('link', { name: 'Spring 2026 watchlist' });
+			expect(link).toHaveAttribute('href', '/import/12');
+		});
+
+		it('is absent when the aggregates say importedFrom is null (hand-added content, or not visible to this viewer)', () => {
+			mocks.mockQueryState.data = {
+				contentByID: {
+					id: content.id,
+					perspectiveCount: 0,
+					averageRating: null,
+					qualityRatingCount: 0,
+					importedFrom: null,
+				},
+			};
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+
+			expect(screen.queryByText('Imported from')).not.toBeInTheDocument();
+			expect(screen.queryByRole('link', { name: /spring/i })).not.toBeInTheDocument();
+		});
+
+		it('shows no row and no error while the aggregates are still loading', () => {
+			mocks.mockQueryState.isLoading = true;
+			mocks.mockQueryState.data = undefined;
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+
+			expect(screen.queryByText('Imported from')).not.toBeInTheDocument();
+			expect(screen.getByText('Perspectives')).toBeInTheDocument();
+		});
+
+		it('ignores an importedFrom carried on the row itself (only the viewer-scoped query is trusted)', () => {
+			render(ActivityDetailsModal, {
+				props: {
+					content: { ...content, importedFrom: { id: '12', name: 'Spring 2026 watchlist' } } as any,
+					open: true,
+					onClose: vi.fn(),
+				},
+			});
+			expect(screen.queryByText('Imported from')).not.toBeInTheDocument();
+		});
+	});
+
 	describe('BOOK content', () => {
 		const eastOfEden = {
 			workKey: 'OL23166W',
