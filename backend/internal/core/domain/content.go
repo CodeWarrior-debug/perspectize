@@ -39,6 +39,12 @@ func (r WebPageRole) SchemaOrgType() string {
 	return webPageRoleSchemaOrg[r]
 }
 
+// IsValid reports whether the role is one of the known values.
+func (r WebPageRole) IsValid() bool {
+	_, ok := webPageRoleSchemaOrg[r]
+	return ok
+}
+
 // FetchStatus records how the metadata read of a webpage went. Internal to the
 // add flow and the import preview: it is never shown as a value in the grid.
 type FetchStatus string
