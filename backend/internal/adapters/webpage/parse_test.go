@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/stretchr/testify/assert"
@@ -178,6 +179,35 @@ func TestParseHead_OGTitleCapped(t *testing.T) {
 	got := ParseHead(strings.NewReader(html), base)
 	require.NotNil(t, got.Title)
 	assert.Equal(t, 300, len([]rune(*got.Title)))
+}
+
+func TestParseHeadAt_FuturePublishedDateIsIgnored(t *testing.T) {
+	// A page dated in the future would pin itself to the top of a published-at sort.
+	now := time.Date(2026, 11, 14, 10, 0, 0, 0, time.UTC)
+	base, _ := url.Parse("https://example.com/")
+	page := func(articlePub, citationDate string) string {
+		return fmt.Sprintf(`<html><head><meta property="article:published_time" content="%s"><meta name="citation_date" content="%s"></head>`,
+			articlePub, citationDate)
+	}
+
+	t.Run("far-future date is dropped", func(t *testing.T) {
+		got := parseHeadAt(strings.NewReader(page("2030-01-01", "")), base, now)
+		assert.Nil(t, got.PublishedAt)
+	})
+	t.Run("future date falls through to a valid past date", func(t *testing.T) {
+		got := parseHeadAt(strings.NewReader(page("2030-01-01", "2026-11-01")), base, now)
+		require.NotNil(t, got.PublishedAt)
+		assert.Equal(t, "2026-11-01", *got.PublishedAt)
+	})
+	t.Run("a date within one day ahead (timezones) is kept", func(t *testing.T) {
+		got := parseHeadAt(strings.NewReader(page("2026-11-15", "")), base, now)
+		require.NotNil(t, got.PublishedAt)
+		assert.Equal(t, "2026-11-15", *got.PublishedAt)
+	})
+	t.Run("two days ahead is dropped", func(t *testing.T) {
+		got := parseHeadAt(strings.NewReader(page("2026-11-16", "")), base, now)
+		assert.Nil(t, got.PublishedAt)
+	})
 }
 
 func TestParseHead_StopsAtHeadEnd(t *testing.T) {

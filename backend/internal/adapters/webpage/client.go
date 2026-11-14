@@ -261,7 +261,7 @@ func (c *Client) Fetch(ctx context.Context, rawURL string) (domain.WebPageMeta, 
 		return failedAt(finalURL, fetchedAt, domain.FetchStatusTooLarge, &code), nil
 	}
 
-	meta := ParseHead(bytes.NewReader(data), resp.Request.URL)
+	meta := parseHeadAt(bytes.NewReader(data), resp.Request.URL, fetchedAt)
 	meta.SchemaVersion = domain.WebPageSchemaVersion
 	meta.FinalURL = finalURL
 	meta.Domain = hostOf(finalURL)

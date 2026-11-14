@@ -55,6 +55,12 @@ type headFields struct {
 // caller fills SchemaVersion, FinalURL, Domain and Fetch. Parsing stops at
 // </head>, the first <body>, or the end of input.
 func ParseHead(r io.Reader, base *url.URL) domain.WebPageMeta {
+	return parseHeadAt(r, base, time.Now())
+}
+
+// parseHeadAt is ParseHead with the clock injected: now decides which published
+// dates are too far in the future to trust.
+func parseHeadAt(r io.Reader, base *url.URL, now time.Time) domain.WebPageMeta {
 	var h headFields
 	var titleText, ldText strings.Builder
 	var ldBlocks []string
@@ -134,7 +140,7 @@ scan:
 
 	ldDates, ldAuthor := jsonLDFields(ldBlocks)
 	for _, candidate := range append([]string{h.articlePub, h.citationDate}, ldDates...) {
-		if date, ok := normaliseDate(candidate); ok {
+		if date, ok := normaliseDate(candidate, now); ok {
 			meta.PublishedAt = &date
 			break
 		}
@@ -253,14 +259,22 @@ func jsonLDAuthorName(v any) string {
 	return ""
 }
 
-// normaliseDate returns the date as YYYY-MM-DD, or false when no known layout parses.
-func normaliseDate(raw string) (string, bool) {
+// maxFutureSkew is how far ahead of now a published date may be. A day covers the
+// gap between the page's timezone and UTC; anything further is not a publish date.
+const maxFutureSkew = 24 * time.Hour
+
+// normaliseDate returns the date as YYYY-MM-DD, or false when no known layout parses
+// or the date is more than maxFutureSkew ahead of now.
+func normaliseDate(raw string, now time.Time) (string, bool) {
 	s := collapse(raw)
 	if s == "" {
 		return "", false
 	}
 	for _, layout := range dateLayouts {
 		if t, err := time.Parse(layout, s); err == nil {
+			if t.After(now.Add(maxFutureSkew)) {
+				return "", false
+			}
 			return t.Format("2006-01-02"), true
 		}
 	}
