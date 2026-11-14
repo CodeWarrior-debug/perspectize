@@ -60,6 +60,10 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 				'tmdbScore',
 				'views',
 				'vsBudget',
+				'webAuthor',
+				'webPublished',
+				'webRoles',
+				'webSite',
 			].sort(),
 		);
 		expect(S.perspectize).toBe(false);
@@ -115,7 +119,10 @@ describe('ACTIVITY_TOOLTIP_SPECS (real column specs)', () => {
 	it('cast rows show role + TMDB id but copyValues are bare names', () => {
 		const data = {
 			contentType: 'MOVIE',
-			movie: { directors: [{ id: 1, name: 'Gus Van Sant' }], cast: [{ id: 880, name: 'Ben Affleck', character: 'Chuckie', order: 0 }] },
+			movie: {
+				directors: [{ id: 1, name: 'Gus Van Sant' }],
+				cast: [{ id: 880, name: 'Ben Affleck', character: 'Chuckie', order: 0 }],
+			},
 		};
 		const s = mk('cast', data);
 		expect(s?.items).toEqual(['Gus Van Sant · Director · TMDB #1', 'Ben Affleck · as Chuckie · TMDB #880']);
