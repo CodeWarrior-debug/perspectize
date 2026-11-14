@@ -13,10 +13,28 @@ export type DetectionResult =
 	| { type: 'MOVIE'; url: string }
 	/** Open Library work or edition link. Author and other Open Library links are never a book. */
 	| { type: 'BOOK'; url: string }
+	/** Any other http(s) URL that no type above claims. The server reads its `<head>` once. */
+	| { type: 'WEB_PAGE'; url: string }
 	| { type: 'CLAIM'; text: string }
 	| { type: null };
 
 const BIBLE_GATEWAY_HOSTS = new Set(['biblegateway.com', 'www.biblegateway.com']);
+
+/**
+ * Hosts that belong to a claimed source (YouTube, TMDB/IMDb, Bible Gateway). A URL on one of
+ * these is never a webpage, even when it matches no specific type (a channel page, a TV show).
+ */
+const CLAIMED_HOSTS = new Set([
+	'youtube.com',
+	'www.youtube.com',
+	'm.youtube.com',
+	'youtu.be',
+	'themoviedb.org',
+	'www.themoviedb.org',
+	'imdb.com',
+	'www.imdb.com',
+	...BIBLE_GATEWAY_HOSTS,
+]);
 
 function parseUrl(input: string): URL | null {
 	// Only treat as a URL when it carries an explicit http(s) scheme, so "John 3:16" (which
@@ -42,10 +60,11 @@ function parseBibleGatewayUrl(url: URL): PassageRange | null {
  * (AN Q21) so this has at most one entry, but the list shape lets a future ambiguous
  * type be added without a signature change.
  *
- * Precedence: YouTube URL > movie link > Open Library book link > Bible Gateway URL > typed Bible
- * reference > free-text claim.
- * Any other URL is never a claim and never guessed: empty candidates. A single bare
- * word is also not guessed as a claim.
+ * Precedence: YouTube URL > movie link > Open Library book link > Bible Gateway URL > other
+ * http(s) URL on an unclaimed host (WEB_PAGE) > typed Bible reference > free-text claim.
+ * A URL on a claimed host (YouTube, TMDB/IMDb, Bible Gateway) that matches no type is empty
+ * candidates, never a webpage. Scheme-less or non-http(s) input is never guessed: a bare
+ * host, `ftp://` or a single bare word gets no candidate.
  */
 export function detectContentCandidates(input: string): DetectionResult[] {
 	const trimmed = input.trim();
@@ -60,7 +79,9 @@ export function detectContentCandidates(input: string): DetectionResult[] {
 	const url = parseUrl(trimmed);
 	if (url) {
 		const range = parseBibleGatewayUrl(url);
-		return range ? [{ type: 'BIBLE_PASSAGE', range, source: 'biblegateway' }] : [];
+		if (range) return [{ type: 'BIBLE_PASSAGE', range, source: 'biblegateway' }];
+		if (CLAIMED_HOSTS.has(url.hostname.toLowerCase())) return [];
+		return [{ type: 'WEB_PAGE', url: trimmed }];
 	}
 
 	const range = parseReference(trimmed);

@@ -267,9 +267,9 @@ describe('AddContentPopover books', () => {
 		expect(mocks.video.mutate).not.toHaveBeenCalled();
 	});
 
-	it('an Open Library author link is not a book: no chip type, submit disabled', async () => {
+	it('an Open Library author link is not a book: it detects as a webpage, submit disabled until the webpage add lands', async () => {
 		await openWith('https://openlibrary.org/authors/OL23919A');
-		expect(chip()).toHaveTextContent('Select a type');
+		expect(chip()).toHaveTextContent('Detected: Webpage');
 		expect(submit()).toBeDisabled();
 		expect(screen.queryByText(BOOK_ATTRIBUTION)).toBeNull();
 	});

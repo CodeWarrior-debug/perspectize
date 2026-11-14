@@ -62,7 +62,7 @@
 	});
 
 	const detected = $derived(detectContentType(input));
-	const effectiveType = $derived<ChosenType | 'CLAIM' | null>(manualType ?? detected.type);
+	const effectiveType = $derived<ChosenType | 'CLAIM' | 'WEB_PAGE' | null>(manualType ?? detected.type);
 	const range = $derived<PassageRange>(
 		rangeOverride ?? (detected.type === 'BIBLE_PASSAGE' ? detected.range : defaultRange(1)),
 	);
@@ -97,7 +97,9 @@
 						? 'Movie'
 						: effectiveType === 'BOOK'
 							? 'Book'
-							: 'Claim';
+							: effectiveType === 'WEB_PAGE'
+								? 'Webpage'
+								: 'Claim';
 		return manualType ? `Type: ${name}` : `Detected: ${name}`;
 	});
 
