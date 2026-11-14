@@ -57,6 +57,33 @@ func TestCanonicalize_RejectsNonWebURLs(t *testing.T) {
 // host (www. dropped, lowercased) equals the host of the page that was actually
 // read, and it is http(s) on the default port. A registrable-domain match is not
 // enough: a sibling subdomain could otherwise claim another user's URL.
+func TestFetchURL(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"www, trailing slash and tracking query kept", "https://www.example.com/a/?utm_source=x", "https://www.example.com/a/?utm_source=x"},
+		{"fragment removed", "https://example.com/a#top", "https://example.com/a"},
+		{"userinfo removed", "https://user:pw@example.com/a", "https://example.com/a"},
+		{"scheme folded to lowercase", "HTTPS://example.com/a", "https://example.com/a"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := FetchURL(tt.in)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+
+	for _, in := range []string{"ftp://example.com/x", "//example.com/x", "https:///no-host"} {
+		t.Run("rejects "+in, func(t *testing.T) {
+			_, err := FetchURL(in)
+			assert.True(t, errors.Is(err, domain.ErrInvalidInput), "want ErrInvalidInput, got %v", err)
+		})
+	}
+}
+
 func TestPreferDeclaredCanonical(t *testing.T) {
 	const requested = "https://example.com/a"
 	tests := []struct {

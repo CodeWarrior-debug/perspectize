@@ -17,24 +17,51 @@ func isTrackingParam(key string) bool {
 	return strings.HasPrefix(k, "utm_") || k == "fbclid" || k == "gclid"
 }
 
+// parseWebURL parses a pasted link and enforces what both the fetch and the dedupe
+// key need: an http or https scheme and a host. Userinfo is left in place for the
+// caller to remove.
+func parseWebURL(raw string) (*url.URL, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return nil, fmt.Errorf("%w: not a valid URL", domain.ErrInvalidInput)
+	}
+	if scheme := strings.ToLower(u.Scheme); scheme != "http" && scheme != "https" {
+		return nil, fmt.Errorf("%w: only http and https links can be saved", domain.ErrInvalidInput)
+	}
+	if u.Hostname() == "" {
+		return nil, fmt.Errorf("%w: the link has no host", domain.ErrInvalidInput)
+	}
+	return u, nil
+}
+
+// FetchURL returns the URL to request for a pasted link. It is the link as the
+// user wrote it (host, www., trailing slash and query kept), so a site that
+// serves only one form of its URLs still reads, with the userinfo and fragment
+// removed: userinfo would become an Authorization header, and a fragment is
+// never sent. The scheme and host rules are those of Canonicalize.
+func FetchURL(raw string) (string, error) {
+	u, err := parseWebURL(raw)
+	if err != nil {
+		return "", err
+	}
+	u.User = nil
+	u.Fragment = ""
+	u.RawFragment = ""
+	return u.String(), nil
+}
+
 // Canonicalize returns the dedupe key for a webpage URL: lowercase scheme and
 // host, www. dropped, fragment and userinfo dropped, tracking parameters
 // (utm_*, fbclid, gclid) dropped, default port dropped, trailing slash dropped
 // except on the root. The remaining query parameters keep their original order
 // and encoding. Only http and https URLs are accepted.
 func Canonicalize(raw string) (string, error) {
-	u, err := url.Parse(strings.TrimSpace(raw))
+	u, err := parseWebURL(raw)
 	if err != nil {
-		return "", fmt.Errorf("%w: not a valid URL", domain.ErrInvalidInput)
+		return "", err
 	}
 	scheme := strings.ToLower(u.Scheme)
-	if scheme != "http" && scheme != "https" {
-		return "", fmt.Errorf("%w: only http and https links can be saved", domain.ErrInvalidInput)
-	}
 	host := strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.")
-	if host == "" {
-		return "", fmt.Errorf("%w: the link has no host", domain.ErrInvalidInput)
-	}
 
 	hostPort := host
 	if strings.Contains(host, ":") { // IPv6 literal

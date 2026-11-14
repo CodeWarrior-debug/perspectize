@@ -45,7 +45,7 @@ func (s *ContentService) CreateFromWebPage(ctx context.Context, rawURL string, r
 		return nil, fmt.Errorf("failed to check existing content: %w", err)
 	}
 
-	meta, err := s.fetchWebPage(ctx, canonical)
+	meta, err := s.fetchWebPage(ctx, rawURL)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (s *ContentService) PreviewWebPage(ctx context.Context, rawURL string) (*po
 	if err != nil {
 		return nil, err
 	}
-	meta, err := s.fetchWebPage(ctx, canonical)
+	meta, err := s.fetchWebPage(ctx, rawURL)
 	if err != nil {
 		return nil, err
 	}
@@ -118,10 +118,16 @@ func (s *ContentService) PreviewWebPage(ctx context.Context, rawURL string) (*po
 	return preview, nil
 }
 
-// fetchWebPage reads the page. Only an SSRF refusal (domain.ErrInvalidInput) is
+// fetchWebPage reads the page at the URL as pasted (minus userinfo and fragment),
+// so a site that serves only one form of its URLs still reads. The row is still
+// keyed on the canonical URL. Only an SSRF refusal (domain.ErrInvalidInput) is
 // returned as an error; every other outcome is carried in Fetch.Status.
-func (s *ContentService) fetchWebPage(ctx context.Context, canonical string) (domain.WebPageMeta, error) {
-	meta, err := s.webPage.Fetch(ctx, canonical)
+func (s *ContentService) fetchWebPage(ctx context.Context, rawURL string) (domain.WebPageMeta, error) {
+	fetchURL, err := webpage.FetchURL(rawURL)
+	if err != nil {
+		return domain.WebPageMeta{}, err
+	}
+	meta, err := s.webPage.Fetch(ctx, fetchURL)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidInput) {
 			return domain.WebPageMeta{}, err

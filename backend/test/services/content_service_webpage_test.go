@@ -87,7 +87,7 @@ func TestCreateFromWebPage_HappyPathStoresTitleCanonicalURLAndMeta(t *testing.T)
 	assert.Equal(t, 1, writes)
 	assert.Equal(t, 1, client.calls)
 
-	assert.Equal(t, "https://arxiv.org/abs/1706.03762", client.lastURL, "the fetch uses the canonical URL")
+	assert.Equal(t, "https://www.arxiv.org/abs/1706.03762?utm_source=x", client.lastURL, "the fetch uses the URL as pasted (minus fragment and userinfo)")
 	assert.Equal(t, domain.ContentTypeWebPage, got.ContentType)
 	assert.Equal(t, "Attention Is All You Need", got.Name)
 	require.NotNil(t, got.URL)
@@ -318,6 +318,44 @@ func TestPreviewWebPage_InvalidAndBlockedErrors(t *testing.T) {
 
 	_, err = newWebPageService(&mockContentRepository{}, blocked).PreviewWebPage(context.Background(), "ftp://example.com/p")
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+}
+
+func TestCreateFromWebPage_FetchesAsPastedButStoresCanonical(t *testing.T) {
+	tests := []struct {
+		name      string
+		pasted    string
+		wantFetch string
+		wantKey   string
+	}{
+		{"www and trailing slash are fetched, the stored key drops them", "https://www.example.com/a/", "https://www.example.com/a/", "https://example.com/a"},
+		{"userinfo and fragment never reach the fetch", "https://user:secret@example.com/a#top", "https://example.com/a", "https://example.com/a"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &mockWebPageClient{fetchFn: func(_ context.Context, _ string) (domain.WebPageMeta, error) {
+				return okWebPage("https://example.com/a", "A"), nil
+			}}
+			var keyed string
+			repo := &mockContentRepository{getOrCreateByURLFn: func(_ context.Context, c *domain.Content, _ bool) (*domain.Content, bool, error) {
+				keyed = *c.URL
+				return c, false, nil
+			}}
+
+			_, err := newWebPageService(repo, client).CreateFromWebPage(context.Background(), tt.pasted, nil, 1)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantFetch, client.lastURL)
+			assert.Equal(t, tt.wantKey, keyed)
+		})
+	}
+}
+
+func TestPreviewWebPage_FetchesAsPasted(t *testing.T) {
+	client := &mockWebPageClient{fetchFn: func(_ context.Context, _ string) (domain.WebPageMeta, error) {
+		return okWebPage("https://www.example.com/a/", "A"), nil
+	}}
+	_, err := newWebPageService(&mockContentRepository{}, client).PreviewWebPage(context.Background(), "https://www.example.com/a/")
+	require.NoError(t, err)
+	assert.Equal(t, "https://www.example.com/a/", client.lastURL)
 }
 
 func TestWebPage_UnconfiguredClientIsUnavailable(t *testing.T) {
