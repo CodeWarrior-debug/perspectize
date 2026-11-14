@@ -16,3 +16,8 @@
 *.ttf binary
 *.eot binary
 *.pdf binary
+
+# gqlgen output stays tracked (builds need it) but is collapsed in PR diffs
+# and left out of PR line counts so reviewers read only hand-written code.
+backend/internal/adapters/graphql/generated/generated.go linguist-generated=true
+backend/internal/adapters/graphql/model/models_gen.go linguist-generated=true
