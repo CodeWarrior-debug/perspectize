@@ -73,7 +73,7 @@ Any other `**Field:**` is a lint error.
 | `activity` | Library (slug kept from "Activity") | verified (3 rounds) | ea74656e (2026-11-14) |
 | `adding-content` | Adding Content | verified (3 rounds) | ea74656e (2026-11-14) |
 | `perspectives` | Perspectives | verified (1 round) | ea74656e (2026-11-14) |
-| `bible` | Bible Passages | verified (2 rounds) | — |
+| `bible` | Bible Passages | verified (3 rounds) | ea74656e (2026-11-14) |
 | `compare` | Compare Perspectives | verified (pilot, 3 rounds) | — |
 | `discover` | Discover | verified (3 rounds) | ea74656e (2026-11-14) |
 | `messaging` | Messaging | verified (1 round) | — |

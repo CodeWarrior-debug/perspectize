@@ -1,5 +1,5 @@
 [
-  { "question": "How do I read a Bible passage that someone added?", "expect_ids": ["bible.read-passage"], "must_not_claim": [] },
+  { "question": "How do I open just one verse from a longer Bible passage?", "expect_ids": ["bible.see-single-verse"], "must_not_claim": [] },
   { "question": "Why can't I see the text of this really long passage?", "expect_ids": ["bible.read-passage"], "must_not_claim": [] },
   { "question": "Can I see the original Hebrew or Greek for a verse and what each word means?", "expect_ids": ["bible.original-language"], "must_not_claim": [] },
   { "question": "Can I read this passage in the Berean Standard Bible on Bible Gateway?", "expect_ids": ["bible.passage-links", "bible.choose-bible-gateway-version"], "must_not_claim": ["Berean Standard Bible is a Bible Gateway version option", "BSB on Bible Gateway"] },
