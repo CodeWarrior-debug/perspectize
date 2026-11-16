@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/svelte';
 import SettingsDialog from '$lib/components/SettingsDialog.svelte';
 import { createThemeStore } from '$lib/theme/store.svelte';
 import { setCoachForceOpen, getCoachForceOpen, getCoachReplayNonce } from '$lib/onboarding/coachGate.svelte';
+import { warmUpRender } from '../helpers/warmUp';
 
 // Settings → Restart onboarding replays the coach immediately (no next-session flag).
 
@@ -52,6 +53,10 @@ function reset() {
 		},
 	};
 }
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUpRender(SettingsDialog, { open: true, store: fakeStore });
 
 describe('SettingsDialog', () => {
 	beforeEach(reset);

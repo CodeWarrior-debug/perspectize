@@ -16,6 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient } from '@tanstack/svelte-query';
 import { queryKeys } from '$lib/queries/keys';
 import type { ListPerspectivesByUserResponse, PerspectiveItem } from '$lib/queries/perspectives';
+import { preloadLazy } from '../helpers/warmUp';
 
 let client: QueryClient;
 let capturedCreateOptions: any;
@@ -87,6 +88,13 @@ beforeEach(async () => {
 	useCreatePerspective();
 	useUpdatePerspective();
 });
+
+// The tests import these inside their bodies; load them once up front so the first
+// test doesn't pay the module transform, which balloons under full-suite load (#728).
+preloadLazy(
+	() => import('$lib/queries/perspectives/useCreatePerspective'),
+	() => import('$lib/queries/perspectives/useUpdatePerspective'),
+);
 
 describe('perspective cache scoping (create)', () => {
 	it("does not touch another user's listByUser cache", async () => {

@@ -8,6 +8,7 @@ import { MOVIE_SEARCH, MOVIE_TRENDING } from '$lib/services/tmdbApi';
 import { BOOK_SEARCH, BOOK_TRENDING } from '$lib/services/openLibraryApi';
 import { YOUTUBE_TRENDING } from '$lib/services/youtubeApi';
 import { LIST_CONTENT } from '$lib/queries/content';
+import { warmUp } from '../helpers/warmUp';
 
 const mocks = vi.hoisted(() => ({
 	graphqlRequest: vi.fn(),
@@ -39,6 +40,10 @@ function respond(doc: string) {
 function renderPage() {
 	render(TestWrapper, { props: { queryClient: makeClient(), component: Page } });
 }
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUp(() => renderPage());
 
 describe('Discover page source switch', () => {
 	beforeEach(async () => {

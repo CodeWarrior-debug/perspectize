@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 import { MODAL_ACTION_CLASS } from '$lib/components/modal-action';
+import { warmUpRender } from '../helpers/warmUp';
 
 // Hoisted mocks — shared pattern for useUpdateSourceData components (see AddVideoPopover.test.ts)
 const mocks = vi.hoisted(() => ({
@@ -73,6 +74,10 @@ const content = {
 	description: 'A record-setting rep, filmed ringside.',
 	tags: ['tom brady', 'tom brady goat'],
 };
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUpRender(ActivityDetailsModal, { content, open: true, onClose: () => {} });
 
 describe('ActivityDetailsModal', () => {
 	beforeEach(reset);

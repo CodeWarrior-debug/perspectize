@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { hashKey, type QueryClient } from '@tanstack/svelte-query';
 import { queryKeys } from '$lib/queries/keys';
 import { countingFetch, invalidationOutcome, makeClient, mountConsumers, seed } from '../helpers/queryBudget';
+import { preloadLazy } from '../helpers/warmUp';
 
 let client: QueryClient;
 let capturedDeleteOptions: any;
@@ -39,6 +40,14 @@ beforeEach(() => {
 	client = makeClient();
 	capturedDeleteOptions = undefined;
 });
+
+// The tests import these inside their bodies; load them once up front so the first
+// test doesn't pay the module transform, which balloons under full-suite load (#728).
+preloadLazy(
+	() => import('$lib/queries/bible/useSetPassageDisplayTitle'),
+	() => import('$lib/queries/content/useAddMovie'),
+	() => import('$lib/queries/perspectives/useDeletePerspective'),
+);
 
 describe('de-duplication and freshness', () => {
 	it('three consumers of one key cost one network call', async () => {

@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { QueryClient } from '@tanstack/svelte-query';
 import { queryKeys } from '$lib/queries/keys';
 import { invalidationOutcome, makeClient, seed } from '../helpers/queryBudget';
+import { preloadLazy } from '../helpers/warmUp';
 
 let client: QueryClient;
 let capturedMutationOptions: any;
@@ -28,6 +29,10 @@ beforeEach(() => {
 	client = makeClient();
 	capturedMutationOptions = undefined;
 });
+
+// The tests import these inside their bodies; load them once up front so the first
+// test doesn't pay the module transform, which balloons under full-suite load (#728).
+preloadLazy(() => import('$lib/queries/content/useCreateWebPage'));
 
 describe('eviction: useCreateWebPage.onSuccess invalidates content lists only', () => {
 	it('marks every content list stale and leaves details, rows, previews and other domains alone', async () => {

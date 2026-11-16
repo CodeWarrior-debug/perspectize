@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/svelte';
 import FontPicker from '$lib/components/fonts/FontPicker.svelte';
 import { parseCatalog, type FontCatalogRow } from '$lib/fonts/googleFonts';
 import { FONT_SLOT_INFO } from '$lib/fonts/slots';
+import { warmUp } from '../helpers/warmUp';
 
 const CATALOG = parseCatalog([
 	['Inter', 'a', [400, 500, 600, 700], 1, 1],
@@ -29,6 +30,10 @@ const optionNames = () => screen.getAllByRole('option').map((o) => o.textContent
 beforeEach(() => {
 	document.head.querySelectorAll('[data-font-preview]').forEach((l) => l.remove());
 });
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUp(() => setup());
 
 describe('FontPicker', () => {
 	it('shows the default font while nothing is picked, and the pick otherwise', () => {

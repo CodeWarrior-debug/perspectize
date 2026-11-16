@@ -16,6 +16,7 @@ vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
 vi.mock('svelte-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 import ThreadListItem from '$lib/components/messaging/ThreadListItem.svelte';
+import { warmUpRender } from '../helpers/warmUp';
 
 const thread = (over = {}) => ({
 	id: 't1',
@@ -32,6 +33,10 @@ const thread = (over = {}) => ({
 	createdAt: 'x',
 	...over,
 });
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUpRender(ThreadListItem, { thread: thread(), myUserId: 'u1', active: false });
 
 describe('ThreadListItem', () => {
 	beforeEach(() => vi.clearAllMocks());

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import ActivityCardList from '$lib/components/ActivityCardList.svelte';
+import { warmUpRender } from '../helpers/warmUp';
 
 vi.mock('$lib/auth/useAuthState', () => ({
 	useAuthState: () => ({
@@ -36,6 +37,10 @@ const pageRow = (id: string, webPageOverrides: Record<string, unknown> = {}) =>
 		contentType: 'WEB_PAGE',
 		webPage: webPage(webPageOverrides),
 	}) as never;
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUpRender(ActivityCardList, { rowData: [pageRow('1')], onOpenDetails: () => {} });
 
 describe('ActivityCardList: webpage card', () => {
 	it('shows the site, the published year and the author', () => {

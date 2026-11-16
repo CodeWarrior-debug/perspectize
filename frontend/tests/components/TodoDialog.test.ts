@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import TodoDialog from '$lib/components/plan/TodoDialog.svelte';
 import { todayIso } from '$lib/utils/plan-todo-helpers';
 import type { TodoActionItem, UserTodoItem, UserTodoListItem } from '$lib/queries/userTodos';
+import { warmUpRender } from '../helpers/warmUp';
 
 const mocks = vi.hoisted(() => ({
 	createMutateAsync: vi.fn(),
@@ -117,6 +118,15 @@ function lastPrompt() {
 	if (!call) throw new Error('no prompt raised');
 	return { message: call[0] as string, action: call[1] as { label: string; onClick: () => void } };
 }
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUpRender(TodoDialog, {
+	open: true,
+	lists: LISTS,
+	newContent: { id: 9, name: 'A great video' },
+	defaultActionId: 2,
+});
 
 describe('TodoDialog', () => {
 	beforeEach(() => {

@@ -11,6 +11,11 @@ vi.mock('$lib/components/theme/ColorWheel.svelte', () => ({
 }));
 
 import ThemeCustomizePanel from '$lib/components/theme/ThemeCustomizePanel.svelte';
+import { warmUp } from '../helpers/warmUp';
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUp(() => render(ThemeCustomizePanel, { props: { store: createThemeStore() } }));
 
 describe('ThemeCustomizePanel', () => {
 	beforeEach(() => {

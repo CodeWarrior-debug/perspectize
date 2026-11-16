@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 import { formatDateTime } from '$lib/utils/formatting';
+import { warmUpRender } from '../helpers/warmUp';
 
 // Same mock shape as ActivityDetailsModal.test.ts: the modal reads mutation and query hooks.
 const mocks = vi.hoisted(() => ({
@@ -76,6 +77,10 @@ function tileValue(label: string): string {
 	const tile = screen.getByText(label, { selector: 'div' }).parentElement;
 	return tile?.lastElementChild?.textContent?.trim() ?? '';
 }
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUpRender(ActivityDetailsModal, { content: webPageContent(), open: true, onClose: () => {} });
 
 describe('ActivityDetailsModal: webpage', () => {
 	beforeEach(() => {

@@ -5,6 +5,7 @@ import BookTrendingFeed from '$lib/components/discover/BookTrendingFeed.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
 import { BOOK_TRENDING, type BookSearchPage, type BookSearchResult } from '$lib/services/openLibraryApi';
+import { warmUp } from '../helpers/warmUp';
 
 vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
 
@@ -60,6 +61,10 @@ function renderFeed(overrides: Record<string, unknown> = {}) {
 	render(TestWrapper, { props: { queryClient: makeClient(), component, props } });
 	return props;
 }
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUp(() => renderFeed());
 
 describe('BookTrendingFeed', () => {
 	beforeEach(() => {

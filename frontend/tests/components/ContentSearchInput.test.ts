@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import ContentSearchInput from '$lib/components/ContentSearchInput.svelte';
 import ContentSearchInputHost from './fixtures/ContentSearchInputHost.svelte';
+import { warmUpRender } from '../helpers/warmUp';
 
 // Note: ContentSearchInput exposes `debouncedQuery` as a $bindable prop (per the task
 // brief). Programmatic render() here can't observe two-way bound prop writes
@@ -9,6 +10,10 @@ import ContentSearchInputHost from './fixtures/ContentSearchInputHost.svelte';
 // DOM-observable behavior — the debounce-timing test below uses
 // ./fixtures/ContentSearchInputHost.svelte (a component that actually owns the bound
 // state) to observe the write.
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUpRender(ContentSearchInput);
+
 describe('ContentSearchInput', () => {
 	it('renders with the expected placeholder text', () => {
 		render(ContentSearchInput);

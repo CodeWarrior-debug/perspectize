@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import AddContentPopover from '$lib/components/AddContentPopover.svelte';
 import type { WebPageFetch, WebPagePreview } from '$lib/queries/content';
+import { warmUp } from '../helpers/warmUp';
 
 const mocks = vi.hoisted(() => ({
 	webPage: {
@@ -110,6 +111,10 @@ beforeEach(() => {
 	mocks.webPage.isSuccess = false;
 	mocks.webPage.isError = false;
 });
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUp(() => openWith(''));
 
 describe('AddContentPopover: webpage add (roles sent with the create)', () => {
 	it('nothing picked: submits the url alone, with no roles key at all', async () => {

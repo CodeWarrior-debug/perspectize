@@ -5,6 +5,7 @@ import MovieSearchPanel from '$lib/components/discover/MovieSearchPanel.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
 import { MOVIE_SEARCH, MOVIE_SEARCH_DEBOUNCE_MS, MOVIE_TRENDING, type MovieSearchPage } from '$lib/services/tmdbApi';
+import { warmUp } from '../helpers/warmUp';
 
 vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
 
@@ -88,6 +89,10 @@ async function typeText(text: string) {
 	await fireEvent.input(searchInput(), { target: { value: text } });
 	await tick();
 }
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUp(() => renderPanel());
 
 describe('MovieSearchPanel', () => {
 	beforeEach(() => {

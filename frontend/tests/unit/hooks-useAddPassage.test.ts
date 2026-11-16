@@ -20,6 +20,7 @@ vi.mock('svelte-sonner', () => ({ toast: { success: mocks.success, error: mocks.
 vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
 
 import { useAddPassage } from '$lib/queries/content/useAddPassage';
+import { preloadLazy } from '../helpers/warmUp';
 
 const range = { bookId: 43, startChapter: 3, startVerse: 16, endChapter: 3, endVerse: 18 };
 
@@ -27,6 +28,10 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	useAddPassage();
 });
+
+// The tests import these inside their bodies; load them once up front so the first
+// test doesn't pay the module transform, which balloons under full-suite load (#728).
+preloadLazy(() => import('$app/navigation'));
 
 describe('useAddPassage', () => {
 	it('sends the range through the authenticated wrapper with the session-derived userID', async () => {

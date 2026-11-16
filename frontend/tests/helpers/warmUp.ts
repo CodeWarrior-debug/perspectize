@@ -31,14 +31,24 @@ export function preloadLazy(...loaders: Array<() => Promise<unknown>>): void {
 }
 
 /**
- * Render and unmount `component` once before any test, so no test pays its
- * first-render cost. Call it after the file's `vi.mock`s; mocks it calls during
- * the warm-up must be reset in `beforeEach` (most files already do).
+ * Render `component` with `props` and unmount it once before any test, so no
+ * test pays its first-render cost. Use props that render what the tests render
+ * (an open dialog, not a closed one). Mocks it calls during the warm-up must be
+ * reset in `beforeEach` (most files already do).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function warmUpRender(component: Component<any>, props: Record<string, unknown> = {}): void {
-	beforeAll(() => {
-		render(component, { props });
+	warmUp(() => render(component, { props }));
+}
+
+/**
+ * Like `warmUpRender`, for a file that renders through its own helper (e.g. a
+ * `renderPanel()` that wraps the component in a QueryClient): run it once, then
+ * unmount everything.
+ */
+export function warmUp(renderOnce: () => unknown): void {
+	beforeAll(async () => {
+		await renderOnce();
 		cleanup();
 	}, WARM_UP_TIMEOUT_MS);
 }
