@@ -41,7 +41,10 @@ export const CREATE_CLAIM = gql`
 	}
 `;
 
-/** Content.customFields for a claim. Null on legacy claims that predate the dates. */
+/**
+ * Content.customFields for a claim. Null on legacy claims that predate the dates.
+ * The API field (and Content.privacy, updateClaim, deleteClaim) ships in the claims backend PR (#729).
+ */
 export interface ClaimCustomFields {
 	effectiveDate?: string;
 	evaluateBy?: string;
