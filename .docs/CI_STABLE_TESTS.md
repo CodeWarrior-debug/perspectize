@@ -86,7 +86,12 @@ A file that fails here but passes alone is a cold-cost problem: apply rule 1, 2 
 
 ## CI configuration
 
-- `frontend-test.yml` runs `pnpm run test:coverage` (unit) and `pnpm run test:browser`. Vitest picks its worker count from the runner's cores; the config doesn't pin it.
+- `frontend-test.yml` runs three jobs in parallel, so each failure shows on its own and none stops the others:
+  - `check`: `pnpm run check` (svelte-check)
+  - `unit`: `pnpm run test:coverage`
+  - `browser`: `pnpm run test:browser`, with the Playwright Chromium download cached, keyed on the Playwright version
+- A newer push to a PR cancels that PR's older run. Pushes to `main` are never cancelled.
+- Vitest picks its worker count from the runner's cores; the config doesn't pin it.
 - With `CI` set, `vite.config.ts` adds the `json` reporter (plus `github-actions`, which keeps inline PR annotations) and writes `frontend/test-results/vitest-results.json`. The browser run writes `vitest-browser-results.json`.
-- The **List failed test files** step writes every failed file to the job summary, and **Upload test results** keeps the JSON as the `vitest-results` artifact. When several files fail at once, none of them scrolls off the log.
+- In both test jobs, the **List failed test files** step (`.github/scripts/list-failed-tests.sh`) writes every failed file to the job summary. **Upload test results** keeps the JSON as the `vitest-results-unit` / `vitest-results-browser` artifact. When several files fail at once, none of them scrolls off the log.
 - No global retries and no raised global timeouts, on purpose (rule 4).
