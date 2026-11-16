@@ -28,7 +28,7 @@
 	import CompareTakeColumn from '$lib/components/CompareTakeColumn.svelte';
 	import { Button } from '$lib/components/shadcn';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
-	import { formatDuration, extractVideoIdFromUrl } from '$lib/utils/formatting';
+	import { formatDuration, formatDate, extractVideoIdFromUrl } from '$lib/utils/formatting';
 	import { passageIconLabels } from '$lib/utils/bible';
 	import BiblePassageIcon from '$lib/components/BiblePassageIcon.svelte';
 
@@ -91,30 +91,60 @@
 
 	// Picker candidates: every user with a fetched perspective row (privacy
 	// gating already happened server-side — see LIST_PERSPECTIVES_BY_CONTENT).
-	const options = $derived(perspectives.map((p) => ({ id: p.userID, name: displayName(p.userID) })));
+	type PerspectiveRow = ListPerspectivesByContentResponse['perspectives']['items'][number];
+
+	// The picker's unit is a perspective, not a user: one person can hold
+	// several perspectives on the same content (nothing makes user+content
+	// unique), and the picker advertises content by perspective count. Keying
+	// by userID collapsed those rows, so a single-author content showed
+	// "3 perspectives" in the picker and "no other perspectives" here (issue 738).
+	const options = $derived(
+		perspectives.map((p) => {
+			const name = displayName(p.userID);
+			const sameAuthor = perspectives.filter((o) => o.userID === p.userID).length > 1;
+			return {
+				id: p.id,
+				userId: p.userID,
+				name,
+				// Date suffix only when one person has several rows.
+				label: sameAuthor ? `${name} · ${formatDate(p.updatedAt)}` : name,
+			};
+		}),
+	);
+
+	function latestOf(rows: PerspectiveRow[]): PerspectiveRow {
+		return rows.reduce((latest, p) => (p.updatedAt > latest.updatedAt ? p : latest));
+	}
 
 	function defaultLeftId(): string | null {
-		if (meCtx.me && perspectives.some((p) => p.userID === meCtx.me!.id)) return meCtx.me.id;
-		return perspectives[0]?.userID ?? null;
+		const mine = meCtx.me ? perspectives.filter((p) => p.userID === meCtx.me!.id) : [];
+		if (mine.length > 0) return latestOf(mine).id;
+		return perspectives[0]?.id ?? null;
 	}
 
 	function defaultRightId(excludeId: string | null): string | null {
-		const candidates = perspectives.filter((p) => p.userID !== excludeId);
+		const candidates = perspectives.filter((p) => p.id !== excludeId);
 		if (candidates.length === 0) return null;
-		return candidates.reduce((latest, p) => (p.updatedAt > latest.updatedAt ? p : latest)).userID;
+		return latestOf(candidates).id;
 	}
 
 	// A URL id is only honored if it names a user present in the fetched
 	// (privacy-scoped) perspectives set — otherwise (stale/bookmarked link to
 	// a since-deleted/private perspective) fall back to the computed default
 	// rather than silently treating the invalid id as a valid selection.
-	function validId(id: string | null): string | null {
-		if (id === null) return null;
-		return options.some((o) => o.id === id) ? id : null;
+	function resolveId(param: string | null): string | null {
+		if (param === null) return null;
+		if (perspectives.some((p) => p.id === param)) return param;
+		// Legacy links carry a user id: resolve to that user's latest perspective.
+		const byUser = perspectives.filter((p) => p.userID === param);
+		return byUser.length > 0 ? latestOf(byUser).id : null;
 	}
 
-	const leftId = $derived(validId(initialLeftId) ?? defaultLeftId());
-	const rightId = $derived(validId(initialRightId) ?? defaultRightId(leftId));
+	const leftId = $derived(resolveId(initialLeftId) ?? defaultLeftId());
+	const rightId = $derived.by(() => {
+		const requested = resolveId(initialRightId);
+		return requested !== null && requested !== leftId ? requested : defaultRightId(leftId);
+	});
 
 	function updateUrl(next: { left?: string; right?: string }) {
 		const params = new URLSearchParams();
@@ -135,8 +165,10 @@
 		updateUrl({ left: rightId, right: leftId });
 	}
 
-	const leftPerspective = $derived(perspectives.find((p) => p.userID === leftId) ?? null);
-	const rightPerspective = $derived(perspectives.find((p) => p.userID === rightId) ?? null);
+	const leftPerspective = $derived(perspectives.find((p) => p.id === leftId) ?? null);
+	const rightPerspective = $derived(perspectives.find((p) => p.id === rightId) ?? null);
+	const leftName = $derived(leftPerspective ? displayName(leftPerspective.userID) : '');
+	const rightName = $derived(rightPerspective ? displayName(rightPerspective.userID) : '');
 
 	let sortDesc = $state(false);
 
@@ -167,8 +199,8 @@
 	// empty-state message instead (compare-no-overlap-summary #1).
 	const noOverlapMessage = $derived.by(() => {
 		if (!leftId || !rightId) return '';
-		const leftLabel = displayName(leftId);
-		const rightLabel = displayName(rightId);
+		const leftLabel = leftName;
+		const rightLabel = rightName;
 		if (summary.leftOnly === 0 && summary.rightOnly === 0) return `Neither of you rated any shared dimensions.`;
 		if (summary.rightOnly === 0) return `${rightLabel} didn't rate this.`;
 		if (summary.leftOnly === 0) return `${leftLabel} didn't rate this.`;
@@ -309,27 +341,22 @@
 					{summary.conflict} conflict
 				</span>
 				{#if summary.leftOnly > 0}
-					<span class="text-muted-foreground">{summary.leftOnly} only {displayName(leftId!)} rated</span>
+					<span class="text-muted-foreground">{summary.leftOnly} only {leftName} rated</span>
 				{/if}
 				{#if summary.rightOnly > 0}
-					<span class="text-muted-foreground">{summary.rightOnly} only {displayName(rightId!)} rated</span>
+					<span class="text-muted-foreground">{summary.rightOnly} only {rightName} rated</span>
 				{/if}
 			</div>
 		{:else}
 			<p class="text-[12.5px] text-muted-foreground">{noOverlapMessage}</p>
 		{/if}
 
-		<CompareOverallRow
-			{overall}
-			leftName={displayName(leftId!)}
-			rightName={displayName(rightId!)}
-			agreementPercent={overallAgreementPercent}
-		/>
+		<CompareOverallRow {overall} {leftName} {rightName} agreementPercent={overallAgreementPercent} />
 
 		<div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
 			<CompareTakeColumn
-				name={displayName(leftId!)}
-				avatarColor={identityColor(leftId!, meCtx.me?.id ?? null)}
+				name={leftName}
+				avatarColor={identityColor(leftPerspective!.userID, meCtx.me?.id ?? null)}
 				review={leftPerspective!.review}
 				uniqueFeelings={feelingsComparison.leftOnly}
 			/>
@@ -339,12 +366,12 @@
 				feelings={feelingsComparison}
 				{sortDesc}
 				onToggleSort={() => (sortDesc = !sortDesc)}
-				leftName={displayName(leftId!)}
-				rightName={displayName(rightId!)}
+				{leftName}
+				{rightName}
 			/>
 			<CompareTakeColumn
-				name={displayName(rightId!)}
-				avatarColor={identityColor(rightId!, meCtx.me?.id ?? null)}
+				name={rightName}
+				avatarColor={identityColor(rightPerspective!.userID, meCtx.me?.id ?? null)}
 				review={rightPerspective!.review}
 				uniqueFeelings={feelingsComparison.rightOnly}
 			/>
