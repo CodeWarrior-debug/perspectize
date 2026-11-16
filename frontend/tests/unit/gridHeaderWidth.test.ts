@@ -14,12 +14,16 @@ import {
 
 const appCss = readFileSync(resolve(process.cwd(), 'src/app.css'), 'utf8');
 
+/** Advance (em) of the widest digit in the header font: the multi-sort order number is one digit. */
+const WIDEST_DIGIT_EM = Math.max(...[...'0123456789'].map((d) => GEIST_SEMIBOLD_ADVANCE_EM[d.charCodeAt(0) - 32]));
+
 describe('headerChrome', () => {
 	it('reads the Activity theme: 4px Balham spacing, 16px icons, 11px uppercase letter-spaced headers', () => {
 		expect(ACTIVITY_HEADER_CHROME).toEqual({
 			fontSize: 11,
 			padding: 8,
 			sort: 20,
+			sortOrder: 4 + WIDEST_DIGIT_EM * 11,
 			filter: 20,
 			uppercase: true,
 			letterSpacingEm: 0.06,
@@ -32,6 +36,7 @@ describe('headerChrome', () => {
 			fontSize: 14,
 			padding: 16,
 			sort: 24,
+			sortOrder: 8 + WIDEST_DIGIT_EM * 14,
 			filter: 24,
 			uppercase: false,
 			letterSpacingEm: 0,
@@ -103,18 +108,32 @@ describe('headerTextWidth', () => {
 });
 
 describe('headerMinWidth', () => {
-	const { padding, sort, filter } = ACTIVITY_HEADER_CHROME;
+	const { padding, sort, sortOrder, filter } = ACTIVITY_HEADER_CHROME;
 
-	it('is padding + measured label + sort arrow + funnel, rounded up', () => {
-		const exact = padding * 2 + headerTextWidth('Released') + sort + filter;
+	it('is padding + measured label + sort arrow + order number + funnel, rounded up', () => {
+		const exact = padding * 2 + headerTextWidth('Released') + sort + sortOrder + filter;
 		const width = headerMinWidth('Released');
 		expect(Number.isInteger(width)).toBe(true);
 		expect(width).toBeGreaterThanOrEqual(exact);
 		expect(width).toBeLessThanOrEqual(Math.ceil(exact) + 3);
 	});
 
-	it('reserves the sort arrow only for sortable columns', () => {
-		expect(headerMinWidth('Genre', { sortable: true }) - headerMinWidth('Genre', { sortable: false })).toBe(sort);
+	it('reserves the sort arrow and the order number only for sortable columns', () => {
+		// Each width is rounded up, so the difference is the reserved px within one whole pixel.
+		const reserved = headerMinWidth('Genre', { sortable: true }) - headerMinWidth('Genre', { sortable: false });
+		expect(Math.abs(reserved - (sort + sortOrder))).toBeLessThanOrEqual(1);
+	});
+
+	it('keeps a sorted column whole when AG Grid draws its order number beside the arrow', () => {
+		// Multi-sort (two or more columns sorted) draws [label] [gap] [order number] [gap] [arrow].
+		// Duration measured 61px of label beside a 7px order number and a 16px arrow in an 85px box:
+		// the old floor (arrow only) left the label cut to "…". The floor must cover every part.
+		const sortedLabel = headerTextWidth('Duration') + sort + sortOrder;
+		expect(headerMinWidth('Duration')).toBeGreaterThanOrEqual(padding * 2 + sortedLabel + filter);
+	});
+
+	it('reserves a whole digit for the order number, which the picker caps at five sorts', () => {
+		expect(sortOrder).toBeGreaterThanOrEqual(ACTIVITY_HEADER_CHROME.fontSize * WIDEST_DIGIT_EM);
 	});
 
 	it('reserves the funnel only for filterable columns', () => {

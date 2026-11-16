@@ -653,7 +653,7 @@
 				lockPinned: true,
 				headerName: 'Item',
 				flex: 2,
-				minWidth: 185,
+				minWidth: 175, // a floor only: Item is flex 2 and grows; 10px less keeps the YouTube lg set inside 1212px
 
 				filter: 'agTextColumnFilter',
 				filterValueGetter: (params) => params.data?.name ?? '',
@@ -1068,7 +1068,8 @@
 				headerName: 'Published',
 				flex: 0.8,
 				minWidth: 105,
-				maxWidth: 130,
+				// Raised to fit the header floor ("Published" + sort arrow, order number and funnel).
+				maxWidth: 140,
 				filter: 'agNumberColumnFilter',
 				// A number to sort by, shown as the plain year (never through the thousands-separated formatter).
 				valueGetter: (params) => {
@@ -1085,7 +1086,8 @@
 				headerName: 'Pages',
 				flex: 0.6,
 				minWidth: 70,
-				maxWidth: 110,
+				// Raised to fit the header floor ("Pages" + sort arrow, order number and funnel).
+				maxWidth: 120,
 				filter: 'agNumberColumnFilter',
 				valueGetter: pagesValueGetter,
 				comparator: unknownLastComparator,
@@ -1098,7 +1100,8 @@
 				headerName: 'Book rating',
 				flex: 0.7,
 				minWidth: 128,
-				maxWidth: 150,
+				// Raised to fit the header floor ("Book rating" + sort arrow, order number and funnel).
+				maxWidth: 160,
 				filter: 'agNumberColumnFilter',
 				valueGetter: ratingValueGetter,
 				comparator: unknownLastComparator,

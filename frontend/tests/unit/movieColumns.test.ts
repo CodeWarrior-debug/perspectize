@@ -616,23 +616,24 @@ describe('default column sets fit the 1212px grid', () => {
 		}
 	});
 
-	it('Movie lg minimum widths are the header-derived floors without Type, which the filter names (sum 1104)', () => {
+	it('Movie lg minimum widths are the header-derived floors without Type, which the filter names (sum 1162)', () => {
+		// Sortable columns also reserve the multi-sort order number (~11px each, see headerChrome).
 		const { visible } = defaultColumnVisibility('lg', 'movie', 'movie');
 		expect(visible).not.toContain('type');
 		const widths = Object.fromEntries(visible.map((id) => [id, minWidth(id)]));
 		expect(widths).toMatchObject({
-			item: 185,
+			item: 175,
 			genre: 79,
-			rated: 98,
+			rated: 110,
 			cast: 125,
-			duration: 121,
-			released: 121,
-			boxOffice: 90,
-			vsBudget: 60,
-			tmdbScore: 104,
+			duration: 132,
+			released: 133,
+			boxOffice: 101,
+			vsBudget: 71,
+			tmdbScore: 115,
 			tags: 71,
 		});
-		expect(Object.values(widths).reduce((a, b) => a + b, 0)).toBe(1104);
+		expect(Object.values(widths).reduce((a, b) => a + b, 0)).toBe(1162);
 	});
 
 	it('the map in ActivityTable floors every column at its header width', () => {
