@@ -41,10 +41,7 @@ export const CREATE_CLAIM = gql`
 	}
 `;
 
-/**
- * Content.customFields for a claim. Null on legacy claims that predate the dates.
- * This field, Content.privacy, updateClaim and deleteClaim must be deployed in the backend first.
- */
+/** Content.customFields for a claim. Null on older claims that predate the dates. */
 export interface ClaimCustomFields {
 	effectiveDate?: string;
 	evaluateBy?: string;
