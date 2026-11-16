@@ -424,6 +424,93 @@ func TestSetPrimaryCategory_PrivateToOtherUserIsNotFound(t *testing.T) {
 	assert.True(t, errors.Is(err, domain.ErrNotFound))
 }
 
+// --- RemovePrimaryCategory Tests ---
+
+func TestRemovePrimaryCategory_ClearsCategoryAsActor(t *testing.T) {
+	var gotContent, gotViewer int
+	var gotCategory *int
+	called := false
+	contentRepo := &mockContentRepoForCategory{
+		updatePrimaryCategoryFn: func(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
+			called = true
+			gotContent, gotCategory, gotViewer = contentID, categoryID, viewerID
+			return &domain.Content{ID: contentID, PrimaryCategoryID: categoryID}, nil
+		},
+	}
+	svc := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})
+
+	content, err := svc.RemovePrimaryCategory(context.Background(), 42, 7)
+	require.NoError(t, err)
+	require.True(t, called)
+	assert.Equal(t, 7, gotContent)
+	assert.Equal(t, 42, gotViewer, "the acting user must reach the owner-scoped UPDATE")
+	assert.Nil(t, gotCategory, "removing writes a NULL category, never an id")
+	assert.Nil(t, content.PrimaryCategoryID)
+}
+
+func TestRemovePrimaryCategory_WritesNothingElse(t *testing.T) {
+	upserted := false
+	categoryRepo := &mockCategoryRepository{
+		upsertFn: func(ctx context.Context, category *domain.Category) (*domain.Category, error) {
+			upserted = true
+			return category, nil
+		},
+	}
+	svc := services.NewCategoryService(categoryRepo, &mockContentRepoForCategory{}, &mockWikidataClient{})
+
+	_, err := svc.RemovePrimaryCategory(context.Background(), 1, 1)
+	require.NoError(t, err)
+	assert.False(t, upserted, "removal must not touch the categories table")
+}
+
+func TestRemovePrimaryCategory_RejectsBadIDs(t *testing.T) {
+	svc := services.NewCategoryService(&mockCategoryRepository{}, &mockContentRepoForCategory{}, &mockWikidataClient{})
+
+	for _, tc := range []struct {
+		name           string
+		actor, content int
+	}{
+		{"no actor", 0, 1},
+		{"negative actor", -3, 1},
+		{"no content", 1, 0},
+		{"negative content", 1, -5},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := svc.RemovePrimaryCategory(context.Background(), tc.actor, tc.content)
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, domain.ErrInvalidInput))
+		})
+	}
+}
+
+func TestRemovePrimaryCategory_NotVisibleIsNotFound(t *testing.T) {
+	contentRepo := &mockContentRepoForCategory{
+		updatePrimaryCategoryFn: func(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
+			// The scoped UPDATE matches no row for a private row the viewer doesn't own.
+			return nil, domain.ErrNotFound
+		},
+	}
+	svc := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})
+
+	_, err := svc.RemovePrimaryCategory(context.Background(), 8, 1)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrNotFound))
+}
+
+func TestRemovePrimaryCategory_RepoFailureIsWrapped(t *testing.T) {
+	contentRepo := &mockContentRepoForCategory{
+		updatePrimaryCategoryFn: func(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
+			return nil, errors.New("boom")
+		},
+	}
+	svc := services.NewCategoryService(&mockCategoryRepository{}, contentRepo, &mockWikidataClient{})
+
+	_, err := svc.RemovePrimaryCategory(context.Background(), 1, 1)
+	require.Error(t, err)
+	assert.False(t, errors.Is(err, domain.ErrNotFound))
+	assert.Contains(t, err.Error(), "clear content primary category")
+}
+
 // --- SearchWikidata Tests ---
 
 func TestSearchWikidata_Success(t *testing.T) {

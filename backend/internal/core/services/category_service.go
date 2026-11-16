@@ -91,6 +91,27 @@ func (s *CategoryServiceImpl) SetPrimaryCategory(ctx context.Context, input port
 	return content, nil
 }
 
+// RemovePrimaryCategory clears a content item's primary category. It is the undo for
+// SetPrimaryCategory and follows the same visibility rule: the UPDATE is scoped to rows the
+// actor may see, so a missing or not-visible content id is domain.ErrNotFound.
+func (s *CategoryServiceImpl) RemovePrimaryCategory(ctx context.Context, actorUserID, contentID int) (*domain.Content, error) {
+	if actorUserID <= 0 {
+		return nil, fmt.Errorf("%w: actor user id must be a positive integer", domain.ErrInvalidInput)
+	}
+	if contentID <= 0 {
+		return nil, fmt.Errorf("%w: content id must be a positive integer", domain.ErrInvalidInput)
+	}
+
+	content, err := s.contentRepo.UpdatePrimaryCategoryID(ctx, contentID, nil, actorUserID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("failed to get content: %w", err)
+		}
+		return nil, fmt.Errorf("failed to clear content primary category: %w", err)
+	}
+	return content, nil
+}
+
 // SearchWikidata proxies a search query to the Wikidata Entity Search API.
 func (s *CategoryServiceImpl) SearchWikidata(ctx context.Context, query string, language string, limit int) ([]domain.WikidataSearchResult, error) {
 	if language == "" {
