@@ -78,9 +78,9 @@ describe('useCreateClaim hook', () => {
 			useCreateClaim();
 		});
 
-		it('shows success toast "Claim created"', () => {
+		it('shows a success toast', () => {
 			capturedMutationOptions.onSuccess();
-			expect(mockToastSuccess).toHaveBeenCalledWith('Claim created');
+			expect(mockToastSuccess).toHaveBeenCalledWith('Claim saved');
 		});
 
 		it('invalidates content lists cache', () => {

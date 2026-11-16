@@ -79,14 +79,14 @@ func TestApplyContentSearch_CastAndDirector(t *testing.T) {
 		wantRe string
 	}{
 		{"cast", []domain.ContentSearchField{domain.ContentSearchFieldCast},
-			`WHERE EXISTS \(SELECT 1 FROM jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'cast'\) = 'array' THEN response->'cast' ELSE '\[\]'::jsonb END\) p WHERE p->>'name' ILIKE \$1\)`},
+			`WHERE EXISTS \(SELECT 1 FROM jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'cast'\) = 'array' THEN response->'cast' ELSE '\[\]'::jsonb END\) p WHERE p->>'name' ILIKE \$1\) AND content\.privacy = \$2`},
 		{"director", []domain.ContentSearchField{domain.ContentSearchFieldDirector},
-			`WHERE EXISTS \(SELECT 1 FROM jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'directors'\) = 'array' THEN response->'directors' ELSE '\[\]'::jsonb END\) p WHERE p->>'name' ILIKE \$1\)`},
+			`WHERE EXISTS \(SELECT 1 FROM jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'directors'\) = 'array' THEN response->'directors' ELSE '\[\]'::jsonb END\) p WHERE p->>'name' ILIKE \$1\) AND content\.privacy = \$2`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			db, mock := newMockDB(t)
-			mock.ExpectQuery(tc.wantRe).WithArgs("%Nolan%", int64(11)).WillReturnRows(contentRows())
+			mock.ExpectQuery(tc.wantRe).WithArgs("%Nolan%", "public", int64(11)).WillReturnRows(contentRows())
 			_, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{
 				SortBy:    domain.ContentSortByCreatedAt,
 				SortOrder: domain.SortOrderDesc,
@@ -99,8 +99,8 @@ func TestApplyContentSearch_CastAndDirector(t *testing.T) {
 
 	t.Run("cast and director are OR'd with one arg each", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'cast'\).*ILIKE \$1\) OR EXISTS .*response->'directors'.*ILIKE \$2`).
-			WithArgs("%Nolan%", "%Nolan%", int64(11)).WillReturnRows(contentRows())
+		mock.ExpectQuery(`jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'cast'\).*ILIKE \$1\) OR EXISTS .*response->'directors'.*ILIKE \$2.*AND content\.privacy = \$3`).
+			WithArgs("%Nolan%", "%Nolan%", "public", int64(11)).WillReturnRows(contentRows())
 		_, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{
 			SortBy:    domain.ContentSortByCreatedAt,
 			SortOrder: domain.SortOrderDesc,
@@ -124,14 +124,14 @@ func TestList_PersonFilter(t *testing.T) {
 		wantArgs []driver.Value
 	}{
 		{"cast only", cInt(525), role(domain.PersonRoleCast),
-			`WHERE content_type = 'movie' AND response->'cast' @> \$1::jsonb ORDER BY`,
-			[]driver.Value{`[{"id":525}]`, int64(11)}},
+			`WHERE \(content_type = 'movie' AND response->'cast' @> \$1::jsonb\) AND content\.privacy = \$2 ORDER BY`,
+			[]driver.Value{`[{"id":525}]`, "public", int64(11)}},
 		{"director only", cInt(525), role(domain.PersonRoleDirector),
-			`WHERE content_type = 'movie' AND response->'directors' @> \$1::jsonb ORDER BY`,
-			[]driver.Value{`[{"id":525}]`, int64(11)}},
+			`WHERE \(content_type = 'movie' AND response->'directors' @> \$1::jsonb\) AND content\.privacy = \$2 ORDER BY`,
+			[]driver.Value{`[{"id":525}]`, "public", int64(11)}},
 		{"any role ORs both", cInt(525), nil,
-			`WHERE content_type = 'movie' AND \(response->'cast' @> \$1::jsonb OR response->'directors' @> \$2::jsonb\) ORDER BY`,
-			[]driver.Value{`[{"id":525}]`, `[{"id":525}]`, int64(11)}},
+			`WHERE \(content_type = 'movie' AND \(response->'cast' @> \$1::jsonb OR response->'directors' @> \$2::jsonb\)\) AND content\.privacy = \$3 ORDER BY`,
+			[]driver.Value{`[{"id":525}]`, `[{"id":525}]`, "public", int64(11)}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -149,7 +149,7 @@ func TestList_PersonFilter(t *testing.T) {
 
 	t.Run("nil personId adds no condition even with a role", func(t *testing.T) {
 		db, mock := newMockDB(t)
-		mock.ExpectQuery(`SELECT \* FROM "content" ORDER BY`).WillReturnRows(contentRows())
+		mock.ExpectQuery(`SELECT \* FROM "content" WHERE content\.privacy = \$1 ORDER BY`).WithArgs("public", int64(11)).WillReturnRows(contentRows())
 		_, err := NewGormContentRepository(db).List(ctx, domain.ContentListParams{
 			SortBy:    domain.ContentSortByCreatedAt,
 			SortOrder: domain.SortOrderDesc,
@@ -170,31 +170,31 @@ func TestList_MovieColumnFilters(t *testing.T) {
 		wantArgs []driver.Value
 	}{
 		{"genre contains", domain.ContentFilter{GenreContains: cStr("sci")},
-			`WHERE \(response->'genres'\)::text ILIKE \$1 ORDER BY`, []driver.Value{"%sci%", int64(11)}},
+			`WHERE \(response->'genres'\)::text ILIKE \$1 AND content\.privacy = \$2 ORDER BY`, []driver.Value{"%sci%", "public", int64(11)}},
 		{"age rating any of", domain.ContentFilter{AgeRating: []string{"PG-13", "R"}},
-			`WHERE response->>'certification' IN \(\$1,\$2\) ORDER BY`, []driver.Value{"PG-13", "R", int64(11)}},
+			`WHERE response->>'certification' IN \(\$1,\$2\) AND content\.privacy = \$3 ORDER BY`, []driver.Value{"PG-13", "R", "public", int64(11)}},
 		{"released after", domain.ContentFilter{ReleasedAfter: cStr("2000-01-01")},
-			`WHERE response->>'releaseDate' >= \$1 ORDER BY`, []driver.Value{"2000-01-01", int64(11)}},
+			`WHERE response->>'releaseDate' >= \$1 AND content\.privacy = \$2 ORDER BY`, []driver.Value{"2000-01-01", "public", int64(11)}},
 		{"released before", domain.ContentFilter{ReleasedBefore: cStr("2010-12-31")},
-			`WHERE response->>'releaseDate' <= \$1 ORDER BY`, []driver.Value{"2010-12-31", int64(11)}},
+			`WHERE response->>'releaseDate' <= \$1 AND content\.privacy = \$2 ORDER BY`, []driver.Value{"2010-12-31", "public", int64(11)}},
 		{"min box office", domain.ContentFilter{MinBoxOffice: f64(1e6)},
-			`WHERE \(response->>'revenue'\)::FLOAT8 >= \$1 ORDER BY`, []driver.Value{1e6, int64(11)}},
+			`WHERE \(response->>'revenue'\)::FLOAT8 >= \$1 AND content\.privacy = \$2 ORDER BY`, []driver.Value{1e6, "public", int64(11)}},
 		{"max box office", domain.ContentFilter{MaxBoxOffice: f64(2e9)},
-			`WHERE \(response->>'revenue'\)::FLOAT8 <= \$1 ORDER BY`, []driver.Value{2e9, int64(11)}},
+			`WHERE \(response->>'revenue'\)::FLOAT8 <= \$1 AND content\.privacy = \$2 ORDER BY`, []driver.Value{2e9, "public", int64(11)}},
 		{"min tmdb score", domain.ContentFilter{MinTmdbScore: f64(6.5)},
-			`WHERE \(response->>'voteAverage'\)::FLOAT8 >= \$1 ORDER BY`, []driver.Value{6.5, int64(11)}},
+			`WHERE \(response->>'voteAverage'\)::FLOAT8 >= \$1 AND content\.privacy = \$2 ORDER BY`, []driver.Value{6.5, "public", int64(11)}},
 		{"max tmdb score", domain.ContentFilter{MaxTmdbScore: f64(9)},
-			`WHERE \(response->>'voteAverage'\)::FLOAT8 <= \$1 ORDER BY`, []driver.Value{9.0, int64(11)}},
+			`WHERE \(response->>'voteAverage'\)::FLOAT8 <= \$1 AND content\.privacy = \$2 ORDER BY`, []driver.Value{9.0, "public", int64(11)}},
 		{"cast contains matches cast or director names", domain.ContentFilter{CastContains: cStr("keanu")},
-			`WHERE \(EXISTS \(SELECT 1 FROM jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'cast'\) = 'array' .*p->>'name' ILIKE \$1\) ` +
-				`OR EXISTS \(SELECT 1 FROM jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'directors'\) = 'array' .*p->>'name' ILIKE \$2\)\) ORDER BY`,
-			[]driver.Value{"%keanu%", "%keanu%", int64(11)}},
+			`WHERE \(\(EXISTS \(SELECT 1 FROM jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'cast'\) = 'array' .*p->>'name' ILIKE \$1\) ` +
+				`OR EXISTS \(SELECT 1 FROM jsonb_array_elements\(CASE WHEN jsonb_typeof\(response->'directors'\) = 'array' .*p->>'name' ILIKE \$2\)\)\) AND content\.privacy = \$3 ORDER BY`,
+			[]driver.Value{"%keanu%", "%keanu%", "public", int64(11)}},
 		{"empty cast contains adds nothing", domain.ContentFilter{CastContains: cStr("")},
-			`SELECT \* FROM "content" ORDER BY`, []driver.Value{int64(11)}},
+			`SELECT \* FROM "content" WHERE content\.privacy = \$1 ORDER BY`, []driver.Value{"public", int64(11)}},
 		{"empty genre and ratings add nothing", domain.ContentFilter{GenreContains: cStr(""), AgeRating: []string{}},
-			`SELECT \* FROM "content" ORDER BY`, []driver.Value{int64(11)}},
+			`SELECT \* FROM "content" WHERE content\.privacy = \$1 ORDER BY`, []driver.Value{"public", int64(11)}},
 		{"filters AND together", domain.ContentFilter{GenreContains: cStr("x"), MinTmdbScore: f64(7)},
-			`ILIKE \$1 AND \(response->>'voteAverage'\)::FLOAT8 >= \$2 ORDER BY`, []driver.Value{"%x%", 7.0, int64(11)}},
+			`ILIKE \$1 AND \(response->>'voteAverage'\)::FLOAT8 >= \$2 AND content\.privacy = \$3 ORDER BY`, []driver.Value{"%x%", 7.0, "public", int64(11)}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

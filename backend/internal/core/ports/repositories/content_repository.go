@@ -26,9 +26,23 @@ type ContentRepository interface {
 	List(ctx context.Context, params domain.ContentListParams) (*domain.PaginatedContent, error)
 	ReassignByUser(ctx context.Context, fromUserID, toUserID int) error
 	// UpdatePrimaryCategoryID sets the primary_category_id FK on a content
-	// record and returns the updated row. A missing content id is
+	// record visible to viewerID (public, or owned by viewerID) and returns the
+	// updated row. A missing row, or a private row the viewer doesn't own, is
 	// domain.ErrNotFound.
-	UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error)
+	UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error)
+	// UpdateClaim rewrites an owned claim's name, response.text/html and custom
+	// fields in one owner-scoped UPDATE (keeping response.parentContentId). A
+	// missing row, or a row the owner does not hold, is domain.ErrNotFound.
+	UpdateClaim(ctx context.Context, id, ownerID int, text string, html string, customFields json.RawMessage, privacy *domain.Privacy) (*domain.Content, error)
+	// DeleteOwnedClaim deletes an owned claim, with the owner's own perspectives
+	// and plan items on it, in one transaction. If another user has a perspective
+	// or plan item on it, nothing is deleted and the error is domain.ErrClaimHasOthers.
+	// A row the owner does not hold is domain.ErrNotFound.
+	DeleteOwnedClaim(ctx context.Context, id, ownerID int) error
+	// AnonymizeOwnedClaim hands an owned claim to the [deleted] sentinel user, so
+	// other users' perspectives on it keep their target. A row the owner does not
+	// hold is domain.ErrNotFound.
+	AnonymizeOwnedClaim(ctx context.Context, id, ownerID int) error
 	// SetDisplayTitleIfEmpty sets a passage's optional display_title only if none exists
 	// (first-write-wins). Returns the title that is now stored: the caller's if it won,
 	// the existing one if it lost the race. Losing is not an error.

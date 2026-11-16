@@ -15,7 +15,6 @@ export type DetectionResult =
 	| { type: 'BOOK'; url: string }
 	/** Any other http(s) URL that no type above claims. The server reads its `<head>` once. */
 	| { type: 'WEB_PAGE'; url: string }
-	| { type: 'CLAIM'; text: string }
 	| { type: null };
 
 const BIBLE_GATEWAY_HOSTS = new Set(['biblegateway.com', 'www.biblegateway.com']);
@@ -61,7 +60,8 @@ function parseBibleGatewayUrl(url: URL): PassageRange | null {
  * type be added without a signature change.
  *
  * Precedence: YouTube URL > movie link > Open Library book link > Bible Gateway URL > other
- * http(s) URL on an unclaimed host (WEB_PAGE) > typed Bible reference > free-text claim.
+ * http(s) URL on an unclaimed host (WEB_PAGE) > typed Bible reference. Free text is no match:
+ * empty candidates, never guessed (claims are declared on the Declare page, not detected here).
  * A URL on a claimed host (YouTube, TMDB/IMDb, Bible Gateway) that matches no type is empty
  * candidates, never a webpage. Scheme-less or non-http(s) input is never guessed: a bare
  * host, `ftp://` or a single bare word gets no candidate.
@@ -86,11 +86,6 @@ export function detectContentCandidates(input: string): DetectionResult[] {
 
 	const range = parseReference(trimmed);
 	if (range) return [{ type: 'BIBLE_PASSAGE', range, source: 'text' }];
-
-	// Free text: needs at least two words and must not look like a bare host or URL.
-	if (/\s/.test(trimmed) && !/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
-		return [{ type: 'CLAIM', text: trimmed }];
-	}
 
 	return [];
 }

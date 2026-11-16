@@ -46,6 +46,9 @@ export const queryKeys = {
 		// PreviewWebPage (the Add dialog's import preview): one entry per url. Deliberately not under
 		// `lists()`, so a list invalidation after a create does not refetch the preview.
 		webPagePreview: (url: string) => [...queryKeys.content.all(), 'web-page-preview', url] as const,
+		// The viewer's own claims (Declare page). Under lists() so any content-list
+		// invalidation (create/update of a claim) also marks it stale.
+		claimList: () => [...queryKeys.content.lists(), 'claims'] as const,
 	},
 
 	bible: {

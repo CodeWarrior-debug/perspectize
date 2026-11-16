@@ -78,7 +78,7 @@
 	});
 
 	const detected = $derived(detectContentType(input));
-	const effectiveType = $derived<ChosenType | 'CLAIM' | null>(manualType ?? detected.type);
+	const effectiveType = $derived<ChosenType | null>(manualType ?? detected.type);
 	const range = $derived<PassageRange>(
 		rangeOverride ?? (detected.type === 'BIBLE_PASSAGE' ? detected.range : defaultRange(1)),
 	);
@@ -143,9 +143,7 @@
 						? 'Movie'
 						: effectiveType === 'BOOK'
 							? 'Book'
-							: effectiveType === 'WEB_PAGE'
-								? 'Webpage'
-								: 'Claim';
+							: 'Webpage';
 		return manualType ? `Type: ${name}` : `Detected: ${name}`;
 	});
 
@@ -340,10 +338,6 @@
 					</button>
 				</div>
 			</div>
-
-			{#if effectiveType === 'CLAIM'}
-				<p class="text-sm text-muted-foreground">Claims can't be added from here yet. Pick a type above to continue.</p>
-			{/if}
 
 			{#if effectiveType === 'MOVIE'}
 				<p class="text-xs text-muted-foreground">
