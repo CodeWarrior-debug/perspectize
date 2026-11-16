@@ -162,17 +162,11 @@ describe('Header component', () => {
 		render(Header);
 		const link = screen.getByRole('link', { name: 'Plan' });
 		expect(link).toHaveAttribute('href', '/plan');
-	});
-
-	it('renders a Declare navigation link pointing to /declare, after Plan', () => {
-		render(Header);
-		const link = screen.getByRole('link', { name: 'Declare' });
-		expect(link).toHaveAttribute('href', '/declare');
 		const labels = screen
 			.getAllByRole('link')
 			.map((a) => a.textContent?.trim())
-			.filter((t) => ['Library', 'Discover', 'Compare', 'Plan', 'Declare', 'Import'].includes(t ?? ''));
-		expect(labels).toEqual(['Library', 'Discover', 'Compare', 'Plan', 'Declare', 'Import']);
+			.filter((t) => ['Library', 'Discover', 'Compare', 'Plan', 'Import'].includes(t ?? ''));
+		expect(labels).toEqual(['Library', 'Discover', 'Compare', 'Plan', 'Import']);
 	});
 
 	describe('Import nav link', () => {

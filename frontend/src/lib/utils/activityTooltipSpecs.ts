@@ -26,7 +26,6 @@ import {
 	formatMoneyExact,
 	budgetValueGetter,
 	formatDate,
-	formatClaimDate,
 } from './formatting';
 import { webPageAuthor, webPagePublished, webPageRoleLabel, webPageRolesOf, webPageSite } from './webPage';
 
@@ -119,22 +118,5 @@ export const ACTIVITY_TOOLTIP_SPECS = {
 		copyValue: (c: CellCtx) => webPageAuthor(c.data),
 	},
 	synopsis: { emptyText: 'No synopsis', text: (c: CellCtx) => synopsisValueGetter({ data: c.data }) ?? '' },
-	// Claim dates: show the formatted day, copy the raw YYYY-MM-DD the backend stores.
-	effectiveDate: {
-		emptyText: 'No effective date',
-		text: (c: CellCtx) => {
-			const raw = c.data?.customFields?.effectiveDate;
-			return raw ? formatClaimDate(raw) : '';
-		},
-		copyValue: (c: CellCtx) => c.data?.customFields?.effectiveDate ?? null,
-	},
-	evaluateBy: {
-		emptyText: 'No evaluate-by date',
-		text: (c: CellCtx) => {
-			const raw = c.data?.customFields?.evaluateBy;
-			return raw ? formatClaimDate(raw) : '';
-		},
-		copyValue: (c: CellCtx) => c.data?.customFields?.evaluateBy ?? null,
-	},
 	description: { emptyText: 'No description', text: (c: CellCtx) => c.data?.description ?? '' },
 } satisfies Record<string, ColTooltipSpec>;

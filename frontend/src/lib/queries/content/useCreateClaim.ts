@@ -12,7 +12,7 @@ export function useCreateClaim() {
 			return graphqlRequest<CreateClaimResponse>(CREATE_CLAIM, { input });
 		},
 		onSuccess: () => {
-			toast.success('Claim saved');
+			toast.success('Claim created');
 			// Invalidate content lists so the new claim row appears in the Activity table
 			queryClient.invalidateQueries({ queryKey: queryKeys.content.lists() });
 		},

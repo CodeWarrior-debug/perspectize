@@ -39,20 +39,20 @@ describe('columnViewFor', () => {
 	});
 });
 
-// The Book view implies a BOOK-only filter, so the Type column is redundant and hidden (as for Movie and Claim).
 describe('Book default column set', () => {
 	it('shows the base set at xs', () => {
-		expect(defaultColumnVisibility('xs', 'book').visible).toEqual(['perspectize', 'item']);
+		expect(defaultColumnVisibility('xs', 'book').visible).toEqual(['perspectize', 'item', 'type']);
 	});
 
 	it('adds Author at sm', () => {
-		expect(defaultColumnVisibility('sm', 'book').visible).toEqual(['perspectize', 'item', 'author']);
+		expect(defaultColumnVisibility('sm', 'book').visible).toEqual(['perspectize', 'item', 'type', 'author']);
 	});
 
 	it('adds Published and Pages at md', () => {
 		expect(defaultColumnVisibility('md', 'book').visible).toEqual([
 			'perspectize',
 			'item',
+			'type',
 			'author',
 			'published',
 			'pages',
@@ -63,6 +63,7 @@ describe('Book default column set', () => {
 		expect(defaultColumnVisibility('lg', 'book').visible).toEqual([
 			'perspectize',
 			'item',
+			'type',
 			'author',
 			'published',
 			'pages',
@@ -105,10 +106,11 @@ describe('Book default column set', () => {
 });
 
 describe('the other views keep their exact default sets', () => {
-	it('movie lg is the Movie set without the redundant Type column', () => {
+	it('movie lg is the unchanged Movie set', () => {
 		expect(defaultColumnVisibility('lg', 'movie').visible).toEqual([
 			'perspectize',
 			'item',
+			'type',
 			'genre',
 			'rated',
 			'cast',
