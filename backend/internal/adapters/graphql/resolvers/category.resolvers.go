@@ -59,6 +59,29 @@ func (r *mutationResolver) SetPrimaryCategory(ctx context.Context, input model.S
 	return domainToModel(content), nil
 }
 
+// RemovePrimaryCategory is the resolver for the removePrimaryCategory field. The actor is
+// derived from the session, and the service only touches content that actor may see.
+func (r *mutationResolver) RemovePrimaryCategory(ctx context.Context, contentID int) (*model.Content, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+
+	content, err := r.CategoryService.RemovePrimaryCategory(ctx, authUser.ID, contentID)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("invalid input: %w", err)
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("content not found")
+		}
+		slog.Error("removing primary category failed", "error", err, "contentID", contentID)
+		return nil, fmt.Errorf("failed to remove primary category: %v", err)
+	}
+
+	return domainToModel(content), nil
+}
+
 // WikidataSearch is the resolver for the wikidataSearch field.
 func (r *queryResolver) WikidataSearch(ctx context.Context, query string, language *string, limit *int) ([]*model.WikidataSearchResult, error) {
 	lang := ""

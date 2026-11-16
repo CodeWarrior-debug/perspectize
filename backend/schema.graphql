@@ -933,6 +933,8 @@ type Mutation {
 
   # Category mutations
   setPrimaryCategory(input: SetPrimaryCategoryInput!): Content! @auth
+  # Clears the content's primary category (the undo for setPrimaryCategory).
+  removePrimaryCategory(contentId: IntID!): Content! @auth
 
   # User todo ("Plan") mutations. Ownership is enforced in UserTodoService and
   # the owner-scoped SQL under it, not by @owner; the actor is the session user.

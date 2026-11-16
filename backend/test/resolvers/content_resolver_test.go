@@ -1482,6 +1482,55 @@ func TestSetPrimaryCategory_ContentNotFound(t *testing.T) {
 	assert.Contains(t, result.Errors[0].Message, "content not found")
 }
 
+// --- RemovePrimaryCategory Mutation Tests ---
+
+func TestRemovePrimaryCategory_Success(t *testing.T) {
+	catID := 42
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{
+				ID:                id,
+				Name:              "Test Video",
+				ContentType:       domain.ContentTypeYouTubeVideo,
+				PrimaryCategoryID: &catID,
+			}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { removePrimaryCategory(contentId: 1) { id name } }`)
+
+	assert.Empty(t, result.Errors)
+
+	var data struct {
+		RemovePrimaryCategory struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"removePrimaryCategory"`
+	}
+	require.NoError(t, json.Unmarshal(result.Data, &data))
+	assert.Equal(t, "1", data.RemovePrimaryCategory.ID)
+	assert.Equal(t, "Test Video", data.RemovePrimaryCategory.Name)
+}
+
+func TestRemovePrimaryCategory_ContentNotFound(t *testing.T) {
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return nil, domain.ErrNotFound
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { removePrimaryCategory(contentId: 999) { id } }`)
+
+	require.NotEmpty(t, result.Errors)
+	assert.Contains(t, result.Errors[0].Message, "content not found")
+}
+
 // --- WikidataSearch Query Tests ---
 
 func TestWikidataSearch_Success(t *testing.T) {
