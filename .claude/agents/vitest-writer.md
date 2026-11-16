@@ -65,6 +65,11 @@ real logic. A test that passes because nothing rendered is worse than no test.
   file. Never use a config-level `define`.
 - **Loading states:** cover `{ isPending: true, isLoading: false }` (a paused,
   offline query), not only `isLoading`.
+- **Make it pass under full-suite load, not only alone** ([.docs/CI_STABLE_TESTS.md](../../.docs/CI_STABLE_TESTS.md)).
+  A component with `{#await import()}` needs `preloadLazy` for that module.
+  A heavy component (dialog, editor, popover) needs `warmUpRender` with the
+  props the tests use, from `tests/helpers/warmUp.ts`. Import real modules
+  statically, not inside the test body. No retries, no raised global timeouts.
 - **Never** read `.env` files or hit a real backend.
 
 ## Cache and call-count tests

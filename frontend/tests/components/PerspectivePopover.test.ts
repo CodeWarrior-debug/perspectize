@@ -4,6 +4,7 @@ import PerspectivePopover from '$lib/components/PerspectivePopover.svelte';
 import { tick } from 'svelte';
 import { toast } from 'svelte-sonner';
 import type { PerspectiveItem } from '$lib/queries/perspectives';
+import { warmUp } from '../helpers/warmUp';
 
 const mocks = vi.hoisted(() => ({
 	mockCreateMutateAsync: vi.fn(),
@@ -94,6 +95,10 @@ function renderPopover(props?: {
 	};
 	return render(PerspectivePopover, { props: defaultProps });
 }
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUp(() => renderPopover());
 
 describe('PerspectivePopover component', () => {
 	beforeEach(() => {

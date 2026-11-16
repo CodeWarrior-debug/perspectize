@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import PlanBoard from '$lib/components/plan/PlanBoard.svelte';
+import { preloadLazy } from '../helpers/warmUp';
 import type { UserTodoItem, UserTodoListItem, UserTodosArgs } from '$lib/queries/userTodos';
 
 const mocks = vi.hoisted(() => ({
@@ -138,6 +139,13 @@ vi.mock('$lib/queries/bible/useSetPassageDisplayTitle', () => ({
 vi.mock('$lib/queries/content/useContentPicker', () => ({
 	useContentPicker: vi.fn(() => ({ data: { content: { items: [] } }, isPending: false })),
 }));
+
+// PlanBoard renders these through {#await import(...)}. Load them up front, so a
+// findBy* below waits on the UI, not on Vite transforming the module (#728).
+preloadLazy(
+	() => import('$lib/components/ActivityDetailsModal.svelte'),
+	() => import('$lib/components/PerspectivePopover.svelte'),
+);
 
 const USER_ID = 7;
 

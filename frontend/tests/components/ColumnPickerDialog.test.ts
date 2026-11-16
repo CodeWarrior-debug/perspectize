@@ -2,8 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/svelte';
 import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
 import { DATA_COLUMNS, INTERNAL_COLUMNS } from '$lib/utils/grid-config';
+import { warmUpRender } from '../helpers/warmUp';
 
 const noop = () => {};
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUpRender(ColumnPickerDialog, { open: true, onToggle: () => {} });
 
 describe('ColumnPickerDialog', () => {
 	beforeEach(() => vi.clearAllMocks());

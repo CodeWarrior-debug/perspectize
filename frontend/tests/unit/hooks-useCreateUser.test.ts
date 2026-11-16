@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { preloadLazy } from '../helpers/warmUp';
 
 // Hoisted mocks — these are referenced inside vi.mock factories
 const { mockMutate, mockInvalidateQueries, mockToastSuccess, mockToastError } = vi.hoisted(() => ({
@@ -34,6 +35,15 @@ vi.mock('svelte-sonner', () => ({
 vi.mock('$lib/queries/client', () => ({
 	graphqlRequest: vi.fn(),
 }));
+
+// The tests import these inside their bodies; load them once up front so the first
+// test doesn't pay the module transform, which balloons under full-suite load (#728).
+preloadLazy(
+	() => import('$lib/queries/client'),
+	() => import('$lib/queries/users'),
+	() => import('$lib/queries/users/useCreateUser'),
+	() => import('@tanstack/svelte-query'),
+);
 
 describe('useCreateUser hook', () => {
 	beforeEach(() => {

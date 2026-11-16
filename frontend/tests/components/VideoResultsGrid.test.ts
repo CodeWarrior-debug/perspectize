@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import VideoResultsGrid from '$lib/components/discover/VideoResultsGrid.svelte';
 import { toWatchUrl, type VideoItem } from '$lib/services/youtubeApi';
+import { warmUpRender } from '../helpers/warmUp';
 
 vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
 
@@ -15,6 +16,10 @@ function makeVideo(id: string): VideoItem {
 		thumbnails: { medium: { url: `https://img.example/${id}.jpg`, width: 320, height: 180 } },
 	};
 }
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUpRender(VideoResultsGrid, { items: [makeVideo('1')], onLoadMore: () => {}, library: new Map(), onAdd: () => {} });
 
 describe('VideoResultsGrid', () => {
 	it('renders the optional label above the grid', () => {

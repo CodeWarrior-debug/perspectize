@@ -1,12 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { WEB_PAGE_ROLE_OPTIONS, webPageReadNotice, webPageRoleLabel, webPageRolesLabel } from '$lib/utils/webPage';
 import type { WebPageFetch } from '$lib/queries/content';
+import { preloadLazy } from '../helpers/warmUp';
 
 const fetchOf = (status: WebPageFetch['status'], httpStatus: number | null = null): WebPageFetch => ({
 	status,
 	httpStatus,
 	at: '2026-11-11T12:00:00Z',
 });
+
+// The tests import these inside their bodies; load them once up front so the first
+// test doesn't pay the module transform, which balloons under full-suite load (#728).
+preloadLazy(() => import('$lib/utils/webPage'));
 
 describe('WEB_PAGE_ROLE_OPTIONS', () => {
 	it('offers exactly Blog post and Session transcript, in that order', () => {

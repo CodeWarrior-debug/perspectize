@@ -4,6 +4,7 @@ import { tick, type Component } from 'svelte';
 import BookSearchPanel from '$lib/components/discover/BookSearchPanel.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
+import { warmUp } from '../helpers/warmUp';
 
 vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
 import {
@@ -95,6 +96,10 @@ async function typeText(text: string) {
 	await fireEvent.input(searchInput(), { target: { value: text } });
 	await tick();
 }
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUp(() => renderPanel());
 
 describe('BookSearchPanel', () => {
 	beforeEach(() => {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { hashKey } from '@tanstack/svelte-query';
+import { preloadLazy } from '../helpers/warmUp';
 
 const { mockGraphqlRequest } = vi.hoisted(() => ({ mockGraphqlRequest: vi.fn() }));
 
@@ -26,6 +27,14 @@ async function mountPreview(url: string | null) {
 	useWebPagePreview(() => url);
 	return capturedQueryOptions;
 }
+
+// The tests import these inside their bodies; load them once up front so the first
+// test doesn't pay the module transform, which balloons under full-suite load (#728).
+preloadLazy(
+	() => import('$lib/queries/content'),
+	() => import('$lib/queries/content/useWebPagePreview'),
+	() => import('$lib/queries/keys'),
+);
 
 describe('useWebPagePreview', () => {
 	beforeEach(() => {

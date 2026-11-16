@@ -12,10 +12,15 @@ import { hashKey } from '@tanstack/svelte-query';
 import { BOOK_SEARCH_STALE_TIME, BOOK_TRENDING_STALE_TIME, openLibraryKeys } from '$lib/services/openLibraryApi';
 import { tmdbKeys } from '$lib/services/tmdbApi';
 import { countingFetch, makeClient, mountConsumers } from '../helpers/queryBudget';
+import { preloadLazy } from '../helpers/warmUp';
 
 afterEach(() => {
 	vi.useRealTimers();
 });
+
+// The tests import these inside their bodies; load them once up front so the first
+// test doesn't pay the module transform, which balloons under full-suite load (#728).
+preloadLazy(() => import('$lib/services/openLibraryApi'));
 
 describe('book search key hygiene', () => {
 	it('is stable for the same query and page', () => {
