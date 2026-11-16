@@ -59,9 +59,10 @@ func pageOf(n int, filter *domain.ContentFilter) domain.ContentListParams {
 
 func TestContentListWebPageRoles_OneValueIsOneContainment(t *testing.T) {
 	db, mock, _ := newCapturingContentDB(t)
-	// Bound parameters: the content type, the role as a JSON array, then the limit.
+	// Bound parameters: the content type, the role as a JSON array, the privacy a signed-out
+	// viewer may read, then the limit.
 	mock.ExpectQuery("FROM").
-		WithArgs("web_page", `["BLOG_POST"]`, int64(11)).
+		WithArgs("web_page", `["BLOG_POST"]`, "public", int64(11)).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
 	first := 10

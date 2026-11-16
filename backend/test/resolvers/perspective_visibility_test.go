@@ -20,8 +20,11 @@ import (
 // the caller supply the mockPerspectiveRepository (so getByIDFn / listFn can be
 // controlled) and choose whether the auth-injecting middleware is wired in.
 func setupPerspectiveVisibilityServer(perspectiveRepo *mockPerspectiveRepository, withAuth bool) *httptest.Server {
+	return setupPerspectiveVisibilityServerWithContent(perspectiveRepo, &mockContentRepository{}, withAuth)
+}
+
+func setupPerspectiveVisibilityServerWithContent(perspectiveRepo *mockPerspectiveRepository, contentRepo *mockContentRepository, withAuth bool) *httptest.Server {
 	userRepo := &mockUserRepository{}
-	contentRepo := &mockContentRepository{}
 	contentService := services.NewContentService(contentRepo, &mockYouTubeClient{}, nil)
 	userService := services.NewUserService(userRepo, contentRepo, perspectiveRepo, nil, nil, nil)
 	perspectiveService := services.NewPerspectiveService(perspectiveRepo, userRepo)
@@ -40,6 +43,57 @@ func setupPerspectiveVisibilityServer(perspectiveRepo *mockPerspectiveRepository
 		return httptest.NewServer(injectAuthMiddleware(srv))
 	}
 	return httptest.NewServer(srv)
+}
+
+func TestPerspectiveByID_ContentPrivacyDominates(t *testing.T) {
+	claimID := 9
+	privateClaim := func(ctx context.Context, id int) (*domain.Content, error) {
+		return &domain.Content{ID: id, Privacy: domain.PrivacyPrivate, AddedByUserID: 2}, nil
+	}
+
+	t.Run("public perspective on another user's private claim is nil", func(t *testing.T) {
+		repo := &mockPerspectiveRepository{
+			getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
+				return &domain.Perspective{ID: 101, UserID: 3, ContentID: &claimID, Privacy: domain.PrivacyPublic}, nil
+			},
+		}
+		server := setupPerspectiveVisibilityServerWithContent(repo, &mockContentRepository{getByIDFn: privateClaim}, true)
+		defer server.Close()
+
+		result := executeGraphQL(t, server, `{ perspectiveByID(id: "101") { id } }`)
+		assert.Empty(t, result.Errors)
+
+		var data struct {
+			PerspectiveByID *json.RawMessage `json:"perspectiveByID"`
+		}
+		require.NoError(t, json.Unmarshal(result.Data, &data))
+		assert.Nil(t, data.PerspectiveByID)
+	})
+
+	t.Run("public perspective on a public claim is returned", func(t *testing.T) {
+		repo := &mockPerspectiveRepository{
+			getByIDFn: func(ctx context.Context, id int) (*domain.Perspective, error) {
+				return &domain.Perspective{ID: 101, UserID: 3, ContentID: &claimID, Privacy: domain.PrivacyPublic}, nil
+			},
+		}
+		publicClaim := func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{ID: id, Privacy: domain.PrivacyPublic, AddedByUserID: 2}, nil
+		}
+		server := setupPerspectiveVisibilityServerWithContent(repo, &mockContentRepository{getByIDFn: publicClaim}, true)
+		defer server.Close()
+
+		result := executeGraphQL(t, server, `{ perspectiveByID(id: "101") { id } }`)
+		assert.Empty(t, result.Errors)
+
+		var data struct {
+			PerspectiveByID *struct {
+				ID string `json:"id"`
+			} `json:"perspectiveByID"`
+		}
+		require.NoError(t, json.Unmarshal(result.Data, &data))
+		require.NotNil(t, data.PerspectiveByID)
+		assert.Equal(t, "101", data.PerspectiveByID.ID)
+	})
 }
 
 func TestPerspectiveByID_Visibility(t *testing.T) {
