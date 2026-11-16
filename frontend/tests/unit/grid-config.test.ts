@@ -13,6 +13,7 @@ import {
 	COL_TO_SORT,
 	sortableColumnsFor,
 	releasedComparator,
+	labelComparator,
 	itemColumnHeader,
 	soloTypeFilter,
 	defaultColumnVisibility,
@@ -530,6 +531,57 @@ describe('client-only sort columns', () => {
 		expect(releasedComparator(null, '2010-01-01', null, null, false)).toBeGreaterThan(0);
 		expect(releasedComparator(null, '2010-01-01', null, null, true)).toBeLessThan(0); // AG negates for desc
 		expect(releasedComparator('garbage', null)).toBe(0);
+	});
+});
+
+describe('Category column (client-only sort)', () => {
+	const withCategory = (id: string, label: string | null) =>
+		row({
+			id,
+			primaryCategory:
+				label == null
+					? null
+					: { id: `q-${id}`, wikidataQid: `Q${id}`, label, description: null, entityType: null, wikipediaUrl: null },
+		});
+	const rows = [
+		withCategory('a', 'Politics'),
+		withCategory('b', 'art'),
+		withCategory('c', null),
+		withCategory('d', 'Economics'),
+	];
+	const ids = (sorts: { col: string; dir: 'asc' | 'desc' }[]) =>
+		[...rows].sort((x, y) => compareContentBySorts(x, y, sorts)).map((r) => r.id);
+
+	it('is sortable in the picker and client-only (no server sort key)', () => {
+		expect(SORTABLE_COLUMNS.map((c) => c.colId)).toContain('category');
+		expect(CLIENT_ONLY_SORT_COLS).toContain('category');
+		expect(COL_TO_SORT).not.toHaveProperty('category');
+	});
+
+	it('is offered in "Loaded" mode and hidden in "All Items" mode', () => {
+		expect(sortableColumnsFor('loaded').map((c) => c.colId)).toContain('category');
+		expect(sortableColumnsFor('all').map((c) => c.colId)).not.toContain('category');
+	});
+
+	it('sorts by the category label, case-insensitively, with no category last in both directions', () => {
+		expect(ids([{ col: 'category', dir: 'asc' }])).toEqual(['b', 'd', 'a', 'c']);
+		expect(ids([{ col: 'category', dir: 'desc' }])).toEqual(['a', 'd', 'b', 'c']);
+	});
+
+	it('the value extractor yields the lowercased label, or null when there is no category', () => {
+		const sortValue = COLUMNS.find((c) => c.colId === 'category')?.sortValue;
+		expect(sortValue?.(withCategory('x', 'Art'))).toBe('art');
+		expect(sortValue?.(withCategory('x', null))).toBeNull();
+	});
+
+	it('labelComparator keeps unknown last in both directions (AG Grid negates for descending)', () => {
+		expect(labelComparator('apple', 'Banana')).toBeLessThan(0);
+		expect(labelComparator('APPLE', 'apple')).toBe(0);
+		expect(labelComparator(null, 'apple', null, null, false)).toBeGreaterThan(0);
+		expect(labelComparator(null, 'apple', null, null, true)).toBeLessThan(0);
+		expect(labelComparator('apple', null, null, null, false)).toBeLessThan(0);
+		expect(labelComparator('apple', null, null, null, true)).toBeGreaterThan(0);
+		expect(labelComparator(null, null)).toBe(0);
 	});
 });
 
