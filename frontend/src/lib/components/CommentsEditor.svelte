@@ -292,8 +292,8 @@
 
 <div
 	class="comment-editor-wrapper border border-input rounded-lg bg-card overflow-hidden flex flex-col w-full min-w-0"
-	style:--pe-min-height={expanded ? 'min(60vh, 560px)' : `${minHeight}px`}
-	style:--pe-max-height={expanded ? 'min(60vh, 560px)' : `max(${minHeight}px, min(40vh, 320px))`}
+	style:--pe-min-height={expanded ? 'min(60dvh, 560px)' : `${minHeight}px`}
+	style:--pe-max-height={expanded ? 'min(60dvh, 560px)' : `max(${minHeight}px, min(40dvh, 320px))`}
 	data-expanded={expanded}
 >
 	<!-- Toolbar -->

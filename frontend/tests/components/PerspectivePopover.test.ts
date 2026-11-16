@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import PerspectivePopover from '$lib/components/PerspectivePopover.svelte';
 import { tick } from 'svelte';
@@ -1318,5 +1318,39 @@ describe('PerspectivePopover: mark an open todo done after a save', () => {
 		await saveNewPerspective();
 		expect(mocks.mockFetchTodos).not.toHaveBeenCalled();
 		expect(mocks.mockToastWithAction).not.toHaveBeenCalled();
+	});
+});
+
+describe('PerspectivePopover mobile layout', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mocks.mockLoadDraft.mockReturnValue(null);
+		vi.stubGlobal(
+			'matchMedia',
+			vi.fn((query: string) => ({
+				matches: query.includes('max-width: 639px'),
+				media: query,
+				addEventListener: vi.fn(),
+				removeEventListener: vi.fn(),
+				addListener: vi.fn(),
+				removeListener: vi.fn(),
+				dispatchEvent: vi.fn(),
+			})),
+		);
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('keeps the Overall/comment row inside the scrolling form so a tall editor cannot push Save out of view', () => {
+		renderPopover();
+		const form = screen.getByText('Overall').closest('form');
+		expect(form).not.toBeNull();
+		expect(form?.contains(screen.getByRole('button', { name: /save perspective/i }))).toBe(true);
+		// The scroll area (not a pinned row) is what grows; the action bar stays a sibling below it.
+		const scroller = screen.getByText('Overall').closest('.overflow-y-auto');
+		expect(scroller).not.toBeNull();
+		expect(scroller?.contains(screen.getByRole('button', { name: /save perspective/i }))).toBe(false);
 	});
 });
