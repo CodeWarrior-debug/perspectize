@@ -143,6 +143,16 @@ export default defineConfig({
 		},
 	},
 	test: {
+		// In CI, also write every result to a file (uploaded by frontend-test.yml), so
+		// when several files fail under load none of them scrolls off the log (#728).
+		// `github-actions` keeps the inline PR annotations that overriding `reporters`
+		// would otherwise drop. Root-level, like coverage: not a per-project option.
+		...(process.env.CI
+			? {
+					reporters: ['default', 'github-actions', 'json'],
+					outputFile: { json: './test-results/vitest-results.json' },
+				}
+			: {}),
 		// Coverage is a root-level (workspace) option, not a per-project one — it
 		// used to live under the 'unit' project's `test` block below, which typechecks
 		// against ProjectConfig and doesn't have a `coverage` key, so `pnpm run check`

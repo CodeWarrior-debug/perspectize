@@ -43,7 +43,31 @@ jobs:
         working-directory: frontend
         env:
           SV_SCREENSHOTS_DIR: ${{ runner.temp }}/screenshots
-        run: pnpm run test:browser --browser.headless=true
+        # Separate results file, or it overwrites the unit run's (vite.config.ts).
+        run: pnpm run test:browser --browser.headless=true --outputFile.json=./test-results/vitest-browser-results.json
+
+      # Every failing test file in one place, so a second failure under load
+      # doesn't scroll off the log (#728). Runs even when a test step failed.
+      - name: List failed test files
+        if: always()
+        working-directory: frontend
+        run: |
+          shopt -s nullglob
+          files=(test-results/*.json)
+          if [ ${#files[@]} -eq 0 ]; then echo "No result files written."; exit 0; fi
+          {
+            echo "### Failed test files"
+            jq -r '.testResults[] | select(.status == "failed") | "- `\(.name | sub(".*/frontend/"; ""))`"' "${files[@]}" | sort -u
+          } >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.testResults[] | select(.status == "failed") | .name' "${files[@]}" | sort -u
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: vitest-results
+          path: frontend/test-results/
+          if-no-files-found: ignore
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v6

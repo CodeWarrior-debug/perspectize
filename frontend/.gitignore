@@ -36,3 +36,6 @@ android/app/src/main/assets/public/
 # Stryker mutation testing
 /reports
 /.stryker-tmp
+
+# Vitest result files written in CI (vite.config.ts)
+/test-results
