@@ -19,7 +19,8 @@ describe('ColumnPickerDialog', () => {
 	it('renders a checkbox row for every data column when open', () => {
 		render(ColumnPickerDialog, { props: { open: true, onToggle: noop } });
 		for (const col of DATA_COLUMNS) {
-			expect(screen.getByLabelText(col.label)).toBeTruthy();
+			// Labels are not unique: Book's Author and Webpage's Author are both "Author" in the picker.
+			expect(screen.getAllByLabelText(col.label).length).toBeGreaterThan(0);
 		}
 	});
 
@@ -33,7 +34,8 @@ describe('ColumnPickerDialog', () => {
 		render(ColumnPickerDialog, { props: { open: true, isAdmin: true, onToggle: noop } });
 		expect(screen.getByText('Internal')).toBeTruthy();
 		for (const col of INTERNAL_COLUMNS) {
-			expect(screen.getByLabelText(col.label)).toBeTruthy();
+			// Labels are not unique: Book's Author and Webpage's Author are both "Author" in the picker.
+			expect(screen.getAllByLabelText(col.label).length).toBeGreaterThan(0);
 		}
 	});
 

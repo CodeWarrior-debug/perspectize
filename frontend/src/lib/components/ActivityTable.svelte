@@ -144,11 +144,20 @@
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
 	import ColumnRelevanceCallout from '$lib/components/ColumnRelevanceCallout.svelte';
-	import { ContentTypeFilter, AgeRatingFilter } from '$lib/utils/contentTypeFilter';
+	import { ContentTypeFilter, AgeRatingFilter, WebRoleFilter } from '$lib/utils/contentTypeFilter';
 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
 	import AddToPlanDialog from '$lib/components/plan/AddToPlanDialog.svelte';
 	import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
+	import {
+		webAuthorCellRenderer,
+		webPublishedFilterValueGetter,
+		webPublishedValueGetter,
+		webRolesCellRenderer,
+		webSiteCellRenderer,
+		formatWebPublished,
+	} from '$lib/utils/webPageFormatting';
+	import { webPageAuthor, webPageSite } from '$lib/utils/webPage';
 	import CategoryTypeahead from '$lib/components/CategoryTypeahead.svelte';
 	import { useSetPrimaryCategory } from '$lib/queries/categories/useSetPrimaryCategory';
 	import type { WikidataSearchResult } from '$lib/queries/categories';
@@ -898,6 +907,64 @@
 				valueFormatter: (params) => truncateDescription(params.value, 80),
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.description },
 				headerTooltip: 'Video description from YouTube API',
+				hide: true,
+			},
+			// Webpage columns. Hidden by default; the responsive effect shows the Webpage default set when
+			// the type filter is exactly WEB_PAGE. Roles is picker-only (never in the default set); its header
+			// filter is server-side only (f.webrole), since Loaded mode cannot filter a multi-valued field.
+			// Site shows from sm up, Published from md up.
+			{
+				colId: 'webSite',
+				headerName: 'Site',
+				flex: 1,
+				maxWidth: 200,
+				filter: 'agTextColumnFilter',
+				valueGetter: (params) => webPageSite({ url: params.data?.url ?? null, webPage: params.data?.webPage }),
+				filterValueGetter: (params) =>
+					webPageSite({ url: params.data?.url ?? null, webPage: params.data?.webPage }) ?? '',
+				cellRenderer: webSiteCellRenderer,
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webSite },
+				headerTooltip: 'Site name the page declares, or its domain',
+				hide: true,
+			},
+			{
+				colId: 'webPublished',
+				headerName: 'Published',
+				flex: 0.8,
+				minWidth: 105,
+				maxWidth: 150,
+				filter: 'agDateColumnFilter',
+				valueGetter: (params) => webPublishedValueGetter({ data: params.data }),
+				filterValueGetter: (params) => webPublishedFilterValueGetter({ data: params.data }),
+				valueFormatter: (params) => formatWebPublished(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webPublished },
+				headerTooltip: 'Date the page declares it was published',
+				hide: true,
+			},
+			{
+				colId: 'webRoles',
+				headerName: 'Roles',
+				flex: 1,
+				maxWidth: 220,
+				sortable: false,
+				filter: WebRoleFilter,
+				cellRenderer: webRolesCellRenderer,
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webRoles },
+				headerTooltip: 'What the page is for, as set by whoever added it',
+				hide: true,
+			},
+			{
+				colId: 'webAuthor',
+				headerName: 'Author',
+				flex: 1.2,
+				minWidth: 120,
+				filter: 'agTextColumnFilter',
+				valueGetter: (params) => webPageAuthor({ url: params.data?.url ?? null, webPage: params.data?.webPage }),
+				filterValueGetter: (params) =>
+					webPageAuthor({ url: params.data?.url ?? null, webPage: params.data?.webPage }) ?? '',
+				cellRenderer: webAuthorCellRenderer,
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webAuthor },
+				headerTooltip: 'Author the page declares',
 				hide: true,
 			},
 			// Book columns (Open Library). Hidden by default; the responsive effect shows the Book default

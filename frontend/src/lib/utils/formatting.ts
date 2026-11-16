@@ -111,11 +111,27 @@ export function formatIsoDuration(iso: string | null | undefined): string | null
 	return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A date-only `YYYY-MM-DD` is a calendar day, so it is built in local time. `new Date('2017-06-12')`
+ * would be UTC midnight, which reads as the day before in US timezones. Anything else (a full ISO
+ * timestamp) is an instant and parses as before. Returns an Invalid Date for an impossible day.
+ */
+export function parseDateValue(value: string): Date {
+	const m = DATE_ONLY.exec(value);
+	if (!m) return new Date(value);
+	const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+	const date = new Date(year, month - 1, day);
+	const real = date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+	return real ? date : new Date(NaN);
+}
+
 /**
  * Format ISO date string to locale string.
  */
 export function formatDate(isoString: string): string {
-	const date = new Date(isoString);
+	const date = parseDateValue(isoString);
 	if (isNaN(date.getTime())) return EMPTY_VALUE;
 	return date.toLocaleDateString('en-US', {
 		year: 'numeric',
@@ -471,6 +487,32 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 		const label = document.createElement('span');
 		label.className = 'sr-only';
 		label.textContent = 'Movie';
+		container.appendChild(svg);
+		container.appendChild(label);
+		return container;
+	}
+
+	if (params.data.contentType === 'WEB_PAGE') {
+		// Lucide "globe" (outline, themed stroke): a web page is not a video, so no YouTube red.
+		container.title = 'Webpage';
+		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		svg.setAttribute('width', '20');
+		svg.setAttribute('height', '20');
+		svg.setAttribute('viewBox', '0 0 24 24');
+		svg.setAttribute('fill', 'none');
+		svg.setAttribute('stroke', 'var(--color-muted-foreground)');
+		svg.setAttribute('stroke-width', '2');
+		svg.setAttribute('stroke-linecap', 'round');
+		svg.setAttribute('stroke-linejoin', 'round');
+		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+		path.setAttribute(
+			'd',
+			'M12 2a10 10 0 1 0 0 20 10 10 0 1 0 0-20M2 12h20M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20',
+		);
+		svg.appendChild(path);
+		const label = document.createElement('span');
+		label.className = 'sr-only';
+		label.textContent = 'Webpage';
 		container.appendChild(svg);
 		container.appendChild(label);
 		return container;

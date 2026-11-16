@@ -215,6 +215,53 @@ function renderBookCell(opts: {
 	return cell;
 }
 
+/**
+ * Webpage variant of the Item cell: the site's favicon in the fixed slot (no play overlay: a page
+ * is not a video), the page title beside it. A missing or failed favicon leaves the slot blank.
+ * The favicon loads without a referrer, like the Add dialog's preview image.
+ */
+function renderWebPageCell(opts: {
+	id: string | number;
+	name: string;
+	url: string | null;
+	faviconUrl: string | null;
+	onOpenDetails?: (contentId: string) => void;
+}): HTMLElement {
+	const { id, name, url, faviconUrl, onOpenDetails } = opts;
+
+	const cell = document.createElement('div');
+	cell.className = 'group/cell flex h-full w-full items-center gap-2 px-2.5 py-[3px] cursor-pointer';
+	cell.addEventListener('click', () => onOpenDetails?.(String(id)));
+
+	const tile = document.createElement('div');
+	tile.dataset.testid = 'item-thumb';
+	tile.className = 'flex h-8 w-10 flex-none items-center justify-center rounded bg-muted';
+	tile.addEventListener('click', (e) => {
+		e.stopPropagation();
+		if (url) window.open(url, '_blank', 'noopener,noreferrer');
+	});
+	if (faviconUrl) {
+		const img = document.createElement('img');
+		img.src = faviconUrl;
+		img.alt = '';
+		img.referrerPolicy = 'no-referrer';
+		img.loading = 'lazy';
+		img.className = 'h-4 w-4 object-contain';
+		img.onerror = () => img.remove();
+		tile.appendChild(img);
+	}
+
+	const title = document.createElement('div');
+	title.dataset.testid = 'item-title';
+	title.className =
+		'line-clamp-2 min-w-0 flex-1 whitespace-normal text-left font-slot-cell font-[family-name:var(--font-family-serif)] text-[13px] leading-[1.5] text-foreground decoration-primary/30 group-hover/cell:underline';
+	title.textContent = name;
+
+	cell.appendChild(thumbSlot(tile));
+	cell.appendChild(title);
+	return cell;
+}
+
 export interface ActivityItemCellRendererParams {
 	data?: {
 		id: string | number;
@@ -227,6 +274,7 @@ export interface ActivityItemCellRendererParams {
 		movie?: unknown;
 		book?: unknown;
 		response?: unknown;
+		webPage?: { faviconUrl: string | null } | null;
 	};
 	context?: { onOpenDetails?: (contentId: string) => void };
 }
@@ -248,8 +296,13 @@ const PLAY_ICON_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="non
 export function activityItemCellRenderer(params: ActivityItemCellRendererParams): HTMLElement | string {
 	if (!params.data) return '';
 
-	const { id, name, url, contentType, displayTitle, verseStartID, verseEndID, movie, book, response } = params.data;
+	const { id, name, url, contentType, displayTitle, verseStartID, verseEndID, movie, book, response, webPage } =
+		params.data;
 	const onOpenDetails = params.context?.onOpenDetails;
+
+	if (contentType === 'WEB_PAGE') {
+		return renderWebPageCell({ id, name, url, faviconUrl: webPage?.faviconUrl ?? null, onOpenDetails });
+	}
 
 	if (contentType === 'BIBLE_PASSAGE') {
 		return renderPassageCell({ id, name, url, displayTitle, verseStartID, verseEndID, onOpenDetails });

@@ -184,7 +184,7 @@ describe('durationComparator', () => {
 // Column-picker registry
 // ---------------------------------------------------------------------------
 describe('column-picker registry', () => {
-	it('DATA_COLUMNS holds the 30 user-togglable data columns', () => {
+	it('DATA_COLUMNS holds the 34 user-togglable data columns (30 + the 4 webpage columns)', () => {
 		expect(DATA_COLUMNS.map((c) => c.colId)).toEqual([
 			'type',
 			'category',
@@ -208,6 +208,10 @@ describe('column-picker registry', () => {
 			'published',
 			'pages',
 			'rating',
+			'webSite',
+			'webPublished',
+			'webRoles',
+			'webAuthor',
 			'editions',
 			'readers',
 			'budget',
@@ -240,13 +244,13 @@ describe('column-picker registry', () => {
 		}
 	});
 
-	it('togglableColIds(false) returns only the 30 data columns', () => {
+	it('togglableColIds(false) returns only the 34 data columns', () => {
 		expect(togglableColIds(false)).toEqual(DATA_COLUMNS.map((c) => c.colId));
 	});
 
-	it('togglableColIds(true) returns all 34 columns', () => {
+	it('togglableColIds(true) returns all 38 columns', () => {
 		const ids = togglableColIds(true);
-		expect(ids).toHaveLength(34);
+		expect(ids).toHaveLength(38);
 		expect(ids).toEqual([...DATA_COLUMNS.map((c) => c.colId), ...INTERNAL_COLUMNS.map((c) => c.colId)]);
 	});
 

@@ -43,6 +43,9 @@ export const queryKeys = {
 		// and the pressed type chips (ContentType enum values, sorted).
 		itemPicker: (search: string, types: readonly string[]) =>
 			[...queryKeys.content.lists(), 'item-picker', search, types] as const,
+		// PreviewWebPage (the Add dialog's import preview): one entry per url. Deliberately not under
+		// `lists()`, so a list invalidation after a create does not refetch the preview.
+		webPagePreview: (url: string) => [...queryKeys.content.all(), 'web-page-preview', url] as const,
 	},
 
 	bible: {

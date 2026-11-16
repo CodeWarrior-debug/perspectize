@@ -24,6 +24,7 @@ import {
 	ratingValueGetter,
 	readersValueGetter,
 } from './bookFormatting';
+import { webPageAuthor, webPagePublished, webPageSite } from './webPage';
 
 /**
  * Display label for a content type — used by the type column valueGetter.
@@ -47,6 +48,7 @@ const CONTENT_TYPE_LABELS: Partial<Record<ContentType, string>> = {
 	BIBLE_PASSAGE: 'Bible Passage',
 	MOVIE: 'Movie',
 	BOOK: 'Book',
+	WEB_PAGE: 'Webpage',
 };
 
 /** Type-filter options. `value` is the lowercased form used in the filter model and `f.type=` URL param. */
@@ -456,6 +458,42 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		filterValue: (row) => ratingValueGetter({ data: row }),
 		filterRange: 'number',
 	},
+	// Webpage columns (WEB_PAGE rows read their shaped `webPage` JSON; see webPage.ts). Shown by
+	// default only when the type filter is exactly Webpage (defaultColumnVisibility). Roles and
+	// Author are picker-only. Roles is filtered server-side only (f.webrole, a checkbox list on the Roles header).
+	{
+		colId: 'webSite',
+		label: 'Site',
+		picker: 'data',
+		sortable: true,
+		sortValue: (row) => webPageSite(row)?.toLowerCase() ?? null,
+		filterKey: 'site',
+		filterValue: (row) => webPageSite(row)?.toLowerCase() ?? null,
+	},
+	{
+		colId: 'webPublished',
+		label: 'Published',
+		picker: 'data',
+		sortable: true,
+		// Same backend key as the YouTube Date column: publishedAt sorts every type.
+		serverSort: 'PUBLISHED_AT',
+		sortValue: (row) => webPagePublished(row),
+		filterKey: 'webdate',
+		filterValue: (row) => webPagePublished(row),
+		filterRange: 'date',
+	},
+	// Server filter only (f.webrole): a page can carry both roles, which the client cannot match on the card list.
+	{ colId: 'webRoles', label: 'Roles', picker: 'data', sortable: false, filterKey: 'webrole', filterSet: true },
+	{
+		colId: 'webAuthor',
+		label: 'Author',
+		picker: 'data',
+		sortable: true,
+		clientOnlySort: true,
+		sortValue: (row) => webPageAuthor(row)?.toLowerCase() ?? null,
+		filterKey: 'webauthor',
+		filterValue: (row) => webPageAuthor(row)?.toLowerCase() ?? null,
+	},
 	{ colId: 'editions', label: 'Editions', picker: 'data', sortable: false },
 	// Open Library reading-log "want to read" count: picker-only (All columns), sorts in "Loaded" mode
 	// only (no server sort: rows added before the snapshot have no counts to order by).
@@ -528,12 +566,19 @@ export function isBookOnlyTypeFilter(typeFilter: string | undefined): boolean {
 	return types.length === 1 && types[0] === 'book';
 }
 
-/** A default column set: one per single-type filter (Movie, Book), otherwise the general (YouTube) set. */
-export type ColumnView = 'movie' | 'book' | 'general';
+/** True when the `f.type` URL value names exactly one type and it is WEB_PAGE (`web_page`). */
+export function isWebPageOnlyTypeFilter(typeFilter: string | undefined): boolean {
+	const types = selectedTypes(typeFilter);
+	return types.length === 1 && types[0] === 'web_page';
+}
+
+/** A default column set: one per single-type filter (Movie, Book, Webpage), otherwise the general (YouTube) set. */
+export type ColumnView = 'movie' | 'book' | 'webpage' | 'general';
 
 export function columnViewFor(typeFilter: string | undefined): ColumnView {
 	if (isMovieOnlyTypeFilter(typeFilter)) return 'movie';
 	if (isBookOnlyTypeFilter(typeFilter)) return 'book';
+	if (isWebPageOnlyTypeFilter(typeFilter)) return 'webpage';
 	return 'general';
 }
 
@@ -569,6 +614,8 @@ const MOVIE_ONLY_PICKER = ['budget', 'votes', 'collection', 'synopsis', 'tmdbId'
 const MOVIE_DEFAULT_COLS = ['genre', 'rated', 'cast', 'released', 'boxOffice', 'vsBudget', 'tmdbScore'];
 /** Book-only columns: Editions and Readers are picker-only, the rest are in the Book default set (defaultColumnVisibility). */
 const BOOK_COLS = ['author', 'published', 'pages', 'rating', 'editions', 'readers'];
+/** Webpage-only columns. `createdAt` is managed here too: each view keeps its own saved layout, so it stays hidden outside Webpage unless the user picks it. */
+const WEBPAGE_COLS = ['webSite', 'webPublished', 'webRoles', 'webAuthor', 'createdAt'];
 
 /**
  * Which grid columns the responsive system shows at a tier. With the type filter
@@ -586,8 +633,17 @@ export function defaultColumnVisibility(
 	const sm = tier !== 'xs';
 	const md = tier === 'md' || tier === 'lg';
 	const lg = tier === 'lg';
-	const visible: string[] = view === 'general' ? ['item', 'type', 'perspectize'] : ['perspectize', 'item', 'type'];
-	if (view === 'movie') {
+	const visible: string[] =
+		view === 'general'
+			? ['item', 'type', 'perspectize']
+			: view === 'webpage'
+				? ['perspectize', 'item']
+				: ['perspectize', 'item', 'type'];
+	if (view === 'webpage') {
+		// Type is redundant (the filter is Webpage only); the rest of the default set is spec §3.
+		if (sm) visible.push('webSite', 'category');
+		if (md) visible.push('webPublished', 'createdAt');
+	} else if (view === 'movie') {
 		if (sm) visible.push('genre', 'rated');
 		if (md) visible.push('cast', 'duration', 'released');
 		if (lg) visible.push('boxOffice', 'vsBudget', 'tmdbScore', 'tags');
@@ -616,6 +672,7 @@ export function defaultColumnVisibility(
 		...MOVIE_DEFAULT_COLS,
 		...MOVIE_ONLY_PICKER,
 		...BOOK_COLS,
+		...WEBPAGE_COLS,
 	];
 	return { visible, hidden: managed.filter((c) => !visible.includes(c)) };
 }
@@ -920,6 +977,7 @@ export function syncItemHeader(api: HeaderApi, name: string): boolean {
 export function itemColumnHeader(typeFilter: string | undefined): string {
 	if (isMovieOnlyTypeFilter(typeFilter)) return 'Film';
 	if (isBookOnlyTypeFilter(typeFilter)) return 'Book';
+	if (isWebPageOnlyTypeFilter(typeFilter)) return 'Webpage';
 	return 'Item';
 }
 
@@ -929,8 +987,6 @@ export function itemColumnHeader(typeFilter: string | undefined): string {
  * calling it then logs "Grid API function X() cannot be called as the grid has been destroyed"
  * (and applyColumnState throws). Use at the call site instead of a bare `!api` check.
  */
-export function liveGridApi<T extends { isDestroyed(): boolean }>(
-	api: T | null | undefined,
-): T | null {
+export function liveGridApi<T extends { isDestroyed(): boolean }>(api: T | null | undefined): T | null {
 	return api && !api.isDestroyed() ? api : null;
 }
