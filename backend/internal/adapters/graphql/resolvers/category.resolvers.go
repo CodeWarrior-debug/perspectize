@@ -11,21 +11,13 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
 
-// SetPrimaryCategory is the resolver for the setPrimaryCategory field. The actor
-// is derived from the session, never from client input, and the service only
-// touches content that actor may see.
+// SetPrimaryCategory is the resolver for the setPrimaryCategory field.
 func (r *mutationResolver) SetPrimaryCategory(ctx context.Context, input model.SetPrimaryCategoryInput) (*model.Content, error) {
-	authUser, err := auth.RequireAuth(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("access denied: authentication required")
-	}
-
 	description := ""
 	if input.Description != nil {
 		description = *input.Description
@@ -36,7 +28,6 @@ func (r *mutationResolver) SetPrimaryCategory(ctx context.Context, input model.S
 	}
 
 	serviceInput := portservices.SetPrimaryCategoryInput{
-		ActorUserID: authUser.ID,
 		ContentID:   input.ContentID,
 		QID:         input.Qid,
 		Label:       input.Label,

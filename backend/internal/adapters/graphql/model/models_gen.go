@@ -96,15 +96,12 @@ type Content struct {
 	// Book-specific metadata (the shaped Open Library payload); null for other content types.
 	Book map[string]any `json:"book,omitempty"`
 	// Webpage-specific metadata for the grid: siteName, domain, imageUrl, faviconUrl, publishedAt, author, webPageRoles (never null, [] when none); null for other content types.
-	WebPage         map[string]any `json:"webPage,omitempty"`
-	PrimaryCategory *Category      `json:"primaryCategory,omitempty"`
-	ImportedFrom    *ImportJobRef  `json:"importedFrom,omitempty"`
-	VerseStartID    *int           `json:"verseStartID,omitempty"`
-	VerseEndID      *int           `json:"verseEndID,omitempty"`
-	DisplayTitle    *string        `json:"displayTitle,omitempty"`
-	// User-set attributes; for CLAIM, effectiveDate and evaluateBy as YYYY-MM-DD. Null when unset.
-	CustomFields            map[string]any `json:"customFields,omitempty"`
-	Privacy                 domain.Privacy `json:"privacy"`
+	WebPage                 map[string]any `json:"webPage,omitempty"`
+	PrimaryCategory         *Category      `json:"primaryCategory,omitempty"`
+	ImportedFrom            *ImportJobRef  `json:"importedFrom,omitempty"`
+	VerseStartID            *int           `json:"verseStartID,omitempty"`
+	VerseEndID              *int           `json:"verseEndID,omitempty"`
+	DisplayTitle            *string        `json:"displayTitle,omitempty"`
 	PerspectiveCount        *int           `json:"perspectiveCount,omitempty"`
 	VisiblePerspectiveCount *int           `json:"visiblePerspectiveCount,omitempty"`
 	AverageRating           *float64       `json:"averageRating,omitempty"`
@@ -164,12 +161,9 @@ type ContentSortInput struct {
 }
 
 type CreateClaimInput struct {
-	Text            string          `json:"text"`
-	UserID          int             `json:"userID"`
-	ParentContentID *int            `json:"parentContentID,omitempty"`
-	EffectiveDate   *string         `json:"effectiveDate,omitempty"`
-	EvaluateBy      *string         `json:"evaluateBy,omitempty"`
-	Privacy         *domain.Privacy `json:"privacy,omitempty"`
+	Text            string `json:"text"`
+	UserID          int    `json:"userID"`
+	ParentContentID int    `json:"parentContentID"`
 }
 
 type CreateContentFromBookInput struct {
@@ -656,13 +650,6 @@ type TypingChanged struct {
 }
 
 func (TypingChanged) IsThreadEvent() {}
-
-type UpdateClaimInput struct {
-	Text          string          `json:"text"`
-	EffectiveDate *string         `json:"effectiveDate,omitempty"`
-	EvaluateBy    *string         `json:"evaluateBy,omitempty"`
-	Privacy       *domain.Privacy `json:"privacy,omitempty"`
-}
 
 type UpdateImportJobDescriptionInput struct {
 	JobID       int    `json:"jobId"`
