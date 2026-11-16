@@ -100,4 +100,13 @@ type ContentService interface {
 	// writing, for the ISBN tab's preview-before-add. Returns ErrNotFound when
 	// Open Library has no record for the ISBN.
 	ResolveBookISBN(ctx context.Context, isbn string) (*BookSearchResult, error)
+
+	// CreateFromWebPage saves a webpage by URL, attributed to userID. roles are the
+	// adder's picks (the first is primary; empty means a plain webpage). If the URL
+	// is already saved, returns that row with ErrAlreadyExists and ignores roles.
+	CreateFromWebPage(ctx context.Context, rawURL string, roles []domain.WebPageRole, userID int) (*domain.Content, error)
+
+	// PreviewWebPage reads a page's metadata for the Add dialog's import preview.
+	// It never writes.
+	PreviewWebPage(ctx context.Context, rawURL string) (*WebPagePreview, error)
 }

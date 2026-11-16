@@ -138,7 +138,7 @@ func newHarnessWithPool(t *testing.T, pool database.PoolConfig) *harness {
 	threadRepo := postgres.NewGormMessageThreadRepository(db)
 	messageRepo := postgres.NewGormMessageRepository(db)
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
-	content := services.NewContentService(h.contentRepo, youtube.NewFixtureClient(), tmdb.NewFixtureClient(), services.WithBibleReference(bibleReferenceRepo), services.WithMovieSearch(tmdb.NewFixtureClient()), services.WithMovieTrending(tmdb.NewFixtureClient()))
+	content := services.NewContentService(h.contentRepo, youtube.NewFixtureClient(), tmdb.NewFixtureClient(), services.WithBibleReference(bibleReferenceRepo), services.WithMovieSearch(tmdb.NewFixtureClient()), services.WithMovieTrending(tmdb.NewFixtureClient()), services.WithWebPageClient(stubWebPages{}))
 	h.contentService = func() *services.ContentService { return content }
 
 	notifier, err := realtime.NewPgNotifier(context.Background(), dsn, counter)

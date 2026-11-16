@@ -122,6 +122,7 @@ type ComplexityRoot struct {
 		VerseStartID            func(childComplexity int) int
 		ViewCount               func(childComplexity int) int
 		VisiblePerspectiveCount func(childComplexity int) int
+		WebPage                 func(childComplexity int) int
 	}
 
 	CreateContentResult struct {
@@ -365,6 +366,7 @@ type ComplexityRoot struct {
 		CreateContentFromBook           func(childComplexity int, input model.CreateContentFromBookInput) int
 		CreateContentFromMovie          func(childComplexity int, input model.CreateContentFromMovieInput) int
 		CreateContentFromPassage        func(childComplexity int, input model.CreateContentFromPassageInput) int
+		CreateContentFromWebPage        func(childComplexity int, input model.CreateContentFromWebPageInput) int
 		CreateContentFromYouTube        func(childComplexity int, input model.CreateContentFromYouTubeInput) int
 		CreateImportJob                 func(childComplexity int, input model.CreateImportJobInput) int
 		CreateMessageThread             func(childComplexity int, input model.CreateMessageThreadInput) int
@@ -501,6 +503,7 @@ type ComplexityRoot struct {
 		PassageText        func(childComplexity int, startVerseID int, endVerseID int) int
 		PerspectiveByID    func(childComplexity int, id string) int
 		Perspectives       func(childComplexity int, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) int
+		PreviewWebPage     func(childComplexity int, url string) int
 		ThreadMessages     func(childComplexity int, threadID string, first *int, before *int) int
 		TodoActions        func(childComplexity int) int
 		UserByID           func(childComplexity int, id string) int
@@ -599,6 +602,27 @@ type ComplexityRoot struct {
 		User        func(childComplexity int) int
 	}
 
+	WebPageFetch struct {
+		At         func(childComplexity int) int
+		HTTPStatus func(childComplexity int) int
+		Status     func(childComplexity int) int
+	}
+
+	WebPagePreview struct {
+		AlreadyExistsContentID func(childComplexity int) int
+		Author                 func(childComplexity int) int
+		Description            func(childComplexity int) int
+		Domain                 func(childComplexity int) int
+		FaviconURL             func(childComplexity int) int
+		Fetch                  func(childComplexity int) int
+		FinalURL               func(childComplexity int) int
+		ImageURL               func(childComplexity int) int
+		Lang                   func(childComplexity int) int
+		PublishedAt            func(childComplexity int) int
+		SiteName               func(childComplexity int) int
+		Title                  func(childComplexity int) int
+	}
+
 	WikidataSearchResult struct {
 		Description func(childComplexity int) int
 		EntityType  func(childComplexity int) int
@@ -661,6 +685,7 @@ type MutationResolver interface {
 	UpdateContentSourceData(ctx context.Context, contentID int) (*model.Content, error)
 	CreateContentFromMovie(ctx context.Context, input model.CreateContentFromMovieInput) (*model.Content, error)
 	CreateContentFromBook(ctx context.Context, input model.CreateContentFromBookInput) (*model.Content, error)
+	CreateContentFromWebPage(ctx context.Context, input model.CreateContentFromWebPageInput) (*model.CreateContentResult, error)
 	CreateContentFromPassage(ctx context.Context, input model.CreateContentFromPassageInput) (*model.Content, error)
 	SetPassageDisplayTitle(ctx context.Context, input model.SetPassageDisplayTitleInput) (*model.Content, error)
 	ClearPassageDisplayTitle(ctx context.Context, contentID int) (*model.Content, error)
@@ -720,6 +745,7 @@ type QueryResolver interface {
 	BookSearch(ctx context.Context, query string, page *int) (*model.BookSearchPage, error)
 	BookTrending(ctx context.Context, window *domain.TrendingWindow, page *int) (*model.BookSearchPage, error)
 	BookByIsbn(ctx context.Context, isbn string) (*model.BookSearchResult, error)
+	PreviewWebPage(ctx context.Context, url string) (*model.WebPagePreview, error)
 	PerspectiveByID(ctx context.Context, id string) (*model.Perspective, error)
 	Perspectives(ctx context.Context, first *int, after *string, last *int, before *string, sortBy *domain.PerspectiveSortBy, sortOrder *domain.SortOrder, includeTotalCount *bool, filter *model.PerspectiveFilter) (*model.PaginatedPerspectives, error)
 	FeelingStats(ctx context.Context, contentID *int, emoji string, label *string) (*model.FeelingStats, error)
@@ -1135,6 +1161,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Content.VisiblePerspectiveCount(childComplexity), true
+	case "Content.webPage":
+		if e.ComplexityRoot.Content.WebPage == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Content.WebPage(childComplexity), true
 
 	case "CreateContentResult.alreadyExisted":
 		if e.ComplexityRoot.CreateContentResult.AlreadyExisted == nil {
@@ -2140,6 +2172,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateContentFromPassage(childComplexity, args["input"].(model.CreateContentFromPassageInput)), true
+	case "Mutation.createContentFromWebPage":
+		if e.ComplexityRoot.Mutation.CreateContentFromWebPage == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createContentFromWebPage_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateContentFromWebPage(childComplexity, args["input"].(model.CreateContentFromWebPageInput)), true
 	case "Mutation.createContentFromYouTube":
 		if e.ComplexityRoot.Mutation.CreateContentFromYouTube == nil {
 			break
@@ -3025,6 +3068,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Perspectives(childComplexity, args["first"].(*int), args["after"].(*string), args["last"].(*int), args["before"].(*string), args["sortBy"].(*domain.PerspectiveSortBy), args["sortOrder"].(*domain.SortOrder), args["includeTotalCount"].(*bool), args["filter"].(*model.PerspectiveFilter)), true
+	case "Query.previewWebPage":
+		if e.ComplexityRoot.Query.PreviewWebPage == nil {
+			break
+		}
+
+		args, err := ec.field_Query_previewWebPage_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.PreviewWebPage(childComplexity, args["url"].(string)), true
 	case "Query.threadMessages":
 		if e.ComplexityRoot.Query.ThreadMessages == nil {
 			break
@@ -3487,6 +3541,98 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.UserTodoList.User(childComplexity), true
 
+	case "WebPageFetch.at":
+		if e.ComplexityRoot.WebPageFetch.At == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPageFetch.At(childComplexity), true
+	case "WebPageFetch.httpStatus":
+		if e.ComplexityRoot.WebPageFetch.HTTPStatus == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPageFetch.HTTPStatus(childComplexity), true
+	case "WebPageFetch.status":
+		if e.ComplexityRoot.WebPageFetch.Status == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPageFetch.Status(childComplexity), true
+
+	case "WebPagePreview.alreadyExistsContentId":
+		if e.ComplexityRoot.WebPagePreview.AlreadyExistsContentID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPagePreview.AlreadyExistsContentID(childComplexity), true
+	case "WebPagePreview.author":
+		if e.ComplexityRoot.WebPagePreview.Author == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPagePreview.Author(childComplexity), true
+	case "WebPagePreview.description":
+		if e.ComplexityRoot.WebPagePreview.Description == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPagePreview.Description(childComplexity), true
+	case "WebPagePreview.domain":
+		if e.ComplexityRoot.WebPagePreview.Domain == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPagePreview.Domain(childComplexity), true
+	case "WebPagePreview.faviconUrl":
+		if e.ComplexityRoot.WebPagePreview.FaviconURL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPagePreview.FaviconURL(childComplexity), true
+	case "WebPagePreview.fetch":
+		if e.ComplexityRoot.WebPagePreview.Fetch == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPagePreview.Fetch(childComplexity), true
+	case "WebPagePreview.finalUrl":
+		if e.ComplexityRoot.WebPagePreview.FinalURL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPagePreview.FinalURL(childComplexity), true
+	case "WebPagePreview.imageUrl":
+		if e.ComplexityRoot.WebPagePreview.ImageURL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPagePreview.ImageURL(childComplexity), true
+	case "WebPagePreview.lang":
+		if e.ComplexityRoot.WebPagePreview.Lang == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPagePreview.Lang(childComplexity), true
+	case "WebPagePreview.publishedAt":
+		if e.ComplexityRoot.WebPagePreview.PublishedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPagePreview.PublishedAt(childComplexity), true
+	case "WebPagePreview.siteName":
+		if e.ComplexityRoot.WebPagePreview.SiteName == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPagePreview.SiteName(childComplexity), true
+	case "WebPagePreview.title":
+		if e.ComplexityRoot.WebPagePreview.Title == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WebPagePreview.Title(childComplexity), true
+
 	case "WikidataSearchResult.description":
 		if e.ComplexityRoot.WikidataSearchResult.Description == nil {
 			break
@@ -3586,6 +3732,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("CreateContentFromBookInput", ec.unmarshalInputCreateContentFromBookInput),
 			graphql.NewInputUnmarshaler("CreateContentFromMovieInput", ec.unmarshalInputCreateContentFromMovieInput),
 			graphql.NewInputUnmarshaler("CreateContentFromPassageInput", ec.unmarshalInputCreateContentFromPassageInput),
+			graphql.NewInputUnmarshaler("CreateContentFromWebPageInput", ec.unmarshalInputCreateContentFromWebPageInput),
 			graphql.NewInputUnmarshaler("CreateContentFromYouTubeInput", ec.unmarshalInputCreateContentFromYouTubeInput),
 			graphql.NewInputUnmarshaler("CreateImportJobInput", ec.unmarshalInputCreateImportJobInput),
 			graphql.NewInputUnmarshaler("CreateImportSourceInput", ec.unmarshalInputCreateImportSourceInput),
@@ -3938,6 +4085,8 @@ type Content {
   movie: JSON
   "Book-specific metadata (the shaped Open Library payload); null for other content types."
   book: JSON
+  "Webpage-specific metadata for the grid: siteName, domain, imageUrl, faviconUrl, publishedAt, author, webPageRoles (never null, [] when none); null for other content types."
+  webPage: JSON
   primaryCategory: Category
   # The import that created this row. Null for hand-added content, and when that
   # import is closed and the viewer isn't an admin.
@@ -4021,6 +4170,7 @@ enum ContentType {
   BIBLE_PASSAGE
   MOVIE
   BOOK
+  WEB_PAGE
 }
 
 # Text columns that ContentFilter.search can be scoped to.
@@ -4048,6 +4198,55 @@ input CreateContentFromMovieInput {
 input CreateContentFromBookInput {
   # Open Library work URL, or a raw ISBN-10/ISBN-13 (resolved to a work key server-side)
   url: String!
+}
+
+# Roles the adder picks for a webpage. The first is the primary role. Additive:
+# later values are new enum values, not a migration.
+enum WebPageRole {
+  BLOG_POST
+  SESSION_TRANSCRIPT
+}
+
+input CreateContentFromWebPageInput {
+  # Any http(s) URL that no other content type claims
+  url: String!
+  # Roles the adder picked. Omitted or [] saves a plain webpage. Never inferred from the page.
+  webPageRoles: [WebPageRole!]
+}
+
+# Outcome of reading a page's <head>. Shown in the Add dialog's import preview.
+enum WebPageFetchStatus {
+  OK
+  BLOCKED
+  ERROR
+  TIMEOUT
+  NOT_HTML
+  TOO_LARGE
+}
+
+type WebPageFetch {
+  status: WebPageFetchStatus!
+  # Null when no HTTP response arrived (timeout, network error)
+  httpStatus: Int
+  # When the metadata was read (RFC 3339, UTC)
+  at: String!
+}
+
+# Metadata read from a page's <head> for the import preview. Nothing is saved.
+type WebPagePreview {
+  finalUrl: String!
+  domain: String!
+  siteName: String
+  title: String
+  description: String
+  imageUrl: String
+  faviconUrl: String
+  publishedAt: String
+  author: String
+  lang: String
+  fetch: WebPageFetch!
+  # Set when this URL is already saved: the ID of the existing row
+  alreadyExistsContentId: IntID
 }
 
 input CreateContentFromYouTubeInput {
@@ -4154,6 +4353,8 @@ input ContentFilter {
   maxPages: Int
   minBookRating: Float       # Open Library average rating (0-5), inclusive
   maxBookRating: Float
+  # Webpage role filter (webpage rows only; other rows never match). Matches any of these roles (OR'd).
+  webPageRoles: [WebPageRole!]
   # View/like count filters
   minViewCount: Int
   maxViewCount: Int
@@ -4529,6 +4730,9 @@ type Mutation {
   # Book mutations
   createContentFromBook(input: CreateContentFromBookInput!): Content! @auth
 
+  # Webpage mutations
+  createContentFromWebPage(input: CreateContentFromWebPageInput!): CreateContentResult! @auth
+
   # Bible passage mutations
   createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth
   # First-write-wins: if a title already exists, returns the content with the existing title.
@@ -4651,6 +4855,9 @@ type Query {
 
   # Discover page: look up a single book by ISBN-10/ISBN-13. Null when not found.
   bookByISBN(isbn: String!): BookSearchResult
+
+  # Add dialog: read a webpage's metadata for the import preview. Writes nothing.
+  previewWebPage(url: String!): WebPagePreview @auth
 
   # Perspective queries
   perspectiveByID(id: ID!): Perspective
@@ -5116,6 +5323,8 @@ func (ec *executionContext) childFields_Content(ctx context.Context, field graph
 		return ec.fieldContext_Content_movie(ctx, field)
 	case "book":
 		return ec.fieldContext_Content_book(ctx, field)
+	case "webPage":
+		return ec.fieldContext_Content_webPage(ctx, field)
 	case "primaryCategory":
 		return ec.fieldContext_Content_primaryCategory(ctx, field)
 	case "importedFrom":
@@ -5842,6 +6051,48 @@ func (ec *executionContext) childFields_UserTodoList(ctx context.Context, field 
 	return nil, fmt.Errorf("no field named %q was found under type UserTodoList", field.Name)
 }
 
+func (ec *executionContext) childFields_WebPageFetch(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "status":
+		return ec.fieldContext_WebPageFetch_status(ctx, field)
+	case "httpStatus":
+		return ec.fieldContext_WebPageFetch_httpStatus(ctx, field)
+	case "at":
+		return ec.fieldContext_WebPageFetch_at(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type WebPageFetch", field.Name)
+}
+
+func (ec *executionContext) childFields_WebPagePreview(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "finalUrl":
+		return ec.fieldContext_WebPagePreview_finalUrl(ctx, field)
+	case "domain":
+		return ec.fieldContext_WebPagePreview_domain(ctx, field)
+	case "siteName":
+		return ec.fieldContext_WebPagePreview_siteName(ctx, field)
+	case "title":
+		return ec.fieldContext_WebPagePreview_title(ctx, field)
+	case "description":
+		return ec.fieldContext_WebPagePreview_description(ctx, field)
+	case "imageUrl":
+		return ec.fieldContext_WebPagePreview_imageUrl(ctx, field)
+	case "faviconUrl":
+		return ec.fieldContext_WebPagePreview_faviconUrl(ctx, field)
+	case "publishedAt":
+		return ec.fieldContext_WebPagePreview_publishedAt(ctx, field)
+	case "author":
+		return ec.fieldContext_WebPagePreview_author(ctx, field)
+	case "lang":
+		return ec.fieldContext_WebPagePreview_lang(ctx, field)
+	case "fetch":
+		return ec.fieldContext_WebPagePreview_fetch(ctx, field)
+	case "alreadyExistsContentId":
+		return ec.fieldContext_WebPagePreview_alreadyExistsContentId(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type WebPagePreview", field.Name)
+}
+
 func (ec *executionContext) childFields_WikidataSearchResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "qid":
@@ -6128,6 +6379,20 @@ func (ec *executionContext) field_Mutation_createContentFromPassage_args(ctx con
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.CreateContentFromPassageInput, error) {
 			return ec.unmarshalNCreateContentFromPassageInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromPassageInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_createContentFromWebPage_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.CreateContentFromWebPageInput, error) {
+			return ec.unmarshalNCreateContentFromWebPageInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromWebPageInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -7101,6 +7366,20 @@ func (ec *executionContext) field_Query_perspectives_args(ctx context.Context, r
 		return nil, err
 	}
 	args["filter"] = arg7
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_previewWebPage_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "url",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["url"] = arg0
 	return args, nil
 }
 
@@ -8564,6 +8843,29 @@ func (ec *executionContext) _Content_book(ctx context.Context, field graphql.Col
 	)
 }
 func (ec *executionContext) fieldContext_Content_book(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Content", field, false, false, "JSON")
+}
+
+func (ec *executionContext) _Content_webPage(ctx context.Context, field graphql.CollectedField, obj *model.Content) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Content_webPage(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.WebPage, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v map[string]any) graphql.Marshaler {
+			return ec.marshalOJSON2map(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Content_webPage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Content", field, false, false, "JSON")
 }
 
@@ -12623,6 +12925,63 @@ func (ec *executionContext) fieldContext_Mutation_createContentFromBook(ctx cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_createContentFromWebPage(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_createContentFromWebPage(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CreateContentFromWebPage(ctx, fc.Args["input"].(model.CreateContentFromWebPageInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.CreateContentResult
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.CreateContentResult) graphql.Marshaler {
+			return ec.marshalNCreateContentResult2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_createContentFromWebPage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CreateContentResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createContentFromWebPage_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_createContentFromPassage(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -16662,6 +17021,63 @@ func (ec *executionContext) fieldContext_Query_bookByISBN(ctx context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_previewWebPage(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_previewWebPage(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().PreviewWebPage(ctx, fc.Args["url"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.WebPagePreview
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.WebPagePreview) graphql.Marshaler {
+			return ec.marshalOWebPagePreview2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐWebPagePreview(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Query_previewWebPage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_WebPagePreview(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_previewWebPage_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_perspectiveByID(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -18908,6 +19324,360 @@ func (ec *executionContext) fieldContext_UserTodoList_updatedAt(_ context.Contex
 	return graphql.NewScalarFieldContext("UserTodoList", field, false, false, "String")
 }
 
+func (ec *executionContext) _WebPageFetch_status(ctx context.Context, field graphql.CollectedField, obj *model.WebPageFetch) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPageFetch_status(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v domain.FetchStatus) graphql.Marshaler {
+			return ec.marshalNWebPageFetchStatus2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐFetchStatus(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_WebPageFetch_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WebPageFetch", field, false, false, "WebPageFetchStatus")
+}
+
+func (ec *executionContext) _WebPageFetch_httpStatus(ctx context.Context, field graphql.CollectedField, obj *model.WebPageFetch) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPageFetch_httpStatus(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.HTTPStatus, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_WebPageFetch_httpStatus(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WebPageFetch", field, false, false, "Int")
+}
+
+func (ec *executionContext) _WebPageFetch_at(ctx context.Context, field graphql.CollectedField, obj *model.WebPageFetch) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPageFetch_at(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.At, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_WebPageFetch_at(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WebPageFetch", field, false, false, "String")
+}
+
+func (ec *executionContext) _WebPagePreview_finalUrl(ctx context.Context, field graphql.CollectedField, obj *model.WebPagePreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPagePreview_finalUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.FinalURL, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_WebPagePreview_finalUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WebPagePreview", field, false, false, "String")
+}
+
+func (ec *executionContext) _WebPagePreview_domain(ctx context.Context, field graphql.CollectedField, obj *model.WebPagePreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPagePreview_domain(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Domain, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_WebPagePreview_domain(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WebPagePreview", field, false, false, "String")
+}
+
+func (ec *executionContext) _WebPagePreview_siteName(ctx context.Context, field graphql.CollectedField, obj *model.WebPagePreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPagePreview_siteName(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SiteName, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_WebPagePreview_siteName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WebPagePreview", field, false, false, "String")
+}
+
+func (ec *executionContext) _WebPagePreview_title(ctx context.Context, field graphql.CollectedField, obj *model.WebPagePreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPagePreview_title(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Title, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_WebPagePreview_title(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WebPagePreview", field, false, false, "String")
+}
+
+func (ec *executionContext) _WebPagePreview_description(ctx context.Context, field graphql.CollectedField, obj *model.WebPagePreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPagePreview_description(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Description, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_WebPagePreview_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WebPagePreview", field, false, false, "String")
+}
+
+func (ec *executionContext) _WebPagePreview_imageUrl(ctx context.Context, field graphql.CollectedField, obj *model.WebPagePreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPagePreview_imageUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ImageURL, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_WebPagePreview_imageUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WebPagePreview", field, false, false, "String")
+}
+
+func (ec *executionContext) _WebPagePreview_faviconUrl(ctx context.Context, field graphql.CollectedField, obj *model.WebPagePreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPagePreview_faviconUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.FaviconURL, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_WebPagePreview_faviconUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WebPagePreview", field, false, false, "String")
+}
+
+func (ec *executionContext) _WebPagePreview_publishedAt(ctx context.Context, field graphql.CollectedField, obj *model.WebPagePreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPagePreview_publishedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PublishedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_WebPagePreview_publishedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WebPagePreview", field, false, false, "String")
+}
+
+func (ec *executionContext) _WebPagePreview_author(ctx context.Context, field graphql.CollectedField, obj *model.WebPagePreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPagePreview_author(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Author, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_WebPagePreview_author(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WebPagePreview", field, false, false, "String")
+}
+
+func (ec *executionContext) _WebPagePreview_lang(ctx context.Context, field graphql.CollectedField, obj *model.WebPagePreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPagePreview_lang(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Lang, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_WebPagePreview_lang(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WebPagePreview", field, false, false, "String")
+}
+
+func (ec *executionContext) _WebPagePreview_fetch(ctx context.Context, field graphql.CollectedField, obj *model.WebPagePreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPagePreview_fetch(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Fetch, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.WebPageFetch) graphql.Marshaler {
+			return ec.marshalNWebPageFetch2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐWebPageFetch(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_WebPagePreview_fetch(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "WebPagePreview",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_WebPageFetch(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _WebPagePreview_alreadyExistsContentId(ctx context.Context, field graphql.CollectedField, obj *model.WebPagePreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_WebPagePreview_alreadyExistsContentId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.AlreadyExistsContentID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOIntID2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_WebPagePreview_alreadyExistsContentId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("WebPagePreview", field, false, false, "IntID")
+}
+
 func (ec *executionContext) _WikidataSearchResult_qid(ctx context.Context, field graphql.CollectedField, obj *model.WikidataSearchResult) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -20447,7 +21217,7 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "authorContains", "minPublishYear", "maxPublishYear", "minPages", "maxPages", "minBookRating", "maxBookRating", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
+	fieldsInOrder := [...]string{"contentType", "contentTypes", "minLengthSeconds", "maxLengthSeconds", "search", "searchFields", "personId", "personRole", "genreContains", "castContains", "ageRating", "releasedAfter", "releasedBefore", "minBoxOffice", "maxBoxOffice", "minTmdbScore", "maxTmdbScore", "authorContains", "minPublishYear", "maxPublishYear", "minPages", "maxPages", "minBookRating", "maxBookRating", "webPageRoles", "minViewCount", "maxViewCount", "minLikeCount", "maxLikeCount", "publishedAfter", "publishedBefore", "channelTitle", "tagContains", "descriptionSearch", "addedByUsername", "minPerspectiveCount", "createdAfter", "createdBefore", "updatedAfter", "updatedBefore"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -20622,6 +21392,13 @@ func (ec *executionContext) unmarshalInputContentFilter(ctx context.Context, obj
 				return it, err
 			}
 			it.MaxBookRating = data
+		case "webPageRoles":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("webPageRoles"))
+			data, err := ec.unmarshalOWebPageRole2ᚕgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐWebPageRoleᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WebPageRoles = data
 		case "minViewCount":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minViewCount"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
@@ -21007,6 +21784,55 @@ func (ec *executionContext) unmarshalInputCreateContentFromPassageInput(ctx cont
 func UnmarshalCreateContentFromPassageInput(ctx context.Context, raw any) (model.CreateContentFromPassageInput, error) {
 	var out model.CreateContentFromPassageInput
 	err := graphql.UnmarshalNamedInputFromContext(ctx, "CreateContentFromPassageInput", raw, &out)
+	return out, err
+}
+
+func (ec *executionContext) unmarshalInputCreateContentFromWebPageInput(ctx context.Context, obj any) (model.CreateContentFromWebPageInput, error) {
+	var it model.CreateContentFromWebPageInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"url", "webPageRoles"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "url":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("url"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.URL = data
+		case "webPageRoles":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("webPageRoles"))
+			data, err := ec.unmarshalOWebPageRole2ᚕgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐWebPageRoleᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WebPageRoles = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalCreateContentFromWebPageInput unmarshals raw into the CreateContentFromWebPageInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalCreateContentFromWebPageInput(ctx context.Context, raw any) (model.CreateContentFromWebPageInput, error) {
+	var out model.CreateContentFromWebPageInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "CreateContentFromWebPageInput", raw, &out)
 	return out, err
 }
 
@@ -23089,6 +23915,11 @@ func (ec *executionContext) _Content(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.RequiredNull {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "webPage":
+			out.Values[i] = ec._Content_webPage(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "primaryCategory":
 			out.ResolveConcurrently(ec.OperationContext, &deferred, i,
 				true, false,
@@ -24748,6 +25579,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "createContentFromWebPage":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createContentFromWebPage(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createContentFromPassage":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createContentFromPassage(ctx, field)
@@ -25670,6 +26508,12 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				func(ctx context.Context) graphql.Marshaler {
 					return ec._Query_bookByISBN(ctx, field)
 				})
+		case "previewWebPage":
+			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
+				true, false,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Query_previewWebPage(ctx, field)
+				})
 		case "perspectiveByID":
 			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
 				true, false,
@@ -26312,6 +27156,137 @@ func (ec *executionContext) _UserTodoList(ctx context.Context, sel ast.Selection
 			out.Values[i] = ec._UserTodoList_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var webPageFetchImplementors = []string{"WebPageFetch"}
+
+func (ec *executionContext) _WebPageFetch(ctx context.Context, sel ast.SelectionSet, obj *model.WebPageFetch) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, webPageFetchImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("WebPageFetch")
+		case "status":
+			out.Values[i] = ec._WebPageFetch_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "httpStatus":
+			out.Values[i] = ec._WebPageFetch_httpStatus(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "at":
+			out.Values[i] = ec._WebPageFetch_at(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var webPagePreviewImplementors = []string{"WebPagePreview"}
+
+func (ec *executionContext) _WebPagePreview(ctx context.Context, sel ast.SelectionSet, obj *model.WebPagePreview) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, webPagePreviewImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("WebPagePreview")
+		case "finalUrl":
+			out.Values[i] = ec._WebPagePreview_finalUrl(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "domain":
+			out.Values[i] = ec._WebPagePreview_domain(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "siteName":
+			out.Values[i] = ec._WebPagePreview_siteName(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "title":
+			out.Values[i] = ec._WebPagePreview_title(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "description":
+			out.Values[i] = ec._WebPagePreview_description(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "imageUrl":
+			out.Values[i] = ec._WebPagePreview_imageUrl(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "faviconUrl":
+			out.Values[i] = ec._WebPagePreview_faviconUrl(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "publishedAt":
+			out.Values[i] = ec._WebPagePreview_publishedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "author":
+			out.Values[i] = ec._WebPagePreview_author(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "lang":
+			out.Values[i] = ec._WebPagePreview_lang(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "fetch":
+			out.Values[i] = ec._WebPagePreview_fetch(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "alreadyExistsContentId":
+			out.Values[i] = ec._WebPagePreview_alreadyExistsContentId(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -27001,6 +27976,11 @@ func (ec *executionContext) unmarshalNCreateContentFromMovieInput2githubᚗcom�
 
 func (ec *executionContext) unmarshalNCreateContentFromPassageInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromPassageInput(ctx context.Context, v any) (model.CreateContentFromPassageInput, error) {
 	res, err := ec.unmarshalInputCreateContentFromPassageInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNCreateContentFromWebPageInput2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐCreateContentFromWebPageInput(ctx context.Context, v any) (model.CreateContentFromWebPageInput, error) {
+	res, err := ec.unmarshalInputCreateContentFromWebPageInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -28044,6 +29024,44 @@ func (ec *executionContext) marshalNUserTodoStatus2githubᚗcomᚋCodeWarriorᚑ
 	return res
 }
 
+func (ec *executionContext) marshalNWebPageFetch2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐWebPageFetch(ctx context.Context, sel ast.SelectionSet, v *model.WebPageFetch) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "WebPageFetch!")
+		return graphql.Null
+	}
+	return ec._WebPageFetch(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNWebPageFetchStatus2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐFetchStatus(ctx context.Context, v any) (domain.FetchStatus, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.FetchStatus(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNWebPageFetchStatus2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐFetchStatus(ctx context.Context, sel ast.SelectionSet, v domain.FetchStatus) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		graphql.AddInvalidNullFromMarshaler(ctx, "WebPageFetchStatus!")
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNWebPageRole2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐWebPageRole(ctx context.Context, v any) (domain.WebPageRole, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.WebPageRole(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNWebPageRole2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐWebPageRole(ctx context.Context, sel ast.SelectionSet, v domain.WebPageRole) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		graphql.AddInvalidNullFromMarshaler(ctx, "WebPageRole!")
+	}
+	return res
+}
+
 func (ec *executionContext) marshalNWikidataSearchResult2ᚕᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐWikidataSearchResultᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.WikidataSearchResult) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -28980,6 +29998,49 @@ func (ec *executionContext) marshalOUserTodoStatus2ᚖgithubᚗcomᚋCodeWarrior
 	_ = ctx
 	res := graphql.MarshalString(string(*v))
 	return res
+}
+
+func (ec *executionContext) marshalOWebPagePreview2ᚖgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋadaptersᚋgraphqlᚋmodelᚐWebPagePreview(ctx context.Context, sel ast.SelectionSet, v *model.WebPagePreview) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._WebPagePreview(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOWebPageRole2ᚕgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐWebPageRoleᚄ(ctx context.Context, v any) ([]domain.WebPageRole, error) {
+	if v == nil {
+		return nil, nil
+	}
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]domain.WebPageRole, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNWebPageRole2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐWebPageRole(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOWebPageRole2ᚕgithubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐWebPageRoleᚄ(ctx context.Context, sel ast.SelectionSet, v []domain.WebPageRole) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNWebPageRole2githubᚗcomᚋCodeWarriorᚑdebugᚋperspectizeᚋbackendᚋinternalᚋcoreᚋdomainᚐWebPageRole(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {

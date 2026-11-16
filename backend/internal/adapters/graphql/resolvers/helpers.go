@@ -19,6 +19,44 @@ import (
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
 
+// webPageInputMessage is the user-facing message for a webpage input error, or ""
+// when err is not one. The role is checked before the URL: an unknown role wraps
+// domain.ErrInvalidInput too, and must not be reported as a bad URL. An SSRF refusal
+// is reported as a URL problem and names no address.
+func webPageInputMessage(err error) string {
+	switch {
+	case errors.Is(err, domain.ErrUnknownWebPageRole):
+		return "unknown webpage role"
+	case errors.Is(err, domain.ErrInvalidInput):
+		return "invalid webpage URL: use an http or https link to a public page"
+	}
+	return ""
+}
+
+// webPagePreviewToModel maps the import-preview result to its GraphQL shape.
+// Missing metadata stays nil (missing is not a value). The read time is RFC 3339 UTC.
+func webPagePreviewToModel(p *portservices.WebPagePreview) *model.WebPagePreview {
+	m := p.Meta
+	return &model.WebPagePreview{
+		FinalURL:    m.FinalURL,
+		Domain:      m.Domain,
+		SiteName:    m.SiteName,
+		Title:       m.Title,
+		Description: m.Description,
+		ImageURL:    m.ImageURL,
+		FaviconURL:  m.FaviconURL,
+		PublishedAt: m.PublishedAt,
+		Author:      m.Author,
+		Lang:        m.Lang,
+		Fetch: &model.WebPageFetch{
+			Status:     m.Fetch.Status,
+			HTTPStatus: m.Fetch.HTTPStatus,
+			At:         m.Fetch.At.UTC().Format(time.RFC3339),
+		},
+		AlreadyExistsContentID: p.AlreadyExistsContentID,
+	}
+}
+
 // movieSearchPageToModel maps one TMDB search page to the GraphQL shape. The
 // canonical url is what createContentFromMovie takes, so the add path dedupes
 // the same way as a pasted link. Items is never null.
@@ -138,6 +176,25 @@ func onboardingDomainToModel(o *domain.UserOnboarding) *model.UserOnboarding {
 	}
 }
 
+// webPageGridPayload is the trimmed webpage payload the grid reads, taken from the
+// stored response already loaded with the row. A key the page never declared is
+// null (missing is not a value); webPageRoles is never null, [] when there are none.
+func webPageGridPayload(response map[string]any) map[string]any {
+	roles, ok := response["webPageRoles"].([]any)
+	if !ok || roles == nil {
+		roles = []any{}
+	}
+	return map[string]any{
+		"siteName":     response["siteName"],
+		"domain":       response["domain"],
+		"imageUrl":     response["imageUrl"],
+		"faviconUrl":   response["faviconUrl"],
+		"publishedAt":  response["publishedAt"],
+		"author":       response["author"],
+		"webPageRoles": roles,
+	}
+}
+
 // domainToModel converts a domain Content to a GraphQL model Content
 func domainToModel(c *domain.Content) *model.Content {
 	m := &model.Content{
@@ -173,6 +230,9 @@ func domainToModel(c *domain.Content) *model.Content {
 			}
 			if c.ContentType == domain.ContentTypeBook {
 				m.Book = responseMap
+			}
+			if c.ContentType == domain.ContentTypeWebPage {
+				m.WebPage = webPageGridPayload(responseMap)
 			}
 		}
 

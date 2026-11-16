@@ -268,6 +268,28 @@ func applyBookColumnFilters(query *gorm.DB, f *domain.ContentFilter) *gorm.DB {
 	return query
 }
 
+// applyWebPageRoleFilter keeps webpage rows that play any of the given roles. Each
+// role is one JSONB containment on response->'webPageRoles', with the JSON array
+// marshalled in Go and bound as a parameter (not "?" operators, which GORM reads as
+// placeholders). The OR'd group is ANDed with the webpage type, so other content
+// types never match. An empty list adds no condition.
+func applyWebPageRoleFilter(query *gorm.DB, roles []domain.WebPageRole) *gorm.DB {
+	if len(roles) == 0 {
+		return query
+	}
+	clauses := make([]string, 0, len(roles))
+	args := []any{contentTypeToDBValue(domain.ContentTypeWebPage)}
+	for _, role := range roles {
+		needle, err := json.Marshal([]string{string(role)})
+		if err != nil {
+			continue // unreachable: marshalling a slice of strings cannot fail
+		}
+		clauses = append(clauses, "response->'webPageRoles' @> ?::jsonb")
+		args = append(args, string(needle))
+	}
+	return query.Where("content_type = ? AND ("+strings.Join(clauses, " OR ")+")", args...)
+}
+
 // maxSearchPhrases caps comma-separated phrases per search to bound query size.
 const maxSearchPhrases = 10
 
@@ -380,6 +402,7 @@ func (r *GormContentRepository) List(ctx context.Context, params domain.ContentL
 		query = applyPersonFilter(query, params.Filter.PersonID, params.Filter.PersonRole)
 		query = applyMovieColumnFilters(query, params.Filter)
 		query = applyBookColumnFilters(query, params.Filter)
+		query = applyWebPageRoleFilter(query, params.Filter.WebPageRoles)
 		// View count filters (JSONB extraction)
 		if params.Filter.MinViewCount != nil {
 			query = query.Where("(response->'items'->0->'statistics'->>'viewCount')::BIGINT >= ?", *params.Filter.MinViewCount)

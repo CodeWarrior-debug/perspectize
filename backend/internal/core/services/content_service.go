@@ -32,6 +32,7 @@ type ContentService struct {
 	bookTrending  portservices.BookTrendingClient
 	bookISBN      portservices.BookISBNClient
 	bookWork      portservices.BookWorkClient
+	webPage       portservices.WebPageClient
 	// now stamps a book's reading-log snapshot; tests inject a fixed clock.
 	now func() time.Time
 }
@@ -91,6 +92,12 @@ func WithBookISBN(client portservices.BookISBNClient) ContentServiceOption {
 // failures never block a book from being added.
 func WithBookWork(client portservices.BookWorkClient) ContentServiceOption {
 	return func(s *ContentService) { s.bookWork = client }
+}
+
+// WithWebPageClient enables webpage adds and the import preview. Without it,
+// CreateFromWebPage and PreviewWebPage return ErrWebPageClientUnavailable.
+func WithWebPageClient(client portservices.WebPageClient) ContentServiceOption {
+	return func(s *ContentService) { s.webPage = client }
 }
 
 // NewContentService creates a new content service

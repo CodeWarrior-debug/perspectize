@@ -94,6 +94,14 @@ func (m *mockContentService) CreateFromBook(ctx context.Context, rawURLOrISBN st
 	return nil, nil
 }
 
+func (m *mockContentService) CreateFromWebPage(ctx context.Context, rawURL string, roles []domain.WebPageRole, userID int) (*domain.Content, error) {
+	return nil, nil
+}
+
+func (m *mockContentService) PreviewWebPage(ctx context.Context, rawURL string) (*portservices.WebPagePreview, error) {
+	return nil, nil
+}
+
 func (m *mockContentService) SearchBooks(ctx context.Context, query string, page int) (*portservices.BookSearchPage, error) {
 	return nil, nil
 }

@@ -286,6 +286,44 @@ func (r *mutationResolver) CreateContentFromYouTube(ctx context.Context, input m
 	}, nil
 }
 
+// CreateContentFromWebPage is the resolver for the createContentFromWebPage field.
+// The roles are the adder's picks; the service stores them in order.
+func (r *mutationResolver) CreateContentFromWebPage(ctx context.Context, input model.CreateContentFromWebPageInput) (*model.CreateContentResult, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+
+	content, err := r.ContentService.CreateFromWebPage(ctx, input.URL, input.WebPageRoles, authUser.ID)
+	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
+		return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: true}, nil
+	}
+	if err != nil {
+		if msg := webPageInputMessage(err); msg != "" {
+			// The message never says why (an SSRF refusal names no address).
+			return nil, errors.New(msg)
+		}
+		// Details are already logged server-side by the service layer.
+		slog.Error("creating webpage content failed", "userID", authUser.ID, "error", err)
+		return nil, fmt.Errorf("failed to save webpage")
+	}
+	return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: false}, nil
+}
+
+// PreviewWebPage is the resolver for the previewWebPage field. It reads the
+// page for the Add dialog and writes nothing.
+func (r *queryResolver) PreviewWebPage(ctx context.Context, url string) (*model.WebPagePreview, error) {
+	preview, err := r.ContentService.PreviewWebPage(ctx, url)
+	if err != nil {
+		if msg := webPageInputMessage(err); msg != "" {
+			return nil, errors.New(msg)
+		}
+		slog.Error("previewing webpage failed", "error", err)
+		return nil, fmt.Errorf("failed to read webpage")
+	}
+	return webPagePreviewToModel(preview), nil
+}
+
 // CreateContentFromMovie is the resolver for the createContentFromMovie field.
 func (r *mutationResolver) CreateContentFromMovie(ctx context.Context, input model.CreateContentFromMovieInput) (*model.Content, error) {
 	// Identity comes from the session only; the input carries just the URL.
@@ -594,6 +632,7 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		params.Filter.MaxPages = filter.MaxPages
 		params.Filter.MinBookRating = filter.MinBookRating
 		params.Filter.MaxBookRating = filter.MaxBookRating
+		params.Filter.WebPageRoles = filter.WebPageRoles
 		params.Filter.MinViewCount = filter.MinViewCount
 		params.Filter.MaxViewCount = filter.MaxViewCount
 		params.Filter.MinLikeCount = filter.MinLikeCount
