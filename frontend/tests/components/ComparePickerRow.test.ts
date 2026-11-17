@@ -98,6 +98,32 @@ describe('ComparePickerRow', () => {
 		expect(screen.getByRole('combobox', { name: 'Right perspective' })).toBeInTheDocument();
 	});
 
+	it('shows the privacy marker as text inside the option label (native options cannot hold an icon)', () => {
+		const withPrivate = [
+			{ id: '1', userId: '1', name: 'You', label: 'You · Private' },
+			{ id: '2', userId: '2', name: 'Jamie Lee', label: 'Jamie Lee' },
+		];
+		render(ComparePickerRow, {
+			props: {
+				options: withPrivate,
+				leftId: '1',
+				rightId: '2',
+				onLeftChange: vi.fn(),
+				onRightChange: vi.fn(),
+				onSwap: vi.fn(),
+			},
+		});
+		const leftOptionTexts = Array.from((screen.getByTestId('picker-left') as HTMLSelectElement).options).map(
+			(o) => o.textContent,
+		);
+		expect(leftOptionTexts).toEqual(['You · Private']);
+		const rightOptionTexts = Array.from((screen.getByTestId('picker-right') as HTMLSelectElement).options).map(
+			(o) => o.textContent,
+		);
+		// Right excludes the left selection (1), so only the unmarked row remains here.
+		expect(rightOptionTexts).toEqual(['Jamie Lee']);
+	});
+
 	// Regression guard for compare-page-enhancements #10: stacks to a single
 	// column below the `sm` breakpoint instead of squeezing both selects onto
 	// one row on a phone-width screen.
