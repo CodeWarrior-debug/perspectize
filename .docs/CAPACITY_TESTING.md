@@ -70,7 +70,7 @@ The register keeps the code default and the measurements. Any value deployed in 
 
 **The number is specific to the hardware it was measured on.** Record cores, RAM, Postgres version and the stub/DB round-trip latency.
 
-**Match the target's resource envelope, not just its software.** The deployed process has hard CPU and memory limits and a remote database (see [CAPACITY_REGISTER.md](CAPACITY_REGISTER.md) section 1 for what to look up; the figures themselves are kept out of git). A dev machine or the cloud sandbox has far more of both, so a max measured there says little about the failures that matter: CPU throttling, and an out-of-memory kill, which is how a server "shuts down". In order of preference:
+**Match the target's resource envelope, not just its software.** The deployed process has CPU and memory limits and a remote database (see [CAPACITY_REGISTER.md](CAPACITY_REGISTER.md) section 1 for what to look up; the figures themselves are kept out of git). A dev machine or the cloud sandbox differs from it in both, so a max measured there says little about the failures that matter: CPU throttling, and an out-of-memory kill, which is how a server "shuts down". In order of preference:
 
 1. **Run the server under the same limits** (`docker run --cpus <cpu> --memory <mem>`, for example on the demo stack).
 2. **If limits can't be enforced** (the cloud sandbox has no Docker daemon and no cgroup v2), record CPU-seconds and peak RSS **per unit of work**, then work out the bound: sustainable rate ≈ CPU limit ÷ CPU-seconds per item, and peak memory ≈ idle RSS + concurrency × RSS per in-flight item. Confirm it once under option 1 before changing a deployed default.
