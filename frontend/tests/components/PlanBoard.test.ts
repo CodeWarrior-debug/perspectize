@@ -205,6 +205,13 @@ describe('PlanBoard: the Unlisted and single-list views are filtered by the serv
 			expect(currentArgs().sortOrder).toBe('DESC');
 		});
 
+		it('on a client-only column (Item) sends no server sort, so the server keeps its default order', () => {
+			sortBy('priority', 'desc');
+			sortBy('content', 'asc');
+			expect(currentArgs().sortBy).toBe('CREATED_AT');
+			expect(currentArgs().sortOrder).toBe('DESC');
+		});
+
 		it('survives moving between All and Unlisted, which share one grid', () => {
 			sortBy('priority', 'desc');
 			choose('unlisted');

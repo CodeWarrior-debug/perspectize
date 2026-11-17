@@ -1,4 +1,5 @@
 import { themeBalham } from '@ag-grid-community/theming';
+import { GEIST_SEMIBOLD_ADVANCE_EM } from './grid-header-metrics';
 
 /**
  * AG Grid theme params for the Activity table. Colours are token references, not hex, so the
@@ -80,6 +81,9 @@ export const ACTIVITY_HEADER_TEXT_CASE: HeaderTextCase = { uppercase: true, lett
  * - `padding`: header cell padding on each side (`cellHorizontalPadding` = spacing * 2 * scale).
  * - `sort`: the label's flex gap (spacing) + the arrow icon. app.css drops AG Grid's extra
  *   padding-left on the arrow, so it sits one gap from its label rather than two.
+ * - `sortOrder`: the multi-sort number AG Grid draws before the arrow once two or more columns are
+ *   sorted: the label's flex gap (spacing) + the widest digit in the header font. The picker caps
+ *   sorts at five (gridUrlState's MAX_SORT_COLUMNS), so one digit is always enough.
  * - `filter`: the gap app.css adds between the label and the funnel (spacing) + the funnel icon.
  * - `uppercase` / `letterSpacingEm`: how app.css sets the label (see HeaderTextCase).
  *
@@ -90,8 +94,12 @@ export interface HeaderChrome extends HeaderTextCase {
 	fontSize: number;
 	padding: number;
 	sort: number;
+	sortOrder: number;
 	filter: number;
 }
+
+/** Advance (em) of the widest digit in the header font: the sort-order number is one digit. */
+const WIDEST_DIGIT_EM = Math.max(...[...'0123456789'].map((d) => GEIST_SEMIBOLD_ADVANCE_EM[d.charCodeAt(0) - 32]));
 
 export function headerChrome(
 	theme: { getParams(): Record<string, unknown> } = ACTIVITY_GRID_THEME,
@@ -109,10 +117,12 @@ export function headerChrome(
 	};
 	const spacing = num('spacing');
 	const iconSize = num('iconSize');
+	const headerFontSize = num('headerFontSize');
 	return {
-		fontSize: num('headerFontSize'),
+		fontSize: headerFontSize,
 		padding: spacing * 2 * num('cellHorizontalPaddingScale'),
 		sort: spacing + iconSize,
+		sortOrder: spacing + WIDEST_DIGIT_EM * headerFontSize,
 		filter: spacing + iconSize,
 		...textCase,
 	};

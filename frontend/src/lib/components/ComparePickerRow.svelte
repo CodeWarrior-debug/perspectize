@@ -11,7 +11,10 @@
 		onRightChange,
 		onSwap,
 	}: {
-		options: { id: string; name: string }[];
+		// id is the perspective (the unit being compared); userId drives the
+		// avatar colour, and label is the select text (name plus a date when one
+		// person has several perspectives).
+		options: { id: string; userId: string; name: string; label: string }[];
 		leftId: string;
 		rightId: string;
 		viewerId?: string | null;
@@ -25,8 +28,9 @@
 
 	// Color by identity (the viewer, "You", is always primary-colored) — not
 	// by side/position — so a Swap doesn't change "You"'s avatar color.
-	function avatarColor(id: string): string {
-		return identityColor(id, viewerId);
+	// Avatar follows the person (userId), not the perspective row being selected.
+	function avatarColor(perspectiveId: string): string {
+		return identityColor(options.find((o) => o.id === perspectiveId)?.userId ?? '', viewerId);
 	}
 
 	const leftName = $derived(options.find((o) => o.id === leftId)?.name ?? '');
@@ -49,7 +53,7 @@
 			onchange={(e) => onLeftChange(e.currentTarget.value)}
 		>
 			{#each leftOptions as option (option.id)}
-				<option value={option.id}>{option.name}</option>
+				<option value={option.id}>{option.label}</option>
 			{/each}
 		</select>
 	</div>
@@ -78,7 +82,7 @@
 			onchange={(e) => onRightChange(e.currentTarget.value)}
 		>
 			{#each rightOptions as option (option.id)}
-				<option value={option.id}>{option.name}</option>
+				<option value={option.id}>{option.label}</option>
 			{/each}
 		</select>
 	</div>

@@ -123,6 +123,25 @@ export function ratedComparator(
 	return unknownLastComparator(ageRatingRank(valueA), ageRatingRank(valueB), nodeA, nodeB, isDescending);
 }
 
+/**
+ * Comparator for the Category column (Wikidata label strings): case-insensitive, unknown
+ * (no category) last in both directions. Same sign flip for descending as unknownLastComparator.
+ */
+export function labelComparator(
+	valueA: string | null | undefined,
+	valueB: string | null | undefined,
+	_nodeA?: unknown,
+	_nodeB?: unknown,
+	isDescending?: boolean,
+): number {
+	const aNull = valueA == null;
+	const bNull = valueB == null;
+	if (aNull && bNull) return 0;
+	if (aNull) return isDescending ? -1 : 1;
+	if (bNull) return isDescending ? 1 : -1;
+	return valueA.localeCompare(valueB, undefined, { sensitivity: 'base' });
+}
+
 /** Comparator for the Released column (ISO dates): chronological, unknown last in both directions. */
 export function releasedComparator(
 	valueA: string | null | undefined,
@@ -231,7 +250,16 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		filterValue: (row) => row.contentType?.toLowerCase() ?? null,
 		filterSet: true,
 	},
-	{ colId: 'category', label: 'Category', picker: 'data', sortable: false },
+	// Wikidata category label (primaryCategory). No backend sort key, so it sorts client-side only
+	// ("Loaded" mode and the mobile card list); disabled in "All Items" mode like the other client-only columns.
+	{
+		colId: 'category',
+		label: 'Category',
+		picker: 'data',
+		sortable: true,
+		clientOnlySort: true,
+		sortValue: (row) => row.primaryCategory?.label?.toLowerCase() ?? null,
+	},
 	// Claim date columns (customFields JSON, see Content.customFields). Client-side sort only:
 	// the backend has no sort on custom fields, so in "All Items" mode they are not sortable.
 	{
