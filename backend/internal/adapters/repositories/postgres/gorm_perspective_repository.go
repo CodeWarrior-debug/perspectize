@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/repositories"
@@ -19,6 +20,18 @@ const pgForeignKeyViolation = "23503"
 // perspectivesUserFK is the FK from perspectives.user_id to users.id
 // (migrations 000004/000006).
 const perspectivesUserFK = "perspectives_users_fk"
+
+// perspectivesUserContentPrivacyUnique is the partial UNIQUE index on
+// (user_id, content_id, privacy) WHERE content_id IS NOT NULL (migration 000038):
+// one perspective per user, content and privacy setting.
+const perspectivesUserContentPrivacyUnique = "uq_perspectives_user_content_privacy"
+
+// perspectiveDuplicateError is the readable domain error for a violation of
+// perspectivesUserContentPrivacyUnique. The SQL detail stays out of the message.
+func perspectiveDuplicateError(privacy domain.Privacy) error {
+	return fmt.Errorf("%w: you already have a %s perspective on this content",
+		domain.ErrAlreadyExists, strings.ToLower(string(privacy)))
+}
 
 // GormPerspectiveRepository implements the PerspectiveRepository interface using GORM
 type GormPerspectiveRepository struct {
@@ -45,6 +58,9 @@ func (r *GormPerspectiveRepository) Create(ctx context.Context, p *domain.Perspe
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolation && pgErr.ConstraintName == perspectivesUserFK {
 			return nil, fmt.Errorf("%w: user with id %d not found", domain.ErrNotFound, p.UserID)
+		}
+		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation && pgErr.ConstraintName == perspectivesUserContentPrivacyUnique {
+			return nil, perspectiveDuplicateError(p.Privacy)
 		}
 		return nil, fmt.Errorf("failed to insert perspective: %w", err)
 	}
@@ -92,6 +108,10 @@ func (r *GormPerspectiveRepository) Update(ctx context.Context, p *domain.Perspe
 		Omit("id", "user_id", "created_at").
 		Updates(model)
 	if result.Error != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(result.Error, &pgErr) && pgErr.Code == pgUniqueViolation && pgErr.ConstraintName == perspectivesUserContentPrivacyUnique {
+			return nil, perspectiveDuplicateError(p.Privacy)
+		}
 		return nil, fmt.Errorf("failed to update perspective: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
