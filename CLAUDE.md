@@ -86,6 +86,8 @@ Unreadable `.env*` files are expected, not a broken setup. Evidence capture: [.d
 - [Demo Mode](.docs/DEMO_MODE.md) — Docker demo stack, Playwright tours (`make demo-test`, `make demo-record`)
 - [Observability](.docs/OBSERVABILITY.md) — OTel/Faro → Grafana runbook (`make obs-up` / `make obs-smoke`)
 - [Query Budget](.docs/QUERY_BUDGET.md) — query-count tests, dataloaders, TanStack caching/eviction
+- [Capacity Testing](.docs/CAPACITY_TESTING.md) — picking worker/concurrency/batch/pool limits: measure max, ship half as the initial default
+- [Capacity Register](.docs/CAPACITY_REGISTER.md) — every limit: code default vs what's known about capacity (deployed figures are kept out of git)
 - [Project Management](project-management/README.md) — intent → spec → plan → PRs; intents in `project-management/intents/` (copy `_template.md`), one intent → many PRs. Link to specs/plans/PRs; don't move them.
 - [PR Workflow](.docs/PR_WORKFLOW.md) · [Planning](.docs/PLANNING.md) · [Hooks](.docs/HOOKS.md) · [Session Environment](.docs/SESSION_ENVIRONMENT.md)
 - [claude-md-audit eval](evals/claude-md-audit/README.md) — scores the `claude-md-improver` skill; rerun after changing CLAUDE.md tooling
