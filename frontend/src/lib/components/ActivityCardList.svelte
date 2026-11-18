@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { LengthDisplay } from '$lib/queries/content';
+	import type { LengthDisplay, WebPageListMeta } from '$lib/queries/content';
+	import { webPageAuthor, webPagePublished, webPageRoleLabel, webPageRolesOf, webPageSite } from '$lib/utils/webPage';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
@@ -34,10 +35,9 @@
 		length: number | null;
 		lengthUnits: string | null;
 		lengthDisplay?: LengthDisplay | null;
-		// Gap #13 in the UI gap audit: the mobile card used to show only name/
-		// channel/duration — 2 of the grid's 9 DATA_COLUMNS. Category, views and
-		// likes are the three most-used of the rest; the remaining columns
-		// (% liked, publish date, tags, description) are still grid/details-modal
+		// Beyond name/channel/duration, the mobile card shows category, views and
+		// likes — the three most-used of the grid's other columns; the remaining
+		// columns (% liked, publish date, tags, description) are grid/details-modal
 		// only on mobile.
 		primaryCategory?: { label: string } | null;
 		viewCount?: number | null;
@@ -48,6 +48,8 @@
 		// BOOK rows carry Open Library data in `book` (or `response`); see bookFormatting.ts.
 		book?: unknown;
 		response?: unknown;
+		// WEB_PAGE rows carry their shaped metadata in `webPage` (site, published date, roles, og image).
+		webPage?: WebPageListMeta | null;
 		displayTitle?: string | null;
 		verseStartID?: number | null;
 		verseEndID?: number | null;
@@ -78,6 +80,13 @@
 	const isPassage = (row: CardRow) => row.contentType === 'BIBLE_PASSAGE';
 	const isMovie = (row: CardRow) => row.contentType === 'MOVIE';
 	const isBook = (row: CardRow) => row.contentType === 'BOOK';
+	const isWebPage = (row: CardRow) => row.contentType === 'WEB_PAGE';
+
+	/** Site and published year for a webpage card (unknown parts are skipped). */
+	function webPageFacts(row: CardRow): string[] {
+		const published = webPagePublished(row);
+		return [webPageSite(row), published ? published.slice(0, 4) : null].filter((f): f is string => !!f);
+	}
 
 	/** Year, rating, runtime and TMDB score for a movie card (unknown parts are skipped). */
 	function movieFacts(row: CardRow): string[] {
@@ -108,6 +117,8 @@
 	 * vary in aspect, so they are fitted, not cropped.
 	 */
 	function thumbSrc(row: CardRow): { src: string; fitted: boolean } | null {
+		// A page's own image (og:image), fitted and never played: a webpage is not a video.
+		if (isWebPage(row)) return row.webPage?.imageUrl ? { src: row.webPage.imageUrl, fitted: true } : null;
 		const videoId = extractVideoIdFromUrl(row.url);
 		if (videoId) return { src: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, fitted: false };
 		const posterPath = movieResponse(row)?.posterPath;
@@ -195,6 +206,26 @@
 							{/each}
 						</div>
 					{/if}
+				{:else if isWebPage(row)}
+					{#if webPageAuthor(row)}
+						<div data-testid={`card-webpage-author-${row.id}`} class="mt-1 line-clamp-1 text-xs text-muted-foreground">
+							{webPageAuthor(row)}
+						</div>
+					{/if}
+					<div
+						data-testid={`card-webpage-facts-${row.id}`}
+						class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+					>
+						{#each webPageFacts(row) as fact, i (i)}
+							{#if i > 0}<span>&middot;</span>{/if}
+							<span>{fact}</span>
+						{/each}
+						{#each webPageRolesOf(row) as role (role)}
+							<span class="rounded-full border border-border bg-muted px-2 py-px text-foreground"
+								>{webPageRoleLabel(role)}</span
+							>
+						{/each}
+					</div>
 				{:else if isMovie(row)}
 					<div
 						data-testid={`card-movie-facts-${row.id}`}

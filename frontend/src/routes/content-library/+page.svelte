@@ -1,8 +1,8 @@
 <script module lang="ts">
 	// Start fetching the table (and AG Grid, ~244KB gzipped) the moment this route module
 	// evaluates, in parallel with Clerk's script. The root layout renders nothing until
-	// `ClerkLoaded`, so awaiting the import from the template only began the AG Grid
-	// download after Clerk finished: two serial network steps on the LCP path (#636).
+	// `ClerkLoaded`, so awaiting the import from the template would start the AG Grid
+	// download only after Clerk finished: two serial network steps on the LCP path.
 	// The page still handles failure below via `{:catch}`.
 	const activityTableImport = import('$lib/components/ActivityTable.svelte');
 	activityTableImport.catch(() => {}); // avoid an unhandled-rejection reload before the template awaits it

@@ -2,6 +2,7 @@
  * URL ↔ grid state synchronization utilities.
  * Serializes/deserializes AG Grid filter models to/from URL search params.
  */
+import type { WebPageRole } from '$lib/queries/content';
 import {
 	COL_TO_SORT,
 	SORT_TO_COL,
@@ -14,6 +15,7 @@ import {
 	PERSON_FILTER_KEY,
 	parsePersonFilter,
 } from './grid-config';
+import { WEB_PAGE_ROLE_OPTIONS } from './webPage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -455,6 +457,8 @@ const SCOPE_TO_GQL_FIELD: Record<SearchScopeKey, ContentSearchFieldGQL> = {
 export interface ContentFilterInput {
 	contentType?: string;
 	contentTypes?: string[];
+	/** Webpage rows only; any of the listed roles matches (OR). Other content types never match. */
+	webPageRoles?: WebPageRole[];
 	minLengthSeconds?: number;
 	maxLengthSeconds?: number;
 	search?: string;
@@ -751,6 +755,19 @@ export function urlParamsToGraphQLFilter(
 				}
 				if (max !== undefined) {
 					result.maxBookRating = max;
+					hasAny = true;
+				}
+				break;
+			}
+
+			case 'webrole': {
+				// Unknown roles are dropped, like unknown types: the server rejects anything outside WebPageRole.
+				const known = new Set(WEB_PAGE_ROLE_OPTIONS.map((o) => o.value.toLowerCase()));
+				const roles = parseSetValue(value)
+					.filter((v) => known.has(v))
+					.map((v) => v.toUpperCase() as WebPageRole);
+				if (roles.length > 0) {
+					result.webPageRoles = roles;
 					hasAny = true;
 				}
 				break;

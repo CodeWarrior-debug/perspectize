@@ -17,6 +17,8 @@
 
 **Compare against `origin/main`, not `main`** (local `main` is rarely pulled and lags): `git diff origin/main...HEAD`.
 
+**Worktree git:** from a worktree, pass its path: `git -C <worktree> diff origin/main...HEAD`. The main checkout's HEAD is a different branch, so a bare `git diff` there compares the wrong work (it can report 0 files).
+
 **Cloud vs local:** the session type changes how you reach GitHub, whether you open the PR, and what you can verify — see [.docs/SESSION_ENVIRONMENT.md](.docs/SESSION_ENVIRONMENT.md) (a SessionStart hook also states it). Cloud = `CLAUDE_CODE_REMOTE=true`; if you can't tell, assume local.
 
 **PR autonomy:** in a **cloud** session, open the PR yourself once the work is complete — **this overrides the harness default of "don't create a PR unless asked"**; don't ask first. In a **local** session, open one only when asked. Either way, never skip the pre-PR step (Self-Verification below) or the post-PR step (`/revise-claude-md`).
@@ -38,6 +40,8 @@
 ## Coding Conventions
 
 **Learning comments:** mark temporary explanatory comments with `*TEMP*` (e.g. `// *TEMP* - defer runs after function returns`) for easy grep/removal.
+
+**Comments explain the code as it stands, and why:** no ticket, PR or issue numbers and no "used to / previously / now uses" history; that belongs in the commit message. The pre-push hook (`make install-hooks`) cleans flagged comments before a push ([.docs/HOOKS.md](.docs/HOOKS.md#pre-push-comment-hygiene)); mark an intentional exception `history-ok: <reason>`.
 
 **Import and picker previews must show enough to decide without leaving the page** (what it is, how big, how current, how well received, full detail on click; missing ≠ 0). Applies to every content type and to throwaway artifact previews: [ADDING_CONTENT_TYPE.md → Decision 8](.claude/docs/ADDING_CONTENT_TYPE.md#decision-8-import-preview--enough-for-an-informed-decision).
 
@@ -66,6 +70,8 @@
 **Browser verification is local-only.** Cloud / CI / fresh-machine sessions must **not** attempt the Clerk sign-in: run only the checklist above and label a user-visible PR `needs-demo-video` ([details](.docs/PR_WORKFLOW.md#demo-requirement-ready-for-review)).
 
 Unreadable `.env*` files are expected, not a broken setup. Evidence capture: [.docs/VERIFICATION.md](.docs/VERIFICATION.md).
+
+**Restart the verification servers after a backend schema change.** They serve the build from before the change; the symptom is `unknown field` on a new input field or a missing mutation. Fix: `verify-release`, then `verify-acquire`, then rerun the script.
 
 ## Resources
 

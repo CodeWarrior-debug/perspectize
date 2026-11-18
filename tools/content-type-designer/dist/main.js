@@ -42,7 +42,12 @@ function blankState() {
             icon: '',
             accent: '#3B6FD4',
             sharesUrlSpace: true,
-            thumbnail: ''
+            thumbnail: '',
+            contentPolicy: '',
+            duplicateFeedback: '',
+            addContentEntry: '',
+            mobileCardFields: '',
+            searchFields: ''
         },
         decisions: {},
         selected: ['youtube'],
@@ -176,6 +181,13 @@ function renderIngestion() {
             field('Link path pattern', input(d.detect?.path ?? '', (v) => {
                 d.detect = { hosts: d.detect?.hosts ?? [], path: v, examples: d.detect?.examples ?? [] };
             }, '^/art/collection/search/(\\d+)/?$'), 'Regular expression over the URL path. Group 1 is the external id. Try it in section 6.')
+        ]),
+        grid2([
+            field('Content policy', input(d.contentPolicy ?? '', (v) => (d.contentPolicy = v), 'Reject NC-17 and adult titles (CONTENT_NOT_ALLOWED)'), 'Adult / rating gate and the exact rejection message. Empty = undecided.'),
+            field('Duplicate-add feedback', input(d.duplicateFeedback ?? '', (v) => (d.duplicateFeedback = v), 'toast: "Already in Perspectize"'), 'What the form shows when the item already exists. Empty = undecided.'),
+            field('Add Content entry', input(d.addContentEntry ?? '', (v) => (d.addContentEntry = v), 'Autodetect <site> links; select label <Type>; notice only for this type'), 'How the type enters the single Add Content window: detection pattern, select label, extra fields or notices. Never a new header button. Empty = undecided.'),
+            field('Mobile card facts', input(d.mobileCardFields ?? '', (v) => (d.mobileCardFields = v), 'year, rating, runtime'), 'Replaces views / likes / channel on the card list. Empty = undecided.'),
+            field('Search fields', input(d.searchFields ?? '', (v) => (d.searchFields = v), 'title, cast, director'), 'Which fields the search box covers (scope picker). Empty = undecided.')
         ]),
         checkbox(d.urlRequired, (v) => (d.urlRequired = v), 'A URL is required to create this type'),
         checkbox(d.sharesUrlSpace, (v) => (d.sharesUrlSpace = v), 'The same URL may exist under another content type (relaxes the global UNIQUE(url) constraint — migration)')

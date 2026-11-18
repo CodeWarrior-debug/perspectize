@@ -24,6 +24,7 @@
 		{ href: '/discover', label: 'Discover' },
 		{ href: '/compare', label: 'Compare' },
 		{ href: '/plan', label: 'Plan' },
+		{ href: '/declare', label: 'Declare' },
 		{ href: '/import', label: 'Import' },
 	];
 

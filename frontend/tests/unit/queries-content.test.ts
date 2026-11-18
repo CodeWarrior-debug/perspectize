@@ -81,6 +81,11 @@ describe('GraphQL query definitions', () => {
 	});
 
 	describe('LIST_CONTENT', () => {
+		it('selects the shaped `webPage` list payload (never the raw `response`)', () => {
+			expect(LIST_CONTENT).toMatch(/\bwebPage\b/);
+			expect(LIST_CONTENT).not.toMatch(/\bresponse\b/);
+		});
+
 		it('selects the shaped `movie` payload instead of the raw `response`', () => {
 			expect(LIST_CONTENT).toMatch(/\bmovie\b/);
 			expect(LIST_CONTENT).not.toMatch(/\bresponse\b/);

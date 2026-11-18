@@ -3,16 +3,27 @@ name: Frontend Tests
 on:
   pull_request:
     paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-test.yml'
+      - "frontend/**"
+      - ".github/workflows/frontend-test.yml"
+      - ".github/scripts/list-failed-tests.sh"
   push:
     branches: [main]
     paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-test.yml'
+      - "frontend/**"
+      - ".github/workflows/frontend-test.yml"
+      - ".github/scripts/list-failed-tests.sh"
 
+# A newer push to the same PR makes the older run pointless: cancel it. Pushes to
+# main get one group per commit (github.sha), so a main run is never cancelled.
+concurrency:
+  group: frontend-test-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: true
+
+# Three independent jobs run in parallel: a type-check failure, a unit failure
+# and a browser failure each show on their own, and none stops the others.
 jobs:
-  test:
+  check:
+    name: Type check (svelte-check)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -23,8 +34,33 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
-          cache: 'pnpm'
+          node-version: "24"
+          cache: "pnpm"
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      # Nothing ran this before, and 33 errors piled up in test harnesses (#728).
+      - name: svelte-check
+        working-directory: frontend
+        run: pnpm run check
+
+  unit:
+    name: Unit tests (coverage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: "pnpm"
           cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install dependencies
@@ -35,15 +71,19 @@ jobs:
         working-directory: frontend
         run: pnpm run test:coverage
 
-      - name: Install Playwright Chromium
+      # Runs even when the test step failed (see the script header).
+      - name: List failed test files
+        if: always()
         working-directory: frontend
-        run: pnpm exec playwright install --with-deps chromium
+        run: bash ../.github/scripts/list-failed-tests.sh
 
-      - name: Run browser-mode tests
-        working-directory: frontend
-        env:
-          SV_SCREENSHOTS_DIR: ${{ runner.temp }}/screenshots
-        run: pnpm run test:browser --browser.headless=true
+      - name: Upload test results
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: vitest-results-unit
+          path: frontend/test-results/
+          if-no-files-found: ignore
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v6
@@ -51,3 +91,67 @@ jobs:
         with:
           name: coverage-report
           path: frontend/coverage/
+
+  browser:
+    name: Browser tests (Chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: "pnpm"
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      # Cache the Chromium download, keyed on the installed Playwright version
+      # (pinned in package.json), so a version bump fetches the matching browser.
+      - name: Read Playwright version
+        id: playwright
+        working-directory: frontend
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium
+
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      # The cache holds the browser only; the OS libraries it needs are not cached.
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        working-directory: frontend
+        run: pnpm exec playwright install-deps chromium
+
+      - name: Run browser-mode tests
+        working-directory: frontend
+        env:
+          SV_SCREENSHOTS_DIR: ${{ runner.temp }}/screenshots
+        run: pnpm run test:browser --browser.headless=true --outputFile.json=./test-results/vitest-browser-results.json
+
+      - name: List failed test files
+        if: always()
+        working-directory: frontend
+        run: bash ../.github/scripts/list-failed-tests.sh
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: vitest-results-browser
+          path: frontend/test-results/
+          if-no-files-found: ignore

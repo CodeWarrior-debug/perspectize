@@ -54,7 +54,7 @@ export async function graphqlRequest<T>(document: string, variables?: Record<str
 /**
  * Like graphqlRequest, but sends no Authorization header and never awaits Clerk. Only for a
  * request whose result is the same for a signed-out and a signed-in viewer (the Activity list,
- * unless filter.minPerspectiveCount is set). Used by the route prefetch (#636).
+ * unless filter.minPerspectiveCount is set). Used by the route prefetch.
  */
 export function graphqlRequestAnonymous<T>(document: string, variables?: Record<string, unknown>): Promise<T> {
 	return graphqlClient.request<T>(document, variables, clientInfoHeaders());

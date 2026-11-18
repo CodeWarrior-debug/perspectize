@@ -286,6 +286,44 @@ func (r *mutationResolver) CreateContentFromYouTube(ctx context.Context, input m
 	}, nil
 }
 
+// CreateContentFromWebPage is the resolver for the createContentFromWebPage field.
+// The roles are the adder's picks; the service stores them in order.
+func (r *mutationResolver) CreateContentFromWebPage(ctx context.Context, input model.CreateContentFromWebPageInput) (*model.CreateContentResult, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+
+	content, err := r.ContentService.CreateFromWebPage(ctx, input.URL, input.WebPageRoles, authUser.ID)
+	if errors.Is(err, domain.ErrAlreadyExists) && content != nil {
+		return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: true}, nil
+	}
+	if err != nil {
+		if msg := webPageInputMessage(err); msg != "" {
+			// The message never says why (an SSRF refusal names no address).
+			return nil, errors.New(msg)
+		}
+		// Details are already logged server-side by the service layer.
+		slog.Error("creating webpage content failed", "userID", authUser.ID, "error", err)
+		return nil, fmt.Errorf("failed to save webpage")
+	}
+	return &model.CreateContentResult{Content: domainToModel(content), AlreadyExisted: false}, nil
+}
+
+// PreviewWebPage is the resolver for the previewWebPage field. It reads the
+// page for the Add dialog and writes nothing.
+func (r *queryResolver) PreviewWebPage(ctx context.Context, url string) (*model.WebPagePreview, error) {
+	preview, err := r.ContentService.PreviewWebPage(ctx, url)
+	if err != nil {
+		if msg := webPageInputMessage(err); msg != "" {
+			return nil, errors.New(msg)
+		}
+		slog.Error("previewing webpage failed", "error", err)
+		return nil, fmt.Errorf("failed to read webpage")
+	}
+	return webPagePreviewToModel(preview), nil
+}
+
 // CreateContentFromMovie is the resolver for the createContentFromMovie field.
 func (r *mutationResolver) CreateContentFromMovie(ctx context.Context, input model.CreateContentFromMovieInput) (*model.Content, error) {
 	// Identity comes from the session only; the input carries just the URL.
@@ -441,7 +479,13 @@ func passageTitleError(err error) error {
 
 // UpdateContentSourceData is the resolver for the updateContentSourceData field.
 func (r *mutationResolver) UpdateContentSourceData(ctx context.Context, contentID int) (*model.Content, error) {
-	content, err := r.ContentService.UpdateSourceData(ctx, contentID)
+	// The mutation is @auth, so a viewer is normally present. Viewer 0 is the
+	// anonymous fallback and can only refresh public rows.
+	var viewerID int
+	if viewer, err := auth.RequireAuth(ctx); err == nil {
+		viewerID = viewer.ID
+	}
+	content, err := r.ContentService.UpdateSourceData(ctx, contentID, viewerID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, fmt.Errorf("content not found")
@@ -460,10 +504,22 @@ func (r *mutationResolver) UpdateContentSourceData(ctx context.Context, contentI
 
 // CreateClaim is the resolver for the createClaim field.
 func (r *mutationResolver) CreateClaim(ctx context.Context, input model.CreateClaimInput) (*model.Content, error) {
+	// Identity comes from the session; a client-supplied userID only has to match it.
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	if input.UserID != 0 && input.UserID != authUser.ID {
+		return nil, fmt.Errorf("access denied: cannot create content for another user")
+	}
+
 	content, err := r.ContentService.CreateClaim(ctx, portservices.CreateClaimInput{
 		Text:            input.Text,
-		UserID:          input.UserID,
+		UserID:          authUser.ID,
 		ParentContentID: input.ParentContentID,
+		EffectiveDate:   input.EffectiveDate,
+		EvaluateBy:      input.EvaluateBy,
+		Privacy:         input.Privacy,
 	})
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidInput) {
@@ -474,10 +530,83 @@ func (r *mutationResolver) CreateClaim(ctx context.Context, input model.CreateCl
 		}
 		slog.Error("creating claim failed",
 			"error", err,
-			"userID", input.UserID,
+			"userID", authUser.ID,
 			"parentContentID", input.ParentContentID,
 		)
-		return nil, fmt.Errorf("failed to create claim: %v", err)
+		return nil, fmt.Errorf("failed to create claim")
+	}
+
+	return domainToModel(content), nil
+}
+
+// DeleteClaim is the resolver for the deleteClaim field.
+func (r *mutationResolver) DeleteClaim(ctx context.Context, id string, keepAnonymous *bool) (bool, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return false, fmt.Errorf("access denied: authentication required")
+	}
+	intID, err := strconv.Atoi(id)
+	if err != nil {
+		return false, fmt.Errorf("invalid content ID: %s", id)
+	}
+
+	err = r.ContentService.DeleteClaim(ctx, portservices.DeleteClaimInput{
+		ContentID:     intID,
+		ActorUserID:   authUser.ID,
+		KeepAnonymous: keepAnonymous != nil && *keepAnonymous,
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrClaimHasOthers) {
+			return false, &gqlerror.Error{
+				Message:    "This claim has perspectives or plan items from other users. Keep it as anonymous instead.",
+				Extensions: map[string]any{"code": "CLAIM_HAS_OTHERS"},
+			}
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return false, fmt.Errorf("content not found")
+		}
+		slog.Error("deleting claim failed",
+			"error", err,
+			"userID", authUser.ID,
+			"contentID", intID,
+		)
+		return false, fmt.Errorf("failed to delete claim")
+	}
+	return true, nil
+}
+
+// UpdateClaim is the resolver for the updateClaim field.
+func (r *mutationResolver) UpdateClaim(ctx context.Context, id string, input model.UpdateClaimInput) (*model.Content, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+	intID, err := strconv.Atoi(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid content ID: %s", id)
+	}
+
+	content, err := r.ContentService.UpdateClaim(ctx, portservices.UpdateClaimInput{
+		ContentID:     intID,
+		ActorUserID:   authUser.ID,
+		Text:          input.Text,
+		EffectiveDate: input.EffectiveDate,
+		EvaluateBy:    input.EvaluateBy,
+		Privacy:       input.Privacy,
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("invalid input: %w", err)
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("content not found")
+		}
+		slog.Error("updating claim failed",
+			"error", err,
+			"userID", authUser.ID,
+			"contentID", intID,
+		)
+		return nil, fmt.Errorf("failed to update claim")
 	}
 
 	return domainToModel(content), nil
@@ -506,10 +635,11 @@ func (r *queryResolver) ContentByID(ctx context.Context, id string) (*model.Cont
 		if !found {
 			return nil, fmt.Errorf("content not found with ID: %s", id)
 		}
-		out := &model.Content{ID: strconv.Itoa(intID)}
-		if agg != nil {
-			out.ImportJobID = agg.ImportJobID
+		if !canViewContent(ctx, agg.ContentPrivacy, agg.ContentOwnerID) {
+			return nil, nil
 		}
+		out := &model.Content{ID: strconv.Itoa(intID)}
+		out.ImportJobID = agg.ImportJobID
 		return out, nil
 	}
 
@@ -523,6 +653,12 @@ func (r *queryResolver) ContentByID(ctx context.Context, id string) (*model.Cont
 		}
 		slog.Error("getting content failed", "id", id, "error", err)
 		return nil, fmt.Errorf("failed to get content")
+	}
+
+	// Private content is visible only to its owner; return nil (not an error)
+	// so the id's existence isn't disclosed — same convention as PerspectiveByID.
+	if !canViewContent(ctx, content.Privacy, content.AddedByUserID) {
+		return nil, nil
 	}
 
 	return domainToModel(content), nil
@@ -594,6 +730,7 @@ func (r *queryResolver) Content(ctx context.Context, first *int, after *string, 
 		params.Filter.MaxPages = filter.MaxPages
 		params.Filter.MinBookRating = filter.MinBookRating
 		params.Filter.MaxBookRating = filter.MaxBookRating
+		params.Filter.WebPageRoles = filter.WebPageRoles
 		params.Filter.MinViewCount = filter.MinViewCount
 		params.Filter.MaxViewCount = filter.MaxViewCount
 		params.Filter.MinLikeCount = filter.MinLikeCount

@@ -71,6 +71,17 @@ A contiguous range of verses in one book. See the Scripture context.
 **Claim**:
 A single proposition stated so it can be affirmed or denied.
 
+**Defined term**:
+A word or phrase people can define, identified by the term and its language. Parent of its definitions; a term needs no dictionary entry to exist. Designed, not shipped.
+_Avoid_: Word, entry, lemma
+
+**Definition**:
+One meaning of a defined term, either taken from the dictionary or written by a person. Belongs to exactly one defined term; two identical texts under one term are the same definition. Designed, not shipped.
+_Avoid_: Sense, meaning, gloss
+
+**Dictionary definition / Custom definition**:
+A definition filled from the dictionary source and shown with its credit, and a definition written by a person. Both are definitions; only where they came from differs.
+
 **Book**:
 A published work, not a particular physical copy. Identified by its Open Library work, so every edition of the same work is one book.
 _Avoid_: Edition, copy

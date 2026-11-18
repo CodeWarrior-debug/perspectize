@@ -24,7 +24,7 @@
 		planPercentLabel,
 		planStatusLabel,
 		planTypeLabel,
-		serverSortFor,
+		serverSortFromColumnState,
 	} from '$lib/utils/plan-grid-config';
 	import { addPerspectiveDisabledReason, type TodoFocusField } from '$lib/utils/plan-todo-helpers';
 
@@ -78,13 +78,7 @@
 				gridReady = true;
 			},
 			onSortChanged: (event: SortChangedEvent<UserTodoItem>) => {
-				const sorted = event.api
-					.getColumnState()
-					.filter((c) => c.sort)
-					.sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
-				const first = sorted[0];
-				const sortBy = first ? serverSortFor(first.colId) : null;
-				onSortChange(sortBy && first.sort ? { sortBy, sortOrder: first.sort === 'asc' ? 'ASC' : 'DESC' } : null);
+				onSortChange(serverSortFromColumnState(event.api.getColumnState()));
 			},
 			onCellClicked: (event: CellClickedEvent<UserTodoItem>) => {
 				const todo = event.data;

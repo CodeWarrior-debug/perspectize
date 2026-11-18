@@ -11,13 +11,21 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/auth"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/adapters/graphql/model"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
 
-// SetPrimaryCategory is the resolver for the setPrimaryCategory field.
+// SetPrimaryCategory is the resolver for the setPrimaryCategory field. The actor
+// is derived from the session, never from client input, and the service only
+// touches content that actor may see.
 func (r *mutationResolver) SetPrimaryCategory(ctx context.Context, input model.SetPrimaryCategoryInput) (*model.Content, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+
 	description := ""
 	if input.Description != nil {
 		description = *input.Description
@@ -28,6 +36,7 @@ func (r *mutationResolver) SetPrimaryCategory(ctx context.Context, input model.S
 	}
 
 	serviceInput := portservices.SetPrimaryCategoryInput{
+		ActorUserID: authUser.ID,
 		ContentID:   input.ContentID,
 		QID:         input.Qid,
 		Label:       input.Label,
@@ -45,6 +54,29 @@ func (r *mutationResolver) SetPrimaryCategory(ctx context.Context, input model.S
 		}
 		slog.Error("setting primary category failed", "error", err, "contentID", input.ContentID)
 		return nil, fmt.Errorf("failed to set primary category: %v", err)
+	}
+
+	return domainToModel(content), nil
+}
+
+// RemovePrimaryCategory is the resolver for the removePrimaryCategory field. The actor is
+// derived from the session, and the service only touches content that actor may see.
+func (r *mutationResolver) RemovePrimaryCategory(ctx context.Context, contentID int) (*model.Content, error) {
+	authUser, err := auth.RequireAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("access denied: authentication required")
+	}
+
+	content, err := r.CategoryService.RemovePrimaryCategory(ctx, authUser.ID, contentID)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return nil, fmt.Errorf("invalid input: %w", err)
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, fmt.Errorf("content not found")
+		}
+		slog.Error("removing primary category failed", "error", err, "contentID", contentID)
+		return nil, fmt.Errorf("failed to remove primary category: %v", err)
 	}
 
 	return domainToModel(content), nil

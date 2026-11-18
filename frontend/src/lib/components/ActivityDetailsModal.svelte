@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { LengthDisplay } from '$lib/queries/content';
+	import type { LengthDisplay, WebPageListMeta } from '$lib/queries/content';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import XIcon from '@lucide/svelte/icons/x';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
@@ -25,6 +25,10 @@
 	import MovieBody from '$lib/components/MovieBody.svelte';
 	import BookTiles from '$lib/components/BookTiles.svelte';
 	import BookBody from '$lib/components/BookBody.svelte';
+	import WebPageTiles from '$lib/components/WebPageTiles.svelte';
+	import WebPageBody from '$lib/components/WebPageBody.svelte';
+	import { webPageSite } from '$lib/utils/webPage';
+	import { useContentDetails } from '$lib/queries/content/useContentDetails';
 	import { bookAuthors, bookResponse, openLibraryCoverUrl } from '$lib/utils/bookFormatting';
 	import PassageText from '$lib/components/PassageText.svelte';
 	import PassagePositionBar from '$lib/components/PassagePositionBar.svelte';
@@ -56,6 +60,8 @@
 		movie?: unknown;
 		// BOOK rows only: the shaped Open Library payload selected by LIST_CONTENT / GET_CONTENT_DETAILS.
 		book?: unknown;
+		// WEB_PAGE rows: the shaped list payload (site, published, roles, og image).
+		webPage?: WebPageListMeta | null;
 		response?: unknown;
 	}
 
@@ -74,6 +80,26 @@
 
 	const isMovie = $derived(content?.contentType === 'MOVIE');
 	const isBook = $derived(content?.contentType === 'BOOK');
+	const isWebPage = $derived(content?.contentType === 'WEB_PAGE');
+	// A list row carries the shaped webpage payload but not `response` (the metadata behind the Fetched
+	// tile and the description). Load the details for that one page while the modal is open. A row that
+	// already has `response`, or a closed modal, makes no request. The hook's key is the one a deep link
+	// uses, so the two share a cache entry.
+	const needsWebPageDetails = $derived(open && isWebPage && content != null && content.response == null);
+	const webPageDetails = useContentDetails(() => (needsWebPageDetails && content ? content.id : null));
+	const webPageState = $derived<'loading' | 'failed' | 'loaded'>(
+		!needsWebPageDetails
+			? 'loaded'
+			: webPageDetails.isError
+				? 'failed'
+				: webPageDetails.isPending
+					? 'loading'
+					: 'loaded',
+	);
+	/** The row with its loaded details `response` merged in. A row that already has one is returned as is. */
+	function withWebPageDetails(row: ModalContent): ModalContent {
+		return { ...row, response: row.response ?? webPageDetails.data?.contentByID?.response ?? null };
+	}
 	const isPassage = $derived(content?.contentType === 'BIBLE_PASSAGE');
 	const hasVerseRange = $derived(isPassage && content?.verseStartID != null && content?.verseEndID != null);
 	const setPassageTitle = useSetPassageDisplayTitle();
@@ -156,7 +182,9 @@
 								? 'Movie'
 								: isBook
 									? 'Book'
-									: 'YouTube Video'}
+									: isWebPage
+										? 'Webpage'
+										: 'YouTube Video'}
 				</DialogTitle>
 				<DialogClose class="text-primary-foreground/80 hover:text-primary-foreground">
 					<XIcon class="size-[18px]" />
@@ -234,6 +262,16 @@
 										onerror={(e) => e.currentTarget.remove()}
 									/>
 								{/if}
+							{:else if isWebPage}
+								{#if content.webPage?.imageUrl}
+									<img
+										src={content.webPage.imageUrl}
+										alt=""
+										referrerpolicy="no-referrer"
+										class="h-full w-full object-cover"
+										onerror={(e) => e.currentTarget.remove()}
+									/>
+								{/if}
 							{:else if thumbSrc}
 								<img
 									src={thumbSrc}
@@ -257,7 +295,9 @@
 								{#if isBook}
 									{#if authorNames}<div class="mt-1 text-[13px] text-muted-foreground">{authorNames}</div>{/if}
 								{:else}
-									<div class="mt-1 text-[13px] text-muted-foreground">{content.channelTitle}</div>
+									{#if isWebPage}<div class="mt-1 text-[13px] text-muted-foreground">
+											{webPageSite(content) ?? ''}
+										</div>{:else}<div class="mt-1 text-[13px] text-muted-foreground">{content.channelTitle}</div>{/if}
 								{/if}
 							{/if}
 						</div>
@@ -315,6 +355,8 @@
 						/>
 					{:else if isBook}
 						<BookTiles row={content} />
+					{:else if isWebPage}
+						<WebPageTiles row={withWebPageDetails(content)} loading={webPageState === 'loading'} />
 					{:else if !isPassage}
 						<div class="rounded-lg border border-border bg-muted px-3 py-2.5">
 							<div class="text-[11px] tracking-wide text-muted-foreground uppercase">Views</div>
@@ -400,7 +442,7 @@
 						{#if onAddToPlan}
 							<AddToPlanButton variant="text" class="grow basis-36" onclick={() => onAddToPlan(content)} />
 						{/if}
-						{#if !isPassage && !isMovie}
+						{#if !isPassage && !isMovie && !isWebPage}
 							<button
 								type="button"
 								disabled={updateSourceData.isPending || cooldown.active}
@@ -417,14 +459,14 @@
 							</button>
 						{/if}
 					</div>
-					{#if !isPassage && !isMovie && cooldown.active}
+					{#if !isPassage && !isMovie && !isWebPage && cooldown.active}
 						<div class="mt-1.5 text-[11px] text-muted-foreground">
 							This was updated recently. Check back in {formatRemainingTime(cooldown.remainingMs)} to refresh again.
 						</div>
 					{/if}
 				</div>
 
-				{#if !isPassage && !isMovie && !isBook && hasDescription}
+				{#if !isPassage && !isMovie && !isBook && !isWebPage && hasDescription}
 					<div class="mt-3.5 border-t border-border pt-3.5">
 						<div class="mb-1.5 text-[11px] tracking-wide text-muted-foreground uppercase">Description</div>
 						<div class="font-slot-longform font-serif text-[13px] whitespace-pre-wrap text-foreground">
@@ -444,6 +486,10 @@
 
 				{#if isBook}
 					<BookBody row={content} />
+				{/if}
+
+				{#if isWebPage}
+					<WebPageBody row={withWebPageDetails(content)} state={webPageState} />
 				{/if}
 
 				{#if isMovie}

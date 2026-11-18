@@ -25,7 +25,7 @@ describe('detectContentType', () => {
 	const bg = 'https://www.biblegateway.com/passage/?search=Genesis+1%3A1-3&version=NIV';
 	const gw = { type: 'BIBLE_PASSAGE', range: GEN_1_1_3, source: 'biblegateway' };
 	const txt = (range: unknown) => ({ type: 'BIBLE_PASSAGE', range, source: 'text' });
-	const claim = (text: string) => ({ type: 'CLAIM', text });
+	const webPage = (url: string) => ({ type: 'WEB_PAGE', url });
 	const cases: Array<[string, string, unknown]> = [
 		['youtube watch url', yt, { type: 'YOUTUBE_VIDEO', url: yt }],
 		['youtube url with surrounding whitespace', `  ${yt}  `, { type: 'YOUTUBE_VIDEO', url: yt }],
@@ -56,7 +56,14 @@ describe('detectContentType', () => {
 			'https://openlibrary.org/books/OL7353617M/Some_title',
 			{ type: 'BOOK', url: 'https://openlibrary.org/books/OL7353617M/Some_title' },
 		],
-		['open library author url is never a book or a claim', 'https://openlibrary.org/authors/OL23919A', { type: null }],
+		[
+			'open library author page is not a book, so it is a webpage',
+			'https://openlibrary.org/authors/OL23919A',
+			{ type: 'WEB_PAGE', url: 'https://openlibrary.org/authors/OL23919A' },
+		],
+		['arxiv article is a webpage', 'https://arxiv.org/abs/1706.03762', webPage('https://arxiv.org/abs/1706.03762')],
+		['plain http page is a webpage', '  http://example.com/a  ', webPage('http://example.com/a')],
+		['youtube channel page is not a webpage', 'https://www.youtube.com/@someone', { type: null }],
 		['tmdb tv url is not a movie', 'https://www.themoviedb.org/tv/1399', { type: null }],
 		['bible gateway url', bg, gw],
 		[
@@ -68,21 +75,38 @@ describe('detectContentType', () => {
 		['typed reference', 'Genesis 1:1-3', txt(GEN_1_1_3)],
 		['typed reference with padding', '  Genesis 1:1-3 ', txt(GEN_1_1_3)],
 		['chapter-only reference is a valid passage', 'John 3', txt(JOHN_3)],
-		['multi-word free text is a claim', 'Love one another', claim('Love one another')],
-		[
-			'reference embedded in a sentence is a claim',
-			'John 3:16 is my favorite verse',
-			claim('John 3:16 is my favorite verse'),
-		],
-		['claim text is trimmed', '  Grace is unearned ', claim('Grace is unearned')],
+		['multi-word free text is no match', 'Love one another', { type: null }],
+		['reference embedded in a sentence is no match', 'John 3:16 is my favorite verse', { type: null }],
+		['free text is trimmed and still no match', '  Grace is unearned ', { type: null }],
 		['empty', '', { type: null }],
 		['whitespace only', '   ', { type: null }],
 		['single bare word is not guessed', 'grace', { type: null }],
-		['non-bible-gateway url', 'https://example.com/passage/?search=Genesis+1%3A1-3', { type: null }],
-		['bible gateway lookalike host', 'https://evilbiblegateway.com/passage/?search=Genesis+1%3A1-3', { type: null }],
-		['bible gateway url without search', 'https://www.biblegateway.com/versions/', { type: null }],
-		['bible gateway url with unparseable search', 'https://www.biblegateway.com/passage/?search=love', { type: null }],
-		['non-youtube url is not a claim', 'https://example.com/some-article', { type: null }],
+		[
+			'non-bible-gateway url with a passage-looking query is a webpage',
+			'https://example.com/passage/?search=Genesis+1%3A1-3',
+			webPage('https://example.com/passage/?search=Genesis+1%3A1-3'),
+		],
+		[
+			'bible gateway lookalike host is a webpage',
+			'https://evilbiblegateway.com/passage/?search=Genesis+1%3A1-3',
+			webPage('https://evilbiblegateway.com/passage/?search=Genesis+1%3A1-3'),
+		],
+		[
+			'bible gateway url without search is claimed, not a webpage',
+			'https://www.biblegateway.com/versions/',
+			{ type: null },
+		],
+		[
+			'bible gateway url with unparseable search is claimed, not a webpage',
+			'https://www.biblegateway.com/passage/?search=love',
+			{ type: null },
+		],
+		[
+			'non-youtube url is a webpage, not a claim',
+			'https://example.com/some-article',
+			webPage('https://example.com/some-article'),
+		],
+		['ftp url is not a webpage', 'ftp://example.com/file.pdf', { type: null }],
 		['bare host', 'example.com', { type: null }],
 		['scheme-less youtube-like text', 'youtube.com/watch?v=abc', { type: null }],
 	];

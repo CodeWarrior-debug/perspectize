@@ -2,8 +2,7 @@
 	/**
 	 * Empty-state picker for /compare with no ?contentId — lets a visitor
 	 * search for content and jump straight into a comparison, instead of the
-	 * page being a dead end that only explains "open it from Library"
-	 * (compare-page-enhancements #1).
+	 * page being a dead end that only explains "open it from Library".
 	 *
 	 * Only surfaces content with 2+ perspectives visible to the viewer
 	 * (comparison needs two takes), filtered server-side via

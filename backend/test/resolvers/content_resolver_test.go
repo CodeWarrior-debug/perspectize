@@ -90,12 +90,27 @@ func (m *mockContentRepository) ReassignByUser(ctx context.Context, fromUserID, 
 	return nil
 }
 
+func (m *mockContentRepository) DeleteOwnedClaim(ctx context.Context, id, ownerID int) error {
+	return nil
+}
+
+func (m *mockContentRepository) AnonymizeOwnedClaim(ctx context.Context, id, ownerID int) error {
+	return nil
+}
+
+func (m *mockContentRepository) UpdateClaim(ctx context.Context, id, ownerID int, text, html string, customFields json.RawMessage, privacy *domain.Privacy) (*domain.Content, error) {
+	return nil, domain.ErrNotFound
+}
+
 // UpdatePrimaryCategoryID emulates UPDATE ... RETURNING against getByIDFn's
 // row: missing content is ErrNotFound, otherwise the row with the new FK.
-func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int) (*domain.Content, error) {
+func (m *mockContentRepository) UpdatePrimaryCategoryID(ctx context.Context, contentID int, categoryID *int, viewerID int) (*domain.Content, error) {
 	got, err := m.GetByID(ctx, contentID)
 	if err != nil {
 		return nil, err
+	}
+	if !got.VisibleTo(viewerID) {
+		return nil, domain.ErrNotFound
 	}
 	cp := *got
 	cp.PrimaryCategoryID = categoryID
@@ -533,7 +548,7 @@ func TestContentQuery_NotFound_ReturnsError(t *testing.T) {
 
 	result := executeGraphQL(t, server, `{ contentByID(id: "999") { id name } }`)
 
-	// Issue #18 fix: should return an error, not a silent null
+	// Should return an error, not a silent null
 	require.NotEmpty(t, result.Errors, "Expected an error when content is not found")
 	assert.Contains(t, result.Errors[0].Message, "content not found")
 }
@@ -682,7 +697,7 @@ func TestCreateContentFromYouTube_DerivesUserIDFromSession_WhenZero(t *testing.T
 }
 
 func TestCreateContentFromYouTube_RejectsSpoofedUserID(t *testing.T) {
-	// Issue #246: a non-zero userId that doesn't match the authenticated
+	// A non-zero userId that doesn't match the authenticated
 	// session must be rejected, not trusted verbatim.
 	metadata := &portservices.VideoMetadata{
 		Title:    "Amazing Video",
@@ -1462,6 +1477,55 @@ func TestSetPrimaryCategory_ContentNotFound(t *testing.T) {
 	defer server.Close()
 
 	result := executeGraphQL(t, server, `mutation { setPrimaryCategory(input: { contentId: 999, qid: "Q12345", label: "Science" }) { id } }`)
+
+	require.NotEmpty(t, result.Errors)
+	assert.Contains(t, result.Errors[0].Message, "content not found")
+}
+
+// --- RemovePrimaryCategory Mutation Tests ---
+
+func TestRemovePrimaryCategory_Success(t *testing.T) {
+	catID := 42
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return &domain.Content{
+				ID:                id,
+				Name:              "Test Video",
+				ContentType:       domain.ContentTypeYouTubeVideo,
+				PrimaryCategoryID: &catID,
+			}, nil
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { removePrimaryCategory(contentId: 1) { id name } }`)
+
+	assert.Empty(t, result.Errors)
+
+	var data struct {
+		RemovePrimaryCategory struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"removePrimaryCategory"`
+	}
+	require.NoError(t, json.Unmarshal(result.Data, &data))
+	assert.Equal(t, "1", data.RemovePrimaryCategory.ID)
+	assert.Equal(t, "Test Video", data.RemovePrimaryCategory.Name)
+}
+
+func TestRemovePrimaryCategory_ContentNotFound(t *testing.T) {
+	repo := &mockContentRepository{
+		getByIDFn: func(ctx context.Context, id int) (*domain.Content, error) {
+			return nil, domain.ErrNotFound
+		},
+	}
+
+	server := setupTestServer(repo, &mockYouTubeClient{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { removePrimaryCategory(contentId: 999) { id } }`)
 
 	require.NotEmpty(t, result.Errors)
 	assert.Contains(t, result.Errors[0].Message, "content not found")

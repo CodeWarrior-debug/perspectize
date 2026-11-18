@@ -55,6 +55,8 @@
 		percentLikedValueGetter,
 		formatPercentLiked,
 		formatPublishDate,
+		formatClaimDate,
+		formatRatingScore,
 		formatTags,
 		contentTags,
 		truncateDescription,
@@ -88,7 +90,9 @@
 		durationComparator,
 		unknownLastComparator,
 		releasedComparator,
+		labelComparator,
 		itemColumnHeader,
+		soloTypeFilter,
 		ratedComparator,
 		CLIENT_ONLY_SORT_COLS,
 		sortableColumnsFor,
@@ -99,6 +103,7 @@
 		PERSON_FILTER_KEY,
 		parsePersonFilter,
 		rowMatchesPerson,
+		perspectiveRating,
 		showColumnRelevanceCallout,
 		NUMERIC_COL_IDS,
 		liveGridApi,
@@ -144,11 +149,20 @@
 	import DataModeToggle from '$lib/components/DataModeToggle.svelte';
 	import FilterChips from '$lib/components/FilterChips.svelte';
 	import ColumnRelevanceCallout from '$lib/components/ColumnRelevanceCallout.svelte';
-	import { ContentTypeFilter, AgeRatingFilter } from '$lib/utils/contentTypeFilter';
+	import { ContentTypeFilter, AgeRatingFilter, WebRoleFilter } from '$lib/utils/contentTypeFilter';
 	import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
 	import ActivityCardList from '$lib/components/ActivityCardList.svelte';
 	import AddToPlanDialog from '$lib/components/plan/AddToPlanDialog.svelte';
 	import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
+	import {
+		webAuthorCellRenderer,
+		webPublishedFilterValueGetter,
+		webPublishedValueGetter,
+		webRolesCellRenderer,
+		webSiteCellRenderer,
+		formatWebPublished,
+	} from '$lib/utils/webPageFormatting';
+	import { webPageAuthor, webPageSite } from '$lib/utils/webPage';
 	import CategoryTypeahead from '$lib/components/CategoryTypeahead.svelte';
 	import { useSetPrimaryCategory } from '$lib/queries/categories/useSetPrimaryCategory';
 	import type { WikidataSearchResult } from '$lib/queries/categories';
@@ -511,10 +525,9 @@
 
 	// The mobile card list has no AG Grid instance to sort or filter for it. In "All
 	// Items" mode the server already returned rows in the requested (and filtered)
-	// order; in "Loaded" mode, apply clientSorts and the URL filters by hand — this
-	// used to only sort, so a mobile "Loaded"-mode card view silently ignored every
-	// column filter (see the UI gap audit, gap #5). On desktop, AG Grid does both
-	// itself, so this is a no-op there.
+	// order; in "Loaded" mode, apply clientSorts and the URL filters by hand, or the
+	// mobile card view would silently ignore every column filter. On desktop, AG Grid
+	// does both itself, so this is a no-op there.
 	const sortedRowData = $derived(
 		mode === 'loaded' && cardMode
 			? (() => {
@@ -639,7 +652,7 @@
 				lockPinned: true,
 				headerName: 'Item',
 				flex: 2,
-				minWidth: 185,
+				minWidth: 175, // a floor only: Item is flex 2 and grows; 10px less keeps the YouTube lg set inside 1212px
 
 				filter: 'agTextColumnFilter',
 				filterValueGetter: (params) => params.data?.name ?? '',
@@ -665,10 +678,85 @@
 				headerName: 'Category',
 				headerTooltip: 'Wikidata category',
 				width: 150,
-				sortable: false,
+				// Sortable only in "Loaded" mode: the effect below toggles `sortable` per mode (clientOnlySort).
 				filter: false,
+				valueGetter: (params) => params.data?.primaryCategory?.label ?? null,
+				comparator: labelComparator,
 				cellRenderer: categoryCellRenderer,
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.category },
+				hide: true,
+			},
+			// Claim date columns (Content.customFields). Hidden by default; the responsive effect
+			// shows them in the claim view. Sorted client-side (the backend cannot sort on custom fields).
+			{
+				colId: 'effectiveDate',
+				headerName: 'Effective',
+				headerTooltip: 'The date the claim takes effect.',
+				width: 120,
+				sortable: true,
+				filter: 'agDateColumnFilter',
+				filterValueGetter: (params) => {
+					const v = params.data?.customFields?.effectiveDate;
+					return v ? new Date(`${v}T00:00:00`) : null;
+				},
+				comparator: releasedComparator,
+				valueGetter: (params) => params.data?.customFields?.effectiveDate ?? null,
+				valueFormatter: (params) => formatClaimDate(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.effectiveDate },
+				hide: true,
+			},
+			{
+				colId: 'evaluateBy',
+				headerName: 'Evaluate by',
+				headerTooltip: 'The date by which the claim should be evaluated.',
+				width: 120,
+				sortable: true,
+				filter: 'agDateColumnFilter',
+				filterValueGetter: (params) => {
+					const v = params.data?.customFields?.evaluateBy;
+					return v ? new Date(`${v}T00:00:00`) : null;
+				},
+				comparator: releasedComparator,
+				valueGetter: (params) => params.data?.customFields?.evaluateBy ?? null,
+				valueFormatter: (params) => formatClaimDate(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.evaluateBy },
+				hide: true,
+			},
+			// The viewer's own ratings (0-100). Read from the perspective map in the grid context;
+			// refreshed with the perspectize column when that map changes.
+			{
+				colId: 'myQuality',
+				headerName: 'My overall',
+				headerTooltip: 'Your overall rating of this claim (0-100).',
+				width: 110,
+				sortable: false,
+				filter: 'agNumberColumnFilter',
+				valueGetter: (params) => perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'quality'),
+				valueFormatter: (params) => formatRatingScore(params.value),
+				hide: true,
+			},
+			{
+				colId: 'myImportance',
+				headerName: 'My importance',
+				headerTooltip: 'Your importance rating of this claim (0-100).',
+				width: 120,
+				sortable: false,
+				filter: 'agNumberColumnFilter',
+				valueGetter: (params) =>
+					perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'importance'),
+				valueFormatter: (params) => formatRatingScore(params.value),
+				hide: true,
+			},
+			{
+				colId: 'myAgreement',
+				headerName: 'My agreement',
+				headerTooltip: 'Your agreement rating with this claim (0-100).',
+				width: 120,
+				sortable: false,
+				filter: 'agNumberColumnFilter',
+				valueGetter: (params) =>
+					perspectiveRating(params.context?.perspectivesByContentId, params.data?.id, 'agreement'),
+				valueFormatter: (params) => formatRatingScore(params.value),
 				hide: true,
 			},
 			// Movie columns (TMDB). Hidden by default; the responsive effect shows the Movie
@@ -900,6 +988,64 @@
 				headerTooltip: 'Video description from YouTube API',
 				hide: true,
 			},
+			// Webpage columns. Hidden by default; the responsive effect shows the Webpage default set when
+			// the type filter is exactly WEB_PAGE. Roles is picker-only (never in the default set); its header
+			// filter is server-side only (f.webrole), since Loaded mode cannot filter a multi-valued field.
+			// Site shows from sm up, Published from md up.
+			{
+				colId: 'webSite',
+				headerName: 'Site',
+				flex: 1,
+				maxWidth: 200,
+				filter: 'agTextColumnFilter',
+				valueGetter: (params) => webPageSite({ url: params.data?.url ?? null, webPage: params.data?.webPage }),
+				filterValueGetter: (params) =>
+					webPageSite({ url: params.data?.url ?? null, webPage: params.data?.webPage }) ?? '',
+				cellRenderer: webSiteCellRenderer,
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webSite },
+				headerTooltip: 'Site name the page declares, or its domain',
+				hide: true,
+			},
+			{
+				colId: 'webPublished',
+				headerName: 'Published',
+				flex: 0.8,
+				minWidth: 105,
+				maxWidth: 150,
+				filter: 'agDateColumnFilter',
+				valueGetter: (params) => webPublishedValueGetter({ data: params.data }),
+				filterValueGetter: (params) => webPublishedFilterValueGetter({ data: params.data }),
+				valueFormatter: (params) => formatWebPublished(params.value),
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webPublished },
+				headerTooltip: 'Date the page declares it was published',
+				hide: true,
+			},
+			{
+				colId: 'webRoles',
+				headerName: 'Roles',
+				flex: 1,
+				maxWidth: 220,
+				sortable: false,
+				filter: WebRoleFilter,
+				cellRenderer: webRolesCellRenderer,
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webRoles },
+				headerTooltip: 'What the page is for, as set by whoever added it',
+				hide: true,
+			},
+			{
+				colId: 'webAuthor',
+				headerName: 'Author',
+				flex: 1.2,
+				minWidth: 120,
+				filter: 'agTextColumnFilter',
+				valueGetter: (params) => webPageAuthor({ url: params.data?.url ?? null, webPage: params.data?.webPage }),
+				filterValueGetter: (params) =>
+					webPageAuthor({ url: params.data?.url ?? null, webPage: params.data?.webPage }) ?? '',
+				cellRenderer: webAuthorCellRenderer,
+				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.webAuthor },
+				headerTooltip: 'Author the page declares',
+				hide: true,
+			},
 			// Book columns (Open Library). Hidden by default; the responsive effect shows the Book default
 			// set when the type filter is exactly BOOK. Author sorts on the server (AUTHOR). Published, Pages
 			// and Rating sort in "Loaded" mode only; all three filter on the server (f.published, f.pages, f.bookrating). Editions and Readers are picker-only.
@@ -921,7 +1067,8 @@
 				headerName: 'Published',
 				flex: 0.8,
 				minWidth: 105,
-				maxWidth: 130,
+				// Raised to fit the header floor ("Published" + sort arrow, order number and funnel).
+				maxWidth: 140,
 				filter: 'agNumberColumnFilter',
 				// A number to sort by, shown as the plain year (never through the thousands-separated formatter).
 				valueGetter: (params) => {
@@ -938,7 +1085,8 @@
 				headerName: 'Pages',
 				flex: 0.6,
 				minWidth: 70,
-				maxWidth: 110,
+				// Raised to fit the header floor ("Pages" + sort arrow, order number and funnel).
+				maxWidth: 120,
 				filter: 'agNumberColumnFilter',
 				valueGetter: pagesValueGetter,
 				comparator: unknownLastComparator,
@@ -951,7 +1099,8 @@
 				headerName: 'Book rating',
 				flex: 0.7,
 				minWidth: 128,
-				maxWidth: 150,
+				// Raised to fit the header floor ("Book rating" + sort arrow, order number and funnel).
+				maxWidth: 160,
 				filter: 'agNumberColumnFilter',
 				valueGetter: ratingValueGetter,
 				comparator: unknownLastComparator,
@@ -1388,7 +1537,7 @@
 				perspectivesByContentId,
 				onOpenDetails: handleOpenDetails,
 			});
-			gridApi.refreshCells({ columns: ['perspectize'], force: true });
+			gridApi.refreshCells({ columns: ['perspectize', 'myQuality', 'myImportance', 'myAgreement'], force: true });
 		}
 	});
 
@@ -1397,7 +1546,7 @@
 	// sm (445-639): Perspectize, Item, Type, Category, Channel
 	// md (640-899): Perspectize, Item, Type, Category, Channel, Duration, Date
 	// lg (900+):    Perspectize, Item, Type, Category, Channel, Duration, Date, Views, Likes, Tags
-	// With the type filter exactly MOVIE (or BOOK), the Movie (or Book) set applies instead (defaultColumnVisibility).
+	// With the type filter exactly MOVIE, BOOK or CLAIM, that view's set applies instead (defaultColumnVisibility).
 	// A view with a saved setup (column picker) shows that instead of its defaults, which
 	// also re-applies it after a grid remount (cardMode toggle, error recovery).
 	// Switching view (e.g. to exactly MOVIE) shows a toast offering the previous columns back.
@@ -1413,6 +1562,9 @@
 		// Read synchronously, before the rAF, so this effect re-runs when they change.
 		const tier = responsiveTier;
 		const view = columnView;
+		// Read synchronously too: a change of the one type named (youtube -> bible_passage) keeps the
+		// view but moves Type's visibility, so the effect must re-run on it.
+		const solo = soloTypeFilter(filters.type);
 		const prevView = lastColumnView;
 		lastColumnView = view;
 		const current = prevView !== null && prevView !== view ? currentVisibility() : {};
@@ -1421,7 +1573,7 @@
 			view,
 			current,
 			saved: loadLayout(view),
-			defaults: defaultLayout(tier, view),
+			defaults: defaultLayout(tier, view, solo),
 		});
 		requestAnimationFrame(() => {
 			if (api.isDestroyed()) return; // Grid may have been destroyed before rAF fires

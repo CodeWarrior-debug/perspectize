@@ -34,11 +34,10 @@ func TestBuildInfoService_ReadsSVLEnvVars(t *testing.T) {
 	assert.Equal(t, "v2024.01.09-abc1234", info.Tag)
 }
 
-// TestBuildInfoService_FallsBackToShortSHAWhenBuildTagUnset covers a
-// semantic change from the original #495 behaviour: pkg/buildinfo.Info now
-// derives Tag from a short7sha of the resolved commit when BUILD_TAG isn't
-// set, rather than reporting "unknown", so /version and the OpenTelemetry
-// app.build.info gauge (which already did this) agree.
+// TestBuildInfoService_FallsBackToShortSHAWhenBuildTagUnset covers that
+// pkg/buildinfo.Info derives Tag from a short7sha of the resolved commit when
+// BUILD_TAG isn't set, rather than reporting "unknown", so /version and the
+// OpenTelemetry app.build.info gauge agree.
 func TestBuildInfoService_FallsBackToShortSHAWhenBuildTagUnset(t *testing.T) {
 	t.Setenv("SVL_DEPLOYMENT_COMMIT_SHA", "abc1234def")
 	t.Setenv("SVL_DEPLOYMENT_BRANCH", "main")

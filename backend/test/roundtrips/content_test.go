@@ -117,8 +117,34 @@ func TestSetPrimaryCategory(t *testing.T) {
 	require.Equal(t, "Physics", got.PrimaryCategory.Label)
 }
 
-// Upsert refreshes wikipedia_url (it used to be left out of DO UPDATE, so a
-// URL was never updated), but a blank one — a failed or empty Wikidata
+const removePrimaryCategoryMut = `mutation($contentId: IntID!) {
+  removePrimaryCategory(contentId: $contentId) { id primaryCategory { id } }
+}`
+
+// Removing is one UPDATE ... RETURNING (no category write, no re-read) and leaves the
+// content with no primary category.
+func TestRemovePrimaryCategory(t *testing.T) {
+	h := newHarness(t)
+	userID, token := h.user("catrm")
+	contentID := h.content(userID, "catrm")
+	h.warm(token)
+	qid := fmt.Sprintf("Q%d", time.Now().UnixNano()%1_000_000_000)
+	t.Cleanup(func() { _ = h.db.Exec("DELETE FROM categories WHERE wikidata_qid = ?", qid).Error })
+
+	h.roundTrips(2, token, setPrimaryCategoryMut, map[string]any{"input": map[string]any{
+		"contentId": contentID, "qid": qid, "label": "Physics",
+	}})
+
+	data := h.roundTrips(1, token, removePrimaryCategoryMut, map[string]any{"contentId": contentID})
+	got := decode[struct {
+		PrimaryCategory *struct {
+			ID string `json:"id"`
+		} `json:"primaryCategory"`
+	}](t, data, "removePrimaryCategory")
+	require.Nil(t, got.PrimaryCategory, "the primary category must be cleared")
+}
+
+// Upsert refreshes wikipedia_url, but a blank one — a failed or empty Wikidata
 // lookup — keeps what's stored.
 func TestCategoryUpsertWikipediaURL(t *testing.T) {
 	h := newHarness(t)

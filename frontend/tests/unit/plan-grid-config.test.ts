@@ -15,6 +15,7 @@ import {
 	planPrivacyLabel,
 	planStatusLabel,
 	serverSortFor,
+	serverSortFromColumnState,
 } from '$lib/utils/plan-grid-config';
 import type { UserTodoItem, UserTodoSortBy } from '$lib/queries/userTodos';
 
@@ -206,12 +207,65 @@ describe('buildPlanColumnDefs', () => {
 		expect(buildPlanColumnDefs(true).filter((d) => d.sortable)).toEqual([]);
 	});
 
-	it('outside list mode, makes exactly the server-sortable headers sortable', () => {
-		const sortable = buildPlanColumnDefs(false)
-			.filter((d) => d.sortable)
+	it('outside list mode, every header is sortable except Status, Privacy and Perspective', () => {
+		// Status and Privacy have no server key and no useful client order (raw enum values);
+		// Perspective is an action cell, not data.
+		const nonSortable = buildPlanColumnDefs(false)
+			.filter((d) => !d.sortable)
 			.map((d) => d.colId);
-		expect(sortable).toEqual(PLAN_COLUMNS.filter((c) => c.sortable).map((c) => c.colId));
-		expect(sortable.length).toBeGreaterThan(0);
+		expect(nonSortable).toEqual(['status', 'privacy', 'addPerspective']);
+	});
+
+	it('gives a server sort to exactly Priority, Due and List; the rest sort client-side', () => {
+		const withServerSort = PLAN_COLUMNS.filter((c) => c.serverSort !== undefined).map((c) => c.colId);
+		expect(withServerSort).toEqual(['priority', 'dueDate', 'list']);
+		const clientOnly = PLAN_COLUMNS.filter((c) => c.sortable && c.serverSort === undefined).map((c) => c.colId);
+		expect(clientOnly).toEqual(['action', 'content', 'type', 'percentComplete', 'startDate', 'endDate', 'comments']);
+	});
+
+	describe('serverSortFromColumnState (the header sort sent to the server)', () => {
+		it('no column sorted: null, so the server uses its default order', () => {
+			expect(serverSortFromColumnState([{ colId: 'priority', sort: null }])).toBeNull();
+			expect(serverSortFromColumnState([])).toBeNull();
+		});
+
+		it('one server-sortable column: its key and direction (asc = ASC, desc = DESC)', () => {
+			expect(serverSortFromColumnState([{ colId: 'dueDate', sort: 'asc', sortIndex: 0 }])).toEqual({
+				sortBy: 'DUE_DATE',
+				sortOrder: 'ASC',
+			});
+			expect(serverSortFromColumnState([{ colId: 'priority', sort: 'desc', sortIndex: 0 }])).toEqual({
+				sortBy: 'PRIORITY',
+				sortOrder: 'DESC',
+			});
+		});
+
+		it('multi-sort: the primary sort (lowest sortIndex) decides, not the column order', () => {
+			expect(
+				serverSortFromColumnState([
+					{ colId: 'dueDate', sort: 'asc', sortIndex: 1 },
+					{ colId: 'priority', sort: 'desc', sortIndex: 0 },
+				]),
+			).toEqual({ sortBy: 'PRIORITY', sortOrder: 'DESC' });
+		});
+
+		it('a client-only primary sort gives null, even when a server-sortable column is second', () => {
+			expect(
+				serverSortFromColumnState([
+					{ colId: 'content', sort: 'asc', sortIndex: 0 },
+					{ colId: 'priority', sort: 'desc', sortIndex: 1 },
+				]),
+			).toBeNull();
+		});
+
+		it('a column that is not sorted is ignored even when it has a sortIndex', () => {
+			expect(
+				serverSortFromColumnState([
+					{ colId: 'priority', sort: null, sortIndex: 0 },
+					{ colId: 'dueDate', sort: 'asc', sortIndex: 1 },
+				]),
+			).toEqual({ sortBy: 'DUE_DATE', sortOrder: 'ASC' });
+		});
 	});
 
 	it('orders the leftmost columns Action, Item, Type, and labels the content column Item as Activity does', () => {

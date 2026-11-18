@@ -234,6 +234,8 @@ type Content {
   movie: JSON
   "Book-specific metadata (the shaped Open Library payload); null for other content types."
   book: JSON
+  "Webpage-specific metadata for the grid: siteName, domain, imageUrl, faviconUrl, publishedAt, author, webPageRoles (never null, [] when none); null for other content types."
+  webPage: JSON
   primaryCategory: Category
   # The import that created this row. Null for hand-added content, and when that
   # import is closed and the viewer isn't an admin.
@@ -243,6 +245,12 @@ type Content {
   verseStartID: Int
   verseEndID: Int
   displayTitle: String
+  "User-set attributes; for CLAIM, effectiveDate and evaluateBy as YYYY-MM-DD. Null when unset."
+  customFields: JSON
+  # Who can read this row. CLAIM content starts PRIVATE (owner-only); everything
+  # else is PUBLIC. Private rows are omitted from lists and contentByID for
+  # anyone but their owner.
+  privacy: Privacy!
   # Aggregates computed from ALL perspectives on this content — public and
   # private alike (privacy controls readability, not whether a perspective
   # counts here). Resolved on demand (batched per-request via dataloader)
@@ -317,6 +325,7 @@ enum ContentType {
   BIBLE_PASSAGE
   MOVIE
   BOOK
+  WEB_PAGE
 }
 
 # Text columns that ContentFilter.search can be scoped to.
@@ -344,6 +353,55 @@ input CreateContentFromMovieInput {
 input CreateContentFromBookInput {
   # Open Library work URL, or a raw ISBN-10/ISBN-13 (resolved to a work key server-side)
   url: String!
+}
+
+# Roles the adder picks for a webpage. The first is the primary role. Additive:
+# later values are new enum values, not a migration.
+enum WebPageRole {
+  BLOG_POST
+  SESSION_TRANSCRIPT
+}
+
+input CreateContentFromWebPageInput {
+  # Any http(s) URL that no other content type claims
+  url: String!
+  # Roles the adder picked. Omitted or [] saves a plain webpage. Never inferred from the page.
+  webPageRoles: [WebPageRole!]
+}
+
+# Outcome of reading a page's <head>. Shown in the Add dialog's import preview.
+enum WebPageFetchStatus {
+  OK
+  BLOCKED
+  ERROR
+  TIMEOUT
+  NOT_HTML
+  TOO_LARGE
+}
+
+type WebPageFetch {
+  status: WebPageFetchStatus!
+  # Null when no HTTP response arrived (timeout, network error)
+  httpStatus: Int
+  # When the metadata was read (RFC 3339, UTC)
+  at: String!
+}
+
+# Metadata read from a page's <head> for the import preview. Nothing is saved.
+type WebPagePreview {
+  finalUrl: String!
+  domain: String!
+  siteName: String
+  title: String
+  description: String
+  imageUrl: String
+  faviconUrl: String
+  publishedAt: String
+  author: String
+  lang: String
+  fetch: WebPageFetch!
+  # Set when this URL is already saved: the ID of the existing row
+  alreadyExistsContentId: IntID
 }
 
 input CreateContentFromYouTubeInput {
@@ -450,6 +508,8 @@ input ContentFilter {
   maxPages: Int
   minBookRating: Float       # Open Library average rating (0-5), inclusive
   maxBookRating: Float
+  # Webpage role filter (webpage rows only; other rows never match). Matches any of these roles (OR'd).
+  webPageRoles: [WebPageRole!]
   # View/like count filters
   minViewCount: Int
   maxViewCount: Int
@@ -573,8 +633,18 @@ input SetPrimaryCategoryInput {
 
 input CreateClaimInput {
   text: String!            # The claim text (may contain @this/@here tokens)
-  userID: IntID!           # Who created the claim
-  parentContentID: IntID!  # The content item this claim is about
+  userID: IntID!           # 0 = derive from session; non-zero must match the session user
+  parentContentID: IntID   # Optional: the content item this claim is about
+  effectiveDate: String    # Optional YYYY-MM-DD; defaults to today (UTC)
+  evaluateBy: String       # Optional YYYY-MM-DD; must not be before effectiveDate
+  privacy: Privacy         # Optional; defaults to PUBLIC. PRIVATE keeps the claim owner-only
+}
+
+input UpdateClaimInput {
+  text: String!            # The new claim text; same rules as create
+  effectiveDate: String    # Optional YYYY-MM-DD; nil or empty means today (UTC)
+  evaluateBy: String       # Optional YYYY-MM-DD; nil or empty clears it
+  privacy: Privacy         # Optional; nil keeps the stored privacy
 }
 
 # --- Import staging (bulk import from channels and filmographies) ---
@@ -825,6 +895,9 @@ type Mutation {
   # Book mutations
   createContentFromBook(input: CreateContentFromBookInput!): Content! @auth
 
+  # Webpage mutations
+  createContentFromWebPage(input: CreateContentFromWebPageInput!): CreateContentResult! @auth
+
   # Bible passage mutations
   createContentFromPassage(input: CreateContentFromPassageInput!): Content! @auth
   # First-write-wins: if a title already exists, returns the content with the existing title.
@@ -852,9 +925,16 @@ type Mutation {
 
   # Claim mutations
   createClaim(input: CreateClaimInput!): Content! @auth
+  updateClaim(id: ID!, input: UpdateClaimInput!): Content! @auth
+  # Deletes an owned claim. If another user has a perspective or plan item on it, the
+  # delete is refused with code CLAIM_HAS_OTHERS; keepAnonymous: true hands the claim to
+  # the [deleted] sentinel user instead, so the others' perspectives keep their target.
+  deleteClaim(id: ID!, keepAnonymous: Boolean): Boolean! @auth
 
   # Category mutations
   setPrimaryCategory(input: SetPrimaryCategoryInput!): Content! @auth
+  # Clears the content's primary category (the undo for setPrimaryCategory).
+  removePrimaryCategory(contentId: IntID!): Content! @auth
 
   # User todo ("Plan") mutations. Ownership is enforced in UserTodoService and
   # the owner-scoped SQL under it, not by @owner; the actor is the session user.
@@ -947,6 +1027,9 @@ type Query {
 
   # Discover page: look up a single book by ISBN-10/ISBN-13. Null when not found.
   bookByISBN(isbn: String!): BookSearchResult
+
+  # Add dialog: read a webpage's metadata for the import preview. Writes nothing.
+  previewWebPage(url: String!): WebPagePreview @auth
 
   # Perspective queries
   perspectiveByID(id: ID!): Perspective

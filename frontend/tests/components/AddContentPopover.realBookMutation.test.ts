@@ -4,6 +4,7 @@ import { tick } from 'svelte';
 import { QueryClient } from '@tanstack/svelte-query';
 import AddContentPopover from '$lib/components/AddContentPopover.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
+import { warmUp } from '../helpers/warmUp';
 
 // Uses the REAL useAddBook hook (real createMutation) so the popover's effects see a genuinely
 // reactive mutation object. Only the network layer, toast and navigation are mocked.
@@ -37,6 +38,10 @@ async function submit(input: HTMLInputElement, value: string) {
 	await tick();
 	await fireEvent.click(screen.getByRole('button', { name: /^add$/i }));
 }
+
+// Pay the component's first-render cost before any test, not inside the first
+// one: under full-suite load it alone can pass the 5 s testTimeout (#728).
+warmUp(() => renderPopover());
 
 describe('AddContentPopover with the real useAddBook mutation', () => {
 	beforeEach(() => {

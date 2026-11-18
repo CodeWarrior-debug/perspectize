@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { preloadLazy } from '../helpers/warmUp';
 
 const { mockMutate, mockInvalidateQueries, mockSetQueriesData, mockToastSuccess, mockToastError } = vi.hoisted(() => ({
 	mockMutate: vi.fn(),
@@ -35,6 +36,13 @@ const mockGraphqlRequest = vi.fn();
 vi.mock('$lib/queries/client', () => ({
 	graphqlRequest: mockGraphqlRequest,
 }));
+
+// The tests import these inside their bodies; load them once up front so the first
+// test doesn't pay the module transform, which balloons under full-suite load (#728).
+preloadLazy(
+	() => import('$lib/queries/content'),
+	() => import('$lib/queries/content/useUpdateSourceData'),
+);
 
 describe('useUpdateSourceData hook', () => {
 	beforeEach(async () => {

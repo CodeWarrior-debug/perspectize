@@ -40,7 +40,8 @@ export interface HeaderWidthOptions {
 /**
  * Smallest width (px) at which a column still shows its whole heading, its sort arrow and its
  * filter funnel side by side, with nothing cut to "…" and no label running into the funnel.
- * The sort arrow is reserved even while unsorted, so sorting a column never truncates it.
+ * The sort arrow and the multi-sort order number are reserved even while unsorted, so sorting a
+ * column (alone or alongside others) never truncates it.
  *
  * Every Activity column's `minWidth` is at least this (see ActivityTable's column defs), and
  * `tests/unit/gridHeaderWidth.test.ts` checks that for every column.
@@ -51,7 +52,7 @@ export function headerMinWidth(
 	chrome: HeaderChrome = ACTIVITY_HEADER_CHROME,
 ): number {
 	let width = chrome.padding * 2 + headerTextWidth(name, chrome) + HEADER_WIDTH_GUARD_PX;
-	if (sortable) width += chrome.sort;
+	if (sortable) width += chrome.sort + chrome.sortOrder;
 	if (filter) width += chrome.filter;
 	return Math.ceil(width);
 }

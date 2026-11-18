@@ -138,7 +138,7 @@ func newHarnessWithPool(t *testing.T, pool database.PoolConfig) *harness {
 	threadRepo := postgres.NewGormMessageThreadRepository(db)
 	messageRepo := postgres.NewGormMessageRepository(db)
 	bibleReferenceRepo := postgres.NewGormBibleReferenceRepository(db)
-	content := services.NewContentService(h.contentRepo, youtube.NewFixtureClient(), tmdb.NewFixtureClient(), services.WithBibleReference(bibleReferenceRepo), services.WithMovieSearch(tmdb.NewFixtureClient()), services.WithMovieTrending(tmdb.NewFixtureClient()))
+	content := services.NewContentService(h.contentRepo, youtube.NewFixtureClient(), tmdb.NewFixtureClient(), services.WithBibleReference(bibleReferenceRepo), services.WithMovieSearch(tmdb.NewFixtureClient()), services.WithMovieTrending(tmdb.NewFixtureClient()), services.WithWebPageClient(stubWebPages{}))
 	h.contentService = func() *services.ContentService { return content }
 
 	notifier, err := realtime.NewPgNotifier(context.Background(), dsn, counter)
@@ -161,7 +161,7 @@ func newHarnessWithPool(t *testing.T, pool database.PoolConfig) *harness {
 	deps := server.Deps{
 		ContentService:     h.contentService(),
 		UserService:        services.NewUserService(userRepo, h.contentRepo, perspectiveRepo, todoRepo, todoListRepo, todoActionRepo),
-		PerspectiveService: services.NewPerspectiveService(perspectiveRepo, userRepo),
+		PerspectiveService: services.NewPerspectiveService(perspectiveRepo, userRepo, services.WithContentRepository(h.contentRepo)),
 		CategoryService:    services.NewCategoryService(categoryRepo, h.contentRepo, noWikidata{}),
 		UserTodoService:    services.NewUserTodoService(todoRepo, todoListRepo, todoActionRepo),
 		MessagingService:   services.NewMessagingService(threadRepo, messageRepo, hub, services.NewSlidingWindowLimiter(1000, time.Second)),

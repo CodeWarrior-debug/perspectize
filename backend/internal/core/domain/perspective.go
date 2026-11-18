@@ -71,7 +71,7 @@ type Perspective struct {
 	// Feelings is the emoji feel-wheel selections for this perspective (JSONB array).
 	Feelings []FeelingEntry
 
-	// Perspective reference fields (Phase 4)
+	// Perspective reference fields
 	PrimaryPerspectiveID  *int            // FK to another perspective (optional)
 	RelatedPerspectiveIDs []int           // array of perspective IDs (max 50 app-level cap)
 	CustomFields          json.RawMessage // JSONB custom fields
@@ -166,6 +166,12 @@ type PerspectiveAggregate struct {
 	Count          int
 	QualityCount   int
 	AverageQuality *float64
+
+	// The content row's own visibility, carried so a caller that resolves
+	// content from aggregates alone (contentByID's id-only fast path) can still
+	// hide another user's private content without a second query.
+	ContentPrivacy Privacy
+	ContentOwnerID int
 	// ImportJobID is the import that created the content row (nil for hand-added
 	// content). It rides on the aggregate so the details modal can name the import
 	// without reading the whole content row.

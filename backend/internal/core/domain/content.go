@@ -14,7 +14,94 @@ const (
 	ContentTypeBiblePassage ContentType = "BIBLE_PASSAGE"
 	ContentTypeMovie        ContentType = "MOVIE"
 	ContentTypeBook         ContentType = "BOOK"
+	ContentTypeWebPage      ContentType = "WEB_PAGE"
 )
+
+// WebPageRole is a role a webpage plays, chosen by the person who added it
+// (never read from the page). Stored uppercase in content.response under
+// "webPageRoles"; the first entry is the primary role.
+type WebPageRole string
+
+const (
+	WebPageRoleBlogPost          WebPageRole = "BLOG_POST"
+	WebPageRoleSessionTranscript WebPageRole = "SESSION_TRANSCRIPT"
+)
+
+// webPageRoleSchemaOrg maps each role to its Schema.org type. Add one line per
+// new role; this is the only place the mapping lives.
+var webPageRoleSchemaOrg = map[WebPageRole]string{
+	WebPageRoleBlogPost:          "BlogPosting",
+	WebPageRoleSessionTranscript: "Conversation", // closest Schema.org match for a working-session record
+}
+
+// SchemaOrgType returns the Schema.org type for a role, or "" for an unknown role.
+func (r WebPageRole) SchemaOrgType() string {
+	return webPageRoleSchemaOrg[r]
+}
+
+// IsValid reports whether the role is one of the known values.
+func (r WebPageRole) IsValid() bool {
+	_, ok := webPageRoleSchemaOrg[r]
+	return ok
+}
+
+// FetchStatus records how the metadata read of a webpage went. Internal to the
+// add flow and the import preview: it is never shown as a value in the grid.
+type FetchStatus string
+
+const (
+	FetchStatusOK       FetchStatus = "OK"
+	FetchStatusBlocked  FetchStatus = "BLOCKED" // the page answered 4xx
+	FetchStatusError    FetchStatus = "ERROR"   // 5xx, a network failure, or too many redirects
+	FetchStatusTimeout  FetchStatus = "TIMEOUT"
+	FetchStatusNotHTML  FetchStatus = "NOT_HTML"
+	FetchStatusTooLarge FetchStatus = "TOO_LARGE"
+)
+
+// WebPageSchemaVersion is the version of the stored WebPageMeta shape.
+const WebPageSchemaVersion = 1
+
+// WebPageFetch is the outcome of one metadata read. HTTPStatus is nil when no
+// response arrived (timeout, network error).
+type WebPageFetch struct {
+	Status     FetchStatus `json:"status"`
+	HTTPStatus *int        `json:"httpStatus"`
+	At         time.Time   `json:"at"`
+}
+
+// WebPageMeta is the metadata read from a webpage's <head> once, at add time
+// (stored in content.response). Missing values are nil, never a guess.
+type WebPageMeta struct {
+	SchemaVersion int           `json:"schemaVersion"`
+	FinalURL      string        `json:"finalUrl"`
+	Domain        string        `json:"domain"`
+	SiteName      *string       `json:"siteName"`
+	Title         *string       `json:"title"`
+	Description   *string       `json:"description"`
+	ImageURL      *string       `json:"imageUrl"`
+	FaviconURL    *string       `json:"faviconUrl"`
+	PublishedAt   *string       `json:"publishedAt"`
+	Roles         []WebPageRole `json:"webPageRoles"`
+	Author        *string       `json:"author"`
+	Lang          *string       `json:"lang"`
+	Fetch         WebPageFetch  `json:"fetch"`
+	// DeclaredCanonical is the page's <link rel=canonical>, absolute. It drives
+	// dedupe only and is never stored (json:"-").
+	DeclaredCanonical string `json:"-"`
+}
+
+// MarshalJSON writes a nil role list as [] (the API field is non-null).
+func (m WebPageMeta) MarshalJSON() ([]byte, error) {
+	type plain WebPageMeta // no methods, so no recursion
+	p := plain(m)
+	if p.Roles == nil {
+		p.Roles = []WebPageRole{}
+	}
+	return json.Marshal(p)
+}
+
+// ClaimMaxLength caps a claim's normalised text, in characters (runes).
+const ClaimMaxLength = 300
 
 // ContentSearchField identifies a text column that a ContentFilter.search term
 // may be scoped to via ContentFilter.searchFields. Omitted/empty selects TITLE only
@@ -80,9 +167,26 @@ type Content struct {
 	VerseStartID      *int    // BIBLE_PASSAGE only — computed ordinal (see BibleVerseOrdinal), not a table FK
 	VerseEndID        *int    // BIBLE_PASSAGE only
 	DisplayTitle      *string // BIBLE_PASSAGE only — optional, first-write-wins
+	// CustomFields holds user-set attributes. nil means unset. CLAIM stores
+	// effectiveDate and evaluateBy here as ISO YYYY-MM-DD strings.
+	CustomFields json.RawMessage
+	// Privacy controls who can read the row. Empty is treated as PrivacyPublic on
+	// write. CLAIM content is created PrivacyPrivate (owner-only).
+	Privacy Privacy
 	// ImportJobID is the import that created this row; nil for hand-added content.
 	// Set once at insert: a later re-add of the same URL never changes it.
 	ImportJobID *int
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+// VisibleTo reports whether viewerID may read this row. A PRIVATE row is visible
+// only to its owner, and viewer 0 (anonymous) never owns one. Any other row
+// (PUBLIC, or unset) is visible to everyone. A caller that gets false should
+// answer exactly as it would for a missing row.
+func (c *Content) VisibleTo(viewerID int) bool {
+	if c.Privacy != PrivacyPrivate {
+		return true
+	}
+	return viewerID > 0 && viewerID == c.AddedByUserID
 }

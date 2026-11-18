@@ -111,11 +111,27 @@ export function formatIsoDuration(iso: string | null | undefined): string | null
 	return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A date-only `YYYY-MM-DD` is a calendar day, so it is built in local time. `new Date('2017-06-12')`
+ * would be UTC midnight, which reads as the day before in US timezones. Anything else (a full ISO
+ * timestamp) is an instant and parses as before. Returns an Invalid Date for an impossible day.
+ */
+export function parseDateValue(value: string): Date {
+	const m = DATE_ONLY.exec(value);
+	if (!m) return new Date(value);
+	const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+	const date = new Date(year, month - 1, day);
+	const real = date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+	return real ? date : new Date(NaN);
+}
+
 /**
  * Format ISO date string to locale string.
  */
 export function formatDate(isoString: string): string {
-	const date = new Date(isoString);
+	const date = parseDateValue(isoString);
 	if (isNaN(date.getTime())) return EMPTY_VALUE;
 	return date.toLocaleDateString('en-US', {
 		year: 'numeric',
@@ -343,6 +359,34 @@ export function formatPublishDate(isoString: string | null): string {
 }
 
 /**
+ * Format a claim's `YYYY-MM-DD` date (Content.customFields) as "Oct 23, 2026". A bare date has no
+ * time, so it is built as a local calendar day: `new Date('2026-10-23')` would read it as UTC
+ * midnight and show the 22nd west of UTC. Anything that is not a real calendar date is the
+ * grid placeholder.
+ */
+export function formatClaimDate(value: unknown): string {
+	if (typeof value !== 'string') return EMPTY_VALUE;
+	const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+	if (!m) return EMPTY_VALUE;
+	const year = Number(m[1]);
+	const month = Number(m[2]);
+	const day = Number(m[3]);
+	const date = new Date(year, month - 1, day);
+	// Rejects overflow such as 2026-02-31, which the Date constructor would roll into March.
+	if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return EMPTY_VALUE;
+	return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+/**
+ * A viewer's perspective rating, stored on the 0-10000 scale, shown as a 0-100
+ * score. Empty when the viewer hasn't rated that field.
+ */
+export function formatRatingScore(value: unknown): string {
+	if (typeof value !== 'number') return EMPTY_VALUE;
+	return String(Math.round(value / 100));
+}
+
+/**
  * Format tags array to comma-separated string.
  */
 export function formatTags(tags: string[] | null): string {
@@ -471,6 +515,32 @@ export function typeCellRenderer(params: { data?: { contentType: string } }): HT
 		const label = document.createElement('span');
 		label.className = 'sr-only';
 		label.textContent = 'Movie';
+		container.appendChild(svg);
+		container.appendChild(label);
+		return container;
+	}
+
+	if (params.data.contentType === 'WEB_PAGE') {
+		// Lucide "globe" (outline, themed stroke): a web page is not a video, so no YouTube red.
+		container.title = 'Webpage';
+		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		svg.setAttribute('width', '20');
+		svg.setAttribute('height', '20');
+		svg.setAttribute('viewBox', '0 0 24 24');
+		svg.setAttribute('fill', 'none');
+		svg.setAttribute('stroke', 'var(--color-muted-foreground)');
+		svg.setAttribute('stroke-width', '2');
+		svg.setAttribute('stroke-linecap', 'round');
+		svg.setAttribute('stroke-linejoin', 'round');
+		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+		path.setAttribute(
+			'd',
+			'M12 2a10 10 0 1 0 0 20 10 10 0 1 0 0-20M2 12h20M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20',
+		);
+		svg.appendChild(path);
+		const label = document.createElement('span');
+		label.className = 'sr-only';
+		label.textContent = 'Webpage';
 		container.appendChild(svg);
 		container.appendChild(label);
 		return container;
@@ -973,8 +1043,7 @@ export function tmdbIdValueGetter(params: { data?: MovieRow }): number | null {
 /**
  * Tags for a row: the real tags (YouTube) when present, else TMDB keywords for a
  * Movie, else Open Library subjects for a Book. Keywords and subjects are source-provided
- * sets (see GitHub issue 560 for the planned source vs user tag split; deliberately not
- * modelled here).
+ * sets; a source vs user tag split is deliberately not modelled here.
  */
 export function contentTags(row: MovieRow | null | undefined): string[] | null {
 	if (row?.tags && row.tags.length > 0) return row.tags;

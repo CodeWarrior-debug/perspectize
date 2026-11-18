@@ -28,6 +28,13 @@ vi.mock('$lib/queries/content/useAddVideo', () => ({ useAddVideo: () => mocks.vi
 vi.mock('$lib/queries/content/useAddMovie', () => ({ useAddMovie: () => mocks.movie }));
 vi.mock('$lib/queries/content/useAddBook', () => ({ useAddBook: () => mocks.book }));
 vi.mock('$lib/queries/content/useAddPassage', () => ({ useAddPassage: () => mocks.passage }));
+// The webpage hooks are not exercised here (see AddContentPopover.webpage.test.ts); stub them so no QueryClient is needed.
+vi.mock('$lib/queries/content/useCreateWebPage', () => ({
+	useCreateWebPage: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isSuccess: false, isError: false }),
+}));
+vi.mock('$lib/queries/content/useWebPagePreview', () => ({
+	useWebPagePreview: () => ({ data: undefined, isPending: false, isError: false }),
+}));
 
 const JOHN = 43;
 const YT = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
@@ -48,7 +55,9 @@ async function openWith(text?: string) {
 }
 
 async function type(text: string) {
-	await fireEvent.input(screen.getByPlaceholderText(/paste a link or type a reference/i), { target: { value: text } });
+	await fireEvent.input(screen.getByPlaceholderText(/paste a link or type a reference/i), {
+		target: { value: text },
+	});
 	await tick();
 }
 
@@ -126,11 +135,21 @@ describe('AddContentPopover detection states', () => {
 		expect(submit()).toBeDisabled();
 	});
 
-	it('claim-like text: chip says Claim, explained, submit disabled', async () => {
-		await openWith('Grace is unearned favor');
-		expect(chip()).toHaveTextContent('Detected: Claim');
-		expect(screen.getByText(/claims can't be added from here yet/i)).toBeInTheDocument();
+	it('free text only is no match: chip says Select a type, submit disabled, nothing is saved', async () => {
+		await openWith('  Grace is unearned favor  ');
+		expect(chip()).toHaveTextContent('Select a type');
 		expect(submit()).toBeDisabled();
+		await fireEvent.click(submit());
+		expect(mocks.video.mutate).not.toHaveBeenCalled();
+		expect(mocks.passage.mutate).not.toHaveBeenCalled();
+		expect(mocks.movie.mutate).not.toHaveBeenCalled();
+	});
+
+	it('the type select offers no Claim option', async () => {
+		await openWith('grace');
+		const select = screen.getByLabelText(/change type/i);
+		expect(select.querySelector('option[value="CLAIM"]')).toBeNull();
+		expect(screen.queryByRole('option', { name: 'Claim' })).toBeNull();
 	});
 });
 
@@ -267,10 +286,10 @@ describe('AddContentPopover books', () => {
 		expect(mocks.video.mutate).not.toHaveBeenCalled();
 	});
 
-	it('an Open Library author link is not a book: no chip type, submit disabled', async () => {
+	it('an Open Library author link is not a book: it detects as a webpage and can be saved as one', async () => {
 		await openWith('https://openlibrary.org/authors/OL23919A');
-		expect(chip()).toHaveTextContent('Select a type');
-		expect(submit()).toBeDisabled();
+		expect(chip()).toHaveTextContent('Detected: Webpage');
+		expect(submit()).toBeEnabled();
 		expect(screen.queryByText(BOOK_ATTRIBUTION)).toBeNull();
 	});
 

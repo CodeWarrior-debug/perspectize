@@ -100,6 +100,9 @@ type ContentFilter struct {
 	MaxPages       *int
 	MinBookRating  *float64
 	MaxBookRating  *float64
+	// WebPageRoles matches webpage rows that play any of these roles (OR'd). Other
+	// content types never match. Empty = no role filter.
+	WebPageRoles []WebPageRole
 }
 
 // ContentListParams contains parameters for paginated content queries
@@ -115,8 +118,10 @@ type ContentListParams struct {
 	Sorts             []ContentSortRule
 	IncludeTotalCount bool
 	Filter            *ContentFilter
-	// ViewerID is the signed-in caller, nil when anonymous. Only
-	// Filter.MinPerspectiveCount reads it.
+
+	// ViewerID is the authenticated caller's local user id, or nil when
+	// anonymous. The repository always limits results to public rows plus
+	// the viewer's own private rows. Filter.MinPerspectiveCount also reads it.
 	ViewerID *int
 }
 

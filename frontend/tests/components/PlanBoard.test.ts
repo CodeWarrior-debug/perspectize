@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import PlanBoard from '$lib/components/plan/PlanBoard.svelte';
+import { preloadLazy } from '../helpers/warmUp';
 import type { UserTodoItem, UserTodoListItem, UserTodosArgs } from '$lib/queries/userTodos';
 
 const mocks = vi.hoisted(() => ({
@@ -139,6 +140,13 @@ vi.mock('$lib/queries/content/useContentPicker', () => ({
 	useContentPicker: vi.fn(() => ({ data: { content: { items: [] } }, isPending: false })),
 }));
 
+// PlanBoard renders these through {#await import(...)}. Load them up front, so a
+// findBy* below waits on the UI, not on Vite transforming the module (#728).
+preloadLazy(
+	() => import('$lib/components/ActivityDetailsModal.svelte'),
+	() => import('$lib/components/PerspectivePopover.svelte'),
+);
+
 const USER_ID = 7;
 
 /** The variables PlanBoard would send right now, for the current selection. */
@@ -194,6 +202,13 @@ describe('PlanBoard: the Unlisted and single-list views are filtered by the serv
 		it('is sent to the server', () => {
 			sortBy('priority', 'desc');
 			expect(currentArgs().sortBy).toBe('PRIORITY');
+			expect(currentArgs().sortOrder).toBe('DESC');
+		});
+
+		it('on a client-only column (Item) sends no server sort, so the server keeps its default order', () => {
+			sortBy('priority', 'desc');
+			sortBy('content', 'asc');
+			expect(currentArgs().sortBy).toBe('CREATED_AT');
 			expect(currentArgs().sortOrder).toBe('DESC');
 		});
 
