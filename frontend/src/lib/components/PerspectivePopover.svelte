@@ -469,75 +469,82 @@
 				{@render commentRows(true)}
 			{/if}
 			<div class="px-5 py-4 flex flex-col gap-3.5">
-				<div class="grid grid-cols-2 gap-3">
-					{#each activeFields as fieldKey (fieldKey)}
-						<div class="relative" bind:this={fieldRefs[fieldKey]}>
-							{#if fieldKey === 'quality'}
-								<RatingInput
-									label="Quality"
-									name="quality"
-									bind:value={quality}
-									compact
-									trackWidth={110}
-									onRemove={() => removeField('quality')}
-								/>
-							{:else if fieldKey === 'agreement'}
-								<RatingInput
-									label="Agreement"
-									name="agreement"
-									bind:value={agreement}
-									compact
-									trackWidth={110}
-									onRemove={() => removeField('agreement')}
-								/>
-							{:else if fieldKey === 'importance'}
-								<RatingInput
-									label="Importance"
-									name="importance"
-									bind:value={importance}
-									compact
-									trackWidth={110}
-									onRemove={() => removeField('importance')}
-								/>
-							{:else if fieldKey === 'confidence'}
-								<RatingInput
-									label="Confidence"
-									name="confidence"
-									bind:value={confidence}
-									compact
-									trackWidth={110}
-									onRemove={() => removeField('confidence')}
-								/>
-							{:else}
-								<RatingInput
-									label={getFieldLabel(fieldKey)}
-									name={fieldKey}
-									bind:value={() => dynamicValues[fieldKey] ?? null, (v) => setFieldValue(fieldKey, v)}
-									compact
-									trackWidth={110}
-									onRemove={() => removeField(fieldKey)}
-								/>
-							{/if}
+				<!-- Wide screens put the feel wheel beside the ratings; narrow screens stack it below. -->
+				<div class="flex flex-col gap-3.5 sm:flex-row sm:items-start sm:gap-5">
+					<div class="flex min-w-0 flex-1 flex-col gap-3.5">
+						<div class="grid grid-cols-2 gap-3">
+							{#each activeFields as fieldKey (fieldKey)}
+								<div class="relative" bind:this={fieldRefs[fieldKey]}>
+									{#if fieldKey === 'quality'}
+										<RatingInput
+											label="Quality"
+											name="quality"
+											bind:value={quality}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField('quality')}
+										/>
+									{:else if fieldKey === 'agreement'}
+										<RatingInput
+											label="Agreement"
+											name="agreement"
+											bind:value={agreement}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField('agreement')}
+										/>
+									{:else if fieldKey === 'importance'}
+										<RatingInput
+											label="Importance"
+											name="importance"
+											bind:value={importance}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField('importance')}
+										/>
+									{:else if fieldKey === 'confidence'}
+										<RatingInput
+											label="Confidence"
+											name="confidence"
+											bind:value={confidence}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField('confidence')}
+										/>
+									{:else}
+										<RatingInput
+											label={getFieldLabel(fieldKey)}
+											name={fieldKey}
+											bind:value={() => dynamicValues[fieldKey] ?? null, (v) => setFieldValue(fieldKey, v)}
+											compact
+											trackWidth={110}
+											onRemove={() => removeField(fieldKey)}
+										/>
+									{/if}
+								</div>
+							{/each}
 						</div>
-					{/each}
-				</div>
 
-				<AddFieldSearch addedKeys={activeFields} onAdd={addField} placeholder="Add a field — e.g. clarity" dense />
+						<AddFieldSearch addedKeys={activeFields} onAdd={addField} placeholder="Add a field — e.g. clarity" dense />
 
-				{#if !feelWheelOpen}
-					<button
-						type="button"
-						onclick={() => (feelWheelOpen = true)}
-						class="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-2 text-sm text-muted-foreground hover:opacity-70"
-					>
-						<span class="text-base leading-none">🙂</span>
-						Add a feeling
-					</button>
-				{:else}
-					<div class="rounded-md border border-border p-3">
-						<FeelWheel bind:value={feelings} />
+						{#if !feelWheelOpen}
+							<button
+								type="button"
+								onclick={() => (feelWheelOpen = true)}
+								class="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-2 text-sm text-muted-foreground hover:opacity-70"
+							>
+								<span class="text-base leading-none">🙂</span>
+								Add a feeling
+							</button>
+						{/if}
 					</div>
-				{/if}
+
+					{#if feelWheelOpen}
+						<div class="rounded-md border border-border p-3 sm:w-[346px] sm:shrink-0" data-testid="feel-wheel-column">
+							<FeelWheel bind:value={feelings} />
+						</div>
+					{/if}
+				</div>
 
 				<div class="flex items-center justify-between rounded-md border border-border px-3 py-2">
 					<div class="flex flex-col">
@@ -697,7 +704,7 @@
 		<DialogContent
 			class={[
 				'w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col transition-[max-width] duration-200',
-				commentExpanded ? 'sm:max-w-[760px]' : 'sm:max-w-[460px]',
+				commentExpanded || feelWheelOpen ? 'sm:max-w-[760px]' : 'sm:max-w-[460px]',
 			]}
 			overlayClass="bg-black/45"
 		>

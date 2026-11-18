@@ -693,6 +693,18 @@ describe('PerspectivePopover component', () => {
 			expect(screen.getByRole('button', { name: 'Remove Happy' })).toBeInTheDocument();
 			expect(screen.queryByRole('button', { name: /Add a feeling/ })).not.toBeInTheDocument();
 		});
+
+		it('puts the wheel in its own column and widens the dialog only while the wheel is open', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			const dialog = () => screen.getByRole('dialog');
+			expect(dialog().className).toContain('sm:max-w-[460px]');
+			expect(screen.queryByTestId('feel-wheel-column')).not.toBeInTheDocument();
+
+			await fireEvent.click(screen.getByRole('button', { name: /Add a feeling/ }));
+			expect(screen.getByTestId('feel-wheel-column')).toContainElement(wheelSearch() as HTMLElement);
+			expect(dialog().className).toContain('sm:max-w-[760px]');
+		});
 	});
 
 	describe('accessibility', () => {
