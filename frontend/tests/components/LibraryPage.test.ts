@@ -44,9 +44,7 @@ describe('Library page search scope picker', () => {
 	it('titles the page Library, as the shared library for all members', () => {
 		render(Page);
 		expect(screen.getByRole('heading', { level: 1, name: 'Library' })).toBeInTheDocument();
-		expect(
-			screen.getByText("Everything Perspectize members have added, and how they've measured it."),
-		).toBeInTheDocument();
+		expect(screen.getByText('Everything Perspectize members have added.')).toBeInTheDocument();
 	});
 
 	it('stays on /content-library when the search box is cleared', async () => {
