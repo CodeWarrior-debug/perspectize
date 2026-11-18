@@ -32,6 +32,8 @@ export interface DraftState {
   seed?: string;
   /** Preview sort, highest priority first. Empty/undefined = unsorted. */
   sort?: SortKey[];
+  /** The mixed-unit sort note was dismissed; cleared when the primary sort column changes. */
+  sortNoteDismissed?: boolean;
   /** Type shown in the single-type view. */
   soloType?: string;
   /** Single-type what-ifs: typeId -> columnId -> forced on/off, over the suggested default. */
@@ -212,12 +214,12 @@ function analyse(state: DraftState, columns: ResolvedColumn[]): Warning[] {
       });
     }
 
-    const units = new Set(rc.aliases.map((a) => a.unit).filter(Boolean) as string[]);
-    if (units.size > 1) {
+    const units = unitKeysFor(rc);
+    if (units.length > 1) {
       warnings.push({
         severity: 'info',
         columnId: rc.col.id,
-        message: `"${rc.header}" mixes units across types (${[...units].join(' | ')}). Format per row from length_units. Sorting it alone raises the mixed-unit alert: filter to one type, or sort by Type first and "${rc.header}" second.`
+        message: `"${rc.header}" mixes units across types (${units.join(' | ')}). Format per row from length_units. Sorting it groups rows by unit first (${units.join(', ')}), each group ordered within itself, with a divider row naming the unit.`
       });
     }
 
@@ -357,22 +359,34 @@ export function gapText(col: ColumnDef): string {
   return col.gapFallback === 'blank' ? '' : '—';
 }
 
-/** Distinct units a column carries across the current selection; >1 means sorting it alone is meaningless. */
-export function unitsFor(rc: ResolvedColumn): string[] {
-  return [...new Set(rc.aliases.map((a) => a.unit).filter(Boolean) as string[])];
+/**
+ * The unit key a binding's free-text unit names: its first word, so
+ * "seconds → h:mm:ss" and "seconds → m:ss" share the key "seconds". A unit that
+ * names two alternatives ("g or ml") is kept whole, so it never groups with
+ * plain grams. Equal keys are directly comparable; different keys are not.
+ */
+export function unitKey(unit: string | undefined): string | undefined {
+  const head = unit?.trim().toLowerCase().split(/\s*(?:→|\()/)[0].trim();
+  if (!head) return undefined;
+  if (head.includes(' or ')) return head;
+  return head.split(/\s+/)[0];
+}
+
+/** Distinct unit keys a column carries across the current selection; more than one splits its sort into unit groups. */
+export function unitKeysFor(rc: ResolvedColumn): string[] {
+  return [...new Set(rc.aliases.map((a) => unitKey(a.unit)).filter(Boolean) as string[])].sort();
 }
 
 /**
- * A sort is conflicted when its first key is a column whose units differ across
- * the selection — the rows would be ordered by numbers that mean different things.
- * Putting a unit-consistent column (Type) first resolves it: each type's rows
- * are then ordered within their own unit.
+ * The mixed-unit column leading the sort, if any. Its rows are ordered grouped
+ * by unit key first, then within each group, so only numbers that share a unit
+ * are compared.
  */
-export function sortConflict(keys: SortKey[] | undefined, grid: GridPreview): ResolvedColumn | null {
+export function mixedPrimary(keys: SortKey[] | undefined, grid: GridPreview): ResolvedColumn | null {
   const first = keys?.[0];
   if (!first) return null;
   const rc = grid.columns.find((c) => c.col.id === first.colId);
-  return rc && unitsFor(rc).length > 1 ? rc : null;
+  return rc && unitKeysFor(rc).length > 1 ? rc : null;
 }
 
 /** Display text of a sample cell. */
