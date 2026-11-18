@@ -96,6 +96,33 @@ Marks a PR that carries the **spec or first implementation of a new content type
 - **Find them:** `gh pr list --state all --label new-content-type`.
 - **Cloud sessions:** set it with the GitHub MCP `issue_write` tool; its `labels` field replaces the whole set, so pass the existing labels too.
 
+## `complexity:` and `risk:` labels (issues)
+
+Two independent labels on every issue say how much human supervision the work needs. Each takes `low`, `medium` or `high`: `complexity: low|medium|high` and `risk: low|medium|high`.
+
+- **`complexity:`** is how hard the work is to get right: how many layers it touches, how much design judgment it takes, how much is unknown.
+- **`risk:`** is the cost of getting it wrong: data loss, security, production behavior, shared infrastructure, or something hard to undo.
+
+**The rule of thumb is whether the issue needs the owner's input.** Judge each label on its own:
+
+| Level | Meaning | Who works it |
+|---|---|---|
+| `low` | Won't need the owner's input from this angle. | An agent can take it end to end, including a cloud session. |
+| `medium` | Borderline. Could go either way. | An agent can start, but the owner reviews the plan or the PR closely. |
+| `high` | Definitely needs the owner's supervision. | The owner is in the loop from the start, with no unattended run. |
+
+**Pointers for the call** (a judgment aid, not a checklist):
+- Raise `risk:` for migrations, auth or ownership guards, secrets, the shared Neon database, deploy or CI workflows, and anything that removes or rewrites user data.
+- Raise `complexity:` for work that spans backend and frontend, introduces a new pattern or content type, or has an open design question.
+- When unsure between two levels, pick the higher one.
+- The two labels can differ: a one-line change to an auth guard is `complexity: low` and `risk: high`.
+
+**Applying them:**
+- **Put them on:** every new issue, at creation time, both labels. Re-label when scope changes.
+- **Independent of `priority:` and the type labels** (`bug`, `enhancement`). They describe the work's supervision needs, not its urgency.
+- **Find them:** `gh api "repos/CodeWarrior-debug/perspectize/issues?labels=risk:%20low,complexity:%20low"` lists issues an agent can take unattended.
+- **Setting one:** `gh api repos/CodeWarrior-debug/perspectize/issues/<n>/labels -f "labels[]=risk: low" -f "labels[]=complexity: low"`. In a cloud session, use the GitHub MCP `issue_write` tool; its `labels` field replaces the whole set, so pass the existing labels too.
+
 ## CI
 
 - **Trigger:** `ci.yml` runs only on PRs and pushes to `main`. Pushing a feature branch with no PR runs nothing, so a PR is the way to get CI's verdict.
