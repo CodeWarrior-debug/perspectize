@@ -41,6 +41,8 @@
 
 **Learning comments:** mark temporary explanatory comments with `*TEMP*` (e.g. `// *TEMP* - defer runs after function returns`) for easy grep/removal.
 
+**Comments explain the code as it stands, and why:** no ticket, PR or issue numbers and no "used to / previously / now uses" history; that belongs in the commit message. The pre-push hook (`make install-hooks`) cleans flagged comments before a push ([.docs/HOOKS.md](.docs/HOOKS.md#pre-push-comment-hygiene)); mark an intentional exception `history-ok: <reason>`.
+
 **Import and picker previews must show enough to decide without leaving the page** (what it is, how big, how current, how well received, full detail on click; missing ≠ 0). Applies to every content type and to throwaway artifact previews: [ADDING_CONTENT_TYPE.md → Decision 8](.claude/docs/ADDING_CONTENT_TYPE.md#decision-8-import-preview--enough-for-an-informed-decision).
 
 **Rating-style numeric fields use the `valid_integer_range` domain (0–10000)** — priority, quality, agreement, importance, confidence. Reuse it for any new "how much" field.
