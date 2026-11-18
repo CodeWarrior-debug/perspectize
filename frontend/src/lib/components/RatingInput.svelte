@@ -199,10 +199,10 @@
 				<button
 					type="button"
 					onclick={clearRating}
-					class="absolute -right-5 flex items-center justify-center transition-opacity hover:opacity-70 text-muted-foreground"
+					class="absolute -top-2 -left-3 flex items-center justify-center transition-opacity hover:opacity-70 text-destructive"
 					aria-label="Clear {label} rating"
 				>
-					<XIcon class="size-3" />
+					<XIcon class="size-3" strokeWidth={1.25} />
 				</button>
 			{/if}
 
