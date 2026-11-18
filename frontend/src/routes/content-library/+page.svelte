@@ -90,9 +90,7 @@
 		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 			<div>
 				<h1 class="text-2xl font-semibold text-foreground">Library</h1>
-				<p class="text-sm text-muted-foreground mt-1">
-					Everything Perspectize members have added, and how they've measured it.
-				</p>
+				<p class="text-sm text-muted-foreground mt-1">Everything Perspectize members have added.</p>
 			</div>
 			<!-- FilterChips (inside the grid card) moves itself here on desktop to save a row of height. -->
 			<div id="activity-chips-slot" class="hidden md:flex flex-1 min-w-0 items-center"></div>
