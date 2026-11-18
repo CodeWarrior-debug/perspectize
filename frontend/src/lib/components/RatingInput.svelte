@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -166,6 +167,7 @@
 
 			<!-- Number input -->
 			<input
+				{...NO_AUTOFILL}
 				id={name}
 				{name}
 				type="number"

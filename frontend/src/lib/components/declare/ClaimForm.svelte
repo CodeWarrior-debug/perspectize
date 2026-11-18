@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import { Button, Input, Label, Switch } from '$lib/components/shadcn';
 	import { useCreateClaim } from '$lib/queries/content/useCreateClaim';
 	import { useUpdateClaim } from '$lib/queries/content/useUpdateClaim';
@@ -127,6 +128,7 @@
 	<div class="space-y-2">
 		<Label for="{uid}-text">Claim</Label>
 		<textarea
+			{...NO_AUTOFILL}
 			id="{uid}-text"
 			class={textareaClass}
 			rows="3"

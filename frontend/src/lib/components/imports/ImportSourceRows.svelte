@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Button } from '$lib/components/shadcn';
@@ -30,6 +31,7 @@
 			<option value="TMDB_PERSON">Person's films (TMDB)</option>
 		</select>
 		<input
+			{...NO_AUTOFILL}
 			type="text"
 			bind:value={src.ref}
 			maxlength={200}

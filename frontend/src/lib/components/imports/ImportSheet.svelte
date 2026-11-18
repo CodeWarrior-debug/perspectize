@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
 	import { untrack } from 'svelte';
 	import AgGridSvelte5Component from 'ag-grid-svelte5';
 	import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
@@ -239,6 +240,7 @@
 			{/each}
 		</div>
 		<input
+			{...NO_AUTOFILL}
 			type="search"
 			bind:value={search}
 			placeholder="Search titles, summaries, sources, cast"
