@@ -18,6 +18,8 @@ import {
 	serverSortFromColumnState,
 } from '$lib/utils/plan-grid-config';
 import type { UserTodoItem, UserTodoSortBy } from '$lib/queries/userTodos';
+import { headerMinWidth } from '$lib/utils/grid-header-width';
+import { PLAN_HEADER_CHROME } from '$lib/utils/grid-theme';
 
 const SERVER_SORTS: UserTodoSortBy[] = ['PRIORITY', 'DUE_DATE', 'CREATED_AT', 'UPDATED_AT', 'LIST_POSITION'];
 
@@ -75,6 +77,18 @@ describe('PLAN_COLUMNS metadata', () => {
 
 	it('gives every column a positive minimum width', () => {
 		for (const c of PLAN_COLUMNS) expect(c.minWidth).toBeGreaterThan(0);
+	});
+});
+
+describe('buildPlanColumnDefs: heading floor', () => {
+	// The floor ignores list mode (which only hides the sort), so both modes must clear the same bar.
+	it.each([false, true])('never narrows a heading below its label + sort arrow (listMode %s)', (listMode) => {
+		const defs = buildPlanColumnDefs(listMode);
+		for (const meta of PLAN_COLUMNS) {
+			const def = defs.find((d) => d.colId === meta.colId);
+			const floor = headerMinWidth(meta.label, { filter: false, sortable: meta.sortable }, PLAN_HEADER_CHROME);
+			expect(def?.minWidth, meta.label).toBeGreaterThanOrEqual(floor);
+		}
 	});
 });
 
