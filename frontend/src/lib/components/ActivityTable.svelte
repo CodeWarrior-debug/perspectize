@@ -1618,6 +1618,11 @@
 			cursors = [null];
 			updateUrl({ filters: {}, page: 1 });
 		}}
+		onClearAllButType={() => {
+			cursors = [null];
+			const { type } = gridParams.filters;
+			updateUrl({ filters: type ? { type } : {}, page: 1 });
+		}}
 	/>
 
 	<!-- Mixed/unfiltered types share one column set, so many cells are blank. The card list
