@@ -84,7 +84,7 @@ lint:
 # Install git hooks (shared hooks in repo root .hooks/)
 install-hooks:
 	git config core.hooksPath .hooks
-	@echo "Git hooks installed (.hooks/pre-commit)"
+	@echo "Git hooks installed (.hooks/pre-commit, .hooks/pre-push)"
 
 # Test duplication detection (requires jscpd: npm install -g jscpd)
 test-duplication:
