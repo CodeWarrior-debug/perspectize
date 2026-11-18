@@ -60,13 +60,60 @@ describe('CellPopover', () => {
 		expect(writeText).toHaveBeenCalledWith('a, c');
 	});
 
-	it('multi mode: Copy all copies every label', async () => {
+	it('multi mode: nothing selected enables Select all, disables Clear and Copy selected', () => {
 		render(CellPopover, {
 			...base,
 			state: { anchor: anchor(), mode: 'multi', text: '', copy: null, items: ['a', 'b'] },
 		});
-		await fireEvent.click(screen.getByTestId('tip-copy-all'));
+		expect((screen.getByTestId('tip-select-all') as HTMLButtonElement).disabled).toBe(false);
+		expect((screen.getByTestId('tip-clear-selection') as HTMLButtonElement).disabled).toBe(true);
+		expect((screen.getByTestId('tip-copy-selected') as HTMLButtonElement).disabled).toBe(true);
+	});
+
+	it('multi mode: some selected enables all three actions', async () => {
+		render(CellPopover, {
+			...base,
+			state: { anchor: anchor(), mode: 'multi', text: '', copy: null, items: ['a', 'b'] },
+		});
+		await fireEvent.click(screen.getByTestId('tip-item-a'));
+		expect((screen.getByTestId('tip-select-all') as HTMLButtonElement).disabled).toBe(false);
+		expect((screen.getByTestId('tip-clear-selection') as HTMLButtonElement).disabled).toBe(false);
+		expect((screen.getByTestId('tip-copy-selected') as HTMLButtonElement).disabled).toBe(false);
+	});
+
+	it('multi mode: all selected disables Select all, enables Clear', async () => {
+		render(CellPopover, {
+			...base,
+			state: { anchor: anchor(), mode: 'multi', text: '', copy: null, items: ['a', 'b'] },
+		});
+		await fireEvent.click(screen.getByTestId('tip-select-all'));
+		expect((screen.getByTestId('tip-select-all') as HTMLButtonElement).disabled).toBe(true);
+		expect((screen.getByTestId('tip-clear-selection') as HTMLButtonElement).disabled).toBe(false);
+		expect(screen.getByTestId('tip-item-a').getAttribute('aria-pressed')).toBe('true');
+		expect(screen.getByTestId('tip-item-b').getAttribute('aria-pressed')).toBe('true');
+	});
+
+	it('multi mode: Select all then Copy selected copies every label', async () => {
+		render(CellPopover, {
+			...base,
+			state: { anchor: anchor(), mode: 'multi', text: '', copy: null, items: ['a', 'b'] },
+		});
+		await fireEvent.click(screen.getByTestId('tip-select-all'));
+		await fireEvent.click(screen.getByTestId('tip-copy-selected'));
 		expect(writeText).toHaveBeenCalledWith('a, b');
+	});
+
+	it('multi mode: Clear empties the selection from the all-selected state', async () => {
+		render(CellPopover, {
+			...base,
+			state: { anchor: anchor(), mode: 'multi', text: '', copy: null, items: ['a', 'b'] },
+		});
+		await fireEvent.click(screen.getByTestId('tip-select-all'));
+		await fireEvent.click(screen.getByTestId('tip-clear-selection'));
+		expect(screen.getByTestId('tip-item-a').getAttribute('aria-pressed')).toBe('false');
+		expect(screen.getByTestId('tip-item-b').getAttribute('aria-pressed')).toBe('false');
+		expect((screen.getByTestId('tip-select-all') as HTMLButtonElement).disabled).toBe(false);
+		expect((screen.getByTestId('tip-clear-selection') as HTMLButtonElement).disabled).toBe(true);
 	});
 
 	const castState = () => ({
@@ -87,9 +134,10 @@ describe('CellPopover', () => {
 		expect(writeText).toHaveBeenCalledWith('Ben Affleck');
 	});
 
-	it('multi mode: Copy all copies names only', async () => {
+	it('multi mode: Select all then Copy selected copies names only', async () => {
 		render(CellPopover, { ...base, state: castState() });
-		await fireEvent.click(screen.getByTestId('tip-copy-all'));
+		await fireEvent.click(screen.getByTestId('tip-select-all'));
+		await fireEvent.click(screen.getByTestId('tip-copy-selected'));
 		expect(writeText).toHaveBeenCalledWith('Ben Affleck, Matt Damon');
 	});
 
