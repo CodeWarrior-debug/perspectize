@@ -13,12 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Gap #2 in the UI gap audit: there was no way to clear a rating, like, review,
-// feelings, or customFields once set on a perspective -- every optional
-// UpdatePerspectiveInput field was a plain nullable pointer, so "omitted" and
-// "explicit null" both decoded to nil, and Update() treated nil as "no change"
-// for every field. These tests cover the tri-state fix: omitted leaves a field
-// alone, a value applies it, and the new Clear* flags reset it to nil.
+// Clearing a rating, like, review, feelings, or customFields needs more than a
+// nullable pointer: "omitted" and "explicit null" both decode to nil, and
+// Update() treats nil as "no change". These tests cover the tri-state update:
+// omitted leaves a field alone, a value applies it, and the Clear* flags reset
+// it to nil.
 
 func intPtr(v int) *int       { return &v }
 func strPtr(v string) *string { return &v }

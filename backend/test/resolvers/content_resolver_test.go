@@ -548,7 +548,7 @@ func TestContentQuery_NotFound_ReturnsError(t *testing.T) {
 
 	result := executeGraphQL(t, server, `{ contentByID(id: "999") { id name } }`)
 
-	// Issue #18 fix: should return an error, not a silent null
+	// Should return an error, not a silent null
 	require.NotEmpty(t, result.Errors, "Expected an error when content is not found")
 	assert.Contains(t, result.Errors[0].Message, "content not found")
 }
@@ -697,7 +697,7 @@ func TestCreateContentFromYouTube_DerivesUserIDFromSession_WhenZero(t *testing.T
 }
 
 func TestCreateContentFromYouTube_RejectsSpoofedUserID(t *testing.T) {
-	// Issue #246: a non-zero userId that doesn't match the authenticated
+	// A non-zero userId that doesn't match the authenticated
 	// session must be rejected, not trusted verbatim.
 	metadata := &portservices.VideoMetadata{
 		Title:    "Amazing Video",

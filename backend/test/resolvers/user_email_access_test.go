@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Regression test for #309: `email` on the User type must only resolve for
+// `email` on the User type must only resolve for
 // the requesting user's own account. Querying `users` (authenticated as user
 // 1, via injectAuthMiddleware) must return null for another user's email
 // while still returning the caller's own.

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// --- CreatePerspective Mutation Tests ---
 func TestCreatePerspective_DuplicateReturnsReadableMessage(t *testing.T) {
 	// A second perspective for the same user, content and privacy is a user
 	// error: the message names the privacy and carries no SQL or constraint name.
@@ -57,7 +58,7 @@ func TestCreatePerspective_DerivesUserIDFromSession_WhenZero(t *testing.T) {
 }
 
 func TestCreatePerspective_RejectsSpoofedUserID(t *testing.T) {
-	// Issue #246: a non-zero userID that doesn't match the authenticated
+	// A non-zero userID that doesn't match the authenticated
 	// session must be rejected, not trusted verbatim.
 	var createCalled bool
 	perspectiveRepo := &mockPerspectiveRepository{

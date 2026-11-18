@@ -1,5 +1,5 @@
--- Retention is no longer enforced in-trigger. The application-side
--- RetentionSweeper (gated by MESSAGE_RETENTION_MAX) is now the only pruner,
+-- Retention is not enforced in-trigger. The application-side
+-- RetentionSweeper (gated by MESSAGE_RETENTION_MAX) is the only pruner,
 -- and it is disabled by default -> unbounded history.
 CREATE OR REPLACE FUNCTION publish_and_prune_message() RETURNS trigger AS $$
 BEGIN

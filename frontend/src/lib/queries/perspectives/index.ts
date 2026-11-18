@@ -8,7 +8,7 @@ import { gql } from 'graphql-request';
  * `first` (this constant), or content/users with more than 10 perspectives
  * silently lose data: the +/glasses "already rated" affordance, the Compare
  * user picker, and onboarding's perspective counts all read past the cutoff
- * as "no perspective" (see the UI gap audit, gap #4).
+ * as "no perspective".
  */
 export const MAX_PERSPECTIVES_PER_LIST = 100;
 

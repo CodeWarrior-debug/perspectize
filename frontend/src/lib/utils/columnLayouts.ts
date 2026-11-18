@@ -3,7 +3,7 @@ import { defaultColumnVisibility, togglableColIds, type ColumnView, type Respons
 export { columnViewFor, type ColumnView } from './grid-config';
 
 /**
- * columnLayouts — per-view Activity table column setups (issue #559).
+ * columnLayouts — per-view Activity table column setups.
  *
  * A "view" is the default column set a type filter maps to: `movie` when the
  * filter is exactly MOVIE, `book` when it is exactly BOOK, `claim` when it is exactly

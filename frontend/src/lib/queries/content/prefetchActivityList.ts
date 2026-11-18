@@ -7,7 +7,7 @@ type ActivityListRequest = ReturnType<typeof activityListRequest>;
 
 /**
  * Start the Activity list at route load, before Clerk is ready, under the SAME key ActivityTable
- * reads, so the table mounts onto cached data (#636).
+ * reads, so the table mounts onto cached data.
  *
  * Anonymous on purpose: LIST_CONTENT's result depends on the viewer only through
  * filter.minPerspectiveCount (ComparePicker sets it; the URL never does). Without it the signed-out

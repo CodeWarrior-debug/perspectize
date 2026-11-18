@@ -353,7 +353,7 @@ func TestWebhookHandler_UserUpdated(t *testing.T) {
 	})
 
 	t.Run("a wrapped ErrNotFound still falls back to creating the user and returns 200", func(t *testing.T) {
-		// Regression test for #325: the dispatch must use errors.Is, not a raw
+		// The dispatch must use errors.Is, not a raw
 		// == comparison, so a repository that wraps the sentinel (e.g.
 		// fmt.Errorf("update by clerk id: %w", domain.ErrNotFound)) still
 		// triggers the fallback instead of falling into the generic 500 path.
@@ -415,7 +415,7 @@ func TestWebhookHandler_UserDeleted(t *testing.T) {
 	})
 
 	t.Run("a wrapped ErrNotFound is tolerated and returns 200", func(t *testing.T) {
-		// Regression test for #325: same errors.Is requirement for the
+		// Same errors.Is requirement for the
 		// user.deleted tolerance branch.
 		repo := &stubUserRepo{
 			deactivateByClerkIDFn: func(ctx context.Context, clerkID string) error {

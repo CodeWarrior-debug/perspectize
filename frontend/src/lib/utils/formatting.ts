@@ -1043,8 +1043,7 @@ export function tmdbIdValueGetter(params: { data?: MovieRow }): number | null {
 /**
  * Tags for a row: the real tags (YouTube) when present, else TMDB keywords for a
  * Movie, else Open Library subjects for a Book. Keywords and subjects are source-provided
- * sets (see GitHub issue 560 for the planned source vs user tag split; deliberately not
- * modelled here).
+ * sets; a source vs user tag split is deliberately not modelled here.
  */
 export function contentTags(row: MovieRow | null | undefined): string[] | null {
 	if (row?.tags && row.tags.length > 0) return row.tags;

@@ -525,10 +525,9 @@
 
 	// The mobile card list has no AG Grid instance to sort or filter for it. In "All
 	// Items" mode the server already returned rows in the requested (and filtered)
-	// order; in "Loaded" mode, apply clientSorts and the URL filters by hand — this
-	// used to only sort, so a mobile "Loaded"-mode card view silently ignored every
-	// column filter (see the UI gap audit, gap #5). On desktop, AG Grid does both
-	// itself, so this is a no-op there.
+	// order; in "Loaded" mode, apply clientSorts and the URL filters by hand, or the
+	// mobile card view would silently ignore every column filter. On desktop, AG Grid
+	// does both itself, so this is a no-op there.
 	const sortedRowData = $derived(
 		mode === 'loaded' && cardMode
 			? (() => {

@@ -4,7 +4,7 @@
 -- Spec: docs/superpowers/specs/2026-10-27-youtube-channel-import-design.md
 -- Plan: docs/superpowers/plans/2026-10-27-import-staging-plan.md
 --
--- Numbering: 000035 sits after 000032 to 000034 (claim content, #612), which production
+-- Numbering: 000035 sits after 000032 to 000034 (claim content), which production
 -- already has. `migrate up` from version 34 skips any lower number.
 --
 -- Requests: anyone signed in can create an import, but only an admin's starts
