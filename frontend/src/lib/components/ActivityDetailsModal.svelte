@@ -4,6 +4,7 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ScaleIcon from '@lucide/svelte/icons/scale';
 	import { MODAL_ACTION_CLASS } from '$lib/components/modal-action';
 	import { Dialog, DialogContent, DialogTitle, DialogClose } from '$lib/components/shadcn';
@@ -70,12 +71,15 @@
 		open = false,
 		onClose,
 		onAddToPlan,
+		onAddPerspective,
 	}: {
 		content: ModalContent | null;
 		open?: boolean;
 		onClose: () => void;
 		/** Shows "Add to plan" (signed-in users only) when provided. The caller owns the todo dialog. */
 		onAddToPlan?: (content: ModalContent) => void;
+		/** Shows "Add perspective" when provided; opens the same editor as the grid's ◎ control. */
+		onAddPerspective?: (content: ModalContent) => void;
 	} = $props();
 
 	const isMovie = $derived(content?.contentType === 'MOVIE');
@@ -439,6 +443,16 @@
 							<ScaleIcon />
 							Compare
 						</a>
+						{#if onAddPerspective}
+							<button
+								type="button"
+								onclick={() => onAddPerspective(content)}
+								class="{MODAL_ACTION_CLASS} grow basis-36"
+							>
+								<PlusIcon />
+								Add perspective
+							</button>
+						{/if}
 						{#if onAddToPlan}
 							<AddToPlanButton variant="text" class="grow basis-36" onclick={() => onAddToPlan(content)} />
 						{/if}

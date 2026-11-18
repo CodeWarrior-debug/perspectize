@@ -219,6 +219,12 @@
 		popoverOpen = true;
 	}
 
+	// From the details modal: close it first so the two dialogs never stack, then open the editor.
+	function handleAddPerspectiveFromDetails(content: { id: string; name: string }) {
+		handleCloseDetails();
+		openPerspective(content.id, content.name);
+	}
+
 	function handleAddPerspectiveFromCard(contentId: string) {
 		const row = rowData.find((item) => String(item.id) === contentId);
 		openPerspective(contentId, row?.name ?? '');
@@ -1790,6 +1796,7 @@
 	open={detailsModalContentId !== null}
 	onClose={handleCloseDetails}
 	onAddToPlan={currentUserId !== null ? handleAddToPlan : undefined}
+	onAddPerspective={handleAddPerspectiveFromDetails}
 />
 
 <!-- "Add to plan" todo dialog. Mounted only while open; the caller is signed in by construction. -->
