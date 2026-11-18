@@ -11,6 +11,7 @@ Confidence: `new` (introduced, not quizzed) → `shaky` → `solid`.
 | Tool = name + description + JSON Schema + handler (shared by API tool use and MCP) | 2026-09-26 | — | new | |
 | Agent loop: model → tool calls → tool results → repeat | 2026-09-26 | 2026-09-26 | shaky | Asked for the answer (calls = tool rounds + 1; parallel calls share a round; each call resends history). Re-quiz soon |
 | Provider port/adapter; normalizing tool-call + stream formats | 2026-09-26 | 2026-09-26 | solid | Named the OpenRouter/DeepSeek switch. Added: test fakes + SDK upgrades as sooner pain points |
+| Tool names are developer-chosen (`read_guide` is ours); wire format is per vendor (Anthropic `tool_use` vs OpenAI-style `tool_calls`; Kimi/Qwen hosted use OpenAI-style); neutral `ToolSpec` + one adapter per provider | 2026-11-14 | 2026-11-14 | shaky | Quiz answered "idk". Explained: only the adapter changes; loop, tool, prompt, guide and eval cases stay; model behavior (skips the tool, wrong area, bad args, ignores the unsupported sentence) is what can still break, and evals catch it. Re-quiz |
 | In-process vs over-HTTP clients | 2026-09-26 | — | new | Go `internal/` rule forced HTTP for `botler` |
 | Latency: tool round-trips + model time dominate, not network hops | 2026-09-26 | — | new | |
 | Stateless API: tools + system + history resent every call → tool bloat compounds; progressive tool discovery | 2026-09-26 | 2026-09-26 | shaky | Knew the goal (avoid bloat); "stateless" reason was explained, not answered |
@@ -18,7 +19,7 @@ Confidence: `new` (introduced, not quizzed) → `shaky` → `solid`.
 | Streaming transport: GraphQL subscription vs SSE | 2026-09-26 | — | new | |
 | Closed loop: independent verifier + objective completion condition + failure feedback path + round cap | 2026-09-26 | 2026-09-26 | solid | Named verifier + completion condition; added feedback path, ground-truth checks, escalation cap. Follow-up: conflated open loop (no feedback) with non-terminating loop (feedback, no exit) — re-check |
 | Context discipline: small tasks in fresh subagents (vs. % caps) | 2026-09-26 | — | new | |
-| Guide format: concise plain English + scoped loading beats caveman compression | 2026-09-26 | — | new | Measurable later via evals A/B |
+| Guide format: concise plain English + scoped loading beats caveman compression | 2026-09-26 | 2026-11-14 | shaky | Answered "context is split and progressively disclosed": right idea. Missed the mechanism: the system prompt carries only an area index (slug, title, route, summary) as the model's menu; `read_guide` returns one area or one entry on demand; deferral saves tokens, splitting alone does not; a vague index summary means a wrong area or a false "unsupported". Measurable later via evals A/B |
 | go:embed is directory-scoped (no `..`); Go `internal/` is subtree-private, one-way deps backend → ai-tooling | 2026-09-26 | 2026-09-26 | shaky | Asked for the answer; C# `internal` analogy given. Re-quiz |
 | Tracer bullets: thin real end-to-end slice first, then widen (≠ prototype, ≠ spike) | 2026-09-26 | — | new | Owner proposed it; applied as Tracer 1 (guide→loop→botler→eval) + Tracer 2 (backend→subscription→sidebar) |
 
@@ -30,4 +31,5 @@ Confidence: `new` (introduced, not quizzed) → `shaky` → `solid`.
 - [ ] Task 3 owner-implements: write `settings.change-theme` in `appguide/guide/settings.md` (reserved; Claude reviews it)
 - [ ] Task 3 quiz: (1) why "Not supported" lines; (2) which claim in your entry a verifier would check first, against which file
 - [ ] MCP Tools reading (modelcontextprotocol.io → Concepts → Tools, tool annotations) + one question
+- [ ] App-guide refresh quiz (2026-11-14): Q1 answered (see "Guide format" row). Q2 (monthly drift check, empty `git log`) dropped: repo maintenance, out of teaching scope. Q3 open: why does each verifier see only the area file, seeds, diff and repo, not the writer's reasoning?
 - [ ] Re-quiz shaky rows above (agent loop call count, stateless API, in-app handshake, open vs non-terminating loop)
