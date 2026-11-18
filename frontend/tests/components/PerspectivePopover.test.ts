@@ -659,24 +659,43 @@ describe('PerspectivePopover component', () => {
 
 	describe('feel-wheel', () => {
 		const wheelSearch = () => screen.queryByPlaceholderText(/Search more feelings/);
+		const wheelColumn = () => screen.getByTestId('feel-wheel-column');
+		const addFeelingButton = () => screen.queryByRole('button', { name: /Add a feeling/ });
 
-		it('starts closed in create mode, showing only the "Add a feeling" button', async () => {
+		it('desktop: the wheel column is open beside the ratings from the first render, in a 760px dialog', async () => {
 			renderPopover({ existingPerspective: null });
 			await tick();
-			expect(screen.getByRole('button', { name: /Add a feeling/ })).toBeInTheDocument();
-			expect(wheelSearch()).not.toBeInTheDocument();
+			expect(wheelColumn()).toContainElement(wheelSearch() as HTMLElement);
+			expect(wheelColumn()).toHaveClass('sm:w-[346px]', 'sm:shrink-0', 'hidden', 'sm:block');
+			expect(wheelColumn().parentElement).toHaveClass('sm:flex-row');
+			expect(screen.getByRole('dialog').className).toContain('sm:max-w-[760px]');
+			expect(addFeelingButton()).toHaveClass('sm:hidden');
 		});
 
-		it('opens the wheel on the same tick as the click, with no loading state', async () => {
+		it('desktop: expanding the comment editor leaves the dialog at 760px and the wheel in place', async () => {
 			renderPopover({ existingPerspective: null });
 			await tick();
-			await fireEvent.click(screen.getByRole('button', { name: /Add a feeling/ }));
+			await fireEvent.click(screen.getByRole('button', { name: 'Expand comment' }));
+			expect(screen.getByRole('dialog').className).toContain('sm:max-w-[760px]');
+			expect(wheelColumn()).toContainElement(wheelSearch() as HTMLElement);
+		});
+
+		it('mobile: the wheel stays hidden below the ratings until "Add a feeling" opens it inline', async () => {
+			renderPopover({ existingPerspective: null });
+			await tick();
+			const button = addFeelingButton() as HTMLElement;
+			expect(wheelColumn()).toHaveClass('hidden');
+			// Stacked order on narrow screens: the button sits above the wheel it opens.
+			expect(button.compareDocumentPosition(wheelColumn()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+			await fireEvent.click(button);
+			expect(wheelColumn()).not.toHaveClass('hidden');
 			expect(wheelSearch()).toBeInTheDocument();
 			expect(screen.queryByText(/Loading feel-wheel/)).not.toBeInTheDocument();
-			expect(screen.queryByRole('button', { name: /Add a feeling/ })).not.toBeInTheDocument();
+			expect(addFeelingButton()).not.toBeInTheDocument();
 		});
 
-		it('opens already expanded when editing a perspective that has feelings', async () => {
+		it('edit mode with saved feelings: the wheel shows them on every width and no button is offered', async () => {
 			renderPopover({
 				existingPerspective: {
 					id: '4',
@@ -689,21 +708,27 @@ describe('PerspectivePopover component', () => {
 				},
 			});
 			await tick();
-			expect(wheelSearch()).toBeInTheDocument();
-			expect(screen.getByRole('button', { name: 'Remove Happy' })).toBeInTheDocument();
-			expect(screen.queryByRole('button', { name: /Add a feeling/ })).not.toBeInTheDocument();
+			expect(wheelColumn()).not.toHaveClass('hidden');
+			expect(wheelColumn()).toContainElement(screen.getByRole('button', { name: 'Remove Happy' }));
+			expect(addFeelingButton()).not.toBeInTheDocument();
 		});
 
-		it('puts the wheel in its own column and widens the dialog only while the wheel is open', async () => {
-			renderPopover({ existingPerspective: null });
+		it('edit mode without feelings: the column is desktop-only and the mobile button is still offered', async () => {
+			renderPopover({
+				existingPerspective: {
+					id: '5',
+					quality: 7000,
+					agreement: null,
+					importance: null,
+					confidence: null,
+					like: null,
+					feelings: [],
+				},
+			});
 			await tick();
-			const dialog = () => screen.getByRole('dialog');
-			expect(dialog().className).toContain('sm:max-w-[460px]');
-			expect(screen.queryByTestId('feel-wheel-column')).not.toBeInTheDocument();
-
-			await fireEvent.click(screen.getByRole('button', { name: /Add a feeling/ }));
-			expect(screen.getByTestId('feel-wheel-column')).toContainElement(wheelSearch() as HTMLElement);
-			expect(dialog().className).toContain('sm:max-w-[760px]');
+			expect(wheelColumn()).toHaveClass('hidden', 'sm:block');
+			expect(addFeelingButton()).toHaveClass('sm:hidden');
+			expect(screen.getByRole('dialog').className).toContain('sm:max-w-[760px]');
 		});
 	});
 

@@ -531,7 +531,7 @@
 							<button
 								type="button"
 								onclick={() => (feelWheelOpen = true)}
-								class="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-2 text-sm text-muted-foreground hover:opacity-70"
+								class="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-2 text-sm text-muted-foreground hover:opacity-70 sm:hidden"
 							>
 								<span class="text-base leading-none">🙂</span>
 								Add a feeling
@@ -539,11 +539,17 @@
 						{/if}
 					</div>
 
-					{#if feelWheelOpen}
-						<div class="rounded-md border border-border p-3 sm:w-[346px] sm:shrink-0" data-testid="feel-wheel-column">
-							<FeelWheel bind:value={feelings} />
-						</div>
-					{/if}
+					<!-- Always mounted (one instance): wide screens show it beside the ratings,
+					     narrow screens show it below them only once it has been opened. -->
+					<div
+						class={[
+							'rounded-md border border-border p-3 sm:w-[346px] sm:shrink-0',
+							!feelWheelOpen && 'hidden sm:block',
+						]}
+						data-testid="feel-wheel-column"
+					>
+						<FeelWheel bind:value={feelings} />
+					</div>
 				</div>
 
 				<div class="flex items-center justify-between rounded-md border border-border px-3 py-2">
@@ -702,10 +708,7 @@
 		}}
 	>
 		<DialogContent
-			class={[
-				'w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col transition-[max-width] duration-200',
-				commentExpanded || feelWheelOpen ? 'sm:max-w-[760px]' : 'sm:max-w-[460px]',
-			]}
+			class="w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden p-0 flex flex-col sm:max-w-[760px]"
 			overlayClass="bg-black/45"
 		>
 			{@render modalBody(false)}
