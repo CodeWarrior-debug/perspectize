@@ -1077,6 +1077,11 @@
 	box-shadow: none;
 	color: var(--color-primary);
 }
+/* AG Grid paints the dot with the grid accent (--color-primary), which is nearly the header colour
+   on dark presets. Foreground contrasts with the header (--color-muted) on every preset. */
+.ag-header-cell .ag-header-cell-filter-button.ag-filter-active::after {
+	background-color: var(--color-foreground);
+}
 .ag-header-cell .ag-header-cell-filter-button.ag-filter-active:hover {
 	background-color: var(--ag-icon-button-hover-color);
 	border-radius: 4px;
