@@ -155,6 +155,33 @@ func TestGormPerspectiveRepository_Create(t *testing.T) {
 		assertAllExpectationsMet(t, mock)
 	})
 
+	t.Run("duplicate (user, content, privacy) maps to domain.ErrAlreadyExists", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`INSERT INTO "perspectives"`).
+			WillReturnError(&pgconn.PgError{Code: "23505", ConstraintName: "uq_perspectives_user_content_privacy"})
+
+		got, err := NewGormPerspectiveRepository(db).Create(ctx, &domain.Perspective{UserID: 2, ContentID: pInt(11), Privacy: domain.PrivacyPrivate})
+		assert.Nil(t, got)
+		assert.True(t, errors.Is(err, domain.ErrAlreadyExists), "expected domain.ErrAlreadyExists, got %v", err)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "you already have a private perspective on this content")
+		assert.NotContains(t, err.Error(), "uq_perspectives")
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("unique violation on a different constraint stays generic", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`INSERT INTO "perspectives"`).
+			WillReturnError(&pgconn.PgError{Code: "23505", ConstraintName: "perspectives_pkey"})
+
+		got, err := NewGormPerspectiveRepository(db).Create(ctx, &domain.Perspective{UserID: 2, ContentID: pInt(11)})
+		assert.Nil(t, got)
+		require.Error(t, err)
+		assert.False(t, errors.Is(err, domain.ErrAlreadyExists), "must not be mapped to ErrAlreadyExists: %v", err)
+		assert.Contains(t, err.Error(), "failed to insert perspective")
+		assertAllExpectationsMet(t, mock)
+	})
+
 	t.Run("other constraint errors stay generic", func(t *testing.T) {
 		tests := []struct {
 			name string
@@ -251,6 +278,34 @@ func TestGormPerspectiveRepository_Update(t *testing.T) {
 			assert.True(t, errors.Is(err, domain.ErrNotFound), "owner %d: expected domain.ErrNotFound, got %v", owner, err)
 			assertAllExpectationsMet(t, mock)
 		}
+	})
+
+	t.Run("duplicate (user, content, privacy) maps to domain.ErrAlreadyExists", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`UPDATE "perspectives" SET`).
+			WillReturnError(&pgconn.PgError{Code: "23505", ConstraintName: "uq_perspectives_user_content_privacy"})
+
+		got, err := NewGormPerspectiveRepository(db).Update(ctx, &domain.Perspective{ID: 5, UserID: 2, ContentID: pInt(11), Privacy: domain.PrivacyPublic}, 2)
+		assert.Nil(t, got)
+		assert.True(t, errors.Is(err, domain.ErrAlreadyExists), "expected domain.ErrAlreadyExists, got %v", err)
+		assert.False(t, errors.Is(err, domain.ErrNotFound))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "you already have a public perspective on this content")
+		assert.NotContains(t, err.Error(), "uq_perspectives")
+		assertAllExpectationsMet(t, mock)
+	})
+
+	t.Run("unique violation on a different constraint stays generic", func(t *testing.T) {
+		db, mock := newMockDB(t)
+		mock.ExpectQuery(`UPDATE "perspectives" SET`).
+			WillReturnError(&pgconn.PgError{Code: "23505", ConstraintName: "perspectives_pkey"})
+
+		got, err := NewGormPerspectiveRepository(db).Update(ctx, &domain.Perspective{ID: 5, UserID: 2}, 2)
+		assert.Nil(t, got)
+		require.Error(t, err)
+		assert.False(t, errors.Is(err, domain.ErrAlreadyExists), "must not be mapped to ErrAlreadyExists: %v", err)
+		assert.Contains(t, err.Error(), "failed to update perspective")
+		assertAllExpectationsMet(t, mock)
 	})
 
 	t.Run("wraps update errors", func(t *testing.T) {
