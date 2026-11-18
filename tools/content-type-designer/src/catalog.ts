@@ -84,6 +84,16 @@ export interface ContentTypeProfile {
   detailOnly?: { label: string; path: string }[];
   /** Every type needs one; undefined means "not decided yet" and the spec flags it. */
   discover?: DiscoverDecision;
+  /** Adult / rating gate and the exact rejection message. Empty = undecided. */
+  contentPolicy?: string;
+  /** How the type enters the Add Content window: detection pattern, select label, extra fields/notices. Empty = undecided. */
+  addContentEntry?: string;
+  /** What the add form shows when the item already exists. Empty = undecided. */
+  duplicateFeedback?: string;
+  /** Facts the mobile card list shows in place of views / likes / channel. Empty = undecided. */
+  mobileCardFields?: string;
+  /** Fields the search box covers for this type (scope picker). Empty = undecided. */
+  searchFields?: string;
 }
 
 export type DiscoverPlacement = 'search-and-feed' | 'feed-only' | 'search-only' | 'not-on-discover';
@@ -263,7 +273,12 @@ export const TYPES: ContentTypeProfile[] = [
     icon: 'film',
     accent: '#0F9D8C',
     sharesUrlSpace: false,
-    thumbnail: 'TMDB poster_path — 2:3 tile (w92 in the grid, w342 in details)'
+    thumbnail: 'TMDB poster_path — 2:3 tile (w92 in the grid, w342 in details)',
+    contentPolicy: 'Reject NC-17 and TMDB adult:true (CONTENT_NOT_ALLOWED)',
+    mobileCardFields: 'year, rating, runtime, TMDB score',
+    searchFields: 'title, cast, director',
+    duplicateFeedback: 'TBD',
+    addContentEntry: 'Autodetect TMDB/IMDb movie links; select label Movie; TMDB attribution notice only for Movie'
   },
   {
     id: 'book',
