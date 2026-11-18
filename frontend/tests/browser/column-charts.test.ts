@@ -140,7 +140,9 @@ describe('column charts on the activity grid', () => {
 		render(ActivityTableHarness);
 		await expect.poll(() => chartButton()).not.toBeNull();
 
-		const topRow = () => document.querySelector('.ag-center-cols-container .ag-row[row-index="0"]')?.textContent ?? '';
+		// The Item column is pinned left, so a row's text spans the pinned and the centre container.
+		const topRow = () =>
+			[...document.querySelectorAll('.ag-row[row-index="0"]')].map((row) => row.textContent ?? '').join(' ');
 		const title = takeHeader()?.querySelector('.ag-header-cell-label') as HTMLElement;
 		title.click(); // ascending: lowest known take first
 		await expect.poll(topRow).toContain('Film 1');
