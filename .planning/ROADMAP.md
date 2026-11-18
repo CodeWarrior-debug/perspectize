@@ -786,6 +786,7 @@ Plans:
 **Depends on**: Phase 7.4 (Performance Monitoring — log lines this phase builds on). Independent of the Neon migration (instrumentation doesn't depend on the DB host).
 **Spec**: `docs/superpowers/specs/2026-09-26-observability-design.md`
 **Context**: `.planning/phases/25-observability-release-tagging/25-CONTEXT.md`
+**Research**: `docs/superpowers/specs/2026-11-18-sevalla-request-log-duplication-research.md` (#558, double `request` + `graphql` log lines)
 **Plans**: 4 plans
 
 **Success criteria (must_haves.truths):**
