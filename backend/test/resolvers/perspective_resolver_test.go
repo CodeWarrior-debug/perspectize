@@ -10,6 +10,26 @@ import (
 )
 
 // --- CreatePerspective Mutation Tests ---
+func TestCreatePerspective_DuplicateReturnsReadableMessage(t *testing.T) {
+	// A second perspective for the same user, content and privacy is a user
+	// error: the message names the privacy and carries no SQL or constraint name.
+	perspectiveRepo := &mockPerspectiveRepository{
+		createFn: func(ctx context.Context, p *domain.Perspective) (*domain.Perspective, error) {
+			return nil, domain.ErrAlreadyExists
+		},
+	}
+
+	server := setupTestServerWithRepos(&mockContentRepository{}, &mockYouTubeClient{}, perspectiveRepo, &mockUserRepository{})
+	defer server.Close()
+
+	result := executeGraphQL(t, server, `mutation { createPerspective(input: { userID: 0, quality: 5, privacy: PRIVATE }) { id } }`)
+
+	require.NotEmpty(t, result.Errors)
+	assert.Equal(t, "you already have a private perspective on this content", result.Errors[0].Message)
+	assert.NotContains(t, result.Errors[0].Message, "uq_perspectives")
+}
+
+// --- CreatePerspective Mutation Tests (Issue #246) ---
 
 func TestCreatePerspective_DerivesUserIDFromSession_WhenZero(t *testing.T) {
 	var capturedUserID int
