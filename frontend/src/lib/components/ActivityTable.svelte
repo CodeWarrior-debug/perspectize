@@ -11,7 +11,7 @@
 		CellClickedEvent,
 		CellMouseOverEvent,
 	} from '@ag-grid-community/core';
-	import { createQuery, keepPreviousData } from '@tanstack/svelte-query';
+	import { createQuery, hashKey, keepPreviousData } from '@tanstack/svelte-query';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { graphqlRequest } from '$lib/queries/client';
@@ -25,6 +25,7 @@
 	} from '$lib/queries/content';
 	import { useContentDetails } from '$lib/queries/content/useContentDetails';
 	import { OPEN_CONTENT_PARAM } from '$lib/utils/contentLinks';
+	import { createRowOrderMemory } from '$lib/utils/rowOrder';
 	import {
 		LIST_PERSPECTIVES_BY_USER,
 		MAX_PERSPECTIVES_PER_LIST,
@@ -455,11 +456,18 @@
 	// Derived values from query
 	// Rows get their adder's username from the cached users list (see useUsernames).
 	const usernames = useUsernames();
+	// The default server order (updatedAt desc) can put an edited row first on a refetch, so the row
+	// jumps out of view. Keep rows where they were while the list (its query key) stays the same.
+	const rowOrder = createRowOrderMemory();
 	const rowData = $derived(
-		(contentQuery.data?.content.items ?? []).map((item) => ({
-			...item,
-			addedByUsername: usernames.byId.get(item.addedByUserID) ?? null,
-		})),
+		rowOrder.apply(
+			hashKey(activityRequest.queryKey),
+			(contentQuery.data?.content.items ?? []).map((item) => ({
+				...item,
+				addedByUsername: usernames.byId.get(item.addedByUserID) ?? null,
+			})),
+			contentQuery.isPlaceholderData,
+		),
 	);
 	const detailsModalRow = $derived(rowData.find((item) => String(item.id) === detailsModalContentId) ?? null);
 	// A deep-linked item (`?open=<id>`, e.g. from a "Go to" toast or a verse jump) is
