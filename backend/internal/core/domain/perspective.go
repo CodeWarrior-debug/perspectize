@@ -71,7 +71,7 @@ type Perspective struct {
 	// Feelings is the emoji feel-wheel selections for this perspective (JSONB array).
 	Feelings []FeelingEntry
 
-	// Perspective reference fields (Phase 4)
+	// Perspective reference fields
 	PrimaryPerspectiveID  *int            // FK to another perspective (optional)
 	RelatedPerspectiveIDs []int           // array of perspective IDs (max 50 app-level cap)
 	CustomFields          json.RawMessage // JSONB custom fields

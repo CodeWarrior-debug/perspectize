@@ -35,10 +35,9 @@
 		length: number | null;
 		lengthUnits: string | null;
 		lengthDisplay?: LengthDisplay | null;
-		// Gap #13 in the UI gap audit: the mobile card used to show only name/
-		// channel/duration — 2 of the grid's 9 DATA_COLUMNS. Category, views and
-		// likes are the three most-used of the rest; the remaining columns
-		// (% liked, publish date, tags, description) are still grid/details-modal
+		// Beyond name/channel/duration, the mobile card shows category, views and
+		// likes — the three most-used of the grid's other columns; the remaining
+		// columns (% liked, publish date, tags, description) are grid/details-modal
 		// only on mobile.
 		primaryCategory?: { label: string } | null;
 		viewCount?: number | null;

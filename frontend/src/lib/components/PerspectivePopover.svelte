@@ -104,8 +104,7 @@
 
 	// Dynamic fields — tracks which rating fields are shown
 	// Single source of truth: STANDARD_DIMENSIONS in comparePerspectives.ts (also used
-	// by AddFieldSearch's core-field entries and Compare's getFieldLabel). See the UI
-	// gap audit, gap #17.
+	// by AddFieldSearch's core-field entries and Compare's getFieldLabel).
 	const DEFAULT_FIELDS: string[] = STANDARD_DIMENSIONS.map((d) => d.key);
 	let activeFields = $state<string[]>([...DEFAULT_FIELDS]);
 
@@ -366,7 +365,7 @@
 
 		// Close immediately instead of waiting for the server: the mutation hooks
 		// patch the cached lists optimistically, so the change is already on
-		// screen, and a slow network (mobile) no longer holds the sheet open for
+		// screen, and a slow network (mobile) doesn't hold the sheet open for
 		// the full round trip. mutateAsync settles even after this component
 		// unmounts. On failure the hook rolls the optimistic patch back and
 		// offers Retry, and the review text survives as a draft (flushed below,
@@ -685,7 +684,6 @@
 			</button>
 		</div>
 	{/if}
-
 {/snippet}
 
 <!-- Desktop: centered dialog -->

@@ -286,8 +286,8 @@ func main() {
 	defer stopListener()
 
 	// Application-side message retention sweep. Disabled unless
-	// MESSAGE_RETENTION_MAX is a positive value — since migration 000018 the
-	// database no longer prunes messages itself, so this is the only pruner.
+	// MESSAGE_RETENTION_MAX is a positive value. The database does not prune
+	// messages itself, so this is the only pruner.
 	if cfg.MessageRetentionMax > 0 {
 		sweeper := services.NewRetentionSweeper(
 			db, cfg.MessageRetentionMax,

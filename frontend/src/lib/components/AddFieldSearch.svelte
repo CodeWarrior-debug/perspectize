@@ -33,8 +33,7 @@
 		// The 4 core dimensions read from STANDARD_DIMENSIONS (comparePerspectives.ts) --
 		// the single source of truth also used by PerspectivePopover's DEFAULT_FIELDS and
 		// Compare's getFieldLabel, so a renamed/relabeled dimension can't drift between
-		// them (see the UI gap audit, gap #17). Only the descriptions are local to this
-		// search box.
+		// them. Only the descriptions are local to this search box.
 		...STANDARD_DIMENSIONS.map((d) => ({
 			key: d.key,
 			label: d.label,

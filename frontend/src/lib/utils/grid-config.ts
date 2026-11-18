@@ -162,15 +162,12 @@ export function releasedComparator(
 // ---------------------------------------------------------------------------
 
 /**
- * One entry per ActivityTable column. Everything below that used to be five
- * separately hand-maintained lists (the column picker's DATA_COLUMNS/
- * INTERNAL_COLUMNS, the sort picker's SORTABLE_COLUMNS, the mobile/Loaded-mode
- * SORT_VALUE_GETTERS, gridUrlState.ts's COL_TO_SORT/SORT_TO_COL and
- * COL_TO_FILTER_KEY, and FilterChips.svelte's COLUMN_LABELS) is now derived
- * from this one array, so a column can no longer be added to the grid and
- * left out of one of those places by mistake — see the UI gap audit, gap #1
- * (the missing Category column), and the structural fix suggested in
- * .docs/UI_THOROUGHNESS_CHECKLIST.md §3.1.
+ * One entry per ActivityTable column. Everything below is derived from this one
+ * array (the column picker's DATA_COLUMNS/INTERNAL_COLUMNS, the sort picker's
+ * SORTABLE_COLUMNS, the mobile/Loaded-mode SORT_VALUE_GETTERS, gridUrlState.ts's
+ * COL_TO_SORT/SORT_TO_COL and COL_TO_FILTER_KEY, and FilterChips.svelte's
+ * COLUMN_LABELS), so a column can't be added to the grid and left out of one of
+ * those places by mistake (see .docs/UI_THOROUGHNESS_CHECKLIST.md §3.1).
  *
  * `colId` and `label` must match the `colId`/`headerName` on the
  * corresponding ColDef in ActivityTable.svelte — column-registry-parity.test.ts
@@ -1002,9 +999,8 @@ function matchesDateFilter(value: string | null, entry: AGFilterEntry): boolean 
 /**
  * Apply an AG-Grid-shaped filter model (as produced by urlParamsToFilter in
  * gridUrlState.ts) to a plain row array, client-side. Used where there's no
- * AG Grid instance to filter for us — the mobile card list in "Loaded" mode,
- * which previously ignored column filters entirely (see the UI gap audit,
- * gap #5). Unknown colIds are skipped (same policy as compareContentBySorts).
+ * AG Grid instance to filter for us — the mobile card list in "Loaded" mode.
+ * Unknown colIds are skipped (same policy as compareContentBySorts).
  */
 export function filterContentRows(rows: ContentItem[], filterModel: Record<string, unknown>): ContentItem[] {
 	const entries = Object.entries(filterModel) as [string, AGFilterEntry][];

@@ -35,8 +35,8 @@ var ErrTrendingUnsupported = errors.New("youtube client does not support trendin
 //
 // The cache is in-memory and per-process only — not Postgres-backed, not
 // shared across replicas, and reset on every deploy/restart. That's an
-// accepted tradeoff. Discover no longer calls search.list at all (search
-// hands off to youtube.com), so there is no search cache.
+// accepted tradeoff. Discover never calls search.list (search hands
+// off to youtube.com), so there is no search cache.
 type CachingClient struct {
 	inner services.YouTubeClient
 	ttl   time.Duration

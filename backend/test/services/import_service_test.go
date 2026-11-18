@@ -1094,7 +1094,7 @@ func TestListSource_FailurePublishesFailed(t *testing.T) {
 	}, p.Sources)
 }
 
-// --- request description (#655) ------------------------------------------------
+// --- request description ------------------------------------------------
 
 func TestCreateImportJob_DescriptionOnlyIsAccepted(t *testing.T) {
 	repo := newFakeImportRepo()

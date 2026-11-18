@@ -96,8 +96,8 @@
 	// The picker's unit is a perspective, not a user: one person can hold
 	// several perspectives on the same content (nothing makes user+content
 	// unique), and the picker advertises content by perspective count. Keying
-	// by userID collapsed those rows, so a single-author content showed
-	// "3 perspectives" in the picker and "no other perspectives" here (issue 738).
+	// by userID would collapse those rows, so a single-author content would show
+	// "3 perspectives" in the picker and "no other perspectives" here.
 	const options = $derived(
 		perspectives.map((p) => {
 			const name = displayName(p.userID);
@@ -196,7 +196,7 @@
 	// Zero overlap means every rated dimension landed in "filled in
 	// differently" — showing "0 similar · 0 diverge · 0 conflict" reads as
 	// either perfect agreement or a broken page, so swap in a plain
-	// empty-state message instead (compare-no-overlap-summary #1).
+	// empty-state message instead.
 	const noOverlapMessage = $derived.by(() => {
 		if (!leftId || !rightId) return '';
 		const leftLabel = leftName;
@@ -216,9 +216,8 @@
 
 	// The page otherwise silently defaults to comparing OTHER people's takes
 	// even when the signed-in viewer has never weighed in themselves —
-	// nudge them to add one instead of leaving it unsaid (compare-page
-	// enhancements #8). Not shown when signed out; there's nowhere for them
-	// to add a perspective from.
+	// nudge them to add one instead of leaving it unsaid. Not shown when signed
+	// out; there's nowhere for them to add a perspective from.
 	const viewerHasPerspective = $derived(meCtx.me ? perspectives.some((p) => p.userID === meCtx.me!.id) : true);
 
 	const isPassage = $derived(content?.contentType === 'BIBLE_PASSAGE');
