@@ -1,6 +1,6 @@
 # Library export and print
 
-Status: approved by the owner 2026-11-14; implementation not started (plan: `docs/superpowers/plans/2026-11-14-library-export-print.md`). Terms follow [Browsing](../../glossary/browsing/GLOSSARY.md): **Library**, **Item column**, **Column picker**, **Column view**, **Data mode**, **Card mode**.
+Status: approved by the owner 2026-11-14; implementation done on `feature/content-export-print`, with CSV and Copy through our own serializer, pending the owner's confirmation of the spike pick (plan: `docs/superpowers/plans/2026-11-14-library-export-print.md`). Terms follow [Browsing](../../glossary/browsing/GLOSSARY.md): **Library**, **Item column**, **Column picker**, **Column view**, **Data mode**, **Card mode**.
 
 ## Intent and why
 
@@ -92,6 +92,19 @@ A pure module (for example `$lib/utils/exportTable.ts`) turns the displayed rows
 
 Compare on: (1) whether the Link column works without a hidden grid column outside `COLUMNS`; (2) whether the logic is testable in jsdom or needs a browser; (3) the measured production-build size delta (the module is about 10.5 KB gzipped on its own); (4) any other wrinkle found while building. Keep the path with fewer problems and delete the other branch. Known facts: the module's file download adds a byte-order mark and quotes fields, has no formula-injection guard, is MIT, and pulls in no new transitive dependency; the Svelte wrapper pins AG Grid to the v32 line.
 - **Drift guard:** a test fails if any entry in `COLUMNS` has no export text and is not explicitly excluded. `ADDING_AG_GRID_COLUMN.md` gains a step for it.
+
+## Decision: CSV and Copy
+
+Kept spike A, our own serializer (`exportSerialize.ts`, `exportActions.ts`). Spike B (`@ag-grid-community/csv-export@32.3.9`) stays on branch `feature/content-export-print-csv-module`, unmerged, until the owner confirms.
+
+| Criterion | A: own serializer | B: AG Grid CSV module |
+|---|---|---|
+| 1. Link column without a column outside `COLUMNS` | Met: built from the export table | Met: reused the existing hidden `url` colDef via `columnKeys` and renamed the header |
+| 2. Testability | CSV/TSV text, quoting, BOM bytes and file name are unit-tested in jsdom | Tests could only assert the parameters and callbacks passed to AG Grid; the real output needs a browser |
+| 3. Size (gzip -9 of all client JS, against the shared base) | +534 bytes | +4,249 bytes (Library page chunk 33.3 KB to 36.9 KB gzipped) |
+| 4. Other | 101 source lines, 132+ test lines | Added a runtime dependency and an 835-line lockfile change (pnpm peer re-resolution, no version changes found); needed a wider grid-api type, which forced a B-only change to the shared menu wiring; quotes every CSV field and ends copied rows with CRLF; 92 source lines, 115 test lines |
+
+Both spikes shared one gap found in review: copied cells starting with a double quote could break a spreadsheet paste. It is fixed on A by quoting cells that contain `"`.
 
 ### CSV and Copy
 
