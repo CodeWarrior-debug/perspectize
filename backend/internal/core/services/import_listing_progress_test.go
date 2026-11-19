@@ -169,9 +169,7 @@ func TestListingTracker_UnsubscribeClosesTheChannel(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("not closed")
 	}
-	tr.mu.Lock()
-	assert.Empty(t, tr.jobs[8].subs)
-	tr.mu.Unlock()
+	assert.Equal(t, 0, tr.subscriberCount(8))
 	tr.begin(8, 1) // publishing after the subscriber left is safe
 	tr.finish(8, 1, domain.ImportSourceStatusReady)
 }
