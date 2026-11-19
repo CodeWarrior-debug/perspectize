@@ -121,6 +121,8 @@
 	import type { PrintSpacing } from '$lib/components/PrintOptionsDialog.svelte';
 	import { isExportDisabled, readExportTable, type ExportGridApi } from '$lib/utils/exportGrid';
 	import type { ExportTable } from '$lib/utils/exportTable';
+	import { copyLibraryTable, downloadLibraryCsv } from '$lib/utils/exportActions';
+	import { copyWithToast } from '$lib/utils/toast';
 	import { addLandscapePageStyle, removeLandscapePageStyle, runPrint } from '$lib/utils/printing';
 	import {
 		COLUMN_VIEW_LABEL,
@@ -1602,6 +1604,20 @@
 
 	function reportPrintFailure(err: unknown) {
 		toast.error(err instanceof Error ? `Could not print: ${err.message}` : 'Could not print');
+	}
+
+	function exportApi(): ExportGridApi | null {
+		return gridApi && !gridApi.isDestroyed() ? (gridApi as unknown as ExportGridApi) : null;
+	}
+
+	function handleDownloadCsv() {
+		const api = exportApi();
+		if (api) downloadLibraryCsv(api);
+	}
+
+	function handleCopy() {
+		const api = exportApi();
+		if (api) void copyWithToast(() => copyLibraryTable(api));
 	}
 
 	async function handlePrintAsSeen() {

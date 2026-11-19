@@ -54,3 +54,21 @@ export function toastWithAction(message: string, action: ToastActionButton, opts
 export function isInsideToast(target: EventTarget | null): boolean {
 	return target instanceof Element && target.closest('[data-sonner-toast]') !== null;
 }
+
+export function copiedRowsMessage(count: number): string {
+	return count === 1 ? 'Copied 1 row' : `Copied ${count} rows`;
+}
+
+export const COPY_BLOCKED_MESSAGE = 'Could not copy. Your browser blocked clipboard access.';
+
+/** Runs a copy that resolves to its row count, then reports the outcome as a toast. Never rejects. */
+export async function copyWithToast(
+	copy: () => Promise<number>,
+	toaster: Pick<typeof toast, 'success' | 'error'> = toast,
+): Promise<void> {
+	try {
+		toaster.success(copiedRowsMessage(await copy()));
+	} catch {
+		toaster.error(COPY_BLOCKED_MESSAGE);
+	}
+}
