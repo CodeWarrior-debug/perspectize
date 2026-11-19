@@ -347,16 +347,51 @@ func candidate(ext string, dest domain.ContentType) *domain.ImportItemWithDetail
 }
 
 // fakeCreator records content creation; urls in exists report ErrAlreadyExists, in fail fail.
+// It also counts calls in flight (peak keeps the most at once) and, when gate is
+// set, holds every call until the gate is closed.
 type fakeCreator struct {
-	mu      sync.Mutex
-	youtube []string
-	movies  []string
-	userIDs []int
-	exists  map[string]bool
-	fail    map[string]error
+	mu       sync.Mutex
+	youtube  []string
+	movies   []string
+	userIDs  []int
+	exists   map[string]bool
+	fail     map[string]error
+	gate     chan struct{} // set before the service runs; never reassigned
+	inFlight int
+	peak     int
+}
+
+func (c *fakeCreator) enter() {
+	c.mu.Lock()
+	c.inFlight++
+	c.peak = max(c.peak, c.inFlight)
+	c.mu.Unlock()
+	if c.gate != nil {
+		<-c.gate
+	}
+}
+
+func (c *fakeCreator) leave() {
+	c.mu.Lock()
+	c.inFlight--
+	c.mu.Unlock()
+}
+
+func (c *fakeCreator) inFlightNow() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.inFlight
+}
+
+func (c *fakeCreator) peakInFlight() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.peak
 }
 
 func (c *fakeCreator) create(url string, userID int, list *[]string) (*domain.Content, error) {
+	c.enter()
+	defer c.leave()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	*list = append(*list, url)
@@ -385,7 +420,21 @@ var (
 	fixedNow    = services.WithImportClock(func() time.Time { return time.Date(2026, 10, 27, 0, 0, 0, 0, time.UTC) })
 )
 
-func newImportService(repo *fakeImportRepo, yt, tmdb *fakeLister, creator *fakeCreator) *services.ImportService {
+// goSpawn runs each spawned func in its own goroutine, counted in wg, so a test
+// can have several batches running at once (inline runs them one at a time).
+func goSpawn(wg *sync.WaitGroup) services.ImportServiceOption {
+	return services.WithImportSpawn(func(f func()) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			f()
+		}()
+	})
+}
+
+// newImportService builds a service that spawns inline on a fixed clock; opts
+// apply after those two, so a test can replace either.
+func newImportService(repo *fakeImportRepo, yt, tmdb *fakeLister, creator *fakeCreator, opts ...services.ImportServiceOption) *services.ImportService {
 	listers := map[domain.ImportSourceType]portservices.ImportSourceLister{}
 	if yt != nil {
 		listers[domain.ImportSourceYouTubeChannel] = yt
@@ -393,7 +442,7 @@ func newImportService(repo *fakeImportRepo, yt, tmdb *fakeLister, creator *fakeC
 	if tmdb != nil {
 		listers[domain.ImportSourceTMDBPerson] = tmdb
 	}
-	return services.NewImportService(repo, listers, creator, inline, fixedNow)
+	return services.NewImportService(repo, listers, creator, append([]services.ImportServiceOption{inline, fixedNow}, opts...)...)
 }
 
 // --- tests --------------------------------------------------------------------

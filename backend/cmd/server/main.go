@@ -29,6 +29,7 @@ import (
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/demo"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/server"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/database"
+	"github.com/CodeWarrior-debug/perspectize/backend/pkg/limiter"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/logger"
 	"github.com/CodeWarrior-debug/perspectize/backend/pkg/telemetry"
 	"github.com/clerk/clerk-sdk-go/v2"
@@ -190,6 +191,19 @@ func main() {
 		trendingClient = cachingClient
 		slog.Info("YouTube API cache configured", "ttlSeconds", cfg.YouTube.CacheTTLSeconds, "trendingTTLSeconds", cfg.YouTube.TrendingCacheTTLSeconds)
 	}
+
+	// Global caps on import work, shared by every user's imports so their total
+	// load on the database and on TMDB stays bounded (IMPORT_ROW_CONCURRENCY,
+	// IMPORT_LISTING_CONCURRENCY). Too-high caps only warn: startup never refuses.
+	importLimits := config.LoadImportLimits()
+	slog.Info("import concurrency", "rows", importLimits.RowConcurrency, "listings", importLimits.ListingConcurrency)
+	if msg, warn := config.ImportPoolWarning(importLimits, poolCfg.MaxOpenConns); warn {
+		slog.Warn(msg)
+	}
+	limiterMeter := limiter.WithMeter(telemetry.Meter())
+	importRowLimiter := limiter.New("import_rows", importLimits.RowConcurrency, limiterMeter)
+	importListingLimiter := limiter.New("import_listings", importLimits.ListingConcurrency, limiterMeter)
+
 	// Import staging listers: one per source type that has an API key. Demo
 	// mode has neither key, so it lists the sample sources in imports.json.
 	importListers := map[domain.ImportSourceType]portservices.ImportSourceLister{}
@@ -209,7 +223,10 @@ func main() {
 		movieSearchClient = tmdbClient
 		// Trending is cached (1h, per window + page); search stays uncached.
 		movieTrendingClient = tmdb.NewTrendingCache(tmdbClient, tmdb.DefaultTrendingTTL)
-		importListers[domain.ImportSourceTMDBPerson] = tmdb.NewPersonLister(tmdbClient)
+		// One enrichment limiter for every person listing, so concurrent listings
+		// share TMDB's budget instead of each spending their own.
+		enrichLimiter := limiter.New("tmdb_enrich", tmdb.PersonEnrichConcurrency, limiterMeter)
+		importListers[domain.ImportSourceTMDBPerson] = tmdb.NewPersonLister(tmdbClient, tmdb.WithEnrichLimiter(enrichLimiter))
 	} else if demoCfg.Enabled {
 		// Demo mode: staged demo films resolve offline, so importing them works
 		// without a token. Discover's movie search and trending stay unconfigured.
@@ -258,7 +275,10 @@ func main() {
 		importCreator = slowImportCreator{inner: contentService, delay: d}
 		slog.Info("demo imports simulate API latency", "delayPerRow", d)
 	}
-	importService := services.NewImportService(importRepo, importListers, importCreator, services.WithImportBackground(importCtx))
+	importService := services.NewImportService(importRepo, importListers, importCreator,
+		services.WithImportBackground(importCtx),
+		services.WithImportRowLimiter(importRowLimiter),
+		services.WithImportListingLimiter(importListingLimiter))
 	if err := importService.RecoverInterrupted(context.Background()); err != nil {
 		slog.Warn("could not recover interrupted imports", "error", err)
 	}
@@ -277,8 +297,8 @@ func main() {
 
 	hub := realtime.NewHub(messageRepo, threadRepo, notifier)
 	presence := realtime.NewPresenceTracker()
-	limiter := services.NewSlidingWindowLimiter(10, 10*time.Second)
-	messagingService := services.NewMessagingService(threadRepo, messageRepo, hub, limiter)
+	messageLimiter := services.NewSlidingWindowLimiter(10, 10*time.Second)
+	messagingService := services.NewMessagingService(threadRepo, messageRepo, hub, messageLimiter)
 
 	listener := realtime.NewListener(dsn, hub)
 	listenerCtx, stopListener := context.WithCancel(context.Background())
