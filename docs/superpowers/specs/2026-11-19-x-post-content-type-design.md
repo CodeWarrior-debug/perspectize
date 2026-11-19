@@ -139,6 +139,15 @@ The parent's details view lists its replies in the library (newest first, capped
 3. Read X's **Display Requirements** and note what, if anything, we may store beyond the cache. This decides whether `note` and the derived `postedAt` are safe, and whether a future paid adapter may store text.
 4. Check the snowflake formula against three known posts.
 
+**Plan order (my call):** the four checks above are **task 0, a blocking spike**. Tasks that depend on the answers are written conditional on them: item 1 sets the canonical URL, item 2 the player and CSP, item 3 whether `postedAt` (and `note`, if kept) may be stored. Don't plan past them on assumed answers.
+
+**Calls I made after the builder check** (change any of them):
+- **Migration ownership:** the plan includes the `parent_content_id` migration unless another PR has landed the column by then (none of the 20 newest open PRs, 2026-11-19, touches it; `main` has no column). `ContentFilter.parentContentID` follows the same "whichever lands first" rule. The migration is written and reviewed only, never applied.
+- **Deleting a post that has replies:** there is no content delete today, so this is out of scope. `RESTRICT` stops a future delete from orphaning replies; that feature must refuse such a post.
+- **Reply creating its parent:** one transaction, all or nothing. The parent gets the same `added_by` as the reply and no note. If the parent can't be created, the reply isn't created and the error says which link failed.
+- **Parent with no handle** (added from an `/i/status/` link): the reply's details view says "In reply to X post <id>", never a blank.
+- **Dedupe:** adding an existing post opens the existing item, as every type does today.
+
 **Left to the builder:** the exact icon, the facade copy, field names inside `response`, whether the parent find-or-create is one transaction or two calls, and the position of the Replies section in the details view.
 
-**Open for the owner:** (a) what a person is trying to capture beyond "post and maybe replies"; (b) whether to ask for a user-typed `note` at all, or leave it to the URL-derived label; (c) whether replies being separate items is enough, or the library should also show the post's own live reply count (only possible with the paid API).
+**Open for the owner:** (a) what a person is trying to capture beyond "post and maybe replies"; (b) **whether v1 has a user-typed `note` at all.** With it: an Item label you choose, plus an input, an adder-only edit mutation and UI, a moderation path for free text, and a "second adder's note is dropped" case. Without it: the label is only `Post by @handle`, with none of that. **My recommendation is to leave it out of v1** (see the message to the owner); until answered, §4 and §8 describe the with-note shape; (c) whether replies being separate items is enough, or the library should also show the post's own live reply count (only possible with the paid API).
