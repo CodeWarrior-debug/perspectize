@@ -126,23 +126,6 @@ func (t *importProgressTracker) publishLocked(jp *jobProgress) {
 	}
 }
 
-// sendLatest delivers s without ever blocking the publisher: a subscriber's
-// channel holds one snapshot, and a newer one replaces an unread older one.
-// Only the publisher (under the tracker's lock) sends, so the drain-then-send
-// can't race another sender.
-func sendLatest[T any](ch chan T, s T) {
-	select {
-	case ch <- s:
-		return
-	default:
-	}
-	select {
-	case <-ch:
-	default:
-	}
-	ch <- s
-}
-
 // subscribe returns a channel that receives the import's current progress at
 // once, then every published change, until ctx ends (then it is closed).
 func (t *importProgressTracker) subscribe(ctx context.Context, jobID int) <-chan domain.ImportProgress {
