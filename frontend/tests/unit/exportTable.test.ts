@@ -34,7 +34,7 @@ function row(overrides: Partial<ContentItem> = {}): ContentItem {
 
 describe('column id constants', () => {
 	it('lists the renderer-only and excluded columns', () => {
-		expect([...RENDERED_TEXT_COLIDS]).toEqual(['item', 'category', 'cast', 'webRoles']);
+		expect([...RENDERED_TEXT_COLIDS]).toEqual(['item', 'category', 'cast', 'webRoles', 'author']);
 		expect([...EXPORT_EXCLUDED_COLIDS]).toEqual(['perspectize']);
 	});
 });
@@ -92,6 +92,16 @@ describe('exportCellText', () => {
 		expect(exportCellText(row({ contentType: 'MOVIE', movie: null }), 'cast', undefined)).toBe('');
 	});
 
+	it('author lists every author, empty when there are none', () => {
+		const book = (authors: { name: string }[]) =>
+			row({ contentType: 'BOOK', book: { authors } } as Partial<ContentItem>);
+		expect(exportCellText(book([{ name: 'Ann' }, { name: 'Bo' }, { name: 'Cy' }]), 'author', 'Ann')).toBe(
+			'Ann, Bo, Cy',
+		);
+		expect(exportCellText(book([]), 'author', null)).toBe('');
+		expect(exportCellText(row({ contentType: 'BOOK' }), 'author', null)).toBe('');
+	});
+
 	it('webRoles lists the role labels in stored order, empty when none', () => {
 		const page = (webPageRoles: ('BLOG_POST' | 'SESSION_TRANSCRIPT')[]) =>
 			row({
@@ -138,6 +148,17 @@ describe('buildExportTable', () => {
 			['Lasagna', "'=cmd", ''],
 		]);
 		expect(t.rowUrls).toEqual(['https://a.test', null]);
+	});
+
+	it('spreadsheet mode neutralizes a formula-like Link value', () => {
+		const t = buildExportTable({
+			columns,
+			rows: [row({ url: '=HYPERLINK("x")' })],
+			cellText,
+			mode: 'spreadsheet',
+		});
+		expect(t.rows[0][2]).toBe(`'=HYPERLINK("x")`);
+		expect(t.rowUrls).toEqual(['=HYPERLINK("x")']);
 	});
 
 	it('spreadsheet mode adds no Link column when a url column exists', () => {

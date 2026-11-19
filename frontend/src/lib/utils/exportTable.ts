@@ -4,6 +4,7 @@
  * printed page can show.
  */
 import type { ContentItem } from '$lib/queries/content';
+import { bookAuthors } from './bookFormatting';
 import { EMPTY_VALUE, moviePeople } from './formatting';
 import { webPageRoleLabel, webPageRolesOf } from './webPage';
 
@@ -24,7 +25,7 @@ export interface ExportTable {
 }
 
 /** Columns whose grid cell is drawn by a renderer with no value to read; their text comes from the row. */
-export const RENDERED_TEXT_COLIDS = ['item', 'category', 'cast', 'webRoles'] as const;
+export const RENDERED_TEXT_COLIDS = ['item', 'category', 'cast', 'webRoles', 'author'] as const;
 
 /** Columns that are controls, not data, and never appear in an export. */
 export const EXPORT_EXCLUDED_COLIDS = ['perspectize'] as const;
@@ -53,6 +54,10 @@ export function exportCellText(row: ContentItem, colId: string, gridValue: unkno
 		case 'cast':
 			return moviePeople(row)
 				.map((p) => p.name)
+				.join(', ');
+		case 'author':
+			return bookAuthors(row)
+				.map((a) => a.name)
 				.join(', ');
 		case 'webRoles':
 			return webPageRolesOf(row).map(webPageRoleLabel).join(', ');
@@ -87,7 +92,7 @@ export function buildExportTable(input: {
 		headers,
 		rows: rows.map((row) => {
 			const cells = columns.map((c) => format(cellText(row, c.colId)));
-			if (addLink) cells.push(row.url ?? '');
+			if (addLink) cells.push(format(row.url ?? ''));
 			return cells;
 		}),
 		rowUrls: rows.map((row) => row.url ?? null),
