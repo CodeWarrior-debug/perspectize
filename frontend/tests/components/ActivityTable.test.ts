@@ -268,7 +268,7 @@ describe('ActivityTable', () => {
 		window.matchMedia = vi.fn(
 			(query: string) =>
 				({
-					matches: query === '(max-width: 859px)',
+					matches: query.includes('max-width: 859px'),
 					media: query,
 					onchange: null,
 					addListener: vi.fn(),
@@ -295,7 +295,7 @@ describe('ActivityTable', () => {
 		window.matchMedia = vi.fn(
 			(query: string) =>
 				({
-					matches: query === '(max-width: 859px)',
+					matches: query.includes('max-width: 859px'),
 					media: query,
 					onchange: null,
 					addListener: vi.fn(),
@@ -353,7 +353,7 @@ describe('ActivityTable', () => {
 		window.matchMedia = vi.fn(
 			(query: string) =>
 				({
-					matches: query === '(max-width: 859px)',
+					matches: query.includes('max-width: 859px'),
 					media: query,
 					onchange: null,
 					addListener: vi.fn(),

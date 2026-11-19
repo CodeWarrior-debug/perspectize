@@ -42,3 +42,18 @@ export async function runPrint(
 		throw error;
 	}
 }
+
+const LANDSCAPE_STYLE_ATTR = 'data-print-page';
+
+/** `@page` cannot be scoped by an attribute selector, so landscape is added for one print run. */
+export function addLandscapePageStyle(doc: Document = document): void {
+	if (doc.head.querySelector(`style[${LANDSCAPE_STYLE_ATTR}]`)) return;
+	const style = doc.createElement('style');
+	style.setAttribute(LANDSCAPE_STYLE_ATTR, '');
+	style.textContent = '@page { size: landscape; }';
+	doc.head.appendChild(style);
+}
+
+export function removeLandscapePageStyle(doc: Document = document): void {
+	doc.head.querySelectorAll(`style[${LANDSCAPE_STYLE_ATTR}]`).forEach((el) => el.remove());
+}

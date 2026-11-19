@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
-import { runPrint } from '$lib/utils/printing';
+import { addLandscapePageStyle, removeLandscapePageStyle, runPrint } from '$lib/utils/printing';
 
 const appCss = readFileSync(resolve(process.cwd(), 'src/app.css'), 'utf8');
 
@@ -136,5 +136,26 @@ describe('As-seen print css', () => {
 			"html[data-print='grid'] body *:not(.activity-grid):not(.activity-grid *):not(:has(.activity-grid))",
 		);
 		expect(appCss).toContain("html[data-print='grid'] .activity-grid");
+	});
+
+	it('lets every grid ancestor grow and show overflow so all rows reach the page', () => {
+		const rule = appCss.slice(appCss.indexOf("html[data-print='grid'] body *:has(.activity-grid)"));
+		const block = rule.slice(0, rule.indexOf('}'));
+		expect(block).toContain("html[data-print='grid'] .activity-grid");
+		expect(block).toContain('height: auto !important');
+		expect(block).toContain('max-height: none !important');
+		expect(block).toContain('overflow: visible !important');
+	});
+});
+
+describe('landscape page style', () => {
+	it('adds one @page landscape style and removes it', () => {
+		addLandscapePageStyle(document);
+		addLandscapePageStyle(document);
+		const styles = document.head.querySelectorAll('style[data-print-page]');
+		expect(styles).toHaveLength(1);
+		expect(styles[0].textContent).toContain('size: landscape');
+		removeLandscapePageStyle(document);
+		expect(document.head.querySelector('style[data-print-page]')).toBeNull();
 	});
 });

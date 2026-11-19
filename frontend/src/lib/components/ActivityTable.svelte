@@ -121,7 +121,7 @@
 	import type { PrintSpacing } from '$lib/components/PrintOptionsDialog.svelte';
 	import { isExportDisabled, readExportTable, type ExportGridApi } from '$lib/utils/exportGrid';
 	import type { ExportTable } from '$lib/utils/exportTable';
-	import { runPrint } from '$lib/utils/printing';
+	import { addLandscapePageStyle, removeLandscapePageStyle, runPrint } from '$lib/utils/printing';
 	import {
 		COLUMN_VIEW_LABEL,
 		clearLayout,
@@ -247,7 +247,7 @@
 	}
 
 	// Mobile card-list breakpoint (< 860px) — replaces the AG Grid entirely, per design handoff.
-	const card = useCardMode();
+	const card = useCardMode({ screenOnly: true });
 	const cardMode = $derived(card.current);
 
 	// Signed-in user — drives the admin-only "Internal" group in the column picker.
@@ -1610,12 +1610,14 @@
 		try {
 			await runPrint('grid', {
 				before: async () => {
+					addLandscapePageStyle();
 					api.setGridOption('domLayout', 'print');
 					// AG Grid lays out the rows on a later frame; printing sooner can print a half-rendered grid.
 					await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 					if (api.isDestroyed()) throw new Error('The table was closed before printing');
 				},
 				after: () => {
+					removeLandscapePageStyle();
 					if (!api.isDestroyed()) api.setGridOption('domLayout', normalDomLayout);
 				},
 			});

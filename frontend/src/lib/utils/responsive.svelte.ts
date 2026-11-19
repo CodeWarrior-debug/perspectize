@@ -23,9 +23,15 @@ export function useResponsiveTier(): { readonly current: ResponsiveTier } {
 	};
 }
 
+/** The card-mode media query; `screenOnly` keeps print media (a Letter page is ~816px wide) from matching. */
+export function cardModeQuery(screenOnly: boolean): string {
+	const width = `max-width: ${GRID_BREAKPOINTS.cardMax}px`;
+	return screenOnly ? `screen and (${width})` : width;
+}
+
 /** Reactive card-list flag: below 860px the grid is replaced by stacked cards. */
-export function useCardMode(): { readonly current: boolean } {
-	const card = new MediaQuery(`max-width: ${GRID_BREAKPOINTS.cardMax}px`, false);
+export function useCardMode(opts: { screenOnly?: boolean } = {}): { readonly current: boolean } {
+	const card = new MediaQuery(cardModeQuery(opts.screenOnly ?? false), false);
 	return {
 		get current() {
 			return card.current;

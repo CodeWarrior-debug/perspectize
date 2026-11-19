@@ -1266,7 +1266,11 @@ select.select-inset {
 	html[data-print='grid'] body *:not(.activity-grid):not(.activity-grid *):not(:has(.activity-grid)) {
 		display: none !important;
 	}
+	/* Every ancestor of the grid has a fixed height or clips; let the whole table flow onto pages. */
+	html[data-print='grid'] body *:has(.activity-grid),
 	html[data-print='grid'] .activity-grid {
 		height: auto !important;
+		max-height: none !important;
+		overflow: visible !important;
 	}
 }

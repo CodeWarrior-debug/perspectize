@@ -1,5 +1,11 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { GRID_BREAKPOINTS, tierFromMatches, useResponsiveTier, useCardMode } from '$lib/utils/responsive.svelte';
+import {
+	cardModeQuery,
+	GRID_BREAKPOINTS,
+	tierFromMatches,
+	useResponsiveTier,
+	useCardMode,
+} from '$lib/utils/responsive.svelte';
 
 function setViewport(width: number) {
 	window.matchMedia = vi.fn((query: string) => {
@@ -47,5 +53,15 @@ describe('useResponsiveTier / useCardMode', () => {
 
 	it('exposes the breakpoint constants', () => {
 		expect(GRID_BREAKPOINTS).toEqual({ sm: 445, md: 640, lg: 900, cardMax: 859 });
+	});
+});
+
+describe('cardModeQuery', () => {
+	it('matches only screen media when screenOnly, so printing never flips card mode', () => {
+		expect(cardModeQuery(true)).toBe('screen and (max-width: 859px)');
+	});
+
+	it('is the bare width query otherwise', () => {
+		expect(cardModeQuery(false)).toBe('max-width: 859px');
 	});
 });
