@@ -1209,3 +1209,57 @@ select.select-inset {
 	/* Nothing to scroll here: show the track only, no thumb. */
 	scrollbar-color: transparent var(--color-muted);
 }
+
+/* Library print view (PrintListView): hidden on screen, and the only thing shown when the page is
+   printed with html[data-print='list']. Plain black on white, no theme colours. */
+.print-root {
+	display: none;
+}
+@media print {
+	html[data-print='list'] body > :not(.print-root) {
+		display: none !important;
+	}
+	html[data-print='list'] .print-root {
+		display: block;
+		background: white;
+		color: black;
+	}
+	.print-root h1 {
+		margin: 0 0 12px;
+		font-size: 18pt;
+	}
+	.print-root table {
+		width: 100%;
+		border-collapse: collapse;
+	}
+	.print-root thead {
+		display: table-header-group;
+	}
+	.print-root tr {
+		break-inside: avoid;
+	}
+	.print-root th,
+	.print-root td {
+		padding: 6px 8px;
+		border-bottom: 1px solid black;
+		text-align: left;
+		vertical-align: top;
+		color: black;
+	}
+	.print-root a {
+		color: black;
+		text-decoration: underline;
+	}
+	.print-root[data-spacing='compact'] th,
+	.print-root[data-spacing='compact'] td {
+		padding-block: 2px;
+	}
+	.print-root[data-spacing='standard'] th,
+	.print-root[data-spacing='standard'] td {
+		padding-block: 6px;
+	}
+	.print-root[data-spacing='roomy'] th,
+	.print-root[data-spacing='roomy'] td {
+		padding-block: 12px;
+	}
+}
