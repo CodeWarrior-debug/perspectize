@@ -44,3 +44,8 @@ export function readExportTable(api: ExportGridApi, mode: ExportMode): ExportTab
 			exportCellText(row, colId, api.getCellValue({ rowNode: nodes.get(row), colKey: colId, useFormatter: true })),
 	});
 }
+
+/** Export needs a ready grid with at least one displayed (post-filter) row, and no fetch in flight. */
+export function isExportDisabled(state: { gridReady: boolean; loading: boolean; displayedRows: number }): boolean {
+	return !state.gridReady || state.loading || state.displayedRows === 0;
+}

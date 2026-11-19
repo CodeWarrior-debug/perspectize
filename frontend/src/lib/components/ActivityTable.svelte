@@ -119,7 +119,7 @@
 	import PrintListView from '$lib/components/PrintListView.svelte';
 	import PrintOptionsDialog from '$lib/components/PrintOptionsDialog.svelte';
 	import type { PrintSpacing } from '$lib/components/PrintOptionsDialog.svelte';
-	import { readExportTable, type ExportGridApi } from '$lib/utils/exportGrid';
+	import { isExportDisabled, readExportTable, type ExportGridApi } from '$lib/utils/exportGrid';
 	import type { ExportTable } from '$lib/utils/exportTable';
 	import { runPrint } from '$lib/utils/printing';
 	import {
@@ -1591,7 +1591,7 @@
 	});
 
 	// Export: the grid is read at click time, so the output matches what the toolbar shows.
-	const exportDisabled = $derived(!gridReady || loading || rowData.length === 0);
+	const exportDisabled = $derived(isExportDisabled({ gridReady, loading, displayedRows: loadedItemsCount }));
 	let printOptionsOpen = $state(false);
 	let printList = $state<{ table: ExportTable; title: string; spacing: PrintSpacing } | null>(null);
 
@@ -1607,7 +1607,12 @@
 		if (!api) return;
 		try {
 			await runPrint('grid', {
-				before: () => api.setGridOption('domLayout', 'print'),
+				before: async () => {
+					api.setGridOption('domLayout', 'print');
+					// AG Grid lays out the rows on a later frame; printing sooner can print a half-rendered grid.
+					await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+					if (api.isDestroyed()) throw new Error('The table was closed before printing');
+				},
 				after: () => {
 					if (!api.isDestroyed()) api.setGridOption('domLayout', normalDomLayout);
 				},

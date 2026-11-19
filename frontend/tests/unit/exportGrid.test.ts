@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { ContentItem } from '$lib/queries/content';
-import { readExportTable, type ExportGridApi } from '$lib/utils/exportGrid';
+import { isExportDisabled, readExportTable, type ExportGridApi } from '$lib/utils/exportGrid';
 
 type Node = { data?: ContentItem };
 
@@ -84,5 +84,25 @@ describe('readExportTable', () => {
 		expect(sheet.rows[0].at(-1)).toBe('https://x.test');
 		const print = readExportTable(stubApi(columns, nodes).api, 'print');
 		expect(print.columnIds).not.toContain('link');
+	});
+});
+
+describe('isExportDisabled', () => {
+	const ready = { gridReady: true, loading: false, displayedRows: 3 };
+
+	it('is enabled when the grid is ready and rows are displayed', () => {
+		expect(isExportDisabled(ready)).toBe(false);
+	});
+
+	it('is disabled until the grid is ready', () => {
+		expect(isExportDisabled({ ...ready, gridReady: false })).toBe(true);
+	});
+
+	it('is disabled while loading', () => {
+		expect(isExportDisabled({ ...ready, loading: true })).toBe(true);
+	});
+
+	it('is disabled with zero displayed rows, including a filter that hides every loaded row', () => {
+		expect(isExportDisabled({ ...ready, displayedRows: 0 })).toBe(true);
 	});
 });

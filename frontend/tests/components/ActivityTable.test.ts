@@ -364,14 +364,16 @@ describe('ActivityTable', () => {
 				}) as unknown as MediaQueryList,
 		);
 
-		const { container } = renderWithQuery();
+		try {
+			const { container } = renderWithQuery();
 
-		await waitFor(() => {
-			expect(container.querySelector('[data-testid="activity-card-list"]')).toBeTruthy();
-		});
-		expect(container.querySelector('button[aria-label="Export"]')).toBeFalsy();
-
-		window.matchMedia = originalMatchMedia;
+			await waitFor(() => {
+				expect(container.querySelector('[data-testid="activity-card-list"]')).toBeTruthy();
+			});
+			expect(container.querySelector('button[aria-label="Export"]')).toBeFalsy();
+		} finally {
+			window.matchMedia = originalMatchMedia;
+		}
 	});
 
 	// Regression: the +/glasses affordance is driven by a per-user perspectives
