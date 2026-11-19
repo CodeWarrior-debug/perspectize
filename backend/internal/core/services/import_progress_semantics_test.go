@@ -48,8 +48,9 @@ func requireNoImportProgress(t *testing.T, ch <-chan domain.ImportProgress, d ti
 }
 
 // Counting an outcome only marks the import as changed; the next tick of a
-// running import is what delivers it. The test never ends the batch, so the
-// snapshot can only have come from the tick.
+// running import delivers it. The test never ends the batch: it asserts that
+// the updated count arrives while the batch is still running, without waiting
+// for end.
 func TestImportProgress_RecordPublishesOnTickWhileRunning(t *testing.T) {
 	tr := newImportProgressTracker(30*time.Millisecond, time.Now)
 	ctx, cancel := context.WithCancel(context.Background())

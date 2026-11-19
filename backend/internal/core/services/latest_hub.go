@@ -85,7 +85,8 @@ func (h *latestHub[K, V, S]) entryLocked(key K) *hubEntry[V, S] {
 
 // update runs fn on the key's state under the hub's lock and acts on the mode
 // it returns. If the state is active afterwards and the key has no ticker, one
-// starts.
+// starts. fn runs under the hub's lock and must not call back into the hub (a
+// call would deadlock).
 func (h *latestHub[K, V, S]) update(key K, fn func(*V) publishMode) {
 	h.mu.Lock()
 	defer h.mu.Unlock()

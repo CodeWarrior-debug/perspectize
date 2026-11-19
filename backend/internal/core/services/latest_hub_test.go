@@ -120,7 +120,7 @@ func TestHub_LatestWinsForSlowSubscriber(t *testing.T) {
 }
 
 func TestHub_MarkDirtyWaitsForTick(t *testing.T) {
-	h := newTestHub(50*time.Millisecond, time.Now)
+	h := newTestHub(200*time.Millisecond, time.Now)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ch := h.subscribe(ctx, "k")
@@ -132,7 +132,7 @@ func TestHub_MarkDirtyWaitsForTick(t *testing.T) {
 	select {
 	case s := <-ch:
 		assert.Equal(t, 1, s.N)
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(time.Second):
 		t.Fatal("the ticker never published the marked change")
 	}
 

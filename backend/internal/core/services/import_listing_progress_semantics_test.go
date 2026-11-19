@@ -34,8 +34,9 @@ func requireNoListingProgress(t *testing.T, ch <-chan domain.ImportListingProgre
 }
 
 // Staging a batch only marks the listing as changed; the next tick of a
-// listing import is what delivers it. The test never finishes the source, so
-// the snapshot can only have come from the tick.
+// listing import delivers it. The test never finishes the source: it asserts
+// that the updated progress arrives while the source is still listing, without
+// waiting for finish.
 func TestListing_StagedPublishesOnTickWhileListing(t *testing.T) {
 	tr := newListingTracker(30*time.Millisecond, time.Now)
 	ctx, cancel := context.WithCancel(context.Background())

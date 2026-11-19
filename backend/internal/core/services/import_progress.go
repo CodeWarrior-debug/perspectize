@@ -23,9 +23,9 @@ const defaultProgressInterval = 500 * time.Millisecond
 // It is per process, like the import workers themselves (one server instance).
 type importProgressTracker struct {
 	*latestHub[int, jobProgress, domain.ImportProgress]
-	// jobs is the hub's per-job entries, shared with it and set once. It is
-	// retained so the unsubscribe test can inspect each job's subscriber set;
-	// nothing in production reads it. The hub's lock (mu) guards it.
+	// jobs aliases the hub's per-job entries so the unsubscribe tests can read
+	// each job's subscriber set under mu. Nothing in production reads it. The
+	// hub's lock guards the map.
 	jobs map[int]*hubEntry[jobProgress, domain.ImportProgress]
 }
 
