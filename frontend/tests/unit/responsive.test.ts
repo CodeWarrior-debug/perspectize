@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
-	cardModeQuery,
+	CARD_MODE_QUERY,
 	GRID_BREAKPOINTS,
 	tierFromMatches,
 	useResponsiveTier,
@@ -56,12 +56,8 @@ describe('useResponsiveTier / useCardMode', () => {
 	});
 });
 
-describe('cardModeQuery', () => {
-	it('matches only screen media when screenOnly, so printing never flips card mode', () => {
-		expect(cardModeQuery(true)).toBe('screen and (max-width: 859px)');
-	});
-
-	it('is the bare width query otherwise', () => {
-		expect(cardModeQuery(false)).toBe('max-width: 859px');
+describe('CARD_MODE_QUERY', () => {
+	it('is the bare width query, so a plain print follows the page width like any other media', () => {
+		expect(CARD_MODE_QUERY).toBe('max-width: 859px');
 	});
 });

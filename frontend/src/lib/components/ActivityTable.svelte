@@ -249,8 +249,10 @@
 	}
 
 	// Mobile card-list breakpoint (< 860px) — replaces the AG Grid entirely, per design handoff.
-	const card = useCardMode({ screenOnly: true });
-	const cardMode = $derived(card.current);
+	const card = useCardMode();
+	// Export's As-seen print keeps the grid mounted even though a Letter page matches the card query.
+	let printingAsSeen = $state(false);
+	const cardMode = $derived(card.current && !printingAsSeen);
 
 	// Signed-in user — drives the admin-only "Internal" group in the column picker.
 	const meCtx = useMe();
@@ -1626,6 +1628,7 @@
 		try {
 			await runPrint('grid', {
 				before: async () => {
+					printingAsSeen = true;
 					addLandscapePageStyle();
 					api.setGridOption('domLayout', 'print');
 					// AG Grid lays out the rows on a later frame; printing sooner can print a half-rendered grid.
@@ -1633,6 +1636,7 @@
 					if (api.isDestroyed()) throw new Error('The table was closed before printing');
 				},
 				after: () => {
+					printingAsSeen = false;
 					removeLandscapePageStyle();
 					if (!api.isDestroyed()) api.setGridOption('domLayout', normalDomLayout);
 				},
