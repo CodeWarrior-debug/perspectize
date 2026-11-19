@@ -353,12 +353,16 @@ func TestHub_NoGoroutineLeakAfterManySubscribers(t *testing.T) {
 		h.update(key, setCounter(0, false, keep)) // lets each ticker stop
 	}
 
+	// A ticker clears its flag only when its next tick sees an inactive key, and
+	// the process-wide goroutine count can dip to the baseline before that (other
+	// tests' goroutines exiting), so wait on the hub's own state first.
+	for _, key := range []string{"a", "b", "c"} {
+		key := key
+		require.Eventually(t, func() bool { return h.subscriberCount(key) == 0 && !h.isTicking(key) },
+			3*time.Second, 5*time.Millisecond, "key %q: subscribers and ticker should be gone", key)
+	}
 	require.Eventually(t, func() bool { return runtime.NumGoroutine() <= baseline }, 3*time.Second, 10*time.Millisecond,
 		"goroutines: baseline %d", baseline)
-	for _, key := range []string{"a", "b", "c"} {
-		assert.Equal(t, 0, h.subscriberCount(key))
-		assert.False(t, h.isTicking(key))
-	}
 }
 
 func TestHub_SlowSubscriberNeverBlocksPublisher(t *testing.T) {
