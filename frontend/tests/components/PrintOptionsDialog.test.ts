@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/svelte';
 import PrintOptionsDialog from '$lib/components/PrintOptionsDialog.svelte';
+import PrintOptionsDialogHarness from '../helpers/PrintOptionsDialogHarness.svelte';
 import { warmUpRender } from '../helpers/warmUp';
 
 warmUpRender(PrintOptionsDialog, { open: true, onPrint: () => {} });
@@ -52,6 +53,26 @@ describe('PrintOptionsDialog', () => {
 		await fireEvent.input(screen.getByLabelText('Title'), { target: { value: '' } });
 		await fireEvent.click(screen.getByRole('button', { name: 'Print' }));
 		expect(onPrint).toHaveBeenCalledWith({ title: '', spacing: 'standard' });
+	});
+
+	it('tells the parent open is false after Print (bound value)', async () => {
+		render(PrintOptionsDialogHarness, { props: { onPrint: vi.fn() } });
+		expect(screen.getByTestId('open-state').textContent).toBe('open');
+		await fireEvent.click(screen.getByRole('button', { name: 'Print' }));
+		await waitFor(() => expect(screen.getByTestId('open-state').textContent).toBe('closed'));
+	});
+
+	it('resets title and spacing to the defaults each time it reopens', async () => {
+		render(PrintOptionsDialogHarness, { props: { onPrint: vi.fn() } });
+		await fireEvent.input(screen.getByLabelText('Title'), { target: { value: 'Edited' } });
+		await fireEvent.click(screen.getByLabelText('Roomy'));
+		await fireEvent.click(screen.getByRole('button', { name: 'Print' }));
+		await waitFor(() => expect(screen.queryByLabelText('Title')).toBeNull());
+
+		await fireEvent.click(screen.getByTestId('open-state'));
+		expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('Library');
+		expect((screen.getByLabelText('Standard') as HTMLInputElement).checked).toBe(true);
+		expect((screen.getByLabelText('Roomy') as HTMLInputElement).checked).toBe(false);
 	});
 
 	it('closes the dialog when Print is clicked', async () => {
