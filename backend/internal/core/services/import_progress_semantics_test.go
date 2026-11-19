@@ -134,3 +134,32 @@ func TestImportProgress_UpdatedAtIsInjectedClockInUTC(t *testing.T) {
 	tr.begin(4, 1)
 	requireClockInstantInUTC(t, next(t, ch).UpdatedAt) // a published snapshot
 }
+
+func TestProgress_OnlyTheMostRecentFinishedImportsAreKept(t *testing.T) {
+	tr := newImportProgressTracker(5*time.Millisecond, time.Now)
+	tr.maxIdle = 1
+	for job := 1; job <= 3; job++ {
+		tr.begin(job, 1)
+		tr.record(job, domain.ImportItemStatusImported)
+		tr.end(job)
+		require.Eventually(t, func() bool { return !tr.isTicking(job) }, time.Second, time.Millisecond)
+	}
+
+	assert.False(t, tr.hasEntry(1))
+	assert.False(t, tr.hasEntry(2))
+	assert.True(t, tr.hasEntry(3), "the latest finished import is kept")
+}
+
+func TestProgress_ARunningImportIsNeverEvicted(t *testing.T) {
+	tr := newImportProgressTracker(5*time.Millisecond, time.Now)
+	tr.maxIdle = 0
+	tr.begin(1, 2)
+
+	tr.begin(2, 1)
+	tr.end(2)
+	require.Eventually(t, func() bool { return !tr.isTicking(2) }, time.Second, time.Millisecond)
+
+	assert.True(t, tr.hasEntry(1), "import 1 still has a batch running")
+	assert.False(t, tr.hasEntry(2))
+	tr.end(1)
+}

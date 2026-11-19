@@ -6,6 +6,14 @@ import (
 	"time"
 )
 
+// defaultMaxIdleEntries is how many idle keys (nothing running, nobody
+// subscribed) a hub keeps. Job ids only grow, so without a bound the map would
+// grow for as long as the process runs. Keeping the most recent few hundred
+// lets a late subscriber to a job that just finished still see how it ended;
+// an older job reads as one this process never ran, as it already does after a
+// restart.
+const defaultMaxIdleEntries = 256
+
 // publishMode is what an update asks the hub to do with subscribers.
 type publishMode int
 
@@ -38,14 +46,22 @@ const (
 // snapshot and active run under the hub's lock and must not call back into
 // the hub. Snapshots go to every subscriber of a key, so a snapshot must not
 // share mutable memory with the state it came from.
+//
+// A key is idle when its state is not active, its ticker has stopped and it
+// has no subscribers. The hub keeps at most maxIdle idle keys and evicts the
+// one that went idle longest ago; a key that is running or watched is never
+// evicted.
 type latestHub[K comparable, V any, S any] struct {
-	mu       sync.Mutex
-	interval time.Duration
-	now      func() time.Time
-	newState func(K) *V
-	snapshot func(K, *V, time.Time) S
-	active   func(*V) bool
-	entries  map[K]*hubEntry[V, S]
+	mu        sync.Mutex
+	interval  time.Duration
+	now       func() time.Time
+	newState  func(K) *V
+	snapshot  func(K, *V, time.Time) S
+	active    func(*V) bool
+	entries   map[K]*hubEntry[V, S]
+	maxIdle   int
+	idleCount int    // entries with idleAt != 0
+	idleSeq   uint64 // last idleAt handed out
 }
 
 // hubEntry is one key's state, publish bookkeeping and subscribers.
@@ -55,6 +71,7 @@ type hubEntry[V any, S any] struct {
 	dirty     bool      // changed since the last publish
 	ticking   bool      // a ticker goroutine is running for this key
 	subs      map[chan S]struct{}
+	idleAt    uint64 // when the key went idle, in idleSeq order; 0 while it is not idle
 }
 
 func newLatestHub[K comparable, V any, S any](
@@ -71,7 +88,48 @@ func newLatestHub[K comparable, V any, S any](
 		snapshot: snapshot,
 		active:   active,
 		entries:  map[K]*hubEntry[V, S]{},
+		maxIdle:  defaultMaxIdleEntries,
 	}
+}
+
+// settleLocked records whether the key has just gone idle or stopped being
+// idle, and evicts the longest-idle keys while more than maxIdle are idle. Call
+// it wherever one of the three things idleness depends on (active state,
+// ticker, subscribers) may have changed.
+func (h *latestHub[K, V, S]) settleLocked(e *hubEntry[V, S]) {
+	idle := !e.ticking && len(e.subs) == 0 && !h.active(e.state)
+	switch {
+	case idle && e.idleAt == 0:
+		h.idleSeq++
+		e.idleAt = h.idleSeq
+		h.idleCount++
+		for h.idleCount > h.maxIdle {
+			if !h.evictOldestIdleLocked() {
+				break
+			}
+		}
+	case !idle && e.idleAt != 0:
+		e.idleAt = 0
+		h.idleCount--
+	}
+}
+
+// evictOldestIdleLocked drops the key that went idle longest ago, reporting
+// whether there was one.
+func (h *latestHub[K, V, S]) evictOldestIdleLocked() bool {
+	var oldest K
+	var oldestAt uint64
+	for key, e := range h.entries {
+		if e.idleAt != 0 && (oldestAt == 0 || e.idleAt < oldestAt) {
+			oldest, oldestAt = key, e.idleAt
+		}
+	}
+	if oldestAt == 0 {
+		return false
+	}
+	delete(h.entries, oldest)
+	h.idleCount--
+	return true
 }
 
 func (h *latestHub[K, V, S]) entryLocked(key K) *hubEntry[V, S] {
@@ -101,6 +159,7 @@ func (h *latestHub[K, V, S]) update(key K, fn func(*V) publishMode) {
 		e.ticking = true
 		go h.tick(key, e)
 	}
+	h.settleLocked(e)
 }
 
 // tick publishes the key's changes once per interval, and stops when the
@@ -115,6 +174,7 @@ func (h *latestHub[K, V, S]) tick(key K, e *hubEntry[V, S]) {
 		}
 		if !h.active(e.state) {
 			e.ticking = false
+			h.settleLocked(e)
 			h.mu.Unlock()
 			return
 		}
@@ -143,12 +203,14 @@ func (h *latestHub[K, V, S]) subscribe(ctx context.Context, key K) <-chan S {
 		at = h.now().UTC()
 	}
 	ch <- h.snapshot(key, e.state, at)
+	h.settleLocked(e)
 	h.mu.Unlock()
 
 	context.AfterFunc(ctx, func() {
 		h.mu.Lock()
 		delete(e.subs, ch)
 		close(ch)
+		h.settleLocked(e)
 		h.mu.Unlock()
 	})
 	return ch
