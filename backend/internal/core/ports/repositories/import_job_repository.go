@@ -86,6 +86,12 @@ type ImportJobRepository interface {
 	// RecordOutcome stores the result of importing one row (1 statement).
 	RecordOutcome(ctx context.Context, itemID int, status domain.ImportItemStatus, errMsg *string, contentID *int) error
 
+	// FailQueuedItems marks the rows of jobID among ids that are still QUEUED as
+	// failed with detail, for rows a batch's time ran out before it reached
+	// (1 statement; 0 for empty ids). Rows with any other status, and rows of
+	// other jobs, are left alone. Returns how many it changed.
+	FailQueuedItems(ctx context.Context, jobID int, ids []int, detail string) (int, error)
+
 	// FailInterrupted marks sources still LISTING and rows still QUEUED as
 	// failed, for work a restart cut short (2 statements). Returns how many of
 	// each it changed.

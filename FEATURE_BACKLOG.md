@@ -653,16 +653,3 @@ Paste a public Facebook video or Reel link; it plays inline behind a click-to-lo
 **Spec:** [docs/superpowers/specs/2026-11-01-food-item-content-type-design.md](docs/superpowers/specs/2026-11-01-food-item-content-type-design.md) (proposal, unscheduled, written without superpowers). **Intent:** [project-management/intents/food-item-content-type.md](project-management/intents/food-item-content-type.md) (draft).
 
 One `FOOD_ITEM` type for packaged foods, generic foods and beverages, added by barcode, USDA/Open Food Facts URL or Discover search. Nutrition comes from USDA FoodData Central (CC0, free key, 1,000 req/h) with Open Food Facts (ODbL, no key, 15 reads/min per IP) for images, Nutri-Score, NOVA and allergens. It is normalised to per-serving and per-100 g/ml so items sort side by side. No migration. Nine decisions to confirm are in its §14.
-
-## Fail Unsent Import Rows When a Batch Times Out
-
-Found in the final review of the import concurrency limiter (PR 1). When an import batch hits its 30-minute timeout (as opposed to a server shutdown), the rows that never started stay `queued`. `ImportItems` counts any row that is not `failed` as `AlreadyQueued`, so it refuses to queue them again, and nothing fails them until the next restart's `RecoverInterrupted` (`FailInterrupted`). The user sees rows stuck in `queued` that they cannot retry.
-
-The global row cap makes a timeout likelier: several concurrent large batches share the cap, so at a slow item latency each batch can run out of its 30 minutes. The numbers are in the batch timeout row of [.docs/CAPACITY_REGISTER.md](.docs/CAPACITY_REGISTER.md) (section 4, "Batch and listing timeouts").
-
-**What it needs:**
-- A bulk repository method that fails one batch's unsent rows, scoped to that job and those item IDs (the existing `FailInterrupted` fails every queued row of every job and is for startup only), called from `runImports` when its context ended by timeout rather than shutdown. One `UPDATE`, not a call per row: `RecordOutcome` in a loop breaks the query budget ([.docs/QUERY_BUDGET.md](.docs/QUERY_BUDGET.md)).
-- A query-count test for the new method, the port interface change with its mocks under `test/`, and an integration test against a local throwaway database.
-- A service test for the timeout path (`TestImportService_RowLimiter_BatchTimeoutWhileQueued` in `backend/test/services/import_limiter_test.go` already reaches it) asserting the unsent rows end `failed` with a retryable detail, and that a shutdown still leaves them `queued`.
-
-**Priority:** Low until a real batch gets near the timeout; revisit if the batch timeout row in the register shows one at risk.

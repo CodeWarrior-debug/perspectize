@@ -31,6 +31,10 @@ const importTimeout = 30 * time.Minute
 // interruptedDetail is what a row or source shows after a restart cut it short.
 const interruptedDetail = "Interrupted by a server restart. Select it again to retry."
 
+// cutShortDetail is what a row shows when its batch stopped before the row
+// finished: the batch ran out of time or the server stopped mid-import.
+const cutShortDetail = "The import was cut short. Select it again to retry."
+
 // importContentCreator is the slice of ContentService the import workers use.
 type importContentCreator interface {
 	CreateFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error)
@@ -75,6 +79,8 @@ type ImportService struct {
 	listing *listingTracker
 	// progressInterval is how often live progress is pushed (tests shorten it).
 	progressInterval time.Duration
+	// batchTimeout bounds one importItems batch (tests shorten it).
+	batchTimeout time.Duration
 }
 
 var _ portservices.ImportService = (*ImportService)(nil)
@@ -95,6 +101,12 @@ func WithImportSpawn(spawn func(func())) ImportServiceOption {
 // WithImportProgressInterval sets how often live import progress is pushed.
 func WithImportProgressInterval(d time.Duration) ImportServiceOption {
 	return func(s *ImportService) { s.progressInterval = d }
+}
+
+// WithImportBatchTimeout sets how long one importItems batch may run. Rows the
+// batch has not finished by then are failed so they can be queued again.
+func WithImportBatchTimeout(d time.Duration) ImportServiceOption {
+	return func(s *ImportService) { s.batchTimeout = d }
 }
 
 // WithImportClock replaces the clock used for fetchedAt.
@@ -139,6 +151,7 @@ func NewImportService(
 		sources: noLimit{},
 
 		progressInterval: defaultProgressInterval,
+		batchTimeout:     importTimeout,
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -750,23 +763,28 @@ func workersFor(capacity, rows int) int {
 // hand).
 //
 // A worker holds a row limiter slot only while it imports a row, so the cap is
-// global across batches. A row still waiting for a slot when the batch ends
-// (shutdown or timeout) stays queued, like a row never sent to a worker.
+// global across batches. A row still waiting for a slot when the batch ends,
+// like a row never sent to a worker, is left queued, with one difference
+// between the two ways a batch ends: a shutdown leaves it for RecoverInterrupted
+// at the next start, while a timeout fails it at once (failUnreached), because
+// the server keeps running and the user must be able to queue it again.
 //
 // Progress is a fan-in: every worker sends its row's outcome down one
 // outcomes channel, and a single collector counts them into the progress
 // tracker, which pushes to subscribers at most twice a second.
 func (s *ImportService) runImports(jobID, actorID int, items []*domain.ImportItem) {
-	ctx, cancel := context.WithTimeout(s.bg, importTimeout)
+	ctx, cancel := context.WithTimeout(s.bg, s.batchTimeout)
 	defer cancel()
 
 	workers := workersFor(s.workers, len(items))
 	outcomes := make(chan domain.ImportItemStatus, workers)
 	collected := make(chan struct{})
+	counted := 0 // outcomes the collector has recorded; read only once collected is closed
 	go func() {
 		defer close(collected)
 		for st := range outcomes {
 			s.progress.record(jobID, st)
+			counted++
 		}
 	}()
 	defer func() {
@@ -802,13 +820,40 @@ feed:
 		select {
 		case queue <- it:
 		case <-ctx.Done():
-			// Unsent rows stay queued; RecoverInterrupted fails them at the next start.
-			break feed
+			break feed // unsent rows are dealt with below, once the workers are done
 		}
 	}
 	close(queue)
 	wg.Wait()
 	close(outcomes)
+	<-collected
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		s.failUnreached(ctx, jobID, items, len(items)-counted)
+	}
+}
+
+// failUnreached fails the rows of a batch that ran out of time before they
+// finished, and counts each as failed in the progress. Rows that already have
+// an outcome keep it: the update only changes rows still queued. uncounted is
+// how many rows the progress count has not reached; it caps the failures
+// counted, so an outcome that could not be saved is not counted twice.
+func (s *ImportService) failUnreached(ctx context.Context, jobID int, items []*domain.ImportItem, uncounted int) {
+	ids := make([]int, len(items))
+	for i, it := range items {
+		ids[i] = it.ID
+	}
+	// ctx has run out, so the write gets its own time.
+	writeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	failed, err := s.repo.FailQueuedItems(writeCtx, jobID, ids, cutShortDetail)
+	if err != nil {
+		slog.Error("import rows not failed after the batch ran out of time", "jobID", jobID, "error", err)
+		return
+	}
+	for range min(failed, uncounted) {
+		s.progress.record(jobID, domain.ImportItemStatusFailed)
+	}
+	slog.Warn("import batch ran out of time", "jobID", jobID, "rows", len(items), "failedUnfinished", failed)
 }
 
 // importJobIDKey is the context key carrying the import a content create belongs to.
@@ -913,7 +958,7 @@ func importFailureDetail(err error) string {
 	case errors.Is(err, domain.ErrNotFound):
 		return "The source no longer has this item."
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
-		return "The import was cut short. Select it again to retry."
+		return cutShortDetail
 	default:
 		return "The source API refused the request. Try again later."
 	}

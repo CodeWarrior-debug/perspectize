@@ -2,6 +2,7 @@ package services_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -112,26 +113,47 @@ func goSpawnDone(wg *sync.WaitGroup, nth int32) (services.ImportServiceOption, <
 	return opt, done
 }
 
-// expiringLimiter lets its first Acquire through and holds every later one
-// until the caller's context ends, then reports a deadline, as a spent batch
-// timeout does to rows still waiting for a slot.
-type expiringLimiter struct {
-	calls   atomic.Int32
-	waiting chan struct{} // gets a value when an Acquire starts waiting (buffer 1; extras are dropped)
+// shortBatchTimeout is the batch time limit the timeout tests set. Rows that
+// must finish inside it are fake and take microseconds; the rest wait for it.
+const shortBatchTimeout = 150 * time.Millisecond
+
+// cutShortDetail is what a row shows after its batch ran out of time or was
+// stopped while the row was importing.
+const cutShortDetail = "The import was cut short. Select it again to retry."
+
+// setOf is the set of the given urls, for fakeCreator.holdUntilDone.
+func setOf(urls ...string) map[string]bool {
+	set := make(map[string]bool, len(urls))
+	for _, u := range urls {
+		set[u] = true
+	}
+	return set
 }
 
-func (l *expiringLimiter) Capacity() int { return 1 }
+// errorOf is a row's import error text, or "" while it has none.
+func errorOf(repo *fakeImportRepo, id int) string {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	if msg := repo.items[id].Item.ImportError; msg != nil {
+		return *msg
+	}
+	return ""
+}
 
-func (l *expiringLimiter) Acquire(ctx context.Context) (func(), error) {
-	if l.calls.Add(1) == 1 {
-		return func() {}, nil
-	}
+// progressNow is the import's progress as a new subscriber sees it.
+func progressNow(t *testing.T, svc *services.ImportService, jobID int) domain.ImportProgress {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch, err := svc.SubscribeImportProgress(ctx, importUser, jobID)
+	require.NoError(t, err)
 	select {
-	case l.waiting <- struct{}{}:
-	default:
+	case p := <-ch:
+		return p
+	case <-time.After(waitFor):
+		require.Fail(t, "no progress snapshot")
+		return domain.ImportProgress{}
 	}
-	<-ctx.Done()
-	return nil, context.DeadlineExceeded
 }
 
 func indexOf(t *testing.T, list []string, want string) int {
@@ -251,6 +273,7 @@ func TestImportService_RowLimiter_ShutdownLeavesWaitingRowsQueued(t *testing.T) 
 	}
 	assert.Equal(t, 1, creator.inFlightNow(), "only batch A's row is in the creator")
 	assertAllStatus(t, repo, bIDs, domain.ImportItemStatusQueued)
+	assert.Zero(t, repo.failQueuedCallCount(), "a shutdown leaves rows to RecoverInterrupted instead of failing them")
 
 	openGate()
 	wg.Wait()
@@ -260,40 +283,161 @@ func TestImportService_RowLimiter_ShutdownLeavesWaitingRowsQueued(t *testing.T) 
 	assert.Equal(t, limiter.Stats{}, lim.Stats(), "every slot is given back")
 }
 
-// RF4: the batch timeout cannot be shortened from a test, so the batch context
-// is ended by cancelling its parent and the limiter stub reports the end as a
-// deadline, which is what a spent timeout looks like to a row still waiting.
-func TestImportService_RowLimiter_BatchTimeoutWhileQueued(t *testing.T) {
+// RF4: a batch that runs out of time while its rows wait for a slot fails
+// them, so the user can queue them again at once instead of after a restart.
+// Batch A's row holds the only slot throughout; batch B's rows never get one.
+func TestImportService_RowLimiter_BatchTimeoutFailsRowsWaitingForASlot(t *testing.T) {
 	repo := newFakeImportRepo()
 	job := approvedJob(t, repo)
-	lim := &expiringLimiter{waiting: make(chan struct{}, 1)}
-	creator := &fakeCreator{}
-	bg, expire := context.WithCancel(context.Background())
-	t.Cleanup(expire)
+	lim := limiter.New("rows", 1)
+	creator := &fakeCreator{gate: make(chan struct{})}
+	openGate := opener(creator.gate)
+	t.Cleanup(openGate)
 	var wg sync.WaitGroup
 	spawn, bDone := goSpawnDone(&wg, 2)
-	svc := newImportService(repo, nil, nil, creator, services.WithImportRowLimiter(lim), services.WithImportBackground(bg), spawn)
+	svc := newImportService(repo, nil, nil, creator, services.WithImportRowLimiter(lim), services.WithImportBatchTimeout(shortBatchTimeout), spawn)
 
 	aIDs, aURLs := seedRows(t, repo, job.ID, "a", 1)
 	importBatch(t, svc, job.ID, aIDs)
-	require.Eventually(t, func() bool { return statusOf(repo, aIDs[0]) == domain.ImportItemStatusImported }, waitFor, tick, "batch A's row got the slot")
+	require.Eventually(t, func() bool { return creator.inFlightNow() == 1 }, waitFor, tick, "batch A's row holds the only slot")
 	bIDs, _ := seedRows(t, repo, job.ID, "b", 2)
 	importBatch(t, svc, job.ID, bIDs)
-	select {
-	case <-lim.waiting:
-	case <-time.After(waitFor):
-		require.Fail(t, "batch B's row never started waiting for a slot")
-	}
 
-	expire()
 	select {
 	case <-bDone:
 	case <-time.After(waitFor):
-		require.Fail(t, "batch B did not return after its context expired while its rows waited for a slot")
+		require.Fail(t, "batch B did not return after its time ran out while its rows waited for a slot")
 	}
+	assertAllStatus(t, repo, bIDs, domain.ImportItemStatusFailed)
+	for _, id := range bIDs {
+		assert.Equal(t, cutShortDetail, errorOf(repo, id), "row %d", id)
+	}
+	assert.Equal(t, 1, creator.inFlightNow(), "only batch A's row is in the creator")
+
+	openGate()
 	wg.Wait()
 	assert.Equal(t, aURLs, creator.youtube, "the creator never saw batch B's rows")
-	assertAllStatus(t, repo, bIDs, domain.ImportItemStatusQueued)
+	assertAllStatus(t, repo, aIDs, domain.ImportItemStatusImported)
+	assert.Equal(t, limiter.Stats{}, lim.Stats(), "every slot is given back")
+}
+
+// Rows a batch never handed to a worker are failed with the rest, and the
+// progress count ends at the batch's total with them counted as failed.
+func TestImportService_BatchTimeoutFailsUnreachedRowsAndCompletesProgress(t *testing.T) {
+	repo := newFakeImportRepo()
+	job := approvedJob(t, repo)
+	lim := limiter.New("rows", 1)
+	creator := &fakeCreator{}
+	var wg sync.WaitGroup
+	svc := newImportService(repo, nil, nil, creator, services.WithImportRowLimiter(lim), services.WithImportBatchTimeout(shortBatchTimeout), goSpawn(&wg))
+
+	// One worker takes the rows in order: rows 0 and 1 import, row 2 is still
+	// in the creator when the time runs out, rows 3 and 4 are never reached.
+	ids, urls := seedRows(t, repo, job.ID, "a", 5)
+	creator.holdUntilDone = setOf(urls[2])
+	importBatch(t, svc, job.ID, ids)
+	wg.Wait()
+
+	assertAllStatus(t, repo, ids[:2], domain.ImportItemStatusImported)
+	assertAllStatus(t, repo, ids[2:], domain.ImportItemStatusFailed)
+	for _, id := range ids[2:] {
+		assert.Equal(t, cutShortDetail, errorOf(repo, id), "row %d", id)
+	}
+	assert.Equal(t, urls[:2], creator.youtube, "row 2 never finished a create and rows 3 and 4 never reached the creator")
+	assert.Zero(t, creator.inFlightNow())
+	assert.Equal(t, limiter.Stats{}, lim.Stats(), "every slot is given back")
+
+	p := progressNow(t, svc, job.ID)
+	assert.False(t, p.Running)
+	assert.Equal(t, 5, p.Total)
+	assert.Equal(t, 5, p.Done, "every row is accounted for")
+	assert.Equal(t, 2, p.Imported)
+	assert.Equal(t, 3, p.Failed)
+}
+
+// A row failed by a timeout is not stuck: selecting it again queues it.
+func TestImportService_BatchTimeoutRowsCanBeQueuedAgain(t *testing.T) {
+	repo := newFakeImportRepo()
+	job := approvedJob(t, repo)
+	creator := &fakeCreator{}
+	var wg sync.WaitGroup
+	svc := newImportService(repo, nil, nil, creator, services.WithImportRowLimiter(limiter.New("rows", 1)), services.WithImportBatchTimeout(shortBatchTimeout), goSpawn(&wg))
+
+	ids, urls := seedRows(t, repo, job.ID, "a", 3)
+	creator.holdUntilDone = setOf(urls...)
+	importBatch(t, svc, job.ID, ids)
+	wg.Wait()
+	assertAllStatus(t, repo, ids, domain.ImportItemStatusFailed)
+
+	res, err := svc.ImportItems(context.Background(), importUser, job.ID, ids)
+	require.NoError(t, err)
+	assert.Equal(t, domain.ImportBatchResult{Queued: 3}, *res, "all three are queued again, none stuck as already queued")
+	wg.Wait()
+}
+
+// If the database refuses the sweep, the batch still ends: the rows stay
+// queued for RecoverInterrupted and the count stops at what was recorded.
+func TestImportService_BatchTimeoutSweepErrorStillEndsTheBatch(t *testing.T) {
+	repo := newFakeImportRepo()
+	repo.failQueuedErr = errors.New("db down")
+	job := approvedJob(t, repo)
+	creator := &fakeCreator{}
+	var wg sync.WaitGroup
+	svc := newImportService(repo, nil, nil, creator, services.WithImportRowLimiter(limiter.New("rows", 1)), services.WithImportBatchTimeout(shortBatchTimeout), goSpawn(&wg))
+
+	ids, urls := seedRows(t, repo, job.ID, "a", 3)
+	creator.holdUntilDone = setOf(urls[0])
+	importBatch(t, svc, job.ID, ids)
+	wg.Wait()
+
+	assert.Equal(t, 1, repo.failQueuedCallCount())
+	assert.Equal(t, domain.ImportItemStatusFailed, statusOf(repo, ids[0]), "the row that was importing is failed by its own outcome")
+	assertAllStatus(t, repo, ids[1:], domain.ImportItemStatusQueued)
+	p := progressNow(t, svc, job.ID)
+	assert.False(t, p.Running, "the batch ended")
+	assert.Equal(t, 1, p.Done)
+	assert.Equal(t, 1, p.Failed)
+}
+
+// An outcome the database refused to save leaves its row queued although the
+// progress already counted it; the sweep fails that row too, and the count must
+// not pass the batch's total.
+func TestImportService_BatchTimeoutDoesNotCountAnUnsavedOutcomeTwice(t *testing.T) {
+	repo := newFakeImportRepo()
+	repo.recordErr = errors.New("db down")
+	job := approvedJob(t, repo)
+	creator := &fakeCreator{}
+	var wg sync.WaitGroup
+	svc := newImportService(repo, nil, nil, creator, services.WithImportRowLimiter(limiter.New("rows", 1)), services.WithImportBatchTimeout(shortBatchTimeout), goSpawn(&wg))
+
+	// Row 0 creates but its outcome is not saved, row 1 is in the creator when the
+	// time runs out (and its failure is not saved either), row 2 is never reached.
+	ids, urls := seedRows(t, repo, job.ID, "a", 3)
+	creator.holdUntilDone = setOf(urls[1])
+	importBatch(t, svc, job.ID, ids)
+	wg.Wait()
+
+	assertAllStatus(t, repo, ids, domain.ImportItemStatusFailed) // no outcome was saved, so the sweep failed all three
+	p := progressNow(t, svc, job.ID)
+	assert.Equal(t, 3, p.Total)
+	assert.Equal(t, 3, p.Done, "the count ends at the batch's total, not past it")
+	assert.Equal(t, 1, p.Imported)
+	assert.Equal(t, 2, p.Failed)
+}
+
+// A batch that finishes inside its time never sweeps.
+func TestImportService_BatchWithinTimeDoesNotSweep(t *testing.T) {
+	repo := newFakeImportRepo()
+	job := approvedJob(t, repo)
+	var wg sync.WaitGroup
+	svc := newImportService(repo, nil, nil, &fakeCreator{}, services.WithImportBatchTimeout(time.Minute), goSpawn(&wg))
+
+	ids, _ := seedRows(t, repo, job.ID, "a", 3)
+	importBatch(t, svc, job.ID, ids)
+	wg.Wait()
+
+	assertAllStatus(t, repo, ids, domain.ImportItemStatusImported)
+	assert.Zero(t, repo.failQueuedCallCount())
 }
 
 // --- listing slots ------------------------------------------------------------
