@@ -249,7 +249,7 @@ At max (32, from the ramp), then at half (16, re-run):
 | Rows per import request | `domain/import_job.go:90,94` | 1,000 (admin 5,000) | n/a | `derived` |
 | Sources per job | `domain/import_job.go:86` | 10 | n/a | `derived` |
 | Batch and listing timeouts | `importTimeout`, `listingTimeout`, `import_service.go` | 30 min each. The batch timeout includes the wait for row slots | **Checked against the shipped row cap, so `runImports` is unchanged.** At 4 rows and the stub's 0.15 s per item, 26 rows/s x 1,800 s is about 47,000 rows against the admin limit of 5,000 (9.4x). At 0.5 s per item: 8 rows/s, 14,400 rows (2.9x). It stops covering 5,000 rows above 1.44 s per item. **Concurrent batches share the global cap**, so three 5,000-row batches at 0.5 s per item (8 rows/s in all) get about 4,800 rows each and would run out of time. **On a batch timeout, rows that never started stay `queued` until the next restart's `RecoverInterrupted` fails them, and `ImportItems` counts them as `AlreadyQueued` and refuses to queue them again until then.** The batch's own rows that did run keep their outcomes. Fixing it needs a bulk "fail this batch's unsent rows" repository method (`FailInterrupted` fails every queued row of every job and is for startup); see FEATURE_BACKLOG.md, "Fail unsent import rows when a batch times out" | `derived` |
-| Progress publish interval | `import_progress.go:13` | 500 ms | n/a | `derived` |
+| Progress publish interval | `import_progress.go:11` | 500 ms | n/a | `derived` |
 
 ### External APIs and caches
 
