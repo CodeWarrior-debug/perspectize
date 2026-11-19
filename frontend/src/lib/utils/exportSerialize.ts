@@ -17,11 +17,16 @@ export function serializeCsv(table: ExportTable): string {
 	return [table.headers, ...table.rows].map((row) => row.map(csvCell).join(',')).join(CSV_ROW_BREAK);
 }
 
+function tsvCell(text: string): string {
+	const flat = text.replace(/[\t\r\n]+/g, ' ');
+	// A pasted cell holding a double quote can read as the start of a quoted field and swallow the
+	// tabs and rows after it, so such a cell is quoted with its inner quotes doubled.
+	return flat.includes('"') ? `"${flat.replaceAll('"', '""')}"` : flat;
+}
+
 /** Tab-separated, one row per line. A tab or line break inside a cell would split it, so each becomes one space. */
 export function serializeTsv(table: ExportTable): string {
-	return [table.headers, ...table.rows]
-		.map((row) => row.map((cell) => cell.replace(/[\t\r\n]+/g, ' ')).join('\t') + '\n')
-		.join('');
+	return [table.headers, ...table.rows].map((row) => row.map(tsvCell).join('\t') + '\n').join('');
 }
 
 function pad2(n: number): string {

@@ -31,6 +31,20 @@ describe('serializeTsv', () => {
 	});
 });
 
+describe('serializeTsv quoting', () => {
+	it('quotes a cell that starts with a double quote and doubles its inner quotes', () => {
+		expect(serializeTsv(table(['t'], [['"Weird Al" Yankovic']]))).toBe('t\n"""Weird Al"" Yankovic"\n');
+	});
+
+	it('quotes a cell with a double quote in the middle', () => {
+		expect(serializeTsv(table(['t'], [['The 5" nail']]))).toBe('t\n"The 5"" nail"\n');
+	});
+
+	it('leaves a cell without a double quote unquoted', () => {
+		expect(serializeTsv(table(['t'], [['plain']]))).toBe('t\nplain\n');
+	});
+});
+
 describe('csvFileName', () => {
 	it('uses the local date', () => {
 		expect(csvFileName(new Date(2026, 10, 14))).toBe('perspectize-library-2026-11-14.csv');
