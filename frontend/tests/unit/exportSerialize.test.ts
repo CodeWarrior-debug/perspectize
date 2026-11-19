@@ -16,6 +16,10 @@ describe('serializeCsv', () => {
 		expect(serializeCsv(table(['Title'], [['x'], ['y']]))).toBe('Title\r\nx\r\ny');
 	});
 
+	it('quotes a cell holding a bare carriage return', () => {
+		expect(serializeCsv(table(['t'], [['a\rb']]))).toBe('t\r\n"a\rb"');
+	});
+
 	it('passes accented and non-Latin text through unchanged', () => {
 		expect(serializeCsv(table(['t'], [['Crème brûlée'], ['日本語']]))).toBe('t\r\nCrème brûlée\r\n日本語');
 	});
@@ -30,6 +34,10 @@ describe('serializeTsv', () => {
 describe('csvFileName', () => {
 	it('uses the local date', () => {
 		expect(csvFileName(new Date(2026, 10, 14))).toBe('perspectize-library-2026-11-14.csv');
+	});
+
+	it('zero-pads a single-digit month and day', () => {
+		expect(csvFileName(new Date(2026, 8, 5))).toBe('perspectize-library-2026-09-05.csv');
 	});
 });
 
