@@ -17,7 +17,13 @@ export async function runPrint(
 	win: Pick<Window, 'print' | 'addEventListener' | 'removeEventListener'> = window,
 	doc: Document = document,
 ): Promise<void> {
-	await hooks.before();
+	try {
+		await hooks.before();
+	} catch (error) {
+		doc.documentElement.removeAttribute('data-print');
+		hooks.after();
+		throw error;
+	}
 	const root = doc.documentElement;
 	let cleaned = false;
 	const cleanup = () => {

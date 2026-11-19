@@ -90,6 +90,44 @@ describe('runPrint', () => {
 		expect(document.documentElement.hasAttribute('data-print')).toBe(false);
 		expect(after).toHaveBeenCalledTimes(1);
 	});
+
+	it('restores the page and rethrows when before() throws', async () => {
+		const after = vi.fn();
+		const { win } = makeWin();
+		const before = () => {
+			throw new Error('setup failed');
+		};
+		await expect(runPrint('grid', { before, after }, win, document)).rejects.toThrow('setup failed');
+		expect(after).toHaveBeenCalledTimes(1);
+		expect(win.print).not.toHaveBeenCalled();
+		expect(document.documentElement.hasAttribute('data-print')).toBe(false);
+		expect(win.addEventListener).not.toHaveBeenCalled();
+	});
+
+	it('restores the page and rethrows when before() rejects', async () => {
+		const after = vi.fn();
+		const { win } = makeWin();
+		const before = async () => {
+			await Promise.resolve();
+			throw new Error('async setup failed');
+		};
+		await expect(runPrint('grid', { before, after }, win, document)).rejects.toThrow('async setup failed');
+		expect(after).toHaveBeenCalledTimes(1);
+		expect(win.print).not.toHaveBeenCalled();
+		expect(document.documentElement.hasAttribute('data-print')).toBe(false);
+		expect(win.addEventListener).not.toHaveBeenCalled();
+	});
+
+	it('runs after once when afterprint fires synchronously inside print()', async () => {
+		const after = vi.fn();
+		const ctl = makeWin();
+		ctl.win.print.mockImplementation(() => ctl.fire());
+		await runPrint('list', { before: () => {}, after }, ctl.win, document);
+		expect(after).toHaveBeenCalledTimes(1);
+		expect(document.documentElement.hasAttribute('data-print')).toBe(false);
+		ctl.fire();
+		expect(after).toHaveBeenCalledTimes(1);
+	});
 });
 
 describe('As-seen print css', () => {
