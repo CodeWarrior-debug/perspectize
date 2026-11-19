@@ -6,6 +6,7 @@ import type { ExportTable } from './exportTable';
 
 const CSV_ROW_BREAK = '\r\n';
 const NEEDS_QUOTING = /[",\r\n]/;
+const REVOKE_DELAY_MS = 1000;
 const UTF8_BOM = '﻿';
 
 function csvCell(text: string): string {
@@ -19,9 +20,9 @@ export function serializeCsv(table: ExportTable): string {
 
 function tsvCell(text: string): string {
 	const flat = text.replace(/[\t\r\n]+/g, ' ');
-	// A pasted cell holding a double quote can read as the start of a quoted field and swallow the
-	// tabs and rows after it, so such a cell is quoted with its inner quotes doubled.
-	return flat.includes('"') ? `"${flat.replaceAll('"', '""')}"` : flat;
+	// A pasted cell that starts with a double quote reads as the start of a quoted field and swallows
+	// the tabs and rows after it, so such a cell is quoted with its inner quotes doubled.
+	return flat.startsWith('"') ? `"${flat.replaceAll('"', '""')}"` : flat;
 }
 
 /** Tab-separated, one row per line. A tab or line break inside a cell would split it, so each becomes one space. */
@@ -50,6 +51,7 @@ export function downloadCsv(csv: string, fileName: string, doc: Document = docum
 		anchor.click();
 	} finally {
 		anchor.remove();
-		URL.revokeObjectURL(url);
+		// Safari can abort the download when the URL is revoked as soon as the click returns.
+		setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS);
 	}
 }

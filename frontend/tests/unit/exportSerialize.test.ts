@@ -36,8 +36,8 @@ describe('serializeTsv quoting', () => {
 		expect(serializeTsv(table(['t'], [['"Weird Al" Yankovic']]))).toBe('t\n"""Weird Al"" Yankovic"\n');
 	});
 
-	it('quotes a cell with a double quote in the middle', () => {
-		expect(serializeTsv(table(['t'], [['The 5" nail']]))).toBe('t\n"The 5"" nail"\n');
+	it('leaves a cell with a double quote in the middle unquoted', () => {
+		expect(serializeTsv(table(['t'], [['The 5" nail']]))).toBe('t\nThe 5" nail\n');
 	});
 
 	it('leaves a cell without a double quote unquoted', () => {
@@ -68,11 +68,15 @@ describe('downloadCsv', () => {
 			expect(document.body.contains(this)).toBe(true);
 		});
 
+		vi.useFakeTimers();
 		downloadCsv('a,b', 'f.csv');
 
 		expect(click).toHaveBeenCalledOnce();
 		expect(document.querySelector('a[download]')).toBeNull();
+		expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+		vi.advanceTimersByTime(1000);
 		expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:x');
+		vi.useRealTimers();
 		const bytes = await new Promise<Uint8Array>((resolve) => {
 			const reader = new FileReader();
 			reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
