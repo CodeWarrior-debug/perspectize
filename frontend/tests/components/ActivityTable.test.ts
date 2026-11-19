@@ -347,6 +347,16 @@ describe('ActivityTable', () => {
 		});
 	});
 
+	// The menu stays disabled under the mocked grid, so its items can't be opened here; ExportMenu.test.ts
+	// covers the items, and this pins that ActivityTable hands the menu its CSV and Copy handlers.
+	it('passes the CSV and Copy handlers to the Export menu', async () => {
+		const { readFileSync } = await import('node:fs');
+		const source = readFileSync('src/lib/components/ActivityTable.svelte', 'utf8');
+		const tag = source.match(/<ExportMenu[\s\S]*?\n\s*\/>/)?.[0] ?? '';
+		expect(tag).toContain('onDownloadCsv={handleDownloadCsv}');
+		expect(tag).toContain('onCopy={handleCopy}');
+	});
+
 	it('omits the Export trigger in card mode', async () => {
 		mockRequest.mockResolvedValue(mockDataResponse);
 		const originalMatchMedia = window.matchMedia;

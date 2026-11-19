@@ -1809,6 +1809,8 @@
 			{#if !cardMode}
 				<ExportMenu
 					disabled={exportDisabled}
+					onDownloadCsv={handleDownloadCsv}
+					onCopy={handleCopy}
 					onPrintAsSeen={handlePrintAsSeen}
 					onPrintAsList={() => (printOptionsOpen = true)}
 				/>
