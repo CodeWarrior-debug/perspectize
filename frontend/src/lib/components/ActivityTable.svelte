@@ -490,12 +490,10 @@
 		goto(search ? `?${search}` : page.url.pathname, { replaceState: true, keepFocus: true, noScroll: true });
 	});
 	const totalCount = $derived(contentQuery.data?.content.totalCount ?? 0);
-	// Reset the filtered-row count whenever the underlying row data changes
-	// (new fetch, mode switch) so a stale filtered count from the previous
-	// dataset doesn't linger until the next filter interaction.
+	// The grid reports its displayed (post-filter) row count through onModelUpdated, which also
+	// fires when row data is replaced under an active filter; the count is cleared on grid teardown.
 	$effect(() => {
 		rowData;
-		displayedRowCount = null;
 		hover.close(); // AG Grid recycles cell DOM; a stale anchor would mislead
 	});
 	const loadedItemsCount = $derived(displayedRowCount ?? rowData.length);
@@ -1373,6 +1371,7 @@
 		onGridPreDestroyed: () => {
 			gridApi = null;
 			gridReady = false;
+			displayedRowCount = null;
 		},
 		onSortChanged: (event: SortChangedEvent) => {
 			hover.close();
@@ -1415,6 +1414,9 @@
 		// The person filter has no column, so "Loaded" mode applies it here, alongside the column filters.
 		isExternalFilterPresent: () => personFilter != null,
 		doesExternalFilterPass: (node) => (personFilter && node.data ? rowMatchesPerson(node.data, personFilter) : false),
+		onModelUpdated: (event) => {
+			displayedRowCount = event.api.getDisplayedRowCount();
+		},
 		onFilterChanged: (event: FilterChangedEvent) => {
 			hover.close();
 			// Immediate: update chip display
