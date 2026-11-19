@@ -7,11 +7,10 @@ import (
 )
 
 // defaultMaxIdleEntries is how many idle keys (nothing running, nobody
-// subscribed) a hub keeps. Job ids only grow, so without a bound the map would
-// grow for as long as the process runs. Keeping the most recent few hundred
-// lets a late subscriber to a job that just finished still see how it ended;
-// an older job reads as one this process never ran, as it already does after a
-// restart.
+// subscribed) a hub keeps. Without a bound, every key ever seen would stay in
+// memory for as long as the process runs. Keeping the most recent few hundred
+// lets a late subscriber to a key that just finished still see how it ended;
+// an older key reads as one this process never saw, as it does after a restart.
 const defaultMaxIdleEntries = 256
 
 // publishMode is what an update asks the hub to do with subscribers.
@@ -50,7 +49,9 @@ const (
 // A key is idle when its state is not active, its ticker has stopped and it
 // has no subscribers. The hub keeps at most maxIdle idle keys and evicts the
 // one that went idle longest ago; a key that is running or watched is never
-// evicted.
+// evicted. A key that goes idle again, say when its last subscriber leaves,
+// counts as newly idle. An evicted key that is seen again starts from newState,
+// even if the work it stood for was only partly done.
 type latestHub[K comparable, V any, S any] struct {
 	mu        sync.Mutex
 	interval  time.Duration
