@@ -61,14 +61,36 @@ export function copiedRowsMessage(count: number): string {
 
 export const COPY_BLOCKED_MESSAGE = 'Could not copy. Your browser blocked clipboard access.';
 
-/** Runs a copy that resolves to its row count, then reports the outcome as a toast. Never rejects. */
+export const EXPORT_FAILED_MESSAGE = 'Could not export the Library.';
+
+/** Thrown when the clipboard refuses the write, so it can be told apart from a failure building the table. */
+export class ClipboardBlockedError extends Error {
+	constructor(options?: ErrorOptions) {
+		super(COPY_BLOCKED_MESSAGE, options);
+		this.name = 'ClipboardBlockedError';
+	}
+}
+
+/**
+ * Runs a copy that resolves to its row count, then reports the outcome as a toast. Never rejects.
+ * Only a `ClipboardBlockedError` gets the clipboard message; any other failure is a generic export error.
+ */
 export async function copyWithToast(
 	copy: () => Promise<number>,
 	toaster: Pick<typeof toast, 'success' | 'error'> = toast,
 ): Promise<void> {
 	try {
 		toaster.success(copiedRowsMessage(await copy()));
+	} catch (err) {
+		toaster.error(err instanceof ClipboardBlockedError ? COPY_BLOCKED_MESSAGE : EXPORT_FAILED_MESSAGE);
+	}
+}
+
+/** Runs a download and toasts a generic error if it throws. Never throws. */
+export function downloadWithToast(download: () => void, toaster: Pick<typeof toast, 'error'> = toast): void {
+	try {
+		download();
 	} catch {
-		toaster.error(COPY_BLOCKED_MESSAGE);
+		toaster.error(EXPORT_FAILED_MESSAGE);
 	}
 }

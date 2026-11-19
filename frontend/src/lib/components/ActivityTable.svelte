@@ -122,7 +122,7 @@
 	import { isExportDisabled, readExportTable, type ExportGridApi } from '$lib/utils/exportGrid';
 	import type { ExportTable } from '$lib/utils/exportTable';
 	import { copyLibraryTable, downloadLibraryCsv } from '$lib/utils/exportActions';
-	import { copyWithToast } from '$lib/utils/toast';
+	import { copyWithToast, downloadWithToast } from '$lib/utils/toast';
 	import { addLandscapePageStyle, removeLandscapePageStyle, runPrint } from '$lib/utils/printing';
 	import {
 		COLUMN_VIEW_LABEL,
@@ -1614,7 +1614,7 @@
 
 	function handleDownloadCsv() {
 		const api = exportApi();
-		if (api) downloadLibraryCsv(api);
+		if (api) downloadWithToast(() => downloadLibraryCsv(api));
 	}
 
 	function handleCopy() {

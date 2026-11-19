@@ -23,7 +23,7 @@
 		<thead>
 			<tr>
 				{#each table.headers as header, c (c)}
-					<th>{header}</th>
+					<th data-col={table.columnIds[c]}>{header}</th>
 				{/each}
 			</tr>
 		</thead>
@@ -31,7 +31,7 @@
 			{#each table.rows as row, r (r)}
 				<tr>
 					{#each row as cell, c (c)}
-						<td>
+						<td data-col={table.columnIds[c]}>
 							{#if table.columnIds[c] === 'item' && table.rowUrls[r]}
 								<a href={table.rowUrls[r]}>{cell}</a>
 							{:else}

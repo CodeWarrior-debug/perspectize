@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { copyWithToast } from '$lib/utils/toast';
+import { ClipboardBlockedError, copyWithToast, downloadWithToast } from '$lib/utils/toast';
 
 function toaster() {
 	return { success: vi.fn(), error: vi.fn() };
@@ -21,8 +21,33 @@ describe('copyWithToast', () => {
 
 	it('reports a blocked clipboard as an error', async () => {
 		const t = toaster();
-		await copyWithToast(() => Promise.reject(new Error('denied')), t as never);
+		await copyWithToast(() => Promise.reject(new ClipboardBlockedError()), t as never);
 		expect(t.error).toHaveBeenCalledWith('Could not copy. Your browser blocked clipboard access.');
 		expect(t.success).not.toHaveBeenCalled();
+	});
+
+	it('reports a failure building the table as a generic export error', async () => {
+		const t = toaster();
+		await copyWithToast(() => Promise.reject(new Error('boom')), t as never);
+		expect(t.error).toHaveBeenCalledWith('Could not export the Library.');
+		expect(t.success).not.toHaveBeenCalled();
+	});
+});
+
+describe('downloadWithToast', () => {
+	it('runs the download without a toast when it succeeds', () => {
+		const t = { error: vi.fn() };
+		const download = vi.fn();
+		downloadWithToast(download, t as never);
+		expect(download).toHaveBeenCalledOnce();
+		expect(t.error).not.toHaveBeenCalled();
+	});
+
+	it('toasts a generic error when the download throws', () => {
+		const t = { error: vi.fn() };
+		downloadWithToast(() => {
+			throw new Error('boom');
+		}, t as never);
+		expect(t.error).toHaveBeenCalledWith('Could not export the Library.');
 	});
 });

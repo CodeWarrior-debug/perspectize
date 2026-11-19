@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ClipboardBlockedError } from '$lib/utils/toast';
 import { copyLibraryTable, downloadLibraryCsv } from '$lib/utils/exportActions';
 import type { ExportGridApi } from '$lib/utils/exportGrid';
 
@@ -19,9 +20,21 @@ describe('copyLibraryTable', () => {
 		expect(writeText).toHaveBeenCalledWith('Item\tLink\na\thttps://e.com/a\nb\thttps://e.com/b\n');
 	});
 
-	it('rejects when the clipboard refuses', async () => {
+	it('rejects with ClipboardBlockedError when the clipboard refuses', async () => {
 		const writeText = vi.fn().mockRejectedValue(new Error('denied'));
-		await expect(copyLibraryTable(fakeApi(['a']), { writeText })).rejects.toThrow('denied');
+		await expect(copyLibraryTable(fakeApi(['a']), { writeText })).rejects.toBeInstanceOf(ClipboardBlockedError);
+	});
+
+	it('lets a table-building failure through as a plain error', async () => {
+		const api = fakeApi(['a']);
+		api.getAllDisplayedColumns = () => {
+			throw new Error('grid gone');
+		};
+		const writeText = vi.fn();
+		const err = await copyLibraryTable(api, { writeText }).catch((e) => e);
+		expect(err).toBeInstanceOf(Error);
+		expect(err).not.toBeInstanceOf(ClipboardBlockedError);
+		expect(writeText).not.toHaveBeenCalled();
 	});
 });
 

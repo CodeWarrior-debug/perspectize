@@ -1246,6 +1246,10 @@ select.select-inset {
 		vertical-align: top;
 		color: black;
 	}
+	/* Short values (counts, dates, ratings) stay on one line; only the item title wraps. */
+	.print-root td:not([data-col='item']) {
+		white-space: nowrap;
+	}
 	.print-root a {
 		color: black;
 		text-decoration: underline;

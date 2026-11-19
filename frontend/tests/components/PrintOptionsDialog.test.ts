@@ -75,6 +75,19 @@ describe('PrintOptionsDialog', () => {
 		expect((screen.getByLabelText('Roomy') as HTMLInputElement).checked).toBe(false);
 	});
 
+	it('prints when the Title field submits its form (Enter in the field)', async () => {
+		const onPrint = vi.fn();
+		render(PrintOptionsDialog, { props: { open: true, onPrint } });
+		const input = screen.getByLabelText('Title');
+		await fireEvent.input(input, { target: { value: 'Quick' } });
+		// Enter in a text field of a form with a submit button submits that form natively.
+		const form = input.closest('form')!;
+		expect(form.querySelector('button[type="submit"]')?.textContent).toBe('Print');
+		await fireEvent.submit(form);
+		expect(onPrint).toHaveBeenCalledWith({ title: 'Quick', spacing: 'standard' });
+		await waitFor(() => expect(screen.queryByText('Print as list')).toBeNull());
+	});
+
 	it('closes the dialog when Print is clicked', async () => {
 		render(PrintOptionsDialog, { props: { open: true, onPrint: vi.fn() } });
 		await fireEvent.click(screen.getByRole('button', { name: 'Print' }));

@@ -70,6 +70,19 @@ describe('PrintListView', () => {
 		expect(document.body.querySelector('.print-root')).toBeNull();
 	});
 
+	it('tags every header and cell with its column id', () => {
+		mount();
+		expect([...document.querySelectorAll('th')].map((c) => c.getAttribute('data-col'))).toEqual(['item', 'type']);
+		expect([...document.querySelectorAll('tbody tr:first-child td')].map((c) => c.getAttribute('data-col'))).toEqual([
+			'item',
+			'type',
+		]);
+	});
+
+	it('keeps every cell but the item title on one line in print css', () => {
+		expect(appCss).toMatch(/\.print-root td:not\(\[data-col='item'\]\)\s*\{\s*white-space: nowrap;/);
+	});
+
 	it('ships print css that repeats headers and keeps rows whole', () => {
 		expect(appCss).toContain('table-header-group');
 		expect(appCss).toContain('break-inside: avoid');
