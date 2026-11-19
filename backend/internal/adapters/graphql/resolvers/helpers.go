@@ -1262,3 +1262,32 @@ func importListingProgressToModel(p domain.ImportListingProgress) *model.ImportL
 		UpdatedAt: isoTime(p.UpdatedAt),
 	}
 }
+
+// forward maps each value read from in and sends it on the returned channel,
+// which has a buffer of one. The output is closed when in closes or ctx ends,
+// whichever comes first, so a subscription's stream always ends with its
+// request. ctx is watched while waiting for the next value and while sending,
+// so a reader that has gone away, or an input that stays open and silent, never
+// leaves the goroutine behind. forward never closes in: the sender owns it.
+func forward[In, Out any](ctx context.Context, in <-chan In, mapFn func(In) Out) <-chan Out {
+	out := make(chan Out, 1)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case v, open := <-in:
+				if !open {
+					return
+				}
+				select {
+				case out <- mapFn(v):
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+	return out
+}
