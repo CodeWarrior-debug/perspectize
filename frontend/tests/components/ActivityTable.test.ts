@@ -335,6 +335,45 @@ describe('ActivityTable', () => {
 		});
 	});
 
+	it('renders the Export trigger disabled while the grid is not ready', async () => {
+		mockRequest.mockResolvedValue(mockDataResponse);
+		const { container } = renderWithQuery();
+
+		await waitFor(() => {
+			const exportButton = container.querySelector<HTMLButtonElement>('button[aria-label="Export"]');
+			expect(exportButton).toBeTruthy();
+			// The mocked AG Grid never fires onGridReady, so gridReady stays false.
+			expect(exportButton?.disabled).toBe(true);
+		});
+	});
+
+	it('omits the Export trigger in card mode', async () => {
+		mockRequest.mockResolvedValue(mockDataResponse);
+		const originalMatchMedia = window.matchMedia;
+		window.matchMedia = vi.fn(
+			(query: string) =>
+				({
+					matches: query === '(max-width: 859px)',
+					media: query,
+					onchange: null,
+					addListener: vi.fn(),
+					removeListener: vi.fn(),
+					addEventListener: vi.fn(),
+					removeEventListener: vi.fn(),
+					dispatchEvent: vi.fn(),
+				}) as unknown as MediaQueryList,
+		);
+
+		const { container } = renderWithQuery();
+
+		await waitFor(() => {
+			expect(container.querySelector('[data-testid="activity-card-list"]')).toBeTruthy();
+		});
+		expect(container.querySelector('button[aria-label="Export"]')).toBeFalsy();
+
+		window.matchMedia = originalMatchMedia;
+	});
+
 	// Regression: the +/glasses affordance is driven by a per-user perspectives
 	// query. It must key off the Clerk-derived `me` id, not the legacy
 	// `userSelection` store (which lags and left the query permanently disabled,

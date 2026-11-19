@@ -11,6 +11,7 @@
 		CellClickedEvent,
 		CellMouseOverEvent,
 	} from '@ag-grid-community/core';
+	import { tick } from 'svelte';
 	import { createQuery, keepPreviousData } from '@tanstack/svelte-query';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -114,6 +115,13 @@
 	import { useMe } from '$lib/queries/users/useMe.svelte';
 	import { useUsernames } from '$lib/queries/users/useUsernames.svelte';
 	import ColumnPickerDialog from '$lib/components/ColumnPickerDialog.svelte';
+	import ExportMenu from '$lib/components/ExportMenu.svelte';
+	import PrintListView from '$lib/components/PrintListView.svelte';
+	import PrintOptionsDialog from '$lib/components/PrintOptionsDialog.svelte';
+	import type { PrintSpacing } from '$lib/components/PrintOptionsDialog.svelte';
+	import { readExportTable, type ExportGridApi } from '$lib/utils/exportGrid';
+	import type { ExportTable } from '$lib/utils/exportTable';
+	import { runPrint } from '$lib/utils/printing';
 	import {
 		COLUMN_VIEW_LABEL,
 		clearLayout,
@@ -1582,10 +1590,57 @@
 		});
 	});
 
+	// Export: the grid is read at click time, so the output matches what the toolbar shows.
+	const exportDisabled = $derived(!gridReady || loading || rowData.length === 0);
+	let printOptionsOpen = $state(false);
+	let printList = $state<{ table: ExportTable; title: string; spacing: PrintSpacing } | null>(null);
+
+	// The grid's resting layout; a print run restores this, not a fixed value.
+	const normalDomLayout = $derived(isMobile ? 'autoHeight' : 'normal');
+
+	function reportPrintFailure(err: unknown) {
+		toast.error(err instanceof Error ? `Could not print: ${err.message}` : 'Could not print');
+	}
+
+	async function handlePrintAsSeen() {
+		const api = gridApi;
+		if (!api) return;
+		try {
+			await runPrint('grid', {
+				before: () => api.setGridOption('domLayout', 'print'),
+				after: () => {
+					if (!api.isDestroyed()) api.setGridOption('domLayout', normalDomLayout);
+				},
+			});
+		} catch (err) {
+			reportPrintFailure(err);
+		}
+	}
+
+	async function handlePrintAsList({ title, spacing }: { title: string; spacing: PrintSpacing }) {
+		const api = gridApi;
+		if (!api) return;
+		try {
+			const table = readExportTable(api as unknown as ExportGridApi, 'print');
+			await runPrint('list', {
+				before: async () => {
+					printList = { table, title, spacing };
+					await tick();
+				},
+				after: () => {
+					printList = null;
+				},
+			});
+		} catch (err) {
+			printList = null;
+			reportPrintFailure(err);
+		}
+	}
+
 	// Switch to autoHeight on mobile — eliminates empty gap below last row
 	$effect(() => {
 		if (!gridApi || !gridReady) return;
-		gridApi.setGridOption('domLayout', isMobile ? 'autoHeight' : 'normal');
+		gridApi.setGridOption('domLayout', normalDomLayout);
 	});
 
 	// Re-evaluate flex column widths when the grid container resizes
@@ -1726,6 +1781,13 @@
 				<ArrowUpDownIcon class="size-4" />
 				<span class="hidden md:inline">Clear sorts</span>
 			</button>
+			{#if !cardMode}
+				<ExportMenu
+					disabled={exportDisabled}
+					onPrintAsSeen={handlePrintAsSeen}
+					onPrintAsList={() => (printOptionsOpen = true)}
+				/>
+			{/if}
 			{#if mode === 'all'}
 				<div class="hidden md:flex items-center gap-2">
 					<label for="pageSize" class="text-muted-foreground">Page size:</label>
@@ -1813,6 +1875,16 @@
 		onToggle={handleColumnToggle}
 		onReset={handleColumnsReset}
 	/>
+{/if}
+
+<!-- Print setup for "Print as list": mounted only while open, like the pickers. -->
+{#if printOptionsOpen}
+	<PrintOptionsDialog bind:open={printOptionsOpen} onPrint={handlePrintAsList} />
+{/if}
+
+<!-- The print-only list; it portals itself to <body> and shows only under html[data-print='list']. -->
+{#if printList}
+	<PrintListView table={printList.table} title={printList.title} spacing={printList.spacing} />
 {/if}
 
 <!-- Sort picker — works identically on mobile and desktop, and in both data modes;
