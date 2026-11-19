@@ -1262,4 +1262,11 @@ select.select-inset {
 	.print-root[data-spacing='roomy'] td {
 		padding-block: 12px;
 	}
+	/* As seen: hide everything that is not the grid or one of its ancestors. */
+	html[data-print='grid'] body *:not(.activity-grid):not(.activity-grid *):not(:has(.activity-grid)) {
+		display: none !important;
+	}
+	html[data-print='grid'] .activity-grid {
+		height: auto !important;
+	}
 }
