@@ -25,6 +25,7 @@ export const COLUMN_VIEW_LABEL: Record<ColumnView, string> = {
 	book: 'Book columns',
 	webpage: 'Webpage columns',
 	claim: 'Claim columns',
+	audio: 'Audio track columns',
 	general: 'standard columns',
 };
 

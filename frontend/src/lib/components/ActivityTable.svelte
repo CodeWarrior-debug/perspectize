@@ -63,6 +63,8 @@
 		contentTags,
 		truncateDescription,
 		contentRowId,
+		channelValueGetter,
+		listenCellRenderer,
 		castCellRenderer,
 		genreValueGetter,
 		ratedValueGetter,
@@ -95,6 +97,7 @@
 		labelComparator,
 		itemColumnHeader,
 		soloTypeFilter,
+		channelColumnHeader,
 		ratedComparator,
 		CLIENT_ONLY_SORT_COLS,
 		sortableColumnsFor,
@@ -788,6 +791,14 @@
 			// minWidth from headerMinWidth (never below the whole heading + sort arrow + funnel);
 			// movieColumns.test.ts checks the default set still fits the 1212px grid.
 			{
+				colId: 'listen',
+				headerName: 'Listen',
+				cellRenderer: listenCellRenderer,
+				sortable: false,
+				hide: true,
+				minWidth: 90,
+			},
+			{
 				colId: 'genre',
 				headerName: 'Genre',
 				flex: 1,
@@ -967,7 +978,7 @@
 			},
 			{
 				colId: 'channel',
-				field: 'channelTitle',
+				valueGetter: channelValueGetter,
 				headerName: 'Channel',
 				flex: 1.2,
 				maxWidth: 200,
@@ -1506,6 +1517,13 @@
 		const headerName = itemColumnHeader(filters.type);
 		if (!gridApi || !gridReady) return;
 		syncItemHeader(gridApi, headerName);
+	});
+
+	// The Channel column reads "Artist" in the Audio track view (it carries the artist there).
+	$effect(() => {
+		const headerName = channelColumnHeader(filters.type);
+		if (!gridApi || !gridReady) return;
+		syncItemHeader(gridApi, headerName, 'channel');
 	});
 
 	// Restore AG Grid filter state from URL on mount and mode changes

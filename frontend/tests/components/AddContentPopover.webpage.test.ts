@@ -38,6 +38,10 @@ vi.mock('#lib/queries/content/useWebPagePreview.js', () => ({
 	},
 }));
 vi.mock('#lib/queries/content/useAddVideo.js', () => ({ useAddVideo: () => mocks.video }));
+vi.mock('#lib/queries/content/useAddAudioTrack.js', () => ({
+	useAddAudioTrack: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isSuccess: false, isError: false }),
+}));
+vi.mock('#lib/queries/content/useAudioTrack.js', () => ({ useMusicGenres: () => ({ data: [] }) }));
 vi.mock('#lib/queries/content/useAddMovie.js', () => ({ useAddMovie: () => mocks.movie }));
 vi.mock('#lib/queries/content/useAddBook.js', () => ({ useAddBook: () => mocks.book }));
 vi.mock('#lib/queries/content/useAddPassage.js', () => ({ useAddPassage: () => mocks.passage }));

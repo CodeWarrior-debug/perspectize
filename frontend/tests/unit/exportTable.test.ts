@@ -37,7 +37,7 @@ function row(overrides: Partial<ContentItem> = {}): ContentItem {
 describe('column id constants', () => {
 	it('lists the renderer-only and excluded columns', () => {
 		expect([...RENDERED_TEXT_COLIDS]).toEqual(['item', 'category', 'cast', 'webRoles', 'author']);
-		expect([...EXPORT_EXCLUDED_COLIDS]).toEqual(['perspectize']);
+		expect([...EXPORT_EXCLUDED_COLIDS]).toEqual(['perspectize', 'listen']);
 	});
 });
 

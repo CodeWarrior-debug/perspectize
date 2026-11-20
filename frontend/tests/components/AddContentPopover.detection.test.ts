@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 	},
 	video: { mutate: vi.fn(), isPending: false, isSuccess: false },
 	passage: { mutate: vi.fn(), isPending: false, isSuccess: false },
+	audio: { mutate: vi.fn(), reset: vi.fn(), isPending: false, isSuccess: false },
 	movie: {
 		mutate: vi.fn(),
 		reset: vi.fn(),
@@ -35,6 +36,8 @@ vi.mock('#lib/queries/content/useCreateWebPage.js', () => ({
 vi.mock('#lib/queries/content/useWebPagePreview.js', () => ({
 	useWebPagePreview: () => ({ data: undefined, isPending: false, isError: false }),
 }));
+vi.mock('#lib/queries/content/useAddAudioTrack.js', () => ({ useAddAudioTrack: () => mocks.audio }));
+vi.mock('#lib/queries/content/useAudioTrack.js', () => ({ useMusicGenres: () => ({ data: [] }) }));
 
 const JOHN = 43;
 const YT = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';

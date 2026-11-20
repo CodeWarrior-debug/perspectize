@@ -28,7 +28,7 @@ export interface ExportTable {
 export const RENDERED_TEXT_COLIDS = ['item', 'category', 'cast', 'webRoles', 'author'] as const;
 
 /** Columns that are controls, not data, and never appear in an export. */
-export const EXPORT_EXCLUDED_COLIDS = ['perspectize'] as const;
+export const EXPORT_EXCLUDED_COLIDS = ['perspectize', 'listen'] as const;
 
 /**
  * Columns whose raw number is not a quantity to sum, so a spreadsheet keeps the grid's text:

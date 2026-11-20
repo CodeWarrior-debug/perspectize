@@ -12,6 +12,7 @@ import {
 	boxOfficeValueGetter,
 	vsBudgetValueGetter,
 	genreValueGetter,
+	channelValueGetter,
 	ratedValueGetter,
 	releasedValueGetter,
 	tmdbScoreValueGetter,
@@ -49,6 +50,7 @@ const CONTENT_TYPE_LABELS: Partial<Record<ContentType, string>> = {
 	MOVIE: 'Movie',
 	BOOK: 'Book',
 	WEB_PAGE: 'Webpage',
+	AUDIO_TRACK: 'Audio Track',
 };
 
 /** Type-filter options. `value` is the lowercased form used in the filter model and `f.type=` URL param. */
@@ -288,6 +290,7 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		filterKey: 'genre',
 		filterValue: (row) => genreValueGetter({ data: row })?.toLowerCase() ?? null,
 	},
+	{ colId: 'listen', label: 'Listen', picker: 'data', sortable: false },
 	{
 		colId: 'rated',
 		label: 'Rated',
@@ -421,10 +424,10 @@ export const COLUMNS: readonly ColumnMeta[] = [
 		label: 'Channel',
 		picker: 'data',
 		sortable: true,
-		sortValue: (row) => row.channelTitle?.toLowerCase() ?? null,
+		sortValue: (row) => channelValueGetter({ data: row })?.toLowerCase() ?? null,
 		serverSort: 'CHANNEL_TITLE',
 		filterKey: 'channel',
-		filterValue: (row) => row.channelTitle?.toLowerCase() ?? null,
+		filterValue: (row) => channelValueGetter({ data: row })?.toLowerCase() ?? null,
 	},
 	{
 		colId: 'user',
@@ -649,14 +652,21 @@ export function isWebPageOnlyTypeFilter(typeFilter: string | undefined): boolean
 	return types.length === 1 && types[0] === 'web_page';
 }
 
+/** True when the `f.type` URL value names exactly one type and it is AUDIO_TRACK (`audio_track`). */
+export function isAudioOnlyTypeFilter(typeFilter: string | undefined): boolean {
+	const types = selectedTypes(typeFilter);
+	return types.length === 1 && types[0] === 'audio_track';
+}
+
 /** A default column set: one per single-type filter (Movie, Book, Webpage, Claim), otherwise the general (YouTube) set. */
-export type ColumnView = 'movie' | 'book' | 'webpage' | 'claim' | 'general';
+export type ColumnView = 'movie' | 'book' | 'webpage' | 'claim' | 'audio' | 'general';
 
 export function columnViewFor(typeFilter: string | undefined): ColumnView {
 	if (soloTypeFilter(typeFilter) === 'claim') return 'claim';
 	if (isMovieOnlyTypeFilter(typeFilter)) return 'movie';
 	if (isBookOnlyTypeFilter(typeFilter)) return 'book';
 	if (isWebPageOnlyTypeFilter(typeFilter)) return 'webpage';
+	if (isAudioOnlyTypeFilter(typeFilter)) return 'audio';
 	return 'general';
 }
 
@@ -735,6 +745,12 @@ export function defaultColumnVisibility(
 		if (sm) visible.push('author');
 		if (md) visible.push('published', 'pages');
 		if (lg) visible.push('rating', 'tags');
+	} else if (view === 'audio') {
+		// Track, ◎ | Artist, Genre | Duration, Listen | Tags (the channel column carries the artist).
+		visible = ['item', 'perspectize'];
+		if (sm) visible.push('channel', 'genre');
+		if (md) visible.push('duration', 'listen');
+		if (lg) visible.push('tags');
 	} else {
 		visible = ['item', 'type', 'perspectize'];
 		if (sm) visible.push('category', 'channel');
@@ -763,6 +779,7 @@ export function defaultColumnVisibility(
 		'myImportance',
 		'myAgreement',
 		'createdAt',
+		'listen',
 		...MOVIE_DEFAULT_COLS,
 		...MOVIE_ONLY_PICKER,
 		...BOOK_COLS,
@@ -1058,8 +1075,8 @@ export interface HeaderApi {
  * effect re-runs on every filter change, so an unconditional redraw closed the
  * filter while the user was still typing. Returns whether it redrew.
  */
-export function syncItemHeader(api: HeaderApi, name: string): boolean {
-	const colDef = api.getColumn('item')?.getColDef();
+export function syncItemHeader(api: HeaderApi, name: string, colId = 'item'): boolean {
+	const colDef = api.getColumn(colId)?.getColDef();
 	if (!colDef || colDef.headerName === name) return false;
 	colDef.headerName = name;
 	api.refreshHeader();
@@ -1073,7 +1090,13 @@ export function itemColumnHeader(typeFilter: string | undefined): string {
 	if (isMovieOnlyTypeFilter(typeFilter)) return 'Film';
 	if (isBookOnlyTypeFilter(typeFilter)) return 'Book';
 	if (isWebPageOnlyTypeFilter(typeFilter)) return 'Webpage';
+	if (isAudioOnlyTypeFilter(typeFilter)) return 'Track';
 	return 'Item';
+}
+
+/** Channel column header: "Artist" when the type filter is exactly AUDIO_TRACK (the column carries the artist), otherwise "Channel". */
+export function channelColumnHeader(typeFilter: string | undefined): string {
+	return isAudioOnlyTypeFilter(typeFilter) ? 'Artist' : 'Channel';
 }
 
 /**

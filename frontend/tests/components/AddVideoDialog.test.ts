@@ -32,7 +32,11 @@ vi.mock('svelte-sonner', () => ({
 }));
 
 vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
-vi.mock('#lib/utils/youtube.js', () => ({ validateYouTubeUrl: (url: string) => mocks.mockValidate(url) }));
+vi.mock('#lib/utils/youtube.js', async (importOriginal) => ({
+	// Real classifier: routing between the video and music mutations is under test too.
+	classifyYouTubeUrl: (await importOriginal<typeof import('#lib/utils/youtube.js')>()).classifyYouTubeUrl,
+	validateYouTubeUrl: (url: string) => mocks.mockValidate(url),
+}));
 
 function reset() {
 	vi.clearAllMocks();

@@ -1,4 +1,5 @@
 import { gql } from 'graphql-request';
+import type { LyricsAvailability } from '#lib/utils/lyricsLinks.js';
 
 /** Content.lengthDisplay: the source of a length and the smallest unit it reports. */
 export interface LengthDisplay {
@@ -11,7 +12,7 @@ export type { ContentFilterInput } from '#lib/utils/gridUrlState.js';
 export { activityListRequest, cursorsAfterPage, ACTIVITY_LIST_STALE_TIME_MS, LOADED_MODE_FIRST } from './activityList';
 
 // Values the API returns in Content.contentType (a String, not a GraphQL enum).
-export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK' | 'WEB_PAGE';
+export type ContentType = 'YOUTUBE_VIDEO' | 'CLAIM' | 'BIBLE_PASSAGE' | 'MOVIE' | 'BOOK' | 'WEB_PAGE' | 'AUDIO_TRACK';
 
 /**
  * A webpage's role (the backend `WebPageRole` enum). Chosen by the adder, never read from the page.
@@ -117,6 +118,9 @@ export interface ContentItem {
 	// WEB_PAGE rows only: the shaped page fields for list rows (same split as `movie`/`book`; the raw
 	// `response` is never selected in lists). Null for every other type. Read it through webPage.ts.
 	webPage?: WebPageListMeta | null;
+	// AUDIO_TRACK rows only: response.music, and the genre from the seeded tree.
+	audioTrack?: AudioTrackMeta | null;
+	genre?: { id: string; name: string } | null;
 	primaryCategory: {
 		id: string;
 		wikidataQid: string;
@@ -149,10 +153,95 @@ export interface ContentSortInput {
 	order: 'ASC' | 'DESC';
 }
 
+export interface CreateContentResult {
+	content: ContentItem;
+	alreadyExisted: boolean;
+}
+
 export interface CreateContentResponse {
-	createContentFromYouTube: {
-		content: ContentItem;
+	createContentFromYouTube: CreateContentResult;
+}
+
+export type RelatedMediaKind = 'audio' | 'official_video' | 'lyric_video' | 'live' | 'other';
+
+// A reference to another upload of the same song. Not a content row unless a
+// user promoted it, in which case contentId is set.
+export interface RelatedMedia {
+	provider: string;
+	videoId: string;
+	kind: RelatedMediaKind | string;
+	title: string | null;
+	contentId: string | null;
+	unavailable: boolean;
+}
+
+export type { LyricsAvailability };
+
+export interface TrackLink {
+	id: string;
+	provider: string;
+	providerTrackId: string;
+	url: string;
+	kind: 'LISTEN' | 'EMBED';
+	source: 'PASTED' | 'MATCHED';
+	unavailableAt: string | null;
+}
+
+export interface MusicGenre {
+	id: string;
+	name: string;
+	parentId: string | null;
+}
+
+/** response.music on an AUDIO_TRACK row (Content.audioTrack). */
+export interface AudioTrackMeta {
+	provider?: string;
+	videoId?: string;
+	artist?: string;
+	album?: string;
+	videoType?: string;
+	explicit?: boolean;
+	coverImageUrl?: string;
+	suggestedGenreId?: number;
+	releaseDate?: string;
+}
+
+/** The details-modal view of an AUDIO_TRACK row. */
+export interface AudioTrack {
+	id: string;
+	name: string;
+	url: string | null;
+	addedByUserID: string;
+	createdAt: string;
+	genreId: string | null;
+	genre: MusicGenre | null;
+	audioTrack: AudioTrackMeta | null;
+	trackLinks: TrackLink[];
+	relatedMedia: RelatedMedia[];
+	lyrics: LyricsAvailability | null;
+}
+
+export interface SameSongCandidate {
+	id: string;
+	name: string;
+	url: string | null;
+	audioTrack: AudioTrackMeta | null;
+}
+
+export interface CreateAudioTrackInput {
+	url: string;
+	title?: string;
+	artist?: string;
+	genreId?: number;
+	sameAsContentId?: number;
+	createNew?: boolean;
+}
+
+export interface CreateAudioTrackResponse {
+	createAudioTrack: {
+		content: (ContentItem & { relatedMedia: RelatedMedia[] }) | null;
 		alreadyExisted: boolean;
+		sameSongCandidates: SameSongCandidate[];
 	};
 }
 
@@ -204,6 +293,11 @@ export const LIST_CONTENT = gql`
 				customFields
 				book
 				webPage
+				audioTrack
+				genre {
+					id
+					name
+				}
 				primaryCategory {
 					id
 					wikidataQid
@@ -347,6 +441,11 @@ export const GET_CONTENT_DETAILS = gql`
 			movie
 			customFields
 			book
+			audioTrack
+			genre {
+				id
+				name
+			}
 			primaryCategory {
 				id
 				wikidataQid
@@ -433,6 +532,124 @@ export const CREATE_CONTENT_FROM_YOUTUBE = gql`
 				updatedAt
 			}
 			alreadyExisted
+		}
+	}
+`;
+
+export const CREATE_AUDIO_TRACK = gql`
+	mutation CreateAudioTrack($input: CreateAudioTrackInput!) {
+		createAudioTrack(input: $input) {
+			content {
+				id
+				name
+				url
+				contentType
+				length
+				lengthUnits
+				addedByUserID
+				audioTrack
+				genre {
+					id
+					name
+				}
+				relatedMedia {
+					provider
+					videoId
+					kind
+					title
+					contentId
+					unavailable
+				}
+				createdAt
+				updatedAt
+			}
+			alreadyExisted
+			sameSongCandidates {
+				id
+				name
+				url
+				audioTrack
+			}
+		}
+	}
+`;
+
+const AUDIO_TRACK_FIELDS = `
+	id
+	name
+	url
+	addedByUserID
+	createdAt
+	genreId
+	genre { id name parentId }
+	audioTrack
+	trackLinks { id provider providerTrackId url kind source unavailableAt }
+	relatedMedia { provider videoId kind title contentId unavailable }
+	lyrics { available lrclibId hasSynced checkedAt }
+`;
+
+export const GET_AUDIO_TRACK = gql`
+	query GetAudioTrack($id: ID!) {
+		contentByID(id: $id) {
+			${AUDIO_TRACK_FIELDS}
+		}
+	}
+`;
+
+export const LIST_MUSIC_GENRES = gql`
+	query ListMusicGenres {
+		musicGenres {
+			id
+			name
+			parentId
+		}
+	}
+`;
+
+export const SET_TRACK_GENRE = gql`
+	mutation SetTrackGenre($contentId: IntID!, $genreId: IntID!) {
+		setTrackGenre(contentId: $contentId, genreId: $genreId) {
+			id
+			genreId
+			genre {
+				id
+				name
+				parentId
+			}
+		}
+	}
+`;
+
+export const MARK_TRACK_LINK_UNAVAILABLE = gql`
+	mutation MarkTrackLinkUnavailable($linkId: IntID!) {
+		markTrackLinkUnavailable(linkId: $linkId) {
+			id
+			unavailableAt
+		}
+	}
+`;
+
+export const REFRESH_LYRICS_AVAILABILITY = gql`
+	mutation RefreshLyricsAvailability($contentId: IntID!) {
+		refreshLyricsAvailability(contentId: $contentId) {
+			${AUDIO_TRACK_FIELDS}
+		}
+	}
+`;
+
+export const MARK_RELATED_MEDIA_UNAVAILABLE = gql`
+	mutation MarkRelatedMediaUnavailable($contentId: IntID!, $videoId: String!) {
+		markRelatedMediaUnavailable(contentId: $contentId, videoId: $videoId) {
+			${AUDIO_TRACK_FIELDS}
+		}
+	}
+`;
+
+export const PROMOTE_RELATED_MEDIA = gql`
+	mutation PromoteRelatedMedia($contentId: IntID!, $videoId: String!) {
+		promoteRelatedMedia(contentId: $contentId, videoId: $videoId) {
+			id
+			name
 		}
 	}
 `;
