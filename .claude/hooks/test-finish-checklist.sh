@@ -43,6 +43,13 @@ out=$(FINISH_MERGED_PR=42 run env)
 
 ARGS=""; out=$(FINISH_MERGED_PR=42 run env)
 echo "$out" | grep -q 'No listeners' && pass "reports no listeners" || bad "no listeners -> $out"
+echo "$out" | grep -q 'branch -D' && bad "home branch: must not suggest deleting it -> $out" || pass "home branch: no delete suggested"
+echo "$out" | grep -q 'Already on wt/3' && pass "home branch: says nothing to finish" || bad "home branch message -> $out"
+
+g -C "$T/repo" checkout -q -b feature/y
+out=$(FINISH_MERGED_PR=42 run env)
+echo "$out" | grep -q '^     git branch -D feature/y$' && ! echo "$out" | grep -q ' ; ' && pass "task branch: one command per line" || bad "task branch commands -> $out"
+g -C "$T/repo" checkout -q wt/3
 
 (python3 -m http.server 38123 --bind 127.0.0.1 >/dev/null 2>&1 & echo $! > "$T/pid")
 for _ in 1 2 3 4 5 6 7 8 9 10; do lsof -nP -iTCP:38123 -sTCP:LISTEN -t >/dev/null 2>&1 && break; sleep 0.5; done

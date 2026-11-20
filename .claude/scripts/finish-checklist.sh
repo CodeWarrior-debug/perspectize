@@ -40,7 +40,14 @@ if [ -n "$listening" ]; then
 else
   echo "2. No listeners on the verification ports. Nothing to stop."
 fi
-echo "3. Return the slot to its home branch, then delete the task branch:"
-echo "     git checkout $home ; git merge --ff-only origin/main ; git branch -D ${branch:-<task-branch>}"
+case "$branch" in
+  main|wt/*)
+    echo "3. Already on $branch, not a task branch: nothing to return to or delete. To catch up: git merge --ff-only origin/main" ;;
+  *)
+    echo "3. Return the slot to its home branch, then delete the task branch (one command at a time):"
+    echo "     git checkout $home"
+    echo "     git merge --ff-only origin/main"
+    echo "     git branch -D ${branch:-<task-branch>}" ;;
+esac
 echo "4. node .claude/agent-registry/agent-registry.mjs release${slot:+ --path $ROOT}   (only if you are done with this slot)"
 echo "5. bash .claude/scripts/worktree-report.sh   (remove only worktrees you created)"
