@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { Popover as PopoverPrimitive } from 'bits-ui';
-	import { Popover, PopoverContent } from '$lib/components/shadcn/popover';
+	import { Popover, PopoverContent } from '#lib/components/shadcn/popover';
 	import ColumnChart from './ColumnChart.svelte';
-	import type { TopBottom } from '$lib/utils/columnStats';
-	import { CHART_TYPES, CHART_TYPE_LABELS, defaultChartType, type ChartType } from '$lib/utils/columnCharts';
+	import type { TopBottom } from '#lib/utils/columnStats';
+	import { CHART_TYPES, CHART_TYPE_LABELS, defaultChartType, type ChartType } from '#lib/utils/columnCharts';
 
 	let {
 		colId,

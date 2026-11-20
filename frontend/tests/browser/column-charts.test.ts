@@ -13,7 +13,7 @@ import { page as browserPage, userEvent } from 'vitest/browser';
 
 import ActivityTableHarness from './fixtures/ActivityTableHarness.svelte';
 import { page as routerPage } from '$app/state';
-import { CHART_SETTINGS_KEY } from '$lib/utils/columnChartSettings';
+import { CHART_SETTINGS_KEY } from '#lib/utils/columnChartSettings';
 
 vi.hoisted(() => vi.stubEnv('VITE_DEMO_MODE', 'true'));
 
@@ -63,7 +63,7 @@ function stubGraphql() {
 }
 
 // The mock's `url` is a plain value; the real `page` type is read-only, hence the cast.
-const setUrl = (url: URL) => ((routerPage as { url: URL }).url = url);
+const setUrl = (url: URL) => ((routerPage as unknown as { url: URL }).url = url);
 
 const rowCount = () => document.querySelectorAll('.ag-center-cols-container .ag-row').length;
 const takeHeader = () => document.querySelector('.ag-header-cell[col-id="boxOffice"]');

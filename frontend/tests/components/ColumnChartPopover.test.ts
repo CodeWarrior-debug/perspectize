@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import ColumnChartPopover from '$lib/components/charts/ColumnChartPopover.svelte';
-import { CHART_TYPES, CHART_TYPE_LABELS, defaultChartType } from '$lib/utils/columnCharts';
+import ColumnChartPopover from '#lib/components/charts/ColumnChartPopover.svelte';
+import { CHART_TYPES, CHART_TYPE_LABELS, defaultChartType } from '#lib/utils/columnCharts';
 
 const values = [1, 2, 2, 3, 4, 5, 6, 8, 9, 10, 15, 40];
 const format = (n: number) => `#${Math.round(n * 100) / 100}`;

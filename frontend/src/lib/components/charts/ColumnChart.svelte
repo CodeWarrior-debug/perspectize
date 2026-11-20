@@ -9,8 +9,8 @@
 		pieSlices,
 		coverage,
 		type TopBottom,
-	} from '$lib/utils/columnStats';
-	import { CHART_TYPE_LABELS, type ChartType } from '$lib/utils/columnCharts';
+	} from '#lib/utils/columnStats';
+	import { CHART_TYPE_LABELS, type ChartType } from '#lib/utils/columnCharts';
 
 	let {
 		type,

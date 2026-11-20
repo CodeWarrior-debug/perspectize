@@ -6,7 +6,7 @@ import {
 	DEFAULT_CHART_TYPE,
 	defaultChartType,
 	isChartEligible,
-} from '$lib/utils/columnCharts';
+} from '#lib/utils/columnCharts';
 
 describe('chart registry', () => {
 	it('has exactly 10 chart types, each with a label', () => {

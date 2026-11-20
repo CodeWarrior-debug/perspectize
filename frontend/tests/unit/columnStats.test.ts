@@ -9,7 +9,7 @@ import {
 	pieSlices,
 	coverage,
 	topBottom,
-} from '$lib/utils/columnStats';
+} from '#lib/utils/columnStats';
 
 describe('summarize', () => {
 	it('computes count, min, median, mean, max and sample std dev', () => {

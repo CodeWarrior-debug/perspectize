@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CHART_SETTINGS_KEY, isChartOn, loadChartFlags, setChartFlag } from '$lib/utils/columnChartSettings';
-import { COLUMN_LAYOUTS_KEY } from '$lib/utils/columnLayouts';
+import { CHART_SETTINGS_KEY, isChartOn, loadChartFlags, setChartFlag } from '#lib/utils/columnChartSettings';
+import { COLUMN_LAYOUTS_KEY } from '#lib/utils/columnLayouts';
 
 describe('columnChartSettings', () => {
 	beforeEach(() => {

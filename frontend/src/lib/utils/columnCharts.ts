@@ -1,4 +1,4 @@
-import { isMovieOnlyTypeFilter } from '$lib/utils/grid-config';
+import { isMovieOnlyTypeFilter } from '#lib/utils/grid-config';
 
 export const CHART_TYPES = [
 	'histogram',

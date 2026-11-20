@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import ColumnChart from '$lib/components/charts/ColumnChart.svelte';
-import { histogram, topBottom } from '$lib/utils/columnStats';
-import { CHART_TYPES, CHART_TYPE_LABELS, type ChartType } from '$lib/utils/columnCharts';
+import ColumnChart from '#lib/components/charts/ColumnChart.svelte';
+import { histogram, topBottom } from '#lib/utils/columnStats';
+import { CHART_TYPES, CHART_TYPE_LABELS, type ChartType } from '#lib/utils/columnCharts';
 
 const values = [1, 2, 2, 3, 4, 5, 6, 8, 9, 10, 15, 40];
 const format = (n: number) => `#${Math.round(n * 100) / 100}`;
