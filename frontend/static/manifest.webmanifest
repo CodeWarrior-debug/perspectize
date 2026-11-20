@@ -1,0 +1,20 @@
+{
+	"name": "Perspectize",
+	"short_name": "Perspectize",
+	"description": "Store, refine, and share perspectives on content",
+	"theme_color": "#1a365d",
+	"background_color": "#1a365d",
+	"display": "standalone",
+	"scope": "/",
+	"start_url": "/",
+	"icons": [
+		{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+		{ "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+		{
+			"src": "icons/icon-512-maskable.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

@@ -1,17 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-const { mockGetPlatform } = vi.hoisted(() => ({ mockGetPlatform: vi.fn() }));
-
-vi.mock('@capacitor/core', () => ({
-	Capacitor: { getPlatform: mockGetPlatform },
-}));
-
+import { describe, it, expect } from 'vitest';
 import { APP_VERSION, GIT_SHA, clientPlatform, clientInfoHeaders } from '#lib/buildInfo.js';
-
-beforeEach(() => {
-	mockGetPlatform.mockReset();
-	mockGetPlatform.mockReturnValue('web');
-});
 
 describe('build info constants', () => {
 	// Either value may be 'unknown' when the build/test run has no git checkout.
@@ -41,39 +29,16 @@ describe('build info constants', () => {
 });
 
 describe('clientPlatform', () => {
-	it("returns 'web' when Capacitor reports web", () => {
-		expect(clientPlatform()).toBe('web');
-	});
-
-	it("returns 'ios' when Capacitor reports ios", () => {
-		mockGetPlatform.mockReturnValue('ios');
-		expect(clientPlatform()).toBe('ios');
-	});
-
-	it("returns 'android' when Capacitor reports android", () => {
-		mockGetPlatform.mockReturnValue('android');
-		expect(clientPlatform()).toBe('android');
-	});
-
-	it("maps any other value to 'web'", () => {
-		mockGetPlatform.mockReturnValue('electron');
-		expect(clientPlatform()).toBe('web');
-	});
-
-	it("falls back to 'web' if Capacitor throws", () => {
-		mockGetPlatform.mockImplementation(() => {
-			throw new Error('no bridge');
-		});
+	it("always reports 'web' (the app ships only as a web build)", () => {
 		expect(clientPlatform()).toBe('web');
 	});
 });
 
 describe('clientInfoHeaders', () => {
 	it('returns exactly the X-Client-Version and X-Client-Platform headers', () => {
-		mockGetPlatform.mockReturnValue('ios');
 		expect(clientInfoHeaders()).toEqual({
 			'X-Client-Version': APP_VERSION,
-			'X-Client-Platform': 'ios',
+			'X-Client-Platform': 'web',
 		});
 	});
 });

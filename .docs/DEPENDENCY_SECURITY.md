@@ -242,9 +242,10 @@ Reading the failure through the GitHub MCP: `get_job_logs` with `return_content:
 Some advisories have no patched release yet. Document them rather than
 suppressing silently, and re-check when upstream ships a fix:
 
-- **`lodash ≤4.17.23`** (code injection via `_.template`) reaches us only
-  through `@vite-pwa/sveltekit > workbox-build`, a build-time dev dependency.
-  There is no `lodash@4.18.0`; the fix must come from upstream `workbox-build`.
+- **`lodash ≤4.17.23`** (code injection via `_.template`) reached us only
+  through `workbox-build`, a build-time dev dependency of the PWA plugin that
+  has since been removed. If it reappears in the tree, the fix must come from
+  upstream `workbox-build`: there is no `lodash@4.18.0`.
   Trivy suppresses dev deps, so this does not gate CI.
 
 ## Quick reference

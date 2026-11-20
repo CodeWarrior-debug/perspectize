@@ -15,7 +15,7 @@
 
 # Everything else — index.html, the SPA fallback _redirects resolves any
 # unmatched/missing path to (client routes, or a previous deploy's now-
-# deleted chunk path), the PWA service worker/manifest, static assets.
+# deleted chunk path), the web manifest, static assets.
 # `no-cache` (which still permits storage, it just forces revalidation
 # before reuse) is what actually matters here, not the max-age numbers: on
 # its own it always revalidates a path that only matches this rule, and if a

@@ -1,4 +1,3 @@
-import { Capacitor } from '@capacitor/core';
 import type { FrontendBuildInfo } from '#lib/utils/versionInfo.js';
 
 // typeof guard keeps this importable from configs that lack the `define` (e.g. the
@@ -19,17 +18,11 @@ export const APP_VERSION: string = info.tag || 'unknown';
 /** Short (7-char) git commit SHA of the build, or 'unknown' when built without .git. */
 export const GIT_SHA: string = info.commitShort || 'unknown';
 
-export type ClientPlatform = 'web' | 'ios' | 'android';
+export type ClientPlatform = 'web';
 
-/** Current runtime platform, bounded to 'web' | 'ios' | 'android'. */
+/** Runtime platform reported to the backend. The app ships only as a web build. */
 export function clientPlatform(): ClientPlatform {
-	let platform: string;
-	try {
-		platform = Capacitor.getPlatform();
-	} catch {
-		return 'web';
-	}
-	return platform === 'ios' || platform === 'android' ? platform : 'web';
+	return 'web';
 }
 
 /** Headers the backend reads to attribute requests to a client version/platform. */

@@ -15,10 +15,6 @@ vi.mock('#lib/queries/client.js', () => ({
 	getAuthToken: mockGetAuthToken,
 }));
 
-vi.mock('@capacitor/core', () => ({
-	Capacitor: { getPlatform: () => 'ios' },
-}));
-
 // browser flag is already mocked true in tests/setup.ts
 
 let capturedOptions: any;
@@ -63,7 +59,7 @@ describe('getWsClient', () => {
 		const { APP_VERSION } = await import('#lib/buildInfo.js');
 		mod.getWsClient();
 		const params = await capturedOptions.connectionParams();
-		expect(params).toEqual({ authToken: 'jwt-abc', clientVersion: APP_VERSION, clientPlatform: 'ios' });
+		expect(params).toEqual({ authToken: 'jwt-abc', clientVersion: APP_VERSION, clientPlatform: 'web' });
 		expect(params.clientVersion.length).toBeGreaterThan(0);
 	});
 
@@ -72,7 +68,7 @@ describe('getWsClient', () => {
 		const mod = await import('#lib/messaging/ws-client.svelte.js');
 		mod.getWsClient();
 		expect(await capturedOptions.connectionParams()).toEqual(
-			expect.objectContaining({ authToken: '', clientPlatform: 'ios' }),
+			expect.objectContaining({ authToken: '', clientPlatform: 'web' }),
 		);
 	});
 

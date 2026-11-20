@@ -677,7 +677,7 @@
       "id": 9,
       "type": "timeseries",
       "title": "Requests by client version",
-      "description": "app.client.requests by client.version (X-Client-Version, bounded to 50 values then \"other\"). Old cached PWA/Capacitor builds show up here as version skew.",
+      "description": "app.client.requests by client.version (X-Client-Version, bounded to 50 values then \"other\"). Old cached PWA builds show up here as version skew.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"

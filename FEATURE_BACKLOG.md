@@ -653,3 +653,11 @@ Paste a public Facebook video or Reel link; it plays inline behind a click-to-lo
 **Spec:** [docs/superpowers/specs/2026-11-01-food-item-content-type-design.md](docs/superpowers/specs/2026-11-01-food-item-content-type-design.md) (proposal, unscheduled, written without superpowers). **Intent:** [project-management/intents/food-item-content-type.md](project-management/intents/food-item-content-type.md) (draft).
 
 One `FOOD_ITEM` type for packaged foods, generic foods and beverages, added by barcode, USDA/Open Food Facts URL or Discover search. Nutrition comes from USDA FoodData Central (CC0, free key, 1,000 req/h) with Open Food Facts (ODbL, no key, 15 reads/min per IP) for images, Nutri-Score, NOVA and allergens. It is normalised to per-serving and per-100 g/ml so items sort side by side. No migration. Nine decisions to confirm are in its §14.
+
+---
+
+## Native Shell and Service Worker (Deferred)
+
+The Capacitor native shell (`frontend/ios`, `frontend/android`) and the PWA service worker were removed in chore/remove-capacitor-pwa (#704). The app keeps a static web manifest so Add to Home Screen still works, but nothing is precached or registered. Re-adding a native shell or a service worker is deferred until a mobile release is scheduled; re-scope it then against what the app needs (push, deep links, auth in a WebView, offline). History is recoverable from git.
+
+**Priority:** Deferred until a mobile release is scheduled.
