@@ -11,6 +11,7 @@
 <script lang="ts">
 	import { Input, Popover, PopoverContent, PopoverTrigger, buttonVariants } from '$lib/components/shadcn';
 	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
+	import TypePills from '$lib/components/TypePills.svelte';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import { page } from '$app/state';
@@ -34,6 +35,13 @@
 		if (myUsername === null) return;
 		const { user: _previous, ...rest } = gridParams.filters;
 		const filters = mineActive ? rest : { ...rest, user: myUsername };
+		const search = serializeGridParams({ ...gridParams, filters, page: 1 });
+		goto(search ? `?${search}` : LIBRARY_PATH, { replaceState: true, keepFocus: true, noScroll: true });
+	}
+
+	// Switching to one type replaces the Type filter only; other filters stay as they are.
+	function selectType(value: string) {
+		const filters = { ...gridParams.filters, type: value };
 		const search = serializeGridParams({ ...gridParams, filters, page: 1 });
 		goto(search ? `?${search}` : LIBRARY_PATH, { replaceState: true, keepFocus: true, noScroll: true });
 	}
@@ -90,9 +98,7 @@
 		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 			<div>
 				<h1 class="text-2xl font-semibold text-foreground">Library</h1>
-				<p class="text-sm text-muted-foreground mt-1">
-					Everything Perspectize members have added, and how they've measured it.
-				</p>
+				<p class="text-sm text-muted-foreground mt-1">Everything Perspectize members have added.</p>
 			</div>
 			<!-- FilterChips (inside the grid card) moves itself here on desktop to save a row of height. -->
 			<div id="activity-chips-slot" class="hidden md:flex flex-1 min-w-0 items-center"></div>
@@ -148,6 +154,8 @@
 			</div>
 		</div>
 	</div>
+
+	<TypePills filters={gridParams.filters} onSelect={selectType} />
 
 	<!-- ColumnRelevanceCallout (rendered by ActivityTable) moves itself here: above the card's top-right
 	     corner, outside the table frame. Collapses to nothing when empty. -->

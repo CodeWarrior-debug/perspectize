@@ -223,5 +223,3 @@ func medianInt(v []int64) int64 {
 	sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
 	return s[len(s)/2]
 }
-
-func ms(d time.Duration) float64 { return float64(d.Microseconds()) / 1000 }

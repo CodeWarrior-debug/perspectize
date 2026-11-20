@@ -401,6 +401,21 @@ func (r *GormImportJobRepository) RecordOutcome(ctx context.Context, itemID int,
 	return nil
 }
 
+// FailQueuedItems fails the rows of jobID among ids that are still queued and
+// returns how many it changed.
+func (r *GormImportJobRepository) FailQueuedItems(ctx context.Context, jobID int, ids []int, detail string) (int, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	result := r.db.WithContext(ctx).Model(&ImportItemModel{}).
+		Where("job_id = ? AND id = ANY(CAST(? AS bigint[])) AND import_status = 'queued'", jobID, intsToArray(ids)).
+		Updates(map[string]any{"import_status": "failed", "import_error": detail})
+	if result.Error != nil {
+		return 0, fmt.Errorf("failed to fail queued import items: %w", result.Error)
+	}
+	return int(result.RowsAffected), nil
+}
+
 // FailInterrupted fails sources still listing and rows still queued.
 func (r *GormImportJobRepository) FailInterrupted(ctx context.Context, detail string) (int, int, error) {
 	src := r.db.WithContext(ctx).Model(&ImportSourceModel{}).

@@ -681,6 +681,24 @@ describe('ActivityDetailsModal', () => {
 			expect(onAddToPlan).toHaveBeenCalledWith(content);
 		});
 
+		it.each(['YOUTUBE_VIDEO', 'MOVIE', 'BOOK', 'WEB_PAGE', 'BIBLE_PASSAGE', 'CLAIM'])(
+			'shows Add perspective for %s and passes the content to onAddPerspective',
+			async (contentType) => {
+				const onAddPerspective = vi.fn();
+				const row = { ...content, contentType };
+				render(ActivityDetailsModal, { props: { content: row, open: true, onClose: vi.fn(), onAddPerspective } });
+
+				await fireEvent.click(screen.getByRole('button', { name: 'Add perspective' }));
+				expect(onAddPerspective).toHaveBeenCalledTimes(1);
+				expect(onAddPerspective).toHaveBeenCalledWith(row);
+			},
+		);
+
+		it('hides Add perspective when no handler is provided', () => {
+			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn() } });
+			expect(screen.queryByRole('button', { name: 'Add perspective' })).toBeNull();
+		});
+
 		it('hides Add to plan for a signed-out user', () => {
 			render(ActivityDetailsModal, { props: { content, open: true, onClose: vi.fn(), onAddToPlan: vi.fn() } });
 			expect(screen.queryByRole('button', { name: 'Add to plan' })).toBeNull();

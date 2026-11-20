@@ -16,9 +16,9 @@ import (
 	portservices "github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
 )
 
-// importWorkers is how many rows are imported at once. Each import is one
-// source API call plus a few statements, so a small pool keeps quota use and
-// DB load steady.
+// importWorkers is how many rows one batch imports at once when no row limiter
+// is set. Each import is one source API call plus a few statements, so a small
+// pool keeps quota use and DB load steady.
 const importWorkers = 4
 
 // listingTimeout bounds one source's listing (a 5,000-video channel takes a
@@ -31,11 +31,31 @@ const importTimeout = 30 * time.Minute
 // interruptedDetail is what a row or source shows after a restart cut it short.
 const interruptedDetail = "Interrupted by a server restart. Select it again to retry."
 
+// cutShortDetail is what a row shows when its batch stopped before the row
+// finished: the batch ran out of time or the server stopped mid-import.
+const cutShortDetail = "The import was cut short. Select it again to retry."
+
 // importContentCreator is the slice of ContentService the import workers use.
 type importContentCreator interface {
 	CreateFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error)
 	CreateFromMovie(ctx context.Context, rawURL string, userID int) (*domain.Content, error)
 }
+
+// slotLimiter hands out a fixed number of slots to concurrent work.
+// *limiter.Limiter satisfies it. Capacity is on the interface because a batch
+// starts no more workers than there are slots. Acquire returns an error only
+// when its context is done.
+type slotLimiter interface {
+	Acquire(ctx context.Context) (release func(), err error)
+	Capacity() int
+}
+
+// noLimit is the default row limiter: it never makes a row wait, and its
+// capacity is the per-batch worker count.
+type noLimit struct{ capacity int }
+
+func (n noLimit) Acquire(context.Context) (func(), error) { return func() {}, nil }
+func (n noLimit) Capacity() int                           { return n.capacity }
 
 // ImportService implements portservices.ImportService.
 type ImportService struct {
@@ -46,7 +66,12 @@ type ImportService struct {
 	// a shutdown cancels in-flight listing and imports.
 	bg context.Context
 	// spawn starts background work; tests replace it to run work inline.
-	spawn    func(func())
+	spawn func(func())
+	// rows is the slot each row holds while it imports, shared by every batch.
+	rows slotLimiter
+	// sources is the slot each source holds while it lists, shared by every import.
+	sources slotLimiter
+	// workers is how many goroutines a batch may start: the row limiter's capacity.
 	workers  int
 	now      func() time.Time
 	progress *importProgressTracker
@@ -54,6 +79,8 @@ type ImportService struct {
 	listing *listingTracker
 	// progressInterval is how often live progress is pushed (tests shorten it).
 	progressInterval time.Duration
+	// batchTimeout bounds one importItems batch (tests shorten it).
+	batchTimeout time.Duration
 }
 
 var _ portservices.ImportService = (*ImportService)(nil)
@@ -76,9 +103,31 @@ func WithImportProgressInterval(d time.Duration) ImportServiceOption {
 	return func(s *ImportService) { s.progressInterval = d }
 }
 
+// WithImportBatchTimeout sets how long one importItems batch may run. Rows the
+// batch has not finished by then are failed so they can be queued again.
+func WithImportBatchTimeout(d time.Duration) ImportServiceOption {
+	return func(s *ImportService) { s.batchTimeout = d }
+}
+
 // WithImportClock replaces the clock used for fetchedAt.
 func WithImportClock(now func() time.Time) ImportServiceOption {
 	return func(s *ImportService) { s.now = now }
+}
+
+// WithImportRowLimiter caps how many rows import at once across every batch,
+// not per batch: a row waits queued for a slot, and a batch starts no more
+// workers than the limiter has slots. Without it each batch imports
+// importWorkers rows at once and batches do not limit each other.
+func WithImportRowLimiter(l slotLimiter) ImportServiceOption {
+	return func(s *ImportService) { s.rows = l }
+}
+
+// WithImportListingLimiter caps how many sources list at once across every
+// import: a source waits for a slot, shown as listing while it waits, and its
+// listing timeout starts once it has one. Without it every source lists at
+// once.
+func WithImportListingLimiter(l slotLimiter) ImportServiceOption {
+	return func(s *ImportService) { s.sources = l }
 }
 
 // NewImportService builds the import service. listers holds one lister per
@@ -96,14 +145,18 @@ func NewImportService(
 		content: content,
 		bg:      context.Background(),
 		spawn:   func(f func()) { go f() },
-		workers: importWorkers,
+		rows:    noLimit{capacity: importWorkers},
 		now:     time.Now,
 
+		sources: noLimit{},
+
 		progressInterval: defaultProgressInterval,
+		batchTimeout:     importTimeout,
 	}
 	for _, opt := range opts {
 		opt(s)
 	}
+	s.workers = max(1, s.rows.Capacity())
 	s.progress = newImportProgressTracker(s.progressInterval, s.now)
 	s.listing = newListingTracker(s.progressInterval, s.now)
 	return s
@@ -533,13 +586,43 @@ func (s *ImportService) resolveForListing(ctx context.Context, src *domain.Impor
 	return resolvedSource{lister: lister, resolved: *r}, true
 }
 
-// listSource is the listing pipeline for one source: the lister goroutine
+// listSource lists one source and saves how it ended. It holds a listing slot
+// for all of that. The source counts as listing while it waits for the slot, so
+// the sheet has nothing new to show; a shutdown while it waits ends it as
+// failed, the same as one cut short mid-listing.
+func (s *ImportService) listSource(src *domain.ImportSource, rs resolvedSource) {
+	s.listing.begin(src.JobID, src.ID)
+
+	count := 0
+	release, err := s.sources.Acquire(s.bg)
+	if err == nil {
+		defer release()
+		count, err = s.listAndStage(src, rs)
+	}
+	done := s.now().UTC()
+	final := repositories.ImportSourceUpdate{Status: domain.ImportSourceStatusReady, ItemCount: &count, FetchedAt: &done}
+	if err != nil {
+		slog.Error("import listing failed", "sourceID", src.ID, "jobID", src.JobID, "staged", count, "error", err)
+		detail := listingFailureDetail(err, count)
+		final.Status, final.StatusDetail = domain.ImportSourceStatusFailed, &detail
+	}
+	// The listing context may be spent (timeout, cancel); the final write gets its own.
+	writeCtx, writeCancel := context.WithTimeout(context.WithoutCancel(s.bg), 10*time.Second)
+	defer writeCancel()
+	if werr := s.repo.UpdateSource(writeCtx, src.ID, final); werr != nil {
+		slog.Error("import listing result not saved", "sourceID", src.ID, "error", werr)
+	}
+	s.listing.finish(src.JobID, src.ID, final.Status)
+}
+
+// listAndStage is the listing pipeline for one source: the lister goroutine
 // sends batches down a channel and this goroutine stages each one as it
 // arrives, so a slow API page and a slow insert overlap instead of adding up.
-func (s *ImportService) listSource(src *domain.ImportSource, rs resolvedSource) {
+// It returns how many rows were staged and why listing stopped, if it did. The
+// listing timeout starts here, once the source has its slot.
+func (s *ImportService) listAndStage(src *domain.ImportSource, rs resolvedSource) (int, error) {
 	ctx, cancel := context.WithTimeout(s.bg, listingTimeout)
 	defer cancel()
-	s.listing.begin(src.JobID, src.ID)
 
 	batches := make(chan []*domain.ImportItemWithDetails, 2)
 	listErr := make(chan error, 1)
@@ -581,20 +664,7 @@ func (s *ImportService) listSource(src *domain.ImportSource, rs resolvedSource) 
 	if stageErr != nil {
 		err = stageErr
 	}
-	done := s.now().UTC()
-	final := repositories.ImportSourceUpdate{Status: domain.ImportSourceStatusReady, ItemCount: &count, FetchedAt: &done}
-	if err != nil {
-		slog.Error("import listing failed", "sourceID", src.ID, "jobID", src.JobID, "staged", count, "error", err)
-		detail := listingFailureDetail(err, count)
-		final.Status, final.StatusDetail = domain.ImportSourceStatusFailed, &detail
-	}
-	// The listing context may be spent (timeout, cancel); the final write gets its own.
-	writeCtx, writeCancel := context.WithTimeout(context.WithoutCancel(s.bg), 10*time.Second)
-	defer writeCancel()
-	if werr := s.repo.UpdateSource(writeCtx, src.ID, final); werr != nil {
-		slog.Error("import listing result not saved", "sourceID", src.ID, "error", werr)
-	}
-	s.listing.finish(src.JobID, src.ID, final.Status)
+	return count, err
 }
 
 // listingFailureDetail is the user-facing reason a listing stopped.
@@ -681,24 +751,45 @@ func (s *ImportService) ImportItems(ctx context.Context, actor *domain.Authentic
 	return result, nil
 }
 
+// workersFor is how many workers a batch of rows needs: no more than the row
+// limiter's capacity (extra ones would only wait) and no more than the rows.
+func workersFor(capacity, rows int) int {
+	return min(capacity, rows)
+}
+
 // runImports is the import pipeline: a channel of queued rows feeding a
-// fixed pool of workers, each creating content through the normal
-// single-item path (so validation, dedupe and metadata are identical to
-// adding the URL by hand).
+// pool of workers, each creating content through the normal single-item path
+// (so validation, dedupe and metadata are identical to adding the URL by
+// hand).
+//
+// A worker holds a row limiter slot only while it imports a row, so the cap is
+// global across batches. A row still waiting for a slot when the batch ends,
+// like a row never sent to a worker, is left queued, with one difference
+// between the two ways a batch ends: a shutdown leaves it for RecoverInterrupted
+// at the next start, while a timeout fails it at once (failUnreached), because
+// the server keeps running and the user must be able to queue it again.
 //
 // Progress is a fan-in: every worker sends its row's outcome down one
 // outcomes channel, and a single collector counts them into the progress
 // tracker, which pushes to subscribers at most twice a second.
 func (s *ImportService) runImports(jobID, actorID int, items []*domain.ImportItem) {
-	ctx, cancel := context.WithTimeout(s.bg, importTimeout)
+	ctx, cancel := context.WithTimeout(s.bg, s.batchTimeout)
 	defer cancel()
 
-	outcomes := make(chan domain.ImportItemStatus, s.workers)
+	workers := workersFor(s.workers, len(items))
+	outcomes := make(chan itemOutcome, workers)
 	collected := make(chan struct{})
+	// What the collector saw; both are read only once collected is closed.
+	counted := 0                                // outcomes counted into the progress
+	saved := make(map[int]struct{}, len(items)) // rows whose outcome the database holds
 	go func() {
 		defer close(collected)
-		for st := range outcomes {
-			s.progress.record(jobID, st)
+		for out := range outcomes {
+			s.progress.record(jobID, out.status)
+			counted++
+			if out.saved {
+				saved[out.itemID] = struct{}{}
+			}
 		}
 	}()
 	defer func() {
@@ -708,13 +799,19 @@ func (s *ImportService) runImports(jobID, actorID int, items []*domain.ImportIte
 
 	queue := make(chan *domain.ImportItem)
 	var wg sync.WaitGroup
-	for range s.workers {
+	for range workers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for it := range queue {
-				if st, ok := s.importOne(ctx, actorID, it); ok {
-					outcomes <- st
+				release, err := s.rows.Acquire(ctx)
+				if err != nil {
+					return // ctx ended while waiting: the row stays queued, nothing is recorded
+				}
+				out, ok := s.importOne(ctx, actorID, it)
+				release() // before the send, so a slow collector never holds a slot
+				if ok {
+					outcomes <- out
 				}
 			}
 		}()
@@ -728,13 +825,60 @@ feed:
 		select {
 		case queue <- it:
 		case <-ctx.Done():
-			// Unsent rows stay queued; RecoverInterrupted fails them at the next start.
-			break feed
+			break feed // unsent rows are dealt with below, once the workers are done
 		}
 	}
 	close(queue)
 	wg.Wait()
 	close(outcomes)
+	<-collected
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		s.failUnreached(ctx, jobID, items, saved, len(items)-counted)
+	}
+}
+
+// failUnreached fails the rows of a batch that ran out of time before they
+// finished, and counts each as failed in the progress. It names only rows whose
+// outcome this batch did not save: a row it did finish may since have been
+// queued again by another batch, which owns it now. Of the rows named, only
+// those still queued change. uncounted is how many rows the progress count has
+// not reached; it caps the failures counted, so an outcome that could not be
+// saved is not counted twice.
+//
+// The batch's progress stays running until this returns, which can take up to
+// the write's 10 seconds. If the server stops meanwhile, the rows stay queued
+// and RecoverInterrupted fails them at the next start.
+func (s *ImportService) failUnreached(ctx context.Context, jobID int, items []*domain.ImportItem, saved map[int]struct{}, uncounted int) {
+	ids := make([]int, 0, len(items)-len(saved))
+	for _, it := range items {
+		if _, done := saved[it.ID]; !done {
+			ids = append(ids, it.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	// ctx has run out, so the write gets its own time.
+	writeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	failed, err := s.repo.FailQueuedItems(writeCtx, jobID, ids, cutShortDetail)
+	if err != nil {
+		slog.Error("import rows not failed after the batch ran out of time", "jobID", jobID, "error", err)
+		return
+	}
+	for range min(failed, uncounted) {
+		s.progress.record(jobID, domain.ImportItemStatusFailed)
+	}
+	if failed > 0 {
+		slog.Warn("import batch ran out of time", "jobID", jobID, "rows", len(items), "failedUnfinished", failed)
+	}
+}
+
+// itemOutcome is how importing one row ended.
+type itemOutcome struct {
+	itemID int
+	status domain.ImportItemStatus
+	saved  bool // the database holds this outcome; false when the write failed
 }
 
 // importJobIDKey is the context key carrying the import a content create belongs to.
@@ -753,10 +897,10 @@ func importJobIDFrom(ctx context.Context) (int, bool) {
 }
 
 // importOne imports one row and records its outcome; ok is false when it
-// was left queued because the import is shutting down.
-func (s *ImportService) importOne(ctx context.Context, actorID int, it *domain.ImportItem) (domain.ImportItemStatus, bool) {
+// was left queued because the import is shutting down or out of time.
+func (s *ImportService) importOne(ctx context.Context, actorID int, it *domain.ImportItem) (out itemOutcome, ok bool) {
 	if ctx.Err() != nil {
-		return "", false // left queued; RecoverInterrupted fails it at the next start
+		return itemOutcome{}, false // left queued; a shutdown leaves it for RecoverInterrupted, a timeout for failUnreached
 	}
 	createCtx := WithImportJobID(ctx, it.JobID)
 	var (
@@ -789,10 +933,11 @@ func (s *ImportService) importOne(ctx context.Context, actorID int, it *domain.I
 	}
 	writeCtx, writeCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer writeCancel()
-	if werr := s.repo.RecordOutcome(writeCtx, it.ID, status, msg, contentID); werr != nil {
+	werr := s.repo.RecordOutcome(writeCtx, it.ID, status, msg, contentID)
+	if werr != nil {
 		slog.Error("import outcome not saved", "itemID", it.ID, "error", werr)
 	}
-	return status, true
+	return itemOutcome{itemID: it.ID, status: status, saved: werr == nil}, true
 }
 
 // SubscribeImportProgress streams an import's live progress: the current
@@ -839,7 +984,7 @@ func importFailureDetail(err error) string {
 	case errors.Is(err, domain.ErrNotFound):
 		return "The source no longer has this item."
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
-		return "The import was cut short. Select it again to retry."
+		return cutShortDetail
 	default:
 		return "The source API refused the request. Try again later."
 	}

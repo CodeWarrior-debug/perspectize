@@ -23,9 +23,12 @@ export function useResponsiveTier(): { readonly current: ResponsiveTier } {
 	};
 }
 
+/** The card-mode media query: below 860px the grid is replaced by stacked cards. */
+export const CARD_MODE_QUERY = `max-width: ${GRID_BREAKPOINTS.cardMax}px`;
+
 /** Reactive card-list flag: below 860px the grid is replaced by stacked cards. */
 export function useCardMode(): { readonly current: boolean } {
-	const card = new MediaQuery(`max-width: ${GRID_BREAKPOINTS.cardMax}px`, false);
+	const card = new MediaQuery(CARD_MODE_QUERY, false);
 	return {
 		get current() {
 			return card.current;

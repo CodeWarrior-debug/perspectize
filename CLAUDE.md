@@ -25,7 +25,7 @@
 
 **`/revise-claude-md` must not block the PR:** push and open the PR first, without asking, then run it while CI runs for the first time. A CRITICAL learning is committed on the PR branch; anything else goes in the PR body's Session Learnings for the monthly routine. What counts as CRITICAL: [PR_WORKFLOW.md → Session learnings](.docs/PR_WORKFLOW.md#session-learnings). The human's review at merge is the approval.
 
-**PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, the `new-content-type` label (specs and first implementations of a new content type), the migration labels (synced automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges (stacked PRs merge differently: PR_WORKFLOW.md → Stacked PRs).
+**PRs, issues, labels, merging:** follow [.docs/PR_WORKFLOW.md](.docs/PR_WORKFLOW.md) — `gh` commands, per-type PR templates (read the template file yourself; `gh api` skips the picker), QA Acceptance Criteria, the `needs-demo-video` / `ready for review` / `needs-local-session-takeover` labels, the `new-content-type` label (specs and first implementations of a new content type), the `complexity:` / `risk:` issue labels (low/medium/high; how much owner supervision the work needs), the migration labels (synced automatically on open PRs; `migrations-applied` is set by hand after rollout), and `--squash --delete-branch --admin` merges (stacked PRs merge differently: PR_WORKFLOW.md → Stacked PRs).
 
 **`@claude` GitHub workflow (`.github/workflows/claude.yml`):** comment-triggered runs use the file from `main`, so workflow edits take effect only once merged (ship them as their own `chore` PR). Deps are installed in workflow steps before Claude starts; `--allowed-tools` in `claude_args` is a narrow allowlist: never add `pnpm install`/`curl`/`gh api`. Claude starts at the repo root, so allowlisted commands use `pnpm --dir frontend run ...` / `go -C backend ...`. Never give it `DATABASE_URL` (DB tests skip without it).
 
@@ -88,6 +88,8 @@ Unreadable `.env*` files are expected, not a broken setup. Evidence capture: [.d
 - [Demo Mode](.docs/DEMO_MODE.md) — Docker demo stack, Playwright tours (`make demo-test`, `make demo-record`)
 - [Observability](.docs/OBSERVABILITY.md) — OTel/Faro → Grafana runbook (`make obs-up` / `make obs-smoke`)
 - [Query Budget](.docs/QUERY_BUDGET.md) — query-count tests, dataloaders, TanStack caching/eviction
+- [Capacity Testing](.docs/CAPACITY_TESTING.md) — picking worker/concurrency/batch/pool limits: measure max, ship half as the initial default
+- [Capacity Register](.docs/CAPACITY_REGISTER.md) — every limit: code default vs what's known about capacity (deployed figures are kept out of git)
 - [Project Management](project-management/README.md) — intent → spec → plan → PRs; intents in `project-management/intents/` (copy `_template.md`), one intent → many PRs. Link to specs/plans/PRs; don't move them.
 - [PR Workflow](.docs/PR_WORKFLOW.md) · [Planning](.docs/PLANNING.md) · [Hooks](.docs/HOOKS.md) · [Session Environment](.docs/SESSION_ENVIRONMENT.md)
 - [claude-md-audit eval](evals/claude-md-audit/README.md) — scores the `claude-md-improver` skill; rerun after changing CLAUDE.md tooling

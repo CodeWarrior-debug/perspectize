@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain"
 	"github.com/CodeWarrior-debug/perspectize/backend/internal/core/ports/services"
+	"github.com/CodeWarrior-debug/perspectize/backend/pkg/limiter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -205,4 +207,187 @@ func TestPersonLister_ListBatches(t *testing.T) {
 		return nil
 	}))
 	assert.Equal(t, []int{20, 20, 5}, sizes)
+}
+
+// filmographyHandler serves n directed films for person 525 and calls onMovie
+// for every /movie/{id} request while that request is still open.
+func filmographyHandler(n int, onMovie func(r *http.Request)) http.HandlerFunc {
+	crew := make([]string, n)
+	for i := range crew {
+		crew[i] = fmt.Sprintf(`{"id":%d,"title":"Film %02d","release_date":"2000-01-%02d","job":"Director"}`, 3000+i, i, i%28+1)
+	}
+	credits := fmt.Sprintf(`{"cast":[],"crew":[%s]}`, strings.Join(crew, ","))
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/movie_credits"):
+			_, _ = w.Write([]byte(credits))
+		case strings.HasPrefix(r.URL.Path, "/movie/"):
+			onMovie(r)
+			_, _ = w.Write([]byte(`{"runtime":90}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}
+}
+
+// concurrencyGauge counts how many requests are open at once and the most it has seen.
+type concurrencyGauge struct {
+	current, peak, total atomic.Int32
+}
+
+func (g *concurrencyGauge) enter() {
+	g.total.Add(1)
+	n := g.current.Add(1)
+	for {
+		p := g.peak.Load()
+		if n <= p || g.peak.CompareAndSwap(p, n) {
+			return
+		}
+	}
+}
+
+func (g *concurrencyGauge) exit() { g.current.Add(-1) }
+
+// failingLimiter is an EnrichLimiter that never grants a slot.
+type failingLimiter struct {
+	err   error
+	calls atomic.Int32
+}
+
+func (f *failingLimiter) Acquire(context.Context) (func(), error) {
+	f.calls.Add(1)
+	return nil, f.err
+}
+
+func listAll(l *PersonLister) error {
+	return l.List(context.Background(), services.ResolvedImportSource{ID: "525"}, nil, func([]*domain.ImportItemWithDetails) error { return nil })
+}
+
+func TestPersonLister_SharedEnrichLimiter_CapsAcrossListings(t *testing.T) {
+	const filmsPerListing = 6
+	var g concurrencyGauge
+	c1 := newTestClient(t, filmographyHandler(filmsPerListing, func(*http.Request) {
+		g.enter()
+		defer g.exit()
+		// Hold each request so overlapping requests would be visible without the limiter.
+		time.Sleep(10 * time.Millisecond)
+	}))
+	c2 := NewClient(testToken)
+	c2.baseURL = c1.baseURL
+
+	shared := limiter.New("tmdb_enrich_test", 1)
+	listers := []*PersonLister{
+		NewPersonLister(c1, WithEnrichLimiter(shared)),
+		NewPersonLister(c2, WithEnrichLimiter(shared)),
+	}
+	errs := make([]error, len(listers))
+	var wg sync.WaitGroup
+	for i, l := range listers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs[i] = listAll(l)
+		}()
+	}
+	wg.Wait()
+
+	for _, err := range errs {
+		require.NoError(t, err)
+	}
+	assert.EqualValues(t, 2*filmsPerListing, g.total.Load(), "every film of both listings was looked up")
+	assert.EqualValues(t, 1, g.peak.Load(), "one slot shared by both listings: never two /movie requests at once")
+	assert.Equal(t, limiter.Stats{}, shared.Stats(), "every slot was released")
+}
+
+func TestPersonLister_EnrichLimiterCancelledLeavesExtrasEmpty(t *testing.T) {
+	var movieCalls atomic.Int32
+	c := newTestClient(t, fakeTMDB(t, &movieCalls))
+	c.token = "test-token"
+	denied := &failingLimiter{err: context.Canceled}
+	l := NewPersonLister(c, WithEnrichLimiter(denied))
+
+	director := domain.ImportPersonRoleDirector
+	items := collect(t, l, &director)
+
+	require.Len(t, items, 3, "the batch still returns every film")
+	assert.EqualValues(t, 3, denied.calls.Load(), "each film asked the limiter for a slot")
+	assert.Zero(t, movieCalls.Load(), "no slot, no /movie lookup")
+	for _, it := range items {
+		assert.Nil(t, it.Item.Facts.DurationSeconds, it.Item.Title)
+		assert.Empty(t, it.Item.Facts.Genres, it.Item.Title)
+		assert.Empty(t, it.Item.Facts.TopCast, it.Item.Title)
+		assert.Nil(t, it.Item.Facts.Budget, it.Item.Title)
+	}
+	// What the credits list already had is still there.
+	assert.Equal(t, "Oppenheimer", items[0].Item.Title)
+	assert.Equal(t, 9000, *items[0].Item.Facts.RatingCount)
+}
+
+// gatedListings starts listings concurrent List calls on one lister that has no
+// injected limiter, each over 12 films, and holds every /movie request open.
+// It returns the gauge and a function that opens the gate and waits for the
+// listings to finish.
+func gatedListings(t *testing.T, listings int) (g *concurrencyGauge, finish func()) {
+	t.Helper()
+	g = &concurrencyGauge{}
+	gate := make(chan struct{})
+	c := newTestClient(t, filmographyHandler(12, func(r *http.Request) {
+		g.enter()
+		defer g.exit()
+		select {
+		case <-gate:
+		case <-r.Context().Done():
+		}
+	}))
+	var once sync.Once
+	openGate := func() { once.Do(func() { close(gate) }) }
+
+	ctx, cancel := context.WithCancel(context.Background())
+	// Registered after the server's cleanup, so these run first and a failed
+	// assertion cannot leave requests parked and hang the server's Close.
+	t.Cleanup(cancel)
+	t.Cleanup(openGate)
+
+	l := NewPersonLister(c)
+	errs := make([]error, listings)
+	var wg sync.WaitGroup
+	for i := range errs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs[i] = l.List(ctx, services.ResolvedImportSource{ID: "525"}, nil, func([]*domain.ImportItemWithDetails) error { return nil })
+		}()
+	}
+	return g, func() {
+		openGate()
+		wg.Wait()
+		for _, err := range errs {
+			require.NoError(t, err)
+		}
+		assert.EqualValues(t, listings*12, g.total.Load(), "every film was still looked up once the gate opened")
+	}
+}
+
+// The two tests below pin the figure 4 as a literal on purpose: changing
+// PersonEnrichConcurrency should be a decision that touches them.
+
+func TestPersonLister_DefaultEnrichCapIsFourPerCall(t *testing.T) {
+	const tick = 5 * time.Millisecond
+	g, finish := gatedListings(t, 1)
+
+	require.Eventually(t, func() bool { return g.current.Load() == 4 }, 5*time.Second, tick,
+		"the call fills its four slots")
+	assert.Never(t, func() bool { return g.peak.Load() > 4 }, 300*time.Millisecond, tick,
+		"a fifth lookup must wait: 12 films, 4 at a time")
+	finish()
+}
+
+func TestPersonLister_DefaultEnrichCapIsPerCallNotPerLister(t *testing.T) {
+	const tick = 5 * time.Millisecond
+	g, finish := gatedListings(t, 2)
+
+	require.Eventually(t, func() bool { return g.current.Load() == 8 }, 5*time.Second, tick,
+		"without an injected limiter each call has four slots of its own")
+	assert.Never(t, func() bool { return g.peak.Load() > 8 }, 300*time.Millisecond, tick)
+	finish()
 }

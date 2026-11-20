@@ -287,18 +287,7 @@ func (r *subscriptionResolver) ImportProgress(ctx context.Context, jobID string)
 	if err != nil {
 		return nil, importError(err)
 	}
-	out := make(chan *model.ImportProgress, 1)
-	go func() {
-		defer close(out)
-		for p := range in {
-			select {
-			case out <- importProgressToModel(p):
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return out, nil
+	return forward(ctx, in, importProgressToModel), nil
 }
 
 // ImportListingProgress is the resolver for the importListingProgress subscription.
@@ -321,16 +310,5 @@ func (r *subscriptionResolver) ImportListingProgress(ctx context.Context, jobID 
 	if err != nil {
 		return nil, importError(err)
 	}
-	out := make(chan *model.ImportListingProgress, 1)
-	go func() {
-		defer close(out)
-		for p := range in {
-			select {
-			case out <- importListingProgressToModel(p):
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return out, nil
+	return forward(ctx, in, importListingProgressToModel), nil
 }
