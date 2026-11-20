@@ -198,6 +198,7 @@ describe('column-picker registry', () => {
 			'myImportance',
 			'myAgreement',
 			'genre',
+			'listen',
 			'rated',
 			'cast',
 			'duration',

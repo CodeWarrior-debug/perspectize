@@ -10,6 +10,7 @@
 	import { useMe } from '#lib/queries/users/useMe.svelte.js';
 	import { replayCoach } from '#lib/onboarding/coachGate.svelte.js';
 	import { CONTRIBUTE_TAB_ENABLED } from '#lib/contribute/config.js';
+	import PlaybackSettingsRow from '#lib/components/PlaybackSettingsRow.svelte';
 
 	let {
 		open = $bindable(false),
@@ -97,6 +98,9 @@
 							<Button type="button" variant="outline" onclick={restartOnboarding} disabled={!meCtx.me}>
 								Restart onboarding
 							</Button>
+						</div>
+						<div class="rounded-md border border-border p-3">
+							<PlaybackSettingsRow />
 						</div>
 					</div>
 				{:else if activeSection === 'theme'}

@@ -42,3 +42,26 @@ export function validateYouTubeUrl(url: string): boolean {
 		return false;
 	}
 }
+
+export type YouTubeUrlKind = 'video' | 'musicTrack' | 'musicCollection';
+
+/**
+ * Decides which create flow a URL belongs to. Mirrors the backend's ClassifyURL:
+ * music.youtube.com watch links are tracks; its playlist/browse/channel pages are
+ * collections (albums, playlists, artists) and cannot be added as one item.
+ * Returns null for anything that is not a YouTube URL.
+ */
+export function classifyYouTubeUrl(url: string): YouTubeUrlKind | null {
+	let u: URL;
+	try {
+		u = new URL(url.trim());
+	} catch {
+		return null;
+	}
+	if (u.hostname === 'music.youtube.com') {
+		if (u.pathname === '/watch' && /^[\w-]{11}$/.test(u.searchParams.get('v') ?? '')) return 'musicTrack';
+		if (/^\/(playlist|browse|channel)(\/|$)/.test(u.pathname)) return 'musicCollection';
+		return null;
+	}
+	return validateYouTubeUrl(url) ? 'video' : null;
+}

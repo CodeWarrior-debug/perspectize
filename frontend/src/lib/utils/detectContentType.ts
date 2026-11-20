@@ -1,4 +1,5 @@
 import { validateYouTubeUrl } from './youtube';
+import { parseMusicLink, type ParsedMusicLink } from './audioLinks';
 import { validateMovieInput } from './movie';
 import { validateBookInput } from './book';
 import { parseReference, type PassageRange } from './passageParserAdapter';
@@ -15,6 +16,8 @@ export type DetectionResult =
 	| { type: 'BOOK'; url: string }
 	/** Any other http(s) URL that no type above claims. The server reads its `<head>` once. */
 	| { type: 'WEB_PAGE'; url: string }
+	/** A music link. `link` is null for an album/playlist/artist link (not addable; the form says so). */
+	| { type: 'AUDIO_TRACK'; url: string; link: ParsedMusicLink | null }
 	| { type: null };
 
 const BIBLE_GATEWAY_HOSTS = new Set(['biblegateway.com', 'www.biblegateway.com']);
@@ -59,8 +62,8 @@ function parseBibleGatewayUrl(url: URL): PassageRange | null {
  * (AN Q21) so this has at most one entry, but the list shape lets a future ambiguous
  * type be added without a signature change.
  *
- * Precedence: YouTube URL > movie link > Open Library book link > Bible Gateway URL > other
- * http(s) URL on an unclaimed host (WEB_PAGE) > typed Bible reference. Free text is no match:
+ * Precedence: Music link > YouTube URL > movie link > Open Library book link > Bible Gateway URL
+ * > http(s) URL on an unclaimed host (WEB_PAGE) > typed Bible reference. Free text is no match:
  * empty candidates, never guessed (claims are declared on the Declare page, not detected here).
  * A URL on a claimed host (YouTube, TMDB/IMDb, Bible Gateway) that matches no type is empty
  * candidates, never a webpage. Scheme-less or non-http(s) input is never guessed: a bare
@@ -69,6 +72,10 @@ function parseBibleGatewayUrl(url: URL): PassageRange | null {
 export function detectContentCandidates(input: string): DetectionResult[] {
 	const trimmed = input.trim();
 	if (!trimmed) return [];
+
+	const music = parseMusicLink(trimmed);
+	if (music.ok) return [{ type: 'AUDIO_TRACK', url: trimmed, link: music.link }];
+	if (music.reason === 'collection') return [{ type: 'AUDIO_TRACK', url: trimmed, link: null }];
 
 	if (validateYouTubeUrl(trimmed)) return [{ type: 'YOUTUBE_VIDEO', url: trimmed }];
 
