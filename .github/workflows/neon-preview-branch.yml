@@ -35,7 +35,10 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          if [ -n "$(git diff --name-only "$BASE" "$HEAD" -- backend/migrations)" ]; then
+          # Three dots diff from the merge base, so only this PR's own changes
+          # count. Two dots would also list every migration that landed on the
+          # base branch after the PR branch was cut.
+          if [ -n "$(git diff --name-only "$BASE...$HEAD" -- backend/migrations)" ]; then
             echo "has_migrations=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_migrations=false" >> "$GITHUB_OUTPUT"
