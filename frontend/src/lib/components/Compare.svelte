@@ -98,16 +98,26 @@
 	// unique), and the picker advertises content by perspective count. Keying
 	// by userID would collapse those rows, so a single-author content would show
 	// "3 perspectives" in the picker and "no other perspectives" here.
+	// Only private is labelled (public carries no marker, matching the Take
+	// column). Compared case-insensitively, as PerspectivePopover does.
+	function isPrivatePerspective(p: { privacy: string }): boolean {
+		return String(p.privacy).toUpperCase() === 'PRIVATE';
+	}
+
 	const options = $derived(
 		perspectives.map((p) => {
 			const name = displayName(p.userID);
 			const sameAuthor = perspectives.filter((o) => o.userID === p.userID).length > 1;
+			// Native <select> options are text only, so the privacy marker is a
+			// text suffix. Date comes first (only when one person has several rows).
+			const parts = [name];
+			if (sameAuthor) parts.push(formatDate(p.updatedAt));
+			if (isPrivatePerspective(p)) parts.push('Private');
 			return {
 				id: p.id,
 				userId: p.userID,
 				name,
-				// Date suffix only when one person has several rows.
-				label: sameAuthor ? `${name} · ${formatDate(p.updatedAt)}` : name,
+				label: parts.join(' · '),
 			};
 		}),
 	);
@@ -358,6 +368,7 @@
 				avatarColor={identityColor(leftPerspective!.userID, meCtx.me?.id ?? null)}
 				review={leftPerspective!.review}
 				uniqueFeelings={feelingsComparison.leftOnly}
+				isPrivate={isPrivatePerspective(leftPerspective!)}
 			/>
 			<CompareRatingTable
 				rows={ratingRows}
@@ -373,6 +384,7 @@
 				avatarColor={identityColor(rightPerspective!.userID, meCtx.me?.id ?? null)}
 				review={rightPerspective!.review}
 				uniqueFeelings={feelingsComparison.rightOnly}
+				isPrivate={isPrivatePerspective(rightPerspective!)}
 			/>
 		</div>
 	{/if}

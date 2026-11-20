@@ -52,6 +52,23 @@ describe('CompareTakeColumn', () => {
 		expect(screen.queryByText('Unique feelings')).not.toBeInTheDocument();
 	});
 
+	it('shows a lock icon and a visible Private label when the take is private', () => {
+		render(CompareTakeColumn, {
+			props: { name: 'You', avatarColor: '#8b5cf6', review: 'x', uniqueFeelings: [], isPrivate: true },
+		});
+		const marker = screen.getByTestId('take-private');
+		expect(marker).toHaveTextContent('Private');
+		expect(marker.querySelector('svg')).not.toBeNull();
+	});
+
+	it('shows no privacy marker for a public take (the default)', () => {
+		render(CompareTakeColumn, {
+			props: { name: 'Jamie Lee', avatarColor: '#8b5cf6', review: 'x', uniqueFeelings: [] },
+		});
+		expect(screen.queryByTestId('take-private')).not.toBeInTheDocument();
+		expect(screen.queryByText('Private')).not.toBeInTheDocument();
+	});
+
 	it('renders unique feelings when present', () => {
 		render(CompareTakeColumn, {
 			props: {
