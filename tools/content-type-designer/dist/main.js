@@ -4,6 +4,8 @@ import { detect } from './detect.js';
 import { el } from './dom.js';
 import { buildMatrix, buildSoloViews, buildSpec } from './emit.js';
 import { openDetails } from './modal.js';
+import { renderMobileScreen } from './mobile.js';
+import { MOBILE_CARDS } from './mobile-data.js';
 import { THUMBS } from './thumbs.js';
 import { bindingFor, cellSortValue, cellText, gapText, previewRowsFor, profileFor, resolveGrid, mixedPrimary, samplesFor, typeLabel, unitKey, unitKeysFor } from './model.js';
 import { attachTip, cellTipContent } from './tip.js';
@@ -260,10 +262,11 @@ function layoutFor(typeId) {
 function accentFor(typeId) {
     return profileFor(typeId, state.draft)?.accent || '#3B6FD4';
 }
-function showDetails(typeId, row) {
+function showDetails(typeId, row, container, image) {
     const img = typeof row.item === 'object' ? row.item.img : undefined;
     openDetails({
-        image: img ? THUMBS[img] ?? img : undefined,
+        container,
+        image: image ?? (img ? THUMBS[img] ?? img : undefined),
         layout: layoutFor(typeId),
         row,
         typeLabel: typeLabel(typeId, state.draft),
@@ -504,6 +507,37 @@ function renderSolo() {
     if (!grid.warnings.length)
         warn.append(el('li', { class: 'w-ok' }, ['No gaps flagged with this type alone.']));
     const offCount = grid.columns.filter((rc) => !rc.visible && rc.bound.length > 0 && !rc.col.hideWhenSolo).length;
+    const viewport = state.soloViewport ?? 'desktop';
+    const vseg = el('div', { class: 'seg', role: 'group' });
+    for (const [mode, text] of [
+        ['desktop', 'Desktop'],
+        ['mobile', 'Mobile'],
+        ['both', 'Both']
+    ]) {
+        const b = el('button', { type: 'button', class: mode === viewport ? 'on' : '' }, [text]);
+        b.setAttribute('aria-pressed', String(mode === viewport));
+        b.addEventListener('click', () => {
+            state.soloViewport = mode;
+            save();
+            render();
+        });
+        vseg.append(b);
+    }
+    const desktop = el('div', { class: 'solo-desktop' }, [
+        picker,
+        el('div', { class: 'row' }, [openFirst, resetBtn]),
+        el('p', { class: 'muted small' }, [
+            synthetic ? 'No sample rows for this type — the placeholder row still carries every tooltip. ' : '',
+            'Hover a header or cell for its tooltip. Click a cell to pin its popover and try Copy. Click a title to open the details view. Click a chip above to try a column on or off.'
+        ]),
+        table,
+        warn
+    ]);
+    const views = [];
+    if (viewport !== 'mobile')
+        views.push(desktop);
+    if (viewport !== 'desktop')
+        views.push(renderPhone(typeId));
     return section('Single-type view — suggested columns, tooltips, details', 'What the Activity table shows when this is the only type filtered in. Headers use the type’s own labels; Type is dropped because every row would repeat it.', [
         tabs,
         el('p', { class: 'solo-summary' }, [
@@ -511,17 +545,35 @@ function renderSolo() {
             ` on by default for ${label} alone · ${offCount} more in the column picker`,
             ...(forcedCount ? [` · ${forcedCount} what-if change${forcedCount > 1 ? 's' : ''}`] : [])
         ]),
-        picker,
-        el('div', { class: 'row' }, [openFirst, resetBtn]),
-        el('p', { class: 'muted small' }, [
-            synthetic
-                ? 'No sample rows for this type — the placeholder row still carries every tooltip. '
-                : '',
-            'Hover a header or cell for its tooltip. Click a cell to pin its popover and try Copy. Click a title to open the details view. Click a chip above to try a column on or off.'
-        ]),
-        table,
-        warn
+        el('div', { class: 'viewport-bar' }, [el('span', { class: 'field-label' }, ['Viewport']), vseg, el('span', { class: 'muted small' }, ['Mobile is the Library page below 860px, drawn at 390×844.'])]),
+        el('div', { class: 'solo-views' }, views)
     ], 'solo');
+}
+/** The type's mobile card list in a phone frame; tapping a card opens the details view as a full-screen sheet. */
+function renderPhone(typeId) {
+    const source = typeId === state.draft.id ? state.seed ?? typeId : typeId;
+    const spec = MOBILE_CARDS[source];
+    if (!spec) {
+        return el('div', { class: 'phone-figure mobile-missing' }, [
+            el('p', { class: 'w-warn' }, [
+                `No mobile drawing for ${typeLabel(typeId, state.draft)} yet. The phone view covers YouTube video so far; a type is added by giving it an entry in MOBILE_CARDS (src/mobile-data.ts).`
+            ])
+        ]);
+    }
+    const rows = samplesFor(typeId, state);
+    const cards = spec.cards(rows);
+    const viewport = el('div', { class: 'phone-viewport' });
+    viewport.append(renderMobileScreen({
+        spec,
+        cards,
+        onOpen: (i) => showDetails(typeId, rows[i], viewport, cards[i].thumb?.src)
+    }));
+    return el('figure', { class: 'phone-figure' }, [
+        el('div', { class: 'phone' }, [viewport]),
+        el('figcaption', { class: 'muted small' }, [
+            `ActivityCardList at 390px with ${typeLabel(typeId, state.draft)} filtered in. Tap a card for its details sheet; tap + to flip it to the glasses (has a perspective) state.`
+        ])
+    ]);
 }
 /* ------------------------------------------------------ cross-type preview */
 function renderPreview() {
@@ -1306,5 +1358,13 @@ reset?.addEventListener('click', () => {
     save();
     render();
 });
-render();
+/** `?phone=<typeId>` draws only that type's phone screen at the page origin, for pixel comparison with the app. */
+const phoneOnly = new URLSearchParams(location.search).get('phone');
+if (phoneOnly) {
+    document.body.className = 'phone-only';
+    document.body.replaceChildren(el('div', { id: 'phone-only' }, [renderPhone(phoneOnly).querySelector('.phone-viewport') ?? el('p', {}, ['No mobile drawing for that type.'])]));
+}
+else {
+    render();
+}
 //# sourceMappingURL=main.js.map

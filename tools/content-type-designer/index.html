@@ -4,10 +4,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Perspectize — Content Type Designer</title>
+    <link rel="icon" href="data:," />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" />
     <style>
+      /* The app's own fonts (frontend/src/app.css), served from the repo when the tool is opened over
+         http from the repo root (python3 -m http.server). Opened any other way, the fallback stacks apply. */
+      @font-face { font-family: 'Geist'; src: url('../../frontend/static/fonts/Geist-Variable.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+      @font-face { font-family: 'Charter'; src: url('../../frontend/static/fonts/Charter-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+      @font-face { font-family: 'Charter'; src: url('../../frontend/static/fonts/Charter-Italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+      @font-face { font-family: 'Charter'; src: url('../../frontend/static/fonts/Charter-Bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
       :root {
         color-scheme: light dark;
         --bg: #f6f7f9;
@@ -516,6 +523,25 @@
         .tiles { grid-template-columns: 1fr; }
         .modal-body { padding: 16px; }
       }
+
+      /* ---- mobile view: the phone frame around src/mobile.ts's screen ------ */
+      .viewport-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+      .solo-views { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+      .solo-views > .solo-desktop { flex: 1 1 520px; min-width: 0; }
+      .phone-figure { flex: none; }
+      .phone {
+        position: relative; width: 414px; padding: 12px; border-radius: 44px; background: #1b1d21;
+        box-shadow: 0 0 0 1px #3a3d44 inset, 0 18px 40px -16px rgb(0 0 0 / 0.45);
+      }
+      .phone-viewport { position: relative; width: 390px; height: 844px; border-radius: 32px; overflow: hidden; background: #fff; }
+      .modal-backdrop.in-phone { position: absolute; padding: 0; align-items: stretch; z-index: 60; }
+      .modal-backdrop.in-phone .modal { max-width: none; border-radius: 0; display: flex; flex-direction: column; }
+      .modal-backdrop.in-phone .modal-body { max-height: none; flex: 1; padding: 16px; }
+      .modal-backdrop.in-phone .tiles { grid-template-columns: 1fr; }
+      .mobile-missing { max-width: 390px; }
+      /* ?phone=<type>: only the phone's screen, at the page origin, for pixel comparison with the app. */
+      body.phone-only { margin: 0; background: #fff; }
+      body.phone-only .phone-viewport { border-radius: 0; }
     </style>
   </head>
   <body>

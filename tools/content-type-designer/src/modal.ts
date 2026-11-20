@@ -19,6 +19,8 @@ export interface ModalInput {
   binding: (colId: string) => Binding | undefined;
   /** Image (data URI or URL) for the hero tile; the tile falls back to initials. */
   image?: string;
+  /** Draw the view inside this element as a full-screen sheet (the phone frame) instead of over the page. */
+  container?: HTMLElement;
 }
 
 let showSources = false;
@@ -233,11 +235,11 @@ export function openDetails(input: ModalInput): void {
     el('div', { class: 'modal-head' }, [el('span', {}, [layout.heading]), el('span', { class: 'modal-head-right' }, [sources, close])]),
     el('div', { class: 'modal-body' }, [hero, links, tiles, footer, ...sections, ...nav, ...attribution, ...notes])
   ]);
-  const backdrop = el('div', { class: 'modal-backdrop' }, [dialog]);
+  const backdrop = el('div', { class: `modal-backdrop${input.container ? ' in-phone' : ''}` }, [dialog]);
   backdrop.addEventListener('mousedown', (e) => {
     if (e.target === backdrop) closeDetails();
   });
-  document.body.append(backdrop);
+  (input.container ?? document.body).append(backdrop);
   openModal = backdrop;
   document.addEventListener('keydown', onKey);
   close.focus();

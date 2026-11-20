@@ -40,6 +40,8 @@ export interface DraftState {
   soloOverrides?: Record<string, Record<string, boolean>>;
   /** Single-type view sort (one key). */
   soloSort?: SortKey;
+  /** Single-type view: the desktop table, the mobile card list in a phone, or both. Undefined = 'desktop'. */
+  soloViewport?: 'desktop' | 'mobile' | 'both';
   /** Which fill state the sample rows show. Undefined = 'usual'. */
   fullness?: Fullness;
   /** Row shown in the details / perspective mocks. */

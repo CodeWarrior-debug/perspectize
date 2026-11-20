@@ -33,6 +33,39 @@ that type filtered in**:
   tiles, sections, prev/next, TMDB attribution. Tiles have tooltips too;
   **Show field sources** annotates every value with where it comes from.
 
+- **Mobile view** — the **Viewport** toggle (Desktop / Mobile / Both) draws the
+  app's mobile Library page in a phone frame at 390×844: below 860px the app
+  swaps the AG Grid table for `ActivityCardList`. The whole page is drawn, not
+  just the cards: header, Library title, Mine / search / search-fields row,
+  "Other types" pills, the Type filter chip, the cards, the footer bar and the
+  messages button. Each card has the app's 96×64 thumbnail (cropped with a play
+  badge for video), the serif two-line title, the muted `·`-separated facts
+  lines with the grey category chip, and the "+" (or glasses) and add-to-plan
+  buttons. Tap a card's text for the details view as a full-screen sheet inside
+  the phone; tap "+" to flip the card to the glasses state.
+
+  It is a pixel copy of the real page in the default Reading Room theme, so it
+  uses the app's fonts: serve the tool from the **repo root**
+  (`python3 -m http.server`, then open
+  `/tools/content-type-designer/index.html`) so `../../frontend/static/fonts/`
+  resolves. Opened from `file://` it falls back to system fonts.
+
+  Only **YouTube video** is drawn so far. A type is added with an entry in
+  `MOBILE_CARDS` (`src/mobile-data.ts`) that turns its sample rows into cards
+  (title, thumbnail rule, facts lines); the page chrome needs no change. Other
+  types show a "no mobile drawing yet" note. The YouTube thumbnails are local
+  placeholders shaped like `i.ytimg.com/…/hqdefault.jpg` (4:3 with letterbox
+  bars), so the crop matches the app.
+
+  `index.html?phone=<typeId>` renders only the phone's screen at the page
+  origin. It exists for pixel comparison with the real app: the YouTube drawing
+  was diffed against the demo-mode Library page at 390×844 (same sample rows
+  served through a mocked GraphQL route) with 0.00% to 0.06% of pixels
+  differing (anti-aliasing noise that varies run to run; no pixel off by more
+  than 32/255, every text box within 0.5px). Rerun it with
+  `scripts/compare_mobile.mjs` (its header lists the two servers it needs)
+  after changing the drawing or when the app's page changes.
+
 Types without sample rows get one placeholder row, so every type can be hovered
 and opened. Output → **Single-type views** emits the columns, tooltips and
 details layout for each type selected in section 4.
@@ -228,5 +261,8 @@ Two deterministic documents, copyable or downloadable:
 | `src/modal.ts` | The details-modal mock |
 | `src/detect.ts` | Mirror of the app's Add Content link detection, plus the draft's rule |
 | `src/thumbs.ts` | Generated inline thumbnails (`scripts/build_thumbs.py`) |
+| `src/mobile-data.ts` | Mobile card data per type (`MOBILE_CARDS`), the app's count/duration formatting, the YouTube thumbnail placeholder. No DOM, so Node scripts can import it |
+| `src/mobile.ts` | The mobile Library page drawing (in a shadow root, so the tool's form styles cannot leak in) |
+| `src/icons.ts` | Generated Lucide icons, copied from the app's `@lucide/svelte` (`node tools/content-type-designer/scripts/build_icons.mjs`) |
 | `src/main.ts` | Form rendering and localStorage persistence |
 | `previews/<type>-activity.html` | Throwaway single-type previews, built by the `content-type-preview` skill (`.claude/skills/content-type-preview/`) from its `examples/<type>.spec.json`. Never hand-edit; rebuild |
