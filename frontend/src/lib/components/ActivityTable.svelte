@@ -353,7 +353,7 @@
 	 * read through the column's own valueGetter. `total` counts every shown row,
 	 * including those with no value. Null when the grid isn't available.
 	 */
-	function chartRows(colId: string): { values: number[]; total: number; ranked: TopBottom } | null {
+	function chartRows(colId: string): { values: number[]; names: string[]; total: number; ranked: TopBottom } | null {
 		const api = gridApi;
 		if (!api || api.isDestroyed()) return null;
 		const column = api.getColumn(colId);
@@ -370,8 +370,11 @@
 			rows.push({ name: node.data.name, value: typeof v === 'number' && Number.isFinite(v) ? v : null });
 		});
 		const values = rows.flatMap((r) => (r.value === null ? [] : [r.value]));
+		// Parallel to `values`: the movie behind each charted number, for the chart readout.
+		const names = rows.flatMap((r) => (r.value === null ? [] : [r.name]));
 		return {
 			values,
+			names,
 			total: rows.length,
 			ranked: topBottom(
 				rows,
@@ -2115,6 +2118,7 @@
 			colId={chartTarget.colId}
 			label={chartTarget.label}
 			values={chartData.values}
+			names={chartData.names}
 			total={chartData.total}
 			ranked={chartData.ranked}
 			format={chartFormat(chartTarget.colId)}

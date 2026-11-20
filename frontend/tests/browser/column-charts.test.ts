@@ -261,11 +261,14 @@ describe('column charts on the activity grid', () => {
 			await expect.poll(() => header('duration')?.querySelector('[data-chart-col]:not([hidden])')).not.toBeNull();
 
 			(document.querySelector('[data-testid="column-chart-button-duration"]') as HTMLElement).click();
-			// Shortest film is 100 minutes, longest 140. Read only the popover's own axis labels, exact text.
+			// Shortest film is 100 minutes, longest 140. The value axis uses round ticks inside that range
+			// (1:40 is an edge tick); each one reads as h:mm, never the seconds-based h:mm:ss form.
 			const popover = () => document.querySelector('[data-testid="column-chart-popover"]');
 			const labels = () => [...(popover()?.querySelectorAll('text') ?? [])].map((t) => t.textContent?.trim());
+			const timeLabels = () => labels().filter((l) => l?.includes(':'));
 			await expect.poll(labels).toContain('1:40');
-			expect(labels()).toContain('2:20');
+			expect(timeLabels().length).toBeGreaterThanOrEqual(3);
+			for (const t of timeLabels()) expect(t).toMatch(/^\d+:\d{2}$/);
 			expect(popover()?.textContent).not.toContain('1:40:00');
 		});
 

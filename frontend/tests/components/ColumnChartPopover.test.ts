@@ -89,4 +89,43 @@ describe('ColumnChartPopover', () => {
 		await new Promise((r) => setTimeout(r, 50));
 		expect(document.activeElement).toBe(document.body);
 	});
+
+	it('heading names the column and the number of movies charted', () => {
+		render(ColumnChartPopover, { props: props() });
+		expect(screen.getByRole('heading', { name: `Views · ${values.length} movies` })).toBeInTheDocument();
+	});
+
+	it('caption says what the axes are, and follows the chosen chart type', async () => {
+		render(ColumnChartPopover, { props: props() });
+		expect(screen.getByText('Number of movies (height) by Views (across)')).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole('button', { name: 'Pie' }));
+		expect(screen.getByText('Share of movies in each Views range')).toBeInTheDocument();
+		expect(screen.queryByText('Number of movies (height) by Views (across)')).toBeNull();
+	});
+
+	it('passes the movie names through so a strip readout names the movie under the pointer', async () => {
+		const names = values.map((_, i) => `Movie ${i}`);
+		const svgRect = {
+			left: 0,
+			top: 0,
+			x: 0,
+			y: 0,
+			width: 256,
+			height: 130,
+			right: 256,
+			bottom: 130,
+			toJSON: () => ({}),
+		};
+		vi.spyOn(SVGElement.prototype, 'getBoundingClientRect').mockReturnValue(svgRect as DOMRect);
+		render(ColumnChartPopover, { props: props({ names }) });
+		await fireEvent.click(screen.getByRole('button', { name: 'Strip plot' }));
+		const dot = document.querySelectorAll<SVGCircleElement>('[data-testid="column-chart-popover"] svg circle')[
+			values.length - 1
+		];
+		await fireEvent.mouseMove(dot.closest('svg') as SVGSVGElement, {
+			clientX: Number(dot.getAttribute('cx')),
+			clientY: Number(dot.getAttribute('cy')),
+		});
+		expect(screen.getByTestId('chart-readout').textContent).toBe(`Movie ${values.length - 1} · ${format(40)}`);
+	});
 });

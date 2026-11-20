@@ -4,11 +4,13 @@
 	import ColumnChart from './ColumnChart.svelte';
 	import type { TopBottom } from '#lib/utils/columnStats';
 	import { CHART_TYPES, CHART_TYPE_LABELS, defaultChartType, type ChartType } from '#lib/utils/columnCharts';
+	import { chartCaption, chartHeading } from '#lib/utils/chartReadout';
 
 	let {
 		colId,
 		label,
 		values,
+		names = [],
 		total,
 		ranked,
 		format,
@@ -20,6 +22,8 @@
 		colId: string;
 		label: string;
 		values: number[];
+		/** Movie title for each entry of `values`, in the same order. */
+		names?: string[];
 		/** Count of all loaded rows, including those with no value. */
 		total: number;
 		ranked?: TopBottom;
@@ -61,7 +65,8 @@
 				aria-label={`${label} chart`}
 				data-testid="column-chart-popover"
 			>
-				<div role="group" aria-label="Chart type" class="mb-3 flex flex-wrap gap-1">
+				<h3 class="text-foreground mb-1 text-sm font-medium">{chartHeading(label, values.length)}</h3>
+				<div role="group" aria-label="Chart type" class="mb-2 flex flex-wrap gap-1">
 					{#each CHART_TYPES as t (t)}
 						<button
 							type="button"
@@ -73,7 +78,8 @@
 						>
 					{/each}
 				</div>
-				<ColumnChart {type} {values} {total} {ranked} {format} />
+				<p class="text-muted-foreground mb-2 text-xs">{chartCaption(type, label)}</p>
+				<ColumnChart {type} {values} {names} {total} {ranked} {format} />
 				<p class="text-muted-foreground mt-2 text-xs">
 					based on {values.length} loaded {values.length === 1 ? 'movie' : 'movies'} · {empty} empty
 				</p>

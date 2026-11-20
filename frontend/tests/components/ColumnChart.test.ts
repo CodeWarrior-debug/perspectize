@@ -243,7 +243,10 @@ describe('ColumnChart readout', () => {
 		const svg = svgOf(container);
 		sizeBox(svg);
 		const dot = container.querySelectorAll('svg circle')[values.length - 1];
-		await fireEvent.mouseMove(svg, { clientX: Number(dot.getAttribute('cx')), clientY: Number(dot.getAttribute('cy')) });
+		await fireEvent.mouseMove(svg, {
+			clientX: Number(dot.getAttribute('cx')),
+			clientY: Number(dot.getAttribute('cy')),
+		});
 		expect(readout()).toBe('Movie 11 · #40');
 	});
 

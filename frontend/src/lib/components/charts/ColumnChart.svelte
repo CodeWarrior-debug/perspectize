@@ -82,12 +82,8 @@
 	const ys = (frac: number) => baseY - frac * plotH;
 
 	const xTicks = $derived(niceTicks(x0, x1, 4).map((v) => ({ v, x: xs(v), text: format(v) })));
-	const countTicks = $derived(
-		niceTicks(0, binMax, 3, true).map((v) => ({ v, y: ys(v / binMax), text: String(v) })),
-	);
-	const percentTicks = $derived(
-		niceTicks(0, 1, 2).map((v) => ({ v, y: ys(v), text: `${Math.round(v * 100)}%` })),
-	);
+	const countTicks = $derived(niceTicks(0, binMax, 3, true).map((v) => ({ v, y: ys(v / binMax), text: String(v) })));
+	const percentTicks = $derived(niceTicks(0, 1, 2).map((v) => ({ v, y: ys(v), text: `${Math.round(v * 100)}%` })));
 	const yTicks = $derived(
 		type === 'cumulative' ? percentTicks : type === 'histogram' || type === 'line' ? countTicks : [],
 	);
@@ -123,9 +119,7 @@
 	});
 
 	// Movies with a value, ascending. Strip and box plot them; the readout names them.
-	const rows = $derived(
-		values.map((v, i) => ({ value: v, name: names[i] ?? '' })).sort((a, b) => a.value - b.value),
-	);
+	const rows = $derived(values.map((v, i) => ({ value: v, name: names[i] ?? '' })).sort((a, b) => a.value - b.value));
 	const STRIP_Y = (i: number) => ys(0.2 + ((i % STRIP_COLS) / STRIP_COLS) * 0.6);
 	const BOX_Y = $derived(ys(0.5));
 
@@ -381,9 +375,19 @@
 				/>
 			{/each}
 		{:else if type === 'line'}
-			<polyline points={items.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke="var(--color-primary)" stroke-width="2" />
+			<polyline
+				points={items.map((p) => `${p.x},${p.y}`).join(' ')}
+				fill="none"
+				stroke="var(--color-primary)"
+				stroke-width="2"
+			/>
 		{:else if type === 'cumulative'}
-			<polyline points={items.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke="var(--color-primary)" stroke-width="2" />
+			<polyline
+				points={items.map((p) => `${p.x},${p.y}`).join(' ')}
+				fill="none"
+				stroke="var(--color-primary)"
+				stroke-width="2"
+			/>
 		{:else if type === 'density'}
 			<path
 				d={densPath}
@@ -454,13 +458,7 @@
 				/>
 			{/each}
 			{#each items as dot, i (i)}
-				<circle
-					cx={dot.x}
-					cy={dot.y}
-					r="2"
-					fill="var(--color-foreground)"
-					fill-opacity={activeIndex === i ? 1 : 0.5}
-				/>
+				<circle cx={dot.x} cy={dot.y} r="2" fill="var(--color-foreground)" fill-opacity={activeIndex === i ? 1 : 0.5} />
 			{/each}
 		{/if}
 		{#if activeMark && (type === 'line' || type === 'cumulative' || type === 'density')}
@@ -482,21 +480,12 @@
 				stroke-width="2"
 			/>
 		{:else if activeMark && (type === 'strip' || type === 'box')}
-			<circle
-				cx={activeMark.x}
-				cy={activeMark.y}
-				r="5"
-				fill="none"
-				stroke="var(--color-foreground)"
-				stroke-width="2"
-			/>
+			<circle cx={activeMark.x} cy={activeMark.y} r="5" fill="none" stroke="var(--color-foreground)" stroke-width="2" />
 		{/if}
 		{#if type !== 'pie'}
 			{#each xTicks as t (t.v)}
 				<line x1={t.x} x2={t.x} y1={baseY} y2={baseY + 3} stroke="var(--color-muted-foreground)" stroke-width="1" />
-				<text x={t.x} y={H - 4} font-size="9" text-anchor="middle" fill="var(--color-muted-foreground)"
-					>{t.text}</text
-				>
+				<text x={t.x} y={H - 4} font-size="9" text-anchor="middle" fill="var(--color-muted-foreground)">{t.text}</text>
 			{/each}
 		{/if}
 	</svg>
