@@ -24,6 +24,7 @@ The goal is to let users add the page or video they are looking at from wherever
 - Native iOS/Android apps or native share extensions.
 - Firefox and Safari extensions. Edge can load the Chrome package as-is but isn't a target.
 - A bookmarklet. It's cheap to add later on top of `/add`.
+- **Publishing the extension to the Chrome Web Store** is a later step, decided by the owner on 2026-11-20. This round ships an extension that loads unpacked, plus a store-listing checklist. Desktop coverage for typical users arrives with publishing, which also needs a privacy policy page in the app (none exists today) and a developer account in the owner's name.
 
 ## Anti-goals (failure even if it works)
 
@@ -108,6 +109,7 @@ The goal is to let users add the page or video they are looking at from wherever
 - **What it does:** a published Apple Shortcut that accepts URLs (and text) from the share menu and opens `<base>/add?url=…` in Safari.
 - **Where users find it:** an install link on a short help section, reachable from Settings and from the `/add` page on iOS.
 - **What's not in the repo:** the Shortcut itself, which is an iCloud link. The repo has the help copy and a doc describing how to rebuild the Shortcut.
+- **Who builds it:** the owner, on an Apple device signed into their iCloud account, from the rebuild doc. PR 4 ships the help copy and the rebuild doc, and the install link is added once the owner provides it. No dead link ships: the install button stays hidden until the link is set.
 
 ### 5. Session length (configuration, not code)
 
