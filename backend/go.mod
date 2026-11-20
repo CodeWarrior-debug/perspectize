@@ -5,7 +5,7 @@ go 1.27.2
 require (
 	github.com/99designs/gqlgen v0.17.98
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/clerk/clerk-sdk-go/v2 v2.8.0
+	github.com/clerk/clerk-sdk-go/v2 v2.9.0
 	github.com/coder/websocket v1.8.15
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-chi/cors v1.2.2
