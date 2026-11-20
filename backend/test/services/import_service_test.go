@@ -30,6 +30,12 @@ type fakeImportRepo struct {
 	nextID      int
 	upsertErr   error
 	updates     []repositories.ImportSourceUpdate
+	// recordErr is returned by RecordOutcome before it changes anything.
+	recordErr error
+	// failQueuedErr is returned by FailQueuedItems before it changes anything.
+	failQueuedErr error
+	// failQueuedCalls counts FailQueuedItems calls, including the ones that fail.
+	failQueuedCalls int
 }
 
 var _ repositories.ImportJobRepository = (*fakeImportRepo)(nil)
@@ -295,15 +301,52 @@ func (r *fakeImportRepo) MarkQueued(_ context.Context, jobID int, ids []int) ([]
 	return out, nil
 }
 
-func (r *fakeImportRepo) RecordOutcome(_ context.Context, itemID int, status domain.ImportItemStatus, errMsg *string, contentID *int) error {
+func (r *fakeImportRepo) RecordOutcome(ctx context.Context, itemID int, status domain.ImportItemStatus, errMsg *string, contentID *int) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err // a real driver refuses a statement on a finished context
+	}
+	if r.recordErr != nil {
+		return r.recordErr
+	}
 	it := r.items[itemID]
 	it.Item.ImportStatus, it.Item.ImportError = &status, errMsg
 	if contentID != nil {
 		it.Item.ContentID = contentID
 	}
 	return nil
+}
+
+func (r *fakeImportRepo) FailQueuedItems(ctx context.Context, jobID int, ids []int, detail string) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.failQueuedCalls++
+	if err := ctx.Err(); err != nil {
+		return 0, err // a real driver refuses a statement on a finished context
+	}
+	if r.failQueuedErr != nil {
+		return 0, r.failQueuedErr
+	}
+	failed := 0
+	for _, id := range ids {
+		it, ok := r.items[id]
+		if !ok || it.Item.JobID != jobID {
+			continue
+		}
+		if st := it.Item.ImportStatus; st != nil && *st == domain.ImportItemStatusQueued {
+			f := domain.ImportItemStatusFailed
+			it.Item.ImportStatus, it.Item.ImportError = &f, &detail
+			failed++
+		}
+	}
+	return failed, nil
+}
+
+func (r *fakeImportRepo) failQueuedCallCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.failQueuedCalls
 }
 
 func (r *fakeImportRepo) FailInterrupted(context.Context, string) (int, int, error) { return 1, 2, nil }
@@ -359,16 +402,48 @@ type fakeCreator struct {
 	gate     chan struct{} // set before the service runs; never reassigned
 	inFlight int
 	peak     int
+	// holdUntilDone names urls whose create waits for its context to end and
+	// then fails with that context's error, as a source API call does when a
+	// batch's time runs out. Such a call is counted in flight but never recorded
+	// as created. Set before the service runs; never changed.
+	holdUntilDone map[string]bool
+	// failFirstThenGate names urls whose first create fails at once and whose
+	// later creates wait for gate (which must be set), then succeed. Set before
+	// the service runs; never changed.
+	failFirstThenGate map[string]bool
+	calls             map[string]int // creates started per url
 }
 
-func (c *fakeCreator) enter() {
+// errSourceRefused is the error a failFirstThenGate url's first create returns.
+var errSourceRefused = errors.New("source refused")
+
+// enter counts the call in flight and holds it as the creator is set to; a
+// non-nil error means the call must fail with it.
+func (c *fakeCreator) enter(ctx context.Context, url string) error {
 	c.mu.Lock()
 	c.inFlight++
 	c.peak = max(c.peak, c.inFlight)
+	if c.calls == nil {
+		c.calls = map[string]int{}
+	}
+	c.calls[url]++
+	first := c.calls[url] == 1
 	c.mu.Unlock()
+	if c.failFirstThenGate[url] {
+		if first {
+			return errSourceRefused
+		}
+		<-c.gate
+		return nil
+	}
+	if c.holdUntilDone[url] {
+		<-ctx.Done()
+		return ctx.Err()
+	}
 	if c.gate != nil {
 		<-c.gate
 	}
+	return nil
 }
 
 func (c *fakeCreator) leave() {
@@ -389,9 +464,12 @@ func (c *fakeCreator) peakInFlight() int {
 	return c.peak
 }
 
-func (c *fakeCreator) create(url string, userID int, list *[]string) (*domain.Content, error) {
-	c.enter()
+func (c *fakeCreator) create(ctx context.Context, url string, userID int, list *[]string) (*domain.Content, error) {
+	err := c.enter(ctx, url)
 	defer c.leave()
+	if err != nil {
+		return nil, err
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	*list = append(*list, url)
@@ -405,12 +483,12 @@ func (c *fakeCreator) create(url string, userID int, list *[]string) (*domain.Co
 	return &domain.Content{ID: 100 + len(*list)}, nil
 }
 
-func (c *fakeCreator) CreateFromYouTube(_ context.Context, url string, userID int) (*domain.Content, error) {
-	return c.create(url, userID, &c.youtube)
+func (c *fakeCreator) CreateFromYouTube(ctx context.Context, url string, userID int) (*domain.Content, error) {
+	return c.create(ctx, url, userID, &c.youtube)
 }
 
-func (c *fakeCreator) CreateFromMovie(_ context.Context, url string, userID int) (*domain.Content, error) {
-	return c.create(url, userID, &c.movies)
+func (c *fakeCreator) CreateFromMovie(ctx context.Context, url string, userID int) (*domain.Content, error) {
+	return c.create(ctx, url, userID, &c.movies)
 }
 
 var (
