@@ -6,6 +6,8 @@ import {
 	neutralizeFormula,
 	EXPORT_EXCLUDED_COLIDS,
 	RENDERED_TEXT_COLIDS,
+	SPREADSHEET_FORMATTED_COLIDS,
+	spreadsheetNumberText,
 } from '$lib/utils/exportTable';
 import { EMPTY_VALUE } from '$lib/utils/formatting';
 import { webPageRoleLabel } from '$lib/utils/webPage';
@@ -53,6 +55,26 @@ describe('neutralizeFormula', () => {
 
 	it.each(['-12%', '-3.5', '+5', 'Crème brûlée', ''])('leaves %j unchanged', (input) => {
 		expect(neutralizeFormula(input)).toBe(input);
+	});
+});
+
+describe('spreadsheetNumberText', () => {
+	it.each([
+		[1234567, '1234567'],
+		[0.8, '0.8'],
+		[-12.5, '-12.5'],
+		[0, '0'],
+	])('writes %j as a plain number', (value, expected) => {
+		expect(spreadsheetNumberText('views', value)).toBe(expected);
+		expect(neutralizeFormula(expected)).toBe(expected);
+	});
+
+	it.each([null, undefined, '1.2 M', Number.NaN, Infinity])('defers %j to the formatted text', (value) => {
+		expect(spreadsheetNumberText('views', value)).toBeNull();
+	});
+
+	it.each([...SPREADSHEET_FORMATTED_COLIDS, ...RENDERED_TEXT_COLIDS])('keeps %s formatted', (colId) => {
+		expect(spreadsheetNumberText(colId, 161)).toBeNull();
 	});
 });
 

@@ -7,6 +7,7 @@ import {
 	EXPORT_EXCLUDED_COLIDS,
 	buildExportTable,
 	exportCellText,
+	spreadsheetNumberText,
 	type ExportColumn,
 	type ExportMode,
 	type ExportTable,
@@ -40,8 +41,14 @@ export function readExportTable(api: ExportGridApi, mode: ExportMode): ExportTab
 		columns,
 		rows,
 		mode,
-		cellText: (row, colId) =>
-			exportCellText(row, colId, api.getCellValue({ rowNode: nodes.get(row), colKey: colId, useFormatter: true })),
+		cellText: (row, colId) => {
+			const rowNode = nodes.get(row);
+			if (mode === 'spreadsheet') {
+				const number = spreadsheetNumberText(colId, api.getCellValue({ rowNode, colKey: colId, useFormatter: false }));
+				if (number !== null) return number;
+			}
+			return exportCellText(row, colId, api.getCellValue({ rowNode, colKey: colId, useFormatter: true }));
+		},
 	});
 }
 
