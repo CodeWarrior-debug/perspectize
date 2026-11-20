@@ -7,6 +7,8 @@
 	import VerseNumber from '$lib/components/VerseNumber.svelte';
 	import VerseJumpPrompt from '$lib/components/VerseJumpPrompt.svelte';
 	import { setVerseJump } from '$lib/utils/verseJump';
+	import { verseIdsToRange } from '$lib/utils/bible';
+	import { DEFAULT_VERSION, gatewayLink } from '$lib/utils/bibleLinks';
 
 	let { startVerseId, endVerseId }: { startVerseId: number; endVerseId: number } = $props();
 
@@ -80,6 +82,14 @@
 	const visibleVerses = $derived(
 		verseCount <= COLLAPSE_THRESHOLD || expanded ? verses : verses.slice(0, COLLAPSED_PREVIEW_COUNT),
 	);
+
+	// The BSB leaves some verses' text empty (the content sits in its footnotes). A passage made
+	// only of such verses gets an explicit state instead of a blank block.
+	const omittedOnly = $derived(verses.length > 0 && verses.every((v) => !v.text));
+	const gatewayUrl = $derived.by(() => {
+		const range = verseIdsToRange(startVerseId, endVerseId);
+		return range ? gatewayLink(range, DEFAULT_VERSION).url : null;
+	});
 </script>
 
 {#snippet plain()}
@@ -87,7 +97,9 @@
 		{#each visibleVerses as v (v.verseId)}
 			<!-- The explicit trailing space keeps a verse number from running into the previous verse's last word. -->
 			<span
-				>{#if v.text}<VerseNumber verseId={v.verseId} verse={v.verse} />{v.text}{' '}{/if}</span
+				><VerseNumber verseId={v.verseId} verse={v.verse} />{#if v.text}{v.text}{:else}<span
+						class="text-[13px] text-muted-foreground italic">omitted in the BSB</span
+					>{/if}{' '}</span
 			>
 		{/each}
 	</div>
@@ -108,27 +120,41 @@
 		<p class="text-destructive">Couldn't load this passage.</p>
 	{:else if query.data}
 		{@const { translation, copyright } = query.data.passageText}
-		{#if showOriginal}
-			<OriginalLanguage {startVerseId} {endVerseId} verses={visibleVerses} {plain} />
+		{#if omittedOnly}
+			<p class="text-muted-foreground">
+				The Berean Standard Bible omits this verse's text; it appears in the BSB footnotes.
+				{#if gatewayUrl}
+					<a
+						href={gatewayUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="font-semibold text-primary hover:underline">Read it on Bible Gateway</a
+					>.
+				{/if}
+			</p>
 		{:else}
-			{@render plain()}
-		{/if}
-		<button
-			type="button"
-			aria-pressed={showOriginal}
-			class="mt-2 mr-3 text-[13px] font-semibold text-primary hover:underline aria-pressed:underline"
-			onclick={() => (showOriginal = !showOriginal)}
-		>
-			Show original language
-		</button>
-		{#if verseCount > COLLAPSE_THRESHOLD}
+			{#if showOriginal}
+				<OriginalLanguage {startVerseId} {endVerseId} verses={visibleVerses} {plain} />
+			{:else}
+				{@render plain()}
+			{/if}
 			<button
 				type="button"
-				class="mt-2 text-[13px] font-semibold text-primary hover:underline"
-				onclick={() => (expanded = !expanded)}
+				aria-pressed={showOriginal}
+				class="mt-2 mr-3 text-[13px] font-semibold text-primary hover:underline aria-pressed:underline"
+				onclick={() => (showOriginal = !showOriginal)}
 			>
-				{expanded ? 'Show less' : 'Show full passage'}
+				Show original language
 			</button>
+			{#if verseCount > COLLAPSE_THRESHOLD}
+				<button
+					type="button"
+					class="mt-2 text-[13px] font-semibold text-primary hover:underline"
+					onclick={() => (expanded = !expanded)}
+				>
+					{expanded ? 'Show less' : 'Show full passage'}
+				</button>
+			{/if}
 		{/if}
 		<p class="mt-2 text-[11px] text-muted-foreground">{translation} · {copyright}</p>
 	{/if}
