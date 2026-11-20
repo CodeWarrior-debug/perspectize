@@ -11,7 +11,9 @@ describe('CompareOverallRow', () => {
 		});
 		const label = screen.getByText('Agree overall');
 		expect(label).toBeInTheDocument();
-		expect(label).toHaveStyle({ color: 'var(--color-rating-positive)' });
+		// Assert the authored inline value: jsdom 31's getComputedStyle resolves var() to
+		// the initial colour, so toHaveStyle with a var() token can't see it.
+		expect(label.style.color).toBe('var(--color-rating-positive)');
 	});
 
 	it('shows "Different" in the negative color (not the "diverges" amber) when thumbs are opposite', () => {
@@ -20,7 +22,7 @@ describe('CompareOverallRow', () => {
 		});
 		const label = screen.getByText('Different');
 		expect(label).toBeInTheDocument();
-		expect(label).toHaveStyle({ color: 'var(--color-rating-negative)' });
+		expect(label.style.color).toBe('var(--color-rating-negative)');
 	});
 
 	it('names the side that gave a verdict, with neutral styling, when the other side is null', () => {
@@ -29,7 +31,7 @@ describe('CompareOverallRow', () => {
 		});
 		const label = screen.getByText('Only You gave a verdict');
 		expect(label).toBeInTheDocument();
-		expect(label).toHaveStyle({ color: 'var(--color-muted-foreground)' });
+		expect(label.style.color).toBe('var(--color-muted-foreground)');
 	});
 
 	it('names the other side when the left side is the one that is null', () => {
@@ -43,7 +45,7 @@ describe('CompareOverallRow', () => {
 		render(CompareOverallRow, { props: { ...baseProps, overall: { left: null, right: null, status: 'none' } } });
 		const label = screen.getByText('No verdict yet');
 		expect(label).toBeInTheDocument();
-		expect(label).toHaveStyle({ color: 'var(--color-muted-foreground)' });
+		expect(label.style.color).toBe('var(--color-muted-foreground)');
 	});
 
 	it('renders a dash for a side with no thumb set', () => {
