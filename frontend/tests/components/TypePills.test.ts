@@ -5,7 +5,7 @@ import TypePills from '#lib/components/TypePills.svelte';
 /** jsdom does no layout, so scroll geometry is faked on the scroller element. */
 async function setScroll(scroller: HTMLElement, m: { scrollLeft: number; scrollWidth: number; clientWidth: number }) {
 	for (const [key, value] of Object.entries(m)) {
-		Object.defineProperty(scroller, key, { value, configurable: true });
+		Object.defineProperty(scroller, key, { value, configurable: true, writable: true });
 	}
 	await fireEvent.scroll(scroller);
 }
@@ -50,25 +50,54 @@ describe('TypePills', () => {
 	describe('when the pills overflow the row', () => {
 		const geometry = { scrollWidth: 1000, clientWidth: 400 };
 
-		it('at the start shows only the right arrow', async () => {
+		it('at the start only the right arrow is usable', async () => {
 			render(TypePills, { props: { filters: { type: 'youtube_video' }, onSelect: vi.fn() } });
 			await setScroll(screen.getByTestId('type-pills-scroller'), { scrollLeft: 0, ...geometry });
-			expect(rightArrow()).toBeInTheDocument();
-			expect(leftArrow()).not.toBeInTheDocument();
+			expect(rightArrow()).toBeEnabled();
+			expect(leftArrow()).toBeDisabled();
 		});
 
-		it('in the middle shows both arrows', async () => {
+		it('in the middle both arrows are usable', async () => {
 			render(TypePills, { props: { filters: { type: 'youtube_video' }, onSelect: vi.fn() } });
 			await setScroll(screen.getByTestId('type-pills-scroller'), { scrollLeft: 300, ...geometry });
-			expect(leftArrow()).toBeInTheDocument();
-			expect(rightArrow()).toBeInTheDocument();
+			expect(leftArrow()).toBeEnabled();
+			expect(rightArrow()).toBeEnabled();
 		});
 
-		it('at the end shows only the left arrow', async () => {
+		it('at the end only the left arrow is usable', async () => {
 			render(TypePills, { props: { filters: { type: 'youtube_video' }, onSelect: vi.fn() } });
 			await setScroll(screen.getByTestId('type-pills-scroller'), { scrollLeft: 600, ...geometry });
-			expect(leftArrow()).toBeInTheDocument();
-			expect(rightArrow()).not.toBeInTheDocument();
+			expect(leftArrow()).toBeEnabled();
+			expect(rightArrow()).toBeDisabled();
+		});
+
+		it('keeps both arrows in the row as it scrolls, so the pills never shift', async () => {
+			render(TypePills, { props: { filters: { type: 'youtube_video' }, onSelect: vi.fn() } });
+			const scroller = screen.getByTestId('type-pills-scroller');
+			for (const scrollLeft of [0, 300, 600]) {
+				await setScroll(scroller, { scrollLeft, ...geometry });
+				expect(leftArrow()).toBeInTheDocument();
+				expect(rightArrow()).toBeInTheDocument();
+			}
+		});
+
+		it('starts again from the first pill once a different type is picked', async () => {
+			const { rerender } = render(TypePills, { props: { filters: { type: 'youtube_video' }, onSelect: vi.fn() } });
+			const scroller = screen.getByTestId('type-pills-scroller');
+			await setScroll(scroller, { scrollLeft: 300, ...geometry });
+			expect(scroller.scrollLeft).toBe(300);
+
+			await rerender({ filters: { type: 'movie' }, onSelect: vi.fn() });
+			expect(scroller.scrollLeft).toBe(0);
+		});
+
+		it('keeps its scroll position when the page re-derives the same filters', async () => {
+			const { rerender } = render(TypePills, { props: { filters: { type: 'youtube_video' }, onSelect: vi.fn() } });
+			const scroller = screen.getByTestId('type-pills-scroller');
+			await setScroll(scroller, { scrollLeft: 300, ...geometry });
+
+			await rerender({ filters: { type: 'youtube_video', q: 'dune' }, onSelect: vi.fn() });
+			expect(scroller.scrollLeft).toBe(300);
 		});
 
 		it('an arrow scrolls the row by most of its visible width, in its own direction', async () => {

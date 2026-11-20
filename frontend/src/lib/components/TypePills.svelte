@@ -26,6 +26,7 @@
 	let scroller = $state<HTMLDivElement | null>(null);
 	let canScrollLeft = $state(false);
 	let canScrollRight = $state(false);
+	const hasOverflow = $derived(canScrollLeft || canScrollRight);
 
 	function measure() {
 		if (!scroller) return;
@@ -39,10 +40,16 @@
 		scroller.scrollBy({ left: direction * scroller.clientWidth * PAGE_FRACTION, behavior: 'smooth' });
 	}
 
-	// Re-measure when the row is resized or the set of pills changes.
+	// `options` is a fresh array whenever the page re-derives its filters, even when the same types
+	// are listed, so the effect below keys on this string, which only changes with the set itself.
+	const optionKey = $derived(options.map((option) => option.value).join(','));
+
+	// Re-measure when the row is resized or the set of pills changes. A new set of pills (the user
+	// picked a type) starts from the first pill, so the type that just left the chip is in view.
 	$effect(() => {
 		if (!scroller) return;
-		void options;
+		void optionKey;
+		scroller.scrollLeft = 0;
 		measure();
 		if (typeof ResizeObserver === 'undefined') return;
 		const observer = new ResizeObserver(measure);
@@ -77,11 +84,26 @@
 	<div class="flex items-center gap-2 min-w-0 max-w-full">
 		<span class="shrink-0 text-xs text-muted-foreground">Other types:</span>
 
-		<div class="relative min-w-0 flex-1">
+		<!-- The arrows sit beside the row, not over it, so no pill ever runs underneath one. They show
+		     whenever the row overflows; the one at the end of the row is dimmed and disabled, so the
+		     row doesn't shift as you scroll. -->
+		<div class="flex min-w-0 flex-1 items-center gap-1">
+			{#if hasOverflow}
+				<button
+					type="button"
+					aria-label="Scroll types left"
+					disabled={!canScrollLeft}
+					class="grid size-6 shrink-0 place-items-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+					onclick={() => page(-1)}
+				>
+					<ChevronLeftIcon class="size-3.5" />
+				</button>
+			{/if}
+
 			<div
 				bind:this={scroller}
 				data-testid="type-pills-scroller"
-				class="flex items-center gap-2 overflow-x-auto scroll-smooth snap-x snap-proximity py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+				class="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scroll-smooth snap-x snap-proximity py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
 				style:mask-image={fadeMask}
 				style:-webkit-mask-image={fadeMask}
 				onscroll={measure}
@@ -98,21 +120,12 @@
 				{/each}
 			</div>
 
-			{#if canScrollLeft}
-				<button
-					type="button"
-					aria-label="Scroll types left"
-					class="absolute left-0 top-1/2 -translate-y-1/2 grid size-6 place-items-center rounded-full border border-border bg-background text-muted-foreground shadow-sm hover:text-foreground hover:bg-muted transition-colors"
-					onclick={() => page(-1)}
-				>
-					<ChevronLeftIcon class="size-3.5" />
-				</button>
-			{/if}
-			{#if canScrollRight}
+			{#if hasOverflow}
 				<button
 					type="button"
 					aria-label="Scroll types right"
-					class="absolute right-0 top-1/2 -translate-y-1/2 grid size-6 place-items-center rounded-full border border-border bg-background text-muted-foreground shadow-sm hover:text-foreground hover:bg-muted transition-colors"
+					disabled={!canScrollRight}
+					class="grid size-6 shrink-0 place-items-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
 					onclick={() => page(1)}
 				>
 					<ChevronRightIcon class="size-3.5" />
