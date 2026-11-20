@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 
 // The real registry has too few types to reach the searchable list, so feed it a long one.
-vi.mock('$lib/utils/gridUrlState', () => ({
+vi.mock('#lib/utils/gridUrlState.js', () => ({
 	otherTypeOptionsWhenOne: () =>
 		['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'India'].map((label) => ({
 			value: label.toLowerCase(),
@@ -10,7 +10,7 @@ vi.mock('$lib/utils/gridUrlState', () => ({
 		})),
 }));
 
-import TypePills from '$lib/components/TypePills.svelte';
+import TypePills from '#lib/components/TypePills.svelte';
 
 const open = async () => {
 	await fireEvent.click(screen.getByRole('button', { name: 'Search all types' }));
