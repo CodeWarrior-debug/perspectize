@@ -363,6 +363,7 @@ the backend rows):
   - [ ] `filterKey` (+ `filterRange` if a number/date range), if filterable — feeds the URL `f.*` param and `urlParamsToGraphQLFilter`
 - [ ] Search scope (`SearchScopeKey`, `SCOPE_TO_GQL_FIELD`, `SCOPE_LABELS`), if searchable
 - [ ] `ActivityCardList.svelte` and `ActivityDetailsModal.svelte`, if the column should also appear on mobile cards / the details modal — both have their own, separate field lists, not derived from `COLUMNS`
+- [ ] `cellRenderer` with no `valueGetter`/`field`: add its text to `exportCellText` and `RENDERED_TEXT_COLIDS` in `exportTable.ts` (`export-text-parity.test.ts` fails otherwise)
 - [ ] Tests updated (see Testing, below) and both parity tests still pass
 
 ---

@@ -1209,3 +1209,126 @@ select.select-inset {
 	/* Nothing to scroll here: show the track only, no thumb. */
 	scrollbar-color: transparent var(--color-muted);
 }
+
+/* Library print view (PrintListView): hidden on screen, and the only thing shown when the page is
+   printed with html[data-print='list']. Plain black on white, no theme colours. */
+.print-root {
+	display: none;
+}
+@media print {
+	html[data-print='list'] body > :not(.print-root) {
+		display: none !important;
+	}
+	html[data-print='list'] .print-root {
+		display: block;
+		background: white;
+		color: black;
+	}
+	.print-root h1 {
+		margin: 0 0 12px;
+		font-size: 18pt;
+	}
+	.print-root table {
+		width: 100%;
+		table-layout: auto;
+		border-collapse: collapse;
+	}
+	.print-root thead {
+		display: table-header-group;
+	}
+	.print-root tr {
+		break-inside: avoid;
+	}
+	.print-root th,
+	.print-root td {
+		padding: 6px 8px;
+		border-bottom: 1px solid black;
+		text-align: left;
+		vertical-align: top;
+		color: black;
+	}
+	/* Text columns wrap at word boundaries; break-word only splits a single word wider than its column
+	   and, unlike `anywhere`, keeps each column's minimum width at its longest word. */
+	.print-root th,
+	.print-root td {
+		overflow-wrap: break-word;
+	}
+	/* Long text (tags, cast, description) is clamped so a row stays a few lines tall. */
+	.print-root .cell-text {
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+		overflow: hidden;
+	}
+	.print-root td[data-col='tags'] .cell-text {
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+	}
+	.print-root th[data-col='item'],
+	.print-root td[data-col='item'] {
+		width: 30%;
+		min-width: 12em;
+	}
+	.print-root th[data-col='tags'],
+	.print-root td[data-col='tags'] {
+		width: 22%;
+	}
+	/* Short numeric and date values stay on one line; every other column wraps. */
+	.print-root td[data-col='duration'],
+	.print-root td[data-col='views'],
+	.print-root td[data-col='likes'],
+	.print-root td[data-col='percentLiked'],
+	.print-root td[data-col='boxOffice'],
+	.print-root td[data-col='vsBudget'],
+	.print-root td[data-col='tmdbScore'],
+	.print-root td[data-col='budget'],
+	.print-root td[data-col='votes'],
+	.print-root td[data-col='pages'],
+	.print-root td[data-col='rating'],
+	.print-root td[data-col='editions'],
+	.print-root td[data-col='readers'],
+	.print-root td[data-col='tmdbId'],
+	.print-root td[data-col='id'],
+	.print-root td[data-col='rated'],
+	.print-root td[data-col='myQuality'],
+	.print-root td[data-col='myImportance'],
+	.print-root td[data-col='myAgreement'],
+	.print-root td[data-col='effectiveDate'],
+	.print-root td[data-col='evaluateBy'],
+	.print-root td[data-col='released'],
+	.print-root td[data-col='publishDate'],
+	.print-root td[data-col='published'],
+	.print-root td[data-col='webPublished'],
+	.print-root td[data-col='createdAt'],
+	.print-root td[data-col='updatedAt'] {
+		white-space: nowrap;
+	}
+	.print-root a {
+		color: black;
+		text-decoration: underline;
+	}
+	.print-root[data-spacing='compact'] th,
+	.print-root[data-spacing='compact'] td {
+		padding-block: 2px;
+	}
+	.print-root[data-spacing='standard'] th,
+	.print-root[data-spacing='standard'] td {
+		padding-block: 6px;
+	}
+	.print-root[data-spacing='roomy'] th,
+	.print-root[data-spacing='roomy'] td {
+		padding-block: 12px;
+	}
+	/* As seen: hide everything that is not the grid or one of its ancestors. */
+	html[data-print='grid'] body *:not(.activity-grid):not(.activity-grid *):not(:has(.activity-grid)) {
+		display: none !important;
+	}
+	/* Every ancestor of the grid has a fixed height or clips; let the whole table flow onto pages. */
+	html[data-print='grid'] body *:has(.activity-grid),
+	html[data-print='grid'] .activity-grid {
+		height: auto !important;
+		max-height: none !important;
+		overflow: visible !important;
+	}
+}
