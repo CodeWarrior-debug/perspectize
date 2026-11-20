@@ -834,7 +834,7 @@
 				comparator: durationComparator,
 				context: { tooltipSpec: ACTIVITY_TOOLTIP_SPECS.duration },
 				headerTooltip:
-					'Video duration from YouTube API. For movies this is the runtime in h:mm (TMDB reports whole minutes).',
+					'Length of the item.',
 			},
 			{
 				colId: 'views',
