@@ -7,7 +7,10 @@ import {
 	coverageReadout,
 	densityReadout,
 	lineReadout,
+	displayName,
 	movieReadout,
+	rankTitles,
+	titlesText,
 	moviesText,
 	nearestIndex,
 	pieReadout,
@@ -99,6 +102,60 @@ describe('readout text', () => {
 
 	it('share is 0% rather than NaN when there are no rows', () => {
 		expect(coverageReadout('empty', 0, 0)).toBe('0 empty (0%)');
+	});
+});
+
+describe('movie titles in readouts', () => {
+	const format = millions;
+	const row = (name: string, value: number) => ({ name, value });
+
+	it('rankTitles orders by value, largest first, and ties by title', () => {
+		const rows = [row('Beta', 5), row('Alpha', 5), row('Gamma', 9)];
+		expect(rankTitles(rows)).toEqual(['Gamma', 'Alpha', 'Beta']);
+	});
+
+	it('rankTitles keeps only the top three', () => {
+		const rows = [row('A', 1), row('B', 2), row('C', 3), row('D', 4)];
+		expect(rankTitles(rows)).toEqual(['D', 'C', 'B']);
+	});
+
+	it('rankTitles labels a movie with no title as Untitled', () => {
+		expect(rankTitles([row('', 7)])).toEqual(['Untitled']);
+		expect(displayName('')).toBe('Untitled');
+		expect(displayName('Film')).toBe('Film');
+	});
+
+	it('titlesText lists one title without a "more" count', () => {
+		expect(titlesText(['Film A'], 1)).toBe('Film A');
+	});
+
+	it('titlesText lists three titles exactly when there are no more', () => {
+		expect(titlesText(['A', 'B', 'C'], 3)).toBe('A, B, C');
+	});
+
+	it('titlesText adds "+N more" from the full count, not the shown list', () => {
+		expect(titlesText(['A', 'B', 'C'], 5)).toBe('A, B, C, +2 more');
+	});
+
+	it('titlesText is empty when there are no movies', () => {
+		expect(titlesText([], 0)).toBe('');
+	});
+
+	it('binReadout appends titles after the count, and leaves the text alone without them', () => {
+		const bin = { lo: 10e6, hi: 20e6, count: 4 };
+		expect(binReadout(bin, format, 'A, B, C, +1 more')).toBe('$10M–$20M · 4 movies · A, B, C, +1 more');
+		expect(binReadout(bin, format)).toBe('$10M–$20M · 4 movies');
+	});
+
+	it('an empty bin reads its count of zero with no titles appended', () => {
+		expect(binReadout({ lo: 10e6, hi: 20e6, count: 0 }, format, '')).toBe('$10M–$20M · 0 movies');
+	});
+
+	it('lineReadout and cumulativeReadout append titles the same way', () => {
+		expect(lineReadout({ lo: 10e6, hi: 20e6, count: 1 }, format, 'Film A')).toBe(
+			'$15M: 1 movie from $10M to $20M · Film A',
+		);
+		expect(cumulativeReadout(40e6, 3, 4, format, 'C, B, A')).toBe('$40M · 3 of 4 movies (75%) at or below · C, B, A');
 	});
 });
 

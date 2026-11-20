@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	summarize,
+	binRows,
 	histogram,
 	frequencyPoints,
 	cumulative,
@@ -61,6 +62,56 @@ describe('histogram', () => {
 
 	it('returns an empty array when binCount is below 1', () => {
 		expect(histogram([1, 2], 0)).toEqual([]);
+	});
+});
+
+describe('binRows', () => {
+	it('gives each bin the rows that fall in it, so the readout names the same movies the bar counts', () => {
+		const rows = [0, 1, 2, 3, 4, 4.5, 7].map((value, i) => ({ name: `M${i}`, value }));
+		const binned = binRows(rows, 3);
+		for (const { bin, members } of binned) {
+			expect(members).toHaveLength(bin.count);
+			for (const m of members) {
+				expect(m.value).toBeGreaterThanOrEqual(bin.lo);
+				expect(m.value).toBeLessThanOrEqual(bin.hi);
+			}
+		}
+		expect(binned.map((b) => b.bin)).toEqual(
+			histogram(
+				rows.map((r) => r.value),
+				3,
+			),
+		);
+	});
+
+	it('puts a value that sits on a shared edge in the upper bin, and the max in the last', () => {
+		const binned = binRows(
+			[
+				{ name: 'A', value: 0 },
+				{ name: 'B', value: 2 },
+				{ name: 'C', value: 4 },
+			],
+			2,
+		);
+		expect(binned[0].members.map((m) => m.name)).toEqual(['A']);
+		expect(binned[1].members.map((m) => m.name)).toEqual(['B', 'C']);
+	});
+
+	it('drops non-finite values and returns nothing for empty input', () => {
+		expect(binRows([{ name: 'A', value: NaN }], 2)).toEqual([]);
+		expect(binRows([], 2)).toEqual([]);
+	});
+
+	it('puts every movie in one bin when all values are identical', () => {
+		const binned = binRows(
+			[
+				{ name: 'A', value: 5 },
+				{ name: 'B', value: 5 },
+			],
+			4,
+		);
+		expect(binned).toHaveLength(1);
+		expect(binned[0].members.map((m) => m.name)).toEqual(['A', 'B']);
 	});
 });
 

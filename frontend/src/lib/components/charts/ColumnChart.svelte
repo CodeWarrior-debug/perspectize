@@ -1,7 +1,7 @@
 <script lang="ts">
 	import {
 		summarize,
-		histogram,
+		binRows,
 		frequencyPoints,
 		cumulative,
 		boxStats,
@@ -21,6 +21,9 @@
 		coverageReadout,
 		nearestIndex,
 		stepIndex,
+		rankTitles,
+		titlesText,
+		TITLES_SHOWN,
 	} from '#lib/utils/chartReadout';
 	import { CHART_TYPE_LABELS, type ChartType } from '#lib/utils/columnCharts';
 
@@ -66,7 +69,22 @@
 	const degenerate = $derived(summary !== null && summary.min === summary.max);
 	const label = $derived(`${CHART_TYPE_LABELS[type]} chart`);
 
-	const bins = $derived(histogram(values, BINS));
+	// Movies with a value, ascending. Strip and box plot them; the readouts name them.
+	const rows = $derived(values.map((v, i) => ({ value: v, name: names[i] ?? '' })).sort((a, b) => a.value - b.value));
+	const binned = $derived(binRows(rows, BINS));
+	const bins = $derived(binned.map((b) => b.bin));
+	// Titles are built once per data change, not on every hover. With no names at all the readout says nothing
+	// rather than "Untitled" for every movie.
+	const titlesFor = (members: { name: string; value: number }[]) =>
+		names.length > 0 ? titlesText(rankTitles(members), members.length) : '';
+	const binTitles = $derived(binned.map((b) => titlesFor(b.members)));
+	// Cumulative point i is the movie at rank i, so the movies at or below it are rows 0..i and the
+	// largest few of those are the last few rows.
+	const cumTitles = $derived(
+		names.length === 0
+			? []
+			: rows.map((_, i) => titlesText(rankTitles(rows.slice(Math.max(0, i - TITLES_SHOWN + 1), i + 1)), i + 1)),
+	);
 	const binMax = $derived(Math.max(...bins.map((b) => b.count), 1));
 	const bandWidth = $derived(summary && summary.max > summary.min ? (summary.max - summary.min) / BINS : 1);
 	const lo = $derived(summary?.min ?? 0);
@@ -118,8 +136,6 @@
 		});
 	});
 
-	// Movies with a value, ascending. Strip and box plot them; the readout names them.
-	const rows = $derived(values.map((v, i) => ({ value: v, name: names[i] ?? '' })).sort((a, b) => a.value - b.value));
 	const STRIP_Y = (i: number) => ys(0.2 + ((i % STRIP_COLS) / STRIP_COLS) * 0.6);
 	const BOX_Y = $derived(ys(0.5));
 
@@ -128,23 +144,23 @@
 	const items = $derived.by((): Mark[] => {
 		switch (type) {
 			case 'histogram':
-				return bins.map((b) => ({
+				return bins.map((b, i) => ({
 					x: xs((b.lo + b.hi) / 2),
 					y: ys(b.count / binMax),
-					text: binReadout(b, format),
+					text: binReadout(b, format, binTitles[i]),
 				}));
 			case 'line':
 				return frequencyPoints(bins).map((p, i) => ({
 					x: xs(p.x),
 					y: ys(p.y / binMax),
-					text: lineReadout(bins[i], format),
+					text: lineReadout(bins[i], format, binTitles[i]),
 				}));
 			case 'cumulative': {
 				const pts = cumulative(values);
 				return pts.map((p, i) => ({
 					x: xs(p.x),
 					y: ys(p.share),
-					text: cumulativeReadout(p.x, i + 1, pts.length, format),
+					text: cumulativeReadout(p.x, i + 1, pts.length, format, cumTitles[i]),
 				}));
 			}
 			case 'density':

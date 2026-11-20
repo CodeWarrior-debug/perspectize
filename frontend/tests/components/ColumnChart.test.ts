@@ -259,6 +259,89 @@ describe('ColumnChart readout', () => {
 		expect(readout()).toBe('Movie 11 · #40');
 	});
 
+	it('histogram: a bin names its three largest movies and counts the rest as "+N more"', async () => {
+		const { container } = withNames('histogram');
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const bar = container.querySelectorAll('rect[data-bin]')[0];
+		await fireEvent.mouseMove(svg, {
+			clientX: Number(bar.getAttribute('x')) + Number(bar.getAttribute('width')) / 2,
+			clientY: 60,
+		});
+		// Bin 0 holds 1, 2, 2, 3, 4 (movies 0 to 4): largest first, then the count left over.
+		expect(readout()).toBe('#1–#4.9 · 5 movies · Movie 4, Movie 3, Movie 1, +2 more');
+	});
+
+	it('histogram: a bin with exactly three movies lists all three and no "more"', async () => {
+		const { container } = withNames('histogram');
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const bar = container.querySelectorAll('rect[data-bin]')[1];
+		await fireEvent.mouseMove(svg, {
+			clientX: Number(bar.getAttribute('x')) + Number(bar.getAttribute('width')) / 2,
+			clientY: 60,
+		});
+		expect(readout()).toBe('#4.9–#8.8 · 3 movies · Movie 7, Movie 6, Movie 5');
+	});
+
+	it('histogram: a bin with one movie names that movie alone', async () => {
+		const { container } = withNames('histogram');
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const bar = container.querySelectorAll('rect[data-bin]')[3];
+		await fireEvent.mouseMove(svg, {
+			clientX: Number(bar.getAttribute('x')) + Number(bar.getAttribute('width')) / 2,
+			clientY: 60,
+		});
+		expect(readout()).toBe('#12.7–#16.6 · 1 movie · Movie 10');
+	});
+
+	it('histogram: an empty bin reads zero movies with no titles', async () => {
+		const { container } = withNames('histogram');
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const bar = container.querySelectorAll('rect[data-bin]')[4];
+		await fireEvent.mouseMove(svg, {
+			clientX: Number(bar.getAttribute('x')) + Number(bar.getAttribute('width')) / 2,
+			clientY: 60,
+		});
+		expect(readout()).toBe('#16.6–#20.5 · 0 movies');
+	});
+
+	it('histogram: a movie with no title is labelled Untitled, not dropped', async () => {
+		const untitled = values.map((_, i) => (i === 10 ? '' : `Movie ${i}`));
+		const { container } = render(ColumnChart, {
+			props: { type: 'histogram', values, names: untitled, total: values.length, format },
+		});
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const bar = container.querySelectorAll('rect[data-bin]')[3];
+		await fireEvent.mouseMove(svg, {
+			clientX: Number(bar.getAttribute('x')) + Number(bar.getAttribute('width')) / 2,
+			clientY: 60,
+		});
+		expect(readout()).toBe('#12.7–#16.6 · 1 movie · Untitled');
+	});
+
+	it('line: a point names the movies in its bin', async () => {
+		const { container } = withNames('line');
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const first = container.querySelector('polyline')!.getAttribute('points')!.split(' ')[0].split(',')[0];
+		await fireEvent.mouseMove(svg, { clientX: Number(first), clientY: 60 });
+		expect(readout()).toBe('#2.95: 5 movies from #1 to #4.9 · Movie 4, Movie 3, Movie 1, +2 more');
+	});
+
+	it('cumulative: a point names the largest movies at or below it', async () => {
+		const { container } = withNames('cumulative');
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const points = container.querySelector('polyline')!.getAttribute('points')!.split(' ');
+		// The fourth point is the movie at rank 4 (value 3); the movies at or below it are values 1, 2, 2, 3.
+		await fireEvent.mouseMove(svg, { clientX: Number(points[3].split(',')[0]), clientY: 60 });
+		expect(readout()).toBe('#3 · 4 of 12 movies (33%) at or below · Movie 3, Movie 1, Movie 2, +1 more');
+	});
+
 	it('pie: hovering a slice reads its range, count and share of the values', async () => {
 		const { container } = renderChart('pie');
 		const first = container.querySelectorAll('svg path')[0];

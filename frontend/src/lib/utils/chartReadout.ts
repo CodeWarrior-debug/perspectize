@@ -35,18 +35,50 @@ export function stepIndex(current: number | null, delta: number, count: number):
 
 const percentOf = (part: number, whole: number): number => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 
-export function binReadout(bin: { lo: number; hi: number; count: number }, format: Format): string {
-	return `${format(bin.lo)}–${format(bin.hi)} · ${moviesText(bin.count)}`;
+/** How many titles a readout names before the rest collapse into "+N more". */
+export const TITLES_SHOWN = 3;
+
+/** Movie title for a readout; rows with no title still get a label. */
+export const displayName = (name: string): string => name || 'Untitled';
+
+/** The `max` titles with the largest values, for a readout. Ties fall back to title order so the text is stable. */
+export function rankTitles(entries: { name: string; value: number }[], max = TITLES_SHOWN): string[] {
+	return [...entries]
+		.sort((a, b) => b.value - a.value || displayName(a.name).localeCompare(displayName(b.name)))
+		.slice(0, max)
+		.map((e) => displayName(e.name));
 }
 
-export function lineReadout(bin: { lo: number; hi: number; count: number }, format: Format): string {
+/**
+ * Titles for a readout: the `shown` names, then "+N more" for the movies that weren't shown.
+ * `total` is every movie behind the point, so the count stays right when `shown` is trimmed.
+ * Empty when there are no movies.
+ */
+export function titlesText(shown: string[], total: number): string {
+	if (total === 0) return '';
+	const more = total - shown.length;
+	return more > 0 ? `${shown.join(', ')}, +${more} more` : shown.join(', ');
+}
+
+/** Titles are appended after the aggregate with a middle dot, and only when there are any. */
+const withTitles = (text: string, titles: string): string => (titles ? `${text} · ${titles}` : text);
+
+/** `titles` is an optional `titlesText` for the movies in the bin. */
+export function binReadout(bin: { lo: number; hi: number; count: number }, format: Format, titles = ''): string {
+	return withTitles(`${format(bin.lo)}–${format(bin.hi)} · ${moviesText(bin.count)}`, titles);
+}
+
+export function lineReadout(bin: { lo: number; hi: number; count: number }, format: Format, titles = ''): string {
 	const mid = (bin.lo + bin.hi) / 2;
-	return `${format(mid)}: ${moviesText(bin.count)} from ${format(bin.lo)} to ${format(bin.hi)}`;
+	return withTitles(`${format(mid)}: ${moviesText(bin.count)} from ${format(bin.lo)} to ${format(bin.hi)}`, titles);
 }
 
-/** `rank` is 1-based: the movie at that position in ascending order, and everything below it. */
-export function cumulativeReadout(x: number, rank: number, total: number, format: Format): string {
-	return `${format(x)} · ${rank} of ${total} movies (${percentOf(rank, total)}%) at or below`;
+/**
+ * `rank` is 1-based: the movie at that position in ascending order, and everything below it.
+ * `titles` is an optional `titlesText` for the movies at or below the point.
+ */
+export function cumulativeReadout(x: number, rank: number, total: number, format: Format, titles = ''): string {
+	return withTitles(`${format(x)} · ${rank} of ${total} movies (${percentOf(rank, total)}%) at or below`, titles);
 }
 
 /** `expected` is the density scaled to a count of movies per band of width `bandWidth`. */

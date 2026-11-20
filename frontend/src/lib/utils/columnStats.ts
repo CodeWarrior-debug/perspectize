@@ -49,24 +49,40 @@ export function summarize(values: number[]): Summary | null {
 	};
 }
 
+/**
+ * Equal-width bins over [min, max], each with the rows that fall in it. The max value lands in the
+ * last bin. Bin membership is computed here, once, so a histogram and the movies named in its
+ * readout can't disagree about which bin a row is in.
+ */
+export function binRows<T extends { value: number }>(rows: T[], binCount: number): { bin: Bin; members: T[] }[] {
+	const sorted = rows.filter((r) => Number.isFinite(r.value)).sort((a, b) => a.value - b.value);
+	if (sorted.length === 0 || binCount < 1) return [];
+	const min = sorted[0].value;
+	const max = sorted[sorted.length - 1].value;
+	if (min === max) return [{ bin: { lo: min, hi: max, count: sorted.length }, members: sorted }];
+	const width = (max - min) / binCount;
+	const out = Array.from({ length: binCount }, (_, i) => ({
+		bin: {
+			lo: min + i * width,
+			hi: i === binCount - 1 ? max : min + (i + 1) * width,
+			count: 0,
+		},
+		members: [] as T[],
+	}));
+	for (const r of sorted) {
+		const i = Math.min(Math.floor((r.value - min) / width), binCount - 1);
+		out[i].members.push(r);
+	}
+	for (const b of out) b.bin.count = b.members.length;
+	return out;
+}
+
 /** Equal-width bins over [min, max]; the max value lands in the last bin. */
 export function histogram(values: number[], binCount: number): Bin[] {
-	const sorted = finiteSorted(values);
-	if (sorted.length === 0 || binCount < 1) return [];
-	const min = sorted[0];
-	const max = sorted[sorted.length - 1];
-	if (min === max) return [{ lo: min, hi: max, count: sorted.length }];
-	const width = (max - min) / binCount;
-	const bins: Bin[] = Array.from({ length: binCount }, (_, i) => ({
-		lo: min + i * width,
-		hi: i === binCount - 1 ? max : min + (i + 1) * width,
-		count: 0,
-	}));
-	for (const v of sorted) {
-		const i = Math.min(Math.floor((v - min) / width), binCount - 1);
-		bins[i].count++;
-	}
-	return bins;
+	return binRows(
+		values.map((value) => ({ value })),
+		binCount,
+	).map((b) => b.bin);
 }
 
 export function frequencyPoints(bins: Bin[]): Point[] {
