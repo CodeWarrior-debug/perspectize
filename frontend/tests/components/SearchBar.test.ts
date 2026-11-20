@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import SearchBar from '$lib/components/discover/SearchBar.svelte';
+import SearchBar from '#lib/components/discover/SearchBar.svelte';
 import SearchBarHost from './fixtures/SearchBarHost.svelte';
 
 const PLACEHOLDER = 'Search YouTube, or paste a video link';

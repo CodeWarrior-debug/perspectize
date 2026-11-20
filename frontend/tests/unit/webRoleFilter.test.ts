@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { WebRoleFilter } from '$lib/utils/contentTypeFilter';
-import { parseGridParams, urlParamsToFilter, urlParamsToGraphQLFilter } from '$lib/utils/gridUrlState';
-import { activityListRequest } from '$lib/queries/content/activityList';
-import type { ContentItem } from '$lib/queries/content';
+import { WebRoleFilter } from '#lib/utils/contentTypeFilter.js';
+import { parseGridParams, urlParamsToFilter, urlParamsToGraphQLFilter } from '#lib/utils/gridUrlState.js';
+import { activityListRequest } from '#lib/queries/content/activityList.js';
+import type { ContentItem } from '#lib/queries/content/index.js';
 
 const row = (webPageRoles: string[] | null): ContentItem =>
 	({

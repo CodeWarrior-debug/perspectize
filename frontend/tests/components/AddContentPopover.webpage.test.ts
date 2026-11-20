@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import AddContentPopover from '$lib/components/AddContentPopover.svelte';
-import type { WebPageFetch, WebPagePreview } from '$lib/queries/content';
+import AddContentPopover from '#lib/components/AddContentPopover.svelte';
+import type { WebPageFetch, WebPagePreview } from '#lib/queries/content/index.js';
 import { warmUp } from '../helpers/warmUp';
 
 const mocks = vi.hoisted(() => ({
@@ -30,17 +30,17 @@ const mocks = vi.hoisted(() => ({
 	book: { mutate: vi.fn(), reset: vi.fn(), isPending: false, isSuccess: false, isError: false, error: null as unknown },
 }));
 
-vi.mock('$lib/queries/content/useCreateWebPage', () => ({ useCreateWebPage: () => mocks.webPage }));
-vi.mock('$lib/queries/content/useWebPagePreview', () => ({
+vi.mock('#lib/queries/content/useCreateWebPage.js', () => ({ useCreateWebPage: () => mocks.webPage }));
+vi.mock('#lib/queries/content/useWebPagePreview.js', () => ({
 	useWebPagePreview: (getUrl: () => string | null) => {
 		mocks.previewUrl.get = getUrl;
 		return mocks.preview;
 	},
 }));
-vi.mock('$lib/queries/content/useAddVideo', () => ({ useAddVideo: () => mocks.video }));
-vi.mock('$lib/queries/content/useAddMovie', () => ({ useAddMovie: () => mocks.movie }));
-vi.mock('$lib/queries/content/useAddBook', () => ({ useAddBook: () => mocks.book }));
-vi.mock('$lib/queries/content/useAddPassage', () => ({ useAddPassage: () => mocks.passage }));
+vi.mock('#lib/queries/content/useAddVideo.js', () => ({ useAddVideo: () => mocks.video }));
+vi.mock('#lib/queries/content/useAddMovie.js', () => ({ useAddMovie: () => mocks.movie }));
+vi.mock('#lib/queries/content/useAddBook.js', () => ({ useAddBook: () => mocks.book }));
+vi.mock('#lib/queries/content/useAddPassage.js', () => ({ useAddPassage: () => mocks.passage }));
 
 const ARXIV = 'https://arxiv.org/abs/1706.03762';
 const DEBOUNCE_MS = 400;

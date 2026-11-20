@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { csvFileName, downloadCsv, serializeCsv, serializeTsv } from '$lib/utils/exportSerialize';
-import type { ExportTable } from '$lib/utils/exportTable';
+import { csvFileName, downloadCsv, serializeCsv, serializeTsv } from '#lib/utils/exportSerialize.js';
+import type { ExportTable } from '#lib/utils/exportTable.js';
 
 function table(headers: string[], rows: string[][]): ExportTable {
 	return { columnIds: headers, headers, rows, rowUrls: rows.map(() => null) };

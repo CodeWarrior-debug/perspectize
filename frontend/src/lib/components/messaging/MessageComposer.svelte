@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
-	import { createTypingController } from '$lib/messaging/typing';
-	import { Button } from '$lib/components/shadcn';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
+	import { createTypingController } from '#lib/messaging/typing.js';
+	import { Button } from '#lib/components/shadcn/index.js';
 	import SendIcon from '@lucide/svelte/icons/send';
 
 	let {

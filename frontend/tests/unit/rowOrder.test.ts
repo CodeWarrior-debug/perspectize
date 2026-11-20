@@ -4,7 +4,7 @@
  * list starts from the server order, and placeholder data is neither applied nor recorded.
  */
 import { describe, it, expect } from 'vitest';
-import { createRowOrderMemory } from '$lib/utils/rowOrder';
+import { createRowOrderMemory } from '#lib/utils/rowOrder.js';
 
 type Row = { id: string; name: string };
 const row = (id: string): Row => ({ id, name: `row ${id}` });

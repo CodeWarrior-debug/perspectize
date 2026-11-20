@@ -5,7 +5,7 @@ import {
 	ACTIVITY_HEADER_PARAMS,
 	GRID_COLOR_PARAM_KEYS,
 	GRID_THEME_PARAMS,
-} from '$lib/utils/grid-theme';
+} from '#lib/utils/grid-theme.js';
 
 describe('GRID_THEME_PARAMS', () => {
 	it('takes every colour from a theme token so the grid follows the picker', () => {

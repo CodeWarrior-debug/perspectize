@@ -1,5 +1,5 @@
 import { createQuery } from '@tanstack/svelte-query';
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { graphqlRequest } from '../client';
 import { GET_CONTENT_DETAILS, type ContentDetailsResponse } from './index';
 import { queryKeys } from '../keys';

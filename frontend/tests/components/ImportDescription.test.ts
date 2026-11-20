@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import ImportDescription from '$lib/components/imports/ImportDescription.svelte';
-import type { ImportJobSummary } from '$lib/queries/imports';
+import ImportDescription from '#lib/components/imports/ImportDescription.svelte';
+import type { ImportJobSummary } from '#lib/queries/imports/index.js';
 
 const mocks = vi.hoisted(() => ({
 	me: null as { id: string } | null,
@@ -10,18 +10,18 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('svelte-sonner', () => ({ toast: mocks.toast }));
-vi.mock('$lib/components/CommentsEditor.svelte', async () => {
+vi.mock('#lib/components/CommentsEditor.svelte', async () => {
 	const mod = await import('../helpers/FakeCommentsEditor.svelte');
 	return { default: mod.default };
 });
-vi.mock('$lib/queries/users/useMe.svelte', () => ({
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({
 	useMe: () => ({
 		get me() {
 			return mocks.me;
 		},
 	}),
 }));
-vi.mock('$lib/queries/imports/useImportJobMutations', () => ({
+vi.mock('#lib/queries/imports/useImportJobMutations.js', () => ({
 	useUpdateImportJobDescription: () => ({ mutateAsync: mocks.update, isPending: false }),
 }));
 

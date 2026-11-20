@@ -3,7 +3,7 @@ import { vi } from 'vitest';
 import { readable } from 'svelte/store';
 
 // Mock $app/environment for tests
-vi.mock('$app/environment', () => ({
+vi.mock('$app/env', () => ({
 	browser: true,
 	dev: true,
 	building: false,
@@ -56,8 +56,8 @@ vi.mock('$app/stores', () => {
 	};
 });
 
-// Mock $lib/assets/favicon.svg
-vi.mock('$lib/assets/favicon.svg', () => ({
+// Mock #lib/assets/favicon.svg
+vi.mock('#lib/assets/favicon.svg', () => ({
 	default: '/favicon.svg',
 }));
 

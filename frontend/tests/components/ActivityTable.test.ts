@@ -32,7 +32,7 @@ vi.mock('ag-grid-svelte5', () => ({
 }));
 
 // Mock graphqlRequest
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: mockRequest,
 }));
 
@@ -45,7 +45,7 @@ vi.mock('svelte-clerk', () => ({
 
 // queryKeys is used directly, no need to mock since it's a simple object
 
-import ActivityTable from '$lib/components/ActivityTable.svelte';
+import ActivityTable from '#lib/components/ActivityTable.svelte';
 import { preloadLazy, warmUp } from '../helpers/warmUp';
 
 const mockEmptyResponse = {
@@ -115,7 +115,7 @@ function renderWithQuery(queryClient?: QueryClient) {
 
 // The component renders this through {#await import(...)}: load it up front so a
 // findBy* waits on the UI, not on Vite's first transform of the module (#728).
-preloadLazy(() => import('$lib/components/PerspectivePopover.svelte'));
+preloadLazy(() => import('#lib/components/PerspectivePopover.svelte'));
 
 // Pay the component's first-render cost before any test, not inside the first
 // one: under full-suite load it alone can pass the 5 s testTimeout (#728).
@@ -241,7 +241,7 @@ describe('ActivityTable', () => {
 		await waitFor(() => {
 			expect(mockRequest).toHaveBeenCalledWith(expect.stringContaining('GetContentDetails'), { id: '99' });
 		});
-		expect(goto).toHaveBeenCalledWith('?q=sowell', expect.objectContaining({ replaceState: true }));
+		expect(goto).toHaveBeenCalledWith('?q=sowell', expect.objectContaining({ replace: true }));
 		expect(await screen.findByText('Deep Linked Video')).toBeInTheDocument();
 	});
 

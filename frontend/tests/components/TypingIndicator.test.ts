@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import TypingIndicator from '$lib/components/messaging/TypingIndicator.svelte';
+import TypingIndicator from '#lib/components/messaging/TypingIndicator.svelte';
 
 describe('TypingIndicator', () => {
 	it('renders nothing when nobody is typing', () => {

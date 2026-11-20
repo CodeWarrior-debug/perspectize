@@ -33,22 +33,22 @@ vi.mock('svelte-sonner', () => ({
 }));
 
 const mockGraphqlRequest = vi.fn();
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: mockGraphqlRequest,
 }));
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
-	() => import('$lib/queries/content'),
-	() => import('$lib/queries/content/useUpdateSourceData'),
+	() => import('#lib/queries/content/index.js'),
+	() => import('#lib/queries/content/useUpdateSourceData.js'),
 );
 
 describe('useUpdateSourceData hook', () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		capturedMutationOptions = undefined;
-		const { useUpdateSourceData } = await import('$lib/queries/content/useUpdateSourceData');
+		const { useUpdateSourceData } = await import('#lib/queries/content/useUpdateSourceData.js');
 		useUpdateSourceData();
 	});
 
@@ -135,7 +135,7 @@ describe('UPDATE_CONTENT_SOURCE_DATA selection set', () => {
 	// so a result without them blanks the Book/Movie tiles (including the Open Library
 	// reading-log counts) until the next reload.
 	it('selects the typed payloads list rows carry, so a refreshed row keeps them', async () => {
-		const { UPDATE_CONTENT_SOURCE_DATA, LIST_CONTENT } = await import('$lib/queries/content');
+		const { UPDATE_CONTENT_SOURCE_DATA, LIST_CONTENT } = await import('#lib/queries/content/index.js');
 		for (const field of ['book', 'movie']) {
 			expect(LIST_CONTENT).toMatch(new RegExp(`\\n\\s+${field}\\n`));
 			expect(UPDATE_CONTENT_SOURCE_DATA).toMatch(new RegExp(`\\n\\s+${field}\\n`));

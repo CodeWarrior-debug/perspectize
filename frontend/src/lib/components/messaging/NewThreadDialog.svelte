@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { createQuery } from '@tanstack/svelte-query';
 	import { goto } from '$app/navigation';
-	import { graphqlRequest } from '$lib/queries/client';
-	import { LIST_USERS, type UsersResponse } from '$lib/queries/users';
-	import { queryKeys } from '$lib/queries/keys';
-	import { useCreateMessageThread } from '$lib/queries/messaging/useCreateMessageThread';
-	import type { CreateMessageThreadResponse } from '$lib/queries/messaging';
+	import { graphqlRequest } from '#lib/queries/client.js';
+	import { LIST_USERS, type UsersResponse } from '#lib/queries/users/index.js';
+	import { queryKeys } from '#lib/queries/keys.js';
+	import { useCreateMessageThread } from '#lib/queries/messaging/useCreateMessageThread.js';
+	import type { CreateMessageThreadResponse } from '#lib/queries/messaging/index.js';
 	import {
 		Dialog,
 		DialogContent,
@@ -14,7 +14,7 @@
 		DialogFooter,
 		Button,
 		Input,
-	} from '$lib/components/shadcn';
+	} from '#lib/components/shadcn/index.js';
 
 	let {
 		open,

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import Avatar from '$lib/components/messaging/Avatar.svelte';
+import Avatar from '#lib/components/messaging/Avatar.svelte';
 
 describe('Avatar', () => {
 	it('renders username initials and a title', () => {

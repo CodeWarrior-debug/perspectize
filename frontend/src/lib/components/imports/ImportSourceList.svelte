@@ -1,7 +1,7 @@
 <script lang="ts">
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
-	import type { ImportSource } from '$lib/queries/imports';
-	import { contentTypeLabel } from '$lib/utils/grid-config';
+	import type { ImportSource } from '#lib/queries/imports/index.js';
+	import { contentTypeLabel } from '#lib/utils/grid-config.js';
 
 	/** One line per source: what it is, what its rows become, and how listing went. */
 	let { sources }: { sources: ImportSource[] } = $props();

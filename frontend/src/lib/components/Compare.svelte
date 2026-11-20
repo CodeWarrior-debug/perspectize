@@ -1,16 +1,16 @@
 <script lang="ts">
-	import type { LengthDisplay } from '$lib/queries/content';
+	import type { LengthDisplay } from '#lib/queries/content/index.js';
 	import { createQuery } from '@tanstack/svelte-query';
 	import { goto } from '$app/navigation';
-	import { graphqlRequest } from '$lib/queries/client';
+	import { graphqlRequest } from '#lib/queries/client.js';
 	import {
 		LIST_PERSPECTIVES_BY_CONTENT,
 		MAX_PERSPECTIVES_PER_LIST,
 		type ListPerspectivesByContentResponse,
-	} from '$lib/queries/perspectives';
-	import { GET_CONTENT } from '$lib/queries/content';
-	import { queryKeys } from '$lib/queries/keys';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
+	} from '#lib/queries/perspectives/index.js';
+	import { GET_CONTENT } from '#lib/queries/content/index.js';
+	import { queryKeys } from '#lib/queries/keys.js';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
 	import {
 		compareRatings,
 		filledInDifferently,
@@ -19,18 +19,18 @@
 		summarize,
 		sortRatingRows,
 		agreementPercent,
-	} from '$lib/utils/comparePerspectives';
-	import { LIBRARY_PATH } from '$lib/utils/contentLinks';
-	import { identityColor } from '$lib/utils/compareIdentity';
-	import ComparePickerRow from '$lib/components/ComparePickerRow.svelte';
-	import CompareOverallRow from '$lib/components/CompareOverallRow.svelte';
-	import CompareRatingTable from '$lib/components/CompareRatingTable.svelte';
-	import CompareTakeColumn from '$lib/components/CompareTakeColumn.svelte';
-	import { Button } from '$lib/components/shadcn';
+	} from '#lib/utils/comparePerspectives.js';
+	import { LIBRARY_PATH } from '#lib/utils/contentLinks.js';
+	import { identityColor } from '#lib/utils/compareIdentity.js';
+	import ComparePickerRow from '#lib/components/ComparePickerRow.svelte';
+	import CompareOverallRow from '#lib/components/CompareOverallRow.svelte';
+	import CompareRatingTable from '#lib/components/CompareRatingTable.svelte';
+	import CompareTakeColumn from '#lib/components/CompareTakeColumn.svelte';
+	import { Button } from '#lib/components/shadcn/index.js';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
-	import { formatDuration, formatDate, extractVideoIdFromUrl } from '$lib/utils/formatting';
-	import { passageIconLabels } from '$lib/utils/bible';
-	import BiblePassageIcon from '$lib/components/BiblePassageIcon.svelte';
+	import { formatDuration, formatDate, extractVideoIdFromUrl } from '#lib/utils/formatting.js';
+	import { passageIconLabels } from '#lib/utils/bible.js';
+	import BiblePassageIcon from '#lib/components/BiblePassageIcon.svelte';
 
 	interface CompareContentBanner {
 		id: string;
@@ -70,7 +70,7 @@
 	}));
 
 	// GET_CONTENT (contentByID) is the existing single-content query in
-	// $lib/queries/content — it does NOT return channelTitle/description/tags,
+	// #lib/queries/content — it does NOT return channelTitle/description/tags,
 	// only the fields below, so the banner is limited to what it actually has.
 	const contentQuery = createQuery(() => ({
 		queryKey: queryKeys.content.banner(contentId),
@@ -161,7 +161,7 @@
 		params.set('contentId', contentId);
 		params.set('left', next.left ?? leftId ?? '');
 		params.set('right', next.right ?? rightId ?? '');
-		goto(`/compare?${params.toString()}`, { replaceState: true, keepFocus: true, noScroll: true });
+		goto(`/compare?${params.toString()}`, { replace: true, reset: false });
 	}
 
 	function handleLeftChange(id: string) {

@@ -9,7 +9,7 @@ import {
 	COL_TO_SORT,
 	SORT_TO_COL,
 	GRID_DEFAULTS,
-} from '$lib/utils/gridUrlState';
+} from '#lib/utils/gridUrlState.js';
 
 // ---------------------------------------------------------------------------
 // parseGridParams

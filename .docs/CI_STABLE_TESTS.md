@@ -10,7 +10,7 @@ The full unit run is about 250 files and 3,500 tests, spread over every core, an
 | ---------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `findBy*` / `waitFor` (Testing Library `asyncUtilTimeout`) | 1,000 ms | Vite transforming a module the first time a `{#await import()}` block renders it                                                                                                              |
 | The test itself (Vitest `testTimeout`)                     | 5,000 ms | The **first render** of a component in a worker. Measured on an idle machine: ThemeCustomizePanel 2.5 s cold, 0.08 s warm. Rendering a different, trivial component first does not absorb it. |
-| The test itself                                            | 5,000 ms | `await import('$lib/...')` of a real module inside the test body                                                                                                                              |
+| The test itself                                            | 5,000 ms | `await import('#lib/...')` of a real module inside the test body                                                                                                                              |
 
 In each case the test logic is fine: the wait covers a cost the test never meant to measure. The fix is to **pay the cost in a `beforeAll`**, which has its own generous timeout, so the timed test measures only the behaviour.
 
@@ -21,7 +21,7 @@ In each case the test logic is fine: the wait covers a cost the test never meant
    ```ts
    import { preloadLazy } from "../helpers/warmUp";
 
-   preloadLazy(() => import("$lib/components/ActivityDetailsModal.svelte"));
+   preloadLazy(() => import("#lib/components/ActivityDetailsModal.svelte"));
    ```
 
    Find them with `grep -rn "{#await import(" src/lib`. Every test file that renders one of those components needs the preload, even when it only sometimes reaches the lazy branch.

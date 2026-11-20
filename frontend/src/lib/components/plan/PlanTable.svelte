@@ -8,11 +8,11 @@
 		RowDragEndEvent,
 		SortChangedEvent,
 	} from '@ag-grid-community/core';
-	import type { UserTodoItem, UserTodoSortBy } from '$lib/queries/userTodos';
-	import { PLAN_GRID_THEME } from '$lib/utils/grid-theme';
-	import { emptyCellClassRules } from '$lib/utils/grid-empty';
-	import EmptyAware from '$lib/components/EmptyAware.svelte';
-	import { useCardMode, useResponsiveTier } from '$lib/utils/responsive.svelte';
+	import type { UserTodoItem, UserTodoSortBy } from '#lib/queries/userTodos/index.js';
+	import { PLAN_GRID_THEME } from '#lib/utils/grid-theme.js';
+	import { emptyCellClassRules } from '#lib/utils/grid-empty.js';
+	import EmptyAware from '#lib/components/EmptyAware.svelte';
+	import { useCardMode, useResponsiveTier } from '#lib/utils/responsive.svelte.js';
 	import {
 		buildPlanColumnDefs,
 		editFieldFor,
@@ -24,8 +24,8 @@
 		planStatusLabel,
 		planTypeLabel,
 		serverSortFromColumnState,
-	} from '$lib/utils/plan-grid-config';
-	import { addPerspectiveDisabledReason, type TodoFocusField } from '$lib/utils/plan-todo-helpers';
+	} from '#lib/utils/plan-grid-config.js';
+	import { addPerspectiveDisabledReason, type TodoFocusField } from '#lib/utils/plan-todo-helpers.js';
 
 	/**
 	 * PlanTable: the user's todos in an AG Grid (or a stacked card list below

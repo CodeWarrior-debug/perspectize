@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import { Input } from '$lib/components/shadcn';
+import { Input } from '#lib/components/shadcn/index.js';
 
 // The shared Input opts out of password-manager fill by default; allowAutofill is the one
 // documented way back for real identity fields.

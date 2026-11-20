@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { initials } from '$lib/messaging/format';
+	import { initials } from '#lib/messaging/format.js';
 
 	let { username, size = 'md' }: { username: string; size?: 'sm' | 'md' } = $props();
 

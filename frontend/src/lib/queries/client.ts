@@ -1,8 +1,8 @@
 import { GraphQLClient } from 'graphql-request';
 import { QueryClient } from '@tanstack/svelte-query';
-import { browser } from '$app/environment';
-import { clientInfoHeaders } from '$lib/buildInfo';
-import { getAuthToken } from '$lib/auth';
+import { browser } from '$app/env';
+import { clientInfoHeaders } from '#lib/buildInfo.js';
+import { getAuthToken } from '#lib/auth/index.js';
 
 /** GraphQL HTTP endpoint (VITE_GRAPHQL_URL build var, localhost fallback). */
 export const GRAPHQL_ENDPOINT = import.meta.env.VITE_GRAPHQL_URL || 'http://localhost:8080/graphql';
@@ -34,7 +34,7 @@ export const queryClient = new QueryClient({
 });
 
 // Token source (Clerk session, or the demo persona in demo mode) lives in
-// $lib/auth; re-exported so existing importers keep working.
+// #lib/auth; re-exported so existing importers keep working.
 export { getAuthToken };
 
 /**

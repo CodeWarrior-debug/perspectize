@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
-	import type { LengthDisplay, WebPageListMeta } from '$lib/queries/content';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
+	import type { LengthDisplay, WebPageListMeta } from '#lib/queries/content/index.js';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import XIcon from '@lucide/svelte/icons/x';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ScaleIcon from '@lucide/svelte/icons/scale';
-	import { MODAL_ACTION_CLASS } from '$lib/components/modal-action';
-	import { Dialog, DialogContent, DialogTitle, DialogClose } from '$lib/components/shadcn';
+	import { MODAL_ACTION_CLASS } from '#lib/components/modal-action.js';
+	import { Dialog, DialogContent, DialogTitle, DialogClose } from '#lib/components/shadcn/index.js';
 	import {
 		formatCount,
 		formatDate,
@@ -19,24 +19,24 @@
 		movieResponse,
 		extractVideoIdFromUrl,
 		getSourceDataCooldown,
-	} from '$lib/utils/formatting';
-	import { useUpdateSourceData } from '$lib/queries/content/useUpdateSourceData';
-	import { useContentAggregates } from '$lib/queries/content/useContentAggregates';
-	import { ratingToDisplay } from '$lib/utils/ratings';
-	import MovieTiles from '$lib/components/MovieTiles.svelte';
-	import MovieBody from '$lib/components/MovieBody.svelte';
-	import BookTiles from '$lib/components/BookTiles.svelte';
-	import BookBody from '$lib/components/BookBody.svelte';
-	import WebPageTiles from '$lib/components/WebPageTiles.svelte';
-	import WebPageBody from '$lib/components/WebPageBody.svelte';
-	import { webPageSite } from '$lib/utils/webPage';
-	import { useContentDetails } from '$lib/queries/content/useContentDetails';
-	import { bookAuthors, bookResponse, openLibraryCoverUrl } from '$lib/utils/bookFormatting';
-	import PassageText from '$lib/components/PassageText.svelte';
-	import PassagePositionBar from '$lib/components/PassagePositionBar.svelte';
-	import PassageLinks from '$lib/components/PassageLinks.svelte';
-	import { useSetPassageDisplayTitle } from '$lib/queries/bible/useSetPassageDisplayTitle';
-	import AddToPlanButton from '$lib/components/plan/AddToPlanButton.svelte';
+	} from '#lib/utils/formatting.js';
+	import { useUpdateSourceData } from '#lib/queries/content/useUpdateSourceData.js';
+	import { useContentAggregates } from '#lib/queries/content/useContentAggregates.js';
+	import { ratingToDisplay } from '#lib/utils/ratings.js';
+	import MovieTiles from '#lib/components/MovieTiles.svelte';
+	import MovieBody from '#lib/components/MovieBody.svelte';
+	import BookTiles from '#lib/components/BookTiles.svelte';
+	import BookBody from '#lib/components/BookBody.svelte';
+	import WebPageTiles from '#lib/components/WebPageTiles.svelte';
+	import WebPageBody from '#lib/components/WebPageBody.svelte';
+	import { webPageSite } from '#lib/utils/webPage.js';
+	import { useContentDetails } from '#lib/queries/content/useContentDetails.js';
+	import { bookAuthors, bookResponse, openLibraryCoverUrl } from '#lib/utils/bookFormatting.js';
+	import PassageText from '#lib/components/PassageText.svelte';
+	import PassagePositionBar from '#lib/components/PassagePositionBar.svelte';
+	import PassageLinks from '#lib/components/PassageLinks.svelte';
+	import { useSetPassageDisplayTitle } from '#lib/queries/bible/useSetPassageDisplayTitle.js';
+	import AddToPlanButton from '#lib/components/plan/AddToPlanButton.svelte';
 
 	interface ModalContent {
 		id: string;

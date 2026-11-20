@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { Button, Input } from '$lib/components/shadcn';
+	import { Button, Input } from '#lib/components/shadcn/index.js';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import GlassesIcon from '@lucide/svelte/icons/glasses';
-	import { youtubeSearchUrl } from '$lib/services/youtubeApi';
-	import { validateYouTubeUrl } from '$lib/utils/youtube';
+	import { youtubeSearchUrl } from '#lib/services/youtubeApi.js';
+	import { validateYouTubeUrl } from '#lib/utils/youtube.js';
 
 	// Search hands off to youtube.com: search.list is capped at 100 calls a day
 	// per project, so the app never calls it. A pasted YouTube link is added

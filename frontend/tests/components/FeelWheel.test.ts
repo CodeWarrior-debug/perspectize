@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import FeelWheel from '$lib/components/FeelWheel.svelte';
+import FeelWheel from '#lib/components/FeelWheel.svelte';
 
 describe('FeelWheel intensity', () => {
 	it('shows a freshly picked feeling as unset until the user changes intensity', async () => {

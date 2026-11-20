@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import WebPageBody from '$lib/components/WebPageBody.svelte';
+import WebPageBody from '#lib/components/WebPageBody.svelte';
 
 describe('WebPageBody', () => {
 	it('shows the page description when it has one', () => {

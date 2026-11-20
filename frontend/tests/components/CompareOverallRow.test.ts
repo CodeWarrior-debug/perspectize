@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import CompareOverallRow from '$lib/components/CompareOverallRow.svelte';
+import CompareOverallRow from '#lib/components/CompareOverallRow.svelte';
 
 const baseProps = { leftName: 'You', rightName: 'Jamie' };
 

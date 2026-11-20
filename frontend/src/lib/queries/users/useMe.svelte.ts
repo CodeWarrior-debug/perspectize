@@ -1,7 +1,7 @@
 import { createQuery } from '@tanstack/svelte-query';
-import { useAuthState } from '$lib/auth/useAuthState';
-import { graphqlRequest } from '$lib/queries/client';
-import { ME, type MeResponse, type Me } from '$lib/queries/users';
+import { useAuthState } from '#lib/auth/useAuthState.js';
+import { graphqlRequest } from '#lib/queries/client.js';
+import { ME, type MeResponse, type Me } from '#lib/queries/users/index.js';
 
 /**
  * Reactive access to the signed-in user and whether they are an admin.

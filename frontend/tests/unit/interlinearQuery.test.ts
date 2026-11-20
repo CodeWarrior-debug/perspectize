@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { PASSAGE_INTERLINEAR_QUERY } from '$lib/queries/bible';
-import { queryKeys } from '$lib/queries/keys';
+import { PASSAGE_INTERLINEAR_QUERY } from '#lib/queries/bible/index.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 describe('passage interlinear query', () => {
 	it('asks for every field the UI renders, using the GraphQL names from the backend contract', () => {

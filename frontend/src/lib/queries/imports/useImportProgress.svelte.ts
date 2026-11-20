@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/svelte-query';
-import { subscribeGraphql } from '$lib/messaging/ws-client.svelte';
+import { subscribeGraphql } from '#lib/messaging/ws-client.svelte.js';
 import { IMPORT_PROGRESS, type ImportProgress, type ImportProgressResponse } from './index';
 import { queryKeys } from '../keys';
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import addFieldSearchSource from '$lib/components/AddFieldSearch.svelte?raw';
-import perspectivePopoverSource from '$lib/components/PerspectivePopover.svelte?raw';
-import { STANDARD_DIMENSIONS, getFieldLabel } from '$lib/utils/comparePerspectives';
+import addFieldSearchSource from '#lib/components/AddFieldSearch.svelte?raw';
+import perspectivePopoverSource from '#lib/components/PerspectivePopover.svelte?raw';
+import { STANDARD_DIMENSIONS, getFieldLabel } from '#lib/utils/comparePerspectives.js';
 
 /**
  * Gap #17 in the UI gap audit: the 4 standard rating dimensions (quality,

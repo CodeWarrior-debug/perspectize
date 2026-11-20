@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
+import { activityItemCellRenderer } from '#lib/utils/activityItemCellRenderer.js';
 
 // Regression guard (plan Task 12): on a Webpage row the title opens the details view only, the
 // thumbnail opens the page in a new tab only, and the ◎ and Category cells keep their own handlers.

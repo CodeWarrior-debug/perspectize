@@ -8,7 +8,7 @@ import {
 	RATING_MAX,
 	RATING_DEFAULT_DISPLAY,
 	RATING_DEFAULT_STORAGE,
-} from '$lib/utils/ratings';
+} from '#lib/utils/ratings.js';
 
 describe('ratingToDisplay', () => {
 	it('converts 0 to "0.000"', () => {

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import translations from '$lib/data/bible-translations.json';
-	import { bibleVersion, type BibleVersionStore } from '$lib/utils/bibleVersion.svelte';
+	import translations from '#lib/data/bible-translations.json';
+	import { bibleVersion, type BibleVersionStore } from '#lib/utils/bibleVersion.svelte.js';
 
 	let { store = bibleVersion }: { store?: BibleVersionStore } = $props();
 </script>

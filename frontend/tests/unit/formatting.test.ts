@@ -35,7 +35,7 @@ import {
 	formatVsBudget,
 	durationTooltip,
 	contentTags,
-} from '$lib/utils/formatting';
+} from '#lib/utils/formatting.js';
 
 describe('shared h:mm:ss duration', () => {
 	it.each([

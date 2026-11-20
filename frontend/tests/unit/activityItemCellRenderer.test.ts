@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
+import { activityItemCellRenderer } from '#lib/utils/activityItemCellRenderer.js';
 
 describe('activityItemCellRenderer', () => {
 	it('returns empty string when data is missing', () => {

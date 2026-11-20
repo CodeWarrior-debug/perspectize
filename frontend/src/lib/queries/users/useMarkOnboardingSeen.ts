@@ -1,8 +1,8 @@
 import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { graphqlRequest } from '../client';
 import { MARK_ONBOARDING_SEEN, type MarkOnboardingSeenResponse, type MeResponse, type UserOnboarding } from './index';
-import { CURRENT_INTRO_VERSION } from '$lib/onboarding/config';
-import { setCoachForceOpen } from '$lib/onboarding/coachGate.svelte';
+import { CURRENT_INTRO_VERSION } from '#lib/onboarding/config.js';
+import { setCoachForceOpen } from '#lib/onboarding/coachGate.svelte.js';
 
 function patchMeOnboarding(queryClient: ReturnType<typeof useQueryClient>, onboarding: UserOnboarding) {
 	queryClient.setQueriesData<MeResponse>({ queryKey: ['me'] }, (old) => {

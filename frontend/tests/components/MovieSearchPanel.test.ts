@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import { tick, type Component } from 'svelte';
-import MovieSearchPanel from '$lib/components/discover/MovieSearchPanel.svelte';
+import MovieSearchPanel from '#lib/components/discover/MovieSearchPanel.svelte';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import { makeClient } from '../helpers/queryBudget';
-import { MOVIE_SEARCH, MOVIE_SEARCH_DEBOUNCE_MS, MOVIE_TRENDING, type MovieSearchPage } from '$lib/services/tmdbApi';
+import { MOVIE_SEARCH, MOVIE_SEARCH_DEBOUNCE_MS, MOVIE_TRENDING, type MovieSearchPage } from '#lib/services/tmdbApi.js';
 import { warmUp } from '../helpers/warmUp';
 
-vi.mock('$lib/queries/users/useMe.svelte', () => ({ useMe: () => ({ me: null }) }));
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({ useMe: () => ({ me: null }) }));
 
 const mocks = vi.hoisted(() => ({ graphqlRequest: vi.fn() }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mocks.graphqlRequest }));
 
 const INPUT_NAME = /search movies by title/i;
 const TMDB_LINK = 'https://www.themoviedb.org/movie/603';

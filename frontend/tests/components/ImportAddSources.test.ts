@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import ImportAddSources from '$lib/components/imports/ImportAddSources.svelte';
-import type { ImportJobSummary, ImportSource } from '$lib/queries/imports';
+import ImportAddSources from '#lib/components/imports/ImportAddSources.svelte';
+import type { ImportJobSummary, ImportSource } from '#lib/queries/imports/index.js';
 
 const mocks = vi.hoisted(() => ({
 	add: vi.fn(),
@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('svelte-sonner', () => ({ toast: mocks.toast }));
-vi.mock('$lib/queries/imports/useImportJobMutations', () => ({
+vi.mock('#lib/queries/imports/useImportJobMutations.js', () => ({
 	useAddImportJobSources: () => ({ mutateAsync: mocks.add, isPending: false }),
 }));
 

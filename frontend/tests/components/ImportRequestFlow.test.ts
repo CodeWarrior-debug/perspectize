@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import ImportRequestForm from '$lib/components/imports/ImportRequestForm.svelte';
-import ImportJobActions from '$lib/components/imports/ImportJobActions.svelte';
-import ImportProgressBar from '$lib/components/imports/ImportProgressBar.svelte';
-import type { ImportJobSummary, ImportProgress } from '$lib/queries/imports';
+import ImportRequestForm from '#lib/components/imports/ImportRequestForm.svelte';
+import ImportJobActions from '#lib/components/imports/ImportJobActions.svelte';
+import ImportProgressBar from '#lib/components/imports/ImportProgressBar.svelte';
+import type { ImportJobSummary, ImportProgress } from '#lib/queries/imports/index.js';
 
 const mocks = vi.hoisted(() => ({
 	create: vi.fn(),
@@ -14,16 +14,16 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('svelte-sonner', () => ({ toast: mocks.toast }));
-vi.mock('$lib/components/CommentsEditor.svelte', async () => {
+vi.mock('#lib/components/CommentsEditor.svelte', async () => {
 	const mod = await import('../helpers/FakeCommentsEditor.svelte');
 	return { default: mod.default };
 });
-vi.mock('$lib/queries/imports/useImportJobMutations', () => ({
+vi.mock('#lib/queries/imports/useImportJobMutations.js', () => ({
 	useCreateImportJob: () => ({ mutateAsync: mocks.create, isPending: false }),
 	useReviewImportJob: () => ({ mutateAsync: mocks.review, isPending: false }),
 	useCloseImportJob: () => ({ mutateAsync: mocks.close, isPending: false }),
 }));
-vi.mock('$lib/queries/imports/useImportProgress.svelte', () => ({
+vi.mock('#lib/queries/imports/useImportProgress.svelte.js', () => ({
 	useImportProgress: () => ({
 		get current() {
 			return mocks.progress;

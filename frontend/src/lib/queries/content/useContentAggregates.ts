@@ -1,9 +1,9 @@
 import { createQuery } from '@tanstack/svelte-query';
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { graphqlRequest } from '../client';
 import { GET_CONTENT_AGGREGATES, type ContentAggregatesResponse } from './index';
 import { queryKeys } from '../keys';
-import { useAuthState } from '$lib/auth/useAuthState';
+import { useAuthState } from '#lib/auth/useAuthState.js';
 
 /**
  * Lazily loads the viewer-scoped detail for a single content item: the

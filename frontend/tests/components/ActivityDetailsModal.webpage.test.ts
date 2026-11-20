@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import ActivityDetailsModal from '$lib/components/ActivityDetailsModal.svelte';
-import { formatDateTime } from '$lib/utils/formatting';
+import ActivityDetailsModal from '#lib/components/ActivityDetailsModal.svelte';
+import { formatDateTime } from '#lib/utils/formatting.js';
 import { warmUpRender } from '../helpers/warmUp';
 
 // Same mock shape as ActivityDetailsModal.test.ts: the modal reads mutation and query hooks.
@@ -25,10 +25,10 @@ vi.mock('@tanstack/svelte-query', () => ({
 }));
 
 vi.mock('svelte-sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 
 const authState = vi.hoisted(() => ({ userId: null as string | null }));
-vi.mock('$lib/auth/useAuthState', () => ({
+vi.mock('#lib/auth/useAuthState.js', () => ({
 	useAuthState: () => ({
 		get isLoaded() {
 			return true;

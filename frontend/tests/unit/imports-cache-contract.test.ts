@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
 import { hashKey, type QueryClient } from '@tanstack/svelte-query';
-import { queryKeys } from '$lib/queries/keys';
+import { queryKeys } from '#lib/queries/keys.js';
 import {
 	IMPORT_JOB_POLL_MS,
 	IMPORT_JOB_STALE_TIME_MS,
@@ -15,18 +15,18 @@ import {
 	type ImportJob,
 	type ImportJobResponse,
 	type ImportListingProgress,
-} from '$lib/queries/imports';
-import { importJobIsBusy, useImportJob } from '$lib/queries/imports/useImportJob';
-import { importItemsOnSuccess } from '$lib/queries/imports/useImportItems';
-import { useImportJobs } from '$lib/queries/imports/useImportJobs';
+} from '#lib/queries/imports/index.js';
+import { importJobIsBusy, useImportJob } from '#lib/queries/imports/useImportJob.js';
+import { importItemsOnSuccess } from '#lib/queries/imports/useImportItems.js';
+import { useImportJobs } from '#lib/queries/imports/useImportJobs.js';
 import {
 	createImportJobOnSuccess,
 	importJobChangedOnSuccess,
 	updateImportJobDescriptionOnSuccess,
-} from '$lib/queries/imports/useImportJobMutations';
-import { patchExcluded } from '$lib/queries/imports/useSetImportItemsExcluded';
-import { useImportItemDetails } from '$lib/queries/imports/useImportItemDetails';
-import { graphqlRequest } from '$lib/queries/client';
+} from '#lib/queries/imports/useImportJobMutations.js';
+import { patchExcluded } from '#lib/queries/imports/useSetImportItemsExcluded.js';
+import { useImportItemDetails } from '#lib/queries/imports/useImportItemDetails.js';
+import { graphqlRequest } from '#lib/queries/client.js';
 import ImportListingProbe from '../helpers/ImportListingProbe.svelte';
 import { countingFetch, invalidationOutcome, makeClient, mountConsumers, seed } from '../helpers/queryBudget';
 
@@ -40,7 +40,7 @@ const ws = vi.hoisted(() => ({
 	status: { value: 'connected' as 'connecting' | 'connected' | 'closed' },
 }));
 
-vi.mock('$lib/messaging/ws-client.svelte', () => ({
+vi.mock('#lib/messaging/ws-client.svelte.js', () => ({
 	subscribeGraphql: (payload: unknown, handlers: unknown) => {
 		ws.subscribe(payload);
 		ws.handlers = handlers;
@@ -60,7 +60,7 @@ vi.mock('@tanstack/svelte-query', async (importOriginal) => {
 		useQueryClient: () => client,
 	};
 });
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 
 function item(overrides: Partial<ImportItem> = {}): ImportItem {
 	return {

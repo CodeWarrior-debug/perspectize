@@ -37,11 +37,11 @@ vi.mock('@tanstack/svelte-query', () => ({
 	createMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 	useQueryClient: vi.fn(() => ({ setQueryData: vi.fn(), getQueryData: vi.fn(), invalidateQueries: vi.fn() })),
 }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
-vi.mock('$lib/queries/users/useMe.svelte', () => ({
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({
 	useMe: () => ({ me: { id: 'u1', username: 'me' }, isSettled: true }),
 }));
-vi.mock('$lib/queries/messaging/useThreadMessages.svelte', () => ({
+vi.mock('#lib/queries/messaging/useThreadMessages.svelte.js', () => ({
 	useThreadMessages: () => ({
 		get query() {
 			return { data: mocks.messagesData, isLoading: false };
@@ -52,12 +52,12 @@ vi.mock('$lib/queries/messaging/useThreadMessages.svelte', () => ({
 		fetchOlder: vi.fn(),
 	}),
 }));
-vi.mock('$lib/queries/messaging/useSendMessage', () => ({ useSendMessage: () => ({ mutate: mocks.sendMutate }) }));
-vi.mock('$lib/queries/messaging/useSetTyping', () => ({ useSetTyping: () => ({ mutate: mocks.setTypingMutate }) }));
-vi.mock('$lib/queries/messaging/useMarkThreadRead', () => ({
+vi.mock('#lib/queries/messaging/useSendMessage.js', () => ({ useSendMessage: () => ({ mutate: mocks.sendMutate }) }));
+vi.mock('#lib/queries/messaging/useSetTyping.js', () => ({ useSetTyping: () => ({ mutate: mocks.setTypingMutate }) }));
+vi.mock('#lib/queries/messaging/useMarkThreadRead.js', () => ({
 	useMarkThreadRead: () => ({ mutate: mocks.markReadMutate }),
 }));
-vi.mock('$lib/messaging/useThreadStream.svelte', () => ({
+vi.mock('#lib/messaging/useThreadStream.svelte.js', () => ({
 	createThreadStream: () => ({
 		get typingUserIds() {
 			return [];
@@ -70,7 +70,7 @@ vi.mock('$lib/messaging/useThreadStream.svelte', () => ({
 	}),
 }));
 
-import ThreadView from '$lib/components/messaging/ThreadView.svelte';
+import ThreadView from '#lib/components/messaging/ThreadView.svelte';
 
 describe('ThreadView', () => {
 	const originalMessagesItems = mocks.messagesData.items;

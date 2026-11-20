@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import AddToPlanDialog from '$lib/components/plan/AddToPlanDialog.svelte';
-import type { TodoActionItem, UserTodoListItem } from '$lib/queries/userTodos';
+import AddToPlanDialog from '#lib/components/plan/AddToPlanDialog.svelte';
+import type { TodoActionItem, UserTodoListItem } from '#lib/queries/userTodos/index.js';
 import { preloadLazy } from '../helpers/warmUp';
 
 const mocks = vi.hoisted(() => ({
@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 	onClose: vi.fn(),
 }));
 
-vi.mock('$lib/components/CommentsEditor.svelte', async () => {
+vi.mock('#lib/components/CommentsEditor.svelte', async () => {
 	const mod = await import('../helpers/FakeCommentsEditor.svelte');
 	return { default: mod.default };
 });
@@ -20,7 +20,7 @@ const ACTIONS: TodoActionItem[] = [
 	{ id: '2', key: 'consume', label: 'Consume', description: '', typicalSequence: 2, isPreset: true },
 ];
 
-vi.mock('$lib/queries/userTodos/useTodoActions', () => ({
+vi.mock('#lib/queries/userTodos/useTodoActions.js', () => ({
 	useTodoActions: vi.fn(() => ({ data: { todoActions: ACTIONS }, isPending: false })),
 }));
 
@@ -36,22 +36,22 @@ const LISTS: UserTodoListItem[] = [
 	},
 ];
 
-vi.mock('$lib/queries/userTodos/useUserTodoLists', () => ({
+vi.mock('#lib/queries/userTodos/useUserTodoLists.js', () => ({
 	useUserTodoLists: vi.fn((userId: () => number | null) => {
 		mocks.listsUserId.mockImplementation(userId);
 		return { data: { userTodoLists: LISTS }, isPending: false };
 	}),
 }));
 
-vi.mock('$lib/queries/userTodos/useCreateUserTodo', () => ({
+vi.mock('#lib/queries/userTodos/useCreateUserTodo.js', () => ({
 	useCreateUserTodo: vi.fn(() => ({ mutateAsync: mocks.createMutateAsync, isPending: false })),
 }));
 
-vi.mock('$lib/queries/userTodos/useUpdateUserTodo', () => ({
+vi.mock('#lib/queries/userTodos/useUpdateUserTodo.js', () => ({
 	useUpdateUserTodo: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 
-vi.mock('$lib/queries/userTodos/useCreateTodoAction', () => ({
+vi.mock('#lib/queries/userTodos/useCreateTodoAction.js', () => ({
 	useCreateTodoAction: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 
@@ -71,7 +71,7 @@ function submit() {
 
 // The component renders this through {#await import(...)}: load it up front so a
 // findBy* waits on the UI, not on Vite's first transform of the module (#728).
-preloadLazy(() => import('$lib/components/plan/TodoDialog.svelte'));
+preloadLazy(() => import('#lib/components/plan/TodoDialog.svelte'));
 
 describe('AddToPlanDialog', () => {
 	beforeEach(() => {

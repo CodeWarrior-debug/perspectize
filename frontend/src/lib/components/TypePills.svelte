@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { otherTypeOptionsWhenOne } from '$lib/utils/gridUrlState';
+	import { otherTypeOptionsWhenOne } from '#lib/utils/gridUrlState.js';
 
 	let {
 		filters,

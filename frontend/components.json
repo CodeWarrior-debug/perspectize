@@ -7,8 +7,8 @@
 		"baseColor": "slate"
 	},
 	"aliases": {
-		"components": "$lib/components/shadcn",
-		"ui": "$lib/components/shadcn",
-		"utils": "$lib/utils"
+		"components": "#lib/components/shadcn",
+		"ui": "#lib/components/shadcn",
+		"utils": "#lib/utils"
 	}
 }

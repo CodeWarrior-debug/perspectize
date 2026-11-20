@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ClipboardBlockedError, copyWithToast, downloadWithToast } from '$lib/utils/toast';
+import { ClipboardBlockedError, copyWithToast, downloadWithToast } from '#lib/utils/toast.js';
 
 function toaster() {
 	return { success: vi.fn(), error: vi.fn() };

@@ -15,12 +15,12 @@ vi.mock('@tanstack/svelte-query', () => ({
 	}),
 	useQueryClient: vi.fn(() => ({ setQueryData: mocks.mockSetQueryData, invalidateQueries: mocks.mockInvalidate })),
 }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
 vi.mock('svelte-sonner', () => ({ toast: { error: mocks.mockToastError, success: vi.fn() } }));
 
-import { useMuteThread } from '$lib/queries/messaging/useMuteThread';
-import { MUTE_THREAD } from '$lib/queries/messaging';
-import { queryKeys } from '$lib/queries/keys';
+import { useMuteThread } from '#lib/queries/messaging/useMuteThread.js';
+import { MUTE_THREAD } from '#lib/queries/messaging/index.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 const thread = {
 	id: 't1',

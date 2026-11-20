@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import FilterChips from '$lib/components/FilterChips.svelte';
+import FilterChips from '#lib/components/FilterChips.svelte';
 
 const mockSetFilterModel = vi.fn();
 const mockGetFilterModel = vi.fn();

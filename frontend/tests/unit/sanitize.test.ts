@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeHtml } from '$lib/utils/sanitize';
+import { sanitizeHtml } from '#lib/utils/sanitize.js';
 
 describe('sanitizeHtml', () => {
 	it('keeps allowed formatting tags and attributes', () => {

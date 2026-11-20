@@ -17,12 +17,12 @@ vi.mock('@tanstack/svelte-query', () => ({
 		invalidateQueries: mocks.mockInvalidate,
 	})),
 }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: (...a: unknown[]) => mocks.mockGraphql(...a) }));
 vi.mock('svelte-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
-import { useMarkThreadRead } from '$lib/queries/messaging/useMarkThreadRead';
-import { MARK_THREAD_READ } from '$lib/queries/messaging';
-import { queryKeys } from '$lib/queries/keys';
+import { useMarkThreadRead } from '#lib/queries/messaging/useMarkThreadRead.js';
+import { MARK_THREAD_READ } from '#lib/queries/messaging/index.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 describe('useMarkThreadRead', () => {
 	beforeEach(() => vi.clearAllMocks());

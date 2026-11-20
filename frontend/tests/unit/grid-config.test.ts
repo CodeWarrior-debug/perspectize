@@ -21,8 +21,8 @@ import {
 	NUMERIC_COL_IDS,
 	CONTENT_TYPE_OPTIONS,
 	liveGridApi,
-} from '$lib/utils/grid-config';
-import type { ContentItem } from '$lib/queries/content';
+} from '#lib/utils/grid-config.js';
+import type { ContentItem } from '#lib/queries/content/index.js';
 
 describe('CONTENT_TYPE_OPTIONS (Book)', () => {
 	it('offers Book as a type filter option', () => {

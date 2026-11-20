@@ -1,5 +1,5 @@
 <script lang="ts">
-	import SearchBar from '$lib/components/discover/SearchBar.svelte';
+	import SearchBar from '#lib/components/discover/SearchBar.svelte';
 
 	// Host wrapper for testing SearchBar's $bindable value: it owns the bound
 	// state and surfaces it in the DOM so tests can assert on two-way writes.

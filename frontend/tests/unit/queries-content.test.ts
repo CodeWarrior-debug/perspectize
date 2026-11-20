@@ -10,7 +10,7 @@ import {
 	type ContentItem,
 	type ContentResponse,
 	type CreateContentResponse,
-} from '$lib/queries/content';
+} from '#lib/queries/content/index.js';
 
 describe('GraphQL query definitions', () => {
 	describe('Type exports', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { apiOriginFromGraphqlUrl, frontendBuildInfo, printVersionInfo } from '$lib/utils/versionInfo';
+import { apiOriginFromGraphqlUrl, frontendBuildInfo, printVersionInfo } from '#lib/utils/versionInfo.js';
 
 function fakeConsole() {
 	return {

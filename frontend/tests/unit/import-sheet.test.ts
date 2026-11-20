@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { ImportFacts, ImportItem, ImportSource } from '$lib/queries/imports';
-import { EMPTY_VALUE } from '$lib/utils/formatting';
+import type { ImportFacts, ImportItem, ImportSource } from '#lib/queries/imports/index.js';
+import { EMPTY_VALUE } from '#lib/utils/formatting.js';
 import {
 	buildImportColumnDefs,
 	canAddImportSources,
@@ -33,7 +33,7 @@ import {
 	toImportRows,
 	unavailableNote,
 	type ImportRow,
-} from '$lib/utils/import-sheet';
+} from '#lib/utils/import-sheet.js';
 
 describe('import request description', () => {
 	it('counts only visible text: tags, empty paragraphs, NBSP and scripts do not count', () => {

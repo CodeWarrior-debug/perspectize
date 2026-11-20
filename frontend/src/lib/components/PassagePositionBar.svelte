@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { passagePosition } from '$lib/utils/biblePosition';
+	import { passagePosition } from '#lib/utils/biblePosition.js';
 
 	let { startVerseId, endVerseId }: { startVerseId: number; endVerseId: number } = $props();
 

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { QueryClient } from '@tanstack/svelte-query';
-import { queryKeys } from '$lib/queries/keys';
-import { UPDATE_CLAIM } from '$lib/queries/content/claims';
-import { graphqlRequest } from '$lib/queries/client';
+import { queryKeys } from '#lib/queries/keys.js';
+import { UPDATE_CLAIM } from '#lib/queries/content/claims.js';
+import { graphqlRequest } from '#lib/queries/client.js';
 import { invalidationOutcome, makeClient, seed } from '../helpers/queryBudget';
 
 let client: QueryClient;
@@ -23,7 +23,7 @@ vi.mock('@tanstack/svelte-query', async (importOriginal) => {
 	};
 });
 vi.mock('svelte-sonner', () => ({ toast: { success: mockToastSuccess, error: mockToastError } }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 
 beforeEach(() => {
 	client = makeClient();
@@ -32,7 +32,7 @@ beforeEach(() => {
 });
 
 async function useHook() {
-	const { useUpdateClaim } = await import('$lib/queries/content/useUpdateClaim');
+	const { useUpdateClaim } = await import('#lib/queries/content/useUpdateClaim.js');
 	useUpdateClaim();
 }
 

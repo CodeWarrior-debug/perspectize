@@ -5,7 +5,7 @@ import type {
 	ImportListingProgress as Progress,
 	ImportSource,
 	ImportSourceListingProgress,
-} from '$lib/queries/imports';
+} from '#lib/queries/imports/index.js';
 import { liveMock, listingProps } from '../helpers/listingProgressMock.svelte';
 import ImportListingHarness from '../helpers/ImportListingHarness.svelte';
 
@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 	enabled: undefined as undefined | (() => boolean),
 }));
 
-vi.mock('$lib/queries/users/useMe.svelte', async () => {
+vi.mock('#lib/queries/users/useMe.svelte.js', async () => {
 	const { liveMock: live } = await import('../helpers/listingProgressMock.svelte');
 	return {
 		useMe: () => ({
@@ -23,7 +23,7 @@ vi.mock('$lib/queries/users/useMe.svelte', async () => {
 		}),
 	};
 });
-vi.mock('$lib/queries/imports/useImportListingProgress.svelte', async () => {
+vi.mock('#lib/queries/imports/useImportListingProgress.svelte.js', async () => {
 	const { liveMock: live } = await import('../helpers/listingProgressMock.svelte');
 	return {
 		useImportListingProgress: (_jobId: () => string | null, enabled: () => boolean) => {

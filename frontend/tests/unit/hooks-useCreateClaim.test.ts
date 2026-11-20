@@ -30,15 +30,15 @@ vi.mock('svelte-sonner', () => ({
 	},
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: vi.fn(),
 }));
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
-	() => import('$lib/queries/client'),
-	() => import('$lib/queries/content/useCreateClaim'),
+	() => import('#lib/queries/client.js'),
+	() => import('#lib/queries/content/useCreateClaim.js'),
 );
 
 describe('useCreateClaim hook', () => {
@@ -49,7 +49,7 @@ describe('useCreateClaim hook', () => {
 
 	describe('hook initialization', () => {
 		it('returns a mutation object with mutate method', async () => {
-			const { useCreateClaim } = await import('$lib/queries/content/useCreateClaim');
+			const { useCreateClaim } = await import('#lib/queries/content/useCreateClaim.js');
 			const mutation = useCreateClaim();
 			expect(mutation).toBeDefined();
 			expect(mutation.mutate).toBeDefined();
@@ -58,15 +58,15 @@ describe('useCreateClaim hook', () => {
 
 	describe('mutationFn', () => {
 		it('is defined and callable', async () => {
-			const { useCreateClaim } = await import('$lib/queries/content/useCreateClaim');
+			const { useCreateClaim } = await import('#lib/queries/content/useCreateClaim.js');
 			useCreateClaim();
 			expect(capturedMutationOptions).toBeDefined();
 			expect(typeof capturedMutationOptions.mutationFn).toBe('function');
 		});
 
 		it('calls graphqlRequest with CREATE_CLAIM and input', async () => {
-			const { useCreateClaim } = await import('$lib/queries/content/useCreateClaim');
-			const { graphqlRequest } = await import('$lib/queries/client');
+			const { useCreateClaim } = await import('#lib/queries/content/useCreateClaim.js');
+			const { graphqlRequest } = await import('#lib/queries/client.js');
 			useCreateClaim();
 
 			(graphqlRequest as any).mockResolvedValue({
@@ -82,7 +82,7 @@ describe('useCreateClaim hook', () => {
 
 	describe('onSuccess callback', () => {
 		beforeEach(async () => {
-			const { useCreateClaim } = await import('$lib/queries/content/useCreateClaim');
+			const { useCreateClaim } = await import('#lib/queries/content/useCreateClaim.js');
 			useCreateClaim();
 		});
 
@@ -101,7 +101,7 @@ describe('useCreateClaim hook', () => {
 
 	describe('onError callback', () => {
 		beforeEach(async () => {
-			const { useCreateClaim } = await import('$lib/queries/content/useCreateClaim');
+			const { useCreateClaim } = await import('#lib/queries/content/useCreateClaim.js');
 			useCreateClaim();
 		});
 
@@ -138,7 +138,7 @@ describe('useCreateClaim hook', () => {
 
 	describe('integration with queryClient and toasts', () => {
 		beforeEach(async () => {
-			const { useCreateClaim } = await import('$lib/queries/content/useCreateClaim');
+			const { useCreateClaim } = await import('#lib/queries/content/useCreateClaim.js');
 			useCreateClaim();
 		});
 

@@ -8,7 +8,7 @@
 		Button,
 		Input,
 		Label,
-	} from '$lib/components/shadcn';
+	} from '#lib/components/shadcn/index.js';
 
 	export type PrintSpacing = 'compact' | 'standard' | 'roomy';
 

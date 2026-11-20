@@ -8,26 +8,26 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { hashKey, type QueryClient, type QueryKey } from '@tanstack/svelte-query';
-import { queryKeys } from '$lib/queries/keys';
+import { queryKeys } from '#lib/queries/keys.js';
 import { invalidationOutcome, makeClient, mountConsumers, seed } from '../helpers/queryBudget';
 import {
 	TODO_ACTIONS_STALE_TIME_MS,
 	USER_TODO_STALE_TIME_MS,
 	type UserTodoItem,
 	type UserTodosArgs,
-} from '$lib/queries/userTodos';
-import { useUserTodos } from '$lib/queries/userTodos/useUserTodos';
-import { useFetchUserTodos } from '$lib/queries/userTodos/useFetchUserTodos';
-import { useUserTodoLists } from '$lib/queries/userTodos/useUserTodoLists';
-import { useTodoActions } from '$lib/queries/userTodos/useTodoActions';
-import { useCreateUserTodo } from '$lib/queries/userTodos/useCreateUserTodo';
-import { useUpdateUserTodo } from '$lib/queries/userTodos/useUpdateUserTodo';
-import { useDeleteUserTodo } from '$lib/queries/userTodos/useDeleteUserTodo';
-import { useCreateTodoAction } from '$lib/queries/userTodos/useCreateTodoAction';
-import { useReorderUserTodoList } from '$lib/queries/userTodos/useReorderUserTodoList';
-import { useCreateUserTodoList } from '$lib/queries/userTodos/useCreateUserTodoList';
-import { useUpdateUserTodoList } from '$lib/queries/userTodos/useUpdateUserTodoList';
-import { useDeleteUserTodoList } from '$lib/queries/userTodos/useDeleteUserTodoList';
+} from '#lib/queries/userTodos/index.js';
+import { useUserTodos } from '#lib/queries/userTodos/useUserTodos.js';
+import { useFetchUserTodos } from '#lib/queries/userTodos/useFetchUserTodos.js';
+import { useUserTodoLists } from '#lib/queries/userTodos/useUserTodoLists.js';
+import { useTodoActions } from '#lib/queries/userTodos/useTodoActions.js';
+import { useCreateUserTodo } from '#lib/queries/userTodos/useCreateUserTodo.js';
+import { useUpdateUserTodo } from '#lib/queries/userTodos/useUpdateUserTodo.js';
+import { useDeleteUserTodo } from '#lib/queries/userTodos/useDeleteUserTodo.js';
+import { useCreateTodoAction } from '#lib/queries/userTodos/useCreateTodoAction.js';
+import { useReorderUserTodoList } from '#lib/queries/userTodos/useReorderUserTodoList.js';
+import { useCreateUserTodoList } from '#lib/queries/userTodos/useCreateUserTodoList.js';
+import { useUpdateUserTodoList } from '#lib/queries/userTodos/useUpdateUserTodoList.js';
+import { useDeleteUserTodoList } from '#lib/queries/userTodos/useDeleteUserTodoList.js';
 
 const { graphqlRequest } = vi.hoisted(() => ({ graphqlRequest: vi.fn() }));
 
@@ -43,7 +43,7 @@ vi.mock('@tanstack/svelte-query', async (importOriginal) => {
 		useQueryClient: () => client,
 	};
 });
-vi.mock('$lib/queries/client', () => ({ graphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest }));
 
 /** The subset of TanStack options these tests read. */
 interface HookOptions {

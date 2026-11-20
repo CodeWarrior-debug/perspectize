@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { computeTag } from '$lib/utils/buildTag';
+import { computeTag } from '#lib/utils/buildTag.js';
 
 interface TagFixtureCase {
 	name: string;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/svelte';
-import type { ClaimRow } from '$lib/queries/content/claims';
+import type { ClaimRow } from '#lib/queries/content/claims.js';
 
 const mocks = vi.hoisted(() => ({
 	auth: { isLoaded: true, userId: null as string | null },
@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
 	claims: { isPending: false, isError: false, data: undefined as ClaimRow[] | undefined },
 }));
 
-vi.mock('$lib/auth/useAuthState', () => ({
+vi.mock('#lib/auth/useAuthState.js', () => ({
 	useAuthState: () => ({
 		get isLoaded() {
 			return mocks.auth.isLoaded;
@@ -19,7 +19,7 @@ vi.mock('$lib/auth/useAuthState', () => ({
 	}),
 }));
 
-vi.mock('$lib/queries/users/useMe.svelte', () => ({
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({
 	useMe: () => ({
 		get me() {
 			return mocks.me;
@@ -27,15 +27,15 @@ vi.mock('$lib/queries/users/useMe.svelte', () => ({
 	}),
 }));
 
-vi.mock('$lib/queries/content/useMyClaims', () => ({
+vi.mock('#lib/queries/content/useMyClaims.js', () => ({
 	useMyClaims: vi.fn(() => mocks.claims),
 }));
 
-vi.mock('$lib/queries/content/useCreateClaim', () => ({
+vi.mock('#lib/queries/content/useCreateClaim.js', () => ({
 	useCreateClaim: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
-vi.mock('$lib/queries/content/useUpdateClaim', () => ({
+vi.mock('#lib/queries/content/useUpdateClaim.js', () => ({
 	useUpdateClaim: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { DemoSession } from '$lib/auth/demo.svelte';
+import { DemoSession } from '#lib/auth/demo.svelte.js';
 
 const STORAGE_KEY = 'perspectize.demoPersona';
 
@@ -72,7 +72,7 @@ describe('getAuthToken', () => {
 		vi.resetModules();
 		const getToken = vi.fn();
 		vi.stubGlobal('Clerk', { session: { getToken } });
-		const { getAuthToken, demoSession } = await import('$lib/auth');
+		const { getAuthToken, demoSession } = await import('#lib/auth/index.js');
 
 		expect(await getAuthToken()).toBeNull();
 		demoSession.signInAs('alice');
@@ -85,7 +85,7 @@ describe('getAuthToken', () => {
 		vi.stubEnv('VITE_DEMO_MODE', '');
 		vi.resetModules();
 		vi.stubGlobal('Clerk', { session: { getToken: vi.fn().mockResolvedValue('jwt-123') } });
-		const { getAuthToken, DEMO_MODE } = await import('$lib/auth');
+		const { getAuthToken, DEMO_MODE } = await import('#lib/auth/index.js');
 
 		expect(DEMO_MODE).toBe(false);
 		expect(await getAuthToken()).toBe('jwt-123');

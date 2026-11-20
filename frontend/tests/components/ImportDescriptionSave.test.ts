@@ -4,7 +4,7 @@ import type { QueryClient } from '@tanstack/svelte-query';
 import TestWrapper from '../helpers/TestWrapper.svelte';
 import ImportDescriptionList from '../helpers/ImportDescriptionList.svelte';
 import { makeClient } from '../helpers/queryBudget';
-import { graphqlRequest } from '$lib/queries/client';
+import { graphqlRequest } from '#lib/queries/client.js';
 import { toast } from 'svelte-sonner';
 
 /**
@@ -17,12 +17,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('svelte-sonner', () => ({ toast: mocks.toast }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
-vi.mock('$lib/components/CommentsEditor.svelte', async () => {
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/components/CommentsEditor.svelte', async () => {
 	const mod = await import('../helpers/FakeCommentsEditor.svelte');
 	return { default: mod.default };
 });
-vi.mock('$lib/queries/users/useMe.svelte', () => ({
+vi.mock('#lib/queries/users/useMe.svelte.js', () => ({
 	useMe: () => ({
 		get me() {
 			return { id: '2', username: 'ben', role: 'USER' };

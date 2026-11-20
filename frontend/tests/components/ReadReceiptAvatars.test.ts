@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import ReadReceiptAvatars from '$lib/components/messaging/ReadReceiptAvatars.svelte';
+import ReadReceiptAvatars from '#lib/components/messaging/ReadReceiptAvatars.svelte';
 
 const p = (id: string, username: string, lastReadSeq: number) => ({
 	user: { id, username },

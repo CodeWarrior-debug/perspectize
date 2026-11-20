@@ -14,7 +14,7 @@
 	import { Popover } from 'bits-ui';
 	import { toast } from 'svelte-sonner';
 	import CopyIcon from '@lucide/svelte/icons/copy';
-	import { itemsCopyText } from '$lib/utils/tooltipSpec';
+	import { itemsCopyText } from '#lib/utils/tooltipSpec.js';
 
 	let {
 		state: popover,
@@ -111,11 +111,8 @@
 						{/each}
 					</div>
 					<div class="tip-actions">
-						<button
-							type="button"
-							data-testid="tip-select-all"
-							disabled={allSelected}
-							onclick={selectAll}>Select all</button
+						<button type="button" data-testid="tip-select-all" disabled={allSelected} onclick={selectAll}
+							>Select all</button
 						>
 						<button
 							type="button"

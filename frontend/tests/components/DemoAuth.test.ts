@@ -3,8 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/svelte';
 
 // Demo mode is a build-time flag; force it on for this file. svelte-clerk must
 // never be rendered in demo mode, so its mock throws if it is.
-vi.mock('$lib/auth/demo.svelte', async (importOriginal) => {
-	const mod = await importOriginal<typeof import('$lib/auth/demo.svelte')>();
+vi.mock('#lib/auth/demo.svelte.js', async (importOriginal) => {
+	const mod = await importOriginal<typeof import('#lib/auth/demo.svelte.js')>();
 	return { ...mod, DEMO_MODE: true, demoSession: new mod.DemoSession() };
 });
 vi.mock('svelte-clerk', () => {
@@ -14,11 +14,11 @@ vi.mock('svelte-clerk', () => {
 	return { Show: fail, SignInButton: fail, UserButton: fail, useClerkContext: fail };
 });
 
-import { demoSession } from '$lib/auth';
-import GuestLanding from '$lib/components/onboarding/GuestLanding.svelte';
-import UserMenu from '$lib/components/auth/UserMenu.svelte';
-import DemoPersonaDialog from '$lib/components/auth/DemoPersonaDialog.svelte';
-import DemoBanner from '$lib/components/auth/DemoBanner.svelte';
+import { demoSession } from '#lib/auth/index.js';
+import GuestLanding from '#lib/components/onboarding/GuestLanding.svelte';
+import UserMenu from '#lib/components/auth/UserMenu.svelte';
+import DemoPersonaDialog from '#lib/components/auth/DemoPersonaDialog.svelte';
+import DemoBanner from '#lib/components/auth/DemoBanner.svelte';
 
 describe('demo-mode auth components', () => {
 	beforeEach(() => {

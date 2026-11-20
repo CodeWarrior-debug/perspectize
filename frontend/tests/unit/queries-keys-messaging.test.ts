@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { queryKeys } from '$lib/queries/keys';
+import { queryKeys } from '#lib/queries/keys.js';
 
 describe('queryKeys.messaging', () => {
 	it('all() is the messaging prefix', () => {

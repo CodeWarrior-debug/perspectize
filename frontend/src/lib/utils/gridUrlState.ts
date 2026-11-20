@@ -2,7 +2,7 @@
  * URL ↔ grid state synchronization utilities.
  * Serializes/deserializes AG Grid filter models to/from URL search params.
  */
-import type { WebPageRole } from '$lib/queries/content';
+import type { WebPageRole } from '#lib/queries/content/index.js';
 import {
 	COL_TO_SORT,
 	SORT_TO_COL,

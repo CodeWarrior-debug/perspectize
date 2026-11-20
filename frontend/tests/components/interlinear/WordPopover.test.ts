@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import WordPopover from '$lib/components/interlinear/WordPopover.svelte';
-import type { InterlinearWord } from '$lib/queries/bible';
+import WordPopover from '#lib/components/interlinear/WordPopover.svelte';
+import type { InterlinearWord } from '#lib/queries/bible/index.js';
 
 const hebrew: InterlinearWord = {
 	id: 1,

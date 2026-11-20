@@ -1,5 +1,5 @@
 <script lang="ts">
-	import ContentSearchInput from '$lib/components/ContentSearchInput.svelte';
+	import ContentSearchInput from '#lib/components/ContentSearchInput.svelte';
 
 	// Host wrapper for testing ContentSearchInput's $bindable props. A plain render()
 	// can't observe two-way bound prop writes without a component that

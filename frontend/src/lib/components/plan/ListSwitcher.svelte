@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { Button, Input } from '$lib/components/shadcn';
-	import type { UserTodoListItem } from '$lib/queries/userTodos';
-	import { useCreateUserTodoList } from '$lib/queries/userTodos/useCreateUserTodoList';
-	import { useUpdateUserTodoList } from '$lib/queries/userTodos/useUpdateUserTodoList';
-	import { useDeleteUserTodoList } from '$lib/queries/userTodos/useDeleteUserTodoList';
-	import type { ListSelection } from '$lib/utils/plan-todo-helpers';
+	import { Button, Input } from '#lib/components/shadcn/index.js';
+	import type { UserTodoListItem } from '#lib/queries/userTodos/index.js';
+	import { useCreateUserTodoList } from '#lib/queries/userTodos/useCreateUserTodoList.js';
+	import { useUpdateUserTodoList } from '#lib/queries/userTodos/useUpdateUserTodoList.js';
+	import { useDeleteUserTodoList } from '#lib/queries/userTodos/useDeleteUserTodoList.js';
+	import type { ListSelection } from '#lib/utils/plan-todo-helpers.js';
 
 	/**
 	 * ListSwitcher: pick All, Unlisted or one of the user's lists, and create,

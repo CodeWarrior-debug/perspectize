@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import OnboardingVideo from '$lib/components/onboarding/OnboardingVideo.svelte';
+import OnboardingVideo from '#lib/components/onboarding/OnboardingVideo.svelte';
 
 describe('OnboardingVideo', () => {
 	it('renders nothing when src is missing', () => {

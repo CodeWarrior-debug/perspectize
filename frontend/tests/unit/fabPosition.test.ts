@@ -6,7 +6,7 @@ import {
 	clampFabPosition,
 	loadFabPosition,
 	saveFabPosition,
-} from '$lib/components/messaging/fabPosition';
+} from '#lib/components/messaging/fabPosition.js';
 
 describe('clampFabPosition', () => {
 	it('leaves an in-bounds position alone', () => {

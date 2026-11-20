@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ExportTable } from '$lib/utils/exportTable';
+	import type { ExportTable } from '#lib/utils/exportTable.js';
 
 	let { table, title, spacing }: { table: ExportTable; title: string; spacing: 'compact' | 'standard' | 'roomy' } =
 		$props();

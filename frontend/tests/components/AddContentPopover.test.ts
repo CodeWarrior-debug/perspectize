@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import AddContentPopover from '$lib/components/AddContentPopover.svelte';
+import AddContentPopover from '#lib/components/AddContentPopover.svelte';
 import { tick } from 'svelte';
 
 // Hoisted mocks — shared pattern for useAddVideo components
@@ -38,12 +38,12 @@ vi.mock('svelte-sonner', () => ({
 	toast: { success: mocks.mockToastSuccess, error: mocks.mockToastError },
 }));
 
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 // This file's svelte-query mock has no createQuery, so the webpage preview query is stubbed.
-vi.mock('$lib/queries/content/useWebPagePreview', () => ({
+vi.mock('#lib/queries/content/useWebPagePreview.js', () => ({
 	useWebPagePreview: () => ({ data: undefined, isPending: false, isError: false }),
 }));
-vi.mock('$lib/utils/youtube', () => ({ validateYouTubeUrl: (url: string) => mocks.mockValidate(url) }));
+vi.mock('#lib/utils/youtube.js', () => ({ validateYouTubeUrl: (url: string) => mocks.mockValidate(url) }));
 
 function reset() {
 	vi.clearAllMocks();
@@ -145,7 +145,7 @@ describe('AddContentPopover mutation setup', () => {
 	});
 
 	it('mutationFn calls graphqlRequest with correct args', async () => {
-		const { graphqlRequest } = await import('$lib/queries/client');
+		const { graphqlRequest } = await import('#lib/queries/client.js');
 		(graphqlRequest as any).mockResolvedValue({
 			createContentFromYouTube: { content: { name: 'Test' }, alreadyExisted: false },
 		});

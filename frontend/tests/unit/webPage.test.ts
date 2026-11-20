@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { WEB_PAGE_ROLE_OPTIONS, webPageReadNotice, webPageRoleLabel, webPageRolesLabel } from '$lib/utils/webPage';
-import type { WebPageFetch } from '$lib/queries/content';
+import { WEB_PAGE_ROLE_OPTIONS, webPageReadNotice, webPageRoleLabel, webPageRolesLabel } from '#lib/utils/webPage.js';
+import type { WebPageFetch } from '#lib/queries/content/index.js';
 import { preloadLazy } from '../helpers/warmUp';
 
 const fetchOf = (status: WebPageFetch['status'], httpStatus: number | null = null): WebPageFetch => ({
@@ -11,7 +11,7 @@ const fetchOf = (status: WebPageFetch['status'], httpStatus: number | null = nul
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
-preloadLazy(() => import('$lib/utils/webPage'));
+preloadLazy(() => import('#lib/utils/webPage.js'));
 
 describe('WEB_PAGE_ROLE_OPTIONS', () => {
 	it('offers exactly Blog post and Session transcript, in that order', () => {
@@ -103,7 +103,7 @@ describe('webpage row readers (list rows carry the shaped webPage payload)', () 
 		}) as never;
 
 	it('site falls back to the domain, then to the url host, when no site name is set', async () => {
-		const { webPageSite } = await import('$lib/utils/webPage');
+		const { webPageSite } = await import('#lib/utils/webPage.js');
 		expect(webPageSite(row({ webPage: { siteName: 'arXiv.org', domain: 'arxiv.org', webPageRoles: [] } }))).toBe(
 			'arXiv.org',
 		);
@@ -112,25 +112,25 @@ describe('webpage row readers (list rows carry the shaped webPage payload)', () 
 	});
 
 	it('site is null when there is no url and no metadata', async () => {
-		const { webPageSite } = await import('$lib/utils/webPage');
+		const { webPageSite } = await import('#lib/utils/webPage.js');
 		expect(webPageSite(row({ url: null, webPage: null }))).toBeNull();
 	});
 
 	it('published date is null (never a guess) when the page declares none', async () => {
-		const { webPagePublished } = await import('$lib/utils/webPage');
+		const { webPagePublished } = await import('#lib/utils/webPage.js');
 		expect(webPagePublished(row({ webPage: { publishedAt: '2017-06-12', webPageRoles: [] } }))).toBe('2017-06-12');
 		expect(webPagePublished(row({ webPage: { publishedAt: null, webPageRoles: [] } }))).toBeNull();
 		expect(webPagePublished(row({ webPage: null }))).toBeNull();
 	});
 
 	it('roles are the stored list, and [] when there is no metadata', async () => {
-		const { webPageRolesOf } = await import('$lib/utils/webPage');
+		const { webPageRolesOf } = await import('#lib/utils/webPage.js');
 		expect(webPageRolesOf(row({ webPage: { webPageRoles: ['BLOG_POST'] } }))).toEqual(['BLOG_POST']);
 		expect(webPageRolesOf(row({ webPage: null }))).toEqual([]);
 	});
 
 	it('author is null when the page declares none (the Author column shows a dash, never "Unknown")', async () => {
-		const { webPageAuthor } = await import('$lib/utils/webPage');
+		const { webPageAuthor } = await import('#lib/utils/webPage.js');
 		expect(webPageAuthor(row({ webPage: { author: 'Jane Doe', webPageRoles: [] } }))).toBe('Jane Doe');
 		expect(webPageAuthor(row({ webPage: { author: null, webPageRoles: [] } }))).toBeNull();
 	});

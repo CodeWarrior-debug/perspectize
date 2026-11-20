@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import activityTableSource from '$lib/components/ActivityTable.svelte?raw';
-import { togglableColIds } from '$lib/utils/grid-config';
+import activityTableSource from '#lib/components/ActivityTable.svelte?raw';
+import { togglableColIds } from '#lib/utils/grid-config.js';
 
 // Always-visible columns that are deliberately never offered in the column picker.
 const NON_TOGGLABLE = ['item', 'perspectize'];

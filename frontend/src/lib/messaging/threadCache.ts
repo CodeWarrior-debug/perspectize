@@ -1,5 +1,5 @@
-import type { Message, MessageThread, MessagePageInfo } from '$lib/queries/messaging';
-import type { ThreadEvent } from '$lib/messaging/events';
+import type { Message, MessageThread, MessagePageInfo } from '#lib/queries/messaging/index.js';
+import type { ThreadEvent } from '#lib/messaging/events.js';
 
 const TYPING_TTL_MS = 6000;
 

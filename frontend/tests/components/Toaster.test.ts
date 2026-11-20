@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@testing-library/svelte';
 import { Toaster, toast } from 'svelte-sonner';
-import { TOASTER_PROPS } from '$lib/utils/toast';
+import { TOASTER_PROPS } from '#lib/utils/toast.js';
 
 // Renders the real svelte-sonner Toaster with the app's props, so a change to
 // how simultaneous toasts are laid out fails here instead of drifting unnoticed.

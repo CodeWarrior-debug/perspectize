@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { IFilterParams } from '@ag-grid-community/core';
-import { ContentTypeFilter } from '$lib/utils/contentTypeFilter';
-import { CONTENT_TYPE_OPTIONS, contentTypeLabel } from '$lib/utils/grid-config';
+import { ContentTypeFilter } from '#lib/utils/contentTypeFilter.js';
+import { CONTENT_TYPE_OPTIONS, contentTypeLabel } from '#lib/utils/grid-config.js';
 
 function setup() {
 	const filterChangedCallback = vi.fn();

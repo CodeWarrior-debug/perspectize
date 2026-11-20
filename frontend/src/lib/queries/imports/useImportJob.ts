@@ -8,7 +8,7 @@ import {
 	type ImportJobResponse,
 } from './index';
 import { queryKeys } from '../keys';
-import { wsStatus } from '$lib/messaging/ws-client.svelte';
+import { wsStatus } from '#lib/messaging/ws-client.svelte.js';
 
 /**
  * True while background work can still change the sheet without telling us:

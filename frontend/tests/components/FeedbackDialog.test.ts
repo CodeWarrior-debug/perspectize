@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import FeedbackDialog from '$lib/components/FeedbackDialog.svelte';
+import FeedbackDialog from '#lib/components/FeedbackDialog.svelte';
 
 describe('FeedbackDialog', () => {
 	const originalWindowOpen = window.open;
@@ -32,7 +32,7 @@ describe('FeedbackDialog', () => {
 		expect(window.open).toHaveBeenCalledWith(
 			'https://github.com/CodeWarrior-debug/perspectize/issues/new?template=bug_report.md',
 			'_blank',
-			'noopener,noreferrer'
+			'noopener,noreferrer',
 		);
 	});
 
@@ -45,7 +45,7 @@ describe('FeedbackDialog', () => {
 		expect(window.open).toHaveBeenCalledWith(
 			'https://github.com/CodeWarrior-debug/perspectize/issues/new?template=feature_request.md',
 			'_blank',
-			'noopener,noreferrer'
+			'noopener,noreferrer',
 		);
 	});
 

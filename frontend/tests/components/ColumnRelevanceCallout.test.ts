@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import ColumnRelevanceCallout from '$lib/components/ColumnRelevanceCallout.svelte';
+import ColumnRelevanceCallout from '#lib/components/ColumnRelevanceCallout.svelte';
 
 describe('ColumnRelevanceCallout', () => {
 	it('renders the short copy', () => {

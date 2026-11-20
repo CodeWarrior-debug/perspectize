@@ -1,11 +1,18 @@
 <script lang="ts">
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
-	import type { ImportItem } from '$lib/queries/imports';
-	import { useImportItemDetails } from '$lib/queries/imports/useImportItemDetails';
-	import { formatDurationSeconds, EMPTY_VALUE } from '$lib/utils/formatting';
-	import { contentTypeLabel } from '$lib/utils/grid-config';
-	import { libraryContentHref } from '$lib/utils/contentLinks';
-	import { factKeys, factText, factTooltip, formatFact, importStatusLabel, prettifyKey } from '$lib/utils/import-sheet';
+	import type { ImportItem } from '#lib/queries/imports/index.js';
+	import { useImportItemDetails } from '#lib/queries/imports/useImportItemDetails.js';
+	import { formatDurationSeconds, EMPTY_VALUE } from '#lib/utils/formatting.js';
+	import { contentTypeLabel } from '#lib/utils/grid-config.js';
+	import { libraryContentHref } from '#lib/utils/contentLinks.js';
+	import {
+		factKeys,
+		factText,
+		factTooltip,
+		formatFact,
+		importStatusLabel,
+		prettifyKey,
+	} from '#lib/utils/import-sheet.js';
 
 	/**
 	 * ImportDetailPanel: everything about one candidate row, so the decision can

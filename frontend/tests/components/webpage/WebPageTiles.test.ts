@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import WebPageTiles from '$lib/components/WebPageTiles.svelte';
-import { formatDateTime } from '$lib/utils/formatting';
+import WebPageTiles from '#lib/components/WebPageTiles.svelte';
+import { formatDateTime } from '#lib/utils/formatting.js';
 
 /** The value shown under a tile's label. */
 function tileValue(label: string): string {

@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
-	import { Button } from '$lib/components/shadcn';
-	import ImportSourceRows from '$lib/components/imports/ImportSourceRows.svelte';
-	import type { ImportJobSummary } from '$lib/queries/imports';
-	import { useAddImportJobSources } from '$lib/queries/imports/useImportJobMutations';
+	import { Button } from '#lib/components/shadcn/index.js';
+	import ImportSourceRows from '#lib/components/imports/ImportSourceRows.svelte';
+	import type { ImportJobSummary } from '#lib/queries/imports/index.js';
+	import { useAddImportJobSources } from '#lib/queries/imports/useImportJobMutations.js';
 	import {
 		canAddImportSources,
 		importErrorMessage,
@@ -12,7 +12,7 @@
 		newSourceRow,
 		toSourceInputs,
 		type SourceRow,
-	} from '$lib/utils/import-sheet';
+	} from '#lib/utils/import-sheet.js';
 
 	/**
 	 * Add sources to an import that already exists: how a request made with only a

@@ -4,13 +4,13 @@ import { render } from '@testing-library/svelte';
 const mocks = vi.hoisted(() => ({ start: vi.fn(), stop: vi.fn() }));
 
 vi.mock('@tanstack/svelte-query', () => ({ useQueryClient: vi.fn(() => ({})) }));
-vi.mock('$lib/messaging/useInboxStream.svelte', () => ({
+vi.mock('#lib/messaging/useInboxStream.svelte.js', () => ({
 	createInboxStream: () => ({ start: mocks.start, stop: mocks.stop }),
 }));
 
 import { tick } from 'svelte';
-import { streamIdle } from '$lib/messaging/streamIdle.svelte';
-import InboxStreamMount from '$lib/components/messaging/InboxStreamMount.svelte';
+import { streamIdle } from '#lib/messaging/streamIdle.svelte.js';
+import InboxStreamMount from '#lib/components/messaging/InboxStreamMount.svelte';
 
 describe('InboxStreamMount', () => {
 	beforeEach(() => vi.clearAllMocks());

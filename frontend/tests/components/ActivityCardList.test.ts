@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import ActivityCardList from '$lib/components/ActivityCardList.svelte';
+import ActivityCardList from '#lib/components/ActivityCardList.svelte';
 
 // The "Add to plan" button reads the auth facade; the real module needs Clerk, so stub it.
 const authState = vi.hoisted(() => ({ userId: null as string | null }));
-vi.mock('$lib/auth/useAuthState', () => ({
+vi.mock('#lib/auth/useAuthState.js', () => ({
 	useAuthState: () => ({
 		get isLoaded() {
 			return true;

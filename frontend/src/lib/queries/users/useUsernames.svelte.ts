@@ -1,7 +1,7 @@
 import { createQuery } from '@tanstack/svelte-query';
-import { graphqlRequest } from '$lib/queries/client';
-import { queryKeys } from '$lib/queries/keys';
-import { LIST_USERS, type UsersResponse } from '$lib/queries/users';
+import { graphqlRequest } from '#lib/queries/client.js';
+import { queryKeys } from '#lib/queries/keys.js';
+import { LIST_USERS, type UsersResponse } from '#lib/queries/users/index.js';
 
 /**
  * Reactive `userId → username` lookup, backed by the shared users-list cache.

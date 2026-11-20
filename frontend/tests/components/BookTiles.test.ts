@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import BookTiles from '$lib/components/BookTiles.svelte';
-import type { BookRow } from '$lib/utils/bookFormatting';
+import BookTiles from '#lib/components/BookTiles.svelte';
+import type { BookRow } from '#lib/utils/bookFormatting.js';
 
 // The four real cases: the full record, a rating-only record, a sparse zine with no
 // cover or rating, and a record with no year.

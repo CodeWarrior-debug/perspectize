@@ -4,8 +4,8 @@
  * comparisons, "filled in differently" rows, feelings overlap, and overall
  * (thumbs) agreement. No I/O, no Svelte — unit tested directly.
  */
-import type { PerspectiveItem, FeelingEntry } from '$lib/queries/perspectives';
-import { ratingToDisplay } from '$lib/utils/ratings';
+import type { PerspectiveItem, FeelingEntry } from '#lib/queries/perspectives/index.js';
+import { ratingToDisplay } from '#lib/utils/ratings.js';
 
 export type RatingStatus = 'similar' | 'diverges' | 'conflict';
 

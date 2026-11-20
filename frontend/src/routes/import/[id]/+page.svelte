@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import SignInTrigger from '$lib/components/auth/SignInTrigger.svelte';
-	import ImportAddSources from '$lib/components/imports/ImportAddSources.svelte';
-	import ImportDescription from '$lib/components/imports/ImportDescription.svelte';
-	import ImportJobActions from '$lib/components/imports/ImportJobActions.svelte';
-	import ImportJobStatus from '$lib/components/imports/ImportJobStatus.svelte';
-	import ImportListingProgress from '$lib/components/imports/ImportListingProgress.svelte';
-	import ImportSheet from '$lib/components/imports/ImportSheet.svelte';
-	import ImportSourceList from '$lib/components/imports/ImportSourceList.svelte';
-	import { Button } from '$lib/components/shadcn';
-	import { useAuthState } from '$lib/auth/useAuthState';
-	import { useImportJob } from '$lib/queries/imports/useImportJob';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
+	import SignInTrigger from '#lib/components/auth/SignInTrigger.svelte';
+	import ImportAddSources from '#lib/components/imports/ImportAddSources.svelte';
+	import ImportDescription from '#lib/components/imports/ImportDescription.svelte';
+	import ImportJobActions from '#lib/components/imports/ImportJobActions.svelte';
+	import ImportJobStatus from '#lib/components/imports/ImportJobStatus.svelte';
+	import ImportListingProgress from '#lib/components/imports/ImportListingProgress.svelte';
+	import ImportSheet from '#lib/components/imports/ImportSheet.svelte';
+	import ImportSourceList from '#lib/components/imports/ImportSourceList.svelte';
+	import { Button } from '#lib/components/shadcn/index.js';
+	import { useAuthState } from '#lib/auth/useAuthState.js';
+	import { useImportJob } from '#lib/queries/imports/useImportJob.js';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
 
 	const auth = useAuthState();
 	const me = useMe();

@@ -2,7 +2,7 @@
  * Webpage helpers shared by the Add dialog, the Activity grid and the details view.
  * Pure functions only: no reactive state, no network.
  */
-import type { ContentItem, WebPageFetch, WebPageMeta, WebPageRole } from '$lib/queries/content';
+import type { ContentItem, WebPageFetch, WebPageMeta, WebPageRole } from '#lib/queries/content/index.js';
 
 /** The roles an adder can pick, in the order the dropdown lists them. */
 export const WEB_PAGE_ROLE_OPTIONS: ReadonlyArray<{ value: WebPageRole; label: string }> = [

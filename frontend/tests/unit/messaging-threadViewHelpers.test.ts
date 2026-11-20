@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import type { Message, MessageThread } from '$lib/queries/messaging';
+import type { Message, MessageThread } from '#lib/queries/messaging/index.js';
 import {
 	showSenderForIndex,
 	lastKnownSeq,
 	typingUsernames,
 	shouldMarkRead,
 	firstUnreadFromOthers,
-} from '$lib/components/messaging/threadView.helpers';
+} from '#lib/components/messaging/threadView.helpers.js';
 
 const m = (seq: number, senderId: string, id = `m${seq}`): Message => ({
 	id,

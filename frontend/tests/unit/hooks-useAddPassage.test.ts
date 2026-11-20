@@ -17,9 +17,9 @@ vi.mock('@tanstack/svelte-query', () => ({
 	useQueryClient: () => ({ invalidateQueries: mocks.invalidate, setQueriesData: mocks.setQueriesData }),
 }));
 vi.mock('svelte-sonner', () => ({ toast: { success: mocks.success, error: mocks.error } }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mocks.graphqlRequest }));
 
-import { useAddPassage } from '$lib/queries/content/useAddPassage';
+import { useAddPassage } from '#lib/queries/content/useAddPassage.js';
 import { preloadLazy } from '../helpers/warmUp';
 
 const range = { bookId: 43, startChapter: 3, startVerse: 16, endChapter: 3, endVerse: 18 };

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import SettingsDialog from '$lib/components/SettingsDialog.svelte';
-import { createThemeStore } from '$lib/theme/store.svelte';
-import { setCoachForceOpen, getCoachForceOpen, getCoachReplayNonce } from '$lib/onboarding/coachGate.svelte';
+import SettingsDialog from '#lib/components/SettingsDialog.svelte';
+import { createThemeStore } from '#lib/theme/store.svelte.js';
+import { setCoachForceOpen, getCoachForceOpen, getCoachReplayNonce } from '#lib/onboarding/coachGate.svelte.js';
 import { warmUpRender } from '../helpers/warmUp';
 
 // Settings → Restart onboarding replays the coach immediately (no next-session flag).
@@ -16,8 +16,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 // Getters let each test flip the Contribute flag; paths come from the real builder.
-vi.mock('$lib/contribute/config', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('$lib/contribute/config')>();
+vi.mock('#lib/contribute/config.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('#lib/contribute/config.js')>();
 	return {
 		...actual,
 		get CONTRIBUTE_TAB_ENABLED() {
@@ -51,7 +51,7 @@ vi.mock('svelte-clerk', () => ({
 	useClerkContext: () => ({ isLoaded: true, auth: { userId: 'user_1' } }),
 }));
 
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: vi.fn() }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: vi.fn() }));
 
 const fakeStore = createThemeStore();
 

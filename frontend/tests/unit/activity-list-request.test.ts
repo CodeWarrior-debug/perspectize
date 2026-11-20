@@ -6,15 +6,15 @@
  */
 import { describe, it, expect } from 'vitest';
 import { hashKey } from '@tanstack/svelte-query';
-import { activityListRequest, cursorsAfterPage, LOADED_MODE_FIRST } from '$lib/queries/content';
-import { queryKeys } from '$lib/queries/keys';
+import { activityListRequest, cursorsAfterPage, LOADED_MODE_FIRST } from '#lib/queries/content/index.js';
+import { queryKeys } from '#lib/queries/keys.js';
 import {
 	ALL_SEARCH_SCOPES,
 	COL_TO_SORT,
 	parseGridParams,
 	searchScopesFor,
 	urlParamsToGraphQLFilter,
-} from '$lib/utils/gridUrlState';
+} from '#lib/utils/gridUrlState.js';
 
 const params = (qs: string) => parseGridParams(new URLSearchParams(qs));
 

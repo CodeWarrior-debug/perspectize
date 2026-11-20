@@ -1,4 +1,4 @@
-import type { PopoverState } from '$lib/components/CellPopover.svelte';
+import type { PopoverState } from '#lib/components/CellPopover.svelte';
 import { resolveSpec, displayText, copyText, type CellCtx, type ColTooltipSpec } from './tooltipSpec';
 
 export interface BuildPopoverParams {

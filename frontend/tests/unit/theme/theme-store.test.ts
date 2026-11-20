@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createThemeStore, loadThemeState, STORAGE_KEY } from '$lib/theme/store.svelte';
-import { DEFAULT_THEME_ID, THEME_PRESETS } from '$lib/theme/presets';
+import { createThemeStore, loadThemeState, STORAGE_KEY } from '#lib/theme/store.svelte.js';
+import { DEFAULT_THEME_ID, THEME_PRESETS } from '#lib/theme/presets.js';
 
 beforeEach(() => {
 	localStorage.clear();

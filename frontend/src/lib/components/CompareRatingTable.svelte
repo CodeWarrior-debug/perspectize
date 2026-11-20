@@ -1,6 +1,6 @@
 <script lang="ts">
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import type { RatingRow, FilledInDifferentlyRow, FeelingComparison } from '$lib/utils/comparePerspectives';
+	import type { RatingRow, FilledInDifferentlyRow, FeelingComparison } from '#lib/utils/comparePerspectives.js';
 
 	let {
 		rows,

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { Show } from 'svelte-clerk';
-	import { DEMO_MODE, demoSession } from '$lib/auth';
+	import { DEMO_MODE, demoSession } from '#lib/auth/index.js';
 
 	/**
 	 * Drop-in for svelte-clerk's `<Show when="signed-in|signed-out">` that also

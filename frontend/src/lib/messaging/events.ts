@@ -1,4 +1,4 @@
-import type { Message } from '$lib/queries/messaging';
+import type { Message } from '#lib/queries/messaging/index.js';
 
 export type ThreadEventTypename =
 	| 'MessagePosted'

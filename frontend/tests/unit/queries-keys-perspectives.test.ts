@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { queryKeys } from '$lib/queries/keys';
+import { queryKeys } from '#lib/queries/keys.js';
 
 describe('queryKeys.perspectives namespace', () => {
 	describe('all()', () => {

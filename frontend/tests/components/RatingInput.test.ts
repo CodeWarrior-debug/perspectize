@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import RatingInput from '$lib/components/RatingInput.svelte';
-import { RATING_DEFAULT_DISPLAY } from '$lib/utils/ratings';
+import RatingInput from '#lib/components/RatingInput.svelte';
+import { RATING_DEFAULT_DISPLAY } from '#lib/utils/ratings.js';
 
 function renderRatingInput(props?: { label?: string; value?: number | null; name?: string }) {
 	const defaultProps = {

@@ -1,6 +1,6 @@
 import { BIBLE_PASSAGE_ICON_SVG } from './icons';
 import { bookSubjects } from './bookFormatting';
-import type { LengthDisplay } from '$lib/queries/content';
+import type { LengthDisplay } from '#lib/queries/content/index.js';
 
 /** The one "no value" glyph for grid cells; keep new formatters on it. */
 export const EMPTY_VALUE = '—';

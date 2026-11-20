@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import AddContentPopover from '$lib/components/AddContentPopover.svelte';
+import AddContentPopover from '#lib/components/AddContentPopover.svelte';
 
 const mocks = vi.hoisted(() => ({
 	book: {
@@ -24,15 +24,15 @@ const mocks = vi.hoisted(() => ({
 	},
 }));
 
-vi.mock('$lib/queries/content/useAddVideo', () => ({ useAddVideo: () => mocks.video }));
-vi.mock('$lib/queries/content/useAddMovie', () => ({ useAddMovie: () => mocks.movie }));
-vi.mock('$lib/queries/content/useAddBook', () => ({ useAddBook: () => mocks.book }));
-vi.mock('$lib/queries/content/useAddPassage', () => ({ useAddPassage: () => mocks.passage }));
+vi.mock('#lib/queries/content/useAddVideo.js', () => ({ useAddVideo: () => mocks.video }));
+vi.mock('#lib/queries/content/useAddMovie.js', () => ({ useAddMovie: () => mocks.movie }));
+vi.mock('#lib/queries/content/useAddBook.js', () => ({ useAddBook: () => mocks.book }));
+vi.mock('#lib/queries/content/useAddPassage.js', () => ({ useAddPassage: () => mocks.passage }));
 // The webpage hooks are not exercised here (see AddContentPopover.webpage.test.ts); stub them so no QueryClient is needed.
-vi.mock('$lib/queries/content/useCreateWebPage', () => ({
+vi.mock('#lib/queries/content/useCreateWebPage.js', () => ({
 	useCreateWebPage: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isSuccess: false, isError: false }),
 }));
-vi.mock('$lib/queries/content/useWebPagePreview', () => ({
+vi.mock('#lib/queries/content/useWebPagePreview.js', () => ({
 	useWebPagePreview: () => ({ data: undefined, isPending: false, isError: false }),
 }));
 

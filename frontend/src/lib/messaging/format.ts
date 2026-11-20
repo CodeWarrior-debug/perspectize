@@ -1,4 +1,4 @@
-import type { MessageThread, MessagingUser } from '$lib/queries/messaging';
+import type { MessageThread, MessagingUser } from '#lib/queries/messaging/index.js';
 
 export function initials(username: string): string {
 	const chars = (username.match(/[a-z0-9]/gi) ?? []).slice(0, 2).join('');

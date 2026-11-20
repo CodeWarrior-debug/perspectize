@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import activityTableSource from '$lib/components/ActivityTable.svelte?raw';
-import { DATA_COLUMNS, INTERNAL_COLUMNS, SORTABLE_COLUMNS } from '$lib/utils/grid-config';
+import activityTableSource from '#lib/components/ActivityTable.svelte?raw';
+import { DATA_COLUMNS, INTERNAL_COLUMNS, SORTABLE_COLUMNS } from '#lib/utils/grid-config.js';
 
 /**
  * Gap #9 in the UI gap audit: the same column had different labels in the grid

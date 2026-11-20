@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Button } from '$lib/components/shadcn';
-	import LazyLoadError from '$lib/components/LazyLoadError.svelte';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
-	import { libraryContentHref } from '$lib/utils/contentLinks';
+	import { Button } from '#lib/components/shadcn/index.js';
+	import LazyLoadError from '#lib/components/LazyLoadError.svelte';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
+	import { libraryContentHref } from '#lib/utils/contentLinks.js';
 	import CheckIcon from '@lucide/svelte/icons/check';
 
 	let {
@@ -56,7 +56,7 @@
 {#if popoverOpen}
 	<!-- Dynamically imported: PerspectivePopover pulls in the Tiptap-based CommentsEditor, which
 	     shouldn't load eagerly for every Discover page visit (same pattern as ActivityTable). -->
-	{#await import('$lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
+	{#await import('#lib/components/PerspectivePopover.svelte') then { default: PerspectivePopover }}
 		<PerspectivePopover
 			contentId={contentIdNumber}
 			{contentName}

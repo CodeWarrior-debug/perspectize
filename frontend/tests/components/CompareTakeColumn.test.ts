@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import CompareTakeColumn from '$lib/components/CompareTakeColumn.svelte';
+import CompareTakeColumn from '#lib/components/CompareTakeColumn.svelte';
 
 describe('CompareTakeColumn', () => {
 	it('renders the name and review text', () => {

@@ -1,4 +1,4 @@
-import { EMPTY_VALUE } from '$lib/utils/formatting';
+import { EMPTY_VALUE } from '#lib/utils/formatting.js';
 import { describe, it, expect } from 'vitest';
 import {
 	PLAN_COLUMNS,
@@ -16,10 +16,10 @@ import {
 	planStatusLabel,
 	serverSortFor,
 	serverSortFromColumnState,
-} from '$lib/utils/plan-grid-config';
-import type { UserTodoItem, UserTodoSortBy } from '$lib/queries/userTodos';
-import { headerMinWidth } from '$lib/utils/grid-header-width';
-import { PLAN_HEADER_CHROME } from '$lib/utils/grid-theme';
+} from '#lib/utils/plan-grid-config.js';
+import type { UserTodoItem, UserTodoSortBy } from '#lib/queries/userTodos/index.js';
+import { headerMinWidth } from '#lib/utils/grid-header-width.js';
+import { PLAN_HEADER_CHROME } from '#lib/utils/grid-theme.js';
 
 const SERVER_SORTS: UserTodoSortBy[] = ['PRIORITY', 'DUE_DATE', 'CREATED_AT', 'UPDATED_AT', 'LIST_POSITION'];
 

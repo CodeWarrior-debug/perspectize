@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
 import { tick, type Snippet } from 'svelte';
-import FormPopover from '$lib/components/FormPopover.svelte';
+import FormPopover from '#lib/components/FormPopover.svelte';
 
 // FormPopover's triggerIcon/formFields props are Snippet<[]>, which is a compiled
 // Svelte construct (an opaque branded function) that can't be produced from a plain
@@ -26,7 +26,7 @@ vi.mock('svelte-sonner', () => ({
 	toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: vi.fn(),
 }));
 

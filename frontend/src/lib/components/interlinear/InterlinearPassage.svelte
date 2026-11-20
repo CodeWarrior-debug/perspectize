@@ -1,6 +1,6 @@
 <!-- frontend/src/lib/components/interlinear/InterlinearPassage.svelte -->
 <script lang="ts">
-	import type { InterlinearVerse, InterlinearWord, VerseText } from '$lib/queries/bible';
+	import type { InterlinearVerse, InterlinearWord, VerseText } from '#lib/queries/bible/index.js';
 	import {
 		activeKey,
 		connectorLine,
@@ -12,9 +12,9 @@
 		reduceInterlinear,
 		wordKey,
 		type InterlinearEvent,
-	} from '$lib/utils/interlinear';
+	} from '#lib/utils/interlinear.js';
 	import WordPopover from './WordPopover.svelte';
-	import VerseNumber from '$lib/components/VerseNumber.svelte';
+	import VerseNumber from '#lib/components/VerseNumber.svelte';
 
 	let { verses, interlinear }: { verses: VerseText[]; interlinear: InterlinearVerse[] } = $props();
 

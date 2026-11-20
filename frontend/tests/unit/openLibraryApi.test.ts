@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ graphqlRequest: vi.fn() }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mocks.graphqlRequest }));
 
 import {
 	BOOK_BY_ISBN,
@@ -19,7 +19,7 @@ import {
 	searchBooks,
 	type BookSearchPage,
 	type BookSearchResult,
-} from '$lib/services/openLibraryApi';
+} from '#lib/services/openLibraryApi.js';
 
 const eastOfEden: BookSearchResult = {
 	workKey: 'OL23166W',

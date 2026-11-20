@@ -4,9 +4,9 @@
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import FontPicker from './FontPicker.svelte';
-	import { parseCatalog, toChoice, type FontCatalogRow, type FontEntry } from '$lib/fonts/googleFonts';
-	import { FONT_PAIRINGS, FONT_SLOT_INFO, FONT_SLOTS, type FontPairing } from '$lib/fonts/slots';
-	import type { FontState, FontStore } from '$lib/fonts/store.svelte';
+	import { parseCatalog, toChoice, type FontCatalogRow, type FontEntry } from '#lib/fonts/googleFonts.js';
+	import { FONT_PAIRINGS, FONT_SLOT_INFO, FONT_SLOTS, type FontPairing } from '#lib/fonts/slots.js';
+	import type { FontState, FontStore } from '#lib/fonts/store.svelte.js';
 
 	let { store, onPeek }: { store: FontStore; onPeek?: () => void } = $props();
 
@@ -15,7 +15,7 @@
 	let loadFailed = $state(false);
 
 	onMount(() => {
-		import('$lib/fonts/google-fonts-catalog.json')
+		import('#lib/fonts/google-fonts-catalog.json')
 			.then((m) => (catalog = parseCatalog(m.default as FontCatalogRow[])))
 			.catch(() => (loadFailed = true));
 		// Leaving the section mid-browse must not strand a preview on the page.

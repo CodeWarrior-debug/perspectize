@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { createQuery } from '@tanstack/svelte-query';
-	import { graphqlRequest } from '$lib/queries/client';
-	import { PASSAGE_TEXT_QUERY, type PassageTextResponse } from '$lib/queries/bible';
-	import { queryKeys } from '$lib/queries/keys';
-	import OriginalLanguage from '$lib/components/interlinear/OriginalLanguage.svelte';
-	import VerseNumber from '$lib/components/VerseNumber.svelte';
-	import VerseJumpPrompt from '$lib/components/VerseJumpPrompt.svelte';
-	import { setVerseJump } from '$lib/utils/verseJump';
-	import { verseIdsToRange } from '$lib/utils/bible';
-	import { DEFAULT_VERSION, gatewayLink } from '$lib/utils/bibleLinks';
+	import { graphqlRequest } from '#lib/queries/client.js';
+	import { PASSAGE_TEXT_QUERY, type PassageTextResponse } from '#lib/queries/bible/index.js';
+	import { queryKeys } from '#lib/queries/keys.js';
+	import OriginalLanguage from '#lib/components/interlinear/OriginalLanguage.svelte';
+	import VerseNumber from '#lib/components/VerseNumber.svelte';
+	import VerseJumpPrompt from '#lib/components/VerseJumpPrompt.svelte';
+	import { setVerseJump } from '#lib/utils/verseJump.js';
+	import { verseIdsToRange } from '#lib/utils/bible.js';
+	import { DEFAULT_VERSION, gatewayLink } from '#lib/utils/bibleLinks.js';
 
 	let { startVerseId, endVerseId }: { startVerseId: number; endVerseId: number } = $props();
 

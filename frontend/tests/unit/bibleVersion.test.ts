@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { createBibleVersionStore, BIBLE_VERSION_KEY } from '$lib/utils/bibleVersion.svelte';
-import translations from '$lib/data/bible-translations.json';
-import { DEFAULT_VERSION } from '$lib/utils/bibleLinks';
+import { createBibleVersionStore, BIBLE_VERSION_KEY } from '#lib/utils/bibleVersion.svelte.js';
+import translations from '#lib/data/bible-translations.json';
+import { DEFAULT_VERSION } from '#lib/utils/bibleLinks.js';
 
 describe('bible-translations.json', () => {
 	it('matches data/bible/translations.json (frontend copy has not drifted)', () => {

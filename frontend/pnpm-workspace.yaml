@@ -26,6 +26,9 @@ overrides:
   nanoid: '>=3.3.18 <5 || >=5.1.6 <6'
   js-cookie: ^3.0.8
   cookie: ^0.7.2
+  # Kit 3 needs cookie v2 (a different API: parseCookie, not parse). The global
+  # override above still pins express and other 0.x consumers.
+  '@sveltejs/kit>cookie': ^2.0.1
   serialize-javascript: ^7.1.0
   brace-expansion: ^5.0.12
   picomatch: ^4.0.4

@@ -2,7 +2,7 @@ import { createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { graphqlRequest } from '../client';
 import { MUTE_THREAD, type MuteThreadResponse } from './index';
 import { queryKeys } from '../keys';
-import { patchThreadInList } from '$lib/messaging/inboxCache';
+import { patchThreadInList } from '#lib/messaging/inboxCache.js';
 import { toast } from 'svelte-sonner';
 
 export function useMuteThread() {

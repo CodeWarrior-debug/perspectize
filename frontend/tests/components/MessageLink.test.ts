@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import { goto } from '$app/navigation';
-import MessageLink from '$lib/components/messaging/MessageLink.svelte';
-import MessageBubble from '$lib/components/messaging/MessageBubble.svelte';
+import MessageLink from '#lib/components/messaging/MessageLink.svelte';
+import MessageBubble from '#lib/components/messaging/MessageBubble.svelte';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 

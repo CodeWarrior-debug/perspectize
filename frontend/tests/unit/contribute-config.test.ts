@@ -6,7 +6,7 @@ import {
 	annualDiscountPercent,
 	MONTHLY_PRICE,
 	ANNUAL_PRICE,
-} from '$lib/contribute/config';
+} from '#lib/contribute/config.js';
 
 const VALID = 'https://buy.stripe.com/test_abc';
 

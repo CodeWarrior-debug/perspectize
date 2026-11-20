@@ -1,8 +1,8 @@
 <script lang="ts">
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
-	import type { ImportSource } from '$lib/queries/imports';
-	import { useImportListingProgress } from '$lib/queries/imports/useImportListingProgress.svelte';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
+	import type { ImportSource } from '#lib/queries/imports/index.js';
+	import { useImportListingProgress } from '#lib/queries/imports/useImportListingProgress.svelte.js';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
 
 	/**
 	 * Admin only: while an import's sources are listed, how many rows each has

@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { WebPagePreview, WebPageRole } from '$lib/queries/content';
-	import { libraryContentHref } from '$lib/utils/contentLinks';
-	import { webPageReadNotice } from '$lib/utils/webPage';
+	import type { WebPagePreview, WebPageRole } from '#lib/queries/content/index.js';
+	import { libraryContentHref } from '#lib/utils/contentLinks.js';
+	import { webPageReadNotice } from '#lib/utils/webPage.js';
 	import WebPageRolesPicker from './WebPageRolesPicker.svelte';
 	import GlobeIcon from '@lucide/svelte/icons/globe';
 

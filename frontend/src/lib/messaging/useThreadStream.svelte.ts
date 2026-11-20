@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/svelte-query';
-import { subscribeGraphql } from '$lib/messaging/ws-client.svelte';
-import { THREAD_EVENTS_SUBSCRIPTION, type MessageThread } from '$lib/queries/messaging';
-import type { ThreadEvent } from '$lib/messaging/events';
+import { subscribeGraphql } from '#lib/messaging/ws-client.svelte.js';
+import { THREAD_EVENTS_SUBSCRIPTION, type MessageThread } from '#lib/queries/messaging/index.js';
+import type { ThreadEvent } from '#lib/messaging/events.js';
 import {
 	applyMessagePosted,
 	applyMessageEdited,
@@ -12,8 +12,8 @@ import {
 	activeTypingUserIds,
 	presenceReducer,
 	type ThreadMessagesCache,
-} from '$lib/messaging/threadCache';
-import { queryKeys } from '$lib/queries/keys';
+} from '#lib/messaging/threadCache.js';
+import { queryKeys } from '#lib/queries/keys.js';
 
 const PRUNE_MS = 3000;
 

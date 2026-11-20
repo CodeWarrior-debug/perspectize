@@ -1,7 +1,7 @@
 <script lang="ts">
 	import BugIcon from '@lucide/svelte/icons/bug';
 	import LightbulbIcon from '@lucide/svelte/icons/lightbulb';
-	import { Button } from '$lib/components/shadcn';
+	import { Button } from '#lib/components/shadcn/index.js';
 
 	let { onClose = undefined }: { onClose?: () => void } = $props();
 
@@ -17,7 +17,9 @@
 
 <div class="space-y-4">
 	<div>
-		<p class="text-sm text-muted-foreground mb-4">Help us improve Perspectize by reporting bugs or sharing feature ideas.</p>
+		<p class="text-sm text-muted-foreground mb-4">
+			Help us improve Perspectize by reporting bugs or sharing feature ideas.
+		</p>
 	</div>
 
 	<div class="grid gap-3">
@@ -46,5 +48,7 @@
 		</Button>
 	</div>
 
-	<p class="text-xs text-muted-foreground pt-2">Your feedback will open GitHub, where you can add more details before submitting.</p>
+	<p class="text-xs text-muted-foreground pt-2">
+		Your feedback will open GitHub, where you can add more details before submitting.
+	</p>
 </div>

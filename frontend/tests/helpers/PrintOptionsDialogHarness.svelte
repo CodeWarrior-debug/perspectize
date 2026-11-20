@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PrintOptionsDialog from '$lib/components/PrintOptionsDialog.svelte';
+	import PrintOptionsDialog from '#lib/components/PrintOptionsDialog.svelte';
 
 	let { onPrint }: { onPrint: (opts: { title: string; spacing: string }) => void } = $props();
 	let open = $state(true);

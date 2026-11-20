@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { webPageFetchedAt } from '$lib/utils/webPage';
+import { webPageFetchedAt } from '#lib/utils/webPage.js';
 
 describe('webPageFetchedAt', () => {
 	it('reads the fetch time from the details response', () => {

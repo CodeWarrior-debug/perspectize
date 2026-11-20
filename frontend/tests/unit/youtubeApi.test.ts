@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ graphqlRequest: vi.fn() }));
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: mocks.graphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mocks.graphqlRequest }));
 
 import {
 	YOUTUBE_TRENDING,
@@ -11,7 +11,7 @@ import {
 	youtubeKeys,
 	youtubeSearchUrl,
 	type TrendingVideo,
-} from '$lib/services/youtubeApi';
+} from '#lib/services/youtubeApi.js';
 
 const video: TrendingVideo = {
 	id: 'abc123',

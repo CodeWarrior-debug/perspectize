@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import ContributePanel from '$lib/components/contribute/ContributePanel.svelte';
-import type { ContributePath } from '$lib/contribute/config';
+import ContributePanel from '#lib/components/contribute/ContributePanel.svelte';
+import type { ContributePath } from '#lib/contribute/config.js';
 import HeartIcon from '@lucide/svelte/icons/heart';
 import StarIcon from '@lucide/svelte/icons/star';
 

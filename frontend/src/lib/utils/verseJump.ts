@@ -1,5 +1,5 @@
 import { getContext, setContext } from 'svelte';
-import { formatReference, verseFromOrdinal, type PassageRange } from '$lib/utils/bible';
+import { formatReference, verseFromOrdinal, type PassageRange } from '#lib/utils/bible.js';
 
 /**
  * Lets a verse number anywhere inside a passage (plain text or the interlinear

@@ -4,9 +4,9 @@ import {
 	webPublishedValueGetter,
 	webRolesCellRenderer,
 	webSiteCellRenderer,
-} from '$lib/utils/webPageFormatting';
-import { typeCellRenderer } from '$lib/utils/formatting';
-import { activityItemCellRenderer } from '$lib/utils/activityItemCellRenderer';
+} from '#lib/utils/webPageFormatting.js';
+import { typeCellRenderer } from '#lib/utils/formatting.js';
+import { activityItemCellRenderer } from '#lib/utils/activityItemCellRenderer.js';
 
 const page = (overrides: Record<string, unknown> = {}, url = 'https://www.example.com/post') =>
 	({

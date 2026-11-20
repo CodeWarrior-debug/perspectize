@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
-	import { Button, Input, Label, Switch } from '$lib/components/shadcn';
-	import { useCreateClaim } from '$lib/queries/content/useCreateClaim';
-	import { useUpdateClaim } from '$lib/queries/content/useUpdateClaim';
-	import type { ClaimPrivacy, ClaimRow } from '$lib/queries/content/claims';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
+	import { Button, Input, Label, Switch } from '#lib/components/shadcn/index.js';
+	import { useCreateClaim } from '#lib/queries/content/useCreateClaim.js';
+	import { useUpdateClaim } from '#lib/queries/content/useUpdateClaim.js';
+	import type { ClaimPrivacy, ClaimRow } from '#lib/queries/content/claims.js';
 
 	// Mirrors the server rules (backend claim validation): trimmed and whitespace-collapsed text,
 	// at least two words, at most 300 characters, and evaluate-by not before effective.

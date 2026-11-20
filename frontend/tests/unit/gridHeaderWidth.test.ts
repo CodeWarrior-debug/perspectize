@@ -2,15 +2,15 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { themeQuartz } from '@ag-grid-community/theming';
-import { headerMinWidth, headerTextWidth } from '$lib/utils/grid-header-width';
-import { GEIST_SEMIBOLD_ADVANCE_EM, GEIST_SEMIBOLD_WIDEST_EM } from '$lib/utils/grid-header-metrics';
+import { headerMinWidth, headerTextWidth } from '#lib/utils/grid-header-width.js';
+import { GEIST_SEMIBOLD_ADVANCE_EM, GEIST_SEMIBOLD_WIDEST_EM } from '#lib/utils/grid-header-metrics.js';
 import {
 	ACTIVITY_GRID_THEME,
 	ACTIVITY_HEADER_CHROME,
 	ACTIVITY_HEADER_TEXT_CASE,
 	GRID_THEME_PARAMS,
 	headerChrome,
-} from '$lib/utils/grid-theme';
+} from '#lib/utils/grid-theme.js';
 
 const appCss = readFileSync(resolve(process.cwd(), 'src/app.css'), 'utf8');
 

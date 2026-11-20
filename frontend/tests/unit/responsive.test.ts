@@ -5,7 +5,7 @@ import {
 	tierFromMatches,
 	useResponsiveTier,
 	useCardMode,
-} from '$lib/utils/responsive.svelte';
+} from '#lib/utils/responsive.svelte.js';
 
 function setViewport(width: number) {
 	window.matchMedia = vi.fn((query: string) => {

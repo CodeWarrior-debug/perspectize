@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import XIcon from '@lucide/svelte/icons/x';
-	import { RATING_STEP, RATING_MIN, RATING_MAX, RATING_DEFAULT_DISPLAY } from '$lib/utils/ratings';
+	import { RATING_STEP, RATING_MIN, RATING_MAX, RATING_DEFAULT_DISPLAY } from '#lib/utils/ratings.js';
 
 	/**
 	 * RatingInput — compact stepper + progress bar rating component.

@@ -11,8 +11,8 @@ import {
 	fontAppliedCache,
 	loadFontState,
 	type FontState,
-} from '$lib/fonts/store.svelte';
-import type { FontChoice } from '$lib/fonts/googleFonts';
+} from '#lib/fonts/store.svelte.js';
+import type { FontChoice } from '#lib/fonts/googleFonts.js';
 
 const LITERATA: FontChoice = { family: 'Literata', category: 's', weights: [400, 700], italic: true };
 const INTER: FontChoice = { family: 'Inter', category: 'a', weights: [400, 600], italic: false };

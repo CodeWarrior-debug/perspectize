@@ -24,28 +24,28 @@ vi.mock('svelte-sonner', () => ({
 
 // Only the authenticated wrapper is exported here: a hook that reached for the bare
 // `graphqlClient` would get `undefined` and fail its request.
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: mockGraphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mockGraphqlRequest }));
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
 	() => import('$app/navigation'),
-	() => import('$lib/queries/content'),
-	() => import('$lib/queries/content/useCreateWebPage'),
-	() => import('$lib/queries/keys'),
+	() => import('#lib/queries/content/index.js'),
+	() => import('#lib/queries/content/useCreateWebPage.js'),
+	() => import('#lib/queries/keys.js'),
 );
 
 describe('useCreateWebPage hook', () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		capturedMutationOptions = undefined;
-		const { useCreateWebPage } = await import('$lib/queries/content/useCreateWebPage');
+		const { useCreateWebPage } = await import('#lib/queries/content/useCreateWebPage.js');
 		useCreateWebPage();
 	});
 
 	it('sends the url through the authenticated graphqlRequest wrapper', async () => {
 		mockGraphqlRequest.mockResolvedValue({});
-		const { CREATE_CONTENT_FROM_WEB_PAGE } = await import('$lib/queries/content');
+		const { CREATE_CONTENT_FROM_WEB_PAGE } = await import('#lib/queries/content/index.js');
 		await capturedMutationOptions.mutationFn({ url: 'https://arxiv.org/abs/1706.03762' });
 		expect(mockGraphqlRequest).toHaveBeenCalledWith(CREATE_CONTENT_FROM_WEB_PAGE, {
 			input: { url: 'https://arxiv.org/abs/1706.03762' },
@@ -99,7 +99,7 @@ describe('useCreateWebPage hook', () => {
 	});
 
 	it('refetches content lists, exactly as the movie add does', async () => {
-		const { queryKeys } = await import('$lib/queries/keys');
+		const { queryKeys } = await import('#lib/queries/keys.js');
 		capturedMutationOptions.onSuccess({
 			createContentFromWebPage: { content: { id: '1', name: 'X' }, alreadyExisted: false },
 		});

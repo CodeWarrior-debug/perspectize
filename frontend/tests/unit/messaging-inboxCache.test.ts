@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { MessageThread, InboxEvent } from '$lib/queries/messaging';
-import { applyInboxEvent, totalUnread } from '$lib/messaging/inboxCache';
+import type { MessageThread, InboxEvent } from '#lib/queries/messaging/index.js';
+import { applyInboxEvent, totalUnread } from '#lib/messaging/inboxCache.js';
 
 const t = (id: string, lastMessageAt: string, unreadCount = 0, latestSeq = 0): MessageThread => ({
 	id,

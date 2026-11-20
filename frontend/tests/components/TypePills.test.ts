@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/svelte';
-import TypePills from '$lib/components/TypePills.svelte';
+import TypePills from '#lib/components/TypePills.svelte';
 
 describe('TypePills', () => {
 	it('renders nothing when no type filter is set', () => {

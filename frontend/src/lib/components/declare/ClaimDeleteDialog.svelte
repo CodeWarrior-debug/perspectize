@@ -7,9 +7,9 @@
 		DialogFooter,
 		DialogHeader,
 		DialogTitle,
-	} from '$lib/components/shadcn';
-	import { claimHasOthersError } from '$lib/queries/content/claims';
-	import { useDeleteClaim } from '$lib/queries/content/useDeleteClaim';
+	} from '#lib/components/shadcn/index.js';
+	import { claimHasOthersError } from '#lib/queries/content/claims.js';
+	import { useDeleteClaim } from '#lib/queries/content/useDeleteClaim.js';
 
 	let { claimId, open = $bindable(false), onDone }: { claimId: string; open?: boolean; onDone?: () => void } = $props();
 

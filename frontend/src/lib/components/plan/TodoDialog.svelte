@@ -1,12 +1,20 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
-	import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label } from '$lib/components/shadcn';
-	import RatingInput from '$lib/components/RatingInput.svelte';
-	import CommentsEditor from '$lib/components/CommentsEditor.svelte';
-	import ActionPicker from '$lib/components/plan/ActionPicker.svelte';
-	import ItemPicker from '$lib/components/plan/ItemPicker.svelte';
-	import { NO_AUTOFILL } from '$lib/utils/noAutofill';
-	import { isInsideToast, toastWithAction } from '$lib/utils/toast';
+	import {
+		Button,
+		Dialog,
+		DialogContent,
+		DialogHeader,
+		DialogTitle,
+		Input,
+		Label,
+	} from '#lib/components/shadcn/index.js';
+	import RatingInput from '#lib/components/RatingInput.svelte';
+	import CommentsEditor from '#lib/components/CommentsEditor.svelte';
+	import ActionPicker from '#lib/components/plan/ActionPicker.svelte';
+	import ItemPicker from '#lib/components/plan/ItemPicker.svelte';
+	import { NO_AUTOFILL } from '#lib/utils/noAutofill.js';
+	import { isInsideToast, toastWithAction } from '#lib/utils/toast.js';
 	import {
 		buildCreateInput,
 		buildUpdateInput,
@@ -19,10 +27,10 @@
 		type CompletionPrompt,
 		type TodoFocusField,
 		type TodoFormValues,
-	} from '$lib/utils/plan-todo-helpers';
-	import type { TodoPrivacy, UserTodoItem, UserTodoListItem, UserTodoStatus } from '$lib/queries/userTodos';
-	import { useCreateUserTodo } from '$lib/queries/userTodos/useCreateUserTodo';
-	import { useUpdateUserTodo } from '$lib/queries/userTodos/useUpdateUserTodo';
+	} from '#lib/utils/plan-todo-helpers.js';
+	import type { TodoPrivacy, UserTodoItem, UserTodoListItem, UserTodoStatus } from '#lib/queries/userTodos/index.js';
+	import { useCreateUserTodo } from '#lib/queries/userTodos/useCreateUserTodo.js';
+	import { useUpdateUserTodo } from '#lib/queries/userTodos/useUpdateUserTodo.js';
 
 	/**
 	 * TodoDialog: create a todo (`todo` null) or edit one. Mounted only while open,

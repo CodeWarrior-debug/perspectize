@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/svelte';
-import PrintListView from '$lib/components/PrintListView.svelte';
-import type { ExportTable } from '$lib/utils/exportTable';
+import PrintListView from '#lib/components/PrintListView.svelte';
+import type { ExportTable } from '#lib/utils/exportTable.js';
 
 const appCss = readFileSync(resolve(process.cwd(), 'src/app.css'), 'utf8');
 

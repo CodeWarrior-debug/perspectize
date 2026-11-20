@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import type { Message } from '$lib/queries/messaging';
-import { seedFromApiPage } from '$lib/messaging/threadCache';
+import type { Message } from '#lib/queries/messaging/index.js';
+import { seedFromApiPage } from '#lib/messaging/threadCache.js';
 import {
 	makeClientNonce,
 	optimisticMessage,
 	addOptimistic,
 	reconcileSentMessage,
 	isOptimistic,
-} from '$lib/messaging/optimistic';
+} from '#lib/messaging/optimistic.js';
 
 const real = (seq: number, over: Partial<Message> = {}): Message => ({
 	id: `m${seq}`,

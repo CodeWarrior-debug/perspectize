@@ -5,8 +5,8 @@
  *
  * Pure: no runes, no network, no Clerk, so it can run at route load.
  */
-import { queryKeys } from '$lib/queries/keys';
-import { sortsToGraphQL, urlParamsToGraphQLFilter, type GridParams } from '$lib/utils/gridUrlState';
+import { queryKeys } from '#lib/queries/keys.js';
+import { sortsToGraphQL, urlParamsToGraphQLFilter, type GridParams } from '#lib/utils/gridUrlState.js';
 
 /** Rows fetched on first load in Loaded mode. 50 rather than 100 halves the payload. */
 export const LOADED_MODE_FIRST = 50;

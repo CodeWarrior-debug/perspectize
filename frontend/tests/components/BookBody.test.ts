@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import BookBody from '$lib/components/BookBody.svelte';
-import type { BookRow } from '$lib/utils/bookFormatting';
+import BookBody from '#lib/components/BookBody.svelte';
+import type { BookRow } from '#lib/utils/bookFormatting.js';
 
 const ATTRIBUTION = 'Data: Open Library (archive.org), community-contributed; may be incomplete.';
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { otherTypeOptionsWhenOne } from '$lib/utils/gridUrlState';
-import { CONTENT_TYPE_OPTIONS } from '$lib/utils/grid-config';
+import { otherTypeOptionsWhenOne } from '#lib/utils/gridUrlState.js';
+import { CONTENT_TYPE_OPTIONS } from '#lib/utils/grid-config.js';
 
 describe('otherTypeOptionsWhenOne', () => {
 	it('offers no switches without a type filter', () => {

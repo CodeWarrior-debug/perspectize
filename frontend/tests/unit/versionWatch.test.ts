@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { FOCUS_CHECK_INTERVAL_MS, isEditing, watchForNewVersion } from '$lib/utils/versionWatch';
+import { FOCUS_CHECK_INTERVAL_MS, isEditing, watchForNewVersion } from '#lib/utils/versionWatch.js';
 
 function setVisibility(state: DocumentVisibilityState) {
 	Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });

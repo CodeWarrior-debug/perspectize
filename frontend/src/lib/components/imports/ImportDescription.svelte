@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
-	import CommentsEditor from '$lib/components/CommentsEditor.svelte';
-	import SafeHtml from '$lib/components/SafeHtml.svelte';
-	import { Button } from '$lib/components/shadcn';
-	import type { ImportJobSummary } from '$lib/queries/imports';
-	import { useUpdateImportJobDescription } from '$lib/queries/imports/useImportJobMutations';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
+	import CommentsEditor from '#lib/components/CommentsEditor.svelte';
+	import SafeHtml from '#lib/components/SafeHtml.svelte';
+	import { Button } from '#lib/components/shadcn/index.js';
+	import type { ImportJobSummary } from '#lib/queries/imports/index.js';
+	import { useUpdateImportJobDescription } from '#lib/queries/imports/useImportJobMutations.js';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
 	import {
 		canEditImportDescription,
 		descriptionText,
 		hasDescriptionText,
 		importErrorMessage,
-	} from '$lib/utils/import-sheet';
+	} from '#lib/utils/import-sheet.js';
 
 	/**
 	 * The requester's description of an import: the nuance the source names don't

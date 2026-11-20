@@ -1,4 +1,4 @@
-import type { ImportListingProgress, ImportSource } from '$lib/queries/imports';
+import type { ImportListingProgress, ImportSource } from '#lib/queries/imports/index.js';
 
 /**
  * Reactive stand-ins for what ImportListingProgress reads, so a test can change

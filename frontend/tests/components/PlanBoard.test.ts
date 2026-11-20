@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import PlanBoard from '$lib/components/plan/PlanBoard.svelte';
+import PlanBoard from '#lib/components/plan/PlanBoard.svelte';
 import { preloadLazy } from '../helpers/warmUp';
-import type { UserTodoItem, UserTodoListItem, UserTodosArgs } from '$lib/queries/userTodos';
+import type { UserTodoItem, UserTodoListItem, UserTodosArgs } from '#lib/queries/userTodos/index.js';
 
 const mocks = vi.hoisted(() => ({
 	/** The args getter PlanBoard handed to useUserTodos; re-read after each selection. */
@@ -19,7 +19,7 @@ vi.mock('ag-grid-svelte5', () => ({
 	}),
 }));
 
-vi.mock('$lib/components/CommentsEditor.svelte', async () => {
+vi.mock('#lib/components/CommentsEditor.svelte', async () => {
 	const mod = await import('../helpers/FakeCommentsEditor.svelte');
 	return { default: mod.default };
 });
@@ -28,7 +28,7 @@ vi.mock('svelte-sonner', () => ({
 	toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() },
 }));
 
-vi.mock('$lib/queries/userTodos/useUserTodos', () => ({
+vi.mock('#lib/queries/userTodos/useUserTodos.js', () => ({
 	useUserTodos: vi.fn((args: () => UserTodosArgs) => {
 		mocks.todosArgs = args;
 		return {
@@ -51,47 +51,47 @@ const LISTS: UserTodoListItem[] = [
 	},
 ];
 
-vi.mock('$lib/queries/userTodos/useUserTodoLists', () => ({
+vi.mock('#lib/queries/userTodos/useUserTodoLists.js', () => ({
 	useUserTodoLists: vi.fn(() => ({ data: { userTodoLists: LISTS }, isPending: false })),
 }));
 
-vi.mock('$lib/queries/userTodos/useReorderUserTodoList', () => ({
+vi.mock('#lib/queries/userTodos/useReorderUserTodoList.js', () => ({
 	useReorderUserTodoList: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
-vi.mock('$lib/queries/perspectives/useMyPerspectives', () => ({
+vi.mock('#lib/queries/perspectives/useMyPerspectives.js', () => ({
 	useMyPerspectives: vi.fn(() => ({ data: undefined })),
 }));
 
-vi.mock('$lib/queries/userTodos/useCreateUserTodoList', () => ({
+vi.mock('#lib/queries/userTodos/useCreateUserTodoList.js', () => ({
 	useCreateUserTodoList: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 
-vi.mock('$lib/queries/userTodos/useUpdateUserTodoList', () => ({
+vi.mock('#lib/queries/userTodos/useUpdateUserTodoList.js', () => ({
 	useUpdateUserTodoList: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 
-vi.mock('$lib/queries/userTodos/useDeleteUserTodoList', () => ({
+vi.mock('#lib/queries/userTodos/useDeleteUserTodoList.js', () => ({
 	useDeleteUserTodoList: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 
-vi.mock('$lib/queries/userTodos/useCreateUserTodo', () => ({
+vi.mock('#lib/queries/userTodos/useCreateUserTodo.js', () => ({
 	useCreateUserTodo: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 
-vi.mock('$lib/queries/userTodos/useUpdateUserTodo', () => ({
+vi.mock('#lib/queries/userTodos/useUpdateUserTodo.js', () => ({
 	useUpdateUserTodo: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 
-vi.mock('$lib/queries/userTodos/useTodoActions', () => ({
+vi.mock('#lib/queries/userTodos/useTodoActions.js', () => ({
 	useTodoActions: vi.fn(() => ({ data: { todoActions: [] }, isPending: false })),
 }));
 
-vi.mock('$lib/queries/userTodos/useCreateTodoAction', () => ({
+vi.mock('#lib/queries/userTodos/useCreateTodoAction.js', () => ({
 	useCreateTodoAction: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 
-vi.mock('$lib/queries/content/useContentDetails', () => ({
+vi.mock('#lib/queries/content/useContentDetails.js', () => ({
 	useContentDetails: vi.fn((id: () => string | null) => {
 		mocks.detailsId = id;
 		return {
@@ -123,28 +123,28 @@ vi.mock('$lib/queries/content/useContentDetails', () => ({
 }));
 
 // The details modal's own hooks (it loads lazily from "View content").
-vi.mock('$lib/auth/useAuthState', () => ({
+vi.mock('#lib/auth/useAuthState.js', () => ({
 	useAuthState: () => ({ isLoaded: true, userId: null }),
 }));
-vi.mock('$lib/queries/content/useContentAggregates', () => ({
+vi.mock('#lib/queries/content/useContentAggregates.js', () => ({
 	useContentAggregates: vi.fn(() => ({ data: undefined, isLoading: false })),
 }));
-vi.mock('$lib/queries/content/useUpdateSourceData', () => ({
+vi.mock('#lib/queries/content/useUpdateSourceData.js', () => ({
 	useUpdateSourceData: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
-vi.mock('$lib/queries/bible/useSetPassageDisplayTitle', () => ({
+vi.mock('#lib/queries/bible/useSetPassageDisplayTitle.js', () => ({
 	useSetPassageDisplayTitle: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
-vi.mock('$lib/queries/content/useContentPicker', () => ({
+vi.mock('#lib/queries/content/useContentPicker.js', () => ({
 	useContentPicker: vi.fn(() => ({ data: { content: { items: [] } }, isPending: false })),
 }));
 
 // PlanBoard renders these through {#await import(...)}. Load them up front, so a
 // findBy* below waits on the UI, not on Vite transforming the module (#728).
 preloadLazy(
-	() => import('$lib/components/ActivityDetailsModal.svelte'),
-	() => import('$lib/components/PerspectivePopover.svelte'),
+	() => import('#lib/components/ActivityDetailsModal.svelte'),
+	() => import('#lib/components/PerspectivePopover.svelte'),
 );
 
 const USER_ID = 7;

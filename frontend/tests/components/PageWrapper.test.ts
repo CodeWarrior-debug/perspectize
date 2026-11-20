@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render } from '@testing-library/svelte';
-import PageWrapper from '$lib/components/PageWrapper.svelte';
+import PageWrapper from '#lib/components/PageWrapper.svelte';
 import { createRawSnippet } from 'svelte';
 
 function createChildrenSnippet(text: string = 'Test content') {

@@ -1,7 +1,7 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { createClient, type Client } from 'graphql-ws';
-import { getAuthToken } from '$lib/queries/client';
-import { APP_VERSION, clientPlatform } from '$lib/buildInfo';
+import { getAuthToken } from '#lib/queries/client.js';
+import { APP_VERSION, clientPlatform } from '#lib/buildInfo.js';
 
 export const wsStatus = $state({ value: 'closed' as 'connecting' | 'connected' | 'closed' });
 

@@ -1,9 +1,9 @@
 <script lang="ts">
-	import BibleVersionPicker from '$lib/components/BibleVersionPicker.svelte';
-	import { verseIdsToRange } from '$lib/utils/bible';
-	import { gatewayLink } from '$lib/utils/bibleLinks';
-	import { commentaryLinks } from '$lib/utils/bibleCommentary';
-	import { bibleVersion, type BibleVersionStore } from '$lib/utils/bibleVersion.svelte';
+	import BibleVersionPicker from '#lib/components/BibleVersionPicker.svelte';
+	import { verseIdsToRange } from '#lib/utils/bible.js';
+	import { gatewayLink } from '#lib/utils/bibleLinks.js';
+	import { commentaryLinks } from '#lib/utils/bibleCommentary.js';
+	import { bibleVersion, type BibleVersionStore } from '#lib/utils/bibleVersion.svelte.js';
 
 	let {
 		startVerseId,

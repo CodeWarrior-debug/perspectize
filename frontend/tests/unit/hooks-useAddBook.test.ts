@@ -22,27 +22,27 @@ vi.mock('svelte-sonner', () => ({
 	toast: { success: mockToastSuccess, error: mockToastError },
 }));
 
-vi.mock('$lib/queries/client', () => ({ graphqlRequest: mockGraphqlRequest }));
+vi.mock('#lib/queries/client.js', () => ({ graphqlRequest: mockGraphqlRequest }));
 
 // The tests import these inside their bodies; load them once up front so the first
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
 	() => import('$app/navigation'),
-	() => import('$lib/queries/content'),
-	() => import('$lib/queries/content/useAddBook'),
+	() => import('#lib/queries/content/index.js'),
+	() => import('#lib/queries/content/useAddBook.js'),
 );
 
 describe('useAddBook hook', () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		capturedMutationOptions = undefined;
-		const { useAddBook } = await import('$lib/queries/content/useAddBook');
+		const { useAddBook } = await import('#lib/queries/content/useAddBook.js');
 		useAddBook();
 	});
 
 	it('sends the url through the authenticated graphqlRequest wrapper', async () => {
 		mockGraphqlRequest.mockResolvedValue({});
-		const { CREATE_CONTENT_FROM_BOOK } = await import('$lib/queries/content');
+		const { CREATE_CONTENT_FROM_BOOK } = await import('#lib/queries/content/index.js');
 		await capturedMutationOptions.mutationFn('https://openlibrary.org/works/OL23166W');
 		expect(mockGraphqlRequest).toHaveBeenCalledWith(CREATE_CONTENT_FROM_BOOK, {
 			input: { url: 'https://openlibrary.org/works/OL23166W' },
@@ -51,7 +51,7 @@ describe('useAddBook hook', () => {
 
 	it('sends a raw ISBN as the url, for the server to resolve', async () => {
 		mockGraphqlRequest.mockResolvedValue({});
-		const { CREATE_CONTENT_FROM_BOOK } = await import('$lib/queries/content');
+		const { CREATE_CONTENT_FROM_BOOK } = await import('#lib/queries/content/index.js');
 		await capturedMutationOptions.mutationFn('9780434740024');
 		expect(mockGraphqlRequest).toHaveBeenCalledWith(CREATE_CONTENT_FROM_BOOK, { input: { url: '9780434740024' } });
 	});

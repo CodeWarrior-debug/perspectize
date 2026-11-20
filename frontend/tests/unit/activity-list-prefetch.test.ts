@@ -8,12 +8,12 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { hashKey, QueryObserver, type QueryClient } from '@tanstack/svelte-query';
-import { activityListRequest, type ContentFilterInput } from '$lib/queries/content';
-import { prefetchActivityList, isViewerScoped } from '$lib/queries/content/prefetchActivityList';
-import { LIST_CONTENT, type ContentResponse } from '$lib/queries/content';
-import { graphqlRequest, graphqlRequestAnonymous } from '$lib/queries/client';
-import { getAuthToken } from '$lib/auth';
-import { parseGridParams } from '$lib/utils/gridUrlState';
+import { activityListRequest, type ContentFilterInput } from '#lib/queries/content/index.js';
+import { prefetchActivityList, isViewerScoped } from '#lib/queries/content/prefetchActivityList.js';
+import { LIST_CONTENT, type ContentResponse } from '#lib/queries/content/index.js';
+import { graphqlRequest, graphqlRequestAnonymous } from '#lib/queries/client.js';
+import { getAuthToken } from '#lib/auth/index.js';
+import { parseGridParams } from '#lib/utils/gridUrlState.js';
 import { makeClient, mountConsumers } from '../helpers/queryBudget';
 
 const env = vi.hoisted(() => ({ demo: false, browser: true }));
@@ -28,11 +28,11 @@ vi.mock('graphql-request', async (importOriginal) => {
 	}
 	return { ...actual, GraphQLClient: FakeGraphQLClient };
 });
-vi.mock('$lib/auth', () => ({
+vi.mock('#lib/auth/index.js', () => ({
 	DEMO_MODE: false,
 	getAuthToken: vi.fn(async () => 'secret-token'),
 }));
-vi.mock('$app/environment', () => ({
+vi.mock('$app/env', () => ({
 	get browser() {
 		return env.browser;
 	},
@@ -185,11 +185,11 @@ describe.each([
 
 	it('skips the prefetch in demo mode (no Clerk gate to overlap)', async () => {
 		vi.resetModules();
-		vi.doMock('$lib/auth', () => ({ DEMO_MODE: true, getAuthToken: vi.fn() }));
+		vi.doMock('#lib/auth/index.js', () => ({ DEMO_MODE: true, getAuthToken: vi.fn() }));
 		const { load } = await importRoute();
 		load({ url: new URL('http://localhost/') } as never);
 		expect(requestMock).not.toHaveBeenCalled();
-		vi.doUnmock('$lib/auth');
+		vi.doUnmock('#lib/auth/index.js');
 	});
 
 	it('skips the prefetch when not in a browser (SSR)', async () => {

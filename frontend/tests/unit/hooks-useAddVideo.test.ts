@@ -35,7 +35,7 @@ vi.mock('svelte-sonner', () => ({
 	},
 }));
 
-vi.mock('$lib/queries/client', () => ({
+vi.mock('#lib/queries/client.js', () => ({
 	graphqlRequest: vi.fn(),
 }));
 
@@ -43,14 +43,14 @@ vi.mock('$lib/queries/client', () => ({
 // test doesn't pay the module transform, which balloons under full-suite load (#728).
 preloadLazy(
 	() => import('$app/navigation'),
-	() => import('$lib/queries/content/useAddVideo'),
+	() => import('#lib/queries/content/useAddVideo.js'),
 );
 
 describe('useAddVideo hook', () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		capturedMutationOptions = undefined;
-		const { useAddVideo } = await import('$lib/queries/content/useAddVideo');
+		const { useAddVideo } = await import('#lib/queries/content/useAddVideo.js');
 		useAddVideo();
 	});
 

@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { useMe } from '$lib/queries/users/useMe.svelte';
-	import { useMessageThreads } from '$lib/queries/messaging/useMessageThreads';
-	import ThreadList from '$lib/components/messaging/ThreadList.svelte';
-	import NewThreadDialog from '$lib/components/messaging/NewThreadDialog.svelte';
+	import { useMe } from '#lib/queries/users/useMe.svelte.js';
+	import { useMessageThreads } from '#lib/queries/messaging/useMessageThreads.js';
+	import ThreadList from '#lib/components/messaging/ThreadList.svelte';
+	import NewThreadDialog from '#lib/components/messaging/NewThreadDialog.svelte';
 
 	let { children } = $props();
 

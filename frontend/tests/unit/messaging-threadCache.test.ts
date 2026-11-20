@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { Message, MessageThread, MessagePageInfo } from '$lib/queries/messaging';
-import type { ThreadEvent } from '$lib/messaging/events';
+import type { Message, MessageThread, MessagePageInfo } from '#lib/queries/messaging/index.js';
+import type { ThreadEvent } from '#lib/messaging/events.js';
 import {
 	emptyThreadMessagesCache,
 	applyMessagePosted,
@@ -13,7 +13,7 @@ import {
 	presenceReducer,
 	applyMessageEdited,
 	applyMessageDeleted,
-} from '$lib/messaging/threadCache';
+} from '#lib/messaging/threadCache.js';
 
 const msg = (seq: number, over: Partial<Message> = {}): Message => ({
 	id: `m${seq}`,
