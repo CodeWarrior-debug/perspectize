@@ -51,6 +51,12 @@ models:
   SortOrder:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.SortOrder
+  TrackLinkKind:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.TrackLinkKind
+  TrackLinkSource:
+    model:
+      - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.TrackLinkSource
   ContentSortBy:
     model:
       - github.com/CodeWarrior-debug/perspectize/backend/internal/core/domain.ContentSortBy
@@ -179,6 +185,10 @@ models:
       # Batched through the per-request import job loader; the resolver applies
       # the closed-import visibility rule.
       importedFrom:
+        resolver: true
+      genre:
+        resolver: true
+      trackLinks:
         resolver: true
     # Non-schema fields: carry the FKs already loaded by the content query so
     # resolvers can batch-load the category / import via dataloader instead of

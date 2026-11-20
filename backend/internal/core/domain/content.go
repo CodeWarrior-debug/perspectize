@@ -12,6 +12,7 @@ const (
 	ContentTypeYouTubeVideo ContentType = "YOUTUBE_VIDEO"
 	ContentTypeClaim        ContentType = "CLAIM"
 	ContentTypeBiblePassage ContentType = "BIBLE_PASSAGE"
+	ContentTypeAudioTrack   ContentType = "AUDIO_TRACK"
 	ContentTypeMovie        ContentType = "MOVIE"
 	ContentTypeBook         ContentType = "BOOK"
 	ContentTypeWebPage      ContentType = "WEB_PAGE"
@@ -164,9 +165,11 @@ type Content struct {
 	LengthDisplay     *LengthDisplay
 	Response          json.RawMessage
 	PrimaryCategoryID *int
-	VerseStartID      *int    // BIBLE_PASSAGE only — computed ordinal (see BibleVerseOrdinal), not a table FK
-	VerseEndID        *int    // BIBLE_PASSAGE only
-	DisplayTitle      *string // BIBLE_PASSAGE only — optional, first-write-wins
+	// GenreID is the AUDIO_TRACK genre (music_genres.id); nil when unset.
+	GenreID      *int
+	VerseStartID *int    // BIBLE_PASSAGE only — computed ordinal (see BibleVerseOrdinal), not a table FK
+	VerseEndID   *int    // BIBLE_PASSAGE only
+	DisplayTitle *string // BIBLE_PASSAGE only — optional, first-write-wins
 	// CustomFields holds user-set attributes. nil means unset. CLAIM stores
 	// effectiveDate and evaluateBy here as ISO YYYY-MM-DD strings.
 	CustomFields json.RawMessage

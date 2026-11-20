@@ -33,8 +33,8 @@ func TestList_BookColumnFilters(t *testing.T) {
 			`WHERE \(response->'authors'->0->>'name'\) ILIKE \$1 AND content.privacy = \$2 ORDER BY`, []driver.Value{"%O'Brien%", "public", int64(11)}},
 		// Movie and book filters AND together; the book clause follows the movie clauses.
 		{"combined with genre contains", domain.ContentFilter{GenreContains: cStr("drama"), AuthorContains: cStr("stein")},
-			`WHERE \(response->'genres'\)::text ILIKE \$1 AND \(response->'authors'->0->>'name'\) ILIKE \$2 AND content.privacy = \$3 ORDER BY`,
-			[]driver.Value{"%drama%", "%stein%", "public", int64(11)}},
+			`WHERE \(\(\(response->'genres'\)::text ILIKE \$1 OR genre_id IN \(SELECT id FROM music_genres WHERE name ILIKE \$2\)\)\) AND \(response->'authors'->0->>'name'\) ILIKE \$3 AND content.privacy = \$4 ORDER BY`,
+			[]driver.Value{"%drama%", "%drama%", "%stein%", "public", int64(11)}},
 		// Numeric ranges read the stored book keys as NUMERIC and bind every bound.
 		{"published year range", domain.ContentFilter{MinPublishYear: cInt(1950), MaxPublishYear: cInt(1960)},
 			`WHERE \(response->>'firstPublishYear'\)::NUMERIC >= \$1 AND \(response->>'firstPublishYear'\)::NUMERIC <= \$2 AND content.privacy = \$3 ORDER BY`,

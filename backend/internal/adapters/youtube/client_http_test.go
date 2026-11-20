@@ -140,3 +140,17 @@ func TestCachingClient_DisabledEventLoggedOnlyWhenTTLNotPositive(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_GetVideoMetadata_AgeRestriction(t *testing.T) {
+	restricted := `{"items":[{"snippet":{"title":"T","channelTitle":"C"},"contentDetails":{"duration":"PT3M","contentRating":{"ytRating":"ytAgeRestricted"}},"statistics":{}}]}`
+	c := newHTTPTestClient(t, func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(restricted)) })
+	meta, err := c.GetVideoMetadata(context.Background(), "abc123DEF45")
+	require.NoError(t, err)
+	assert.True(t, meta.AgeRestricted)
+
+	ok := newHTTPTestClient(t, func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(okVideoJSON)) })
+	meta, err = ok.GetVideoMetadata(context.Background(), "abc123DEF45")
+	require.NoError(t, err)
+	assert.False(t, meta.AgeRestricted)
+	assert.NotContains(t, string(meta.Response), "contentRating", "an absent rating is not stored")
+}
