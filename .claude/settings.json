@@ -105,6 +105,11 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/monthly-routine-check.sh\" 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/finish-checklist.sh\" 2>/dev/null || true",
+            "timeout": 15
           }
         ]
       },
@@ -140,6 +145,11 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/sync-main-after-merge.sh\"",
             "timeout": 45
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/finish-checklist.sh\"",
+            "timeout": 15
           }
         ]
       }

@@ -8,4 +8,6 @@ export const variables = defineEnvVars({
 	PUBLIC_CLERK_ORIGIN: { public: true, static: true },
 	PUBLIC_CLERK_SCRIPT_URL: { public: true, static: true },
 	PUBLIC_GRAPHQL_ORIGIN: { public: true, static: true },
+	// svelte-clerk reads this when the root layout passes no publishableKey.
+	PUBLIC_CLERK_PUBLISHABLE_KEY: { public: true, static: true },
 });

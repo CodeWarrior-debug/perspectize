@@ -24,6 +24,11 @@ process.env.PUBLIC_CLERK_SCRIPT_URL = clerkPreload.scriptUrl;
 // app.html preconnects to the GraphQL backend origin (%sveltekit.env.PUBLIC_GRAPHQL_ORIGIN%),
 // so the connection opens during the Clerk wait. Empty when the endpoint is unset or relative.
 process.env.PUBLIC_GRAPHQL_ORIGIN = graphqlPreconnectOrigin(clerkBuildEnv);
+// svelte-clerk falls back to the public env's PUBLIC_CLERK_PUBLISHABLE_KEY when the layout passes
+// no key. Kit 3 exposes only variables declared in src/env.ts, so the key is declared there and
+// set here from the same build env the preload values come from.
+process.env.PUBLIC_CLERK_PUBLISHABLE_KEY =
+	clerkBuildEnv.VITE_CLERK_PUBLISHABLE_KEY || clerkBuildEnv.PUBLIC_CLERK_PUBLISHABLE_KEY || '';
 
 // Opt-in Faro source-map upload: empty (no sourcemaps, no plugin) unless
 // FARO_SOURCEMAP_API_KEY is set; throws if the key is set without its companion vars.
