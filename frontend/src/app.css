@@ -1067,7 +1067,9 @@
 
 /* Funnel states. AG Grid marks an active filter with a tinted block plus a 4px ring around the
    icon, which reads as an oversized rectangle in a 36px header. Instead the funnel itself takes
-   the primary colour and keeps AG Grid's small dot; hover is a small rounded wash. */
+   the foreground colour and keeps AG Grid's small dot; hover is a small rounded wash. Foreground,
+   not primary: Midnight's primary is a dark navy almost identical to its header (contrast 1.1), while
+   foreground contrasts with the header on every preset (5 or more for the funnel, 11 or more for the dot). */
 .ag-header-cell .ag-header-cell-filter-button:hover {
 	border-radius: 4px;
 	box-shadow: 0 0 0 2px var(--ag-icon-button-hover-color);
@@ -1075,7 +1077,11 @@
 .ag-header-cell .ag-header-cell-filter-button.ag-filter-active {
 	background-color: transparent;
 	box-shadow: none;
-	color: var(--color-primary);
+	color: var(--color-foreground);
+}
+/* AG Grid paints the dot with the grid accent (--color-primary), so it needs the same override. */
+.ag-header-cell .ag-header-cell-filter-button.ag-filter-active::after {
+	background-color: var(--color-foreground);
 }
 .ag-header-cell .ag-header-cell-filter-button.ag-filter-active:hover {
 	background-color: var(--ag-icon-button-hover-color);
