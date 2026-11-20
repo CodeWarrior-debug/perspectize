@@ -301,9 +301,12 @@ func (r *fakeImportRepo) MarkQueued(_ context.Context, jobID int, ids []int) ([]
 	return out, nil
 }
 
-func (r *fakeImportRepo) RecordOutcome(_ context.Context, itemID int, status domain.ImportItemStatus, errMsg *string, contentID *int) error {
+func (r *fakeImportRepo) RecordOutcome(ctx context.Context, itemID int, status domain.ImportItemStatus, errMsg *string, contentID *int) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err // a real driver refuses a statement on a finished context
+	}
 	if r.recordErr != nil {
 		return r.recordErr
 	}
@@ -315,10 +318,13 @@ func (r *fakeImportRepo) RecordOutcome(_ context.Context, itemID int, status dom
 	return nil
 }
 
-func (r *fakeImportRepo) FailQueuedItems(_ context.Context, jobID int, ids []int, detail string) (int, error) {
+func (r *fakeImportRepo) FailQueuedItems(ctx context.Context, jobID int, ids []int, detail string) (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.failQueuedCalls++
+	if err := ctx.Err(); err != nil {
+		return 0, err // a real driver refuses a statement on a finished context
+	}
 	if r.failQueuedErr != nil {
 		return 0, r.failQueuedErr
 	}
@@ -401,7 +407,15 @@ type fakeCreator struct {
 	// batch's time runs out. Such a call is counted in flight but never recorded
 	// as created. Set before the service runs; never changed.
 	holdUntilDone map[string]bool
+	// failFirstThenGate names urls whose first create fails at once and whose
+	// later creates wait for gate (which must be set), then succeed. Set before
+	// the service runs; never changed.
+	failFirstThenGate map[string]bool
+	calls             map[string]int // creates started per url
 }
+
+// errSourceRefused is the error a failFirstThenGate url's first create returns.
+var errSourceRefused = errors.New("source refused")
 
 // enter counts the call in flight and holds it as the creator is set to; a
 // non-nil error means the call must fail with it.
@@ -409,7 +423,19 @@ func (c *fakeCreator) enter(ctx context.Context, url string) error {
 	c.mu.Lock()
 	c.inFlight++
 	c.peak = max(c.peak, c.inFlight)
+	if c.calls == nil {
+		c.calls = map[string]int{}
+	}
+	c.calls[url]++
+	first := c.calls[url] == 1
 	c.mu.Unlock()
+	if c.failFirstThenGate[url] {
+		if first {
+			return errSourceRefused
+		}
+		<-c.gate
+		return nil
+	}
 	if c.holdUntilDone[url] {
 		<-ctx.Done()
 		return ctx.Err()

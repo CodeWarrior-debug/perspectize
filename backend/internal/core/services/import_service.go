@@ -777,14 +777,19 @@ func (s *ImportService) runImports(jobID, actorID int, items []*domain.ImportIte
 	defer cancel()
 
 	workers := workersFor(s.workers, len(items))
-	outcomes := make(chan domain.ImportItemStatus, workers)
+	outcomes := make(chan itemOutcome, workers)
 	collected := make(chan struct{})
-	counted := 0 // outcomes the collector has recorded; read only once collected is closed
+	// What the collector saw; both are read only once collected is closed.
+	counted := 0                                // outcomes counted into the progress
+	saved := make(map[int]struct{}, len(items)) // rows whose outcome the database holds
 	go func() {
 		defer close(collected)
-		for st := range outcomes {
-			s.progress.record(jobID, st)
+		for out := range outcomes {
+			s.progress.record(jobID, out.status)
 			counted++
+			if out.saved {
+				saved[out.itemID] = struct{}{}
+			}
 		}
 	}()
 	defer func() {
@@ -803,10 +808,10 @@ func (s *ImportService) runImports(jobID, actorID int, items []*domain.ImportIte
 				if err != nil {
 					return // ctx ended while waiting: the row stays queued, nothing is recorded
 				}
-				st, ok := s.importOne(ctx, actorID, it)
+				out, ok := s.importOne(ctx, actorID, it)
 				release() // before the send, so a slow collector never holds a slot
 				if ok {
-					outcomes <- st
+					outcomes <- out
 				}
 			}
 		}()
@@ -828,19 +833,30 @@ feed:
 	close(outcomes)
 	<-collected
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		s.failUnreached(ctx, jobID, items, len(items)-counted)
+		s.failUnreached(ctx, jobID, items, saved, len(items)-counted)
 	}
 }
 
 // failUnreached fails the rows of a batch that ran out of time before they
-// finished, and counts each as failed in the progress. Rows that already have
-// an outcome keep it: the update only changes rows still queued. uncounted is
-// how many rows the progress count has not reached; it caps the failures
-// counted, so an outcome that could not be saved is not counted twice.
-func (s *ImportService) failUnreached(ctx context.Context, jobID int, items []*domain.ImportItem, uncounted int) {
-	ids := make([]int, len(items))
-	for i, it := range items {
-		ids[i] = it.ID
+// finished, and counts each as failed in the progress. It names only rows whose
+// outcome this batch did not save: a row it did finish may since have been
+// queued again by another batch, which owns it now. Of the rows named, only
+// those still queued change. uncounted is how many rows the progress count has
+// not reached; it caps the failures counted, so an outcome that could not be
+// saved is not counted twice.
+//
+// The batch's progress stays running until this returns, which can take up to
+// the write's 10 seconds. If the server stops meanwhile, the rows stay queued
+// and RecoverInterrupted fails them at the next start.
+func (s *ImportService) failUnreached(ctx context.Context, jobID int, items []*domain.ImportItem, saved map[int]struct{}, uncounted int) {
+	ids := make([]int, 0, len(items)-len(saved))
+	for _, it := range items {
+		if _, done := saved[it.ID]; !done {
+			ids = append(ids, it.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return
 	}
 	// ctx has run out, so the write gets its own time.
 	writeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
@@ -853,7 +869,16 @@ func (s *ImportService) failUnreached(ctx context.Context, jobID int, items []*d
 	for range min(failed, uncounted) {
 		s.progress.record(jobID, domain.ImportItemStatusFailed)
 	}
-	slog.Warn("import batch ran out of time", "jobID", jobID, "rows", len(items), "failedUnfinished", failed)
+	if failed > 0 {
+		slog.Warn("import batch ran out of time", "jobID", jobID, "rows", len(items), "failedUnfinished", failed)
+	}
+}
+
+// itemOutcome is how importing one row ended.
+type itemOutcome struct {
+	itemID int
+	status domain.ImportItemStatus
+	saved  bool // the database holds this outcome; false when the write failed
 }
 
 // importJobIDKey is the context key carrying the import a content create belongs to.
@@ -872,10 +897,10 @@ func importJobIDFrom(ctx context.Context) (int, bool) {
 }
 
 // importOne imports one row and records its outcome; ok is false when it
-// was left queued because the import is shutting down.
-func (s *ImportService) importOne(ctx context.Context, actorID int, it *domain.ImportItem) (domain.ImportItemStatus, bool) {
+// was left queued because the import is shutting down or out of time.
+func (s *ImportService) importOne(ctx context.Context, actorID int, it *domain.ImportItem) (out itemOutcome, ok bool) {
 	if ctx.Err() != nil {
-		return "", false // left queued; RecoverInterrupted fails it at the next start
+		return itemOutcome{}, false // left queued; a shutdown leaves it for RecoverInterrupted, a timeout for failUnreached
 	}
 	createCtx := WithImportJobID(ctx, it.JobID)
 	var (
@@ -908,10 +933,11 @@ func (s *ImportService) importOne(ctx context.Context, actorID int, it *domain.I
 	}
 	writeCtx, writeCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer writeCancel()
-	if werr := s.repo.RecordOutcome(writeCtx, it.ID, status, msg, contentID); werr != nil {
+	werr := s.repo.RecordOutcome(writeCtx, it.ID, status, msg, contentID)
+	if werr != nil {
 		slog.Error("import outcome not saved", "itemID", it.ID, "error", werr)
 	}
-	return status, true
+	return itemOutcome{itemID: it.ID, status: status, saved: werr == nil}, true
 }
 
 // SubscribeImportProgress streams an import's live progress: the current
