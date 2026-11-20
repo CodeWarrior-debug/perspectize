@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/svelte';
 import ColumnChart from '#lib/components/charts/ColumnChart.svelte';
 import { histogram, topBottom } from '#lib/utils/columnStats';
 import { CHART_TYPES, CHART_TYPE_LABELS, type ChartType } from '#lib/utils/columnCharts';
@@ -8,6 +8,27 @@ const values = [1, 2, 2, 3, 4, 5, 6, 8, 9, 10, 15, 40];
 const format = (n: number) => `#${Math.round(n * 100) / 100}`;
 const renderChart = (type: ChartType, v: number[] = values, ranked?: ReturnType<typeof topBottom>) =>
 	render(ColumnChart, { props: { type, values: v, total: v.length, ranked, format } });
+
+const HINT = /Hover the chart/;
+const readout = () => screen.getByTestId('chart-readout').textContent?.trim() ?? '';
+const svgOf = (c: HTMLElement) => c.querySelector<SVGSVGElement>('svg[role="img"]')!;
+const texts = (c: HTMLElement, anchor: string) =>
+	[...c.querySelectorAll('svg text')].filter((t) => t.getAttribute('text-anchor') === anchor).map((t) => t.textContent);
+
+/** jsdom has no layout: give the chart a 256x130 box so pointer coordinates map 1:1 onto the viewBox. */
+function sizeBox(svg: SVGSVGElement) {
+	vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue({
+		left: 0,
+		top: 0,
+		x: 0,
+		y: 0,
+		width: 256,
+		height: 130,
+		right: 256,
+		bottom: 130,
+		toJSON: () => ({}),
+	} as DOMRect);
+}
 
 describe('ColumnChart', () => {
 	it('histogram renders one rect per bin', () => {
@@ -28,7 +49,6 @@ describe('ColumnChart', () => {
 		const { container } = renderChart('pie', many);
 		const paths = [...container.querySelectorAll('svg path')];
 		expect(paths.length).toBeLessThanOrEqual(6);
-		expect(paths.at(-1)?.querySelector('title')?.textContent).toMatch(/^Other:/);
 		expect(screen.getByRole('img', { name: /pie/i })).toBeInTheDocument();
 	});
 
@@ -150,6 +170,169 @@ describe('ColumnChart', () => {
 		for (const type of CHART_TYPES.filter((t) => t !== 'summary' && t !== 'topBottom' && t !== 'coverage')) {
 			const { unmount } = renderChart(type);
 			expect(screen.getByRole('img').getAttribute('aria-label')).toContain(CHART_TYPE_LABELS[type]);
+			unmount();
+		}
+	});
+});
+
+describe('ColumnChart readout', () => {
+	const names = values.map((_, i) => `Movie ${i}`);
+	const withNames = (type: ChartType, v = values) =>
+		render(ColumnChart, { props: { type, values: v, names, total: v.length, format } });
+
+	it('shows only the hint until something is hovered or focused', () => {
+		const { container } = renderChart('histogram');
+		expect(readout()).toMatch(HINT);
+		expect(container.querySelector('[data-bin]')).not.toBeNull();
+	});
+
+	it('histogram: hovering a bar reads its range and count, and leaving clears it', async () => {
+		const { container } = renderChart('histogram');
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const bar = container.querySelectorAll('rect[data-bin]')[0];
+		const cx = Number(bar.getAttribute('x')) + Number(bar.getAttribute('width')) / 2;
+		await fireEvent.mouseMove(svg, { clientX: cx, clientY: 60 });
+		expect(readout()).toBe('#1–#4.9 · 5 movies');
+		await fireEvent.mouseLeave(svg);
+		expect(readout()).toMatch(HINT);
+	});
+
+	it('histogram: the hovered bar is highlighted and the others dim', async () => {
+		const { container } = renderChart('histogram');
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const bars = container.querySelectorAll('rect[data-bin]');
+		const cx = Number(bars[0].getAttribute('x')) + Number(bars[0].getAttribute('width')) / 2;
+		await fireEvent.mouseMove(svg, { clientX: cx, clientY: 60 });
+		expect(bars[0].getAttribute('fill-opacity')).toBe('1');
+		expect(bars[1].getAttribute('fill-opacity')).toBe('0.45');
+	});
+
+	it('line: hovering a point reads the midpoint, count and range of its bin', async () => {
+		const { container } = renderChart('line');
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const first = container.querySelector('polyline')!.getAttribute('points')!.split(' ')[0].split(',')[0];
+		await fireEvent.mouseMove(svg, { clientX: Number(first), clientY: 60 });
+		expect(readout()).toBe('#2.95: 5 movies from #1 to #4.9');
+		expect(container.querySelector('svg circle[r="4"]')).not.toBeNull();
+	});
+
+	it('cumulative: hovering a point reads its value and rank of the total', async () => {
+		const { container } = renderChart('cumulative');
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const first = container.querySelector('polyline')!.getAttribute('points')!.split(' ')[0].split(',')[0];
+		await fireEvent.mouseMove(svg, { clientX: Number(first), clientY: 60 });
+		expect(readout()).toBe('#1 · 1 of 12 movies (8%) at or below');
+	});
+
+	it('density: hovering the curve reads an expected count in one band', async () => {
+		const { container } = renderChart('density');
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const peakX = 30 + 212 * ((values[1] - 1) / 39);
+		await fireEvent.mouseMove(svg, { clientX: peakX, clientY: 60 });
+		expect(readout()).toMatch(/band around it$/);
+		expect(readout()).toMatch(/· (about \d+ movies?|under 1 movie) in the/);
+	});
+
+	it('strip: hovering a dot names its movie and value', async () => {
+		const { container } = withNames('strip');
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const dot = container.querySelectorAll('svg circle')[values.length - 1];
+		await fireEvent.mouseMove(svg, { clientX: Number(dot.getAttribute('cx')), clientY: Number(dot.getAttribute('cy')) });
+		expect(readout()).toBe('Movie 11 · #40');
+	});
+
+	it('box: hovering on the outlier names its movie', async () => {
+		const { container } = withNames('box');
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const outlier = container.querySelector('circle[data-outlier]')!;
+		await fireEvent.mouseMove(svg, { clientX: Number(outlier.getAttribute('cx')), clientY: 60 });
+		expect(readout()).toBe('Movie 11 · #40');
+	});
+
+	it('pie: hovering a slice reads its range, count and share of the values', async () => {
+		const { container } = renderChart('pie');
+		const first = container.querySelectorAll('svg path')[0];
+		await fireEvent.mouseEnter(first);
+		expect(readout()).toBe('#1–#4.9 · 5 movies (42%)');
+		await fireEvent.mouseLeave(svgOf(container));
+		expect(readout()).toMatch(HINT);
+	});
+
+	it('pie: the last slice reads as open-ended', async () => {
+		const many = Array.from({ length: 60 }, (_, i) => i + 1);
+		const { container } = renderChart('pie', many);
+		const paths = container.querySelectorAll('svg path');
+		await fireEvent.mouseEnter(paths[paths.length - 1]);
+		expect(readout()).toMatch(/^#\d+(\.\d+)? and up · \d+ movies? \(\d+%\)$/);
+	});
+
+	it('coverage: hovering a segment reads its count and share of all rows', async () => {
+		const { container } = render(ColumnChart, { props: { type: 'coverage', values, total: 20, format } });
+		await fireEvent.mouseEnter(container.querySelector('circle[data-filled]')!);
+		expect(readout()).toBe('12 with a value (60%)');
+	});
+
+	it('keyboard: focus reads the first mark, arrows step, Home and End jump, blur clears', async () => {
+		const { container } = renderChart('histogram');
+		const svg = svgOf(container);
+		expect(svg.getAttribute('tabindex')).toBe('0');
+		await fireEvent.focus(svg);
+		expect(readout()).toBe('#1–#4.9 · 5 movies');
+		await fireEvent.keyDown(svg, { key: 'ArrowRight' });
+		expect(readout()).toMatch(/^#4\.9–/);
+		await fireEvent.keyDown(svg, { key: 'End' });
+		expect(readout()).toMatch(/^#36\.1–#40 ·/);
+		await fireEvent.keyDown(svg, { key: 'Home' });
+		expect(readout()).toBe('#1–#4.9 · 5 movies');
+		await fireEvent.keyDown(svg, { key: 'ArrowLeft' });
+		expect(readout()).toBe('#1–#4.9 · 5 movies');
+		await fireEvent.blur(svg);
+		expect(readout()).toMatch(HINT);
+	});
+
+	it('keyboard: an arrow key that is not a chart key is left alone', async () => {
+		const { container } = renderChart('histogram');
+		const svg = svgOf(container);
+		await fireEvent.focus(svg);
+		const notPrevented = await fireEvent.keyDown(svg, { key: 'a' });
+		expect(notPrevented).toBe(true);
+	});
+
+	it('a hover on one chart type does not leak into another', async () => {
+		const { container, rerender } = renderChart('histogram');
+		const svg = svgOf(container);
+		sizeBox(svg);
+		const bar = container.querySelectorAll('rect[data-bin]')[9];
+		await fireEvent.mouseMove(svg, { clientX: Number(bar.getAttribute('x')) + 1, clientY: 60 });
+		expect(readout()).not.toMatch(HINT);
+		await rerender({ type: 'pie', values, total: values.length, format });
+		expect(readout()).toMatch(HINT);
+	});
+
+	it('axes: the count scale is whole numbers and the value axis is formatted', () => {
+		const { container } = renderChart('histogram');
+		const counts = texts(container, 'end');
+		expect(counts.length).toBeGreaterThanOrEqual(2);
+		for (const c of counts) expect(c).toMatch(/^\d+$/);
+		expect(texts(container, 'middle')).toEqual(['#10', '#20', '#30', '#40']);
+	});
+
+	it('axes: the cumulative scale is a percentage', () => {
+		const { container } = renderChart('cumulative');
+		expect(texts(container, 'end')).toEqual(['0%', '50%', '100%']);
+	});
+
+	it('axes: strip and box have no count scale', () => {
+		for (const type of ['strip', 'box'] as const) {
+			const { container, unmount } = renderChart(type);
+			expect(texts(container, 'end')).toEqual([]);
 			unmount();
 		}
 	});
