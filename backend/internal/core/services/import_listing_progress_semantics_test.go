@@ -138,3 +138,31 @@ func TestListing_UpdatedAtIsInjectedClockInUTC(t *testing.T) {
 	tr.begin(4, 1)
 	requireClockInstantInUTC(t, nextListing(t, ch).UpdatedAt) // a published snapshot
 }
+
+func TestListingTracker_OnlyTheMostRecentFinishedListingsAreKept(t *testing.T) {
+	tr := newListingTracker(5*time.Millisecond, time.Now)
+	tr.maxIdle = 1
+	for job := 1; job <= 3; job++ {
+		tr.begin(job, 1)
+		tr.finish(job, 1, domain.ImportSourceStatusReady)
+		require.Eventually(t, func() bool { return !tr.isTicking(job) }, time.Second, time.Millisecond)
+	}
+
+	assert.False(t, tr.hasEntry(1))
+	assert.False(t, tr.hasEntry(2))
+	assert.True(t, tr.hasEntry(3), "the latest finished listing is kept")
+}
+
+func TestListingTracker_AListingInProgressIsNeverEvicted(t *testing.T) {
+	tr := newListingTracker(5*time.Millisecond, time.Now)
+	tr.maxIdle = 0
+	tr.begin(1, 1)
+
+	tr.begin(2, 1)
+	tr.finish(2, 1, domain.ImportSourceStatusReady)
+	require.Eventually(t, func() bool { return !tr.isTicking(2) }, time.Second, time.Millisecond)
+
+	assert.True(t, tr.hasEntry(1), "import 1 still has a source listing")
+	assert.False(t, tr.hasEntry(2))
+	tr.finish(1, 1, domain.ImportSourceStatusReady)
+}

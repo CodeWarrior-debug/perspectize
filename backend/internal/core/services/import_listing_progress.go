@@ -21,10 +21,6 @@ import (
 // Like importProgressTracker, it is per process (one server instance).
 type listingTracker struct {
 	*latestHub[int, jobListing, domain.ImportListingProgress]
-	// jobs aliases the hub's per-job entries so the unsubscribe tests can read
-	// each job's subscriber set under mu. Nothing in production reads it. The
-	// hub's lock guards the map.
-	jobs map[int]*hubEntry[jobListing, domain.ImportListingProgress]
 }
 
 // jobListing is one import's state in the hub: each source's listing progress,
@@ -45,7 +41,7 @@ func newListingTracker(interval time.Duration, now func() time.Time) *listingTra
 		},
 		(*jobListing).listingLocked,
 	)
-	return &listingTracker{latestHub: hub, jobs: hub.entries}
+	return &listingTracker{latestHub: hub}
 }
 
 // source returns the source's progress, or a fresh LISTING entry if the tracker hasn't seen it.

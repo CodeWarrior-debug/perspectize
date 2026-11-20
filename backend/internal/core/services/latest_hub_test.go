@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"math/rand/v2"
 	"runtime"
 	"sync"
 	"testing"
@@ -59,6 +61,14 @@ func (h *latestHub[K, V, S]) subscriberCount(key K) int {
 		return 0
 	}
 	return len(e.subs)
+}
+
+// hasEntry reports whether the hub still holds state for key.
+func (h *latestHub[K, V, S]) hasEntry(key K) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	_, ok := h.entries[key]
+	return ok
 }
 
 func recvHub(t *testing.T, ch <-chan hubSnap) hubSnap {
@@ -363,6 +373,207 @@ func TestHub_NoGoroutineLeakAfterManySubscribers(t *testing.T) {
 	}
 	require.Eventually(t, func() bool { return runtime.NumGoroutine() <= baseline }, 3*time.Second, 10*time.Millisecond,
 		"goroutines: baseline %d", baseline)
+}
+
+func TestHub_IdleKeysAreCappedOldestFirst(t *testing.T) {
+	h := newTestHub(time.Hour, time.Now)
+	h.maxIdle = 2
+	for i, key := range []string{"a", "b", "c", "d"} {
+		h.update(key, setCounter(i+1, false, keep)) // inactive, no ticker, no subscribers: idle at once
+	}
+
+	assert.False(t, h.hasEntry("a"), "the oldest idle key goes first")
+	assert.False(t, h.hasEntry("b"))
+	assert.True(t, h.hasEntry("c"))
+	assert.True(t, h.hasEntry("d"))
+}
+
+func TestHub_AFinishedKeyKeepsItsFinalStateWhileUnderTheCap(t *testing.T) {
+	h := newTestHub(time.Hour, time.Now)
+	h.update("job", setCounter(9, false, publishNow))
+	for i := range defaultMaxIdleEntries - 1 {
+		h.update(fmt.Sprintf("other-%d", i), setCounter(1, false, keep))
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	assert.Equal(t, 9, recvHub(t, h.subscribe(ctx, "job")).N, "a late subscriber still sees how it ended")
+}
+
+func TestHub_AnEvictedKeyStartsFreshWhenNextSeen(t *testing.T) {
+	h := newTestHub(time.Hour, time.Now)
+	h.maxIdle = 1
+	h.update("old", setCounter(9, false, publishNow))
+	h.update("newer", setCounter(1, false, keep))
+	require.False(t, h.hasEntry("old"))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	assert.Equal(t, 0, recvHub(t, h.subscribe(ctx, "old")).N, "like a job this process never ran")
+}
+
+func TestHub_NeverEvictsAKeyWithSubscribers(t *testing.T) {
+	h := newTestHub(time.Hour, time.Now)
+	h.maxIdle = 1
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := h.subscribe(ctx, "watched")
+	recvHub(t, ch)
+	h.update("watched", setCounter(7, false, publishNow))
+
+	for _, key := range []string{"x", "y", "z"} {
+		h.update(key, setCounter(1, false, keep))
+	}
+
+	assert.True(t, h.hasEntry("watched"))
+	assert.Equal(t, 7, recvHub(t, ch).N, "its subscriber still receives")
+}
+
+func TestHub_AKeyBecomesEvictableOnceItsLastSubscriberLeaves(t *testing.T) {
+	h := newTestHub(time.Hour, time.Now)
+	h.maxIdle = 1
+	ctx, cancel := context.WithCancel(context.Background())
+	recvHub(t, h.subscribe(ctx, "watched"))
+	h.update("x", setCounter(1, false, keep))
+	h.update("y", setCounter(1, false, keep)) // x and y are idle, one over the cap: x, the older, goes
+	require.False(t, h.hasEntry("x"))
+
+	cancel()
+
+	require.Eventually(t, func() bool { return !h.hasEntry("y") }, time.Second, 5*time.Millisecond,
+		"watched became idle after y, so the older idle key y goes")
+	assert.True(t, h.hasEntry("watched"))
+}
+
+// A subscriber who arrives after a key finished makes it watched again, so a
+// later overflow of the cap must not evict it from under that subscriber.
+func TestHub_ASubscriberToAnIdleKeyProtectsItFromEviction(t *testing.T) {
+	h := newTestHub(time.Hour, time.Now)
+	h.maxIdle = 1
+	h.update("finished", setCounter(9, false, publishNow)) // idle
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := h.subscribe(ctx, "finished")
+	recvHub(t, ch)
+
+	h.update("x", setCounter(1, false, keep))
+	h.update("y", setCounter(1, false, keep)) // two idle keys over a cap of one: x, the older, goes
+
+	assert.False(t, h.hasEntry("x"))
+	require.True(t, h.hasEntry("finished"), "watched, so not evictable")
+	h.update("finished", setCounter(10, false, publishNow))
+	assert.Equal(t, 10, recvHub(t, ch).N, "its subscriber still receives updates")
+}
+
+// A key whose state is no longer active is not idle until its ticker has
+// stopped: the ticker goroutine still holds the entry. The one-hour interval
+// keeps that ticker running for the whole test (one parked goroutine is left
+// behind), so the test does not depend on how soon the ticker would notice.
+func TestHub_AKeyWithALiveTickerIsNotEvictedEvenIfInactive(t *testing.T) {
+	h := newTestHub(time.Hour, time.Now)
+	h.maxIdle = 1
+	h.update("running", setCounter(1, true, markDirty)) // starts a ticker
+	require.True(t, h.isTicking("running"))
+	h.update("running", setCounter(2, false, keep)) // inactive now, ticker still alive
+
+	h.update("x", setCounter(1, false, keep))
+	h.update("y", setCounter(1, false, keep))
+
+	assert.True(t, h.hasEntry("running"), "its ticker is still running, so it is not idle")
+	assert.False(t, h.hasEntry("x"), "x, the older idle key, goes")
+	assert.True(t, h.hasEntry("y"))
+}
+
+// requireIdleInvariants fails the test unless the hub's idle bookkeeping agrees
+// with its entries: idleCount counts the entries marked idle, each of those has
+// no ticker, no subscriber and an inactive state, and no more than maxIdle are idle.
+func (h *latestHub[K, V, S]) requireIdleInvariants(t *testing.T) {
+	t.Helper()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	marked := 0
+	for key, e := range h.entries {
+		if e.idleAt == 0 {
+			continue
+		}
+		marked++
+		require.False(t, e.ticking, "key %v is marked idle with a running ticker", key)
+		require.Empty(t, e.subs, "key %v is marked idle with subscribers", key)
+		require.False(t, h.active(e.state), "key %v is marked idle while active", key)
+	}
+	require.Equal(t, marked, h.idleCount, "idleCount disagrees with the entries marked idle")
+	require.LessOrEqual(t, h.idleCount, h.maxIdle, "more idle keys than the cap")
+}
+
+// Random starts, finishes, subscriptions and departures over a few keys, with
+// live tickers and unsubscribes running on their own goroutines, never leave the
+// idle bookkeeping inconsistent. The checks read only state under the lock, so
+// they do not depend on timing.
+func TestHub_IdleBookkeepingStaysConsistentUnderRandomUse(t *testing.T) {
+	h := newTestHub(time.Millisecond, time.Now)
+	h.maxIdle = 3
+	keys := []string{"a", "b", "c", "d", "e", "f"}
+	rng := rand.New(rand.NewPCG(7, 11))
+	var cancels []context.CancelFunc
+
+	for range 3000 {
+		key := keys[rng.IntN(len(keys))]
+		switch rng.IntN(5) {
+		case 0:
+			h.update(key, setCounter(rng.IntN(100), true, markDirty))
+		case 1:
+			h.update(key, setCounter(rng.IntN(100), false, publishNow))
+		case 2:
+			h.update(key, setCounter(rng.IntN(100), false, keep))
+		case 3:
+			ctx, cancel := context.WithCancel(context.Background())
+			h.subscribe(ctx, key)
+			cancels = append(cancels, cancel)
+		case 4:
+			if len(cancels) > 0 {
+				i := rng.IntN(len(cancels))
+				cancels[i]()
+				cancels[i] = cancels[len(cancels)-1]
+				cancels = cancels[:len(cancels)-1]
+			}
+		}
+		h.requireIdleInvariants(t)
+	}
+
+	for _, cancel := range cancels {
+		cancel()
+	}
+	for _, key := range keys {
+		h.update(key, setCounter(0, false, keep))
+	}
+	require.Eventually(t, func() bool {
+		for _, key := range keys {
+			if h.isTicking(key) || h.subscriberCount(key) != 0 {
+				return false
+			}
+		}
+		return true
+	}, 3*time.Second, 5*time.Millisecond, "every ticker and subscriber should be gone")
+	h.requireIdleInvariants(t)
+}
+
+func TestHub_AnActiveKeyIsNotEvictedAndRejoinsAsNewestWhenItFinishes(t *testing.T) {
+	h := newTestHub(5*time.Millisecond, time.Now)
+	h.maxIdle = 2
+	h.update("a", setCounter(1, false, keep)) // idle
+	h.update("a", setCounter(2, true, markDirty))
+	for _, key := range []string{"b", "c", "d"} {
+		h.update(key, setCounter(1, false, keep))
+	}
+	assert.True(t, h.hasEntry("a"), "running, so not idle")
+	assert.False(t, h.hasEntry("b"), "b was the oldest idle key when d arrived")
+
+	h.update("a", setCounter(3, false, keep)) // finishes: its ticker stops at the next tick
+	require.Eventually(t, func() bool { return !h.isTicking("a") }, time.Second, time.Millisecond)
+
+	assert.True(t, h.hasEntry("a"), "a finished last, so it is the newest idle key")
+	assert.False(t, h.hasEntry("c"), "c is now the oldest idle key")
+	assert.True(t, h.hasEntry("d"))
 }
 
 func TestHub_SlowSubscriberNeverBlocksPublisher(t *testing.T) {

@@ -23,10 +23,6 @@ const defaultProgressInterval = 500 * time.Millisecond
 // It is per process, like the import workers themselves (one server instance).
 type importProgressTracker struct {
 	*latestHub[int, jobProgress, domain.ImportProgress]
-	// jobs aliases the hub's per-job entries so the unsubscribe tests can read
-	// each job's subscriber set under mu. Nothing in production reads it. The
-	// hub's lock guards the map.
-	jobs map[int]*hubEntry[jobProgress, domain.ImportProgress]
 }
 
 // jobProgress is one import's state in the hub: its count so far and how many
@@ -50,7 +46,7 @@ func newImportProgressTracker(interval time.Duration, now func() time.Time) *imp
 		},
 		func(jp *jobProgress) bool { return jp.batches > 0 },
 	)
-	return &importProgressTracker{latestHub: hub, jobs: hub.entries}
+	return &importProgressTracker{latestHub: hub}
 }
 
 // begin records a batch of n rows starting. A batch starting while none is
